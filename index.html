@@ -211,13 +211,13 @@ db.auth.onAuthStateChange((event, session) => {
 });
 
    // init
-  (async function init() {
+  async function init() {
     hideAll();
     const { data } = await db.auth.getSession();
     if (data.session?.user) {
       renderByUser(data.session.user);
     }
-  })();
+  }();
 
   init();
 
