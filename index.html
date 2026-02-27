@@ -12,7 +12,7 @@
 <br>
 <input id="password" type="password" placeholder="Mật khẩu" />
 <br>
-<button onclick="alert('click ok')">Đăng nhập</button>
+<button onclick="login()">Đăng nhập</button>
 
 <p id="auth-status"></p>
 
@@ -41,7 +41,8 @@
       SUPABASE_KEY
     );
     async function login() {
-  const email = document.getElementById("email").value;
+  alert("login chạy");
+      const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
 
   const { data, error } = await supabase.auth.signInWithPassword({
