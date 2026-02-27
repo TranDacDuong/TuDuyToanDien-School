@@ -209,6 +209,19 @@ db.auth.onAuthStateChange((event, session) => {
     hideAll();
   }
 });
+    <script>
+  async function init() {
+    hideAll();
+
+    const { data } = await db.auth.getSession();
+
+    if (data.session?.user) {
+      renderByUser(data.session.user);
+    }
+  }
+
+  init();
+</script>
   </script>
 </body>
 </html>
