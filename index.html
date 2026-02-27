@@ -64,10 +64,7 @@
   if (error) {
     document.getElementById("auth-status").innerText =
       "❌ Đăng nhập thất bại";
-  } else {
-    document.getElementById("auth-status").innerText =
-      "✅ Đăng nhập thành công";
-  }
+  } 
 }
   
   async function renderByUser(user) {
@@ -203,8 +200,6 @@ list.appendChild(li);
     loadStudents();
   }
 }
-    hideAll();
-checkLogin();
     hideAll();
 
 db.auth.onAuthStateChange((event, session) => {
