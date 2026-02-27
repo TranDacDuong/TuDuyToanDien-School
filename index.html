@@ -18,6 +18,8 @@
 
 <hr>
   <div id="app" style="display:none">
+
+  <div id="student-management" style="display:none">
   <h1>Quản lý học sinh</h1>
 
   <input id="name" placeholder="Tên học sinh" />
@@ -27,7 +29,10 @@
   <h2>Danh sách học sinh</h2>
 <ul id="student-list"></ul>
 </div>
-    
+      <div id="student-view" style="display:none">
+    <!-- giao diện học sinh -->
+  </div>
+   </div> 
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -40,6 +45,13 @@
   SUPABASE_URL,
   SUPABASE_KEY
 );
+
+    function hideAll() {
+  document.getElementById("app").style.display = "none";
+  document.getElementById("student-management").style.display = "none";
+  document.getElementById("student-view").style.display = "none";
+}
+    
     async function login() {
       const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
@@ -60,18 +72,35 @@
 }
   
   async function checkLogin() {
-  const { data } = await db.auth.getUser();
+  hideAll();
 
-  if (data.user) {
-    document.getElementById("auth-status").innerText =
-      "👋 Xin chào " + data.user.email;
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) return;
 
-    document.getElementById("app").style.display = "block";
-  } else {
-    document.getElementById("app").style.display = "none";
+  const { data: profile } = await db
+    .from("profiles")
+    .select("role, full_name")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile) return;
+
+  document.getElementById("auth-status").innerText =
+    `👋 Xin chào ${profile.full_name} (${profile.role})`;
+
+  document.getElementById("app").style.display = "block";
+
+  if (profile.role === "admin" || profile.role === "teacher") {
+    document.getElementById("student-management").style.display = "block";
+    loadStudents();
+  }
+
+  if (profile.role === "student") {
+    document.getElementById("student-view").style.display = "block";
   }
 }
 
+    
 async function getUserRole() {
   const { data: { user } } = await db.auth.getUser();
   if (!user) return null;
@@ -202,7 +231,8 @@ list.appendChild(li);
   }
 }
     loadStudents();
-    checkLogin();
+    hideAll();
+checkLogin();
   </script>
 </body>
 </html>
