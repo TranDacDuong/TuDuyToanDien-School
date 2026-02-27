@@ -60,7 +60,7 @@
 }
   
   async function checkLogin() {
-  const { data } = await supabase.auth.getUser();
+  const { data } = await db.auth.getUser();
 
   if (data.user) {
     document.getElementById("auth-status").innerText =
