@@ -200,7 +200,6 @@ list.appendChild(li);
     loadStudents();
   }
 }
-    hideAll();
 
 db.auth.onAuthStateChange((event, session) => {
   if (session?.user) {
@@ -217,7 +216,7 @@ db.auth.onAuthStateChange((event, session) => {
     if (data.session?.user) {
       renderByUser(data.session.user);
     }
-  }();
+  };
 
   init();
 
