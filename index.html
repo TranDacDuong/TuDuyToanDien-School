@@ -5,6 +5,49 @@
   <title>Quản lý học sinh</title>
 </head>
 <body>
+  <h2>Đăng nhập</h2>
+
+<input id="email" type="email" placeholder="Email" />
+<br>
+<input id="password" type="password" placeholder="Mật khẩu" />
+<br>
+<button onclick="login()">Đăng nhập</button>
+
+<p id="auth-status"></p>
+
+<hr>
+  async function login() {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) {
+    document.getElementById("auth-status").innerText =
+      "❌ Đăng nhập thất bại";
+  } else {
+    document.getElementById("auth-status").innerText =
+      "✅ Đăng nhập thành công";
+    checkLogin();
+  }
+}
+  
+  async function checkLogin() {
+  const { data } = await supabase.auth.getUser();
+
+  if (data.user) {
+    document.getElementById("auth-status").innerText =
+      "👋 Xin chào " + data.user.email;
+
+    document.getElementById("app").style.display = "block";
+  } else {
+    document.getElementById("app").style.display = "none";
+  }
+}
+  <div id="app" style="display:none">
   <h1>Quản lý học sinh</h1>
 
   <input id="name" placeholder="Tên học sinh" />
@@ -125,6 +168,7 @@ list.appendChild(li);
   }
 }
     loadStudents();
+    </div>
   </script>
 </body>
 </html>
