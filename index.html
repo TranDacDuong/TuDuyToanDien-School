@@ -11,6 +11,8 @@
   <button onclick="saveStudent()">Lưu</button>
 
   <p id="status"></p>
+  <h2>Danh sách học sinh</h2>
+<ul id="student-list"></ul>
 
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -25,6 +27,28 @@
       SUPABASE_KEY
     );
 
+    async function loadStudents() {
+  const { data, error } = await db
+    .from("students")
+    .select("*")
+    .order("id", { ascending: false });
+
+  if (error) {
+    document.getElementById("status").innerText =
+      "❌ Lỗi tải danh sách";
+    return;
+  }
+
+  const list = document.getElementById("student-list");
+  list.innerHTML = "";
+
+  data.forEach(student => {
+    const li = document.createElement("li");
+    li.innerText = student.name;
+    list.appendChild(li);
+  });
+}
+    
     async function saveStudent() {
       const name = document.getElementById("name").value;
 
@@ -45,8 +69,10 @@
         document.getElementById("status").innerText =
           "✅ Đã lưu học sinh: " + name;
         document.getElementById("name").value = "";
+        loadStudents();
       }
     }
+    loadStudents();
   </script>
 </body>
 </html>
