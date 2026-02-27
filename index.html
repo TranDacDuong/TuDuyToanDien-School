@@ -44,8 +44,14 @@
 
   data.forEach(student => {
     const li = document.createElement("li");
-    li.innerText = student.name;
-    list.appendChild(li);
+li.innerText = student.name + " ";
+
+const btn = document.createElement("button");
+btn.innerText = "❌ Xóa";
+btn.onclick = () => deleteStudent(student.id);
+
+li.appendChild(btn);
+list.appendChild(li);
   });
 }
     
@@ -72,6 +78,24 @@
         loadStudents();
       }
     }
+    async function deleteStudent(id) {
+  const ok = confirm("Bạn có chắc muốn xóa học sinh này?");
+  if (!ok) return;
+
+  const { error } = await db
+    .from("students")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    document.getElementById("status").innerText =
+      "❌ Lỗi xóa học sinh";
+  } else {
+    document.getElementById("status").innerText =
+      "🗑️ Đã xóa học sinh";
+    loadStudents();
+  }
+}
     loadStudents();
   </script>
 </body>
