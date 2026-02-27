@@ -46,11 +46,16 @@
     const li = document.createElement("li");
 li.innerText = student.name + " ";
 
-const btn = document.createElement("button");
-btn.innerText = "❌ Xóa";
-btn.onclick = () => deleteStudent(student.id);
+const editBtn = document.createElement("button");
+editBtn.innerText = "✏️ Sửa";
+editBtn.onclick = () => editStudent(student.id, student.name);
 
-li.appendChild(btn);
+const deleteBtn = document.createElement("button");
+deleteBtn.innerText = "❌ Xóa";
+deleteBtn.onclick = () => deleteStudent(student.id);
+
+li.appendChild(editBtn);
+li.appendChild(deleteBtn);
 list.appendChild(li);
   });
 }
@@ -78,6 +83,29 @@ list.appendChild(li);
         loadStudents();
       }
     }
+    async function editStudent(id, oldName) {
+  const newName = prompt("Nhập tên mới:", oldName);
+  if (!newName || newName.trim() === "") {
+    document.getElementById("status").innerText =
+      "❌ Tên không hợp lệ";
+    return;
+  }
+
+  const { error } = await db
+    .from("students")
+    .update({ name: newName.trim() })
+    .eq("id", id);
+
+  if (error) {
+    document.getElementById("status").innerText =
+      "❌ Lỗi cập nhật học sinh";
+  } else {
+    document.getElementById("status").innerText =
+      "✏️ Đã cập nhật tên học sinh";
+    loadStudents();
+  }
+}
+    
     async function deleteStudent(id) {
   const ok = confirm("Bạn có chắc muốn xóa học sinh này?");
   if (!ok) return;
