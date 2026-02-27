@@ -2,20 +2,50 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <title>Test Quản Lý Trường</title>
+  <title>Quản lý học sinh</title>
 </head>
 <body>
   <h1>Quản lý học sinh</h1>
 
   <input id="name" placeholder="Tên học sinh" />
-  <button onclick="save()">Lưu</button>
+  <button onclick="saveStudent()">Lưu</button>
 
   <p id="status"></p>
 
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <script>
-    function save() {
-      document.getElementById("status").innerText =
-        "OK 👍 Web đã chạy!";
+    // 🔴 DÁN THÔNG TIN CỦA BẠN VÀO ĐÂY
+    const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxneWRqYWFxZnhxemdiZHBxdmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxODY2NDQsImV4cCI6MjA4Nzc2MjY0NH0.l6ojk0fH5wYMK4H_RIGTepatUd1Uy2KHOTiRfAS1JD4";
+
+    const supabase = supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_KEY
+    );
+
+    async function saveStudent() {
+      const name = document.getElementById("name").value;
+
+      if (!name) {
+        document.getElementById("status").innerText =
+          "❌ Chưa nhập tên";
+        return;
+      }
+
+      const { error } = await supabase
+        .from("students")
+        .insert([{ name }]);
+
+      if (error) {
+        document.getElementById("status").innerText =
+          "❌ Lỗi: " + error.message;
+      } else {
+        document.getElementById("status").innerText =
+          "✅ Đã lưu học sinh: " + name;
+        document.getElementById("name").value = "";
+      }
     }
   </script>
 </body>
