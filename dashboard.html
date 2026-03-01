@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      display: flex;
+      height: 100vh;
+    }
+
+    aside {
+      width: 260px;
+      background: #1f2937;
+      color: white;
+      padding: 20px;
+    }
+
+    aside h2 {
+      font-size: 18px;
+      margin-bottom: 20px;
+    }
+
+    aside ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    aside li {
+      padding: 10px;
+      cursor: pointer;
+      border-radius: 6px;
+    }
+
+    aside li:hover {
+      background: #374151;
+    }
+
+    main {
+      flex: 1;
+      padding: 20px;
+      background: #f3f4f6;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <aside>
+    <h2>📚 Quản lý giáo dục</h2>
+    <ul>
+      <li data-role="admin,teacher,student">🏠 Trang chủ</li>
+
+      <li data-role="admin">🏫 Trường học</li>
+
+      <li data-role="admin,teacher">🏛️ Phòng học</li>
+
+      <li data-role="admin,teacher">📘 Lớp học</li>
+
+      <li data-role="admin">👨‍🏫 Giáo viên</li>
+
+      <li data-role="admin,teacher">👩‍🎓 Học sinh</li>
+
+      <li data-role="admin,teacher">📝 Ngân hàng câu hỏi</li>
+
+      <li data-role="admin,teacher">📄 Đề kiểm tra</li>
+
+      <li data-role="admin,teacher">📊 Kết quả thi</li>
+
+      <li data-role="admin,teacher,student">⚙️ Tài khoản</li>
+    </ul>
+  </aside>
+
+  <!-- MAIN -->
+  <main>
+    <h1>Dashboard</h1>
+    <p>Nội dung sẽ hiển thị ở đây</p>
+  </main>
+
+</body>
+</html>
