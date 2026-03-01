@@ -2,132 +2,56 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <title>Quản lý học sinh</title>
+  <title>Đăng nhập</title>
 </head>
 <body>
 
- 
-    <h1>Quản lý học sinh</h1>
+<h2>Đăng nhập hệ thống</h2>
 
-  <input id="name" placeholder="Tên học sinh" />
-  <button onclick="saveStudent()">Lưu</button>
+<input id="email" type="email" placeholder="Email" /><br><br>
+<input id="password" type="password" placeholder="Mật khẩu" /><br><br>
 
-  <p id="status"></p>
-  <h2>Danh sách học sinh</h2>
-<ul id="student-list"></ul>
-        
-  <!-- Supabase SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<button onclick="login()">Đăng nhập</button>
 
-  <script>
-    // 🔴 DÁN THÔNG TIN CỦA BẠN VÀO ĐÂY
-    const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxneWRqYWFxZnhxemdiZHBxdmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxODY2NDQsImV4cCI6MjA4Nzc2MjY0NH0.l6ojk0fH5wYMK4H_RIGTepatUd1Uy2KHOTiRfAS1JD4";
+<p id="status"></p>
 
-   const db = supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_KEY
-);
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxneWRqYWFxZnhxemdiZHBxdmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxODY2NDQsImV4cCI6MjA4Nzc2MjY0NH0.l6ojk0fH5wYMK4H_RIGTepatUd1Uy2KHOTiRfAS1JD4";
 
-    
-    async function loadStudents() {
-  const { data, error } = await db
-    .from("students")
-    .select("*")
-    .order("id", { ascending: false });
+  const supabase = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
 
-  if (error) {
-    document.getElementById("status").innerText =
-      "❌ Lỗi tải danh sách";
-    return;
-  }
+  async function login() {
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
 
-  const list = document.getElementById("student-list");
-  list.innerHTML = "";
-
-  data.forEach(student => {
-    const li = document.createElement("li");
-li.innerText = student.name + " ";
-
-const editBtn = document.createElement("button");
-editBtn.innerText = "✏️ Sửa";
-editBtn.onclick = () => editStudent(student.id, student.name);
-
-const deleteBtn = document.createElement("button");
-deleteBtn.innerText = "❌ Xóa";
-deleteBtn.onclick = () => deleteStudent(student.id);
-
-li.appendChild(editBtn);
-li.appendChild(deleteBtn);
-list.appendChild(li);
-  });
-}
-    
-    async function saveStudent() {
-      const name = document.getElementById("name").value;
-
-      if (!name) {
-        document.getElementById("status").innerText =
-          "❌ Chưa nhập tên";
-        return;
-      }
-
-      const { error } = await db
-        .from("students")
-        .insert([{ name }]);
-
-      if (error) {
-        document.getElementById("status").innerText =
-          "❌ Lỗi: " + error.message;
-      } else {
-        document.getElementById("status").innerText =
-          "✅ Đã lưu học sinh: " + name;
-        document.getElementById("name").value = "";
-        loadStudents();
-      }
+    if (!email || !password) {
+      document.getElementById("status").innerText = "❌ Thiếu email hoặc mật khẩu";
+      return;
     }
-    async function editStudent(id, oldName) {
-  const newName = prompt("Nhập tên mới:", oldName);
-  if (!newName || newName.trim() === "") {
-    document.getElementById("status").innerText =
-      "❌ Tên không hợp lệ";
-    return;
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      document.getElementById("status").innerText = "❌ " + error.message;
+      return;
+    }
+
+    document.getElementById("status").innerText = "✅ Đăng nhập thành công";
+
+    // Tạm thời redirect
+    setTimeout(() => {
+      window.location.href = "dashboard.html";
+    }, 500);
   }
+</script>
 
-  const { error } = await db
-    .from("students")
-    .update({ name: newName.trim() })
-    .eq("id", id);
-
-  if (error) {
-    document.getElementById("status").innerText =
-      "❌ Lỗi cập nhật học sinh";
-  } else {
-    document.getElementById("status").innerText =
-      "✏️ Đã cập nhật tên học sinh";
-    loadStudents();
-  }
-}
-    
-    async function deleteStudent(id) {
-  const ok = confirm("Bạn có chắc muốn xóa học sinh này?");
-  if (!ok) return;
-
-  const { error } = await db
-    .from("students")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    document.getElementById("status").innerText =
-      "❌ Lỗi xóa học sinh";
-  } else {
-    document.getElementById("status").innerText =
-      "🗑️ Đã xóa học sinh";
-    loadStudents();
-  }
-}
-
-  </script>
 </body>
 </html>
