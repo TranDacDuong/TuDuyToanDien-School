@@ -79,5 +79,39 @@
     <p>Nội dung sẽ hiển thị ở đây</p>
   </main>
 
+  <script>
+  async function initDashboard() {
+
+    const { data: { user } } = await sb.auth.getUser();
+
+    if (!user) {
+      window.location.href = "login.html";
+      return;
+    }
+
+    const { data: profile, error } = await sb
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (error || !profile) {
+      alert("Không tìm thấy quyền người dùng");
+      return;
+    }
+
+    applyRoleMenu(profile.role);
+  }
+
+  function applyRoleMenu(role) {
+    document.querySelectorAll("[data-role]").forEach(item => {
+      const roles = item.dataset.role.split(",");
+      item.style.display = roles.includes(role) ? "block" : "none";
+    });
+  }
+
+  initDashboard();
+</script>
+  
 </body>
 </html>
