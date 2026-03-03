@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Quản lý phòng học</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: Arial; margin: 0; background: #f3f4f6; }
+    header { background: #1f2937; color: white; padding: 15px; }
+    main { padding: 20px; }
+    input, button { padding: 8px; margin-right: 5px; }
+    button { cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+    th { background: #e5e7eb; }
+    .danger { background: red; color: white; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h2>🏛️ Quản lý phòng học</h2>
+</header>
+
+<main>
+  <div id="form-area">
+    <input type="text" id="roomName" placeholder="Tên phòng học">
+    <button onclick="addRoom()">Thêm phòng</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Tên phòng</th>
+        <th>Ngày tạo</th>
+        <th>Hành động</th>
+      </tr>
+    </thead>
+    <tbody id="roomTable"></tbody>
+  </table>
+</main>
+
+<script>
+  const SUPABASE_URL = "YOUR_SUPABASE_URL";
+  const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let currentUser = null;
+  let currentRole = null;
+
+  async function init() {
+
+    const { data: { user } } = await sb.auth.getUser();
+
+    if (!user) {
+      window.location.href = "login.html";
+      return;
+    }
+
+    currentUser = user;
+
+    const { data: profile } = await sb
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile) {
+      alert("Không tìm thấy quyền người dùng");
+      return;
+    }
+
+    currentRole = profile.role;
+
+    // Student không được vào trang này
+    if (currentRole === "student") {
+      window.location.href = "dashboard.html";
+      return;
+    }
+
+    loadRooms();
+  }
+
+  async function loadRooms() {
+    const { data, error } = await sb
+      .from("rooms")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    const table = document.getElementById("roomTable");
+    table.innerHTML = "";
+
+    data.forEach(room => {
+      const row = document.createElement("tr");
+
+      row.innerHTML = `
+        <td>${room.name}</td>
+        <td>${new Date(room.created_at).toLocaleString()}</td>
+        <td>
+          <button class="danger" onclick="deleteRoom('${room.id}')">
+            Xóa
+          </button>
+        </td>
+      `;
+
+      table.appendChild(row);
+    });
+  }
+
+  async function addRoom() {
+    const name = document.getElementById("roomName").value.trim();
+
+    if (!name) {
+      alert("Nhập tên phòng");
+      return;
+    }
+
+    const { error } = await sb
+      .from("rooms")
+      .insert({
+        name: name,
+        created_by: currentUser.id
+      });
+
+    if (error) {
+      console.error(error);
+      alert("Lỗi khi thêm phòng");
+      return;
+    }
+
+    document.getElementById("roomName").value = "";
+    loadRooms();
+  }
+
+  async function deleteRoom(id) {
+    if (!confirm("Xóa phòng này?")) return;
+
+    const { error } = await sb
+      .from("rooms")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error(error);
+      alert("Lỗi khi xóa");
+      return;
+    }
+
+    loadRooms();
+  }
+
+  init();
+</script>
+
+</body>
+</html>
