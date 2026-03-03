@@ -51,38 +51,39 @@
   let currentUser = null;
   let currentRole = null;
 
-  async function init() {
+ async function init() {
 
-    const { data: { user } } = await sb.auth.getUser();
+  const { data: { user } } = await sb.auth.getUser();
 
-    if (!user) {
-      window.location.href = "login.html";
-      return;
-    }
-
-    currentUser = user;
-
-    const { data: profile } = await sb
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (!profile) {
-      alert("Không tìm thấy quyền người dùng");
-      return;
-    }
-
-    currentRole = profile.role;
-
-    // Student không được vào trang này
-    if (currentRole === "student") {
-      window.location.href = "dashboard.html";
-      return;
-    }
-
-    loadRooms();
+  if (!user) {
+    window.location.href = "login.html";
+    return;
   }
+
+  currentUser = user;
+
+  const { data: profile } = await sb
+    .from("users")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile) {
+    alert("Không tìm thấy quyền người dùng");
+    return;
+  }
+
+  currentRole = profile.role;
+
+  // 🔥 CHỈ ADMIN ĐƯỢC VÀO
+  if (currentRole !== "admin") {
+    alert("Bạn không có quyền truy cập trang này");
+    window.location.href = "dashboard.html";
+    return;
+  }
+
+  loadRooms();
+}
 
   async function loadRooms() {
   const { data, error } = await sb
@@ -115,6 +116,10 @@
 }
 
   async function addRoom() {
+  if (currentRole !== "admin") {
+  alert("Không có quyền");
+  return;
+}
     const name = document.getElementById("roomName").value.trim();
 
     if (!name) {
@@ -127,7 +132,8 @@
   .insert({
     room_name: name,
     capacity: 0,
-    note: ""
+    note: "",
+    created_by: currentUser.id
   });
 
     if (error) {
@@ -141,6 +147,10 @@
   }
 
   async function deleteRoom(id) {
+    if (currentRole !== "admin") {
+  alert("Không có quyền");
+  return;
+}
     if (!confirm("Xóa phòng này?")) return;
 
     const { error } = await sb
@@ -156,7 +166,9 @@
 
     loadRooms();
   }
-
+if (currentRole !== "admin") {
+  document.getElementById("form-area").style.display = "none";
+}
   init();
 </script>
 
