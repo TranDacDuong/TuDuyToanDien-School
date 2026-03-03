@@ -29,13 +29,13 @@
   </div>
 
   <table>
-    <thead>
-      <tr>
-        <th>Tên phòng</th>
-        <th>Ngày tạo</th>
-        <th>Hành động</th>
-      </tr>
-    </thead>
+   <thead>
+  <tr>
+    <th>Tên phòng</th>
+    <th>Sức chứa</th>
+    <th>Hành động</th>
+  </tr>
+</thead>
     <tbody id="roomTable"></tbody>
   </table>
 </main>
@@ -85,35 +85,34 @@
   }
 
   async function loadRooms() {
-    const { data, error } = await sb
-      .from("rooms")
-      .select("*")
-      .order("created_at", { ascending: false });
+  const { data, error } = await sb
+    .from("rooms")
+    .select("*");
 
-    if (error) {
-      console.error(error);
-      return;
-    }
-
-    const table = document.getElementById("roomTable");
-    table.innerHTML = "";
-
-    data.forEach(room => {
-      const row = document.createElement("tr");
-
-      row.innerHTML = `
-        <td>${room.name}</td>
-        <td>${new Date(room.created_at).toLocaleString()}</td>
-        <td>
-          <button class="danger" onclick="deleteRoom('${room.id}')">
-            Xóa
-          </button>
-        </td>
-      `;
-
-      table.appendChild(row);
-    });
+  if (error) {
+    console.error(error);
+    return;
   }
+
+  const table = document.getElementById("roomTable");
+  table.innerHTML = "";
+
+  data.forEach(room => {
+    const row = document.createElement("tr");
+
+    row.innerHTML = `
+      <td>${room.room_name}</td>
+      <td>${room.capacity ?? "-"}</td>
+      <td>
+        <button class="danger" onclick="deleteRoom('${room.id}')">
+          Xóa
+        </button>
+      </td>
+    `;
+
+    table.appendChild(row);
+  });
+}
 
   async function addRoom() {
     const name = document.getElementById("roomName").value.trim();
@@ -123,12 +122,13 @@
       return;
     }
 
-    const { error } = await sb
-      .from("rooms")
-      .insert({
-        name: name,
-        created_by: currentUser.id
-      });
+   const { error } = await sb
+  .from("rooms")
+  .insert({
+    room_name: name,
+    capacity: 0,
+    note: ""
+  });
 
     if (error) {
       console.error(error);
