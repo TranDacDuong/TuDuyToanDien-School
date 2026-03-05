@@ -183,6 +183,9 @@ window.location.href="dashboard.html";
 
 async function register(){
 
+const btn = document.getElementById("submitBtn");
+btn.disabled = true;
+
 const email = document.getElementById("email").value.trim();
 const password = document.getElementById("password").value;
 const password2 = document.getElementById("password2").value;
@@ -192,25 +195,35 @@ const phone = document.getElementById("phone").value.trim();
 const birthyear = document.getElementById("birthyear").value.trim();
 
 
-// 🔴 kiểm tra thiếu thông tin
+// kiểm tra thiếu thông tin
 if(!email || !password || !password2 || !fullname || !phone || !birthyear){
 showToast("Vui lòng nhập đầy đủ thông tin");
+btn.disabled = false;
 return;
 }
 
-// 🔴 kiểm tra mật khẩu
+// kiểm tra mật khẩu
 if(password !== password2){
 showToast("Mật khẩu nhập lại không khớp");
+btn.disabled = false;
 return;
 }
 
-if(password.length < 6){
-showToast("Mật khẩu tối thiểu 6 ký tự");
+// kiểm tra email đã tồn tại trong bảng users
+const { data: existingUser } = await sb
+.from("users")
+.select("id")
+.eq("email", email)
+.maybeSingle();
+
+if(existingUser){
+showToast("Email đã tồn tại");
+btn.disabled = false;
 return;
 }
 
 
-// 🔴 tạo tài khoản supabase
+// tạo tài khoản auth
 const { data, error } = await sb.auth.signUp({
 email,
 password
@@ -218,6 +231,7 @@ password
 
 if(error){
 showToast(error.message);
+btn.disabled = false;
 return;
 }
 
@@ -225,11 +239,12 @@ const user = data.user;
 
 if(!user){
 showToast("Không tạo được tài khoản");
+btn.disabled = false;
 return;
 }
 
 
-// 🔴 lưu thông tin vào bảng users
+// lưu thông tin profile
 const { error: profileError } = await sb
 .from("users")
 .insert({
@@ -243,10 +258,13 @@ role: "teacher"
 
 if(profileError){
 showToast("Lỗi lưu thông tin người dùng");
+btn.disabled = false;
 return;
 }
 
 showToast("Tạo tài khoản thành công");
+
+btn.disabled = false;
 
 }
 
