@@ -1,107 +1,349 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
 <meta charset="UTF-8">
 <title>Quản lý trường học</title>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
 
 <style>
+
 body{
 font-family:Arial;
-padding:30px;
+margin:0;
+background:#f3f4f6;
+}
+
+header{
+background:#1f2937;
+color:white;
+padding:15px 20px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+}
+
+main{
+padding:20px;
+max-width:900px;
+margin:auto;
+}
+
+h3{
+margin-top:0;
+}
+
+.form-box{
+background:white;
+padding:15px;
+border-radius:8px;
+box-shadow:0 2px 5px rgba(0,0,0,0.1);
+margin-bottom:20px;
 }
 
 input{
 padding:8px;
+border:1px solid #ccc;
+border-radius:5px;
 width:250px;
 }
 
 button{
-padding:8px 12px;
-cursor:pointer;
-margin-left:5px;
-}
-
-.school{
-display:flex;
-justify-content:space-between;
-width:400px;
-padding:8px;
-border-bottom:1px solid #ddd;
-}
-
-.delete{
-background:red;
-color:white;
 border:none;
+padding:7px 14px;
+border-radius:6px;
+background:#2563eb;
+color:white;
+cursor:pointer;
 }
-</style>
 
+button:hover{
+opacity:0.85;
+}
+
+.danger{
+background:#dc2626;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+background:white;
+border-radius:8px;
+overflow:hidden;
+box-shadow:0 2px 5px rgba(0,0,0,0.1);
+}
+
+th,td{
+padding:12px;
+border-bottom:1px solid #eee;
+}
+
+th{
+background:#f1f5f9;
+text-align:left;
+}
+
+.actions button{
+margin-right:6px;
+}
+
+#toast{
+position:fixed;
+bottom:20px;
+right:20px;
+background:#333;
+color:white;
+padding:12px 20px;
+border-radius:6px;
+opacity:0;
+transition:0.3s;
+}
+
+#toast.show{
+opacity:1;
+}
+
+.popup{
+display:none;
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.4);
+justify-content:center;
+align-items:center;
+}
+
+.popup-content{
+background:white;
+padding:25px;
+border-radius:8px;
+text-align:center;
+}
+
+.popup-content button{
+margin:10px;
+}
+
+</style>
 </head>
+
 <body>
 
-<h2>Trường học</h2>
+<header>
+<h2>🏫 Quản lý trường học</h2>
+</header>
 
-<input id="schoolName" placeholder="Tên trường">
-<button onclick="addSchool()">Thêm trường</button>
+<main>
 
-<br><br>
+<h3>Tổng số trường: <span id="schoolCount">0</span></h3>
 
-<div id="schoolList"></div>
+<div class="form-box" id="form-area">
 
-<script>
+<input
+id="schoolName"
+type="text"
+placeholder="Tên trường"
+/>
 
-const supabase = window.supabase.createClient(
-"SUPABASE_URL",
-"SUPABASE_ANON_KEY"
-)
-
-async function loadSchools(){
-
-const {data,error} = await supabase
-.from("schools")
-.select("*")
-.order("name",{ascending:true})
-
-renderSchools(data)
-
-}
-
-function renderSchools(data){
-
-const list = document.getElementById("schoolList")
-list.innerHTML=""
-
-data.forEach(s=>{
-
-list.innerHTML+=`
-
-<div class="school">
-
-<span>${s.name}</span>
-
-<button class="delete" onclick="deleteSchool('${s.id}')">
-Xóa
+<button id="saveBtn" onclick="saveSchool()">
+Thêm trường
 </button>
 
 </div>
 
+<table>
+
+<thead>
+<tr>
+<th>Tên trường</th>
+<th>Hành động</th>
+</tr>
+</thead>
+
+<tbody id="schoolTable"></tbody>
+
+</table>
+
+</main>
+
+<div id="toast"></div>
+
+<div id="confirmPopup" class="popup">
+<div class="popup-content">
+
+<p>Bạn có chắc muốn xóa trường này?</p>
+
+<button onclick="confirmDelete()" class="danger">
+Xóa
+</button>
+
+<button onclick="closePopup()">
+Hủy
+</button>
+
+</div>
+</div>
+
+<script>
+
+let currentUser = null
+let currentRole = null
+let editingSchoolId = null
+let deletingSchoolId = null
+
+
+async function init(){
+
+const { data:{ user } } = await sb.auth.getUser()
+
+if(!user){
+window.location.href="index.html"
+return
+}
+
+currentUser = user
+
+const { data:profile } = await sb
+.from("users")
+.select("role")
+.eq("id",user.id)
+.single()
+
+currentRole = profile?.role
+
+if(currentRole !== "admin"){
+document.getElementById("form-area").style.display="none"
+}
+
+loadSchools()
+
+}
+
+
+async function loadSchools(){
+
+const { data,error } = await sb
+.from("schools")
+.select("*")
+.order("school_name",{ascending:true})
+
+if(error){
+console.error(error)
+return
+}
+
+renderSchools(data)
+
+document.getElementById("schoolCount").innerText = data.length
+
+}
+
+
+function renderSchools(data){
+
+const table = document.getElementById("schoolTable")
+
+table.innerHTML=""
+
+data.forEach(school=>{
+
+const row=document.createElement("tr")
+
+row.innerHTML=`
+
+<td>${school.school_name}</td>
+
+<td class="actions">
+
+<button onclick="editSchool('${school.id}','${school.school_name}')">
+Sửa
+</button>
+
+<button class="danger"
+onclick="openDeletePopup('${school.id}')">
+Xóa
+</button>
+
+</td>
+
 `
+
+table.appendChild(row)
 
 })
 
 }
 
-async function addSchool(){
 
-const name = document.getElementById("schoolName").value
+function editSchool(id,name){
 
-if(!name) return alert("Nhập tên trường")
+editingSchoolId = id
 
-await supabase
+document.getElementById("schoolName").value = name
+
+document.getElementById("saveBtn").innerText="Cập nhật"
+
+}
+
+
+async function saveSchool(){
+
+if(currentRole !== "admin"){
+alert("Không có quyền")
+return
+}
+
+const name=document.getElementById("schoolName").value.trim()
+
+if(!name){
+alert("Nhập tên trường")
+return
+}
+
+if(!editingSchoolId){
+
+const { error } = await sb
 .from("schools")
-.insert([{name:name}])
+.insert({
+school_name:name
+})
+
+if(error){
+console.error(error)
+alert("Lỗi khi thêm")
+return
+}
+
+showToast("Thêm trường thành công")
+
+}
+
+else{
+
+const { error } = await sb
+.from("schools")
+.update({
+school_name:name
+})
+.eq("id",editingSchoolId)
+
+if(error){
+console.error(error)
+alert("Lỗi khi cập nhật")
+return
+}
+
+showToast("Cập nhật thành công")
+
+editingSchoolId=null
+
+document.getElementById("saveBtn").innerText="Thêm trường"
+
+}
 
 document.getElementById("schoolName").value=""
 
@@ -109,20 +351,55 @@ loadSchools()
 
 }
 
-async function deleteSchool(id){
 
-if(!confirm("Xóa trường này?")) return
+function openDeletePopup(id){
 
-await supabase
+deletingSchoolId=id
+
+document.getElementById("confirmPopup").style.display="flex"
+
+}
+
+
+function closePopup(){
+
+document.getElementById("confirmPopup").style.display="none"
+
+}
+
+
+async function confirmDelete(){
+
+await sb
 .from("schools")
 .delete()
-.eq("id",id)
+.eq("id",deletingSchoolId)
+
+closePopup()
+
+showToast("Đã xóa trường")
 
 loadSchools()
 
 }
 
-loadSchools()
+
+function showToast(message){
+
+const toast=document.getElementById("toast")
+
+toast.innerText=message
+
+toast.classList.add("show")
+
+setTimeout(()=>{
+toast.classList.remove("show")
+},2000)
+
+}
+
+
+init()
 
 </script>
 
