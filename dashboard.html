@@ -47,6 +47,20 @@
 </head>
 <body>
 
+  <div id="profileWarning" style="
+display:none;
+background:#fee2e2;
+color:#b91c1c;
+padding:10px;
+border-radius:6px;
+margin-bottom:15px;
+">
+
+⚠ Bạn chưa cập nhật đầy đủ thông tin.
+Vui lòng vào mục <b>Tài khoản</b> để cập nhật.
+
+</div>
+  
   <!-- SIDEBAR -->
   <aside>
     <h2>📚 Quản lý giáo dục</h2>
@@ -103,6 +117,24 @@
     applyRoleMenu(profile.role);
   }
 
+  async function checkProfile(){
+
+const { data:{user} } = await sb.auth.getUser();
+
+const { data:profile } = await sb
+.from("users")
+.select("*")
+.eq("id",user.id)
+.single();
+
+if(!profile.full_name || !profile.phone || !profile.birth_year){
+
+document.getElementById("profileWarning").style.display="block";
+
+}
+
+}
+  
   function applyRoleMenu(role) {
     document.querySelectorAll("[data-role]").forEach(item => {
       const roles = item.dataset.role.split(",");
