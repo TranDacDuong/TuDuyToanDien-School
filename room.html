@@ -47,11 +47,11 @@
   let currentRole = null;
 
  async function init() {
-
+  const user = await requireLogin();
   const { data: { user } } = await sb.auth.getUser();
 
   if (!user) {
-    window.location.href = "login.html";
+    window.location.href = "index.html";
     return;
   }
 
@@ -164,7 +164,6 @@
 if (currentRole !== "admin") {
   document.getElementById("form-area").style.display = "none";
 }
-  const user = await requireLogin();
   init();
 </script>
 
