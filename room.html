@@ -54,9 +54,7 @@
   }
 
   currentUser = user;
-  if (currentRole !== "admin") {
-  document.getElementById("form-area").style.display = "none";
-  }
+  
   const { data: profile } = await sb
     .from("users")
     .select("role")
@@ -71,6 +69,9 @@
   currentRole = profile.role;
 
   // 🔥 CHỈ ADMIN ĐƯỢC VÀO
+  if (currentRole !== "admin") {
+  document.getElementById("form-area").style.display = "none";
+  }
   if (currentRole !== "admin") {
     alert("Bạn không có quyền truy cập trang này");
     window.location.href = "dashboard.html";
