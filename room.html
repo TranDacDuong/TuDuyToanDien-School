@@ -168,6 +168,7 @@
 if (currentRole !== "admin") {
   document.getElementById("form-area").style.display = "none";
 }
+  const user = await requireLogin();
   init();
 </script>
 
