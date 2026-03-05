@@ -68,6 +68,22 @@ cursor:pointer;
 font-weight:bold;
 }
 
+.password-box{
+display:flex;
+align-items:center;
+}
+
+.password-box input{
+flex:1;
+}
+
+.password-box span{
+margin-left:8px;
+cursor:pointer;
+font-size:13px;
+color:#2563eb;
+}
+
 #toast{
 position:fixed;
 bottom:20px;
@@ -95,9 +111,15 @@ opacity:1;
 
 <input id="email" type="email" placeholder="Email">
 
+<div class="password-box">
 <input id="password" type="password" placeholder="Mật khẩu">
+<span onclick="togglePassword('password')">Hiện</span>
+</div>
 
-<input id="password2" type="password" placeholder="Nhập lại mật khẩu" class="hidden">
+<div id="password2Box" class="password-box hidden">
+<input id="password2" type="password" placeholder="Nhập lại mật khẩu">
+<span onclick="togglePassword('password2')">Hiện</span>
+</div>
 
 <button onclick="submitForm()" id="btn">Đăng nhập</button>
 
@@ -116,54 +138,62 @@ Chưa có tài khoản? Đăng ký
 
 <script>
 
-let isLogin = true;
+let isLogin=true;
 
 function toggleMode(){
 
-isLogin = !isLogin;
+isLogin=!isLogin;
 
-document.getElementById("password2").classList.toggle("hidden");
+document.getElementById("password2Box").classList.toggle("hidden");
 
 if(isLogin){
-document.getElementById("title").innerText="Đăng nhập";
-document.getElementById("btn").innerText="Đăng nhập";
-document.getElementById("switchText").innerText="Chưa có tài khoản? Đăng ký";
+title.innerText="Đăng nhập";
+btn.innerText="Đăng nhập";
+switchText.innerText="Chưa có tài khoản? Đăng ký";
 }else{
-document.getElementById("title").innerText="Đăng ký";
-document.getElementById("btn").innerText="Tạo tài khoản";
-document.getElementById("switchText").innerText="Đã có tài khoản? Đăng nhập";
+title.innerText="Đăng ký";
+btn.innerText="Tạo tài khoản";
+switchText.innerText="Đã có tài khoản? Đăng nhập";
 }
+
+}
+
+function togglePassword(id){
+
+const input=document.getElementById(id);
+
+input.type = input.type==="password" ? "text" : "password";
 
 }
 
 async function submitForm(){
 
-const email = document.getElementById("email").value.trim().toLowerCase();
-const password = document.getElementById("password").value;
-const password2 = document.getElementById("password2").value;
+const email=document.getElementById("email").value.trim().toLowerCase();
+const password=document.getElementById("password").value;
+const password2=document.getElementById("password2").value;
 
 if(!email || !password){
 showToast("Vui lòng nhập email và mật khẩu");
 return;
 }
 
-if(password.length < 6){
-showToast("Mật khẩu tối thiểu 6 ký tự");
-return;
-}
-
 if(isLogin){
 
-await login(email,password);
+login(email,password);
 
 }else{
 
-if(password !== password2){
-showToast("Mật khẩu không khớp");
+if(password.length<6){
+showToast("Mật khẩu phải ít nhất 6 ký tự");
 return;
 }
 
-await register(email,password);
+if(password!==password2){
+showToast("Nhập lại mật khẩu không đúng");
+return;
+}
+
+register(email,password);
 
 }
 
@@ -171,39 +201,14 @@ await register(email,password);
 
 async function login(email,password){
 
-try{
-
-const {data,error} = await sb.auth.signInWithPassword({
+const {data,error}=await sb.auth.signInWithPassword({
 email,
 password
 });
 
 if(error){
-showToast("Email hoặc mật khẩu sai");
+showToast("Email hoặc mật khẩu không đúng");
 return;
-}
-
-const user = data.user;
-
-const {data:profile,error:profileError} = await sb
-.from("users")
-.select("*")
-.eq("id",user.id)
-.maybeSingle();
-
-if(profileError){
-showToast("Lỗi tải dữ liệu người dùng");
-return;
-}
-
-if(!profile){
-
-await sb.from("users").insert({
-id:user.id,
-email:user.email,
-role:"student"
-});
-
 }
 
 showToast("Đăng nhập thành công");
@@ -212,66 +217,38 @@ setTimeout(()=>{
 window.location.href="dashboard.html";
 },800);
 
-}catch(e){
-
-showToast("Lỗi hệ thống");
-
-}
-
 }
 
 async function register(email,password){
 
-try{
-
-// kiểm tra email đã tồn tại chưa
-const {data:exist} = await sb
-.from("users")
-.select("email")
-.eq("email",email)
-.maybeSingle();
-
-if(exist){
-showToast("Email đã được đăng ký");
-return;
-}
-
-const {data,error} = await sb.auth.signUp({
+const {data,error}=await sb.auth.signUp({
 email,
 password
 });
 
 if(error){
+
+if(error.message.includes("already")){
+showToast("Email đã được đăng ký");
+}else{
 showToast(error.message);
+}
+
 return;
-}
-
-if(!data.user){
-showToast("Không thể tạo tài khoản");
-return;
-}
-
-await sb.from("users").insert({
-id:data.user.id,
-email:email,
-role:"student"
-});
-
-showToast("Tạo tài khoản thành công");
-
-}catch(e){
-
-showToast("Lỗi hệ thống");
 
 }
+
+showToast("Đăng ký thành công. Hãy đăng nhập.");
+
+toggleMode();
 
 }
 
 function showToast(msg){
 
-const toast = document.getElementById("toast");
+const toast=document.getElementById("toast");
 
-toast.innerText = msg;
+toast.innerText=msg;
 
 toast.classList.add("show");
 
