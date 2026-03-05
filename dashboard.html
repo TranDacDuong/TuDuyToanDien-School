@@ -118,7 +118,7 @@ alert(JSON.stringify(session.user.app_metadata));
       item.style.display = roles.includes(role) ? "block" : "none";
     });
   }
-
+const user = await requireLogin();
   initDashboard();
     
 </script>
