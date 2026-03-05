@@ -13,14 +13,15 @@ height:100vh;
 display:flex;
 justify-content:center;
 align-items:center;
+margin:0;
 }
 
 .card{
 background:white;
 padding:35px;
-width:340px;
+width:360px;
 border-radius:10px;
-box-shadow:0 10px 30px rgba(0,0,0,0.2);
+box-shadow:0 10px 30px rgba(0,0,0,0.25);
 }
 
 h2{
@@ -44,10 +45,16 @@ background:#2563eb;
 color:white;
 border-radius:6px;
 cursor:pointer;
+font-weight:bold;
 }
 
 button:hover{
 background:#1d4ed8;
+}
+
+button:disabled{
+opacity:0.6;
+cursor:not-allowed;
 }
 
 .switch{
@@ -59,6 +66,7 @@ font-size:14px;
 .switch span{
 color:#2563eb;
 cursor:pointer;
+font-weight:bold;
 }
 
 .hidden{
@@ -163,13 +171,13 @@ register();
 
 async function login(email,password){
 
-const {data,error}=await sb.auth.signInWithPassword({
+const {error}=await sb.auth.signInWithPassword({
 email,
 password
 });
 
 if(error){
-showToast(error.message);
+showToast("Sai email hoặc mật khẩu");
 return;
 }
 
@@ -177,7 +185,7 @@ showToast("Đăng nhập thành công");
 
 setTimeout(()=>{
 window.location.href="dashboard.html";
-},600);
+},500);
 
 }
 
@@ -185,6 +193,7 @@ async function register(){
 
 const btn = document.getElementById("submitBtn");
 btn.disabled = true;
+btn.innerText="Đang tạo...";
 
 const email = document.getElementById("email").value.trim();
 const password = document.getElementById("password").value;
@@ -194,22 +203,18 @@ const fullname = document.getElementById("fullname").value.trim();
 const phone = document.getElementById("phone").value.trim();
 const birthyear = document.getElementById("birthyear").value.trim();
 
-
-// kiểm tra thiếu thông tin
 if(!email || !password || !password2 || !fullname || !phone || !birthyear){
 showToast("Vui lòng nhập đầy đủ thông tin");
-btn.disabled = false;
+resetBtn();
 return;
 }
 
-// kiểm tra mật khẩu
 if(password !== password2){
 showToast("Mật khẩu nhập lại không khớp");
-btn.disabled = false;
+resetBtn();
 return;
 }
 
-// kiểm tra email đã tồn tại trong bảng users
 const { data: existingUser } = await sb
 .from("users")
 .select("id")
@@ -218,12 +223,10 @@ const { data: existingUser } = await sb
 
 if(existingUser){
 showToast("Email đã tồn tại");
-btn.disabled = false;
+resetBtn();
 return;
 }
 
-
-// tạo tài khoản auth
 const { data, error } = await sb.auth.signUp({
 email,
 password
@@ -231,27 +234,18 @@ password
 
 if(error){
 showToast(error.message);
-btn.disabled = false;
+resetBtn();
 return;
 }
 
+const user = data.user;
 
-// đăng nhập ngay sau khi đăng ký
-const { data: loginData, error: loginError } = await sb.auth.signInWithPassword({
-email,
-password
-});
-
-if(loginError){
-showToast("Tài khoản tạo rồi nhưng không đăng nhập được");
-btn.disabled = false;
+if(!user){
+showToast("Không tạo được tài khoản");
+resetBtn();
 return;
 }
 
-const user = loginData.user;
-
-
-// lưu thông tin profile
 const { error: profileError } = await sb
 .from("users")
 .insert({
@@ -260,22 +254,30 @@ email: email,
 full_name: fullname,
 phone: phone,
 birth_year: parseInt(birthyear),
-role: "teacher"
+role: "student"
 });
 
 if(profileError){
 showToast("Lỗi lưu thông tin người dùng");
-console.log(profileError);
-btn.disabled = false;
+resetBtn();
 return;
 }
 
 showToast("Tạo tài khoản thành công");
 
-setTimeout(()=>{
-window.location.href="dashboard.html";
-},800);
+await sb.auth.signInWithPassword({
+email,
+password
+});
 
+window.location.href="dashboard.html";
+
+}
+
+function resetBtn(){
+const btn = document.getElementById("submitBtn");
+btn.disabled=false;
+btn.innerText="Tạo tài khoản";
 }
 
 function showToast(message){
