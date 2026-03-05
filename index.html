@@ -116,11 +116,11 @@ Chưa có tài khoản? Đăng ký
 
 <script>
 
-let isLogin=true;
+let isLogin = true;
 
 function toggleMode(){
 
-isLogin=!isLogin;
+isLogin = !isLogin;
 
 document.getElementById("password2").classList.toggle("hidden");
 
@@ -138,12 +138,17 @@ document.getElementById("switchText").innerText="Đã có tài khoản? Đăng n
 
 async function submitForm(){
 
-const email=document.getElementById("email").value.trim();
-const password=document.getElementById("password").value;
-const password2=document.getElementById("password2").value;
+const email = document.getElementById("email").value.trim().toLowerCase();
+const password = document.getElementById("password").value;
+const password2 = document.getElementById("password2").value;
 
-if(!email||!password){
-showToast("Nhập email và mật khẩu");
+if(!email || !password){
+showToast("Vui lòng nhập email và mật khẩu");
+return;
+}
+
+if(password.length < 6){
+showToast("Mật khẩu tối thiểu 6 ký tự");
 return;
 }
 
@@ -153,7 +158,7 @@ await login(email,password);
 
 }else{
 
-if(password!==password2){
+if(password !== password2){
 showToast("Mật khẩu không khớp");
 return;
 }
@@ -166,23 +171,30 @@ await register(email,password);
 
 async function login(email,password){
 
-const {data,error}=await sb.auth.signInWithPassword({
+try{
+
+const {data,error} = await sb.auth.signInWithPassword({
 email,
 password
 });
 
 if(error){
-showToast(error.message);
+showToast("Email hoặc mật khẩu sai");
 return;
 }
 
-const user=data.user;
+const user = data.user;
 
-const {data:profile}=await sb
+const {data:profile,error:profileError} = await sb
 .from("users")
 .select("*")
 .eq("id",user.id)
 .maybeSingle();
+
+if(profileError){
+showToast("Lỗi tải dữ liệu người dùng");
+return;
+}
 
 if(!profile){
 
@@ -194,27 +206,37 @@ role:"student"
 
 }
 
-else{
-
-if(!profile.full_name||!profile.phone||!profile.birth_year){
-
-showToast("Vui lòng cập nhật thông tin tài khoản");
-
-}
-
-}
-
 showToast("Đăng nhập thành công");
 
 setTimeout(()=>{
 window.location.href="dashboard.html";
-},700);
+},800);
+
+}catch(e){
+
+showToast("Lỗi hệ thống");
+
+}
 
 }
 
 async function register(email,password){
 
-const {error}=await sb.auth.signUp({
+try{
+
+// kiểm tra email đã tồn tại chưa
+const {data:exist} = await sb
+.from("users")
+.select("email")
+.eq("email",email)
+.maybeSingle();
+
+if(exist){
+showToast("Email đã được đăng ký");
+return;
+}
+
+const {data,error} = await sb.auth.signUp({
 email,
 password
 });
@@ -224,15 +246,32 @@ showToast(error.message);
 return;
 }
 
+if(!data.user){
+showToast("Không thể tạo tài khoản");
+return;
+}
+
+await sb.from("users").insert({
+id:data.user.id,
+email:email,
+role:"student"
+});
+
 showToast("Tạo tài khoản thành công");
+
+}catch(e){
+
+showToast("Lỗi hệ thống");
+
+}
 
 }
 
 function showToast(msg){
 
-const toast=document.getElementById("toast");
+const toast = document.getElementById("toast");
 
-toast.innerText=msg;
+toast.innerText = msg;
 
 toast.classList.add("show");
 
