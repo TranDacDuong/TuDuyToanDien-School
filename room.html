@@ -47,7 +47,7 @@
   let currentRole = null;
 
  async function init() {
-  const user = await requireLogin();
+  const { data: { user } } = await sb.auth.getUser();
   if (!user) {
     window.location.href = "index.html";
     return;
