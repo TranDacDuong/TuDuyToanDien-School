@@ -1,49 +1,199 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <title>Đăng nhập</title>
+<meta charset="UTF-8">
+<title>Đăng nhập hệ thống</title>
+
+<style>
+
+body{
+  font-family: Arial;
+  background: linear-gradient(135deg,#2563eb,#1e3a8a);
+  height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+.card{
+  background:white;
+  padding:40px;
+  width:320px;
+  border-radius:10px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.2);
+}
+
+h2{
+  text-align:center;
+  margin-bottom:20px;
+}
+
+input{
+  width:100%;
+  padding:10px;
+  margin-bottom:15px;
+  border:1px solid #ccc;
+  border-radius:6px;
+}
+
+button{
+  width:100%;
+  padding:10px;
+  border:none;
+  background:#2563eb;
+  color:white;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+button:hover{
+  background:#1d4ed8;
+}
+
+.switch{
+  text-align:center;
+  margin-top:15px;
+  font-size:14px;
+}
+
+.switch span{
+  color:#2563eb;
+  cursor:pointer;
+}
+
+#toast{
+  position:fixed;
+  bottom:20px;
+  right:20px;
+  background:#333;
+  color:white;
+  padding:12px 18px;
+  border-radius:6px;
+  opacity:0;
+  transition:0.3s;
+}
+
+#toast.show{
+  opacity:1;
+}
+
+</style>
 </head>
+
 <body>
 
-<h2>Đăng nhập hệ thống</h2>
+<div class="card">
 
-<input id="email" type="email" placeholder="Email" /><br><br>
-<input id="password" type="password" placeholder="Mật khẩu" /><br><br>
+<h2 id="title">Đăng nhập</h2>
 
-<button onclick="login()">Đăng nhập</button>
+<input id="email" type="email" placeholder="Email">
 
-<p id="status"></p>
+<input id="password" type="password" placeholder="Mật khẩu">
+
+<button onclick="submitForm()" id="submitBtn">Đăng nhập</button>
+
+<div class="switch">
+  <span onclick="toggleMode()" id="switchText">
+    Chưa có tài khoản? Đăng ký
+  </span>
+</div>
+
+</div>
+
+<div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
+
 <script>
-   async function login() {
-    const email = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value;
 
-    if (!email || !password) {
-      document.getElementById("status").innerText = "❌ Thiếu email hoặc mật khẩu";
-      return;
-    }
+let isLogin = true;
 
-    const { data, error } = await sb.auth.signInWithPassword({
-      email,
-      password
-    });
+function toggleMode(){
 
-    if (error) {
-      document.getElementById("status").innerText = "❌ " + error.message;
-      return;
-    }
+  isLogin = !isLogin;
 
-    document.getElementById("status").innerText = "✅ Đăng nhập thành công";
-
-    // Tạm thời redirect
-    setTimeout(() => {
-      window.location.href = "dashboard.html";
-    }, 500);
+  if(isLogin){
+    document.getElementById("title").innerText = "Đăng nhập";
+    document.getElementById("submitBtn").innerText = "Đăng nhập";
+    document.getElementById("switchText").innerText = "Chưa có tài khoản? Đăng ký";
   }
+  else{
+    document.getElementById("title").innerText = "Đăng ký";
+    document.getElementById("submitBtn").innerText = "Tạo tài khoản";
+    document.getElementById("switchText").innerText = "Đã có tài khoản? Đăng nhập";
+  }
+
+}
+
+async function submitForm(){
+
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+
+  if(!email || !password){
+    showToast("Thiếu email hoặc mật khẩu");
+    return;
+  }
+
+  if(isLogin){
+    login(email,password);
+  }
+  else{
+    register(email,password);
+  }
+
+}
+
+async function login(email,password){
+
+  const { data, error } = await sb.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if(error){
+    showToast(error.message);
+    return;
+  }
+
+  showToast("Đăng nhập thành công");
+
+  setTimeout(()=>{
+    window.location.href="dashboard.html";
+  },700);
+
+}
+
+async function register(email,password){
+
+  const { data, error } = await sb.auth.signUp({
+    email,
+    password
+  });
+
+  if(error){
+    showToast(error.message);
+    return;
+  }
+
+  showToast("Tạo tài khoản thành công");
+
+}
+
+function showToast(message){
+
+  const toast = document.getElementById("toast");
+
+  toast.innerText = message;
+  toast.classList.add("show");
+
+  setTimeout(()=>{
+    toast.classList.remove("show");
+  },2000);
+
+}
+
 </script>
 
 </body>
