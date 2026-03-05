@@ -101,10 +101,10 @@ alert(JSON.stringify(session.user.app_metadata));
     }
 
     const { data: profile, error } = await sb
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+  .from("users")
+  .select("role")
+  .eq("id", user.id)
+  .maybeSingle();
 
     if (error || !profile) {
       alert("Không tìm thấy quyền người dùng");
