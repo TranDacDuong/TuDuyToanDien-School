@@ -175,6 +175,33 @@
   });
 }
 
+  function renderRooms(data) {
+
+  const table = document.getElementById("roomTable");
+  table.innerHTML = "";
+
+  data.forEach(room => {
+    const row = document.createElement("tr");
+
+    row.innerHTML = `
+      <td>${room.room_name}</td>
+      <td>${room.capacity ?? "-"}</td>
+      <td>
+        <button onclick="editRoom('${room.id}','${room.room_name}','${room.capacity}')">
+          Sửa
+        </button>
+
+        <button class="danger" onclick="openDeletePopup('${room.id}')">
+          Xóa
+        </button>
+      </td>
+    `;
+
+    table.appendChild(row);
+  });
+
+}
+  
 function openDeletePopup(id){
   deletingRoomId = id;
   document.getElementById("confirmPopup").style.display="flex";
