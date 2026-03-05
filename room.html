@@ -54,7 +54,9 @@
   }
 
   currentUser = user;
-
+  if (currentRole !== "admin") {
+  document.getElementById("form-area").style.display = "none";
+  }
   const { data: profile } = await sb
     .from("users")
     .select("role")
