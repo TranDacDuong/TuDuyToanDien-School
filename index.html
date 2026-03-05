@@ -135,7 +135,7 @@ async function submitForm(){
     showToast("Thiếu email hoặc mật khẩu");
     return;
   }
-
+  
   if(isLogin){
     login(email,password);
   }
@@ -166,7 +166,10 @@ async function login(email,password){
 }
 
 async function register(email,password){
-
+if(password.length < 6){
+  showToast("Mật khẩu phải ≥ 6 ký tự");
+  return;
+}
   const { data, error } = await sb.auth.signUp({
     email,
     password
