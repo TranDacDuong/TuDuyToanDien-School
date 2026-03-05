@@ -171,106 +171,71 @@ register();
 
 async function login(email,password){
 
-const {error}=await sb.auth.signInWithPassword({
-email,
-password
-});
-
-if(error){
-showToast("Sai email hoặc mật khẩu");
-return;
-}
-
-showToast("Đăng nhập thành công");
-
-setTimeout(()=>{
-window.location.href="dashboard.html";
-},500);
-
-}
-
-async function register(){
-
-const btn = document.getElementById("submitBtn");
-btn.disabled = true;
-btn.innerText="Đang tạo...";
-
-const email = document.getElementById("email").value.trim();
-const password = document.getElementById("password").value;
-const password2 = document.getElementById("password2").value;
-
-const fullname = document.getElementById("fullname").value.trim();
-const phone = document.getElementById("phone").value.trim();
-const birthyear = document.getElementById("birthyear").value.trim();
-
-if(!email || !password || !password2 || !fullname || !phone || !birthyear){
-showToast("Vui lòng nhập đầy đủ thông tin");
-resetBtn();
-return;
-}
-
-if(password !== password2){
-showToast("Mật khẩu nhập lại không khớp");
-resetBtn();
-return;
-}
-
-const { data: existingUser } = await sb
-.from("users")
-.select("id")
-.eq("email", email)
-.maybeSingle();
-
-if(existingUser){
-showToast("Email đã tồn tại");
-resetBtn();
-return;
-}
-
-const { data, error } = await sb.auth.signUp({
+const {data,error}=await sb.auth.signInWithPassword({
 email,
 password
 });
 
 if(error){
 showToast(error.message);
-resetBtn();
 return;
 }
 
 const user = data.user;
 
-if(!user){
-showToast("Không tạo được tài khoản");
-resetBtn();
-return;
-}
-
-const { error: profileError } = await sb
+// kiểm tra profile
+const { data:profile } = await sb
 .from("users")
-.insert({
-id: user.id,
-email: email,
-full_name: fullname,
-phone: phone,
-birth_year: parseInt(birthyear),
-role: "student"
+.select("*")
+.eq("id",user.id)
+.maybeSingle();
+
+if(!profile){
+
+// tạo profile rỗng
+await sb.from("users").insert({
+id:user.id,
+email:user.email,
+role:"student"
 });
 
-if(profileError){
-showToast("Lỗi lưu thông tin người dùng");
-resetBtn();
+}
+
+showToast("Đăng nhập thành công");
+
+setTimeout(()=>{
+window.location.href="dashboard.html";
+},600);
+
+}
+
+async function register(){
+
+const email = document.getElementById("email").value.trim();
+const password = document.getElementById("password").value;
+const password2 = document.getElementById("password2").value;
+
+if(!email || !password || !password2){
+showToast("Nhập đầy đủ thông tin");
 return;
 }
 
-showToast("Tạo tài khoản thành công");
+if(password !== password2){
+showToast("Mật khẩu không khớp");
+return;
+}
 
-await sb.auth.signInWithPassword({
+const { error } = await sb.auth.signUp({
 email,
 password
 });
 
-window.location.href="dashboard.html";
+if(error){
+showToast(error.message);
+return;
+}
+
+showToast("Tạo tài khoản thành công");
 
 }
 
