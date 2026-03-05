@@ -93,7 +93,8 @@
   async function initDashboard() {
 
     const { data: { user } } = await sb.auth.getUser();
-
+const { data: { session } } = await sb.auth.getSession();
+alert(JSON.stringify(session.user.app_metadata));
     if (!user) {
       window.location.href = "login.html";
       return;
@@ -121,10 +122,6 @@
   }
 
   initDashboard();
-
-    const { data: { session } } = await sb.auth.getSession();
-
-alert(JSON.stringify(session.user.app_metadata));
     
 </script>
   
