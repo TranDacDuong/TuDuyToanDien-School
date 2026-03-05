@@ -104,12 +104,6 @@ opacity:1;
 
 <input id="password2" type="password" placeholder="Nhập lại mật khẩu" class="hidden">
 
-<input id="fullname" type="text" placeholder="Họ và tên" class="hidden">
-
-<input id="phone" type="text" placeholder="Số điện thoại" class="hidden">
-
-<input id="birthyear" type="number" placeholder="Năm sinh" class="hidden">
-
 <button onclick="submitForm()" id="submitBtn">Đăng nhập</button>
 
 <div class="switch">
@@ -133,11 +127,19 @@ function toggleMode(){
 
 isLogin = !isLogin;
 
-const fields = ["password2","fullname","phone","birthyear"];
+document.getElementById("password2").classList.toggle("hidden");
 
-fields.forEach(id=>{
-document.getElementById(id).classList.toggle("hidden");
-});
+if(isLogin){
+document.getElementById("title").innerText="Đăng nhập";
+document.getElementById("submitBtn").innerText="Đăng nhập";
+document.getElementById("switchText").innerText="Chưa có tài khoản? Đăng ký";
+}else{
+document.getElementById("title").innerText="Đăng ký";
+document.getElementById("submitBtn").innerText="Tạo tài khoản";
+document.getElementById("switchText").innerText="Đã có tài khoản? Đăng nhập";
+}
+
+}
 
 if(isLogin){
 document.getElementById("title").innerText="Đăng nhập";
