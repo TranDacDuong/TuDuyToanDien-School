@@ -195,21 +195,27 @@ window.location.href="dashboard.html";
 
 async function register(email,password){
 
+// kiểm tra email đã tồn tại trong bảng users chưa
+const { data: existingUser, error: checkError } = await sb
+.from("users")
+.select("email")
+.eq("email", email)
+.single();
+
+if(existingUser){
+showToast("Email đã được đăng ký");
+return;
+}
+
+// nếu chưa có thì tạo tài khoản
 const {data,error} = await sb.auth.signUp({
 email:email,
 password:password
 });
 
 if(error){
-
-if(error.message.includes("already")){
-showToast("Email đã được đăng ký");
-}else{
 showToast("Không thể tạo tài khoản");
-}
-
 return;
-
 }
 
 showToast("Đăng ký thành công. Hãy đăng nhập.");
@@ -217,7 +223,6 @@ showToast("Đăng ký thành công. Hãy đăng nhập.");
 toggleMode();
 
 }
-
 function showToast(msg){
 
 const toast = document.getElementById("toast");
