@@ -235,13 +235,20 @@ btn.disabled = false;
 return;
 }
 
-const user = data.user;
 
-if(!user){
-showToast("Không tạo được tài khoản");
+// đăng nhập ngay sau khi đăng ký
+const { data: loginData, error: loginError } = await sb.auth.signInWithPassword({
+email,
+password
+});
+
+if(loginError){
+showToast("Tài khoản tạo rồi nhưng không đăng nhập được");
 btn.disabled = false;
 return;
 }
+
+const user = loginData.user;
 
 
 // lưu thông tin profile
@@ -258,13 +265,16 @@ role: "teacher"
 
 if(profileError){
 showToast("Lỗi lưu thông tin người dùng");
+console.log(profileError);
 btn.disabled = false;
 return;
 }
 
 showToast("Tạo tài khoản thành công");
 
-btn.disabled = false;
+setTimeout(()=>{
+window.location.href="dashboard.html";
+},800);
 
 }
 
