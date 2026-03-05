@@ -167,9 +167,9 @@ input.type = input.type==="password" ? "text" : "password";
 
 async function submitForm(){
 
-const email = emailInput.value.trim();
-const password = passwordInput.value;
-const password2 = password2Input.value;
+const email = document.getElementById("email").value.trim();
+const password = document.getElementById("password").value;
+const password2 = document.getElementById("password2").value;
 
 if(!email || !password){
 showToast("Vui lòng nhập email và mật khẩu");
@@ -192,6 +192,7 @@ register(email,password);
 }
 
 }
+  
 async function login(email,password){
 
 const {data,error}=await sb.auth.signInWithPassword({
