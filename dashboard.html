@@ -97,40 +97,36 @@ Vui lòng vào mục <b>Tài khoản</b> để cập nhật.
 <script src="supabaseClient.js"></script>
 <script>
   async function initDashboard() {
-    const { data: { user } } = await sb.auth.getUser();
-    if (!user) {
-      window.location.href = "index.html";
-      return;
-    }
+  const { data: { user } } = await sb.auth.getUser();
 
-    const { data: profile, error } = await sb
-  .from("users")
-  .select("role")
-  .eq("id", user.id)
-  .maybeSingle();
-
-    if (error || !profile) {
-      alert("Không tìm thấy quyền người dùng");
-      return;
-    }
-
-    applyRoleMenu(profile.role);
+  if (!user) {
+    window.location.href = "index.html";
+    return;
   }
 
-  async function checkProfile(){
+  const { data: profile, error } = await sb
+    .from("users")
+    .select("*")
+    .eq("id", user.id)
+    .maybeSingle();
 
-const { data:{user} } = await sb.auth.getUser();
+  if (error || !profile) {
+    alert("Không tìm thấy quyền người dùng");
+    return;
+  }
 
-const { data:profile } = await sb
-.from("users")
-.select("*")
-.eq("id",user.id)
-.single();
+  applyRoleMenu(profile.role);
 
-if(!profile.full_name || !profile.phone || !profile.birth_year){
+  checkProfile(profile);
+}
 
+  function checkProfile(profile){
+
+if(
+profile.role === "student" &&
+(!profile.full_name || !profile.phone || !profile.birth_year)
+){
 document.getElementById("profileWarning").style.display="block";
-
 }
 
 }
