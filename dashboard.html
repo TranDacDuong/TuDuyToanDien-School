@@ -83,9 +83,7 @@
 <script src="supabaseClient.js"></script>
 <script>
   async function initDashboard() {
-    const user = await requireLogin();
     const { data: { user } } = await sb.auth.getUser();
-
     if (!user) {
       window.location.href = "index.html";
       return;
