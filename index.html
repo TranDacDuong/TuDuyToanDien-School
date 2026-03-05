@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>Đăng nhập hệ thống</title>
+<title>Đăng nhập</title>
 
 <style>
 
@@ -52,14 +52,13 @@ button:hover{
 background:#1d4ed8;
 }
 
-button:disabled{
-opacity:0.6;
-cursor:not-allowed;
+.hidden{
+display:none;
 }
 
 .switch{
 text-align:center;
-margin-top:15px;
+margin-top:10px;
 font-size:14px;
 }
 
@@ -67,10 +66,6 @@ font-size:14px;
 color:#2563eb;
 cursor:pointer;
 font-weight:bold;
-}
-
-.hidden{
-display:none;
 }
 
 #toast{
@@ -104,7 +99,7 @@ opacity:1;
 
 <input id="password2" type="password" placeholder="Nhập lại mật khẩu" class="hidden">
 
-<button onclick="submitForm()" id="submitBtn">Đăng nhập</button>
+<button onclick="submitForm()" id="btn">Đăng nhập</button>
 
 <div class="switch">
 <span onclick="toggleMode()" id="switchText">
@@ -121,33 +116,21 @@ Chưa có tài khoản? Đăng ký
 
 <script>
 
-let isLogin = true;
+let isLogin=true;
 
 function toggleMode(){
 
-isLogin = !isLogin;
+isLogin=!isLogin;
 
 document.getElementById("password2").classList.toggle("hidden");
 
 if(isLogin){
 document.getElementById("title").innerText="Đăng nhập";
-document.getElementById("submitBtn").innerText="Đăng nhập";
+document.getElementById("btn").innerText="Đăng nhập";
 document.getElementById("switchText").innerText="Chưa có tài khoản? Đăng ký";
 }else{
 document.getElementById("title").innerText="Đăng ký";
-document.getElementById("submitBtn").innerText="Tạo tài khoản";
-document.getElementById("switchText").innerText="Đã có tài khoản? Đăng nhập";
-}
-
-}
-
-if(isLogin){
-document.getElementById("title").innerText="Đăng nhập";
-document.getElementById("submitBtn").innerText="Đăng nhập";
-document.getElementById("switchText").innerText="Chưa có tài khoản? Đăng ký";
-}else{
-document.getElementById("title").innerText="Đăng ký";
-document.getElementById("submitBtn").innerText="Tạo tài khoản";
+document.getElementById("btn").innerText="Tạo tài khoản";
 document.getElementById("switchText").innerText="Đã có tài khoản? Đăng nhập";
 }
 
@@ -157,16 +140,26 @@ async function submitForm(){
 
 const email=document.getElementById("email").value.trim();
 const password=document.getElementById("password").value;
+const password2=document.getElementById("password2").value;
 
 if(!email||!password){
-showToast("Thiếu email hoặc mật khẩu");
+showToast("Nhập email và mật khẩu");
 return;
 }
 
 if(isLogin){
-login(email,password);
+
+await login(email,password);
+
 }else{
-register();
+
+if(password!==password2){
+showToast("Mật khẩu không khớp");
+return;
+}
+
+await register(email,password);
+
 }
 
 }
@@ -183,10 +176,9 @@ showToast(error.message);
 return;
 }
 
-const user = data.user;
+const user=data.user;
 
-// kiểm tra profile
-const { data:profile } = await sb
+const {data:profile}=await sb
 .from("users")
 .select("*")
 .eq("id",user.id)
@@ -194,7 +186,6 @@ const { data:profile } = await sb
 
 if(!profile){
 
-// tạo profile rỗng
 await sb.from("users").insert({
 id:user.id,
 email:user.email,
@@ -203,31 +194,27 @@ role:"student"
 
 }
 
+else{
+
+if(!profile.full_name||!profile.phone||!profile.birth_year){
+
+showToast("Vui lòng cập nhật thông tin tài khoản");
+
+}
+
+}
+
 showToast("Đăng nhập thành công");
 
 setTimeout(()=>{
 window.location.href="dashboard.html";
-},600);
+},700);
 
 }
 
-async function register(){
+async function register(email,password){
 
-const email = document.getElementById("email").value.trim();
-const password = document.getElementById("password").value;
-const password2 = document.getElementById("password2").value;
-
-if(!email || !password || !password2){
-showToast("Nhập đầy đủ thông tin");
-return;
-}
-
-if(password !== password2){
-showToast("Mật khẩu không khớp");
-return;
-}
-
-const { error } = await sb.auth.signUp({
+const {error}=await sb.auth.signUp({
 email,
 password
 });
@@ -241,17 +228,12 @@ showToast("Tạo tài khoản thành công");
 
 }
 
-function resetBtn(){
-const btn = document.getElementById("submitBtn");
-btn.disabled=false;
-btn.innerText="Tạo tài khoản";
-}
-
-function showToast(message){
+function showToast(msg){
 
 const toast=document.getElementById("toast");
 
-toast.innerText=message;
+toast.innerText=msg;
+
 toast.classList.add("show");
 
 setTimeout(()=>{
