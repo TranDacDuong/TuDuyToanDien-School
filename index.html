@@ -7,74 +7,78 @@
 <style>
 
 body{
-  font-family: Arial;
-  background: linear-gradient(135deg,#2563eb,#1e3a8a);
-  height:100vh;
-  display:flex;
-  justify-content:center;
-  align-items:center;
+font-family:Arial;
+background:linear-gradient(135deg,#2563eb,#1e3a8a);
+height:100vh;
+display:flex;
+justify-content:center;
+align-items:center;
 }
 
 .card{
-  background:white;
-  padding:40px;
-  width:320px;
-  border-radius:10px;
-  box-shadow:0 10px 30px rgba(0,0,0,0.2);
+background:white;
+padding:35px;
+width:340px;
+border-radius:10px;
+box-shadow:0 10px 30px rgba(0,0,0,0.2);
 }
 
 h2{
-  text-align:center;
-  margin-bottom:20px;
+text-align:center;
+margin-bottom:20px;
 }
 
 input{
-  width:100%;
-  padding:10px;
-  margin-bottom:15px;
-  border:1px solid #ccc;
-  border-radius:6px;
+width:100%;
+padding:10px;
+margin-bottom:12px;
+border:1px solid #ccc;
+border-radius:6px;
 }
 
 button{
-  width:100%;
-  padding:10px;
-  border:none;
-  background:#2563eb;
-  color:white;
-  border-radius:6px;
-  cursor:pointer;
+width:100%;
+padding:10px;
+border:none;
+background:#2563eb;
+color:white;
+border-radius:6px;
+cursor:pointer;
 }
 
 button:hover{
-  background:#1d4ed8;
+background:#1d4ed8;
 }
 
 .switch{
-  text-align:center;
-  margin-top:15px;
-  font-size:14px;
+text-align:center;
+margin-top:15px;
+font-size:14px;
 }
 
 .switch span{
-  color:#2563eb;
-  cursor:pointer;
+color:#2563eb;
+cursor:pointer;
+}
+
+.hidden{
+display:none;
 }
 
 #toast{
-  position:fixed;
-  bottom:20px;
-  right:20px;
-  background:#333;
-  color:white;
-  padding:12px 18px;
-  border-radius:6px;
-  opacity:0;
-  transition:0.3s;
+position:fixed;
+bottom:20px;
+right:20px;
+background:#333;
+color:white;
+padding:12px 18px;
+border-radius:6px;
+opacity:0;
+transition:0.3s;
 }
 
 #toast.show{
-  opacity:1;
+opacity:1;
 }
 
 </style>
@@ -90,12 +94,20 @@ button:hover{
 
 <input id="password" type="password" placeholder="Mật khẩu">
 
+<input id="password2" type="password" placeholder="Nhập lại mật khẩu" class="hidden">
+
+<input id="fullname" type="text" placeholder="Họ và tên" class="hidden">
+
+<input id="phone" type="text" placeholder="Số điện thoại" class="hidden">
+
+<input id="birthyear" type="number" placeholder="Năm sinh" class="hidden">
+
 <button onclick="submitForm()" id="submitBtn">Đăng nhập</button>
 
 <div class="switch">
-  <span onclick="toggleMode()" id="switchText">
-    Chưa có tài khoản? Đăng ký
-  </span>
+<span onclick="toggleMode()" id="switchText">
+Chưa có tài khoản? Đăng ký
+</span>
 </div>
 
 </div>
@@ -111,84 +123,143 @@ let isLogin = true;
 
 function toggleMode(){
 
-  isLogin = !isLogin;
+isLogin = !isLogin;
 
-  if(isLogin){
-    document.getElementById("title").innerText = "Đăng nhập";
-    document.getElementById("submitBtn").innerText = "Đăng nhập";
-    document.getElementById("switchText").innerText = "Chưa có tài khoản? Đăng ký";
-  }
-  else{
-    document.getElementById("title").innerText = "Đăng ký";
-    document.getElementById("submitBtn").innerText = "Tạo tài khoản";
-    document.getElementById("switchText").innerText = "Đã có tài khoản? Đăng nhập";
-  }
+const fields = ["password2","fullname","phone","birthyear"];
+
+fields.forEach(id=>{
+document.getElementById(id).classList.toggle("hidden");
+});
+
+if(isLogin){
+document.getElementById("title").innerText="Đăng nhập";
+document.getElementById("submitBtn").innerText="Đăng nhập";
+document.getElementById("switchText").innerText="Chưa có tài khoản? Đăng ký";
+}else{
+document.getElementById("title").innerText="Đăng ký";
+document.getElementById("submitBtn").innerText="Tạo tài khoản";
+document.getElementById("switchText").innerText="Đã có tài khoản? Đăng nhập";
+}
 
 }
 
 async function submitForm(){
 
-  const email = document.getElementById("email").value.trim();
-  const password = document.getElementById("password").value;
+const email=document.getElementById("email").value.trim();
+const password=document.getElementById("password").value;
 
-  if(!email || !password){
-    showToast("Thiếu email hoặc mật khẩu");
-    return;
-  }
-  
-  if(isLogin){
-    login(email,password);
-  }
-  else{
-    register(email,password);
-  }
+if(!email||!password){
+showToast("Thiếu email hoặc mật khẩu");
+return;
+}
+
+if(isLogin){
+login(email,password);
+}else{
+register();
+}
 
 }
 
 async function login(email,password){
 
-  const { data, error } = await sb.auth.signInWithPassword({
-    email,
-    password
-  });
+const {data,error}=await sb.auth.signInWithPassword({
+email,
+password
+});
 
-  if(error){
-    showToast(error.message);
-    return;
-  }
+if(error){
+showToast(error.message);
+return;
+}
 
-  showToast("Đăng nhập thành công");
+showToast("Đăng nhập thành công");
 
-  setTimeout(()=>{
-    window.location.href="dashboard.html";
-  },700);
+setTimeout(()=>{
+window.location.href="dashboard.html";
+},600);
 
 }
 
-async function register(email,password){
+async function register(){
 
-  const { data, error } = await sb.auth.signUp({
-    email,
-    password
-  });
+const email = document.getElementById("email").value.trim();
+const password = document.getElementById("password").value;
+const password2 = document.getElementById("password2").value;
+
+const fullname = document.getElementById("fullname").value.trim();
+const phone = document.getElementById("phone").value.trim();
+const birthyear = document.getElementById("birthyear").value.trim();
+
+
+// 🔴 kiểm tra thiếu thông tin
+if(!email || !password || !password2 || !fullname || !phone || !birthyear){
+showToast("Vui lòng nhập đầy đủ thông tin");
+return;
+}
+
+// 🔴 kiểm tra mật khẩu
+if(password !== password2){
+showToast("Mật khẩu nhập lại không khớp");
+return;
+}
+
 if(password.length < 6){
-  showToast("Mật khẩu phải ≥ 6 ký tự");
-  return;
+showToast("Mật khẩu tối thiểu 6 ký tự");
+return;
 }
-  showToast("Tạo tài khoản thành công");
+
+
+// 🔴 tạo tài khoản supabase
+const { data, error } = await sb.auth.signUp({
+email,
+password
+});
+
+if(error){
+showToast(error.message);
+return;
+}
+
+const user = data.user;
+
+if(!user){
+showToast("Không tạo được tài khoản");
+return;
+}
+
+
+// 🔴 lưu thông tin vào bảng users
+const { error: profileError } = await sb
+.from("users")
+.insert({
+id: user.id,
+email: email,
+full_name: fullname,
+phone: phone,
+birth_year: parseInt(birthyear),
+role: "teacher"
+});
+
+if(profileError){
+showToast("Lỗi lưu thông tin người dùng");
+return;
+}
+
+showToast("Tạo tài khoản thành công");
 
 }
 
 function showToast(message){
 
-  const toast = document.getElementById("toast");
+const toast=document.getElementById("toast");
 
-  toast.innerText = message;
-  toast.classList.add("show");
+toast.innerText=message;
+toast.classList.add("show");
 
-  setTimeout(()=>{
-    toast.classList.remove("show");
-  },2000);
+setTimeout(()=>{
+toast.classList.remove("show");
+},2000);
 
 }
 
