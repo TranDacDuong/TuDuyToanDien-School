@@ -111,13 +111,17 @@ opacity:1;
 
 <input id="email" type="email" placeholder="Email">
 
-<div class="password-box">
-<input id="password" type="password" placeholder="Mật khẩu">
-<span onclick="togglePassword('password')">Hiện</span>
-</div>
+<div style="position:relative">
 
-<div id="password2Box" class="hidden">
-<input id="password2" type="password" placeholder="Nhập lại mật khẩu">
+<input id="password" type="password" placeholder="Mật khẩu">
+
+<input id="password2" type="password" placeholder="Nhập lại mật khẩu" class="hidden">
+
+<span onclick="togglePassword()" id="eye"
+style="position:absolute;right:10px;top:12px;cursor:pointer;font-size:18px;">
+👁
+</span>
+
 </div>
 
 <button onclick="submitForm()" id="btn">Đăng nhập</button>
@@ -139,6 +143,25 @@ Chưa có tài khoản? Đăng ký
 
 let isLogin=true;
 
+function togglePassword(){
+
+const password = document.getElementById("password");
+const password2 = document.getElementById("password2");
+
+if(password.type === "password"){
+
+password.type = "text";
+password2.type = "text";
+
+}else{
+
+password.type = "password";
+password2.type = "password";
+
+}
+
+}
+  
 function toggleMode(){
 
 isLogin = !isLogin;
