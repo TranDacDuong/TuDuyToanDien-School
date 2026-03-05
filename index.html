@@ -116,9 +116,8 @@ opacity:1;
 <span onclick="togglePassword('password')">Hiện</span>
 </div>
 
-<div id="password2Box" class="password-box hidden">
+<div id="password2Box" class="hidden">
 <input id="password2" type="password" placeholder="Nhập lại mật khẩu">
-<span onclick="togglePassword('password2')">Hiện</span>
 </div>
 
 <button onclick="submitForm()" id="btn">Đăng nhập</button>
@@ -142,7 +141,7 @@ let isLogin=true;
 
 function toggleMode(){
 
-isLogin=!isLogin;
+isLogin = !isLogin;
 
 document.getElementById("password2Box").classList.toggle("hidden");
 
@@ -168,9 +167,9 @@ input.type = input.type==="password" ? "text" : "password";
 
 async function submitForm(){
 
-const email=document.getElementById("email").value.trim().toLowerCase();
-const password=document.getElementById("password").value;
-const password2=document.getElementById("password2").value;
+const email = emailInput.value.trim();
+const password = passwordInput.value;
+const password2 = password2Input.value;
 
 if(!email || !password){
 showToast("Vui lòng nhập email và mật khẩu");
@@ -183,13 +182,8 @@ login(email,password);
 
 }else{
 
-if(password.length<6){
-showToast("Mật khẩu phải ít nhất 6 ký tự");
-return;
-}
-
-if(password!==password2){
-showToast("Nhập lại mật khẩu không đúng");
+if(password !== password2){
+showToast("Mật khẩu nhập lại không khớp");
 return;
 }
 
@@ -198,7 +192,6 @@ register(email,password);
 }
 
 }
-
 async function login(email,password){
 
 const {data,error}=await sb.auth.signInWithPassword({
