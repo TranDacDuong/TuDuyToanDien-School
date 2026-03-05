@@ -21,7 +21,7 @@ background:white;
 padding:35px;
 width:360px;
 border-radius:12px;
-box-shadow:0 15px 35px rgba(0,0,0,0.25);
+box-shadow:0 10px 30px rgba(0,0,0,0.25);
 }
 
 h2{
@@ -60,7 +60,7 @@ display:none;
 
 .switch{
 text-align:center;
-margin-top:14px;
+margin-top:12px;
 font-size:14px;
 }
 
@@ -68,20 +68,6 @@ font-size:14px;
 color:#2563eb;
 cursor:pointer;
 font-weight:bold;
-}
-
-.password-wrapper{
-position:relative;
-}
-
-.eye{
-position:absolute;
-right:10px;
-top:50%;
-transform:translateY(-50%);
-cursor:pointer;
-font-size:16px;
-color:#555;
 }
 
 #toast{
@@ -93,12 +79,13 @@ color:white;
 padding:12px 18px;
 border-radius:6px;
 opacity:0;
+transform:translateY(10px);
 transition:0.3s;
-font-size:14px;
 }
 
 #toast.show{
 opacity:1;
+transform:translateY(0);
 }
 
 </style>
@@ -112,10 +99,7 @@ opacity:1;
 
 <input id="email" type="email" placeholder="Email">
 
-<div class="password-wrapper">
 <input id="password" type="password" placeholder="Mật khẩu">
-<span class="eye" onclick="togglePassword()">👁</span>
-</div>
 
 <input id="password2" type="password" placeholder="Nhập lại mật khẩu" class="hidden">
 
@@ -138,13 +122,10 @@ Chưa có tài khoản? Đăng ký
 
 let isLogin = true;
 
-const emailInput = document.getElementById("email");
-const passwordInput = document.getElementById("password");
-const password2Input = document.getElementById("password2");
-
 const title = document.getElementById("title");
 const btn = document.getElementById("btn");
 const switchText = document.getElementById("switchText");
+const password2Input = document.getElementById("password2");
 
 function toggleMode(){
 
@@ -153,35 +134,22 @@ isLogin = !isLogin;
 password2Input.classList.toggle("hidden");
 
 if(isLogin){
-
 title.innerText="Đăng nhập";
 btn.innerText="Đăng nhập";
 switchText.innerText="Chưa có tài khoản? Đăng ký";
-
 }else{
-
 title.innerText="Đăng ký";
 btn.innerText="Tạo tài khoản";
 switchText.innerText="Đã có tài khoản? Đăng nhập";
-
 }
-
-}
-
-function togglePassword(){
-
-const type = passwordInput.type === "password" ? "text" : "password";
-
-passwordInput.type = type;
-password2Input.type = type;
 
 }
 
 async function submitForm(){
 
-const email = emailInput.value.trim();
-const password = passwordInput.value;
-const password2 = password2Input.value;
+const email = document.getElementById("email").value.trim();
+const password = document.getElementById("password").value;
+const password2 = document.getElementById("password2").value;
 
 if(!email || !password){
 showToast("Vui lòng nhập email và mật khẩu");
@@ -190,7 +158,7 @@ return;
 
 if(isLogin){
 
-await login(email,password);
+login(email,password);
 
 }else{
 
@@ -199,7 +167,7 @@ showToast("Mật khẩu nhập lại không khớp");
 return;
 }
 
-await register(email,password);
+register(email,password);
 
 }
 
@@ -207,9 +175,9 @@ await register(email,password);
 
 async function login(email,password){
 
-const {error} = await sb.auth.signInWithPassword({
-email,
-password
+const {data,error} = await sb.auth.signInWithPassword({
+email:email,
+password:password
 });
 
 if(error){
@@ -221,23 +189,23 @@ showToast("Đăng nhập thành công");
 
 setTimeout(()=>{
 window.location.href="dashboard.html";
-},700);
+},800);
 
 }
 
 async function register(email,password){
 
-const {error} = await sb.auth.signUp({
-email,
-password
+const {data,error} = await sb.auth.signUp({
+email:email,
+password:password
 });
 
 if(error){
 
-if(error.message.toLowerCase().includes("already")){
+if(error.message.includes("already")){
 showToast("Email đã được đăng ký");
 }else{
-showToast(error.message);
+showToast("Không thể tạo tài khoản");
 }
 
 return;
@@ -252,9 +220,9 @@ toggleMode();
 
 function showToast(msg){
 
-const toast=document.getElementById("toast");
+const toast = document.getElementById("toast");
 
-toast.innerText=msg;
+toast.innerText = msg;
 
 toast.classList.add("show");
 
