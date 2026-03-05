@@ -297,7 +297,7 @@ function openDeletePopup(id){
 
   async function confirmDelete(){
 
-  await supabase
+  await sb
     .from("rooms")
     .delete()
     .eq("id",deletingRoomId);
