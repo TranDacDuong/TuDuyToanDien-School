@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Quản lý trường học</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
+<style>
+body{
+font-family:Arial;
+padding:30px;
+}
+
+input{
+padding:8px;
+width:250px;
+}
+
+button{
+padding:8px 12px;
+cursor:pointer;
+margin-left:5px;
+}
+
+.school{
+display:flex;
+justify-content:space-between;
+width:400px;
+padding:8px;
+border-bottom:1px solid #ddd;
+}
+
+.delete{
+background:red;
+color:white;
+border:none;
+}
+</style>
+
+</head>
+<body>
+
+<h2>Trường học</h2>
+
+<input id="schoolName" placeholder="Tên trường">
+<button onclick="addSchool()">Thêm trường</button>
+
+<br><br>
+
+<div id="schoolList"></div>
+
+<script>
+
+const supabase = window.supabase.createClient(
+"SUPABASE_URL",
+"SUPABASE_ANON_KEY"
+)
+
+async function loadSchools(){
+
+const {data,error} = await supabase
+.from("schools")
+.select("*")
+.order("name",{ascending:true})
+
+renderSchools(data)
+
+}
+
+function renderSchools(data){
+
+const list = document.getElementById("schoolList")
+list.innerHTML=""
+
+data.forEach(s=>{
+
+list.innerHTML+=`
+
+<div class="school">
+
+<span>${s.name}</span>
+
+<button class="delete" onclick="deleteSchool('${s.id}')">
+Xóa
+</button>
+
+</div>
+
+`
+
+})
+
+}
+
+async function addSchool(){
+
+const name = document.getElementById("schoolName").value
+
+if(!name) return alert("Nhập tên trường")
+
+await supabase
+.from("schools")
+.insert([{name:name}])
+
+document.getElementById("schoolName").value=""
+
+loadSchools()
+
+}
+
+async function deleteSchool(id){
+
+if(!confirm("Xóa trường này?")) return
+
+await supabase
+.from("schools")
+.delete()
+.eq("id",id)
+
+loadSchools()
+
+}
+
+loadSchools()
+
+</script>
+
+</body>
+</html>
