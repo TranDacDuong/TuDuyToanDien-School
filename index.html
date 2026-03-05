@@ -20,8 +20,8 @@ margin:0;
 background:white;
 padding:35px;
 width:360px;
-border-radius:10px;
-box-shadow:0 10px 30px rgba(0,0,0,0.25);
+border-radius:12px;
+box-shadow:0 15px 35px rgba(0,0,0,0.25);
 }
 
 h2{
@@ -31,21 +31,23 @@ margin-bottom:20px;
 
 input{
 width:100%;
-padding:10px;
+padding:11px;
 margin-bottom:12px;
 border:1px solid #ccc;
 border-radius:6px;
+font-size:14px;
 }
 
 button{
 width:100%;
-padding:10px;
+padding:11px;
 border:none;
 background:#2563eb;
 color:white;
 border-radius:6px;
 cursor:pointer;
 font-weight:bold;
+font-size:15px;
 }
 
 button:hover{
@@ -58,7 +60,7 @@ display:none;
 
 .switch{
 text-align:center;
-margin-top:10px;
+margin-top:14px;
 font-size:14px;
 }
 
@@ -68,20 +70,18 @@ cursor:pointer;
 font-weight:bold;
 }
 
-.password-box{
-display:flex;
-align-items:center;
+.password-wrapper{
+position:relative;
 }
 
-.password-box input{
-flex:1;
-}
-
-.password-box span{
-margin-left:8px;
+.eye{
+position:absolute;
+right:10px;
+top:50%;
+transform:translateY(-50%);
 cursor:pointer;
-font-size:13px;
-color:#2563eb;
+font-size:16px;
+color:#555;
 }
 
 #toast{
@@ -94,6 +94,7 @@ padding:12px 18px;
 border-radius:6px;
 opacity:0;
 transition:0.3s;
+font-size:14px;
 }
 
 #toast.show{
@@ -111,18 +112,12 @@ opacity:1;
 
 <input id="email" type="email" placeholder="Email">
 
-<div style="position:relative">
-
+<div class="password-wrapper">
 <input id="password" type="password" placeholder="Mật khẩu">
+<span class="eye" onclick="togglePassword()">👁</span>
+</div>
 
 <input id="password2" type="password" placeholder="Nhập lại mật khẩu" class="hidden">
-
-<span onclick="togglePassword()" id="eye"
-style="position:absolute;right:10px;top:12px;cursor:pointer;font-size:18px;">
-👁
-</span>
-
-</div>
 
 <button onclick="submitForm()" id="btn">Đăng nhập</button>
 
@@ -141,58 +136,52 @@ Chưa có tài khoản? Đăng ký
 
 <script>
 
-let isLogin=true;
+let isLogin = true;
 
-function togglePassword(){
+const emailInput = document.getElementById("email");
+const passwordInput = document.getElementById("password");
+const password2Input = document.getElementById("password2");
 
-const password = document.getElementById("password");
-const password2 = document.getElementById("password2");
+const title = document.getElementById("title");
+const btn = document.getElementById("btn");
+const switchText = document.getElementById("switchText");
 
-if(password.type === "password"){
-
-password.type = "text";
-password2.type = "text";
-
-}else{
-
-password.type = "password";
-password2.type = "password";
-
-}
-
-}
-  
 function toggleMode(){
 
 isLogin = !isLogin;
 
-document.getElementById("password2Box").classList.toggle("hidden");
+password2Input.classList.toggle("hidden");
 
 if(isLogin){
+
 title.innerText="Đăng nhập";
 btn.innerText="Đăng nhập";
 switchText.innerText="Chưa có tài khoản? Đăng ký";
+
 }else{
+
 title.innerText="Đăng ký";
 btn.innerText="Tạo tài khoản";
 switchText.innerText="Đã có tài khoản? Đăng nhập";
-}
 
 }
 
-function togglePassword(id){
+}
 
-const input=document.getElementById(id);
+function togglePassword(){
 
-input.type = input.type==="password" ? "text" : "password";
+const type = passwordInput.type === "password" ? "text" : "password";
+
+passwordInput.type = type;
+password2Input.type = type;
 
 }
 
 async function submitForm(){
 
-const email = document.getElementById("email").value.trim();
-const password = document.getElementById("password").value;
-const password2 = document.getElementById("password2").value;
+const email = emailInput.value.trim();
+const password = passwordInput.value;
+const password2 = password2Input.value;
 
 if(!email || !password){
 showToast("Vui lòng nhập email và mật khẩu");
@@ -201,7 +190,7 @@ return;
 
 if(isLogin){
 
-login(email,password);
+await login(email,password);
 
 }else{
 
@@ -210,15 +199,15 @@ showToast("Mật khẩu nhập lại không khớp");
 return;
 }
 
-register(email,password);
+await register(email,password);
 
 }
 
 }
-  
+
 async function login(email,password){
 
-const {data,error}=await sb.auth.signInWithPassword({
+const {error} = await sb.auth.signInWithPassword({
 email,
 password
 });
@@ -232,20 +221,20 @@ showToast("Đăng nhập thành công");
 
 setTimeout(()=>{
 window.location.href="dashboard.html";
-},800);
+},700);
 
 }
 
 async function register(email,password){
 
-const {data,error}=await sb.auth.signUp({
+const {error} = await sb.auth.signUp({
 email,
 password
 });
 
 if(error){
 
-if(error.message.includes("already")){
+if(error.message.toLowerCase().includes("already")){
 showToast("Email đã được đăng ký");
 }else{
 showToast(error.message);
