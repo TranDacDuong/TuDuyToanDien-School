@@ -14,6 +14,19 @@
     th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
     th { background: #e5e7eb; }
     .danger { background: red; color: white; }
+    
+    /* CSS đẹp hơn cho button */
+  button{
+    border:none;
+    padding:6px 12px;
+    border-radius:5px;
+    background:#2563eb;
+    color:white;
+  }
+
+  button:hover{
+    opacity:0.8;
+  }
   </style>
 </head>
 <body>
@@ -24,9 +37,12 @@
 
 <main>
   <div id="form-area">
-    <input type="text" id="roomName" placeholder="Tên phòng học">
-    <button onclick="addRoom()">Thêm phòng</button>
-  </div>
+  <input type="text" id="roomName" placeholder="Tên phòng học">
+
+  <input type="number" id="roomCapacity" placeholder="Sức chứa">
+
+  <button id="saveBtn" onclick="saveRoom()">Thêm phòng</button>
+</div>
 
   <table>
    <thead>
@@ -45,7 +61,7 @@
 
   let currentUser = null;
   let currentRole = null;
-
+  let editingRoomId = null;
  async function init() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) {
@@ -98,49 +114,94 @@
     const row = document.createElement("tr");
 
     row.innerHTML = `
-      <td>${room.room_name}</td>
-      <td>${room.capacity ?? "-"}</td>
-      <td>
-        <button class="danger" onclick="deleteRoom('${room.id}')">
-          Xóa
-        </button>
-      </td>
-    `;
+  <td>${room.room_name}</td>
+  <td>${room.capacity ?? "-"}</td>
+  <td>
+    <button onclick="editRoom('${room.id}','${room.room_name}',${room.capacity})">
+      Sửa
+    </button>
+
+    <button class="danger" onclick="deleteRoom('${room.id}')">
+      Xóa
+    </button>
+  </td>
+`;
 
     table.appendChild(row);
   });
 }
+function editRoom(id, name, capacity){
 
-  async function addRoom() {
-  if (currentRole !== "admin") {
-  alert("Không có quyền");
-  return;
+  editingRoomId = id;
+
+  document.getElementById("roomName").value = name;
+  document.getElementById("roomCapacity").value = capacity ?? 0;
+
+  document.getElementById("saveBtn").innerText = "Cập nhật";
+
 }
-    const name = document.getElementById("roomName").value.trim();
+  async function saveRoom(){
 
-    if (!name) {
-      alert("Nhập tên phòng");
-      return;
-    }
+  if (currentRole !== "admin") {
+    alert("Không có quyền");
+    return;
+  }
 
-   const { error } = await sb
-  .from("rooms")
-  .insert({
-    room_name: name,
-    capacity: 0,
-    note: "",
-    created_by: currentUser.id
-  });
+  const name = document.getElementById("roomName").value.trim();
+  const capacity = parseInt(document.getElementById("roomCapacity").value) || 0;
 
-    if (error) {
+  if (!name){
+    alert("Nhập tên phòng");
+    return;
+  }
+
+  // CREATE
+  if(!editingRoomId){
+
+    const { error } = await sb
+      .from("rooms")
+      .insert({
+        room_name: name,
+        capacity: capacity,
+        note: "",
+        created_by: currentUser.id
+      });
+
+    if(error){
       console.error(error);
       alert("Lỗi khi thêm phòng");
       return;
     }
 
-    document.getElementById("roomName").value = "";
-    loadRooms();
   }
+
+  // UPDATE
+  else{
+
+    const { error } = await sb
+      .from("rooms")
+      .update({
+        room_name: name,
+        capacity: capacity
+      })
+      .eq("id", editingRoomId);
+
+    if(error){
+      console.error(error);
+      alert("Lỗi khi cập nhật");
+      return;
+    }
+
+    editingRoomId = null;
+    document.getElementById("saveBtn").innerText = "Thêm phòng";
+
+  }
+
+  document.getElementById("roomName").value = "";
+  document.getElementById("roomCapacity").value = "";
+
+  loadRooms();
+}
 
   async function deleteRoom(id) {
     if (currentRole !== "admin") {
