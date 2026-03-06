@@ -105,6 +105,37 @@ cursor:pointer;
 background:#1d4ed8;
 }
 
+#userBox{
+display:flex;
+align-items:center;
+gap:10px;
+margin-bottom:20px;
+padding-bottom:15px;
+border-bottom:1px solid #374151;
+}
+
+#userAvatar{
+width:40px;
+height:40px;
+border-radius:50%;
+object-fit:cover;
+}
+
+#userName{
+font-weight:bold;
+font-size:14px;
+}
+
+#userBox button{
+margin-top:5px;
+padding:4px 10px;
+background:#ef4444;
+border:none;
+border-radius:5px;
+color:white;
+cursor:pointer;
+}
+
 </style>
 </head>
 
@@ -113,7 +144,17 @@ background:#1d4ed8;
 <!-- SIDEBAR -->
 
 <aside>
+<div id="userBox">
 
+<img id="userAvatar" src="default-avatar.png">
+
+<div>
+<div id="userName">User</div>
+<button onclick="logout()">Logout</button>
+</div>
+
+</div>
+  
 <h2>📚 Quản lý giáo dục</h2>
 
 <ul id="menu">
@@ -205,12 +246,33 @@ setupMenu();
 
 checkProfile(profile);
 
+loadUserInfo(profile);
+  
 /* hiện dashboard sau khi xác thực xong */
 
 document.body.style.visibility="visible";
 
 }
 
+
+function loadUserInfo(profile){
+
+document.getElementById("userName").innerText =
+profile.full_name || "User";
+
+if(profile.avatar_url){
+document.getElementById("userAvatar").src = profile.avatar_url;
+}
+
+}
+
+async function logout(){
+
+await sb.auth.signOut();
+
+window.location.href="index.html";
+
+}
 
 /* -------------------- ROLE MENU -------------------- */
 
