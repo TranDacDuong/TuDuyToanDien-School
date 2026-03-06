@@ -300,13 +300,27 @@ document.getElementById("profileModal").style.display="flex";
 /* -------------------- GO ACCOUNT -------------------- */
 
 function goToAccount(){
+
 document.getElementById("profileModal").style.display="none";
 
-document.querySelectorAll("[data-role]").forEach(li=>{
-if(li.innerText.includes("Tài khoản")){
-li.click();
+/* tìm menu tài khoản */
+
+const items = document.querySelectorAll("#menu li");
+
+items.forEach(item => {
+
+if(item.dataset.page && item.dataset.page.includes("account")){
+
+items.forEach(i=>i.classList.remove("active"));
+
+item.classList.add("active");
+
+document.getElementById("contentFrame").src = item.dataset.page;
+
 }
+
 });
+
 }
 
 
