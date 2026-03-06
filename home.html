@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
@@ -13,40 +14,74 @@ background:#f1f5f9;
 }
 
 .container{
-max-width:800px;
+max-width:750px;
 margin:auto;
 padding:30px;
 }
 
 .card{
 background:white;
-padding:20px;
 border-radius:10px;
-margin-bottom:20px;
+padding:18px;
+margin-bottom:18px;
 box-shadow:0 2px 10px rgba(0,0,0,0.05);
+}
+
+.post-header{
+display:flex;
+align-items:center;
+gap:10px;
+margin-bottom:10px;
+}
+
+.avatar{
+width:40px;
+height:40px;
+border-radius:50%;
+object-fit:cover;
+}
+
+.name{
+font-weight:600;
+}
+
+.time{
+font-size:12px;
+color:#6b7280;
 }
 
 textarea{
 width:100%;
-padding:10px;
 border:1px solid #ddd;
 border-radius:6px;
+padding:10px;
 }
 
 button{
+border:none;
 background:#2563eb;
 color:white;
-border:none;
-padding:8px 14px;
+padding:6px 12px;
 border-radius:6px;
 cursor:pointer;
-margin-top:8px;
+}
+
+button:hover{
+background:#1d4ed8;
+}
+
+.actions{
+margin-top:10px;
+display:flex;
+gap:15px;
+font-size:14px;
+color:#374151;
 }
 
 .comment{
 margin-top:10px;
-padding-left:10px;
 border-left:2px solid #eee;
+padding-left:10px;
 }
 
 .reply{
@@ -54,20 +89,40 @@ margin-left:20px;
 font-size:14px;
 }
 
+.comment-input{
+margin-top:8px;
+display:flex;
+gap:6px;
+}
+
+.comment-input input{
+flex:1;
+padding:8px;
+border:1px solid #ddd;
+border-radius:6px;
+}
+
+.pin{
+font-size:12px;
+color:#ef4444;
+margin-left:auto;
+}
+
 </style>
+
 </head>
 
 <body>
 
 <div class="container">
 
-<h2>📢 Bảng tin lớp học</h2>
-
-<!-- tạo bài viết -->
+<h2>📢 Bảng tin</h2>
 
 <div id="createPost" class="card" style="display:none">
 
 <textarea id="postContent" placeholder="Viết thông báo..."></textarea>
+
+<br><br>
 
 <button onclick="createPost()">Đăng bài</button>
 
@@ -78,59 +133,57 @@ font-size:14px;
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script src="../supabaseClient.js"></script>
 
 <script>
 
-let currentUser;
-let userRole;
+let currentUser
+let role
 
 async function init(){
 
-const { data:{user} } = await sb.auth.getUser();
+const { data:{user} } = await sb.auth.getUser()
 
 if(!user){
-location.href="../index.html";
-return;
+location.href="../index.html"
+return
 }
 
-currentUser=user;
+currentUser=user
 
-const { data } = await sb
+const { data:profile } = await sb
 .from("users")
-.select("role,full_name")
+.select("*")
 .eq("id",user.id)
-.single();
+.single()
 
-userRole=data.role;
+role=profile.role
 
-if(userRole==="admin"){
-document.getElementById("createPost").style.display="block";
+if(role==="admin"){
+document.getElementById("createPost").style.display="block"
 }
 
-loadPosts();
+loadPosts()
 
 }
 
 async function createPost(){
 
-const content=document.getElementById("postContent").value.trim();
+const text=document.getElementById("postContent").value.trim()
 
-if(!content){
-alert("Nhập nội dung");
-return;
-}
+if(!text) return
 
 await sb
 .from("posts")
 .insert({
 user_id:currentUser.id,
-content:content
-});
+content:text
+})
 
-document.getElementById("postContent").value="";
+document.getElementById("postContent").value=""
 
-loadPosts();
+loadPosts()
 
 }
 
@@ -140,44 +193,77 @@ const { data:posts } = await sb
 .from("posts")
 .select(`
 *,
-users(full_name)
+users(full_name,avatar_url),
+likes(count),
+comments(count)
 `)
-.order("created_at",{ascending:false});
+.order("is_pinned",{ascending:false})
+.order("created_at",{ascending:false})
 
-let html="";
+let html=""
 
 for(const post of posts){
 
 html+=`
+
 <div class="card">
 
-<b>${post.users?.full_name ?? "User"}</b>
+<div class="post-header">
+
+<img class="avatar"
+src="${post.users?.avatar_url ?? '/default-avatar.png'}">
+
+<div>
+
+<div class="name">${post.users?.full_name ?? "User"}</div>
+
+<div class="time">${new Date(post.created_at).toLocaleString()}</div>
+
+</div>
+
+${post.is_pinned ? `<div class="pin">📌 Ghim</div>` : ""}
+
+</div>
 
 <p>${post.content}</p>
 
-<button onclick="likePost('${post.id}')">
-👍 Thích
-</button>
+<div class="actions">
+
+<span onclick="likePost('${post.id}')">
+❤️ ${post.likes[0]?.count ?? 0}
+</span>
+
+<span>
+💬 ${post.comments[0]?.count ?? 0}
+</span>
+
+${role==="admin" ? `
+<button onclick="pinPost('${post.id}')">📌 Ghim</button>
+` : ""}
+
+</div>
 
 <div id="comments-${post.id}"></div>
 
-<input
-placeholder="Viết bình luận..."
-id="input-${post.id}">
+<div class="comment-input">
+
+<input id="c-${post.id}" placeholder="Viết bình luận">
 
 <button onclick="commentPost('${post.id}')">
 Gửi
 </button>
 
 </div>
-`;
+
+</div>
+`
 
 }
 
-document.getElementById("posts").innerHTML=html;
+document.getElementById("posts").innerHTML=html
 
 for(const post of posts){
-loadComments(post.id);
+loadComments(post.id)
 }
 
 }
@@ -189,17 +275,32 @@ await sb
 .insert({
 post_id:postId,
 user_id:currentUser.id
-});
+})
+
+loadPosts()
+
+}
+
+async function pinPost(postId){
+
+await sb
+.from("posts")
+.update({
+is_pinned:true
+})
+.eq("id",postId)
+
+loadPosts()
 
 }
 
 async function commentPost(postId){
 
-const input=document.getElementById(`input-${postId}`);
+const input=document.getElementById(`c-${postId}`)
 
-const text=input.value.trim();
+const text=input.value.trim()
 
-if(!text) return;
+if(!text) return
 
 await sb
 .from("comments")
@@ -207,19 +308,19 @@ await sb
 post_id:postId,
 user_id:currentUser.id,
 content:text
-});
+})
 
-input.value="";
+input.value=""
 
-loadComments(postId);
+loadComments(postId)
 
 }
 
 async function replyComment(postId,parentId){
 
-const text=prompt("Nhập trả lời");
+const text=prompt("Nhập trả lời")
 
-if(!text) return;
+if(!text) return
 
 await sb
 .from("comments")
@@ -228,58 +329,60 @@ post_id:postId,
 user_id:currentUser.id,
 content:text,
 parent_id:parentId
-});
+})
 
-loadComments(postId);
+loadComments(postId)
 
 }
 
 async function loadComments(postId){
 
-const { data:comments } = await sb
+const { data } = await sb
 .from("comments")
 .select(`
 *,
 users(full_name)
 `)
 .eq("post_id",postId)
-.order("created_at",{ascending:true});
+.order("created_at",{ascending:true})
 
-let html="";
+let html=""
 
-for(const c of comments){
+for(const c of data){
 
 if(!c.parent_id){
 
 html+=`
+
 <div class="comment">
 
 <b>${c.users?.full_name}</b>
 
-<p>${c.content}</p>
+<div>${c.content}</div>
 
 <button onclick="replyComment('${postId}','${c.id}')">
 Trả lời
 </button>
 
 </div>
-`;
+`
 
 }
 
-for(const r of comments){
+for(const r of data){
 
 if(r.parent_id===c.id){
 
 html+=`
+
 <div class="comment reply">
 
 <b>${r.users?.full_name}</b>
 
-<p>${r.content}</p>
+<div>${r.content}</div>
 
 </div>
-`;
+`
 
 }
 
@@ -287,11 +390,11 @@ html+=`
 
 }
 
-document.getElementById(`comments-${postId}`).innerHTML=html;
+document.getElementById(`comments-${postId}`).innerHTML=html
 
 }
 
-init();
+init()
 
 </script>
 
