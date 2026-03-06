@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Bảng tin</title>
+
+<style>
+
+body{
+font-family:Arial;
+margin:0;
+background:#f1f5f9;
+}
+
+.container{
+max-width:800px;
+margin:auto;
+padding:30px;
+}
+
+.card{
+background:white;
+padding:20px;
+border-radius:10px;
+margin-bottom:20px;
+box-shadow:0 2px 10px rgba(0,0,0,0.05);
+}
+
+textarea{
+width:100%;
+padding:10px;
+border:1px solid #ddd;
+border-radius:6px;
+}
+
+button{
+background:#2563eb;
+color:white;
+border:none;
+padding:8px 14px;
+border-radius:6px;
+cursor:pointer;
+margin-top:8px;
+}
+
+.comment{
+margin-top:10px;
+padding-left:10px;
+border-left:2px solid #eee;
+}
+
+.reply{
+margin-left:20px;
+font-size:14px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>📢 Bảng tin lớp học</h2>
+
+<!-- tạo bài viết -->
+
+<div id="createPost" class="card" style="display:none">
+
+<textarea id="postContent" placeholder="Viết thông báo..."></textarea>
+
+<button onclick="createPost()">Đăng bài</button>
+
+</div>
+
+<div id="posts"></div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabaseClient.js"></script>
+
+<script>
+
+let currentUser;
+let userRole;
+
+async function init(){
+
+const { data:{user} } = await sb.auth.getUser();
+
+if(!user){
+location.href="../index.html";
+return;
+}
+
+currentUser=user;
+
+const { data } = await sb
+.from("users")
+.select("role,full_name")
+.eq("id",user.id)
+.single();
+
+userRole=data.role;
+
+if(userRole==="admin"){
+document.getElementById("createPost").style.display="block";
+}
+
+loadPosts();
+
+}
+
+async function createPost(){
+
+const content=document.getElementById("postContent").value.trim();
+
+if(!content){
+alert("Nhập nội dung");
+return;
+}
+
+await sb
+.from("posts")
+.insert({
+user_id:currentUser.id,
+content:content
+});
+
+document.getElementById("postContent").value="";
+
+loadPosts();
+
+}
+
+async function loadPosts(){
+
+const { data:posts } = await sb
+.from("posts")
+.select(`
+*,
+users(full_name)
+`)
+.order("created_at",{ascending:false});
+
+let html="";
+
+for(const post of posts){
+
+html+=`
+<div class="card">
+
+<b>${post.users?.full_name ?? "User"}</b>
+
+<p>${post.content}</p>
+
+<button onclick="likePost('${post.id}')">
+👍 Thích
+</button>
+
+<div id="comments-${post.id}"></div>
+
+<input
+placeholder="Viết bình luận..."
+id="input-${post.id}">
+
+<button onclick="commentPost('${post.id}')">
+Gửi
+</button>
+
+</div>
+`;
+
+}
+
+document.getElementById("posts").innerHTML=html;
+
+for(const post of posts){
+loadComments(post.id);
+}
+
+}
+
+async function likePost(postId){
+
+await sb
+.from("likes")
+.insert({
+post_id:postId,
+user_id:currentUser.id
+});
+
+}
+
+async function commentPost(postId){
+
+const input=document.getElementById(`input-${postId}`);
+
+const text=input.value.trim();
+
+if(!text) return;
+
+await sb
+.from("comments")
+.insert({
+post_id:postId,
+user_id:currentUser.id,
+content:text
+});
+
+input.value="";
+
+loadComments(postId);
+
+}
+
+async function replyComment(postId,parentId){
+
+const text=prompt("Nhập trả lời");
+
+if(!text) return;
+
+await sb
+.from("comments")
+.insert({
+post_id:postId,
+user_id:currentUser.id,
+content:text,
+parent_id:parentId
+});
+
+loadComments(postId);
+
+}
+
+async function loadComments(postId){
+
+const { data:comments } = await sb
+.from("comments")
+.select(`
+*,
+users(full_name)
+`)
+.eq("post_id",postId)
+.order("created_at",{ascending:true});
+
+let html="";
+
+for(const c of comments){
+
+if(!c.parent_id){
+
+html+=`
+<div class="comment">
+
+<b>${c.users?.full_name}</b>
+
+<p>${c.content}</p>
+
+<button onclick="replyComment('${postId}','${c.id}')">
+Trả lời
+</button>
+
+</div>
+`;
+
+}
+
+for(const r of comments){
+
+if(r.parent_id===c.id){
+
+html+=`
+<div class="comment reply">
+
+<b>${r.users?.full_name}</b>
+
+<p>${r.content}</p>
+
+</div>
+`;
+
+}
+
+}
+
+}
+
+document.getElementById(`comments-${postId}`).innerHTML=html;
+
+}
+
+init();
+
+</script>
+
+</body>
+</html>
