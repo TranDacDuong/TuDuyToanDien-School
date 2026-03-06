@@ -97,7 +97,22 @@ transform:translateY(0);
 </header>
 
 <main>
+<div style="text-align:center;margin-bottom:20px">
 
+<img id="avatarPreview"
+src="default-avatar.png"
+style="width:90px;height:90px;border-radius:50%;object-fit:cover">
+
+<br><br>
+
+<input type="file" id="avatarInput">
+
+<br><br>
+
+<button onclick="uploadAvatar()">Đổi Avatar</button>
+
+</div>
+  
 <div class="card">
 
 <div class="form-group">
@@ -122,6 +137,21 @@ transform:translateY(0);
 
 <button onclick="saveProfile()">Lưu thông tin</button>
 
+<hr style="margin:30px 0">
+
+<h3>Đổi mật khẩu</h3>
+
+<input
+type="password"
+id="newPassword"
+placeholder="Mật khẩu mới">
+
+<br><br>
+
+<button onclick="changePassword()">
+Đổi mật khẩu
+</button>
+  
 </div>
 
 </main>
@@ -174,8 +204,77 @@ document.getElementById("fullName").value=data.full_name ?? "";
 document.getElementById("phone").value=data.phone ?? "";
 document.getElementById("birthYear").value=data.birth_year ?? "";
 
+if(data.avatar_url){
+document.getElementById("avatarPreview").src =
+data.avatar_url;
+}
 }
 
+async function changePassword(){
+
+const password =
+document.getElementById("newPassword").value;
+
+if(password.length < 6){
+alert("Mật khẩu tối thiểu 6 ký tự");
+return;
+}
+
+const { error } =
+await sb.auth.updateUser({
+password: password
+});
+
+if(error){
+alert("Lỗi đổi mật khẩu");
+return;
+}
+
+showToast("Đổi mật khẩu thành công");
+
+document.getElementById("newPassword").value="";
+
+}
+  
+async function uploadAvatar(){
+
+const file =
+document.getElementById("avatarInput").files[0];
+
+if(!file){
+alert("Chọn ảnh");
+return;
+}
+
+const filePath =
+currentUser.id + "-" + Date.now();
+
+const { error } = await sb.storage
+.from("avatars")
+.upload(filePath,file);
+
+if(error){
+console.error(error);
+alert("Upload lỗi");
+return;
+}
+
+const { data } = sb.storage
+.from("avatars")
+.getPublicUrl(filePath);
+
+const avatarUrl = data.publicUrl;
+
+await sb
+.from("users")
+.update({avatar_url:avatarUrl})
+.eq("id",currentUser.id);
+
+document.getElementById("avatarPreview").src = avatarUrl;
+
+showToast("Đổi avatar thành công");
+
+}
 
 /* SAVE PROFILE */
 
