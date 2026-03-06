@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Quản lý giáo viên</title>
+
+<style>
+
+body{
+font-family:Arial, Helvetica, sans-serif;
+margin:0;
+background:#f1f5f9;
+padding:30px;
+}
+
+h2{
+margin-bottom:20px;
+}
+
+.card{
+background:white;
+border-radius:12px;
+padding:20px;
+margin-bottom:20px;
+box-shadow:0 4px 14px rgba(0,0,0,0.06);
+}
+
+input,select{
+width:100%;
+padding:8px;
+border:1px solid #ddd;
+border-radius:6px;
+margin-top:6px;
+margin-bottom:12px;
+}
+
+button{
+border:none;
+background:#2563eb;
+color:white;
+padding:8px 16px;
+border-radius:6px;
+cursor:pointer;
+font-size:14px;
+}
+
+button:hover{
+background:#1d4ed8;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+background:white;
+border-radius:10px;
+overflow:hidden;
+}
+
+th,td{
+padding:10px;
+border-bottom:1px solid #eee;
+text-align:left;
+font-size:14px;
+}
+
+th{
+background:#f8fafc;
+}
+
+.avatar{
+width:40px;
+height:40px;
+border-radius:50%;
+object-fit:cover;
+}
+
+.actions button{
+margin-right:6px;
+font-size:12px;
+padding:6px 10px;
+}
+
+.delete{
+background:#ef4444;
+}
+
+.delete:hover{
+background:#dc2626;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h2>👨‍🏫 Quản lý giáo viên</h2>
+
+<div class="card">
+
+<h3>Thêm / Cập nhật giáo viên</h3>
+
+<label>Email tài khoản</label> <input id="email">
+
+<label>Môn giảng dạy</label> <select id="subject">
+
+<option value="">Chọn môn</option>
+<option>Toán</option>
+<option>Văn</option>
+<option>Anh</option>
+<option>Lý</option>
+<option>Hóa</option>
+<option>Sinh</option>
+<option>Sử</option>
+<option>Địa</option>
+</select>
+
+<label>Năm sinh</label> <input id="birth_year" type="number">
+
+<label>Số điện thoại</label> <input id="phone">
+
+<button onclick="saveTeacher()">Lưu giáo viên</button>
+
+</div>
+
+<table>
+
+<thead>
+<tr>
+<th>Avatar</th>
+<th>Tên</th>
+<th>Email</th>
+<th>Môn</th>
+<th>Năm sinh</th>
+<th>Phone</th>
+<th>Hành động</th>
+</tr>
+</thead>
+
+<tbody id="teacherTable"></tbody>
+
+</table>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script src="../supabaseClient.js"></script>
+
+<script>
+
+let editingId=null
+
+async function init(){
+
+const { data:{user} } = await sb.auth.getUser()
+
+if(!user){
+location.href="../index.html"
+return
+}
+
+const { data:profile } = await sb
+.from("users")
+.select("role")
+.eq("id",user.id)
+.single()
+
+if(profile.role!=="admin"){
+alert("Không có quyền truy cập")
+location.href="home.html"
+return
+}
+
+loadTeachers()
+
+}
+
+async function saveTeacher(){
+
+const email=document.getElementById("email").value.trim()
+const subject=document.getElementById("subject").value
+const birth_year=document.getElementById("birth_year").value
+const phone=document.getElementById("phone").value
+
+if(!email || !subject){
+alert("Thiếu thông tin")
+return
+}
+
+const { data:userData } = await sb
+.from("users")
+.select("id,full_name,avatar_url,email")
+.eq("email",email)
+.single()
+
+if(!userData){
+alert("Email chưa đăng ký")
+return
+}
+
+if(editingId){
+
+await sb
+.from("teachers")
+.update({
+subject,
+birth_year,
+phone
+})
+.eq("id",editingId)
+
+editingId=null
+
+}else{
+
+await sb
+.from("teachers")
+.insert({
+user_id:userData.id,
+subject,
+birth_year,
+phone
+})
+
+}
+
+document.getElementById("email").value=""
+document.getElementById("subject").value=""
+document.getElementById("birth_year").value=""
+document.getElementById("phone").value=""
+
+loadTeachers()
+
+}
+
+async function loadTeachers(){
+
+const { data } = await sb
+.from("teachers")
+.select(`
+*,
+users(full_name,email,avatar_url)
+`)
+.order("id",{ascending:false})
+
+let html=""
+
+for(const t of data){
+
+html+=`
+
+<tr>
+
+<td>
+<img class="avatar"
+src="${t.users?.avatar_url ?? '/default-avatar.png'}">
+</td>
+
+<td>${t.users?.full_name ?? ""}</td>
+
+<td>${t.users?.email ?? ""}</td>
+
+<td>${t.subject ?? ""}</td>
+
+<td>${t.birth_year ?? ""}</td>
+
+<td>${t.phone ?? ""}</td>
+
+<td class="actions">
+
+<button onclick="editTeacher('${t.id}','${t.users?.email}','${t.subject}','${t.birth_year}','${t.phone}')">
+Sửa
+</button>
+
+<button class="delete" onclick="deleteTeacher('${t.id}')">
+Xóa
+</button>
+
+</td>
+
+</tr>
+`
+}
+
+document.getElementById("teacherTable").innerHTML=html
+
+}
+
+function editTeacher(id,email,subject,birth,phone){
+
+editingId=id
+
+document.getElementById("email").value=email
+document.getElementById("subject").value=subject
+document.getElementById("birth_year").value=birth
+document.getElementById("phone").value=phone
+
+window.scrollTo(0,0)
+
+}
+
+async function deleteTeacher(id){
+
+if(!confirm("Xóa giáo viên này?")) return
+
+await sb
+.from("teachers")
+.delete()
+.eq("id",id)
+
+loadTeachers()
+
+}
+
+init()
+
+</script>
+
+</body>
+</html>
