@@ -231,7 +231,9 @@ item.style.display=roles.includes(role) ? "block" : "none";
 
 function setupMenu(){
 
-const items=document.querySelectorAll("#menu li");
+const items = document.querySelectorAll("#menu li");
+
+/* click menu */
 
 items.forEach(item=>{
 
@@ -254,20 +256,24 @@ document.getElementById("contentFrame").src=page;
 });
 
 
-/* load trang chủ mặc định */
+/* mở menu đầu tiên được phép */
 
-const items = document.querySelectorAll("#menu li");
+let firstVisible=null;
 
-let firstVisible = null;
+items.forEach(item=>{
 
-items.forEach(item => {
-  if (item.style.display !== "none" && !firstVisible) {
-    firstVisible = item;
-  }
+if(item.style.display!=="none" && !firstVisible){
+
+firstVisible=item;
+
+}
+
 });
 
-if (firstVisible) {
-  firstVisible.click();
+if(firstVisible){
+
+firstVisible.click();
+
 }
 
 }
