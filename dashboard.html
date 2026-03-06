@@ -300,19 +300,13 @@ document.getElementById("profileModal").style.display="flex";
 /* -------------------- GO ACCOUNT -------------------- */
 
 function goToAccount(){
-
 document.getElementById("profileModal").style.display="none";
 
-document.querySelectorAll("#menu li").forEach(li=>{
-
-if(li.dataset.page==="pages/account.html"){
-
+document.querySelectorAll("[data-role]").forEach(li=>{
+if(li.innerText.includes("Tài khoản")){
 li.click();
-
 }
-
 });
-
 }
 
 
