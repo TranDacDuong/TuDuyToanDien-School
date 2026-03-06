@@ -1,10 +1,75 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <title>Dashboard</title>
-  <style>
-    .modal{
+<meta charset="UTF-8">
+<title>Dashboard</title>
+
+<style>
+
+body{
+margin:0;
+font-family:Arial, Helvetica, sans-serif;
+display:flex;
+height:100vh;
+background:#f3f4f6;
+visibility:hidden;
+}
+
+/* SIDEBAR */
+
+aside{
+width:250px;
+background:#1f2937;
+color:white;
+padding:20px;
+box-sizing:border-box;
+}
+
+aside h2{
+font-size:18px;
+margin-bottom:20px;
+}
+
+aside ul{
+list-style:none;
+padding:0;
+margin:0;
+}
+
+aside li{
+padding:10px;
+cursor:pointer;
+border-radius:6px;
+margin-bottom:5px;
+}
+
+aside li:hover{
+background:#374151;
+}
+
+aside li.active{
+background:#2563eb;
+}
+
+/* MAIN */
+
+main{
+flex:1;
+padding:20px;
+box-sizing:border-box;
+}
+
+iframe{
+width:100%;
+height:100%;
+border:none;
+background:white;
+border-radius:8px;
+}
+
+/* MODAL */
+
+.modal{
 position:fixed;
 top:0;
 left:0;
@@ -26,10 +91,6 @@ text-align:center;
 box-shadow:0 10px 30px rgba(0,0,0,0.3);
 }
 
-.modal-box h3{
-margin-top:0;
-}
-
 .modal-box button{
 margin-top:15px;
 padding:10px 20px;
@@ -43,160 +104,210 @@ cursor:pointer;
 .modal-box button:hover{
 background:#1d4ed8;
 }
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      display: flex;
-      height: 100vh;
-    }
 
-    aside {
-      width: 260px;
-      background: #1f2937;
-      color: white;
-      padding: 20px;
-    }
-
-    aside h2 {
-      font-size: 18px;
-      margin-bottom: 20px;
-    }
-
-    aside ul {
-      list-style: none;
-      padding: 0;
-    }
-
-    aside li {
-      padding: 10px;
-      cursor: pointer;
-      border-radius: 6px;
-    }
-
-    aside li:hover {
-      background: #374151;
-    }
-
-    main {
-      flex: 1;
-      padding: 20px;
-      background: #f3f4f6;
-    }
-  </style>
+</style>
 </head>
+
 <body>
 
-  <div id="profileWarning" style="
-display:none;
-background:#fee2e2;
-color:#b91c1c;
-padding:10px;
-border-radius:6px;
-margin-bottom:15px;
-">
+<!-- SIDEBAR -->
 
-⚠ Bạn chưa cập nhật đầy đủ thông tin.
-Vui lòng vào mục <b>Tài khoản</b> để cập nhật.
+<aside>
+
+<h2>📚 Quản lý giáo dục</h2>
+
+<ul id="menu">
+
+<li data-role="admin,teacher,student" data-page="pages/home.html">🏠 Trang chủ</li>
+
+<li data-role="admin" data-page="pages/school.html">🏫 Trường học</li>
+
+<li data-role="admin" data-page="pages/room.html">🏛️ Phòng học</li>
+
+<li data-role="admin,teacher" data-page="pages/class.html">📘 Lớp học</li>
+
+<li data-role="admin" data-page="pages/teacher.html">👨‍🏫 Giáo viên</li>
+
+<li data-role="admin,teacher" data-page="pages/student.html">👩‍🎓 Học sinh</li>
+
+<li data-role="admin,teacher" data-page="pages/question.html">📝 Ngân hàng câu hỏi</li>
+
+<li data-role="admin,teacher" data-page="pages/exam.html">📄 Đề kiểm tra</li>
+
+<li data-role="admin,teacher" data-page="pages/result.html">📊 Kết quả thi</li>
+
+<li data-role="admin,teacher,student" data-page="pages/account.html">⚙️ Tài khoản</li>
+
+</ul>
+
+</aside>
+
+
+<!-- MAIN -->
+
+<main>
+
+<iframe id="contentFrame" src=""></iframe>
+
+</main>
+
+
+<!-- MODAL -->
+
+<div id="profileModal" class="modal">
+
+<div class="modal-box">
+
+<h3>⚠ Cập nhật thông tin</h3>
+
+<p>Bạn chưa cập nhật đầy đủ thông tin cá nhân.</p>
+
+<p>Vui lòng cập nhật để sử dụng đầy đủ chức năng.</p>
+
+<button onclick="goToAccount()">Cập nhật</button>
 
 </div>
-  
-  <!-- SIDEBAR -->
-  <aside>
-    <h2>📚 Quản lý giáo dục</h2>
-    <ul>
-      <li data-role="admin,teacher,student">🏠 Trang chủ</li>
 
-      <li data-role="admin">🏫 Trường học</li>
+</div>
 
-      <li data-role="admin">🏛️ Phòng học</li>
 
-      <li data-role="admin,teacher">📘 Lớp học</li>
-
-      <li data-role="admin">👨‍🏫 Giáo viên</li>
-
-      <li data-role="admin,teacher">👩‍🎓 Học sinh</li>
-
-      <li data-role="admin,teacher">📝 Ngân hàng câu hỏi</li>
-
-      <li data-role="admin,teacher">📄 Đề kiểm tra</li>
-
-      <li data-role="admin,teacher">📊 Kết quả thi</li>
-
-      <li data-role="admin,teacher,student">⚙️ Tài khoản</li>
-    </ul>
-  </aside>
-
-  <!-- MAIN -->
-  <main>
-    <h1>Dashboard</h1>
-    <p>Nội dung sẽ hiển thị ở đây</p>
-  </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
+
 <script>
-  async function initDashboard() {
-  const { data: { user } } = await sb.auth.getUser();
 
-  if (!user) {
-    window.location.href = "index.html";
-    return;
-  }
+/* -------------------- INIT -------------------- */
 
-  const { data: profile, error } = await sb
-    .from("users")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle();
+async function initDashboard(){
 
-  if (error || !profile) {
-    alert("Không tìm thấy quyền người dùng");
-    return;
-  }
+const { data:{user} } = await sb.auth.getUser();
 
-  applyRoleMenu(profile.role);
-
-  checkProfile(profile);
+if(!user){
+window.location.href="index.html";
+return;
 }
+
+const { data:profile , error } = await sb
+.from("users")
+.select("*")
+.eq("id",user.id)
+.maybeSingle();
+
+if(error || !profile){
+alert("Không tìm thấy thông tin người dùng");
+return;
+}
+
+applyRoleMenu(profile.role);
+
+setupMenu();
+
+checkProfile(profile);
+
+/* hiện dashboard sau khi xác thực xong */
+
+document.body.style.visibility="visible";
+
+}
+
+
+/* -------------------- ROLE MENU -------------------- */
+
+function applyRoleMenu(role){
+
+document.querySelectorAll("#menu li").forEach(item=>{
+
+const roles=item.dataset.role.split(",");
+
+item.style.display=roles.includes(role) ? "block" : "none";
+
+});
+
+}
+
+
+/* -------------------- MENU CLICK -------------------- */
+
+function setupMenu(){
+
+const items=document.querySelectorAll("#menu li");
+
+items.forEach(item=>{
+
+item.addEventListener("click",()=>{
+
+items.forEach(i=>i.classList.remove("active"));
+
+item.classList.add("active");
+
+const page=item.dataset.page;
+
+if(page){
+
+document.getElementById("contentFrame").src=page;
+
+}
+
+});
+
+});
+
+
+/* load trang chủ mặc định */
+
+const first=document.querySelector('#menu li[style!="display: none"]');
+
+if(first){
+first.click();
+}
+
+}
+
+
+/* -------------------- PROFILE CHECK -------------------- */
+
+function checkProfile(profile){
+
+if(
+
+profile.role==="student" &&
+(!profile.full_name || !profile.phone || !profile.birth_year)
+
+){
+
+document.getElementById("profileModal").style.display="flex";
+
+}
+
+}
+
+
+/* -------------------- GO ACCOUNT -------------------- */
+
 function goToAccount(){
 
 document.getElementById("profileModal").style.display="none";
 
-document.querySelectorAll("[data-role]").forEach(li=>{
-if(li.innerText.includes("Tài khoản")){
+document.querySelectorAll("#menu li").forEach(li=>{
+
+if(li.dataset.page==="pages/account.html"){
+
 li.click();
+
 }
+
 });
 
 }
-  function checkProfile(profile){
 
-if(
-profile.role === "student" &&
-(!profile.full_name || !profile.phone || !profile.birth_year)
-){
-document.getElementById("profileModal").style.display="flex";
-}
 
-}
-  
-  function applyRoleMenu(role) {
-    document.querySelectorAll("[data-role]").forEach(item => {
-      const roles = item.dataset.role.split(",");
-      item.style.display = roles.includes(role) ? "block" : "none";
-    });
-  }
-  initDashboard();
-    
+/* -------------------- START -------------------- */
+
+initDashboard();
+
 </script>
-<div id="profileModal" class="modal">
-  <div class="modal-box">
-    <h3>⚠ Cập nhật thông tin</h3>
-    <p>Bạn chưa cập nhật đầy đủ thông tin cá nhân.</p>
-    <p>Vui lòng cập nhật để sử dụng đầy đủ chức năng.</p>
 
-    <button onclick="goToAccount()">Cập nhật</button>
-  </div>
-</div>  
+
 </body>
 </html>
