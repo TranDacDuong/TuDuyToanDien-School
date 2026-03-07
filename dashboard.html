@@ -4,47 +4,95 @@
 <meta charset="UTF-8">
 <title>Dashboard</title>
 
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
 <style>
+
+*{
+box-sizing:border-box;
+}
 
 body{
 margin:0;
-font-family:Arial, Helvetica, sans-serif;
+font-family:'Inter',sans-serif;
 display:flex;
 height:100vh;
-background:#f3f4f6;
+background:#f1f5f9;
 visibility:hidden;
+color:#0f172a;
 }
 
 /* SIDEBAR */
 
 aside{
-width:250px;
-background:#1f2937;
+width:260px;
+background:#0f172a;
 color:white;
 padding:20px;
-box-sizing:border-box;
+display:flex;
+flex-direction:column;
 }
 
-aside h2{
+.logo{
 font-size:18px;
-margin-bottom:20px;
+font-weight:600;
+margin-bottom:25px;
+}
+
+#userBox{
+display:flex;
+align-items:center;
+gap:12px;
+margin-bottom:25px;
+padding-bottom:15px;
+border-bottom:1px solid #1e293b;
+}
+
+#userAvatar{
+width:42px;
+height:42px;
+border-radius:50%;
+object-fit:cover;
+}
+
+#userName{
+font-size:14px;
+font-weight:600;
+}
+
+.logoutBtn{
+font-size:12px;
+background:#ef4444;
+border:none;
+padding:4px 10px;
+border-radius:5px;
+color:white;
+cursor:pointer;
+margin-top:4px;
+}
+
+.logoutBtn:hover{
+background:#dc2626;
 }
 
 aside ul{
 list-style:none;
 padding:0;
 margin:0;
+flex:1;
 }
 
 aside li{
-padding:10px;
+padding:12px 14px;
 cursor:pointer;
-border-radius:6px;
-margin-bottom:5px;
+border-radius:8px;
+margin-bottom:6px;
+font-size:14px;
+transition:0.2s;
 }
 
 aside li:hover{
-background:#374151;
+background:#1e293b;
 }
 
 aside li.active{
@@ -55,16 +103,34 @@ background:#2563eb;
 
 main{
 flex:1;
+display:flex;
+flex-direction:column;
+}
+
+/* TOP BAR */
+
+.topbar{
+height:60px;
+background:white;
+border-bottom:1px solid #e2e8f0;
+display:flex;
+align-items:center;
+padding:0 25px;
+font-weight:600;
+}
+
+.content{
+flex:1;
 padding:20px;
-box-sizing:border-box;
 }
 
 iframe{
 width:100%;
 height:100%;
 border:none;
+border-radius:12px;
 background:white;
-border-radius:8px;
+box-shadow:0 10px 30px rgba(0,0,0,0.05);
 }
 
 /* MODAL */
@@ -84,11 +150,11 @@ z-index:999;
 
 .modal-box{
 background:white;
-padding:25px;
-border-radius:10px;
-width:320px;
+padding:30px;
+border-radius:12px;
+width:340px;
 text-align:center;
-box-shadow:0 10px 30px rgba(0,0,0,0.3);
+box-shadow:0 20px 40px rgba(0,0,0,0.2);
 }
 
 .modal-box button{
@@ -105,37 +171,6 @@ cursor:pointer;
 background:#1d4ed8;
 }
 
-#userBox{
-display:flex;
-align-items:center;
-gap:10px;
-margin-bottom:20px;
-padding-bottom:15px;
-border-bottom:1px solid #374151;
-}
-
-#userAvatar{
-width:40px;
-height:40px;
-border-radius:50%;
-object-fit:cover;
-}
-
-#userName{
-font-weight:bold;
-font-size:14px;
-}
-
-#userBox button{
-margin-top:5px;
-padding:4px 10px;
-background:#ef4444;
-border:none;
-border-radius:5px;
-color:white;
-cursor:pointer;
-}
-
 </style>
 </head>
 
@@ -144,24 +179,23 @@ cursor:pointer;
 <!-- SIDEBAR -->
 
 <aside>
+
+<div class="logo">📚 Edu Manager</div>
+
 <div id="userBox">
 
 <img id="userAvatar" src="default-avatar.png">
 
 <div>
 <div id="userName">User</div>
-<button onclick="logout()">Logout</button>
+<button class="logoutBtn" onclick="logout()">Logout</button>
 </div>
 
 </div>
-  
-<h2>📚 Quản lý giáo dục</h2>
 
 <ul id="menu">
 
 <li data-role="admin,teacher,student" data-page="home.html">🏠 Trang chủ</li>
-
-<li data-role="admin" data-page="school.html">🏫 Trường học</li>
 
 <li data-role="admin" data-page="room.html">🏛️ Phòng học</li>
 
@@ -188,7 +222,15 @@ cursor:pointer;
 
 <main>
 
-<iframe id="contentFrame" src=""></iframe>
+<div class="topbar">
+Hệ thống quản lý trung tâm
+</div>
+
+<div class="content">
+
+<iframe id="contentFrame"></iframe>
+
+</div>
 
 </main>
 
@@ -212,13 +254,12 @@ cursor:pointer;
 </div>
 
 
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
 
 <script>
 
-/* -------------------- INIT -------------------- */
+/* INIT */
 
 async function initDashboard(){
 
@@ -247,13 +288,10 @@ setupMenu();
 checkProfile(profile);
 
 loadUserInfo(profile);
-  
-/* hiện dashboard sau khi xác thực xong */
 
 document.body.style.visibility="visible";
 
 }
-
 
 function loadUserInfo(profile){
 
@@ -274,7 +312,7 @@ window.location.href="index.html";
 
 }
 
-/* -------------------- ROLE MENU -------------------- */
+/* ROLE MENU */
 
 function applyRoleMenu(role){
 
@@ -288,14 +326,11 @@ item.style.display=roles.includes(role) ? "block" : "none";
 
 }
 
-
-/* -------------------- MENU CLICK -------------------- */
+/* MENU */
 
 function setupMenu(){
 
 const items = document.querySelectorAll("#menu li");
-
-/* click menu */
 
 items.forEach(item=>{
 
@@ -308,64 +343,47 @@ item.classList.add("active");
 const page=item.dataset.page;
 
 if(page){
-
 document.getElementById("contentFrame").src=page;
-
 }
 
 });
 
 });
-
-
-/* mở menu đầu tiên được phép */
 
 let firstVisible=null;
 
 items.forEach(item=>{
 
 if(item.style.display!=="none" && !firstVisible){
-
 firstVisible=item;
-
 }
 
 });
 
 if(firstVisible){
-
 firstVisible.click();
-
 }
 
 }
 
-
-/* -------------------- PROFILE CHECK -------------------- */
+/* PROFILE CHECK */
 
 function checkProfile(profile){
 
 if(
-
 profile.role==="student" &&
 (!profile.full_name || !profile.phone || !profile.birth_year)
-
 ){
-
 document.getElementById("profileModal").style.display="flex";
-
 }
 
 }
 
-
-/* -------------------- GO ACCOUNT -------------------- */
+/* GO ACCOUNT */
 
 function goToAccount(){
 
 document.getElementById("profileModal").style.display="none";
-
-/* tìm menu tài khoản */
 
 const items = document.querySelectorAll("#menu li");
 
@@ -385,13 +403,9 @@ document.getElementById("contentFrame").src = item.dataset.page;
 
 }
 
-
-/* -------------------- START -------------------- */
-
 initDashboard();
 
 </script>
-
 
 </body>
 </html>
