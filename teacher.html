@@ -154,12 +154,13 @@ const {data}=await sb
 id,
 full_name,
 email,
-teachers(subject,birth_year,phone)
+birth_year,
+phone,
+teachers(subject)
 `)
 .eq("role","teacher")
 
 let html=""
-
 let i=1
 
 for(const u of data){
@@ -174,14 +175,14 @@ html+=`
 <td>${u.full_name ?? ""}</td>
 <td>${u.email}</td>
 <td>${t.subject ?? ""}</td>
-<td>${t.birth_year ?? ""}</td>
-<td>${t.phone ?? ""}</td>
+<td>${u.birth_year ?? ""}</td>
+<td>${u.phone ?? ""}</td>
 
-<td class="actions">
+<td>
 
 <button onclick="editTeacher('${u.id}')">Sửa</button>
 
-<button class="delete" onclick="deleteTeacher('${u.id}')">Xóa</button>
+<button onclick="deleteTeacher('${u.id}')" class="delete">Xóa</button>
 
 </td>
 
@@ -204,38 +205,41 @@ async function submitTeacher(){
 const userId=document.getElementById("editUserId").value
 const email=document.getElementById("email").value.trim()
 const subject=document.getElementById("subject").value
-const birth=document.getElementById("birth_year").value
-const phone=document.getElementById("phone").value
-
 
 /* ===== UPDATE ===== */
 
 if(userId){
 
-await sb
+const {error}=await sb
 .from("teachers")
 .update({
-subject,
-birth_year:birth,
-phone
+subject
 })
 .eq("user_id",userId)
+
+if(error){
+alert(error.message)
+return
+}
 
 resetForm()
 loadTeachers()
 return
-
 }
-
 
 
 /* ===== ADD ===== */
 
-const {data:user}=await sb
+const {data:user,error:userError}=await sb
 .from("users")
 .select("*")
 .eq("email",email)
 .maybeSingle()
+
+if(userError){
+alert(userError.message)
+return
+}
 
 if(!user){
 alert("Không tìm thấy user")
@@ -250,25 +254,30 @@ return
 
 /* update role */
 
-await sb
+const {error:updateError}=await sb
 .from("users")
 .update({role:"teacher"})
 .eq("id",user.id)
 
+if(updateError){
+alert(updateError.message)
+return
+}
 
-/* copy sang teachers */
 
-await sb
+/* insert teachers */
+
+const {error:insertError}=await sb
 .from("teachers")
 .insert({
-
 user_id:user.id,
-subject:subject,
-birth_year:null,
-phone:null
-
+subject
 })
 
+if(insertError){
+alert(insertError.message)
+return
+}
 
 resetForm()
 loadTeachers()
@@ -315,15 +324,31 @@ async function deleteTeacher(id){
 
 if(!confirm("Bạn có chắc muốn xóa giáo viên này?")) return
 
-await sb
+
+/* delete teachers */
+
+const {error:deleteError}=await sb
 .from("teachers")
 .delete()
 .eq("user_id",id)
 
-await sb
+if(deleteError){
+alert(deleteError.message)
+return
+}
+
+
+/* update role */
+
+const {error:updateError}=await sb
 .from("users")
 .update({role:"student"})
 .eq("id",id)
+
+if(updateError){
+alert(updateError.message)
+return
+}
 
 loadTeachers()
 
