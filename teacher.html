@@ -8,42 +8,35 @@
 <style>
 
 body{
-font-family:Arial, Helvetica, sans-serif;
-margin:0;
+font-family:Arial;
 background:#f1f5f9;
 padding:30px;
 }
 
-h2{
-margin-bottom:20px;
-}
-
 .card{
 background:white;
-border-radius:12px;
 padding:20px;
+border-radius:10px;
 margin-bottom:20px;
-box-shadow:0 4px 14px rgba(0,0,0,0.06);
-max-width:600px;
+max-width:500px;
 }
 
 input,select{
 width:100%;
 padding:8px;
+margin-top:5px;
+margin-bottom:12px;
 border:1px solid #ddd;
 border-radius:6px;
-margin-top:6px;
-margin-bottom:12px;
 }
 
 button{
-border:none;
 background:#2563eb;
 color:white;
-padding:8px 16px;
+border:none;
+padding:8px 14px;
 border-radius:6px;
 cursor:pointer;
-font-size:14px;
 }
 
 button:hover{
@@ -54,41 +47,31 @@ table{
 width:100%;
 border-collapse:collapse;
 background:white;
-border-radius:10px;
-overflow:hidden;
-box-shadow:0 4px 14px rgba(0,0,0,0.05);
 }
 
 th,td{
 padding:10px;
 border-bottom:1px solid #eee;
 text-align:left;
-font-size:14px;
 }
 
 th{
 background:#f8fafc;
 }
 
-.avatar{
-width:40px;
-height:40px;
-border-radius:50%;
-object-fit:cover;
-}
-
 .actions button{
-margin-right:6px;
-font-size:12px;
-padding:6px 10px;
+margin-right:5px;
 }
 
 .delete{
 background:#ef4444;
 }
 
-.delete:hover{
-background:#dc2626;
+.editbox{
+display:none;
+background:#f9fafb;
+padding:10px;
+border-radius:6px;
 }
 
 </style>
@@ -97,13 +80,11 @@ background:#dc2626;
 
 <body>
 
-<h2>👨‍🏫 Quản lý giáo viên</h2>
+<h2>Quản lý giáo viên</h2>
 
 <div class="card">
 
-<h3>Thêm giáo viên</h3>
-
-<label>Email (tài khoản đang là student)</label> <input id="email" placeholder="example@gmail.com">
+<label>Email</label> <input id="email">
 
 <label>Môn giảng dạy</label> <select id="subject">
 
@@ -118,10 +99,6 @@ background:#dc2626;
 <option>Địa</option>
 </select>
 
-<label>Năm sinh</label> <input id="birth_year" type="number">
-
-<label>Số điện thoại</label> <input id="phone">
-
 <button onclick="addTeacher()">Thêm giáo viên</button>
 
 </div>
@@ -130,17 +107,16 @@ background:#dc2626;
 
 <thead>
 <tr>
-<th>Avatar</th>
 <th>Tên</th>
 <th>Email</th>
 <th>Môn</th>
 <th>Năm sinh</th>
-<th>Phone</th>
+<th>SĐT</th>
 <th>Hành động</th>
 </tr>
 </thead>
 
-<tbody id="teacherTable"></tbody>
+<tbody id="table"></tbody>
 
 </table>
 
@@ -151,159 +127,201 @@ background:#dc2626;
 <script>
 
 async function init(){
-
-const { data:{user} } = await sb.auth.getUser()
-
-if(!user){
-location.href="../index.html"
-return
-}
-
-const { data:profile } = await sb
-.from("users")
-.select("role")
-.eq("id",user.id)
-.single()
-
-if(profile.role!=="admin"){
-alert("Bạn không có quyền")
-location.href="home.html"
-return
-}
-
+await ensureTeacherRows()
 loadTeachers()
+}
+
+
+async function ensureTeacherRows(){
+
+const {data:teachers} = await sb
+.from("teachers")
+.select("user_id")
+
+const teacherIds = teachers.map(t=>t.user_id)
+
+const {data:users} = await sb
+.from("users")
+.select("*")
+.eq("role","teacher")
+
+for(const u of users){
+
+if(!teacherIds.includes(u.id)){
+
+await sb.from("teachers").insert({
+user_id:u.id
+})
 
 }
+
+}
+
+}
+
+
 
 async function addTeacher(){
 
 const email=document.getElementById("email").value.trim()
 const subject=document.getElementById("subject").value
-const birth_year=document.getElementById("birth_year").value
-const phone=document.getElementById("phone").value
 
 if(!email || !subject){
 alert("Thiếu thông tin")
 return
 }
 
-const { data:userData } = await sb
+const {data:user}=await sb
 .from("users")
 .select("*")
 .eq("email",email)
-.single()
+.maybeSingle()
 
-if(!userData){
+if(!user){
 alert("Không tìm thấy user")
 return
 }
 
-if(userData.role!=="student"){
-alert("User này không phải student")
-return
-}
-
-/* cập nhật role thành teacher */
-
 await sb
 .from("users")
-.update({
-role:"teacher"
-})
-.eq("id",userData.id)
-
-/* lưu bảng teachers */
+.update({role:"teacher"})
+.eq("id",user.id)
 
 await sb
 .from("teachers")
-.insert({
-user_id:userData.id,
-subject,
-birth_year,
-phone,
-avatar_url:userData.avatar_url
+.upsert({
+user_id:user.id,
+subject
 })
 
 document.getElementById("email").value=""
 document.getElementById("subject").value=""
-document.getElementById("birth_year").value=""
-document.getElementById("phone").value=""
 
 loadTeachers()
 
 }
 
+
+
 async function loadTeachers(){
 
-const { data } = await sb
-.from("teachers")
+const {data}=await sb
+.from("users")
 .select(`
-*,
-users(full_name,email,avatar_url)
+id,
+email,
+full_name,
+teachers(subject,birth_year,phone)
 `)
-.order("id",{ascending:false})
+.eq("role","teacher")
 
 let html=""
 
-for(const t of data){
+for(const u of data){
+
+const t=u.teachers?.[0] || {}
 
 html+=`
 
 <tr>
 
-<td>
-<img class="avatar"
-src="${t.users?.avatar_url ?? '/default-avatar.png'}">
-</td>
-
-<td>${t.users?.full_name ?? ""}</td>
-
-<td>${t.users?.email ?? ""}</td>
-
+<td>${u.full_name ?? ""}</td>
+<td>${u.email}</td>
 <td>${t.subject ?? ""}</td>
-
 <td>${t.birth_year ?? ""}</td>
-
 <td>${t.phone ?? ""}</td>
 
 <td class="actions">
 
-<button onclick="deleteTeacher('${t.id}','${t.user_id}')">
+<button onclick="showEdit('${u.id}','${t.subject ?? ""}','${t.birth_year ?? ""}','${t.phone ?? ""}')">
+Sửa
+</button>
+
+<button class="delete" onclick="deleteTeacher('${u.id}')">
 Xóa
 </button>
+
+<div class="editbox" id="edit-${u.id}">
+
+<label>Môn</label>
+<input id="subject-${u.id}" value="${t.subject ?? ""}">
+
+<label>Năm sinh</label>
+<input id="birth-${u.id}" value="${t.birth_year ?? ""}">
+
+<label>SĐT</label>
+<input id="phone-${u.id}" value="${t.phone ?? ""}">
+
+<button onclick="saveEdit('${u.id}')">Lưu</button>
+
+</div>
 
 </td>
 
 </tr>
+
 `
 
 }
 
-document.getElementById("teacherTable").innerHTML=html
+document.getElementById("table").innerHTML=html
 
 }
 
-async function deleteTeacher(id,userId){
 
-if(!confirm("Xóa giáo viên này?")) return
+
+function showEdit(id){
+
+const box=document.getElementById("edit-"+id)
+
+box.style.display = box.style.display==="block" ? "none":"block"
+
+}
+
+
+
+async function saveEdit(id){
+
+const subject=document.getElementById("subject-"+id).value
+const birth=document.getElementById("birth-"+id).value
+const phone=document.getElementById("phone-"+id).value
 
 await sb
 .from("teachers")
-.delete()
-.eq("id",id)
+.update({
+subject,
+birth_year:birth,
+phone
+})
+.eq("user_id",id)
 
-/* đổi lại role student */
+loadTeachers()
+
+}
+
+
+
+async function deleteTeacher(id){
+
+if(!confirm("Bạn có chắc muốn xóa giáo viên này?")) return
 
 await sb
 .from("users")
 .update({
 role:"student"
 })
-.eq("id",userId)
+.eq("id",id)
+
+await sb
+.from("teachers")
+.delete()
+.eq("user_id",id)
 
 loadTeachers()
 
 }
+
+
 
 init()
 
