@@ -23,7 +23,6 @@ padding:20px;
 border-radius:10px;
 margin-bottom:20px;
 max-width:500px;
-box-shadow:0 2px 10px rgba(0,0,0,0.05);
 }
 
 input,select{
@@ -52,8 +51,6 @@ table{
 width:100%;
 border-collapse:collapse;
 background:white;
-border-radius:8px;
-overflow:hidden;
 }
 
 th,td{
@@ -74,10 +71,6 @@ margin-right:6px;
 background:#ef4444;
 }
 
-.delete:hover{
-background:#dc2626;
-}
-
 </style>
 
 </head>
@@ -85,6 +78,8 @@ background:#dc2626;
 <body>
 
 <h2>Quản lý giáo viên</h2>
+
+<!-- PHẦN ĐIỀN -->
 
 <div class="card">
 
@@ -105,18 +100,25 @@ background:#dc2626;
 <option>Địa</option>
 </select>
 
+<div id="extraFields" style="display:none">
+
 <label>Năm sinh</label> <input id="birth_year">
 
 <label>SĐT</label> <input id="phone">
+
+</div>
 
 <button id="submitBtn" onclick="submitTeacher()">Thêm giáo viên</button>
 
 </div>
 
+<!-- BẢNG GIÁO VIÊN -->
+
 <table>
 
 <thead>
 <tr>
+<th>STT</th>
 <th>Tên</th>
 <th>Email</th>
 <th>Môn</th>
@@ -141,9 +143,8 @@ loadTeachers()
 }
 
 
-/* =========================
-LOAD TEACHERS
-========================= */
+
+/* LOAD DANH SÁCH */
 
 async function loadTeachers(){
 
@@ -151,13 +152,15 @@ const {data}=await sb
 .from("users")
 .select(`
 id,
-email,
 full_name,
+email,
 teachers(subject,birth_year,phone)
 `)
 .eq("role","teacher")
 
 let html=""
+
+let i=1
 
 for(const u of data){
 
@@ -167,6 +170,7 @@ html+=`
 
 <tr>
 
+<td>${i++}</td>
 <td>${u.full_name ?? ""}</td>
 <td>${u.email}</td>
 <td>${t.subject ?? ""}</td>
@@ -192,16 +196,15 @@ document.getElementById("table").innerHTML=html
 }
 
 
-/* =========================
-ADD / UPDATE
-========================= */
+
+/* THÊM / CẬP NHẬT */
 
 async function submitTeacher(){
 
 const userId=document.getElementById("editUserId").value
 const email=document.getElementById("email").value.trim()
 const subject=document.getElementById("subject").value
-const birth_year=document.getElementById("birth_year").value
+const birth=document.getElementById("birth_year").value
 const phone=document.getElementById("phone").value
 
 
@@ -213,16 +216,17 @@ await sb
 .from("teachers")
 .update({
 subject,
-birth_year,
+birth_year:birth,
 phone
 })
 .eq("user_id",userId)
 
 resetForm()
 loadTeachers()
-
 return
+
 }
+
 
 
 /* ===== ADD ===== */
@@ -238,6 +242,11 @@ alert("Không tìm thấy user")
 return
 }
 
+if(user.role!=="student"){
+alert("User này không phải student")
+return
+}
+
 
 /* update role */
 
@@ -247,15 +256,17 @@ await sb
 .eq("id",user.id)
 
 
-/* insert teachers */
+/* copy sang teachers */
 
 await sb
 .from("teachers")
-.upsert({
+.insert({
+
 user_id:user.id,
-subject,
-birth_year,
-phone
+subject:subject,
+birth_year:null,
+phone:null
+
 })
 
 
@@ -265,11 +276,10 @@ loadTeachers()
 }
 
 
-/* =========================
-EDIT
-========================= */
 
-async function editTeacher(userId){
+/* SỬA */
+
+async function editTeacher(id){
 
 const {data}=await sb
 .from("users")
@@ -278,16 +288,18 @@ id,
 email,
 teachers(subject,birth_year,phone)
 `)
-.eq("id",userId)
+.eq("id",id)
 .single()
 
 const t=data.teachers?.[0] || {}
 
-document.getElementById("editUserId").value=userId
+document.getElementById("editUserId").value=id
 document.getElementById("email").value=data.email
 document.getElementById("subject").value=t.subject ?? ""
 document.getElementById("birth_year").value=t.birth_year ?? ""
 document.getElementById("phone").value=t.phone ?? ""
+
+document.getElementById("extraFields").style.display="block"
 
 document.getElementById("submitBtn").innerText="Cập nhật"
 
@@ -296,9 +308,8 @@ window.scrollTo({top:0,behavior:"smooth"})
 }
 
 
-/* =========================
-DELETE
-========================= */
+
+/* XÓA */
 
 async function deleteTeacher(id){
 
@@ -319,9 +330,8 @@ loadTeachers()
 }
 
 
-/* =========================
-RESET FORM
-========================= */
+
+/* RESET FORM */
 
 function resetForm(){
 
@@ -331,9 +341,12 @@ document.getElementById("subject").value=""
 document.getElementById("birth_year").value=""
 document.getElementById("phone").value=""
 
+document.getElementById("extraFields").style.display="none"
+
 document.getElementById("submitBtn").innerText="Thêm giáo viên"
 
 }
+
 
 init()
 
