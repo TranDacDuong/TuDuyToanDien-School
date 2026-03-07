@@ -24,6 +24,7 @@ border-radius:12px;
 padding:20px;
 margin-bottom:20px;
 box-shadow:0 4px 14px rgba(0,0,0,0.06);
+max-width:600px;
 }
 
 input,select{
@@ -55,6 +56,7 @@ border-collapse:collapse;
 background:white;
 border-radius:10px;
 overflow:hidden;
+box-shadow:0 4px 14px rgba(0,0,0,0.05);
 }
 
 th,td{
@@ -99,9 +101,9 @@ background:#dc2626;
 
 <div class="card">
 
-<h3>Thêm / Cập nhật giáo viên</h3>
+<h3>Thêm giáo viên</h3>
 
-<label>Email tài khoản</label> <input id="email">
+<label>Email (tài khoản đang là student)</label> <input id="email" placeholder="example@gmail.com">
 
 <label>Môn giảng dạy</label> <select id="subject">
 
@@ -120,7 +122,7 @@ background:#dc2626;
 
 <label>Số điện thoại</label> <input id="phone">
 
-<button onclick="saveTeacher()">Lưu giáo viên</button>
+<button onclick="addTeacher()">Thêm giáo viên</button>
 
 </div>
 
@@ -148,8 +150,6 @@ background:#dc2626;
 
 <script>
 
-let editingId=null
-
 async function init(){
 
 const { data:{user} } = await sb.auth.getUser()
@@ -166,7 +166,7 @@ const { data:profile } = await sb
 .single()
 
 if(profile.role!=="admin"){
-alert("Không có quyền truy cập")
+alert("Bạn không có quyền")
 location.href="home.html"
 return
 }
@@ -175,7 +175,7 @@ loadTeachers()
 
 }
 
-async function saveTeacher(){
+async function addTeacher(){
 
 const email=document.getElementById("email").value.trim()
 const subject=document.getElementById("subject").value
@@ -189,29 +189,30 @@ return
 
 const { data:userData } = await sb
 .from("users")
-.select("id,full_name,avatar_url,email")
+.select("*")
 .eq("email",email)
 .single()
 
 if(!userData){
-alert("Email chưa đăng ký")
+alert("Không tìm thấy user")
 return
 }
 
-if(editingId){
+if(userData.role!=="student"){
+alert("User này không phải student")
+return
+}
+
+/* cập nhật role thành teacher */
 
 await sb
-.from("teachers")
+.from("users")
 .update({
-subject,
-birth_year,
-phone
+role:"teacher"
 })
-.eq("id",editingId)
+.eq("id",userData.id)
 
-editingId=null
-
-}else{
+/* lưu bảng teachers */
 
 await sb
 .from("teachers")
@@ -219,10 +220,9 @@ await sb
 user_id:userData.id,
 subject,
 birth_year,
-phone
+phone,
+avatar_url:userData.avatar_url
 })
-
-}
 
 document.getElementById("email").value=""
 document.getElementById("subject").value=""
@@ -268,11 +268,7 @@ src="${t.users?.avatar_url ?? '/default-avatar.png'}">
 
 <td class="actions">
 
-<button onclick="editTeacher('${t.id}','${t.users?.email}','${t.subject}','${t.birth_year}','${t.phone}')">
-Sửa
-</button>
-
-<button class="delete" onclick="deleteTeacher('${t.id}')">
+<button onclick="deleteTeacher('${t.id}','${t.user_id}')">
 Xóa
 </button>
 
@@ -280,26 +276,14 @@ Xóa
 
 </tr>
 `
+
 }
 
 document.getElementById("teacherTable").innerHTML=html
 
 }
 
-function editTeacher(id,email,subject,birth,phone){
-
-editingId=id
-
-document.getElementById("email").value=email
-document.getElementById("subject").value=subject
-document.getElementById("birth_year").value=birth
-document.getElementById("phone").value=phone
-
-window.scrollTo(0,0)
-
-}
-
-async function deleteTeacher(id){
+async function deleteTeacher(id,userId){
 
 if(!confirm("Xóa giáo viên này?")) return
 
@@ -307,6 +291,15 @@ await sb
 .from("teachers")
 .delete()
 .eq("id",id)
+
+/* đổi lại role student */
+
+await sb
+.from("users")
+.update({
+role:"student"
+})
+.eq("id",userId)
 
 loadTeachers()
 
