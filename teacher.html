@@ -4,55 +4,73 @@
 <meta charset="UTF-8">
 <title>Quản lý giáo viên</title>
 
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
 <style>
 
+*{
+box-sizing:border-box;
+}
+
 body{
-font-family:Arial;
+font-family:'Inter',sans-serif;
 background:#f1f5f9;
+margin:0;
 padding:40px;
+color:#0f172a;
 }
 
 h2{
 margin-bottom:25px;
+font-weight:600;
+}
+
+.container{
+display:grid;
+grid-template-columns:420px 1fr;
+gap:30px;
+align-items:start;
 }
 
 .card{
 background:white;
 padding:25px;
-border-radius:12px;
-box-shadow:0 4px 10px rgba(0,0,0,0.05);
-margin-bottom:30px;
-max-width:500px;
+border-radius:14px;
+box-shadow:0 8px 20px rgba(0,0,0,0.05);
 }
 
 label{
-font-weight:600;
+font-weight:500;
 font-size:14px;
+color:#475569;
 }
 
 input,select{
 width:100%;
-padding:10px;
+padding:11px;
 margin-top:6px;
-margin-bottom:15px;
-border:1px solid #ddd;
+margin-bottom:16px;
+border:1px solid #e2e8f0;
 border-radius:8px;
 font-size:14px;
+background:#fafafa;
 }
 
 input:focus,select:focus{
 outline:none;
 border-color:#2563eb;
+background:white;
 }
 
 button{
 background:#2563eb;
 color:white;
 border:none;
-padding:10px 16px;
+padding:11px 16px;
 border-radius:8px;
 cursor:pointer;
-font-weight:600;
+font-weight:500;
+font-size:14px;
 }
 
 button:hover{
@@ -61,8 +79,8 @@ background:#1d4ed8;
 
 .table-card{
 background:white;
-border-radius:12px;
-box-shadow:0 4px 10px rgba(0,0,0,0.05);
+border-radius:14px;
+box-shadow:0 8px 20px rgba(0,0,0,0.05);
 overflow:hidden;
 }
 
@@ -72,15 +90,15 @@ border-collapse:collapse;
 }
 
 th,td{
-padding:12px 14px;
-border-bottom:1px solid #eee;
-text-align:left;
+padding:14px 16px;
+border-bottom:1px solid #f1f5f9;
 font-size:14px;
 }
 
 th{
 background:#f8fafc;
 font-weight:600;
+color:#475569;
 }
 
 tr:hover{
@@ -89,7 +107,7 @@ background:#f9fafb;
 
 .actions button{
 margin-right:6px;
-padding:6px 10px;
+padding:7px 10px;
 font-size:13px;
 }
 
@@ -101,12 +119,42 @@ background:#ef4444;
 background:#dc2626;
 }
 
+.teacher{
+display:flex;
+align-items:center;
+gap:10px;
+}
+
+.avatar{
+width:32px;
+height:32px;
+border-radius:50%;
+background:#2563eb;
+color:white;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:13px;
+font-weight:600;
+}
+
+.badge{
+background:#e0f2fe;
+color:#0369a1;
+padding:4px 8px;
+border-radius:6px;
+font-size:12px;
+font-weight:500;
+}
+
 </style>
 </head>
 
 <body>
 
 <h2>Quản lý giáo viên</h2>
+
+<div class="container">
 
 <!-- FORM -->
 
@@ -154,7 +202,7 @@ background:#dc2626;
 <thead>
 <tr>
 <th>STT</th>
-<th>Tên</th>
+<th>Giáo viên</th>
 <th>Email</th>
 <th>Môn</th>
 <th>Năm sinh</th>
@@ -166,6 +214,8 @@ background:#dc2626;
 <tbody id="table"></tbody>
 
 </table>
+
+</div>
 
 </div>
 
@@ -208,15 +258,27 @@ for(const u of data){
 
 const t=u.teachers?.[0] || {}
 
+const letter=(u.full_name||"?").charAt(0).toUpperCase()
+
 html+=`
 
 <tr>
 
 <td>${i++}</td>
-<td>${u.full_name ?? ""}</td>
+
+<td>
+<div class="teacher">
+<div class="avatar">${letter}</div>
+<div>${u.full_name ?? ""}</div>
+</div>
+</td>
+
 <td>${u.email}</td>
-<td>${t.subject ?? ""}</td>
+
+<td><span class="badge">${t.subject ?? ""}</span></td>
+
 <td>${u.birth_year ?? ""}</td>
+
 <td>${u.phone ?? ""}</td>
 
 <td class="actions">
@@ -250,8 +312,6 @@ const birth_year=document.getElementById("birth_year").value
 const phone=document.getElementById("phone").value
 
 
-/* UPDATE */
-
 if(userId){
 
 const {error:teacherError}=await sb
@@ -284,8 +344,6 @@ return
 
 
 
-/* ADD */
-
 const {data:user,error:userError}=await sb
 .from("users")
 .select("*")
@@ -308,8 +366,6 @@ return
 }
 
 
-/* UPDATE ROLE */
-
 const {error:updateError}=await sb
 .from("users")
 .update({role:"teacher"})
@@ -320,8 +376,6 @@ alert(updateError.message)
 return
 }
 
-
-/* INSERT TEACHER */
 
 const {error:insertError}=await sb
 .from("teachers")
