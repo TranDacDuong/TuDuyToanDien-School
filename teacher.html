@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
@@ -10,85 +9,116 @@
 body{
 font-family:Arial;
 background:#f1f5f9;
-padding:30px;
+padding:40px;
 }
 
 h2{
-margin-bottom:20px;
+margin-bottom:25px;
 }
 
 .card{
 background:white;
-padding:20px;
-border-radius:10px;
-margin-bottom:20px;
+padding:25px;
+border-radius:12px;
+box-shadow:0 4px 10px rgba(0,0,0,0.05);
+margin-bottom:30px;
 max-width:500px;
+}
+
+label{
+font-weight:600;
+font-size:14px;
 }
 
 input,select{
 width:100%;
-padding:8px;
-margin-top:5px;
-margin-bottom:12px;
+padding:10px;
+margin-top:6px;
+margin-bottom:15px;
 border:1px solid #ddd;
-border-radius:6px;
+border-radius:8px;
+font-size:14px;
+}
+
+input:focus,select:focus{
+outline:none;
+border-color:#2563eb;
 }
 
 button{
 background:#2563eb;
 color:white;
 border:none;
-padding:8px 14px;
-border-radius:6px;
+padding:10px 16px;
+border-radius:8px;
 cursor:pointer;
+font-weight:600;
 }
 
 button:hover{
 background:#1d4ed8;
 }
 
+.table-card{
+background:white;
+border-radius:12px;
+box-shadow:0 4px 10px rgba(0,0,0,0.05);
+overflow:hidden;
+}
+
 table{
 width:100%;
 border-collapse:collapse;
-background:white;
 }
 
 th,td{
-padding:10px;
+padding:12px 14px;
 border-bottom:1px solid #eee;
 text-align:left;
+font-size:14px;
 }
 
 th{
 background:#f8fafc;
+font-weight:600;
+}
+
+tr:hover{
+background:#f9fafb;
 }
 
 .actions button{
 margin-right:6px;
+padding:6px 10px;
+font-size:13px;
 }
 
 .delete{
 background:#ef4444;
 }
 
-</style>
+.delete:hover{
+background:#dc2626;
+}
 
+</style>
 </head>
 
 <body>
 
 <h2>Quản lý giáo viên</h2>
 
-<!-- PHẦN ĐIỀN -->
+<!-- FORM -->
 
 <div class="card">
 
 <input type="hidden" id="editUserId">
 
-<label>Email</label> <input id="email">
+<label>Email</label>
+<input id="email" placeholder="Nhập email học sinh">
 
-<label>Môn giảng dạy</label> <select id="subject">
-
+<label>Môn giảng dạy</label>
+<select id="subject">
 <option value="">Chọn môn</option>
 <option>Toán</option>
 <option>Văn</option>
@@ -102,9 +132,11 @@ background:#ef4444;
 
 <div id="extraFields" style="display:none">
 
-<label>Năm sinh</label> <input id="birth_year">
+<label>Năm sinh</label>
+<input id="birth_year">
 
-<label>SĐT</label> <input id="phone">
+<label>SĐT</label>
+<input id="phone">
 
 </div>
 
@@ -112,7 +144,10 @@ background:#ef4444;
 
 </div>
 
-<!-- BẢNG GIÁO VIÊN -->
+
+<!-- TABLE -->
+
+<div class="table-card">
 
 <table>
 
@@ -132,8 +167,10 @@ background:#ef4444;
 
 </table>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</div>
 
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../supabaseClient.js"></script>
 
 <script>
@@ -143,12 +180,11 @@ loadTeachers()
 }
 
 
-
-/* LOAD DANH SÁCH */
+/* LOAD TEACHERS */
 
 async function loadTeachers(){
 
-const {data}=await sb
+const {data,error}=await sb
 .from("users")
 .select(`
 id,
@@ -159,6 +195,11 @@ phone,
 teachers(subject)
 `)
 .eq("role","teacher")
+
+if(error){
+alert(error.message)
+return
+}
 
 let html=""
 let i=1
@@ -178,7 +219,7 @@ html+=`
 <td>${u.birth_year ?? ""}</td>
 <td>${u.phone ?? ""}</td>
 
-<td>
+<td class="actions">
 
 <button onclick="editTeacher('${u.id}')">Sửa</button>
 
@@ -198,27 +239,41 @@ document.getElementById("table").innerHTML=html
 
 
 
-/* THÊM / CẬP NHẬT */
+/* ADD / UPDATE */
 
 async function submitTeacher(){
 
 const userId=document.getElementById("editUserId").value
 const email=document.getElementById("email").value.trim()
 const subject=document.getElementById("subject").value
+const birth_year=document.getElementById("birth_year").value
+const phone=document.getElementById("phone").value
 
-/* ===== UPDATE ===== */
+
+/* UPDATE */
 
 if(userId){
 
-const {error}=await sb
+const {error:teacherError}=await sb
 .from("teachers")
-.update({
-subject
-})
+.update({subject})
 .eq("user_id",userId)
 
-if(error){
-alert(error.message)
+if(teacherError){
+alert(teacherError.message)
+return
+}
+
+const {error:userError}=await sb
+.from("users")
+.update({
+birth_year,
+phone
+})
+.eq("id",userId)
+
+if(userError){
+alert(userError.message)
 return
 }
 
@@ -228,7 +283,8 @@ return
 }
 
 
-/* ===== ADD ===== */
+
+/* ADD */
 
 const {data:user,error:userError}=await sb
 .from("users")
@@ -252,7 +308,7 @@ return
 }
 
 
-/* update role */
+/* UPDATE ROLE */
 
 const {error:updateError}=await sb
 .from("users")
@@ -265,7 +321,7 @@ return
 }
 
 
-/* insert teachers */
+/* INSERT TEACHER */
 
 const {error:insertError}=await sb
 .from("teachers")
@@ -286,27 +342,34 @@ loadTeachers()
 
 
 
-/* SỬA */
+/* EDIT */
 
 async function editTeacher(id){
 
-const {data}=await sb
+const {data,error}=await sb
 .from("users")
 .select(`
 id,
 email,
-teachers(subject,birth_year,phone)
+birth_year,
+phone,
+teachers(subject)
 `)
 .eq("id",id)
 .single()
+
+if(error){
+alert(error.message)
+return
+}
 
 const t=data.teachers?.[0] || {}
 
 document.getElementById("editUserId").value=id
 document.getElementById("email").value=data.email
 document.getElementById("subject").value=t.subject ?? ""
-document.getElementById("birth_year").value=t.birth_year ?? ""
-document.getElementById("phone").value=t.phone ?? ""
+document.getElementById("birth_year").value=data.birth_year ?? ""
+document.getElementById("phone").value=data.phone ?? ""
 
 document.getElementById("extraFields").style.display="block"
 
@@ -318,14 +381,12 @@ window.scrollTo({top:0,behavior:"smooth"})
 
 
 
-/* XÓA */
+/* DELETE */
 
 async function deleteTeacher(id){
 
 if(!confirm("Bạn có chắc muốn xóa giáo viên này?")) return
 
-
-/* delete teachers */
 
 const {error:deleteError}=await sb
 .from("teachers")
@@ -337,8 +398,6 @@ alert(deleteError.message)
 return
 }
 
-
-/* update role */
 
 const {error:updateError}=await sb
 .from("users")
