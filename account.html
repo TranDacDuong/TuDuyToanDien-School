@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <title>Tài khoản</title>
 
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
 <style>
 
 *{
@@ -11,16 +13,16 @@ box-sizing:border-box;
 }
 
 body{
-font-family:Inter,Arial;
+font-family:'Inter',sans-serif;
 margin:0;
-background:#f3f4f6;
-color:#111827;
+background:#f1f5f9;
+color:#0f172a;
 }
 
 /* HEADER */
 
 header{
-background:#111827;
+background:#0f172a;
 color:white;
 padding:18px 30px;
 display:flex;
@@ -31,6 +33,7 @@ align-items:center;
 header h2{
 margin:0;
 font-size:20px;
+font-weight:600;
 }
 
 /* MAIN */
@@ -45,12 +48,12 @@ padding:20px;
 
 .card{
 background:white;
-border-radius:14px;
-box-shadow:0 8px 25px rgba(0,0,0,0.06);
+border-radius:16px;
+box-shadow:0 10px 30px rgba(0,0,0,0.06);
 padding:30px;
 }
 
-/* PROFILE TOP */
+/* PROFILE */
 
 .profile-top{
 display:flex;
@@ -60,8 +63,8 @@ margin-bottom:30px;
 }
 
 .profile-top img{
-width:100px;
-height:100px;
+width:110px;
+height:110px;
 border-radius:50%;
 object-fit:cover;
 border:4px solid #f1f5f9;
@@ -71,7 +74,7 @@ border:4px solid #f1f5f9;
 margin-bottom:10px;
 }
 
-/* FORM GRID */
+/* GRID */
 
 .form-grid{
 display:grid;
@@ -88,20 +91,21 @@ label{
 font-weight:600;
 margin-bottom:6px;
 font-size:14px;
+color:#475569;
 }
 
-input{
+input,select{
 padding:11px;
-border:1px solid #d1d5db;
+border:1px solid #e2e8f0;
 border-radius:8px;
 font-size:14px;
-transition:0.2s;
+background:#fafafa;
 }
 
-input:focus{
+input:focus,select:focus{
 outline:none;
 border-color:#2563eb;
-box-shadow:0 0 0 2px rgba(37,99,235,0.2);
+background:white;
 }
 
 /* BUTTON */
@@ -137,7 +141,7 @@ border-top:1px solid #e5e7eb;
 position:fixed;
 bottom:30px;
 right:30px;
-background:#111827;
+background:#0f172a;
 color:white;
 padding:14px 22px;
 border-radius:8px;
@@ -164,26 +168,16 @@ transform:translateY(0);
 
 <div class="card">
 
-<!-- PROFILE TOP -->
-
 <div class="profile-top">
 
-<img id="avatarPreview"
-src="default-avatar.png">
+<img id="avatarPreview" src="default-avatar.png">
 
 <div class="avatar-actions">
-
 <input type="file" id="avatarInput">
-
-<button onclick="uploadAvatar()">
-Đổi Avatar
-</button>
-
+<button onclick="uploadAvatar()">Đổi Avatar</button>
 </div>
 
 </div>
-
-<!-- FORM -->
 
 <div class="form-grid">
 
@@ -207,28 +201,94 @@ src="default-avatar.png">
 <input type="number" id="birthYear">
 </div>
 
+<div class="form-group">
+<label>Tỉnh / Thành phố</label>
+<select id="province">
+<option value="">Chọn tỉnh</option>
+<option>Hà Nội</option>
+<option>TP Hồ Chí Minh</option>
+<option>Đà Nẵng</option>
+<option>Cần Thơ</option>
+<option>Hải Phòng</option>
+<option>An Giang</option>
+<option>Bà Rịa - Vũng Tàu</option>
+<option>Bắc Giang</option>
+<option>Bắc Kạn</option>
+<option>Bạc Liêu</option>
+<option>Bắc Ninh</option>
+<option>Bến Tre</option>
+<option>Bình Định</option>
+<option>Bình Dương</option>
+<option>Bình Phước</option>
+<option>Bình Thuận</option>
+<option>Cà Mau</option>
+<option>Cao Bằng</option>
+<option>Đắk Lắk</option>
+<option>Đắk Nông</option>
+<option>Điện Biên</option>
+<option>Đồng Nai</option>
+<option>Đồng Tháp</option>
+<option>Gia Lai</option>
+<option>Hà Giang</option>
+<option>Hà Nam</option>
+<option>Hà Tĩnh</option>
+<option>Hải Dương</option>
+<option>Hậu Giang</option>
+<option>Hòa Bình</option>
+<option>Hưng Yên</option>
+<option>Khánh Hòa</option>
+<option>Kiên Giang</option>
+<option>Kon Tum</option>
+<option>Lai Châu</option>
+<option>Lâm Đồng</option>
+<option>Lạng Sơn</option>
+<option>Lào Cai</option>
+<option>Long An</option>
+<option>Nam Định</option>
+<option>Nghệ An</option>
+<option>Ninh Bình</option>
+<option>Ninh Thuận</option>
+<option>Phú Thọ</option>
+<option>Phú Yên</option>
+<option>Quảng Bình</option>
+<option>Quảng Nam</option>
+<option>Quảng Ngãi</option>
+<option>Quảng Ninh</option>
+<option>Quảng Trị</option>
+<option>Sóc Trăng</option>
+<option>Sơn La</option>
+<option>Tây Ninh</option>
+<option>Thái Bình</option>
+<option>Thái Nguyên</option>
+<option>Thanh Hóa</option>
+<option>Thừa Thiên Huế</option>
+<option>Tiền Giang</option>
+<option>Trà Vinh</option>
+<option>Tuyên Quang</option>
+<option>Vĩnh Long</option>
+<option>Vĩnh Phúc</option>
+<option>Yên Bái</option>
+</select>
 </div>
 
-<button onclick="saveProfile()">
-Lưu thông tin
-</button>
+<div class="form-group">
+<label>Trường học</label>
+<input id="school">
+</div>
 
-<!-- PASSWORD -->
+</div>
+
+<button onclick="saveProfile()">Lưu thông tin</button>
 
 <div class="password-box">
 
 <h3>Đổi mật khẩu</h3>
 
-<input
-type="password"
-id="newPassword"
-placeholder="Nhập mật khẩu mới">
+<input type="password" id="newPassword" placeholder="Nhập mật khẩu mới">
 
 <br>
 
-<button onclick="changePassword()">
-Đổi mật khẩu
-</button>
+<button onclick="changePassword()">Đổi mật khẩu</button>
 
 </div>
 
@@ -241,16 +301,9 @@ placeholder="Nhập mật khẩu mới">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../supabaseClient.js"></script>
 
-<!-- GIỮ NGUYÊN JS CỦA BẠN -->
-
-</body>
-</html>
-
 <script>
 
 let currentUser=null;
-
-/* INIT */
 
 async function init(){
 
@@ -269,9 +322,6 @@ loadProfile();
 
 }
 
-
-/* LOAD PROFILE */
-
 async function loadProfile(){
 
 const { data , error } = await sb
@@ -288,25 +338,59 @@ return;
 document.getElementById("fullName").value=data.full_name ?? "";
 document.getElementById("phone").value=data.phone ?? "";
 document.getElementById("birthYear").value=data.birth_year ?? "";
+document.getElementById("province").value=data.province ?? "";
+document.getElementById("school").value=data.school ?? "";
 
 if(data.avatar_url){
-document.getElementById("avatarPreview").src =
-data.avatar_url;
+document.getElementById("avatarPreview").src=data.avatar_url;
 }
+
+}
+
+async function saveProfile(){
+
+const fullName=document.getElementById("fullName").value.trim();
+const phone=document.getElementById("phone").value.trim();
+const birthYear=parseInt(document.getElementById("birthYear").value);
+const province=document.getElementById("province").value;
+const school=document.getElementById("school").value;
+
+if(!fullName || !phone || !birthYear){
+alert("Vui lòng nhập đầy đủ thông tin");
+return;
+}
+
+const { error } = await sb
+.from("users")
+.update({
+full_name:fullName,
+phone:phone,
+birth_year:birthYear,
+province:province,
+school:school
+})
+.eq("id",currentUser.id);
+
+if(error){
+console.error(error);
+alert("Lỗi khi cập nhật");
+return;
+}
+
+showToast("Cập nhật thành công");
+
 }
 
 async function changePassword(){
 
-const password =
-document.getElementById("newPassword").value;
+const password=document.getElementById("newPassword").value;
 
 if(password.length < 6){
 alert("Mật khẩu tối thiểu 6 ký tự");
 return;
 }
 
-const { error } =
-await sb.auth.updateUser({
+const { error } = await sb.auth.updateUser({
 password: password
 });
 
@@ -320,19 +404,17 @@ showToast("Đổi mật khẩu thành công");
 document.getElementById("newPassword").value="";
 
 }
-  
+
 async function uploadAvatar(){
 
-const file =
-document.getElementById("avatarInput").files[0];
+const file=document.getElementById("avatarInput").files[0];
 
 if(!file){
 alert("Chọn ảnh");
 return;
 }
 
-const filePath =
-currentUser.id + "-" + Date.now();
+const filePath=currentUser.id + "-" + Date.now();
 
 const { error } = await sb.storage
 .from("avatars")
@@ -348,53 +430,18 @@ const { data } = sb.storage
 .from("avatars")
 .getPublicUrl(filePath);
 
-const avatarUrl = data.publicUrl;
+const avatarUrl=data.publicUrl;
 
 await sb
 .from("users")
 .update({avatar_url:avatarUrl})
 .eq("id",currentUser.id);
 
-document.getElementById("avatarPreview").src = avatarUrl;
+document.getElementById("avatarPreview").src=avatarUrl;
 
 showToast("Đổi avatar thành công");
 
 }
-
-/* SAVE PROFILE */
-
-async function saveProfile(){
-
-const fullName=document.getElementById("fullName").value.trim();
-const phone=document.getElementById("phone").value.trim();
-const birthYear=parseInt(document.getElementById("birthYear").value);
-
-if(!fullName || !phone || !birthYear){
-alert("Vui lòng nhập đầy đủ thông tin");
-return;
-}
-
-const { error } = await sb
-.from("users")
-.update({
-full_name:fullName,
-phone:phone,
-birth_year:birthYear
-})
-.eq("id",currentUser.id);
-
-if(error){
-console.error(error);
-alert("Lỗi khi cập nhật");
-return;
-}
-
-showToast("Cập nhật thành công");
-
-}
-
-
-/* TOAST */
 
 function showToast(message){
 
@@ -409,7 +456,6 @@ toast.classList.remove("show");
 },2000);
 
 }
-
 
 init();
 
