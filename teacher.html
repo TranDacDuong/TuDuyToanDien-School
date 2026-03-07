@@ -13,12 +13,17 @@ background:#f1f5f9;
 padding:30px;
 }
 
+h2{
+margin-bottom:20px;
+}
+
 .card{
 background:white;
 padding:20px;
 border-radius:10px;
 margin-bottom:20px;
 max-width:500px;
+box-shadow:0 2px 10px rgba(0,0,0,0.05);
 }
 
 input,select{
@@ -47,6 +52,8 @@ table{
 width:100%;
 border-collapse:collapse;
 background:white;
+border-radius:8px;
+overflow:hidden;
 }
 
 th,td{
@@ -60,18 +67,15 @@ background:#f8fafc;
 }
 
 .actions button{
-margin-right:5px;
+margin-right:6px;
 }
 
 .delete{
 background:#ef4444;
 }
 
-.editbox{
-display:none;
-background:#f9fafb;
-padding:10px;
-border-radius:6px;
+.delete:hover{
+background:#dc2626;
 }
 
 </style>
@@ -83,6 +87,8 @@ border-radius:6px;
 <h2>Quản lý giáo viên</h2>
 
 <div class="card">
+
+<input type="hidden" id="editUserId">
 
 <label>Email</label> <input id="email">
 
@@ -99,7 +105,11 @@ border-radius:6px;
 <option>Địa</option>
 </select>
 
-<button onclick="addTeacher()">Thêm giáo viên</button>
+<label>Năm sinh</label> <input id="birth_year">
+
+<label>SĐT</label> <input id="phone">
+
+<button id="submitBtn" onclick="submitTeacher()">Thêm giáo viên</button>
 
 </div>
 
@@ -127,81 +137,13 @@ border-radius:6px;
 <script>
 
 async function init(){
-await ensureTeacherRows()
 loadTeachers()
 }
 
 
-async function ensureTeacherRows(){
-
-const {data:teachers} = await sb
-.from("teachers")
-.select("user_id")
-
-const teacherIds = teachers.map(t=>t.user_id)
-
-const {data:users} = await sb
-.from("users")
-.select("*")
-.eq("role","teacher")
-
-for(const u of users){
-
-if(!teacherIds.includes(u.id)){
-
-await sb.from("teachers").insert({
-user_id:u.id
-})
-
-}
-
-}
-
-}
-
-
-
-async function addTeacher(){
-
-const email=document.getElementById("email").value.trim()
-const subject=document.getElementById("subject").value
-
-if(!email || !subject){
-alert("Thiếu thông tin")
-return
-}
-
-const {data:user}=await sb
-.from("users")
-.select("*")
-.ilike("email",email)
-.maybeSingle()
-
-if(!user){
-alert("Không tìm thấy user")
-return
-}
-
-await sb
-.from("users")
-.update({role:"teacher"})
-.eq("id",user.id)
-
-await sb
-.from("teachers")
-.upsert({
-user_id:user.id,
-subject
-})
-
-document.getElementById("email").value=""
-document.getElementById("subject").value=""
-
-loadTeachers()
-
-}
-
-
+/* =========================
+LOAD TEACHERS
+========================= */
 
 async function loadTeachers(){
 
@@ -233,28 +175,9 @@ html+=`
 
 <td class="actions">
 
-<button onclick="showEdit('${u.id}','${t.subject ?? ""}','${t.birth_year ?? ""}','${t.phone ?? ""}')">
-Sửa
-</button>
+<button onclick="editTeacher('${u.id}')">Sửa</button>
 
-<button class="delete" onclick="deleteTeacher('${u.id}')">
-Xóa
-</button>
-
-<div class="editbox" id="edit-${u.id}">
-
-<label>Môn</label>
-<input id="subject-${u.id}" value="${t.subject ?? ""}">
-
-<label>Năm sinh</label>
-<input id="birth-${u.id}" value="${t.birth_year ?? ""}">
-
-<label>SĐT</label>
-<input id="phone-${u.id}" value="${t.phone ?? ""}">
-
-<button onclick="saveEdit('${u.id}')">Lưu</button>
-
-</div>
+<button class="delete" onclick="deleteTeacher('${u.id}')">Xóa</button>
 
 </td>
 
@@ -269,59 +192,148 @@ document.getElementById("table").innerHTML=html
 }
 
 
+/* =========================
+ADD / UPDATE
+========================= */
 
-function showEdit(id){
+async function submitTeacher(){
 
-const box=document.getElementById("edit-"+id)
+const userId=document.getElementById("editUserId").value
+const email=document.getElementById("email").value.trim()
+const subject=document.getElementById("subject").value
+const birth_year=document.getElementById("birth_year").value
+const phone=document.getElementById("phone").value
 
-box.style.display = box.style.display==="block" ? "none":"block"
 
-}
+/* ===== UPDATE ===== */
 
-
-
-async function saveEdit(id){
-
-const subject=document.getElementById("subject-"+id).value
-const birth=document.getElementById("birth-"+id).value
-const phone=document.getElementById("phone-"+id).value
+if(userId){
 
 await sb
 .from("teachers")
 .update({
 subject,
-birth_year:birth,
+birth_year,
 phone
 })
-.eq("user_id",id)
+.eq("user_id",userId)
 
+resetForm()
+loadTeachers()
+
+return
+}
+
+
+/* ===== ADD ===== */
+
+const {data:user}=await sb
+.from("users")
+.select("*")
+.eq("email",email)
+.maybeSingle()
+
+if(!user){
+alert("Không tìm thấy user")
+return
+}
+
+
+/* update role */
+
+await sb
+.from("users")
+.update({role:"teacher"})
+.eq("id",user.id)
+
+
+/* insert teachers */
+
+await sb
+.from("teachers")
+.upsert({
+user_id:user.id,
+subject,
+birth_year,
+phone
+})
+
+
+resetForm()
 loadTeachers()
 
 }
 
 
+/* =========================
+EDIT
+========================= */
+
+async function editTeacher(userId){
+
+const {data}=await sb
+.from("users")
+.select(`
+id,
+email,
+teachers(subject,birth_year,phone)
+`)
+.eq("id",userId)
+.single()
+
+const t=data.teachers?.[0] || {}
+
+document.getElementById("editUserId").value=userId
+document.getElementById("email").value=data.email
+document.getElementById("subject").value=t.subject ?? ""
+document.getElementById("birth_year").value=t.birth_year ?? ""
+document.getElementById("phone").value=t.phone ?? ""
+
+document.getElementById("submitBtn").innerText="Cập nhật"
+
+window.scrollTo({top:0,behavior:"smooth"})
+
+}
+
+
+/* =========================
+DELETE
+========================= */
 
 async function deleteTeacher(id){
 
 if(!confirm("Bạn có chắc muốn xóa giáo viên này?")) return
 
 await sb
-.from("users")
-.update({
-role:"student"
-})
-.eq("id",id)
-
-await sb
 .from("teachers")
 .delete()
 .eq("user_id",id)
+
+await sb
+.from("users")
+.update({role:"student"})
+.eq("id",id)
 
 loadTeachers()
 
 }
 
 
+/* =========================
+RESET FORM
+========================= */
+
+function resetForm(){
+
+document.getElementById("editUserId").value=""
+document.getElementById("email").value=""
+document.getElementById("subject").value=""
+document.getElementById("birth_year").value=""
+document.getElementById("phone").value=""
+
+document.getElementById("submitBtn").innerText="Thêm giáo viên"
+
+}
 
 init()
 
