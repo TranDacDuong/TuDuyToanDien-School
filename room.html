@@ -387,6 +387,97 @@ loadRooms()
 
 /* KHỐI */
 
+/* CREATE / UPDATE GRADE */
+
+async function saveGrade(){
+
+const id=document.getElementById("gradeId").value
+const name=document.getElementById("gradeName").value.trim()
+
+if(!name){
+alert("Nhập khối")
+return
+}
+
+/* UPDATE */
+
+if(id){
+
+const {error}=await sb
+.from("grades")
+.update({name})
+.eq("id",id)
+
+if(error){
+alert(error.message)
+return
+}
+
+}
+
+/* CREATE */
+
+else{
+
+const {error}=await sb
+.from("grades")
+.insert({name})
+
+if(error){
+alert(error.message)
+return
+}
+
+}
+
+resetGrade()
+loadGrades()
+
+}
+
+
+/* EDIT */
+
+function editGrade(id,name){
+
+document.getElementById("gradeId").value=id
+document.getElementById("gradeName").value=name
+
+window.scrollTo({top:0,behavior:"smooth"})
+
+}
+
+
+/* DELETE */
+
+async function deleteGrade(id){
+
+if(!confirm("Xóa khối này?")) return
+
+const {error}=await sb
+.from("grades")
+.delete()
+.eq("id",id)
+
+if(error){
+alert(error.message)
+return
+}
+
+loadGrades()
+
+}
+
+
+/* RESET */
+
+function resetGrade(){
+
+document.getElementById("gradeId").value=""
+document.getElementById("gradeName").value=""
+
+}
+  
 async function loadGrades(){
 
 const {data}=await sb
