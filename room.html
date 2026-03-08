@@ -561,7 +561,7 @@ async function loadChapters(){
 
 const {data}=await sb
 .from("chapters")
-.select("id,name,subjects(id,name,grades(name))")
+.select("id,name,subjects(id,name,grades(id,name))")
 
 data.sort((a,b)=>{
 
@@ -589,7 +589,7 @@ html+=`
 <td>${c.subjects?.name}</td>
 <td>${c.name}</td>
 <td class="actions">
-<button onclick="editChapter('${c.id}','${c.name}','${c.subjects?.id}')">Sửa</button>
+<button onclick="editChapter('${c.id}','${c.name}','${c.subjects?.id}','${c.subjects?.grades?.id}')">Sửa</button>
 <button class="delete" onclick="deleteChapter('${c.id}')">Xóa</button>
 </td>
 </tr>
@@ -626,11 +626,26 @@ loadChapters()
 
 }
 
-function editChapter(id,name,subject){
+async function editChapter(id,name,subject,grade){
 
 chapterId.value=id
 chapterName.value=name
+
+/* set khối trước */
+
+chapterGrade.value=grade
+
+/* load môn theo khối */
+
+await loadSubjectsByGrade()
+
+/* set môn */
+
 chapterSubject.value=subject
+
+/* lọc bảng realtime */
+
+filterChapters()
 
 }
 
