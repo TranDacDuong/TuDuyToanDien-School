@@ -18,10 +18,7 @@ padding:40px;
 color:#0f172a;
 }
 
-h2{
-margin-bottom:25px;
-font-weight:600;
-}
+h2{margin-bottom:25px;font-weight:600;}
 
 .tabs{
 display:flex;
@@ -88,9 +85,7 @@ cursor:pointer;
 font-weight:500;
 }
 
-button:hover{
-background:#1d4ed8;
-}
+button:hover{background:#1d4ed8;}
 
 .delete{
 background:#ef4444;
@@ -129,9 +124,7 @@ margin-right:6px;
 font-size:13px;
 }
 
-.hidden{
-display:none;
-}
+.hidden{display:none;}
 
 </style>
 </head>
@@ -169,7 +162,6 @@ display:none;
 <div class="table-card">
 
 <table>
-
 <thead>
 <tr>
 <th>Tên phòng</th>
@@ -196,7 +188,7 @@ display:none;
 <input type="hidden" id="gradeId">
 
 <label>Tên khối</label>
-<input id="gradeName" placeholder="Ví dụ: 10">
+<input id="gradeName">
 
 <button onclick="saveGrade()">Lưu</button>
 
@@ -226,17 +218,6 @@ display:none;
 
 <div id="subjects" class="container hidden">
 
-<div class="card">
-
-<input type="hidden" id="subjectId">
-
-<label>Tên môn</label>
-<input id="subjectName">
-
-<button onclick="saveSubject()">Lưu</button>
-
-</div>
-
 <div class="table-card">
 
 <table>
@@ -244,7 +225,6 @@ display:none;
 <thead>
 <tr>
 <th>Môn học</th>
-<th>Hành động</th>
 </tr>
 </thead>
 
@@ -263,10 +243,11 @@ display:none;
 
 <div class="card">
 
-<input type="hidden" id="chapterId">
-
 <label>Môn học</label>
 <select id="chapterSubject"></select>
+
+<label>Khối</label>
+<select id="chapterGrade"></select>
 
 <label>Tên chương</label>
 <input id="chapterName">
@@ -282,8 +263,9 @@ display:none;
 <thead>
 <tr>
 <th>Môn</th>
+<th>Khối</th>
 <th>Chương</th>
-<th>Hành động</th>
+<th></th>
 </tr>
 </thead>
 
@@ -325,10 +307,9 @@ loadRooms()
 loadGrades()
 loadSubjects()
 loadChapters()
-loadSubjectDropdown()
+loadDropdowns()
 
 }
-
 
 /* PHÒNG */
 
@@ -404,7 +385,6 @@ loadRooms()
 
 }
 
-
 /* KHỐI */
 
 async function loadGrades(){
@@ -412,7 +392,8 @@ async function loadGrades(){
 const {data}=await sb
 .from("grades")
 .select("*")
-.order("name",{ascending:true})
+
+data.sort((a,b)=>parseInt(a.name)-parseInt(b.name))
 
 let html=""
 
@@ -433,49 +414,6 @@ gradeTable.innerHTML=html
 
 }
 
-async function saveGrade(){
-
-const id=gradeId.value
-const name=gradeName.value
-
-if(id){
-
-await sb.from("grades")
-.update({name})
-.eq("id",id)
-
-}else{
-
-await sb.from("grades")
-.insert({name})
-
-}
-
-gradeId.value=""
-gradeName.value=""
-
-loadGrades()
-
-}
-
-function editGrade(id,name){
-
-gradeId.value=id
-gradeName.value=name
-
-}
-
-async function deleteGrade(id){
-
-if(!confirm("Xóa khối?")) return
-
-await sb.from("grades").delete().eq("id",id)
-
-loadGrades()
-
-}
-
-
 /* MÔN */
 
 async function loadSubjects(){
@@ -491,10 +429,6 @@ for(const s of data){
 html+=`
 <tr>
 <td>${s.name}</td>
-<td class="actions">
-<button onclick="editSubject('${s.id}','${s.name}')">Sửa</button>
-<button class="delete" onclick="deleteSubject('${s.id}')">Xóa</button>
-</td>
 </tr>
 `
 }
@@ -503,32 +437,19 @@ subjectTable.innerHTML=html
 
 }
 
-async function saveSubject(){
+/* DROPDOWN */
 
-const id=subjectId.value
-const name=subjectName.value
+async function loadDropdowns(){
 
-if(id){
+const {data:subjects}=await sb.from("subjects").select("*")
+const {data:grades}=await sb.from("grades").select("*")
 
-await sb.from("subjects")
-.update({name})
-.eq("id",id)
+grades.sort((a,b)=>parseInt(a.name)-parseInt(b.name))
 
-}else{
-
-await sb.from("subjects")
-.insert({name})
+chapterSubject.innerHTML=subjects.map(s=>`<option value="${s.id}">${s.name}</option>`).join("")
+chapterGrade.innerHTML=grades.map(g=>`<option value="${g.id}">${g.name}</option>`).join("")
 
 }
-
-subjectId.value=""
-subjectName.value=""
-
-loadSubjects()
-loadSubjectDropdown()
-
-}
-
 
 /* CHƯƠNG */
 
@@ -536,7 +457,7 @@ async function loadChapters(){
 
 const {data}=await sb
 .from("chapters")
-.select("id,name,subjects(name)")
+.select("id,name,subjects(name),grades(name)")
 .order("name",{ascending:true})
 
 let html=""
@@ -545,11 +466,10 @@ for(const c of data){
 
 html+=`
 <tr>
-<td>${c.subjects?.name ?? ""}</td>
+<td>${c.subjects?.name}</td>
+<td>${c.grades?.name}</td>
 <td>${c.name}</td>
-<td class="actions">
-<button class="delete" onclick="deleteChapter('${c.id}')">Xóa</button>
-</td>
+<td><button class="delete" onclick="deleteChapter('${c.id}')">Xóa</button></td>
 </tr>
 `
 }
@@ -558,33 +478,15 @@ chapterTable.innerHTML=html
 
 }
 
-async function loadSubjectDropdown(){
-
-const {data}=await sb
-.from("subjects")
-.select("*")
-
-let html=""
-
-for(const s of data){
-
-html+=`<option value="${s.id}">${s.name}</option>`
-
-}
-
-chapterSubject.innerHTML=html
-
-}
-
 async function saveChapter(){
 
 const subject=chapterSubject.value
+const grade=chapterGrade.value
 const name=chapterName.value
 
-await sb
-.from("chapters")
-.insert({
+await sb.from("chapters").insert({
 subject_id:subject,
+grade_id:grade,
 name
 })
 
