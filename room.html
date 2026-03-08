@@ -141,6 +141,7 @@ font-size:13px;
 <div class="tab" onclick="switchTab(event,'chapters')">Chương</div>
 </div>
 
+
 <!-- PHÒNG -->
 
 <div id="rooms" class="container">
@@ -178,6 +179,7 @@ font-size:13px;
 
 </div>
 
+
 <!-- KHỐI -->
 
 <div id="grades" class="container hidden">
@@ -211,6 +213,7 @@ font-size:13px;
 </div>
 
 </div>
+
 
 <!-- MÔN -->
 
@@ -250,11 +253,14 @@ font-size:13px;
 
 </div>
 
+
 <!-- CHƯƠNG -->
 
 <div id="chapters" class="container hidden">
 
 <div class="card">
+
+<input type="hidden" id="chapterId">
 
 <label>Khối</label>
 <select id="chapterGrade"></select>
@@ -289,6 +295,7 @@ font-size:13px;
 </div>
 
 </div>
+
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
@@ -471,7 +478,18 @@ async function loadSubjects(){
 
 const {data}=await sb
 .from("subjects")
-.select("id,name,grades(name)")
+.select("id,name,grade_id,grades(name)")
+
+data.sort((a,b)=>{
+
+const g1=parseInt(a.grades?.name||0)
+const g2=parseInt(b.grades?.name||0)
+
+if(g1!==g2) return g1-g2
+
+return a.name.localeCompare(b.name)
+
+})
 
 let html=""
 
@@ -482,7 +500,7 @@ html+=`
 <td>${s.grades?.name}</td>
 <td>${s.name}</td>
 <td class="actions">
-<button onclick="editSubject('${s.id}','${s.name}')">Sửa</button>
+<button onclick="editSubject('${s.id}','${s.name}','${s.grade_id}')">Sửa</button>
 <button class="delete" onclick="deleteSubject('${s.id}')">Xóa</button>
 </td>
 </tr>
@@ -520,10 +538,11 @@ loadDropdowns()
 
 }
 
-function editSubject(id,name){
+function editSubject(id,name,grade){
 
 subjectId.value=id
 subjectName.value=name
+subjectGrade.value=grade
 
 }
 
@@ -543,8 +562,23 @@ async function loadChapters(){
 
 const {data}=await sb
 .from("chapters")
-.select("id,name,subjects(name,grades(name))")
-.order("name")
+.select("id,name,subjects(id,name,grades(name))")
+
+data.sort((a,b)=>{
+
+const g1=parseInt(a.subjects?.grades?.name||0)
+const g2=parseInt(b.subjects?.grades?.name||0)
+
+if(g1!==g2) return g1-g2
+
+const s1=a.subjects?.name||""
+const s2=b.subjects?.name||""
+
+if(s1!==s2) return s1.localeCompare(s2)
+
+return a.name.localeCompare(b.name)
+
+})
 
 let html=""
 
@@ -555,7 +589,8 @@ html+=`
 <td>${c.subjects?.grades?.name}</td>
 <td>${c.subjects?.name}</td>
 <td>${c.name}</td>
-<td>
+<td class="actions">
+<button onclick="editChapter('${c.id}','${c.name}','${c.subjects?.id}')">Sửa</button>
 <button class="delete" onclick="deleteChapter('${c.id}')">Xóa</button>
 </td>
 </tr>
@@ -568,12 +603,43 @@ chapterTable.innerHTML=html
 
 async function saveChapter(){
 
+const id=chapterId.value
 const subject_id=chapterSubject.value
 const name=chapterName.value
 
-await sb.from("chapters").insert({subject_id,name})
+if(id){
 
+await sb.from("chapters")
+.update({subject_id,name})
+.eq("id",id)
+
+}else{
+
+await sb.from("chapters")
+.insert({subject_id,name})
+
+}
+
+chapterId.value=""
 chapterName.value=""
+
+loadChapters()
+
+}
+
+function editChapter(id,name,subject){
+
+chapterId.value=id
+chapterName.value=name
+chapterSubject.value=subject
+
+}
+
+async function deleteChapter(id){
+
+if(!confirm("Xóa chương?")) return
+
+await sb.from("chapters").delete().eq("id",id)
 
 loadChapters()
 
@@ -584,6 +650,7 @@ loadChapters()
 async function loadDropdowns(){
 
 const {data:grades}=await sb.from("grades").select("*")
+
 grades.sort((a,b)=>parseInt(a.name)-parseInt(b.name))
 
 chapterGrade.innerHTML=grades.map(g=>`<option value="${g.id}">${g.name}</option>`).join("")
@@ -593,7 +660,14 @@ loadSubjectsByGrade()
 
 }
 
-chapterGrade.onchange=loadSubjectsByGrade
+chapterGrade.onchange=async ()=>{
+
+await loadSubjectsByGrade()
+filterChapters()
+
+}
+
+chapterSubject.onchange=filterChapters
 
 async function loadSubjectsByGrade(){
 
@@ -610,13 +684,28 @@ chapterSubject.innerHTML=data
 
 }
 
-async function deleteChapter(id){
+/* FILTER CHAPTER */
 
-if(!confirm("Xóa chương?")) return
+function filterChapters(){
 
-await sb.from("chapters").delete().eq("id",id)
+const grade=chapterGrade.options[chapterGrade.selectedIndex].text
+const subject=chapterSubject.options[chapterSubject.selectedIndex]?.text
 
-loadChapters()
+const rows=document.querySelectorAll("#chapterTable tr")
+
+rows.forEach(r=>{
+
+const g=r.children[0].innerText
+const s=r.children[1].innerText
+
+let show=true
+
+if(grade && g!==grade) show=false
+if(subject && s!==subject) show=false
+
+r.style.display=show?"":"none"
+
+})
 
 }
 
