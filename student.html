@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Quản lý học sinh</title>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<style>
+
+body{
+font-family:Arial;
+background:#f5f5f5;
+padding:30px;
+}
+
+.container{
+max-width:1200px;
+margin:auto;
+background:white;
+padding:20px;
+border-radius:10px;
+}
+
+.search-box{
+width:100%;
+padding:12px;
+font-size:16px;
+border:1px solid #ccc;
+border-radius:6px;
+margin-bottom:10px;
+}
+
+.filter{
+margin-bottom:20px;
+}
+
+.stats{
+background:#fafafa;
+padding:10px;
+border-radius:6px;
+margin-bottom:20px;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+}
+
+th,td{
+padding:12px;
+border-bottom:1px solid #eee;
+text-align:left;
+}
+
+th{
+background:#fafafa;
+}
+
+button{
+padding:6px 10px;
+border:none;
+background:#1976d2;
+color:white;
+border-radius:5px;
+cursor:pointer;
+}
+
+button:hover{
+background:#125aa0;
+}
+
+.pagination{
+margin-top:20px;
+text-align:center;
+}
+
+.pagination button{
+margin:3px;
+background:#eee;
+color:#333;
+}
+
+.pagination button.active{
+background:#1976d2;
+color:white;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Danh sách học sinh</h2>
+
+<input 
+type="text"
+id="searchInput"
+class="search-box"
+placeholder="Tìm tên, email, SĐT, năm sinh, tỉnh, trường..."
+>
+
+<div class="filter">
+
+<select id="provinceFilter">
+<option value="">Tất cả tỉnh</option>
+</select>
+
+<button onclick="exportExcel()">Xuất Excel</button>
+
+</div>
+
+<div class="stats" id="stats"></div>
+
+<table>
+
+<thead>
+<tr>
+<th>Tên</th>
+<th>Email</th>
+<th>SĐT</th>
+<th>Năm sinh</th>
+<th>Tỉnh</th>
+<th>Trường</th>
+</tr>
+</thead>
+
+<tbody id="studentTable"></tbody>
+
+</table>
+
+<div class="pagination" id="pagination"></div>
+
+</div>
+
+<script src="supabaseClient.js"></script>
+
+<script>
+
+let allStudents=[]
+let filteredStudents=[]
+let currentPage=1
+let pageSize=10
+
+
+// bỏ dấu tiếng Việt
+
+function removeVietnameseTones(str){
+
+return str
+.normalize("NFD")
+.replace(/[\u0300-\u036f]/g,"")
+.replace(/đ/g,"d")
+.replace(/Đ/g,"D")
+
+}
+
+
+// LOAD DATA
+
+async function loadStudents(){
+
+const {data,error}=await sb
+.from("users")
+.select("*")
+.eq("role","student")
+
+if(error){
+console.log(error)
+return
+}
+
+allStudents=data.filter(s=>
+
+s.full_name &&
+s.phone &&
+s.birth_year &&
+s.province &&
+s.school
+
+)
+
+filteredStudents=[...allStudents]
+
+loadProvinceFilter()
+
+render()
+
+}
+
+loadStudents()
+
+
+// LOAD FILTER TỈNH
+
+function loadProvinceFilter(){
+
+const provinces=[...new Set(allStudents.map(s=>s.province))]
+
+const select=document.getElementById("provinceFilter")
+
+provinces.forEach(p=>{
+
+select.innerHTML+=`<option value="${p}">${p}</option>`
+
+})
+
+}
+
+
+// SEARCH
+
+document
+.getElementById("searchInput")
+.addEventListener("input",filterStudents)
+
+document
+.getElementById("provinceFilter")
+.addEventListener("change",filterStudents)
+
+
+function filterStudents(){
+
+const keyword=removeVietnameseTones(
+document.getElementById("searchInput").value.toLowerCase()
+)
+
+const province=document.getElementById("provinceFilter").value
+
+filteredStudents=allStudents.filter(s=>{
+
+const text=removeVietnameseTones(
+
+(s.full_name+" "+
+s.email+" "+
+s.phone+" "+
+s.birth_year+" "+
+s.province+" "+
+s.school).toLowerCase()
+
+)
+
+const matchText=text.includes(keyword)
+
+const matchProvince=!province || s.province===province
+
+return matchText && matchProvince
+
+})
+
+currentPage=1
+
+render()
+
+}
+
+
+// RENDER
+
+function render(){
+
+const start=(currentPage-1)*pageSize
+const end=start+pageSize
+
+renderTable(filteredStudents.slice(start,end))
+renderPagination()
+renderStats()
+
+}
+
+
+// TABLE
+
+function renderTable(list){
+
+const table=document.getElementById("studentTable")
+
+table.innerHTML=""
+
+list.forEach(s=>{
+
+table.innerHTML+=`
+
+<tr>
+
+<td>${s.full_name}</td>
+<td>${s.email}</td>
+<td>${s.phone}</td>
+<td>${s.birth_year}</td>
+<td>${s.province}</td>
+<td>${s.school}</td>
+
+</tr>
+
+`
+
+})
+
+}
+
+
+// PAGINATION
+
+function renderPagination(){
+
+const totalPages=Math.ceil(filteredStudents.length/pageSize)
+
+const div=document.getElementById("pagination")
+
+div.innerHTML=""
+
+for(let i=1;i<=totalPages;i++){
+
+div.innerHTML+=`
+
+<button
+class="${i===currentPage?'active':''}"
+onclick="goPage(${i})"
+>
+
+${i}
+
+</button>
+
+`
+
+}
+
+}
+
+function goPage(p){
+
+currentPage=p
+
+render()
+
+}
+
+
+// STATS
+
+function renderStats(){
+
+const total=filteredStudents.length
+
+const provinceStats={}
+
+filteredStudents.forEach(s=>{
+
+provinceStats[s.province]=(provinceStats[s.province]||0)+1
+
+})
+
+let html=`<b>Tổng học sinh:</b> ${total} <br><br>`
+
+for(let p in provinceStats){
+
+html+=`${p}: ${provinceStats[p]}<br>`
+
+}
+
+document.getElementById("stats").innerHTML=html
+
+}
+
+
+// EXPORT EXCEL
+
+function exportExcel(){
+
+const data=filteredStudents.map(s=>({
+
+"Tên":s.full_name,
+"Email":s.email,
+"SĐT":s.phone,
+"Năm sinh":s.birth_year,
+"Tỉnh":s.province,
+"Trường":s.school
+
+}))
+
+const worksheet=XLSX.utils.json_to_sheet(data)
+
+const workbook=XLSX.utils.book_new()
+
+XLSX.utils.book_append_sheet(workbook,worksheet,"Students")
+
+XLSX.writeFile(workbook,"students.xlsx")
+
+}
+
+</script>
+
+</body>
+</html>
