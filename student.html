@@ -28,12 +28,10 @@ h2{
 margin-bottom:20px;
 }
 
-/* SEARCH */
-
 .search-row{
 display:flex;
-gap:10px;
 flex-wrap:wrap;
+gap:10px;
 margin-bottom:20px;
 }
 
@@ -44,8 +42,6 @@ border-radius:6px;
 font-size:14px;
 }
 
-/* BUTTON */
-
 button{
 padding:8px 12px;
 border:none;
@@ -53,7 +49,6 @@ background:#1976d2;
 color:white;
 border-radius:6px;
 cursor:pointer;
-font-size:14px;
 }
 
 button:hover{
@@ -63,8 +58,6 @@ background:#125aa0;
 button.delete{
 background:#e53935;
 }
-
-/* TABLE */
 
 table{
 width:100%;
@@ -79,13 +72,12 @@ text-align:left;
 
 th{
 background:#fafafa;
+cursor:pointer;
 }
 
 tr:hover{
 background:#f9f9f9;
 }
-
-/* PAGINATION */
 
 .pagination{
 margin-top:20px;
@@ -102,8 +94,6 @@ color:#333;
 background:#1976d2;
 color:white;
 }
-
-/* MODAL */
 
 .modal{
 position:fixed;
@@ -154,7 +144,6 @@ color:#444;
 <input id="search_province" placeholder="Tỉnh">
 <input id="search_school" placeholder="Trường">
 
-<button onclick="filterStudents()">Tìm</button>
 <button onclick="exportExcel()">Xuất Excel</button>
 
 </div>
@@ -165,12 +154,12 @@ color:#444;
 
 <thead>
 <tr>
-<th>Tên</th>
+<th onclick="sortTable('full_name')">Tên</th>
 <th>Email</th>
-<th>SĐT</th>
-<th>Năm sinh</th>
-<th>Tỉnh</th>
-<th>Trường</th>
+<th onclick="sortTable('phone')">SĐT</th>
+<th onclick="sortTable('birth_year')">Năm sinh</th>
+<th onclick="sortTable('province')">Tỉnh</th>
+<th onclick="sortTable('school')">Trường</th>
 <th>Hành động</th>
 </tr>
 </thead>
@@ -183,7 +172,6 @@ color:#444;
 
 </div>
 
-<!-- MODAL -->
 
 <div class="modal" id="editModal">
 
@@ -203,6 +191,7 @@ color:#444;
 
 </div>
 
+
 <script>
 
 let allStudents=[]
@@ -212,17 +201,21 @@ let page=1
 let pageSize=10
 
 let editingId=null
+let sortDirection=1
+
 
 function removeVN(str){
+
 return str
 .normalize("NFD")
 .replace(/[\u0300-\u036f]/g,"")
 .replace(/đ/g,"d")
 .replace(/Đ/g,"D")
+
 }
 
 
-// LOAD DATA
+// LOAD STUDENTS
 
 async function loadStudents(){
 
@@ -252,38 +245,70 @@ render()
 loadStudents()
 
 
-// FILTER
+
+// SEARCH
 
 function filterStudents(){
 
-const name = removeVN(search_name.value.toLowerCase())
-const phone = search_phone.value
-const birth = search_birth.value
-const province = removeVN(search_province.value.toLowerCase())
-const school = removeVN(search_school.value.toLowerCase())
+const name=removeVN(search_name.value.toLowerCase())
+const phone=search_phone.value
+const birth=search_birth.value
+const province=removeVN(search_province.value.toLowerCase())
+const school=removeVN(search_school.value.toLowerCase())
 
-filteredStudents = allStudents.filter(s=>{
+filteredStudents=allStudents.filter(s=>{
 
-const matchName =
-removeVN((s.full_name || "").toLowerCase()).includes(name)
+const matchName=
+removeVN((s.full_name||"").toLowerCase()).includes(name)
 
-const matchPhone =
-(s.phone || "").includes(phone)
+const matchPhone=
+(s.phone||"").includes(phone)
 
-const matchBirth =
-!birth || s.birth_year == birth
+const matchBirth=
+!birth || s.birth_year==birth
 
-const matchProvince =
-removeVN((s.province || "").toLowerCase()).includes(province)
+const matchProvince=
+removeVN((s.province||"").toLowerCase()).includes(province)
 
-const matchSchool =
-removeVN((s.school || "").toLowerCase()).includes(school)
+const matchSchool=
+removeVN((s.school||"").toLowerCase()).includes(school)
 
 return matchName && matchPhone && matchBirth && matchProvince && matchSchool
 
 })
 
 page=1
+render()
+
+}
+
+
+// REALTIME SEARCH
+
+document.querySelectorAll(".search-row input")
+.forEach(i=>{
+i.addEventListener("input",filterStudents)
+})
+
+
+// SORT
+
+function sortTable(field){
+
+filteredStudents.sort((a,b)=>{
+
+let A=a[field]||""
+let B=b[field]||""
+
+if(A>B) return sortDirection
+if(A<B) return -sortDirection
+
+return 0
+
+})
+
+sortDirection*=-1
+
 render()
 
 }
@@ -380,7 +405,7 @@ school:edit_school.value
 
 if(error){
 
-alert("Lỗi")
+alert("Lỗi cập nhật")
 
 }else{
 
@@ -422,7 +447,9 @@ pagination.innerHTML+=`
 <button 
 class="${i===page?'active':''}"
 onclick="goPage(${i})">
+
 ${i}
+
 </button>
 
 `
@@ -443,7 +470,26 @@ render()
 
 function renderStats(){
 
-stats.innerHTML=`Tổng học sinh: <b>${filteredStudents.length}</b>`
+const total=filteredStudents.length
+
+const provinceStats={}
+
+filteredStudents.forEach(s=>{
+
+provinceStats[s.province]=
+(provinceStats[s.province]||0)+1
+
+})
+
+let html=`<b>Tổng học sinh:</b> ${total}<br><br>`
+
+for(let p in provinceStats){
+
+html+=`${p}: ${provinceStats[p]}<br>`
+
+}
+
+stats.innerHTML=html
 
 }
 
