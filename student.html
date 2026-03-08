@@ -127,6 +127,11 @@ margin-bottom:15px;
 color:#444;
 }
 
+.phone{
+cursor:pointer;
+color:#1976d2;
+}
+
 </style>
 </head>
 
@@ -154,6 +159,7 @@ color:#444;
 
 <thead>
 <tr>
+<th>STT</th>
 <th onclick="sortTable('full_name')">Tên</th>
 <th>Email</th>
 <th onclick="sortTable('phone')">SĐT</th>
@@ -186,6 +192,7 @@ color:#444;
 <input id="edit_school" placeholder="Trường">
 
 <button onclick="saveStudent()">Lưu</button>
+<button onclick="closeModal()">Đóng</button>
 
 </div>
 
@@ -215,7 +222,7 @@ return str
 }
 
 
-// LOAD STUDENTS
+// LOAD
 
 async function loadStudents(){
 
@@ -224,16 +231,18 @@ const {data,error}=await sb
 .select("*")
 .eq("role","student")
 
-if(error) return
+if(error){
+alert("Lỗi tải dữ liệu")
+console.log(error)
+return
+}
 
 allStudents=data.filter(s=>
-
 s.full_name &&
 s.phone &&
 s.birth_year &&
 s.province &&
 s.school
-
 )
 
 filteredStudents=[...allStudents]
@@ -243,7 +252,6 @@ render()
 }
 
 loadStudents()
-
 
 
 // SEARCH
@@ -282,9 +290,6 @@ render()
 
 }
 
-
-// REALTIME SEARCH
-
 document.querySelectorAll(".search-row input")
 .forEach(i=>{
 i.addEventListener("input",filterStudents)
@@ -300,9 +305,13 @@ filteredStudents.sort((a,b)=>{
 let A=a[field]||""
 let B=b[field]||""
 
+if(field==="birth_year"){
+A=parseInt(A)
+B=parseInt(B)
+}
+
 if(A>B) return sortDirection
 if(A<B) return -sortDirection
-
 return 0
 
 })
@@ -334,22 +343,34 @@ function renderTable(list){
 
 studentTable.innerHTML=""
 
-list.forEach(s=>{
+list.forEach((s,i)=>{
 
 studentTable.innerHTML+=`
 
 <tr>
 
+<td>${(page-1)*pageSize+i+1}</td>
+
 <td>${s.full_name}</td>
+
 <td>${s.email}</td>
-<td>${s.phone}</td>
+
+<td class="phone"
+onclick="copyPhone('${s.phone}')">
+${s.phone}
+</td>
+
 <td>${s.birth_year}</td>
+
 <td>${s.province}</td>
+
 <td>${s.school}</td>
 
 <td>
 
-<button onclick="editStudent('${s.id}')">Sửa</button>
+<button onclick="editStudent('${s.id}')">
+Sửa
+</button>
 
 <button class="delete"
 onclick="deleteStudent('${s.id}')">
@@ -363,6 +384,17 @@ Xóa
 `
 
 })
+
+}
+
+
+// COPY PHONE
+
+function copyPhone(phone){
+
+navigator.clipboard.writeText(phone)
+
+alert("Đã copy SĐT")
 
 }
 
@@ -386,6 +418,13 @@ editModal.style.display="flex"
 }
 
 
+// CLOSE
+
+function closeModal(){
+editModal.style.display="none"
+}
+
+
 // SAVE
 
 async function saveStudent(){
@@ -404,14 +443,10 @@ school:edit_school.value
 .eq("id",editingId)
 
 if(error){
-
 alert("Lỗi cập nhật")
-
 }else{
-
 editModal.style.display="none"
 loadStudents()
-
 }
 
 }
@@ -423,7 +458,15 @@ async function deleteStudent(id){
 
 if(!confirm("Xóa học sinh này?")) return
 
-await sb.from("users").delete().eq("id",id)
+const {error}=await sb
+.from("users")
+.delete()
+.eq("id",id)
+
+if(error){
+alert("Không thể xóa")
+return
+}
 
 await sb.rpc("delete_auth_user",{uid:id})
 
@@ -444,7 +487,7 @@ for(let i=1;i<=total;i++){
 
 pagination.innerHTML+=`
 
-<button 
+<button
 class="${i===page?'active':''}"
 onclick="goPage(${i})">
 
@@ -472,22 +515,8 @@ function renderStats(){
 
 const total=filteredStudents.length
 
-const provinceStats={}
-
-filteredStudents.forEach(s=>{
-
-provinceStats[s.province]=
-(provinceStats[s.province]||0)+1
-
-})
-
-let html=`<b>Tổng học sinh:</b> ${total}<br><br>`
-
-for(let p in provinceStats){
-
-html+=`${p}: ${provinceStats[p]}<br>`
-
-}
+let html=`<b>Tổng hiển thị:</b> ${total}<br>`
+html+=`<b>Tổng toàn bộ:</b> ${allStudents.length}`
 
 stats.innerHTML=html
 
@@ -510,7 +539,6 @@ Trường:s.school
 }))
 
 const ws=XLSX.utils.json_to_sheet(data)
-
 const wb=XLSX.utils.book_new()
 
 XLSX.utils.book_append_sheet(wb,ws,"Students")
