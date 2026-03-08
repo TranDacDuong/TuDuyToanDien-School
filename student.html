@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <title>Quản lý học sinh</title>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="supabaseClient.js"></script>
 
 <style>
 
@@ -15,46 +17,27 @@ padding:30px;
 }
 
 .container{
-max-width:1200px;
+max-width:1300px;
 margin:auto;
 background:white;
 padding:20px;
 border-radius:10px;
 }
 
-.search-box{
-width:100%;
-padding:12px;
-font-size:16px;
-border:1px solid #ccc;
-border-radius:6px;
-margin-bottom:10px;
-}
-
-.filter{
-margin-bottom:20px;
-}
-
-.stats{
-background:#fafafa;
-padding:10px;
-border-radius:6px;
-margin-bottom:20px;
+input,select{
+padding:8px;
+margin:5px;
 }
 
 table{
 width:100%;
 border-collapse:collapse;
+margin-top:10px;
 }
 
 th,td{
-padding:12px;
+padding:10px;
 border-bottom:1px solid #eee;
-text-align:left;
-}
-
-th{
-background:#fafafa;
 }
 
 button{
@@ -66,24 +49,31 @@ border-radius:5px;
 cursor:pointer;
 }
 
-button:hover{
-background:#125aa0;
+button.delete{
+background:#d32f2f;
 }
 
 .pagination{
 margin-top:20px;
-text-align:center;
 }
 
-.pagination button{
-margin:3px;
-background:#eee;
-color:#333;
+.modal{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.4);
+display:none;
+justify-content:center;
+align-items:center;
 }
 
-.pagination button.active{
-background:#1976d2;
-color:white;
+.modal-content{
+background:white;
+padding:20px;
+border-radius:10px;
+width:350px;
 }
 
 </style>
@@ -95,24 +85,19 @@ color:white;
 
 <h2>Danh sách học sinh</h2>
 
-<input 
-type="text"
-id="searchInput"
-class="search-box"
-placeholder="Tìm tên, email, SĐT, năm sinh, tỉnh, trường..."
->
+<div>
 
-<div class="filter">
+<input id="search_name" placeholder="Tên">
+<input id="search_birth" placeholder="Năm sinh">
+<input id="search_province" placeholder="Tỉnh">
+<input id="search_school" placeholder="Trường">
 
-<select id="provinceFilter">
-<option value="">Tất cả tỉnh</option>
-</select>
-
+<button onclick="filterStudents()">Tìm kiếm</button>
 <button onclick="exportExcel()">Xuất Excel</button>
 
 </div>
 
-<div class="stats" id="stats"></div>
+<div id="stats"></div>
 
 <table>
 
@@ -124,6 +109,7 @@ placeholder="Tìm tên, email, SĐT, năm sinh, tỉnh, trường..."
 <th>Năm sinh</th>
 <th>Tỉnh</th>
 <th>Trường</th>
+<th>Hành động</th>
 </tr>
 </thead>
 
@@ -131,24 +117,40 @@ placeholder="Tìm tên, email, SĐT, năm sinh, tỉnh, trường..."
 
 </table>
 
-<div class="pagination" id="pagination"></div>
+<div id="pagination"></div>
 
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabaseClient.js"></script>
+<div class="modal" id="editModal">
+
+<div class="modal-content">
+
+<h3>Sửa học sinh</h3>
+
+<input id="edit_name" placeholder="Tên">
+<input id="edit_phone" placeholder="SĐT">
+<input id="edit_birth" placeholder="Năm sinh">
+<input id="edit_province" placeholder="Tỉnh">
+<input id="edit_school" placeholder="Trường">
+
+<button onclick="saveStudent()">Lưu</button>
+
+</div>
+
+</div>
 
 <script>
 
 let allStudents=[]
 let filteredStudents=[]
-let currentPage=1
+
+let page=1
 let pageSize=10
 
+let editingId=null
 
-// bỏ dấu tiếng Việt
 
-function removeVietnameseTones(str){
+function removeVN(str){
 
 return str
 .normalize("NFD")
@@ -168,10 +170,7 @@ const {data,error}=await sb
 .select("*")
 .eq("role","student")
 
-if(error){
-console.log(error)
-return
-}
+if(error) return
 
 allStudents=data.filter(s=>
 
@@ -185,8 +184,6 @@ s.school
 
 filteredStudents=[...allStudents]
 
-loadProvinceFilter()
-
 render()
 
 }
@@ -194,64 +191,27 @@ render()
 loadStudents()
 
 
-// LOAD FILTER TỈNH
-
-function loadProvinceFilter(){
-
-const provinces=[...new Set(allStudents.map(s=>s.province))]
-
-const select=document.getElementById("provinceFilter")
-
-provinces.forEach(p=>{
-
-select.innerHTML+=`<option value="${p}">${p}</option>`
-
-})
-
-}
-
-
-// SEARCH
-
-document
-.getElementById("searchInput")
-.addEventListener("input",filterStudents)
-
-document
-.getElementById("provinceFilter")
-.addEventListener("change",filterStudents)
-
+// FILTER
 
 function filterStudents(){
 
-const keyword=removeVietnameseTones(
-document.getElementById("searchInput").value.toLowerCase()
-)
-
-const province=document.getElementById("provinceFilter").value
+const name=removeVN(document.getElementById("search_name").value.toLowerCase())
+const birth=document.getElementById("search_birth").value
+const province=removeVN(document.getElementById("search_province").value.toLowerCase())
+const school=removeVN(document.getElementById("search_school").value.toLowerCase())
 
 filteredStudents=allStudents.filter(s=>{
 
-const text=removeVietnameseTones(
+const matchName=removeVN(s.full_name.toLowerCase()).includes(name)
+const matchBirth=!birth || s.birth_year==birth
+const matchProvince=removeVN(s.province.toLowerCase()).includes(province)
+const matchSchool=removeVN(s.school.toLowerCase()).includes(school)
 
-(s.full_name+" "+
-s.email+" "+
-s.phone+" "+
-s.birth_year+" "+
-s.province+" "+
-s.school).toLowerCase()
-
-)
-
-const matchText=text.includes(keyword)
-
-const matchProvince=!province || s.province===province
-
-return matchText && matchProvince
+return matchName && matchBirth && matchProvince && matchSchool
 
 })
 
-currentPage=1
+page=1
 
 render()
 
@@ -262,7 +222,7 @@ render()
 
 function render(){
 
-const start=(currentPage-1)*pageSize
+const start=(page-1)*pageSize
 const end=start+pageSize
 
 renderTable(filteredStudents.slice(start,end))
@@ -293,6 +253,17 @@ table.innerHTML+=`
 <td>${s.province}</td>
 <td>${s.school}</td>
 
+<td>
+
+<button onclick="editStudent('${s.id}')">Sửa</button>
+
+<button class="delete"
+onclick="deleteStudent('${s.id}')">
+Xóa
+</button>
+
+</td>
+
 </tr>
 
 `
@@ -302,28 +273,87 @@ table.innerHTML+=`
 }
 
 
+// EDIT
+
+function editStudent(id){
+
+const s=allStudents.find(x=>x.id===id)
+
+editingId=id
+
+edit_name.value=s.full_name
+edit_phone.value=s.phone
+edit_birth.value=s.birth_year
+edit_province.value=s.province
+edit_school.value=s.school
+
+editModal.style.display="flex"
+
+}
+
+
+// SAVE
+
+async function saveStudent(){
+
+const {error}=await sb
+.from("users")
+.update({
+
+full_name:edit_name.value,
+phone:edit_phone.value,
+birth_year:edit_birth.value,
+province:edit_province.value,
+school:edit_school.value
+
+})
+.eq("id",editingId)
+
+if(error){
+
+alert("Lỗi")
+
+}else{
+
+editModal.style.display="none"
+
+loadStudents()
+
+}
+
+}
+
+
+// DELETE
+
+async function deleteStudent(id){
+
+if(!confirm("Xóa học sinh này?")) return
+
+await sb.from("users").delete().eq("id",id)
+
+await sb.rpc("delete_auth_user",{uid:id})
+
+loadStudents()
+
+}
+
+
 // PAGINATION
 
 function renderPagination(){
 
-const totalPages=Math.ceil(filteredStudents.length/pageSize)
+const total=Math.ceil(filteredStudents.length/pageSize)
 
 const div=document.getElementById("pagination")
 
 div.innerHTML=""
 
-for(let i=1;i<=totalPages;i++){
+for(let i=1;i<=total;i++){
 
 div.innerHTML+=`
 
-<button
-class="${i===currentPage?'active':''}"
-onclick="goPage(${i})"
->
-
-${i}
-
-</button>
+<button onclick="goPage(${i})">${i}</button>
 
 `
 
@@ -333,8 +363,7 @@ ${i}
 
 function goPage(p){
 
-currentPage=p
-
+page=p
 render()
 
 }
@@ -344,51 +373,35 @@ render()
 
 function renderStats(){
 
-const total=filteredStudents.length
+document.getElementById("stats").innerHTML=
 
-const provinceStats={}
-
-filteredStudents.forEach(s=>{
-
-provinceStats[s.province]=(provinceStats[s.province]||0)+1
-
-})
-
-let html=`<b>Tổng học sinh:</b> ${total} <br><br>`
-
-for(let p in provinceStats){
-
-html+=`${p}: ${provinceStats[p]}<br>`
-
-}
-
-document.getElementById("stats").innerHTML=html
+`Tổng học sinh: ${filteredStudents.length}`
 
 }
 
 
-// EXPORT EXCEL
+// EXPORT
 
 function exportExcel(){
 
 const data=filteredStudents.map(s=>({
 
-"Tên":s.full_name,
-"Email":s.email,
-"SĐT":s.phone,
+Tên:s.full_name,
+Email:s.email,
+SĐT:s.phone,
 "Năm sinh":s.birth_year,
-"Tỉnh":s.province,
-"Trường":s.school
+Tỉnh:s.province,
+Trường:s.school
 
 }))
 
-const worksheet=XLSX.utils.json_to_sheet(data)
+const ws=XLSX.utils.json_to_sheet(data)
 
-const workbook=XLSX.utils.book_new()
+const wb=XLSX.utils.book_new()
 
-XLSX.utils.book_append_sheet(workbook,worksheet,"Students")
+XLSX.utils.book_append_sheet(wb,ws,"Students")
 
-XLSX.writeFile(workbook,"students.xlsx")
+XLSX.writeFile(wb,"students.xlsx")
 
 }
 
