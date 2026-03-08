@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Quản lý câu hỏi</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+
+<style>
+
+body{
+font-family:Arial;
+background:#f5f5f5;
+padding:30px;
+}
+
+.container{
+max-width:1100px;
+margin:auto;
+background:white;
+padding:20px;
+border-radius:10px;
+}
+
+h2{
+margin-bottom:20px;
+}
+
+button{
+padding:8px 12px;
+border:none;
+background:#1976d2;
+color:white;
+border-radius:6px;
+cursor:pointer;
+}
+
+button:hover{
+background:#125aa0;
+}
+
+button.delete{
+background:#e53935;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:20px;
+}
+
+th,td{
+padding:12px;
+border-bottom:1px solid #eee;
+}
+
+th{
+background:#fafafa;
+}
+
+img{
+max-width:120px;
+}
+
+.modal{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.4);
+display:none;
+align-items:center;
+justify-content:center;
+}
+
+.modal-content{
+background:white;
+padding:20px;
+border-radius:10px;
+width:400px;
+}
+
+.modal-content input,
+.modal-content select{
+width:100%;
+padding:10px;
+margin-bottom:10px;
+border:1px solid #ccc;
+border-radius:5px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Ngân hàng câu hỏi</h2>
+
+<button onclick="openCreate()">Tạo câu hỏi</button>
+
+<table>
+
+<thead>
+
+<tr>
+<th>Ảnh</th>
+<th>Môn</th>
+<th>Lớp</th>
+<th>Chương</th>
+<th>Loại</th>
+<th>Độ khó</th>
+<th>Hành động</th>
+</tr>
+
+</thead>
+
+<tbody id="questionTable"></tbody>
+
+</table>
+
+</div>
+
+
+<div class="modal" id="modal">
+
+<div class="modal-content">
+
+<h3 id="modalTitle"></h3>
+
+<input id="image_url" placeholder="Link ảnh câu hỏi">
+
+<input id="subject" placeholder="Môn">
+
+<input id="grade" placeholder="Lớp">
+
+<input id="chapter" placeholder="Chương">
+
+<select id="question_type">
+
+<option value="multi_choice">multi_choice</option>
+<option value="true_false">true_false</option>
+<option value="short_answer">short_answer</option>
+<option value="essay">essay</option>
+
+</select>
+
+<input id="difficulty" placeholder="Độ khó">
+
+<input id="answer" placeholder="Đáp án">
+
+<button onclick="saveQuestion()">Lưu</button>
+<button onclick="closeModal()">Đóng</button>
+
+</div>
+
+</div>
+
+<script>
+
+let questions=[]
+let editingId=null
+
+let userRole=""
+let userSubject=""
+
+async function getUser(){
+
+const {data}=await sb.auth.getUser()
+
+const user=data.user
+
+const {data:profile}=await sb
+.from("users")
+.select("*")
+.eq("id",user.id)
+.single()
+
+userRole=profile.role
+userSubject=profile.subject
+
+}
+
+async function loadQuestions(){
+
+let query=sb.from("question_bank").select("*").eq("hidden",false)
+
+if(userRole==="teacher"){
+
+query=query.eq("subject",userSubject)
+
+}
+
+const {data,error}=await query.order("created_at",{ascending:false})
+
+if(error){
+
+alert("Lỗi tải dữ liệu")
+
+return
+
+}
+
+questions=data
+
+render()
+
+}
+
+function render(){
+
+questionTable.innerHTML=""
+
+questions.forEach(q=>{
+
+questionTable.innerHTML+=`
+
+<tr>
+
+<td><img src="${q.image_url}"></td>
+
+<td>${q.subject}</td>
+
+<td>${q.grade}</td>
+
+<td>${q.chapter}</td>
+
+<td>${q.question_type}</td>
+
+<td>${q.difficulty}</td>
+
+<td>
+
+<button onclick="editQuestion('${q.id}')">Sửa</button>
+
+<button class="delete"
+onclick="requestDelete('${q.id}')">
+Yêu cầu xóa
+</button>
+
+</td>
+
+</tr>
+
+`
+
+})
+
+}
+
+function openCreate(){
+
+editingId=null
+
+modalTitle.innerText="Tạo câu hỏi"
+
+modal.style.display="flex"
+
+}
+
+function editQuestion(id){
+
+const q=questions.find(x=>x.id===id)
+
+editingId=id
+
+modalTitle.innerText="Sửa câu hỏi"
+
+image_url.value=q.image_url
+subject.value=q.subject
+grade.value=q.grade
+chapter.value=q.chapter
+question_type.value=q.question_type
+difficulty.value=q.difficulty
+answer.value=q.answer
+
+modal.style.display="flex"
+
+}
+
+function closeModal(){
+
+modal.style.display="none"
+
+}
+
+async function saveQuestion(){
+
+const payload={
+
+image_url:image_url.value,
+subject:subject.value,
+grade:grade.value,
+chapter:chapter.value,
+question_type:question_type.value,
+difficulty:difficulty.value,
+answer:answer.value
+
+}
+
+if(editingId){
+
+await sb
+.from("question_bank")
+.update(payload)
+.eq("id",editingId)
+
+}else{
+
+const {data}=await sb.auth.getUser()
+
+payload.created_by=data.user.id
+
+await sb
+.from("question_bank")
+.insert(payload)
+
+}
+
+closeModal()
+
+loadQuestions()
+
+}
+
+async function requestDelete(id){
+
+if(!confirm("Gửi yêu cầu xóa câu hỏi?")) return
+
+await sb
+.from("question_bank")
+.update({hidden:true})
+.eq("id",id)
+
+await sb
+.from("delete_requests")
+.insert({
+
+question_id:id,
+status:"pending"
+
+})
+
+loadQuestions()
+
+}
+
+async function init(){
+
+await getUser()
+
+loadQuestions()
+
+}
+
+init()
+
+</script>
+
+</body>
+</html>
