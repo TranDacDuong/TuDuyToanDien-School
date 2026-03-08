@@ -88,6 +88,7 @@ width:350px;
 <div>
 
 <input id="search_name" placeholder="Tên">
+<input id="search_phone" placeholder="SĐT">
 <input id="search_birth" placeholder="Năm sinh">
 <input id="search_province" placeholder="Tỉnh">
 <input id="search_school" placeholder="Trường">
@@ -195,23 +196,34 @@ loadStudents()
 
 function filterStudents(){
 
-const name=removeVN(document.getElementById("search_name").value.toLowerCase())
-const birth=document.getElementById("search_birth").value
-const province=removeVN(document.getElementById("search_province").value.toLowerCase())
-const school=removeVN(document.getElementById("search_school").value.toLowerCase())
+const name = removeVN(document.getElementById("search_name").value.toLowerCase())
+const phone = document.getElementById("search_phone").value
+const birth = document.getElementById("search_birth").value
+const province = removeVN(document.getElementById("search_province").value.toLowerCase())
+const school = removeVN(document.getElementById("search_school").value.toLowerCase())
 
-filteredStudents=allStudents.filter(s=>{
+filteredStudents = allStudents.filter(s=>{
 
-const matchName=removeVN(s.full_name.toLowerCase()).includes(name)
-const matchBirth=!birth || s.birth_year==birth
-const matchProvince=removeVN(s.province.toLowerCase()).includes(province)
-const matchSchool=removeVN(s.school.toLowerCase()).includes(school)
+const matchName =
+removeVN((s.full_name || "").toLowerCase()).includes(name)
 
-return matchName && matchBirth && matchProvince && matchSchool
+const matchPhone =
+(s.phone || "").includes(phone)
+
+const matchBirth =
+!birth || s.birth_year == birth
+
+const matchProvince =
+removeVN((s.province || "").toLowerCase()).includes(province)
+
+const matchSchool =
+removeVN((s.school || "").toLowerCase()).includes(school)
+
+return matchName && matchPhone && matchBirth && matchProvince && matchSchool
 
 })
 
-page=1
+page = 1
 
 render()
 
