@@ -1,17 +1,19 @@
 <!DOCTYPE html>
+
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>Quản lý câu hỏi</title>
+<title>Ngân hàng câu hỏi</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script src="supabaseClient.js"></script>
 
 <style>
 
 body{
 font-family:Arial;
-background:#f5f5f5;
+background:#f1f5f9;
 padding:30px;
 }
 
@@ -19,8 +21,9 @@ padding:30px;
 max-width:1100px;
 margin:auto;
 background:white;
-padding:20px;
+padding:25px;
 border-radius:10px;
+box-shadow:0 10px 30px rgba(0,0,0,0.05);
 }
 
 h2{
@@ -30,14 +33,10 @@ margin-bottom:20px;
 button{
 padding:8px 12px;
 border:none;
-background:#1976d2;
+background:#2563eb;
 color:white;
 border-radius:6px;
 cursor:pointer;
-}
-
-button:hover{
-background:#125aa0;
 }
 
 button.delete{
@@ -51,8 +50,9 @@ margin-top:20px;
 }
 
 th,td{
-padding:12px;
+padding:10px;
 border-bottom:1px solid #eee;
+text-align:left;
 }
 
 th{
@@ -75,15 +75,15 @@ align-items:center;
 justify-content:center;
 }
 
-.modal-content{
+.modal-box{
 background:white;
 padding:20px;
 border-radius:10px;
-width:400px;
+width:420px;
 }
 
-.modal-content input,
-.modal-content select{
+.modal-box select,
+.modal-box input{
 width:100%;
 padding:10px;
 margin-bottom:10px;
@@ -92,6 +92,7 @@ border-radius:5px;
 }
 
 </style>
+
 </head>
 
 <body>
@@ -108,8 +109,8 @@ border-radius:5px;
 
 <tr>
 <th>Ảnh</th>
+<th>Khối</th>
 <th>Môn</th>
-<th>Lớp</th>
 <th>Chương</th>
 <th>Loại</th>
 <th>Độ khó</th>
@@ -124,20 +125,19 @@ border-radius:5px;
 
 </div>
 
-
 <div class="modal" id="modal">
 
-<div class="modal-content">
+<div class="modal-box">
 
 <h3 id="modalTitle"></h3>
 
 <input id="image_url" placeholder="Link ảnh câu hỏi">
 
-<input id="subject" placeholder="Môn">
+<select id="grade"></select>
 
-<input id="grade" placeholder="Lớp">
+<select id="subject"></select>
 
-<input id="chapter" placeholder="Chương">
+<select id="chapter"></select>
 
 <select id="question_type">
 
@@ -152,8 +152,9 @@ border-radius:5px;
 
 <input id="answer" placeholder="Đáp án">
 
-<button onclick="saveQuestion()">Lưu</button>
-<button onclick="closeModal()">Đóng</button>
+<input id="answer_image_url" placeholder="Link ảnh đáp án">
+
+<button onclick="saveQuestion()">Lưu</button> <button onclick="closeModal()">Đóng</button>
 
 </div>
 
@@ -162,53 +163,104 @@ border-radius:5px;
 <script>
 
 let questions=[]
+let grades=[]
+let subjects=[]
+let chapters=[]
 let editingId=null
 
-let userRole=""
-let userSubject=""
+/* LOAD GRADES */
 
-async function getUser(){
+async function loadGrades(){
 
-const {data}=await sb.auth.getUser()
-
-const user=data.user
-
-const {data:profile}=await sb
-.from("users")
+const {data}=await sb
+.from("grades")
 .select("*")
-.eq("id",user.id)
-.single()
+.order("name")
 
-userRole=profile.role
-userSubject=profile.subject
+grades=data
+
+grade.innerHTML="<option value=''>Chọn khối</option>"
+
+grades.forEach(g=>{
+grade.innerHTML+=`<option value="${g.id}">${g.name}</option>`
+})
 
 }
+
+/* LOAD SUBJECTS */
+
+grade.onchange=async()=>{
+
+const {data}=await sb
+.from("subjects")
+.select("*")
+.eq("grade_id",grade.value)
+.order("name")
+
+subjects=data
+
+subject.innerHTML=""
+
+subjects.forEach(s=>{
+subject.innerHTML+=`<option value="${s.id}">${s.name}</option>`
+})
+
+loadChapters()
+
+}
+
+/* LOAD CHAPTERS */
+
+subject.onchange=loadChapters
+
+async function loadChapters(){
+
+const {data}=await sb
+.from("chapters")
+.select("*")
+.eq("subject_id",subject.value)
+.order("name")
+
+chapters=data
+
+chapter.innerHTML=""
+
+chapters.forEach(c=>{
+chapter.innerHTML+=`<option value="${c.id}">${c.name}</option>`
+})
+
+}
+
+/* LOAD QUESTIONS */
 
 async function loadQuestions(){
 
-let query=sb.from("question_bank").select("*").eq("hidden",false)
+const {data}=await sb
 
-if(userRole==="teacher"){
+.from("question_bank")
 
-query=query.eq("subject",userSubject)
+.select(`
+*,
+chapters(
+name,
+subjects(
+name,
+grades(name)
+)
+)
+`)
 
-}
+.eq("hidden",false)
 
-const {data,error}=await query.order("created_at",{ascending:false})
-
-if(error){
-
-alert("Lỗi tải dữ liệu")
-
-return
-
-}
+.order("created_at",{ascending:false})
 
 questions=data
 
 render()
 
 }
+
+/* RENDER TABLE */
 
 function render(){
 
@@ -220,13 +272,13 @@ questionTable.innerHTML+=`
 
 <tr>
 
-<td><img src="${q.image_url}"></td>
+<td>${q.image_url ? `<img src="${q.image_url}">` : ""}</td>
 
-<td>${q.subject}</td>
+<td>${q.chapters?.subjects?.grades?.name||""}</td>
 
-<td>${q.grade}</td>
+<td>${q.chapters?.subjects?.name||""}</td>
 
-<td>${q.chapter}</td>
+<td>${q.chapters?.name||""}</td>
 
 <td>${q.question_type}</td>
 
@@ -237,9 +289,7 @@ questionTable.innerHTML+=`
 <button onclick="editQuestion('${q.id}')">Sửa</button>
 
 <button class="delete"
-onclick="requestDelete('${q.id}')">
-Yêu cầu xóa
-</button>
+onclick="requestDelete('${q.id}')">Xóa</button>
 
 </td>
 
@@ -251,6 +301,8 @@ Yêu cầu xóa
 
 }
 
+/* CREATE */
+
 function openCreate(){
 
 editingId=null
@@ -261,43 +313,44 @@ modal.style.display="flex"
 
 }
 
+/* EDIT */
+
 function editQuestion(id){
 
 const q=questions.find(x=>x.id===id)
 
 editingId=id
 
-modalTitle.innerText="Sửa câu hỏi"
-
-image_url.value=q.image_url
-subject.value=q.subject
-grade.value=q.grade
-chapter.value=q.chapter
+image_url.value=q.image_url||""
 question_type.value=q.question_type
 difficulty.value=q.difficulty
 answer.value=q.answer
+answer_image_url.value=q.answer_image_url||""
+
+modalTitle.innerText="Sửa câu hỏi"
 
 modal.style.display="flex"
 
 }
 
+/* CLOSE */
+
 function closeModal(){
-
 modal.style.display="none"
-
 }
+
+/* SAVE */
 
 async function saveQuestion(){
 
 const payload={
 
 image_url:image_url.value,
-subject:subject.value,
-grade:grade.value,
-chapter:chapter.value,
+chapter_id:chapter.value,
 question_type:question_type.value,
 difficulty:difficulty.value,
-answer:answer.value
+answer:answer.value,
+answer_image_url:answer_image_url.value
 
 }
 
@@ -326,33 +379,28 @@ loadQuestions()
 
 }
 
+/* DELETE */
+
 async function requestDelete(id){
 
-if(!confirm("Gửi yêu cầu xóa câu hỏi?")) return
+if(!confirm("Xóa câu hỏi?")) return
 
 await sb
 .from("question_bank")
 .update({hidden:true})
 .eq("id",id)
 
-await sb
-.from("delete_requests")
-.insert({
-
-question_id:id,
-status:"pending"
-
-})
-
 loadQuestions()
 
 }
 
+/* INIT */
+
 async function init(){
 
-await getUser()
+await loadGrades()
 
-loadQuestions()
+await loadQuestions()
 
 }
 
