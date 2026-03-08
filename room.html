@@ -1,431 +1,378 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <title>Quản lý phòng học</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>   
-    body{
-  font-family: Arial, sans-serif;
-  margin:0;
-  background:#f1f5f9;
+<meta charset="UTF-8">
+<title>Quản lý phòng học</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+
+*{box-sizing:border-box}
+
+body{
+font-family:'Inter',sans-serif;
+background:#f1f5f9;
+margin:0;
+padding:40px;
+color:#0f172a;
 }
 
-header{
-  background:#111827;
-  color:white;
-  padding:18px 30px;
+h2{
+margin-bottom:25px;
+font-weight:600;
 }
 
-header h2{
-  margin:0;
-}
-
-main{
-  padding:30px;
-  max-width:1100px;
-  margin:auto;
+.container{
+display:grid;
+grid-template-columns:420px 1fr;
+gap:30px;
+align-items:start;
 }
 
 /* CARD */
-#form-area{
-  background:white;
-  padding:20px;
-  border-radius:10px;
-  box-shadow:0 2px 10px rgba(0,0,0,0.05);
-  margin-bottom:20px;
+
+.card{
+background:white;
+padding:25px;
+border-radius:14px;
+box-shadow:0 8px 20px rgba(0,0,0,0.05);
 }
 
-/* INPUT */
+/* FORM */
+
+label{
+font-weight:500;
+font-size:14px;
+color:#475569;
+}
+
 input{
-  padding:10px;
-  border:1px solid #ddd;
-  border-radius:6px;
-  margin-right:10px;
+width:100%;
+padding:11px;
+margin-top:6px;
+margin-bottom:16px;
+border:1px solid #e2e8f0;
+border-radius:8px;
+font-size:14px;
+background:#fafafa;
 }
 
-/* BUTTON */
+input:focus{
+outline:none;
+border-color:#2563eb;
+background:white;
+}
+
 button{
-  border:none;
-  padding:8px 14px;
-  border-radius:6px;
-  cursor:pointer;
-  font-weight:500;
+background:#2563eb;
+color:white;
+border:none;
+padding:11px 16px;
+border-radius:8px;
+cursor:pointer;
+font-weight:500;
+font-size:14px;
 }
 
 button:hover{
-  opacity:0.85;
-}
-
-#saveBtn{
-  background:#2563eb;
-  color:white;
-}
-
-.danger{
-  background:#ef4444;
-  color:white;
-}
-
-.edit{
-  background:#f59e0b;
-  color:white;
+background:#1d4ed8;
 }
 
 /* TABLE */
+
+.table-card{
+background:white;
+border-radius:14px;
+box-shadow:0 8px 20px rgba(0,0,0,0.05);
+overflow:hidden;
+}
+
 table{
-  width:100%;
-  border-collapse:collapse;
-  background:white;
-  border-radius:10px;
-  overflow:hidden;
-  box-shadow:0 2px 10px rgba(0,0,0,0.05);
+width:100%;
+border-collapse:collapse;
 }
 
 th,td{
-  padding:12px 14px;
-  border-bottom:1px solid #eee;
+padding:14px 16px;
+border-bottom:1px solid #f1f5f9;
+font-size:14px;
 }
 
 th{
-  background:#f9fafb;
-  text-align:left;
+background:#f8fafc;
+font-weight:600;
+color:#475569;
 }
 
 tr:hover{
-  background:#f3f4f6;
+background:#f9fafb;
 }
 
-/* ROOM COUNT */
-h3{
-  margin-bottom:15px;
+.actions button{
+margin-right:6px;
+padding:7px 10px;
+font-size:13px;
 }
 
-/* TOAST */
-#toast{
-  position:fixed;
-  bottom:30px;
-  right:30px;
-  background:#111827;
-  color:white;
-  padding:14px 22px;
-  border-radius:8px;
-  opacity:0;
-  transform:translateY(20px);
-  transition:0.3s;
+.delete{
+background:#ef4444;
 }
 
-#toast.show{
-  opacity:1;
-  transform:translateY(0);
+.delete:hover{
+background:#dc2626;
 }
 
-/* POPUP */
-.popup{
-  display:none;
-  position:fixed;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  background:rgba(0,0,0,0.4);
-  justify-content:center;
-  align-items:center;
+.badge{
+background:#e0f2fe;
+color:#0369a1;
+padding:4px 8px;
+border-radius:6px;
+font-size:12px;
+font-weight:500;
 }
 
-.popup-content{
-  background:white;
-  padding:25px;
-  border-radius:10px;
-  text-align:center;
-  width:300px;
-}
-
-.popup-content p{
-  margin-bottom:20px;
-  font-size:16px;
-}
-
-.popup-content button{
-  margin:5px;
-}
-    
-  </style>
+</style>
 </head>
+
 <body>
 
-<header>
-  <h2>🏛️ Quản lý phòng học</h2>
-</header>
-  
-<main>
-  <h3>Tổng số phòng: <span id="roomCount">0</span></h3>
+<h2>Quản lý phòng học</h2>
 
-  <div id="form-area">
-  <input type="text" id="roomName" placeholder="Tên phòng">
-<input type="number" id="roomCapacity" placeholder="Sức chứa">
+<div class="container">
 
-  <button id="saveBtn" onclick="saveRoom()">Thêm phòng</button>
+<!-- FORM -->
+
+<div class="card">
+
+<input type="hidden" id="editRoomId">
+
+<label>Tên phòng</label>
+<input id="roomName" placeholder="Ví dụ: Phòng A101">
+
+<label>Sức chứa</label>
+<input id="roomCapacity" type="number" placeholder="Ví dụ: 40">
+
+<button id="submitBtn" onclick="submitRoom()">Thêm phòng</button>
+
 </div>
 
-  <table>
-   <thead>
-  <tr>
-    <th>Tên phòng</th>
-    <th>Sức chứa</th>
-    <th>Hành động</th>
-  </tr>
+<!-- TABLE -->
+
+<div class="table-card">
+
+<table>
+
+<thead>
+<tr>
+<th>STT</th>
+<th>Tên phòng</th>
+<th>Sức chứa</th>
+<th>Hành động</th>
+</tr>
 </thead>
-    <tbody id="roomTable"></tbody>
-  </table>
-</main>
+
+<tbody id="table"></tbody>
+
+</table>
+
+</div>
+
+</div>
+
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
+
 <script>
 
-  let currentUser = null;
-  let currentRole = null;
-  let editingRoomId = null;
-  let deletingRoomId = null;
- async function init() {
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) {
-    window.location.href = "index.html";
-    return;
-  }
+let currentUser=null
+let currentRole=null
 
-  currentUser = user;
-  
-  const { data: profile } = await sb
-    .from("users")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+async function init(){
 
-  if (!profile) {
-    alert("Không tìm thấy quyền người dùng");
-    return;
-  }
+const {data:{user}}=await sb.auth.getUser()
 
-  currentRole = profile.role;
-
-  // 🔥 CHỈ ADMIN ĐƯỢC VÀO
-  if (currentRole !== "admin") {
-  document.getElementById("form-area").style.display = "none";
-  }
-  if (currentRole !== "admin") {
-    alert("Bạn không có quyền truy cập trang này");
-    window.location.href = "dashboard.html";
-    return;
-  }
-
-  loadRooms();
+if(!user){
+location.href="index.html"
+return
 }
 
-  async function loadRooms() {
-  const { data, error } = await sb
-    .from("rooms")
-    .select("*")
-  .order("room_name", { ascending: true });
-  renderRooms(data);
-  document.getElementById("roomCount").innerText = data.length;
-  if (error) {
-    console.error(error);
-    return;
-  }
+currentUser=user
 
-  const table = document.getElementById("roomTable");
-  table.innerHTML = "";
+const {data:profile}=await sb
+.from("users")
+.select("role")
+.eq("id",user.id)
+.single()
 
-  data.forEach(room => {
-    const row = document.createElement("tr");
+currentRole=profile.role
 
-    row.innerHTML = `
-  <td>${room.room_name}</td>
-  <td>${room.capacity ?? "-"}</td>
-  <td>
-    <button onclick="editRoom('${room.id}','${room.room_name}',${room.capacity})">
-      Sửa
-    </button>
-
-    <button class="danger" onclick="openDeletePopup('${room.id}')">
-  Xóa
-</button>
-  </td>
-`;
-
-    table.appendChild(row);
-  });
+if(currentRole!=="admin"){
+alert("Bạn không có quyền truy cập")
+location.href="dashboard.html"
+return
 }
 
-  function renderRooms(data) {
-
-  const table = document.getElementById("roomTable");
-  table.innerHTML = "";
-
-  data.forEach(room => {
-    const row = document.createElement("tr");
-
-    row.innerHTML = `
-      <td>${room.room_name}</td>
-      <td>${room.capacity ?? "-"}</td>
-      <td>
-        <button onclick="editRoom('${room.id}','${room.room_name}','${room.capacity}')">
-          Sửa
-        </button>
-
-        <button class="edit"
-onclick="editRoom('${room.id}','${room.room_name}','${room.capacity}')">
-Sửa
-</button>
-      </td>
-    `;
-
-    table.appendChild(row);
-  });
+loadRooms()
 
 }
-  
-function openDeletePopup(id){
-  deletingRoomId = id;
-  document.getElementById("confirmPopup").style.display="flex";
+
+
+/* LOAD ROOMS */
+
+async function loadRooms(){
+
+const {data,error}=await sb
+.from("rooms")
+.select("*")
+.order("room_name",{ascending:true})
+
+if(error){
+alert(error.message)
+return
 }
 
-  function closePopup(){
-  document.getElementById("confirmPopup").style.display="none";
-}
+let html=""
+let i=1
 
-  async function confirmDelete(){
+for(const r of data){
 
-  await sb
-    .from("rooms")
-    .delete()
-    .eq("id",deletingRoomId);
+html+=`
+<tr>
 
-  closePopup();
+<td>${i++}</td>
 
-  showToast("Đã xóa phòng");
+<td>
+<span class="badge">${r.room_name}</span>
+</td>
 
-  loadRooms();
+<td>${r.capacity ?? "-"}</td>
 
-}
-  
-  function showToast(message){
+<td class="actions">
+<button onclick="editRoom('${r.id}','${r.room_name}','${r.capacity}')">Sửa</button>
+<button onclick="deleteRoom('${r.id}')" class="delete">Xóa</button>
+</td>
 
-  const toast = document.getElementById("toast");
-
-  toast.innerText = message;
-  toast.classList.add("show");
-
-  setTimeout(()=>{
-    toast.classList.remove("show");
-  },2000);
+</tr>
+`
 
 }
-  
-function editRoom(id, name, capacity){
 
-  editingRoomId = id;
-
-  document.getElementById("roomName").value = name;
-  document.getElementById("roomCapacity").value = capacity ?? 0;
-
-  document.getElementById("saveBtn").innerText = "Cập nhật";
+document.getElementById("table").innerHTML=html
 
 }
-  async function saveRoom(){
 
-  if (currentRole !== "admin") {
-    alert("Không có quyền");
-    return;
-  }
 
-  const name = document.getElementById("roomName").value.trim();
-  const capacity = parseInt(document.getElementById("roomCapacity").value) || 0;
+/* ADD / UPDATE */
 
-  if (!name){
-    alert("Nhập tên phòng");
-    return;
-  }
+async function submitRoom(){
 
-  // CREATE
-  if(!editingRoomId){
+const id=document.getElementById("editRoomId").value
+const name=document.getElementById("roomName").value.trim()
+const capacity=parseInt(document.getElementById("roomCapacity").value)||0
 
-    const { error } = await sb
-      .from("rooms")
-      .insert({
-        room_name: name,
-        capacity: capacity,
-        note: "",
-        created_by: currentUser.id
-      });
-
-    if(error){
-      console.error(error);
-      alert("Lỗi khi thêm phòng");
-      return;
-    }
-showToast("Thêm phòng thành công");
-  }
-
-  // UPDATE
-  else{
-
-    const { error } = await sb
-      .from("rooms")
-      .update({
-        room_name: name,
-        capacity: capacity
-      })
-      .eq("id", editingRoomId);
-
-    if(error){
-      console.error(error);
-      alert("Lỗi khi cập nhật");
-      return;
-    }
-showToast("Cập nhật phòng thành công");
-    editingRoomId = null;
-    document.getElementById("saveBtn").innerText = "Thêm phòng";
-
-  }
-
-  document.getElementById("roomName").value = "";
-  document.getElementById("roomCapacity").value = "";
-
-  loadRooms();
+if(!name){
+alert("Nhập tên phòng")
+return
 }
 
-  async function deleteRoom(id) {
-    if (currentRole !== "admin") {
-  alert("Không có quyền");
-  return;
+/* UPDATE */
+
+if(id){
+
+const {error}=await sb
+.from("rooms")
+.update({
+room_name:name,
+capacity:capacity
+})
+.eq("id",id)
+
+if(error){
+alert(error.message)
+return
 }
-    if (!confirm("Xóa phòng này?")) return;
 
-    const { error } = await sb
-      .from("rooms")
-      .delete()
-      .eq("id", id);
+resetForm()
+loadRooms()
+return
 
-    if (error) {
-      console.error(error);
-      alert("Lỗi khi xóa");
-      return;
-    }
+}
 
-    loadRooms();
-  }
-  init();
+
+/* CREATE */
+
+const {error}=await sb
+.from("rooms")
+.insert({
+room_name:name,
+capacity:capacity,
+created_by:currentUser.id
+})
+
+if(error){
+alert(error.message)
+return
+}
+
+resetForm()
+loadRooms()
+
+}
+
+
+/* EDIT */
+
+function editRoom(id,name,capacity){
+
+document.getElementById("editRoomId").value=id
+document.getElementById("roomName").value=name
+document.getElementById("roomCapacity").value=capacity ?? ""
+
+document.getElementById("submitBtn").innerText="Cập nhật"
+
+window.scrollTo({top:0,behavior:"smooth"})
+
+}
+
+
+/* DELETE */
+
+async function deleteRoom(id){
+
+if(!confirm("Bạn có chắc muốn xóa phòng này?")) return
+
+const {error}=await sb
+.from("rooms")
+.delete()
+.eq("id",id)
+
+if(error){
+alert(error.message)
+return
+}
+
+loadRooms()
+
+}
+
+
+/* RESET */
+
+function resetForm(){
+
+document.getElementById("editRoomId").value=""
+document.getElementById("roomName").value=""
+document.getElementById("roomCapacity").value=""
+
+document.getElementById("submitBtn").innerText="Thêm phòng"
+
+}
+
+init()
+
 </script>
-<div id="toast"></div>
 
-<div id="confirmPopup" class="popup">
-  <div class="popup-content">
-    <p>Bạn có chắc muốn xóa phòng này?</p>
-    <button onclick="confirmDelete()">Xóa</button>
-    <button onclick="closePopup()">Hủy</button>
-  </div>
-</div>
 </body>
 </html>
