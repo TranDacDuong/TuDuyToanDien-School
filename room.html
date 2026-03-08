@@ -141,6 +141,7 @@ font-size:13px;
 <div class="tab" onclick="switchTab(event,'chapters')">Chương</div>
 </div>
 
+
 <!-- PHÒNG -->
 
 <div id="rooms" class="container">
@@ -178,6 +179,7 @@ font-size:13px;
 
 </div>
 
+
 <!-- KHỐI -->
 
 <div id="grades" class="container hidden">
@@ -196,6 +198,7 @@ font-size:13px;
 <div class="table-card">
 
 <table>
+
 <thead>
 <tr>
 <th>Khối</th>
@@ -210,6 +213,7 @@ font-size:13px;
 </div>
 
 </div>
+
 
 <!-- MÔN -->
 
@@ -232,11 +236,12 @@ font-size:13px;
 <div class="table-card">
 
 <table>
+
 <thead>
 <tr>
 <th>Khối</th>
-<th>Môn</th>
-<th></th>
+<th>Môn học</th>
+<th>Hành động</th>
 </tr>
 </thead>
 
@@ -247,6 +252,7 @@ font-size:13px;
 </div>
 
 </div>
+
 
 <!-- CHƯƠNG -->
 
@@ -259,7 +265,7 @@ font-size:13px;
 <label>Khối</label>
 <select id="chapterGrade"></select>
 
-<label>Môn</label>
+<label>Môn học</label>
 <select id="chapterSubject"></select>
 
 <label>Tên chương</label>
@@ -272,6 +278,7 @@ font-size:13px;
 <div class="table-card">
 
 <table>
+
 <thead>
 <tr>
 <th>Khối</th>
@@ -289,16 +296,11 @@ font-size:13px;
 
 </div>
 
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
 
 <script>
-
-/* CACHE */
-
-let rooms=[]
-let grades=[]
-let subjects=[]
-let chapters=[]
 
 /* TAB */
 
@@ -316,63 +318,44 @@ event.target.classList.add("active")
 
 }
 
-/* INIT */
-
 init()
 
 async function init(){
 
-await loadAll()
-renderAll()
+loadRooms()
+loadGrades()
+loadSubjects()
+loadChapters()
 loadDropdowns()
 
 }
 
-/* LOAD DATABASE */
+/* PHÒNG */
 
-async function loadAll(){
+async function loadRooms(){
 
-const r=await sb.from("rooms").select("*")
-rooms=r.data||[]
+const {data}=await sb
+.from("rooms")
+.select("*")
+.order("room_name",{ascending:true})
 
-const g=await sb.from("grades").select("*")
-grades=g.data||[]
+let html=""
 
-const s=await sb.from("subjects").select("*,grades(name)")
-subjects=s.data||[]
+for(const r of data){
 
-const c=await sb.from("chapters").select("*,subjects(id,name,grades(name,id))")
-chapters=c.data||[]
-
-}
-
-/* RENDER */
-
-function renderAll(){
-
-renderRooms()
-renderGrades()
-renderSubjects()
-renderChapters()
-
-}
-
-/* ROOMS */
-
-function renderRooms(){
-
-rooms.sort((a,b)=>a.room_name.localeCompare(b.room_name))
-
-roomTable.innerHTML=rooms.map(r=>`
+html+=`
 <tr>
 <td>${r.room_name}</td>
-<td>${r.capacity||""}</td>
+<td>${r.capacity ?? ""}</td>
 <td class="actions">
-<button onclick="editRoom('${r.id}')">Sửa</button>
+<button onclick="editRoom('${r.id}','${r.room_name}','${r.capacity}')">Sửa</button>
 <button class="delete" onclick="deleteRoom('${r.id}')">Xóa</button>
 </td>
 </tr>
-`).join("")
+`
+}
+
+roomTable.innerHTML=html
 
 }
 
@@ -384,66 +367,74 @@ const capacity=parseInt(roomCapacity.value)||0
 
 if(id){
 
-await sb.from("rooms").update({room_name:name,capacity}).eq("id",id)
+await sb.from("rooms")
+.update({room_name:name,capacity})
+.eq("id",id)
 
 }else{
 
-await sb.from("rooms").insert({room_name:name,capacity})
+await sb.from("rooms")
+.insert({room_name:name,capacity})
 
 }
-
-await loadAll()
-renderRooms()
 
 roomId.value=""
 roomName.value=""
 roomCapacity.value=""
 
+loadRooms()
+
 }
 
-function editRoom(id){
+function editRoom(id,name,capacity){
 
-const r=rooms.find(x=>x.id===id)
-
-roomId.value=r.id
-roomName.value=r.room_name
-roomCapacity.value=r.capacity
+roomId.value=id
+roomName.value=name
+roomCapacity.value=capacity
 
 }
 
 async function deleteRoom(id){
 
-if(!confirm("Xóa phòng?"))return
+if(!confirm("Xóa phòng?")) return
 
 await sb.from("rooms").delete().eq("id",id)
 
-await loadAll()
-renderRooms()
+loadRooms()
 
 }
 
-/* GRADES */
+/* KHỐI */
 
-function renderGrades(){
+async function loadGrades(){
 
-grades.sort((a,b)=>parseInt(a.name)-parseInt(b.name))
+const {data}=await sb.from("grades").select("*")
 
-gradeTable.innerHTML=grades.map(g=>`
+data.sort((a,b)=>parseInt(a.name)-parseInt(b.name))
+
+let html=""
+
+for(const g of data){
+
+html+=`
 <tr>
 <td>${g.name}</td>
 <td class="actions">
-<button onclick="editGrade('${g.id}')">Sửa</button>
+<button onclick="editGrade('${g.id}','${g.name}')">Sửa</button>
 <button class="delete" onclick="deleteGrade('${g.id}')">Xóa</button>
 </td>
 </tr>
-`).join("")
+`
+}
+
+gradeTable.innerHTML=html
 
 }
 
 async function saveGrade(){
 
 const id=gradeId.value
-const name=gradeName.value
+const name=gradeName.value.trim()
 
 if(id){
 
@@ -455,61 +446,68 @@ await sb.from("grades").insert({name})
 
 }
 
-await loadAll()
-renderGrades()
-loadDropdowns()
-
 gradeId.value=""
 gradeName.value=""
 
+loadGrades()
+loadDropdowns()
+
 }
 
-function editGrade(id){
+function editGrade(id,name){
 
-const g=grades.find(x=>x.id===id)
-
-gradeId.value=g.id
-gradeName.value=g.name
+gradeId.value=id
+gradeName.value=name
 
 }
 
 async function deleteGrade(id){
 
-if(!confirm("Xóa khối?"))return
+if(!confirm("Xóa khối?")) return
 
 await sb.from("grades").delete().eq("id",id)
 
-await loadAll()
-renderGrades()
+loadGrades()
 loadDropdowns()
 
 }
 
-/* SUBJECTS */
+/* MÔN */
 
-function renderSubjects(){
+async function loadSubjects(){
 
-subjects.sort((a,b)=>{
+const {data}=await sb
+.from("subjects")
+.select("id,name,grade_id,grades(name)")
+
+data.sort((a,b)=>{
 
 const g1=parseInt(a.grades?.name||0)
 const g2=parseInt(b.grades?.name||0)
 
-if(g1!==g2)return g1-g2
+if(g1!==g2) return g1-g2
 
 return a.name.localeCompare(b.name)
 
 })
 
-subjectTable.innerHTML=subjects.map(s=>`
+let html=""
+
+for(const s of data){
+
+html+=`
 <tr>
 <td>${s.grades?.name}</td>
 <td>${s.name}</td>
 <td class="actions">
-<button onclick="editSubject('${s.id}')">Sửa</button>
+<button onclick="editSubject('${s.id}','${s.name}','${s.grade_id}')">Sửa</button>
 <button class="delete" onclick="deleteSubject('${s.id}')">Xóa</button>
 </td>
 </tr>
-`).join("")
+`
+}
+
+subjectTable.innerHTML=html
 
 }
 
@@ -521,93 +519,85 @@ const grade_id=subjectGrade.value
 
 if(id){
 
-await sb.from("subjects").update({name,grade_id}).eq("id",id)
+await sb.from("subjects")
+.update({name,grade_id})
+.eq("id",id)
 
 }else{
 
-await sb.from("subjects").insert({name,grade_id})
+await sb.from("subjects")
+.insert({name,grade_id})
 
 }
-
-await loadAll()
-renderSubjects()
-loadDropdowns()
 
 subjectId.value=""
 subjectName.value=""
 
+loadSubjects()
+loadDropdowns()
+
 }
 
-function editSubject(id){
+function editSubject(id,name,grade){
 
-const s=subjects.find(x=>x.id===id)
-
-subjectId.value=s.id
-subjectName.value=s.name
-subjectGrade.value=s.grade_id
+subjectId.value=id
+subjectName.value=name
+subjectGrade.value=grade
 
 }
 
 async function deleteSubject(id){
 
-if(!confirm("Xóa môn?"))return
+if(!confirm("Xóa môn?")) return
 
 await sb.from("subjects").delete().eq("id",id)
 
-await loadAll()
-renderSubjects()
+loadSubjects()
 
 }
 
-/* CHAPTERS */
+/* CHƯƠNG */
 
-function renderChapters(){
+async function loadChapters(){
 
-let g=chapterGrade.value
-let s=chapterSubject.value
+const {data}=await sb
+.from("chapters")
+.select("id,name,subjects(id,name,grades(name))")
 
-let list=[...chapters]
-
-if(g){
-
-const gradeName=grades.find(x=>x.id===g)?.name
-list=list.filter(c=>c.subjects?.grades?.name===gradeName)
-
-}
-
-if(s){
-
-list=list.filter(c=>c.subjects?.id===s)
-
-}
-
-list.sort((a,b)=>{
+data.sort((a,b)=>{
 
 const g1=parseInt(a.subjects?.grades?.name||0)
 const g2=parseInt(b.subjects?.grades?.name||0)
 
-if(g1!==g2)return g1-g2
+if(g1!==g2) return g1-g2
 
 const s1=a.subjects?.name||""
 const s2=b.subjects?.name||""
 
-if(s1!==s2)return s1.localeCompare(s2)
+if(s1!==s2) return s1.localeCompare(s2)
 
 return a.name.localeCompare(b.name)
 
 })
 
-chapterTable.innerHTML=list.map(c=>`
+let html=""
+
+for(const c of data){
+
+html+=`
 <tr>
 <td>${c.subjects?.grades?.name}</td>
 <td>${c.subjects?.name}</td>
 <td>${c.name}</td>
 <td class="actions">
-<button onclick="editChapter('${c.id}')">Sửa</button>
+<button onclick="editChapter('${c.id}','${c.name}','${c.subjects?.id}')">Sửa</button>
 <button class="delete" onclick="deleteChapter('${c.id}')">Xóa</button>
 </td>
 </tr>
-`).join("")
+`
+}
+
+chapterTable.innerHTML=html
 
 }
 
@@ -619,89 +609,103 @@ const name=chapterName.value
 
 if(id){
 
-await sb.from("chapters").update({subject_id,name}).eq("id",id)
+await sb.from("chapters")
+.update({subject_id,name})
+.eq("id",id)
 
 }else{
 
-await sb.from("chapters").insert({subject_id,name})
+await sb.from("chapters")
+.insert({subject_id,name})
 
 }
-
-await loadAll()
-renderChapters()
 
 chapterId.value=""
 chapterName.value=""
 
-}
-
-function editChapter(id){
-
-const c=chapters.find(x=>x.id===id)
-
-chapterId.value=c.id
-chapterName.value=c.name
-chapterGrade.value=c.subjects.grades.id
-
-loadSubjectsByGrade()
-
-setTimeout(()=>{
-
-chapterSubject.value=c.subjects.id
-
-},50)
-
-window.scrollTo({top:0,behavior:"smooth"})
+loadChapters()
 
 }
 
-/* DELETE */
+function editChapter(id,name,subject){
+
+chapterId.value=id
+chapterName.value=name
+chapterSubject.value=subject
+
+}
 
 async function deleteChapter(id){
 
-if(!confirm("Xóa chương?"))return
+if(!confirm("Xóa chương?")) return
 
 await sb.from("chapters").delete().eq("id",id)
 
-await loadAll()
-renderChapters()
+loadChapters()
 
 }
 
 /* DROPDOWN */
 
-function loadDropdowns(){
+async function loadDropdowns(){
+
+const {data:grades}=await sb.from("grades").select("*")
 
 grades.sort((a,b)=>parseInt(a.name)-parseInt(b.name))
 
-chapterGrade.innerHTML=grades.map(g=>`
-<option value="${g.id}">${g.name}</option>
-`).join("")
-
+chapterGrade.innerHTML=grades.map(g=>`<option value="${g.id}">${g.name}</option>`).join("")
 subjectGrade.innerHTML=chapterGrade.innerHTML
 
 loadSubjectsByGrade()
 
 }
 
-chapterGrade.onchange=()=>{
+chapterGrade.onchange=async ()=>{
 
-loadSubjectsByGrade()
-renderChapters()
+await loadSubjectsByGrade()
+filterChapters()
 
 }
 
-chapterSubject.onchange=renderChapters
+chapterSubject.onchange=filterChapters
 
-function loadSubjectsByGrade(){
+async function loadSubjectsByGrade(){
 
-const grade=chapterGrade.value
+const grade_id=chapterGrade.value
 
-let list=subjects.filter(s=>s.grade_id===grade)
+const {data}=await sb
+.from("subjects")
+.select("*")
+.eq("grade_id",grade_id)
 
-chapterSubject.innerHTML=list.map(s=>`
-<option value="${s.id}">${s.name}</option>
-`).join("")
+chapterSubject.innerHTML=data
+.map(s=>`<option value="${s.id}">${s.name}</option>`)
+.join("")
+
+}
+
+/* FILTER CHAPTER */
+
+function filterChapters(){
+
+const grade=chapterGrade.options[chapterGrade.selectedIndex].text
+const subject=chapterSubject.options[chapterSubject.selectedIndex]?.text
+
+const rows=document.querySelectorAll("#chapterTable tr")
+
+rows.forEach(r=>{
+
+const g=r.children[0].innerText
+const s=r.children[1].innerText
+
+let show=true
+
+if(grade && g!==grade) show=false
+if(subject && s!==subject) show=false
+
+r.style.display=show?"":"none"
+
+})
 
 }
 
