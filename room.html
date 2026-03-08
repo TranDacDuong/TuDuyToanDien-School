@@ -23,8 +23,6 @@ margin-bottom:25px;
 font-weight:600;
 }
 
-/* TABS */
-
 .tabs{
 display:flex;
 gap:10px;
@@ -44,15 +42,11 @@ background:#2563eb;
 color:white;
 }
 
-/* LAYOUT */
-
 .container{
 display:grid;
 grid-template-columns:420px 1fr;
 gap:30px;
 }
-
-/* CARD */
 
 .card{
 background:white;
@@ -60,8 +54,6 @@ padding:25px;
 border-radius:14px;
 box-shadow:0 8px 20px rgba(0,0,0,0.05);
 }
-
-/* INPUT */
 
 label{
 font-size:14px;
@@ -86,8 +78,6 @@ border-color:#2563eb;
 background:white;
 }
 
-/* BUTTON */
-
 button{
 background:#2563eb;
 color:white;
@@ -109,8 +99,6 @@ background:#ef4444;
 .delete:hover{
 background:#dc2626;
 }
-
-/* TABLE */
 
 .table-card{
 background:white;
@@ -153,15 +141,14 @@ display:none;
 <h2>Quản lý hệ thống</h2>
 
 <div class="tabs">
-
-<div class="tab active" onclick="switchTab('rooms')">Phòng học</div>
-<div class="tab" onclick="switchTab('grades')">Khối</div>
-<div class="tab" onclick="switchTab('subjects')">Môn học</div>
-<div class="tab" onclick="switchTab('chapters')">Chương</div>
-
+<div class="tab active" onclick="switchTab(event,'rooms')">Phòng học</div>
+<div class="tab" onclick="switchTab(event,'grades')">Khối</div>
+<div class="tab" onclick="switchTab(event,'subjects')">Môn học</div>
+<div class="tab" onclick="switchTab(event,'chapters')">Chương</div>
 </div>
 
-<!-- ROOMS -->
+
+<!-- PHÒNG -->
 
 <div id="rooms" class="container">
 
@@ -180,6 +167,7 @@ display:none;
 </div>
 
 <div class="table-card">
+
 <table>
 
 <thead>
@@ -193,11 +181,13 @@ display:none;
 <tbody id="roomTable"></tbody>
 
 </table>
-</div>
 
 </div>
 
-<!-- GRADES -->
+</div>
+
+
+<!-- KHỐI -->
 
 <div id="grades" class="container hidden">
 
@@ -231,7 +221,8 @@ display:none;
 
 </div>
 
-<!-- SUBJECTS -->
+
+<!-- MÔN -->
 
 <div id="subjects" class="container hidden">
 
@@ -265,7 +256,8 @@ display:none;
 
 </div>
 
-<!-- CHAPTERS -->
+
+<!-- CHƯƠNG -->
 
 <div id="chapters" class="container hidden">
 
@@ -311,7 +303,7 @@ display:none;
 
 /* TAB */
 
-function switchTab(id){
+function switchTab(event,id){
 
 document.querySelectorAll(".container")
 .forEach(e=>e.classList.add("hidden"))
@@ -325,8 +317,6 @@ event.target.classList.add("active")
 
 }
 
-/* INIT */
-
 init()
 
 async function init(){
@@ -335,14 +325,19 @@ loadRooms()
 loadGrades()
 loadSubjects()
 loadChapters()
+loadSubjectDropdown()
 
 }
 
-/* ROOMS */
+
+/* PHÒNG */
 
 async function loadRooms(){
 
-const {data}=await sb.from("rooms").select("*")
+const {data}=await sb
+.from("rooms")
+.select("*")
+.order("room_name",{ascending:true})
 
 let html=""
 
@@ -409,11 +404,15 @@ loadRooms()
 
 }
 
-/* GRADES */
+
+/* KHỐI */
 
 async function loadGrades(){
 
-const {data}=await sb.from("grades").select("*")
+const {data}=await sb
+.from("grades")
+.select("*")
+.order("name",{ascending:true})
 
 let html=""
 
@@ -476,11 +475,14 @@ loadGrades()
 
 }
 
-/* SUBJECTS */
+
+/* MÔN */
 
 async function loadSubjects(){
 
-const {data}=await sb.from("subjects").select("*")
+const {data}=await sb
+.from("subjects")
+.select("*")
 
 let html=""
 
@@ -500,8 +502,6 @@ html+=`
 subjectTable.innerHTML=html
 
 }
-
-/* SAVE SUBJECT */
 
 async function saveSubject(){
 
@@ -525,16 +525,19 @@ subjectId.value=""
 subjectName.value=""
 
 loadSubjects()
+loadSubjectDropdown()
 
 }
 
-/* CHAPTERS */
+
+/* CHƯƠNG */
 
 async function loadChapters(){
 
 const {data}=await sb
 .from("chapters")
 .select("id,name,subjects(name)")
+.order("name",{ascending:true})
 
 let html=""
 
@@ -552,6 +555,24 @@ html+=`
 }
 
 chapterTable.innerHTML=html
+
+}
+
+async function loadSubjectDropdown(){
+
+const {data}=await sb
+.from("subjects")
+.select("*")
+
+let html=""
+
+for(const s of data){
+
+html+=`<option value="${s.id}">${s.name}</option>`
+
+}
+
+chapterSubject.innerHTML=html
 
 }
 
