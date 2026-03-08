@@ -307,12 +307,15 @@ const subject=document.getElementById("subject").value
 const birth_year=document.getElementById("birth_year").value
 const phone=document.getElementById("phone").value
 
+const birth_year = birth_year_input ? parseInt(birth_year_input) : null
+const phone = phone_input || null
+
 
 /* UPDATE */
 
 if(userId){
 
-const {error}=await sb
+await sb
 .from("users")
 .update({
 subject,
