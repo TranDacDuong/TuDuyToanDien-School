@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>Quản lý phòng học</title>
+<title>Quản lý hệ thống</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
@@ -23,11 +23,33 @@ margin-bottom:25px;
 font-weight:600;
 }
 
+/* TABS */
+
+.tabs{
+display:flex;
+gap:10px;
+margin-bottom:25px;
+}
+
+.tab{
+padding:10px 16px;
+background:white;
+border-radius:8px;
+cursor:pointer;
+border:1px solid #e2e8f0;
+}
+
+.tab.active{
+background:#2563eb;
+color:white;
+}
+
+/* LAYOUT */
+
 .container{
 display:grid;
 grid-template-columns:420px 1fr;
 gap:30px;
-align-items:start;
 }
 
 /* CARD */
@@ -39,15 +61,15 @@ border-radius:14px;
 box-shadow:0 8px 20px rgba(0,0,0,0.05);
 }
 
-/* FORM */
+/* INPUT */
 
 label{
-font-weight:500;
 font-size:14px;
 color:#475569;
+font-weight:500;
 }
 
-input{
+input,select{
 width:100%;
 padding:11px;
 margin-top:6px;
@@ -58,11 +80,13 @@ font-size:14px;
 background:#fafafa;
 }
 
-input:focus{
+input:focus,select:focus{
 outline:none;
 border-color:#2563eb;
 background:white;
 }
+
+/* BUTTON */
 
 button{
 background:#2563eb;
@@ -72,11 +96,18 @@ padding:11px 16px;
 border-radius:8px;
 cursor:pointer;
 font-weight:500;
-font-size:14px;
 }
 
 button:hover{
 background:#1d4ed8;
+}
+
+.delete{
+background:#ef4444;
+}
+
+.delete:hover{
+background:#dc2626;
 }
 
 /* TABLE */
@@ -101,35 +132,17 @@ font-size:14px;
 
 th{
 background:#f8fafc;
-font-weight:600;
-color:#475569;
-}
-
-tr:hover{
-background:#f9fafb;
+text-align:left;
 }
 
 .actions button{
+padding:6px 10px;
 margin-right:6px;
-padding:7px 10px;
 font-size:13px;
 }
 
-.delete{
-background:#ef4444;
-}
-
-.delete:hover{
-background:#dc2626;
-}
-
-.badge{
-background:#e0f2fe;
-color:#0369a1;
-padding:4px 8px;
-border-radius:6px;
-font-size:12px;
-font-weight:500;
+.hidden{
+display:none;
 }
 
 </style>
@@ -137,27 +150,67 @@ font-weight:500;
 
 <body>
 
-<h2>Quản lý phòng học</h2>
+<h2>Quản lý hệ thống</h2>
 
-<div class="container">
+<div class="tabs">
 
-<!-- FORM -->
-
-<div class="card">
-
-<input type="hidden" id="editRoomId">
-
-<label>Tên phòng</label>
-<input id="roomName" placeholder="Ví dụ: Phòng A101">
-
-<label>Sức chứa</label>
-<input id="roomCapacity" type="number" placeholder="Ví dụ: 40">
-
-<button id="submitBtn" onclick="submitRoom()">Thêm phòng</button>
+<div class="tab active" onclick="switchTab('rooms')">Phòng học</div>
+<div class="tab" onclick="switchTab('grades')">Khối</div>
+<div class="tab" onclick="switchTab('subjects')">Môn học</div>
+<div class="tab" onclick="switchTab('chapters')">Chương</div>
 
 </div>
 
-<!-- TABLE -->
+<!-- ROOMS -->
+
+<div id="rooms" class="container">
+
+<div class="card">
+
+<input type="hidden" id="roomId">
+
+<label>Tên phòng</label>
+<input id="roomName">
+
+<label>Sức chứa</label>
+<input id="roomCapacity" type="number">
+
+<button onclick="saveRoom()">Lưu</button>
+
+</div>
+
+<div class="table-card">
+<table>
+
+<thead>
+<tr>
+<th>Tên phòng</th>
+<th>Sức chứa</th>
+<th>Hành động</th>
+</tr>
+</thead>
+
+<tbody id="roomTable"></tbody>
+
+</table>
+</div>
+
+</div>
+
+<!-- GRADES -->
+
+<div id="grades" class="container hidden">
+
+<div class="card">
+
+<input type="hidden" id="gradeId">
+
+<label>Tên khối</label>
+<input id="gradeName" placeholder="Ví dụ: 10">
+
+<button onclick="saveGrade()">Lưu</button>
+
+</div>
 
 <div class="table-card">
 
@@ -165,14 +218,84 @@ font-weight:500;
 
 <thead>
 <tr>
-<th>STT</th>
-<th>Tên phòng</th>
-<th>Sức chứa</th>
+<th>Khối</th>
 <th>Hành động</th>
 </tr>
 </thead>
 
-<tbody id="table"></tbody>
+<tbody id="gradeTable"></tbody>
+
+</table>
+
+</div>
+
+</div>
+
+<!-- SUBJECTS -->
+
+<div id="subjects" class="container hidden">
+
+<div class="card">
+
+<input type="hidden" id="subjectId">
+
+<label>Tên môn</label>
+<input id="subjectName">
+
+<button onclick="saveSubject()">Lưu</button>
+
+</div>
+
+<div class="table-card">
+
+<table>
+
+<thead>
+<tr>
+<th>Môn học</th>
+<th>Hành động</th>
+</tr>
+</thead>
+
+<tbody id="subjectTable"></tbody>
+
+</table>
+
+</div>
+
+</div>
+
+<!-- CHAPTERS -->
+
+<div id="chapters" class="container hidden">
+
+<div class="card">
+
+<input type="hidden" id="chapterId">
+
+<label>Môn học</label>
+<select id="chapterSubject"></select>
+
+<label>Tên chương</label>
+<input id="chapterName">
+
+<button onclick="saveChapter()">Lưu</button>
+
+</div>
+
+<div class="table-card">
+
+<table>
+
+<thead>
+<tr>
+<th>Môn</th>
+<th>Chương</th>
+<th>Hành động</th>
+</tr>
+</thead>
+
+<tbody id="chapterTable"></tbody>
 
 </table>
 
@@ -186,191 +309,279 @@ font-weight:500;
 
 <script>
 
-let currentUser=null
-let currentRole=null
+/* TAB */
+
+function switchTab(id){
+
+document.querySelectorAll(".container")
+.forEach(e=>e.classList.add("hidden"))
+
+document.getElementById(id).classList.remove("hidden")
+
+document.querySelectorAll(".tab")
+.forEach(e=>e.classList.remove("active"))
+
+event.target.classList.add("active")
+
+}
+
+/* INIT */
+
+init()
 
 async function init(){
 
-const {data:{user}}=await sb.auth.getUser()
-
-if(!user){
-location.href="index.html"
-return
-}
-
-currentUser=user
-
-const {data:profile}=await sb
-.from("users")
-.select("role")
-.eq("id",user.id)
-.single()
-
-currentRole=profile.role
-
-if(currentRole!=="admin"){
-alert("Bạn không có quyền truy cập")
-location.href="dashboard.html"
-return
-}
-
 loadRooms()
+loadGrades()
+loadSubjects()
+loadChapters()
 
 }
 
-
-/* LOAD ROOMS */
+/* ROOMS */
 
 async function loadRooms(){
 
-const {data,error}=await sb
-.from("rooms")
-.select("*")
-.order("room_name",{ascending:true})
-
-if(error){
-alert(error.message)
-return
-}
+const {data}=await sb.from("rooms").select("*")
 
 let html=""
-let i=1
 
 for(const r of data){
 
 html+=`
 <tr>
-
-<td>${i++}</td>
-
-<td>
-<span class="badge">${r.room_name}</span>
-</td>
-
-<td>${r.capacity ?? "-"}</td>
-
+<td>${r.room_name}</td>
+<td>${r.capacity ?? ""}</td>
 <td class="actions">
 <button onclick="editRoom('${r.id}','${r.room_name}','${r.capacity}')">Sửa</button>
-<button onclick="deleteRoom('${r.id}')" class="delete">Xóa</button>
+<button class="delete" onclick="deleteRoom('${r.id}')">Xóa</button>
 </td>
-
 </tr>
 `
+}
+
+roomTable.innerHTML=html
 
 }
 
-document.getElementById("table").innerHTML=html
+async function saveRoom(){
 
-}
-
-
-/* ADD / UPDATE */
-
-async function submitRoom(){
-
-const id=document.getElementById("editRoomId").value
-const name=document.getElementById("roomName").value.trim()
-const capacity=parseInt(document.getElementById("roomCapacity").value)||0
-
-if(!name){
-alert("Nhập tên phòng")
-return
-}
-
-/* UPDATE */
+const id=roomId.value
+const name=roomName.value
+const capacity=parseInt(roomCapacity.value)||0
 
 if(id){
 
-const {error}=await sb
-.from("rooms")
-.update({
-room_name:name,
-capacity:capacity
-})
+await sb.from("rooms")
+.update({room_name:name,capacity})
 .eq("id",id)
 
-if(error){
-alert(error.message)
-return
-}
+}else{
 
-resetForm()
-loadRooms()
-return
+await sb.from("rooms")
+.insert({room_name:name,capacity})
 
 }
 
+roomId.value=""
+roomName.value=""
+roomCapacity.value=""
 
-/* CREATE */
-
-const {error}=await sb
-.from("rooms")
-.insert({
-room_name:name,
-capacity:capacity,
-created_by:currentUser.id
-})
-
-if(error){
-alert(error.message)
-return
-}
-
-resetForm()
 loadRooms()
 
 }
-
-
-/* EDIT */
 
 function editRoom(id,name,capacity){
 
-document.getElementById("editRoomId").value=id
-document.getElementById("roomName").value=name
-document.getElementById("roomCapacity").value=capacity ?? ""
-
-document.getElementById("submitBtn").innerText="Cập nhật"
-
-window.scrollTo({top:0,behavior:"smooth"})
+roomId.value=id
+roomName.value=name
+roomCapacity.value=capacity
 
 }
-
-
-/* DELETE */
 
 async function deleteRoom(id){
 
-if(!confirm("Bạn có chắc muốn xóa phòng này?")) return
+if(!confirm("Xóa phòng?")) return
 
-const {error}=await sb
-.from("rooms")
-.delete()
-.eq("id",id)
-
-if(error){
-alert(error.message)
-return
-}
+await sb.from("rooms").delete().eq("id",id)
 
 loadRooms()
 
 }
 
+/* GRADES */
 
-/* RESET */
+async function loadGrades(){
 
-function resetForm(){
+const {data}=await sb.from("grades").select("*")
 
-document.getElementById("editRoomId").value=""
-document.getElementById("roomName").value=""
-document.getElementById("roomCapacity").value=""
+let html=""
 
-document.getElementById("submitBtn").innerText="Thêm phòng"
+for(const g of data){
+
+html+=`
+<tr>
+<td>${g.name}</td>
+<td class="actions">
+<button onclick="editGrade('${g.id}','${g.name}')">Sửa</button>
+<button class="delete" onclick="deleteGrade('${g.id}')">Xóa</button>
+</td>
+</tr>
+`
+}
+
+gradeTable.innerHTML=html
 
 }
 
-init()
+async function saveGrade(){
+
+const id=gradeId.value
+const name=gradeName.value
+
+if(id){
+
+await sb.from("grades")
+.update({name})
+.eq("id",id)
+
+}else{
+
+await sb.from("grades")
+.insert({name})
+
+}
+
+gradeId.value=""
+gradeName.value=""
+
+loadGrades()
+
+}
+
+function editGrade(id,name){
+
+gradeId.value=id
+gradeName.value=name
+
+}
+
+async function deleteGrade(id){
+
+if(!confirm("Xóa khối?")) return
+
+await sb.from("grades").delete().eq("id",id)
+
+loadGrades()
+
+}
+
+/* SUBJECTS */
+
+async function loadSubjects(){
+
+const {data}=await sb.from("subjects").select("*")
+
+let html=""
+
+for(const s of data){
+
+html+=`
+<tr>
+<td>${s.name}</td>
+<td class="actions">
+<button onclick="editSubject('${s.id}','${s.name}')">Sửa</button>
+<button class="delete" onclick="deleteSubject('${s.id}')">Xóa</button>
+</td>
+</tr>
+`
+}
+
+subjectTable.innerHTML=html
+
+}
+
+/* SAVE SUBJECT */
+
+async function saveSubject(){
+
+const id=subjectId.value
+const name=subjectName.value
+
+if(id){
+
+await sb.from("subjects")
+.update({name})
+.eq("id",id)
+
+}else{
+
+await sb.from("subjects")
+.insert({name})
+
+}
+
+subjectId.value=""
+subjectName.value=""
+
+loadSubjects()
+
+}
+
+/* CHAPTERS */
+
+async function loadChapters(){
+
+const {data}=await sb
+.from("chapters")
+.select("id,name,subjects(name)")
+
+let html=""
+
+for(const c of data){
+
+html+=`
+<tr>
+<td>${c.subjects?.name ?? ""}</td>
+<td>${c.name}</td>
+<td class="actions">
+<button class="delete" onclick="deleteChapter('${c.id}')">Xóa</button>
+</td>
+</tr>
+`
+}
+
+chapterTable.innerHTML=html
+
+}
+
+async function saveChapter(){
+
+const subject=chapterSubject.value
+const name=chapterName.value
+
+await sb
+.from("chapters")
+.insert({
+subject_id:subject,
+name
+})
+
+chapterName.value=""
+
+loadChapters()
+
+}
+
+async function deleteChapter(id){
+
+if(!confirm("Xóa chương?")) return
+
+await sb.from("chapters").delete().eq("id",id)
+
+loadChapters()
+
+}
 
 </script>
 
