@@ -8,9 +8,7 @@
 
 <style>
 
-*{
-box-sizing:border-box;
-}
+*{box-sizing:border-box;}
 
 body{
 font-family:'Inter',sans-serif;
@@ -20,10 +18,7 @@ padding:40px;
 color:#0f172a;
 }
 
-h2{
-margin-bottom:25px;
-font-weight:600;
-}
+h2{margin-bottom:25px;font-weight:600;}
 
 .container{
 display:grid;
@@ -73,9 +68,7 @@ font-weight:500;
 font-size:14px;
 }
 
-button:hover{
-background:#1d4ed8;
-}
+button:hover{background:#1d4ed8;}
 
 .table-card{
 background:white;
@@ -84,10 +77,7 @@ box-shadow:0 8px 20px rgba(0,0,0,0.05);
 overflow:hidden;
 }
 
-table{
-width:100%;
-border-collapse:collapse;
-}
+table{width:100%;border-collapse:collapse;}
 
 th,td{
 padding:14px 16px;
@@ -101,9 +91,7 @@ font-weight:600;
 color:#475569;
 }
 
-tr:hover{
-background:#f9fafb;
-}
+tr:hover{background:#f9fafb;}
 
 .actions button{
 margin-right:6px;
@@ -111,13 +99,8 @@ padding:7px 10px;
 font-size:13px;
 }
 
-.delete{
-background:#ef4444;
-}
-
-.delete:hover{
-background:#dc2626;
-}
+.delete{background:#ef4444;}
+.delete:hover{background:#dc2626;}
 
 .teacher{
 display:flex;
@@ -156,8 +139,6 @@ font-weight:500;
 
 <div class="container">
 
-<!-- FORM -->
-
 <div class="card">
 
 <input type="hidden" id="editUserId">
@@ -181,7 +162,7 @@ font-weight:500;
 <div id="extraFields" style="display:none">
 
 <label>Năm sinh</label>
-<input id="birth_year">
+<input id="birth_year" type="number" placeholder="Ví dụ 2000">
 
 <label>SĐT</label>
 <input id="phone">
@@ -191,9 +172,6 @@ font-weight:500;
 <button id="submitBtn" onclick="submitTeacher()">Thêm giáo viên</button>
 
 </div>
-
-
-<!-- TABLE -->
 
 <div class="table-card">
 
@@ -235,14 +213,7 @@ async function loadTeachers(){
 
 const {data,error}=await sb
 .from("users")
-.select(`
-id,
-full_name,
-email,
-birth_year,
-phone,
-subject
-`)
+.select("id,full_name,email,birth_year,phone,subject")
 .eq("role","teacher")
 
 if(error){
@@ -258,9 +229,7 @@ for(const u of data){
 const letter=(u.full_name||"?").charAt(0).toUpperCase()
 
 html+=`
-
 <tr>
-
 <td>${i++}</td>
 
 <td>
@@ -279,17 +248,12 @@ html+=`
 <td>${u.phone ?? ""}</td>
 
 <td class="actions">
-
 <button onclick="editTeacher('${u.id}')">Sửa</button>
-
 <button onclick="deleteTeacher('${u.id}')" class="delete">Xóa</button>
-
 </td>
 
 </tr>
-
 `
-
 }
 
 document.getElementById("table").innerHTML=html
@@ -304,18 +268,19 @@ async function submitTeacher(){
 const userId=document.getElementById("editUserId").value
 const email=document.getElementById("email").value.trim()
 const subject=document.getElementById("subject").value
-const birth_year=document.getElementById("birth_year").value
-const phone=document.getElementById("phone").value
 
-const birth_year = birth_year_input ? parseInt(birth_year_input) : null
-const phone = phone_input || null
+const birth_year_input=document.getElementById("birth_year").value
+const phone_input=document.getElementById("phone").value
+
+const birth_year=birth_year_input ? parseInt(birth_year_input) : null
+const phone=phone_input || null
 
 
 /* UPDATE */
 
 if(userId){
 
-await sb
+const {error}=await sb
 .from("users")
 .update({
 subject,
@@ -335,7 +300,7 @@ return
 }
 
 
-/* ADD NEW TEACHER */
+/* ADD TEACHER */
 
 const {data:user,error:userError}=await sb
 .from("users")
@@ -357,7 +322,6 @@ if(user.role!=="student"){
 alert("User này không phải student")
 return
 }
-
 
 const {error:updateError}=await sb
 .from("users")
@@ -386,13 +350,7 @@ async function editTeacher(id){
 
 const {data,error}=await sb
 .from("users")
-.select(`
-id,
-email,
-birth_year,
-phone,
-subject
-`)
+.select("id,email,birth_year,phone,subject")
 .eq("id",id)
 .single()
 
@@ -408,7 +366,6 @@ document.getElementById("birth_year").value=data.birth_year ?? ""
 document.getElementById("phone").value=data.phone ?? ""
 
 document.getElementById("extraFields").style.display="block"
-
 document.getElementById("submitBtn").innerText="Cập nhật"
 
 window.scrollTo({top:0,behavior:"smooth"})
@@ -421,7 +378,6 @@ window.scrollTo({top:0,behavior:"smooth"})
 async function deleteTeacher(id){
 
 if(!confirm("Bạn có chắc muốn xóa giáo viên này?")) return
-
 
 const {error}=await sb
 .from("users")
@@ -441,7 +397,7 @@ loadTeachers()
 }
 
 
-/* RESET FORM */
+/* RESET */
 
 function resetForm(){
 
@@ -452,7 +408,6 @@ document.getElementById("birth_year").value=""
 document.getElementById("phone").value=""
 
 document.getElementById("extraFields").style.display="none"
-
 document.getElementById("submitBtn").innerText="Thêm giáo viên"
 
 }
