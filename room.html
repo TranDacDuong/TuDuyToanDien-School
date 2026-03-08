@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -140,7 +141,6 @@ font-size:13px;
 <div class="tab" onclick="switchTab(event,'chapters')">Chương</div>
 </div>
 
-
 <!-- PHÒNG -->
 
 <div id="rooms" class="container">
@@ -178,7 +178,6 @@ font-size:13px;
 
 </div>
 
-
 <!-- KHỐI -->
 
 <div id="grades" class="container hidden">
@@ -213,10 +212,23 @@ font-size:13px;
 
 </div>
 
-
 <!-- MÔN -->
 
 <div id="subjects" class="container hidden">
+
+<div class="card">
+
+<input type="hidden" id="subjectId">
+
+<label>Khối</label>
+<select id="subjectGrade"></select>
+
+<label>Tên môn</label>
+<input id="subjectName">
+
+<button onclick="saveSubject()">Lưu</button>
+
+</div>
 
 <div class="table-card">
 
@@ -224,7 +236,9 @@ font-size:13px;
 
 <thead>
 <tr>
+<th>Khối</th>
 <th>Môn học</th>
+<th>Hành động</th>
 </tr>
 </thead>
 
@@ -236,18 +250,17 @@ font-size:13px;
 
 </div>
 
-
 <!-- CHƯƠNG -->
 
 <div id="chapters" class="container hidden">
 
 <div class="card">
 
-<label>Môn học</label>
-<select id="chapterSubject"></select>
-
 <label>Khối</label>
 <select id="chapterGrade"></select>
+
+<label>Môn học</label>
+<select id="chapterSubject"></select>
 
 <label>Tên chương</label>
 <input id="chapterName">
@@ -262,8 +275,8 @@ font-size:13px;
 
 <thead>
 <tr>
-<th>Môn</th>
 <th>Khối</th>
+<th>Môn</th>
 <th>Chương</th>
 <th></th>
 </tr>
@@ -276,7 +289,6 @@ font-size:13px;
 </div>
 
 </div>
-
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
@@ -387,102 +399,9 @@ loadRooms()
 
 /* KHỐI */
 
-/* CREATE / UPDATE GRADE */
-
-async function saveGrade(){
-
-const id=document.getElementById("gradeId").value
-const name=document.getElementById("gradeName").value.trim()
-
-if(!name){
-alert("Nhập khối")
-return
-}
-
-/* UPDATE */
-
-if(id){
-
-const {error}=await sb
-.from("grades")
-.update({name})
-.eq("id",id)
-
-if(error){
-alert(error.message)
-return
-}
-
-}
-
-/* CREATE */
-
-else{
-
-const {error}=await sb
-.from("grades")
-.insert({name})
-
-if(error){
-alert(error.message)
-return
-}
-
-}
-
-resetGrade()
-loadGrades()
-
-}
-
-
-/* EDIT */
-
-function editGrade(id,name){
-
-document.getElementById("gradeId").value=id
-document.getElementById("gradeName").value=name
-
-window.scrollTo({top:0,behavior:"smooth"})
-
-}
-
-
-/* DELETE */
-
-async function deleteGrade(id){
-
-if(!confirm("Xóa khối này?")) return
-
-const {error}=await sb
-.from("grades")
-.delete()
-.eq("id",id)
-
-if(error){
-alert(error.message)
-return
-}
-
-loadGrades()
-
-}
-
-
-/* RESET */
-
-function resetGrade(){
-
-document.getElementById("gradeId").value=""
-document.getElementById("gradeName").value=""
-
-}
-  
 async function loadGrades(){
 
-const {data}=await sb
-.from("grades")
-.select("*")
+const {data}=await sb.from("grades").select("*")
 
 data.sort((a,b)=>parseInt(a.name)-parseInt(b.name))
 
@@ -505,13 +424,54 @@ gradeTable.innerHTML=html
 
 }
 
+async function saveGrade(){
+
+const id=gradeId.value
+const name=gradeName.value.trim()
+
+if(id){
+
+await sb.from("grades").update({name}).eq("id",id)
+
+}else{
+
+await sb.from("grades").insert({name})
+
+}
+
+gradeId.value=""
+gradeName.value=""
+
+loadGrades()
+loadDropdowns()
+
+}
+
+function editGrade(id,name){
+
+gradeId.value=id
+gradeName.value=name
+
+}
+
+async function deleteGrade(id){
+
+if(!confirm("Xóa khối?")) return
+
+await sb.from("grades").delete().eq("id",id)
+
+loadGrades()
+loadDropdowns()
+
+}
+
 /* MÔN */
 
 async function loadSubjects(){
 
 const {data}=await sb
 .from("subjects")
-.select("*")
+.select("id,name,grades(name)")
 
 let html=""
 
@@ -519,7 +479,12 @@ for(const s of data){
 
 html+=`
 <tr>
+<td>${s.grades?.name}</td>
 <td>${s.name}</td>
+<td class="actions">
+<button onclick="editSubject('${s.id}','${s.name}')">Sửa</button>
+<button class="delete" onclick="deleteSubject('${s.id}')">Xóa</button>
+</td>
 </tr>
 `
 }
@@ -528,17 +493,47 @@ subjectTable.innerHTML=html
 
 }
 
-/* DROPDOWN */
+async function saveSubject(){
 
-async function loadDropdowns(){
+const id=subjectId.value
+const name=subjectName.value
+const grade_id=subjectGrade.value
 
-const {data:subjects}=await sb.from("subjects").select("*")
-const {data:grades}=await sb.from("grades").select("*")
+if(id){
 
-grades.sort((a,b)=>parseInt(a.name)-parseInt(b.name))
+await sb.from("subjects")
+.update({name,grade_id})
+.eq("id",id)
 
-chapterSubject.innerHTML=subjects.map(s=>`<option value="${s.id}">${s.name}</option>`).join("")
-chapterGrade.innerHTML=grades.map(g=>`<option value="${g.id}">${g.name}</option>`).join("")
+}else{
+
+await sb.from("subjects")
+.insert({name,grade_id})
+
+}
+
+subjectId.value=""
+subjectName.value=""
+
+loadSubjects()
+loadDropdowns()
+
+}
+
+function editSubject(id,name){
+
+subjectId.value=id
+subjectName.value=name
+
+}
+
+async function deleteSubject(id){
+
+if(!confirm("Xóa môn?")) return
+
+await sb.from("subjects").delete().eq("id",id)
+
+loadSubjects()
 
 }
 
@@ -548,8 +543,8 @@ async function loadChapters(){
 
 const {data}=await sb
 .from("chapters")
-.select("id,name,subjects(name),grades(name)")
-.order("name",{ascending:true})
+.select("id,name,subjects(name,grades(name))")
+.order("name")
 
 let html=""
 
@@ -557,10 +552,12 @@ for(const c of data){
 
 html+=`
 <tr>
+<td>${c.subjects?.grades?.name}</td>
 <td>${c.subjects?.name}</td>
-<td>${c.grades?.name}</td>
 <td>${c.name}</td>
-<td><button class="delete" onclick="deleteChapter('${c.id}')">Xóa</button></td>
+<td>
+<button class="delete" onclick="deleteChapter('${c.id}')">Xóa</button>
+</td>
 </tr>
 `
 }
@@ -571,19 +568,45 @@ chapterTable.innerHTML=html
 
 async function saveChapter(){
 
-const subject=chapterSubject.value
-const grade=chapterGrade.value
+const subject_id=chapterSubject.value
 const name=chapterName.value
 
-await sb.from("chapters").insert({
-subject_id:subject,
-grade_id:grade,
-name
-})
+await sb.from("chapters").insert({subject_id,name})
 
 chapterName.value=""
 
 loadChapters()
+
+}
+
+/* DROPDOWN */
+
+async function loadDropdowns(){
+
+const {data:grades}=await sb.from("grades").select("*")
+grades.sort((a,b)=>parseInt(a.name)-parseInt(b.name))
+
+chapterGrade.innerHTML=grades.map(g=>`<option value="${g.id}">${g.name}</option>`).join("")
+subjectGrade.innerHTML=chapterGrade.innerHTML
+
+loadSubjectsByGrade()
+
+}
+
+chapterGrade.onchange=loadSubjectsByGrade
+
+async function loadSubjectsByGrade(){
+
+const grade_id=chapterGrade.value
+
+const {data}=await sb
+.from("subjects")
+.select("*")
+.eq("grade_id",grade_id)
+
+chapterSubject.innerHTML=data
+.map(s=>`<option value="${s.id}">${s.name}</option>`)
+.join("")
 
 }
 
@@ -601,3 +624,4 @@ loadChapters()
 
 </body>
 </html>
+```
