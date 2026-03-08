@@ -17,45 +17,93 @@ padding:30px;
 }
 
 .container{
-max-width:1300px;
+max-width:1100px;
 margin:auto;
 background:white;
 padding:20px;
 border-radius:10px;
 }
 
-input,select{
-padding:8px;
-margin:5px;
+h2{
+margin-bottom:20px;
 }
+
+/* SEARCH */
+
+.search-row{
+display:flex;
+gap:10px;
+flex-wrap:wrap;
+margin-bottom:20px;
+}
+
+.search-row input{
+padding:10px;
+border:1px solid #ccc;
+border-radius:6px;
+font-size:14px;
+}
+
+/* BUTTON */
+
+button{
+padding:8px 12px;
+border:none;
+background:#1976d2;
+color:white;
+border-radius:6px;
+cursor:pointer;
+font-size:14px;
+}
+
+button:hover{
+background:#125aa0;
+}
+
+button.delete{
+background:#e53935;
+}
+
+/* TABLE */
 
 table{
 width:100%;
 border-collapse:collapse;
-margin-top:10px;
 }
 
 th,td{
-padding:10px;
+padding:12px;
 border-bottom:1px solid #eee;
+text-align:left;
 }
 
-button{
-padding:6px 10px;
-border:none;
-background:#1976d2;
-color:white;
-border-radius:5px;
-cursor:pointer;
+th{
+background:#fafafa;
 }
 
-button.delete{
-background:#d32f2f;
+tr:hover{
+background:#f9f9f9;
 }
+
+/* PAGINATION */
 
 .pagination{
 margin-top:20px;
+text-align:center;
 }
+
+.pagination button{
+margin:3px;
+background:#eee;
+color:#333;
+}
+
+.pagination button.active{
+background:#1976d2;
+color:white;
+}
+
+/* MODAL */
 
 .modal{
 position:fixed;
@@ -65,8 +113,8 @@ width:100%;
 height:100%;
 background:rgba(0,0,0,0.4);
 display:none;
-justify-content:center;
 align-items:center;
+justify-content:center;
 }
 
 .modal-content{
@@ -74,6 +122,19 @@ background:white;
 padding:20px;
 border-radius:10px;
 width:350px;
+}
+
+.modal-content input{
+width:100%;
+padding:10px;
+margin-bottom:10px;
+border:1px solid #ccc;
+border-radius:5px;
+}
+
+.stats{
+margin-bottom:15px;
+color:#444;
 }
 
 </style>
@@ -85,7 +146,7 @@ width:350px;
 
 <h2>Danh sách học sinh</h2>
 
-<div>
+<div class="search-row">
 
 <input id="search_name" placeholder="Tên">
 <input id="search_phone" placeholder="SĐT">
@@ -93,12 +154,12 @@ width:350px;
 <input id="search_province" placeholder="Tỉnh">
 <input id="search_school" placeholder="Trường">
 
-<button onclick="filterStudents()">Tìm kiếm</button>
+<button onclick="filterStudents()">Tìm</button>
 <button onclick="exportExcel()">Xuất Excel</button>
 
 </div>
 
-<div id="stats"></div>
+<div class="stats" id="stats"></div>
 
 <table>
 
@@ -118,9 +179,11 @@ width:350px;
 
 </table>
 
-<div id="pagination"></div>
+<div class="pagination" id="pagination"></div>
 
 </div>
+
+<!-- MODAL -->
 
 <div class="modal" id="editModal">
 
@@ -150,15 +213,12 @@ let pageSize=10
 
 let editingId=null
 
-
 function removeVN(str){
-
 return str
 .normalize("NFD")
 .replace(/[\u0300-\u036f]/g,"")
 .replace(/đ/g,"d")
 .replace(/Đ/g,"D")
-
 }
 
 
@@ -196,11 +256,11 @@ loadStudents()
 
 function filterStudents(){
 
-const name = removeVN(document.getElementById("search_name").value.toLowerCase())
-const phone = document.getElementById("search_phone").value
-const birth = document.getElementById("search_birth").value
-const province = removeVN(document.getElementById("search_province").value.toLowerCase())
-const school = removeVN(document.getElementById("search_school").value.toLowerCase())
+const name = removeVN(search_name.value.toLowerCase())
+const phone = search_phone.value
+const birth = search_birth.value
+const province = removeVN(search_province.value.toLowerCase())
+const school = removeVN(search_school.value.toLowerCase())
 
 filteredStudents = allStudents.filter(s=>{
 
@@ -223,8 +283,7 @@ return matchName && matchPhone && matchBirth && matchProvince && matchSchool
 
 })
 
-page = 1
-
+page=1
 render()
 
 }
@@ -248,13 +307,11 @@ renderStats()
 
 function renderTable(list){
 
-const table=document.getElementById("studentTable")
-
-table.innerHTML=""
+studentTable.innerHTML=""
 
 list.forEach(s=>{
 
-table.innerHTML+=`
+studentTable.innerHTML+=`
 
 <tr>
 
@@ -328,7 +385,6 @@ alert("Lỗi")
 }else{
 
 editModal.style.display="none"
-
 loadStudents()
 
 }
@@ -357,15 +413,17 @@ function renderPagination(){
 
 const total=Math.ceil(filteredStudents.length/pageSize)
 
-const div=document.getElementById("pagination")
-
-div.innerHTML=""
+pagination.innerHTML=""
 
 for(let i=1;i<=total;i++){
 
-div.innerHTML+=`
+pagination.innerHTML+=`
 
-<button onclick="goPage(${i})">${i}</button>
+<button 
+class="${i===page?'active':''}"
+onclick="goPage(${i})">
+${i}
+</button>
 
 `
 
@@ -385,9 +443,7 @@ render()
 
 function renderStats(){
 
-document.getElementById("stats").innerHTML=
-
-`Tổng học sinh: ${filteredStudents.length}`
+stats.innerHTML=`Tổng học sinh: <b>${filteredStudents.length}</b>`
 
 }
 
