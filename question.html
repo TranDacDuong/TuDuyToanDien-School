@@ -10,100 +10,6 @@
 
 <style>
 
-.modal-large{
-width:1100px;
-max-width:95%;
-}
-
-.createGrid{
-display:grid;
-grid-template-columns:220px 1fr 300px;
-gap:25px;
-}
-
-.leftCol,
-.centerCol,
-.rightCol{
-display:flex;
-flex-direction:column;
-gap:10px;
-}
-
-.pasteBox{
-border:2px dashed #cbd5f5;
-padding:18px;
-text-align:center;
-border-radius:6px;
-background:#f8fafc;
-cursor:pointer;
-}
-
-.previewImg{
-max-width:100%;
-border-radius:6px;
-display:none;
-}
-
-.answerHorizontal{
-display:flex;
-gap:10px;
-flex-wrap:wrap;
-margin-top:5px;
-}
-
-.answerItem{
-display:flex;
-align-items:center;
-gap:4px;
-padding:6px 10px;
-border:1px solid #ddd;
-border-radius:6px;
-background:#fafafa;
-}
-  
-.pasteBox{
-border:2px dashed #cbd5f5;
-padding:20px;
-text-align:center;
-border-radius:6px;
-margin-top:5px;
-margin-bottom:10px;
-background:#f8fafc;
-cursor:pointer;
-}
-
-.previewImg{
-max-width:100%;
-margin-bottom:10px;
-border-radius:6px;
-display:none;
-}
-
-.answerRow{
-display:flex;
-align-items:center;
-gap:8px;
-margin-bottom:6px;
-}
-
-.answerBtn{
-width:26px;
-height:26px;
-border-radius:50%;
-border:1px solid #ccc;
-cursor:pointer;
-}
-
-.trueBtn{
-background:#22c55e;
-color:white;
-}
-
-.falseBtn{
-background:#ef4444;
-color:white;
-}
-  
 body{
 font-family:Arial;
 background:#f1f5f9;
@@ -164,6 +70,108 @@ border:1px solid #ccc;
 border-radius:5px;
 }
 
+/* MODAL */
+
+.modal{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.4);
+display:none;
+align-items:center;
+justify-content:center;
+}
+
+.modal-box{
+background:white;
+padding:25px;
+border-radius:10px;
+}
+
+.modal-large{
+width:1100px;
+max-width:95%;
+}
+
+/* GRID */
+
+.createGrid{
+display:grid;
+grid-template-columns:220px 1fr 300px;
+gap:25px;
+}
+
+.leftCol,
+.centerCol,
+.rightCol{
+display:flex;
+flex-direction:column;
+gap:10px;
+}
+
+/* IMAGE PASTE */
+
+.pasteBox{
+border:2px dashed #cbd5f5;
+padding:18px;
+text-align:center;
+border-radius:6px;
+background:#f8fafc;
+cursor:pointer;
+}
+
+.previewImg{
+max-width:100%;
+border-radius:6px;
+display:none;
+}
+
+/* ANSWER */
+
+.answerHorizontal{
+display:flex;
+gap:10px;
+flex-wrap:wrap;
+margin-top:5px;
+}
+
+.answerItem{
+display:flex;
+align-items:center;
+gap:4px;
+padding:6px 10px;
+border:1px solid #ddd;
+border-radius:6px;
+background:#fafafa;
+}
+
+.answerRow{
+display:flex;
+align-items:center;
+gap:8px;
+margin-bottom:6px;
+}
+
+.answerBtn{
+width:26px;
+height:26px;
+border-radius:50%;
+border:1px solid #ccc;
+cursor:pointer;
+}
+
+.trueBtn{
+background:#22c55e;
+color:white;
+}
+
+.falseBtn{
+background:#ef4444;
+color:white;
+}
+
 .questionImgBox{
 width:320px;
 aspect-ratio:7/2;
@@ -193,11 +201,13 @@ word-break:break-word;
 
 <body>
 
-
-  
 <div class="container">
 
 <h2>Ngân hàng câu hỏi</h2>
+
+<button onclick="openModal()">Tạo câu hỏi</button>
+
+<!-- MODAL -->
 
 <div class="modal" id="modal">
 
@@ -211,13 +221,13 @@ word-break:break-word;
 
 <div class="leftCol">
 
-<label class="label">Khối</label>
+<label>Khối</label>
 <select id="grade"></select>
 
-<label class="label">Môn</label>
+<label>Môn</label>
 <select id="subject"></select>
 
-<label class="label">Chương</label>
+<label>Chương</label>
 <select id="chapter"></select>
 
 </div>
@@ -227,7 +237,7 @@ word-break:break-word;
 
 <div class="centerCol">
 
-<label class="label">Nhập câu hỏi</label>
+<label>Nhập câu hỏi</label>
 
 <input id="questionText" placeholder="Nhập câu hỏi">
 
@@ -237,8 +247,7 @@ Ctrl + V để dán ảnh câu hỏi
 
 <img id="questionPreview" class="previewImg">
 
-
-<label class="label">Nhập đáp án</label>
+<label>Nhập đáp án</label>
 
 <input id="answerText" placeholder="Nhập đáp án">
 
@@ -255,7 +264,7 @@ Ctrl + V để dán ảnh đáp án
 
 <div class="rightCol">
 
-<label class="label">Loại câu hỏi</label>
+<label>Loại câu hỏi</label>
 
 <select id="question_type">
 <option value="multi_choice">Nhiều lựa chọn</option>
@@ -264,11 +273,10 @@ Ctrl + V để dán ảnh đáp án
 <option value="essay">Tự luận</option>
 </select>
 
-<label class="label">Mức độ</label>
+<label>Mức độ</label>
 <select id="difficulty"></select>
 
-
-<label class="label">
+<label>
 Đáp án
 <button onclick="removeAnswer()">-</button>
 <button onclick="addAnswer()">+</button>
@@ -280,7 +288,6 @@ Ctrl + V để dán ảnh đáp án
 
 </div>
 
-
 <br>
 
 <button onclick="saveQuestion()">Lưu</button>
@@ -288,6 +295,9 @@ Ctrl + V để dán ảnh đáp án
 
 </div>
 </div>
+
+
+<!-- FILTER -->
 
 <div class="filterBar">
 
@@ -311,6 +321,7 @@ Ctrl + V để dán ảnh đáp án
 
 </div>
 
+
 <table>
 
 <thead>
@@ -320,7 +331,7 @@ Ctrl + V để dán ảnh đáp án
 <th>Khối</th>
 <th>Môn</th>
 <th>Chương</th>
-<th>Loại câu hỏi</th>
+<th>Loại</th>
 <th>Mức độ</th>
 <th>Đáp án</th>
 <th></th>
@@ -335,7 +346,22 @@ Ctrl + V để dán ảnh đáp án
 
 <script>
 
-/* TẠO CÂU HỎI */
+/* MODAL */
+
+function openModal(){
+
+modal.style.display="flex"
+
+}
+
+function closeModal(){
+
+modal.style.display="none"
+
+}
+
+
+/* ANSWER UI */
 
 let answerCount = 4
 
@@ -345,10 +371,7 @@ answerBox.innerHTML=""
 
 const type = question_type.value
 
-if(type==="essay"){
-answerBox.innerHTML=""
-return
-}
+if(type==="essay") return
 
 for(let i=0;i<answerCount;i++){
 
@@ -357,10 +380,29 @@ let letter = String.fromCharCode(65+i)
 answerBox.innerHTML+=`
 
 <div class="answerItem">
-
 <input type="checkbox">
-
 <span>${letter}</span>
+</div>
+
+`
+}
+
+if(type==="true_false"){
+
+answerBox.innerHTML=""
+
+for(let i=0;i<answerCount;i++){
+
+let letter = String.fromCharCode(97+i)
+
+answerBox.innerHTML+=`
+
+<div class="answerRow">
+
+<span>${letter})</span>
+
+<button class="answerBtn trueBtn">Đ</button>
+<button class="answerBtn falseBtn">S</button>
 
 </div>
 
@@ -368,44 +410,31 @@ answerBox.innerHTML+=`
 
 }
 
-if(type==="true_false"){
-
-for(let i=0;i<answerCount;i++){
-
-let letter = String.fromCharCode(97+i)
-
-answerBox.innerHTML+=`
-<div class="answerRow">
-<span>${letter})</span>
-
-<button class="answerBtn trueBtn">Đ</button>
-<button class="answerBtn falseBtn">S</button>
-
-</div>`
-}
-
 }
 
 if(type==="short_answer"){
 
+answerBox.innerHTML=""
+
 for(let i=0;i<answerCount;i++){
 
 answerBox.innerHTML+=`
+
 <div class="answerRow">
-<input class="shortAnswerInput" placeholder="Đáp án ${i+1}">
-</div>`
-}
+<input placeholder="Đáp án ${i+1}">
+</div>
+
+`
 
 }
 
 }
 
-/* Tạo câu hỏi */
+}
 
 function addAnswer(){
 
 answerCount++
-
 renderAnswerUI()
 
 }
@@ -415,39 +444,19 @@ function removeAnswer(){
 if(answerCount<=1) return
 
 answerCount--
-
 renderAnswerUI()
 
 }
 
-/* Đổi loại câu hỏi */
 question_type.onchange = () => {
 
 answerCount = 4
-
 renderAnswerUI()
 
 }
 
-/* Dấu +, - */
 
-function addAnswer(){
-
-answerCount++
-renderAnswerUI()
-
-}
-
-function removeAnswer(){
-
-if(answerCount<=1) return
-
-answerCount--
-renderAnswerUI()
-
-}
-
-/* Paste Ảnh */
+/* PASTE IMAGE */
 
 document.addEventListener("paste",function(e){
 
@@ -476,12 +485,12 @@ reader.readAsDataURL(file)
 
 })
 
-
-init()
+renderAnswerUI()
 
 </script>
 
 <script src="questionList.js"></script>
-  
+<script src="createQuestion.js"></script>
+
 </body>
 </html>
