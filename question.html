@@ -10,6 +10,49 @@
 
 <style>
 
+.pasteBox{
+border:2px dashed #cbd5f5;
+padding:20px;
+text-align:center;
+border-radius:6px;
+margin-top:5px;
+margin-bottom:10px;
+background:#f8fafc;
+cursor:pointer;
+}
+
+.previewImg{
+max-width:100%;
+margin-bottom:10px;
+border-radius:6px;
+display:none;
+}
+
+.answerRow{
+display:flex;
+align-items:center;
+gap:8px;
+margin-bottom:6px;
+}
+
+.answerBtn{
+width:26px;
+height:26px;
+border-radius:50%;
+border:1px solid #ccc;
+cursor:pointer;
+}
+
+.trueBtn{
+background:#22c55e;
+color:white;
+}
+
+.falseBtn{
+background:#ef4444;
+color:white;
+}
+  
 body{
 font-family:Arial;
 background:#f1f5f9;
@@ -99,9 +142,94 @@ word-break:break-word;
 
 <body>
 
+
+  
 <div class="container">
 
 <h2>Ngân hàng câu hỏi</h2>
+
+<div class="modal" id="modal">
+
+<div class="modal-box">
+
+<h3>Tạo câu hỏi</h3>
+
+<!-- KHỐI -->
+
+<label class="label">Khối</label>
+<select id="grade"></select>
+
+<!-- MÔN -->
+
+<label class="label">Môn</label>
+<select id="subject"></select>
+
+<!-- CHƯƠNG -->
+
+<label class="label">Chương</label>
+<select id="chapter"></select>
+
+<!-- NHẬP CÂU HỎI -->
+
+<label class="label">Nhập câu hỏi</label>
+
+<input id="questionText" placeholder="Nhập câu hỏi dạng text">
+
+<div class="pasteBox" id="questionPaste">
+Dán ảnh câu hỏi (Ctrl + V)
+</div>
+
+<img id="questionPreview" class="previewImg">
+
+<!-- LOẠI CÂU HỎI -->
+
+<label class="label">Loại câu hỏi</label>
+
+<select id="question_type">
+<option value="multi_choice">Nhiều phương án lựa chọn</option>
+<option value="true_false">Đúng/Sai</option>
+<option value="short_answer">Trả lời ngắn</option>
+<option value="essay">Tự luận</option>
+</select>
+
+<!-- MỨC ĐỘ -->
+
+<label class="label">Mức độ</label>
+<select id="difficulty"></select>
+
+<!-- ĐÁP ÁN -->
+
+<div id="answerSection">
+
+<label class="label">
+Đáp án
+<button onclick="removeAnswer()">-</button>
+<button onclick="addAnswer()">+</button>
+</label>
+
+<div id="answerBox"></div>
+
+<!-- NHẬP ĐÁP ÁN -->
+
+<label class="label">Nhập đáp án</label>
+
+<input id="answerText" placeholder="Nhập đáp án dạng text">
+
+<div class="pasteBox" id="answerPaste">
+Dán ảnh đáp án (Ctrl + V)
+</div>
+
+<img id="answerPreview" class="previewImg">
+
+</div>
+
+<br>
+
+<button onclick="saveQuestion()">Lưu</button>
+<button onclick="closeModal()">Đóng</button>
+
+</div>
+</div>
 
 <div class="filterBar">
 
