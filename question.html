@@ -24,10 +24,6 @@ padding:25px;
 border-radius:10px;
 }
 
-h2{
-margin-bottom:15px;
-}
-
 button{
 padding:7px 12px;
 border:none;
@@ -51,10 +47,6 @@ th,td{
 padding:10px;
 border-bottom:1px solid #eee;
 text-align:center;
-}
-
-th{
-background:#fafafa;
 }
 
 .filterBar{
@@ -111,24 +103,14 @@ flex-direction:column;
 gap:10px;
 }
 
-/* IMAGE PASTE */
-
-.pasteBox{
-border:2px dashed #cbd5f5;
-padding:18px;
-text-align:center;
-border-radius:6px;
-background:#f8fafc;
-cursor:pointer;
-}
+/* IMAGE */
 
 .previewImg{
 max-width:100%;
 border-radius:6px;
 display:none;
+margin-top:10px;
 }
-
-/* ANSWER */
 
 .answerHorizontal{
 display:flex;
@@ -145,13 +127,6 @@ padding:6px 10px;
 border:1px solid #ddd;
 border-radius:6px;
 background:#fafafa;
-}
-
-.answerRow{
-display:flex;
-align-items:center;
-gap:8px;
-margin-bottom:6px;
 }
 
 .answerBtn{
@@ -188,11 +163,6 @@ width:100%;
 height:100%;
 object-fit:contain;
 cursor:pointer;
-}
-
-.answerCell{
-max-width:200px;
-word-break:break-word;
 }
 
 </style>
@@ -237,25 +207,20 @@ word-break:break-word;
 
 <div class="centerCol">
 
-<label>Nhập câu hỏi</label>
+<label>
+Nhập câu hỏi
+<button type="button" onclick="toggleQuestionMode()" id="modeBtn">
+Ảnh
+</button>
+</label>
 
-<input id="questionText" placeholder="Nhập câu hỏi">
-
-<div class="pasteBox" id="questionPaste">
-Ctrl + V để dán ảnh câu hỏi
-</div>
+<input id="questionText" placeholder="Nhập câu hỏi" style="display:none">
 
 <img id="questionPreview" class="previewImg">
 
 <label>Nhập đáp án</label>
 
 <input id="answerText" placeholder="Nhập đáp án">
-
-<div class="pasteBox" id="answerPaste">
-Ctrl + V để dán ảnh đáp án
-</div>
-
-<img id="answerPreview" class="previewImg">
 
 </div>
 
@@ -343,6 +308,73 @@ Ctrl + V để dán ảnh đáp án
 </table>
 
 </div>
+
+<script>
+
+let questionMode="image"
+
+function toggleQuestionMode(){
+
+const text=document.getElementById("questionText")
+const img=document.getElementById("questionPreview")
+const btn=document.getElementById("modeBtn")
+
+if(questionMode==="image"){
+
+questionMode="text"
+
+text.style.display="block"
+img.style.display="none"
+
+btn.innerText="Chữ"
+
+}else{
+
+questionMode="image"
+
+text.style.display="none"
+img.style.display="block"
+
+btn.innerText="Ảnh"
+
+}
+
+}
+
+/* paste ảnh */
+
+document.addEventListener("paste",function(e){
+
+if(questionMode!=="image") return
+
+const items=e.clipboardData.items
+
+for(let item of items){
+
+if(item.type.indexOf("image")!==-1){
+
+const file=item.getAsFile()
+
+const reader=new FileReader()
+
+reader.onload=function(event){
+
+const img=document.getElementById("questionPreview")
+
+img.src=event.target.result
+img.style.display="block"
+
+}
+
+reader.readAsDataURL(file)
+
+}
+
+}
+
+})
+
+</script>
 
 <script src="questionList.js"></script>
 <script src="createQuestionUI.js"></script>
