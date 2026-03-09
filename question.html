@@ -18,20 +18,19 @@ padding:30px;
 }
 
 .container{
-max-width:1100px;
+max-width:1200px;
 margin:auto;
 background:white;
 padding:25px;
 border-radius:10px;
-box-shadow:0 10px 30px rgba(0,0,0,0.05);
 }
 
 h2{
-margin-bottom:20px;
+margin-bottom:15px;
 }
 
 button{
-padding:8px 12px;
+padding:7px 12px;
 border:none;
 background:#2563eb;
 color:white;
@@ -46,13 +45,12 @@ background:#e53935;
 table{
 width:100%;
 border-collapse:collapse;
-margin-top:20px;
+margin-top:15px;
 }
 
 th,td{
-padding:10px;
+padding:8px;
 border-bottom:1px solid #eee;
-text-align:left;
 }
 
 th{
@@ -79,16 +77,31 @@ justify-content:center;
 background:white;
 padding:20px;
 border-radius:10px;
-width:420px;
+width:500px;
+max-height:90vh;
+overflow:auto;
 }
 
-.modal-box select,
-.modal-box input{
+.modal-box input,
+.modal-box select{
 width:100%;
-padding:10px;
-margin-bottom:10px;
+padding:8px;
+margin-bottom:8px;
 border:1px solid #ccc;
 border-radius:5px;
+}
+
+.answerRow{
+display:flex;
+gap:5px;
+margin-bottom:5px;
+}
+
+.filterBar{
+display:flex;
+gap:10px;
+margin-top:10px;
+flex-wrap:wrap;
 }
 
 </style>
@@ -103,20 +116,39 @@ border-radius:5px;
 
 <button onclick="openCreate()">Tạo câu hỏi</button>
 
+<div class="filterBar">
+
+<select id="f_grade"></select> <select id="f_subject"></select> <select id="f_chapter"></select>
+
+<select id="f_type">
+<option value="">Loại</option>
+<option value="multi_choice">Nhiều lựa chọn</option>
+<option value="true_false">Đúng/Sai</option>
+<option value="short_answer">Trả lời ngắn</option>
+<option value="essay">Tự luận</option>
+</select>
+
+<select id="f_difficulty">
+<option value="">Độ khó</option>
+</select>
+
+<input id="searchBox" placeholder="Tìm kiếm...">
+
+</div>
+
 <table>
 
 <thead>
-
 <tr>
+<th>STT</th>
 <th>Ảnh</th>
 <th>Khối</th>
 <th>Môn</th>
 <th>Chương</th>
 <th>Loại</th>
 <th>Độ khó</th>
-<th>Hành động</th>
+<th></th>
 </tr>
-
 </thead>
 
 <tbody id="questionTable"></tbody>
@@ -131,28 +163,28 @@ border-radius:5px;
 
 <h3 id="modalTitle"></h3>
 
-<input id="image_url" placeholder="Link ảnh câu hỏi">
+<label>Ảnh câu hỏi</label>
 
-<select id="grade"></select>
+<input type="file" id="imageFile">
 
-<select id="subject"></select>
+<img id="previewImage">
 
-<select id="chapter"></select>
+<select id="grade"></select> <select id="subject"></select> <select id="chapter"></select>
 
 <select id="question_type">
 
-<option value="multi_choice">multi_choice</option>
-<option value="true_false">true_false</option>
-<option value="short_answer">short_answer</option>
-<option value="essay">essay</option>
+<option value="multi_choice">Nhiều phương án lựa chọn</option>
+<option value="true_false">Đúng/Sai</option>
+<option value="short_answer">Trả lời ngắn</option>
+<option value="essay">Tự luận</option>
 
 </select>
 
-<input id="difficulty" placeholder="Độ khó">
+<select id="difficulty"></select>
 
-<input id="answer" placeholder="Đáp án">
+<div id="answerBox"></div>
 
-<input id="answer_image_url" placeholder="Link ảnh đáp án">
+<label>Ảnh đáp án</label> <input type="file" id="answerFile">
 
 <button onclick="saveQuestion()">Lưu</button> <button onclick="closeModal()">Đóng</button>
 
@@ -166,38 +198,44 @@ let questions=[]
 let grades=[]
 let subjects=[]
 let chapters=[]
-let editingId=null
 
-/* LOAD GRADES */
+let image_url=""
+let answer_image_url=""
 
-async function loadGrades(){
+/* difficulty */
 
-const {data}=await sb
-.from("grades")
-.select("*")
-.order("name")
+for(let i=1;i<=10;i++){
 
-grades=data
+difficulty.innerHTML+=`<option value="${i}">${i}</option>`
+f_difficulty.innerHTML+=`<option value="${i}">${i}</option>`
 
-grade.innerHTML="<option value=''>Chọn khối</option>"
+}
+
+/* LOAD DATA */
+
+async function loadBase(){
+
+grades=(await sb.from("grades").select("*")).data
+
+grades.sort((a,b)=>a.name-b.name)
+
+grade.innerHTML="<option value=''>Khối</option>"
+f_grade.innerHTML="<option value=''>Khối</option>"
 
 grades.forEach(g=>{
 grade.innerHTML+=`<option value="${g.id}">${g.name}</option>`
+f_grade.innerHTML+=`<option value="${g.id}">${g.name}</option>`
 })
 
 }
 
-/* LOAD SUBJECTS */
+/* SUBJECT */
 
 grade.onchange=async()=>{
 
-const {data}=await sb
-.from("subjects")
+subjects=(await sb.from("subjects")
 .select("*")
-.eq("grade_id",grade.value)
-.order("name")
-
-subjects=data
+.eq("grade_id",grade.value)).data
 
 subject.innerHTML=""
 
@@ -209,19 +247,13 @@ loadChapters()
 
 }
 
-/* LOAD CHAPTERS */
-
-subject.onchange=loadChapters
+/* CHAPTER */
 
 async function loadChapters(){
 
-const {data}=await sb
-.from("chapters")
+chapters=(await sb.from("chapters")
 .select("*")
-.eq("subject_id",subject.value)
-.order("name")
-
-chapters=data
+.eq("subject_id",subject.value)).data
 
 chapter.innerHTML=""
 
@@ -231,48 +263,162 @@ chapter.innerHTML+=`<option value="${c.id}">${c.name}</option>`
 
 }
 
+/* ANSWER UI */
+
+question_type.onchange=renderAnswerUI
+
+function renderAnswerUI(){
+
+answerBox.innerHTML=""
+
+const t=question_type.value
+
+if(t==="multi_choice"){
+
+for(let i=0;i<4;i++){
+
+answerBox.innerHTML+=`
+
+<div class="answerRow">
+
+<input placeholder="Đáp án">
+
+<input type="radio" name="correct">
+
+</div>
+
+`
+
+}
+
+}
+
+if(t==="true_false"){
+
+for(let i=0;i<4;i++){
+
+answerBox.innerHTML+=`
+
+<div class="answerRow">
+
+<span>${String.fromCharCode(97+i)})</span>
+
+<select>
+
+<option>Đúng</option>
+<option>Sai</option>
+
+</select>
+
+</div>
+
+`
+
+}
+
+}
+
+if(t==="short_answer"){
+
+answerBox.innerHTML=`<input placeholder="Đáp án">`
+
+}
+
+if(t==="essay"){
+
+answerBox.innerHTML=`<textarea placeholder="Đáp án gợi ý"></textarea>`
+
+}
+
+}
+
+/* IMAGE UPLOAD */
+
+imageFile.onchange=async()=>{
+
+const file=imageFile.files[0]
+
+const path="q_"+Date.now()+file.name
+
+await sb.storage.from("question-images").upload(path,file)
+
+const {data}=sb.storage.from("question-images").getPublicUrl(path)
+
+image_url=data.publicUrl
+
+previewImage.src=image_url
+
+}
+
+/* PASTE IMAGE */
+
+document.addEventListener("paste",async(e)=>{
+
+const item=e.clipboardData.items[0]
+
+if(item.type.indexOf("image")!==-1){
+
+const file=item.getAsFile()
+
+const path="q_"+Date.now()+".png"
+
+await sb.storage.from("question-images").upload(path,file)
+
+const {data}=sb.storage.from("question-images").getPublicUrl(path)
+
+image_url=data.publicUrl
+
+previewImage.src=image_url
+
+}
+
+})
+
 /* LOAD QUESTIONS */
 
 async function loadQuestions(){
 
-const {data}=await sb
-
+questions=(await sb
 .from("question_bank")
-
-.select(`
-*,
+.select(`*,
 chapters(
 name,
 subjects(
 name,
 grades(name)
 )
-)
-`)
-
-.eq("hidden",false)
-
-.order("created_at",{ascending:false})
-
-questions=data
+)`)
+.eq("hidden",false)).data
 
 render()
 
 }
 
-/* RENDER TABLE */
+/* RENDER */
 
 function render(){
 
 questionTable.innerHTML=""
 
-questions.forEach(q=>{
+let list=[...questions]
+
+/* FILTER */
+
+if(f_type.value)
+list=list.filter(x=>x.question_type===f_type.value)
+
+if(f_difficulty.value)
+list=list.filter(x=>x.difficulty==f_difficulty.value)
+
+list.forEach((q,i)=>{
 
 questionTable.innerHTML+=`
 
 <tr>
 
-<td>${q.image_url ? `<img src="${q.image_url}">` : ""}</td>
+<td>${i+1}</td>
+
+<td>${q.image_url?`<img src="${q.image_url}">`:""}</td>
 
 <td>${q.chapters?.subjects?.grades?.name||""}</td>
 
@@ -288,8 +434,7 @@ questionTable.innerHTML+=`
 
 <button onclick="editQuestion('${q.id}')">Sửa</button>
 
-<button class="delete"
-onclick="requestDelete('${q.id}')">Xóa</button>
+<button class="delete" onclick="deleteQ('${q.id}')">Xóa</button>
 
 </td>
 
@@ -305,38 +450,10 @@ onclick="requestDelete('${q.id}')">Xóa</button>
 
 function openCreate(){
 
-editingId=null
-
-modalTitle.innerText="Tạo câu hỏi"
-
 modal.style.display="flex"
 
-}
+renderAnswerUI()
 
-/* EDIT */
-
-function editQuestion(id){
-
-const q=questions.find(x=>x.id===id)
-
-editingId=id
-
-image_url.value=q.image_url||""
-question_type.value=q.question_type
-difficulty.value=q.difficulty
-answer.value=q.answer
-answer_image_url.value=q.answer_image_url||""
-
-modalTitle.innerText="Sửa câu hỏi"
-
-modal.style.display="flex"
-
-}
-
-/* CLOSE */
-
-function closeModal(){
-modal.style.display="none"
 }
 
 /* SAVE */
@@ -345,33 +462,19 @@ async function saveQuestion(){
 
 const payload={
 
-image_url:image_url.value,
+image_url,
 chapter_id:chapter.value,
 question_type:question_type.value,
 difficulty:difficulty.value,
-answer:answer.value,
-answer_image_url:answer_image_url.value
+answer:"demo"
 
 }
-
-if(editingId){
-
-await sb
-.from("question_bank")
-.update(payload)
-.eq("id",editingId)
-
-}else{
 
 const {data}=await sb.auth.getUser()
 
 payload.created_by=data.user.id
 
-await sb
-.from("question_bank")
-.insert(payload)
-
-}
+await sb.from("question_bank").insert(payload)
 
 closeModal()
 
@@ -381,12 +484,11 @@ loadQuestions()
 
 /* DELETE */
 
-async function requestDelete(id){
+async function deleteQ(id){
 
-if(!confirm("Xóa câu hỏi?")) return
+if(!confirm("Xóa câu hỏi?"))return
 
-await sb
-.from("question_bank")
+await sb.from("question_bank")
 .update({hidden:true})
 .eq("id",id)
 
@@ -394,11 +496,15 @@ loadQuestions()
 
 }
 
+function closeModal(){
+modal.style.display="none"
+}
+
 /* INIT */
 
 async function init(){
 
-await loadGrades()
+await loadBase()
 
 await loadQuestions()
 
