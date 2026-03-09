@@ -57,8 +57,14 @@ th{
 background:#fafafa;
 }
 
-img{
-max-width:120px;
+.questionImg{
+width:120px;
+max-height:90px;
+object-fit:contain;
+border-radius:6px;
+cursor:pointer;
+background:#f3f4f6;
+padding:3px;
 }
 
 .modal{
@@ -418,7 +424,15 @@ questionTable.innerHTML+=`
 
 <td>${i+1}</td>
 
-<td>${q.image_url?`<img src="${q.image_url}">`:""}</td>
+<td>
+${
+q.image_url
+? `<img class="questionImg"
+src="${q.image_url}"
+onclick="window.open('${q.image_url}')">`
+: "—"
+}
+</td>
 
 <td>${q.chapters?.subjects?.grades?.name||""}</td>
 
