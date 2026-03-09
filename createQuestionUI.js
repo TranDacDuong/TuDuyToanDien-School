@@ -19,11 +19,17 @@ MỨC ĐỘ 1 → 10
 
 function loadDifficulty(){
 
+if(!difficulty) return
+
 difficulty.innerHTML=""
 
 for(let i=1;i<=10;i++){
 
-difficulty.innerHTML+=`<option value="${i}">${i}</option>`
+const option=document.createElement("option")
+option.value=i
+option.textContent=i
+
+difficulty.appendChild(option)
 
 }
 
@@ -43,15 +49,24 @@ function toggleQuestionMode(){
 if(questionMode==="image"){
 
 questionMode="text"
-questionModeBtn.innerText="Chữ"
+
+if(questionModeBtn) questionModeBtn.innerText="Chữ"
+if(questionText){
 questionText.readOnly=false
+questionText.dataset.image=""
+}
 
 }else{
 
 questionMode="image"
-questionModeBtn.innerText="Ảnh"
+
+if(questionModeBtn) questionModeBtn.innerText="Ảnh"
+
+if(questionText){
 questionText.readOnly=true
 questionText.value=""
+questionText.dataset.image=""
+}
 
 }
 
@@ -63,15 +78,25 @@ function toggleAnswerMode(){
 if(answerMode==="image"){
 
 answerMode="text"
-answerModeBtn.innerText="Chữ"
+
+if(answerModeBtn) answerModeBtn.innerText="Chữ"
+
+if(answerText){
 answerText.readOnly=false
+answerText.dataset.image=""
+}
 
 }else{
 
 answerMode="image"
-answerModeBtn.innerText="Ảnh"
+
+if(answerModeBtn) answerModeBtn.innerText="Ảnh"
+
+if(answerText){
 answerText.readOnly=true
 answerText.value=""
+answerText.dataset.image=""
+}
 
 }
 
@@ -81,6 +106,8 @@ answerText.value=""
 /* =========================
 CHẶN GÕ CHỮ KHI MODE ẢNH
 ========================= */
+
+if(questionText){
 
 questionText.addEventListener("keydown",e=>{
 
@@ -92,6 +119,10 @@ e.preventDefault()
 
 })
 
+}
+
+if(answerText){
+
 answerText.addEventListener("keydown",e=>{
 
 if(answerMode==="image"){
@@ -102,6 +133,8 @@ e.preventDefault()
 
 })
 
+}
+
 
 /* =========================
 PASTE IMAGE
@@ -109,7 +142,9 @@ PASTE IMAGE
 
 document.addEventListener("paste",function(e){
 
-const items = e.clipboardData.items
+const items = e.clipboardData?.items
+
+if(!items) return
 
 for(let item of items){
 
@@ -117,25 +152,29 @@ if(item.type.indexOf("image")!==-1){
 
 const file = item.getAsFile()
 
+if(!file) continue
+
 const reader = new FileReader()
 
 reader.onload=function(ev){
+
+const imgData = ev.target.result
 
 if(document.activeElement===questionText){
 
 if(questionMode==="text") return
 
-questionText.dataset.image = ev.target.result
-questionText.value="[Ảnh câu hỏi]"
+questionText.dataset.image = imgData
+questionText.value = "[Ảnh câu hỏi]"
 
 }
 
-if(document.activeElement===answerText){
+else if(document.activeElement===answerText){
 
 if(answerMode==="text") return
 
-answerText.dataset.image = ev.target.result
-answerText.value="[Ảnh đáp án]"
+answerText.dataset.image = imgData
+answerText.value = "[Ảnh đáp án]"
 
 }
 
@@ -160,6 +199,8 @@ let answerCount = 4
 
 function renderAnswerUI(){
 
+if(!answerBox || !question_type) return
+
 answerBox.innerHTML=""
 
 const type = question_type.value
@@ -169,11 +210,11 @@ const type = question_type.value
 
 if(type==="multi_choice"){
 
-for(let i=0;i<answerCount;i++){
+const html = Array.from({length:answerCount},(_,i)=>{
 
 let letter = String.fromCharCode(65+i)
 
-answerBox.innerHTML+=`
+return `
 
 <div class="answerItem">
 
@@ -187,7 +228,9 @@ answerBox.innerHTML+=`
 
 `
 
-}
+}).join("")
+
+answerBox.innerHTML = html
 
 }
 
@@ -196,24 +239,26 @@ answerBox.innerHTML+=`
 
 if(type==="true_false"){
 
-for(let i=0;i<answerCount;i++){
+const html = Array.from({length:answerCount},(_,i)=>{
 
 let letter = String.fromCharCode(97+i)
 
-answerBox.innerHTML+=`
+return `
 
 <div class="answerRow">
 
 <span>${letter})</span>
 
-<button class="answerBtn trueBtn">Đ</button>
-<button class="answerBtn falseBtn">S</button>
+<button type="button" class="answerBtn trueBtn">Đ</button>
+<button type="button" class="answerBtn falseBtn">S</button>
 
 </div>
 
 `
 
-}
+}).join("")
+
+answerBox.innerHTML = html
 
 }
 
@@ -249,6 +294,8 @@ THÊM BỚT ĐÁP ÁN
 
 function addAnswer(){
 
+if(question_type.value==="short_answer") return
+
 answerCount++
 
 renderAnswerUI()
@@ -271,6 +318,8 @@ renderAnswerUI()
 ĐỔI LOẠI CÂU HỎI
 ========================= */
 
+if(question_type){
+
 question_type.addEventListener("change",()=>{
 
 if(question_type.value==="short_answer"){
@@ -286,6 +335,8 @@ answerCount=4
 renderAnswerUI()
 
 })
+
+}
 
 
 /* =========================
