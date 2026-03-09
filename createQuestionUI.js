@@ -1,8 +1,6 @@
 /* =========================
-KHAI BÁO ELEMENT
+ELEMENT
 ========================= */
-
-const modal = document.getElementById("modal")
 
 const questionText = document.getElementById("questionText")
 const answerText = document.getElementById("answerText")
@@ -12,29 +10,28 @@ const answerModeBtn = document.getElementById("answerModeBtn")
 
 const question_type = document.getElementById("question_type")
 const answerBox = document.getElementById("answerBox")
-
 const difficulty = document.getElementById("difficulty")
 
 
 /* =========================
-MODAL
+MỨC ĐỘ 1 → 10
 ========================= */
 
-function openModal(){
+function loadDifficulty(){
 
-modal.style.display="flex"
+difficulty.innerHTML=""
+
+for(let i=1;i<=10;i++){
+
+difficulty.innerHTML+=`<option value="${i}">${i}</option>`
 
 }
-
-function closeModal(){
-
-modal.style.display="none"
 
 }
 
 
 /* =========================
-MODE CHỮ / ẢNH
+CHẾ ĐỘ CHỮ / ẢNH
 ========================= */
 
 let questionMode = "image"
@@ -82,10 +79,10 @@ answerText.value=""
 
 
 /* =========================
-CHẶN GÕ CHỮ KHI Ở CHẾ ĐỘ ẢNH
+CHẶN GÕ CHỮ KHI MODE ẢNH
 ========================= */
 
-questionText.addEventListener("keydown",function(e){
+questionText.addEventListener("keydown",e=>{
 
 if(questionMode==="image"){
 
@@ -95,8 +92,7 @@ e.preventDefault()
 
 })
 
-
-answerText.addEventListener("keydown",function(e){
+answerText.addEventListener("keydown",e=>{
 
 if(answerMode==="image"){
 
@@ -125,14 +121,18 @@ const reader = new FileReader()
 
 reader.onload=function(ev){
 
-if(document.activeElement===questionText && questionMode==="image"){
+if(document.activeElement===questionText){
+
+if(questionMode==="text") return
 
 questionText.dataset.image = ev.target.result
 questionText.value="[Ảnh câu hỏi]"
 
 }
 
-if(document.activeElement===answerText && answerMode==="image"){
+if(document.activeElement===answerText){
+
+if(answerMode==="text") return
 
 answerText.dataset.image = ev.target.result
 answerText.value="[Ảnh đáp án]"
@@ -149,22 +149,6 @@ reader.readAsDataURL(file)
 
 })
 
-
-/* =========================
-MỨC ĐỘ 1 → 10
-========================= */
-
-function loadDifficulty(){
-
-difficulty.innerHTML=""
-
-for(let i=1;i<=10;i++){
-
-difficulty.innerHTML+=`<option value="${i}">${i}</option>`
-
-}
-
-}
 
 
 /* =========================
@@ -197,7 +181,7 @@ answerBox.innerHTML+=`
 
 <span>${letter}</span>
 
-<input placeholder="Đáp án">
+<input class="answerInput" placeholder="Đáp án">
 
 </div>
 
@@ -238,7 +222,11 @@ answerBox.innerHTML+=`
 
 if(type==="short_answer"){
 
-answerBox.innerHTML=`<input placeholder="Đáp án">`
+answerBox.innerHTML=`
+
+<input class="answerInput" placeholder="Đáp án">
+
+`
 
 }
 
@@ -256,12 +244,13 @@ answerBox.innerHTML=""
 
 
 /* =========================
-THÊM / BỚT ĐÁP ÁN
+THÊM BỚT ĐÁP ÁN
 ========================= */
 
 function addAnswer(){
 
 answerCount++
+
 renderAnswerUI()
 
 }
@@ -271,6 +260,7 @@ function removeAnswer(){
 if(answerCount<=1) return
 
 answerCount--
+
 renderAnswerUI()
 
 }
@@ -281,7 +271,7 @@ renderAnswerUI()
 ĐỔI LOẠI CÂU HỎI
 ========================= */
 
-question_type.addEventListener("change",function(){
+question_type.addEventListener("change",()=>{
 
 if(question_type.value==="short_answer"){
 
