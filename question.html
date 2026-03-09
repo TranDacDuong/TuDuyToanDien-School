@@ -1,41 +1,15 @@
 <!DOCTYPE html>
-
 <html lang="vi">
+
 <head>
 <meta charset="UTF-8">
 <title>Ngân hàng câu hỏi</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <script src="supabaseClient.js"></script>
 
 <style>
 
-.questionImgBox{
-
-width:210px;
-aspect-ratio:7/2;
-
-overflow:hidden;
-
-border-radius:6px;
-background:#f1f5f9;
-
-display:flex;
-align-items:center;
-justify-content:center;
-
-}
-
-.questionImg{
-
-width:100%;
-height:100%;
-
-object-fit:contain;
-
-}
-  
 body{
 font-family:Arial;
 background:#f1f5f9;
@@ -50,12 +24,8 @@ padding:25px;
 border-radius:10px;
 }
 
-h2{
-margin-bottom:15px;
-}
-
 button{
-padding:7px 12px;
+padding:6px 12px;
 border:none;
 background:#2563eb;
 color:white;
@@ -64,33 +34,57 @@ cursor:pointer;
 }
 
 button.delete{
-background:#e53935;
+background:#ef4444;
 }
 
 table{
 width:100%;
 border-collapse:collapse;
-margin-top:15px;
+margin-top:20px;
 }
 
 th,td{
 padding:8px;
 border-bottom:1px solid #eee;
+text-align:center;
 }
 
 th{
 background:#fafafa;
 }
 
-.questionImg{
-width:120px;
-max-height:90px;
-object-fit:contain;
-border-radius:6px;
-cursor:pointer;
-background:#f3f4f6;
-padding:3px;
+.filterBar{
+display:flex;
+gap:10px;
+flex-wrap:wrap;
+margin-top:10px;
 }
+
+select,input{
+padding:6px;
+border:1px solid #ccc;
+border-radius:5px;
+}
+
+.questionImgBox{
+width:210px;
+aspect-ratio:7/2;
+overflow:hidden;
+border-radius:6px;
+background:#f1f5f9;
+display:flex;
+align-items:center;
+justify-content:center;
+}
+
+.questionImg{
+width:100%;
+height:100%;
+object-fit:contain;
+cursor:pointer;
+}
+
+/* modal */
 
 .modal{
 position:fixed;
@@ -108,31 +102,20 @@ justify-content:center;
 background:white;
 padding:20px;
 border-radius:10px;
-width:500px;
+width:520px;
 max-height:90vh;
 overflow:auto;
-}
-
-.modal-box input,
-.modal-box select{
-width:100%;
-padding:8px;
-margin-bottom:8px;
-border:1px solid #ccc;
-border-radius:5px;
 }
 
 .answerRow{
 display:flex;
 gap:5px;
-margin-bottom:5px;
+margin-bottom:6px;
+align-items:center;
 }
 
-.filterBar{
-display:flex;
-gap:10px;
-margin-top:10px;
-flex-wrap:wrap;
+.answerRow input{
+flex:1;
 }
 
 </style>
@@ -149,28 +132,32 @@ flex-wrap:wrap;
 
 <div class="filterBar">
 
-<select id="f_grade"></select> <select id="f_subject"></select> <select id="f_chapter"></select>
+<select id="f_grade"></select>
+<select id="f_subject"></select>
+<select id="f_chapter"></select>
 
 <select id="f_type">
+
 <option value="">Loại</option>
 <option value="multi_choice">Nhiều lựa chọn</option>
 <option value="true_false">Đúng/Sai</option>
 <option value="short_answer">Trả lời ngắn</option>
 <option value="essay">Tự luận</option>
+
 </select>
 
-<select id="f_difficulty">
-<option value="">Độ khó</option>
-</select>
+<select id="f_difficulty"></select>
 
-<input id="searchBox" placeholder="Tìm kiếm...">
+<input id="searchBox" placeholder="Tìm kiếm">
 
 </div>
 
 <table>
 
 <thead>
+
 <tr>
+
 <th>STT</th>
 <th>Ảnh</th>
 <th>Khối</th>
@@ -179,7 +166,9 @@ flex-wrap:wrap;
 <th>Loại</th>
 <th>Độ khó</th>
 <th></th>
+
 </tr>
+
 </thead>
 
 <tbody id="questionTable"></tbody>
@@ -188,19 +177,23 @@ flex-wrap:wrap;
 
 </div>
 
+<!-- MODAL -->
+
 <div class="modal" id="modal">
 
 <div class="modal-box">
 
-<h3 id="modalTitle"></h3>
+<h3>Tạo câu hỏi</h3>
 
 <label>Ảnh câu hỏi</label>
 
 <input type="file" id="imageFile">
 
-<img id="previewImage">
+<img id="previewImage" style="max-width:100%;margin-bottom:10px">
 
-<select id="grade"></select> <select id="subject"></select> <select id="chapter"></select>
+<select id="grade"></select>
+<select id="subject"></select>
+<select id="chapter"></select>
 
 <select id="question_type">
 
@@ -215,9 +208,12 @@ flex-wrap:wrap;
 
 <div id="answerBox"></div>
 
-<label>Ảnh đáp án</label> <input type="file" id="answerFile">
+<label>Ảnh đáp án</label>
 
-<button onclick="saveQuestion()">Lưu</button> <button onclick="closeModal()">Đóng</button>
+<input type="file" id="answerFile">
+
+<button onclick="saveQuestion()">Lưu</button>
+<button onclick="closeModal()">Đóng</button>
 
 </div>
 
@@ -242,20 +238,22 @@ f_difficulty.innerHTML+=`<option value="${i}">${i}</option>`
 
 }
 
-/* LOAD DATA */
+/* LOAD BASE */
 
 async function loadBase(){
 
 grades=(await sb.from("grades").select("*")).data
 
-grades.sort((a,b)=>a.name-b.name)
+grades.sort((a,b)=>parseInt(a.name)-parseInt(b.name))
 
 grade.innerHTML="<option value=''>Khối</option>"
 f_grade.innerHTML="<option value=''>Khối</option>"
 
 grades.forEach(g=>{
+
 grade.innerHTML+=`<option value="${g.id}">${g.name}</option>`
 f_grade.innerHTML+=`<option value="${g.id}">${g.name}</option>`
+
 })
 
 }
@@ -312,7 +310,9 @@ answerBox.innerHTML+=`
 
 <div class="answerRow">
 
-<input placeholder="Đáp án">
+<span>${String.fromCharCode(65+i)})</span>
+
+<input class="answerInput">
 
 <input type="radio" name="correct">
 
@@ -321,6 +321,8 @@ answerBox.innerHTML+=`
 `
 
 }
+
+answerBox.innerHTML+=`<button onclick="addChoice()">+ Thêm đáp án</button>`
 
 }
 
@@ -336,8 +338,8 @@ answerBox.innerHTML+=`
 
 <select>
 
-<option>Đúng</option>
-<option>Sai</option>
+<option value="true">Đúng</option>
+<option value="false">Sai</option>
 
 </select>
 
@@ -351,15 +353,39 @@ answerBox.innerHTML+=`
 
 if(t==="short_answer"){
 
-answerBox.innerHTML=`<input placeholder="Đáp án">`
+answerBox.innerHTML=`<input id="shortAnswer" placeholder="Đáp án">`
 
 }
 
 if(t==="essay"){
 
-answerBox.innerHTML=`<textarea placeholder="Đáp án gợi ý"></textarea>`
+answerBox.innerHTML=`<textarea id="essayAnswer" placeholder="Đáp án gợi ý"></textarea>`
 
 }
+
+}
+
+/* ADD CHOICE */
+
+function addChoice(){
+
+const index=document.querySelectorAll(".answerRow").length
+
+answerBox.insertAdjacentHTML("beforeend",`
+
+<div class="answerRow">
+
+<span>${String.fromCharCode(65+index)})</span>
+
+<input class="answerInput">
+
+<input type="radio" name="correct">
+
+<button onclick="this.parentElement.remove()">X</button>
+
+</div>
+
+`)
 
 }
 
@@ -381,13 +407,29 @@ previewImage.src=image_url
 
 }
 
-/* PASTE IMAGE */
+/* ANSWER IMAGE */
+
+answerFile.onchange=async()=>{
+
+const file=answerFile.files[0]
+
+const path="a_"+Date.now()+file.name
+
+await sb.storage.from("question-images").upload(path,file)
+
+const {data}=sb.storage.from("question-images").getPublicUrl(path)
+
+answer_image_url=data.publicUrl
+
+}
+
+/* CTRL V IMAGE */
 
 document.addEventListener("paste",async(e)=>{
 
-const item=e.clipboardData.items[0]
+for(const item of e.clipboardData.items){
 
-if(item.type.indexOf("image")!==-1){
+if(item.type.includes("image")){
 
 const file=item.getAsFile()
 
@@ -400,6 +442,8 @@ const {data}=sb.storage.from("question-images").getPublicUrl(path)
 image_url=data.publicUrl
 
 previewImage.src=image_url
+
+}
 
 }
 
@@ -419,6 +463,7 @@ name,
 grades(name)
 )
 )`)
+
 .eq("hidden",false)).data
 
 render()
@@ -433,13 +478,25 @@ questionTable.innerHTML=""
 
 let list=[...questions]
 
-/* FILTER */
-
 if(f_type.value)
 list=list.filter(x=>x.question_type===f_type.value)
 
 if(f_difficulty.value)
 list=list.filter(x=>x.difficulty==f_difficulty.value)
+
+const keyword=searchBox.value.toLowerCase()
+
+if(keyword){
+
+list=list.filter(q=>
+
+(q.chapters?.name||"").toLowerCase().includes(keyword) ||
+
+(q.chapters?.subjects?.name||"").toLowerCase().includes(keyword)
+
+)
+
+}
 
 list.forEach((q,i)=>{
 
@@ -451,28 +508,22 @@ questionTable.innerHTML+=`
 
 <td>
 
-${
-q.image_url
-? `
-<div class="questionImgBox">
+${q.image_url?
+
+`<div class="questionImgBox">
 <img class="questionImg"
 src="${q.image_url}"
 onclick="window.open('${q.image_url}')">
-</div>
-`
-: "—"
-}
+</div>`
+
+:"—"}
 
 </td>
 
 <td>${q.chapters?.subjects?.grades?.name||""}</td>
-
 <td>${q.chapters?.subjects?.name||""}</td>
-
 <td>${q.chapters?.name||""}</td>
-
 <td>${q.question_type}</td>
-
 <td>${q.difficulty}</td>
 
 <td>
@@ -511,7 +562,8 @@ image_url,
 chapter_id:chapter.value,
 question_type:question_type.value,
 difficulty:difficulty.value,
-answer:"demo"
+answer:"demo",
+answer_image_url
 
 }
 
@@ -545,12 +597,17 @@ function closeModal(){
 modal.style.display="none"
 }
 
+/* FILTER REALTIME */
+
+f_type.onchange=render
+f_difficulty.onchange=render
+searchBox.oninput=render
+
 /* INIT */
 
 async function init(){
 
 await loadBase()
-
 await loadQuestions()
 
 }
