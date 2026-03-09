@@ -545,9 +545,28 @@ payload.created_by=data.user.id
 
 await sb.from("question_bank").insert(payload)
 
-closeModal()
+await loadQuestions()
 
-loadQuestions()
+/* RESET FORM */
+
+image_url=""
+answer_image_url=""
+
+previewImage.src=""
+
+imageFile.value=""
+answerFile.value=""
+
+grade.value=""
+
+subject.innerHTML="<option value=''>Chọn môn</option>"
+chapter.innerHTML="<option value=''>Chọn chương</option>"
+
+question_type.value="multi_choice"
+
+difficulty.value=""
+
+renderAnswerUI()
 
 }
 
