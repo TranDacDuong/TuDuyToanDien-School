@@ -10,6 +10,57 @@
 
 <style>
 
+.modal-large{
+width:1100px;
+max-width:95%;
+}
+
+.createGrid{
+display:grid;
+grid-template-columns:220px 1fr 300px;
+gap:25px;
+}
+
+.leftCol,
+.centerCol,
+.rightCol{
+display:flex;
+flex-direction:column;
+gap:10px;
+}
+
+.pasteBox{
+border:2px dashed #cbd5f5;
+padding:18px;
+text-align:center;
+border-radius:6px;
+background:#f8fafc;
+cursor:pointer;
+}
+
+.previewImg{
+max-width:100%;
+border-radius:6px;
+display:none;
+}
+
+.answerHorizontal{
+display:flex;
+gap:10px;
+flex-wrap:wrap;
+margin-top:5px;
+}
+
+.answerItem{
+display:flex;
+align-items:center;
+gap:4px;
+padding:6px 10px;
+border:1px solid #ddd;
+border-radius:6px;
+background:#fafafa;
+}
+  
 .pasteBox{
 border:2px dashed #cbd5f5;
 padding:20px;
@@ -150,56 +201,72 @@ word-break:break-word;
 
 <div class="modal" id="modal">
 
-<div class="modal-box">
+<div class="modal-box modal-large">
 
 <h3>Tạo câu hỏi</h3>
 
-<!-- KHỐI -->
+<div class="createGrid">
+
+<!-- CỘT TRÁI -->
+
+<div class="leftCol">
 
 <label class="label">Khối</label>
 <select id="grade"></select>
 
-<!-- MÔN -->
-
 <label class="label">Môn</label>
 <select id="subject"></select>
-
-<!-- CHƯƠNG -->
 
 <label class="label">Chương</label>
 <select id="chapter"></select>
 
-<!-- NHẬP CÂU HỎI -->
+</div>
+
+
+<!-- CỘT GIỮA -->
+
+<div class="centerCol">
 
 <label class="label">Nhập câu hỏi</label>
 
-<input id="questionText" placeholder="Nhập câu hỏi dạng text">
+<input id="questionText" placeholder="Nhập câu hỏi">
 
 <div class="pasteBox" id="questionPaste">
-Dán ảnh câu hỏi (Ctrl + V)
+Ctrl + V để dán ảnh câu hỏi
 </div>
 
 <img id="questionPreview" class="previewImg">
 
-<!-- LOẠI CÂU HỎI -->
+
+<label class="label">Nhập đáp án</label>
+
+<input id="answerText" placeholder="Nhập đáp án">
+
+<div class="pasteBox" id="answerPaste">
+Ctrl + V để dán ảnh đáp án
+</div>
+
+<img id="answerPreview" class="previewImg">
+
+</div>
+
+
+<!-- CỘT PHẢI -->
+
+<div class="rightCol">
 
 <label class="label">Loại câu hỏi</label>
 
 <select id="question_type">
-<option value="multi_choice">Nhiều phương án lựa chọn</option>
+<option value="multi_choice">Nhiều lựa chọn</option>
 <option value="true_false">Đúng/Sai</option>
 <option value="short_answer">Trả lời ngắn</option>
 <option value="essay">Tự luận</option>
 </select>
 
-<!-- MỨC ĐỘ -->
-
 <label class="label">Mức độ</label>
 <select id="difficulty"></select>
 
-<!-- ĐÁP ÁN -->
-
-<div id="answerSection">
 
 <label class="label">
 Đáp án
@@ -207,21 +274,12 @@ Dán ảnh câu hỏi (Ctrl + V)
 <button onclick="addAnswer()">+</button>
 </label>
 
-<div id="answerBox"></div>
-
-<!-- NHẬP ĐÁP ÁN -->
-
-<label class="label">Nhập đáp án</label>
-
-<input id="answerText" placeholder="Nhập đáp án dạng text">
-
-<div class="pasteBox" id="answerPaste">
-Dán ảnh đáp án (Ctrl + V)
-</div>
-
-<img id="answerPreview" class="previewImg">
+<div id="answerBox" class="answerHorizontal"></div>
 
 </div>
+
+</div>
+
 
 <br>
 
@@ -496,23 +554,26 @@ answerBox.innerHTML=""
 const type = question_type.value
 
 if(type==="essay"){
-answerSection.style.display="none"
+answerBox.innerHTML=""
 return
 }
-
-answerSection.style.display="block"
-
-if(type==="multi_choice"){
 
 for(let i=0;i<answerCount;i++){
 
 let letter = String.fromCharCode(65+i)
 
 answerBox.innerHTML+=`
-<div class="answerRow">
-<input type="checkbox" class="correctBox">
+
+<div class="answerItem">
+
+<input type="checkbox">
+
 <span>${letter}</span>
-</div>`
+
+</div>
+
+`
+
 }
 
 }
@@ -574,6 +635,24 @@ question_type.onchange = () => {
 
 answerCount = 4
 
+renderAnswerUI()
+
+}
+
+/* Dấu +, - */
+
+function addAnswer(){
+
+answerCount++
+renderAnswerUI()
+
+}
+
+function removeAnswer(){
+
+if(answerCount<=1) return
+
+answerCount--
 renderAnswerUI()
 
 }
