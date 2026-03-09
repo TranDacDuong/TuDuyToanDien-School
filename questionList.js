@@ -1,5 +1,3 @@
-<script>
-
 let grades=[]
 let questions=[]
 
@@ -209,5 +207,3 @@ await loadQuestions()
 }
 
 init()
-
-</script>
