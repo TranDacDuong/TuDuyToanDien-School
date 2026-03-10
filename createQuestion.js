@@ -162,9 +162,14 @@ LƯU CÂU HỎI
 
 async function saveQuestion(){
 
+/* USER */
+
 const { data: { user } } = await sb.auth.getUser()
 
-const userId = user.id
+const userId = user?.id || null
+
+/* FORM DATA */
+
 const chapterVal = chapter.value
 const typeVal = question_type.value
 const difficultyVal = difficulty.value
@@ -233,13 +238,40 @@ correctAnswer = [...inputs].map(i=>i.value).join(";")
 }
 
 /* =========================
-LƯU DATABASE
+QUERY INSERT / UPDATE
 ========================= */
 
-const { data, error } = await sb
+let query
+
+if(editingQuestionId){
+
+query = sb
+.from("question_bank")
+.update({
+
+chapter_id: chapterVal,
+question_type: typeVal,
+difficulty: difficultyVal,
+
+question_text: questionVal,
+question_img: questionImgSrc,
+
+answer_text: answerVal,
+answer_img: answerImgSrc,
+
+answer_count: answerCount,
+answer: correctAnswer
+
+})
+.eq("id", editingQuestionId)
+
+}else{
+
+query = sb
 .from("question_bank")
 .insert([
 {
+
 chapter_id: chapterVal,
 question_type: typeVal,
 difficulty: difficultyVal,
@@ -252,10 +284,20 @@ answer_img: answerImgSrc,
 
 answer_count: answerCount,
 answer: correctAnswer,
+
 hidden: false,
 created_by: userId
+
 }
 ])
+
+}
+
+/* =========================
+EXECUTE QUERY
+========================= */
+
+const { error } = await query
 
 if(error){
 
@@ -264,13 +306,25 @@ alert(error.message)
 
 }else{
 
+if(editingQuestionId){
+
+alert("Cập nhật câu hỏi thành công")
+
+}else{
+
 alert("Tạo câu hỏi thành công")
 
-/* reset form câu hỏi */
+}
+
+/* reset edit mode */
+
+editingQuestionId = null
+
+/* reset form */
 
 resetQuestionForm()
 
-/* reload bảng câu hỏi */
+/* reload list */
 
 loadQuestions()
 
