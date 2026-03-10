@@ -130,9 +130,46 @@ border-radius:6px;
 background:#fafafa;
 }
 
+.answerBtn{
+width:26px;
+height:26px;
+border-radius:50%;
+border:1px solid #ccc;
+cursor:pointer;
+}
+
+.trueBtn{
+background:#22c55e;
+color:white;
+}
+
+.falseBtn{
+background:#ef4444;
+color:white;
+}
+
+.questionImgBox{
+width:320px;
+aspect-ratio:7/2;
+overflow:hidden;
+border-radius:6px;
+background:#f1f5f9;
+display:flex;
+align-items:center;
+justify-content:center;
+}
+
+.questionImg{
+width:100%;
+height:100%;
+object-fit:contain;
+cursor:pointer;
+}
+
 </style>
 
 </head>
+
 
 <body>
 
@@ -153,7 +190,7 @@ background:#fafafa;
 
 <div class="createGrid">
 
-<!-- LEFT -->
+<!-- CỘT TRÁI -->
 
 <div class="leftCol">
 
@@ -169,35 +206,28 @@ background:#fafafa;
 </div>
 
 
-<!-- CENTER -->
+<!-- CỘT GIỮA -->
 
 <div class="centerCol">
 
 <label>
 Nhập câu hỏi
-<button type="button" onclick="toggleQuestionMode()" id="questionModeBtn">
+<button type="button" onclick="toggleQuestionMode()" id="modeBtn">
 Ảnh
 </button>
 </label>
 
-<input id="questionText" placeholder="Nhập câu hỏi">
+<input id="questionText" placeholder="Nhập câu hỏi" style="display:none">
+
 <img id="questionPreview" class="previewImg">
 
-
-<label>
-Nhập đáp án
-<button type="button" onclick="toggleAnswerMode()" id="answerModeBtn">
-Ảnh
-</button>
-</label>
-
+<label>Nhập đáp án</label>
 <input id="answerText" placeholder="Nhập đáp án">
-<img id="answerPreview" class="previewImg">
 
 </div>
 
 
-<!-- RIGHT -->
+<!-- CỘT PHẢI -->
 
 <div class="rightCol">
 
@@ -231,6 +261,7 @@ Nhập đáp án
 <button onclick="closeModal()">Đóng</button>
 
 </div>
+
 </div>
 
 
@@ -238,9 +269,17 @@ Nhập đáp án
 
 <div class="filterBar">
 
-<select id="f_grade"><option value="">Khối</option></select>
-<select id="f_subject"><option value="">Môn</option></select>
-<select id="f_chapter"><option value="">Chương</option></select>
+<select id="f_grade">
+<option value="">Khối</option>
+</select>
+
+<select id="f_subject">
+<option value="">Môn</option>
+</select>
+
+<select id="f_chapter">
+<option value="">Chương</option>
+</select>
 
 <select id="f_type">
 <option value="">Loại câu hỏi</option>
@@ -282,6 +321,44 @@ Nhập đáp án
 </table>
 
 </div>
+
+
+<script>
+
+/* paste ảnh */
+
+document.addEventListener("paste",function(e){
+
+if(questionMode!=="image") return
+
+const items=e.clipboardData.items
+
+for(let item of items){
+
+if(item.type.indexOf("image")!==-1){
+
+const file=item.getAsFile()
+
+const reader=new FileReader()
+
+reader.onload=function(event){
+
+const img=document.getElementById("questionPreview")
+
+img.src=event.target.result
+img.style.display="block"
+
+}
+
+reader.readAsDataURL(file)
+
+}
+
+}
+
+})
+
+</script>
 
 
 <script src="questionList.js"></script>
