@@ -338,6 +338,20 @@ let activeField=null
 questionText.onfocus=()=>activeField="question"
 answerText.onfocus=()=>activeField="answer"
 
+function openModal(){
+
+const modal = document.getElementById("modal")
+modal.style.display = "flex"
+
+}
+
+function closeModal(){
+
+const modal = document.getElementById("modal")
+modal.style.display = "none"
+
+}
+
 document.addEventListener("paste",function(e){
 
 if(!activeField) return
