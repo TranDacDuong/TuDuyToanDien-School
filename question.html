@@ -15,14 +15,21 @@
 
 textarea{
 width:100%;
-min-height:70px;
-resize:vertical;
-padding:6px;
+min-height:80px;
+padding:8px;
 border:1px solid #ccc;
-border-radius:5px;
+border-radius:6px;
 font-family:Arial;
+font-size:14px;
+
+resize:vertical;
+
+/* QUAN TRỌNG */
+
+white-space:pre-wrap;
+word-wrap:break-word;
 }
-  
+    
 body{
 font-family:Arial;
 background:#f1f5f9;
@@ -276,19 +283,22 @@ margin-bottom:6px;
 
 <div class="centerCol">
 
-<label>
+<label>Câu hỏi</label>
 
-</label>
-
-<input id="questionText" placeholder="Nhập câu hỏi tại đây, ctrl + V để tải ảnh lên">
+<textarea
+id="questionText"
+placeholder="Nhập câu hỏi hoặc Ctrl+V ảnh tại đây">
+</textarea>
 
 <img id="questionImg" class="previewImg">
 
-<label>
 
-</label>
+<label>Đáp án</label>
 
-<input id="answerText" placeholder="Nhập đáp án tại đây, ctrl + V để tải ảnh lên">
+<textarea
+id="answerText"
+placeholder="Nhập đáp án hoặc Ctrl+V ảnh tại đây">
+</textarea>
 
 <img id="answerImg" class="previewImg">
 
