@@ -268,21 +268,17 @@ margin-bottom:6px;
 
 <label>
 
-Câu hỏi <button class="modeBtn" onclick="toggleMode('question')" id="qMode">Ảnh</button>
-
 </label>
 
-<input id="questionText" placeholder="Paste ảnh tại đây">
+<input id="questionText" placeholder="Nhập câu hỏi tại đây, ctrl + V để tải ảnh lên">
 
 <img id="questionImg" class="previewImg">
 
 <label>
 
-Đáp án <button class="modeBtn" onclick="toggleMode('answer')" id="aMode">Ảnh</button>
-
 </label>
 
-<input id="answerText" placeholder="Paste ảnh tại đây">
+<input id="answerText" placeholder="Nhập đáp án tại đây, ctrl + V để tải ảnh lên">
 
 <img id="answerImg" class="previewImg">
 
@@ -327,134 +323,36 @@ Chọn đáp án đúng <button onclick="addAnswer()">+</button> <button onclick
 
 <script>
 
-let activeField = null
+let activeField=null
 
-questionText.onfocus = () => activeField = "question"
-answerText.onfocus = () => activeField = "answer"
-  
-function openModal(){
-modal.style.display="flex"
-changeType()
-}
-
-function closeModal(){
-modal.style.display="none"
-}
-
-/* TEXT IMAGE MODE */
-
-let questionMode="image"
-let answerMode="image"
-
-function toggleMode(type){
-
-if(type==="question"){
-
-questionMode = questionMode==="image" ? "text" : "image"
-
-if(questionMode==="image"){
-
-qMode.innerText="Ảnh"
-
-questionText.placeholder="Paste ảnh tại đây"
-questionText.readOnly=true
-
-/* XÓA CHỮ */
-
-questionText.value=""
-
-/* HIỆN ẢNH */
-
-questionImg.style.display="block"
-
-}else{
-
-qMode.innerText="Chữ"
-
-questionText.placeholder="Nhập câu hỏi tại đây"
-questionText.readOnly=false
-
-/* XÓA ẢNH */
-
-questionImg.src=""
-questionImg.style.display="none"
-
-}
-
-}
-
-
-if(type==="answer"){
-
-answerMode = answerMode==="image" ? "text" : "image"
-
-if(answerMode==="image"){
-
-aMode.innerText="Ảnh"
-
-answerText.placeholder="Paste ảnh tại đây"
-answerText.readOnly=true
-
-/* XÓA CHỮ */
-
-answerText.value=""
-
-/* HIỆN ẢNH */
-
-answerImg.style.display="block"
-
-}else{
-
-aMode.innerText="Chữ"
-
-answerText.placeholder="Nhập đáp án tại đây"
-answerText.readOnly=false
-
-/* XÓA ẢNH */
-
-answerImg.src=""
-answerImg.style.display="none"
-
-}
-
-}
-
-}
-
-/* PASTE IMAGE */
+questionText.onfocus=()=>activeField="question"
+answerText.onfocus=()=>activeField="answer"
 
 document.addEventListener("paste",function(e){
 
-if(activeField===null) return
+if(!activeField) return
 
-const items = e.clipboardData.items
+const items=e.clipboardData.items
 
 for(let item of items){
 
 if(item.type.indexOf("image")!==-1){
 
-if(
-(activeField==="question" && questionMode==="text") ||
-(activeField==="answer" && answerMode==="text")
-){
-return
-}
-
-const file = item.getAsFile()
-const reader = new FileReader()
+const file=item.getAsFile()
+const reader=new FileReader()
 
 reader.onload=function(event){
 
 if(activeField==="question"){
 
-questionImg.src = event.target.result
+questionImg.src=event.target.result
 questionImg.style.display="block"
 
 }
 
 if(activeField==="answer"){
 
-answerImg.src = event.target.result
+answerImg.src=event.target.result
 answerImg.style.display="block"
 
 }
