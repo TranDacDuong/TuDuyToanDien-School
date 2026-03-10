@@ -1,6 +1,8 @@
 let grades = []
 let questions = []
 let editingQuestionId = null
+const formTitle = document.getElementById("formTitle")
+const saveBtn = document.getElementById("saveBtn")
 
 const typeText = {
 multi_choice: "Nhiều lựa chọn",
