@@ -194,6 +194,8 @@ onclick="window.open('${q.question_img}')">
 
 <td>${q.difficulty}</td>
 
+<td>${q.answer_count || 0}</td>
+
 <td class="answerCell">${q.answer || ""}</td>
 
 <td>
