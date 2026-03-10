@@ -272,7 +272,7 @@ Câu hỏi <button class="modeBtn" onclick="toggleMode('question')" id="qMode">�
 
 </label>
 
-<input id="questionText" placeholder="Nhập câu hỏi">
+<input id="questionText" placeholder="Paste ảnh tại đây">
 
 <img id="questionImg" class="previewImg">
 
@@ -282,7 +282,7 @@ Câu hỏi <button class="modeBtn" onclick="toggleMode('question')" id="qMode">�
 
 </label>
 
-<input id="answerText" placeholder="Nhập đáp án">
+<input id="answerText" placeholder="Paste ảnh tại đây">
 
 <img id="answerImg" class="previewImg">
 
@@ -327,6 +327,11 @@ Chọn đáp án đúng <button onclick="addAnswer()">+</button> <button onclick
 
 <script>
 
+let activeField = null
+
+questionText.onfocus = () => activeField = "question"
+answerText.onfocus = () => activeField = "answer"
+  
 function openModal(){
 modal.style.display="flex"
 changeType()
@@ -344,13 +349,43 @@ let answerMode="image"
 function toggleMode(type){
 
 if(type==="question"){
-questionMode=questionMode==="image"?"text":"image"
-qMode.innerText=questionMode==="image"?"Ảnh":"Chữ"
+
+questionMode = questionMode==="image" ? "text" : "image"
+
+if(questionMode==="image"){
+
+qMode.innerText="Ảnh"
+questionText.placeholder="Paste ảnh tại đây"
+questionText.readOnly=true
+
+}else{
+
+qMode.innerText="Chữ"
+questionText.placeholder="Nhập câu hỏi tại đây"
+questionText.readOnly=false
+
+}
+
 }
 
 if(type==="answer"){
-answerMode=answerMode==="image"?"text":"image"
-aMode.innerText=answerMode==="image"?"Ảnh":"Chữ"
+
+answerMode = answerMode==="image" ? "text" : "image"
+
+if(answerMode==="image"){
+
+aMode.innerText="Ảnh"
+answerText.placeholder="Paste ảnh tại đây"
+answerText.readOnly=true
+
+}else{
+
+aMode.innerText="Chữ"
+answerText.placeholder="Nhập đáp án tại đây"
+answerText.readOnly=false
+
+}
+
 }
 
 }
@@ -359,25 +394,38 @@ aMode.innerText=answerMode==="image"?"Ảnh":"Chữ"
 
 document.addEventListener("paste",function(e){
 
-const items=e.clipboardData.items
+if(activeField===null) return
+
+const items = e.clipboardData.items
 
 for(let item of items){
 
 if(item.type.indexOf("image")!==-1){
 
-const file=item.getAsFile()
-const reader=new FileReader()
+if(
+(activeField==="question" && questionMode==="text") ||
+(activeField==="answer" && answerMode==="text")
+){
+return
+}
+
+const file = item.getAsFile()
+const reader = new FileReader()
 
 reader.onload=function(event){
 
-if(questionMode==="image"){
-questionImg.src=event.target.result
+if(activeField==="question"){
+
+questionImg.src = event.target.result
 questionImg.style.display="block"
+
 }
 
-if(answerMode==="image"){
-answerImg.src=event.target.result
+if(activeField==="answer"){
+
+answerImg.src = event.target.result
 answerImg.style.display="block"
+
 }
 
 }
