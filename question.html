@@ -103,8 +103,6 @@ flex-direction:column;
 gap:10px;
 }
 
-/* IMAGE */
-
 .previewImg{
 max-width:100%;
 border-radius:6px;
@@ -147,24 +145,6 @@ background:#ef4444;
 color:white;
 }
 
-.questionImgBox{
-width:320px;
-aspect-ratio:7/2;
-overflow:hidden;
-border-radius:6px;
-background:#f1f5f9;
-display:flex;
-align-items:center;
-justify-content:center;
-}
-
-.questionImg{
-width:100%;
-height:100%;
-object-fit:contain;
-cursor:pointer;
-}
-
 </style>
 
 </head>
@@ -177,8 +157,6 @@ cursor:pointer;
 
 <button onclick="openModal()">Tạo câu hỏi</button>
 
-<!-- MODAL -->
-
 <div class="modal" id="modal">
 
 <div class="modal-box modal-large">
@@ -187,7 +165,7 @@ cursor:pointer;
 
 <div class="createGrid">
 
-<!-- CỘT TRÁI -->
+<!-- LEFT -->
 
 <div class="leftCol">
 
@@ -202,30 +180,31 @@ cursor:pointer;
 
 </div>
 
-
-<!-- CỘT GIỮA -->
+<!-- CENTER -->
 
 <div class="centerCol">
 
 <label>
 Nhập câu hỏi
-<button type="button" onclick="toggleQuestionMode()" id="modeBtn">
+<button type="button" onclick="toggleQuestionMode()" id="questionModeBtn">
 Ảnh
 </button>
 </label>
 
-<input id="questionText" placeholder="Nhập câu hỏi" style="display:none">
+<input id="questionText" placeholder="Nhập câu hỏi">
 
-<img id="questionPreview" class="previewImg">
-
-<label>Nhập đáp án</label>
+<label>
+Nhập đáp án
+<button type="button" onclick="toggleAnswerMode()" id="answerModeBtn">
+Ảnh
+</button>
+</label>
 
 <input id="answerText" placeholder="Nhập đáp án">
 
 </div>
 
-
-<!-- CỘT PHẢI -->
+<!-- RIGHT -->
 
 <div class="rightCol">
 
@@ -261,78 +240,142 @@ Nhập câu hỏi
 </div>
 </div>
 
-
-<!-- FILTER -->
-
-<div class="filterBar">
-
-<select id="f_grade"><option value="">Khối</option></select>
-<select id="f_subject"><option value="">Môn</option></select>
-<select id="f_chapter"><option value="">Chương</option></select>
-
-<select id="f_type">
-<option value="">Loại câu hỏi</option>
-<option value="multi_choice">Nhiều lựa chọn</option>
-<option value="true_false">Đúng/Sai</option>
-<option value="short_answer">Trả lời ngắn</option>
-<option value="essay">Tự luận</option>
-</select>
-
-<select id="f_difficulty">
-<option value="">Mức độ</option>
-</select>
-
-<input id="searchBox" placeholder="Tìm kiếm...">
-
-</div>
-
-
-<table>
-
-<thead>
-<tr>
-<th>STT</th>
-<th>Ảnh</th>
-<th>Khối</th>
-<th>Môn</th>
-<th>Chương</th>
-<th>Loại</th>
-<th>Mức độ</th>
-<th>Đáp án</th>
-<th></th>
-</tr>
-</thead>
-
-<tbody id="questionTable"></tbody>
-
-</table>
-
 </div>
 
 <script>
 
-/* paste ảnh */
+/* =========================
+ELEMENT
+========================= */
+
+const questionText = document.getElementById("questionText")
+const answerText = document.getElementById("answerText")
+
+const questionModeBtn = document.getElementById("questionModeBtn")
+const answerModeBtn = document.getElementById("answerModeBtn")
+
+const question_type = document.getElementById("question_type")
+const answerBox = document.getElementById("answerBox")
+const difficulty = document.getElementById("difficulty")
+
+/* =========================
+MỨC ĐỘ
+========================= */
+
+function loadDifficulty(){
+
+if(!difficulty) return
+
+difficulty.innerHTML=""
+
+for(let i=1;i<=10;i++){
+
+const option=document.createElement("option")
+option.value=i
+option.textContent=i
+
+difficulty.appendChild(option)
+
+}
+
+}
+
+/* =========================
+MODE
+========================= */
+
+let questionMode="image"
+let answerMode="image"
+
+function toggleQuestionMode(){
+
+if(questionMode==="image"){
+
+questionMode="text"
+questionModeBtn.innerText="Chữ"
+questionText.readOnly=false
+
+}else{
+
+questionMode="image"
+questionModeBtn.innerText="Ảnh"
+questionText.readOnly=true
+questionText.value=""
+questionText.dataset.image=""
+
+}
+
+}
+
+function toggleAnswerMode(){
+
+if(answerMode==="image"){
+
+answerMode="text"
+answerModeBtn.innerText="Chữ"
+answerText.readOnly=false
+
+}else{
+
+answerMode="image"
+answerModeBtn.innerText="Ảnh"
+answerText.readOnly=true
+answerText.value=""
+answerText.dataset.image=""
+
+}
+
+}
+
+/* =========================
+CHẶN GÕ
+========================= */
+
+questionText.addEventListener("keydown",e=>{
+if(questionMode==="image") e.preventDefault()
+})
+
+answerText.addEventListener("keydown",e=>{
+if(answerMode==="image") e.preventDefault()
+})
+
+/* =========================
+PASTE IMAGE
+========================= */
 
 document.addEventListener("paste",function(e){
 
-if(questionMode!=="image") return
-
-const items=e.clipboardData.items
+const items=e.clipboardData?.items
+if(!items) return
 
 for(let item of items){
 
 if(item.type.indexOf("image")!==-1){
 
 const file=item.getAsFile()
-
 const reader=new FileReader()
 
-reader.onload=function(event){
+reader.onload=function(ev){
 
-const img=document.getElementById("questionPreview")
+const imgData=ev.target.result
 
-img.src=event.target.result
-img.style.display="block"
+if(document.activeElement===questionText){
+
+if(questionMode==="text") return
+
+questionText.dataset.image=imgData
+questionText.value="[Ảnh câu hỏi]"
+
+}
+
+if(document.activeElement===answerText){
+
+if(answerMode==="text") return
+
+answerText.dataset.image=imgData
+answerText.value="[Ảnh đáp án]"
+
+}
 
 }
 
@@ -344,10 +387,120 @@ reader.readAsDataURL(file)
 
 })
 
+/* =========================
+ANSWER UI
+========================= */
+
+let answerCount=4
+
+function renderAnswerUI(){
+
+if(!answerBox) return
+
+answerBox.innerHTML=""
+
+const type=question_type.value
+
+if(type==="multi_choice"){
+
+for(let i=0;i<answerCount;i++){
+
+let letter=String.fromCharCode(65+i)
+
+answerBox.innerHTML+=`
+
+<div class="answerItem">
+<input type="checkbox">
+<span>${letter}</span>
+<input class="answerInput" placeholder="Đáp án">
+</div>
+
+`
+
+}
+
+}
+
+if(type==="true_false"){
+
+for(let i=0;i<answerCount;i++){
+
+let letter=String.fromCharCode(97+i)
+
+answerBox.innerHTML+=`
+
+<div class="answerItem">
+<span>${letter})</span>
+<button class="answerBtn trueBtn">Đ</button>
+<button class="answerBtn falseBtn">S</button>
+</div>
+
+`
+
+}
+
+}
+
+if(type==="short_answer"){
+
+answerBox.innerHTML=`<input class="answerInput" placeholder="Đáp án">`
+
+}
+
+}
+
+function addAnswer(){
+
+if(question_type.value==="short_answer") return
+
+answerCount++
+renderAnswerUI()
+
+}
+
+function removeAnswer(){
+
+if(answerCount<=1) return
+
+answerCount--
+renderAnswerUI()
+
+}
+
+question_type.addEventListener("change",()=>{
+
+if(question_type.value==="short_answer"){
+answerCount=1
+}else{
+answerCount=4
+}
+
+renderAnswerUI()
+
+})
+
+/* =========================
+MODAL
+========================= */
+
+const modal=document.getElementById("modal")
+
+function openModal(){
+modal.style.display="flex"
+}
+
+function closeModal(){
+modal.style.display="none"
+}
+
+/* INIT */
+
+loadDifficulty()
+renderAnswerUI()
+
 </script>
 
 <script src="questionList.js"></script>
-<script src="createQuestionUI.js"></script>
 <script src="createQuestion.js"></script>
 
 </body>
