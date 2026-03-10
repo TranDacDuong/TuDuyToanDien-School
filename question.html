@@ -493,9 +493,9 @@ function renderMulti(){
 const row=document.createElement("div")
 row.className="answerRow"
 
-for(let i=0;i<answerCount;i++){
+for(let i=1;i<=answerCount;i++){
 
-const letter=String.fromCharCode(65+i)
+const letter=String.fromCharCode(64+i)
 
 row.innerHTML+=`
 <div class="answerBox">
@@ -559,16 +559,72 @@ ${i}
 
 function addAnswer(){
 
+const type = question_type.value
+
 answerCount++
-changeType()
+
+/* MULTI CHOICE */
+
+if(type==="multi_choice"){
+
+const row = answerArea.firstChild
+const letter = String.fromCharCode(64 + answerCount)
+
+row.innerHTML += `
+<div class="answerBox">
+<input type="checkbox">
+${letter}
+</div>
+`
+
+}
+
+/* TRUE FALSE */
+
+if(type==="true_false"){
+
+if(answerCount>4) return
+
+}
+
+/* SHORT ANSWER */
+
+if(type==="short_answer"){
+
+answerArea.innerHTML += `
+<div class="shortRow">
+${answerCount}
+<input>
+</div>
+`
+
+}
 
 }
 
 function removeAnswer(){
 
-if(answerCount>1){
+const type = question_type.value
+
+if(answerCount<=1) return
+
 answerCount--
-changeType()
+
+/* MULTI CHOICE */
+
+if(type==="multi_choice"){
+
+const row = answerArea.firstChild
+row.removeChild(row.lastElementChild)
+
+}
+
+/* SHORT ANSWER */
+
+if(type==="short_answer"){
+
+answerArea.removeChild(answerArea.lastElementChild)
+
 }
 
 }
