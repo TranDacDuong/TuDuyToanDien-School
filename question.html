@@ -13,6 +13,34 @@
 
 <style>
 
+.imgWrapper{
+position:relative;
+display:none;
+max-width:100%;
+}
+
+.previewImg{
+width:100%;
+border-radius:6px;
+}
+
+.imgDelete{
+position:absolute;
+top:6px;
+right:6px;
+background:red;
+color:white;
+width:20px;
+height:20px;
+border-radius:50%;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:14px;
+cursor:pointer;
+font-weight:bold;
+}
+    
 textarea{
 width:100%;
 min-height:80px;
@@ -290,7 +318,10 @@ id="questionText"
 placeholder="Nhập câu hỏi hoặc Ctrl+V ảnh tại đây">
 </textarea>
 
+<div class="imgWrapper" id="questionImgBox">
 <img id="questionImg" class="previewImg">
+<span class="imgDelete" onclick="removeImg('question')">×</span>
+</div>
 
 
 <label>Đáp án</label>
@@ -300,7 +331,10 @@ id="answerText"
 placeholder="Nhập đáp án hoặc Ctrl+V ảnh tại đây">
 </textarea>
 
+<div class="imgWrapper" id="answerImgBox">
 <img id="answerImg" class="previewImg">
+<span class="imgDelete" onclick="removeImg('answer')">×</span>
+</div>
 
 </div>
 
@@ -362,6 +396,20 @@ modal.style.display = "none"
 
 }
 
+function removeImg(type){
+
+if(type==="question"){
+questionImg.src=""
+questionImgBox.style.display="none"
+}
+
+if(type==="answer"){
+answerImg.src=""
+answerImgBox.style.display="none"
+}
+
+}
+    
 document.addEventListener("paste",function(e){
 
 if(!activeField) return
@@ -379,15 +427,15 @@ reader.onload=function(event){
 
 if(activeField==="question"){
 
-questionImg.src=event.target.result
-questionImg.style.display="block"
+questionImg.src = event.target.result
+questionImgBox.style.display = "block"
 
 }
 
 if(activeField==="answer"){
 
-answerImg.src=event.target.result
-answerImg.style.display="block"
+answerImg.src = event.target.result
+answerImgBox.style.display = "block"
 
 }
 
