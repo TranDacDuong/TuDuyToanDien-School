@@ -162,13 +162,17 @@ LƯU CÂU HỎI
 
 async function saveQuestion(){
 
-/* USER */
+/* =========================
+USER
+========================= */
 
 const { data: { user } } = await sb.auth.getUser()
 
 const userId = user?.id || null
 
-/* FORM DATA */
+/* =========================
+FORM DATA
+========================= */
 
 const chapterVal = chapter.value
 const typeVal = question_type.value
@@ -198,9 +202,7 @@ boxes.forEach((box,index)=>{
 const checkbox = box.querySelector("input")
 
 if(checkbox.checked){
-
 correctAnswer += String.fromCharCode(65 + index) // A B C D
-
 }
 
 })
@@ -218,9 +220,7 @@ boxes.forEach((box,index)=>{
 const state = box.querySelector(".correct, .wrong")
 
 if(state.innerText === "Đúng"){
-
 correctAnswer += String.fromCharCode(97 + index) // a b c d
-
 }
 
 })
@@ -271,7 +271,6 @@ query = sb
 .from("question_bank")
 .insert([
 {
-
 chapter_id: chapterVal,
 question_type: typeVal,
 difficulty: difficultyVal,
@@ -287,7 +286,6 @@ answer: correctAnswer,
 
 hidden: false,
 created_by: userId
-
 }
 ])
 
@@ -303,8 +301,13 @@ if(error){
 
 console.error(error)
 alert(error.message)
+return
 
-}else{
+}
+
+/* =========================
+SUCCESS
+========================= */
 
 if(editingQuestionId){
 
@@ -316,19 +319,22 @@ alert("Tạo câu hỏi thành công")
 
 }
 
-/* reset edit mode */
+/* reset chế độ edit */
 
 editingQuestionId = null
 
-/* reset form */
+/* reset tiêu đề form */
+
+formTitle.innerText = "Tạo câu hỏi"
+saveBtn.innerText = "Lưu câu hỏi"
+
+/* reset nội dung câu hỏi */
 
 resetQuestionForm()
 
-/* reload list */
+/* reload danh sách */
 
 loadQuestions()
-
-}
 
 }
 
