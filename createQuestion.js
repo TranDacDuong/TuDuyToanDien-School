@@ -178,7 +178,7 @@ const answerImgSrc = answerImg.src || null
 
 
 const { data, error } = await sb
-.from("questions")
+.from("question_bank")
 .insert([
 {
 grade_id: gradeVal,
