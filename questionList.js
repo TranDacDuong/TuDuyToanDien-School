@@ -1,5 +1,6 @@
 let grades = []
 let questions = []
+let editingQuestionId = null
 
 const typeText = {
 multi_choice: "Nhiều lựa chọn",
@@ -246,9 +247,11 @@ await loadQuestions()
 
 function editQ(id){
 
-const q = questions.find(q => q.id === id)
+const q = questions.find(q=>q.id===id)
 
 if(!q) return
+
+editingQuestionId = id
 
 openModal()
 
@@ -262,7 +265,35 @@ difficulty.value = q.difficulty
 questionText.value = q.question_text || ""
 answerText.value = q.answer_text || ""
 
+/* HIỂN THỊ ẢNH */
+
+if(q.question_img){
+
+questionImg.src = q.question_img
+questionImgBox.style.display = "block"
+
+}else{
+
+questionImgBox.style.display = "none"
+
+}
+
+if(q.answer_img){
+
+answerImg.src = q.answer_img
+answerImgBox.style.display = "block"
+
+}else{
+
+answerImgBox.style.display = "none"
+
+}
+
 changeType()
+
+/* Đổi text nút */
+
+saveBtn.innerText = "Cập nhật câu hỏi"
 
 }
 
