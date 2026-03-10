@@ -162,34 +162,101 @@ LƯU CÂU HỎI
 
 async function saveQuestion(){
 
-const gradeVal = grade.value
-const subjectVal = subject.value
 const chapterVal = chapter.value
 const typeVal = question_type.value
 const difficultyVal = difficulty.value
 
-const questionVal = questionText.value
-const answerVal = answerText.value
-
-/* IMAGE */
+const questionVal = questionText.value.trim()
+const answerVal = answerText.value.trim()
 
 const questionImgSrc = questionImg.src || null
 const answerImgSrc = answerImg.src || null
 
+let answerCount = 0
+let correctAnswer = ""
+
+/* =========================
+LẤY ĐÁP ÁN
+========================= */
+
+if(typeVal === "multi_choice"){
+
+const boxes = document.querySelectorAll("#answerArea .answerBox")
+
+answerCount = boxes.length
+
+boxes.forEach((box,index)=>{
+
+const checkbox = box.querySelector("input")
+
+if(checkbox.checked){
+
+correctAnswer += String.fromCharCode(65 + index)  // A B C D
+
+}
+
+})
+
+}
+
+if(typeVal === "true_false"){
+
+const boxes = document.querySelectorAll("#answerArea .answerBox")
+
+answerCount = boxes.length
+
+boxes.forEach((box,index)=>{
+
+const state = box.querySelector(".correct, .wrong")
+
+if(state.innerText === "Đúng"){
+
+correctAnswer += String.fromCharCode(97 + index) // a b c d
+
+}
+
+})
+
+}
+
+if(typeVal === "short_answer"){
+
+const inputs = document.querySelectorAll("#answerArea input")
+
+answerCount = inputs.length
+
+correctAnswer = [...inputs].map(i=>i.value).join(";")
+
+}
+
+if(typeVal === "essay"){
+
+answerCount = 0
+correctAnswer = answerVal
+
+}
+
+/* =========================
+LƯU DATABASE
+========================= */
 
 const { data, error } = await sb
 .from("question_bank")
 .insert([
 {
-grade_id: gradeVal,
-subject_id: subjectVal,
 chapter_id: chapterVal,
 question_type: typeVal,
 difficulty: difficultyVal,
+
 question_text: questionVal,
-answer_text: answerVal,
 question_img: questionImgSrc,
-answer_img: answerImgSrc
+
+answer_text: correctAnswer,
+answer_img: answerImgSrc,
+
+answer_count: answerCount,
+
+hidden: false
 }
 ])
 
