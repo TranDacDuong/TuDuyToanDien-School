@@ -162,89 +162,49 @@ LƯU CÂU HỎI
 
 async function saveQuestion(){
 
-/* VALIDATE */
+const gradeVal = grade.value
+const subjectVal = subject.value
+const chapterVal = chapter.value
+const typeVal = question_type.value
+const difficultyVal = difficulty.value
 
-if(!grade.value){
+const questionVal = questionText.value
+const answerVal = answerText.value
 
-alert("Chưa chọn khối")
-return
+/* IMAGE */
 
-}
-
-if(!subject.value){
-
-alert("Chưa chọn môn")
-return
-
-}
-
-if(!chapter.value){
-
-alert("Chưa chọn chương")
-return
-
-}
-
-if(!question_type.value){
-
-alert("Chưa chọn loại câu hỏi")
-return
-
-}
-
-if(!difficulty.value){
-
-alert("Chưa chọn mức độ")
-return
-
-}
-
-const qContent = getQuestionContent()
-
-if(!qContent){
-
-alert("Chưa nhập câu hỏi")
-return
-
-}
-
-const aContent = getAnswerContent()
+const questionImgSrc = questionImg.src || null
+const answerImgSrc = answerImg.src || null
 
 
-/* INSERT DB */
-
-const {error} = await sb
+const { data, error } = await supabase
 .from("questions")
-.insert({
-
-grade_id: grade.value,
-subject_id: subject.value,
-chapter_id: chapter.value,
-
-type: question_type.value,
-difficulty_id: difficulty.value,
-
-question_text: qContent,
-answer_text: aContent
-
-})
+.insert([
+{
+grade: gradeVal,
+subject: subjectVal,
+chapter: chapterVal,
+question_type: typeVal,
+difficulty: difficultyVal,
+question_text: questionVal,
+answer_text: answerVal,
+question_img: questionImgSrc,
+answer_img: answerImgSrc
+}
+])
 
 if(error){
 
 console.error(error)
+alert("Lỗi lưu câu hỏi")
 
-alert("Lưu thất bại")
+}else{
 
-return
-
-}
-
-
-alert("Đã lưu câu hỏi")
+alert("Lưu thành công")
 
 closeModal()
 
-location.reload()
+}
 
 }
 
