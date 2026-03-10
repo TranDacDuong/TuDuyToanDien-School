@@ -283,6 +283,69 @@ difficulty.appendChild(option)
 
 }
 
+/* NÉN ẢNH */
+
+async function compressImage(file){
+
+return new Promise((resolve)=>{
+
+const img = new Image()
+const reader = new FileReader()
+
+reader.onload = function(e){
+
+img.src = e.target.result
+
+}
+
+img.onload = function(){
+
+const canvas = document.createElement("canvas")
+const ctx = canvas.getContext("2d")
+
+/* resize tối đa */
+
+const MAX_WIDTH = 1200
+const MAX_HEIGHT = 1200
+
+let width = img.width
+let height = img.height
+
+if(width > MAX_WIDTH){
+
+height = height * (MAX_WIDTH / width)
+width = MAX_WIDTH
+
+}
+
+if(height > MAX_HEIGHT){
+
+width = width * (MAX_HEIGHT / height)
+height = MAX_HEIGHT
+
+}
+
+canvas.width = width
+canvas.height = height
+
+ctx.drawImage(img,0,0,width,height)
+
+/* nén JPEG */
+
+canvas.toBlob((blob)=>{
+
+resolve(blob)
+
+},"image/jpeg",0.7)
+
+}
+
+reader.readAsDataURL(file)
+
+})
+
+}
+
 /* =========================
 INIT
 ========================= */
