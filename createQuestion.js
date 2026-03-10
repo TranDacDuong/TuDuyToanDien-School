@@ -229,13 +229,6 @@ correctAnswer = [...inputs].map(i=>i.value).join(";")
 
 }
 
-if(typeVal === "essay"){
-
-answerCount = 0
-correctAnswer = answerVal
-
-}
-
 /* =========================
 LƯU DATABASE
 ========================= */
@@ -251,11 +244,11 @@ difficulty: difficultyVal,
 question_text: questionVal,
 question_img: questionImgSrc,
 
-answer_text: correctAnswer,
+answer_text: answerVal,
 answer_img: answerImgSrc,
 
 answer_count: answerCount,
-
+answer: correctAnswer,
 hidden: false
 }
 ])
