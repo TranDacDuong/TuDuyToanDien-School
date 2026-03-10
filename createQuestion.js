@@ -191,7 +191,7 @@ if(typeVal === "multi_choice"){
 
 const boxes = document.querySelectorAll("#answerArea .answerBox")
 
-answerCount = boxes.length
+answerCount = [...boxes].filter(b=>b.style.display!=="none").length
 
 boxes.forEach((box,index)=>{
 
