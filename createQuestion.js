@@ -162,27 +162,6 @@ LƯU CÂU HỎI
 
 async function saveQuestion(){
 const { data: { user } } = await sb.auth.getUser()
-
-let questionImgSrc = null
-let answerImgSrc = null
-
-if(questionImageFile){
-
-questionImgSrc = await uploadImage(
-questionImageFile,
-"questions"
-)
-
-}
-
-if(answerImageFile){
-
-answerImgSrc = await uploadImage(
-answerImageFile,
-"answers"
-)
-
-}
   
 const userId = user.id
 const chapterVal = chapter.value
