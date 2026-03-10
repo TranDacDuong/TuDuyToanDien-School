@@ -339,6 +339,10 @@ LOAD ANSWER UI
 
 changeType()
 
+if(q.answer_count){
+createAnswerInputs(q.answer_count)
+}
+  
 /* =========================
 SET ĐÁP ÁN ĐÚNG
 ========================= */
@@ -392,6 +396,66 @@ input.value = arr[i] || ""
 /* đổi text nút */
 
 saveBtn.innerText = "Cập nhật câu hỏi"
+
+}
+
+function createAnswerInputs(count){
+
+answerArea.innerHTML = ""
+
+if(question_type.value === "multi_choice"){
+
+for(let i=0;i<count;i++){
+
+answerArea.innerHTML += `
+
+<div class="answerBox">
+
+<label>${String.fromCharCode(65+i)}</label>
+
+<input type="checkbox">
+
+</div>
+
+`
+
+}
+
+}
+
+if(question_type.value === "true_false"){
+
+for(let i=0;i<count;i++){
+
+answerArea.innerHTML += `
+
+<div class="answerBox">
+
+<label>${String.fromCharCode(97+i)}</label>
+
+<span class="state wrong">Sai</span>
+
+</div>
+
+`
+
+}
+
+}
+
+if(question_type.value === "short_answer"){
+
+for(let i=0;i<count;i++){
+
+answerArea.innerHTML += `
+
+<input class="shortAnswer">
+
+`
+
+}
+
+}
 
 }
 
