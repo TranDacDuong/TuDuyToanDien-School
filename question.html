@@ -355,18 +355,34 @@ questionMode = questionMode==="image" ? "text" : "image"
 if(questionMode==="image"){
 
 qMode.innerText="Ảnh"
+
 questionText.placeholder="Paste ảnh tại đây"
 questionText.readOnly=true
+
+/* XÓA CHỮ */
+
+questionText.value=""
+
+/* HIỆN ẢNH */
+
+questionImg.style.display="block"
 
 }else{
 
 qMode.innerText="Chữ"
+
 questionText.placeholder="Nhập câu hỏi tại đây"
 questionText.readOnly=false
 
+/* XÓA ẢNH */
+
+questionImg.src=""
+questionImg.style.display="none"
+
 }
 
 }
+
 
 if(type==="answer"){
 
@@ -375,14 +391,29 @@ answerMode = answerMode==="image" ? "text" : "image"
 if(answerMode==="image"){
 
 aMode.innerText="Ảnh"
+
 answerText.placeholder="Paste ảnh tại đây"
 answerText.readOnly=true
+
+/* XÓA CHỮ */
+
+answerText.value=""
+
+/* HIỆN ẢNH */
+
+answerImg.style.display="block"
 
 }else{
 
 aMode.innerText="Chữ"
+
 answerText.placeholder="Nhập đáp án tại đây"
 answerText.readOnly=false
+
+/* XÓA ẢNH */
+
+answerImg.src=""
+answerImg.style.display="none"
 
 }
 
