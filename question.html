@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="vi">
 
 <head>
@@ -7,6 +8,7 @@
 <title>Ngân hàng câu hỏi</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script src="supabaseClient.js"></script>
 
 <style>
@@ -26,7 +28,7 @@ border-radius:10px;
 }
 
 button{
-padding:7px 12px;
+padding:6px 12px;
 border:none;
 background:#2563eb;
 color:white;
@@ -34,11 +36,17 @@ border-radius:6px;
 cursor:pointer;
 }
 
-button.delete{
-background:#ef4444;
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:20px;
 }
 
-/* FILTER */
+th,td{
+padding:10px;
+border-bottom:1px solid #eee;
+text-align:center;
+}
 
 .filterBar{
 display:flex;
@@ -53,19 +61,7 @@ border:1px solid #ccc;
 border-radius:5px;
 }
 
-/* TABLE */
-
-table{
-width:100%;
-border-collapse:collapse;
-margin-top:20px;
-}
-
-th,td{
-padding:10px;
-border-bottom:1px solid #eee;
-text-align:center;
-}
+/* IMAGE */
 
 .questionImgBox{
 width:320px;
@@ -111,7 +107,7 @@ max-width:95%;
 
 .createGrid{
 display:grid;
-grid-template-columns:220px 1fr 300px;
+grid-template-columns:220px 1fr 320px;
 gap:25px;
 }
 
@@ -123,38 +119,54 @@ flex-direction:column;
 gap:10px;
 }
 
+/* TEXT IMAGE SWITCH */
+
+.modeBtn{
+background:#64748b;
+font-size:12px;
+margin-right:6px;
+}
+
 /* PREVIEW */
 
 .previewImg{
 max-width:100%;
 border-radius:6px;
 display:none;
-margin-top:10px;
 }
 
-.answerList{
+/* ANSWERS */
+
+.answerRow{
 display:flex;
-flex-wrap:wrap;
 gap:10px;
+flex-wrap:wrap;
 }
 
-.answerItem{
-padding:6px 10px;
+.answerBox{
 border:1px solid #ccc;
+padding:6px 10px;
 border-radius:6px;
 cursor:pointer;
 }
 
-.answerItem.correct{
+.correct{
 background:#22c55e;
 color:white;
+}
+
+.wrong{
+background:#ef4444;
+color:white;
+}
+
+.shortInput{
+width:80px;
 }
 
 </style>
 
 </head>
-
-
 
 <body>
 
@@ -164,21 +176,9 @@ color:white;
 
 <button onclick="openModal()">Tạo câu hỏi</button>
 
-<!-- FILTER -->
-
 <div class="filterBar">
 
-<select id="f_grade">
-<option value="">Khối</option>
-</select>
-
-<select id="f_subject">
-<option value="">Môn</option>
-</select>
-
-<select id="f_chapter">
-<option value="">Chương</option>
-</select>
+<select id="f_grade"><option value="">Khối</option></select> <select id="f_subject"><option value="">Môn</option></select> <select id="f_chapter"><option value="">Chương</option></select>
 
 <select id="f_type">
 <option value="">Loại câu hỏi</option>
@@ -193,7 +193,6 @@ color:white;
 </select>
 
 </div>
-
 
 <table>
 
@@ -211,15 +210,30 @@ color:white;
 </tr>
 </thead>
 
-<tbody id="questionTable"></tbody>
+<tbody id="questionTable">
+
+<tr>
+<td>1</td>
+<td>—</td>
+<td>10</td>
+<td>Toán</td>
+<td>Chương 1</td>
+<td>Nhiều lựa chọn</td>
+<td>3</td>
+<td>A</td>
+<td>
+<button>Sửa</button>
+<button style="background:#ef4444">Xóa</button>
+</td>
+</tr>
+
+</tbody>
 
 </table>
 
 </div>
 
-
-
-<!-- MODAL CREATE QUESTION -->
+<!-- MODAL CREATE -->
 
 <div class="modal" id="modal">
 
@@ -233,36 +247,41 @@ color:white;
 
 <div class="leftCol">
 
-<label>Khối</label>
-<select id="grade"></select>
+<label>Khối</label> <select id="grade"></select>
 
-<label>Môn</label>
-<select id="subject"></select>
+<label>Môn</label> <select id="subject"></select>
 
-<label>Chương</label>
-<select id="chapter"></select>
+<label>Chương</label> <select id="chapter"></select>
 
 </div>
-
-
 
 <!-- CENTER -->
 
 <div class="centerCol">
 
-<label>Câu hỏi</label>
+<label>
+
+<button class="modeBtn" onclick="toggleMode('question')">Chữ/Ảnh</button>
+Câu hỏi
+
+</label>
+
 <input id="questionText" placeholder="Nhập câu hỏi">
 
-<img id="questionPreview" class="previewImg">
+<img id="questionImg" class="previewImg">
 
-<label>Đáp án</label>
+<label>
+
+<button class="modeBtn" onclick="toggleMode('answer')">Chữ/Ảnh</button>
+Đáp án
+
+</label>
+
 <input id="answerText" placeholder="Nhập đáp án">
 
-<img id="answerPreview" class="previewImg">
+<img id="answerImg" class="previewImg">
 
 </div>
-
-
 
 <!-- RIGHT -->
 
@@ -270,23 +289,24 @@ color:white;
 
 <label>Loại câu hỏi</label>
 
-<select id="question_type">
+<select id="question_type" onchange="changeType()">
+
 <option value="multi_choice">Nhiều lựa chọn</option>
 <option value="true_false">Đúng/Sai</option>
 <option value="short_answer">Trả lời ngắn</option>
 <option value="essay">Tự luận</option>
+
 </select>
 
+<label>Mức độ</label> <select id="difficulty"></select>
 
-<label>Mức độ</label>
-<select id="difficulty"></select>
+<label>
 
+Thiết lập đáp án <button onclick="addAnswer()">+</button> <button onclick="removeAnswer()">-</button>
 
-<label>Đáp án trắc nghiệm</label>
+</label>
 
-<div class="answerList" id="answerList"></div>
-
-<button onclick="addAnswer()">+ Thêm đáp án</button>
+<div id="answerArea"></div>
 
 </div>
 
@@ -294,14 +314,11 @@ color:white;
 
 <br>
 
-<button onclick="saveQuestion()">Lưu câu hỏi</button>
-<button onclick="closeModal()">Đóng</button>
+<button>Lưu câu hỏi</button> <button onclick="closeModal()">Đóng</button>
 
 </div>
 
 </div>
-
-
 
 <script>
 
@@ -309,30 +326,39 @@ color:white;
 
 function openModal(){
 modal.style.display="flex"
+changeType()
 }
 
 function closeModal(){
 modal.style.display="none"
 }
 
+/* MODE */
 
-/* ADD ANSWER */
+let questionMode="text"
+let answerMode="text"
 
-function addAnswer(){
+function toggleMode(type){
 
-const div=document.createElement("div")
+if(type==="question"){
 
-div.className="answerItem"
-div.innerText="Đáp án"
+questionMode=questionMode==="text"?"image":"text"
 
-div.onclick=function(){
-div.classList.toggle("correct")
-}
-
-answerList.appendChild(div)
+questionText.style.display=questionMode==="text"?"block":"none"
+questionImg.style.display="none"
 
 }
 
+if(type==="answer"){
+
+answerMode=answerMode==="text"?"image":"text"
+
+answerText.style.display=answerMode==="text"?"block":"none"
+answerImg.style.display="none"
+
+}
+
+}
 
 /* PASTE IMAGE */
 
@@ -350,15 +376,17 @@ const reader=new FileReader()
 
 reader.onload=function(event){
 
-if(document.activeElement===questionText){
+if(questionMode==="image"){
 
-questionPreview.src=event.target.result
-questionPreview.style.display="block"
+questionImg.src=event.target.result
+questionImg.style.display="block"
 
-}else{
+}
 
-answerPreview.src=event.target.result
-answerPreview.style.display="block"
+if(answerMode==="image"){
+
+answerImg.src=event.target.result
+answerImg.style.display="block"
 
 }
 
@@ -372,8 +400,128 @@ reader.readAsDataURL(file)
 
 })
 
-</script>
+/* ANSWER TYPE */
 
+let answerCount=4
+
+function changeType(){
+
+const type=question_type.value
+
+answerArea.innerHTML=""
+answerCount=4
+
+if(type==="multi_choice"){
+
+renderMulti()
+
+}
+
+if(type==="true_false"){
+
+renderTrueFalse()
+
+}
+
+if(type==="short_answer"){
+
+renderShort()
+
+}
+
+}
+
+function renderMulti(){
+
+answerArea.innerHTML=`<div class="answerRow"></div>`
+const row=answerArea.firstChild
+
+const letters=["A","B","C","D"]
+
+letters.forEach(l=>{
+row.innerHTML+=`<div class="answerBox">[]${l}</div>`
+})
+
+}
+
+function renderTrueFalse(){
+
+answerArea.innerHTML=`<div class="answerRow"></div>`
+const row=answerArea.firstChild
+
+const letters=["a","b","c","d"]
+
+letters.forEach(l=>{
+row.innerHTML+=`<div class="answerBox correct" onclick="toggleTF(this)">${l}) Đúng</div>`
+})
+
+}
+
+function toggleTF(el){
+
+if(el.classList.contains("correct")){
+
+el.classList.remove("correct")
+el.classList.add("wrong")
+el.innerText=el.innerText.replace("Đúng","Sai")
+
+}else{
+
+el.classList.remove("wrong")
+el.classList.add("correct")
+el.innerText=el.innerText.replace("Sai","Đúng")
+
+}
+
+}
+
+function renderShort(){
+
+answerArea.innerHTML=`<div class="answerRow">
+<input class="shortInput">
+</div>`
+
+}
+
+function addAnswer(){
+
+answerCount++
+
+const type=question_type.value
+
+if(type==="multi_choice"){
+
+answerArea.firstChild.innerHTML+=`<div class="answerBox">[]</div>`
+
+}
+
+if(type==="true_false"){
+
+answerArea.firstChild.innerHTML+=`<div class="answerBox correct" onclick="toggleTF(this)">Đúng</div>`
+
+}
+
+if(type==="short_answer"){
+
+answerArea.firstChild.innerHTML+=`<input class="shortInput">`
+
+}
+
+}
+
+function removeAnswer(){
+
+const row=answerArea.firstChild
+
+if(row.children.length>1){
+
+row.removeChild(row.lastChild)
+
+}
+
+}
+
+</script>
 
 <script src="questionList.js"></script>
 
