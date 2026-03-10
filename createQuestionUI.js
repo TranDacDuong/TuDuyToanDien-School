@@ -1,119 +1,352 @@
-/* ELEMENT */
+<!DOCTYPE html>
+<html lang="vi">
 
-const questionText = document.getElementById("questionText")
-const answerText = document.getElementById("answerText")
+<head>
 
-const questionPreview = document.getElementById("questionPreview")
-const answerPreview = document.getElementById("answerPreview")
+<meta charset="UTF-8">
+<title>Ngân hàng câu hỏi</title>
 
-const questionModeBtn = document.getElementById("questionModeBtn")
-const answerModeBtn = document.getElementById("answerModeBtn")
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
 
-let questionMode = "image"
-let answerMode = "image"
+<style>
 
-
-/* MODE TOGGLE */
-
-function toggleQuestionMode(){
-
-if(questionMode==="image"){
-
-questionMode="text"
-questionModeBtn.innerText="Chữ"
-
-questionText.readOnly=false
-questionPreview.style.display="none"
-
-}else{
-
-questionMode="image"
-questionModeBtn.innerText="Ảnh"
-
-questionText.readOnly=true
-questionText.value=""
-questionPreview.style.display="none"
-
+body{
+font-family:Arial;
+background:#f1f5f9;
+padding:30px;
 }
 
+.container{
+max-width:1400px;
+margin:auto;
+background:white;
+padding:25px;
+border-radius:10px;
 }
 
-function toggleAnswerMode(){
-
-if(answerMode==="image"){
-
-answerMode="text"
-answerModeBtn.innerText="Chữ"
-
-answerText.readOnly=false
-answerPreview.style.display="none"
-
-}else{
-
-answerMode="image"
-answerModeBtn.innerText="Ảnh"
-
-answerText.readOnly=true
-answerText.value=""
-answerPreview.style.display="none"
-
+button{
+padding:7px 12px;
+border:none;
+background:#2563eb;
+color:white;
+border-radius:6px;
+cursor:pointer;
 }
 
+button.delete{
+background:#ef4444;
 }
 
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:20px;
+}
 
-/* CHẶN GÕ */
+th,td{
+padding:10px;
+border-bottom:1px solid #eee;
+text-align:center;
+}
 
-questionText.addEventListener("keydown",e=>{
-if(questionMode==="image") e.preventDefault()
-})
+.filterBar{
+display:flex;
+gap:10px;
+flex-wrap:wrap;
+margin-top:10px;
+}
 
-answerText.addEventListener("keydown",e=>{
-if(answerMode==="image") e.preventDefault()
-})
+select,input{
+padding:6px;
+border:1px solid #ccc;
+border-radius:5px;
+}
+
+/* MODAL */
+
+.modal{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.4);
+display:none;
+align-items:center;
+justify-content:center;
+}
+
+.modal-box{
+background:white;
+padding:25px;
+border-radius:10px;
+}
+
+.modal-large{
+width:1100px;
+max-width:95%;
+}
+
+/* GRID */
+
+.createGrid{
+display:grid;
+grid-template-columns:220px 1fr 300px;
+gap:25px;
+}
+
+.leftCol,
+.centerCol,
+.rightCol{
+display:flex;
+flex-direction:column;
+gap:10px;
+}
+
+/* IMAGE */
+
+.previewImg{
+max-width:100%;
+border-radius:6px;
+display:none;
+margin-top:10px;
+}
+
+.answerHorizontal{
+display:flex;
+gap:10px;
+flex-wrap:wrap;
+margin-top:5px;
+}
+
+.answerItem{
+display:flex;
+align-items:center;
+gap:4px;
+padding:6px 10px;
+border:1px solid #ddd;
+border-radius:6px;
+background:#fafafa;
+}
+
+.answerBtn{
+width:26px;
+height:26px;
+border-radius:50%;
+border:1px solid #ccc;
+cursor:pointer;
+}
+
+.trueBtn{
+background:#22c55e;
+color:white;
+}
+
+.falseBtn{
+background:#ef4444;
+color:white;
+}
+
+.questionImgBox{
+width:320px;
+aspect-ratio:7/2;
+overflow:hidden;
+border-radius:6px;
+background:#f1f5f9;
+display:flex;
+align-items:center;
+justify-content:center;
+}
+
+.questionImg{
+width:100%;
+height:100%;
+object-fit:contain;
+cursor:pointer;
+}
+
+</style>
+
+</head>
 
 
-/* PASTE IMAGE */
+<body>
+
+<div class="container">
+
+<h2>Ngân hàng câu hỏi</h2>
+
+<button onclick="openModal()">Tạo câu hỏi</button>
+
+
+<!-- MODAL -->
+
+<div class="modal" id="modal">
+
+<div class="modal-box modal-large">
+
+<h3>Tạo câu hỏi</h3>
+
+<div class="createGrid">
+
+<!-- CỘT TRÁI -->
+
+<div class="leftCol">
+
+<label>Khối</label>
+<select id="grade"></select>
+
+<label>Môn</label>
+<select id="subject"></select>
+
+<label>Chương</label>
+<select id="chapter"></select>
+
+</div>
+
+
+<!-- CỘT GIỮA -->
+
+<div class="centerCol">
+
+<label>
+Nhập câu hỏi
+<button type="button" onclick="toggleQuestionMode()" id="modeBtn">
+Ảnh
+</button>
+</label>
+
+<input id="questionText" placeholder="Nhập câu hỏi" style="display:none">
+
+<img id="questionPreview" class="previewImg">
+
+<label>Nhập đáp án</label>
+<input id="answerText" placeholder="Nhập đáp án">
+
+</div>
+
+
+<!-- CỘT PHẢI -->
+
+<div class="rightCol">
+
+<label>Loại câu hỏi</label>
+
+<select id="question_type">
+<option value="multi_choice">Nhiều lựa chọn</option>
+<option value="true_false">Đúng/Sai</option>
+<option value="short_answer">Trả lời ngắn</option>
+<option value="essay">Tự luận</option>
+</select>
+
+<label>Mức độ</label>
+<select id="difficulty"></select>
+
+<label>
+Đáp án
+<button onclick="removeAnswer()">-</button>
+<button onclick="addAnswer()">+</button>
+</label>
+
+<div id="answerBox" class="answerHorizontal"></div>
+
+</div>
+
+</div>
+
+<br>
+
+<button onclick="saveQuestion()">Lưu</button>
+<button onclick="closeModal()">Đóng</button>
+
+</div>
+
+</div>
+
+
+<!-- FILTER -->
+
+<div class="filterBar">
+
+<select id="f_grade">
+<option value="">Khối</option>
+</select>
+
+<select id="f_subject">
+<option value="">Môn</option>
+</select>
+
+<select id="f_chapter">
+<option value="">Chương</option>
+</select>
+
+<select id="f_type">
+<option value="">Loại câu hỏi</option>
+<option value="multi_choice">Nhiều lựa chọn</option>
+<option value="true_false">Đúng/Sai</option>
+<option value="short_answer">Trả lời ngắn</option>
+<option value="essay">Tự luận</option>
+</select>
+
+<select id="f_difficulty">
+<option value="">Mức độ</option>
+</select>
+
+<input id="searchBox" placeholder="Tìm kiếm...">
+
+</div>
+
+
+<table>
+
+<thead>
+
+<tr>
+<th>STT</th>
+<th>Ảnh</th>
+<th>Khối</th>
+<th>Môn</th>
+<th>Chương</th>
+<th>Loại</th>
+<th>Mức độ</th>
+<th>Đáp án</th>
+<th></th>
+</tr>
+
+</thead>
+
+<tbody id="questionTable"></tbody>
+
+</table>
+
+</div>
+
+
+<script>
+
+/* paste ảnh */
 
 document.addEventListener("paste",function(e){
 
-const items=e.clipboardData?.items
-if(!items) return
+if(questionMode!=="image") return
+
+const items=e.clipboardData.items
 
 for(let item of items){
 
 if(item.type.indexOf("image")!==-1){
 
 const file=item.getAsFile()
+
 const reader=new FileReader()
 
 reader.onload=function(event){
 
-const imgData=event.target.result
+const img=document.getElementById("questionPreview")
 
-if(document.activeElement===questionText){
-
-if(questionMode==="text") return
-
-questionPreview.src=imgData
-questionPreview.style.display="block"
-
-questionText.dataset.image=imgData
-questionText.value="[Ảnh câu hỏi]"
-
-}
-
-if(document.activeElement===answerText){
-
-if(answerMode==="text") return
-
-answerPreview.src=imgData
-answerPreview.style.display="block"
-
-answerText.dataset.image=imgData
-answerText.value="[Ảnh đáp án]"
-
-}
+img.src=event.target.result
+img.style.display="block"
 
 }
 
@@ -124,3 +357,13 @@ reader.readAsDataURL(file)
 }
 
 })
+
+</script>
+
+
+<script src="questionList.js"></script>
+<script src="createQuestionUI.js"></script>
+<script src="createQuestion.js"></script>
+
+</body>
+</html>
