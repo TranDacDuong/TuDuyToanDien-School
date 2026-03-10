@@ -346,6 +346,31 @@ reader.readAsDataURL(file)
 
 }
 
+/* HÀM UPLOAD ẢNH */
+
+async function uploadImage(file, folder){
+
+const compressed = await compressImage(file)
+
+const fileName = folder + "/" + crypto.randomUUID() + ".jpg"
+
+const { data, error } = await sb.storage
+.from("question-images")
+.upload(fileName, compressed)
+
+if(error){
+console.error(error)
+return null
+}
+
+const { data:urlData } = sb.storage
+.from("question-images")
+.getPublicUrl(fileName)
+
+return urlData.publicUrl
+
+}
+
 /* =========================
 INIT
 ========================= */
