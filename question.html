@@ -410,10 +410,7 @@ answerImgBox.style.display="none"
 
 }
 
-let questionImageFile = null
-let answerImageFile = null
-
-document.addEventListener("paste", function(e){
+document.addEventListener("paste", async function(e){
 
 if(!activeField) return
 
@@ -425,31 +422,51 @@ if(item.type.indexOf("image") !== -1){
 
 const file = item.getAsFile()
 
-const reader = new FileReader()
+/* NÉN ẢNH */
 
-reader.onload = function(event){
+const compressedBlob = await compressImage(file)
+
+/* TÊN FILE */
+
+const fileName = crypto.randomUUID() + ".jpg"
+
+/* UPLOAD STORAGE */
+
+const { data, error } = await sb.storage
+.from("question-images")
+.upload(fileName, compressedBlob)
+
+if(error){
+
+console.error(error)
+alert("Upload ảnh lỗi")
+return
+
+}
+
+/* LẤY URL */
+
+const { data:urlData } = sb.storage
+.from("question-images")
+.getPublicUrl(fileName)
+
+const imageUrl = urlData.publicUrl
+
+/* HIỂN THỊ */
 
 if(activeField === "question"){
 
-questionImg.src = event.target.result
+questionImg.src = imageUrl
 questionImgBox.style.display = "block"
-
-questionImageFile = file
 
 }
 
 if(activeField === "answer"){
 
-answerImg.src = event.target.result
+answerImg.src = imageUrl
 answerImgBox.style.display = "block"
 
-answerImageFile = file
-
 }
-
-}
-
-reader.readAsDataURL(file)
 
 }
 
