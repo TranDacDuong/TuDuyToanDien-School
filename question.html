@@ -409,8 +409,11 @@ answerImgBox.style.display="none"
 }
 
 }
-    
-document.addEventListener("paste", async function(e){
+
+let questionImageFile = null
+let answerImageFile = null
+
+document.addEventListener("paste", function(e){
 
 if(!activeField) return
 
@@ -422,51 +425,31 @@ if(item.type.indexOf("image") !== -1){
 
 const file = item.getAsFile()
 
-/* NÉN ẢNH */
+const reader = new FileReader()
 
-const compressedBlob = await compressImage(file)
-
-/* TÊN FILE */
-
-const fileName = crypto.randomUUID() + ".jpg"
-
-/* UPLOAD STORAGE */
-
-const { data, error } = await sb.storage
-.from("question-images")
-.upload(fileName, compressedBlob)
-
-if(error){
-
-console.error(error)
-alert("Upload ảnh lỗi")
-return
-
-}
-
-/* LẤY URL */
-
-const { data:urlData } = sb.storage
-.from("question-images")
-.getPublicUrl(fileName)
-
-const imageUrl = urlData.publicUrl
-
-/* HIỂN THỊ */
+reader.onload = function(event){
 
 if(activeField === "question"){
 
-questionImg.src = imageUrl
+questionImg.src = event.target.result
 questionImgBox.style.display = "block"
+
+questionImageFile = file
 
 }
 
 if(activeField === "answer"){
 
-answerImg.src = imageUrl
+answerImg.src = event.target.result
 answerImgBox.style.display = "block"
 
+answerImageFile = file
+
 }
+
+}
+
+reader.readAsDataURL(file)
 
 }
 
