@@ -264,8 +264,15 @@ alert(error.message)
 
 }else{
 
-alert("Lưu thành công")
-closeModal()
+alert("Tạo câu hỏi thành công")
+
+/* reset form câu hỏi */
+
+resetQuestionForm()
+
+/* reload bảng câu hỏi */
+
+loadQuestions()
 
 }
 
@@ -346,28 +353,31 @@ reader.readAsDataURL(file)
 
 }
 
-/* HÀM UPLOAD ẢNH */
+function resetQuestionForm(){
 
-async function uploadImage(file, folder){
+/* reset text */
 
-const compressed = await compressImage(file)
+questionText.value = ""
+answerText.value = ""
 
-const fileName = folder + "/" + crypto.randomUUID() + ".jpg"
+/* reset ảnh */
 
-const { data, error } = await sb.storage
-.from("question-images")
-.upload(fileName, compressed)
+questionImg.src = ""
+answerImg.src = ""
 
-if(error){
-console.error(error)
-return null
-}
+questionImgBox.style.display = "none"
+answerImgBox.style.display = "none"
 
-const { data:urlData } = sb.storage
-.from("question-images")
-.getPublicUrl(fileName)
+questionImageFile = null
+answerImageFile = null
 
-return urlData.publicUrl
+/* reset đáp án */
+
+const checkboxes = document.querySelectorAll("#answerArea input[type='checkbox']")
+checkboxes.forEach(cb => cb.checked = false)
+
+const inputs = document.querySelectorAll("#answerArea input[type='text']")
+inputs.forEach(i => i.value = "")
 
 }
 
