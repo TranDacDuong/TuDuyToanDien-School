@@ -252,14 +252,9 @@ await loadQuestions()
 async function editQ(id){
 
 const q = questions.find(q => q.id === id)
-
 if(!q) return
 
-/* bật chế độ sửa */
-
 editingQuestionId = id
-
-/* mở form */
 
 openModal()
 
@@ -268,11 +263,53 @@ openModal()
 formTitle.innerText = "Sửa câu hỏi"
 saveBtn.innerText = "Cập nhật"
 
-/* điền dữ liệu */
+/* =========================
+SET GRADE
+========================= */
 
-grade.value = q.chapters?.subjects?.grades?.id || ""
-subject.value = q.chapters?.subjects?.id || ""
-chapter.value = q.chapter_id || ""
+const gradeId = q.chapters?.subjects?.grades?.id
+const subjectId = q.chapters?.subjects?.id
+const chapterId = q.chapter_id
+
+grade.value = gradeId || ""
+
+/* =========================
+LOAD SUBJECT
+========================= */
+
+let subjects = (await sb
+.from("subjects")
+.select("*")
+.eq("grade_id", gradeId)).data
+
+subject.innerHTML = "<option value=''>Môn</option>"
+
+subjects.forEach(s=>{
+subject.innerHTML += `<option value="${s.id}">${s.name}</option>`
+})
+
+subject.value = subjectId || ""
+
+/* =========================
+LOAD CHAPTER
+========================= */
+
+let chapters = (await sb
+.from("chapters")
+.select("*")
+.eq("subject_id", subjectId)).data
+
+chapter.innerHTML = "<option value=''>Chương</option>"
+
+chapters.forEach(c=>{
+chapter.innerHTML += `<option value="${c.id}">${c.name}</option>`
+})
+
+chapter.value = chapterId || ""
+
+/* =========================
+SET THÔNG TIN KHÁC
+========================= */
 
 question_type.value = q.question_type
 difficulty.value = q.difficulty
@@ -280,7 +317,9 @@ difficulty.value = q.difficulty
 questionText.value = q.question_text || ""
 answerText.value = q.answer_text || ""
 
-/* ảnh */
+/* =========================
+ẢNH
+========================= */
 
 if(q.question_img){
 questionImg.src = q.question_img
@@ -296,15 +335,25 @@ answerImgBox.style.display = "block"
 answerImgBox.style.display = "none"
 }
 
-/* tạo UI đáp án */
+/* =========================
+TẠO UI ĐÁP ÁN
+========================= */
 
 changeType()
 
-/* set đáp án đúng */
-
-if(q.question_type === "multi_choice"){
+/* sửa lại số đáp án */
 
 const boxes = document.querySelectorAll("#answerArea .answerBox")
+
+boxes.forEach((box,i)=>{
+if(i >= q.answer_count) box.style.display = "none"
+})
+
+/* =========================
+SET ĐÁP ÁN ĐÚNG
+========================= */
+
+if(q.question_type === "multi_choice"){
 
 boxes.forEach((box,index)=>{
 
@@ -319,8 +368,6 @@ checkbox.checked = true
 }
 
 if(q.question_type === "true_false"){
-
-const boxes = document.querySelectorAll("#answerArea .answerBox")
 
 boxes.forEach((box,index)=>{
 
