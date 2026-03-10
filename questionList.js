@@ -169,14 +169,20 @@ questionTable.innerHTML += `
 
 <td>${i+1}</td>
 
-<td>
-${q.question_img ?
+<td class="questionCell">
+
+<div class="questionText">
+${q.question_text || ""}
+</div>
+
+${q.question_img ? 
 `<div class="questionImgBox">
 <img class="questionImg"
 src="${q.question_img}"
 onclick="window.open('${q.question_img}')">
 </div>`
-:"—"}
+:""}
+
 </td>
 
 <td>${q.chapters?.subjects?.grades?.name || ""}</td>
