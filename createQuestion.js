@@ -163,6 +163,27 @@ LƯU CÂU HỎI
 async function saveQuestion(){
 const { data: { user } } = await sb.auth.getUser()
 
+let questionImgSrc = null
+let answerImgSrc = null
+
+if(questionImageFile){
+
+questionImgSrc = await uploadImage(
+questionImageFile,
+"questions"
+)
+
+}
+
+if(answerImageFile){
+
+answerImgSrc = await uploadImage(
+answerImageFile,
+"answers"
+)
+
+}
+  
 const userId = user.id
 const chapterVal = chapter.value
 const typeVal = question_type.value
@@ -343,6 +364,81 @@ resolve(blob)
 reader.readAsDataURL(file)
 
 })
+
+}
+
+/* HÀM NÉN ẢNH */
+async function compressImage(file){
+
+return new Promise((resolve)=>{
+
+const img = new Image()
+const reader = new FileReader()
+
+reader.onload = function(e){
+img.src = e.target.result
+}
+
+img.onload = function(){
+
+const canvas = document.createElement("canvas")
+const ctx = canvas.getContext("2d")
+
+const MAX_WIDTH = 1200
+const MAX_HEIGHT = 1200
+
+let width = img.width
+let height = img.height
+
+if(width > MAX_WIDTH){
+height *= MAX_WIDTH / width
+width = MAX_WIDTH
+}
+
+if(height > MAX_HEIGHT){
+width *= MAX_HEIGHT / height
+height = MAX_HEIGHT
+}
+
+canvas.width = width
+canvas.height = height
+
+ctx.drawImage(img,0,0,width,height)
+
+canvas.toBlob((blob)=>{
+resolve(blob)
+},"image/jpeg",0.7)
+
+}
+
+reader.readAsDataURL(file)
+
+})
+
+}
+
+/* HÀM UPLOAD ẢNH */
+
+async function uploadImage(file, folder){
+
+const compressed = await compressImage(file)
+
+const fileName = folder + "/" + crypto.randomUUID() + ".jpg"
+
+const { data, error } = await sb.storage
+.from("question-images")
+.upload(fileName, compressed)
+
+if(error){
+console.error(error)
+return null
+}
+
+const { data:urlData } = sb.storage
+.from("question-images")
+.getPublicUrl(fileName)
+
+return urlData.publicUrl
 
 }
 
