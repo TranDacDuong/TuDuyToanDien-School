@@ -257,49 +257,20 @@ editingQuestionId = id
 
 openModal()
 
-/* =========================
-SET KHỐI
-========================= */
+/* đổi tiêu đề */
+
+formTitle.innerText = "Sửa câu hỏi"
+saveBtn.innerText = "Cập nhật"
+
+/* đổ dữ liệu */
 
 grade.value = q.chapters?.subjects?.grades?.id || ""
-
-/* =========================
-LOAD SUBJECT
-========================= */
-
-const { data: subjects } = await sb
-.from("subjects")
-.select("*")
-.eq("grade_id", grade.value)
-
-subject.innerHTML = "<option value=''>Môn</option>"
-
-subjects.forEach(s=>{
-subject.innerHTML += `<option value="${s.id}">${s.name}</option>`
-})
+await loadSubjects()
 
 subject.value = q.chapters?.subjects?.id || ""
-
-/* =========================
-LOAD CHAPTER
-========================= */
-
-const { data: chapters } = await sb
-.from("chapters")
-.select("*")
-.eq("subject_id", subject.value)
-
-chapter.innerHTML = "<option value=''>Chương</option>"
-
-chapters.forEach(c=>{
-chapter.innerHTML += `<option value="${c.id}">${c.name}</option>`
-})
+await loadChapters()
 
 chapter.value = q.chapter_id || ""
-
-/* =========================
-SET TYPE
-========================= */
 
 question_type.value = q.question_type
 difficulty.value = q.difficulty
@@ -307,95 +278,16 @@ difficulty.value = q.difficulty
 questionText.value = q.question_text || ""
 answerText.value = q.answer_text || ""
 
-/* =========================
-HIỂN THỊ ẢNH
-========================= */
+/* ảnh */
 
-if(q.question_img){
+questionImg.src = q.question_img || ""
+answerImg.src = q.answer_img || ""
 
-questionImg.src = q.question_img
-questionImgBox.style.display = "block"
-
-}else{
-
-questionImgBox.style.display = "none"
-
-}
-
-if(q.answer_img){
-
-answerImg.src = q.answer_img
-answerImgBox.style.display = "block"
-
-}else{
-
-answerImgBox.style.display = "none"
-
-}
-
-/* =========================
-LOAD ANSWER UI
-========================= */
+/* tạo UI đáp án */
 
 changeType()
 
-if(q.answer_count){
-createAnswerInputs(q.answer_count)
-}
-  
-/* =========================
-SET ĐÁP ÁN ĐÚNG
-========================= */
-
-if(q.question_type === "multi_choice"){
-
-const boxes = document.querySelectorAll("#answerArea .answerBox")
-
-boxes.forEach((box,index)=>{
-
-const checkbox = box.querySelector("input")
-
-if(q.answer.includes(String.fromCharCode(65 + index))){
-checkbox.checked = true
-}
-
-})
-
-}
-
-if(q.question_type === "true_false"){
-
-const boxes = document.querySelectorAll("#answerArea .answerBox")
-
-boxes.forEach((box,index)=>{
-
-const state = box.querySelector(".correct, .wrong")
-
-if(q.answer.includes(String.fromCharCode(97 + index))){
-state.innerText = "Đúng"
-}else{
-state.innerText = "Sai"
-}
-
-})
-
-}
-
-if(q.question_type === "short_answer"){
-
-const inputs = document.querySelectorAll("#answerArea input")
-
-const arr = q.answer.split(";")
-
-inputs.forEach((input,i)=>{
-input.value = arr[i] || ""
-})
-
-}
-
-/* đổi text nút */
-
-saveBtn.innerText = "Cập nhật câu hỏi"
+setCorrectAnswer(q)
 
 }
 
