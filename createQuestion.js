@@ -181,9 +181,9 @@ const { data, error } = await sb
 .from("questions")
 .insert([
 {
-grade: gradeVal,
-subject: subjectVal,
-chapter: chapterVal,
+grade_id: gradeVal,
+subject_id: subjectVal,
+chapter_id: chapterVal,
 question_type: typeVal,
 difficulty: difficultyVal,
 question_text: questionVal,
@@ -196,7 +196,7 @@ answer_img: answerImgSrc
 if(error){
 
 console.error(error)
-alert("Lỗi lưu câu hỏi")
+alert(error.message)
 
 }else{
 
