@@ -128,15 +128,6 @@ list=list.filter(q=>q.question_type===f_type.value)
 if(f_difficulty.value)
 list=list.filter(q=>q.difficulty==f_difficulty.value)
 
-const keyword=searchBox.value.toLowerCase()
-
-if(keyword){
-list=list.filter(q=>
-(q.chapters?.name||"").toLowerCase().includes(keyword) ||
-(q.chapters?.subjects?.name||"").toLowerCase().includes(keyword)
-)
-}
-
 list.forEach((q,i)=>{
 
 questionTable.innerHTML+=`
