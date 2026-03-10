@@ -475,12 +475,14 @@ let answerCount=4
 
 function changeType(){
 
-const type=question_type.value
+const type = question_type.value
 answerArea.innerHTML=""
 
-answerLabel.style.display= type==="essay" ? "none" : "block"
+answerLabel.style.display = type==="essay" ? "none" : "block"
 
-answerCount=4
+if(type==="multi_choice") answerCount=4
+if(type==="true_false") answerCount=4
+if(type==="short_answer") answerCount=1
 
 if(type==="multi_choice") renderMulti()
 if(type==="true_false") renderTF()
@@ -515,15 +517,18 @@ function renderTF(){
 const row=document.createElement("div")
 row.className="answerRow"
 
-const letters=["a","b","c","d"]
+for(let i=0;i<answerCount;i++){
 
-letters.forEach(l=>{
+const letter=String.fromCharCode(97+i)
+
 row.innerHTML+=`
 <div class="answerBox">
-<span>${l})</span>
+<span>${letter})</span>
 <span class="correct" onclick="toggleTF(this)">Đúng</span>
-</div>`
-})
+</div>
+`
+
+}
 
 answerArea.appendChild(row)
 
@@ -583,7 +588,15 @@ ${letter}
 
 if(type==="true_false"){
 
-if(answerCount>4) return
+const row = answerArea.firstChild
+const letter = String.fromCharCode(96 + answerCount)
+
+row.innerHTML += `
+<div class="answerBox">
+<span>${letter})</span>
+<span class="correct" onclick="toggleTF(this)">Đúng</span>
+</div>
+`
 
 }
 
@@ -619,6 +632,13 @@ row.removeChild(row.lastElementChild)
 
 }
 
+if(type==="true_false"){
+
+const row = answerArea.firstChild
+row.removeChild(row.lastElementChild)
+
+}
+  
 /* SHORT ANSWER */
 
 if(type==="short_answer"){
