@@ -157,6 +157,7 @@ onclick="window.open('${q.image_url}')">
 <td class="answerCell">${q.answer||""}</td>
 
 <td>
+<button onclick="editQ('${q.id}')">Sửa</button>
 <button onclick="deleteQ('${q.id}')">Xóa</button>
 </td>
 
@@ -193,6 +194,28 @@ async function init(){
 
 await loadGrades()
 await loadQuestions()
+
+}
+
+function editQ(id){
+
+const q = questions.find(q=>q.id===id)
+
+if(!q) return
+
+openModal()
+
+grade.value = q.chapters?.subjects?.grades?.id || ""
+subject.value = q.chapters?.subjects?.id || ""
+chapter.value = q.chapter_id || ""
+
+question_type.value = q.question_type
+difficulty.value = q.difficulty
+
+questionText.value = q.question_text || ""
+answerText.value = q.answer || ""
+
+changeType()
 
 }
 
