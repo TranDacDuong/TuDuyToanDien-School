@@ -249,11 +249,15 @@ await loadQuestions()
 
 async function editQ(id){
 
-const q = questions.find(q=>q.id===id)
+const q = questions.find(q => q.id === id)
 
 if(!q) return
 
+/* bật chế độ sửa */
+
 editingQuestionId = id
+
+/* mở form */
 
 openModal()
 
@@ -262,14 +266,10 @@ openModal()
 formTitle.innerText = "Sửa câu hỏi"
 saveBtn.innerText = "Cập nhật"
 
-/* đổ dữ liệu */
+/* điền dữ liệu */
 
 grade.value = q.chapters?.subjects?.grades?.id || ""
-await loadSubjects()
-
 subject.value = q.chapters?.subjects?.id || ""
-await loadChapters()
-
 chapter.value = q.chapter_id || ""
 
 question_type.value = q.question_type
@@ -280,14 +280,71 @@ answerText.value = q.answer_text || ""
 
 /* ảnh */
 
-questionImg.src = q.question_img || ""
-answerImg.src = q.answer_img || ""
+if(q.question_img){
+questionImg.src = q.question_img
+questionImgBox.style.display = "block"
+}else{
+questionImgBox.style.display = "none"
+}
+
+if(q.answer_img){
+answerImg.src = q.answer_img
+answerImgBox.style.display = "block"
+}else{
+answerImgBox.style.display = "none"
+}
 
 /* tạo UI đáp án */
 
 changeType()
 
-setCorrectAnswer(q)
+/* set đáp án đúng */
+
+if(q.question_type === "multi_choice"){
+
+const boxes = document.querySelectorAll("#answerArea .answerBox")
+
+boxes.forEach((box,index)=>{
+
+const checkbox = box.querySelector("input")
+
+if(q.answer.includes(String.fromCharCode(65 + index))){
+checkbox.checked = true
+}
+
+})
+
+}
+
+if(q.question_type === "true_false"){
+
+const boxes = document.querySelectorAll("#answerArea .answerBox")
+
+boxes.forEach((box,index)=>{
+
+const state = box.querySelector(".correct, .wrong")
+
+if(q.answer.includes(String.fromCharCode(97 + index))){
+state.innerText = "Đúng"
+}else{
+state.innerText = "Sai"
+}
+
+})
+
+}
+
+if(q.question_type === "short_answer"){
+
+const inputs = document.querySelectorAll("#answerArea input")
+
+const arr = q.answer.split(";")
+
+inputs.forEach((input,i)=>{
+input.value = arr[i] || ""
+})
+
+}
 
 }
 
