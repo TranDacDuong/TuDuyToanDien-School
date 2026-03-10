@@ -311,36 +311,6 @@ Nhập câu hỏi
 
 <script>
 
-let questionMode="image"
-
-function toggleQuestionMode(){
-
-const text=document.getElementById("questionText")
-const img=document.getElementById("questionPreview")
-const btn=document.getElementById("modeBtn")
-
-if(questionMode==="image"){
-
-questionMode="text"
-
-text.style.display="block"
-img.style.display="none"
-
-btn.innerText="Chữ"
-
-}else{
-
-questionMode="image"
-
-text.style.display="none"
-img.style.display="block"
-
-btn.innerText="Ảnh"
-
-}
-
-}
-
 /* paste ảnh */
 
 document.addEventListener("paste",function(e){
