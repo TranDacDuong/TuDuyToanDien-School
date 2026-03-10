@@ -167,7 +167,6 @@ USER
 ========================= */
 
 const { data: { user } } = await sb.auth.getUser()
-
 const userId = user?.id || null
 
 /* =========================
@@ -181,8 +180,8 @@ const difficultyVal = difficulty.value
 const questionVal = questionText.value.trim()
 const answerVal = answerText.value.trim()
 
-const questionImgSrc = questionImg.src || null
-const answerImgSrc = answerImg.src || null
+const questionImgSrc = questionImg.src ? questionImg.src : null
+const answerImgSrc = answerImg.src ? answerImg.src : null
 
 let answerCount = 0
 let correctAnswer = ""
@@ -202,7 +201,7 @@ boxes.forEach((box,index)=>{
 const checkbox = box.querySelector("input")
 
 if(checkbox.checked){
-correctAnswer += String.fromCharCode(65 + index) // A B C D
+correctAnswer += String.fromCharCode(65 + index)
 }
 
 })
@@ -220,7 +219,7 @@ boxes.forEach((box,index)=>{
 const state = box.querySelector(".correct, .wrong")
 
 if(state.innerText === "Đúng"){
-correctAnswer += String.fromCharCode(97 + index) // a b c d
+correctAnswer += String.fromCharCode(97 + index)
 }
 
 })
@@ -238,16 +237,10 @@ correctAnswer = [...inputs].map(i=>i.value).join(";")
 }
 
 /* =========================
-QUERY INSERT / UPDATE
+DATA OBJECT
 ========================= */
 
-let query
-
-if(editingQuestionId){
-
-query = sb
-.from("question_bank")
-.update({
+const dataObj = {
 
 chapter_id: chapterVal,
 question_type: typeVal,
@@ -262,40 +255,43 @@ answer_img: answerImgSrc,
 answer_count: answerCount,
 answer: correctAnswer
 
-})
+}
+
+/* =========================
+INSERT / UPDATE
+========================= */
+
+let error
+
+if(editingQuestionId){
+
+/* UPDATE */
+
+const res = await sb
+.from("question_bank")
+.update(dataObj)
 .eq("id", editingQuestionId)
+
+error = res.error
 
 }else{
 
-query = sb
+/* INSERT */
+
+dataObj.hidden = false
+dataObj.created_by = userId
+
+const res = await sb
 .from("question_bank")
-.insert([
-{
-chapter_id: chapterVal,
-question_type: typeVal,
-difficulty: difficultyVal,
+.insert([dataObj])
 
-question_text: questionVal,
-question_img: questionImgSrc,
-
-answer_text: answerVal,
-answer_img: answerImgSrc,
-
-answer_count: answerCount,
-answer: correctAnswer,
-
-hidden: false,
-created_by: userId
-}
-])
+error = res.error
 
 }
 
 /* =========================
-EXECUTE QUERY
+RESULT
 ========================= */
-
-const { error } = await query
 
 if(error){
 
@@ -310,29 +306,20 @@ SUCCESS
 ========================= */
 
 if(editingQuestionId){
-
 alert("Cập nhật câu hỏi thành công")
-
 }else{
-
 alert("Tạo câu hỏi thành công")
-
 }
 
-/* reset chế độ edit */
+/* reset edit mode */
 
 editingQuestionId = null
 
-/* reset tiêu đề form */
-
-formTitle.innerText = "Tạo câu hỏi"
-saveBtn.innerText = "Lưu câu hỏi"
-
-/* reset nội dung câu hỏi */
+/* reset form */
 
 resetQuestionForm()
 
-/* reload danh sách */
+/* reload bảng */
 
 loadQuestions()
 
