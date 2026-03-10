@@ -177,7 +177,7 @@ const questionImgSrc = questionImg.src || null
 const answerImgSrc = answerImg.src || null
 
 
-const { data, error } = await supabase
+const { data, error } = await sb
 .from("questions")
 .insert([
 {
