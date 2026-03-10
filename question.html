@@ -410,34 +410,63 @@ answerImgBox.style.display="none"
 
 }
     
-document.addEventListener("paste",function(e){
+document.addEventListener("paste", async function(e){
 
 if(!activeField) return
 
-const items=e.clipboardData.items
+const items = e.clipboardData.items
 
 for(let item of items){
 
-if(item.type.indexOf("image")!==-1){
+if(item.type.indexOf("image") !== -1){
 
-const file=item.getAsFile()
-const reader=new FileReader()
+const file = item.getAsFile()
 
-reader.onload=function(event){
+/* NÉN ẢNH */
 
-if(activeField==="question"){
-document.getElementById("questionImg").src = event.target.result
-document.getElementById("questionImgBox").style.display="block"
+const compressedBlob = await compressImage(file)
+
+/* TÊN FILE */
+
+const fileName = crypto.randomUUID() + ".jpg"
+
+/* UPLOAD STORAGE */
+
+const { data, error } = await sb.storage
+.from("question-images")
+.upload(fileName, compressedBlob)
+
+if(error){
+
+console.error(error)
+alert("Upload ảnh lỗi")
+return
+
 }
 
-if(activeField==="answer"){
-document.getElementById("answerImg").src = event.target.result
-document.getElementById("answerImgBox").style.display="block"
-}
+/* LẤY URL */
+
+const { data:urlData } = sb.storage
+.from("question-images")
+.getPublicUrl(fileName)
+
+const imageUrl = urlData.publicUrl
+
+/* HIỂN THỊ */
+
+if(activeField === "question"){
+
+questionImg.src = imageUrl
+questionImgBox.style.display = "block"
 
 }
 
-reader.readAsDataURL(file)
+if(activeField === "answer"){
+
+answerImg.src = imageUrl
+answerImgBox.style.display = "block"
+
+}
 
 }
 
