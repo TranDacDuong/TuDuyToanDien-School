@@ -248,6 +248,18 @@ location.reload()
 
 }
 
+/* LOAD DIFFICULTY */
+
+for(let i = 1; i <= 10; i++){
+
+const option = document.createElement("option")
+option.value = i
+option.textContent = i
+
+difficulty.appendChild(option)
+
+}
+
 /* =========================
 INIT
 ========================= */
