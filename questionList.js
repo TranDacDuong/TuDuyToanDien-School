@@ -245,7 +245,7 @@ await loadQuestions()
 
 /* EDIT */
 
-function editQ(id){
+async function editQ(id){
 
 const q = questions.find(q=>q.id===id)
 
@@ -255,9 +255,49 @@ editingQuestionId = id
 
 openModal()
 
+/* =========================
+SET KHỐI
+========================= */
+
 grade.value = q.chapters?.subjects?.grades?.id || ""
+
+/* =========================
+LOAD SUBJECT
+========================= */
+
+const { data: subjects } = await sb
+.from("subjects")
+.select("*")
+.eq("grade_id", grade.value)
+
+subject.innerHTML = "<option value=''>Môn</option>"
+
+subjects.forEach(s=>{
+subject.innerHTML += `<option value="${s.id}">${s.name}</option>`
+})
+
 subject.value = q.chapters?.subjects?.id || ""
+
+/* =========================
+LOAD CHAPTER
+========================= */
+
+const { data: chapters } = await sb
+.from("chapters")
+.select("*")
+.eq("subject_id", subject.value)
+
+chapter.innerHTML = "<option value=''>Chương</option>"
+
+chapters.forEach(c=>{
+chapter.innerHTML += `<option value="${c.id}">${c.name}</option>`
+})
+
 chapter.value = q.chapter_id || ""
+
+/* =========================
+SET TYPE
+========================= */
 
 question_type.value = q.question_type
 difficulty.value = q.difficulty
@@ -265,7 +305,9 @@ difficulty.value = q.difficulty
 questionText.value = q.question_text || ""
 answerText.value = q.answer_text || ""
 
-/* HIỂN THỊ ẢNH */
+/* =========================
+HIỂN THỊ ẢNH
+========================= */
 
 if(q.question_img){
 
@@ -289,9 +331,63 @@ answerImgBox.style.display = "none"
 
 }
 
+/* =========================
+LOAD ANSWER UI
+========================= */
+
 changeType()
 
-/* Đổi text nút */
+/* =========================
+SET ĐÁP ÁN ĐÚNG
+========================= */
+
+if(q.question_type === "multi_choice"){
+
+const boxes = document.querySelectorAll("#answerArea .answerBox")
+
+boxes.forEach((box,index)=>{
+
+const checkbox = box.querySelector("input")
+
+if(q.answer.includes(String.fromCharCode(65 + index))){
+checkbox.checked = true
+}
+
+})
+
+}
+
+if(q.question_type === "true_false"){
+
+const boxes = document.querySelectorAll("#answerArea .answerBox")
+
+boxes.forEach((box,index)=>{
+
+const state = box.querySelector(".correct, .wrong")
+
+if(q.answer.includes(String.fromCharCode(97 + index))){
+state.innerText = "Đúng"
+}else{
+state.innerText = "Sai"
+}
+
+})
+
+}
+
+if(q.question_type === "short_answer"){
+
+const inputs = document.querySelectorAll("#answerArea input")
+
+const arr = q.answer.split(";")
+
+inputs.forEach((input,i)=>{
+input.value = arr[i] || ""
+})
+
+}
+
+/* đổi text nút */
 
 saveBtn.innerText = "Cập nhật câu hỏi"
 
