@@ -161,8 +161,9 @@ LƯU CÂU HỎI
 ========================= */
 
 async function saveQuestion(){
+
 const { data: { user } } = await sb.auth.getUser()
-  
+
 const userId = user.id
 const chapterVal = chapter.value
 const typeVal = question_type.value
@@ -171,15 +172,37 @@ const difficultyVal = difficulty.value
 const questionVal = questionText.value.trim()
 const answerVal = answerText.value.trim()
 
-const questionImgSrc = questionImg.src || null
-const answerImgSrc = answerImg.src || null
+/* =========================
+UPLOAD ẢNH
+========================= */
 
-let answerCount = 0
-let correctAnswer = ""
+let questionImgSrc = null
+let answerImgSrc = null
+
+if(questionImageFile){
+
+questionImgSrc = await uploadImage(
+questionImageFile,
+"questions"
+)
+
+}
+
+if(answerImageFile){
+
+answerImgSrc = await uploadImage(
+answerImageFile,
+"answers"
+)
+
+}
 
 /* =========================
 LẤY ĐÁP ÁN
 ========================= */
+
+let answerCount = 0
+let correctAnswer = ""
 
 if(typeVal === "multi_choice"){
 
@@ -193,7 +216,7 @@ const checkbox = box.querySelector("input")
 
 if(checkbox.checked){
 
-correctAnswer += String.fromCharCode(65 + index)  // A B C D
+correctAnswer += String.fromCharCode(65 + index)
 
 }
 
@@ -213,7 +236,7 @@ const state = box.querySelector(".correct, .wrong")
 
 if(state.innerText === "Đúng"){
 
-correctAnswer += String.fromCharCode(97 + index) // a b c d
+correctAnswer += String.fromCharCode(97 + index)
 
 }
 
@@ -232,7 +255,7 @@ correctAnswer = [...inputs].map(i=>i.value).join(";")
 }
 
 /* =========================
-LƯU DATABASE
+INSERT DATABASE
 ========================= */
 
 const { data, error } = await sb
@@ -264,7 +287,6 @@ alert(error.message)
 }else{
 
 alert("Lưu thành công")
-
 closeModal()
 
 }
