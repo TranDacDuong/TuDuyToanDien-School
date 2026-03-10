@@ -46,37 +46,6 @@ ${g.name}
 
 })
 
-
-/* LOAD MỨC ĐỘ */
-
-const {data:levels,error:lErr} = await sb
-.from("difficulty_levels")
-.select("*")
-.order("id")
-
-if(lErr){
-
-console.error(lErr)
-alert("Không load được mức độ")
-return
-
-}
-
-difficulty.innerHTML = `<option value="">Chọn mức độ</option>`
-
-levels?.forEach(l=>{
-
-difficulty.innerHTML += `
-<option value="${l.id}">
-${l.name}
-</option>
-`
-
-})
-
-}
-
-
 /* =========================
 CHỌN KHỐI → LOAD MÔN
 ========================= */
