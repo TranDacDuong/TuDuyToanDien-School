@@ -20,8 +20,9 @@ max-width:100%;
 }
 
 .previewImg{
-width:100%;
+max-width:400px;
 border-radius:6px;
+margin-top:8px;
 }
 
 .imgDelete{
@@ -170,14 +171,6 @@ gap:10px;
 background:#64748b;
 font-size:12px;
 margin-left:8px;
-}
-
-/* PREVIEW */
-
-.previewImg{
-max-width:100%;
-border-radius:6px;
-display:none;
 }
 
 /* ANSWERS */
@@ -426,17 +419,13 @@ const reader=new FileReader()
 reader.onload=function(event){
 
 if(activeField==="question"){
-
-questionImg.src = event.target.result
-questionImgBox.style.display = "block"
-
+document.getElementById("questionImg").src = event.target.result
+document.getElementById("questionImgBox").style.display="block"
 }
 
 if(activeField==="answer"){
-
-answerImg.src = event.target.result
-answerImgBox.style.display = "block"
-
+document.getElementById("answerImg").src = event.target.result
+document.getElementById("answerImgBox").style.display="block"
 }
 
 }
