@@ -119,12 +119,12 @@ flex-direction:column;
 gap:10px;
 }
 
-/* TEXT IMAGE SWITCH */
+/* MODE BUTTON */
 
 .modeBtn{
 background:#64748b;
 font-size:12px;
-margin-right:6px;
+margin-left:8px;
 }
 
 /* PREVIEW */
@@ -138,30 +138,37 @@ display:none;
 /* ANSWERS */
 
 .answerRow{
-display:flex;
+display:grid;
+grid-template-columns:repeat(4,1fr);
 gap:10px;
-flex-wrap:wrap;
 }
 
 .answerBox{
 border:1px solid #ccc;
-padding:6px 10px;
+padding:6px 8px;
 border-radius:6px;
-cursor:pointer;
+display:flex;
+align-items:center;
+gap:6px;
 }
 
 .correct{
-background:#22c55e;
-color:white;
+color:#22c55e;
+font-weight:bold;
+cursor:pointer;
 }
 
 .wrong{
-background:#ef4444;
-color:white;
+color:#ef4444;
+font-weight:bold;
+cursor:pointer;
 }
 
-.shortInput{
-width:80px;
+.shortRow{
+display:flex;
+align-items:center;
+gap:6px;
+margin-bottom:6px;
 }
 
 </style>
@@ -233,7 +240,7 @@ width:80px;
 
 </div>
 
-<!-- MODAL CREATE -->
+<!-- MODAL -->
 
 <div class="modal" id="modal">
 
@@ -261,8 +268,7 @@ width:80px;
 
 <label>
 
-<button class="modeBtn" onclick="toggleMode('question')">Chữ/Ảnh</button>
-Câu hỏi
+Câu hỏi <button class="modeBtn" onclick="toggleMode('question')" id="qMode">Ảnh</button>
 
 </label>
 
@@ -272,8 +278,7 @@ Câu hỏi
 
 <label>
 
-<button class="modeBtn" onclick="toggleMode('answer')">Chữ/Ảnh</button>
-Đáp án
+Đáp án <button class="modeBtn" onclick="toggleMode('answer')" id="aMode">Ảnh</button>
 
 </label>
 
@@ -300,9 +305,9 @@ Câu hỏi
 
 <label>Mức độ</label> <select id="difficulty"></select>
 
-<label>
+<label id="answerLabel">
 
-Thiết lập đáp án <button onclick="addAnswer()">+</button> <button onclick="removeAnswer()">-</button>
+Chọn đáp án đúng <button onclick="addAnswer()">+</button> <button onclick="removeAnswer()">-</button>
 
 </label>
 
@@ -322,8 +327,6 @@ Thiết lập đáp án <button onclick="addAnswer()">+</button> <button onclick
 
 <script>
 
-/* MODAL */
-
 function openModal(){
 modal.style.display="flex"
 changeType()
@@ -333,29 +336,21 @@ function closeModal(){
 modal.style.display="none"
 }
 
-/* MODE */
+/* TEXT IMAGE MODE */
 
-let questionMode="text"
-let answerMode="text"
+let questionMode="image"
+let answerMode="image"
 
 function toggleMode(type){
 
 if(type==="question"){
-
-questionMode=questionMode==="text"?"image":"text"
-
-questionText.style.display=questionMode==="text"?"block":"none"
-questionImg.style.display="none"
-
+questionMode=questionMode==="image"?"text":"image"
+qMode.innerText=questionMode==="image"?"Ảnh":"Chữ"
 }
 
 if(type==="answer"){
-
-answerMode=answerMode==="text"?"image":"text"
-
-answerText.style.display=answerMode==="text"?"block":"none"
-answerImg.style.display="none"
-
+answerMode=answerMode==="image"?"text":"image"
+aMode.innerText=answerMode==="image"?"Ảnh":"Chữ"
 }
 
 }
@@ -371,23 +366,18 @@ for(let item of items){
 if(item.type.indexOf("image")!==-1){
 
 const file=item.getAsFile()
-
 const reader=new FileReader()
 
 reader.onload=function(event){
 
 if(questionMode==="image"){
-
 questionImg.src=event.target.result
 questionImg.style.display="block"
-
 }
 
 if(answerMode==="image"){
-
 answerImg.src=event.target.result
 answerImg.style.display="block"
-
 }
 
 }
@@ -400,123 +390,106 @@ reader.readAsDataURL(file)
 
 })
 
-/* ANSWER TYPE */
+/* ANSWER TYPES */
 
 let answerCount=4
 
 function changeType(){
 
 const type=question_type.value
-
 answerArea.innerHTML=""
+
+answerLabel.style.display= type==="essay" ? "none" : "block"
+
 answerCount=4
 
-if(type==="multi_choice"){
-
-renderMulti()
-
-}
-
-if(type==="true_false"){
-
-renderTrueFalse()
-
-}
-
-if(type==="short_answer"){
-
-renderShort()
-
-}
+if(type==="multi_choice") renderMulti()
+if(type==="true_false") renderTF()
+if(type==="short_answer") renderShort()
 
 }
 
 function renderMulti(){
 
-answerArea.innerHTML=`<div class="answerRow"></div>`
-const row=answerArea.firstChild
+const row=document.createElement("div")
+row.className="answerRow"
 
-const letters=["A","B","C","D"]
+for(let i=0;i<answerCount;i++){
 
-letters.forEach(l=>{
-row.innerHTML+=`<div class="answerBox">[]${l}</div>`
-})
+const letter=String.fromCharCode(65+i)
+
+row.innerHTML+=`
+<div class="answerBox">
+<input type="checkbox">
+${letter}
+</div>
+`
 
 }
 
-function renderTrueFalse(){
+answerArea.appendChild(row)
 
-answerArea.innerHTML=`<div class="answerRow"></div>`
-const row=answerArea.firstChild
+}
+
+function renderTF(){
+
+const row=document.createElement("div")
+row.className="answerRow"
 
 const letters=["a","b","c","d"]
 
 letters.forEach(l=>{
-row.innerHTML+=`<div class="answerBox correct" onclick="toggleTF(this)">${l}) Đúng</div>`
+row.innerHTML+=`
+<div class="answerBox">
+<span>${l})</span>
+<span class="correct" onclick="toggleTF(this)">Đúng</span>
+</div>`
 })
+
+answerArea.appendChild(row)
 
 }
 
 function toggleTF(el){
 
-if(el.classList.contains("correct")){
-
+if(el.innerText==="Đúng"){
+el.innerText="Sai"
 el.classList.remove("correct")
 el.classList.add("wrong")
-el.innerText=el.innerText.replace("Đúng","Sai")
-
 }else{
-
+el.innerText="Đúng"
 el.classList.remove("wrong")
 el.classList.add("correct")
-el.innerText=el.innerText.replace("Sai","Đúng")
-
 }
 
 }
 
 function renderShort(){
 
-answerArea.innerHTML=`<div class="answerRow">
-<input class="shortInput">
+for(let i=1;i<=answerCount;i++){
+
+answerArea.innerHTML+=`
+<div class="shortRow">
+${i}
+<input>
 </div>`
+
+}
 
 }
 
 function addAnswer(){
 
 answerCount++
-
-const type=question_type.value
-
-if(type==="multi_choice"){
-
-answerArea.firstChild.innerHTML+=`<div class="answerBox">[]</div>`
-
-}
-
-if(type==="true_false"){
-
-answerArea.firstChild.innerHTML+=`<div class="answerBox correct" onclick="toggleTF(this)">Đúng</div>`
-
-}
-
-if(type==="short_answer"){
-
-answerArea.firstChild.innerHTML+=`<input class="shortInput">`
-
-}
+changeType()
 
 }
 
 function removeAnswer(){
 
-const row=answerArea.firstChild
-
-if(row.children.length>1){
-
-row.removeChild(row.lastChild)
-
+if(answerCount>1){
+answerCount--
+changeType()
 }
 
 }
