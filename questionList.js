@@ -186,7 +186,6 @@ loadQuestions()
 
 f_type.onchange=render
 f_difficulty.onchange=render
-searchBox.oninput=render
 
 /* INIT */
 
