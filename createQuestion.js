@@ -161,7 +161,9 @@ LƯU CÂU HỎI
 ========================= */
 
 async function saveQuestion(){
+const { data: { user } } = await sb.auth.getUser()
 
+const userId = user.id
 const chapterVal = chapter.value
 const typeVal = question_type.value
 const difficultyVal = difficulty.value
@@ -249,7 +251,8 @@ answer_img: answerImgSrc,
 
 answer_count: answerCount,
 answer: correctAnswer,
-hidden: false
+hidden: false,
+created_by: userId
 }
 ])
 
