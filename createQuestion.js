@@ -172,37 +172,15 @@ const difficultyVal = difficulty.value
 const questionVal = questionText.value.trim()
 const answerVal = answerText.value.trim()
 
-/* =========================
-UPLOAD ẢNH
-========================= */
+const questionImgSrc = questionImg.src || null
+const answerImgSrc = answerImg.src || null
 
-let questionImgSrc = null
-let answerImgSrc = null
-
-if(questionImageFile){
-
-questionImgSrc = await uploadImage(
-questionImageFile,
-"questions"
-)
-
-}
-
-if(answerImageFile){
-
-answerImgSrc = await uploadImage(
-answerImageFile,
-"answers"
-)
-
-}
+let answerCount = 0
+let correctAnswer = ""
 
 /* =========================
 LẤY ĐÁP ÁN
 ========================= */
-
-let answerCount = 0
-let correctAnswer = ""
 
 if(typeVal === "multi_choice"){
 
@@ -216,7 +194,7 @@ const checkbox = box.querySelector("input")
 
 if(checkbox.checked){
 
-correctAnswer += String.fromCharCode(65 + index)
+correctAnswer += String.fromCharCode(65 + index) // A B C D
 
 }
 
@@ -236,7 +214,7 @@ const state = box.querySelector(".correct, .wrong")
 
 if(state.innerText === "Đúng"){
 
-correctAnswer += String.fromCharCode(97 + index)
+correctAnswer += String.fromCharCode(97 + index) // a b c d
 
 }
 
@@ -255,7 +233,7 @@ correctAnswer = [...inputs].map(i=>i.value).join(";")
 }
 
 /* =========================
-INSERT DATABASE
+LƯU DATABASE
 ========================= */
 
 const { data, error } = await sb
