@@ -402,6 +402,13 @@ function closeModal(){
 const modal = document.getElementById("modal")
 modal.style.display = "none"
 
+editingQuestionId = null
+
+formTitle.innerText = "Tạo câu hỏi"
+saveBtn.innerText = "Lưu câu hỏi"
+
+resetQuestionForm()
+
 }
 
 function removeImg(type){
