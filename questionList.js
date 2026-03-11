@@ -1,6 +1,5 @@
 let grades = []
 let questions = []
-let editingQuestionId = null
 const formTitle = document.getElementById("formTitle")
 const saveBtn = document.getElementById("saveBtn")
 
