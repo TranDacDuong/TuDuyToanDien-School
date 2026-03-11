@@ -19,36 +19,24 @@ LOAD SELECT DATA
 
 async function loadSelectData(){
 
-/* LOAD KHỐI */
-
 const {data:grades,error:gErr} = await sb
 .from("grades")
 .select("*")
 .order("id")
 
 if(gErr){
-
 console.error(gErr)
 alert("Không load được khối")
 return
-
 }
 
 grade.innerHTML = `<option value="">Chọn khối</option>`
 
 grades?.forEach(g=>{
-
-grade.innerHTML += `
-<option value="${g.id}">
-${g.name}
-</option>
-`
-
+grade.innerHTML += `<option value="${g.id}">${g.name}</option>`
 })
 
-/* =========================
-CHỌN KHỐI → LOAD MÔN
-========================= */
+/* CHỌN KHỐI → LOAD MÔN */
 
 grade.addEventListener("change", async ()=>{
 
@@ -64,31 +52,20 @@ const {data:subjects,error} = await sb
 .order("id")
 
 if(error){
-
 console.error(error)
 alert("Không load được môn")
 return
-
 }
 
 subject.innerHTML = `<option value="">Chọn môn</option>`
 
 subjects?.forEach(s=>{
-
-subject.innerHTML += `
-<option value="${s.id}">
-${s.name}
-</option>
-`
-
+subject.innerHTML += `<option value="${s.id}">${s.name}</option>`
 })
 
 })
 
-
-/* =========================
-CHỌN MÔN → LOAD CHƯƠNG
-========================= */
+/* CHỌN MÔN → LOAD CHƯƠNG */
 
 subject.addEventListener("change", async ()=>{
 
@@ -103,55 +80,18 @@ const {data:chapters,error} = await sb
 .order("id")
 
 if(error){
-
 console.error(error)
 alert("Không load được chương")
 return
-
 }
 
 chapter.innerHTML = `<option value="">Chọn chương</option>`
 
 chapters?.forEach(c=>{
-
-chapter.innerHTML += `
-<option value="${c.id}">
-${c.name}
-</option>
-`
-
+chapter.innerHTML += `<option value="${c.id}">${c.name}</option>`
 })
 
 })
-}
-
-
-/* =========================
-LẤY NỘI DUNG CÂU HỎI
-========================= */
-
-function getQuestionContent(){
-
-if(questionText.dataset.image){
-
-return questionText.dataset.image
-
-}
-
-return questionText.value.trim()
-
-}
-
-
-function getAnswerContent(){
-
-if(answerText.dataset.image){
-
-return answerText.dataset.image
-
-}
-
-return answerText.value.trim()
 
 }
 
@@ -162,16 +102,12 @@ LƯU CÂU HỎI
 
 async function saveQuestion(){
 
-/* =========================
-USER
-========================= */
+/* USER */
 
 const { data: { user } } = await sb.auth.getUser()
 const userId = user?.id || null
 
-/* =========================
-FORM DATA
-========================= */
+/* FORM DATA */
 
 const chapterVal = chapter.value
 const typeVal = question_type.value
@@ -186,24 +122,18 @@ const answerImgSrc = answerImg.src ? answerImg.src : null
 let answerCount = 0
 let correctAnswer = ""
 
-/* =========================
-LẤY ĐÁP ÁN
-========================= */
+/* LẤY ĐÁP ÁN */
 
 if(typeVal === "multi_choice"){
 
 const boxes = document.querySelectorAll("#answerArea .answerBox")
-
 answerCount = boxes.length
 
 boxes.forEach((box,index)=>{
-
 const checkbox = box.querySelector("input")
-
 if(checkbox.checked){
 correctAnswer += String.fromCharCode(65 + index)
 }
-
 })
 
 }
@@ -211,17 +141,13 @@ correctAnswer += String.fromCharCode(65 + index)
 if(typeVal === "true_false"){
 
 const boxes = document.querySelectorAll("#answerArea .answerBox")
-
 answerCount = boxes.length
 
 boxes.forEach((box,index)=>{
-
 const state = box.querySelector(".correct, .wrong")
-
 if(state.innerText === "Đúng"){
 correctAnswer += String.fromCharCode(97 + index)
 }
-
 })
 
 }
@@ -229,16 +155,12 @@ correctAnswer += String.fromCharCode(97 + index)
 if(typeVal === "short_answer"){
 
 const inputs = document.querySelectorAll("#answerArea input")
-
 answerCount = inputs.length
-
 correctAnswer = [...inputs].map(i=>i.value).join(";")
 
 }
 
-/* =========================
-DATA OBJECT
-========================= */
+/* DATA OBJECT */
 
 const dataObj = {
 
@@ -253,56 +175,36 @@ answer_text: answerVal,
 answer_img: answerImgSrc,
 
 answer_count: answerCount,
-answer: correctAnswer
+answer: correctAnswer,
+
+hidden: false,
+created_by: userId
 
 }
-
-/* =========================
-INSERT / UPDATE
-========================= */
-
-let error
 
 /* INSERT */
 
-dataObj.hidden = false
-dataObj.created_by = userId
-
-const res = await sb
+const { error } = await sb
 .from("question_bank")
 .insert([dataObj])
 
-error = res.error
-
-}
-
-/* =========================
-RESULT
-========================= */
+/* RESULT */
 
 if(error){
-
 console.error(error)
 alert(error.message)
 return
-
 }
 
-/* =========================
-SUCCESS
-========================= */
+/* SUCCESS */
 
 alert("Tạo câu hỏi thành công")
 
-/* reset form */
-
 resetQuestionForm()
-
-/* reload bảng */
-
 loadQuestions()
 
 }
+
 
 /* LOAD DIFFICULTY */
 
@@ -316,6 +218,7 @@ difficulty.appendChild(option)
 
 }
 
+
 /* NÉN ẢNH */
 
 async function compressImage(file){
@@ -325,18 +228,12 @@ return new Promise((resolve)=>{
 const img = new Image()
 const reader = new FileReader()
 
-reader.onload = function(e){
-
-img.src = e.target.result
-
-}
+reader.onload = e => img.src = e.target.result
 
 img.onload = function(){
 
 const canvas = document.createElement("canvas")
 const ctx = canvas.getContext("2d")
-
-/* resize tối đa */
 
 const MAX_WIDTH = 1200
 const MAX_HEIGHT = 1200
@@ -345,17 +242,13 @@ let width = img.width
 let height = img.height
 
 if(width > MAX_WIDTH){
-
 height = height * (MAX_WIDTH / width)
 width = MAX_WIDTH
-
 }
 
 if(height > MAX_HEIGHT){
-
 width = width * (MAX_HEIGHT / height)
 height = MAX_HEIGHT
-
 }
 
 canvas.width = width
@@ -363,12 +256,8 @@ canvas.height = height
 
 ctx.drawImage(img,0,0,width,height)
 
-/* nén JPEG */
-
-canvas.toBlob((blob)=>{
-
+canvas.toBlob(blob=>{
 resolve(blob)
-
 },"image/jpeg",0.7)
 
 }
@@ -379,14 +268,13 @@ reader.readAsDataURL(file)
 
 }
 
-function resetQuestionForm(){
 
-/* reset text */
+/* RESET FORM */
+
+function resetQuestionForm(){
 
 questionText.value = ""
 answerText.value = ""
-
-/* reset ảnh */
 
 questionImg.src = ""
 answerImg.src = ""
@@ -394,21 +282,15 @@ answerImg.src = ""
 questionImgBox.style.display = "none"
 answerImgBox.style.display = "none"
 
-questionImageFile = null
-answerImageFile = null
-
-/* reset đáp án */
-
 const checkboxes = document.querySelectorAll("#answerArea input[type='checkbox']")
 checkboxes.forEach(cb => cb.checked = false)
 
-const inputs = document.querySelectorAll("#answerArea input[type='text']")
+const inputs = document.querySelectorAll("#answerArea input")
 inputs.forEach(i => i.value = "")
 
 }
 
-/* =========================
-INIT
-========================= */
+
+/* INIT */
 
 loadSelectData()
