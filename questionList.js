@@ -229,7 +229,7 @@ console.error(error)
 return
 }
 
-loadQuestions()
+await loadQuestions()
 
 }
 
@@ -339,15 +339,9 @@ answerImgBox.style.display = "none"
 TẠO UI ĐÁP ÁN
 ========================= */
 
+answerCount = q.answer_count || 1
+
 changeType()
-
-/* sửa lại số đáp án */
-
-const boxes = document.querySelectorAll("#answerArea .answerBox")
-
-boxes.forEach((box,i)=>{
-if(i >= q.answer_count) box.style.display = "none"
-})
 
 /* =========================
 SET ĐÁP ÁN ĐÚNG
