@@ -500,9 +500,13 @@ answerArea.innerHTML=""
 
 answerLabel.style.display = type==="essay" ? "none" : "block"
 
+if(!editingQuestionId){
+
 if(type==="multi_choice") answerCount=4
 if(type==="true_false") answerCount=4
 if(type==="short_answer") answerCount=1
+
+}
 
 if(type==="multi_choice") renderMulti()
 if(type==="true_false") renderTF()
