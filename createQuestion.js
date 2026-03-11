@@ -263,19 +263,6 @@ INSERT / UPDATE
 
 let error
 
-if(editingQuestionId){
-
-/* UPDATE */
-
-const res = await sb
-.from("question_bank")
-.update(dataObj)
-.eq("id", editingQuestionId)
-
-error = res.error
-
-}else{
-
 /* INSERT */
 
 dataObj.hidden = false
@@ -305,15 +292,7 @@ return
 SUCCESS
 ========================= */
 
-if(editingQuestionId){
-alert("Cập nhật câu hỏi thành công")
-}else{
 alert("Tạo câu hỏi thành công")
-}
-
-/* reset edit mode */
-
-editingQuestionId = null
 
 /* reset form */
 
