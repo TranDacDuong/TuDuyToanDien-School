@@ -4,78 +4,97 @@
 <meta charset="UTF-8">
 <title>Quản lý lớp học</title>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+
 <style>
 
+*{box-sizing:border-box;}
+
 body{
-font-family:Arial;
-background:#f5f6fa;
-margin:30px;
+font-family:Inter,Arial,sans-serif;
+background:#f8fafc;
+padding:30px;
+color:#1e293b;
 }
 
 .container{
-max-width:1200px;
+max-width:1300px;
 margin:auto;
+background:white;
+padding:28px;
+border-radius:12px;
+box-shadow:0 4px 20px rgba(0,0,0,0.05);
 }
 
 h2{
+font-size:26px;
 margin-bottom:10px;
 }
 
-.box-form{
-background:white;
-padding:20px;
-border-radius:10px;
-margin-bottom:30px;
-box-shadow:0 2px 6px rgba(0,0,0,0.1);
-}
-
-label{
-display:block;
-margin-top:10px;
-}
-
-input,select{
-width:100%;
-padding:8px;
-margin-top:5px;
-}
-
-.lich-row{
-display:flex;
-gap:10px;
-margin-top:10px;
-}
-
-.nut{
-background:#007bff;
-color:white;
+button{
+padding:7px 14px;
 border:none;
-padding:8px 15px;
-border-radius:5px;
+background:#2563eb;
+color:white;
+border-radius:7px;
 cursor:pointer;
 }
 
-.nut-them{
-background:#28a745;
-margin-top:10px;
+button:hover{
+background:#1d4ed8;
 }
 
-.danh-sach-lop{
-display:grid;
-grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
-gap:15px;
-}
-
-.lop-box{
+select,input{
+padding:7px 8px;
+border:1px solid #d1d5db;
+border-radius:6px;
 background:white;
-padding:15px;
-border-radius:10px;
-box-shadow:0 2px 6px rgba(0,0,0,0.1);
-cursor:pointer;
 }
 
-.lop-box:hover{
-transform:scale(1.02);
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:20px;
+}
+
+thead{
+background:#f1f5f9;
+}
+
+th,td{
+padding:10px;
+text-align:center;
+border-bottom:1px solid #f1f5f9;
+}
+
+tr:hover{
+background:#f8fafc;
+}
+
+.modal{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.35);
+display:none;
+align-items:center;
+justify-content:center;
+}
+
+.modal-box{
+background:white;
+padding:26px;
+border-radius:12px;
+width:700px;
+}
+
+.scheduleRow{
+display:flex;
+gap:8px;
+margin-bottom:8px;
 }
 
 </style>
@@ -85,189 +104,245 @@ transform:scale(1.02);
 
 <div class="container">
 
-<h2>Tạo lớp học mới</h2>
+<h2>Quản lý lớp học</h2>
 
-<div class="box-form">
+<button onclick="openModal()">Tạo lớp</button>
 
-<form id="formTaoLop">
+<table>
+
+<thead>
+<tr>
+<th>ID</th>
+<th>Tên lớp</th>
+<th>Khối</th>
+<th>Môn</th>
+<th>Học phí</th>
+<th>Loại học phí</th>
+</tr>
+</thead>
+
+<tbody id="classTable">
+<tr>
+<td colspan="6">Đang tải...</td>
+</tr>
+</tbody>
+
+</table>
+
+</div>
+
+<!-- MODAL -->
+
+<div class="modal" id="modal">
+
+<div class="modal-box">
+
+<h3>Tạo lớp học</h3>
 
 <label>Tên lớp</label>
-<input type="text" name="ten_lop">
+<input id="class_name">
 
 <label>Khối</label>
-<select id="chonKhoi"></select>
+<select id="grade"></select>
 
-<label>Môn học</label>
-<select id="chonMon"></select>
+<label>Môn</label>
+<select id="subject"></select>
 
 <label>Loại học phí</label>
-<select id="loaiHocPhi">
 
-<option value="theo_buoi">Theo buổi</option>
-<option value="theo_khoa">Theo khóa</option>
-
+<select id="tuition_type">
+<option value="per_session">Theo buổi</option>
+<option value="per_course">Theo khóa</option>
 </select>
 
-<label>Số tiền</label>
-<input type="number" name="hoc_phi">
-
-<h3>Lịch học</h3>
-
-<div id="lichHocContainer"></div>
-
-<button type="button" class="nut nut-them" onclick="themLichHoc()">
-Thêm buổi học
-</button>
+<label>Học phí</label>
+<input id="tuition_fee" type="number">
 
 <br><br>
 
-<button type="submit" class="nut">
-Tạo lớp
-</button>
+<label>Lịch học</label>
 
-</form>
+<div id="scheduleArea"></div>
 
-</div>
+<button onclick="addSchedule()">+ Thêm buổi</button>
 
+<br><br>
 
-<h2>Các lớp tôi quản lý</h2>
-
-<div class="danh-sach-lop" id="danhSachLop">
+<button onclick="saveClass()">Lưu</button>
+<button onclick="closeModal()">Đóng</button>
 
 </div>
-
 </div>
 
 
 <script>
 
-async function loadKhoi() {
+/* LOAD GRADES */
 
-const res = await fetch("/api/grades");
-const data = await res.json();
+async function loadGrades(){
 
-const select = document.getElementById("chonKhoi");
+const {data} = await sb
+.from("grades")
+.select("*")
+.order("id")
 
-select.innerHTML = '<option value="">Chọn khối</option>';
+grade.innerHTML=""
 
-data.forEach(khoi => {
-
-select.innerHTML += `
-<option value="${khoi.id}">
-${khoi.name}
+data.forEach(g=>{
+grade.innerHTML += `
+<option value="${g.id}">
+${g.name}
 </option>
-`;
-
-});
+`
+})
 
 }
 
-loadKhoi();
-  
-const lichContainer = document.getElementById("lichHocContainer")
+/* LOAD SUBJECTS */
 
-document.getElementById("chonKhoi").addEventListener("change", async function(){
+grade.addEventListener("change",loadSubjects)
 
-const gradeId = this.value;
+async function loadSubjects(){
 
-const res = await fetch("/api/subjects?grade_id=" + gradeId);
-const data = await res.json();
+const grade_id=grade.value
 
-const subjectSelect = document.getElementById("chonMon");
+const {data} = await sb
+.from("subjects")
+.select("*")
+.eq("grade_id",grade_id)
 
-subjectSelect.innerHTML = "";
+subject.innerHTML=""
 
-data.forEach(mon => {
-
-subjectSelect.innerHTML += `
-<option value="${mon.id}">
-${mon.name}
+data.forEach(s=>{
+subject.innerHTML += `
+<option value="${s.id}">
+${s.name}
 </option>
-`;
+`
+})
 
-});
+}
 
-});
-  
-function themLichHoc(){
+/* MODAL */
 
-const row = document.createElement("div")
-row.className="lich-row"
+function openModal(){
+modal.style.display="flex"
+}
 
-row.innerHTML = `
+function closeModal(){
+modal.style.display="none"
+}
 
-<select name="thu[]">
+/* SCHEDULE */
 
+function addSchedule(){
+
+scheduleArea.innerHTML+=`
+
+<div class="scheduleRow">
+
+<select class="weekday">
 <option value="1">Thứ 2</option>
 <option value="2">Thứ 3</option>
 <option value="3">Thứ 4</option>
 <option value="4">Thứ 5</option>
 <option value="5">Thứ 6</option>
 <option value="6">Thứ 7</option>
-<option value="7">Chủ nhật</option>
-
+<option value="7">CN</option>
 </select>
 
-<input type="time" name="gio_bat_dau[]">
+<input type="time" class="start">
 
-<input type="time" name="gio_ket_thuc[]">
+<input type="time" class="end">
 
+</div>
 `
 
-lichContainer.appendChild(row)
-
 }
 
-themLichHoc()
+/* SAVE CLASS */
 
+async function saveClass(){
 
-/* Demo danh sách lớp */
+const {data,error}=await sb
+.from("classes")
+.insert({
 
-const dsLop = [
-
-{
-id:1,
-ten:"Toán 10A",
-khoi:"10",
-mon:"Toán",
-lich:"Thứ 2, Thứ 5 - 18:00"
-},
-
-{
-id:2,
-ten:"Lý 11B",
-khoi:"11",
-mon:"Vật lý",
-lich:"Thứ 3, Thứ 6 - 19:00"
-}
-
-]
-
-const danhSachLop = document.getElementById("danhSachLop")
-
-dsLop.forEach(lop=>{
-
-const box=document.createElement("div")
-box.className="lop-box"
-
-box.innerHTML=`
-
-<h3>${lop.ten}</h3>
-<p>Khối: ${lop.khoi}</p>
-<p>Môn: ${lop.mon}</p>
-<p>${lop.lich}</p>
-
-`
-
-box.onclick=()=>{
-
-window.location="class_detail.html?id="+lop.id
-
-}
-
-danhSachLop.appendChild(box)
+class_name:class_name.value,
+grade:grade.value,
+subject:subject.value,
+tuition_type:tuition_type.value,
+tuition_fee:tuition_fee.value
 
 })
+.select()
+.single()
+
+if(error){
+alert("Lỗi tạo lớp")
+return
+}
+
+const class_id=data.id
+
+const rows=document.querySelectorAll(".scheduleRow")
+
+for(let r of rows){
+
+const weekday=r.querySelector(".weekday").value
+const start=r.querySelector(".start").value
+const end=r.querySelector(".end").value
+
+await sb
+.from("class_schedules")
+.insert({
+class_id,
+weekday,
+start_time:start,
+end_time:end
+})
+
+}
+
+alert("Đã tạo lớp")
+
+closeModal()
+loadClasses()
+
+}
+
+/* LOAD CLASSES */
+
+async function loadClasses(){
+
+const {data}=await sb
+.from("classes")
+.select("*")
+
+classTable.innerHTML=""
+
+data.forEach(c=>{
+
+classTable.innerHTML+=`
+
+<tr>
+
+<td>${c.id}</td>
+<td>${c.class_name}</td>
+<td>${c.grade}</td>
+<td>${c.subject}</td>
+<td>${c.tuition_fee}</td>
+<td>${c.tuition_type}</td>
+
+</tr>
+`
+
+})
+
+}
+
+loadGrades()
+loadClasses()
 
 </script>
 
