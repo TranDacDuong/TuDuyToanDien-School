@@ -387,6 +387,64 @@ function resetQuestionForm(){
 
 }
 
+function createAnswerInputs(count){
+
+    // xóa giao diện cũ
+    answerArea.innerHTML = ""
+
+    const type = question_type.value
+
+    /* MULTI CHOICE */
+
+    if(type === "multi_choice"){
+
+        for(let i=0;i<count;i++){
+
+            answerArea.innerHTML += `
+            <div class="answerBox">
+                <label>${String.fromCharCode(65+i)}</label>
+                <input type="checkbox">
+            </div>
+            `
+
+        }
+
+    }
+
+
+    /* TRUE FALSE */
+
+    if(type === "true_false"){
+
+        for(let i=0;i<count;i++){
+
+            answerArea.innerHTML += `
+            <div class="answerBox">
+                <label>${String.fromCharCode(97+i)}</label>
+                <span class="state wrong" onclick="toggleState(this)">Sai</span>
+            </div>
+            `
+
+        }
+
+    }
+
+
+    /* SHORT ANSWER */
+
+    if(type === "short_answer"){
+
+        for(let i=0;i<count;i++){
+
+            answerArea.innerHTML += `
+            <input class="shortAnswer" placeholder="Đáp án ${i+1}">
+            `
+
+        }
+
+    }
+
+}
 
 /* =========================
    INIT
