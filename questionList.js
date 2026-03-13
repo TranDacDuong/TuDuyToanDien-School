@@ -338,7 +338,6 @@ TẠO UI ĐÁP ÁN
 ========================= */
 
 changeType()
-
 createAnswerInputs(q.answer_count)
 
 const boxes = document.querySelectorAll("#answerArea .answerBox")
@@ -428,7 +427,24 @@ async function deleteQ(id){
 
 if(!confirm("Xóa câu hỏi?")) return
 
-let error
+let res
+
+if(editingQuestionId){
+
+res = await sb
+.from("question_bank")
+.update(dataObj)
+.eq("id", editingQuestionId)
+
+}else{
+
+res = await sb
+.from("question_bank")
+.insert([dataObj])
+
+}
+
+const error = res.error
 
 if(isAdmin){
 
