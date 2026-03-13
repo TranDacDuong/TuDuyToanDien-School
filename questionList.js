@@ -304,26 +304,49 @@ chapter.value = chapterId || ""
 
 
 /* =========================
-SET TYPE + ANSWER COUNT
+THÔNG TIN CÂU HỎI
 ========================= */
 
 question_type.value = q.question_type
+difficulty.value = q.difficulty
 
-// đặt số đáp án
-answerCount.value = q.answer_count || 4
+questionText.value = q.question_text || ""
+answerText.value = q.answer_text || ""
 
-// tạo UI đúng loại câu hỏi
+
+/* =========================
+ẢNH
+========================= */
+
+if(q.question_img){
+questionImg.src = q.question_img
+questionImgBox.style.display = "block"
+}else{
+questionImgBox.style.display = "none"
+}
+
+if(q.answer_img){
+answerImg.src = q.answer_img
+answerImgBox.style.display = "block"
+}else{
+answerImgBox.style.display = "none"
+}
+
+
+/* =========================
+TẠO UI ĐÁP ÁN
+========================= */
+
 changeType()
 
-// tạo số đáp án
 createAnswerInputs(q.answer_count)
+
+const boxes = document.querySelectorAll("#answerArea .answerBox")
 
 
 /* =========================
 SET ĐÁP ÁN ĐÚNG
 ========================= */
-
-const boxes = document.querySelectorAll("#answerArea .answerBox")
 
 if(q.question_type === "multi_choice"){
 
@@ -333,9 +356,9 @@ const checkbox = box.querySelector("input")
 
 if(!checkbox) return
 
-const letter = String.fromCharCode(65 + index)
-
-checkbox.checked = q.answer?.includes(letter)
+if(q.answer.includes(String.fromCharCode(65+index))){
+checkbox.checked = true
+}
 
 })
 
@@ -350,9 +373,11 @@ const state = box.querySelector(".state")
 
 if(!state) return
 
-const letter = String.fromCharCode(97 + index)
-
-state.innerText = q.answer?.includes(letter) ? "Đúng" : "Sai"
+if(q.answer.includes(String.fromCharCode(97+index))){
+state.innerText = "Đúng"
+}else{
+state.innerText = "Sai"
+}
 
 })
 
@@ -369,7 +394,6 @@ inputs.forEach((input,i)=>{
 input.value = arr[i] || ""
 })
 
-}
 }
 
 /* =========================
