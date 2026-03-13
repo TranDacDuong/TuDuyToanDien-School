@@ -1,5 +1,5 @@
 /* =========================
-ELEMENT
+   ELEMENT
 ========================= */
 
 const grade = document.getElementById("grade")
@@ -14,394 +14,384 @@ const answerText = document.getElementById("answerText")
 
 
 /* =========================
-LOAD SELECT DATA
+   LOAD SELECT DATA
 ========================= */
 
 async function loadSelectData(){
 
-  /* LOAD KHỐI */
+    /* LOAD KHỐI */
 
-  const {data:grades,error:gErr} = await sb
-    .from("grades")
-    .select("*")
-    .order("id")
+    const {data:grades,error:gErr} = await sb
+        .from("grades")
+        .select("*")
+        .order("id")
 
-  if(gErr){
-    console.error(gErr)
-    alert("Không load được khối")
-    return
-  }
-
-  grade.innerHTML = `<option value="">Chọn khối</option>`
-
-  grades?.forEach(g=>{
-    grade.innerHTML += `
-      <option value="${g.id}">
-        ${g.name}
-      </option>
-    `
-  })
-
-
-  /* =========================
-  CHỌN KHỐI → LOAD MÔN
-  ========================= */
-
-  grade.addEventListener("change", async ()=>{
-
-    subject.innerHTML = ""
-    chapter.innerHTML = ""
-
-    if(!grade.value) return
-
-    const {data:subjects,error} = await sb
-      .from("subjects")
-      .select("*")
-      .eq("grade_id",grade.value)
-      .order("id")
-
-    if(error){
-      console.error(error)
-      alert("Không load được môn")
-      return
+    if(gErr){
+        console.error(gErr)
+        alert("Không load được khối")
+        return
     }
 
-    subject.innerHTML = `<option value="">Chọn môn</option>`
+    grade.innerHTML = `<option value="">Chọn khối</option>`
 
-    subjects?.forEach(s=>{
-      subject.innerHTML += `
-        <option value="${s.id}">
-          ${s.name}
-        </option>
-      `
+    grades?.forEach(g=>{
+        grade.innerHTML += `
+        <option value="${g.id}">
+            ${g.name}
+        </option>`
     })
 
-  })
 
+    /* =========================
+       CHỌN KHỐI → LOAD MÔN
+    ========================= */
 
-  /* =========================
-  CHỌN MÔN → LOAD CHƯƠNG
-  ========================= */
+    grade.addEventListener("change", async ()=>{
 
-  subject.addEventListener("change", async ()=>{
+        subject.innerHTML = ""
+        chapter.innerHTML = ""
 
-    chapter.innerHTML = ""
+        if(!grade.value) return
 
-    if(!subject.value) return
+        const {data:subjects,error} = await sb
+            .from("subjects")
+            .select("*")
+            .eq("grade_id",grade.value)
+            .order("id")
 
-    const {data:chapters,error} = await sb
-      .from("chapters")
-      .select("*")
-      .eq("subject_id",subject.value)
-      .order("id")
+        if(error){
+            console.error(error)
+            alert("Không load được môn")
+            return
+        }
 
-    if(error){
-      console.error(error)
-      alert("Không load được chương")
-      return
-    }
+        subject.innerHTML = `<option value="">Chọn môn</option>`
 
-    chapter.innerHTML = `<option value="">Chọn chương</option>`
+        subjects?.forEach(s=>{
+            subject.innerHTML += `
+            <option value="${s.id}">
+                ${s.name}
+            </option>`
+        })
 
-    chapters?.forEach(c=>{
-      chapter.innerHTML += `
-        <option value="${c.id}">
-          ${c.name}
-        </option>
-      `
     })
 
-  })
+
+    /* =========================
+       CHỌN MÔN → LOAD CHƯƠNG
+    ========================= */
+
+    subject.addEventListener("change", async ()=>{
+
+        chapter.innerHTML = ""
+
+        if(!subject.value) return
+
+        const {data:chapters,error} = await sb
+            .from("chapters")
+            .select("*")
+            .eq("subject_id",subject.value)
+            .order("id")
+
+        if(error){
+            console.error(error)
+            alert("Không load được chương")
+            return
+        }
+
+        chapter.innerHTML = `<option value="">Chọn chương</option>`
+
+        chapters?.forEach(c=>{
+            chapter.innerHTML += `
+            <option value="${c.id}">
+                ${c.name}
+            </option>`
+        })
+
+    })
 
 }
 
 
 /* =========================
-LẤY NỘI DUNG CÂU HỎI
+   LẤY NỘI DUNG CÂU HỎI
 ========================= */
 
 function getQuestionContent(){
 
-  if(questionText.dataset.image){
-    return questionText.dataset.image
-  }
+    if(questionText.dataset.image){
+        return questionText.dataset.image
+    }
 
-  return questionText.value.trim()
-
+    return questionText.value.trim()
 }
 
 function getAnswerContent(){
 
-  if(answerText.dataset.image){
-    return answerText.dataset.image
-  }
+    if(answerText.dataset.image){
+        return answerText.dataset.image
+    }
 
-  return answerText.value.trim()
-
+    return answerText.value.trim()
 }
 
 
 /* =========================
-LƯU CÂU HỎI
+   LƯU CÂU HỎI
 ========================= */
 
 async function saveQuestion(){
 
-  /* USER */
+    /* =========================
+       USER
+    ========================= */
 
-  const { data: { user } } = await sb.auth.getUser()
-  const userId = user?.id || null
-
-
-  /* FORM DATA */
-
-  const chapterVal = chapter.value
-  const typeVal = question_type.value
-  const difficultyVal = difficulty.value
-
-  const questionVal = questionText.value.trim()
-  const answerVal = answerText.value.trim()
-
-  const questionImgSrc = questionImg.src ? questionImg.src : null
-  const answerImgSrc = answerImg.src ? answerImg.src : null
-
-  let answerCount = 0
-  let correctAnswer = ""
+    const { data: { user } } = await sb.auth.getUser()
+    const userId = user?.id || null
 
 
-  /* =========================
-  LẤY ĐÁP ÁN
-  ========================= */
+    /* =========================
+       FORM DATA
+    ========================= */
 
-  if(typeVal === "multi_choice"){
+    const chapterVal = chapter.value
+    const typeVal = question_type.value
+    const difficultyVal = difficulty.value
 
-    const boxes = document.querySelectorAll("#answerArea .answerBox")
-    answerCount = boxes.length
+    const questionVal = questionText.value.trim()
+    const answerVal = answerText.value.trim()
 
-    boxes.forEach((box,index)=>{
-      const checkbox = box.querySelector("input")
+    const questionImgSrc = questionImg.src ? questionImg.src : null
+    const answerImgSrc = answerImg.src ? answerImg.src : null
 
-      if(checkbox.checked){
-        correctAnswer += String.fromCharCode(65 + index)
-      }
-    })
-
-  }
+    let answerCount = 0
+    let correctAnswer = ""
 
 
-  if(typeVal === "true_false"){
+    /* =========================
+       LẤY ĐÁP ÁN
+    ========================= */
 
-    const boxes = document.querySelectorAll("#answerArea .answerBox")
-    answerCount = boxes.length
+    if(typeVal === "multi_choice"){
 
-    boxes.forEach((box,index)=>{
+        const boxes = document.querySelectorAll("#answerArea .answerBox")
 
-      const state = box.querySelector(".correct, .wrong")
+        answerCount = boxes.length
 
-      if(state.innerText === "Đúng"){
-        correctAnswer += String.fromCharCode(97 + index)
-      }
+        boxes.forEach((box,index)=>{
 
-    })
+            const checkbox = box.querySelector("input")
 
-  }
+            if(checkbox.checked){
+                correctAnswer += String.fromCharCode(65 + index)
+            }
 
-
-  if(typeVal === "short_answer"){
-
-    const inputs = document.querySelectorAll("#answerArea input")
-
-    answerCount = inputs.length
-
-    correctAnswer = [...inputs]
-      .map(i=>i.value)
-      .join(";")
-
-  }
+        })
+    }
 
 
-  /* =========================
-  DATA OBJECT
-  ========================= */
+    if(typeVal === "true_false"){
 
-  const dataObj = {
+        const boxes = document.querySelectorAll("#answerArea .answerBox")
 
-    chapter_id: chapterVal,
-    question_type: typeVal,
-    difficulty: difficultyVal,
+        answerCount = boxes.length
 
-    question_text: questionVal,
-    question_img: questionImgSrc,
+        boxes.forEach((box,index)=>{
 
-    answer_text: answerVal,
-    answer_img: answerImgSrc,
+            const state = box.querySelector(".correct, .wrong")
 
-    answer_count: answerCount,
-    answer: correctAnswer
+            if(state.innerText === "Đúng"){
+                correctAnswer += String.fromCharCode(97 + index)
+            }
 
-  }
+        })
+    }
 
 
-  /* =========================
-  INSERT / UPDATE
-  ========================= */
+    if(typeVal === "short_answer"){
 
-  let error
+        const inputs = document.querySelectorAll("#answerArea input")
 
-  if(editingQuestionId){
+        answerCount = inputs.length
 
-    const res = await sb
-      .from("question_bank")
-      .update(dataObj)
-      .eq("id", editingQuestionId)
-
-    error = res.error
-
-  }
-  else{
-
-    dataObj.hidden = false
-    dataObj.created_by = userId
-
-    const res = await sb
-      .from("question_bank")
-      .insert([dataObj])
-
-    error = res.error
-
-  }
+        correctAnswer = [...inputs].map(i=>i.value).join(";")
+    }
 
 
-  /* =========================
-  RESULT
-  ========================= */
+    /* =========================
+       DATA OBJECT
+    ========================= */
 
-  if(error){
-    console.error(error)
-    alert(error.message)
-    return
-  }
-
-
-  if(editingQuestionId){
-    alert("Cập nhật câu hỏi thành công")
-  }
-  else{
-    alert("Tạo câu hỏi thành công")
-  }
+    const dataObj = {
+        chapter_id: chapterVal,
+        question_type: typeVal,
+        difficulty: difficultyVal,
+        question_text: questionVal,
+        question_img: questionImgSrc,
+        answer_text: answerVal,
+        answer_img: answerImgSrc,
+        answer_count: answerCount,
+        answer: correctAnswer
+    }
 
 
-  /* reset edit mode */
+    /* =========================
+       INSERT / UPDATE
+    ========================= */
 
-  editingQuestionId = null
+    let error
 
-  /* reset form */
+    if(editingQuestionId){
 
-  resetQuestionForm()
+        const res = await sb
+            .from("question_bank")
+            .update(dataObj)
+            .eq("id", editingQuestionId)
 
-  /* reload bảng */
+        error = res.error
 
-  loadQuestions()
+    }else{
 
+        dataObj.hidden = false
+        dataObj.created_by = userId
+
+        const res = await sb
+            .from("question_bank")
+            .insert([dataObj])
+
+        error = res.error
+    }
+
+
+    /* =========================
+       RESULT
+    ========================= */
+
+    if(error){
+        console.error(error)
+        alert(error.message)
+        return
+    }
+
+
+    /* =========================
+       SUCCESS
+    ========================= */
+
+    if(editingQuestionId){
+        alert("Cập nhật câu hỏi thành công")
+    }else{
+        alert("Tạo câu hỏi thành công")
+    }
+
+
+    editingQuestionId = null
+
+    resetQuestionForm()
+
+    loadQuestions()
 }
 
 
 /* =========================
-LOAD DIFFICULTY
+   LOAD DIFFICULTY
 ========================= */
 
 for(let i = 1; i <= 10; i++){
 
-  const option = document.createElement("option")
+    const option = document.createElement("option")
 
-  option.value = i
-  option.textContent = i
+    option.value = i
+    option.textContent = i
 
-  difficulty.appendChild(option)
-
+    difficulty.appendChild(option)
 }
 
 
 /* =========================
-NÉN ẢNH
+   NÉN ẢNH
 ========================= */
 
 async function compressImage(file){
 
-  return new Promise((resolve)=>{
+return new Promise((resolve)=>{
 
     const img = new Image()
     const reader = new FileReader()
 
     reader.onload = function(e){
-      img.src = e.target.result
+        img.src = e.target.result
     }
 
     img.onload = function(){
 
-      const canvas = document.createElement("canvas")
-      const ctx = canvas.getContext("2d")
+        const canvas = document.createElement("canvas")
+        const ctx = canvas.getContext("2d")
 
-      const MAX_WIDTH = 1200
-      const MAX_HEIGHT = 1200
+        const MAX_WIDTH = 1200
+        const MAX_HEIGHT = 1200
 
-      let width = img.width
-      let height = img.height
+        let width = img.width
+        let height = img.height
 
-      if(width > MAX_WIDTH){
-        height = height * (MAX_WIDTH / width)
-        width = MAX_WIDTH
-      }
+        if(width > MAX_WIDTH){
+            height = height * (MAX_WIDTH / width)
+            width = MAX_WIDTH
+        }
 
-      if(height > MAX_HEIGHT){
-        width = width * (MAX_HEIGHT / height)
-        height = MAX_HEIGHT
-      }
+        if(height > MAX_HEIGHT){
+            width = width * (MAX_HEIGHT / height)
+            height = MAX_HEIGHT
+        }
 
-      canvas.width = width
-      canvas.height = height
+        canvas.width = width
+        canvas.height = height
 
-      ctx.drawImage(img,0,0,width,height)
+        ctx.drawImage(img,0,0,width,height)
 
-      canvas.toBlob((blob)=>{
-        resolve(blob)
-      },"image/jpeg",0.7)
+        canvas.toBlob((blob)=>{
+            resolve(blob)
+        },"image/jpeg",0.7)
 
     }
 
     reader.readAsDataURL(file)
 
-  })
+})
 
 }
 
 
 /* =========================
-RESET FORM
+   RESET FORM
 ========================= */
 
 function resetQuestionForm(){
 
-  questionText.value = ""
-  answerText.value = ""
+    questionText.value = ""
+    answerText.value = ""
 
-  questionImg.src = ""
-  answerImg.src = ""
+    questionImg.src = ""
+    answerImg.src = ""
 
-  questionImgBox.style.display = "none"
-  answerImgBox.style.display = "none"
+    questionImgBox.style.display = "none"
+    answerImgBox.style.display = "none"
 
-  const checkboxes = document.querySelectorAll("#answerArea input[type='checkbox']")
-  checkboxes.forEach(cb => cb.checked = false)
+    questionImageFile = null
+    answerImageFile = null
 
-  const inputs = document.querySelectorAll("#answerArea input[type='text']")
-  inputs.forEach(i => i.value = "")
+
+    const checkboxes = document.querySelectorAll("#answerArea input[type='checkbox']")
+    checkboxes.forEach(cb => cb.checked = false)
+
+    const inputs = document.querySelectorAll("#answerArea input[type='text']")
+    inputs.forEach(i => i.value = "")
 
 }
 
 
 /* =========================
-INIT
+   INIT
 ========================= */
 
 loadSelectData()
