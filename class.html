@@ -1,13 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>Class Management</title>
+<title>Quản lý lớp</title>
 
 <style>
+
 body{
     font-family: Arial;
-    background:#f4f6f9;
+    background:#f5f6fa;
     margin:0;
 }
 
@@ -24,20 +25,37 @@ header{
     margin:auto;
 }
 
-.create-class{
+.top-bar{
+    margin-top:20px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+button{
+    padding:8px 14px;
+    border:none;
+    border-radius:6px;
+    background:#2563eb;
+    color:white;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#1e4fd1;
+}
+
+.form-box{
+    display:none;
     background:white;
     padding:20px;
-    margin-top:20px;
     border-radius:10px;
+    margin-top:15px;
     box-shadow:0 2px 5px rgba(0,0,0,0.1);
 }
 
-.create-class h2{
-    margin-top:0;
-}
-
 .form-row{
-    margin-bottom:12px;
+    margin-bottom:10px;
 }
 
 input,select{
@@ -47,26 +65,10 @@ input,select{
     border-radius:6px;
 }
 
-button{
-    padding:10px 15px;
-    border:none;
-    background:#2563eb;
-    color:white;
-    border-radius:6px;
-    cursor:pointer;
-}
-
-button:hover{
-    background:#1e4fd1;
-}
-
-.class-list{
-    margin-top:30px;
-}
-
 .class-grid{
+    margin-top:20px;
     display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
+    grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
     gap:15px;
 }
 
@@ -76,7 +78,6 @@ button:hover{
     border-radius:10px;
     box-shadow:0 2px 5px rgba(0,0,0,0.1);
     cursor:pointer;
-    transition:0.2s;
 }
 
 .class-box:hover{
@@ -84,8 +85,8 @@ button:hover{
 }
 
 .class-title{
-    font-size:18px;
     font-weight:bold;
+    font-size:17px;
 }
 
 .class-info{
@@ -93,86 +94,85 @@ button:hover{
     margin-top:5px;
     color:#555;
 }
-</style>
 
+</style>
 </head>
 
 <body>
 
 <header>
-Class Management
+Quản lý lớp học
 </header>
 
 <div class="container">
 
-<!-- CREATE CLASS -->
-<div class="create-class">
+<div class="top-bar">
+<h2>Lớp của tôi</h2>
+<button onclick="toggleForm()">Tạo lớp</button>
+</div>
 
-<h2>Create New Class</h2>
+
+<!-- FORM TẠO LỚP -->
+
+<div class="form-box" id="createForm">
 
 <div class="form-row">
-<label>Class Name</label>
+<label>Tên lớp</label>
 <input id="className">
 </div>
 
 <div class="form-row">
-<label>Grade</label>
+<label>Khối</label>
 <select id="gradeSelect"></select>
 </div>
 
 <div class="form-row">
-<label>Subject</label>
+<label>Môn học</label>
 <select id="subjectSelect"></select>
 </div>
 
 <div class="form-row">
-<label>Tuition Type</label>
+<label>Hình thức học phí</label>
 <select id="tuitionType">
-<option value="month">Monthly</option>
-<option value="course">Course</option>
+<option value="month">Theo tháng</option>
+<option value="course">Theo khóa</option>
 </select>
 </div>
 
 <div class="form-row">
-<label>Tuition Fee</label>
+<label>Học phí</label>
 <input type="number" id="tuitionFee">
 </div>
 
 <div class="form-row">
-<label>Day of week</label>
+<label>Thứ</label>
 <select id="dayOfWeek">
-<option value="2">Monday</option>
-<option value="3">Tuesday</option>
-<option value="4">Wednesday</option>
-<option value="5">Thursday</option>
-<option value="6">Friday</option>
-<option value="7">Saturday</option>
-<option value="8">Sunday</option>
+<option value="2">Thứ 2</option>
+<option value="3">Thứ 3</option>
+<option value="4">Thứ 4</option>
+<option value="5">Thứ 5</option>
+<option value="6">Thứ 6</option>
+<option value="7">Thứ 7</option>
+<option value="8">Chủ nhật</option>
 </select>
 </div>
 
 <div class="form-row">
-<label>Start Time</label>
+<label>Giờ bắt đầu</label>
 <input type="time" id="startTime">
 </div>
 
-<button onclick="createClass()">Create Class</button>
+<button onclick="createClass()">Lưu lớp</button>
 
 </div>
 
 
-<!-- CLASS LIST -->
-<div class="class-list">
+<!-- DANH SÁCH LỚP -->
 
-<h2>Your Classes</h2>
-
-<div class="class-grid" id="classGrid">
+<div class="class-grid" id="classGrid"></div>
 
 </div>
 
-</div>
-
-</div>
 
 <script>
 
@@ -181,110 +181,136 @@ let subjects=[]
 let classes=[]
 
 
-async function loadGrades(){
-    let res = await fetch("/api/grades")
-    grades = await res.json()
+function toggleForm(){
 
-    let gradeSelect=document.getElementById("gradeSelect")
+let form=document.getElementById("createForm")
 
-    gradeSelect.innerHTML=grades.map(g=>
-        `<option value="${g.id}">${g.name}</option>`
-    ).join("")
+form.style.display = form.style.display=="block" ? "none":"block"
+
 }
+
+
+async function loadGrades(){
+
+let res=await fetch("/api/grades")
+
+grades=await res.json()
+
+let select=document.getElementById("gradeSelect")
+
+select.innerHTML=grades.map(g=>
+`<option value="${g.id}">${g.name}</option>`
+).join("")
+
+}
+
 
 async function loadSubjects(){
-    let res = await fetch("/api/subjects")
-    subjects = await res.json()
 
-    filterSubjects()
+let res=await fetch("/api/subjects")
+
+subjects=await res.json()
+
+filterSubjects()
+
 }
+
 
 function filterSubjects(){
 
-    let gradeId=document.getElementById("gradeSelect").value
+let gradeId=document.getElementById("gradeSelect").value
 
-    let subjectSelect=document.getElementById("subjectSelect")
+let list=subjects.filter(s=>s.grade_id==gradeId)
 
-    let filtered=subjects.filter(s=>s.grade_id==gradeId)
+let select=document.getElementById("subjectSelect")
 
-    subjectSelect.innerHTML=filtered.map(s=>
-        `<option value="${s.id}">${s.name}</option>`
-    ).join("")
+select.innerHTML=list.map(s=>
+`<option value="${s.id}">${s.name}</option>`
+).join("")
+
 }
 
 document.getElementById("gradeSelect").addEventListener("change",filterSubjects)
 
 
+
 async function loadClasses(){
 
-    let res=await fetch("/api/my_classes")
-    classes=await res.json()
+let res=await fetch("/api/my_classes")
 
-    renderClasses()
+classes=await res.json()
+
+renderClasses()
+
 }
+
 
 function renderClasses(){
 
-    let grid=document.getElementById("classGrid")
+let grid=document.getElementById("classGrid")
 
-    grid.innerHTML=classes.map(c=>
+grid.innerHTML=classes.map(c=>
 
-        `<div class="class-box" onclick="openClass(${c.id})">
+`<div class="class-box" onclick="openClass(${c.id})">
 
-            <div class="class-title">${c.class_name}</div>
+<div class="class-title">${c.class_name}</div>
 
-            <div class="class-info">
-            Grade: ${c.grade_name}
-            </div>
+<div class="class-info">
+Khối: ${c.grade_name}
+</div>
 
-            <div class="class-info">
-            Subject: ${c.subject_name}
-            </div>
+<div class="class-info">
+Môn: ${c.subject_name}
+</div>
 
-            <div class="class-info">
-            Fee: ${c.tuition_fee}
-            </div>
+<div class="class-info">
+Học phí: ${c.tuition_fee}
+</div>
 
-        </div>`
+</div>`
 
-    ).join("")
+).join("")
+
 }
 
 
 async function createClass(){
 
-    let data={
-        class_name:document.getElementById("className").value,
-        grade_id:document.getElementById("gradeSelect").value,
-        subject_id:document.getElementById("subjectSelect").value,
-        tuition_type:document.getElementById("tuitionType").value,
-        tuition_fee:document.getElementById("tuitionFee").value,
-        day_of_week:document.getElementById("dayOfWeek").value,
-        start_time:document.getElementById("startTime").value
-    }
+let data={
+class_name:document.getElementById("className").value,
+grade_id:document.getElementById("gradeSelect").value,
+subject_id:document.getElementById("subjectSelect").value,
+tuition_type:document.getElementById("tuitionType").value,
+tuition_fee:document.getElementById("tuitionFee").value,
+day_of_week:document.getElementById("dayOfWeek").value,
+start_time:document.getElementById("startTime").value
+}
 
-    await fetch("/api/classes",{
-        method:"POST",
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(data)
-    })
+await fetch("/api/classes",{
+method:"POST",
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify(data)
+})
 
-    loadClasses()
+toggleForm()
+
+loadClasses()
+
 }
 
 
 function openClass(id){
 
-    window.location="class_detail.html?id="+id
+window.location="class_detail.html?id="+id
 
 }
 
 
 async function init(){
 
-    await loadGrades()
-    await loadSubjects()
-    await loadClasses()
+await loadGrades()
+await loadSubjects()
+await loadClasses()
 
 }
 
