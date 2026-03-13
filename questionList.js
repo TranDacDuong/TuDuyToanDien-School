@@ -429,48 +429,30 @@ if(!confirm("Xóa câu hỏi?")) return
 
 let res
 
-if(editingQuestionId){
+if(isAdmin){
+
+if(!confirm("Admin sẽ xóa vĩnh viễn câu hỏi này!")) return
 
 res = await sb
 .from("question_bank")
-.update(dataObj)
-.eq("id", editingQuestionId)
+.delete()
+.eq("id", id)
 
 }else{
 
 res = await sb
 .from("question_bank")
-.insert([dataObj])
+.update({ hidden: true })
+.eq("id", id)
 
 }
 
 const error = res.error
 
-if(isAdmin){
-
-    if(!confirm("Admin sẽ xóa vĩnh viễn câu hỏi này!")) return
-
-    const res = await sb
-    .from("question_bank")
-    .delete()
-    .eq("id",id)
-
-    error = res.error
-
-}else{
-
-    const res = await sb
-    .from("question_bank")
-    .update({hidden:true})
-    .eq("id",id)
-
-    error = res.error
-}
-
 if(error){
-    console.error(error)
-    alert(error.message)
-    return
+console.error(error)
+alert(error.message)
+return
 }
 
 loadQuestions()
