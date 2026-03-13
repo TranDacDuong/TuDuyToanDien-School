@@ -7,10 +7,10 @@ const formTitle = document.getElementById("formTitle")
 const saveBtn = document.getElementById("saveBtn")
 
 const typeText = {
-multi_choice:"Nhiều lựa chọn",
-true_false:"Đúng/Sai",
-short_answer:"Trả lời ngắn",
-essay:"Tự luận"
+    multi_choice: "Nhiều lựa chọn",
+    true_false: "Đúng/Sai",
+    short_answer: "Trả lời ngắn",
+    essay: "Tự luận"
 }
 
 
@@ -18,11 +18,9 @@ essay:"Tự luận"
 DIFFICULTY
 ========================= */
 
-f_difficulty.innerHTML =
-"<option value=''>Mức độ</option>" +
-Array.from({length:10},(_,i)=>
-`<option value="${i+1}">${i+1}</option>`
-).join("")
+for (let i = 1; i <= 10; i++) {
+    f_difficulty.innerHTML += `<option value="${i}">${i}</option>`
+}
 
 
 /* =========================
@@ -31,70 +29,87 @@ LOAD GRADES
 
 async function loadGrades(){
 
-const {data,error} = await sb
-.from("grades")
-.select("*")
-.order("id")
+    const { data, error } = await sb
+    .from("grades")
+    .select("*")
 
-if(error) return console.error(error)
+    if(error){
+        console.error(error)
+        return
+    }
 
-grades = data || []
+    grades = data || []
 
-f_grade.innerHTML =
-"<option value=''>Khối</option>" +
-grades.map(g=>`<option value="${g.id}">${g.name}</option>`).join("")
+    grades.sort((a,b)=>Number(a.name)-Number(b.name))
 
+    f_grade.innerHTML = "<option value=''>Khối</option>"
+
+    grades.forEach(g=>{
+        f_grade.innerHTML += `<option value="${g.id}">${g.name}</option>`
+    })
 }
 
 
 /* =========================
-GRADE → SUBJECT
+FILTER SUBJECT BY GRADE
 ========================= */
 
 f_grade.onchange = async ()=>{
 
-f_subject.innerHTML = "<option value=''>Môn</option>"
-f_chapter.innerHTML = "<option value=''>Chương</option>"
+    f_subject.innerHTML = "<option value=''>Môn</option>"
+    f_chapter.innerHTML = "<option value=''>Chương</option>"
 
-if(!f_grade.value) return render()
+    if(!f_grade.value){
+        render()
+        return
+    }
 
-const {data,error} = await sb
-.from("subjects")
-.select("*")
-.eq("grade_id",f_grade.value)
+    const {data,error} = await sb
+    .from("subjects")
+    .select("*")
+    .eq("grade_id",f_grade.value)
 
-if(error) return console.error(error)
+    if(error){
+        console.error(error)
+        return
+    }
 
-f_subject.innerHTML +=
-data.map(s=>`<option value="${s.id}">${s.name}</option>`).join("")
+    data.forEach(s=>{
+        f_subject.innerHTML += `<option value="${s.id}">${s.name}</option>`
+    })
 
-render()
-
+    render()
 }
 
 
 /* =========================
-SUBJECT → CHAPTER
+FILTER CHAPTER BY SUBJECT
 ========================= */
 
 f_subject.onchange = async ()=>{
 
-f_chapter.innerHTML = "<option value=''>Chương</option>"
+    f_chapter.innerHTML = "<option value=''>Chương</option>"
 
-if(!f_subject.value) return render()
+    if(!f_subject.value){
+        render()
+        return
+    }
 
-const {data,error} = await sb
-.from("chapters")
-.select("*")
-.eq("subject_id",f_subject.value)
+    const {data,error} = await sb
+    .from("chapters")
+    .select("*")
+    .eq("subject_id",f_subject.value)
 
-if(error) return console.error(error)
+    if(error){
+        console.error(error)
+        return
+    }
 
-f_chapter.innerHTML +=
-data.map(c=>`<option value="${c.id}">${c.name}</option>`).join("")
+    data.forEach(c=>{
+        f_chapter.innerHTML += `<option value="${c.id}">${c.name}</option>`
+    })
 
-render()
-
+    render()
 }
 
 f_chapter.onchange = render
@@ -106,30 +121,32 @@ LOAD QUESTIONS
 
 async function loadQuestions(){
 
-const {data,error} = await sb
-.from("question_bank")
-.select(`
-*,
-chapters(
-id,
-name,
-subjects(
-id,
-name,
-grades(
-id,
-name
-)
-)
-)
-`)
+    const {data,error} = await sb
+    .from("question_bank")
+    .select(`
+        *,
+        chapters(
+            id,
+            name,
+            subjects(
+                id,
+                name,
+                grades(
+                    id,
+                    name
+                )
+            )
+        )
+    `)
 
-if(error) return console.error(error)
+    if(error){
+        console.error(error)
+        return
+    }
 
-questions = data || []
+    questions = data || []
 
-render()
-
+    render()
 }
 
 
@@ -139,50 +156,35 @@ RENDER
 
 function render(){
 
-let list = [...questions]
+    let list = [...questions]
 
-if(!isAdmin){
-list = list.filter(q=>!q.hidden)
-}
+    questionTable.innerHTML = ""
 
-list = list.filter(q=>{
+    if(!isAdmin){
+        list = list.filter(q => !q.hidden)
+    }
 
-if(f_grade.value &&
-q.chapters?.subjects?.grades?.id != f_grade.value)
-return false
+    if(f_grade.value)
+        list = list.filter(q=>q.chapters?.subjects?.grades?.id == f_grade.value)
 
-if(f_subject.value &&
-q.chapters?.subjects?.id != f_subject.value)
-return false
+    if(f_subject.value)
+        list = list.filter(q=>q.chapters?.subjects?.id == f_subject.value)
 
-if(f_chapter.value &&
-q.chapter_id != f_chapter.value)
-return false
+    if(f_chapter.value)
+        list = list.filter(q=>q.chapter_id == f_chapter.value)
 
-if(f_type.value &&
-q.question_type !== f_type.value)
-return false
+    if(f_type.value)
+        list = list.filter(q=>q.question_type === f_type.value)
 
-if(f_difficulty.value &&
-q.difficulty != f_difficulty.value)
-return false
-
-return true
-
-})
+    if(f_difficulty.value)
+        list = list.filter(q=>q.difficulty == f_difficulty.value)
 
 
-let html=""
+    list.forEach((q,i)=>{
 
-list.forEach((q,i)=>{
+        const faded = q.hidden ? "faded" : ""
 
-const grade=q.chapters?.subjects?.grades
-const subject=q.chapters?.subjects
-const chapter=q.chapters
-
-const faded=q.hidden?"faded":""
-
-html+=`
+        questionTable.innerHTML += `
 <tr>
 
 <td class="${faded}">${i+1}</td>
@@ -190,67 +192,209 @@ html+=`
 <td class="questionCell ${faded}">
 
 <div class="questionText">
-${q.question_text||""}
+${q.question_text || ""}
 </div>
 
-${q.question_img?`
+${q.question_img ? `
 <div class="questionImgBox">
 <img class="questionImg"
 src="${q.question_img}"
 onclick="window.open('${q.question_img}')">
-</div>`:""}
+</div>
+` : ""}
 
 </td>
 
-<td class="${faded}">${grade?.name||""}</td>
-<td class="${faded}">${subject?.name||""}</td>
-<td class="${faded}">${chapter?.name||""}</td>
+<td class="${faded}">${q.chapters?.subjects?.grades?.name || ""}</td>
+<td class="${faded}">${q.chapters?.subjects?.name || ""}</td>
+<td class="${faded}">${q.chapters?.name || ""}</td>
 
 <td class="${faded}">
-${typeText[q.question_type]||q.question_type}
+${typeText[q.question_type] || q.question_type}
 </td>
 
-<td class="${faded}">${q.difficulty||""}</td>
+<td class="${faded}">${q.difficulty}</td>
 
-<td class="${faded}">
-${q.answer_count||0}
-</td>
+<td class="${faded}">${q.answer_count || 0}</td>
 
-<td class="${faded}">
-${q.answer||""}
+<td class="answerCell ${faded}">
+${q.answer || ""}
 </td>
 
 <td>
 
-<button onclick="editQ('${q.id}')">
-Sửa
-</button>
+<button onclick="editQ('${q.id}')">Sửa</button>
 
-<button onclick="deleteQ('${q.id}')"
-style="background:#dc2626">
+<button onclick="deleteQ('${q.id}')" style="background:#dc2626">
 Xóa
 </button>
 
-${q.hidden?`
-<button onclick="restoreQ('${q.id}')"
-style="background:#16a34a">
+${q.hidden ? `
+<button onclick="restoreQ('${q.id}')" style="background:#16a34a">
 Khôi phục
 </button>
-`:""}
+` : ""}
 
 </td>
 
 </tr>
 `
+    })
 
+}
+
+/* SỬA CÂU HỎI */
+
+async function editQ(id){
+
+const q = questions.find(x => x.id === id)
+if(!q) return
+
+editingQuestionId = id
+
+openModal()
+
+/* đổi tiêu đề */
+
+formTitle.innerText = "Sửa câu hỏi"
+saveBtn.innerText = "Cập nhật"
+
+
+/* =========================
+SET KHỐI / MÔN / CHƯƠNG
+========================= */
+
+const gradeId = q.chapters?.subjects?.grades?.id
+const subjectId = q.chapters?.subjects?.id
+const chapterId = q.chapter_id
+
+grade.value = gradeId || ""
+
+
+/* load subjects */
+
+const { data:subjects } = await sb
+.from("subjects")
+.select("*")
+.eq("grade_id", gradeId)
+
+subject.innerHTML = "<option value=''>Môn</option>"
+
+subjects?.forEach(s=>{
+subject.innerHTML += `<option value="${s.id}">${s.name}</option>`
 })
 
-questionTable.innerHTML =
-html || `<tr><td colspan="10">Không có câu hỏi</td></tr>`
+subject.value = subjectId || ""
+
+
+/* load chapters */
+
+const { data:chapters } = await sb
+.from("chapters")
+.select("*")
+.eq("subject_id", subjectId)
+
+chapter.innerHTML = "<option value=''>Chương</option>"
+
+chapters?.forEach(c=>{
+chapter.innerHTML += `<option value="${c.id}">${c.name}</option>`
+})
+
+chapter.value = chapterId || ""
+
+
+/* =========================
+THÔNG TIN CÂU HỎI
+========================= */
+
+question_type.value = q.question_type
+difficulty.value = q.difficulty
+
+questionText.value = q.question_text || ""
+answerText.value = q.answer_text || ""
+
+
+/* =========================
+ẢNH
+========================= */
+
+if(q.question_img){
+questionImg.src = q.question_img
+questionImgBox.style.display = "block"
+}else{
+questionImgBox.style.display = "none"
+}
+
+if(q.answer_img){
+answerImg.src = q.answer_img
+answerImgBox.style.display = "block"
+}else{
+answerImgBox.style.display = "none"
+}
+
+
+/* =========================
+TẠO UI ĐÁP ÁN
+========================= */
+
+changeType()
+createAnswerInputs(q.answer_count)
+
+const boxes = document.querySelectorAll("#answerArea .answerBox")
+
+
+/* =========================
+SET ĐÁP ÁN ĐÚNG
+========================= */
+
+if(q.question_type === "multi_choice"){
+
+boxes.forEach((box,index)=>{
+
+const checkbox = box.querySelector("input")
+
+if(!checkbox) return
+
+if(q.answer.includes(String.fromCharCode(65+index))){
+checkbox.checked = true
+}
+
+})
 
 }
 
 
+if(q.question_type === "true_false"){
+
+boxes.forEach((box,index)=>{
+
+const state = box.querySelector(".state")
+
+if(!state) return
+
+if(q.answer.includes(String.fromCharCode(97+index))){
+state.innerText = "Đúng"
+}else{
+state.innerText = "Sai"
+}
+
+})
+
+}
+
+
+if(q.question_type === "short_answer"){
+
+const inputs = document.querySelectorAll("#answerArea input")
+
+const arr = q.answer?.split(";") || []
+
+inputs.forEach((input,i)=>{
+input.value = arr[i] || ""
+})
+
+}
+}
 /* =========================
 RESTORE
 ========================= */
@@ -259,15 +403,15 @@ async function restoreQ(id){
 
 if(!confirm("Khôi phục câu hỏi này?")) return
 
-const {error}=await sb
+const {error} = await sb
 .from("question_bank")
 .update({hidden:false})
 .eq("id",id)
 
 if(error){
-console.error(error)
-alert(error.message)
-return
+    console.error(error)
+    alert(error.message)
+    return
 }
 
 loadQuestions()
@@ -287,25 +431,27 @@ let res
 
 if(isAdmin){
 
-if(!confirm("Admin sẽ xóa vĩnh viễn!")) return
+if(!confirm("Admin sẽ xóa vĩnh viễn câu hỏi này!")) return
 
 res = await sb
 .from("question_bank")
 .delete()
-.eq("id",id)
+.eq("id", id)
 
 }else{
 
 res = await sb
 .from("question_bank")
-.update({hidden:true})
-.eq("id",id)
+.update({ hidden: true })
+.eq("id", id)
 
 }
 
-if(res.error){
-console.error(res.error)
-alert(res.error.message)
+const error = res.error
+
+if(error){
+console.error(error)
+alert(error.message)
 return
 }
 
@@ -328,19 +474,24 @@ USER ROLE
 
 async function getUserRole(){
 
-const {data:{user}}=await sb.auth.getUser()
+    const {data:{user}} = await sb.auth.getUser()
 
-if(!user) return
+    if(!user) return
 
-const {data,error}=await sb
-.from("users")
-.select("role")
-.eq("id",user.id)
-.single()
+    const {data,error} = await sb
+    .from("users")
+    .select("role")
+    .eq("id",user.id)
+    .single()
 
-if(error) return console.error(error)
+    if(error){
+        console.error(error)
+        return
+    }
 
-isAdmin = data.role === "admin"
+    if(data.role === "admin"){
+        isAdmin = true
+    }
 
 }
 
@@ -351,9 +502,9 @@ INIT
 
 async function init(){
 
-await getUserRole()
-await loadGrades()
-await loadQuestions()
+    await getUserRole()
+    await loadGrades()
+    await loadQuestions()
 
 }
 
