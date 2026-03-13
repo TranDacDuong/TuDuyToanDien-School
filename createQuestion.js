@@ -227,9 +227,9 @@ async function saveQuestion(){
         question_type: typeVal,
         difficulty: difficultyVal,
         question_text: questionVal,
-        question_img: questionImgSrc,
+        question_img: questionImgBox.style.display === "block" ? questionImg.src : null,
         answer_text: answerVal,
-        answer_img: answerImgSrc,
+        answer_img: answerImgBox.style.display === "block" ? answerImg.src : null,
         answer_count: answerCount,
         answer: correctAnswer
     }
