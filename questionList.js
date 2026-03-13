@@ -243,6 +243,158 @@ Khôi phục
 
 }
 
+/* SỬA CÂU HỎI */
+
+async function editQ(id){
+
+const q = questions.find(q => q.id === id)
+if(!q) return
+
+editingQuestionId = id
+
+openModal()
+
+/* ĐỔI TIÊU ĐỀ FORM */
+
+formTitle.innerText = "Sửa câu hỏi"
+saveBtn.innerText = "Cập nhật"
+
+
+/* =========================
+SET KHỐI
+========================= */
+
+const gradeId = q.chapters?.subjects?.grades?.id
+const subjectId = q.chapters?.subjects?.id
+const chapterId = q.chapter_id
+
+grade.value = gradeId || ""
+
+
+/* =========================
+LOAD MÔN
+========================= */
+
+const { data:subjects } = await sb
+.from("subjects")
+.select("*")
+.eq("grade_id", gradeId)
+
+subject.innerHTML = "<option value=''>Môn</option>"
+
+subjects.forEach(s=>{
+subject.innerHTML += `<option value="${s.id}">${s.name}</option>`
+})
+
+subject.value = subjectId || ""
+
+
+/* =========================
+LOAD CHƯƠNG
+========================= */
+
+const { data:chapters } = await sb
+.from("chapters")
+.select("*")
+.eq("subject_id", subjectId)
+
+chapter.innerHTML = "<option value=''>Chương</option>"
+
+chapters.forEach(c=>{
+chapter.innerHTML += `<option value="${c.id}">${c.name}</option>`
+})
+
+chapter.value = chapterId || ""
+
+
+/* =========================
+THÔNG TIN CÂU HỎI
+========================= */
+
+question_type.value = q.question_type
+difficulty.value = q.difficulty
+
+questionText.value = q.question_text || ""
+answerText.value = q.answer_text || ""
+
+
+/* =========================
+ẢNH
+========================= */
+
+if(q.question_img){
+questionImg.src = q.question_img
+questionImgBox.style.display = "block"
+}else{
+questionImgBox.style.display = "none"
+}
+
+if(q.answer_img){
+answerImg.src = q.answer_img
+answerImgBox.style.display = "block"
+}else{
+answerImgBox.style.display = "none"
+}
+
+
+/* =========================
+TẠO INPUT ĐÁP ÁN
+========================= */
+
+createAnswerInputs(q.answer_count)
+
+const boxes = document.querySelectorAll("#answerArea .answerBox")
+
+
+/* =========================
+SET ĐÁP ÁN ĐÚNG
+========================= */
+
+if(q.question_type === "multi_choice"){
+
+boxes.forEach((box,index)=>{
+
+const checkbox = box.querySelector("input")
+
+if(q.answer.includes(String.fromCharCode(65+index))){
+checkbox.checked = true
+}
+
+})
+
+}
+
+
+if(q.question_type === "true_false"){
+
+boxes.forEach((box,index)=>{
+
+const state = box.querySelector(".state")
+
+if(q.answer.includes(String.fromCharCode(97+index))){
+state.innerText = "Đúng"
+}else{
+state.innerText = "Sai"
+}
+
+})
+
+}
+
+
+if(q.question_type === "short_answer"){
+
+const inputs = document.querySelectorAll("#answerArea input")
+
+const arr = q.answer.split(";")
+
+inputs.forEach((input,i)=>{
+input.value = arr[i] || ""
+})
+
+}
+
+}
 
 /* =========================
 RESTORE
