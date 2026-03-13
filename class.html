@@ -2,42 +2,55 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>Quản lý lớp học</title>
+<title>Tạo lớp học</title>
 
+<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
 
 <style>
 
-*{box-sizing:border-box;}
-
 body{
-font-family:Inter,Arial,sans-serif;
-background:#f8fafc;
+font-family: Arial, sans-serif;
+background:#f5f6fa;
+margin:0;
 padding:30px;
-color:#1e293b;
 }
 
 .container{
-max-width:1300px;
+max-width:900px;
 margin:auto;
 background:white;
-padding:28px;
-border-radius:12px;
-box-shadow:0 4px 20px rgba(0,0,0,0.05);
+padding:25px;
+border-radius:10px;
+box-shadow:0 2px 10px rgba(0,0,0,0.08);
 }
 
 h2{
-font-size:26px;
-margin-bottom:10px;
+margin-top:0;
+}
+
+label{
+display:block;
+margin-top:15px;
+margin-bottom:5px;
+font-weight:600;
+}
+
+input,select,textarea{
+width:100%;
+padding:8px;
+border:1px solid #ccc;
+border-radius:6px;
 }
 
 button{
-padding:7px 14px;
+margin-top:20px;
+padding:10px 16px;
 border:none;
+border-radius:6px;
 background:#2563eb;
 color:white;
-border-radius:7px;
 cursor:pointer;
 }
 
@@ -45,306 +58,88 @@ button:hover{
 background:#1d4ed8;
 }
 
-select,input{
-padding:7px 8px;
-border:1px solid #d1d5db;
-border-radius:6px;
-background:white;
-}
-
-table{
-width:100%;
-border-collapse:collapse;
-margin-top:20px;
-}
-
-thead{
-background:#f1f5f9;
-}
-
-th,td{
-padding:10px;
-text-align:center;
-border-bottom:1px solid #f1f5f9;
-}
-
-tr:hover{
-background:#f8fafc;
-}
-
-.modal{
-position:fixed;
-top:0;
-left:0;
-width:100%;
-height:100%;
-background:rgba(0,0,0,0.35);
-display:none;
-align-items:center;
-justify-content:center;
-}
-
-.modal-box{
-background:white;
-padding:26px;
-border-radius:12px;
-width:700px;
-}
-
 .scheduleRow{
 display:flex;
-gap:8px;
-margin-bottom:8px;
+gap:10px;
+margin-top:10px;
+}
+
+.scheduleRow select,
+.scheduleRow input{
+width:auto;
 }
 
 </style>
 </head>
 
+
 <body>
 
 <div class="container">
 
-<h2>Quản lý lớp học</h2>
+<h2>Tạo lớp học</h2>
 
-<button onclick="openModal()">Tạo lớp</button>
-
-<table>
-
-<thead>
-<tr>
-<th>ID</th>
-<th>Tên lớp</th>
-<th>Khối</th>
-<th>Môn</th>
-<th>Học phí</th>
-<th>Loại học phí</th>
-</tr>
-</thead>
-
-<tbody id="classTable">
-<tr>
-<td colspan="6">Đang tải...</td>
-</tr>
-</tbody>
-
-</table>
-
-</div>
-
-<!-- MODAL -->
-
-<div class="modal" id="modal">
-
-<div class="modal-box">
-
-<h3>Tạo lớp học</h3>
+<!-- TÊN LỚP -->
 
 <label>Tên lớp</label>
-<input id="class_name">
+<input id="class_name" placeholder="Ví dụ: Toán 10A">
+
+<!-- KHỐI -->
 
 <label>Khối</label>
-<select id="grade"></select>
-
-<label>Môn</label>
-<select id="subject"></select>
-
-<label>Loại học phí</label>
-
-<select id="tuition_type">
-<option value="per_session">Theo buổi</option>
-<option value="per_course">Theo khóa</option>
+<select id="grade">
+<option value="">Đang tải...</option>
 </select>
 
-<label>Học phí</label>
-<input id="tuition_fee" type="number">
+<!-- MÔN -->
 
-<br><br>
+<label>Môn</label>
+<select id="subject">
+<option value="">Chọn khối trước</option>
+</select>
+
+<!-- LOẠI HỌC PHÍ -->
+
+<label>Kiểu học phí</label>
+<select id="tuition_type">
+
+<option value="per_session">
+Theo buổi
+</option>
+
+<option value="per_course">
+Theo khóa
+</option>
+
+</select>
+
+<!-- HỌC PHÍ -->
+
+<label>Số tiền</label>
+<input id="tuition_fee" type="number" placeholder="Ví dụ: 300000">
+
+<!-- LỊCH HỌC -->
 
 <label>Lịch học</label>
 
 <div id="scheduleArea"></div>
 
-<button onclick="addSchedule()">+ Thêm buổi</button>
+<button type="button" onclick="addSchedule()">
++ Thêm buổi học
+</button>
 
-<br><br>
+<br>
 
-<button onclick="saveClass()">Lưu</button>
-<button onclick="closeModal()">Đóng</button>
-
-</div>
-</div>
-
-
-<script>
-
-/* LOAD GRADES */
-
-async function loadGrades(){
-
-const {data} = await sb
-.from("grades")
-.select("*")
-.order("id")
-
-grade.innerHTML=""
-
-data.forEach(g=>{
-grade.innerHTML += `
-<option value="${g.id}">
-${g.name}
-</option>
-`
-})
-
-}
-
-/* LOAD SUBJECTS */
-
-grade.addEventListener("change",loadSubjects)
-
-async function loadSubjects(){
-
-const grade_id=grade.value
-
-const {data} = await sb
-.from("subjects")
-.select("*")
-.eq("grade_id",grade_id)
-
-subject.innerHTML=""
-
-data.forEach(s=>{
-subject.innerHTML += `
-<option value="${s.id}">
-${s.name}
-</option>
-`
-})
-
-}
-
-/* MODAL */
-
-function openModal(){
-modal.style.display="flex"
-}
-
-function closeModal(){
-modal.style.display="none"
-}
-
-/* SCHEDULE */
-
-function addSchedule(){
-
-scheduleArea.innerHTML+=`
-
-<div class="scheduleRow">
-
-<select class="weekday">
-<option value="1">Thứ 2</option>
-<option value="2">Thứ 3</option>
-<option value="3">Thứ 4</option>
-<option value="4">Thứ 5</option>
-<option value="5">Thứ 6</option>
-<option value="6">Thứ 7</option>
-<option value="7">CN</option>
-</select>
-
-<input type="time" class="start">
-
-<input type="time" class="end">
+<button onclick="saveClass()">
+Lưu lớp học
+</button>
 
 </div>
-`
 
-}
 
-/* SAVE CLASS */
+<!-- FILE JS -->
 
-async function saveClass(){
-
-const {data,error}=await sb
-.from("classes")
-.insert({
-
-class_name:class_name.value,
-grade:grade.value,
-subject:subject.value,
-tuition_type:tuition_type.value,
-tuition_fee:tuition_fee.value
-
-})
-.select()
-.single()
-
-if(error){
-alert("Lỗi tạo lớp")
-return
-}
-
-const class_id=data.id
-
-const rows=document.querySelectorAll(".scheduleRow")
-
-for(let r of rows){
-
-const weekday=r.querySelector(".weekday").value
-const start=r.querySelector(".start").value
-const end=r.querySelector(".end").value
-
-await sb
-.from("class_schedules")
-.insert({
-class_id,
-weekday,
-start_time:start,
-end_time:end
-})
-
-}
-
-alert("Đã tạo lớp")
-
-closeModal()
-loadClasses()
-
-}
-
-/* LOAD CLASSES */
-
-async function loadClasses(){
-
-const {data}=await sb
-.from("classes")
-.select("*")
-
-classTable.innerHTML=""
-
-data.forEach(c=>{
-
-classTable.innerHTML+=`
-
-<tr>
-
-<td>${c.id}</td>
-<td>${c.class_name}</td>
-<td>${c.grade}</td>
-<td>${c.subject}</td>
-<td>${c.tuition_fee}</td>
-<td>${c.tuition_type}</td>
-
-</tr>
-`
-
-})
-
-}
-
-loadGrades()
-loadClasses()
-
-</script>
+<script src="createClass.js"></script>
 
 </body>
 </html>
