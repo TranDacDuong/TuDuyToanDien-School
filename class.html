@@ -1,213 +1,294 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Quản lý lớp học</title>
+<title>Class Management</title>
 
 <style>
-
 body{
-font-family: Arial;
-background:#f5f5f5;
-margin:0;
-padding:20px;
+    font-family: Arial;
+    background:#f4f6f9;
+    margin:0;
 }
 
-h1{
-margin-bottom:20px;
+header{
+    background:#2563eb;
+    color:white;
+    padding:15px;
+    font-size:20px;
 }
 
 .container{
-max-width:1000px;
-margin:auto;
+    width:95%;
+    max-width:1100px;
+    margin:auto;
 }
 
-.create-box{
-background:white;
-padding:20px;
-border-radius:10px;
-margin-bottom:30px;
-box-shadow:0 0 5px rgba(0,0,0,0.1);
+.create-class{
+    background:white;
+    padding:20px;
+    margin-top:20px;
+    border-radius:10px;
+    box-shadow:0 2px 5px rgba(0,0,0,0.1);
+}
+
+.create-class h2{
+    margin-top:0;
+}
+
+.form-row{
+    margin-bottom:12px;
 }
 
 input,select{
-padding:8px;
-margin:5px;
+    width:100%;
+    padding:8px;
+    border:1px solid #ccc;
+    border-radius:6px;
 }
 
 button{
-padding:8px 16px;
-cursor:pointer;
+    padding:10px 15px;
+    border:none;
+    background:#2563eb;
+    color:white;
+    border-radius:6px;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#1e4fd1;
 }
 
 .class-list{
-display:grid;
-grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
-gap:15px;
+    margin-top:30px;
 }
 
-.class-card{
-background:white;
-padding:15px;
-border-radius:10px;
-box-shadow:0 0 5px rgba(0,0,0,0.1);
-cursor:pointer;
-transition:0.2s;
+.class-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
+    gap:15px;
 }
 
-.class-card:hover{
-transform:scale(1.03);
+.class-box{
+    background:white;
+    padding:15px;
+    border-radius:10px;
+    box-shadow:0 2px 5px rgba(0,0,0,0.1);
+    cursor:pointer;
+    transition:0.2s;
 }
 
-.class-name{
-font-size:18px;
-font-weight:bold;
-margin-bottom:8px;
+.class-box:hover{
+    transform:scale(1.03);
 }
 
+.class-title{
+    font-size:18px;
+    font-weight:bold;
+}
+
+.class-info{
+    font-size:14px;
+    margin-top:5px;
+    color:#555;
+}
 </style>
+
 </head>
 
 <body>
 
+<header>
+Class Management
+</header>
+
 <div class="container">
 
-<h1>Quản lý lớp học</h1>
+<!-- CREATE CLASS -->
+<div class="create-class">
 
-<!-- Tạo lớp -->
-<div class="create-box">
+<h2>Create New Class</h2>
 
-<h3>Tạo lớp mới</h3>
+<div class="form-row">
+<label>Class Name</label>
+<input id="className">
+</div>
 
-<select id="grade">
-<option value="">Chọn khối</option>
-<option>10</option>
-<option>11</option>
-<option>12</option>
+<div class="form-row">
+<label>Grade</label>
+<select id="gradeSelect"></select>
+</div>
+
+<div class="form-row">
+<label>Subject</label>
+<select id="subjectSelect"></select>
+</div>
+
+<div class="form-row">
+<label>Tuition Type</label>
+<select id="tuitionType">
+<option value="month">Monthly</option>
+<option value="course">Course</option>
 </select>
+</div>
 
-<select id="subject">
-<option value="">Chọn môn</option>
-<option>Toán</option>
-<option>Lý</option>
-<option>Hóa</option>
-<option>Anh</option>
+<div class="form-row">
+<label>Tuition Fee</label>
+<input type="number" id="tuitionFee">
+</div>
+
+<div class="form-row">
+<label>Day of week</label>
+<select id="dayOfWeek">
+<option value="2">Monday</option>
+<option value="3">Tuesday</option>
+<option value="4">Wednesday</option>
+<option value="5">Thursday</option>
+<option value="6">Friday</option>
+<option value="7">Saturday</option>
+<option value="8">Sunday</option>
 </select>
+</div>
 
-<input id="className" placeholder="Tên lớp">
+<div class="form-row">
+<label>Start Time</label>
+<input type="time" id="startTime">
+</div>
 
-<select id="day">
-<option>Thứ 2</option>
-<option>Thứ 3</option>
-<option>Thứ 4</option>
-<option>Thứ 5</option>
-<option>Thứ 6</option>
-<option>Thứ 7</option>
-<option>Chủ nhật</option>
-</select>
-
-<select id="hour"></select>
-<select id="minute"></select>
-
-<button onclick="createClass()">Tạo lớp</button>
+<button onclick="createClass()">Create Class</button>
 
 </div>
 
-<!-- Danh sách lớp -->
-<div class="class-list" id="classList"></div>
+
+<!-- CLASS LIST -->
+<div class="class-list">
+
+<h2>Your Classes</h2>
+
+<div class="class-grid" id="classGrid">
+
+</div>
+
+</div>
 
 </div>
 
 <script>
 
-let classes = JSON.parse(localStorage.getItem("classes")) || []
+let grades=[]
+let subjects=[]
+let classes=[]
 
-const classList = document.getElementById("classList")
-const hourSelect = document.getElementById("hour")
-const minuteSelect = document.getElementById("minute")
 
-// tạo giờ
-for(let i=0;i<24;i++){
-let op=document.createElement("option")
-op.value=i
-op.text=i+" giờ"
-hourSelect.appendChild(op)
+async function loadGrades(){
+    let res = await fetch("/api/grades")
+    grades = await res.json()
+
+    let gradeSelect=document.getElementById("gradeSelect")
+
+    gradeSelect.innerHTML=grades.map(g=>
+        `<option value="${g.id}">${g.name}</option>`
+    ).join("")
 }
 
-// tạo phút
-for(let i=0;i<60;i+=5){
-let op=document.createElement("option")
-op.value=i
-op.text=i+" phút"
-minuteSelect.appendChild(op)
+async function loadSubjects(){
+    let res = await fetch("/api/subjects")
+    subjects = await res.json()
+
+    filterSubjects()
 }
 
-// tạo lớp
-function createClass(){
+function filterSubjects(){
 
-let grade=document.getElementById("grade").value
-let subject=document.getElementById("subject").value
-let name=document.getElementById("className").value
-let day=document.getElementById("day").value
-let hour=document.getElementById("hour").value
-let minute=document.getElementById("minute").value
+    let gradeId=document.getElementById("gradeSelect").value
 
-if(!grade || !subject || !name){
-alert("Vui lòng nhập đủ thông tin")
-return
+    let subjectSelect=document.getElementById("subjectSelect")
+
+    let filtered=subjects.filter(s=>s.grade_id==gradeId)
+
+    subjectSelect.innerHTML=filtered.map(s=>
+        `<option value="${s.id}">${s.name}</option>`
+    ).join("")
 }
 
-let newClass={
-id:Date.now(),
-grade,
-subject,
-name,
-day,
-hour,
-minute
+document.getElementById("gradeSelect").addEventListener("change",filterSubjects)
+
+
+async function loadClasses(){
+
+    let res=await fetch("/api/my_classes")
+    classes=await res.json()
+
+    renderClasses()
 }
 
-classes.push(newClass)
-
-localStorage.setItem("classes",JSON.stringify(classes))
-
-renderClasses()
-
-}
-
-// hiển thị lớp
 function renderClasses(){
 
-classList.innerHTML=""
+    let grid=document.getElementById("classGrid")
 
-classes.forEach(c=>{
+    grid.innerHTML=classes.map(c=>
 
-let card=document.createElement("div")
-card.className="class-card"
+        `<div class="class-box" onclick="openClass(${c.id})">
 
-card.innerHTML=`
+            <div class="class-title">${c.class_name}</div>
 
-<div class="class-name">${c.name}</div>
+            <div class="class-info">
+            Grade: ${c.grade_name}
+            </div>
 
-<div>Khối: ${c.grade}</div>
+            <div class="class-info">
+            Subject: ${c.subject_name}
+            </div>
 
-<div>Môn: ${c.subject}</div>
+            <div class="class-info">
+            Fee: ${c.tuition_fee}
+            </div>
 
-<div>Lịch: ${c.day} ${c.hour}:${c.minute}</div>
+        </div>`
 
-`
-
-card.onclick=()=>{
-window.location="class-detail.html?id="+c.id
+    ).join("")
 }
 
-classList.appendChild(card)
 
-})
+async function createClass(){
+
+    let data={
+        class_name:document.getElementById("className").value,
+        grade_id:document.getElementById("gradeSelect").value,
+        subject_id:document.getElementById("subjectSelect").value,
+        tuition_type:document.getElementById("tuitionType").value,
+        tuition_fee:document.getElementById("tuitionFee").value,
+        day_of_week:document.getElementById("dayOfWeek").value,
+        start_time:document.getElementById("startTime").value
+    }
+
+    await fetch("/api/classes",{
+        method:"POST",
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(data)
+    })
+
+    loadClasses()
+}
+
+
+function openClass(id){
+
+    window.location="class_detail.html?id="+id
 
 }
 
-renderClasses()
+
+async function init(){
+
+    await loadGrades()
+    await loadSubjects()
+    await loadClasses()
+
+}
+
+init()
 
 </script>
 
