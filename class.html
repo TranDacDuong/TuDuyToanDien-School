@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Quản lý lớp học</title>
+
+<style>
+
+body{
+font-family: Arial;
+background:#f5f5f5;
+margin:0;
+padding:20px;
+}
+
+h1{
+margin-bottom:20px;
+}
+
+.container{
+max-width:1000px;
+margin:auto;
+}
+
+.create-box{
+background:white;
+padding:20px;
+border-radius:10px;
+margin-bottom:30px;
+box-shadow:0 0 5px rgba(0,0,0,0.1);
+}
+
+input,select{
+padding:8px;
+margin:5px;
+}
+
+button{
+padding:8px 16px;
+cursor:pointer;
+}
+
+.class-list{
+display:grid;
+grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+gap:15px;
+}
+
+.class-card{
+background:white;
+padding:15px;
+border-radius:10px;
+box-shadow:0 0 5px rgba(0,0,0,0.1);
+cursor:pointer;
+transition:0.2s;
+}
+
+.class-card:hover{
+transform:scale(1.03);
+}
+
+.class-name{
+font-size:18px;
+font-weight:bold;
+margin-bottom:8px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Quản lý lớp học</h1>
+
+<!-- Tạo lớp -->
+<div class="create-box">
+
+<h3>Tạo lớp mới</h3>
+
+<select id="grade">
+<option value="">Chọn khối</option>
+<option>10</option>
+<option>11</option>
+<option>12</option>
+</select>
+
+<select id="subject">
+<option value="">Chọn môn</option>
+<option>Toán</option>
+<option>Lý</option>
+<option>Hóa</option>
+<option>Anh</option>
+</select>
+
+<input id="className" placeholder="Tên lớp">
+
+<select id="day">
+<option>Thứ 2</option>
+<option>Thứ 3</option>
+<option>Thứ 4</option>
+<option>Thứ 5</option>
+<option>Thứ 6</option>
+<option>Thứ 7</option>
+<option>Chủ nhật</option>
+</select>
+
+<select id="hour"></select>
+<select id="minute"></select>
+
+<button onclick="createClass()">Tạo lớp</button>
+
+</div>
+
+<!-- Danh sách lớp -->
+<div class="class-list" id="classList"></div>
+
+</div>
+
+<script>
+
+let classes = JSON.parse(localStorage.getItem("classes")) || []
+
+const classList = document.getElementById("classList")
+const hourSelect = document.getElementById("hour")
+const minuteSelect = document.getElementById("minute")
+
+// tạo giờ
+for(let i=0;i<24;i++){
+let op=document.createElement("option")
+op.value=i
+op.text=i+" giờ"
+hourSelect.appendChild(op)
+}
+
+// tạo phút
+for(let i=0;i<60;i+=5){
+let op=document.createElement("option")
+op.value=i
+op.text=i+" phút"
+minuteSelect.appendChild(op)
+}
+
+// tạo lớp
+function createClass(){
+
+let grade=document.getElementById("grade").value
+let subject=document.getElementById("subject").value
+let name=document.getElementById("className").value
+let day=document.getElementById("day").value
+let hour=document.getElementById("hour").value
+let minute=document.getElementById("minute").value
+
+if(!grade || !subject || !name){
+alert("Vui lòng nhập đủ thông tin")
+return
+}
+
+let newClass={
+id:Date.now(),
+grade,
+subject,
+name,
+day,
+hour,
+minute
+}
+
+classes.push(newClass)
+
+localStorage.setItem("classes",JSON.stringify(classes))
+
+renderClasses()
+
+}
+
+// hiển thị lớp
+function renderClasses(){
+
+classList.innerHTML=""
+
+classes.forEach(c=>{
+
+let card=document.createElement("div")
+card.className="class-card"
+
+card.innerHTML=`
+
+<div class="class-name">${c.name}</div>
+
+<div>Khối: ${c.grade}</div>
+
+<div>Môn: ${c.subject}</div>
+
+<div>Lịch: ${c.day} ${c.hour}:${c.minute}</div>
+
+`
+
+card.onclick=()=>{
+window.location="class-detail.html?id="+c.id
+}
+
+classList.appendChild(card)
+
+})
+
+}
+
+renderClasses()
+
+</script>
+
+</body>
+</html>
