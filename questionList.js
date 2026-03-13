@@ -247,21 +247,21 @@ Khôi phục
 
 async function editQ(id){
 
-const q = questions.find(q => q.id === id)
+const q = questions.find(x => x.id === id)
 if(!q) return
 
 editingQuestionId = id
 
 openModal()
 
-/* ĐỔI TIÊU ĐỀ FORM */
+/* đổi tiêu đề */
 
 formTitle.innerText = "Sửa câu hỏi"
 saveBtn.innerText = "Cập nhật"
 
 
 /* =========================
-SET KHỐI
+SET KHỐI / MÔN / CHƯƠNG
 ========================= */
 
 const gradeId = q.chapters?.subjects?.grades?.id
@@ -271,9 +271,7 @@ const chapterId = q.chapter_id
 grade.value = gradeId || ""
 
 
-/* =========================
-LOAD MÔN
-========================= */
+/* load subjects */
 
 const { data:subjects } = await sb
 .from("subjects")
@@ -282,16 +280,14 @@ const { data:subjects } = await sb
 
 subject.innerHTML = "<option value=''>Môn</option>"
 
-subjects.forEach(s=>{
+subjects?.forEach(s=>{
 subject.innerHTML += `<option value="${s.id}">${s.name}</option>`
 })
 
 subject.value = subjectId || ""
 
 
-/* =========================
-LOAD CHƯƠNG
-========================= */
+/* load chapters */
 
 const { data:chapters } = await sb
 .from("chapters")
@@ -300,7 +296,7 @@ const { data:chapters } = await sb
 
 chapter.innerHTML = "<option value=''>Chương</option>"
 
-chapters.forEach(c=>{
+chapters?.forEach(c=>{
 chapter.innerHTML += `<option value="${c.id}">${c.name}</option>`
 })
 
@@ -338,8 +334,10 @@ answerImgBox.style.display = "none"
 
 
 /* =========================
-TẠO INPUT ĐÁP ÁN
+TẠO UI ĐÁP ÁN
 ========================= */
+
+changeType()
 
 createAnswerInputs(q.answer_count)
 
@@ -356,6 +354,8 @@ boxes.forEach((box,index)=>{
 
 const checkbox = box.querySelector("input")
 
+if(!checkbox) return
+
 if(q.answer.includes(String.fromCharCode(65+index))){
 checkbox.checked = true
 }
@@ -370,6 +370,8 @@ if(q.question_type === "true_false"){
 boxes.forEach((box,index)=>{
 
 const state = box.querySelector(".state")
+
+if(!state) return
 
 if(q.answer.includes(String.fromCharCode(97+index))){
 state.innerText = "Đúng"
@@ -386,7 +388,7 @@ if(q.question_type === "short_answer"){
 
 const inputs = document.querySelectorAll("#answerArea input")
 
-const arr = q.answer.split(";")
+const arr = q.answer?.split(";") || []
 
 inputs.forEach((input,i)=>{
 input.value = arr[i] || ""
