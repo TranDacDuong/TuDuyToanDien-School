@@ -198,7 +198,7 @@ async function saveQuestion(){
 
         boxes.forEach((box,index)=>{
 
-            const state = box.querySelector(".correct, .wrong")
+            const state = box.querySelector(".state")
 
             if(state.innerText === "Đúng"){
                 correctAnswer += String.fromCharCode(97 + index)
@@ -384,6 +384,21 @@ function resetQuestionForm(){
 
     const inputs = document.querySelectorAll("#answerArea input[type='text']")
     inputs.forEach(i => i.value = "")
+
+    const states = document.querySelectorAll("#answerArea .state")
+
+    states.forEach(s=>{
+       s.innerText = "Sai"
+})
+}
+
+function toggleState(el){
+
+if(el.innerText === "Sai"){
+    el.innerText = "Đúng"
+}else{
+    el.innerText = "Sai"
+}
 
 }
 
