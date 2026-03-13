@@ -237,9 +237,6 @@ Khôi phục
 
 </tr>
 `
-: ""}
-
-</td>
 
 <td>${q.chapters?.subjects?.grades?.name || ""}</td>
 <td>${q.chapters?.subjects?.name || ""}</td>
