@@ -1,240 +1,221 @@
 <!DOCTYPE html>
-
 <html lang="vi">
 
 <head>
-
 <meta charset="UTF-8">
 <title>Ngân hàng câu hỏi</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <script src="supabaseClient.js"></script>
 
 <style>
 
 .questionCell{
-text-align:left;
-padding:10px 14px;
-max-width:500px;
+  text-align:left;
+  padding:10px 14px;
+  max-width:500px;
 }
 
 .questionText{
-margin-bottom:8px;
-white-space:pre-line;
+  margin-bottom:8px;
+  white-space:pre-line;
 }
 
 .questionImg{
-max-width:300px;
-display:block;
-margin-top:6px;
-border-radius:6px;
-cursor:pointer;
+  max-width:300px;
+  display:block;
+  margin-top:6px;
+  border-radius:6px;
+  cursor:pointer;
 }
-    
+
 .imgWrapper{
-position:relative;
-display:none;
-max-width:100%;
+  position:relative;
+  display:none;
+  max-width:100%;
 }
 
 .previewImg{
-max-width:400px;
-border-radius:6px;
-margin-top:8px;
-max-height:250px;
-object-fit:contain;
+  max-width:400px;
+  border-radius:6px;
+  margin-top:8px;
+  max-height:250px;
+  object-fit:contain;
 }
 
 .imgDelete{
-position:absolute;
-top:6px;
-right:6px;
-background:red;
-color:white;
-width:20px;
-height:20px;
-border-radius:50%;
-display:flex;
-align-items:center;
-justify-content:center;
-font-size:14px;
-cursor:pointer;
-font-weight:bold;
+  position:absolute;
+  top:6px;
+  right:6px;
+  background:red;
+  color:white;
+  width:20px;
+  height:20px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:14px;
+  cursor:pointer;
+  font-weight:bold;
 }
-    
+
 textarea{
-width:100%;
-min-height:80px;
-padding:8px;
-border:1px solid #ccc;
-border-radius:6px;
-font-family:Arial;
-font-size:14px;
-
-resize:vertical;
-
-/* QUAN TRỌNG */
-
-white-space:pre-wrap;
-word-wrap:break-word;
+  width:100%;
+  min-height:80px;
+  padding:8px;
+  border:1px solid #ccc;
+  border-radius:6px;
+  font-family:Arial;
+  font-size:14px;
+  resize:vertical;
+  white-space:pre-wrap;
+  word-wrap:break-word;
 }
-    
+
 body{
-font-family:Arial;
-background:#f1f5f9;
-padding:30px;
+  font-family:Arial;
+  background:#f1f5f9;
+  padding:30px;
 }
 
 .container{
-max-width:1400px;
-margin:auto;
-background:white;
-padding:25px;
-border-radius:10px;
+  max-width:1400px;
+  margin:auto;
+  background:white;
+  padding:25px;
+  border-radius:10px;
 }
 
 button{
-padding:6px 12px;
-border:none;
-background:#2563eb;
-color:white;
-border-radius:6px;
-cursor:pointer;
+  padding:6px 12px;
+  border:none;
+  background:#2563eb;
+  color:white;
+  border-radius:6px;
+  cursor:pointer;
 }
 
 table{
-width:100%;
-border-collapse:collapse;
-margin-top:20px;
+  width:100%;
+  border-collapse:collapse;
+  margin-top:20px;
 }
 
 th,td{
-padding:10px;
-border-bottom:1px solid #eee;
-text-align:center;
+  padding:10px;
+  border-bottom:1px solid #eee;
+  text-align:center;
 }
 
 .filterBar{
-display:flex;
-gap:10px;
-flex-wrap:wrap;
-margin-top:10px;
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:10px;
 }
 
 select,input{
-padding:6px;
-border:1px solid #ccc;
-border-radius:5px;
+  padding:6px;
+  border:1px solid #ccc;
+  border-radius:5px;
 }
 
-/* IMAGE */
-
 .questionImgBox{
-width:320px;
-aspect-ratio:7/2;
-overflow:hidden;
-border-radius:6px;
-background:#f1f5f9;
-display:flex;
-align-items:center;
-justify-content:center;
+  width:320px;
+  aspect-ratio:7/2;
+  overflow:hidden;
+  border-radius:6px;
+  background:#f1f5f9;
+  display:flex;
+  align-items:center;
+  justify-content:center;
 }
 
 .questionImg{
-width:100%;
-height:100%;
-object-fit:contain;
-cursor:pointer;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  cursor:pointer;
 }
 
-/* MODAL */
-
 .modal{
-position:fixed;
-top:0;
-left:0;
-width:100%;
-height:100%;
-background:rgba(0,0,0,0.4);
-display:none;
-align-items:center;
-justify-content:center;
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:rgba(0,0,0,0.4);
+  display:none;
+  align-items:center;
+  justify-content:center;
 }
 
 .modal-box{
-background:white;
-padding:25px;
-border-radius:10px;
-width:1100px;
-max-width:95%;
-
-max-height:90vh;
-overflow-y:auto;
+  background:white;
+  padding:25px;
+  border-radius:10px;
+  width:1100px;
+  max-width:95%;
+  max-height:90vh;
+  overflow-y:auto;
 }
 
-/* GRID */
-
 .createGrid{
-display:grid;
-grid-template-columns:220px 1fr 320px;
-gap:25px;
+  display:grid;
+  grid-template-columns:220px 1fr 320px;
+  gap:25px;
 }
 
 .leftCol,
 .centerCol,
 .rightCol{
-display:flex;
-flex-direction:column;
-gap:10px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
 }
-
-/* MODE BUTTON */
 
 .modeBtn{
-background:#64748b;
-font-size:12px;
-margin-left:8px;
+  background:#64748b;
+  font-size:12px;
+  margin-left:8px;
 }
 
-/* ANSWERS */
-
 .answerRow{
-display:grid;
-grid-template-columns:repeat(4,1fr);
-gap:10px;
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
 }
 
 .answerBox{
-border:1px solid #ccc;
-padding:6px 8px;
-border-radius:6px;
-display:flex;
-align-items:center;
-gap:6px;
+  border:1px solid #ccc;
+  padding:6px 8px;
+  border-radius:6px;
+  display:flex;
+  align-items:center;
+  gap:6px;
 }
 
 .correct{
-color:#22c55e;
-font-weight:bold;
-cursor:pointer;
+  color:#22c55e;
+  font-weight:bold;
+  cursor:pointer;
 }
 
 .wrong{
-color:#ef4444;
-font-weight:bold;
-cursor:pointer;
+  color:#ef4444;
+  font-weight:bold;
+  cursor:pointer;
 }
 
 .shortRow{
-display:flex;
-align-items:center;
-gap:6px;
-margin-bottom:6px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-bottom:6px;
 }
 
 </style>
-
 </head>
 
 <body>
@@ -247,7 +228,17 @@ margin-bottom:6px;
 
 <div class="filterBar">
 
-<select id="f_grade"><option value="">Khối</option></select> <select id="f_subject"><option value="">Môn</option></select> <select id="f_chapter"><option value="">Chương</option></select>
+<select id="f_grade">
+<option value="">Khối</option>
+</select>
+
+<select id="f_subject">
+<option value="">Môn</option>
+</select>
+
+<select id="f_chapter">
+<option value="">Chương</option>
+</select>
 
 <select id="f_type">
 <option value="">Loại câu hỏi</option>
@@ -285,7 +276,7 @@ margin-bottom:6px;
 <td colspan="9">Đang tải câu hỏi...</td>
 </tr>
 </tbody>
-    
+
 </table>
 
 </div>
@@ -304,11 +295,14 @@ margin-bottom:6px;
 
 <div class="leftCol">
 
-<label>Khối</label> <select id="grade"></select>
+<label>Khối</label>
+<select id="grade"></select>
 
-<label>Môn</label> <select id="subject"></select>
+<label>Môn</label>
+<select id="subject"></select>
 
-<label>Chương</label> <select id="chapter"></select>
+<label>Chương</label>
+<select id="chapter"></select>
 
 </div>
 
@@ -318,23 +312,16 @@ margin-bottom:6px;
 
 <label>Câu hỏi</label>
 
-<textarea
-id="questionText"
-placeholder="Nhập câu hỏi hoặc Ctrl+V ảnh tại đây">
-</textarea>
+<textarea id="questionText" placeholder="Nhập câu hỏi hoặc Ctrl+V ảnh tại đây"></textarea>
 
 <div class="imgWrapper" id="questionImgBox">
 <img id="questionImg" class="previewImg">
 <span class="imgDelete" onclick="removeImg('question')">×</span>
 </div>
 
-
 <label>Đáp án</label>
 
-<textarea
-id="answerText"
-placeholder="Nhập đáp án hoặc Ctrl+V ảnh tại đây">
-</textarea>
+<textarea id="answerText" placeholder="Nhập đáp án hoặc Ctrl+V ảnh tại đây"></textarea>
 
 <div class="imgWrapper" id="answerImgBox">
 <img id="answerImg" class="previewImg">
@@ -350,20 +337,19 @@ placeholder="Nhập đáp án hoặc Ctrl+V ảnh tại đây">
 <label>Loại câu hỏi</label>
 
 <select id="question_type" onchange="changeType()">
-
 <option value="multi_choice">Nhiều lựa chọn</option>
 <option value="true_false">Đúng/Sai</option>
 <option value="short_answer">Trả lời ngắn</option>
 <option value="essay">Tự luận</option>
-
 </select>
 
-<label>Mức độ</label> <select id="difficulty"></select>
+<label>Mức độ</label>
+<select id="difficulty"></select>
 
 <label id="answerLabel">
-
-Chọn đáp án đúng <button onclick="addAnswer()">+</button> <button onclick="removeAnswer()">-</button>
-
+Chọn đáp án đúng
+<button onclick="addAnswer()">+</button>
+<button onclick="removeAnswer()">-</button>
 </label>
 
 <div id="answerArea"></div>
@@ -378,298 +364,37 @@ Chọn đáp án đúng <button onclick="addAnswer()">+</button> <button onclick
 <button onclick="closeModal()">Đóng</button>
 
 </div>
-
 </div>
 
 <script>
 
-let activeField=null
+let activeField = null
 
-questionText.onfocus=()=>activeField="question"
-answerText.onfocus=()=>activeField="answer"
+questionText.onfocus = () => activeField = "question"
+answerText.onfocus = () => activeField = "answer"
 
 function openModal(){
-
-resetQuestionForm()
-const modal = document.getElementById("modal")
-modal.style.display = "flex"
-changeType() 
-    
+  const modal = document.getElementById("modal")
+  modal.style.display = "flex"
+  changeType()
 }
 
 function closeModal(){
-
-const modal = document.getElementById("modal")
-modal.style.display = "none"
-
-editingQuestionId = null
-
-formTitle.innerText = "Tạo câu hỏi"
-saveBtn.innerText = "Lưu câu hỏi"
-
-resetQuestionForm()
-
+  const modal = document.getElementById("modal")
+  modal.style.display = "none"
 }
 
 function removeImg(type){
 
-if(type==="question"){
-questionImg.src=""
-questionImgBox.style.display="none"
-}
-
-if(type==="answer"){
-answerImg.src=""
-answerImgBox.style.display="none"
-}
-
-}
-
-document.addEventListener("paste", async function(e){
-
-if(!activeField) return
-
-const items = e.clipboardData.items
-
-for(let item of items){
-
-if(item.type.indexOf("image") !== -1){
-
-const file = item.getAsFile()
-
-/* NÉN ẢNH */
-
-const compressedBlob = await compressImage(file)
-
-/* TÊN FILE */
-
-const fileName = crypto.randomUUID() + ".jpg"
-
-/* UPLOAD STORAGE */
-
-const { data, error } = await sb.storage
-.from("question-images")
-.upload(fileName, compressedBlob)
-
-if(error){
-
-console.error(error)
-alert("Upload ảnh lỗi")
-return
-
-}
-
-/* LẤY URL */
-
-const { data:urlData } = sb.storage
-.from("question-images")
-.getPublicUrl(fileName)
-
-const imageUrl = urlData.publicUrl
-
-/* HIỂN THỊ */
-
-if(activeField === "question"){
-
-questionImg.src = imageUrl
-questionImgBox.style.display = "block"
-
-}
-
-if(activeField === "answer"){
-
-answerImg.src = imageUrl
-answerImgBox.style.display = "block"
-
-}
-
-}
-
-}
-
-})
-
-/* ANSWER TYPES */
-
-let answerCount=4
-
-function changeType(){
-
-const type = question_type.value
-answerArea.innerHTML=""
-
-answerLabel.style.display = type==="essay" ? "none" : "block"
-
-if(!editingQuestionId){
-
-if(type==="multi_choice") answerCount=4
-if(type==="true_false") answerCount=4
-if(type==="short_answer") answerCount=1
-
-}
-
-if(type==="multi_choice") renderMulti()
-if(type==="true_false") renderTF()
-if(type==="short_answer") renderShort()
-
-}
-
-function renderMulti(){
-
-const row=document.createElement("div")
-row.className="answerRow"
-
-for(let i=1;i<=answerCount;i++){
-
-const letter=String.fromCharCode(64+i)
-
-row.innerHTML+=`
-<div class="answerBox">
-<input type="checkbox">
-${letter}
-</div>
-`
-
-}
-
-answerArea.appendChild(row)
-
-}
-
-function renderTF(){
-
-const row=document.createElement("div")
-row.className="answerRow"
-
-for(let i=0;i<answerCount;i++){
-
-const letter=String.fromCharCode(97+i)
-
-row.innerHTML+=`
-<div class="answerBox">
-<span>${letter})</span>
-<span class="correct" onclick="toggleTF(this)">Đúng</span>
-</div>
-`
-
-}
-
-answerArea.appendChild(row)
-
-}
-
-function toggleTF(el){
-
-if(el.innerText==="Đúng"){
-el.innerText="Sai"
-el.classList.remove("correct")
-el.classList.add("wrong")
-}else{
-el.innerText="Đúng"
-el.classList.remove("wrong")
-el.classList.add("correct")
-}
-
-}
-
-function renderShort(){
-
-for(let i=1;i<=answerCount;i++){
-
-answerArea.innerHTML+=`
-<div class="shortRow">
-${i}
-<input>
-</div>`
-
-}
-
-}
-
-function addAnswer(){
-
-const type = question_type.value
-
-answerCount++
-
-/* MULTI CHOICE */
-
-if(type==="multi_choice"){
-
-const row = answerArea.firstChild
-const letter = String.fromCharCode(64 + answerCount)
-
-row.innerHTML += `
-<div class="answerBox">
-<input type="checkbox">
-${letter}
-</div>
-`
-
-}
-
-/* TRUE FALSE */
-
-if(type==="true_false"){
-
-const row = answerArea.firstChild
-const letter = String.fromCharCode(96 + answerCount)
-
-row.innerHTML += `
-<div class="answerBox">
-<span>${letter})</span>
-<span class="correct" onclick="toggleTF(this)">Đúng</span>
-</div>
-`
-
-}
-
-/* SHORT ANSWER */
-
-if(type==="short_answer"){
-
-answerArea.innerHTML += `
-<div class="shortRow">
-${answerCount}
-<input>
-</div>
-`
-
-}
-
-}
-
-function removeAnswer(){
-
-const type = question_type.value
-
-if(answerCount<=1) return
-
-answerCount--
-
-/* MULTI CHOICE */
-
-if(type==="multi_choice"){
-
-const row = answerArea.firstChild
-row.removeChild(row.lastElementChild)
-
-}
-
-if(type==="true_false"){
-
-const row = answerArea.firstChild
-row.removeChild(row.lastElementChild)
-
-}
-  
-/* SHORT ANSWER */
-
-if(type==="short_answer"){
-
-answerArea.removeChild(answerArea.lastElementChild)
-
-}
+  if(type === "question"){
+    questionImg.src = ""
+    questionImgBox.style.display = "none"
+  }
+
+  if(type === "answer"){
+    answerImg.src = ""
+    answerImgBox.style.display = "none"
+  }
 
 }
 
@@ -677,5 +402,6 @@ answerArea.removeChild(answerArea.lastElementChild)
 
 <script src="questionList.js"></script>
 <script src="createQuestion.js"></script>
+
 </body>
 </html>
