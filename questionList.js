@@ -137,7 +137,6 @@ async function loadQuestions() {
                 )
             )
         `)
-        .eq("hidden", false)
 
     if (error) {
         console.error(error)
@@ -160,7 +159,10 @@ function render() {
 
     questionTable.innerHTML = ""
 
-    /* FILTER */
+    if(!isAdmin){
+    list = list.filter(q => !q.hidden)
+    }
+        /* FILTER */
 
     if (f_grade.value)
         list = list.filter(q => q.chapters?.subjects?.grades?.id == f_grade.value)
@@ -182,8 +184,10 @@ function render() {
 
     list.forEach((q, i) => {
 
-        questionTable.innerHTML += `
-<tr>
+    const rowStyle = q.hidden ? "style='opacity:0.35'" : ""
+
+    questionTable.innerHTML += `
+<tr ${rowStyle}>
 
 <td>${i + 1}</td>
 
@@ -218,8 +222,15 @@ onclick="window.open('${q.question_img}')">
 <td class="answerCell">${q.answer || ""}</td>
 
 <td>
+
 <button onclick="editQ('${q.id}')">Sửa</button>
-<button onclick="deleteQ('${q.id}')">Xóa</button>
+
+<button onclick="deleteQ('${q.id}')" style="background:#dc2626">Xóa</button>
+
+${q.hidden 
+? `<button onclick="restoreQ('${q.id}')" style="background:#16a34a">Khôi phục</button>`
+: ""}
+
 </td>
 
 </tr>
@@ -228,25 +239,69 @@ onclick="window.open('${q.question_img}')">
 }
 
 
+async function restoreQ(id){
+
+if(!confirm("Khôi phục câu hỏi này?")) return
+
+const { error } = await sb
+.from("question_bank")
+.update({ hidden:false })
+.eq("id", id)
+
+if(error){
+    console.error(error)
+    alert(error.message)
+    return
+}
+
+loadQuestions()
+
+}
+
 /* =========================
    DELETE
 ========================= */
 
-async function deleteQ(id) {
+async function deleteQ(id){
 
-    if (!confirm("Xóa câu hỏi?")) return
+if(!confirm("Xóa câu hỏi?")) return
 
-    const { error } = await sb
-        .from("question_bank")
-        .update({ hidden: true })
-        .eq("id", id)
+let error
 
-    if (error) {
-        console.error(error)
-        return
-    }
+if(isAdmin){
 
-    loadQuestions()
+    /* ADMIN → XÓA HẲN */
+    if(isAdmin){
+    if(!confirm("Admin sẽ xóa vĩnh viễn câu hỏi này!")) return
+    const res = await sb
+    .from("question_bank")
+    .delete()
+    .eq("id", id)
+
+    error = res.error
+
+}else{
+
+    /* USER → ẨN */
+    if(isAdmin){
+
+    if(!confirm("Bạn có thực sự muốn xóa câu hỏi này không?")) return
+    const res = await sb
+    .from("question_bank")
+    .update({ hidden:true })
+    .eq("id", id)
+
+    error = res.error
+}
+
+if(error){
+    console.error(error)
+    alert(error.message)
+    return
+}
+
+loadQuestions()
+
 }
 
 
@@ -262,10 +317,37 @@ f_difficulty.onchange = render
    INIT
 ========================= */
 
-async function init() {
+async function init(){
+
+    await getUserRole()
 
     await loadGrades()
     await loadQuestions()
+
+}
+
+let isAdmin = false
+
+async function getUserRole(){
+
+    const { data:{ user } } = await sb.auth.getUser()
+
+    if(!user) return
+
+    const { data, error } = await sb
+        .from("users")
+        .select("role")
+        .eq("id", user.id)
+        .single()
+
+    if(error){
+        console.error(error)
+        return
+    }
+
+    if(data.role === "admin"){
+        isAdmin = true
+    }
 
 }
 
