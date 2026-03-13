@@ -6,264 +6,474 @@ const formTitle = document.getElementById("formTitle")
 const saveBtn = document.getElementById("saveBtn")
 
 const typeText = {
-  multi_choice: "Nhiều lựa chọn",
-  true_false: "Đúng/Sai",
-  short_answer: "Trả lời ngắn",
-  essay: "Tự luận"
+    multi_choice: "Nhiều lựa chọn",
+    true_false: "Đúng/Sai",
+    short_answer: "Trả lời ngắn",
+    essay: "Tự luận"
 }
 
-/* =====================
-DIFFICULTY
-===================== */
 
-for(let i = 1; i <= 10; i++){
-  f_difficulty.innerHTML += `<option value="${i}">${i}</option>`
+/* =========================
+   DIFFICULTY
+========================= */
+
+for (let i = 1; i <= 10; i++) {
+    f_difficulty.innerHTML += `<option value="${i}">${i}</option>`
 }
 
-/* =====================
-LOAD GRADES
-===================== */
 
-async function loadGrades(){
+/* =========================
+   LOAD GRADES
+========================= */
 
-  const { data, error } = await sb
-    .from("grades")
-    .select("*")
+async function loadGrades() {
 
-  if(error){
-    console.error(error)
-    return
-  }
+    const { data, error } = await sb
+        .from("grades")
+        .select("*")
 
-  grades = data || []
+    if (error) {
+        console.error(error)
+        return
+    }
 
-  grades.sort((a,b)=>Number(a.name)-Number(b.name))
+    grades = data || []
 
-  f_grade.innerHTML = "<option value=''>Khối</option>"
+    grades.sort((a, b) => Number(a.name) - Number(b.name))
 
-  grades.forEach(g=>{
-    f_grade.innerHTML += `<option value="${g.id}">${g.name}</option>`
-  })
+    f_grade.innerHTML = "<option value=''>Khối</option>"
 
+    grades.forEach(g => {
+        f_grade.innerHTML += `<option value="${g.id}">${g.name}</option>`
+    })
 }
 
-/* =====================
-FILTER SUBJECT BY GRADE
-===================== */
 
-f_grade.onchange = async ()=>{
+/* =========================
+   FILTER SUBJECT BY GRADE
+========================= */
 
-  f_subject.innerHTML = "<option value=''>Môn</option>"
-  f_chapter.innerHTML = "<option value=''>Chương</option>"
+f_grade.onchange = async () => {
 
-  if(!f_grade.value){
+    f_subject.innerHTML = "<option value=''>Môn</option>"
+    f_chapter.innerHTML = "<option value=''>Chương</option>"
+
+    if (!f_grade.value) {
+        render()
+        return
+    }
+
+    const { data, error } = await sb
+        .from("subjects")
+        .select("*")
+        .eq("grade_id", f_grade.value)
+
+    if (error) {
+        console.error(error)
+        return
+    }
+
+    data.forEach(s => {
+        f_subject.innerHTML += `<option value="${s.id}">${s.name}</option>`
+    })
+
     render()
-    return
-  }
-
-  const { data, error } = await sb
-    .from("subjects")
-    .select("*")
-    .eq("grade_id", f_grade.value)
-
-  if(error){
-    console.error(error)
-    return
-  }
-
-  data.forEach(s=>{
-    f_subject.innerHTML += `<option value="${s.id}">${s.name}</option>`
-  })
-
-  render()
-
 }
 
-/* =====================
-FILTER CHAPTER BY SUBJECT
-===================== */
 
-f_subject.onchange = async ()=>{
+/* =========================
+   FILTER CHAPTER BY SUBJECT
+========================= */
 
-  f_chapter.innerHTML = "<option value=''>Chương</option>"
+f_subject.onchange = async () => {
 
-  if(!f_subject.value){
+    f_chapter.innerHTML = "<option value=''>Chương</option>"
+
+    if (!f_subject.value) {
+        render()
+        return
+    }
+
+    const { data, error } = await sb
+        .from("chapters")
+        .select("*")
+        .eq("subject_id", f_subject.value)
+
+    if (error) {
+        console.error(error)
+        return
+    }
+
+    data.forEach(c => {
+        f_chapter.innerHTML += `<option value="${c.id}">${c.name}</option>`
+    })
+
     render()
-    return
-  }
-
-  const { data, error } = await sb
-    .from("chapters")
-    .select("*")
-    .eq("subject_id", f_subject.value)
-
-  if(error){
-    console.error(error)
-    return
-  }
-
-  data.forEach(c=>{
-    f_chapter.innerHTML += `<option value="${c.id}">${c.name}</option>`
-  })
-
-  render()
-
 }
 
 f_chapter.onchange = render
 
-/* =====================
-LOAD QUESTIONS
-===================== */
 
-async function loadQuestions(){
+/* =========================
+   LOAD QUESTIONS
+========================= */
 
-  const { data, error } = await sb
-    .from("question_bank")
-    .select(`
-      *,
-      chapters(
-        id,
-        name,
-        subjects(
-          id,
-          name,
-          grades(
-            id,
-            name
-          )
-        )
-      )
-    `)
-    .eq("hidden", false)
+async function loadQuestions() {
 
-  if(error){
-    console.error(error)
-    return
-  }
+    const { data, error } = await sb
+        .from("question_bank")
+        .select(`
+            *,
+            chapters(
+                id,
+                name,
+                subjects(
+                    id,
+                    name,
+                    grades(
+                        id,
+                        name
+                    )
+                )
+            )
+        `)
+        .eq("hidden", false)
 
-  questions = data || []
+    if (error) {
+        console.error(error)
+        return
+    }
 
-  render()
+    questions = data || []
 
+    render()
 }
 
-/* =====================
-RENDER
-===================== */
 
-function render(){
+/* =========================
+   RENDER
+========================= */
 
-  let list = [...questions]
+function render() {
 
-  questionTable.innerHTML = ""
+    let list = [...questions]
 
-  if(f_grade.value)
-    list = list.filter(q => q.chapters?.subjects?.grades?.id == f_grade.value)
+    questionTable.innerHTML = ""
 
-  if(f_subject.value)
-    list = list.filter(q => q.chapters?.subjects?.id == f_subject.value)
+    /* FILTER */
 
-  if(f_chapter.value)
-    list = list.filter(q => q.chapter_id == f_chapter.value)
+    if (f_grade.value)
+        list = list.filter(q => q.chapters?.subjects?.grades?.id == f_grade.value)
 
-  if(f_type.value)
-    list = list.filter(q => q.question_type === f_type.value)
+    if (f_subject.value)
+        list = list.filter(q => q.chapters?.subjects?.id == f_subject.value)
 
-  if(f_difficulty.value)
-    list = list.filter(q => q.difficulty == f_difficulty.value)
+    if (f_chapter.value)
+        list = list.filter(q => q.chapter_id == f_chapter.value)
 
-  list.forEach((q,i)=>{
+    if (f_type.value)
+        list = list.filter(q => q.question_type === f_type.value)
 
-    questionTable.innerHTML += `
-      <tr>
+    if (f_difficulty.value)
+        list = list.filter(q => q.difficulty == f_difficulty.value)
 
-      <td>${i+1}</td>
 
-      <td class="questionCell">
+    /* RENDER TABLE */
 
-        <div class="questionText">
-          ${q.question_text || ""}
-        </div>
+    list.forEach((q, i) => {
 
-        ${
-          q.question_img
-          ? `
-            <div class="questionImgBox">
-              <img class="questionImg"
-                   src="${q.question_img}"
-                   onclick="window.open('${q.question_img}')">
-            </div>
-          `
-          : ""
-        }
+        questionTable.innerHTML += `
+<tr>
 
-      </td>
+<td>${i + 1}</td>
 
-      <td>${q.chapters?.subjects?.grades?.name || ""}</td>
-      <td>${q.chapters?.subjects?.name || ""}</td>
-      <td>${q.chapters?.name || ""}</td>
+<td class="questionCell">
 
-      <td>${typeText[q.question_type] || q.question_type}</td>
+<div class="questionText">
+${q.question_text || ""}
+</div>
 
-      <td>${q.difficulty}</td>
+${q.question_img ?
+`
+<div class="questionImgBox">
+<img class="questionImg"
+src="${q.question_img}"
+onclick="window.open('${q.question_img}')">
+</div>
+`
+: ""}
 
-      <td>${q.answer_count || 0}</td>
+</td>
 
-      <td class="answerCell">
-        ${q.answer || ""}
-      </td>
+<td>${q.chapters?.subjects?.grades?.name || ""}</td>
+<td>${q.chapters?.subjects?.name || ""}</td>
+<td>${q.chapters?.name || ""}</td>
 
-      <td>
-        <button onclick="editQ('${q.id}')">Sửa</button>
-        <button onclick="deleteQ('${q.id}')">Xóa</button>
-      </td>
+<td>${typeText[q.question_type] || q.question_type}</td>
 
-      </tr>
-    `
+<td>${q.difficulty}</td>
 
-  })
+<td>${q.answer_count || 0}</td>
 
+<td class="answerCell">${q.answer || ""}</td>
+
+<td>
+<button onclick="editQ('${q.id}')">Sửa</button>
+<button onclick="deleteQ('${q.id}')">Xóa</button>
+</td>
+
+</tr>
+`
+    })
 }
 
-/* =====================
-DELETE
-===================== */
 
-async function deleteQ(id){
+/* =========================
+   DELETE
+========================= */
 
-  if(!confirm("Xóa câu hỏi?")) return
+async function deleteQ(id) {
 
-  const { error } = await sb
-    .from("question_bank")
-    .update({ hidden:true })
-    .eq("id", id)
+    if (!confirm("Xóa câu hỏi?")) return
 
-  if(error){
-    console.error(error)
-    return
-  }
+    const { error } = await sb
+        .from("question_bank")
+        .update({ hidden: true })
+        .eq("id", id)
 
-  loadQuestions()
+    if (error) {
+        console.error(error)
+        return
+    }
 
+    loadQuestions()
 }
 
-/* =====================
-FILTER
-===================== */
+
+/* =========================
+   FILTER
+========================= */
 
 f_type.onchange = render
 f_difficulty.onchange = render
 
-/* =====================
-INIT
-===================== */
 
-async function init(){
+/* =========================
+   INIT
+========================= */
 
-  await loadGrades()
-  await loadQuestions()
+async function init() {
+
+    await loadGrades()
+    await loadQuestions()
 
 }
+
+
+/* =========================
+   EDIT QUESTION
+========================= */
+
+async function editQ(id) {
+
+    const q = questions.find(q => q.id === id)
+    if (!q) return
+
+    editingQuestionId = id
+
+    openModal()
+
+    formTitle.innerText = "Sửa câu hỏi"
+    saveBtn.innerText = "Cập nhật"
+
+
+    /* =========================
+       SET GRADE
+    ========================= */
+
+    const gradeId = q.chapters?.subjects?.grades?.id
+    const subjectId = q.chapters?.subjects?.id
+    const chapterId = q.chapter_id
+
+    grade.value = gradeId || ""
+
+
+    /* LOAD SUBJECT */
+
+    let subjects = (await sb
+        .from("subjects")
+        .select("*")
+        .eq("grade_id", gradeId)).data
+
+    subject.innerHTML = "<option value=''>Môn</option>"
+
+    subjects.forEach(s => {
+        subject.innerHTML += `<option value="${s.id}">${s.name}</option>`
+    })
+
+    subject.value = subjectId || ""
+
+
+    /* LOAD CHAPTER */
+
+    let chapters = (await sb
+        .from("chapters")
+        .select("*")
+        .eq("subject_id", subjectId)).data
+
+    chapter.innerHTML = "<option value=''>Chương</option>"
+
+    chapters.forEach(c => {
+        chapter.innerHTML += `<option value="${c.id}">${c.name}</option>`
+    })
+
+    chapter.value = chapterId || ""
+
+
+    /* =========================
+       SET OTHER INFO
+    ========================= */
+
+    question_type.value = q.question_type
+    difficulty.value = q.difficulty
+
+    questionText.value = q.question_text || ""
+    answerText.value = q.answer_text || ""
+
+
+    /* =========================
+       IMAGES
+    ========================= */
+
+    if (q.question_img) {
+        questionImg.src = q.question_img
+        questionImgBox.style.display = "block"
+    } else {
+        questionImgBox.style.display = "none"
+    }
+
+    if (q.answer_img) {
+        answerImg.src = q.answer_img
+        answerImgBox.style.display = "block"
+    } else {
+        answerImgBox.style.display = "none"
+    }
+
+
+    /* =========================
+       ANSWER UI
+    ========================= */
+
+    changeType()
+
+    const boxes = document.querySelectorAll("#answerArea .answerBox")
+
+    boxes.forEach((box, i) => {
+        if (i >= q.answer_count) box.style.display = "none"
+    })
+
+
+    /* =========================
+       SET CORRECT ANSWER
+    ========================= */
+
+    if (q.question_type === "multi_choice") {
+
+        boxes.forEach((box, index) => {
+
+            const checkbox = box.querySelector("input")
+
+            if (q.answer.includes(String.fromCharCode(65 + index))) {
+                checkbox.checked = true
+            }
+
+        })
+    }
+
+
+    if (q.question_type === "true_false") {
+
+        boxes.forEach((box, index) => {
+
+            const state = box.querySelector(".correct, .wrong")
+
+            if (q.answer.includes(String.fromCharCode(97 + index))) {
+                state.innerText = "Đúng"
+            } else {
+                state.innerText = "Sai"
+            }
+
+        })
+    }
+
+
+    if (q.question_type === "short_answer") {
+
+        const inputs = document.querySelectorAll("#answerArea input")
+
+        const arr = q.answer.split(";")
+
+        inputs.forEach((input, i) => {
+            input.value = arr[i] || ""
+        })
+
+    }
+
+}
+
+
+/* =========================
+   CREATE ANSWER INPUTS
+========================= */
+
+function createAnswerInputs(count) {
+
+    answerArea.innerHTML = ""
+
+    if (question_type.value === "multi_choice") {
+
+        for (let i = 0; i < count; i++) {
+
+            answerArea.innerHTML += `
+<div class="answerBox">
+<label>${String.fromCharCode(65 + i)}</label>
+<input type="checkbox">
+</div>
+`
+
+        }
+    }
+
+
+    if (question_type.value === "true_false") {
+
+        for (let i = 0; i < count; i++) {
+
+            answerArea.innerHTML += `
+<div class="answerBox">
+<label>${String.fromCharCode(97 + i)}</label>
+<span class="state wrong">Sai</span>
+</div>
+`
+
+        }
+    }
+
+
+    if (question_type.value === "short_answer") {
+
+        for (let i = 0; i < count; i++) {
+
+            answerArea.innerHTML += `<input class="shortAnswer">`
+
+        }
+    }
+
+}
+
+
+/* =========================
+   START
+========================= */
 
 init()
