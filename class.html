@@ -45,7 +45,7 @@ button:hover{
 background:#1e4fd1;
 }
 
-/* GRID LỚP */
+/* GRID */
 
 .class-grid{
 margin-top:20px;
@@ -91,7 +91,9 @@ align-items:center;
 background:white;
 padding:20px;
 border-radius:10px;
-width:400px;
+width:450px;
+max-height:90%;
+overflow:auto;
 }
 
 .form-row{
@@ -105,27 +107,23 @@ border:1px solid #ccc;
 border-radius:6px;
 }
 
-.modal-header{
+.schedule-row{
 display:flex;
-justify-content:space-between;
-align-items:center;
-margin-bottom:10px;
+gap:5px;
+margin-bottom:5px;
 }
 
-.close{
-cursor:pointer;
-font-size:20px;
+.schedule-row select,
+.schedule-row input{
+flex:1;
 }
 
 </style>
-
 </head>
 
 <body>
 
-<header>
-Quản lý lớp học
-</header>
+<header>Quản lý lớp học</header>
 
 <div class="container">
 
@@ -138,17 +136,13 @@ Quản lý lớp học
 
 </div>
 
+<!-- MODAL -->
 
-<!-- MODAL TẠO LỚP -->
-
-<div class="modal" id="createModal">
+<div class="modal" id="modal">
 
 <div class="modal-content">
 
-<div class="modal-header">
 <h3>Tạo lớp mới</h3>
-<span class="close" onclick="closeModal()">×</span>
-</div>
 
 <div class="form-row">
 <label>Tên lớp</label>
@@ -161,40 +155,40 @@ Quản lý lớp học
 </div>
 
 <div class="form-row">
-<label>Môn học</label>
+<label>Môn</label>
 <select id="subjectSelect"></select>
 </div>
 
 <div class="form-row">
 <label>Hình thức học phí</label>
 <select id="tuitionType">
-<option value="month">Theo tháng</option>
+<option value="per_session">Theo buổi</option>
 <option value="course">Theo khóa</option>
 </select>
 </div>
 
 <div class="form-row">
-<label>Học phí</label>
+<label>Học phí mỗi buổi</label>
 <input type="number" id="tuitionFee">
 </div>
 
 <div class="form-row">
-<label>Thứ</label>
-<select id="dayOfWeek">
-<option value="2">Thứ 2</option>
-<option value="3">Thứ 3</option>
-<option value="4">Thứ 4</option>
-<option value="5">Thứ 5</option>
-<option value="6">Thứ 6</option>
-<option value="7">Thứ 7</option>
-<option value="8">Chủ nhật</option>
-</select>
+<label>Số buổi của khóa</label>
+<input type="number" id="totalSessions" value="20">
 </div>
 
 <div class="form-row">
-<label>Giờ bắt đầu</label>
-<input type="time" id="startTime">
+<label>Tổng học phí khóa</label>
+<input id="totalFee" disabled>
 </div>
+
+<h4>Lịch học</h4>
+
+<div id="scheduleList"></div>
+
+<button onclick="addSchedule()">+ Thêm lịch học</button>
+
+<br><br>
 
 <button onclick="createClass()">Tạo lớp</button>
 
@@ -202,21 +196,19 @@ Quản lý lớp học
 
 </div>
 
-
 <script>
 
 let grades=[]
 let subjects=[]
 let classes=[]
-
-/* MODAL */
+let schedules=[]
 
 function openModal(){
-document.getElementById("createModal").style.display="flex"
+document.getElementById("modal").style.display="flex"
 }
 
 function closeModal(){
-document.getElementById("createModal").style.display="none"
+document.getElementById("modal").style.display="none"
 }
 
 /* LOAD KHỐI */
@@ -249,11 +241,11 @@ function filterSubjects(){
 
 let gradeId=document.getElementById("gradeSelect").value
 
-let list=subjects.filter(s=>s.grade_id==gradeId)
+let filtered=subjects.filter(s=>s.grade_id==gradeId)
 
 let select=document.getElementById("subjectSelect")
 
-select.innerHTML=list.map(s=>
+select.innerHTML=filtered.map(s=>
 `<option value="${s.id}">${s.name}</option>`
 ).join("")
 
@@ -261,11 +253,60 @@ select.innerHTML=list.map(s=>
 
 document.getElementById("gradeSelect").addEventListener("change",filterSubjects)
 
+/* LỊCH HỌC */
+
+function addSchedule(){
+
+let div=document.createElement("div")
+
+div.className="schedule-row"
+
+div.innerHTML=`
+
+<select class="day">
+<option value="2">Thứ 2</option>
+<option value="3">Thứ 3</option>
+<option value="4">Thứ 4</option>
+<option value="5">Thứ 5</option>
+<option value="6">Thứ 6</option>
+<option value="7">Thứ 7</option>
+<option value="8">Chủ nhật</option>
+</select>
+
+<input type="time" class="start">
+
+<input type="time" class="end">
+
+<button onclick="this.parentElement.remove()">X</button>
+
+`
+
+document.getElementById("scheduleList").appendChild(div)
+
+}
+
+/* TÍNH HỌC PHÍ */
+
+document.getElementById("tuitionFee").addEventListener("input",calcFee)
+document.getElementById("totalSessions").addEventListener("input",calcFee)
+
+function calcFee(){
+
+let fee=document.getElementById("tuitionFee").value
+let sessions=document.getElementById("totalSessions").value
+
+let total=fee*sessions
+
+document.getElementById("totalFee").value=total
+
+}
+
 /* LOAD LỚP */
 
 async function loadClasses(){
 
 let res=await fetch("/api/my_classes")
+
 classes=await res.json()
 
 renderClasses()
@@ -278,15 +319,13 @@ let grid=document.getElementById("classGrid")
 
 grid.innerHTML=classes.map(c=>
 
-`<div class="class-box" onclick="openClass(${c.id})">
+`<div class="class-box">
 
 <div class="class-title">${c.class_name}</div>
 
-<div class="class-info">Khối: ${c.grade_name}</div>
-
-<div class="class-info">Môn: ${c.subject_name}</div>
-
-<div class="class-info">Học phí: ${c.tuition_fee}</div>
+<div class="class-info">
+Học phí: ${c.tuition_fee}
+</div>
 
 </div>`
 
@@ -298,21 +337,63 @@ grid.innerHTML=classes.map(c=>
 
 async function createClass(){
 
-let data={
+let classData={
+
 class_name:document.getElementById("className").value,
-grade_id:document.getElementById("gradeSelect").value,
-subject_id:document.getElementById("subjectSelect").value,
+
+grade:document.getElementById("gradeSelect").value,
+
+subject:document.getElementById("subjectSelect").value,
+
 tuition_type:document.getElementById("tuitionType").value,
-tuition_fee:document.getElementById("tuitionFee").value,
-day_of_week:document.getElementById("dayOfWeek").value,
-start_time:document.getElementById("startTime").value
+
+tuition_fee:document.getElementById("totalFee").value
+
 }
 
-await fetch("/api/classes",{
+let res=await fetch("/api/classes",{
+
 method:"POST",
+
 headers:{'Content-Type':'application/json'},
-body:JSON.stringify(data)
+
+body:JSON.stringify(classData)
+
 })
+
+let data=await res.json()
+
+let classId=data.id
+
+/* LƯU LỊCH */
+
+let rows=document.querySelectorAll(".schedule-row")
+
+for(let r of rows){
+
+let schedule={
+
+class_id:classId,
+
+day_of_week:r.querySelector(".day").value,
+
+start_time:r.querySelector(".start").value,
+
+end_time:r.querySelector(".end").value
+
+}
+
+await fetch("/api/class_schedules",{
+
+method:"POST",
+
+headers:{'Content-Type':'application/json'},
+
+body:JSON.stringify(schedule)
+
+})
+
+}
 
 closeModal()
 
@@ -320,16 +401,16 @@ loadClasses()
 
 }
 
-/* MỞ LỚP */
-
-function openClass(id){
-window.location="class_detail.html?id="+id
-}
-
 async function init(){
+
 await loadGrades()
+
 await loadSubjects()
+
 await loadClasses()
+
+addSchedule()
+
 }
 
 init()
