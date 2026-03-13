@@ -270,28 +270,26 @@ let error
 
 if(isAdmin){
 
-    /* ADMIN → XÓA HẲN */
-    if(isAdmin){
+    // ADMIN → XÓA HẲN
     if(!confirm("Admin sẽ xóa vĩnh viễn câu hỏi này!")) return
+
     const res = await sb
-    .from("question_bank")
-    .delete()
-    .eq("id", id)
+        .from("question_bank")
+        .delete()
+        .eq("id", id)
 
     error = res.error
 
 }else{
 
-    /* USER → ẨN */
-    if(isAdmin){
-
-    if(!confirm("Bạn có thực sự muốn xóa câu hỏi này không?")) return
+    // USER → CHỈ ẨN
     const res = await sb
-    .from("question_bank")
-    .update({ hidden:true })
-    .eq("id", id)
+        .from("question_bank")
+        .update({ hidden:true })
+        .eq("id", id)
 
     error = res.error
+
 }
 
 if(error){
