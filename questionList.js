@@ -156,7 +156,7 @@ async function loadQuestions() {
 function render() {
 
     let list = [...questions]
-
+    const faded = q.hidden ? "faded" : ""
     questionTable.innerHTML = ""
 
     if(!isAdmin){
@@ -184,14 +184,12 @@ function render() {
 
     list.forEach((q, i) => {
 
-    const rowStyle = q.hidden ? "style='opacity:0.35'" : ""
-
     questionTable.innerHTML += `
-<tr ${rowStyle}>
+<tr>
 
-<td>${i + 1}</td>
+<td class="${faded}">${i + 1}</td>
 
-<td class="questionCell">
+<td class="questionCell ${faded}">
 
 <div class="questionText">
 ${q.question_text || ""}
@@ -204,6 +202,40 @@ ${q.question_img ?
 src="${q.question_img}"
 onclick="window.open('${q.question_img}')">
 </div>
+`
+: ""}
+
+</td>
+
+<td class="${faded}">${q.chapters?.subjects?.grades?.name || ""}</td>
+<td class="${faded}">${q.chapters?.subjects?.name || ""}</td>
+<td class="${faded}">${q.chapters?.name || ""}</td>
+
+<td class="${faded}">${typeText[q.question_type] || q.question_type}</td>
+
+<td class="${faded}">${q.difficulty}</td>
+
+<td class="${faded}">${q.answer_count || 0}</td>
+
+<td class="answerCell ${faded}">${q.answer || ""}</td>
+
+<td>
+
+<button onclick="editQ('${q.id}')">Sửa</button>
+
+<button onclick="deleteQ('${q.id}')" style="background:#dc2626">
+Xóa
+</button>
+
+${q.hidden 
+? `<button onclick="restoreQ('${q.id}')" style="background:#16a34a">
+Khôi phục
+</button>`
+: ""}
+
+</td>
+
+</tr>
 `
 : ""}
 
