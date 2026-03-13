@@ -243,24 +243,22 @@ async function saveQuestion(){
 
     if(editingQuestionId){
 
-        const res = await sb
-            .from("question_bank")
-            .update(dataObj)
-            .eq("id", editingQuestionId)
+/* UPDATE */
 
-        error = res.error
+await sb
+.from("question_bank")
+.update(dataObj)
+.eq("id", editingQuestionId)
 
-    }else{
+}else{
 
-        dataObj.hidden = false
-        dataObj.created_by = userId
+/* INSERT */
 
-        const res = await sb
-            .from("question_bank")
-            .insert([dataObj])
+await sb
+.from("question_bank")
+.insert([dataObj])
 
-        error = res.error
-    }
+}
 
 
     /* =========================
