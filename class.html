@@ -141,8 +141,54 @@ Tạo lớp
 
 <script>
 
+async function loadKhoi() {
+
+const res = await fetch("/api/grades");
+const data = await res.json();
+
+const select = document.getElementById("chonKhoi");
+
+select.innerHTML = '<option value="">Chọn khối</option>';
+
+data.forEach(khoi => {
+
+select.innerHTML += `
+<option value="${khoi.id}">
+${khoi.name}
+</option>
+`;
+
+});
+
+}
+
+loadKhoi();
+  
 const lichContainer = document.getElementById("lichHocContainer")
 
+document.getElementById("chonKhoi").addEventListener("change", async function(){
+
+const gradeId = this.value;
+
+const res = await fetch("/api/subjects?grade_id=" + gradeId);
+const data = await res.json();
+
+const subjectSelect = document.getElementById("chonMon");
+
+subjectSelect.innerHTML = "";
+
+data.forEach(mon => {
+
+subjectSelect.innerHTML += `
+<option value="${mon.id}">
+${mon.name}
+</option>
+`;
+
+});
+
+});
+  
 function themLichHoc(){
 
 const row = document.createElement("div")
