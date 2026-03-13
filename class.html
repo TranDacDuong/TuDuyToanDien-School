@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>Class Management</title>
+<title>Quản lý lớp học</title>
 
 <style>
 
 body{
 font-family:Arial;
-background:#f4f6f9;
+background:#f5f6fa;
 margin:30px;
 }
 
@@ -21,7 +21,7 @@ h2{
 margin-bottom:10px;
 }
 
-.form-box{
+.box-form{
 background:white;
 padding:20px;
 border-radius:10px;
@@ -29,19 +29,24 @@ margin-bottom:30px;
 box-shadow:0 2px 6px rgba(0,0,0,0.1);
 }
 
-input,select{
-padding:8px;
-margin:5px 0;
-width:100%;
+label{
+display:block;
+margin-top:10px;
 }
 
-.schedule-row{
+input,select{
+width:100%;
+padding:8px;
+margin-top:5px;
+}
+
+.lich-row{
 display:flex;
 gap:10px;
-margin-bottom:10px;
+margin-top:10px;
 }
 
-.btn{
+.nut{
 background:#007bff;
 color:white;
 border:none;
@@ -50,17 +55,18 @@ border-radius:5px;
 cursor:pointer;
 }
 
-.btn-add{
+.nut-them{
 background:#28a745;
+margin-top:10px;
 }
 
-.class-list{
+.danh-sach-lop{
 display:grid;
 grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
 gap:15px;
 }
 
-.class-box{
+.lop-box{
 background:white;
 padding:15px;
 border-radius:10px;
@@ -68,12 +74,8 @@ box-shadow:0 2px 6px rgba(0,0,0,0.1);
 cursor:pointer;
 }
 
-.class-box:hover{
+.lop-box:hover{
 transform:scale(1.02);
-}
-
-.tuition-box{
-display:none;
 }
 
 </style>
@@ -83,48 +85,44 @@ display:none;
 
 <div class="container">
 
-<h2>Create New Class</h2>
+<h2>Tạo lớp học mới</h2>
 
-<div class="form-box">
+<div class="box-form">
 
-<form id="createClassForm">
+<form id="formTaoLop">
 
-<label>Class Name</label>
-<input type="text" name="class_name">
+<label>Tên lớp</label>
+<input type="text" name="ten_lop">
 
-<label>Grade</label>
-<select id="gradeSelect"></select>
+<label>Khối</label>
+<select id="chonKhoi"></select>
 
-<label>Subject</label>
-<select id="subjectSelect"></select>
+<label>Môn học</label>
+<select id="chonMon"></select>
 
-<label>Tuition Type</label>
-<select id="tuitionType">
+<label>Loại học phí</label>
+<select id="loaiHocPhi">
 
-<option value="per_session">Per Session</option>
-<option value="per_course">Per Course</option>
+<option value="theo_buoi">Theo buổi</option>
+<option value="theo_khoa">Theo khóa</option>
 
 </select>
 
-<div class="tuition-box" id="tuitionFeeBox">
+<label>Số tiền</label>
+<input type="number" name="hoc_phi">
 
-<label>Tuition Fee</label>
-<input type="number" name="tuition_fee">
+<h3>Lịch học</h3>
 
-</div>
+<div id="lichHocContainer"></div>
 
-<h3>Schedule</h3>
-
-<div id="scheduleContainer"></div>
-
-<button type="button" class="btn btn-add" onclick="addSchedule()">
-Add Schedule
+<button type="button" class="nut nut-them" onclick="themLichHoc()">
+Thêm buổi học
 </button>
 
 <br><br>
 
-<button type="submit" class="btn">
-Create Class
+<button type="submit" class="nut">
+Tạo lớp
 </button>
 
 </form>
@@ -132,11 +130,9 @@ Create Class
 </div>
 
 
-<h2>Your Classes</h2>
+<h2>Các lớp tôi quản lý</h2>
 
-<div class="class-list" id="classList">
-
-<!-- class boxes render here -->
+<div class="danh-sach-lop" id="danhSachLop">
 
 </div>
 
@@ -145,91 +141,85 @@ Create Class
 
 <script>
 
-const scheduleContainer = document.getElementById("scheduleContainer")
+const lichContainer = document.getElementById("lichHocContainer")
 
-function addSchedule(){
+function themLichHoc(){
 
 const row = document.createElement("div")
-row.className="schedule-row"
+row.className="lich-row"
 
-row.innerHTML=`
+row.innerHTML = `
 
-<select name="weekday[]">
+<select name="thu[]">
 
-<option value="1">Mon</option>
-<option value="2">Tue</option>
-<option value="3">Wed</option>
-<option value="4">Thu</option>
-<option value="5">Fri</option>
-<option value="6">Sat</option>
-<option value="7">Sun</option>
+<option value="1">Thứ 2</option>
+<option value="2">Thứ 3</option>
+<option value="3">Thứ 4</option>
+<option value="4">Thứ 5</option>
+<option value="5">Thứ 6</option>
+<option value="6">Thứ 7</option>
+<option value="7">Chủ nhật</option>
 
 </select>
 
-<input type="time" name="start_time[]">
+<input type="time" name="gio_bat_dau[]">
 
-<input type="time" name="end_time[]">
+<input type="time" name="gio_ket_thuc[]">
 
 `
 
-scheduleContainer.appendChild(row)
+lichContainer.appendChild(row)
 
 }
 
-addSchedule()
-
-document.getElementById("tuitionType").addEventListener("change",function(){
-
-document.getElementById("tuitionFeeBox").style.display="block"
-
-})
+themLichHoc()
 
 
+/* Demo danh sách lớp */
 
-/* Demo render classes */
-
-const classes = [
+const dsLop = [
 
 {
-name:"Math 10A",
-grade:"10",
-subject:"Math",
-schedule:"Mon, Wed 18:00"
+id:1,
+ten:"Toán 10A",
+khoi:"10",
+mon:"Toán",
+lich:"Thứ 2, Thứ 5 - 18:00"
 },
 
 {
-name:"Physics 11B",
-grade:"11",
-subject:"Physics",
-schedule:"Tue, Thu 19:00"
+id:2,
+ten:"Lý 11B",
+khoi:"11",
+mon:"Vật lý",
+lich:"Thứ 3, Thứ 6 - 19:00"
 }
 
 ]
 
+const danhSachLop = document.getElementById("danhSachLop")
 
-const classList=document.getElementById("classList")
-
-classes.forEach(c=>{
+dsLop.forEach(lop=>{
 
 const box=document.createElement("div")
-box.className="class-box"
+box.className="lop-box"
 
 box.innerHTML=`
 
-<h3>${c.name}</h3>
-<p>Grade: ${c.grade}</p>
-<p>Subject: ${c.subject}</p>
-<p>${c.schedule}</p>
+<h3>${lop.ten}</h3>
+<p>Khối: ${lop.khoi}</p>
+<p>Môn: ${lop.mon}</p>
+<p>${lop.lich}</p>
 
 `
 
 box.onclick=()=>{
 
-window.location="class_detail.html?id="+c.id
+window.location="class_detail.html?id="+lop.id
 
 }
 
-classList.appendChild(box)
+danhSachLop.appendChild(box)
 
 })
 
