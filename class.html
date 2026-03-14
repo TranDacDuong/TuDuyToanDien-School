@@ -1,30 +1,366 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Your Title</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Quản lý Lớp học — Tạo & Danh sách</title>
+  <style>
+    :root{
+      --bg:#f4f7fb;
+      --card:#fff;
+      --accent:#2b6cb0;
+      --muted:#6b7280;
+      --success:#16a34a;
+      --danger:#dc2626;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    body{
+      margin:0;
+      background:var(--bg);
+      color:#111827;
+      padding:24px;
+    }
+    header{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:18px;
+    }
+    h1{margin:0;font-size:20px;}
+    main{
+      display:grid;
+      grid-template-columns: 360px 1fr;
+      gap:20px;
+      align-items:start;
+    }
+
+    /* form */
+    .card{
+      background:var(--card);
+      border-radius:10px;
+      padding:16px;
+      box-shadow:0 1px 2px rgba(15,23,42,0.05);
+    }
+    form .row{display:flex;gap:8px;margin-bottom:10px;}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;}
+    input[type="text"], textarea, select{
+      width:100%;
+      padding:8px 10px;
+      border:1px solid #e6e9ef;
+      border-radius:6px;
+      font-size:14px;
+      background:#fff;
+      box-sizing:border-box;
+    }
+    textarea{min-height:80px; resize:vertical;}
+    button{
+      background:var(--accent);
+      color:#fff;
+      border:0;
+      padding:10px 12px;
+      border-radius:8px;
+      cursor:pointer;
+      font-weight:600;
+    }
+    button.secondary{
+      background:#fff;
+      color:var(--accent);
+      border:1px solid #cfe0f6;
+    }
+    .muted{color:var(--muted); font-size:13px;}
+
+    /* class list */
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(auto-fill,minmax(220px,1fr));
+      gap:12px;
+    }
+    .class-card{
+      background:var(--card);
+      border-radius:10px;
+      padding:12px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      box-shadow:0 1px 2px rgba(15,23,42,0.04);
+      border-left:4px solid rgba(43,108,176,0.12);
+    }
+    .class-title{font-weight:700;font-size:15px;}
+    .tag{display:inline-block;background:#eef6ff;color:var(--accent);padding:4px 8px;border-radius:999px;font-size:12px;}
+    .meta{font-size:13px;color:var(--muted);}
+    .actions{margin-top:auto;display:flex;gap:8px;justify-content:flex-end;}
+    .small{font-size:12px;padding:6px 8px;border-radius:8px;}
+  </style>
 </head>
 <body>
-    <script>
-        // Initialize Supabase client
-        const sb = window.sb;
-        sb.auth.onAuthStateChanged(user => {
-            if (user) {
-                console.log('User is logged in:', user);
-            } else {
-                console.log('User is not logged in.');
-            }
-        });
+  <header>
+    <h1>Quản lý Lớp học</h1>
+    <div class="muted">Đăng nhập bằng tài khoản giáo viên</div>
+  </header>
 
-        // Error handling with Supabase
-        sb.from('your_table').select('*').then(response => {
-            if (response.error) {
-                console.error('Error fetching data from sb:', response.error);
-            } else {
-                console.log('Data:', response.data);
-            }
+  <main>
+    <!-- Left: Create/Edit form -->
+    <section class="card" aria-labelledby="createTitle">
+      <h2 id="createTitle" style="margin-top:0;font-size:16px;">Tạo lớp mới</h2>
+
+      <form id="createForm">
+        <div class="row">
+          <div style="flex:1">
+            <label for="name">Tên lớp</label>
+            <input id="name" name="name" type="text" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div style="flex:1">
+            <label for="code">Mã lớp</label>
+            <input id="code" name="code" type="text" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div style="flex:1">
+            <label for="subject">Môn học</label>
+            <input id="subject" name="subject" type="text" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div style="flex:1">
+            <label for="grade">Khối</label>
+            <input id="grade" name="grade" type="text" />
+          </div>
+        </div>
+
+        <div style="margin-top:8px;">
+          <label for="description">Mô tả</label>
+          <textarea id="description" name="description"></textarea>
+        </div>
+
+        <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;">
+          <button id="createBtn" type="submit">Tạo / Cập nhật</button>
+          <button id="resetBtn" type="button" class="secondary">Đặt lại</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Right: List classes -->
+    <section class="card" aria-labelledby="listTitle">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h2 id="listTitle" style="margin:0;font-size:16px;">Danh sách lớp của bạn</h2>
+        <div class="muted" id="countText">0 lớp</div>
+      </div>
+
+      <div id="listContainer">
+        <div class="muted">Đang tải danh sách...</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Supabase client expected to be provided by supabaseClient.js in repository -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./supabaseClient.js"></script>
+
+  <script>
+    // --- Assumptions ---
+    // - supabaseClient.js exposes a global `sb` object (window.sb)
+    // - There is a `classes` table with columns:
+    //     id (uuid), name (text), code (text), subject (text), grade (text), description (text),
+    //     teacher_id (uuid), created_at (timestamp)
+    // - User is authenticated; teacher's user id is available from sb.auth
+
+    (function () {
+      const createForm = document.getElementById('createForm');
+      const messageContainer = document.getElementById('messageContainer') || document.createElement('div');
+      const listContainer = document.getElementById('listContainer');
+      const createBtn = document.getElementById('createBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const countText = document.getElementById('countText');
+
+      let currentUser = null;
+      let editingClassId = null;
+
+      // Compatibility with Supabase v1/v2 auth API (variable name changed to sb)
+      async function getCurrentUser() {
+        if (!window.sb) {
+          throw new Error('Supabase client không được tìm thấy. Hãy kiểm tra supabaseClient.js');
+        }
+
+        // v2: sb.auth.getUser()
+        if (sb.auth && typeof sb.auth.getUser === 'function') {
+          const { data, error } = await sb.auth.getUser();
+          if (error) throw error;
+          return data.user;
+        }
+
+        // v1: sb.auth.user()
+        if (sb.auth && typeof sb.auth.user === 'function') {
+          return sb.auth.user();
+        }
+
+        // fallback for setups that attach user to sb.currentUser
+        return sb.currentUser || null;
+      }
+
+      function showMessage(text, type = 'success') {
+        // ensure messageContainer is in DOM
+        if (!document.body.contains(messageContainer)) {
+          messageContainer.id = 'messageContainer';
+          document.body.insertBefore(messageContainer, document.body.firstChild);
+        }
+        messageContainer.innerHTML = '';
+        const el = document.createElement('div');
+        el.className = 'message ' + (type === 'error' ? 'error' : 'success');
+        el.textContent = text;
+        messageContainer.appendChild(el);
+        // auto hide after 4s
+        setTimeout(() => {
+          if (messageContainer.contains(el)) messageContainer.removeChild(el);
+        }, 4000);
+      }
+
+      function showError(text) {
+        showMessage(text, 'error');
+      }
+
+      function setLoading(on = true) {
+        createBtn.disabled = on;
+        if (on) {
+          createBtn.textContent = 'Đang xử lý...';
+          return;
+        }
+        createBtn.textContent = editingClassId ? 'Cập nhật' : 'Tạo / Cập nhật';
+      }
+
+      async function loadClasses() {
+        try {
+          const { data, error } = await sb.from('classes').select('*').order('created_at', { ascending: false });
+          if (error) throw error;
+          renderList(data || []);
+        } catch (err) {
+          showError('Không thể tải danh sách lớp: ' + (err.message || err));
+        }
+      }
+
+      function renderList(items) {
+        listContainer.innerHTML = '';
+        if (!items || items.length === 0) {
+          listContainer.innerHTML = '<div class="muted">Chưa có lớp nào.</div>';
+          countText.textContent = '0 lớp';
+          return;
+        }
+        countText.textContent = items.length + ' lớp';
+        const grid = document.createElement('div');
+        grid.className = 'grid';
+        items.forEach(i => {
+          const card = document.createElement('div');
+          card.className = 'class-card';
+          card.innerHTML = `
+            <div>
+              <div class="class-title">${escapeHtml(i.name || '')}</div>
+              <div class="meta">${escapeHtml(i.subject || '')} • ${escapeHtml(i.grade || '')}</div>
+              <div style="margin-top:6px;">${escapeHtml(i.description || '')}</div>
+            </div>
+            <div class="actions">
+              <button class="small" data-id="${i.id}" data-action="edit">Sửa</button>
+              <button class="small" data-id="${i.id}" data-action="delete">Xóa</button>
+            </div>
+          `;
+          grid.appendChild(card);
         });
-    </script>
+        listContainer.appendChild(grid);
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      createForm.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        setLoading(true);
+        const payload = {
+          name: createForm.name.value.trim(),
+          code: createForm.code.value.trim(),
+          subject: createForm.subject.value.trim(),
+          grade: createForm.grade.value.trim(),
+          description: createForm.description.value.trim(),
+          teacher_id: currentUser ? currentUser.id : null,
+        };
+        try {
+          if (editingClassId) {
+            const { data, error } = await sb.from('classes').update(payload).eq('id', editingClassId);
+            if (error) throw error;
+            showMessage('Cập nhật lớp thành công');
+            editingClassId = null;
+          } else {
+            const { data, error } = await sb.from('classes').insert([payload]);
+            if (error) throw error;
+            showMessage('Tạo lớp thành công');
+          }
+          createForm.reset();
+          await loadClasses();
+        } catch (err) {
+          showError(err.message || err);
+        } finally {
+          setLoading(false);
+        }
+      });
+
+      resetBtn.addEventListener('click', () => {
+        editingClassId = null;
+        createForm.reset();
+      });
+
+      listContainer.addEventListener('click', async (ev) => {
+        const btn = ev.target.closest('button[data-action]');
+        if (!btn) return;
+        const id = btn.getAttribute('data-id');
+        const action = btn.getAttribute('data-action');
+        if (action === 'edit') {
+          // load class into form
+          try {
+            const { data, error } = await sb.from('classes').select('*').eq('id', id).single();
+            if (error) throw error;
+            const c = data;
+            createForm.name.value = c.name || '';
+            createForm.code.value = c.code || '';
+            createForm.subject.value = c.subject || '';
+            createForm.grade.value = c.grade || '';
+            createForm.description.value = c.description || '';
+            editingClassId = id;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } catch (err) {
+            showError('Không thể tải thông tin lớp: ' + (err.message || err));
+          }
+        } else if (action === 'delete') {
+          if (!confirm('Bạn có chắc muốn xóa lớp này?')) return;
+          try {
+            const { error } = await sb.from('classes').delete().eq('id', id);
+            if (error) throw error;
+            showMessage('Xóa lớp thành công');
+            await loadClasses();
+          } catch (err) {
+            showError('Không thể xóa lớp: ' + (err.message || err));
+          }
+        }
+      });
+
+      // init
+      (async function init() {
+        try {
+          currentUser = await getCurrentUser();
+        } catch (err) {
+          // user may be unauthenticated; still try to load classes if public
+          console.warn('getCurrentUser error:', err);
+        }
+        await loadClasses();
+      })();
+    })();
+  </script>
 </body>
 </html>
