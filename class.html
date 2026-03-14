@@ -128,19 +128,11 @@
     </section>
   </main>
 
-  <!-- Supabase lib then supabaseClient.js (which MUST expose window.sb = createClient(...)) -->
+  <!-- Supabase lib then supabaseClient.js (which may define sb or window.sb) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./supabaseClient.js"></script>
 
   <script>
-    /*
-      GHI CHÚ:
-      - supabaseClient.js phải gán client vào window.sb:
-          window.sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-      - File này sử dụng window.sb (không phải 'supabase').
-      - Nếu muốn tôi có thể tạo supabaseClient.js mẫu riêng.
-    */
-
     (function () {
       // Elements
       const userInfo = document.getElementById('userInfo');
@@ -159,11 +151,9 @@
       const resetBtn = document.getElementById('resetBtn');
       const countText = document.getElementById('countText');
 
-      // Internal state
       let currentUser = null;
       let editingClassId = null;
 
-      // Weekday labels: using numbers matching your DB convention (0 = Sunday, 1 = Monday, ...)
       const WEEKDAYS = [
         { v: 1, label: 'Thứ 2' },
         { v: 2, label: 'Thứ 3' },
@@ -174,7 +164,6 @@
         { v: 0, label: 'Chủ nhật' }
       ];
 
-      // Helpers: messages
       function showMessage(text, type = 'success') {
         messageContainer.innerHTML = '';
         const el = document.createElement('div');
@@ -189,24 +178,37 @@
         console.error(err);
       }
 
-      // Wait for window.sb to be ready (supabase client created by supabaseClient.js)
-      async function waitForSb(timeout = 5000) {
-        const start = Date.now();
-        while (!window.sb) {
-          if (Date.now() - start > timeout) throw new Error('Supabase client (window.sb) không được tìm thấy sau ' + timeout + 'ms. Kiểm tra supabaseClient.js và thứ tự script.');
-          await new Promise(r => setTimeout(r, 50));
-        }
-        return window.sb;
-      }
-      function requireSb() {
-        if (!window.sb) throw new Error('Supabase client không được tìm thấy. Kiểm tra supabaseClient.js');
-        return window.sb;
+      // Detect sb whether it's window.sb or a global const sb
+      function getGlobalSbIfAvailable() {
+        if (typeof window !== 'undefined' && window.sb) return window.sb;
+        // typeof sb avoids ReferenceError if sb not declared
+        if (typeof sb !== 'undefined') return sb;
+        return null;
       }
 
-      // Auth helper (compat v2/v1)
+      // Wait for sb (either window.sb or global sb)
+      async function waitForSb(timeout = 10000) {
+        const start = Date.now();
+        while (true) {
+          const candidate = getGlobalSbIfAvailable();
+          if (candidate) return candidate;
+          if (Date.now() - start > timeout) {
+            throw new Error('Supabase client (window.sb or sb) không được tìm thấy sau ' + timeout + 'ms. Kiểm tra supabaseClient.js và thứ tự script.');
+          }
+          await new Promise(r => setTimeout(r, 50));
+        }
+      }
+
+      // requireSb throws if not available immediately (used in code paths where we expect sb to be ready)
+      function requireSbImmediate() {
+        const candidate = getGlobalSbIfAvailable();
+        if (!candidate) throw new Error('Supabase client không được tìm thấy. Kiểm tra supabaseClient.js');
+        return candidate;
+      }
+
       async function getCurrentUser() {
-        await waitForSb(5000);
-        const sb = requireSb();
+        await waitForSb();
+        const sb = requireSbImmediate();
         if (sb.auth && typeof sb.auth.getUser === 'function') {
           const { data, error } = await sb.auth.getUser();
           if (error) throw error;
@@ -218,10 +220,9 @@
         return sb.currentUser || null;
       }
 
-      // Load dropdown data
       async function loadGrades() {
         try {
-          const sb = requireSb();
+          const sb = requireSbImmediate();
           const { data, error } = await sb.from('grades').select('id,name').order('name', { ascending: true });
           if (error) throw error;
           gradeSelect.innerHTML = '<option value="">-- Chọn khối --</option>';
@@ -235,12 +236,8 @@
 
       async function loadSubjects(gradeId) {
         try {
-          subjectSelect.innerHTML = '<option value="">-- Đang tải --</option>';
-          if (!gradeId) {
-            subjectSelect.innerHTML = '<option value="">-- Chọn khối trước --</option>';
-            return;
-          }
-          const sb = requireSb();
+          const sb = requireSbImmediate();
+          if (!gradeId) { subjectSelect.innerHTML = '<option value="">-- Chọn khối trước --</option>'; return; }
           const { data, error } = await sb.from('subjects').select('id,name,grade_id').eq('grade_id', gradeId).order('name', { ascending: true });
           if (error) throw error;
           subjectSelect.innerHTML = '<option value="">-- Chọn môn --</option>';
@@ -252,14 +249,10 @@
         }
       }
 
-      gradeSelect.addEventListener('change', (e) => {
-        loadSubjects(e.target.value);
-      });
+      gradeSelect.addEventListener('change', () => loadSubjects(gradeSelect.value));
 
-      // Schedule row creation: weekday, start_time, end_time, room select, remove btn
       function createScheduleRow(initial = {}) {
-        const row = document.createElement('div');
-        row.className = 'schedule-row';
+        const row = document.createElement('div'); row.className = 'schedule-row';
 
         const weekdaySelect = document.createElement('select');
         weekdaySelect.innerHTML = WEEKDAYS.map(w => `<option value="${w.v}">${w.label}</option>`).join('');
@@ -271,7 +264,6 @@
         const roomSelect = document.createElement('select'); roomSelect.innerHTML = '<option value="">Đang tải phòng...</option>';
 
         const removeBtn = document.createElement('button'); removeBtn.type = 'button'; removeBtn.className = 'small'; removeBtn.textContent = '-';
-        removeBtn.title = 'Xóa buổi';
 
         row.appendChild(weekdaySelect);
         row.appendChild(startInput);
@@ -279,39 +271,27 @@
         row.appendChild(roomSelect);
         row.appendChild(removeBtn);
 
-        // Refresh available rooms for the chosen weekday/time
         async function refreshRooms() {
           const weekday = weekdaySelect.value;
           const start = startInput.value;
           const end = endInput.value;
           roomSelect.innerHTML = '<option value="">Đang kiểm tra...</option>';
-
-          if (weekday === '' || !start || !end) {
-            roomSelect.innerHTML = '<option value="">Chọn ngày/giờ hợp lệ</option>';
-            return;
-          }
-          if (start >= end) {
-            roomSelect.innerHTML = '<option value="">Thời gian không hợp lệ</option>';
-            return;
-          }
+          if (weekday === '' || !start || !end) { roomSelect.innerHTML = '<option value="">Chọn ngày/giờ hợp lệ</option>'; return; }
+          if (start >= end) { roomSelect.innerHTML = '<option value="">Thời gian không hợp lệ</option>'; return; }
 
           try {
-            const sb = requireSb();
-            // Fetch all rooms
+            const sb = requireSbImmediate();
             const [{ data: rooms, error: rErr }, { data: schedules, error: sErr }] = await Promise.all([
               sb.from('rooms').select('id,room_name,capacity').order('room_name'),
-              // fetch schedules that are on the same weekday
               sb.from('class_schedules').select('id,class_id,room_id,weekday,start_time,end_time').eq('weekday', parseInt(weekday, 10))
             ]);
             if (rErr) throw rErr;
             if (sErr) throw sErr;
 
-            // determine occupied room ids by overlapping time
             const occupied = new Set();
             (schedules || []).forEach(s => {
               const sStart = (s.start_time || '').slice(0,5);
               const sEnd = (s.end_time || '').slice(0,5);
-              // overlap if sStart < end && sEnd > start
               if (sStart && sEnd && sStart < end && sEnd > start) {
                 if (s.room_id) occupied.add(s.room_id);
               }
@@ -319,14 +299,10 @@
 
             const freeRooms = (rooms || []).filter(r => !occupied.has(r.id));
             roomSelect.innerHTML = '';
-            if (freeRooms.length === 0) {
-              roomSelect.innerHTML = '<option value="">Không có phòng trống</option>';
-            } else {
+            if (freeRooms.length === 0) roomSelect.innerHTML = '<option value="">Không có phòng trống</option>';
+            else {
               roomSelect.appendChild(new Option('-- Chọn phòng --', ''));
-              freeRooms.forEach(r => {
-                const opt = new Option(r.room_name + (r.capacity ? ` (${r.capacity})` : ''), r.id);
-                roomSelect.appendChild(opt);
-              });
+              freeRooms.forEach(r => roomSelect.appendChild(new Option(r.room_name + (r.capacity ? ` (${r.capacity})` : ''), r.id)));
               if (initial.room_id) roomSelect.value = initial.room_id;
             }
           } catch (err) {
@@ -338,36 +314,20 @@
         weekdaySelect.addEventListener('change', refreshRooms);
         startInput.addEventListener('change', refreshRooms);
         endInput.addEventListener('change', refreshRooms);
-        // remove
         removeBtn.addEventListener('click', () => row.remove());
-
-        // initial refresh
         setTimeout(refreshRooms, 0);
         return row;
       }
 
-      // Add initial schedule row by default
       schedulesEl.appendChild(createScheduleRow());
+      addScheduleBtn.addEventListener('click', () => schedulesEl.appendChild(createScheduleRow()));
 
-      addScheduleBtn.addEventListener('click', () => {
-        schedulesEl.appendChild(createScheduleRow());
-      });
-
-      // Load classes the current user manages (created_by or class_teachers.teacher_id)
       async function loadMyClasses() {
         try {
           listContainer.innerHTML = '<div class="muted">Đang tải danh sách...</div>';
-          const sb = requireSb();
-          // First try classes created_by = currentUser.id
-          // Optionally you could join class_teachers to find ones the teacher is assigned to
-          const { data: classes, error } = await sb.from('classes')
-            .select('id,class_name,grade_id,grade,subject_id,tuition_type,tuition_fee,created_at')
-            .or(`created_by.eq.${currentUser ? currentUser.id : ''},created_by.is.null`) // fallback: will filter below
-            .order('created_at', { ascending: false });
-
+          const sb = requireSbImmediate();
+          const { data: classes, error } = await sb.from('classes').select('id,class_name,grade_id,subject_id,tuition_type,tuition_fee,created_by,created_at').order('created_at', { ascending: false });
           if (error) throw error;
-          // Filter to classes where created_by = currentUser OR class_teachers has teacher_id
-          // Simpler: fetch classes where class_teachers.teacher_id = currentUser.id
           const { data: viaCT, error: ctErr } = await sb.from('class_teachers').select('class_id').eq('teacher_id', currentUser ? currentUser.id : '');
           if (ctErr) throw ctErr;
           const ctClassIds = new Set((viaCT || []).map(x => x.class_id));
@@ -396,7 +356,6 @@
           meta.textContent = `${tuitionText} • ${c.tuition_fee ? new Intl.NumberFormat('vi-VN').format(c.tuition_fee) + ' đ' : ''}`;
           card.appendChild(title); card.appendChild(meta);
           card.addEventListener('click', () => {
-            // open detailed management (must implement class_manage.html separately)
             window.location.href = `class_manage.html?class_id=${encodeURIComponent(c.id)}`;
           });
           grid.appendChild(card);
@@ -404,14 +363,12 @@
         listContainer.appendChild(grid);
       }
 
-      // Create class: validate -> insert into classes -> insert schedules -> insert class_teachers
       classForm.addEventListener('submit', async (ev) => {
         ev.preventDefault();
         setLoading(true);
         try {
           if (!currentUser) throw new Error('Bạn chưa đăng nhập.');
-          const sb = requireSb();
-
+          const sb = requireSbImmediate();
           const class_name = classForm.class_name.value.trim();
           const grade_id = gradeSelect.value || null;
           const subject_id = subjectSelect.value || null;
@@ -423,7 +380,6 @@
           if (!grade_id) throw new Error('Vui lòng chọn khối.');
           if (!subject_id) throw new Error('Vui lòng chọn môn.');
 
-          // Build class record payload: adapt to your DB column names
           const classPayload = {
             class_name,
             grade_id,
@@ -435,12 +391,10 @@
             created_at: new Date().toISOString()
           };
 
-          // Insert class
           const { data: classData, error: classErr } = await sb.from('classes').insert([classPayload]).select('id').single();
           if (classErr) throw classErr;
           const classId = classData.id;
 
-          // Prepare schedule inserts
           const rows = Array.from(schedulesEl.querySelectorAll('.schedule-row'));
           const scheduleInserts = [];
           for (const r of rows) {
@@ -448,7 +402,7 @@
             const start_time = r.children[1].value;
             const end_time = r.children[2].value;
             const room_id = r.children[3].value || null;
-            if (!weekday || !start_time || !end_time) continue; // skip incomplete
+            if (!weekday || !start_time || !end_time) continue;
             if (start_time >= end_time) throw new Error('Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc trong một buổi.');
             scheduleInserts.push({
               class_id: classId,
@@ -465,7 +419,6 @@
             if (schedErr) throw schedErr;
           }
 
-          // Assign current user as teacher/owner in class_teachers
           const { error: ctErr } = await sb.from('class_teachers').insert([{
             class_id: classId,
             teacher_id: currentUser.id,
@@ -496,16 +449,14 @@
         saveBtn.textContent = loading ? 'Đang lưu...' : 'Lưu lớp';
       }
 
-      // Tuition type label update
       tuitionType.addEventListener('change', () => {
         if (tuitionType.value === 'per_session') tuitionLabel.textContent = 'Số tiền (VNĐ) / 1 buổi';
         else tuitionLabel.textContent = 'Số tiền (VNĐ) / 1 khóa';
       });
 
-      // Init sequence
       (async function init() {
         try {
-          await waitForSb(5000); // wait for supabase client
+          await waitForSb(10000);
         } catch (err) {
           showError(err);
           return;
@@ -524,7 +475,6 @@
           userInfo.textContent = 'Người dùng chưa đăng nhập';
         }
 
-        // Load dropdowns + user's classes concurrently
         try {
           await loadGrades();
           await loadSubjects(gradeSelect.value);
@@ -539,10 +489,8 @@
         }
       })();
 
-      // Expose some helpers to console for debugging (optional)
-      window.__classAdmin = {
-        reload: async () => { await loadGrades(); await loadMyClasses(); }
-      };
+      // Debug helper
+      window.__classAdmin = { reload: async () => { await loadGrades(); await loadMyClasses(); } };
     })();
   </script>
 </body>
