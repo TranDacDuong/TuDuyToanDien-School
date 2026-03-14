@@ -38,6 +38,7 @@
     .muted{color:var(--muted);font-size:13px}
     .schedules{display:flex;flex-direction:column;gap:8px;margin-top:8px}
     .schedule-row{display:grid;grid-template-columns:110px 1fr 1fr 1fr 40px;gap:8px;align-items:center}
+    .remove-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid #e6edf3;background:#fff;color:#ef4444;cursor:pointer;font-weight:700}
     .small{padding:6px 8px;border-radius:8px;border:1px solid #e6edf3;background:#fafafa;cursor:pointer;font-size:13px}
     .controls{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
     .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
@@ -48,7 +49,6 @@
     .message.success{background:#ecfdf5;color:#065f46}
     .message.error{background:#fff1f2;color:#981b24}
     .hidden{display:none}
-    .label-inline{font-size:13px;color:var(--muted);margin-right:8px}
   </style>
 </head>
 <body>
@@ -97,11 +97,6 @@
           <div class="muted" style="margin-top:6px">Nếu chọn "Theo buổi" => tiền trên mỗi buổi; nếu "Theo khóa" => tiền toàn khóa.</div>
         </div>
 
-        <div style="margin-top:10px">
-          <label for="note">Ghi chú (tuỳ chọn)</label>
-          <textarea id="note" name="note"></textarea>
-        </div>
-
         <h3 style="margin-top:12px;margin-bottom:6px;font-size:15px">Lịch học (có thể nhiều buổi)</h3>
         <div class="schedules" id="schedules"></div>
         <div style="display:flex;justify-content:flex-end;margin-top:6px">
@@ -134,7 +129,6 @@
 
   <script>
     (function () {
-      // Elements
       const userInfo = document.getElementById('userInfo');
       const messageContainer = document.getElementById('messageContainer');
       const classForm = document.getElementById('classForm');
@@ -143,7 +137,6 @@
       const tuitionType = document.getElementById('tuition_type');
       const tuitionFee = document.getElementById('tuition_fee');
       const tuitionLabel = document.getElementById('tuition_label');
-      const noteInput = document.getElementById('note');
       const schedulesEl = document.getElementById('schedules');
       const addScheduleBtn = document.getElementById('addSchedule');
       const listContainer = document.getElementById('listContainer');
@@ -152,7 +145,6 @@
       const countText = document.getElementById('countText');
 
       let currentUser = null;
-      let editingClassId = null;
 
       const WEEKDAYS = [
         { v: 1, label: 'Thứ 2' },
@@ -178,15 +170,12 @@
         console.error(err);
       }
 
-      // Detect sb whether it's window.sb or a global const sb
       function getGlobalSbIfAvailable() {
         if (typeof window !== 'undefined' && window.sb) return window.sb;
-        // typeof sb avoids ReferenceError if sb not declared
         if (typeof sb !== 'undefined') return sb;
         return null;
       }
 
-      // Wait for sb (either window.sb or global sb)
       async function waitForSb(timeout = 10000) {
         const start = Date.now();
         while (true) {
@@ -199,7 +188,6 @@
         }
       }
 
-      // requireSb throws if not available immediately (used in code paths where we expect sb to be ready)
       function requireSbImmediate() {
         const candidate = getGlobalSbIfAvailable();
         if (!candidate) throw new Error('Supabase client không được tìm thấy. Kiểm tra supabaseClient.js');
@@ -207,7 +195,7 @@
       }
 
       async function getCurrentUser() {
-        await waitForSb();
+        await waitForSb(10000);
         const sb = requireSbImmediate();
         if (sb.auth && typeof sb.auth.getUser === 'function') {
           const { data, error } = await sb.auth.getUser();
@@ -226,9 +214,7 @@
           const { data, error } = await sb.from('grades').select('id,name').order('name', { ascending: true });
           if (error) throw error;
           gradeSelect.innerHTML = '<option value="">-- Chọn khối --</option>';
-          (data || []).forEach(g => {
-            const o = document.createElement('option'); o.value = g.id; o.textContent = g.name; gradeSelect.appendChild(o);
-          });
+          (data || []).forEach(g => gradeSelect.appendChild(new Option(g.name, g.id)));
         } catch (err) {
           showError('Không tải được danh sách khối: ' + (err.message || err));
         }
@@ -241,9 +227,7 @@
           const { data, error } = await sb.from('subjects').select('id,name,grade_id').eq('grade_id', gradeId).order('name', { ascending: true });
           if (error) throw error;
           subjectSelect.innerHTML = '<option value="">-- Chọn môn --</option>';
-          (data || []).forEach(s => {
-            const o = document.createElement('option'); o.value = s.id; o.textContent = s.name; subjectSelect.appendChild(o);
-          });
+          (data || []).forEach(s => subjectSelect.appendChild(new Option(s.name, s.id)));
         } catch (err) {
           showError('Không tải được môn học: ' + (err.message || err));
         }
@@ -263,7 +247,8 @@
 
         const roomSelect = document.createElement('select'); roomSelect.innerHTML = '<option value="">Đang tải phòng...</option>';
 
-        const removeBtn = document.createElement('button'); removeBtn.type = 'button'; removeBtn.className = 'small'; removeBtn.textContent = '-';
+        const removeBtn = document.createElement('button'); removeBtn.type = 'button'; removeBtn.className = 'remove-btn'; removeBtn.innerHTML = '✖';
+        removeBtn.title = 'Xóa buổi';
 
         row.appendChild(weekdaySelect);
         row.appendChild(startInput);
@@ -281,6 +266,7 @@
 
           try {
             const sb = requireSbImmediate();
+            // fetch rooms and schedules; handle permission / missing table errors
             const [{ data: rooms, error: rErr }, { data: schedules, error: sErr }] = await Promise.all([
               sb.from('rooms').select('id,room_name,capacity').order('room_name'),
               sb.from('class_schedules').select('id,class_id,room_id,weekday,start_time,end_time').eq('weekday', parseInt(weekday, 10))
@@ -306,8 +292,9 @@
               if (initial.room_id) roomSelect.value = initial.room_id;
             }
           } catch (err) {
-            console.error(err);
-            roomSelect.innerHTML = '<option value="">Lỗi tải phòng</option>';
+            // Provide clearer UI message and console log details for debugging permissions/schema
+            console.error('Lỗi tải phòng — chi tiết:', err);
+            roomSelect.innerHTML = '<option value="">Lỗi tải phòng (check quyền / bảng rooms/class_schedules)</option>';
           }
         }
 
@@ -319,6 +306,7 @@
         return row;
       }
 
+      // initial schedule row
       schedulesEl.appendChild(createScheduleRow());
       addScheduleBtn.addEventListener('click', () => schedulesEl.appendChild(createScheduleRow()));
 
@@ -369,12 +357,12 @@
         try {
           if (!currentUser) throw new Error('Bạn chưa đăng nhập.');
           const sb = requireSbImmediate();
+
           const class_name = classForm.class_name.value.trim();
           const grade_id = gradeSelect.value || null;
           const subject_id = subjectSelect.value || null;
           const tuition_type = tuitionType.value;
           const tuition_fee_val = parseInt(tuitionFee.value || '0', 10) || 0;
-          const note = noteInput.value.trim();
 
           if (!class_name) throw new Error('Vui lòng nhập tên lớp.');
           if (!grade_id) throw new Error('Vui lòng chọn khối.');
@@ -386,7 +374,6 @@
             subject_id,
             tuition_type,
             tuition_fee: tuition_fee_val,
-            note,
             created_by: currentUser.id,
             created_at: new Date().toISOString()
           };
@@ -475,22 +462,13 @@
           userInfo.textContent = 'Người dùng chưa đăng nhập';
         }
 
-        try {
-          await loadGrades();
-          await loadSubjects(gradeSelect.value);
-        } catch (err) {
-          console.warn('Lỗi load danh mục:', err);
-        }
+        await loadGrades();
+        await loadSubjects(gradeSelect.value);
 
-        if (currentUser) {
-          await loadMyClasses();
-        } else {
-          listContainer.innerHTML = '<div class="muted">Đăng nhập để xem các lớp bạn quản lý.</div>';
-        }
+        if (currentUser) await loadMyClasses();
+        else listContainer.innerHTML = '<div class="muted">Đăng nhập để xem các lớp bạn quản lý.</div>';
       })();
 
-      // Debug helper
-      window.__classAdmin = { reload: async () => { await loadGrades(); await loadMyClasses(); } };
     })();
   </script>
 </body>
