@@ -10,135 +10,102 @@
       --card:#fff;
       --accent:#2b6cb0;
       --muted:#6b7280;
-      --success:#16a34a;
       --danger:#dc2626;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
     }
-    body{
-      margin:0;
-      background:var(--bg);
-      color:#111827;
-      padding:24px;
-    }
-    header{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      margin-bottom:18px;
-    }
+    body{margin:0;font-family:Inter,system-ui,Arial;background:var(--bg);color:#111827;padding:18px;}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
     h1{margin:0;font-size:20px;}
-    main{
-      display:grid;
-      grid-template-columns: 360px 1fr;
-      gap:20px;
-      align-items:start;
-    }
-
-    /* form */
-    .card{
-      background:var(--card);
-      border-radius:10px;
-      padding:16px;
-      box-shadow:0 1px 2px rgba(15,23,42,0.05);
-    }
-    form .row{display:flex;gap:8px;margin-bottom:10px;}
+    main{display:grid;grid-template-columns:420px 1fr;gap:18px;align-items:start;}
+    .card{background:var(--card);border-radius:10px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,0.04);}
     label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;}
-    input[type="text"], textarea, select{
-      width:100%;
-      padding:8px 10px;
-      border:1px solid #e6e9ef;
-      border-radius:6px;
-      font-size:14px;
-      background:#fff;
-      box-sizing:border-box;
+    input[type="text"], select, textarea, input[type="time"], input[type="number"]{
+      width:100%;padding:8px;border:1px solid #e6e9ef;border-radius:6px;background:#fff;box-sizing:border-box;font-size:14px;
     }
-    textarea{min-height:80px; resize:vertical;}
-    button{
-      background:var(--accent);
-      color:#fff;
-      border:0;
-      padding:10px 12px;
-      border-radius:8px;
-      cursor:pointer;
-      font-weight:600;
-    }
-    button.secondary{
-      background:#fff;
-      color:var(--accent);
-      border:1px solid #cfe0f6;
-    }
-    .muted{color:var(--muted); font-size:13px;}
-
-    /* class list */
-    .grid{
-      display:grid;
-      grid-template-columns: repeat(auto-fill,minmax(220px,1fr));
-      gap:12px;
-    }
-    .class-card{
-      background:var(--card);
-      border-radius:10px;
-      padding:12px;
-      display:flex;
-      flex-direction:column;
-      gap:8px;
-      box-shadow:0 1px 2px rgba(15,23,42,0.04);
-      border-left:4px solid rgba(43,108,176,0.12);
-    }
-    .class-title{font-weight:700;font-size:15px;}
-    .tag{display:inline-block;background:#eef6ff;color:var(--accent);padding:4px 8px;border-radius:999px;font-size:12px;}
+    textarea{min-height:80px;resize:vertical;}
+    .row{display:flex;gap:8px;margin-bottom:10px;}
+    .row > div{flex:1;}
+    button{background:var(--accent);color:#fff;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;}
+    button.secondary{background:#fff;color:var(--accent);border:1px solid #cfe0f6;}
+    .muted{color:var(--muted);font-size:13px;}
+    .small{font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid #eee;background:#fafafa;cursor:pointer;}
+    .schedules{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+    .schedule-row{display:grid;grid-template-columns:1fr 1fr 1fr 180px 40px;gap:8px;align-items:center;}
+    .schedule-row > *{min-width:0;}
+    .add-schedule{display:flex;gap:8px;justify-content:flex-end;margin-top:8px;}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
+    .class-card{background:var(--card);padding:10px;border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,0.04);border-left:4px solid rgba(43,108,176,0.12);cursor:pointer;}
+    .class-title{font-weight:700;}
     .meta{font-size:13px;color:var(--muted);}
-    .actions{margin-top:auto;display:flex;gap:8px;justify-content:flex-end;}
-    .small{font-size:12px;padding:6px 8px;border-radius:8px;}
+    .danger{color:var(--danger);}
+    .inline{display:inline-flex;gap:8px;align-items:center;}
+    .hidden{display:none;}
+    .message{padding:8px;border-radius:8px;margin-bottom:10px;}
+    .message.success{background:#ecfdf5;color:#065f46;}
+    .message.error{background:#ffefef;color:#86181d;}
+    .controls{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;}
   </style>
 </head>
 <body>
   <header>
     <h1>Quản lý Lớp học</h1>
-    <div class="muted">Đăng nhập bằng tài khoản giáo viên</div>
+    <div class="muted" id="userInfo">Đang tải thông tin người dùng...</div>
   </header>
 
   <main>
     <!-- Left: Create/Edit form -->
     <section class="card" aria-labelledby="createTitle">
-      <h2 id="createTitle" style="margin-top:0;font-size:16px;">Tạo lớp mới</h2>
+      <h2 id="createTitle" style="margin-top:0;font-size:16px;">Tạo / Chỉnh sửa Lớp</h2>
+
+      <div id="messageContainer"></div>
 
       <form id="createForm">
-        <div class="row">
-          <div style="flex:1">
-            <label for="name">Tên lớp</label>
-            <input id="name" name="name" type="text" />
-          </div>
-        </div>
+        <label for="class_name">Tên lớp</label>
+        <input id="class_name" name="class_name" type="text" placeholder="Ví dụ: Toán nâng cao A1" required />
 
-        <div class="row">
-          <div style="flex:1">
-            <label for="code">Mã lớp</label>
-            <input id="code" name="code" type="text" />
+        <div class="row" style="margin-top:8px;">
+          <div>
+            <label for="grade_id">Khối</label>
+            <select id="grade_id" name="grade_id" required>
+              <option value="">-- chọn khối --</option>
+            </select>
           </div>
-        </div>
-
-        <div class="row">
-          <div style="flex:1">
-            <label for="subject">Môn học</label>
-            <input id="subject" name="subject" type="text" />
-          </div>
-        </div>
-
-        <div class="row">
-          <div style="flex:1">
-            <label for="grade">Khối</label>
-            <input id="grade" name="grade" type="text" />
+          <div>
+            <label for="subject_id">Môn</label>
+            <select id="subject_id" name="subject_id" required>
+              <option value="">-- chọn môn --</option>
+            </select>
           </div>
         </div>
 
         <div style="margin-top:8px;">
-          <label for="description">Mô tả</label>
-          <textarea id="description" name="description"></textarea>
+          <label for="tuition_type">Kiểu học phí</label>
+          <select id="tuition_type" name="tuition_type" required>
+            <option value="per_session">Theo buổi</option>
+            <option value="per_course">Theo khóa</option>
+          </select>
         </div>
 
-        <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;">
-          <button id="createBtn" type="submit">Tạo / Cập nhật</button>
+        <div style="margin-top:8px;">
+          <label for="tuition_fee" id="tuitionFeeLabel">Số tiền (VNĐ)</label>
+          <input id="tuition_fee" name="tuition_fee" type="number" min="0" step="1000" placeholder="Số tiền..." required />
+          <div class="muted" style="margin-top:6px;">Chọn kiểu học phí để biết đó là tiền 1 buổi hay tiền 1 khóa.</div>
+        </div>
+
+        <div style="margin-top:8px;">
+          <label for="note">Ghi chú (tuỳ chọn)</label>
+          <textarea id="note" name="note"></textarea>
+        </div>
+
+        <h3 style="margin-top:12px;margin-bottom:8px;font-size:15px;">Lịch học (một lớp có thể có nhiều buổi)</h3>
+        <div class="schedules" id="schedulesContainer">
+          <!-- schedule rows injected here -->
+        </div>
+        <div class="add-schedule">
+          <button type="button" id="addScheduleBtn" class="secondary">+ Thêm buổi</button>
+        </div>
+
+        <div class="controls" style="margin-top:14px;">
+          <button id="createBtn" type="submit">Lưu lớp</button>
           <button id="resetBtn" type="button" class="secondary">Đặt lại</button>
         </div>
       </form>
@@ -147,7 +114,7 @@
     <!-- Right: List classes -->
     <section class="card" aria-labelledby="listTitle">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <h2 id="listTitle" style="margin:0;font-size:16px;">Danh sách lớp của bạn</h2>
+        <h2 id="listTitle" style="margin:0;font-size:16px;">Các lớp tôi quản lý</h2>
         <div class="muted" id="countText">0 lớp</div>
       </div>
 
@@ -157,121 +124,264 @@
     </section>
   </main>
 
-  <!-- Supabase client expected to be provided by supabaseClient.js in repository -->
+  <!-- Supabase client (phải expose window.sb) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./supabaseClient.js"></script>
 
   <script>
-    // --- Assumptions ---
-    // - supabaseClient.js exposes a global `sb` object (window.sb)
-    // - There is a `classes` table with columns:
-    //     id (uuid), name (text), code (text), subject (text), grade (text), description (text),
-    //     teacher_id (uuid), created_at (timestamp)
-    // - User is authenticated; teacher's user id is available from sb.auth
+    // LƯU Ý: supabaseClient.js phải gán client vào window.sb:
+    // window.sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     (function () {
+      // Elements
+      const userInfo = document.getElementById('userInfo');
+      const messageContainer = document.getElementById('messageContainer');
       const createForm = document.getElementById('createForm');
-      const messageContainer = document.getElementById('messageContainer') || document.createElement('div');
+      const gradeSelect = document.getElementById('grade_id');
+      const subjectSelect = document.getElementById('subject_id');
+      const tuitionType = document.getElementById('tuition_type');
+      const tuitionFee = document.getElementById('tuition_fee');
+      const tuitionFeeLabel = document.getElementById('tuitionFeeLabel');
+      const schedulesContainer = document.getElementById('schedulesContainer');
+      const addScheduleBtn = document.getElementById('addScheduleBtn');
       const listContainer = document.getElementById('listContainer');
       const createBtn = document.getElementById('createBtn');
       const resetBtn = document.getElementById('resetBtn');
       const countText = document.getElementById('countText');
 
       let currentUser = null;
-      let editingClassId = null;
+      let editingClassId = null; // support editing later if desired
 
-      // Compatibility with Supabase v1/v2 auth API (variable name changed to sb)
-      async function getCurrentUser() {
-        if (!window.sb) {
-          throw new Error('Supabase client không được tìm thấy. Hãy kiểm tra supabaseClient.js');
-        }
-
-        // v2: sb.auth.getUser()
-        if (sb.auth && typeof sb.auth.getUser === 'function') {
-          const { data, error } = await sb.auth.getUser();
-          if (error) throw error;
-          return data.user;
-        }
-
-        // v1: sb.auth.user()
-        if (sb.auth && typeof sb.auth.user === 'function') {
-          return sb.auth.user();
-        }
-
-        // fallback for setups that attach user to sb.currentUser
-        return sb.currentUser || null;
-      }
-
+      // Utility UI
       function showMessage(text, type = 'success') {
-        // ensure messageContainer is in DOM
-        if (!document.body.contains(messageContainer)) {
-          messageContainer.id = 'messageContainer';
-          document.body.insertBefore(messageContainer, document.body.firstChild);
-        }
         messageContainer.innerHTML = '';
         const el = document.createElement('div');
         el.className = 'message ' + (type === 'error' ? 'error' : 'success');
         el.textContent = text;
         messageContainer.appendChild(el);
-        // auto hide after 4s
         setTimeout(() => {
           if (messageContainer.contains(el)) messageContainer.removeChild(el);
         }, 4000);
       }
+      function showError(text) { showMessage(text, 'error'); }
 
-      function showError(text) {
-        showMessage(text, 'error');
+      // Ensure sb exists
+      function requireClient() {
+        if (!window.sb) throw new Error('Supabase client không được tìm thấy. Hãy kiểm tra supabaseClient.js và đảm bảo window.sb được gán.');
+        return window.sb;
       }
 
-      function setLoading(on = true) {
-        createBtn.disabled = on;
-        if (on) {
-          createBtn.textContent = 'Đang xử lý...';
-          return;
-        }
-        createBtn.textContent = editingClassId ? 'Cập nhật' : 'Tạo / Cập nhật';
-      }
-
-      async function loadClasses() {
-        try {
-          const { data, error } = await sb.from('classes').select('*').order('created_at', { ascending: false });
+      // Init: get current user
+      async function getCurrentUser() {
+        const sb = requireClient();
+        // supabase v2
+        if (sb.auth && typeof sb.auth.getUser === 'function') {
+          const { data, error } = await sb.auth.getUser();
           if (error) throw error;
-          renderList(data || []);
+          return data.user;
+        }
+        // fallback v1
+        if (sb.auth && typeof sb.auth.user === 'function') {
+          return sb.auth.user();
+        }
+        // fallback
+        return sb.currentUser || null;
+      }
+
+      // Load grades & subjects
+      async function loadGrades() {
+        const sb = requireClient();
+        const { data, error } = await sb.from('grades').select('*').order('name', { ascending: true });
+        if (error) { console.error(error); showError('Không tải được danh sách khối'); return; }
+        gradeSelect.innerHTML = '<option value="">-- chọn khối --</option>';
+        (data || []).forEach(g => {
+          const opt = document.createElement('option');
+          opt.value = g.id;
+          opt.textContent = g.name;
+          gradeSelect.appendChild(opt);
+        });
+      }
+
+      async function loadSubjectsForGrade(gradeId) {
+        subjectSelect.innerHTML = '<option value="">-- chọn môn --</option>';
+        if (!gradeId) return;
+        const sb = requireClient();
+        const { data, error } = await sb.from('subjects').select('*').eq('grade_id', gradeId).order('name', { ascending: true });
+        if (error) { console.error(error); showError('Không tải được danh sách môn'); return; }
+        (data || []).forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = s.name;
+          subjectSelect.appendChild(opt);
+        });
+      }
+
+      gradeSelect.addEventListener('change', () => {
+        loadSubjectsForGrade(gradeSelect.value);
+      });
+
+      // Schedule row management
+      const weekdays = [
+        {v:1, label:'Thứ 2'}, {v:2,label:'Thứ 3'}, {v:3,label:'Thứ 4'}, {v:4,label:'Thứ 5'},
+        {v:5,label:'Thứ 6'}, {v:6,label:'Thứ 7'}, {v:0,label:'Chủ nhật'}
+      ];
+
+      function createScheduleRow(data = {}) {
+        const row = document.createElement('div');
+        row.className = 'schedule-row';
+
+        // weekday
+        const selWeek = document.createElement('select');
+        weekdays.forEach(w => selWeek.appendChild(new Option(w.label, w.v)));
+        selWeek.value = (data.weekday !== undefined) ? data.weekday : '';
+        // start time
+        const startInput = document.createElement('input');
+        startInput.type = 'time';
+        startInput.value = data.start_time || '';
+        // end time
+        const endInput = document.createElement('input');
+        endInput.type = 'time';
+        endInput.value = data.end_time || '';
+        // room select
+        const roomSelect = document.createElement('select');
+        roomSelect.innerHTML = '<option value="">Đang tải phòng...</option>';
+        // remove btn
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'small';
+        removeBtn.textContent = '-';
+        removeBtn.title = 'Xóa buổi';
+
+        row.appendChild(selWeek);
+        row.appendChild(startInput);
+        row.appendChild(endInput);
+        row.appendChild(roomSelect);
+        row.appendChild(removeBtn);
+
+        // When any of weekday/start/end changes, load available rooms
+        async function refreshRooms() {
+          const weekday = parseInt(selWeek.value, 10);
+          const start = startInput.value;
+          const end = endInput.value;
+          if (!weekday && weekday !== 0) return; // no weekday
+          if (!start || !end) {
+            roomSelect.innerHTML = '<option value="">Chọn thời gian hợp lệ</option>';
+            return;
+          }
+          // ensure start < end
+          if (start >= end) {
+            roomSelect.innerHTML = '<option value="">Thời gian không hợp lệ</option>';
+            return;
+          }
+          // fetch rooms and conflicting schedules for that weekday, then filter
+          try {
+            const sb = requireClient();
+            const [{ data: rooms }, { data: schedules }] = await Promise.all([
+              sb.from('rooms').select('*').order('room_name', { ascending: true }),
+              // fetch schedules on same weekday that overlap time; filter in client for robust comparison
+              sb.from('class_schedules').select('id,class_id,room_id,start_time,end_time').eq('weekday', weekday)
+            ]);
+            // find occupied room ids by overlap
+            const occupied = new Set();
+            (schedules || []).forEach(s => {
+              // s.start_time and s.end_time expected in "HH:MM:SS" or "HH:MM" format
+              const sStart = s.start_time.slice(0,5);
+              const sEnd = s.end_time.slice(0,5);
+              // overlap if sStart < end && sEnd > start
+              if (sStart < end && sEnd > start) {
+                if (s.room_id) occupied.add(s.room_id);
+              }
+            });
+            // build options for rooms not occupied
+            roomSelect.innerHTML = '';
+            const freeRooms = (rooms || []).filter(r => !occupied.has(r.id));
+            if (freeRooms.length === 0) {
+              roomSelect.innerHTML = '<option value="">Không có phòng trống</option>';
+            } else {
+              roomSelect.appendChild(new Option('-- chọn phòng --', ''));
+              freeRooms.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r.id;
+                opt.textContent = r.room_name + (r.capacity ? ' ('+r.capacity+')' : '');
+                roomSelect.appendChild(opt);
+              });
+              if (data.room_id) roomSelect.value = data.room_id;
+            }
+          } catch (err) {
+            console.error(err);
+            roomSelect.innerHTML = '<option value="">Lỗi tải phòng</option>';
+          }
+        }
+
+        selWeek.addEventListener('change', refreshRooms);
+        startInput.addEventListener('change', refreshRooms);
+        endInput.addEventListener('change', refreshRooms);
+
+        removeBtn.addEventListener('click', () => {
+          schedulesContainer.removeChild(row);
+        });
+
+        // initial refresh
+        setTimeout(refreshRooms, 0);
+
+        return row;
+      }
+
+      addScheduleBtn.addEventListener('click', () => {
+        const r = createScheduleRow();
+        schedulesContainer.appendChild(r);
+      });
+
+      // Pre-populate one schedule row by default
+      schedulesContainer.appendChild(createScheduleRow());
+
+      // Load classes created/managed by current user
+      async function loadClasses() {
+        listContainer.innerHTML = '<div class="muted">Đang tải danh sách...</div>';
+        try {
+          const sb = requireClient();
+          // select basic info and optionally join to count schedules or teachers if needed
+          const { data, error } = await sb.from('classes').select('id,class_name,grade,subject,tuition_type,tuition_fee,created_at').eq('created_by', currentUser ? currentUser.id : '').order('created_at', { ascending: false });
+          if (error) throw error;
+          renderClasses(data || []);
         } catch (err) {
-          showError('Không thể tải danh sách lớp: ' + (err.message || err));
+          console.error(err);
+          listContainer.innerHTML = '<div class="muted">Không lấy được danh sách lớp.</div>';
         }
       }
 
-      function renderList(items) {
+      function renderClasses(items) {
         listContainer.innerHTML = '';
         if (!items || items.length === 0) {
-          listContainer.innerHTML = '<div class="muted">Chưa có lớp nào.</div>';
+          listContainer.innerHTML = '<div class="muted">Bạn chưa tạo lớp nào.</div>';
           countText.textContent = '0 lớp';
           return;
         }
-        countText.textContent = items.length + ' lớp';
+        countText.textContent = (items.length || 0) + ' lớp';
         const grid = document.createElement('div');
         grid.className = 'grid';
-        items.forEach(i => {
+        items.forEach(c => {
           const card = document.createElement('div');
           card.className = 'class-card';
           card.innerHTML = `
             <div>
-              <div class="class-title">${escapeHtml(i.name || '')}</div>
-              <div class="meta">${escapeHtml(i.subject || '')} • ${escapeHtml(i.grade || '')}</div>
-              <div style="margin-top:6px;">${escapeHtml(i.description || '')}</div>
-            </div>
-            <div class="actions">
-              <button class="small" data-id="${i.id}" data-action="edit">Sửa</button>
-              <button class="small" data-id="${i.id}" data-action="delete">Xóa</button>
+              <div class="class-title">${escapeHtml(c.class_name)}</div>
+              <div class="meta">${escapeHtml(c.subject || '')} • Khối ${escapeHtml(c.grade || '')}</div>
+              <div class="muted" style="margin-top:6px;font-size:13px;">${c.tuition_type === 'per_session' ? 'Theo buổi' : 'Theo khóa'} • ${formatMoney(c.tuition_fee)}</div>
             </div>
           `;
+          card.addEventListener('click', () => {
+            // open management page for that class (implement class_manage.html separately)
+            window.location.href = `class_manage.html?class_id=${encodeURIComponent(c.id)}`;
+          });
           grid.appendChild(card);
         });
         listContainer.appendChild(grid);
       }
 
+      // Helper: escape html
       function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
         return String(str)
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
@@ -279,87 +389,133 @@
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#39;');
       }
+      function formatMoney(v) {
+        if (!v && v !== 0) return '';
+        return new Intl.NumberFormat('vi-VN').format(v) + ' đ';
+      }
 
+      // Submit form: create class -> insert schedules -> insert class_teachers
       createForm.addEventListener('submit', async (ev) => {
         ev.preventDefault();
         setLoading(true);
-        const payload = {
-          name: createForm.name.value.trim(),
-          code: createForm.code.value.trim(),
-          subject: createForm.subject.value.trim(),
-          grade: createForm.grade.value.trim(),
-          description: createForm.description.value.trim(),
-          teacher_id: currentUser ? currentUser.id : null,
-        };
         try {
-          if (editingClassId) {
-            const { data, error } = await sb.from('classes').update(payload).eq('id', editingClassId);
-            if (error) throw error;
-            showMessage('Cập nhật lớp thành công');
-            editingClassId = null;
-          } else {
-            const { data, error } = await sb.from('classes').insert([payload]);
-            if (error) throw error;
-            showMessage('Tạo lớp thành công');
+          if (!currentUser) throw new Error('Người dùng chưa đăng nhập.');
+          // collect form values
+          const payload = {
+            class_name: createForm.class_name.value.trim(),
+            grade: gradeSelect.options[gradeSelect.selectedIndex]?.text || null, // store name or id depending on schema
+            grade_id: gradeSelect.value || null,
+            subject_id: subjectSelect.value || null,
+            tuition_type: tuitionType.value,
+            tuition_fee: parseInt(tuitionFee.value || 0, 10),
+            note: document.getElementById('note').value.trim(),
+            created_by: currentUser.id,
+            created_at: new Date().toISOString()
+          };
+          if (!payload.class_name) throw new Error('Vui lòng nhập tên lớp.');
+          if (!payload.grade_id) throw new Error('Vui lòng chọn khối.');
+          if (!payload.subject_id) throw new Error('Vui lòng chọn môn.');
+          const sb = requireClient();
+
+          // insert class
+          const { data: classData, error: classError } = await sb.from('classes').insert([payload]).select('id').single();
+          if (classError) throw classError;
+          const classId = classData.id;
+
+          // insert schedules: iterate schedule rows
+          const rows = Array.from(schedulesContainer.querySelectorAll('.schedule-row'));
+          const schedulesToInsert = [];
+          for (const r of rows) {
+            const selWeek = r.children[0];
+            const startInput = r.children[1];
+            const endInput = r.children[2];
+            const roomSelect = r.children[3];
+            const weekday = selWeek.value;
+            const start_time = startInput.value;
+            const end_time = endInput.value;
+            const room_id = roomSelect.value || null;
+            if (!weekday || !start_time || !end_time) continue; // skip incomplete rows
+            if (start_time >= end_time) {
+              throw new Error('Một buổi có thời gian bắt đầu phải nhỏ hơn thời gian kết thúc.');
+            }
+            // schedule record must include class_id and room_id if available
+            schedulesToInsert.push({
+              class_id: classId,
+              weekday: parseInt(weekday, 10),
+              start_time: start_time,
+              end_time: end_time,
+              room_id: room_id,
+              created_at: new Date().toISOString()
+            });
           }
+
+          if (schedulesToInsert.length > 0) {
+            const { data: schedData, error: schedError } = await sb.from('class_schedules').insert(schedulesToInsert);
+            if (schedError) throw schedError;
+          }
+
+          // insert class_teachers: assign current user as owner/teacher
+          const { data: ctData, error: ctError } = await sb.from('class_teachers').insert([{
+            class_id: classId,
+            teacher_id: currentUser.id,
+            role: 'owner'
+          }]);
+          if (ctError) throw ctError;
+
+          showMessage('Tạo lớp thành công!');
           createForm.reset();
+          // clear schedules container and add default one
+          schedulesContainer.innerHTML = '';
+          schedulesContainer.appendChild(createScheduleRow());
+
+          // refresh lists
           await loadClasses();
         } catch (err) {
-          showError(err.message || err);
+          console.error(err);
+          showError(err.message || 'Lỗi khi lưu lớp.');
         } finally {
           setLoading(false);
         }
       });
 
       resetBtn.addEventListener('click', () => {
-        editingClassId = null;
         createForm.reset();
+        schedulesContainer.innerHTML = '';
+        schedulesContainer.appendChild(createScheduleRow());
       });
 
-      listContainer.addEventListener('click', async (ev) => {
-        const btn = ev.target.closest('button[data-action]');
-        if (!btn) return;
-        const id = btn.getAttribute('data-id');
-        const action = btn.getAttribute('data-action');
-        if (action === 'edit') {
-          // load class into form
-          try {
-            const { data, error } = await sb.from('classes').select('*').eq('id', id).single();
-            if (error) throw error;
-            const c = data;
-            createForm.name.value = c.name || '';
-            createForm.code.value = c.code || '';
-            createForm.subject.value = c.subject || '';
-            createForm.grade.value = c.grade || '';
-            createForm.description.value = c.description || '';
-            editingClassId = id;
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          } catch (err) {
-            showError('Không thể tải thông tin lớp: ' + (err.message || err));
-          }
-        } else if (action === 'delete') {
-          if (!confirm('Bạn có chắc muốn xóa lớp này?')) return;
-          try {
-            const { error } = await sb.from('classes').delete().eq('id', id);
-            if (error) throw error;
-            showMessage('Xóa lớp thành công');
-            await loadClasses();
-          } catch (err) {
-            showError('Không thể xóa lớp: ' + (err.message || err));
-          }
+      function setLoading(isLoading) {
+        createBtn.disabled = isLoading;
+        if (isLoading) createBtn.textContent = 'Đang xử lý...';
+        else createBtn.textContent = editingClassId ? 'Lưu thay đổi' : 'Lưu lớp';
+      }
+
+      // tuition type UI
+      tuitionType.addEventListener('change', () => {
+        if (tuitionType.value === 'per_session') {
+          tuitionFeeLabel.textContent = 'Số tiền (VNĐ) / 1 buổi';
+        } else {
+          tuitionFeeLabel.textContent = 'Số tiền (VNĐ) / 1 khóa';
         }
       });
 
-      // init
+      // Init sequence
       (async function init() {
         try {
           currentUser = await getCurrentUser();
+          if (currentUser) {
+            userInfo.textContent = currentUser.email || currentUser.user_metadata?.full_name || 'Giáo viên';
+          } else {
+            userInfo.textContent = 'Người dùng chưa đăng nhập';
+          }
         } catch (err) {
-          // user may be unauthenticated; still try to load classes if public
-          console.warn('getCurrentUser error:', err);
+          console.warn('Không lấy được user:', err);
+          userInfo.textContent = 'Người dùng chưa đăng nhập';
         }
-        await loadClasses();
+
+        await Promise.all([ loadGrades(), loadClasses() ]);
       })();
+
     })();
   </script>
 </body>
