@@ -256,47 +256,63 @@
         row.appendChild(roomSelect);
         row.appendChild(removeBtn);
 
-        async function refreshRooms() {
-          const weekday = weekdaySelect.value;
-          const start = startInput.value;
-          const end = endInput.value;
-          roomSelect.innerHTML = '<option value="">Đang kiểm tra...</option>';
-          if (weekday === '' || !start || !end) { roomSelect.innerHTML = '<option value="">Chọn ngày/giờ hợp lệ</option>'; return; }
-          if (start >= end) { roomSelect.innerHTML = '<option value="">Thời gian không hợp lệ</option>'; return; }
+        // Thay thế phần refreshRooms cũ bằng hàm này
+async function refreshRooms() {
+  const weekday = weekdaySelect.value;
+  const start = startInput.value;
+  const end = endInput.value;
+  roomSelect.innerHTML = '<option value="">Đang kiểm tra...</option>';
+  if (weekday === '' || !start || !end) { roomSelect.innerHTML = '<option value="">Chọn ngày/giờ hợp lệ</option>'; return; }
+  if (start >= end) { roomSelect.innerHTML = '<option value="">Thời gian không hợp lệ</option>'; return; }
 
-          try {
-            const sb = requireSbImmediate();
-            // fetch rooms and schedules; handle permission / missing table errors
-            const [{ data: rooms, error: rErr }, { data: schedules, error: sErr }] = await Promise.all([
-              sb.from('rooms').select('id,room_name,capacity').order('room_name'),
-              sb.from('class_schedules').select('id,class_id,room_id,weekday,start_time,end_time').eq('weekday', parseInt(weekday, 10))
-            ]);
-            if (rErr) throw rErr;
-            if (sErr) throw sErr;
+  try {
+    const sb = requireSbImmediate();
+    // Lấy rooms trước
+    const roomsRes = await sb.from('rooms').select('id,room_name,capacity').order('room_name');
+    if (roomsRes.error) {
+      console.error('roomsRes.error:', roomsRes.error);
+      roomSelect.innerHTML = `<option value="">Lỗi tải phòng: ${roomsRes.error.message || roomsRes.error}</option>`;
+      return;
+    }
+    const rooms = roomsRes.data || [];
 
-            const occupied = new Set();
-            (schedules || []).forEach(s => {
-              const sStart = (s.start_time || '').slice(0,5);
-              const sEnd = (s.end_time || '').slice(0,5);
-              if (sStart && sEnd && sStart < end && sEnd > start) {
-                if (s.room_id) occupied.add(s.room_id);
-              }
-            });
+    // Lấy schedules cùng weekday để lọc trùng giờ
+    const schedRes = await sb.from('class_schedules').select('id,class_id,room_id,start_time,end_time').eq('weekday', parseInt(weekday, 10));
+    if (schedRes.error) {
+      // Nếu schedules bị lỗi do RLS, chúng ta vẫn có thể show danh sách rooms (fallback)
+      console.warn('Không lấy được class_schedules (fallback to show rooms):', schedRes.error);
+      // hiển thị tất cả rooms (không lọc)
+      roomSelect.innerHTML = '';
+      if (rooms.length === 0) roomSelect.innerHTML = '<option value="">Không có phòng</option>';
+      else {
+        roomSelect.appendChild(new Option('-- Chọn phòng --', ''));
+        rooms.forEach(r => roomSelect.appendChild(new Option(r.room_name + (r.capacity ? ` (${r.capacity})` : ''), r.id)));
+      }
+      return;
+    }
 
-            const freeRooms = (rooms || []).filter(r => !occupied.has(r.id));
-            roomSelect.innerHTML = '';
-            if (freeRooms.length === 0) roomSelect.innerHTML = '<option value="">Không có phòng trống</option>';
-            else {
-              roomSelect.appendChild(new Option('-- Chọn phòng --', ''));
-              freeRooms.forEach(r => roomSelect.appendChild(new Option(r.room_name + (r.capacity ? ` (${r.capacity})` : ''), r.id)));
-              if (initial.room_id) roomSelect.value = initial.room_id;
-            }
-          } catch (err) {
-            // Provide clearer UI message and console log details for debugging permissions/schema
-            console.error('Lỗi tải phòng — chi tiết:', err);
-            roomSelect.innerHTML = '<option value="">Lỗi tải phòng (check quyền / bảng rooms/class_schedules)</option>';
-          }
-        }
+    const schedules = schedRes.data || [];
+    const occupied = new Set();
+    schedules.forEach(s => {
+      const sStart = (s.start_time || '').slice(0,5);
+      const sEnd = (s.end_time || '').slice(0,5);
+      if (sStart && sEnd && sStart < end && sEnd > start) {
+        if (s.room_id) occupied.add(s.room_id);
+      }
+    });
+
+    const freeRooms = rooms.filter(r => !occupied.has(r.id));
+    roomSelect.innerHTML = '';
+    if (freeRooms.length === 0) roomSelect.innerHTML = '<option value="">Không có phòng trống</option>';
+    else {
+      roomSelect.appendChild(new Option('-- Chọn phòng --', ''));
+      freeRooms.forEach(r => roomSelect.appendChild(new Option(r.room_name + (r.capacity ? ` (${r.capacity})` : ''), r.id)));
+    }
+  } catch (err) {
+    console.error('refreshRooms unexpected error:', err);
+    roomSelect.innerHTML = '<option value="">Lỗi tải phòng (xem console)</option>';
+  }
+}
 
         weekdaySelect.addEventListener('change', refreshRooms);
         startInput.addEventListener('change', refreshRooms);
