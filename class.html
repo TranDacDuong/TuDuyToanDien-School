@@ -183,6 +183,7 @@
       const countText = document.getElementById('countText');
 
       let currentUser = null;
+      let editingClassId = null;
 
       // Compatibility with Supabase v1/v2 auth API
       async function getCurrentUser() {
@@ -224,7 +225,11 @@
 
       function setLoading(on = true) {
         createBtn.disabled = on;
-        createBtn.textContent = on ? 'Đang tạo...' : 'Tạo lớp';
+        if (on) {
+          createBtn.textContent = 'Đang xử lý...';
+          return;
+        }
+        createBtn.textContent = editingClassId ? 'Cập nhật lớp' : 'Tạo lớp';
       }
 
       function renderClasses(items) {
@@ -274,6 +279,7 @@
 
           const actions = document.createElement('div');
           actions.className = 'actions';
+
           const openBtn = document.createElement('button');
           openBtn.className = 'small';
           openBtn.textContent = 'Mở';
@@ -287,20 +293,31 @@
           });
 
           const editBtn = document.createElement('button');
-          editBtn.className = 'small secondary small';
+          editBtn.className = 'small secondary';
           editBtn.textContent = 'Sửa';
           editBtn.addEventListener('click', () => {
-            // simple inline edit: fill form with values
+            editingClassId = it.id;
             document.getElementById('name').value = it.name || '';
             document.getElementById('code').value = it.code || '';
             document.getElementById('subject').value = it.subject || '';
             document.getElementById('grade').value = it.grade || '';
             document.getElementById('description').value = it.description || '';
+            createBtn.textContent = 'Cập nhật lớp';
             window.scrollTo({ top: 0, behavior: 'smooth' });
-            showMessage('Đã điền thông tin lớp vào form. Chỉnh sửa và nhấn "Tạo lớp" để cập nhật (tính năng cập nhật: chưa cài đặt).', 'success');
+            showMessage('Bạn đang sửa lớp. Chỉnh sửa và nhấn "Cập nhật lớp" để lưu.', 'success');
+          });
+
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'small';
+          deleteBtn.style.background = '#ef4444';
+          deleteBtn.style.color = 'white';
+          deleteBtn.textContent = 'Xóa';
+          deleteBtn.addEventListener('click', () => {
+            deleteClass(it.id);
           });
 
           actions.appendChild(editBtn);
+          actions.appendChild(deleteBtn);
           actions.appendChild(openBtn);
 
           c.appendChild(title);
@@ -363,7 +380,6 @@
         setLoading(true);
 
         try {
-          // Attempt to insert; you may want to implement update-on-duplicate in future
           const payload = {
             name,
             code: code || null,
@@ -373,32 +389,75 @@
             teacher_id: currentUser.id
           };
 
-          const { data, error } = await supabase
-            .from('classes')
-            .insert([payload])
-            .select() // return inserted row (if supported)
-            .single();
+          if (editingClassId) {
+            const { data, error } = await supabase
+              .from('classes')
+              .update(payload)
+              .eq('id', editingClassId)
+              .select()
+              .single();
 
-          if (error) {
-            console.error('Insert error', error);
-            showError('Tạo lớp thất bại: ' + (error.message || error));
-            setLoading(false);
-            return;
+            if (error) {
+              console.error('Update error', error);
+              showError('Cập nhật lớp thất bại: ' + (error.message || error));
+              setLoading(false);
+              return;
+            }
+
+            showMessage('Cập nhật lớp thành công!');
+          } else {
+            const { data, error } = await supabase
+              .from('classes')
+              .insert([payload])
+              .select() // return inserted row (if supported)
+              .single();
+
+            if (error) {
+              console.error('Insert error', error);
+              showError('Tạo lớp thất bại: ' + (error.message || error));
+              setLoading(false);
+              return;
+            }
+
+            showMessage('Tạo lớp thành công!');
           }
 
-          showMessage('Tạo lớp thành công!');
-          createForm.reset();
+          resetForm();
           await fetchClasses();
         } catch (err) {
           console.error(err);
-          showError('Lỗi khi tạo lớp.');
+          showError('Lỗi khi lưu lớp.');
         } finally {
           setLoading(false);
         }
       }
 
       function resetForm() {
+        editingClassId = null;
         createForm.reset();
+        createBtn.textContent = 'Tạo lớp';
+      }
+
+      async function deleteClass(id) {
+        if (!confirm('Bạn có chắc muốn xóa lớp này?')) return;
+
+        const { error } = await supabase
+          .from('classes')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          console.error('Delete error', error);
+          showError('Xóa lớp thất bại: ' + (error.message || error));
+          return;
+        }
+
+        showMessage('Đã xóa lớp.');
+        // Nếu đang chỉnh sửa lớp bị xóa thì reset form
+        if (editingClassId === id) {
+          resetForm();
+        }
+        await fetchClasses();
       }
 
       async function init() {
