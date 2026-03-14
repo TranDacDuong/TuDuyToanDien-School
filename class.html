@@ -4,308 +4,330 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Quản lý Lớp học — Tạo & Danh sách</title>
+
   <style>
     :root{
       --bg:#f4f7fb;
       --card:#fff;
-      --accent:#2b6cb0;
+      --accent:#2563eb;
       --muted:#6b7280;
       --danger:#dc2626;
+      --success:#16a34a;
     }
-    body{margin:0;font-family:Inter,system-ui,Arial;background:var(--bg);color:#111827;padding:18px;}
-    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
-    h1{margin:0;font-size:20px;}
-    main{display:grid;grid-template-columns:420px 1fr;gap:18px;align-items:start;}
-    .card{background:var(--card);border-radius:10px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,0.04);}
-    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;}
-    input[type="text"], select, textarea, input[type="time"], input[type="number"]{
-      width:100%;padding:8px;border:1px solid #e6e9ef;border-radius:6px;background:#fff;box-sizing:border-box;font-size:14px;
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,Arial,sans-serif;
+      background:var(--bg);
+      color:#0f172a;
+      padding:20px;
     }
-    textarea{min-height:80px;resize:vertical;}
-    .row{display:flex;gap:8px;margin-bottom:10px;}
-    .row > div{flex:1;}
-    button{background:var(--accent);color:#fff;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;}
-    button.secondary{background:#fff;color:var(--accent);border:1px solid #cfe0f6;}
-    .muted{color:var(--muted);font-size:13px;}
-    .small{font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid #eee;background:#fafafa;cursor:pointer;}
-    .schedules{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
-    .schedule-row{display:grid;grid-template-columns:1fr 1fr 1fr 180px 40px;gap:8px;align-items:center;}
-    .schedule-row > *{min-width:0;}
-    .add-schedule{display:flex;gap:8px;justify-content:flex-end;margin-top:8px;}
-    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
-    .class-card{background:var(--card);padding:10px;border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,0.04);border-left:4px solid rgba(43,108,176,0.12);cursor:pointer;}
-    .class-title{font-weight:700;}
-    .meta{font-size:13px;color:var(--muted);}
-    .danger{color:var(--danger);}
-    .inline{display:inline-flex;gap:8px;align-items:center;}
-    .hidden{display:none;}
-    .message{padding:8px;border-radius:8px;margin-bottom:10px;}
-    .message.success{background:#ecfdf5;color:#065f46;}
-    .message.error{background:#ffefef;color:#86181d;}
-    .controls{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+    h1{margin:0;font-size:20px}
+    main{display:grid;grid-template-columns:440px 1fr;gap:18px;align-items:start}
+    .card{background:var(--card);padding:14px;border-radius:10px;box-shadow:0 1px 4px rgba(2,6,23,0.06)}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    input[type="text"], input[type="number"], select, textarea, input[type="time"]{
+      width:100%;padding:8px;border:1px solid #e6edf3;border-radius:8px;background:#fff;font-size:14px
+    }
+    textarea{min-height:80px;resize:vertical}
+    .row{display:flex;gap:8px}
+    .row>div{flex:1}
+    button{background:var(--accent);color:#fff;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+    button.secondary{background:#fff;color:var(--accent);border:1px solid #cfe0f6}
+    .muted{color:var(--muted);font-size:13px}
+    .schedules{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+    .schedule-row{display:grid;grid-template-columns:110px 1fr 1fr 1fr 40px;gap:8px;align-items:center}
+    .small{padding:6px 8px;border-radius:8px;border:1px solid #e6edf3;background:#fafafa;cursor:pointer;font-size:13px}
+    .controls{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+    .class-card{padding:10px;border-radius:10px;background:#fff;box-shadow:0 1px 2px rgba(2,6,23,0.04);cursor:pointer;border-left:4px solid rgba(37,99,235,0.14)}
+    .class-title{font-weight:700}
+    .meta{font-size:13px;color:var(--muted);margin-top:6px}
+    .message{padding:8px;border-radius:8px;margin-bottom:10px}
+    .message.success{background:#ecfdf5;color:#065f46}
+    .message.error{background:#fff1f2;color:#981b24}
+    .hidden{display:none}
+    .label-inline{font-size:13px;color:var(--muted);margin-right:8px}
   </style>
 </head>
 <body>
   <header>
     <h1>Quản lý Lớp học</h1>
-    <div class="muted" id="userInfo">Đang tải thông tin người dùng...</div>
+    <div id="userInfo" class="muted">Đang tải thông tin người dùng...</div>
   </header>
 
   <main>
-    <!-- Left: Create/Edit form -->
+    <!-- Left: Create/Edit -->
     <section class="card" aria-labelledby="createTitle">
-      <h2 id="createTitle" style="margin-top:0;font-size:16px;">Tạo / Chỉnh sửa Lớp</h2>
+      <h2 id="createTitle" style="margin:0 0 10px 0;font-size:16px">Tạo / Chỉnh sửa lớp</h2>
 
       <div id="messageContainer"></div>
 
-      <form id="createForm">
+      <form id="classForm">
         <label for="class_name">Tên lớp</label>
         <input id="class_name" name="class_name" type="text" placeholder="Ví dụ: Toán nâng cao A1" required />
 
-        <div class="row" style="margin-top:8px;">
+        <div class="row" style="margin-top:10px">
           <div>
             <label for="grade_id">Khối</label>
             <select id="grade_id" name="grade_id" required>
-              <option value="">-- chọn khối --</option>
+              <option value="">-- Đang tải --</option>
             </select>
           </div>
           <div>
             <label for="subject_id">Môn</label>
             <select id="subject_id" name="subject_id" required>
-              <option value="">-- chọn môn --</option>
+              <option value="">-- Chọn khối trước --</option>
             </select>
           </div>
         </div>
 
-        <div style="margin-top:8px;">
+        <div style="margin-top:10px">
           <label for="tuition_type">Kiểu học phí</label>
-          <select id="tuition_type" name="tuition_type" required>
+          <select id="tuition_type" name="tuition_type">
             <option value="per_session">Theo buổi</option>
             <option value="per_course">Theo khóa</option>
           </select>
         </div>
 
-        <div style="margin-top:8px;">
-          <label for="tuition_fee" id="tuitionFeeLabel">Số tiền (VNĐ)</label>
-          <input id="tuition_fee" name="tuition_fee" type="number" min="0" step="1000" placeholder="Số tiền..." required />
-          <div class="muted" style="margin-top:6px;">Chọn kiểu học phí để biết đó là tiền 1 buổi hay tiền 1 khóa.</div>
+        <div style="margin-top:8px">
+          <label id="tuition_label" for="tuition_fee">Số tiền (VNĐ)</label>
+          <input id="tuition_fee" name="tuition_fee" type="number" min="0" step="1000" placeholder="Ví dụ: 200000" />
+          <div class="muted" style="margin-top:6px">Nếu chọn "Theo buổi" => tiền trên mỗi buổi; nếu "Theo khóa" => tiền toàn khóa.</div>
         </div>
 
-        <div style="margin-top:8px;">
+        <div style="margin-top:10px">
           <label for="note">Ghi chú (tuỳ chọn)</label>
           <textarea id="note" name="note"></textarea>
         </div>
 
-        <h3 style="margin-top:12px;margin-bottom:8px;font-size:15px;">Lịch học (một lớp có thể có nhiều buổi)</h3>
-        <div class="schedules" id="schedulesContainer">
-          <!-- schedule rows injected here -->
-        </div>
-        <div class="add-schedule">
-          <button type="button" id="addScheduleBtn" class="secondary">+ Thêm buổi</button>
+        <h3 style="margin-top:12px;margin-bottom:6px;font-size:15px">Lịch học (có thể nhiều buổi)</h3>
+        <div class="schedules" id="schedules"></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:6px">
+          <button type="button" id="addSchedule" class="secondary">+ Thêm buổi</button>
         </div>
 
-        <div class="controls" style="margin-top:14px;">
-          <button id="createBtn" type="submit">Lưu lớp</button>
-          <button id="resetBtn" type="button" class="secondary">Đặt lại</button>
+        <div class="controls">
+          <button type="submit" id="saveBtn">Lưu lớp</button>
+          <button type="button" id="resetBtn" class="secondary">Đặt lại</button>
         </div>
       </form>
     </section>
 
     <!-- Right: List classes -->
     <section class="card" aria-labelledby="listTitle">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <h2 id="listTitle" style="margin:0;font-size:16px;">Các lớp tôi quản lý</h2>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h2 id="listTitle" style="margin:0;font-size:16px">Các lớp tôi quản lý</h2>
         <div class="muted" id="countText">0 lớp</div>
       </div>
 
       <div id="listContainer">
-        <div class="muted">Đang tải danh sách...</div>
+        <div class="muted">Đang tải...</div>
       </div>
     </section>
   </main>
 
-  <!-- Supabase client (phải expose window.sb) -->
+  <!-- Supabase lib then supabaseClient.js (which MUST expose window.sb = createClient(...)) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./supabaseClient.js"></script>
 
   <script>
-    // LƯU Ý: supabaseClient.js phải gán client vào window.sb:
-    // window.sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    /*
+      GHI CHÚ:
+      - supabaseClient.js phải gán client vào window.sb:
+          window.sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+      - File này sử dụng window.sb (không phải 'supabase').
+      - Nếu muốn tôi có thể tạo supabaseClient.js mẫu riêng.
+    */
 
     (function () {
       // Elements
       const userInfo = document.getElementById('userInfo');
       const messageContainer = document.getElementById('messageContainer');
-      const createForm = document.getElementById('createForm');
+      const classForm = document.getElementById('classForm');
       const gradeSelect = document.getElementById('grade_id');
       const subjectSelect = document.getElementById('subject_id');
       const tuitionType = document.getElementById('tuition_type');
       const tuitionFee = document.getElementById('tuition_fee');
-      const tuitionFeeLabel = document.getElementById('tuitionFeeLabel');
-      const schedulesContainer = document.getElementById('schedulesContainer');
-      const addScheduleBtn = document.getElementById('addScheduleBtn');
+      const tuitionLabel = document.getElementById('tuition_label');
+      const noteInput = document.getElementById('note');
+      const schedulesEl = document.getElementById('schedules');
+      const addScheduleBtn = document.getElementById('addSchedule');
       const listContainer = document.getElementById('listContainer');
-      const createBtn = document.getElementById('createBtn');
+      const saveBtn = document.getElementById('saveBtn');
       const resetBtn = document.getElementById('resetBtn');
       const countText = document.getElementById('countText');
 
+      // Internal state
       let currentUser = null;
-      let editingClassId = null; // support editing later if desired
+      let editingClassId = null;
 
-      // Utility UI
+      // Weekday labels: using numbers matching your DB convention (0 = Sunday, 1 = Monday, ...)
+      const WEEKDAYS = [
+        { v: 1, label: 'Thứ 2' },
+        { v: 2, label: 'Thứ 3' },
+        { v: 3, label: 'Thứ 4' },
+        { v: 4, label: 'Thứ 5' },
+        { v: 5, label: 'Thứ 6' },
+        { v: 6, label: 'Thứ 7' },
+        { v: 0, label: 'Chủ nhật' }
+      ];
+
+      // Helpers: messages
       function showMessage(text, type = 'success') {
         messageContainer.innerHTML = '';
         const el = document.createElement('div');
         el.className = 'message ' + (type === 'error' ? 'error' : 'success');
         el.textContent = text;
         messageContainer.appendChild(el);
-        setTimeout(() => {
-          if (messageContainer.contains(el)) messageContainer.removeChild(el);
-        }, 4000);
+        setTimeout(() => { if (messageContainer.contains(el)) messageContainer.removeChild(el); }, 4000);
       }
-      function showError(text) { showMessage(text, 'error'); }
+      function showError(err) {
+        const text = err && err.message ? err.message : String(err);
+        showMessage(text, 'error');
+        console.error(err);
+      }
 
-      // Ensure sb exists
-      function requireClient() {
-        if (!window.sb) throw new Error('Supabase client không được tìm thấy. Hãy kiểm tra supabaseClient.js và đảm bảo window.sb được gán.');
+      // Wait for window.sb to be ready (supabase client created by supabaseClient.js)
+      async function waitForSb(timeout = 5000) {
+        const start = Date.now();
+        while (!window.sb) {
+          if (Date.now() - start > timeout) throw new Error('Supabase client (window.sb) không được tìm thấy sau ' + timeout + 'ms. Kiểm tra supabaseClient.js và thứ tự script.');
+          await new Promise(r => setTimeout(r, 50));
+        }
+        return window.sb;
+      }
+      function requireSb() {
+        if (!window.sb) throw new Error('Supabase client không được tìm thấy. Kiểm tra supabaseClient.js');
         return window.sb;
       }
 
-      // Init: get current user
+      // Auth helper (compat v2/v1)
       async function getCurrentUser() {
-        const sb = requireClient();
-        // supabase v2
+        await waitForSb(5000);
+        const sb = requireSb();
         if (sb.auth && typeof sb.auth.getUser === 'function') {
           const { data, error } = await sb.auth.getUser();
           if (error) throw error;
           return data.user;
         }
-        // fallback v1
         if (sb.auth && typeof sb.auth.user === 'function') {
           return sb.auth.user();
         }
-        // fallback
         return sb.currentUser || null;
       }
 
-      // Load grades & subjects
+      // Load dropdown data
       async function loadGrades() {
-        const sb = requireClient();
-        const { data, error } = await sb.from('grades').select('*').order('name', { ascending: true });
-        if (error) { console.error(error); showError('Không tải được danh sách khối'); return; }
-        gradeSelect.innerHTML = '<option value="">-- chọn khối --</option>';
-        (data || []).forEach(g => {
-          const opt = document.createElement('option');
-          opt.value = g.id;
-          opt.textContent = g.name;
-          gradeSelect.appendChild(opt);
-        });
+        try {
+          const sb = requireSb();
+          const { data, error } = await sb.from('grades').select('id,name').order('name', { ascending: true });
+          if (error) throw error;
+          gradeSelect.innerHTML = '<option value="">-- Chọn khối --</option>';
+          (data || []).forEach(g => {
+            const o = document.createElement('option'); o.value = g.id; o.textContent = g.name; gradeSelect.appendChild(o);
+          });
+        } catch (err) {
+          showError('Không tải được danh sách khối: ' + (err.message || err));
+        }
       }
 
-      async function loadSubjectsForGrade(gradeId) {
-        subjectSelect.innerHTML = '<option value="">-- chọn môn --</option>';
-        if (!gradeId) return;
-        const sb = requireClient();
-        const { data, error } = await sb.from('subjects').select('*').eq('grade_id', gradeId).order('name', { ascending: true });
-        if (error) { console.error(error); showError('Không tải được danh sách môn'); return; }
-        (data || []).forEach(s => {
-          const opt = document.createElement('option');
-          opt.value = s.id;
-          opt.textContent = s.name;
-          subjectSelect.appendChild(opt);
-        });
+      async function loadSubjects(gradeId) {
+        try {
+          subjectSelect.innerHTML = '<option value="">-- Đang tải --</option>';
+          if (!gradeId) {
+            subjectSelect.innerHTML = '<option value="">-- Chọn khối trước --</option>';
+            return;
+          }
+          const sb = requireSb();
+          const { data, error } = await sb.from('subjects').select('id,name,grade_id').eq('grade_id', gradeId).order('name', { ascending: true });
+          if (error) throw error;
+          subjectSelect.innerHTML = '<option value="">-- Chọn môn --</option>';
+          (data || []).forEach(s => {
+            const o = document.createElement('option'); o.value = s.id; o.textContent = s.name; subjectSelect.appendChild(o);
+          });
+        } catch (err) {
+          showError('Không tải được môn học: ' + (err.message || err));
+        }
       }
 
-      gradeSelect.addEventListener('change', () => {
-        loadSubjectsForGrade(gradeSelect.value);
+      gradeSelect.addEventListener('change', (e) => {
+        loadSubjects(e.target.value);
       });
 
-      // Schedule row management
-      const weekdays = [
-        {v:1, label:'Thứ 2'}, {v:2,label:'Thứ 3'}, {v:3,label:'Thứ 4'}, {v:4,label:'Thứ 5'},
-        {v:5,label:'Thứ 6'}, {v:6,label:'Thứ 7'}, {v:0,label:'Chủ nhật'}
-      ];
-
-      function createScheduleRow(data = {}) {
+      // Schedule row creation: weekday, start_time, end_time, room select, remove btn
+      function createScheduleRow(initial = {}) {
         const row = document.createElement('div');
         row.className = 'schedule-row';
 
-        // weekday
-        const selWeek = document.createElement('select');
-        weekdays.forEach(w => selWeek.appendChild(new Option(w.label, w.v)));
-        selWeek.value = (data.weekday !== undefined) ? data.weekday : '';
-        // start time
-        const startInput = document.createElement('input');
-        startInput.type = 'time';
-        startInput.value = data.start_time || '';
-        // end time
-        const endInput = document.createElement('input');
-        endInput.type = 'time';
-        endInput.value = data.end_time || '';
-        // room select
-        const roomSelect = document.createElement('select');
-        roomSelect.innerHTML = '<option value="">Đang tải phòng...</option>';
-        // remove btn
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'small';
-        removeBtn.textContent = '-';
+        const weekdaySelect = document.createElement('select');
+        weekdaySelect.innerHTML = WEEKDAYS.map(w => `<option value="${w.v}">${w.label}</option>`).join('');
+        if (initial.weekday !== undefined && initial.weekday !== null) weekdaySelect.value = initial.weekday;
+
+        const startInput = document.createElement('input'); startInput.type = 'time'; startInput.value = initial.start_time || '';
+        const endInput = document.createElement('input'); endInput.type = 'time'; endInput.value = initial.end_time || '';
+
+        const roomSelect = document.createElement('select'); roomSelect.innerHTML = '<option value="">Đang tải phòng...</option>';
+
+        const removeBtn = document.createElement('button'); removeBtn.type = 'button'; removeBtn.className = 'small'; removeBtn.textContent = '-';
         removeBtn.title = 'Xóa buổi';
 
-        row.appendChild(selWeek);
+        row.appendChild(weekdaySelect);
         row.appendChild(startInput);
         row.appendChild(endInput);
         row.appendChild(roomSelect);
         row.appendChild(removeBtn);
 
-        // When any of weekday/start/end changes, load available rooms
+        // Refresh available rooms for the chosen weekday/time
         async function refreshRooms() {
-          const weekday = parseInt(selWeek.value, 10);
+          const weekday = weekdaySelect.value;
           const start = startInput.value;
           const end = endInput.value;
-          if (!weekday && weekday !== 0) return; // no weekday
-          if (!start || !end) {
-            roomSelect.innerHTML = '<option value="">Chọn thời gian hợp lệ</option>';
+          roomSelect.innerHTML = '<option value="">Đang kiểm tra...</option>';
+
+          if (weekday === '' || !start || !end) {
+            roomSelect.innerHTML = '<option value="">Chọn ngày/giờ hợp lệ</option>';
             return;
           }
-          // ensure start < end
           if (start >= end) {
             roomSelect.innerHTML = '<option value="">Thời gian không hợp lệ</option>';
             return;
           }
-          // fetch rooms and conflicting schedules for that weekday, then filter
+
           try {
-            const sb = requireClient();
-            const [{ data: rooms }, { data: schedules }] = await Promise.all([
-              sb.from('rooms').select('*').order('room_name', { ascending: true }),
-              // fetch schedules on same weekday that overlap time; filter in client for robust comparison
-              sb.from('class_schedules').select('id,class_id,room_id,start_time,end_time').eq('weekday', weekday)
+            const sb = requireSb();
+            // Fetch all rooms
+            const [{ data: rooms, error: rErr }, { data: schedules, error: sErr }] = await Promise.all([
+              sb.from('rooms').select('id,room_name,capacity').order('room_name'),
+              // fetch schedules that are on the same weekday
+              sb.from('class_schedules').select('id,class_id,room_id,weekday,start_time,end_time').eq('weekday', parseInt(weekday, 10))
             ]);
-            // find occupied room ids by overlap
+            if (rErr) throw rErr;
+            if (sErr) throw sErr;
+
+            // determine occupied room ids by overlapping time
             const occupied = new Set();
             (schedules || []).forEach(s => {
-              // s.start_time and s.end_time expected in "HH:MM:SS" or "HH:MM" format
-              const sStart = s.start_time.slice(0,5);
-              const sEnd = s.end_time.slice(0,5);
+              const sStart = (s.start_time || '').slice(0,5);
+              const sEnd = (s.end_time || '').slice(0,5);
               // overlap if sStart < end && sEnd > start
-              if (sStart < end && sEnd > start) {
+              if (sStart && sEnd && sStart < end && sEnd > start) {
                 if (s.room_id) occupied.add(s.room_id);
               }
             });
-            // build options for rooms not occupied
-            roomSelect.innerHTML = '';
+
             const freeRooms = (rooms || []).filter(r => !occupied.has(r.id));
+            roomSelect.innerHTML = '';
             if (freeRooms.length === 0) {
               roomSelect.innerHTML = '<option value="">Không có phòng trống</option>';
             } else {
-              roomSelect.appendChild(new Option('-- chọn phòng --', ''));
+              roomSelect.appendChild(new Option('-- Chọn phòng --', ''));
               freeRooms.forEach(r => {
-                const opt = document.createElement('option');
-                opt.value = r.id;
-                opt.textContent = r.room_name + (r.capacity ? ' ('+r.capacity+')' : '');
+                const opt = new Option(r.room_name + (r.capacity ? ` (${r.capacity})` : ''), r.id);
                 roomSelect.appendChild(opt);
               });
-              if (data.room_id) roomSelect.value = data.room_id;
+              if (initial.room_id) roomSelect.value = initial.room_id;
             }
           } catch (err) {
             console.error(err);
@@ -313,65 +335,68 @@
           }
         }
 
-        selWeek.addEventListener('change', refreshRooms);
+        weekdaySelect.addEventListener('change', refreshRooms);
         startInput.addEventListener('change', refreshRooms);
         endInput.addEventListener('change', refreshRooms);
-
-        removeBtn.addEventListener('click', () => {
-          schedulesContainer.removeChild(row);
-        });
+        // remove
+        removeBtn.addEventListener('click', () => row.remove());
 
         // initial refresh
         setTimeout(refreshRooms, 0);
-
         return row;
       }
 
+      // Add initial schedule row by default
+      schedulesEl.appendChild(createScheduleRow());
+
       addScheduleBtn.addEventListener('click', () => {
-        const r = createScheduleRow();
-        schedulesContainer.appendChild(r);
+        schedulesEl.appendChild(createScheduleRow());
       });
 
-      // Pre-populate one schedule row by default
-      schedulesContainer.appendChild(createScheduleRow());
-
-      // Load classes created/managed by current user
-      async function loadClasses() {
-        listContainer.innerHTML = '<div class="muted">Đang tải danh sách...</div>';
+      // Load classes the current user manages (created_by or class_teachers.teacher_id)
+      async function loadMyClasses() {
         try {
-          const sb = requireClient();
-          // select basic info and optionally join to count schedules or teachers if needed
-          const { data, error } = await sb.from('classes').select('id,class_name,grade,subject,tuition_type,tuition_fee,created_at').eq('created_by', currentUser ? currentUser.id : '').order('created_at', { ascending: false });
+          listContainer.innerHTML = '<div class="muted">Đang tải danh sách...</div>';
+          const sb = requireSb();
+          // First try classes created_by = currentUser.id
+          // Optionally you could join class_teachers to find ones the teacher is assigned to
+          const { data: classes, error } = await sb.from('classes')
+            .select('id,class_name,grade_id,grade,subject_id,tuition_type,tuition_fee,created_at')
+            .or(`created_by.eq.${currentUser ? currentUser.id : ''},created_by.is.null`) // fallback: will filter below
+            .order('created_at', { ascending: false });
+
           if (error) throw error;
-          renderClasses(data || []);
+          // Filter to classes where created_by = currentUser OR class_teachers has teacher_id
+          // Simpler: fetch classes where class_teachers.teacher_id = currentUser.id
+          const { data: viaCT, error: ctErr } = await sb.from('class_teachers').select('class_id').eq('teacher_id', currentUser ? currentUser.id : '');
+          if (ctErr) throw ctErr;
+          const ctClassIds = new Set((viaCT || []).map(x => x.class_id));
+          const filtered = (classes || []).filter(c => (c.created_by === (currentUser && currentUser.id)) || ctClassIds.has(c.id));
+          renderClassList(filtered);
         } catch (err) {
           console.error(err);
-          listContainer.innerHTML = '<div class="muted">Không lấy được danh sách lớp.</div>';
+          listContainer.innerHTML = '<div class="muted">Không thể tải danh sách lớp.</div>';
         }
       }
 
-      function renderClasses(items) {
+      function renderClassList(items) {
         listContainer.innerHTML = '';
         if (!items || items.length === 0) {
-          listContainer.innerHTML = '<div class="muted">Bạn chưa tạo lớp nào.</div>';
+          listContainer.innerHTML = '<div class="muted">Bạn chưa quản lý lớp nào.</div>';
           countText.textContent = '0 lớp';
           return;
         }
-        countText.textContent = (items.length || 0) + ' lớp';
-        const grid = document.createElement('div');
-        grid.className = 'grid';
+        countText.textContent = items.length + ' lớp';
+        const grid = document.createElement('div'); grid.className = 'grid';
         items.forEach(c => {
-          const card = document.createElement('div');
-          card.className = 'class-card';
-          card.innerHTML = `
-            <div>
-              <div class="class-title">${escapeHtml(c.class_name)}</div>
-              <div class="meta">${escapeHtml(c.subject || '')} • Khối ${escapeHtml(c.grade || '')}</div>
-              <div class="muted" style="margin-top:6px;font-size:13px;">${c.tuition_type === 'per_session' ? 'Theo buổi' : 'Theo khóa'} • ${formatMoney(c.tuition_fee)}</div>
-            </div>
-          `;
+          const card = document.createElement('div'); card.className = 'class-card';
+          const title = document.createElement('div'); title.className = 'class-title'; title.textContent = c.class_name || '(Không tên)';
+          const meta = document.createElement('div'); meta.className = 'meta';
+          const tuitionText = (c.tuition_type === 'per_session') ? 'Theo buổi' : 'Theo khóa';
+          meta.textContent = `${tuitionText} • ${c.tuition_fee ? new Intl.NumberFormat('vi-VN').format(c.tuition_fee) + ' đ' : ''}`;
+          card.appendChild(title); card.appendChild(meta);
           card.addEventListener('click', () => {
-            // open management page for that class (implement class_manage.html separately)
+            // open detailed management (must implement class_manage.html separately)
             window.location.href = `class_manage.html?class_id=${encodeURIComponent(c.id)}`;
           });
           grid.appendChild(card);
@@ -379,143 +404,145 @@
         listContainer.appendChild(grid);
       }
 
-      // Helper: escape html
-      function escapeHtml(str) {
-        if (str === null || str === undefined) return '';
-        return String(str)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#39;');
-      }
-      function formatMoney(v) {
-        if (!v && v !== 0) return '';
-        return new Intl.NumberFormat('vi-VN').format(v) + ' đ';
-      }
-
-      // Submit form: create class -> insert schedules -> insert class_teachers
-      createForm.addEventListener('submit', async (ev) => {
+      // Create class: validate -> insert into classes -> insert schedules -> insert class_teachers
+      classForm.addEventListener('submit', async (ev) => {
         ev.preventDefault();
         setLoading(true);
         try {
-          if (!currentUser) throw new Error('Người dùng chưa đăng nhập.');
-          // collect form values
-          const payload = {
-            class_name: createForm.class_name.value.trim(),
-            grade: gradeSelect.options[gradeSelect.selectedIndex]?.text || null, // store name or id depending on schema
-            grade_id: gradeSelect.value || null,
-            subject_id: subjectSelect.value || null,
-            tuition_type: tuitionType.value,
-            tuition_fee: parseInt(tuitionFee.value || 0, 10),
-            note: document.getElementById('note').value.trim(),
+          if (!currentUser) throw new Error('Bạn chưa đăng nhập.');
+          const sb = requireSb();
+
+          const class_name = classForm.class_name.value.trim();
+          const grade_id = gradeSelect.value || null;
+          const subject_id = subjectSelect.value || null;
+          const tuition_type = tuitionType.value;
+          const tuition_fee_val = parseInt(tuitionFee.value || '0', 10) || 0;
+          const note = noteInput.value.trim();
+
+          if (!class_name) throw new Error('Vui lòng nhập tên lớp.');
+          if (!grade_id) throw new Error('Vui lòng chọn khối.');
+          if (!subject_id) throw new Error('Vui lòng chọn môn.');
+
+          // Build class record payload: adapt to your DB column names
+          const classPayload = {
+            class_name,
+            grade_id,
+            subject_id,
+            tuition_type,
+            tuition_fee: tuition_fee_val,
+            note,
             created_by: currentUser.id,
             created_at: new Date().toISOString()
           };
-          if (!payload.class_name) throw new Error('Vui lòng nhập tên lớp.');
-          if (!payload.grade_id) throw new Error('Vui lòng chọn khối.');
-          if (!payload.subject_id) throw new Error('Vui lòng chọn môn.');
-          const sb = requireClient();
 
-          // insert class
-          const { data: classData, error: classError } = await sb.from('classes').insert([payload]).select('id').single();
-          if (classError) throw classError;
+          // Insert class
+          const { data: classData, error: classErr } = await sb.from('classes').insert([classPayload]).select('id').single();
+          if (classErr) throw classErr;
           const classId = classData.id;
 
-          // insert schedules: iterate schedule rows
-          const rows = Array.from(schedulesContainer.querySelectorAll('.schedule-row'));
-          const schedulesToInsert = [];
+          // Prepare schedule inserts
+          const rows = Array.from(schedulesEl.querySelectorAll('.schedule-row'));
+          const scheduleInserts = [];
           for (const r of rows) {
-            const selWeek = r.children[0];
-            const startInput = r.children[1];
-            const endInput = r.children[2];
-            const roomSelect = r.children[3];
-            const weekday = selWeek.value;
-            const start_time = startInput.value;
-            const end_time = endInput.value;
-            const room_id = roomSelect.value || null;
-            if (!weekday || !start_time || !end_time) continue; // skip incomplete rows
-            if (start_time >= end_time) {
-              throw new Error('Một buổi có thời gian bắt đầu phải nhỏ hơn thời gian kết thúc.');
-            }
-            // schedule record must include class_id and room_id if available
-            schedulesToInsert.push({
+            const weekday = r.children[0].value;
+            const start_time = r.children[1].value;
+            const end_time = r.children[2].value;
+            const room_id = r.children[3].value || null;
+            if (!weekday || !start_time || !end_time) continue; // skip incomplete
+            if (start_time >= end_time) throw new Error('Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc trong một buổi.');
+            scheduleInserts.push({
               class_id: classId,
               weekday: parseInt(weekday, 10),
-              start_time: start_time,
-              end_time: end_time,
-              room_id: room_id,
+              start_time,
+              end_time,
+              room_id,
               created_at: new Date().toISOString()
             });
           }
 
-          if (schedulesToInsert.length > 0) {
-            const { data: schedData, error: schedError } = await sb.from('class_schedules').insert(schedulesToInsert);
-            if (schedError) throw schedError;
+          if (scheduleInserts.length > 0) {
+            const { error: schedErr } = await sb.from('class_schedules').insert(scheduleInserts);
+            if (schedErr) throw schedErr;
           }
 
-          // insert class_teachers: assign current user as owner/teacher
-          const { data: ctData, error: ctError } = await sb.from('class_teachers').insert([{
+          // Assign current user as teacher/owner in class_teachers
+          const { error: ctErr } = await sb.from('class_teachers').insert([{
             class_id: classId,
             teacher_id: currentUser.id,
             role: 'owner'
           }]);
-          if (ctError) throw ctError;
+          if (ctErr) throw ctErr;
 
-          showMessage('Tạo lớp thành công!');
-          createForm.reset();
-          // clear schedules container and add default one
-          schedulesContainer.innerHTML = '';
-          schedulesContainer.appendChild(createScheduleRow());
-
-          // refresh lists
-          await loadClasses();
+          showMessage('Tạo lớp thành công');
+          classForm.reset();
+          schedulesEl.innerHTML = '';
+          schedulesEl.appendChild(createScheduleRow());
+          await loadMyClasses();
         } catch (err) {
-          console.error(err);
-          showError(err.message || 'Lỗi khi lưu lớp.');
+          showError(err);
         } finally {
           setLoading(false);
         }
       });
 
       resetBtn.addEventListener('click', () => {
-        createForm.reset();
-        schedulesContainer.innerHTML = '';
-        schedulesContainer.appendChild(createScheduleRow());
+        classForm.reset();
+        schedulesEl.innerHTML = '';
+        schedulesEl.appendChild(createScheduleRow());
       });
 
-      function setLoading(isLoading) {
-        createBtn.disabled = isLoading;
-        if (isLoading) createBtn.textContent = 'Đang xử lý...';
-        else createBtn.textContent = editingClassId ? 'Lưu thay đổi' : 'Lưu lớp';
+      function setLoading(loading) {
+        saveBtn.disabled = loading;
+        saveBtn.textContent = loading ? 'Đang lưu...' : 'Lưu lớp';
       }
 
-      // tuition type UI
+      // Tuition type label update
       tuitionType.addEventListener('change', () => {
-        if (tuitionType.value === 'per_session') {
-          tuitionFeeLabel.textContent = 'Số tiền (VNĐ) / 1 buổi';
-        } else {
-          tuitionFeeLabel.textContent = 'Số tiền (VNĐ) / 1 khóa';
-        }
+        if (tuitionType.value === 'per_session') tuitionLabel.textContent = 'Số tiền (VNĐ) / 1 buổi';
+        else tuitionLabel.textContent = 'Số tiền (VNĐ) / 1 khóa';
       });
 
       // Init sequence
       (async function init() {
         try {
+          await waitForSb(5000); // wait for supabase client
+        } catch (err) {
+          showError(err);
+          return;
+        }
+
+        try {
           currentUser = await getCurrentUser();
-          if (currentUser) {
-            userInfo.textContent = currentUser.email || currentUser.user_metadata?.full_name || 'Giáo viên';
-          } else {
-            userInfo.textContent = 'Người dùng chưa đăng nhập';
-          }
         } catch (err) {
           console.warn('Không lấy được user:', err);
+          currentUser = null;
+        }
+
+        if (currentUser) {
+          userInfo.textContent = currentUser.email || (currentUser.user_metadata && currentUser.user_metadata.full_name) || 'Giáo viên';
+        } else {
           userInfo.textContent = 'Người dùng chưa đăng nhập';
         }
 
-        await Promise.all([ loadGrades(), loadClasses() ]);
+        // Load dropdowns + user's classes concurrently
+        try {
+          await loadGrades();
+          await loadSubjects(gradeSelect.value);
+        } catch (err) {
+          console.warn('Lỗi load danh mục:', err);
+        }
+
+        if (currentUser) {
+          await loadMyClasses();
+        } else {
+          listContainer.innerHTML = '<div class="muted">Đăng nhập để xem các lớp bạn quản lý.</div>';
+        }
       })();
 
+      // Expose some helpers to console for debugging (optional)
+      window.__classAdmin = {
+        reload: async () => { await loadGrades(); await loadMyClasses(); }
+      };
     })();
   </script>
 </body>
