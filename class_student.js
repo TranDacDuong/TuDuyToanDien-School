@@ -60,12 +60,12 @@
       'box-shadow:0 2px 8px rgba(0,0,0,.2)">' +
         '<button onclick="closeStudentClassView()" style="background:rgba(255,255,255,.12);' +
         'border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 14px;border-radius:7px;' +
-        'font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">â† Quay láº¡i</button>' +
+        'font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">← Quay lại</button>' +
         '<span style="font-family:var(--font-display);font-size:1.1rem;flex:1">' + className + "</span>" +
         '<span id="scv-date" style="font-size:.8rem;color:rgba(255,255,255,.6)">' + todayStr() + "</span>" +
       "</div>" +
       '<div id="scv-body" style="flex:1;overflow-y:auto;padding:22px 24px;min-height:0">' +
-        '<p style="color:var(--ink-light);padding:20px">Äang táº£i...</p>' +
+        '<p style="color:var(--ink-light);padding:20px">Đang tải...</p>' +
       "</div>";
 
     await loadStudentView(classId);
@@ -73,10 +73,10 @@
 
   /* â”€â”€ ThoÃ¡t khá»i bÃ i thi: lÆ°u tiáº¿n trÃ¬nh rá»“i vá» trang lá»›p â”€â”€ */
   window.exitExam = async function () {
-    if (!confirm("Báº¡n muá»‘n thoÃ¡t? Tiáº¿n trÃ¬nh sáº½ Ä‘Æ°á»£c lÆ°u láº¡i, thá»i gian lÃ m bÃ i sáº½ bá»‹ trá»« 5 phÃºt khi vÃ o láº¡i.")) return;
+    if (!confirm("Bạn muốn thoát? Tiến trình sẽ được lưu lại, thời gian làm bài sẽ bị trừ 5 phút khi vào lại.")) return;
 
     const btn = document.getElementById("examExitBtn");
-    if (btn) { btn.disabled = true; btn.textContent = "Äang lÆ°u..."; }
+    if (btn) { btn.disabled = true; btn.textContent = "Đang lưu..."; }
 
     clearInterval(_examTimer);
 
@@ -643,14 +643,14 @@
               </div>
             </div>`).join("");
         } else if (type === "short_answer") {
-          ansHtml = `<input type="text" placeholder="Nháº­p cÃ¢u tráº£ lá»i..."
+          ansHtml = `<input type="text" placeholder="Nhập câu trả lời..."
             value="${(_examAnswers[qid]||"").replace(/"/g,"&quot;")}"
             oninput="window._peAnswers('${qid}',this.value)"
             style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;
               font-family:var(--font-body);font-size:.9rem;box-sizing:border-box;outline:none"
             onfocus="this.style.borderColor='var(--navy)'" onblur="this.style.borderColor='var(--border)'">`;
         } else if (type === "essay") {
-          ansHtml = `<textarea placeholder="Viáº¿t cÃ¢u tráº£ lá»i cá»§a báº¡n..."
+          ansHtml = `<textarea placeholder="Viết câu trả lời của bạn..."
             oninput="window._peAnswers('${qid}',this.value)"
             style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;
               font-family:var(--font-body);font-size:.9rem;resize:vertical;min-height:120px;
@@ -668,8 +668,8 @@
         hdr.innerHTML = `
           <span style="width:26px;height:26px;border-radius:50%;background:var(--navy);color:var(--gold-light);
             display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;flex-shrink:0">${globalNum}</span>
-          <span style="font-size:1.18rem;font-weight:700;color:var(--ink-mid)">CÃ¢u ${globalNum}</span>
-          <span style="margin-left:auto;font-size:.75rem;color:var(--ink-mid)">${eq.points} Ä‘iá»ƒm</span>`;
+          <span style="font-size:1.18rem;font-weight:700;color:var(--ink-mid)">Câu ${globalNum}</span>
+          <span style="margin-left:auto;font-size:.75rem;color:var(--ink-mid)">${eq.points} điểm</span>`;
         card.appendChild(hdr);
 
         const body = document.createElement("div");
@@ -754,28 +754,28 @@
         gap:14px;padding:0 20px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.2)">
         <button id="examExitBtn" onclick="exitExam()" style="background:rgba(255,255,255,.12);
           border:1px solid rgba(255,255,255,.25);color:#fff;padding:5px 12px;border-radius:7px;
-          font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-body)">â† ThoÃ¡t</button>
+          font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-body)">← Thoát</button>
         <span style="font-family:var(--font-display);font-size:1.2rem;flex:1">${examTitle}</span>
         <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);padding:7px 16px;border-radius:8px">
-          <span style="font-size:.8rem;color:rgba(255,255,255,.7)">â±</span>
+          <span style="font-size:.8rem;color:rgba(255,255,255,.7)">Thời gian</span>
           <span id="examClock" style="font-size:1.22rem;font-weight:700;font-family:monospace;
             color:var(--gold-light);min-width:72px;text-align:center">${formatClock(_examSeconds)}</span>
         </div>
         <button onclick="submitExam(false)" style="background:var(--gold);color:var(--navy);
           border:none;padding:9px 20px;border-radius:8px;font-size:.95rem;font-weight:700;
-          cursor:pointer;font-family:var(--font-body)">âœ… Ná»™p bÃ i</button>
+          cursor:pointer;font-family:var(--font-body)">Nộp bài</button>
       </div>
       <div style="flex:1;display:flex;overflow:hidden;min-height:0">
         <div style="width:120px;flex-shrink:0;background:var(--white);border-right:1px solid var(--border);
           overflow-y:auto;padding:10px 8px">
           <div style="font-size:.82rem;font-weight:700;color:var(--ink-light);text-transform:uppercase;
-            letter-spacing:.05em;margin-bottom:8px">Danh sÃ¡ch cÃ¢u</div>
+            letter-spacing:.05em;margin-bottom:8px">Danh sách câu</div>
           ${navHtml}
           <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
             <button onclick="submitExam(false)"
               style="width:100%;background:var(--navy);color:var(--gold-light);border:none;
               padding:11px;border-radius:8px;font-size:.95rem;font-weight:700;cursor:pointer;
-              font-family:var(--font-body)">âœ… Ná»™p bÃ i</button>
+              font-family:var(--font-body)">Nộp bài</button>
           </div>
         </div>
         <div style="flex:1;overflow-y:auto;padding:18px 20px;background:#f8fafc">${sectionsHtml}</div>
