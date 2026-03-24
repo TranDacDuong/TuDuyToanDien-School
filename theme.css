@@ -1,0 +1,261 @@
+/* ═══════════════════════════════════════════════════
+   TUDUY TOAN DIEN — ROYAL ACADEMY DESIGN SYSTEM
+   Theme: Navy + Gold, Playfair + DM Sans
+═══════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap');
+
+:root {
+  /* ── Palette ── */
+  --navy:       #0f1f3d;   /* Deep navy */
+  --navy-mid:   #1a3460;   /* Sidebar */
+  --navy-light: #1e4080;   /* Hover */
+  --gold:       #c8962a;   /* Primary gold */
+  --gold-light: #e4b84d;   /* Gold accent */
+  --gold-pale:  #fdf4dc;   /* Gold tint bg */
+  --gold-border:#e8c96a;   /* Gold border */
+  --cream:      #fdfaf4;   /* Page bg */
+  --white:      #ffffff;
+  --ink:        #1a2340;   /* Body text */
+  --ink-mid:    #4a5578;   /* Muted */
+  --ink-light:  #8b94ae;   /* Placeholder */
+  --border:     #e8eaf0;   /* Default border */
+  --surface:    #f4f6fb;   /* Card bg alt */
+
+  /* ── Semantic ── */
+  --green:  #1a7a4a;
+  --green-bg: #e6f5ee;
+  --red:    #c0392b;
+  --red-bg: #fdecea;
+  --blue:   #1a56a8;
+  --blue-bg:#e8f0fb;
+  --amber:  #b45309;
+  --amber-bg:#fef3c7;
+
+  /* ── Typography ── */
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body:    'DM Sans', system-ui, sans-serif;
+
+  /* ── Spacing & Radius ── */
+  --radius:   10px;
+  --radius-lg:16px;
+  --shadow-sm: 0 1px 4px rgba(15,31,61,.06), 0 0 0 1px rgba(15,31,61,.04);
+  --shadow:    0 3px 12px rgba(15,31,61,.10), 0 0 0 1px rgba(15,31,61,.05);
+  --shadow-lg: 0 8px 32px rgba(15,31,61,.16), 0 0 0 1px rgba(15,31,61,.06);
+
+  /* ── Transitions ── */
+  --t: .18s ease;
+}
+
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+.hidden { display: none !important; }
+html { font-size: 14px; }
+body {
+  font-family: var(--font-body);
+  background: var(--cream);
+  color: var(--ink);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c8d0e0; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #a0aabe; }
+
+/* ── Typography scale ── */
+h1, h2, h3 { font-family: var(--font-display); color: var(--navy); line-height: 1.25; }
+h1 { font-size: 1.75rem; }
+h2 { font-size: 1.35rem; }
+h3 { font-size: 1.1rem; }
+p  { color: var(--ink-mid); }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 18px; border: none; border-radius: var(--radius);
+  font-family: var(--font-body); font-size: .875rem; font-weight: 600;
+  cursor: pointer; transition: var(--t); white-space: nowrap;
+  text-decoration: none; line-height: 1;
+}
+.btn-primary {
+  background: var(--navy); color: var(--gold-light);
+  box-shadow: 0 1px 0 rgba(255,255,255,.08) inset;
+}
+.btn-primary:hover { background: var(--navy-light); color: #fff; }
+
+.btn-gold {
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
+  color: var(--navy); box-shadow: 0 2px 8px rgba(200,150,42,.3);
+}
+.btn-gold:hover { filter: brightness(1.06); }
+
+.btn-outline {
+  background: var(--white); color: var(--navy);
+  border: 1.5px solid var(--border);
+}
+.btn-outline:hover { border-color: var(--gold-border); background: var(--gold-pale); }
+
+.btn-ghost {
+  background: transparent; color: var(--ink-mid);
+  border: 1px solid transparent;
+}
+.btn-ghost:hover { background: var(--surface); color: var(--navy); }
+
+.btn-danger {
+  background: var(--red-bg); color: var(--red);
+  border: 1px solid #f5c6c2;
+}
+.btn-danger:hover { background: var(--red); color: #fff; }
+
+.btn-sm { padding: 5px 12px; font-size: .8rem; }
+.btn-lg { padding: 11px 24px; font-size: 1rem; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Cards ── */
+.card {
+  background: var(--white); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm); overflow: hidden;
+}
+.card-gold-accent {
+  border-top: 3px solid var(--gold);
+}
+.card-body { padding: 20px; }
+
+/* ── Form controls ── */
+input, select, textarea {
+  font-family: var(--font-body); font-size: .875rem;
+  color: var(--ink); background: var(--white);
+  border: 1.5px solid var(--border); border-radius: var(--radius);
+  padding: 8px 12px; width: 100%; transition: var(--t);
+}
+input:focus, select:focus, textarea:focus {
+  outline: none; border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(200,150,42,.12);
+}
+input::placeholder { color: var(--ink-light); }
+label {
+  display: block; font-size: .8rem; font-weight: 600;
+  color: var(--ink-mid); margin-bottom: 5px; letter-spacing: .02em;
+  text-transform: uppercase;
+}
+
+/* ── Table ── */
+.table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+.table thead tr { background: var(--navy); }
+.table thead th {
+  padding: 11px 14px; color: var(--gold-light);
+  font-weight: 600; text-align: left; white-space: nowrap;
+  font-family: var(--font-display); font-size: .85rem;
+  border: none;
+}
+.table thead th.center, .table td.center { text-align: center; }
+.table thead th.right,  .table td.right  { text-align: right; }
+.table tbody tr {
+  border-bottom: 1px solid var(--surface);
+  transition: background var(--t);
+}
+.table tbody tr:hover { background: var(--gold-pale); }
+.table tbody td { padding: 10px 14px; vertical-align: middle; }
+.table tbody tr:last-child { border-bottom: none; }
+
+/* ── Badges / Pills ── */
+.badge {
+  display: inline-block; padding: 2px 10px; border-radius: 20px;
+  font-size: .75rem; font-weight: 600;
+}
+.badge-gold   { background: var(--gold-pale); color: var(--gold); border: 1px solid var(--gold-border); }
+.badge-green  { background: var(--green-bg);  color: var(--green); }
+.badge-red    { background: var(--red-bg);    color: var(--red); }
+.badge-blue   { background: var(--blue-bg);   color: var(--blue); }
+.badge-amber  { background: var(--amber-bg);  color: var(--amber); }
+.badge-navy   { background: var(--navy); color: var(--gold-light); }
+
+/* ── Page layout ── */
+.page-wrap { padding: 24px; max-width: 1400px; margin: 0 auto; }
+.page-header { display: flex; align-items: center; justify-content: space-between;
+               flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
+.page-title  { font-family: var(--font-display); font-size: 1.5rem; color: var(--navy); }
+.page-sub    { font-size: .8rem; color: var(--ink-light); margin-top: 2px; }
+
+/* ── Section divider ── */
+.divider {
+  height: 1px; background: linear-gradient(90deg, var(--gold-border) 0%, transparent 100%);
+  margin: 20px 0;
+}
+
+/* ── Toolbar ── */
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ── Popup / Modal ── */
+.popup-overlay {
+  position: fixed; inset: 0; background: rgba(10,20,40,.55);
+  backdrop-filter: blur(3px); display: flex;
+  align-items: center; justify-content: center; z-index: 1000;
+}
+.popup-overlay.hidden, .popup-overlay[style*="none"] {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+.popup-card {
+  background: var(--white); border-radius: var(--radius-lg);
+  width: min(95vw, 1100px); max-height: 90vh; overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  border-top: 4px solid var(--gold);
+}
+.popup-header {
+  display: flex; align-items: center; padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.popup-header h3 { font-family: var(--font-display); font-size: 1.1rem; flex: 1; color: var(--navy); }
+.popup-close {
+  background: var(--surface); border: none; border-radius: 8px;
+  width: 32px; height: 32px; cursor: pointer; font-size: 16px;
+  color: var(--ink-mid); display: flex; align-items: center; justify-content: center;
+  transition: var(--t);
+}
+.popup-close:hover { background: var(--red-bg); color: var(--red); }
+
+/* ── Status colors for attendance/payment ── */
+.status-present { background: var(--green-bg); color: var(--green); }
+.status-absent  { background: var(--red-bg);   color: var(--red); }
+.status-makeup  { background: var(--amber-bg);  color: var(--amber); }
+
+/* ── Toast ── */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+  background: var(--navy); color: var(--gold-light);
+  padding: 12px 20px; border-radius: var(--radius);
+  box-shadow: var(--shadow-lg); font-size: .875rem; font-weight: 500;
+  transform: translateY(8px); opacity: 0;
+  transition: all .25s ease; pointer-events: none;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+
+/* ── Loading skeleton ── */
+.loading-text { color: var(--ink-light); font-size: .875rem; padding: 20px; text-align: center; }
+
+/* ── Class tag ── */
+.class-tag {
+  display: inline-block; background: var(--blue-bg); color: var(--blue);
+  padding: 2px 10px; border-radius: 12px; font-size: .75rem; font-weight: 600;
+}
+
+/* ── Attendance pill buttons ── */
+.att-btn {
+  border: none; border-radius: 6px; padding: 4px 10px;
+  font-size: .78rem; font-weight: 600; cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,.12); transition: var(--t);
+}
+.att-btn:hover { opacity: .82; transform: scale(1.04); }
+.att-btn.present { background: var(--green); color: #fff; }
+.att-btn.absent  { background: var(--red);   color: #fff; }
+.att-btn.makeup  { background: var(--amber);  color: #fff; }
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+  .page-wrap { padding: 14px; }
+  h1 { font-size: 1.35rem; }
+}

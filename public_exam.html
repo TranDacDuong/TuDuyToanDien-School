@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Đề thi</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--cream); font-family: var(--font-body); color: var(--ink); padding: 24px; }
+
+.page-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 24px;
+}
+.page-hd h1 {
+  font-family: var(--font-display); font-size: 1.4rem; color: var(--navy);
+  margin: 0; display: flex; align-items: center; gap: 10px;
+}
+.page-hd h1::before {
+  content: ''; width: 4px; height: 24px;
+  background: linear-gradient(180deg,var(--gold),var(--gold-light));
+  border-radius: 2px; display: inline-block;
+}
+
+/* Tabs */
+.tab-bar {
+  display: flex; gap: 4px; margin-bottom: 20px;
+  background: var(--surface); border-radius: 10px;
+  padding: 4px; width: fit-content;
+}
+.tab-btn {
+  padding: 8px 22px; border: none; border-radius: 7px;
+  font-size: .85rem; font-weight: 600; cursor: pointer;
+  font-family: var(--font-body); transition: .15s;
+  background: transparent; color: var(--ink-mid);
+}
+.tab-btn.active { background: var(--navy); color: var(--gold-light); }
+
+/* Grid đề thi */
+.exam-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+.exam-card {
+  background: var(--white); border-radius: 12px;
+  box-shadow: var(--shadow-sm); border: 1px solid var(--border);
+  padding: 16px; cursor: pointer; transition: box-shadow .2s, transform .15s;
+  border-left: 4px solid var(--gold-border);
+}
+.exam-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); border-left-color: var(--gold); }
+.exam-card.official { border-left-color: var(--red, #ef4444); }
+.exam-card.official:hover { border-left-color: #dc2626; }
+
+.exam-title { font-weight: 700; font-size: .95rem; color: var(--navy); margin-bottom: 8px; }
+.exam-meta  { font-size: .78rem; color: var(--ink-mid); line-height: 1.6; }
+.exam-badge {
+  display: inline-block; font-size: .7rem; font-weight: 700;
+  padding: 2px 9px; border-radius: 10px; margin-bottom: 8px;
+}
+.badge-trial    { background: #dcfce7; color: #15803d; }
+.badge-official { background: #fee2e2; color: #b91c1c; }
+
+.exam-actions {
+  display: flex; gap: 8px; margin-top: 12px;
+  border-top: 1px solid var(--surface); padding-top: 10px;
+  flex-wrap: wrap;
+}
+
+/* Admin card thêm nút */
+.admin-card-actions { display: flex; gap: 6px; }
+
+/* Empty */
+.empty-state {
+  text-align: center; padding: 50px 20px; color: var(--ink-light);
+  background: var(--white); border-radius: 12px; border: 1px dashed var(--border);
+  grid-column: 1/-1;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(10,20,40,.5);
+  backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+}
+.modal-overlay.hidden { display: none; }
+.modal-card {
+  background: var(--white); border-radius: 14px; padding: 22px;
+  width: min(95vw, 520px); box-shadow: var(--shadow-lg);
+  border-top: 4px solid var(--gold); max-height: 90vh; overflow-y: auto;
+}
+.modal-card h3 {
+  font-family: var(--font-display); font-size: 1.05rem;
+  color: var(--navy); margin: 0 0 16px;
+}
+.fg { margin-bottom: 14px; }
+.fg label {
+  display: block; font-size: .75rem; font-weight: 700;
+  color: var(--ink-mid); margin-bottom: 5px;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.fg input, .fg select {
+  width: 100%; padding: 8px 10px;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  font-family: var(--font-body); font-size: .875rem;
+  color: var(--ink); outline: none; transition: .15s;
+}
+.fg input:focus, .fg select:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(200,150,42,.1);
+}
+.modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+/* Fullscreen overlay cho làm bài / xem lại */
+#examOverlay {
+  display: none; position: fixed; inset: 0;
+  background: var(--cream); z-index: 200;
+  flex-direction: column; overflow: hidden;
+  font-family: var(--font-body); min-height: 0;
+}
+</style>
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [["$","$"],["\\(","\\)"]], displayMath: [["$$","$$"],["\\[","\\]"]] },
+    options: { skipHtmlTags: ["script","noscript","style","textarea"] },
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+
+<div class="page-hd">
+  <h1>Đề thi</h1>
+  <div id="adminToolbar" style="display:none">
+    <button class="btn btn-primary" onclick="openAddExamModal()">+ Thêm đề thi</button>
+  </div>
+</div>
+
+<!-- Grid -->
+<div id="examGrid" class="exam-grid">
+  <div style="color:var(--ink-light);padding:20px">Đang tải...</div>
+</div>
+
+<!-- Modal thêm đề (admin) -->
+<div id="addExamModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <h3>Thêm đề thi công khai</h3>
+    <div class="fg">
+      <label>Chọn đề từ Ngân hàng đề</label>
+      <select id="peExamId">
+        <option value="">-- Chọn đề --</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Loại đề</label>
+      <select id="peType">
+        <option value="trial">Thi thử (làm nhiều lần, xem lại ngay)</option>
+        <option value="official">Thi thật (làm 1 lần, xem lại sau khi hết giờ)</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Thời gian bắt đầu</label>
+      <input type="datetime-local" id="peStartsAt">
+    </div>
+    <div class="fg">
+      <label>Thời gian kết thúc</label>
+      <input type="datetime-local" id="peEndsAt">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="savePublicExam()">💾 Lưu</button>
+      <button class="btn btn-outline" onclick="closeAddExamModal()">Hủy</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fullscreen overlay làm bài / xem lại / kết quả -->
+<div id="examOverlay"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script src="ai_solution.js"></script>
+<script src="public_exam.js"></script>
+</body>
+</html>

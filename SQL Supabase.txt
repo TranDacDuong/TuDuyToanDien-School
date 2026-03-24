@@ -1,0 +1,251 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.attendance (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  class_id uuid NOT NULL,
+  student_id uuid NOT NULL,
+  date date NOT NULL,
+  status text DEFAULT 'present'::text CHECK (status = ANY (ARRAY['present'::text, 'absent'::text, 'makeup'::text])),
+  created_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT attendance_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.chapters (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  subject_id uuid,
+  name text NOT NULL,
+  CONSTRAINT chapters_pkey PRIMARY KEY (id),
+  CONSTRAINT chapters_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES public.subjects(id)
+);
+CREATE TABLE public.class_exams (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  class_id uuid NOT NULL,
+  exam_id uuid NOT NULL,
+  starts_at timestamp with time zone,
+  ends_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT class_exams_pkey PRIMARY KEY (id),
+  CONSTRAINT class_exams_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id),
+  CONSTRAINT class_exams_exam_id_fkey FOREIGN KEY (exam_id) REFERENCES public.exams(id)
+);
+CREATE TABLE public.class_schedules (
+  id integer NOT NULL DEFAULT nextval('class_schedules_id_seq'::regclass),
+  class_id uuid NOT NULL,
+  weekday smallint NOT NULL CHECK (weekday >= 1 AND weekday <= 7),
+  start_time time without time zone NOT NULL,
+  end_time time without time zone NOT NULL,
+  created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+  room_id uuid,
+  effective_from date NOT NULL DEFAULT '2000-01-01'::date,
+  CONSTRAINT class_schedules_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_schedule_class FOREIGN KEY (class_id) REFERENCES public.classes(id),
+  CONSTRAINT class_schedules_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.rooms(id)
+);
+CREATE TABLE public.class_students (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  class_id uuid,
+  student_id uuid,
+  joined_at timestamp with time zone DEFAULT now(),
+  left_at timestamp with time zone,
+  CONSTRAINT class_students_pkey PRIMARY KEY (id),
+  CONSTRAINT class_students_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id),
+  CONSTRAINT class_students_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.users(id),
+  CONSTRAINT fk_student FOREIGN KEY (student_id) REFERENCES public.users(id),
+  CONSTRAINT fk_class FOREIGN KEY (class_id) REFERENCES public.classes(id)
+);
+CREATE TABLE public.class_teachers (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  class_id uuid,
+  teacher_id uuid,
+  role USER-DEFINED NOT NULL,
+  CONSTRAINT class_teachers_pkey PRIMARY KEY (id),
+  CONSTRAINT class_teachers_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id),
+  CONSTRAINT class_teachers_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.classes (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  class_name text NOT NULL,
+  tuition_type USER-DEFINED NOT NULL,
+  tuition_fee numeric NOT NULL,
+  created_by uuid DEFAULT auth.uid(),
+  created_at timestamp with time zone DEFAULT now(),
+  grade_id uuid,
+  subject_id uuid,
+  hidden boolean DEFAULT false,
+  makeup_fee numeric,
+  CONSTRAINT classes_pkey PRIMARY KEY (id),
+  CONSTRAINT classes_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
+  CONSTRAINT classes_grade_id_fkey FOREIGN KEY (grade_id) REFERENCES public.grades(id),
+  CONSTRAINT classes_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES public.subjects(id)
+);
+CREATE TABLE public.comments (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  post_id uuid,
+  user_id uuid,
+  content text,
+  parent_id uuid,
+  created_at timestamp without time zone DEFAULT now(),
+  CONSTRAINT comments_pkey PRIMARY KEY (id),
+  CONSTRAINT comments_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT comments_post_id_fkey FOREIGN KEY (post_id) REFERENCES public.posts(id)
+);
+CREATE TABLE public.exam_answers (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  result_id uuid NOT NULL,
+  question_id uuid NOT NULL,
+  answer text,
+  is_correct boolean,
+  score_earned numeric DEFAULT 0,
+  CONSTRAINT exam_answers_pkey PRIMARY KEY (id),
+  CONSTRAINT exam_answers_result_id_fkey FOREIGN KEY (result_id) REFERENCES public.exam_results(id),
+  CONSTRAINT exam_answers_question_id_fkey FOREIGN KEY (question_id) REFERENCES public.question_bank(id)
+);
+CREATE TABLE public.exam_questions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  exam_id uuid,
+  question_id uuid,
+  order_no integer,
+  points numeric NOT NULL DEFAULT 0.25,
+  partial_points jsonb,
+  CONSTRAINT exam_questions_pkey PRIMARY KEY (id),
+  CONSTRAINT exam_questions_exam_id_fkey FOREIGN KEY (exam_id) REFERENCES public.exams(id),
+  CONSTRAINT exam_questions_question_id_fkey FOREIGN KEY (question_id) REFERENCES public.question_bank(id)
+);
+CREATE TABLE public.exam_results (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  exam_id uuid NOT NULL,
+  student_id uuid NOT NULL,
+  attempt_no integer NOT NULL DEFAULT 1,
+  started_at timestamp with time zone DEFAULT now(),
+  submitted_at timestamp with time zone,
+  score_auto numeric,
+  score_essay numeric,
+  score_total numeric,
+  graded_by uuid,
+  graded_at timestamp with time zone,
+  note text,
+  seconds_left integer,
+  class_id uuid,
+  public_exam_id uuid,
+  CONSTRAINT exam_results_pkey PRIMARY KEY (id),
+  CONSTRAINT exam_results_exam_id_fkey FOREIGN KEY (exam_id) REFERENCES public.exams(id),
+  CONSTRAINT exam_results_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.users(id),
+  CONSTRAINT exam_results_graded_by_fkey FOREIGN KEY (graded_by) REFERENCES public.users(id),
+  CONSTRAINT exam_results_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id),
+  CONSTRAINT exam_results_public_exam_id_fkey FOREIGN KEY (public_exam_id) REFERENCES public.public_exams(id)
+);
+CREATE TABLE public.exams (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  class_id uuid,
+  title text NOT NULL,
+  duration_minutes integer NOT NULL,
+  created_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  total_points numeric NOT NULL DEFAULT 10,
+  exam_date date,
+  class_id_text text,
+  starts_at timestamp with time zone,
+  ends_at timestamp with time zone,
+  CONSTRAINT exams_pkey PRIMARY KEY (id),
+  CONSTRAINT exams_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id)
+);
+CREATE TABLE public.grades (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  CONSTRAINT grades_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.likes (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  post_id uuid,
+  user_id uuid,
+  CONSTRAINT likes_pkey PRIMARY KEY (id),
+  CONSTRAINT likes_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT likes_post_id_fkey FOREIGN KEY (post_id) REFERENCES public.posts(id)
+);
+CREATE TABLE public.posts (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  user_id uuid,
+  content text,
+  is_pinned boolean DEFAULT false,
+  created_at timestamp without time zone DEFAULT now(),
+  status text NOT NULL DEFAULT 'approved'::text CHECK (status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])),
+  CONSTRAINT posts_pkey PRIMARY KEY (id),
+  CONSTRAINT posts_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.public_exams (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  exam_id uuid NOT NULL,
+  exam_type text NOT NULL CHECK (exam_type = ANY (ARRAY['trial'::text, 'official'::text])),
+  starts_at timestamp with time zone,
+  ends_at timestamp with time zone,
+  created_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  is_pinned boolean NOT NULL DEFAULT false,
+  CONSTRAINT public_exams_pkey PRIMARY KEY (id),
+  CONSTRAINT public_exams_exam_id_fkey FOREIGN KEY (exam_id) REFERENCES public.exams(id),
+  CONSTRAINT public_exams_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
+);
+CREATE TABLE public.question_bank (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  question_img text,
+  difficulty integer CHECK (difficulty >= 1 AND difficulty <= 10),
+  question_type USER-DEFINED NOT NULL,
+  answer_img text,
+  created_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  answer text,
+  hidden boolean DEFAULT false,
+  chapter_id uuid,
+  answer_count integer,
+  question_text text,
+  answer_text text,
+  CONSTRAINT question_bank_pkey PRIMARY KEY (id),
+  CONSTRAINT question_bank_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
+  CONSTRAINT question_bank_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES public.chapters(id)
+);
+CREATE TABLE public.rooms (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  room_name text NOT NULL,
+  capacity integer,
+  note text,
+  created_by uuid,
+  CONSTRAINT rooms_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.subjects (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  grade_id uuid,
+  CONSTRAINT subjects_pkey PRIMARY KEY (id),
+  CONSTRAINT subjects_grade_id_fkey FOREIGN KEY (grade_id) REFERENCES public.grades(id)
+);
+CREATE TABLE public.tuition_payments (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL,
+  class_id uuid,
+  month date NOT NULL,
+  amount_due numeric NOT NULL DEFAULT 0,
+  amount_paid numeric NOT NULL DEFAULT 0,
+  paid_at timestamp with time zone,
+  collected_by uuid DEFAULT auth.uid(),
+  note text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT tuition_payments_pkey PRIMARY KEY (id),
+  CONSTRAINT tuition_payments_student_fkey FOREIGN KEY (student_id) REFERENCES public.users(id),
+  CONSTRAINT tuition_payments_class_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id),
+  CONSTRAINT tuition_payments_collector_fkey FOREIGN KEY (collected_by) REFERENCES public.users(id)
+);
+CREATE TABLE public.users (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  email text NOT NULL UNIQUE,
+  full_name text,
+  role USER-DEFINED NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  phone text,
+  birth_year integer,
+  avatar_url text,
+  province text,
+  school text,
+  subject text,
+  CONSTRAINT users_pkey PRIMARY KEY (id)
+);

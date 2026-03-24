@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Quản lý Lớp học</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--cream); font-family: var(--font-body); color: var(--ink); padding: 24px; }
+
+/* ── Header ── */
+.page-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 20px;
+}
+.page-hd h1 {
+  font-family: var(--font-display); font-size: 1.4rem; color: var(--navy);
+  margin: 0; display: flex; align-items: center; gap: 10px;
+}
+.page-hd h1::before {
+  content: ''; width: 4px; height: 24px;
+  background: linear-gradient(180deg,var(--gold),var(--gold-light));
+  border-radius: 2px; display: inline-block;
+}
+
+/* ── Filter bar ── */
+.filter-bar {
+  background: var(--white); border-radius: 12px;
+  box-shadow: var(--shadow-sm); border: 1px solid var(--border);
+  padding: 14px 16px; margin-bottom: 20px;
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;
+}
+.filter-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px; }
+.filter-group label {
+  font-size: .72rem; font-weight: 700; color: var(--ink-light);
+  text-transform: uppercase; letter-spacing: .04em; margin: 0;
+}
+.filter-group select,
+.filter-group input {
+  padding: 7px 10px; border: 1.5px solid var(--border); border-radius: 8px;
+  font-family: var(--font-body); font-size: .83rem; color: var(--ink);
+  background: var(--surface); width: 100%; outline: none; transition: .15s;
+}
+.filter-group select:focus,
+.filter-group input:focus  { border-color: var(--gold); background: var(--white); box-shadow: 0 0 0 3px rgba(200,150,42,.1); }
+
+.filter-reset {
+  background: var(--surface); color: var(--ink-mid); border: 1.5px solid var(--border);
+  border-radius: 8px; padding: 7px 14px; font-size: .82rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap; font-family: var(--font-body);
+  transition: .15s; align-self: flex-end;
+}
+.filter-reset:hover { border-color: var(--red); color: var(--red); background: var(--red-bg); }
+
+.filter-count {
+  font-size: .78rem; color: var(--ink-light); align-self: flex-end;
+  white-space: nowrap; padding-bottom: 8px;
+}
+
+/* ── Toolbar ── */
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+
+/* ── Grade block ── */
+.grade-block { margin-bottom: 32px; }
+.grade-title {
+  font-family: var(--font-display); font-size: 1.05rem; color: var(--navy);
+  margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+}
+.grade-title::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, var(--gold-border), transparent);
+}
+
+/* ── Class grid ── */
+.class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+/* ── Class card ── */
+.class-card {
+  background: var(--white); border-radius: 12px;
+  box-shadow: var(--shadow-sm); border: 1px solid var(--border);
+  padding: 14px; cursor: pointer; transition: box-shadow .2s, transform .15s;
+  display: flex; flex-direction: column; justify-content: space-between;
+  border-left: 4px solid var(--gold-border);
+  position: relative; overflow: hidden;
+}
+.class-card:hover {
+  box-shadow: var(--shadow); transform: translateY(-2px);
+  border-left-color: var(--gold);
+}
+.class-name  { font-weight: 700; font-size: .95rem; color: var(--navy); margin-bottom: 8px; }
+.class-info  { font-size: .78rem; color: var(--ink-mid); margin-top: 4px; line-height: 1.5; }
+.class-teacher-tag {
+  display: inline-block; font-size: .7rem; font-weight: 600;
+  background: var(--navy); color: var(--gold-light);
+  padding: 2px 8px; border-radius: 10px; margin-top: 6px;
+}
+
+.class-actions {
+  display: flex; gap: 6px; margin-top: 10px;
+  border-top: 1px solid var(--surface); padding-top: 10px;
+}
+.edit-btn {
+  flex: 1; background: var(--navy); color: var(--gold-light);
+  border: none; padding: 6px 10px; border-radius: 7px;
+  font-size: .78rem; font-weight: 600; cursor: pointer;
+  font-family: var(--font-body); transition: .15s;
+}
+.edit-btn:hover { background: var(--navy-light); }
+.delete-btn {
+  flex: 1; background: var(--red-bg); color: var(--red);
+  border: 1px solid #fca5a5; padding: 6px 10px; border-radius: 7px;
+  font-size: .78rem; font-weight: 600; cursor: pointer;
+  font-family: var(--font-body); transition: .15s;
+}
+.delete-btn:hover { background: var(--red); color: #fff; }
+
+/* ── Empty state ── */
+.empty-state {
+  text-align: center; padding: 50px 20px; color: var(--ink-light);
+  background: var(--white); border-radius: 12px; border: 1px dashed var(--border);
+}
+.empty-state .icon { font-size: 2.5rem; margin-bottom: 10px; }
+
+/* ── Popup ── */
+.popup-overlay {
+  position: fixed; inset: 0; background: rgba(10,20,40,.5);
+  backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
+}
+.popup-overlay.hidden { display: none; }
+.popup-card {
+  width: min(95vw, 760px); max-height: 90vh; overflow: auto;
+  background: var(--white); border-radius: 14px; padding: 20px;
+  box-shadow: var(--shadow-lg); border-top: 4px solid var(--gold);
+}
+.popup-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;
+}
+.popup-header h3 { font-family: var(--font-display); font-size: 1.1rem; color: var(--navy); margin: 0; }
+.close-btn {
+  background: var(--surface); border: none; border-radius: 8px;
+  width: 30px; height: 30px; cursor: pointer; font-size: 14px;
+  color: var(--ink-mid); display: flex; align-items: center; justify-content: center;
+  transition: .15s;
+}
+.close-btn:hover { background: var(--red-bg); color: var(--red); }
+
+label { display: block; font-size: .78rem; font-weight: 700; color: var(--ink-mid); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .03em; }
+input, select {
+  width: 100%; padding: 8px 10px; border: 1.5px solid var(--border);
+  border-radius: 8px; font-family: var(--font-body); font-size: .875rem;
+  color: var(--ink); outline: none; transition: .15s;
+}
+input:focus, select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(200,150,42,.1); }
+
+.row { display: flex; gap: 10px; }
+.row > div { flex: 1; }
+
+.schedules { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.schedule-row {
+  display: grid; grid-template-columns: 120px 1fr 1fr 1fr 40px;
+  gap: 8px; align-items: center;
+}
+.remove-btn {
+  background: var(--red-bg); border: 1px solid #fca5a5; border-radius: 6px;
+  cursor: pointer; color: var(--red); font-weight: 700;
+  width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+}
+</style>
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [["$","$"],["\\(","\\)"]], displayMath: [["$$","$$"],["\\[","\\]"]] },
+    options: { skipHtmlTags: ["script","noscript","style","textarea"] },
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+
+<div class="page-hd">
+  <h1>Lớp học</h1>
+  <div id="userInfo" style="font-size:.82rem;color:var(--ink-light)">Đang tải...</div>
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <button class="btn btn-primary" id="openCreateClass">+ Tạo lớp mới</button>
+</div>
+
+<!-- FILTER BAR -->
+<div class="filter-bar" id="filterBar" style="display:none">
+  <div class="filter-group">
+    <label>🏫 Khối</label>
+    <select id="filterGrade">
+      <option value="">Tất cả khối</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>📚 Môn</label>
+    <select id="filterSubject">
+      <option value="">Tất cả môn</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>👨‍🏫 Giáo viên</label>
+    <select id="filterTeacher">
+      <option value="">Tất cả giáo viên</option>
+    </select>
+  </div>
+  <button class="filter-reset" onclick="resetFilters()">✕ Xóa lọc</button>
+  <span class="filter-count" id="filterCount"></span>
+</div>
+
+<!-- CLASSES CONTAINER -->
+<div id="classesContainer">
+  <div style="color:var(--ink-light);padding:20px">Đang tải...</div>
+</div>
+
+<!-- POPUP CREATE / EDIT -->
+<div id="createClassPopup" class="hidden popup-overlay">
+  <div class="popup-card">
+    <div class="popup-header">
+      <h3>Tạo / Sửa lớp</h3>
+      <button class="close-btn" id="closeCreatePopup">✕</button>
+    </div>
+    <form id="classForm">
+      <label>Tên lớp</label>
+      <input id="class_name" name="class_name" type="text" required/>
+
+      <div class="row" style="margin-top:12px">
+        <div><label>Khối</label><select id="grade_id"></select></div>
+        <div><label>Môn</label><select id="subject_id"></select></div>
+      </div>
+
+      <div style="margin-top:12px">
+        <label>Kiểu học phí</label>
+        <select id="tuition_type">
+          <option value="per_session">Theo buổi</option>
+          <option value="per_month">Theo tháng</option>
+          <option value="per_course">Theo khóa</option>
+        </select>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <div><label>Học phí</label><input id="tuition_fee" type="number"/></div>
+        <div><label>Học phí học bù</label><input id="makeup_fee" type="number" placeholder="Để trống = giống học phí"/></div>
+      </div>
+
+      <!-- Giáo viên phụ trách -->
+      <h3 style="margin-top:16px;font-family:var(--font-display);font-size:1rem;color:var(--navy)">Giáo viên phụ trách</h3>
+      <div id="teacherPickerWrap" style="margin-top:8px;max-height:180px;overflow-y:auto;
+        border:1.5px solid var(--border);border-radius:10px;padding:8px;background:var(--surface)">
+        <span style="color:var(--ink-light);font-size:.82rem">Đang tải...</span>
+      </div>
+
+      <h3 style="margin-top:16px;font-family:var(--font-display);font-size:1rem;color:var(--navy)">Lịch học</h3>
+      <div class="schedules" id="schedules"></div>
+      <div style="margin-top:8px">
+        <button type="button" id="addSchedule" class="btn btn-outline btn-sm">+ Thêm buổi</button>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+        <button type="submit" class="btn btn-primary">Lưu lớp</button>
+        <button type="button" class="btn btn-outline"
+          onclick="document.getElementById('createClassPopup').classList.add('hidden')">Hủy</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- POPUP CLASS DETAIL -->
+<div id="classPopup" class="hidden popup-overlay">
+  <div class="popup-card" style="width:min(95vw,1100px)">
+    <div class="popup-header">
+      <h3>Chi tiết lớp</h3>
+      <button class="close-btn" id="closePopup">✕</button>
+    </div>
+    <div id="popupContent">Đang tải...</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./supabaseClient.js"></script>
+<script src="./class_init.js"></script>
+<script src="./class_create.js"></script>
+<script src="./class_list.js"></script>
+<script src="./ai_solution.js"></script>
+<script src="./review_helper.js"></script>
+<script src="./class_manage.js"></script>
+<script src="./class_student.js"></script>
+</body>
+</html>

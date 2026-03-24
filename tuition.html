@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Thu học phí</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./supabaseClient.js"></script>
+<style>
+* { box-sizing: border-box; }
+:root {
+  --bg: var(--cream);
+  
+  
+  
+  
+  
+  
+}
+body {
+  margin: 0;
+  font-family: Inter, system-ui, Arial, sans-serif;
+  background: var(--cream);
+  color: #0f172a;
+  padding: 24px;
+}
+h1 { margin: 0 0 4px; font-size: 1.5rem; font-family: var(--font-display); color: var(--navy); }
+.subtitle { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+
+/* ── Toolbar ── */
+.toolbar {
+  display: flex; gap: 10px; align-items: center;
+  flex-wrap: wrap; margin-bottom: 20px;
+}
+.toolbar button {
+  padding: 7px 16px; border: none; border-radius: 8px;
+  background: var(--navy); color: #fff;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.toolbar button:hover { opacity: .85; }
+.toolbar button.secondary {
+  background: #fff; color: var(--accent);
+  border: 1px solid var(--border);
+}
+.toolbar select, .toolbar input[type=month] {
+  padding: 7px 10px; border: 1px solid var(--border);
+  border-radius: 8px; font-size: 13px; background: #fff; cursor: pointer;
+}
+.badge {
+  background: #dbeafe; color: #1d4ed8;
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+}
+
+/* ── Summary cards ── */
+.summary-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px; margin-bottom: 20px;
+}
+.summary-card {
+  background: var(--card); border-radius: 10px;
+  padding: 14px 16px; box-shadow: 0 1px 4px rgba(2,6,23,.06);
+}
+.summary-card .label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.summary-card .value { font-size: 20px; font-weight: 700; }
+.summary-card .value.green { color: var(--green); }
+.summary-card .value.red   { color: var(--red); }
+.summary-card .value.blue  { color: var(--navy); }
+
+/* ── Table ── */
+.table-wrap {
+  background: var(--card); border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(2,6,23,.06);
+  overflow: auto;
+  max-height: calc(100vh - 280px);
+}
+table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+thead tr { background: var(--navy); }
+th {
+  padding: 11px 12px; text-align: left;
+  font-weight: 600; white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+  color: var(--gold-light); font-family: var(--font-display);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+th.right, td.right { text-align: right; }
+th.center, td.center { text-align: center; }
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f8fafc;
+  vertical-align: middle;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #f8fafc; }
+
+.student-name { font-weight: 600; }
+.student-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--navy);
+  font: inherit;
+  cursor: pointer;
+}
+.student-trigger:hover { text-decoration: underline; }
+.tuition-row-clickable { cursor: pointer; }
+.hint-link {
+  font-size: 11px;
+  color: #0369a1;
+  margin-top: 4px;
+}
+.class-tag {
+  display: inline-block;
+  background: #e0f2fe; color: #0369a1;
+  padding: 2px 8px; border-radius: 12px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+
+/* attendance pills */
+.pill {
+  display: inline-block; padding: 2px 8px;
+  border-radius: 10px; font-size: 12px; font-weight: 600;
+}
+.pill.present { background: #dcfce7; color: #15803d; }
+.pill.absent  { background: #fee2e2; color: #b91c1c; }
+.pill.makeup  { background: #fef9c3; color: #854d0e; }
+
+/* amount */
+.amount { font-weight: 700; font-size: 14px; color: #0f172a; }
+.amount.discount { color: var(--red); font-size: 12px; font-weight: 400; }
+
+/* paid toggle */
+/* status badge */
+.status-badge {
+  display: inline-block; padding: 3px 10px; border-radius: 12px;
+  font-size: 12px; font-weight: 600;
+}
+.status-badge.unpaid    { background: #fee2e2; color: #b91c1c; }
+.status-badge.partial   { background: #fef9c3; color: #854d0e; }
+.status-badge.paid      { background: #dcfce7; color: #15803d; }
+.status-badge.overpaid  { background: #e0f2fe; color: #0369a1; }
+
+/* action buttons */
+.action-btn {
+  display: inline-block; padding: 4px 11px; border: none;
+  border-radius: 6px; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: .15s; white-space: nowrap;
+}
+.action-btn:hover { opacity: .82; }
+.action-btn.collect  { background: #2563eb; color: #fff; }
+.action-btn.refund   { background: #f59e0b; color: #fff; }
+.action-btn.note     { background: #f1f5f9; color: #475569;
+                        border: 1px solid var(--border); }
+.action-btn.note.has { background: #fef9c3; color: #854d0e;
+                        border-color: #fde68a; }
+
+/* empty state */
+.empty {
+  text-align: center; padding: 48px;
+  color: var(--muted); font-size: 14px;
+}
+
+/* loading */
+.loading { text-align: center; padding: 40px; color: var(--muted); }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, .35);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+.modal-overlay.show { display: flex; }
+.modal-card {
+  width: min(980px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(15,23,42,.18);
+  border: 1px solid var(--border);
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid #eef2f7;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 3;
+}
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-family: var(--font-display);
+  color: var(--navy);
+}
+.modal-close {
+  border: 1px solid var(--border);
+  background: #fff;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.modal-body { padding: 18px 20px 20px; }
+.detail-card {
+  margin-top: 12px;
+  padding: 14px 15px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+.student-detail-view {
+  display: none;
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 4px rgba(2,6,23,.06);
+  padding: 18px 20px 20px;
+}
+.student-detail-view.show { display: block; }
+.student-detail-title {
+  margin: 0 0 14px;
+  font-size: 1.05rem;
+  font-family: var(--font-display);
+  color: var(--navy);
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+.detail-metric {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.detail-metric .label {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+.detail-metric .value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+#printArea { display: none; }
+.invoice-page {
+  page-break-after: always;
+  break-after: page;
+  min-height: 100vh;
+  padding: 24px 28px;
+}
+.invoice-page:last-child {
+  page-break-after: auto;
+  break-after: auto;
+}
+.invoice-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 12px;
+  margin-bottom: 18px;
+}
+.invoice-title {
+  font-size: 22px;
+  font-family: var(--font-display);
+  color: var(--navy);
+}
+.invoice-meta {
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.7;
+}
+.invoice-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 14px;
+}
+.invoice-table th,
+.invoice-table td {
+  border: 1px solid #dbe3ee;
+  padding: 9px 10px;
+  font-size: 12px;
+  vertical-align: top;
+}
+.invoice-table th {
+  background: #eff6ff;
+  color: #0f172a;
+  font-family: var(--font-body);
+}
+.invoice-note {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fef9c3;
+  border: 1px solid #fde68a;
+  font-size: 12px;
+  color: #854d0e;
+  white-space: pre-wrap;
+ }
+.invoice-summary {
+  margin-top: 18px;
+  margin-left: auto;
+  width: min(320px, 100%);
+}
+.invoice-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px dashed #cbd5e1;
+  font-size: 13px;
+}
+.invoice-summary-row.total {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--navy);
+  border-bottom: none;
+  padding-top: 10px;
+}
+
+/* print */
+@media print {
+  body.printing-invoices > *:not(#printArea) { display: none !important; }
+  body.printing-invoices #printArea { display: block; }
+  .toolbar, .summary-row, .modal-overlay { display: none !important; }
+  body { padding: 0; background: #fff; }
+  .table-wrap { box-shadow: none; border-radius: 0; }
+  #printArea { display: block; }
+  .invoice-page { padding: 18px 20px; }
+}
+</style>
+</head>
+<body>
+
+<h1>💰 Thu học phí</h1>
+<p class="subtitle">Tính học phí tự động theo điểm danh từng tháng</p>
+
+<div class="toolbar">
+  <input type="month" id="monthPicker">
+  <select id="classFilter" onchange="renderRows()">
+    <option value="">Tất cả lớp</option>
+  </select>
+  <select id="paidFilter" onchange="renderRows()">
+    <option value="">Tất cả trạng thái</option>
+    <option value="unpaid">Chưa nộp</option>
+    <option value="partial">Chưa nộp đủ</option>
+    <option value="paid">Đã nộp đủ</option>
+    <option value="overpaid">Nộp thừa</option>
+  </select>
+  <button onclick="loadTuition()">🔄 Tải lại</button>
+  <button class="secondary" onclick="printInvoices()">🖨 In hóa đơn</button>
+  <span class="badge" id="rowCount">0 học sinh</span>
+</div>
+
+<!-- Summary -->
+<div class="summary-row">
+  <div class="summary-card">
+    <div class="label">Tổng cần thu</div>
+    <div class="value blue" id="sumTotal">—</div>
+  </div>
+  <div class="summary-card">
+    <div class="label">Đã thu được</div>
+    <div class="value green" id="sumPaid">—</div>
+  </div>
+  <div class="summary-card">
+    <div class="label">Còn thiếu</div>
+    <div class="value red" id="sumUnpaid">—</div>
+  </div>
+  <div class="summary-card">
+    <div class="label">Nộp thừa</div>
+    <div class="value" id="sumOverpaid" style="color:#0369a1">—</div>
+  </div>
+</div>
+
+<div id="studentDetailView" class="student-detail-view">
+  <h3 class="student-detail-title">Chi tiết học phí</h3>
+  <div id="studentDetailBody"></div>
+</div>
+
+<!-- Table -->
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:36px">STT</th>
+        <th>Học sinh &amp; Chi tiết lớp</th>
+        <th class="right">Thành tiền</th>
+        <th class="right">Đã nộp</th>
+        <th class="right">Còn thiếu</th>
+        <th class="center">Trạng thái</th>
+        <th class="center">Thao tác</th>
+      </tr>
+    </thead>
+    <tbody id="tuitionBody">
+      <tr><td colspan="7" class="loading">Đang tải...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div id="tuitionDetailModal" class="modal-overlay" onclick="closeTuitionDetail(event)">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 id="tuitionDetailTitle">Chi tiết học phí</h3>
+      <button class="modal-close" onclick="closeTuitionDetail()">✕</button>
+    </div>
+    <div class="modal-body" id="tuitionDetailBody"></div>
+  </div>
+</div>
+
+<div id="printArea"></div>
+
+<script src="./tuition.js"></script>
+</body>
+</html>

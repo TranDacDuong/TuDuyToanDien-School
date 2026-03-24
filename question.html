@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<title>Ngân hàng câu hỏi</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<style>
+* { box-sizing: border-box; }
+body {
+  font-family: var(--font-body);
+  background: var(--cream);
+  padding: 24px;
+  color: var(--ink);
+}
+.container {
+  max-width: 1500px; margin: auto;
+  background: var(--white); padding: 24px;
+  border-radius: 14px; box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+}
+
+/* ── Header ── */
+.page-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
+}
+.page-hd h2 {
+  font-size: 1.35rem; font-family: var(--font-display); color: var(--navy);
+  margin: 0; display: flex; align-items: center; gap: 10px;
+}
+.page-hd h2::before {
+  content: ''; width: 4px; height: 22px;
+  background: linear-gradient(180deg,var(--gold),var(--gold-light));
+  border-radius: 2px; display: inline-block;
+}
+
+/* ── Filter bar ── */
+.filterBar {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 14px; align-items: center;
+}
+.filterBar select {
+  padding: 7px 10px; border: 1.5px solid var(--border);
+  border-radius: 8px; background: var(--surface);
+  font-family: var(--font-body); font-size: .83rem; outline: none; transition: .15s;
+}
+.filterBar select:focus { border-color: var(--gold); background: var(--white); }
+
+/* ── Table ── */
+table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+thead { background: var(--navy); }
+th {
+  padding: 11px 12px; font-weight: 600; color: var(--gold-light);
+  font-family: var(--font-display); font-size: .8rem; text-align: left;
+  white-space: nowrap;
+}
+td { padding: 11px 12px; border-bottom: 1px solid var(--surface); vertical-align: middle; }
+
+/* ── Clickable row ── */
+.q-row { cursor: pointer; transition: background .13s; }
+.q-row:hover { background: var(--gold-pale) !important; }
+.q-row:hover td { color: var(--navy); }
+
+.questionCell { text-align: left; max-width: 500px; }
+.questionText { white-space: pre-line; line-height: 1.5; margin-bottom: 4px; }
+.questionImg  { max-width: 280px; border-radius: 6px; margin-top: 4px; cursor: pointer; }
+.faded        { opacity: .38; }
+
+.hidden-badge {
+  margin-left: 6px; background: #fef3c7; color: #b45309;
+  border: 1px solid #fcd34d; padding: 1px 7px;
+  border-radius: 10px; font-size: .68rem; font-weight: 700;
+}
+
+/* ── Hint click ── */
+.click-hint {
+  font-size: .72rem; color: var(--ink-light); margin-bottom: 10px;
+  display: flex; align-items: center; gap: 5px;
+}
+
+/* ── IMAGE WRAPPER ── */
+.imgWrapper { position: relative; display: none; max-width: 100%; }
+.previewImg { max-width: 420px; border-radius: 6px; margin-top: 8px; max-height: 260px; object-fit: contain; }
+.imgDelete {
+  position: absolute; top: 6px; right: 6px;
+  background: #ef4444; color: white;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; cursor: pointer;
+}
+
+/* ── Textarea ── */
+textarea {
+  width: 100%; min-height: 90px; padding: 10px;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: .875rem; resize: vertical; font-family: var(--font-body); outline: none;
+  transition: .15s;
+}
+textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(200,150,42,.1); }
+
+/* ── MODAL ── */
+.modal {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(10,20,40,.45); backdrop-filter: blur(3px);
+  display: none; align-items: center; justify-content: center; z-index: 100;
+}
+.modal-box {
+  background: var(--white); padding: 26px; border-radius: 14px;
+  width: min(98vw, 1400px); max-height: 92vh;
+  overflow-y: auto; box-shadow: var(--shadow-lg);
+  border-top: 4px solid var(--gold);
+}
+#formTitle {
+  font-size: 1.2rem; font-family: var(--font-display);
+  color: var(--navy); margin-bottom: 16px;
+}
+
+/* ── GRID ── */
+.createGrid { display: grid; grid-template-columns: 200px 1fr 440px; gap: 24px; }
+.leftCol, .centerCol, .rightCol { display: flex; flex-direction: column; gap: 10px; }
+label { font-weight: 600; font-size: .85rem; color: var(--ink-mid); }
+
+.leftCol select, .rightCol select {
+  padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 8px;
+  font-family: var(--font-body); font-size: .875rem; outline: none;
+  background: var(--surface); transition: .15s;
+}
+.leftCol select:focus, .rightCol select:focus {
+  border-color: var(--gold); background: var(--white);
+}
+
+/* ── Answer UI ── */
+.answerRow  { display: flex; flex-wrap: wrap; gap: 8px; }
+.answerBox  {
+  border: 1.5px solid var(--border); padding: 7px 10px;
+  border-radius: 8px; display: flex; align-items: center; gap: 6px;
+  background: var(--surface); flex: 1 1 calc(50% - 8px); min-width: 90px;
+}
+.state { font-weight: 600; cursor: pointer; padding: 2px 8px; border-radius: 4px; user-select: none; }
+.state.correct { color: #16a34a; background: #dcfce7; }
+.state.wrong   { color: #dc2626; background: #fee2e2; }
+.shortRow { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.shortRow input {
+  flex: 1; padding: 7px 10px; border: 1.5px solid var(--border);
+  border-radius: 8px; font-family: var(--font-body); font-size: .875rem; outline: none;
+}
+.shortRow input:focus { border-color: var(--gold); }
+
+/* ── Modal footer buttons ── */
+.modal-footer { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; align-items: center; }
+#saveBtn   { background: var(--green); color: #fff; }
+#saveBtn:hover { background: #155c38; }
+.btn-close { background: var(--surface); color: var(--ink-mid); border: 1.5px solid var(--border); }
+.btn-close:hover { background: var(--border); }
+.btn-del   { background: #ef4444; color: #fff; }
+.btn-del:hover { background: #dc2626; }
+.btn-restore { background: #16a34a; color: #fff; }
+.btn-restore:hover { background: #15803d; }
+
+button {
+  padding: 8px 16px; border: none;
+  border-radius: 8px; cursor: pointer;
+  font-size: .85rem; font-weight: 600;
+  font-family: var(--font-body); transition: .15s;
+}
+.btn-add-ans, .btn-rem-ans {
+  padding: 2px 8px; font-size: .75rem; margin-left: 4px;
+  background: var(--navy); color: var(--gold-light);
+  border-radius: 5px; vertical-align: middle;
+}
+
+/* ── Tabs ── */
+.tab-bar { border-bottom: 1px solid var(--border); display:flex; margin-bottom:0; }
+.tab-btn { padding:11px 20px;border:none;background:none;cursor:pointer;font-family:var(--font-body);font-size:.88rem;font-weight:600;color:var(--ink-mid);border-bottom:3px solid transparent;transition:.15s;margin-bottom:-1px; }
+.tab-btn.active { color:var(--navy);border-bottom-color:var(--gold); }
+.tab-btn:hover:not(.active) { color:var(--ink); }
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+/* AI tab styles */
+.ai-wrap { padding:20px 0; }
+.ai-filter-bar { display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;background:var(--surface);border-radius:10px;padding:10px 14px;border:1px solid var(--border); }
+.ai-filter-bar select { padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:.83rem;background:var(--white);color:var(--ink);outline:none;flex:1;min-width:110px; }
+.input-zone { display:flex;gap:16px;min-height:180px;margin-bottom:14px; }
+.input-left { flex:3;display:flex;flex-direction:column;gap:6px; }
+.input-right { flex:1;display:flex;flex-direction:column;gap:6px; }
+.zone-label { font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em; }
+.text-input { flex:1;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);font-size:.9rem;color:var(--ink);resize:none;outline:none;min-height:130px;background:var(--white);transition:.15s; }
+.text-input:focus { border-color:var(--gold); }
+.img-drop-zone { flex:1;border:2px dashed var(--border);border-radius:10px;background:var(--white);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:130px;position:relative;overflow:hidden; }
+.img-drop-zone .drop-hint { font-size:.8rem;color:var(--ink-light);text-align:center;padding:12px; }
+.img-drop-zone img { width:100%;height:100%;object-fit:contain;position:absolute;inset:0;padding:6px; }
+.clear-img { position:absolute;top:6px;right:6px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;display:none;align-items:center;justify-content:center; }
+.img-drop-zone:hover .clear-img { display:flex; }
+.action-bar { display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px; }
+.convert-btn { display:inline-flex;align-items:center;gap:7px;padding:9px 22px;border:none;border-radius:9px;background:linear-gradient(135deg,var(--navy),#1e3a5f);color:var(--gold-light);font-size:.85rem;font-weight:700;cursor:pointer;font-family:var(--font-body);box-shadow:0 2px 8px rgba(10,30,60,.18);transition:.15s; }
+.convert-btn:hover { transform:translateY(-1px); }
+.convert-btn:disabled { opacity:.6;cursor:not-allowed;transform:none; }
+.upload-pdf-btn { display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border:1.5px solid var(--border);border-radius:9px;background:var(--white);color:var(--ink);font-size:.85rem;font-weight:600;cursor:pointer;transition:.15s;font-family:var(--font-body); }
+.upload-pdf-btn:hover { border-color:var(--navy);color:var(--navy); }
+.progress-bar-wrap { display:none;background:var(--surface);border-radius:8px;overflow:hidden;height:6px;margin-bottom:6px; }
+.progress-bar-fill { height:100%;background:linear-gradient(90deg,var(--gold),var(--gold-light));border-radius:8px;transition:width .3s; }
+.progress-text { font-size:.78rem;color:var(--ink-mid);display:none;margin-bottom:8px; }
+.qs-hd { display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px; }
+.qs-hd h3 { font-family:var(--font-display);font-size:.95rem;color:var(--navy);margin:0; }
+.save-all-btn { padding:9px 22px;border:none;border-radius:9px;background:linear-gradient(135deg,var(--gold),var(--gold-light));color:var(--navy);font-size:.85rem;font-weight:700;cursor:pointer;font-family:var(--font-body);box-shadow:0 2px 8px rgba(200,150,42,.3);transition:.15s; }
+.save-all-btn:hover { transform:translateY(-1px); }
+.save-all-btn:disabled { opacity:.5;cursor:not-allowed;transform:none; }
+.qcard { background:var(--white);border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden;box-shadow:var(--shadow-sm);border-left:4px solid var(--gold-border); }
+.qcard-hd { padding:9px 14px;background:var(--surface);display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border); }
+.qcard-num { width:26px;height:26px;border-radius:50%;background:var(--navy);color:var(--gold-light);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0; }
+.qcard-type-badge { font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:10px; }
+.badge-mc{background:#eff6ff;color:#2563eb;}.badge-tf{background:#f0fdf4;color:#16a34a;}.badge-sa{background:#fef9c3;color:#854d0e;}.badge-essay{background:#fdf4ff;color:#7e22ce;}
+.qcard-del { margin-left:auto;background:transparent;border:none;color:var(--ink-light);cursor:pointer;font-size:1rem;padding:2px 6px;border-radius:6px;transition:.15s; }
+.qcard-del:hover { background:#fee2e2;color:#ef4444; }
+.qcard-body { padding:12px 14px;display:flex;gap:12px; }
+.qcard-left { flex:3;display:flex;flex-direction:column;gap:8px; }
+.qcard-right { flex:1;display:flex;flex-direction:column;gap:6px; }
+.math-preview { padding:8px 10px;background:var(--surface);border-radius:8px;border:1px solid var(--border);font-size:.88rem;line-height:1.8;min-height:40px;color:var(--navy);white-space:pre-line; }
+.answer-grid{display:flex;flex-direction:column;gap:5px;}.answer-row{display:flex;align-items:center;gap:8px;}
+.ans-label{width:24px;height:24px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:var(--ink-mid);flex-shrink:0;}
+.answer-row.correct .ans-label{background:var(--navy);color:var(--gold-light);}
+.tf-row{display:flex;align-items:center;gap:8px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;}
+.tf-true{background:#f0fdf4;color:#15803d;display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:5px;font-size:.82rem;font-weight:600;cursor:pointer;}
+.tf-false{background:#fef2f2;color:#b91c1c;display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:5px;font-size:.82rem;font-weight:600;cursor:pointer;}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.spin{display:inline-block;animation:spin 1s linear infinite;}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:var(--gold-light);padding:10px 18px;border-radius:10px;font-size:.85rem;font-weight:600;z-index:9999;box-shadow:var(--shadow-lg);transition:opacity .3s;}
+.rdrop{border:2px dashed var(--border);border-radius:10px;background:var(--white);display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100px;flex:1;position:relative;cursor:default;transition:.15s;}
+.rdrop:focus{border-color:var(--gold);outline:none;}
+.rdrop .drop-hint{font-size:.75rem;color:var(--ink-light);text-align:center;padding:8px;}
+.confirm-crop-btn{position:absolute;bottom:5px;right:5px;z-index:20;padding:4px 10px;font-size:.75rem;font-weight:700;border:none;border-radius:6px;background:#c8962a;color:#fff;cursor:pointer;}
+</style>
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [["$","$"],["\\(","\\)"]], displayMath: [["$$","$$"],["\\[","\\]"]] },
+    options: { skipHtmlTags: ["script","noscript","style","textarea"] },
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+
+<div class="container">
+  <div class="page-hd">
+    <h2>Ngân hàng câu hỏi</h2>
+    <button class="btn btn-primary" onclick="openModal()">+ Tạo câu hỏi</button>
+  </div>
+
+  <div class="filterBar" style="flex-direction:column;align-items:stretch;gap:6px">
+    <div style="display:flex;gap:8px;flex-wrap:nowrap;align-items:center">
+      <select id="f_grade"><option value="">Khối</option></select>
+      <select id="f_subject"><option value="">Môn</option></select>
+      <select id="f_chapter"><option value="">Chương</option></select>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:nowrap;align-items:center">
+      <select id="f_type">
+        <option value="">Loại câu hỏi</option>
+        <option value="multi_choice">Nhiều lựa chọn</option>
+        <option value="true_false">Đúng/Sai</option>
+        <option value="short_answer">Trả lời ngắn</option>
+        <option value="essay">Tự luận</option>
+      </select>
+      <select id="f_difficulty"><option value="">Mức độ</option></select>
+      <select id="f_creator"><option value="">Người tạo</option></select>
+    </div>
+  </div>
+
+  <div class="click-hint">👆 Click vào câu hỏi để sửa hoặc xóa</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>STT</th>
+        <th>Câu hỏi</th>
+        <th>Khối</th>
+        <th>Môn</th>
+        <th>Chương</th>
+        <th>Loại</th>
+        <th>Mức độ</th>
+        <th>Số ĐA</th>
+        <th>Đáp án</th>
+        <th>Người tạo</th>
+      </tr>
+    </thead>
+    <tbody id="questionTable">
+      <tr><td colspan="10" style="text-align:center;padding:32px;color:var(--ink-light)">⏳ Đang tải câu hỏi...</td></tr>
+    </tbody>
+  </table>
+
+  <div id="tab-ai" class="tab-content">
+    <div class="ai-wrap" style="padding:20px 24px">
+      <div class="ai-filter-bar">
+        <label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);white-space:nowrap">Phân loại:</label>
+        <select id="aiGrade"><option value="">Chọn khối</option></select>
+        <select id="aiSubject"><option value="">Chọn môn</option></select>
+        <select id="aiChapter"><option value="">Chọn chương</option></select>
+        <select id="aiDifficulty"><option value="">Độ khó (tự động)</option></select>
+      </div>
+      <div class="input-zone">
+        <div class="input-left">
+          <div class="zone-label">📝 Nội dung câu hỏi <span style="font-weight:400;text-transform:none;font-size:.75rem;color:var(--ink-light)">(paste text hoặc Ctrl+V ảnh)</span></div>
+          <textarea class="text-input" id="aiTextInput" placeholder="Paste nội dung câu hỏi vào đây...&#10;&#10;Hoặc Ctrl+V để paste ảnh để AI nhận diện"></textarea>
+        </div>
+        <div class="input-right">
+          <div class="zone-label">🖼 Hình vẽ <span style="font-weight:400;text-transform:none;font-size:.75rem;color:var(--ink-light)">(Ctrl+V)</span></div>
+          <div class="img-drop-zone" id="aiImgDrop" style="cursor:default">
+            <div class="drop-hint">Ctrl+V để paste<br>hình vẽ vào đây</div>
+            <button class="clear-img" id="aiImgClear" title="Xóa ảnh">✕</button>
+          </div>
+        </div>
+      </div>
+      <div class="action-bar">
+        <label class="upload-pdf-btn">📄 Upload PDF<input type="file" id="aiPdfFile" accept=".pdf" style="display:none"></label>
+        <button class="convert-btn" id="convertBtn" onclick="convertWithAI()">✨ Chuyển đổi với AI</button>
+        <span id="convertHint" style="font-size:.78rem;color:var(--ink-light)">Nhập nội dung hoặc upload PDF rồi bấm chuyển đổi</span>
+      </div>
+      <div class="progress-bar-wrap" id="progressWrap"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
+      <div class="progress-text" id="progressText"></div>
+      <div id="questionsSection" style="display:none">
+        <div class="qs-hd">
+          <h3 id="qSectionTitle">Câu hỏi</h3>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline btn-sm" onclick="addEmptyQuestion()">+ Thêm câu</button>
+            <button class="save-all-btn" id="saveAllBtn" onclick="saveAllQuestions()">💾 Lưu tất cả</button>
+          </div>
+        </div>
+        <div id="questionsList"></div>
+      </div>
+    </div>
+  </div><!-- end tab-ai -->
+
+</div>
+
+<!-- MODAL -->
+<div class="modal" id="modal">
+  <div class="modal-box" style="width:min(98vw,920px)">
+    <h3 id="formTitle" style="font-family:var(--font-display);font-size:1.1rem;color:var(--navy);margin:0 0 14px">Tạo câu hỏi</h3>
+
+    <!-- Hàng 1: Khối / Môn / Chương -->
+    <div style="display:flex;gap:8px;flex-wrap:nowrap;margin-bottom:12px">
+      <select id="grade" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:.85rem;outline:none"><option value="">Chọn khối</option></select>
+      <select id="subject" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:.85rem;outline:none"><option value="">Chọn môn</option></select>
+      <select id="chapter" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:.85rem;outline:none"><option value="">Chọn chương</option></select>
+    </div>
+
+    <!-- Hàng 2: Nội dung (3) + Hình vẽ (1) -->
+    <div style="display:flex;gap:14px;margin-bottom:12px">
+      <!-- Trái: text + preview + nút AI -->
+      <div style="flex:3;display:flex;flex-direction:column;gap:8px">
+        <label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;display:block">Nội dung câu hỏi</label>
+        <textarea id="questionText" style="width:100%;min-height:100px;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:.875rem;resize:vertical;font-family:var(--font-body);outline:none;box-sizing:border-box;transition:.15s" placeholder="Nhập câu hỏi + các phương án A,B,C,D (nếu có)&#10;Hoặc Ctrl+V ảnh để AI nhận diện"></textarea>
+        <div class="imgWrapper" id="questionImgBox">
+          <img id="questionImg" class="previewImg">
+          <span class="imgDelete" onclick="removeImg('question')">×</span>
+        </div>
+        <!-- Preview LaTeX -->
+        <div id="qPreview" style="padding:8px 10px;background:var(--surface);border-radius:8px;border:1px solid var(--border);font-size:.88rem;line-height:1.8;min-height:36px;color:var(--navy);white-space:pre-line;display:none"></div>
+        <!-- Nút AI + Upload PDF -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <label style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;background:var(--white);font-size:.82rem;font-weight:600;cursor:pointer;font-family:var(--font-body)">
+            📄 Upload PDF<input type="file" id="qPdfFile" accept=".pdf" style="display:none">
+          </label>
+          <button type="button" onclick="convertModalWithAI()" id="qAiBtn"
+            style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border:none;border-radius:8px;background:linear-gradient(135deg,var(--navy),#1e3a5f);color:var(--gold-light);font-size:.82rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">
+            ✨ Chuyển đổi với AI
+          </button>
+          <span id="qAiHint" style="font-size:.75rem;color:var(--ink-light)">Paste ảnh hoặc PDF rồi bấm chuyển đổi</span>
+        </div>
+        <!-- answerText/answerImg ẩn để tương thích với question_create.js -->
+        <textarea id="answerText" style="display:none"></textarea>
+        <div class="imgWrapper" id="answerImgBox" style="display:none">
+          <img id="answerImg" class="previewImg">
+          <span class="imgDelete" onclick="removeImg('answer')">×</span>
+        </div>
+      </div>
+      <!-- Phải: hình vẽ -->
+      <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+        <label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block">🖼 Hình vẽ <span style="font-weight:400;text-transform:none;font-size:.72rem">(Ctrl+V)</span></label>
+        <div id="qFigureDrop" tabindex="0" style="flex:1;border:2px dashed var(--border);border-radius:10px;background:var(--white);display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;position:relative;overflow:hidden;cursor:default;outline:none">
+          <span id="qFigureHint" style="font-size:.8rem;color:var(--ink-light);text-align:center;padding:12px">Ctrl+V để paste<br>hình vẽ vào đây</span>
+          <button type="button" id="qFigureClear" onclick="clearFigure()" style="display:none;position:absolute;top:6px;right:6px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px">✕</button>
+          <canvas id="qFigureCropCanvas" style="display:none;position:absolute;inset:0;width:100%;height:100%;cursor:crosshair"></canvas>
+          <button type="button" id="qFigureCropConfirm" onclick="confirmFigureCrop()" style="display:none;position:absolute;bottom:6px;right:6px;z-index:20;padding:4px 10px;font-size:.75rem;font-weight:700;border:none;border-radius:6px;background:#c8962a;color:#fff;cursor:pointer">✓ Xong</button>
+        </div>
+        <button type="button" id="qFigureCropBtn" onclick="startFigureCrop()" style="display:none;padding:5px 12px;font-size:.75rem;font-weight:600;border:1px solid var(--gold);border-radius:7px;background:var(--gold-pale);color:var(--navy);cursor:pointer;font-family:var(--font-body)">✂ Cắt lại</button>
+      </div>
+    </div>
+
+    <!-- Hàng 3: Loại câu hỏi / Mức độ / Đáp án -->
+    <div style="display:flex;gap:8px;flex-wrap:nowrap;margin-bottom:10px;align-items:center">
+      <select id="question_type" onchange="changeType()" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:.85rem;outline:none">
+        <option value="multi_choice">Nhiều lựa chọn</option>
+        <option value="true_false">Đúng/Sai</option>
+        <option value="short_answer">Trả lời ngắn</option>
+        <option value="essay">Tự luận</option>
+      </select>
+      <select id="difficulty" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:.85rem;outline:none"><option value="">Độ khó</option></select>
+    </div>
+    <div>
+      <label id="answerLabel" style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;display:flex;align-items:center;gap:6px">
+        Chọn đáp án đúng
+        <button type="button" class="btn-add-ans" onclick="addAnswer()">+</button>
+        <button type="button" class="btn-rem-ans" onclick="removeAnswer()">−</button>
+      </label>
+      <div id="answerArea"></div>
+    </div>
+
+    <div class="modal-footer">
+      <div id="qProgress" style="display:none;font-size:.8rem;font-weight:700;color:var(--navy);padding:6px 12px;background:var(--surface);border-radius:8px;border:1px solid var(--border)"></div>
+      <button id="saveBtn" onclick="saveQuestion()">Lưu câu hỏi</button>
+      <button class="btn-close" onclick="closeModal()">Đóng</button>
+      <div id="modalActionBtns" style="display:flex;gap:8px;margin-left:auto"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── State ── */
+let activeField = null;
+let _modalFigureBase64 = null; // ảnh hình vẽ trong modal (base64)
+let _modalPastedImg   = null; // ảnh paste vào ô text để AI đọc
+
+document.getElementById("questionText").onfocus = () => { activeField = "question"; };
+document.getElementById("answerText").onfocus   = () => { activeField = "answer"; };
+document.getElementById("qFigureDrop").onfocus  = () => { activeField = "figure"; };
+
+function openModal(resetForm = true) {
+  document.getElementById("modal").style.display = "flex";
+  document.getElementById("modalActionBtns").innerHTML = "";
+  if(resetForm) changeType();
+}
+
+function closeModal() {
+  document.getElementById("modal").style.display = "none";
+  resetQuestionForm();
+}
+
+function removeImg(type) {
+  if (type === "question") {
+    document.getElementById("questionImg").src = "";
+    document.getElementById("questionImgBox").style.display = "none";
+  } else {
+    document.getElementById("answerImg").src = "";
+    document.getElementById("answerImgBox").style.display = "none";
+  }
+}
+
+/* ── Hình vẽ drop zone ── */
+function showFigure(src) {
+  const drop = document.getElementById("qFigureDrop");
+  document.getElementById("qFigureHint").style.display = "none";
+  /* FIX 2: Luôn hiện nút X và Cắt lại khi có ảnh */
+  document.getElementById("qFigureClear").style.display = "flex";
+  document.getElementById("qFigureCropBtn").style.display = "block";
+  let img = drop.querySelector("img.figure-img");
+  if (!img) {
+    img = document.createElement("img");
+    img.className = "figure-img";
+    img.style.cssText = "width:100%;height:100%;object-fit:contain;padding:6px;position:absolute;inset:0";
+    drop.insertBefore(img, drop.querySelector("canvas"));
+  }
+  img.src = src;
+  window._modalFigureBase64 = src; // expose ra window cho question_create.js
+}
+
+function clearFigure() {
+  _modalFigureBase64 = null;
+  window._modalFigureBase64 = null;
+  document.getElementById("qFigureHint").style.display = "";
+  document.getElementById("qFigureClear").style.display = "none";
+  document.getElementById("qFigureCropBtn").style.display = "none";
+  const img = document.getElementById("qFigureDrop").querySelector("img.figure-img");
+  if (img) img.remove();
+}
+
+/* ── Crop figure ── */
+let _cropTmpImg = null;
+let _cropState  = { x:0, y:0, x2:0, y2:0 };
+const HANDLE = 16;
+
+function startFigureCrop() {
+  const drop   = document.getElementById("qFigureDrop");
+  const canvas = document.getElementById("qFigureCropCanvas");
+  const img    = drop.querySelector("img.figure-img");
+  if (!img) return;
+  const rect = drop.getBoundingClientRect();
+  canvas.width = rect.width; canvas.height = rect.height;
+  canvas.style.display = "block";
+  document.getElementById("qFigureCropConfirm").style.display = "block";
+  _cropTmpImg = new Image();
+  /* FIX 3a: crossOrigin trước khi set src để tránh tainted canvas */
+  _cropTmpImg.crossOrigin = "anonymous";
+  _cropTmpImg.onload = () => {
+    _cropState = { x:0, y:0, x2:canvas.width, y2:canvas.height };
+    drawCrop(canvas);
+  };
+  _cropTmpImg.src = img.src;
+  let drag = null;
+  canvas.onmousedown = e => { const p=getCanvasPos(e,canvas); drag=hitHandle(p); };
+  canvas.onmousemove = e => {
+    const p=getCanvasPos(e,canvas);
+    canvas.style.cursor = hitHandle(p) ? "pointer" : "default";
+    if (!drag) return;
+    const MIN=20, W=canvas.width, H=canvas.height, s=_cropState;
+    if(drag==="tl"){s.x=Math.max(0,Math.min(p.x,s.x2-MIN));s.y=Math.max(0,Math.min(p.y,s.y2-MIN));}
+    if(drag==="tr"){s.x2=Math.min(W,Math.max(p.x,s.x+MIN));s.y=Math.max(0,Math.min(p.y,s.y2-MIN));}
+    if(drag==="bl"){s.x=Math.max(0,Math.min(p.x,s.x2-MIN));s.y2=Math.min(H,Math.max(p.y,s.y+MIN));}
+    if(drag==="br"){s.x2=Math.min(W,Math.max(p.x,s.x+MIN));s.y2=Math.min(H,Math.max(p.y,s.y+MIN));}
+    drawCrop(canvas);
+  };
+  canvas.onmouseup = () => drag=null;
+}
+
+function getCanvasPos(e,canvas){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
+function hitHandle(p){const{x,y,x2,y2}=_cropState;
+  if(p.x>=x&&p.x<=x+HANDLE&&p.y>=y&&p.y<=y+HANDLE)return"tl";
+  if(p.x>=x2-HANDLE&&p.x<=x2&&p.y>=y&&p.y<=y+HANDLE)return"tr";
+  if(p.x>=x&&p.x<=x+HANDLE&&p.y>=y2-HANDLE&&p.y<=y2)return"bl";
+  if(p.x>=x2-HANDLE&&p.x<=x2&&p.y>=y2-HANDLE&&p.y<=y2)return"br";
+  return null;
+}
+function drawCrop(canvas){
+  const ctx=canvas.getContext("2d"),{x,y,x2,y2}=_cropState,sw=x2-x,sh=y2-y;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.globalAlpha=0.35;ctx.drawImage(_cropTmpImg,0,0,canvas.width,canvas.height);ctx.globalAlpha=1;
+  ctx.drawImage(_cropTmpImg,x/canvas.width*_cropTmpImg.naturalWidth,y/canvas.height*_cropTmpImg.naturalHeight,sw/canvas.width*_cropTmpImg.naturalWidth,sh/canvas.height*_cropTmpImg.naturalHeight,x,y,sw,sh);
+  ctx.strokeStyle="#c8962a";ctx.lineWidth=2;ctx.setLineDash([]);ctx.strokeRect(x,y,sw,sh);
+  ctx.fillStyle="#c8962a";[[x,y],[x2-HANDLE,y],[x,y2-HANDLE],[x2-HANDLE,y2-HANDLE]].forEach(([hx,hy])=>ctx.fillRect(hx,hy,HANDLE,HANDLE));
+}
+
+function confirmFigureCrop(){
+  const canvas=document.getElementById("qFigureCropCanvas");
+  const{x,y,x2,y2}=_cropState,sw=x2-x,sh=y2-y;
+  if(sw<10||sh<10){canvas.style.display="none";return;}
+  const scX=_cropTmpImg.naturalWidth/canvas.width,scY=_cropTmpImg.naturalHeight/canvas.height;
+  const out=document.createElement("canvas");out.width=Math.round(sw*scX);out.height=Math.round(sh*scY);
+  const fi=new Image();
+  fi.onload=()=>{
+    out.getContext("2d").drawImage(fi,x*scX,y*scY,sw*scX,sh*scY,0,0,out.width,out.height);
+    const src=out.toDataURL("image/jpeg",0.92);
+    _modalFigureBase64=src;
+    window._modalFigureBase64=src;
+    const img=document.getElementById("qFigureDrop").querySelector("img.figure-img");
+    if(img)img.src=src;
+    canvas.style.display="none";
+    document.getElementById("qFigureCropConfirm").style.display="none";
+  };
+  /* FIX 3b: crossOrigin trước khi set src để tránh tainted canvas */
+  fi.crossOrigin="anonymous";
+  fi.src=_cropTmpImg.src;
+}
+
+/* ── Paste handler ── */
+document.addEventListener("paste", async function(e) {
+  if (document.getElementById("modal").style.display !== "flex") return;
+  for (let item of e.clipboardData.items) {
+    if (item.type.startsWith("image/")) {
+      const file = item.getAsFile();
+      const reader = new FileReader();
+      reader.onload = async ev => {
+        if (activeField === "figure") {
+          // Paste vào ô hình vẽ
+          _modalFigureBase64 = ev.target.result;
+          showFigure(_modalFigureBase64);
+        } else {
+          // Paste vào ô text — lưu để AI đọc
+          _modalPastedImg = ev.target.result;
+          document.getElementById("qAiHint").textContent = "✅ Đã paste ảnh — bấm Chuyển đổi";
+          document.getElementById("qAiHint").style.color = "var(--green)";
+        }
+      };
+      reader.readAsDataURL(file);
+      e.preventDefault(); break;
+    }
+  }
+});
+
+/* ── AI convert trong modal ── */
+const EDGE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co/functions/v1/ai-solution";
+const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxneWRqYWFxZnhxemdiZHBxdmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxODY2NDQsImV4cCI6MjA4Nzc2MjY0NH0.l6ojk0fH5wYMK4H_RIGTepatUd1Uy2KHOTiRfAS1JD4";
+
+async function convertModalWithAI() {
+  const text = document.getElementById("questionText").value.trim();
+  if (!text && !_modalPastedImg) { alert("Nhập nội dung hoặc paste ảnh trước!"); return; }
+  const btn = document.getElementById("qAiBtn");
+  btn.disabled = true; btn.innerHTML = '<span class="spin">⟳</span> Đang phân tích...';
+  document.getElementById("qAiHint").textContent = "AI đang xử lý...";
+  try {
+    const parts = [];
+    if (_modalPastedImg) {
+      const mtype = _modalPastedImg.startsWith("data:image/png") ? "image/png" : "image/jpeg";
+      parts.push({ type:"image", source:{ type:"base64", media_type:mtype, data:_modalPastedImg.split(",")[1] } });
+    }
+    const prompt = `Trích xuất TẤT CẢ câu hỏi từ nội dung này. Trả về JSON array (không markdown, không backtick):
+[{
+  "question_text": "Nội dung câu hỏi (KHÔNG bao gồm 'Câu 1', 'Câu 2'...). Với trắc nghiệm nhiều lựa chọn: gộp câu hỏi + các phương án A,B,C,D vào đây, mỗi phương án 1 dòng. Với đúng/sai: chỉ ghi nội dung câu hỏi chính, KHÔNG ghi các ý a,b,c,d vào đây. Công thức dùng LaTeX $x^2$",
+  "options": ["Nội dung ý a", "Nội dung ý b", "Nội dung ý c", "Nội dung ý d"],
+  "answer": "Với multi_choice: chữ cái A/B/C/D. Với true_false: VÍ DỤ nếu a đúng b sai c đúng d sai thì ghi 'aTbFcTdF'. Với short_answer: đáp án",
+  "question_type": "multi_choice | true_false | short_answer | essay",
+  "answer_count": 4,
+  "difficulty": 5,
+  "has_figure": false
+}]
+
+QUY TẮC QUAN TRỌNG:
+- Bỏ hoàn toàn 'Câu 1', 'Câu 2', số thứ tự câu
+- true_false: 1 câu hỏi = 1 object duy nhất, các ý a,b,c,d để trong "options", KHÔNG tách thành nhiều object
+- true_false answer: PHẢI điền đầy đủ, ví dụ 4 ý: "aTbFcTdF" hoặc "aFbTcFdT" — bắt buộc có đủ 4 cặp
+- multi_choice: gộp A,B,C,D vào question_text, để "options" là []
+- difficulty: 1-3 dễ, 4-6 trung bình, 7-10 khó — PHẢI điền số cụ thể
+- Chỉ trả về JSON, không text thêm`;
+    parts.push({ type:"text", text:(text||"")+"\n\n"+prompt });
+    const res = await fetch(EDGE_URL, { method:"POST", headers:{"Content-Type":"application/json","apikey":ANON_KEY,"Authorization":"Bearer "+ANON_KEY}, body:JSON.stringify({messages:[{role:"user",content:parts}]}) });
+    const data = await res.json();
+    const raw = data.content?.[0]?.text || "";
+    let parsed;
+    try {
+      const clean = raw.replace(/```json\s*/gi,"").replace(/```\s*/g,"").trim();
+      parsed = JSON.parse(clean);
+    } catch {
+      const m = raw.match(/\[[\s\S]*\]/) || raw.match(/\{[\s\S]*\}/);
+      if (m) try { parsed = JSON.parse(m[0]); } catch {}
+    }
+
+    const questions = Array.isArray(parsed) ? parsed : (parsed ? [parsed] : null);
+    if (!questions || !questions.length) {
+      document.getElementById("qAiHint").textContent = "❌ Không tìm thấy câu hỏi, thử lại.";
+      document.getElementById("qAiHint").style.color = "var(--red,#ef4444)";
+    } else {
+      _modalPastedImg = null;
+      startMultiQuestion(questions);
+    }
+  } catch(err) { alert("Lỗi AI: "+err.message); }
+  btn.disabled = false; btn.innerHTML = "✨ Chuyển đổi với AI";
+}
+
+/* PDF trong modal */
+document.getElementById("qPdfFile").onchange = async function(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const btn = document.getElementById("qAiBtn");
+  btn.disabled = true; btn.innerHTML = '<span class="spin">⟳</span> Đang xử lý PDF...';
+  const reader = new FileReader();
+  const b64 = await new Promise(res => { reader.onload = ev => res(ev.target.result.split(",")[1]); reader.readAsDataURL(file); });
+  _modalPastedImg = "data:application/pdf;base64," + b64;
+  document.getElementById("qAiHint").textContent = "✅ Đã tải PDF — bấm Chuyển đổi";
+  document.getElementById("qAiHint").style.color = "var(--green)";
+  btn.disabled = false; btn.innerHTML = "✨ Chuyển đổi với AI";
+  e.target.value = "";
+};
+
+/* ── Multi-question flow ── */
+let _mqList  = [];
+let _mqIndex = 0;
+
+function startMultiQuestion(questions) {
+  _mqList  = questions;
+  _mqIndex = 0;
+  renderMqNav();
+  fillQuestion(0);
+}
+
+function renderMqNav() {
+  const footer = document.getElementById("qProgress").parentElement;
+  // Xóa nav cũ nếu có
+  document.getElementById("mqNav")?.remove();
+  if (_mqList.length <= 1) return;
+
+  const nav = document.createElement("div");
+  nav.id = "mqNav";
+  nav.style.cssText = "display:flex;align-items:center;gap:6px;margin-left:8px";
+  nav.innerHTML = `
+    <button onclick="mqGo(-1)" id="mqPrev" style="padding:5px 10px;border:1.5px solid var(--border);border-radius:7px;background:var(--white);cursor:pointer;font-size:.85rem;font-family:var(--font-body)">◀</button>
+    <button onclick="mqGo(1)"  id="mqNext" style="padding:5px 10px;border:1.5px solid var(--border);border-radius:7px;background:var(--white);cursor:pointer;font-size:.85rem;font-family:var(--font-body)">▶</button>`;
+  document.getElementById("qProgress").after(nav);
+}
+
+function mqGo(dir) {
+  const next = _mqIndex + dir;
+  if (next < 0 || next >= _mqList.length) return;
+  _mqIndex = next;
+  fillQuestion(_mqIndex);
+}
+
+function fillQuestion(idx) {
+  const q = _mqList[idx];
+  const n = _mqList.length;
+
+  // Điền nội dung câu hỏi — với true_false gộp options vào question_text
+  let questionText = q.question_text || "";
+  if (q.question_type === "true_false" && q.options?.length) {
+    const optLines = q.options.map((opt, i) => `${String.fromCharCode(97+i)}) ${opt}`).join("\n");
+    questionText = questionText.trimEnd() + "\n" + optLines;
+  }
+  document.getElementById("questionText").value = questionText;
+  document.getElementById("question_type").value = q.question_type || "multi_choice";
+  changeType();
+
+  // Độ khó
+  if (q.difficulty) document.getElementById("difficulty").value = q.difficulty;
+
+  // Số lượng đáp án
+  const count = q.answer_count || (q.options?.length) || 4;
+  createAnswerInputs(count);
+
+  // Điền đáp án đúng
+  const ans = (q.answer || "");
+  if (q.question_type === "multi_choice") {
+    document.querySelectorAll("#answerArea .answerBox").forEach((box, i) => {
+      const cb = box.querySelector("input[type='checkbox']");
+      if (cb) cb.checked = ans.toUpperCase().includes(String.fromCharCode(65 + i));
+    });
+  } else if (q.question_type === "true_false") {
+    document.querySelectorAll("#answerArea .answerBox").forEach((box, i) => {
+      const st = box.querySelector(".state");
+      if (st) {
+        const lbl = String.fromCharCode(97 + i);
+        const isT = ans.toLowerCase().includes(lbl + "t");
+        st.innerText = isT ? "Đúng" : "Sai";
+        st.className = "state " + (isT ? "correct" : "wrong");
+      }
+    });
+  } else if (q.question_type === "short_answer") {
+    const inputs = document.querySelectorAll("#answerArea .shortRow input");
+    const parts  = ans.split(";");
+    inputs.forEach((inp, i) => inp.value = parts[i] || "");
+  }
+
+  updateQPreview();
+  clearFigure();
+
+  // Progress bar
+  const prog = document.getElementById("qProgress");
+  prog.style.display = "block";
+  prog.textContent = `📋 Câu ${idx + 1} / ${n}`;
+
+  // Cập nhật nút ◀▶
+  const prev = document.getElementById("mqPrev");
+  const next = document.getElementById("mqNext");
+  if (prev) prev.style.opacity = idx === 0 ? "0.3" : "1";
+  if (next) next.style.opacity = idx === n-1 ? "0.3" : "1";
+
+  // Hint
+  const hint = document.getElementById("qAiHint");
+  if (q.has_figure) {
+    hint.textContent = "⚠ Câu này có hình vẽ — nhớ Ctrl+V paste ảnh vào ô Hình vẽ bên phải!";
+    hint.style.cssText = "font-size:.75rem;color:#b45309;background:#fef3c7;padding:5px 10px;border-radius:7px";
+  } else {
+    hint.textContent = `✅ Câu ${idx + 1}/${n} — kiểm tra rồi bấm Lưu`;
+    hint.style.cssText = "font-size:.75rem;color:var(--green)";
+  }
+
+  // Nút Lưu — luôn lưu câu hiện tại, không tự chuyển
+  const saveBtn = document.getElementById("saveBtn");
+  saveBtn.textContent = "💾 Lưu câu này";
+  saveBtn.onclick = () => saveQuestion(false).then(() => {
+    const hint2 = document.getElementById("qAiHint");
+    hint2.textContent = `✅ Đã lưu câu ${idx + 1}!`;
+    hint2.style.cssText = "font-size:.75rem;color:var(--green);font-weight:700";
+  });
+}
+
+function updateQPreview() {
+  const val = document.getElementById("questionText").value;
+  const prev = document.getElementById("qPreview");
+  if (!val.trim()) { prev.style.display="none"; return; }
+  prev.style.display = "block";
+  prev.textContent = val;
+  if (window.MathJax?.typesetPromise) window.MathJax.typesetPromise([prev]).catch(()=>{});
+}
+document.getElementById("questionText").addEventListener("input", updateQPreview);
+
+
+/* ── Answer area ── */
+let answerCount = 4;
+
+function createAnswerInputs(count) {
+  answerCount = count || 4;
+  renderAnswerArea(document.getElementById("question_type").value, answerCount);
+}
+
+function changeType() {
+  const type = document.getElementById("question_type").value;
+  const answerLabel = document.getElementById("answerLabel");
+  answerLabel.style.display = type === "essay" ? "none" : "block";
+  answerCount = (type === "short_answer") ? 1 : 4;
+  renderAnswerArea(type, answerCount);
+}
+
+function renderAnswerArea(type, count) {
+  const area = document.getElementById("answerArea");
+  area.innerHTML = "";
+  if (type === "multi_choice") {
+    const row = document.createElement("div");
+    row.className = "answerRow";
+    for (let i = 0; i < count; i++) {
+      const box = document.createElement("div");
+      box.className = "answerBox";
+      box.innerHTML = `<input type="checkbox"> ${String.fromCharCode(65 + i)}`;
+      row.appendChild(box);
+    }
+    area.appendChild(row);
+  } else if (type === "true_false") {
+    const row = document.createElement("div");
+    row.className = "answerRow";
+    for (let i = 0; i < count; i++) {
+      const box = document.createElement("div");
+      box.className = "answerBox";
+      box.style.cssText = "flex:1 1 100%;display:flex;align-items:center;gap:6px";
+      box.innerHTML = `<span style="font-weight:700;flex-shrink:0;min-width:20px">${String.fromCharCode(97 + i)})</span>
+        <input type="text" class="tf-text" placeholder="Nội dung ý ${String.fromCharCode(97+i)}"
+          style="flex:1;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-family:var(--font-body);font-size:.85rem;outline:none">
+        <span class="state wrong" onclick="toggleState(this)">Sai</span>`;
+      row.appendChild(box);
+    }
+    area.appendChild(row);
+  } else if (type === "short_answer") {
+    for (let i = 0; i < count; i++) {
+      const div = document.createElement("div");
+      div.className = "shortRow";
+      div.innerHTML = `<span>${i + 1}</span><input type="text" placeholder="Đáp án ${i + 1}">`;
+      area.appendChild(div);
+    }
+  }
+}
+
+function toggleState(el) {
+  if (el.innerText === "Sai") {
+    el.innerText = "Đúng";
+    el.classList.remove("wrong");
+    el.classList.add("correct");
+  } else {
+    el.innerText = "Sai";
+    el.classList.remove("correct");
+    el.classList.add("wrong");
+  }
+}
+
+function addAnswer() {
+  const type = document.getElementById("question_type").value;
+  answerCount++;
+  const area = document.getElementById("answerArea");
+  if (type === "multi_choice") {
+    const box = document.createElement("div");
+    box.className = "answerBox";
+    box.innerHTML = `<input type="checkbox"> ${String.fromCharCode(64 + answerCount)}`;
+    area.firstChild.appendChild(box);
+  } else if (type === "true_false") {
+    const box = document.createElement("div");
+    box.className = "answerBox";
+    box.innerHTML = `<span>${String.fromCharCode(96 + answerCount)})</span>
+      <span class="state wrong" onclick="toggleState(this)">Sai</span>`;
+    area.firstChild.appendChild(box);
+  } else if (type === "short_answer") {
+    const div = document.createElement("div");
+    div.className = "shortRow";
+    div.innerHTML = `<span>${answerCount}</span><input type="text" placeholder="Đáp án ${answerCount}">`;
+    area.appendChild(div);
+  }
+}
+
+function removeAnswer() {
+  const type = document.getElementById("question_type").value;
+  if (answerCount <= 1) return;
+  answerCount--;
+  const area = document.getElementById("answerArea");
+  if (type === "multi_choice" || type === "true_false") {
+    area.firstChild.removeChild(area.firstChild.lastElementChild);
+  } else if (type === "short_answer") {
+    area.removeChild(area.lastElementChild);
+  }
+}
+
+/* ── Reset form ── */
+function resetQuestionForm() {
+  if(typeof editingQuestionId !== "undefined") editingQuestionId = null;
+  document.getElementById("questionText").value = "";
+  document.getElementById("answerText").value   = "";
+  document.getElementById("questionImg").src    = "";
+  document.getElementById("answerImg").src      = "";
+  document.getElementById("questionImgBox").style.display = "none";
+  document.getElementById("answerImgBox").style.display   = "none";
+  document.getElementById("formTitle").innerText = "Tạo câu hỏi";
+  document.getElementById("saveBtn").innerText   = "Lưu câu hỏi";
+  document.getElementById("modalActionBtns").innerHTML = "";
+  document.getElementById("question_type").value = "multi_choice";
+  document.getElementById("qProgress").style.display = "none";
+  document.getElementById("mqNav")?.remove();
+  document.getElementById("saveBtn").textContent = "Lưu câu hỏi";
+  document.getElementById("saveBtn").onclick = () => saveQuestion(true);
+  _mqList = []; _mqIndex = 0;
+  document.getElementById("qAiHint").textContent = "Paste ảnh hoặc PDF rồi bấm chuyển đổi";
+  document.getElementById("qAiHint").style.color = "";
+  clearFigure();
+  _modalPastedImg = null;
+  answerCount = 4; changeType();
+}
+</script>
+
+
+<script>
+function switchTab(tab) {
+  document.querySelectorAll(".tab-btn").forEach((b,i) => b.classList.toggle("active",(i===0&&tab==="bank")||(i===1&&tab==="ai")));
+  document.getElementById("tab-bank").classList.toggle("active",tab==="bank");
+  document.getElementById("tab-ai").classList.toggle("active",tab==="ai");
+}
+</script>
+<script src="question_list.js"></script>
+<script src="question_create.js"></script>
+<script src="question_AI.js"></script>
+</body>
+</html>

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Bảng tin</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--cream); font-family: var(--font-body); color: var(--ink); }
+
+.feed-wrap { max-width: 680px; margin: 0 auto; padding: 28px 20px 60px; }
+
+/* ── Header ── */
+.feed-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+}
+.feed-title {
+  font-family: var(--font-display); font-size: 1.45rem; color: var(--navy);
+  display: flex; align-items: center; gap: 10px;
+}
+.feed-title::before {
+  content: ''; display: inline-block; width: 4px; height: 26px;
+  background: linear-gradient(180deg,var(--gold),var(--gold-light)); border-radius: 2px;
+}
+
+/* ── Compose ── */
+.compose-card {
+  background: var(--white); border-radius: 14px;
+  box-shadow: var(--shadow-sm); border: 1px solid var(--border);
+  padding: 16px; margin-bottom: 20px; display: none;
+}
+.compose-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.compose-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  object-fit: cover; border: 2px solid var(--gold-border);
+}
+.compose-name { font-weight: 600; font-size: .85rem; color: var(--navy); }
+.compose-textarea {
+  width: 100%; border: 1.5px solid var(--border); border-radius: 10px;
+  padding: 11px 14px; font-family: var(--font-body); font-size: .88rem;
+  resize: none; transition: .18s; background: var(--surface); color: var(--ink);
+}
+.compose-textarea:focus {
+  outline: none; border-color: var(--gold); background: var(--white);
+  box-shadow: 0 0 0 3px rgba(200,150,42,.1);
+}
+.compose-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 10px; flex-wrap: wrap; gap: 8px;
+}
+.compose-note { font-size: .74rem; color: var(--amber); display: none; }
+.compose-note.show { display: block; }
+
+/* ── Post card ── */
+.post-card {
+  background: var(--white); border-radius: 14px;
+  box-shadow: var(--shadow-sm); border: 1px solid var(--border);
+  margin-bottom: 14px; overflow: hidden; transition: box-shadow .2s;
+}
+.post-card:hover { box-shadow: var(--shadow); }
+.post-card.pinned  { border-top: 3px solid var(--gold); }
+.post-card.pending-card  { border-left: 3px solid var(--amber); opacity: .92; }
+.post-card.rejected-card { border-left: 3px solid var(--red);   opacity: .75; }
+
+.post-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 0; }
+.post-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  object-fit: cover; border: 2px solid var(--gold-border); flex-shrink: 0;
+}
+.post-meta { flex: 1; min-width: 0; }
+.post-author {
+  font-weight: 600; font-size: .88rem; color: var(--navy);
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.post-time { font-size: .71rem; color: var(--ink-light); margin-top: 1px; }
+
+.badge-pin      { font-size: .68rem; font-weight: 700; background: var(--gold-pale); color: var(--gold); border: 1px solid var(--gold-border); padding: 1px 8px; border-radius: 20px; }
+.badge-pending  { font-size: .68rem; font-weight: 700; background: var(--amber-bg); color: var(--amber); padding: 1px 8px; border-radius: 20px; }
+.badge-rejected { font-size: .68rem; font-weight: 700; background: var(--red-bg);   color: var(--red);   padding: 1px 8px; border-radius: 20px; }
+
+.post-body {
+  padding: 10px 16px 12px; font-size: .9rem; line-height: 1.65;
+  color: var(--ink); white-space: pre-wrap; word-break: break-word;
+}
+.post-pending-notice {
+  margin: 0 16px 10px; padding: 8px 12px;
+  background: var(--amber-bg); border-radius: 8px;
+  font-size: .78rem; color: var(--amber); font-weight: 500;
+}
+.mod-bar { display: flex; gap: 6px; padding: 0 16px 10px; flex-wrap: wrap; }
+
+/* ── Actions ── */
+.post-actions {
+  display: flex; align-items: center; gap: 2px;
+  padding: 6px 10px 8px; border-top: 1px solid var(--surface);
+}
+.act-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 10px; border-radius: 8px; border: none;
+  background: transparent; font-family: var(--font-body);
+  font-size: .8rem; font-weight: 500; color: var(--ink-mid);
+  cursor: pointer; transition: .15s;
+}
+.act-btn:hover        { background: var(--surface); color: var(--navy); }
+.act-btn.liked        { color: #e11d48; }
+.act-btn.pin:hover    { background: var(--gold-pale); color: var(--gold); }
+.act-btn.danger:hover { background: var(--red-bg); color: var(--red); }
+.act-btn.mod-ok:hover { background: var(--green-bg); color: var(--green); }
+.act-btn.mod-no:hover { background: var(--red-bg); color: var(--red); }
+.act-spacer { flex: 1; }
+
+/* ── Comments ── */
+.cmt-section { border-top: 1px solid var(--surface); padding: 0 16px 12px; display: none; }
+.cmt-item { display: flex; gap: 8px; padding: 8px 0; }
+.cmt-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  object-fit: cover; flex-shrink: 0; margin-top: 2px;
+  border: 1.5px solid var(--border);
+}
+.cmt-bubble { background: var(--surface); border-radius: 10px; padding: 7px 11px; flex: 1; }
+.cmt-name   { font-weight: 600; font-size: .77rem; color: var(--navy); margin-bottom: 2px; }
+.cmt-text   { font-size: .83rem; color: var(--ink); line-height: 1.5; }
+.cmt-time   { font-size: .69rem; color: var(--ink-light); margin-top: 3px; }
+.reply-link {
+  font-size: .72rem; color: var(--blue); cursor: pointer;
+  margin-top: 3px; display: inline-block; font-weight: 500;
+}
+.reply-link:hover { text-decoration: underline; }
+.reply-indent { margin-left: 36px; }
+.reply-box { display: none; align-items: center; gap: 8px; margin-top: 6px; padding-left: 36px; }
+.reply-box.open { display: flex; }
+
+.cmt-input-row {
+  display: flex; align-items: center; gap: 8px; padding-top: 10px;
+}
+.cmt-input {
+  flex: 1; border: 1.5px solid var(--border); border-radius: 20px;
+  padding: 7px 14px; font-family: var(--font-body); font-size: .82rem;
+  background: var(--surface); color: var(--ink); outline: none; transition: .15s;
+}
+.cmt-input:focus { border-color: var(--gold); background: var(--white); box-shadow: 0 0 0 3px rgba(200,150,42,.08); }
+.cmt-send {
+  width: 32px; height: 32px; border-radius: 50%; border: none;
+  background: var(--navy); color: var(--gold-light); font-size: 13px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: .15s;
+}
+.cmt-send:hover { background: var(--navy-light); }
+
+/* ── Mod buttons ── */
+.btn-ok  { background: var(--green-bg); color: var(--green); border: 1px solid #a7f3d0; padding: 4px 12px; border-radius: 7px; font-size: .78rem; font-weight: 600; cursor: pointer; font-family: var(--font-body); transition: .15s; }
+.btn-ok:hover  { background: var(--green); color: #fff; }
+.btn-no  { background: var(--red-bg);   color: var(--red);   border: 1px solid #fca5a5; padding: 4px 12px; border-radius: 7px; font-size: .78rem; font-weight: 600; cursor: pointer; font-family: var(--font-body); transition: .15s; }
+.btn-no:hover  { background: var(--red);   color: #fff; }
+
+/* ── Empty ── */
+.empty-feed { text-align: center; padding: 60px 20px; color: var(--ink-light); }
+.empty-feed .icon { font-size: 3rem; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div class="feed-wrap">
+
+  <div class="feed-header">
+    <div class="feed-title">Bảng tin</div>
+  </div>
+
+  <div class="compose-card" id="composeCard">
+    <div class="compose-header">
+      <img class="compose-avatar" id="composeAvatar" src="default-avatar.png">
+      <div class="compose-name" id="composeName"></div>
+    </div>
+    <textarea class="compose-textarea" id="postContent" rows="3"
+      placeholder="Chia sẻ thông báo hoặc bài viết..."></textarea>
+    <div class="compose-footer">
+      <span class="compose-note" id="composeNote">⏳ Bài sẽ được duyệt trước khi hiển thị</span>
+      <button class="btn btn-primary btn-sm" onclick="createPost()">Đăng bài</button>
+    </div>
+  </div>
+
+  <div id="posts"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script>
+let currentUser, role, currentProfile;
+
+async function init() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) { location.href = "index.html"; return; }
+  currentUser = user;
+  const { data: p } = await sb.from("users").select("*").eq("id", user.id).single();
+  role = p.role; currentProfile = p;
+  const card = document.getElementById("composeCard");
+  card.style.display = "block";
+  document.getElementById("composeAvatar").src = p.avatar_url || "default-avatar.png";
+  document.getElementById("composeName").textContent = p.full_name || "Bạn";
+  if (role === "student") document.getElementById("composeNote").classList.add("show");
+  loadPosts();
+}
+
+async function createPost() {
+  const text = document.getElementById("postContent").value.trim();
+  if (!text) return;
+  const status = (role === "admin" || role === "teacher") ? "approved" : "pending";
+  const { error } = await sb.from("posts").insert({ user_id: currentUser.id, content: text, status });
+  if (error) { alert("Lỗi: " + error.message); return; }
+  document.getElementById("postContent").value = "";
+  loadPosts();
+}
+
+async function loadPosts() {
+  const { data: posts } = await sb
+    .from("posts")
+    .select(`*, users(full_name,avatar_url), likes(count), comments(count)`)
+    .order("is_pinned", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  const wrap = document.getElementById("posts");
+  if (!posts?.length) {
+    wrap.innerHTML = `<div class="empty-feed"><div class="icon">📭</div><p>Chưa có bài viết nào.</p></div>`;
+    return;
+  }
+  wrap.innerHTML = "";
+  for (const post of posts) {
+    wrap.appendChild(buildCard(post));
+    loadComments(post.id);
+  }
+}
+
+function buildCard(post) {
+  const isPending  = post.status === "pending";
+  const isRejected = post.status === "rejected";
+  const isMyPost   = post.user_id === currentUser.id;
+  const canMod     = role === "admin" || role === "teacher";
+  const isAdmin    = role === "admin";
+
+  const div = document.createElement("div");
+  div.id = "post_" + post.id;
+  div.className = "post-card" +
+    (post.is_pinned  ? " pinned"        : "") +
+    (isPending       ? " pending-card"  : "") +
+    (isRejected      ? " rejected-card" : "");
+
+  const dt = new Date(post.created_at);
+  const timeStr = dt.toLocaleString("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+
+  const likeCount = post.likes?.[0]?.count ?? 0;
+  const cmtCount  = post.comments?.[0]?.count ?? 0;
+
+  const statusBadge = isPending  ? `<span class="badge-pending">Chờ duyệt</span>`
+                    : isRejected ? `<span class="badge-rejected">Từ chối</span>` : "";
+
+  const modBar = (canMod && isPending) ? `
+    <div class="mod-bar">
+      <button class="btn-ok" onclick="moderatePost('${post.id}','approved')">✅ Duyệt</button>
+      <button class="btn-no" onclick="moderatePost('${post.id}','rejected')">❌ Từ chối</button>
+    </div>` : "";
+
+  const pendingNotice = (isPending && isMyPost && role === "student")
+    ? `<div class="post-pending-notice">⏳ Bài đang chờ admin/giáo viên duyệt</div>` : "";
+
+  const actionBar = (!isPending && !isRejected) ? `
+    <div class="post-actions">
+      <button class="act-btn" id="likeBtn_${post.id}" onclick="likePost('${post.id}')">❤️ <span id="likeCount_${post.id}">${likeCount}</span></button>
+      <button class="act-btn" onclick="toggleCmt('${post.id}')">💬 ${cmtCount}</button>
+      <div class="act-spacer"></div>
+      ${isAdmin && !post.is_pinned ? `<button class="act-btn pin" onclick="pinPost('${post.id}')">📌 Ghim</button>` : ""}
+      ${(isAdmin || isMyPost) ? `<button class="act-btn danger" onclick="deletePost('${post.id}')">🗑</button>` : ""}
+    </div>
+    <div class="cmt-section" id="cmt_${post.id}">
+      <div id="cmtList_${post.id}"></div>
+      <div class="cmt-input-row">
+        <img class="cmt-avatar" src="${currentProfile?.avatar_url||'default-avatar.png'}" onerror="this.src='default-avatar.png'">
+        <input class="cmt-input" id="cmtIn_${post.id}" placeholder="Viết bình luận..."
+          onkeydown="if(event.key==='Enter')commentPost('${post.id}')">
+        <button class="cmt-send" onclick="commentPost('${post.id}')">➤</button>
+      </div>
+    </div>` : "";
+
+  div.innerHTML = `
+    <div class="post-head">
+      <img class="post-avatar" src="${post.users?.avatar_url||'default-avatar.png'}" onerror="this.src='default-avatar.png'">
+      <div class="post-meta">
+        <div class="post-author">
+          ${esc(post.users?.full_name??"Người dùng")}
+          ${post.is_pinned ? '<span class="badge-pin">📌 Đã ghim</span>' : ""}
+          ${statusBadge}
+        </div>
+        <div class="post-time">${timeStr}</div>
+      </div>
+    </div>
+    <div class="post-body">${esc(post.content)}</div>
+    ${pendingNotice}${modBar}${actionBar}`;
+
+  return div;
+}
+
+window.toggleCmt = function(pid) {
+  const s = document.getElementById("cmt_" + pid);
+  if (!s) return;
+  const open = s.style.display === "block";
+  s.style.display = open ? "none" : "block";
+  if (!open) { loadComments(pid); setTimeout(()=>document.getElementById("cmtIn_"+pid)?.focus(),80); }
+};
+
+window.likePost = async function(pid) {
+  const { error } = await sb.from("likes").insert({ post_id: pid, user_id: currentUser.id });
+  if (error) return;
+  const el = document.getElementById("likeCount_" + pid);
+  if (el) el.textContent = parseInt(el.textContent) + 1;
+  document.getElementById("likeBtn_" + pid)?.classList.add("liked");
+};
+
+window.pinPost = async function(pid) {
+  const { error } = await sb.from("posts").update({ is_pinned: true }).eq("id", pid);
+  if (error) { alert("Lỗi: " + error.message); return; }
+  loadPosts();
+};
+
+window.moderatePost = async function(pid, status) {
+  if (!confirm(status === "approved" ? "Duyệt bài này?" : "Từ chối bài này?")) return;
+  const { error } = await sb.from("posts").update({ status }).eq("id", pid);
+  if (error) { alert("Lỗi: " + error.message); return; }
+  loadPosts();
+};
+
+window.deletePost = async function(pid) {
+  if (!confirm("Xóa bài này?")) return;
+  await sb.from("comments").delete().eq("post_id", pid);
+  await sb.from("likes").delete().eq("post_id", pid);
+  const { error } = await sb.from("posts").delete().eq("id", pid);
+  if (error) { alert("Lỗi: " + error.message); return; }
+  document.getElementById("post_" + pid)?.remove();
+};
+
+window.commentPost = async function(pid) {
+  const inp = document.getElementById("cmtIn_" + pid);
+  const txt = inp?.value.trim();
+  if (!txt) return;
+  await sb.from("comments").insert({ post_id: pid, user_id: currentUser.id, content: txt });
+  inp.value = "";
+  loadComments(pid);
+};
+
+window.showReply = function(cid) {
+  const box = document.getElementById("rbox_" + cid);
+  if (!box) return;
+  box.classList.toggle("open");
+  if (box.classList.contains("open")) box.querySelector("input")?.focus();
+};
+
+window.sendReply = async function(pid, parentId) {
+  const inp = document.getElementById("rIn_" + parentId);
+  const txt = inp?.value.trim();
+  if (!txt) return;
+  await sb.from("comments").insert({ post_id: pid, user_id: currentUser.id, content: txt, parent_id: parentId });
+  inp.value = "";
+  loadComments(pid);
+};
+
+async function loadComments(pid) {
+  const { data } = await sb
+    .from("comments")
+    .select("*, users(full_name,avatar_url)")
+    .eq("post_id", pid)
+    .order("created_at", { ascending: true });
+  const list = document.getElementById("cmtList_" + pid);
+  if (!list) return;
+  const tops    = (data||[]).filter(c => !c.parent_id);
+  const replies = (data||[]).filter(c =>  c.parent_id);
+  list.innerHTML = tops.map(c => {
+    const t = new Date(c.created_at).toLocaleString("vi-VN",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+    const rHtml = replies.filter(r => r.parent_id === c.id).map(r => `
+      <div class="cmt-item reply-indent">
+        <img class="cmt-avatar" src="${r.users?.avatar_url||'default-avatar.png'}" onerror="this.src='default-avatar.png'">
+        <div class="cmt-bubble">
+          <div class="cmt-name">${esc(r.users?.full_name??"User")}</div>
+          <div class="cmt-text">${esc(r.content)}</div>
+        </div>
+      </div>`).join("");
+    return `
+      <div class="cmt-item">
+        <img class="cmt-avatar" src="${c.users?.avatar_url||'default-avatar.png'}" onerror="this.src='default-avatar.png'">
+        <div style="flex:1">
+          <div class="cmt-bubble">
+            <div class="cmt-name">${esc(c.users?.full_name??"User")}</div>
+            <div class="cmt-text">${esc(c.content)}</div>
+            <div class="cmt-time">${t}</div>
+          </div>
+          <span class="reply-link" onclick="showReply('${c.id}')">Trả lời</span>
+          <div class="reply-box" id="rbox_${c.id}">
+            <input class="cmt-input" id="rIn_${c.id}" placeholder="Trả lời..."
+              onkeydown="if(event.key==='Enter')sendReply('${pid}','${c.id}')">
+            <button class="cmt-send" onclick="sendReply('${pid}','${c.id}')">➤</button>
+          </div>
+          ${rHtml}
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function esc(s) {
+  return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+init();
+</script>
+</body>
+</html>

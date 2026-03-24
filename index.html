@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tư Duy Toàn Diện — Đăng nhập</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0f1f3d;--navy-mid:#1a3460;
+  --gold:#c8962a;--gold-light:#e4b84d;--gold-pale:#fdf4dc;--gold-border:#e8c96a;
+  --cream:#fdfaf4;--white:#fff;
+  --ink:#1a2340;--ink-mid:#4a5578;--ink-light:#8b94ae;
+  --border:#e8eaf0;
+  --font-display:'Playfair Display',Georgia,serif;
+  --font-body:'DM Sans',system-ui,sans-serif;
+  --t:.18s ease;
+}
+body{
+  font-family:var(--font-body);
+  min-height:100vh;
+  background:var(--navy);
+  display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+}
+
+/* Background pattern */
+body::before{
+  content:'';position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 80%, rgba(200,150,42,.18) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 80% at 80% 20%, rgba(26,52,96,.8) 0%, transparent 60%);
+}
+.bg-dots{
+  position:absolute;inset:0;
+  background-image:radial-gradient(rgba(228,184,77,.1) 1px, transparent 1px);
+  background-size:28px 28px;
+}
+
+.login-wrap{
+  position:relative;z-index:1;
+  display:flex;gap:0;
+  border-radius:20px;overflow:hidden;
+  box-shadow:0 24px 80px rgba(0,0,0,.45);
+  width:min(94vw,860px);
+}
+
+/* Left panel — branding */
+.brand-panel{
+  width:320px;flex-shrink:0;
+  background:linear-gradient(160deg, var(--navy-mid) 0%, #0d1b35 100%);
+  padding:48px 36px;
+  display:flex;flex-direction:column;justify-content:space-between;
+  border-right:1px solid rgba(228,184,77,.15);
+}
+.brand-logo{
+  font-family:var(--font-display);font-size:1.6rem;
+  color:var(--gold-light);line-height:1.2;
+  margin-bottom:8px;
+}
+.brand-sub{
+  font-size:.78rem;color:rgba(228,184,77,.6);
+  letter-spacing:.12em;text-transform:uppercase;
+  margin-bottom:36px;
+}
+.brand-divider{
+  width:48px;height:2px;
+  background:linear-gradient(90deg,var(--gold),transparent);
+  margin-bottom:28px;
+}
+.brand-tagline{
+  font-size:.9rem;color:rgba(255,255,255,.65);
+  line-height:1.7;
+}
+.brand-badge{
+  margin-top:auto;display:flex;align-items:center;gap:10px;
+  padding:12px 16px;background:rgba(200,150,42,.1);
+  border:1px solid rgba(200,150,42,.2);border-radius:10px;
+}
+.brand-badge span{font-size:.78rem;color:rgba(255,255,255,.6)}
+.brand-badge strong{font-size:.85rem;color:var(--gold-light);display:block}
+
+/* Right panel — form */
+.form-panel{
+  flex:1;background:var(--white);padding:48px 40px;
+  display:flex;flex-direction:column;justify-content:center;
+}
+.form-panel h2{
+  font-family:var(--font-display);color:var(--navy);
+  font-size:1.6rem;margin-bottom:6px;
+}
+.form-sub{font-size:.85rem;color:var(--ink-mid);margin-bottom:32px;}
+
+.field{margin-bottom:18px;}
+.field label{
+  display:block;font-size:.75rem;font-weight:600;
+  color:var(--ink-mid);margin-bottom:6px;
+  letter-spacing:.06em;text-transform:uppercase;
+}
+.field input{
+  width:100%;padding:11px 14px;
+  border:1.5px solid var(--border);border-radius:10px;
+  font-family:var(--font-body);font-size:.9rem;color:var(--ink);
+  transition:var(--t);background:var(--cream);
+}
+.field input:focus{
+  outline:none;border-color:var(--gold);
+  box-shadow:0 0 0 3px rgba(200,150,42,.12);
+  background:var(--white);
+}
+.field input::placeholder{color:var(--ink-light);}
+
+.btn-submit{
+  width:100%;padding:12px;border:none;border-radius:10px;
+  font-family:var(--font-body);font-size:.95rem;font-weight:600;
+  cursor:pointer;transition:var(--t);
+  background:linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
+  color:var(--gold-light);
+  box-shadow:0 4px 16px rgba(15,31,61,.25);
+  position:relative;overflow:hidden;
+}
+.btn-submit::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg, transparent 0%, rgba(228,184,77,.08) 100%);
+}
+.btn-submit:hover{background:linear-gradient(135deg, var(--navy-mid) 0%, #1e4080 100%);color:#fff;}
+.btn-submit:active{transform:scale(.99);}
+
+.switch-row{
+  text-align:center;margin-top:20px;
+  font-size:.85rem;color:var(--ink-mid);
+}
+.switch-link{
+  color:var(--gold);font-weight:600;cursor:pointer;
+  text-decoration:none;transition:var(--t);
+}
+.switch-link:hover{color:var(--navy);text-decoration:underline;}
+
+.hidden{display:none!important;}
+
+/* Toast */
+#toast{
+  position:fixed;bottom:24px;right:24px;z-index:9999;
+  background:var(--navy);color:var(--gold-light);
+  padding:12px 20px;border-radius:10px;
+  box-shadow:0 8px 32px rgba(0,0,0,.35);
+  font-size:.875rem;font-weight:500;
+  transform:translateY(8px);opacity:0;transition:all .25s ease;
+  pointer-events:none;
+}
+#toast.show{transform:translateY(0);opacity:1;}
+
+@media(max-width:640px){
+  .login-wrap{flex-direction:column;width:94vw;}
+  .brand-panel{width:100%;padding:28px 24px;}
+  .form-panel{padding:28px 24px;}
+}
+</style>
+</head>
+<body>
+<div class="bg-dots"></div>
+
+<div class="login-wrap">
+  <!-- Brand -->
+  <div class="brand-panel">
+    <div>
+      <div class="brand-logo">Tư Duy<br>Toàn Diện</div>
+      <div class="brand-sub">School Management</div>
+      <div class="brand-divider"></div>
+      <div class="brand-tagline">
+        Nền tảng quản lý học tập toàn diện — điểm danh, học phí, ngân hàng câu hỏi và đề kiểm tra trong một hệ thống.
+      </div>
+    </div>
+    <div class="brand-badge">
+      <div>🎓</div>
+      <div>
+        <strong>Dành cho giáo viên & học sinh</strong>
+        <span>Được tin dùng bởi các trung tâm</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form -->
+  <div class="form-panel">
+    <h2 id="formTitle">Đăng nhập</h2>
+    <p class="form-sub" id="formSub">Chào mừng trở lại! Nhập thông tin để tiếp tục.</p>
+
+    <div class="field">
+      <label>Email</label>
+      <input id="email" type="email" placeholder="example@email.com" autocomplete="email">
+    </div>
+    <div class="field">
+      <label>Mật khẩu</label>
+      <input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <div class="field hidden" id="pw2Wrap">
+      <label>Nhập lại mật khẩu</label>
+      <input id="password2" type="password" placeholder="••••••••">
+    </div>
+
+    <button class="btn-submit" onclick="submitForm()" id="submitBtn">Đăng nhập</button>
+
+    <div class="switch-row">
+      <span id="switchText">Chưa có tài khoản? </span>
+      <span class="switch-link" onclick="toggleMode()" id="switchLink">Đăng ký ngay</span>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script>
+let isLogin = true;
+
+function toggleMode() {
+  isLogin = !isLogin;
+  const pw2 = document.getElementById("pw2Wrap");
+  if (isLogin) {
+    document.getElementById("formTitle").textContent = "Đăng nhập";
+    document.getElementById("formSub").textContent = "Chào mừng trở lại! Nhập thông tin để tiếp tục.";
+    document.getElementById("submitBtn").textContent = "Đăng nhập";
+    document.getElementById("switchText").textContent = "Chưa có tài khoản? ";
+    document.getElementById("switchLink").textContent = "Đăng ký ngay";
+    pw2.classList.add("hidden");
+  } else {
+    document.getElementById("formTitle").textContent = "Tạo tài khoản";
+    document.getElementById("formSub").textContent = "Điền thông tin để bắt đầu hành trình học tập.";
+    document.getElementById("submitBtn").textContent = "Tạo tài khoản";
+    document.getElementById("switchText").textContent = "Đã có tài khoản? ";
+    document.getElementById("switchLink").textContent = "Đăng nhập";
+    pw2.classList.remove("hidden");
+  }
+}
+
+async function submitForm() {
+  const email = document.getElementById("email").value.trim();
+  const pw    = document.getElementById("password").value;
+  const pw2   = document.getElementById("password2").value;
+  if (!email || !pw) { toast("Vui lòng nhập email và mật khẩu"); return; }
+  const btn = document.getElementById("submitBtn");
+  btn.disabled = true; btn.textContent = "Đang xử lý...";
+  try {
+    if (isLogin) {
+      const { error } = await sb.auth.signInWithPassword({ email, password: pw });
+      if (error) { toast("Email hoặc mật khẩu không đúng"); return; }
+      toast("Đăng nhập thành công ✓");
+      setTimeout(() => { window.location.href = "dashboard.html"; }, 700);
+    } else {
+      if (pw !== pw2) { toast("Mật khẩu nhập lại không khớp"); return; }
+      const { data, error } = await sb.auth.signUp({ email, password: pw });
+      if (error || !data.user) { toast(error?.message || "Email đã được đăng ký"); return; }
+      toast("Đăng ký thành công! Hãy đăng nhập.");
+      toggleMode();
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = isLogin ? "Đăng nhập" : "Tạo tài khoản";
+  }
+}
+
+function toast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg; el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), 2500);
+}
+
+// Enter key
+document.addEventListener("keydown", e => { if (e.key === "Enter") submitForm(); });
+</script>
+</body>
+</html>

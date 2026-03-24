@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0; font-family: var(--font-body);
+  display: flex; height: 100vh;
+  background: var(--cream); visibility: hidden; color: var(--ink);
+}
+
+/* ── Trigger zone (invisible strip on the left edge) ── */
+#sidebarTrigger {
+  position: fixed; top: 0; left: 0;
+  width: 16px; height: 100vh;
+  z-index: 200;
+}
+
+/* ── Sidebar ── */
+aside {
+  position: fixed; top: 0; left: 0; height: 100vh;
+  width: 240px; background: var(--navy); color: #fff;
+  padding: 20px 14px; display: flex; flex-direction: column; flex-shrink: 0;
+  transform: translateX(-100%);
+  transition: transform .25s cubic-bezier(.4,0,.2,1), box-shadow .25s;
+  z-index: 201;
+  box-shadow: none;
+}
+aside.open {
+  transform: translateX(0);
+  box-shadow: 4px 0 32px rgba(10,20,40,.22);
+}
+
+/* Tab kéo nhỏ luôn hiển thị ở cạnh trái */
+#sidebarTab {
+  position: fixed; top: 50%; left: 0;
+  transform: translateY(-50%);
+  width: 18px; height: 56px;
+  background: var(--navy);
+  border-radius: 0 8px 8px 0;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; z-index: 199;
+  transition: width .2s, left .25s cubic-bezier(.4,0,.2,1);
+  box-shadow: 2px 0 8px rgba(10,20,40,.18);
+}
+#sidebarTab::after {
+  content: '›';
+  color: var(--gold-light);
+  font-size: 1rem; font-weight: 700;
+  transition: transform .25s;
+}
+aside.open ~ #sidebarTab,
+#sidebarTab.open {
+  left: 240px;
+}
+#sidebarTab.open::after {
+  transform: rotate(180deg);
+}
+
+.logo {
+  font-family: var(--font-display); font-size: 1.1rem; font-weight: 700;
+  color: var(--gold-light); margin-bottom: 20px; padding: 0 6px;
+  display: flex; align-items: center; gap: 8px;
+}
+.logo::before {
+  content: ''; width: 3px; height: 18px;
+  background: linear-gradient(180deg,var(--gold),var(--gold-light));
+  border-radius: 2px; flex-shrink: 0;
+}
+
+#userBox {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 20px; padding: 10px;
+  border-radius: 10px; background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.08);
+}
+#userAvatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  object-fit: cover; border: 2px solid var(--gold-border); flex-shrink: 0;
+}
+#userName { font-size: .85rem; font-weight: 600; color: #fff; }
+.logoutBtn {
+  font-size: .72rem; background: rgba(239,68,68,.15);
+  border: 1px solid rgba(239,68,68,.3); padding: 3px 9px;
+  border-radius: 5px; color: #fca5a5; cursor: pointer;
+  margin-top: 3px; font-family: var(--font-body); transition: .15s;
+}
+.logoutBtn:hover { background: #ef4444; color: #fff; border-color: #ef4444; }
+
+aside ul { list-style: none; padding: 0; margin: 0; flex: 1; }
+aside li {
+  padding: 10px 12px; cursor: pointer; border-radius: 8px;
+  margin-bottom: 3px; font-size: .86rem; font-weight: 500;
+  transition: .15s; color: rgba(255,255,255,.7);
+  display: flex; align-items: center; gap: 8px;
+}
+aside li:hover { background: rgba(255,255,255,.08); color: #fff; }
+aside li.active {
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
+  color: var(--navy); font-weight: 700;
+}
+
+/* Overlay mờ khi sidebar mở */
+#sidebarOverlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(10,20,40,.25);
+  z-index: 200;
+  backdrop-filter: blur(1px);
+}
+#sidebarOverlay.show { display: block; }
+
+/* ── Main — full width vì sidebar overlay ── */
+main { flex: 1; display: flex; flex-direction: column; overflow: hidden; width: 100%; }
+.content { flex: 1; padding: 0; overflow: hidden; }
+iframe { width: 100%; height: 100%; border: none; background: var(--white); }
+
+/* ── Modal ── */
+.modal {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(10,20,40,.5); backdrop-filter: blur(3px);
+  display: none; align-items: center; justify-content: center; z-index: 999;
+}
+.modal-box {
+  background: var(--white); padding: 28px; border-radius: 14px; width: 360px;
+  text-align: center; box-shadow: var(--shadow-lg); border-top: 4px solid var(--gold);
+}
+.modal-box h3 { font-family: var(--font-display); color: var(--navy); margin-bottom: 10px; }
+.modal-box p  { font-size: .85rem; color: var(--ink-mid); margin-bottom: 6px; }
+.modal-box button {
+  margin-top: 16px; padding: 10px 24px; border: none;
+  background: var(--navy); color: var(--gold-light);
+  border-radius: 8px; cursor: pointer; font-family: var(--font-body);
+  font-weight: 600; font-size: .9rem;
+}
+.modal-box button:hover { background: var(--navy-light); }
+</style>
+</head>
+<body>
+
+<!-- Vùng trigger ẩn ở cạnh trái -->
+<div id="sidebarTrigger"></div>
+
+<!-- Overlay -->
+<div id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<aside id="sidebar">
+  <div class="logo">Tư Duy Toàn Diện</div>
+
+  <div id="userBox">
+    <img id="userAvatar" src="default-avatar.png">
+    <div>
+      <div id="userName">User</div>
+      <button class="logoutBtn" onclick="logout()">Đăng xuất</button>
+    </div>
+  </div>
+
+  <ul id="menu">
+    <li data-role="admin,teacher,student" data-page="home.html">🏠 Trang chủ</li>
+    <li data-role="admin,teacher,student" data-page="class.html">📘 Lớp học</li>
+    <li data-role="admin,teacher,student" data-page="public_exam.html">🎯 Đề thi</li>
+    <li data-role="admin,teacher"         data-page="question.html">📝 Ngân hàng câu hỏi</li>
+    <li data-role="admin,teacher"         data-page="exam.html">📄 Đề kiểm tra</li>
+    <li data-role="admin,student"         data-page="tuition.html">💰 Học phí</li>
+    <li data-role="admin"                 data-page="sourcedata.html">⚙️ Hệ thống</li>
+    <li data-role="admin,teacher,student" data-page="account.html">👤 Tài khoản</li>
+  </ul>
+</aside>
+
+<!-- Tab kéo nhỏ cạnh trái -->
+<div id="sidebarTab" onclick="toggleSidebar()"></div>
+
+<main>
+  <div class="content">
+    <iframe id="contentFrame"></iframe>
+  </div>
+</main>
+
+<div id="profileModal" class="modal">
+  <div class="modal-box">
+    <h3>⚠ Cập nhật thông tin</h3>
+    <p>Bạn chưa cập nhật đầy đủ thông tin cá nhân.</p>
+    <p>Vui lòng cập nhật để sử dụng đầy đủ chức năng.</p>
+    <button onclick="goToAccount()">Cập nhật ngay</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script>
+/* ── Sidebar toggle ── */
+const sidebar  = document.getElementById("sidebar");
+const tab      = document.getElementById("sidebarTab");
+const overlay  = document.getElementById("sidebarOverlay");
+const trigger  = document.getElementById("sidebarTrigger");
+
+function openSidebar() {
+  sidebar.classList.add("open");
+  tab.classList.add("open");
+  overlay.classList.add("show");
+}
+function closeSidebar() {
+  sidebar.classList.remove("open");
+  tab.classList.remove("open");
+  overlay.classList.remove("show");
+}
+function toggleSidebar() {
+  sidebar.classList.contains("open") ? closeSidebar() : openSidebar();
+}
+
+// Kéo chuột vào vùng 16px cạnh trái → mở sidebar
+trigger.addEventListener("mouseenter", openSidebar);
+
+// Giữ sidebar mở khi chuột ở trong sidebar
+sidebar.addEventListener("mouseleave", e => {
+  // Chỉ đóng nếu chuột không sang tab
+  if (!tab.matches(":hover")) closeSidebar();
+});
+tab.addEventListener("mouseleave", e => {
+  if (!sidebar.matches(":hover")) closeSidebar();
+});
+
+/* ── Dashboard init ── */
+async function initDashboard(){
+  const { data:{ user } } = await sb.auth.getUser();
+  if(!user){ window.location.href = "index.html"; return; }
+
+  const { data: profile, error } = await sb.from("users").select("*").eq("id", user.id).maybeSingle();
+  if(error || !profile){ alert("Không tìm thấy thông tin người dùng"); return; }
+
+  applyRoleMenu(profile.role);
+  setupMenu();
+  checkProfile(profile);
+  loadUserInfo(profile);
+  document.body.style.visibility = "visible";
+}
+
+function loadUserInfo(profile){
+  document.getElementById("userName").innerText = profile.full_name || "User";
+  if(profile.avatar_url) document.getElementById("userAvatar").src = profile.avatar_url;
+}
+
+async function logout(){
+  await sb.auth.signOut();
+  window.location.href = "index.html";
+}
+
+function applyRoleMenu(role){
+  document.querySelectorAll("#menu li").forEach(item => {
+    const roles = item.dataset.role.split(",");
+    item.style.display = roles.includes(role) ? "flex" : "none";
+  });
+}
+
+function setupMenu(){
+  const items = document.querySelectorAll("#menu li");
+  items.forEach(item => {
+    item.addEventListener("click", () => {
+      items.forEach(i => i.classList.remove("active"));
+      item.classList.add("active");
+      if(item.dataset.page) document.getElementById("contentFrame").src = item.dataset.page;
+      closeSidebar();
+    });
+  });
+  // Click trang đầu tiên visible
+  const first = [...items].find(i => i.style.display !== "none");
+  if(first) first.click();
+}
+
+function checkProfile(profile){
+  if(profile.role === "student" &&
+    (!profile.full_name || !profile.phone || !profile.birth_year)){
+    document.getElementById("profileModal").style.display = "flex";
+  }
+}
+
+function goToAccount(){
+  document.getElementById("profileModal").style.display = "none";
+  document.querySelectorAll("#menu li").forEach(item => {
+    if(item.dataset.page?.includes("account")){
+      item.click();
+    }
+  });
+}
+
+initDashboard();
+</script>
+</body>
+</html>
