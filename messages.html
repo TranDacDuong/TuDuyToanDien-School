@@ -125,10 +125,11 @@ let currentUser = null;
 let currentProfile = null;
 let currentConversationId = null;
 let activeFriend = null;
-let refreshTimer = null;
 let friendMap = new Map();
 let allFriends = [];
 let selectedUserFromQuery = null;
+let messageChannel = null;
+let notificationChannel = null;
 
 async function createNotification(userId, type, message, refId) {
   if (!userId || userId === currentUser.id) return;
@@ -151,6 +152,7 @@ async function init() {
   const { data: profile } = await sb.from("users").select("*").eq("id", user.id).single();
   currentProfile = profile;
   selectedUserFromQuery = new URLSearchParams(location.search).get("user");
+  subscribeNotificationChanges();
   await loadFriends();
 }
 
@@ -221,9 +223,14 @@ async function loadFriends() {
   friendMap = new Map(enriched.map(item => [item.friend_id, item]));
   renderFriendList(enriched);
 
-  const selectedUserId = activeFriend?.id || selectedUserFromQuery;
+  if (activeFriend?.id) {
+    document.getElementById("friend_" + activeFriend.id)?.classList.add("active");
+  }
+
+  const selectedUserId = !currentConversationId ? selectedUserFromQuery : null;
   if (selectedUserId && friendMap.has(selectedUserId)) {
     const item = friendMap.get(selectedUserId);
+    selectedUserFromQuery = null;
     openConversation(
       selectedUserId,
       item.users?.full_name || "Người dùng",
@@ -283,14 +290,9 @@ window.openConversation = async function(friendId, friendName, friendAvatar, fri
 
   currentConversationId = await ensureConversation(friendId);
   await markMessageNotificationsRead(friendId);
-  await loadFriends();
   await loadMessages();
-
-  if (refreshTimer) clearInterval(refreshTimer);
-  refreshTimer = setInterval(async () => {
-    await loadFriends();
-    await loadMessages();
-  }, 5000);
+  await loadFriends();
+  subscribeConversationMessages(currentConversationId);
 };
 
 async function markMessageNotificationsRead(friendId) {
@@ -337,6 +339,44 @@ async function ensureConversation(friendId) {
   ], { onConflict: "conversation_id,user_id" });
 
   return conversation.id;
+}
+
+function subscribeConversationMessages(conversationId) {
+  if (messageChannel) {
+    sb.removeChannel(messageChannel);
+    messageChannel = null;
+  }
+  if (!conversationId) return;
+
+  messageChannel = sb
+    .channel("messages:" + conversationId)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "messages", filter: "conversation_id=eq." + conversationId },
+      async () => {
+        await loadMessages();
+        await loadFriends();
+      }
+    )
+    .subscribe();
+}
+
+function subscribeNotificationChanges() {
+  if (notificationChannel) {
+    sb.removeChannel(notificationChannel);
+    notificationChannel = null;
+  }
+
+  notificationChannel = sb
+    .channel("message-notifications:" + currentUser.id)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "notifications", filter: "user_id=eq." + currentUser.id },
+      async () => {
+        await loadFriends();
+      }
+    )
+    .subscribe();
 }
 
 async function loadMessages() {
@@ -397,6 +437,11 @@ window.sendMessage = async function() {
   await loadFriends();
   await loadMessages();
 };
+
+window.addEventListener("beforeunload", () => {
+  if (messageChannel) sb.removeChannel(messageChannel);
+  if (notificationChannel) sb.removeChannel(notificationChannel);
+});
 
 document.getElementById("messageInput").addEventListener("keydown", function(event) {
   if (event.key === "Enter" && !event.shiftKey) {

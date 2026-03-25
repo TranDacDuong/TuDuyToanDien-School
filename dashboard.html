@@ -250,6 +250,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
 <script>
+let badgeChannels = [];
 /* ── Sidebar toggle ── */
 const sidebar  = document.getElementById("sidebar");
 const tab      = document.getElementById("sidebarTab");
@@ -297,6 +298,7 @@ async function initDashboard(){
   loadFriendRequestBadge(user.id);
   loadNotificationBadge(user.id);
   loadMessageBadge(user.id);
+  subscribeBadgeChanges(user.id);
   document.body.style.visibility = "visible";
 }
 
@@ -408,6 +410,39 @@ async function loadMessageBadge(userId){
   badge.textContent = count > 99 ? "99+" : String(count);
   badge.classList.add("show");
 }
+
+function subscribeBadgeChanges(userId){
+  badgeChannels.forEach(channel => sb.removeChannel(channel));
+  badgeChannels = [];
+
+  const notificationChannel = sb
+    .channel("dashboard-notifications:" + userId)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "notifications", filter: "user_id=eq." + userId },
+      () => {
+        loadNotificationBadge(userId);
+        loadMessageBadge(userId);
+      }
+    )
+    .subscribe();
+
+  const friendRequestChannel = sb
+    .channel("dashboard-friend-requests:" + userId)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "friend_requests", filter: "receiver_id=eq." + userId },
+      () => loadFriendRequestBadge(userId)
+    )
+    .subscribe();
+
+  badgeChannels.push(notificationChannel, friendRequestChannel);
+}
+
+window.addEventListener("beforeunload", () => {
+  badgeChannels.forEach(channel => sb.removeChannel(channel));
+  badgeChannels = [];
+});
 
 initDashboard();
 </script>

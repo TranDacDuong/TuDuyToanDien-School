@@ -40,6 +40,7 @@ body { margin: 0; font-family: var(--font-body); background: var(--cream); color
 <script src="supabaseClient.js"></script>
 <script>
 let currentUser = null;
+let notificationChannel = null;
 
 async function init() {
   const { data: { user } } = await sb.auth.getUser();
@@ -48,6 +49,7 @@ async function init() {
     return;
   }
   currentUser = user;
+  subscribeNotifications();
   await loadNotifications();
 }
 
@@ -109,6 +111,22 @@ window.markAllRead = async function() {
   loadNotifications();
 };
 
+function subscribeNotifications() {
+  if (notificationChannel) {
+    sb.removeChannel(notificationChannel);
+    notificationChannel = null;
+  }
+
+  notificationChannel = sb
+    .channel("notifications-page:" + currentUser.id)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "notifications", filter: "user_id=eq." + currentUser.id },
+      () => loadNotifications()
+    )
+    .subscribe();
+}
+
 function formatType(type) {
   if (type === "friend_request") return "đã gửi cho bạn một lời mời kết bạn.";
   if (type === "friend_accept") return "đã chấp nhận lời mời kết bạn.";
@@ -139,6 +157,10 @@ function esc(value) {
 }
 
 init();
+
+window.addEventListener("beforeunload", () => {
+  if (notificationChannel) sb.removeChannel(notificationChannel);
+});
 </script>
 </body>
 </html>
