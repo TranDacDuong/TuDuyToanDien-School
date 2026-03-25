@@ -794,18 +794,18 @@
           const tfOpts = {};
           tfLines.forEach(line => { const m=line.match(/^([a-d])\)\s*(.*)/); if(m) tfOpts[m[1]]=m[2].trim(); });
           ansHtml = lbls.map(lbl => `
-            <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;
-              background:var(--white);border-radius:8px;border:1px solid var(--border);margin-bottom:8px">
-              <span style="font-weight:700;min-width:24px;color:var(--navy);flex-shrink:0">${lbl})</span>
-              <span style="flex:1;min-width:0;font-size:.95rem;color:var(--ink);line-height:1.5">${tfOpts[lbl]||""}</span>
-              <div style="display:flex;align-items:center;gap:14px;flex-shrink:0;white-space:nowrap">
-                <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.88rem;color:#15803d;font-weight:700">
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;
+              background:var(--white);border-radius:6px;border:1px solid var(--border);margin-bottom:6px">
+              <span style="font-weight:700;min-width:22px;color:var(--navy);flex-shrink:0;font-size:.86rem">${lbl})</span>
+              <span style="flex:1;min-width:0;font-size:.88rem;color:var(--ink);line-height:1.4">${tfOpts[lbl]||""}</span>
+              <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;white-space:nowrap">
+                <label style="display:inline-flex;align-items:center;gap:3px;cursor:pointer;font-size:.82rem;color:#15803d;font-weight:700">
                   <input type="radio" name="tf_${qid}_${lbl}" value="T" onchange="window.peTF('${qid}')"
-                    ${saved.includes(lbl+"T")?"checked":""} style="accent-color:#16a34a"> Đ
+                    ${saved.includes(lbl+"T")?"checked":""} style="accent-color:#16a34a;width:14px;height:14px"> Đ
                 </label>
-                <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.88rem;color:#b91c1c;font-weight:700">
+                <label style="display:inline-flex;align-items:center;gap:3px;cursor:pointer;font-size:.82rem;color:#b91c1c;font-weight:700">
                   <input type="radio" name="tf_${qid}_${lbl}" value="F" onchange="window.peTF('${qid}')"
-                    ${saved.includes(lbl+"F")?"checked":""} style="accent-color:#dc2626"> S
+                    ${saved.includes(lbl+"F")?"checked":""} style="accent-color:#dc2626;width:14px;height:14px"> S
                 </label>
               </div>
             </div>`).join("");
