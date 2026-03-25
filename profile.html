@@ -406,6 +406,8 @@ body {
 let currentUser = null;
 let viewedProfile = null;
 let viewedUserId = null;
+let profileChannels = [];
+let profileRefreshTimer = null;
 
 async function createNotification(userId, type, message, refId) {
   if (!userId || userId === currentUser.id) return;
@@ -436,9 +438,70 @@ async function init() {
   renderHeader();
   await renderPostsAndStats();
   await renderFriendList();
+  subscribeProfileRealtime();
 
   document.getElementById("loadingBox").classList.add("hidden");
   document.getElementById("profileView").classList.remove("hidden");
+}
+
+function subscribeProfileRealtime() {
+  clearProfileRealtime();
+
+  const tables = [
+    { table: "users", filter: "id=eq." + viewedUserId, handler: refreshProfileView },
+    { table: "posts", filter: "user_id=eq." + viewedUserId, handler: refreshPostSection },
+    { table: "friendships", handler: refreshProfileView },
+    { table: "friend_requests", handler: refreshRelationshipState }
+  ];
+
+  profileChannels = tables.map(item =>
+    sb
+      .channel("profile:" + item.table + ":" + viewedUserId + ":" + Math.random().toString(36).slice(2))
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: item.table, filter: item.filter },
+        () => item.handler()
+      )
+      .subscribe()
+  );
+}
+
+function clearProfileRealtime() {
+  profileChannels.forEach(channel => sb.removeChannel(channel));
+  profileChannels = [];
+}
+
+function queueProfileRefresh(task) {
+  clearTimeout(profileRefreshTimer);
+  profileRefreshTimer = setTimeout(task, 180);
+}
+
+async function refreshProfileView() {
+  queueProfileRefresh(async () => {
+    const { data: profile } = await sb.from("users").select("*").eq("id", viewedUserId).single();
+    if (profile) {
+      viewedProfile = profile;
+      renderHeader();
+    }
+    await renderPostsAndStats();
+    await renderFriendList();
+  });
+}
+
+async function refreshPostSection() {
+  queueProfileRefresh(async () => {
+    await renderPostsAndStats();
+  });
+}
+
+async function refreshRelationshipState() {
+  queueProfileRefresh(async () => {
+    if (viewedProfile.id !== currentUser.id) {
+      await setupFriendButton();
+    }
+    await renderPostsAndStats();
+    await renderFriendList();
+  });
 }
 
 function renderHeader() {
@@ -791,6 +854,11 @@ function esc(value) {
 function safeUrl(value) {
   return String(value || "").replace(/"/g, "&quot;");
 }
+
+window.addEventListener("beforeunload", () => {
+  clearProfileRealtime();
+  if (profileRefreshTimer) clearTimeout(profileRefreshTimer);
+});
 
 init().catch(err => {
   document.getElementById("loadingBox").classList.add("hidden");
