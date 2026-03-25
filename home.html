@@ -189,6 +189,65 @@ body {
   flex-direction: column;
   gap: 12px;
 }
+.teacher-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+.teacher-card {
+  display: block;
+  padding: 12px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fff 0%, #fbfcff 100%);
+  border: 1px solid rgba(15,31,61,.08);
+  text-decoration: none;
+  color: inherit;
+  transition: .16s ease;
+}
+.teacher-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(15,31,61,.08);
+}
+.teacher-card-avatar {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 18px;
+  object-fit: cover;
+  background: #eef2f7;
+  border: 1px solid rgba(15,31,61,.08);
+}
+.teacher-card-name {
+  margin-top: 10px;
+  color: var(--navy);
+  font-size: .84rem;
+  font-weight: 700;
+}
+.teacher-card-subject {
+  margin-top: 4px;
+  color: var(--ink-light);
+  font-size: .76rem;
+  line-height: 1.45;
+}
+.intro-card-title {
+  color: var(--navy);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.intro-card-text {
+  margin-top: 10px;
+  color: var(--ink);
+  font-size: .84rem;
+  line-height: 1.7;
+}
+.intro-card-text a,
+.overview-post-text a,
+.contact-item a,
+.post-body a,
+.cmt-text a {
+  color: #1877f2;
+  text-decoration: underline;
+}
 .overview-post {
   border: 1px solid rgba(15,31,61,.08);
   border-radius: 16px;
@@ -339,6 +398,12 @@ body {
   font-weight: 700;
   margin-bottom: 10px;
 }
+.admin-note {
+  color: var(--ink-light);
+  font-size: .74rem;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
 .admin-field,
 .admin-textarea,
 .admin-select {
@@ -389,6 +454,12 @@ body {
   color: var(--ink-light);
   font-size: .74rem;
   margin-top: 4px;
+}
+.teacher-admin-item {
+  cursor: grab;
+}
+.teacher-admin-item.dragging {
+  opacity: .55;
 }
 .tiny-btn {
   border: 1px solid rgba(220,38,38,.12);
@@ -1335,6 +1406,46 @@ body {
                 <button class="btn btn-primary btn-sm" type="button" onclick="saveContactInfo()">Lưu liên hệ</button>
               </div>
             </div>
+            <div class="admin-section">
+              <div class="admin-title">Giáo viên trên Trang chủ</div>
+              <div class="admin-note">Chọn giáo viên, kéo thả để sắp xếp hoặc xóa khỏi Trang chủ.</div>
+              <select class="admin-select" id="homeTeacherSelect"></select>
+              <div class="admin-actions">
+                <button class="btn btn-primary btn-sm" type="button" onclick="addTeacherToHome()">Thêm giáo viên</button>
+              </div>
+              <div class="admin-list" id="homeTeacherAdminList"></div>
+            </div>
+            <div class="admin-section full">
+              <div class="admin-title">Giới thiệu trung tâm</div>
+              <input class="admin-field" id="centerIntroTitle" type="text" placeholder="Tiêu đề giới thiệu">
+              <div style="height:10px;"></div>
+              <textarea class="admin-textarea" id="centerIntroContent" placeholder="Nội dung giới thiệu về trung tâm..."></textarea>
+              <div class="admin-actions">
+                <button class="btn btn-primary btn-sm" type="button" onclick="saveCenterIntro()">Lưu bài giới thiệu</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="overview-card">
+        <div class="overview-card-head">
+          <div class="overview-card-title">Giáo viên của trung tâm</div>
+          <div class="overview-card-sub">Danh sách giáo viên do quản trị viên chọn và sắp xếp.</div>
+        </div>
+        <div class="overview-card-body">
+          <div class="teacher-grid" id="overviewTeachers">
+            <div class="empty-feed" style="padding:24px 16px;"><p>Đang tải giáo viên...</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="overview-card">
+        <div class="overview-card-head">
+          <div class="overview-card-title">Giới thiệu trung tâm</div>
+          <div class="overview-card-sub">Bài giới thiệu duy nhất do quản trị viên cập nhật.</div>
+        </div>
+        <div class="overview-card-body">
+          <div class="overview-list" id="overviewIntro">
+            <div class="empty-feed" style="padding:24px 16px;"><p>Đang tải bài giới thiệu...</p></div>
           </div>
         </div>
       </div>
@@ -1469,6 +1580,9 @@ let cachedVisiblePosts = [];
 let examEvents = [];
 let contactInfo = "Trung tâm: liên hệ quản trị viên để được hỗ trợ nhanh.\nGiáo viên: theo dõi thông báo hoặc nhắn tin trực tiếp trong hệ thống.\nKhóa học: xem các cập nhật mới trong mục thông tin trung tâm.";
 let homeSettingsLoaded = false;
+let allTeachers = [];
+let homeTeachers = [];
+let centerIntro = { title: "Giới thiệu trung tâm", content: "" };
 const uiIcons = {
   search: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="6"></circle><path d="M20 20l-4.2-4.2"></path></svg>',
   bell: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M15 17H5.5a1 1 0 0 1-.8-1.6L6 13.5V10a6 6 0 1 1 12 0v3.5l1.3 1.9A1 1 0 0 1 18.5 17H15"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg>',
@@ -1765,6 +1879,7 @@ async function init() {
   document.getElementById("composeName").textContent = p.full_name || "Bạn";
   if (role === "student") document.getElementById("composeNote").classList.add("show");
   document.getElementById("overviewAdminCard")?.classList.toggle("show", role === "admin");
+  document.getElementById("overviewPostCategory")?.style.setProperty("display", "none");
   setupHomeLinks();
   updateFeedFilterButton();
   updateHomeTabs();
@@ -1792,28 +1907,63 @@ async function loadLikedPosts() {
 }
 
 async function loadOverviewSettings() {
-  const [examRes, settingRes] = await Promise.all([
+  const [examRes, settingRes, teacherRes, homeTeacherRes] = await Promise.all([
     sb.from("exam_events").select("*").order("exam_at", { ascending: true }),
-    sb.from("site_settings").select("setting_key,setting_value").eq("setting_key", "home_contact_info").maybeSingle()
+    sb.from("site_settings").select("setting_key,setting_value").in("setting_key", ["home_contact_info", "home_center_intro"]),
+    sb.from("users").select("id, full_name, avatar_url, subject").eq("role", "teacher").order("full_name", { ascending: true }),
+    sb.from("home_teachers").select("id, user_id, sort_order, users(id, full_name, avatar_url, subject)").order("sort_order", { ascending: true })
   ]);
 
   if (!examRes.error) {
     examEvents = examRes.data || [];
   }
-  if (!settingRes.error && settingRes.data) {
-    contactInfo = settingRes.data.setting_value || "";
+  if (!settingRes.error) {
+    const settingsMap = Object.fromEntries((settingRes.data || []).map(item => [item.setting_key, item.setting_value || ""]));
+    if (Object.prototype.hasOwnProperty.call(settingsMap, "home_contact_info")) {
+      contactInfo = settingsMap.home_contact_info || "";
+    }
+    if (settingsMap.home_center_intro) {
+      try {
+        centerIntro = JSON.parse(settingsMap.home_center_intro) || centerIntro;
+      } catch {
+        centerIntro = { title: "Giới thiệu trung tâm", content: settingsMap.home_center_intro || "" };
+      }
+    }
+  }
+  if (!teacherRes.error) {
+    allTeachers = teacherRes.data || [];
+  }
+  if (!homeTeacherRes.error) {
+    homeTeachers = (homeTeacherRes.data || []).map(item => ({
+      id: item.id,
+      user_id: item.user_id,
+      sort_order: item.sort_order,
+      user: item.users
+    }));
   }
 
   homeSettingsLoaded = true;
   renderCountdown();
   renderContactInfo();
   renderAdminExamList();
+  renderHomeTeachers();
+  renderTeacherSelectOptions();
+  renderHomeTeacherAdminList();
+  renderCenterIntro();
+  syncCenterIntroInputs();
   syncContactInput();
 }
 
 function syncContactInput() {
   const input = document.getElementById("contactInfoInput");
   if (input) input.value = contactInfo || "";
+}
+
+function syncCenterIntroInputs() {
+  const titleInput = document.getElementById("centerIntroTitle");
+  const contentInput = document.getElementById("centerIntroContent");
+  if (titleInput) titleInput.value = centerIntro?.title || "";
+  if (contentInput) contentInput.value = centerIntro?.content || "";
 }
 
 function renderContactInfo() {
@@ -1825,7 +1975,7 @@ function renderContactInfo() {
     .filter(Boolean);
 
   wrap.innerHTML = lines.length
-    ? lines.map(line => `<div class="contact-item">${esc(line)}</div>`).join("")
+    ? lines.map(line => `<div class="contact-item">${formatRichText(line)}</div>`).join("")
     : `<div class="empty-feed" style="padding:18px 14px;"><p>Chưa có thông tin liên hệ.</p></div>`;
 }
 
@@ -1843,6 +1993,77 @@ function renderAdminExamList() {
         </div>
       `).join("")
     : `<div class="empty-feed" style="padding:14px 12px;"><p>Chưa có kỳ thi nào.</p></div>`;
+}
+
+function renderTeacherSelectOptions() {
+  const select = document.getElementById("homeTeacherSelect");
+  if (!select) return;
+  const usedIds = new Set(homeTeachers.map(item => item.user_id));
+  const available = allTeachers.filter(teacher => !usedIds.has(teacher.id));
+  select.innerHTML = available.length
+    ? `<option value="">Chọn giáo viên</option>` + available.map(teacher =>
+        `<option value="${teacher.id}">${esc(teacher.full_name || "Giáo viên")} - ${esc(teacher.subject || "Chưa cập nhật môn")}</option>`
+      ).join("")
+    : `<option value="">Không còn giáo viên nào để thêm</option>`;
+}
+
+function renderHomeTeachers() {
+  const wrap = document.getElementById("overviewTeachers");
+  if (!wrap) return;
+  if (!homeTeachers.length) {
+    wrap.innerHTML = `<div class="empty-feed" style="padding:24px 16px;"><p>Chưa có giáo viên nào được ghim trên Trang chủ.</p></div>`;
+    return;
+  }
+  wrap.innerHTML = homeTeachers.map(item => {
+    const teacher = item.user || {};
+    return `
+      <a class="teacher-card" href="profile.html?id=${item.user_id}">
+        <img class="teacher-card-avatar" src="${teacher.avatar_url || 'default-avatar.png'}" alt="${esc(teacher.full_name || 'Giáo viên')}" onerror="this.src='default-avatar.png'">
+        <div class="teacher-card-name">${esc(teacher.full_name || "Giáo viên")}</div>
+        <div class="teacher-card-subject">${esc(teacher.subject || "Chưa cập nhật môn")}</div>
+      </a>
+    `;
+  }).join("");
+}
+
+function renderHomeTeacherAdminList() {
+  const wrap = document.getElementById("homeTeacherAdminList");
+  if (!wrap) return;
+  if (!homeTeachers.length) {
+    wrap.innerHTML = `<div class="empty-feed" style="padding:14px 12px;"><p>Chưa có giáo viên nào trên Trang chủ.</p></div>`;
+    return;
+  }
+  wrap.innerHTML = homeTeachers.map((item, index) => `
+    <div class="admin-list-item teacher-admin-item" draggable="true" data-home-teacher-id="${item.id}" data-index="${index}">
+      <div>
+        <div>${esc(item.user?.full_name || "Giáo viên")}</div>
+        <div class="admin-list-meta">${esc(item.user?.subject || "Chưa cập nhật môn")}</div>
+      </div>
+      <button class="tiny-btn" type="button" onclick="removeTeacherFromHome('${item.id}')">Xóa</button>
+    </div>
+  `).join("");
+
+  wrap.querySelectorAll(".teacher-admin-item").forEach(item => {
+    item.addEventListener("dragstart", handleTeacherDragStart);
+    item.addEventListener("dragover", handleTeacherDragOver);
+    item.addEventListener("drop", handleTeacherDrop);
+    item.addEventListener("dragend", handleTeacherDragEnd);
+  });
+}
+
+function renderCenterIntro() {
+  const wrap = document.getElementById("overviewIntro");
+  if (!wrap) return;
+  if (!centerIntro?.title && !centerIntro?.content) {
+    wrap.innerHTML = `<div class="empty-feed" style="padding:24px 16px;"><p>Chưa có bài giới thiệu nào.</p></div>`;
+    return;
+  }
+  wrap.innerHTML = `
+    <article class="overview-post">
+      <div class="intro-card-title">${esc(centerIntro.title || "Giới thiệu trung tâm")}</div>
+      <div class="intro-card-text">${formatRichText(centerIntro.content || "")}</div>
+    </article>
+  `;
 }
 
 function setupHomeLinks() {
@@ -2274,7 +2495,7 @@ function buildCard(post) {
         <div class="post-time"><a class="post-author-link" href="post.html?id=${post.id}">${timeStr}</a></div>
       </div>
     </div>
-    <div class="post-body">${esc(post.content)}</div>
+    <div class="post-body">${formatRichText(post.content)}</div>
     ${mediaHtml}
     ${pendingNotice}${modBar}${actionBar}`;
 
@@ -2514,7 +2735,7 @@ async function loadComments(pid) {
         <img class="cmt-avatar" src="${r.users?.avatar_url||'default-avatar.png'}" onerror="this.src='default-avatar.png'">
         <div class="cmt-bubble">
           <div class="cmt-name">${esc(r.users?.full_name??"User")}</div>
-          <div class="cmt-text">${esc(r.content)}</div>
+          <div class="cmt-text">${formatRichText(r.content)}</div>
           ${(role === "admin" || r.user_id === currentUser.id) ? `<div class="cmt-tools"><span class="edit-link" onclick="editComment('${pid}','${r.id}',${JSON.stringify(String(r.content || ""))})">Sửa</span><span class="delete-link" onclick="deleteComment('${pid}','${r.id}')">Xóa</span></div>` : ""}
         </div>
       </div>`).join("");
@@ -2524,7 +2745,7 @@ async function loadComments(pid) {
         <div style="flex:1">
           <div class="cmt-bubble">
             <div class="cmt-name">${esc(c.users?.full_name??"User")}</div>
-            <div class="cmt-text">${esc(c.content)}</div>
+            <div class="cmt-text">${formatRichText(c.content)}</div>
             <div class="cmt-time">${t}</div>
           </div>
           <div class="cmt-tools">
@@ -2545,6 +2766,16 @@ async function loadComments(pid) {
 
 function esc(s) {
   return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function formatRichText(text) {
+  const escaped = esc(text || "");
+  return escaped
+    .replace(/((https?:\/\/|www\.)[^\s<]+)/gi, (raw) => {
+      const href = raw.startsWith("http") ? raw : `https://${raw}`;
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${raw}</a>`;
+    })
+    .replace(/\n/g, "<br>");
 }
 
 function inferTitleFromContent(content) {
@@ -2959,8 +3190,152 @@ function subscribeFeedRealtime() {
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "exam_events" }, () => loadOverviewSettings())
     .on("postgres_changes", { event: "*", schema: "public", table: "site_settings" }, () => loadOverviewSettings())
+    .on("postgres_changes", { event: "*", schema: "public", table: "home_teachers" }, () => loadOverviewSettings())
     .subscribe();
 }
+
+function renderOverviewPost(post, compact = false) {
+  return `
+    <article class="overview-post">
+      <a class="overview-post-title" href="post.html?id=${post.id}">${esc(extractPostTitle(post))}</a>
+      <div class="overview-post-meta">${esc(post.users?.full_name || "Hệ thống")} • ${formatPostTime(post.created_at)}</div>
+      <div class="overview-post-text">${formatRichText(extractPostExcerpt(post, compact ? 120 : 180))}</div>
+    </article>
+  `;
+}
+
+function renderOverviewSection(posts) {
+  const newsWrap = document.getElementById("overviewNews");
+  if (!newsWrap) return;
+  const approved = (posts || []).filter(post => post.status === "approved");
+  const newsPosts = approved
+    .filter(post => (post.home_category || "update") === "news")
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 8);
+
+  newsWrap.innerHTML = newsPosts.length
+    ? newsPosts.map(post => `
+        <div class="overview-news-item">
+          <span class="overview-news-dot"></span>
+          <a class="overview-news-link" href="post.html?id=${post.id}">${esc(extractPostTitle(post))}</a>
+        </div>
+      `).join("")
+    : `<div class="empty-feed" style="padding:24px 16px;"><p>Chưa có tin tức nào.</p></div>`;
+
+  document.getElementById("overviewUpdates")?.closest(".overview-card")?.style.setProperty("display", "none");
+  document.getElementById("overviewCourses")?.closest(".overview-card")?.style.setProperty("display", "none");
+  renderHomeTeachers();
+  renderCenterIntro();
+  renderContactInfo();
+  renderCountdown();
+}
+
+let draggedTeacherId = "";
+function handleTeacherDragStart(event) {
+  draggedTeacherId = event.currentTarget.dataset.homeTeacherId || "";
+  event.currentTarget.classList.add("dragging");
+}
+
+function handleTeacherDragOver(event) {
+  event.preventDefault();
+}
+
+async function handleTeacherDrop(event) {
+  event.preventDefault();
+  const targetId = event.currentTarget.dataset.homeTeacherId || "";
+  if (!draggedTeacherId || !targetId || draggedTeacherId === targetId) return;
+  const sourceIndex = homeTeachers.findIndex(item => item.id === draggedTeacherId);
+  const targetIndex = homeTeachers.findIndex(item => item.id === targetId);
+  if (sourceIndex === -1 || targetIndex === -1) return;
+  const reordered = [...homeTeachers];
+  const [moved] = reordered.splice(sourceIndex, 1);
+  reordered.splice(targetIndex, 0, moved);
+  homeTeachers = reordered.map((item, index) => ({ ...item, sort_order: index + 1 }));
+  renderHomeTeachers();
+  renderHomeTeacherAdminList();
+  const payload = homeTeachers.map((item, index) => sb.from("home_teachers").update({ sort_order: index + 1 }).eq("id", item.id));
+  await Promise.all(payload);
+}
+
+function handleTeacherDragEnd(event) {
+  event.currentTarget.classList.remove("dragging");
+  draggedTeacherId = "";
+}
+
+window.addTeacherToHome = async function() {
+  if (role !== "admin") return;
+  const select = document.getElementById("homeTeacherSelect");
+  const userId = select?.value;
+  if (!userId) return;
+  const nextOrder = homeTeachers.length + 1;
+  const { error } = await sb.from("home_teachers").insert({ user_id: userId, sort_order: nextOrder, created_by: currentUser.id });
+  if (error) {
+    alert("Lỗi khi thêm giáo viên: " + error.message);
+    return;
+  }
+  await loadOverviewSettings();
+};
+
+window.removeTeacherFromHome = async function(homeTeacherId) {
+  if (role !== "admin") return;
+  const { error } = await sb.from("home_teachers").delete().eq("id", homeTeacherId);
+  if (error) {
+    alert("Lỗi khi xóa giáo viên khỏi Trang chủ: " + error.message);
+    return;
+  }
+  await loadOverviewSettings();
+};
+
+window.saveCenterIntro = async function() {
+  if (role !== "admin") return;
+  const title = document.getElementById("centerIntroTitle")?.value.trim() || "Giới thiệu trung tâm";
+  const content = document.getElementById("centerIntroContent")?.value.trim() || "";
+  const value = JSON.stringify({ title, content });
+  const { error } = await sb.from("site_settings").upsert({
+    setting_key: "home_center_intro",
+    setting_value: value,
+    updated_by: currentUser.id,
+    updated_at: new Date().toISOString()
+  }, { onConflict: "setting_key" });
+  if (error) {
+    alert("Lỗi khi lưu bài giới thiệu: " + error.message);
+    return;
+  }
+  centerIntro = { title, content };
+  renderCenterIntro();
+};
+
+window.createOverviewPost = async function() {
+  if (role !== "admin") return;
+  const titleInput = document.getElementById("overviewPostTitle");
+  const contentInput = document.getElementById("overviewPostContent");
+  const rawContent = contentInput?.value.trim() || "";
+  const title = (titleInput?.value.trim() || inferTitleFromContent(rawContent) || "Thông báo mới").trim();
+  if (!rawContent) {
+    alert("Bạn cần nhập nội dung cho bài viết Trang chủ.");
+    return;
+  }
+
+  const { error } = await sb.from("posts").insert({
+    user_id: currentUser.id,
+    title,
+    content: rawContent,
+    status: "approved",
+    visibility: "public",
+    feed_tab: "overview",
+    home_category: "news",
+    is_pinned: true
+  });
+
+  if (error) {
+    alert("Lỗi khi đăng tin tức Trang chủ: " + error.message);
+    return;
+  }
+
+  if (titleInput) titleInput.value = "";
+  if (contentInput) contentInput.value = "";
+  await loadPosts();
+};
 
 init();
 </script>

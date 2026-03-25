@@ -636,8 +636,24 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
   CONSTRAINT site_settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS public.home_teachers (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  sort_order integer NOT NULL DEFAULT 1,
+  created_by uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT home_teachers_pkey PRIMARY KEY (id),
+  CONSTRAINT home_teachers_user_id_key UNIQUE (user_id),
+  CONSTRAINT home_teachers_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE,
+  CONSTRAINT home_teachers_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS home_teachers_sort_order_idx
+  ON public.home_teachers (sort_order ASC);
+
 ALTER TABLE public.exam_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.home_teachers ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS exam_events_select_policy ON public.exam_events;
 CREATE POLICY exam_events_select_policy ON public.exam_events
@@ -690,6 +706,48 @@ USING (
   )
 )
 WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS home_teachers_select_policy ON public.home_teachers;
+CREATE POLICY home_teachers_select_policy ON public.home_teachers
+FOR SELECT
+USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS home_teachers_insert_policy ON public.home_teachers;
+CREATE POLICY home_teachers_insert_policy ON public.home_teachers
+FOR INSERT
+WITH CHECK (
+  auth.uid() = created_by
+  AND EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS home_teachers_update_policy ON public.home_teachers;
+CREATE POLICY home_teachers_update_policy ON public.home_teachers
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS home_teachers_delete_policy ON public.home_teachers;
+CREATE POLICY home_teachers_delete_policy ON public.home_teachers
+FOR DELETE
+USING (
   EXISTS (
     SELECT 1 FROM public.users u
     WHERE u.id = auth.uid() AND u.role = 'admin'
