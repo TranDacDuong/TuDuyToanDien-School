@@ -45,6 +45,30 @@ body { margin: 0; font-family: var(--font-body); background: var(--cream); color
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.friend-main { flex: 1; min-width: 0; }
+.friend-top { display: flex; gap: 8px; align-items: center; }
+.friend-time {
+  margin-left: auto;
+  color: var(--ink-light);
+  font-size: .72rem;
+  white-space: nowrap;
+}
+.friend-badge {
+  display: none;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: .72rem;
+  font-weight: 700;
+  align-items: center;
+  justify-content: center;
+  margin-top: 8px;
+  margin-left: auto;
+}
+.friend-badge.show { display: inline-flex; }
 .chat-panel { display: grid; grid-template-rows: auto 1fr auto; min-height: 0; }
 .message-list { padding: 18px; overflow: auto; display: flex; flex-direction: column; gap: 10px; background: linear-gradient(180deg,#fafbff 0%,#f8f5ef 100%); }
 .message-row { display: flex; }
@@ -104,6 +128,7 @@ let activeFriend = null;
 let refreshTimer = null;
 let friendMap = new Map();
 let allFriends = [];
+let selectedUserFromQuery = null;
 
 async function createNotification(userId, type, message, refId) {
   if (!userId || userId === currentUser.id) return;
@@ -125,6 +150,7 @@ async function init() {
   currentUser = user;
   const { data: profile } = await sb.from("users").select("*").eq("id", user.id).single();
   currentProfile = profile;
+  selectedUserFromQuery = new URLSearchParams(location.search).get("user");
   await loadFriends();
 }
 
@@ -155,6 +181,7 @@ async function loadFriends() {
 
     let preview = "";
     let lastActivity = null;
+    let unreadCount = 0;
     if (conversation?.id) {
       const { data: lastMessage } = await sb
         .from("messages")
@@ -170,7 +197,17 @@ async function loadFriends() {
       }
     }
 
-    return { ...item, preview, lastActivity };
+    const { count } = await sb
+      .from("notifications")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", currentUser.id)
+      .eq("actor_id", item.friend_id)
+      .eq("type", "message_new")
+      .eq("is_read", false);
+
+    unreadCount = count || 0;
+
+    return { ...item, preview, lastActivity, unreadCount };
   }));
 
   enriched.sort((a, b) => {
@@ -184,8 +221,7 @@ async function loadFriends() {
   friendMap = new Map(enriched.map(item => [item.friend_id, item]));
   renderFriendList(enriched);
 
-  const params = new URLSearchParams(location.search);
-  const selectedUserId = params.get("user");
+  const selectedUserId = activeFriend?.id || selectedUserFromQuery;
   if (selectedUserId && friendMap.has(selectedUserId)) {
     const item = friendMap.get(selectedUserId);
     openConversation(
@@ -207,11 +243,15 @@ function renderFriendList(list) {
   wrap.innerHTML = list.map(item => `
     <div class="friend-card" id="friend_${item.friend_id}" onclick="openConversation('${item.friend_id}', '${escapeJs(item.users?.full_name || "Người dùng")}', '${escapeJs(item.users?.avatar_url || "default-avatar.png")}', '${escapeJs(item.users?.role || "")}')">
       <img class="avatar" src="${item.users?.avatar_url || "default-avatar.png"}" alt="Avatar" onerror="this.src='default-avatar.png'">
-      <div>
-        <div class="name">${esc(item.users?.full_name || "Người dùng")}</div>
+      <div class="friend-main">
+        <div class="friend-top">
+          <div class="name">${esc(item.users?.full_name || "Người dùng")}</div>
+          <div class="friend-time">${item.lastActivity ? esc(formatListTime(item.lastActivity)) : ""}</div>
+        </div>
         <div class="meta">${esc(formatRole(item.users?.role || ""))}</div>
         <div class="preview">${esc(item.preview || "Chưa có tin nhắn nào")}</div>
       </div>
+      <div class="friend-badge ${item.unreadCount ? "show" : ""}">${item.unreadCount > 99 ? "99+" : item.unreadCount || ""}</div>
     </div>
   `).join("");
 }
@@ -243,10 +283,14 @@ window.openConversation = async function(friendId, friendName, friendAvatar, fri
 
   currentConversationId = await ensureConversation(friendId);
   await markMessageNotificationsRead(friendId);
+  await loadFriends();
   await loadMessages();
 
   if (refreshTimer) clearInterval(refreshTimer);
-  refreshTimer = setInterval(loadMessages, 5000);
+  refreshTimer = setInterval(async () => {
+    await loadFriends();
+    await loadMessages();
+  }, 5000);
 };
 
 async function markMessageNotificationsRead(friendId) {
@@ -350,6 +394,7 @@ window.sendMessage = async function() {
   }
 
   input.value = "";
+  await loadFriends();
   await loadMessages();
 };
 
@@ -361,6 +406,15 @@ document.getElementById("messageInput").addEventListener("keydown", function(eve
 });
 
 function formatTime(value) {
+  return new Date(value).toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function formatListTime(value) {
   return new Date(value).toLocaleString("vi-VN", {
     day: "2-digit",
     month: "2-digit",
