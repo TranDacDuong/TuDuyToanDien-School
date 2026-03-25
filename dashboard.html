@@ -61,6 +61,21 @@ aside.open ~ #sidebarTab,
   transform: rotate(180deg);
 }
 
+@media (max-width: 768px) {
+  #sidebarTrigger {
+    width: 28px;
+  }
+  #sidebarTab {
+    width: 32px;
+    height: 74px;
+    border-radius: 0 12px 12px 0;
+    box-shadow: 3px 0 12px rgba(10,20,40,.22);
+  }
+  #sidebarTab::after {
+    font-size: 1.2rem;
+  }
+}
+
 .logo {
   font-family: var(--font-display); font-size: 1.1rem; font-weight: 700;
   color: var(--gold-light); margin-bottom: 20px; padding: 0 6px;
