@@ -92,6 +92,28 @@ body {
   border-color: transparent;
   color: var(--navy);
 }
+.quick-suggest {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.suggest-chip {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-mid);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-family: var(--font-body);
+  font-size: .8rem;
+  cursor: pointer;
+  transition: .15s;
+}
+.suggest-chip:hover {
+  border-color: var(--gold-border);
+  background: var(--gold-pale);
+  color: var(--navy);
+}
 .meta-line {
   margin-top: 14px;
   color: var(--ink-light);
@@ -153,6 +175,12 @@ body {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+.section-label {
+  font-family: var(--font-display);
+  color: var(--navy);
+  font-size: 1.04rem;
+  margin: 6px 0 2px;
 }
 .empty, .loading {
   padding: 20px;
@@ -342,6 +370,13 @@ body {
       <button class="tab-btn" data-tab="users" onclick="setTab('users')">Người dùng</button>
       <button class="tab-btn" data-tab="posts" onclick="setTab('posts')">Bài viết</button>
     </div>
+    <div class="quick-suggest">
+      <button class="suggest-chip" type="button" onclick="applySuggestion('giáo viên')">Giáo viên</button>
+      <button class="suggest-chip" type="button" onclick="applySuggestion('học sinh')">Học sinh</button>
+      <button class="suggest-chip" type="button" onclick="applySuggestion('toán')">Toán</button>
+      <button class="suggest-chip" type="button" onclick="applySuggestion('Hà Nội')">Hà Nội</button>
+      <button class="suggest-chip" type="button" onclick="applySuggestion('trường')">Trường</button>
+    </div>
     <div id="metaLine" class="meta-line">Nhập từ khóa để bắt đầu tìm kiếm.</div>
   </section>
 
@@ -387,9 +422,9 @@ body {
 <script src="supabaseClient.js"></script>
 <script>
 let currentUser = null;
-let currentProfile = null;
 let activeTab = "all";
 let friendIds = new Set();
+let searchDebounceTimer = null;
 
 async function init() {
   const { data: { user } } = await sb.auth.getUser();
@@ -399,8 +434,6 @@ async function init() {
   }
 
   currentUser = user;
-  const { data: profile } = await sb.from("users").select("*").eq("id", user.id).single();
-  currentProfile = profile;
   await loadFriendIds();
 
   const keyword = new URLSearchParams(location.search).get("q");
@@ -427,9 +460,15 @@ window.setTab = function(tab) {
 };
 
 window.resetSearch = function() {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
   document.getElementById("keywordInput").value = "";
   document.getElementById("metaLine").textContent = "Nhập từ khóa để bắt đầu tìm kiếm.";
   document.getElementById("resultList").innerHTML = '<div class="empty">Chưa có kết quả nào. Hãy nhập từ khóa rồi bấm tìm kiếm.</div>';
+};
+
+window.applySuggestion = function(keyword) {
+  document.getElementById("keywordInput").value = keyword;
+  performSearch();
 };
 
 window.performSearch = async function() {
@@ -449,7 +488,7 @@ window.performSearch = async function() {
   if (activeTab === "all" || activeTab === "users") {
     const users = await searchUsers(keyword);
     if (users.length) {
-      parts.push(renderSectionTitle("Người dùng"));
+      parts.push('<div class="section-label">Người dùng</div>');
       parts.push(users.map(renderUserItem).join(""));
     }
   }
@@ -457,7 +496,7 @@ window.performSearch = async function() {
   if (activeTab === "all" || activeTab === "posts") {
     const posts = await searchPosts(keyword);
     if (posts.length) {
-      parts.push(renderSectionTitle("Bài viết"));
+      parts.push('<div class="section-label">Bài viết</div>');
       parts.push(posts.map(renderPostItem).join(""));
     }
   }
@@ -488,8 +527,10 @@ async function searchUsers(keyword) {
 
   return (data || []).filter(item => {
     const roleText = formatRole(item.role).toLowerCase();
-    if (roleText.includes(lowerKeyword)) return true;
-    return true;
+    return roleText.includes(lowerKeyword)
+      || String(item.full_name || "").toLowerCase().includes(lowerKeyword)
+      || String(item.school || "").toLowerCase().includes(lowerKeyword)
+      || String(item.province || "").toLowerCase().includes(lowerKeyword);
   });
 }
 
@@ -523,10 +564,6 @@ function canViewPost(post) {
   if (!post.visibility || post.visibility === "public") return true;
   if (post.visibility === "friends" && friendIds.has(post.user_id)) return true;
   return false;
-}
-
-function renderSectionTitle(title) {
-  return '<div class="card-title" style="margin:4px 0 2px;">' + esc(title) + '</div>';
 }
 
 function renderUserItem(user) {
@@ -594,6 +631,18 @@ document.getElementById("keywordInput").addEventListener("keydown", function(eve
     event.preventDefault();
     performSearch();
   }
+});
+
+document.getElementById("keywordInput").addEventListener("input", function() {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+  const keyword = this.value.trim();
+  if (!keyword) {
+    resetSearch();
+    return;
+  }
+  searchDebounceTimer = setTimeout(() => {
+    performSearch();
+  }, 320);
 });
 
 function formatRole(role) {
