@@ -20,6 +20,7 @@ body {
   max-width: 1120px;
   margin: 0 auto;
   padding: 24px 20px 60px;
+  position: relative;
 }
 
 .feed-shell {
@@ -184,12 +185,16 @@ body {
 .hub-badge.show { display: inline-flex; }
 .social-panel {
   display: none;
-  margin-bottom: 18px;
+  position: absolute;
+  top: 72px;
+  right: 20px;
+  width: min(420px, calc(100% - 40px));
   background: var(--white);
   border: 1px solid var(--border);
   border-radius: 18px;
   box-shadow: 0 16px 36px rgba(15,31,61,.1);
   overflow: hidden;
+  z-index: 1050;
 }
 .social-panel.open { display: block; }
 .social-panel-head {
@@ -784,9 +789,9 @@ function ensureHomeOverlayShell() {
       <iframe class="social-panel-frame" id="socialPanelFrame" src="about:blank" loading="lazy"></iframe>
     `;
     const feedWrap = document.querySelector(".feed-wrap");
-    const feedHeader = document.querySelector(".feed-header");
-    if (feedWrap && feedHeader) {
-      feedWrap.insertBefore(panel, feedHeader);
+    const socialHub = document.querySelector(".social-hub");
+    if (feedWrap && socialHub) {
+      feedWrap.insertBefore(panel, socialHub.nextSibling);
     }
   }
 
@@ -820,7 +825,7 @@ function enhanceHomeHub() {
       <span class="hub-icon">🤝</span>
       <span class="hub-badge" id="homeFriendRequestBadge">0</span>
     </button>
-    <button class="hub-button" type="button" title="Nhắn tin" onclick="toggleChatPopup()">
+    <button class="hub-button" type="button" title="Nhắn tin" onclick="toggleSocialPanel('messages')">
       <span class="hub-icon">💬</span>
       <span class="hub-badge" id="homeMessageBadge">0</span>
     </button>
@@ -884,8 +889,20 @@ function enhanceComposerUI() {
 const socialPanelConfig = {
   search: { title: "Tìm kiếm", src: "search.html" },
   notifications: { title: "Thông báo", src: "notifications.html" },
-  friend_requests: { title: "Lời mời kết bạn", src: "friend_requests.html" }
+  friend_requests: { title: "Lời mời kết bạn", src: "friend_requests.html" },
+  messages: { title: "Nhắn tin", src: "messages.html?tray=1" }
 };
+
+function positionSocialPanel() {
+  const panel = document.getElementById("socialPanel");
+  const hub = document.querySelector(".social-hub");
+  const wrap = document.querySelector(".feed-wrap");
+  if (!panel || !hub || !wrap) return;
+
+  const availableWidth = Math.max(320, wrap.clientWidth - 40);
+  panel.style.width = Math.min(420, availableWidth) + "px";
+  panel.style.top = hub.offsetTop + hub.offsetHeight + 12 + "px";
+}
 
 window.toggleSocialPanel = function(type) {
   ensureHomeOverlayShell();
@@ -907,6 +924,7 @@ window.toggleSocialPanel = function(type) {
     frame.dataset.loaded = config.src;
   }
   activeSocialPanel = type;
+  positionSocialPanel();
   panel.classList.add("open");
 };
 
@@ -919,7 +937,6 @@ window.closeSocialPanel = function() {
 
 window.toggleChatPopup = function() {
   ensureHomeOverlayShell();
-  closeSocialPanel();
   const popup = document.getElementById("chatPopup");
   const frame = document.getElementById("chatPopupFrame");
   if (!popup || !frame) return;
@@ -936,6 +953,16 @@ window.closeChatPopup = function() {
   const popup = document.getElementById("chatPopup");
   if (!popup) return;
   popup.classList.remove("open");
+};
+
+window.openChatPopupForUser = function(userId) {
+  ensureHomeOverlayShell();
+  const popup = document.getElementById("chatPopup");
+  const frame = document.getElementById("chatPopupFrame");
+  if (!popup || !frame || !userId) return;
+  frame.src = "messages.html?user=" + encodeURIComponent(userId);
+  frame.dataset.loaded = frame.src;
+  popup.classList.add("open");
 };
 
 window.toggleVisibilityMenu = function(event) {
@@ -971,6 +998,19 @@ document.addEventListener("click", (event) => {
     const clickedPanel = event.target.closest("#socialPanel");
     if (!clickedHub && !clickedPanel) closeSocialPanel();
   }
+});
+
+window.addEventListener("message", (event) => {
+  const data = event.data;
+  if (!data || data.type !== "open-chat-popup") return;
+  const userId = data.payload?.userId;
+  if (!userId) return;
+  closeSocialPanel();
+  openChatPopupForUser(userId);
+});
+
+window.addEventListener("resize", () => {
+  if (activeSocialPanel) positionSocialPanel();
 });
 
 async function init() {
