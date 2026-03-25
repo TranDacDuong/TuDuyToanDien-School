@@ -53,6 +53,9 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
 .compose-tools {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
 }
+.compose-media {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
 .compose-note { font-size: .74rem; color: var(--amber); display: none; }
 .compose-note.show { display: block; }
 .compose-select {
@@ -69,6 +72,35 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
   outline: none;
   border-color: var(--gold);
   box-shadow: 0 0 0 3px rgba(200,150,42,.08);
+}
+.compose-file {
+  max-width: 230px;
+  font-size: .78rem;
+}
+.compose-file::-webkit-file-upload-button {
+  border: none;
+  background: var(--surface);
+  color: var(--navy);
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: .78rem;
+  cursor: pointer;
+  margin-right: 8px;
+}
+.compose-preview {
+  display: none;
+  margin-top: 12px;
+}
+.compose-preview.show {
+  display: block;
+}
+.compose-preview img {
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--border);
 }
 
 /* ── Post card ── */
@@ -104,6 +136,17 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
 .post-body {
   padding: 10px 16px 12px; font-size: .9rem; line-height: 1.65;
   color: var(--ink); white-space: pre-wrap; word-break: break-word;
+}
+.post-media-wrap {
+  padding: 0 16px 12px;
+}
+.post-media-img {
+  width: 100%;
+  max-height: 420px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
 }
 .post-pending-notice {
   margin: 0 16px 10px; padding: 8px 12px;
@@ -203,8 +246,14 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
           <option value="friends">Bạn bè</option>
           <option value="private">Riêng tư</option>
         </select>
+        <div class="compose-media">
+          <input class="compose-file" type="file" id="postImage" accept="image/*" onchange="previewPostImage(event)">
+        </div>
       </div>
       <button class="btn btn-primary btn-sm" onclick="createPost()">Đăng bài</button>
+    </div>
+    <div class="compose-preview" id="composePreview">
+      <img id="composePreviewImg" src="" alt="Xem trước ảnh bài viết">
     </div>
   </div>
 
@@ -215,6 +264,23 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
 <script src="supabaseClient.js"></script>
 <script>
 let currentUser, role, currentProfile;
+
+window.previewPostImage = function(event) {
+  const file = event.target.files?.[0];
+  const preview = document.getElementById("composePreview");
+  const img = document.getElementById("composePreviewImg");
+  if (!file) {
+    preview.classList.remove("show");
+    img.src = "";
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    img.src = e.target.result;
+    preview.classList.add("show");
+  };
+  reader.readAsDataURL(file);
+};
 
 async function init() {
   const { data: { user } } = await sb.auth.getUser();
@@ -233,19 +299,47 @@ async function init() {
 async function createPost() {
   const text = document.getElementById("postContent").value.trim();
   const visibility = document.getElementById("postVisibility").value;
-  if (!text) return;
+  const imageFile = document.getElementById("postImage").files?.[0];
+  if (!text && !imageFile) return;
   const status = (role === "admin" || role === "teacher") ? "approved" : "pending";
-  const { error } = await sb.from("posts").insert({ user_id: currentUser.id, content: text, status, visibility });
+  const { data: insertedPost, error } = await sb
+    .from("posts")
+    .insert({ user_id: currentUser.id, content: text, status, visibility })
+    .select("id")
+    .single();
   if (error) { alert("Lỗi: " + error.message); return; }
+
+  if (imageFile && insertedPost?.id) {
+    const mediaPath = `posts/${currentUser.id}/${insertedPost.id}-${Date.now()}-${imageFile.name}`.replace(/\s+/g, "-");
+    const { error: uploadError } = await sb.storage
+      .from("post-media")
+      .upload(mediaPath, imageFile);
+
+    if (uploadError) {
+      alert("Bài viết đã tạo nhưng upload ảnh lỗi. Hãy kiểm tra bucket 'post-media'. Lỗi: " + uploadError.message);
+    } else {
+      const { data: publicData } = sb.storage.from("post-media").getPublicUrl(mediaPath);
+      await sb.from("post_media").insert({
+        post_id: insertedPost.id,
+        file_url: publicData.publicUrl,
+        file_type: "image",
+        sort_order: 0
+      });
+    }
+  }
+
   document.getElementById("postContent").value = "";
   document.getElementById("postVisibility").value = "public";
+  document.getElementById("postImage").value = "";
+  document.getElementById("composePreview").classList.remove("show");
+  document.getElementById("composePreviewImg").src = "";
   loadPosts();
 }
 
 async function loadPosts() {
   const { data: posts } = await sb
     .from("posts")
-    .select(`*, users(full_name,avatar_url), likes(count), comments(count)`)
+    .select(`*, users(full_name,avatar_url), likes(count), comments(count), post_media(file_url,file_type,sort_order)`)
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false });
 
@@ -297,6 +391,11 @@ function buildCard(post) {
 
   const pendingNotice = (isPending && isMyPost && role === "student")
     ? `<div class="post-pending-notice">⏳ Bài đang chờ admin/giáo viên duyệt</div>` : "";
+  const mediaHtml = (post.post_media || [])
+    .filter(item => item.file_type === "image")
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+    .map(item => `<div class="post-media-wrap"><img class="post-media-img" src="${item.file_url}" alt="Ảnh bài viết"></div>`)
+    .join("");
 
   const actionBar = (!isPending && !isRejected) ? `
     <div class="post-actions">
@@ -330,6 +429,7 @@ function buildCard(post) {
       </div>
     </div>
     <div class="post-body">${esc(post.content)}</div>
+    ${mediaHtml}
     ${pendingNotice}${modBar}${actionBar}`;
 
   return div;
