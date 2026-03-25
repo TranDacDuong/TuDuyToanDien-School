@@ -14,6 +14,21 @@ body { margin: 0; font-family: var(--font-body); background: var(--cream); color
 .sidebar-head, .chat-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--surface); }
 .sidebar-title, .chat-title { font-family: var(--font-display); color: var(--navy); font-size: 1.12rem; }
 .sidebar-sub, .chat-sub { margin-top: 4px; color: var(--ink-light); font-size: .78rem; }
+.search-wrap { padding: 14px 14px 0; }
+.search-input {
+  width: 100%;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-family: var(--font-body);
+  font-size: .86rem;
+  background: var(--white);
+}
+.search-input:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(200,150,42,.08);
+}
 .friend-list { padding: 14px; display: flex; flex-direction: column; gap: 10px; max-height: 100%; overflow: auto; }
 .friend-card { display: flex; align-items: center; gap: 12px; border: 1px solid var(--border); border-radius: 16px; padding: 12px; cursor: pointer; transition: .15s; background: linear-gradient(180deg,#fff 0%,#fbfbfe 100%); }
 .friend-card:hover, .friend-card.active { border-color: var(--gold-border); background: var(--gold-pale); }
@@ -45,6 +60,9 @@ body { margin: 0; font-family: var(--font-body); background: var(--cream); color
         <div class="sidebar-title">Nhắn tin</div>
         <div class="sidebar-sub">Chọn một người bạn để bắt đầu trò chuyện</div>
       </div>
+      <div class="search-wrap">
+        <input id="friendSearch" class="search-input" placeholder="Tìm bạn bè..." oninput="filterFriends()">
+      </div>
       <div id="friendList" class="friend-list">
         <div class="empty">Đang tải danh sách bạn bè...</div>
       </div>
@@ -74,6 +92,8 @@ let currentProfile = null;
 let currentConversationId = null;
 let activeFriend = null;
 let refreshTimer = null;
+let friendMap = new Map();
+let allFriends = [];
 
 async function init() {
   const { data: { user } } = await sb.auth.getUser();
@@ -104,7 +124,31 @@ async function loadFriends() {
     return;
   }
 
-  wrap.innerHTML = data.map(item => `
+  allFriends = data;
+  friendMap = new Map(data.map(item => [item.friend_id, item]));
+  renderFriendList(data);
+
+  const params = new URLSearchParams(location.search);
+  const selectedUserId = params.get("user");
+  if (selectedUserId && friendMap.has(selectedUserId)) {
+    const item = friendMap.get(selectedUserId);
+    openConversation(
+      selectedUserId,
+      item.users?.full_name || "Người dùng",
+      item.users?.avatar_url || "default-avatar.png",
+      item.users?.role || ""
+    );
+  }
+}
+
+function renderFriendList(list) {
+  const wrap = document.getElementById("friendList");
+  if (!list.length) {
+    wrap.innerHTML = '<div class="empty">Không tìm thấy người phù hợp.</div>';
+    return;
+  }
+
+  wrap.innerHTML = list.map(item => `
     <div class="friend-card" id="friend_${item.friend_id}" onclick="openConversation('${item.friend_id}', '${escapeJs(item.users?.full_name || "Người dùng")}', '${escapeJs(item.users?.avatar_url || "default-avatar.png")}', '${escapeJs(item.users?.role || "")}')">
       <img class="avatar" src="${item.users?.avatar_url || "default-avatar.png"}" alt="Avatar" onerror="this.src='default-avatar.png'">
       <div>
@@ -114,6 +158,21 @@ async function loadFriends() {
     </div>
   `).join("");
 }
+
+window.filterFriends = function() {
+  const keyword = document.getElementById("friendSearch").value.trim().toLowerCase();
+  if (!keyword) {
+    renderFriendList(allFriends);
+    if (activeFriend?.id) document.getElementById("friend_" + activeFriend.id)?.classList.add("active");
+    return;
+  }
+  const filtered = allFriends.filter(item =>
+    String(item.users?.full_name || "").toLowerCase().includes(keyword) ||
+    String(formatRole(item.users?.role || "")).toLowerCase().includes(keyword)
+  );
+  renderFriendList(filtered);
+  if (activeFriend?.id) document.getElementById("friend_" + activeFriend.id)?.classList.add("active");
+};
 
 window.openConversation = async function(friendId, friendName, friendAvatar, friendRole) {
   document.querySelectorAll(".friend-card").forEach(el => el.classList.remove("active"));
