@@ -188,11 +188,16 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
 .cmt-name   { font-weight: 600; font-size: .77rem; color: var(--navy); margin-bottom: 2px; }
 .cmt-text   { font-size: .83rem; color: var(--ink); line-height: 1.5; }
 .cmt-time   { font-size: .69rem; color: var(--ink-light); margin-top: 3px; }
+.cmt-tools  { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
 .reply-link {
   font-size: .72rem; color: var(--blue); cursor: pointer;
   margin-top: 3px; display: inline-block; font-weight: 500;
 }
 .reply-link:hover { text-decoration: underline; }
+.delete-link {
+  font-size: .72rem; color: var(--red); cursor: pointer; font-weight: 500;
+}
+.delete-link:hover { text-decoration: underline; }
 .reply-indent { margin-left: 36px; }
 .reply-box { display: none; align-items: center; gap: 8px; margin-top: 6px; padding-left: 36px; }
 .reply-box.open { display: flex; }
@@ -308,6 +313,7 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
 <script>
 let currentUser, role, currentProfile;
 let friendIds = new Set();
+let likedPostIds = new Set();
 
 async function createNotification(userId, type, message, refId) {
   if (!userId || userId === currentUser.id) return;
@@ -344,6 +350,7 @@ async function init() {
   const { data: p } = await sb.from("users").select("*").eq("id", user.id).single();
   role = p.role; currentProfile = p;
   await loadFriendIds();
+  await loadLikedPosts();
   const card = document.getElementById("composeCard");
   card.style.display = "block";
   document.getElementById("composeAvatar").src = p.avatar_url || "default-avatar.png";
@@ -358,6 +365,14 @@ async function loadFriendIds() {
     .select("friend_id")
     .eq("user_id", currentUser.id);
   friendIds = new Set((data || []).map(item => item.friend_id));
+}
+
+async function loadLikedPosts() {
+  const { data } = await sb
+    .from("likes")
+    .select("post_id")
+    .eq("user_id", currentUser.id);
+  likedPostIds = new Set((data || []).map(item => item.post_id));
 }
 
 async function createPost() {
@@ -454,6 +469,7 @@ function buildCard(post) {
 
   const likeCount = post.likes?.[0]?.count ?? 0;
   const cmtCount  = post.comments?.[0]?.count ?? 0;
+  const isLiked   = likedPostIds.has(post.id);
 
   const statusBadge = isPending  ? `<span class="badge-pending">Chờ duyệt</span>`
                     : isRejected ? `<span class="badge-rejected">Từ chối</span>` : "";
@@ -479,7 +495,7 @@ function buildCard(post) {
 
   const actionBar = (!isPending && !isRejected) ? `
     <div class="post-actions">
-      <button class="act-btn" id="likeBtn_${post.id}" onclick="likePost('${post.id}')">❤️ <span id="likeCount_${post.id}">${likeCount}</span></button>
+      <button class="act-btn ${isLiked ? "liked" : ""}" id="likeBtn_${post.id}" onclick="likePost('${post.id}')">❤️ <span id="likeCount_${post.id}">${likeCount}</span></button>
       <button class="act-btn" onclick="toggleCmt('${post.id}')">💬 ${cmtCount}</button>
       <div class="act-spacer"></div>
       ${(isAdmin || isMyPost) ? `<button class="act-btn edit" onclick="toggleEditPost('${post.id}')">✏️ Sửa</button>` : ""}
@@ -589,11 +605,22 @@ window.removePostImage = async function(pid) {
 };
 
 window.likePost = async function(pid) {
+  const el = document.getElementById("likeCount_" + pid);
+  const btn = document.getElementById("likeBtn_" + pid);
+  if (likedPostIds.has(pid)) {
+    const { error } = await sb.from("likes").delete().eq("post_id", pid).eq("user_id", currentUser.id);
+    if (error) return;
+    likedPostIds.delete(pid);
+    if (el) el.textContent = Math.max(0, parseInt(el.textContent) - 1);
+    btn?.classList.remove("liked");
+    return;
+  }
+
   const { error } = await sb.from("likes").insert({ post_id: pid, user_id: currentUser.id });
   if (error) return;
-  const el = document.getElementById("likeCount_" + pid);
+  likedPostIds.add(pid);
   if (el) el.textContent = parseInt(el.textContent) + 1;
-  document.getElementById("likeBtn_" + pid)?.classList.add("liked");
+  btn?.classList.add("liked");
   const { data: post } = await sb.from("posts").select("user_id").eq("id", pid).maybeSingle();
   if (post?.user_id) {
     await createNotification(post.user_id, "post_like", (currentProfile?.full_name || currentUser.email || "Một người dùng") + " đã thích bài viết của bạn.", pid);
@@ -659,6 +686,17 @@ window.sendReply = async function(pid, parentId) {
   loadComments(pid);
 };
 
+window.deleteComment = async function(pid, cid) {
+  if (!confirm("Xóa bình luận này?")) return;
+  const { error } = await sb.from("comments").delete().eq("id", cid);
+  if (error) {
+    alert("Lỗi khi xóa bình luận: " + error.message);
+    return;
+  }
+  loadComments(pid);
+  loadPosts();
+};
+
 async function loadComments(pid) {
   const { data } = await sb
     .from("comments")
@@ -671,12 +709,14 @@ async function loadComments(pid) {
   const replies = (data||[]).filter(c =>  c.parent_id);
   list.innerHTML = tops.map(c => {
     const t = new Date(c.created_at).toLocaleString("vi-VN",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+    const canDeleteTop = role === "admin" || c.user_id === currentUser.id;
     const rHtml = replies.filter(r => r.parent_id === c.id).map(r => `
       <div class="cmt-item reply-indent">
         <img class="cmt-avatar" src="${r.users?.avatar_url||'default-avatar.png'}" onerror="this.src='default-avatar.png'">
         <div class="cmt-bubble">
           <div class="cmt-name">${esc(r.users?.full_name??"User")}</div>
           <div class="cmt-text">${esc(r.content)}</div>
+          ${(role === "admin" || r.user_id === currentUser.id) ? `<div class="cmt-tools"><span class="delete-link" onclick="deleteComment('${pid}','${r.id}')">Xóa</span></div>` : ""}
         </div>
       </div>`).join("");
     return `
@@ -688,7 +728,10 @@ async function loadComments(pid) {
             <div class="cmt-text">${esc(c.content)}</div>
             <div class="cmt-time">${t}</div>
           </div>
-          <span class="reply-link" onclick="showReply('${c.id}')">Trả lời</span>
+          <div class="cmt-tools">
+            <span class="reply-link" onclick="showReply('${c.id}')">Trả lời</span>
+            ${canDeleteTop ? `<span class="delete-link" onclick="deleteComment('${pid}','${c.id}')">Xóa</span>` : ""}
+          </div>
           <div class="reply-box" id="rbox_${c.id}">
             <input class="cmt-input" id="rIn_${c.id}" placeholder="Trả lời..."
               onkeydown="if(event.key==='Enter')sendReply('${pid}','${c.id}')">
