@@ -794,19 +794,19 @@
           const tfOpts = {};
           tfLines.forEach(line => { const m=line.match(/^([a-d])\)\s*(.*)/); if(m) tfOpts[m[1]]=m[2].trim(); });
           ansHtml = lbls.map(lbl => `
-            <div style="display:grid;grid-template-columns:20px minmax(0,1fr) auto;align-items:flex-start;gap:8px;padding:10px 12px;
-              background:var(--white);border-radius:8px;border:1px solid var(--border);margin-bottom:8px">
+            <div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;
+              background:var(--white);border-radius:8px;border:1px solid var(--border);margin-bottom:8px;flex-wrap:wrap">
               <span style="font-weight:700;min-width:20px;color:var(--navy);flex-shrink:0">${lbl})</span>
-              <span style="min-width:0;font-size:1.12rem;color:var(--ink);line-height:1.7">${tfOpts[lbl]||""}</span>
-              <div style="display:inline-flex;gap:6px;flex-wrap:nowrap;width:102px;min-width:102px;justify-content:flex-end">
-              <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.92rem;
-                padding:8px 6px;border-radius:8px;background:#f0fdf4;color:#15803d;font-weight:700;flex:1 1 0;justify-content:center;min-width:48px;max-width:48px;box-sizing:border-box;overflow:hidden;white-space:nowrap">
+              <span style="flex:1 1 280px;font-size:1.02rem;color:var(--ink);line-height:1.62;min-width:0">${tfOpts[lbl]||""}</span>
+              <div style="display:flex;gap:6px;flex-wrap:nowrap;flex:0 1 96px;min-width:96px;justify-content:flex-end">
+              <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.82rem;
+                padding:7px 6px;border-radius:8px;background:#f0fdf4;color:#15803d;font-weight:700;flex:1 1 0;justify-content:center;min-width:0">
                 <input type="radio" name="tf_${qid}_${lbl}" value="T" onchange="window.peTF('${qid}')"
-                  ${saved.includes(lbl+"T")?"checked":""} style="accent-color:#16a34a;margin:0;width:14px;height:14px;flex-shrink:0"> Đ</label>
-              <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.92rem;
-                padding:8px 6px;border-radius:8px;background:#fef2f2;color:#b91c1c;font-weight:700;flex:1 1 0;justify-content:center;min-width:48px;max-width:48px;box-sizing:border-box;overflow:hidden;white-space:nowrap">
+                  ${saved.includes(lbl+"T")?"checked":""} style="accent-color:#16a34a;margin:0;width:13px;height:13px;flex-shrink:0"> Đ</label>
+              <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.82rem;
+                padding:7px 6px;border-radius:8px;background:#fef2f2;color:#b91c1c;font-weight:700;flex:1 1 0;justify-content:center;min-width:0">
                 <input type="radio" name="tf_${qid}_${lbl}" value="F" onchange="window.peTF('${qid}')"
-                  ${saved.includes(lbl+"F")?"checked":""} style="accent-color:#dc2626;margin:0;width:14px;height:14px;flex-shrink:0"> S</label>
+                  ${saved.includes(lbl+"F")?"checked":""} style="accent-color:#dc2626;margin:0;width:13px;height:13px;flex-shrink:0"> S</label>
               </div>
             </div>`).join("");
         } else if (type === "short_answer") {
@@ -837,7 +837,7 @@
         header.innerHTML = `
           <span style="width:26px;height:26px;border-radius:50%;background:var(--navy);color:var(--gold-light);
             display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;flex-shrink:0">${globalNum}</span>
-          <span style="font-size:1.18rem;font-weight:700;color:var(--ink-mid)">Câu ${globalNum}</span>
+          <span style="font-size:1.08rem;font-weight:700;color:var(--ink-mid)">Câu ${globalNum}</span>
           <span style="margin-left:auto;font-size:.75rem;color:var(--ink-mid)">${eq.points} điểm</span>`;
         card.appendChild(header);
 
@@ -848,7 +848,7 @@
           body.style.cssText = "display:flex;flex-direction:column;padding:14px 16px;gap:10px";
 
           const qEl = document.createElement("div");
-          qEl.style.cssText = "font-size:1.32rem;line-height:1.98;color:var(--navy);white-space:pre-line";
+          qEl.style.cssText = "font-size:1.2rem;line-height:1.9;color:var(--navy);white-space:pre-line";
           qEl.textContent = q.question_text||"";
           body.appendChild(qEl);
 
@@ -874,7 +874,7 @@
           if (type === "true_false") {
             const mainQ = (q.question_text||"").split("\n")[0];
             const qEl = document.createElement("div");
-            qEl.style.cssText = "font-size:1.32rem;line-height:1.98;color:var(--navy);white-space:pre-line";
+            qEl.style.cssText = "font-size:1.2rem;line-height:1.9;color:var(--navy);white-space:pre-line";
             qEl.textContent = mainQ;
             questionPart.appendChild(qEl);
             if (hasImg) {
@@ -891,7 +891,7 @@
             }
           } else if (hasImg) {
             const textCol = document.createElement("div");
-            textCol.style.cssText = "flex:8;font-size:1.32rem;line-height:1.98;color:var(--navy);white-space:pre-line";
+            textCol.style.cssText = "flex:8;font-size:1.2rem;line-height:1.9;color:var(--navy);white-space:pre-line";
             textCol.textContent = q.question_text||"";
             const imgCol = document.createElement("div");
             imgCol.style.cssText = "flex:5;display:flex;align-items:center;justify-content:center";
@@ -903,14 +903,14 @@
             questionPart.appendChild(imgCol);
           } else {
             const qEl = document.createElement("div");
-            qEl.style.cssText = "flex:1;font-size:1.32rem;line-height:1.98;color:var(--navy);white-space:pre-line";
+            qEl.style.cssText = "flex:1;font-size:1.2rem;line-height:1.9;color:var(--navy);white-space:pre-line";
             qEl.textContent = q.question_text||"";
             questionPart.appendChild(qEl);
           }
 
           /* â”€â”€ Pháº§n Ä‘Ã¡p Ã¡n: flex:2 â”€â”€ */
           const answerPart = document.createElement("div");
-          answerPart.style.cssText = "flex:" + (type === "true_false" ? "4.8" : "2") + ";padding:10px 12px;background:var(--surface);min-width:0";
+          answerPart.style.cssText = "flex:" + (type === "true_false" ? "4.1" : "2") + ";padding:10px 12px;background:var(--surface);min-width:0";
           answerPart.innerHTML = ansHtml;
 
           body.appendChild(questionPart);
