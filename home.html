@@ -121,22 +121,25 @@ body {
   margin-bottom: 18px; flex-wrap: wrap; gap: 12px;
 }
 .social-hub {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
-  margin-bottom: 18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
 }
 .hub-link {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 16px;
-  border-radius: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border-radius: 50%;
   text-decoration: none;
   color: var(--navy);
-  background: linear-gradient(180deg, #ffffff 0%, #fbfbff 100%);
+  background: rgba(255,255,255,.95);
   border: 1px solid var(--border);
-  box-shadow: 0 14px 32px rgba(15,31,61,.08);
+  box-shadow: 0 10px 24px rgba(15,31,61,.08);
   font-weight: 600;
   transition: .15s;
   position: relative;
@@ -144,38 +147,25 @@ body {
 .hub-link:hover {
   transform: translateY(-2px);
   border-color: var(--gold-border);
-  background: linear-gradient(180deg, #fffef8 0%, #faf3da 100%);
+  background: #fffaf0;
 }
 .hub-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 14px;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(15,31,61,.1) 0%, rgba(200,150,42,.18) 100%);
-  font-size: 1.05rem;
+  background: transparent;
+  font-size: 1.12rem;
   flex-shrink: 0;
 }
-.hub-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.hub-title {
-  font-size: .9rem;
-  font-weight: 700;
-}
-.hub-sub {
-  color: var(--ink-light);
-  font-size: .75rem;
-  font-weight: 500;
-}
+.hub-copy { display: none; }
 .hub-badge {
   display: none;
   position: absolute;
-  top: 8px;
-  right: 10px;
+  top: -2px;
+  right: -2px;
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
@@ -537,11 +527,24 @@ body {
 <div class="feed-wrap">
 
   <div class="social-hub">
-    <a class="hub-link" href="search.html">🔎 Tìm kiếm</a>
-    <a class="hub-link" href="notifications.html">🔔 Thông báo<span class="hub-badge" id="homeNotificationBadge">0</span></a>
-    <a class="hub-link" href="friend_requests.html">🤝 Lời mời<span class="hub-badge" id="homeFriendRequestBadge">0</span></a>
-    <a class="hub-link" href="messages.html">💬 Nhắn tin<span class="hub-badge" id="homeMessageBadge">0</span></a>
-    <a class="hub-link" href="profile.html">🪪 Trang cá nhân</a>
+    <a class="hub-link" href="search.html" title="Tìm kiếm">
+      <span class="hub-icon">🔎</span>
+    </a>
+    <a class="hub-link" href="notifications.html" title="Thông báo">
+      <span class="hub-icon">🔔</span>
+      <span class="hub-badge" id="homeNotificationBadge">0</span>
+    </a>
+    <a class="hub-link" href="friend_requests.html" title="Lời mời kết bạn">
+      <span class="hub-icon">🤝</span>
+      <span class="hub-badge" id="homeFriendRequestBadge">0</span>
+    </a>
+    <a class="hub-link" href="messages.html" title="Nhắn tin">
+      <span class="hub-icon">💬</span>
+      <span class="hub-badge" id="homeMessageBadge">0</span>
+    </a>
+    <a class="hub-link" href="profile.html" title="Trang cá nhân">
+      <img class="hub-icon" id="homeProfileAvatar" src="default-avatar.png" alt="Avatar" onerror="this.src='default-avatar.png'">
+    </a>
   </div>
 
   <div class="feed-header">
@@ -670,6 +673,10 @@ function setupHomeLinks() {
   const profileLink = document.querySelector('.hub-link[href="profile.html"]');
   if (profileLink && currentUser?.id) {
     profileLink.href = "profile.html?id=" + currentUser.id;
+  }
+  const profileAvatar = document.getElementById("homeProfileAvatar");
+  if (profileAvatar) {
+    profileAvatar.src = currentProfile?.avatar_url || "default-avatar.png";
   }
 }
 
