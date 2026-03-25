@@ -69,7 +69,7 @@
   async function loadExamList() {
     const sb   = getSb();
     const grid = document.getElementById("examGrid");
-    grid.innerHTML = '<div style="color:var(--ink-light);padding:20px">Äang táº£i...</div>';
+    grid.innerHTML = '<div style="color:var(--ink-light);padding:20px">Đang tải...</div>';
 
     const { data, error } = await sb
       .from("public_exams")
@@ -83,7 +83,7 @@
     if (!_allExams.length) {
       grid.innerHTML = `<div class="empty-state">
         <div style="font-size:2.5rem;margin-bottom:10px">ðŸ“„</div>
-        <p>ChÆ°a cÃ³ Ä‘á» thi nÃ o.</p>
+        <p>Chưa có đề thi nào.</p>
       </div>`;
       return;
     }
@@ -124,8 +124,8 @@
       return { section, innerGrid };
     }
 
-    const officialSection = buildSection("ðŸŽ¯ Äá» thi tháº­t", "#ef4444", officialExams);
-    const trialSection    = buildSection("ðŸ“ Äá» thi thá»­",  "var(--gold)", trialExams);
+    const officialSection = buildSection("Đề thi thật", "#ef4444", officialExams);
+    const trialSection    = buildSection("Đề thi thử",  "var(--gold)", trialExams);
 
     function buildCard(pe) {
       const ex         = pe.exam;
@@ -146,16 +146,16 @@
       let timeStatus = "", canDo = true;
       if (pe.starts_at && pe.ends_at) {
         const s = new Date(pe.starts_at), e = new Date(pe.ends_at);
-        if (now < s)      { canDo = false; timeStatus = "â° ChÆ°a Ä‘áº¿n giá» thi"; }
-        else if (now > e) { canDo = false; timeStatus = "ðŸ”’ ÄÃ£ káº¿t thÃºc"; }
-        else              { timeStatus = "ðŸŸ¢ Äang má»Ÿ"; }
+        if (now < s)      { canDo = false; timeStatus = "Chưa đến giờ thi"; }
+        else if (now > e) { canDo = false; timeStatus = "Đã kết thúc"; }
+        else              { timeStatus = "Đang mở"; }
       } else {
-        timeStatus = "ðŸ“… KhÃ´ng giá»›i háº¡n";
+        timeStatus = "Không giới hạn";
       }
 
       const timeStr = pe.starts_at && pe.ends_at
-        ? `ðŸ• ${fmtDT(pe.starts_at)} â†’ ${fmtDT(pe.ends_at)}`
-        : "ðŸ“… KhÃ´ng giá»›i háº¡n";
+        ? `${fmtDT(pe.starts_at)} -> ${fmtDT(pe.ends_at)}`
+        : "Không giới hạn";
 
       let actionHtml = "";
       if (_role === "student") {
@@ -183,9 +183,9 @@
           if (canReview) {
             reviewBtn = `<button class="btn btn-outline btn-sm"
               onclick="openReview('${pe.id}','${best.id}','${ex.title.replace(/'/g,"\\'")}',${isOfficial})">
-              ðŸ‘ Xem láº¡i</button>`;
+              Xem lại</button>`;
           } else {
-            reviewBtn = `<span style="font-size:.75rem;color:var(--ink-light)">Xem láº¡i sau khi háº¿t giá»</span>`;
+            reviewBtn = `<span style="font-size:.75rem;color:var(--ink-light)">Xem lại sau khi hết giờ</span>`;
           }
         }
 
@@ -200,11 +200,11 @@
             `<button class="btn btn-sm" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none"
               onclick="resumePublicExam('${pe.id}','${ex.id}','${ex.title.replace(/'/g,"\\'")}',
                 ${ex.duration_minutes},${ex.total_points},'${pe.exam_type}','${inProgress.id}',${secsLeft})">
-              â–¶ LÃ m tiáº¿p (${m}:${String(s2).padStart(2,"0")})</button>`;
+              Làm tiếp (${m}:${String(s2).padStart(2,"0")})</button>`;
         } else if (best && isOfficial) {
           actionHtml = `${scoreBadge}${reviewBtn}`;
         } else {
-          const btnLabel = best ? "ðŸ”„ LÃ m láº¡i" : "ðŸ“ LÃ m bÃ i";
+          const btnLabel = best ? "Làm lại" : "Làm bài";
           actionHtml = scoreBadge +
             `<button class="btn btn-primary btn-sm"
               onclick="startPublicExam('${pe.id}','${ex.id}','${ex.title.replace(/'/g,"\\'")}',
@@ -217,25 +217,25 @@
       let adminHtml = "";
       if (_role === "admin") {
         const pinBtn = pe.is_pinned
-          ? `<button class="btn btn-outline btn-sm" onclick="togglePin('${pe.id}',false)">ðŸ“Œ Bá» ghim</button>`
-          : `<button class="btn btn-outline btn-sm" onclick="togglePin('${pe.id}',true)">ðŸ“Œ Ghim</button>`;
+          ? `<button class="btn btn-outline btn-sm" onclick="togglePin('${pe.id}',false)">Bỏ ghim</button>`
+          : `<button class="btn btn-outline btn-sm" onclick="togglePin('${pe.id}',true)">Ghim</button>`;
         adminHtml = `
           <div class="admin-card-actions">
             ${pinBtn}
-            <button class="btn btn-outline btn-sm" onclick="openEditExamModal('${pe.id}')">âœ Sá»­a</button>
+            <button class="btn btn-outline btn-sm" onclick="openEditExamModal('${pe.id}')">Sửa</button>
             <button class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5"
-              onclick="deletePublicExam('${pe.id}','${ex.title.replace(/'/g,"\\'")}')">ðŸ—‘ XÃ³a</button>
+              onclick="deletePublicExam('${pe.id}','${ex.title.replace(/'/g,"\\'")}')">Xóa</button>
           </div>`;
       }
 
       card.innerHTML = `
-        ${pe.is_pinned ? '<div style="font-size:.72rem;font-weight:700;color:var(--gold);margin-bottom:4px">ðŸ“Œ ÄÃ£ ghim</div>' : ""}
+        ${pe.is_pinned ? '<div style="font-size:.72rem;font-weight:700;color:var(--gold);margin-bottom:4px">Đã ghim</div>' : ""}
         <div class="exam-badge ${isOfficial ? "badge-official" : "badge-trial"}">
-          ${isOfficial ? "ðŸŽ¯ Thi tháº­t" : "ðŸ“ Thi thá»­"}
+          ${isOfficial ? "Thi thật" : "Thi thử"}
         </div>
         <div class="exam-title">${ex.title}</div>
         <div class="exam-meta">
-          â± ${ex.duration_minutes} phÃºt &nbsp;â€¢&nbsp; ðŸ† ${ex.total_points}Ä‘<br>
+          ${ex.duration_minutes} phút &nbsp;•&nbsp; ${ex.total_points}đ<br>
           ${timeStr}<br>
           ${timeStatus ? `<span style="font-weight:600">${timeStatus}</span>` : ""}
         </div>
@@ -265,13 +265,13 @@
   window.togglePin = async function(peId, pin) {
     const sb = getSb();
     const { error } = await sb.from("public_exams").update({ is_pinned: pin }).eq("id", peId);
-    if (error) { alert("Lá»—i: " + error.message); return; }
+    if (error) { alert("Lỗi: " + error.message); return; }
     await loadExamList();
   };
 
   window.openAddExamModal = async function() {
     _editingPeId = null;
-    document.querySelector("#addExamModal .modal-card h3").textContent = "ThÃªm Ä‘á» thi cÃ´ng khai";
+    document.querySelector("#addExamModal .modal-card h3").textContent = "Thêm đề thi công khai";
     document.getElementById("peExamId").value = "";
     document.getElementById("peType").value   = "trial";
     document.getElementById("peStartsAt").value = "";
@@ -282,8 +282,8 @@
       .select("id,title,duration_minutes,total_points")
       .order("created_at", { ascending: false });
     const sel = document.getElementById("peExamId");
-    sel.innerHTML = '<option value="">-- Chá»n Ä‘á» --</option>';
-    (data||[]).forEach(e => sel.appendChild(new Option(`${e.title} (${e.duration_minutes}p / ${e.total_points}Ä‘)`, e.id)));
+    sel.innerHTML = '<option value="">-- Chọn đề --</option>';
+    (data||[]).forEach(e => sel.appendChild(new Option(`${e.title} (${e.duration_minutes}p / ${e.total_points}đ)`, e.id)));
 
     document.getElementById("addExamModal").classList.remove("hidden");
   };
@@ -311,9 +311,9 @@
     const startsAt = document.getElementById("peStartsAt").value || null;
     const endsAt   = document.getElementById("peEndsAt").value   || null;
 
-    if (!examId) { alert("Vui lÃ²ng chá»n Ä‘á»!"); return; }
+    if (!examId) { alert("Vui lòng chọn đề!"); return; }
     if (startsAt && endsAt && startsAt >= endsAt) {
-      alert("Thá»i gian káº¿t thÃºc pháº£i sau thá»i gian báº¯t Ä‘áº§u!"); return;
+      alert("Thời gian kết thúc phải sau thời gian bắt đầu!"); return;
     }
 
     const sb = getSb();
@@ -327,10 +327,10 @@
 
     if (_editingPeId) {
       const { error } = await sb.from("public_exams").update(payload).eq("id", _editingPeId);
-      if (error) { alert("Lá»—i: " + error.message); return; }
+      if (error) { alert("Lỗi: " + error.message); return; }
     } else {
       const { error } = await sb.from("public_exams").insert([payload]);
-      if (error) { alert("Lá»—i: " + error.message); return; }
+      if (error) { alert("Lỗi: " + error.message); return; }
     }
 
     closeAddExamModal();
@@ -338,7 +338,7 @@
   };
 
   window.deletePublicExam = async function(peId, title) {
-    if (!confirm(`XÃ³a Ä‘á» thi "${title}"? ToÃ n bá»™ káº¿t quáº£ liÃªn quan sáº½ bá»‹ xÃ³a.`)) return;
+    if (!confirm(`Xóa đề thi "${title}"? Toàn bộ kết quả liên quan sẽ bị xóa.`)) return;
     const sb = getSb();
     const { data: results } = await sb.from("exam_results").select("id").eq("public_exam_id", peId);
     if (results?.length) {
@@ -347,7 +347,7 @@
       await sb.from("exam_results").delete().in("id", ids);
     }
     const { error } = await sb.from("public_exams").delete().eq("id", peId);
-    if (error) { alert("Lá»—i: " + error.message); return; }
+    if (error) { alert("Lỗi: " + error.message); return; }
     await loadExamList();
   };
 
@@ -357,7 +357,7 @@
   async function loadResultsView() {
     const grid = document.getElementById("examGrid");
     grid.style.display = "block";
-    grid.innerHTML = '<div style="color:var(--ink-light);padding:20px">Äang táº£i...</div>';
+    grid.innerHTML = '<div style="color:var(--ink-light);padding:20px">Đang tải...</div>';
 
     const sb = getSb();
     const { data: publicExams } = await sb
@@ -366,7 +366,7 @@
       .order("created_at", { ascending: false });
 
     if (!publicExams?.length) {
-      grid.innerHTML = '<p style="color:var(--ink-light)">ChÆ°a cÃ³ Ä‘á» thi nÃ o.</p>';
+      grid.innerHTML = '<p style="color:var(--ink-light)">Chưa có đề thi nào.</p>';
       return;
     }
 
