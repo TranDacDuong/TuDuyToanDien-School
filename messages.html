@@ -245,6 +245,7 @@ let notificationChannel = null;
 let presenceChannel = null;
 let presencePingInterval = null;
 let activePresenceIds = new Set();
+let friendsLoadToken = 0;
 
 const CHAT_IMAGE_PREFIX = "__CHAT_IMAGE__";
 const ACTIVE_WINDOW_MS = 2 * 60 * 1000;
@@ -356,6 +357,104 @@ async function loadFriends() {
     openConversation(
       selectedUserId,
       item.users?.full_name || "Người dùng",
+      item.users?.avatar_url || "default-avatar.png",
+      item.users?.role || ""
+    );
+  }
+}
+
+async function loadFriends() {
+  const requestToken = ++friendsLoadToken;
+  const { data, error } = await sb
+    .from("friendships")
+    .select("friend_id, users!friendships_friend_id_fkey(full_name, avatar_url, role)")
+    .eq("user_id", currentUser.id)
+    .order("created_at", { ascending: false });
+
+  const wrap = document.getElementById("friendList");
+  if (error) {
+    wrap.innerHTML = '<div class="empty">KhÃ´ng táº£i Ä‘Æ°á»£c danh sÃ¡ch báº¡n bÃ¨.</div>';
+    return;
+  }
+  if (!data || !data.length) {
+    wrap.innerHTML = '<div class="empty">Báº¡n chÆ°a cÃ³ báº¡n bÃ¨ nÃ o Ä‘á»ƒ nháº¯n tin.</div>';
+    return;
+  }
+
+  const directKeys = (data || []).map(item => [currentUser.id, item.friend_id].sort().join("_"));
+  const [{ data: conversations }, { data: unreadNotifications }] = await Promise.all([
+    sb.from("conversations").select("id, direct_key").in("direct_key", directKeys),
+    sb
+      .from("notifications")
+      .select("actor_id")
+      .eq("user_id", currentUser.id)
+      .eq("type", "message_new")
+      .eq("is_read", false)
+  ]);
+
+  const conversationMap = new Map((conversations || []).map(item => [item.direct_key, item]));
+  const unreadMap = new Map();
+  (unreadNotifications || []).forEach(item => {
+    if (!item.actor_id) return;
+    unreadMap.set(item.actor_id, (unreadMap.get(item.actor_id) || 0) + 1);
+  });
+
+  const conversationIds = (conversations || []).map(item => item.id);
+  const lastMessageMap = new Map();
+  if (conversationIds.length) {
+    const { data: messages } = await sb
+      .from("messages")
+      .select("conversation_id, content, sender_id, created_at")
+      .in("conversation_id", conversationIds)
+      .order("created_at", { ascending: false });
+
+    (messages || []).forEach(item => {
+      if (!lastMessageMap.has(item.conversation_id)) {
+        lastMessageMap.set(item.conversation_id, item);
+      }
+    });
+  }
+
+  const enriched = (data || []).map(item => {
+    const directKey = [currentUser.id, item.friend_id].sort().join("_");
+    const conversation = conversationMap.get(directKey);
+    const lastMessage = conversation ? lastMessageMap.get(conversation.id) : null;
+    const preview = lastMessage?.content
+      ? (lastMessage.sender_id === currentUser.id ? "Báº¡n: " : "") + getMessagePreview(lastMessage.content)
+      : "";
+
+    return {
+      ...item,
+      preview,
+      lastActivity: lastMessage?.created_at || null,
+      unreadCount: unreadMap.get(item.friend_id) || 0
+    };
+  });
+
+  if (requestToken !== friendsLoadToken) return;
+
+  enriched.sort((a, b) => {
+    const timeA = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
+    const timeB = b.lastActivity ? new Date(b.lastActivity).getTime() : 0;
+    if (timeA !== timeB) return timeB - timeA;
+    return String(a.users?.full_name || "").localeCompare(String(b.users?.full_name || ""), "vi");
+  });
+
+  allFriends = enriched;
+  friendMap = new Map(enriched.map(item => [item.friend_id, item]));
+  renderFriendList(getFilteredFriendList());
+
+  if (activeFriend?.id) {
+    document.getElementById("friend_" + activeFriend.id)?.classList.add("active");
+  }
+
+  const selectedUserId = !currentConversationId ? selectedUserFromQuery : null;
+  if (selectedUserId && friendMap.has(selectedUserId)) {
+    const item = friendMap.get(selectedUserId);
+    selectedUserFromQuery = null;
+    openConversation(
+      selectedUserId,
+      item.users?.full_name || "NgÆ°á»i dÃ¹ng",
       item.users?.avatar_url || "default-avatar.png",
       item.users?.role || ""
     );

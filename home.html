@@ -330,6 +330,8 @@ let currentUser, role, currentProfile;
 let friendIds = new Set();
 let likedPostIds = new Set();
 let feedChannel = null;
+let feedRefreshTimer = null;
+let feedRefreshRunning = false;
 
 async function createNotification(userId, type, message, refId) {
   if (!userId || userId === currentUser.id) return;
@@ -392,6 +394,24 @@ async function loadLikedPosts() {
   likedPostIds = new Set((data || []).map(item => item.post_id));
 }
 
+function scheduleFeedRefresh(options = {}) {
+  const { withLikes = false, postId = null } = options;
+  if (feedRefreshTimer) clearTimeout(feedRefreshTimer);
+  feedRefreshTimer = setTimeout(async () => {
+    if (feedRefreshRunning) return;
+    feedRefreshRunning = true;
+    try {
+      if (withLikes) await loadLikedPosts();
+      await loadPosts();
+      if (postId && document.getElementById("cmt_" + postId)?.style.display === "block") {
+        await loadComments(postId);
+      }
+    } finally {
+      feedRefreshRunning = false;
+    }
+  }, 180);
+}
+
 function subscribeFeedRealtime() {
   if (feedChannel) {
     sb.removeChannel(feedChannel);
@@ -400,25 +420,21 @@ function subscribeFeedRealtime() {
 
   feedChannel = sb
     .channel("home-feed")
-    .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, async () => {
-      await loadLikedPosts();
-      await loadPosts();
+    .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => {
+      scheduleFeedRefresh();
     })
-    .on("postgres_changes", { event: "*", schema: "public", table: "likes" }, async () => {
-      await loadLikedPosts();
-      await loadPosts();
+    .on("postgres_changes", { event: "*", schema: "public", table: "likes" }, () => {
+      scheduleFeedRefresh({ withLikes: true });
     })
-    .on("postgres_changes", { event: "*", schema: "public", table: "comments" }, async payload => {
-      await loadPosts();
+    .on("postgres_changes", { event: "*", schema: "public", table: "comments" }, payload => {
       const postId = payload?.new?.post_id || payload?.old?.post_id;
-      if (postId && document.getElementById("cmt_" + postId)?.style.display === "block") {
-        await loadComments(postId);
-      }
+      scheduleFeedRefresh({ postId });
     })
     .subscribe();
 }
 
 window.addEventListener("beforeunload", () => {
+  if (feedRefreshTimer) clearTimeout(feedRefreshTimer);
   if (feedChannel) {
     sb.removeChannel(feedChannel);
     feedChannel = null;

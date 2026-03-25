@@ -425,6 +425,7 @@ let currentUser = null;
 let activeTab = "all";
 let friendIds = new Set();
 let searchDebounceTimer = null;
+let searchCache = new Map();
 
 async function init() {
   const { data: { user } } = await sb.auth.getUser();
@@ -673,6 +674,74 @@ function esc(value) {
 function safeUrl(value) {
   return String(value || "").replace(/"/g, "&quot;");
 }
+
+window.resetSearch = function() {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+  searchCache.clear();
+  document.getElementById("keywordInput").value = "";
+  document.getElementById("metaLine").textContent = "Nhập từ khóa để bắt đầu tìm kiếm.";
+  document.getElementById("resultList").innerHTML = '<div class="empty">Chưa có kết quả nào. Hãy nhập từ khóa rồi bấm tìm kiếm.</div>';
+};
+
+window.performSearch = async function() {
+  const keyword = document.getElementById("keywordInput").value.trim();
+  const resultList = document.getElementById("resultList");
+  const metaLine = document.getElementById("metaLine");
+
+  if (!keyword) {
+    resultList.innerHTML = '<div class="empty">Hãy nhập từ khóa để tìm kiếm.</div>';
+    metaLine.textContent = "Hãy nhập ít nhất một từ khóa.";
+    return;
+  }
+
+  if (keyword.length < 2) {
+    resultList.innerHTML = '<div class="empty">Hãy nhập ít nhất 2 ký tự để giảm tải hệ thống và cho kết quả chính xác hơn.</div>';
+    metaLine.textContent = "Từ khóa quá ngắn để tìm kiếm hiệu quả.";
+    return;
+  }
+
+  const cacheKey = activeTab + "::" + keyword.toLowerCase();
+  if (searchCache.has(cacheKey)) {
+    const cached = searchCache.get(cacheKey);
+    resultList.innerHTML = cached.html;
+    metaLine.textContent = cached.meta;
+    return;
+  }
+
+  resultList.innerHTML = '<div class="loading">Đang tìm kiếm...</div>';
+
+  const parts = [];
+  if (activeTab === "all" || activeTab === "users") {
+    const users = await searchUsers(keyword);
+    if (users.length) {
+      parts.push('<div class="section-label">Người dùng</div>');
+      parts.push(users.map(renderUserItem).join(""));
+    }
+  }
+
+  if (activeTab === "all" || activeTab === "posts") {
+    const posts = await searchPosts(keyword);
+    if (posts.length) {
+      parts.push('<div class="section-label">Bài viết</div>');
+      parts.push(posts.map(renderPostItem).join(""));
+    }
+  }
+
+  if (!parts.length) {
+    const emptyHtml = '<div class="empty">Không tìm thấy kết quả phù hợp.</div>';
+    const emptyMeta = 'Không có kết quả cho từ khóa "' + keyword + '".';
+    resultList.innerHTML = emptyHtml;
+    metaLine.textContent = emptyMeta;
+    searchCache.set(cacheKey, { html: emptyHtml, meta: emptyMeta });
+    return;
+  }
+
+  const nextHtml = parts.join("");
+  const nextMeta = 'Đang hiển thị kết quả cho từ khóa "' + keyword + '".';
+  resultList.innerHTML = nextHtml;
+  metaLine.textContent = nextMeta;
+  searchCache.set(cacheKey, { html: nextHtml, meta: nextMeta });
+};
 
 init();
 </script>
