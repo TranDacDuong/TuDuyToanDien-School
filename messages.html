@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Nhắn tin</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-body); background: var(--cream); color: var(--ink); }
+.page { height: 100vh; padding: 18px; }
+.shell { display: grid; grid-template-columns: 320px minmax(0,1fr); gap: 18px; height: calc(100vh - 36px); }
+.panel { background: var(--white); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow-sm); overflow: hidden; }
+.sidebar-head, .chat-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--surface); }
+.sidebar-title, .chat-title { font-family: var(--font-display); color: var(--navy); font-size: 1.12rem; }
+.sidebar-sub, .chat-sub { margin-top: 4px; color: var(--ink-light); font-size: .78rem; }
+.friend-list { padding: 14px; display: flex; flex-direction: column; gap: 10px; max-height: 100%; overflow: auto; }
+.friend-card { display: flex; align-items: center; gap: 12px; border: 1px solid var(--border); border-radius: 16px; padding: 12px; cursor: pointer; transition: .15s; background: linear-gradient(180deg,#fff 0%,#fbfbfe 100%); }
+.friend-card:hover, .friend-card.active { border-color: var(--gold-border); background: var(--gold-pale); }
+.avatar { width: 46px; height: 46px; border-radius: 14px; object-fit: cover; border: 2px solid var(--gold-border); background: var(--surface); }
+.name { color: var(--navy); font-weight: 700; font-size: .9rem; }
+.meta { color: var(--ink-light); font-size: .78rem; margin-top: 3px; }
+.chat-panel { display: grid; grid-template-rows: auto 1fr auto; min-height: 0; }
+.message-list { padding: 18px; overflow: auto; display: flex; flex-direction: column; gap: 10px; background: linear-gradient(180deg,#fafbff 0%,#f8f5ef 100%); }
+.message-row { display: flex; }
+.message-row.mine { justify-content: flex-end; }
+.bubble { max-width: min(76%, 560px); padding: 10px 14px; border-radius: 16px; line-height: 1.6; font-size: .88rem; border: 1px solid var(--border); background: var(--white); }
+.message-row.mine .bubble { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%); color: #fff; border-color: transparent; }
+.bubble-time { margin-top: 6px; font-size: .72rem; opacity: .75; }
+.composer { border-top: 1px solid var(--surface); padding: 14px; display: flex; gap: 10px; align-items: center; }
+.composer textarea { min-height: 52px; max-height: 140px; resize: vertical; }
+.empty { padding: 22px; color: var(--ink-light); text-align: center; }
+@media (max-width: 860px) {
+  .page { padding: 10px; }
+  .shell { grid-template-columns: 1fr; height: auto; }
+  .panel { min-height: 320px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="shell">
+    <aside class="panel">
+      <div class="sidebar-head">
+        <div class="sidebar-title">Nhắn tin</div>
+        <div class="sidebar-sub">Chọn một người bạn để bắt đầu trò chuyện</div>
+      </div>
+      <div id="friendList" class="friend-list">
+        <div class="empty">Đang tải danh sách bạn bè...</div>
+      </div>
+    </aside>
+
+    <section class="panel chat-panel">
+      <div class="chat-head">
+        <div id="chatTitle" class="chat-title">Chưa chọn cuộc trò chuyện</div>
+        <div id="chatSub" class="chat-sub">Hãy chọn một người ở cột bên trái</div>
+      </div>
+      <div id="messageList" class="message-list">
+        <div class="empty">Chưa có cuộc trò chuyện nào được mở.</div>
+      </div>
+      <div class="composer">
+        <textarea id="messageInput" placeholder="Nhập tin nhắn..." disabled></textarea>
+        <button class="btn btn-primary" id="sendBtn" onclick="sendMessage()" disabled>Gửi</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script>
+let currentUser = null;
+let currentProfile = null;
+let currentConversationId = null;
+let activeFriend = null;
+let refreshTimer = null;
+
+async function init() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) {
+    location.href = "index.html";
+    return;
+  }
+  currentUser = user;
+  const { data: profile } = await sb.from("users").select("*").eq("id", user.id).single();
+  currentProfile = profile;
+  await loadFriends();
+}
+
+async function loadFriends() {
+  const { data, error } = await sb
+    .from("friendships")
+    .select("friend_id, users!friendships_friend_id_fkey(full_name, avatar_url, role)")
+    .eq("user_id", currentUser.id)
+    .order("created_at", { ascending: false });
+
+  const wrap = document.getElementById("friendList");
+  if (error) {
+    wrap.innerHTML = '<div class="empty">Không tải được danh sách bạn bè.</div>';
+    return;
+  }
+  if (!data || !data.length) {
+    wrap.innerHTML = '<div class="empty">Bạn chưa có bạn bè nào để nhắn tin.</div>';
+    return;
+  }
+
+  wrap.innerHTML = data.map(item => `
+    <div class="friend-card" id="friend_${item.friend_id}" onclick="openConversation('${item.friend_id}', '${escapeJs(item.users?.full_name || "Người dùng")}', '${escapeJs(item.users?.avatar_url || "default-avatar.png")}', '${escapeJs(item.users?.role || "")}')">
+      <img class="avatar" src="${item.users?.avatar_url || "default-avatar.png"}" alt="Avatar" onerror="this.src='default-avatar.png'">
+      <div>
+        <div class="name">${esc(item.users?.full_name || "Người dùng")}</div>
+        <div class="meta">${esc(formatRole(item.users?.role || ""))}</div>
+      </div>
+    </div>
+  `).join("");
+}
+
+window.openConversation = async function(friendId, friendName, friendAvatar, friendRole) {
+  document.querySelectorAll(".friend-card").forEach(el => el.classList.remove("active"));
+  document.getElementById("friend_" + friendId)?.classList.add("active");
+
+  activeFriend = { id: friendId, name: friendName, avatar: friendAvatar, role: friendRole };
+  document.getElementById("chatTitle").textContent = friendName;
+  document.getElementById("chatSub").textContent = formatRole(friendRole);
+  document.getElementById("messageInput").disabled = false;
+  document.getElementById("sendBtn").disabled = false;
+
+  currentConversationId = await ensureConversation(friendId);
+  await loadMessages();
+
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(loadMessages, 5000);
+};
+
+async function ensureConversation(friendId) {
+  const directKey = [currentUser.id, friendId].sort().join("_");
+
+  const { data: existing } = await sb
+    .from("conversations")
+    .select("id")
+    .eq("direct_key", directKey)
+    .maybeSingle();
+
+  if (existing?.id) return existing.id;
+
+  const { data: conversation, error } = await sb
+    .from("conversations")
+    .insert({ kind: "direct", direct_key: directKey })
+    .select("id")
+    .single();
+
+  if (error) {
+    const { data: retry } = await sb
+      .from("conversations")
+      .select("id")
+      .eq("direct_key", directKey)
+      .maybeSingle();
+    if (retry?.id) return retry.id;
+    throw error;
+  }
+
+  await sb.from("conversation_members").upsert([
+    { conversation_id: conversation.id, user_id: currentUser.id },
+    { conversation_id: conversation.id, user_id: friendId }
+  ], { onConflict: "conversation_id,user_id" });
+
+  return conversation.id;
+}
+
+async function loadMessages() {
+  if (!currentConversationId) return;
+  const { data, error } = await sb
+    .from("messages")
+    .select("id, content, created_at, sender_id")
+    .eq("conversation_id", currentConversationId)
+    .order("created_at", { ascending: true });
+
+  const wrap = document.getElementById("messageList");
+  if (error) {
+    wrap.innerHTML = '<div class="empty">Không tải được tin nhắn.</div>';
+    return;
+  }
+  if (!data || !data.length) {
+    wrap.innerHTML = '<div class="empty">Chưa có tin nhắn nào. Hãy gửi lời chào đầu tiên.</div>';
+    return;
+  }
+
+  wrap.innerHTML = data.map(item => `
+    <div class="message-row ${item.sender_id === currentUser.id ? "mine" : ""}">
+      <div class="bubble">
+        <div>${esc(item.content)}</div>
+        <div class="bubble-time">${formatTime(item.created_at)}</div>
+      </div>
+    </div>
+  `).join("");
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+window.sendMessage = async function() {
+  const input = document.getElementById("messageInput");
+  const content = input.value.trim();
+  if (!content || !currentConversationId) return;
+
+  const { error } = await sb.from("messages").insert({
+    conversation_id: currentConversationId,
+    sender_id: currentUser.id,
+    content
+  });
+
+  if (error) {
+    alert("Không gửi được tin nhắn: " + error.message);
+    return;
+  }
+
+  input.value = "";
+  await loadMessages();
+};
+
+document.getElementById("messageInput").addEventListener("keydown", function(event) {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    sendMessage();
+  }
+});
+
+function formatTime(value) {
+  return new Date(value).toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function formatRole(role) {
+  if (role === "admin") return "Quản trị viên";
+  if (role === "teacher") return "Giáo viên";
+  if (role === "student") return "Học sinh";
+  return "Thành viên";
+}
+
+function esc(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function escapeJs(value) {
+  return String(value || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'");
+}
+
+init();
+</script>
+</body>
+</html>
