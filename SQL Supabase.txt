@@ -585,3 +585,113 @@ WITH CHECK (
       AND cm.user_id = auth.uid()
   )
 );
+
+-- ============================================
+-- Home overview migration
+-- ============================================
+
+ALTER TABLE public.posts
+  ADD COLUMN IF NOT EXISTS title text,
+  ADD COLUMN IF NOT EXISTS feed_tab text NOT NULL DEFAULT 'discussion'
+    CHECK (feed_tab IN ('overview', 'discussion')),
+  ADD COLUMN IF NOT EXISTS home_category text NOT NULL DEFAULT 'update'
+    CHECK (home_category IN ('update', 'course', 'news'));
+
+UPDATE public.posts
+SET feed_tab = COALESCE(feed_tab, 'discussion')
+WHERE feed_tab IS NULL;
+
+UPDATE public.posts
+SET home_category = COALESCE(home_category, 'update')
+WHERE home_category IS NULL;
+
+CREATE INDEX IF NOT EXISTS posts_feed_tab_created_idx
+  ON public.posts (feed_tab, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS posts_home_category_created_idx
+  ON public.posts (home_category, created_at DESC)
+  WHERE feed_tab = 'overview';
+
+CREATE TABLE IF NOT EXISTS public.exam_events (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  exam_at timestamp with time zone NOT NULL,
+  created_by uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT exam_events_pkey PRIMARY KEY (id),
+  CONSTRAINT exam_events_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS exam_events_exam_at_idx
+  ON public.exam_events (exam_at ASC);
+
+CREATE TABLE IF NOT EXISTS public.site_settings (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  setting_key text NOT NULL,
+  setting_value text,
+  updated_by uuid,
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT site_settings_pkey PRIMARY KEY (id),
+  CONSTRAINT site_settings_setting_key_key UNIQUE (setting_key),
+  CONSTRAINT site_settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id) ON DELETE SET NULL
+);
+
+ALTER TABLE public.exam_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS exam_events_select_policy ON public.exam_events;
+CREATE POLICY exam_events_select_policy ON public.exam_events
+FOR SELECT
+USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS exam_events_insert_policy ON public.exam_events;
+CREATE POLICY exam_events_insert_policy ON public.exam_events
+FOR INSERT
+WITH CHECK (
+  auth.uid() = created_by
+  AND EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS exam_events_delete_policy ON public.exam_events;
+CREATE POLICY exam_events_delete_policy ON public.exam_events
+FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS site_settings_select_policy ON public.site_settings;
+CREATE POLICY site_settings_select_policy ON public.site_settings
+FOR SELECT
+USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS site_settings_insert_policy ON public.site_settings;
+CREATE POLICY site_settings_insert_policy ON public.site_settings
+FOR INSERT
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS site_settings_update_policy ON public.site_settings;
+CREATE POLICY site_settings_update_policy ON public.site_settings
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
