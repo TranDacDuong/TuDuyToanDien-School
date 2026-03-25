@@ -90,6 +90,9 @@ function buildLink(item) {
   if (item.type === "friend_request" || item.type === "friend_accept") {
     return `<a class="btn btn-outline btn-sm" href="friend_requests.html">Mở lời mời</a>`;
   }
+  if (item.type === "message_new") {
+    return `<a class="btn btn-outline btn-sm" href="messages.html?user=${item.actor_id}">Mở chat</a>`;
+  }
   if (item.actor_id) {
     return `<a class="btn btn-outline btn-sm" href="profile.html?id=${item.actor_id}">Xem hồ sơ</a>`;
   }
@@ -113,6 +116,7 @@ function formatType(type) {
   if (type === "post_comment") return "đã bình luận vào bài viết của bạn.";
   if (type === "post_approved") return "đã duyệt bài viết của bạn.";
   if (type === "post_rejected") return "đã từ chối bài viết của bạn.";
+  if (type === "message_new") return "đã gửi cho bạn một tin nhắn mới.";
   return "Bạn có một thông báo mới.";
 }
 

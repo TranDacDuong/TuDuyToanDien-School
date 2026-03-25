@@ -258,7 +258,7 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
   actor_id uuid,
-  type text NOT NULL CHECK (type IN ('friend_request', 'friend_accept', 'post_like', 'post_comment', 'post_approved', 'post_rejected')),
+  type text NOT NULL CHECK (type IN ('friend_request', 'friend_accept', 'post_like', 'post_comment', 'post_approved', 'post_rejected', 'message_new')),
   ref_id uuid,
   message text,
   is_read boolean NOT NULL DEFAULT false,

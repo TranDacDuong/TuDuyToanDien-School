@@ -95,6 +95,17 @@ let refreshTimer = null;
 let friendMap = new Map();
 let allFriends = [];
 
+async function createNotification(userId, type, message, refId) {
+  if (!userId || userId === currentUser.id) return;
+  await sb.from("notifications").insert({
+    user_id: userId,
+    actor_id: currentUser.id,
+    type,
+    ref_id: refId || null,
+    message
+  });
+}
+
 async function init() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) {
@@ -269,6 +280,15 @@ window.sendMessage = async function() {
   if (error) {
     alert("Không gửi được tin nhắn: " + error.message);
     return;
+  }
+
+  if (activeFriend?.id) {
+    await createNotification(
+      activeFriend.id,
+      "message_new",
+      (currentProfile?.full_name || currentUser.email || "Một người dùng") + " đã gửi cho bạn một tin nhắn mới.",
+      currentConversationId
+    );
   }
 
   input.value = "";
