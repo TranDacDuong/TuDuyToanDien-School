@@ -29,6 +29,25 @@ body { margin: 0; font-family: var(--font-body); background: var(--cream); color
 .tray-mode .search-wrap {
   padding: 10px 12px 0;
 }
+.popup-mode body { background: transparent; }
+.popup-mode .page { padding: 0; height: 100vh; }
+.popup-mode .shell { grid-template-columns: 1fr; gap: 0; height: 100vh; }
+.popup-mode aside.panel { display: none; }
+.popup-mode .panel {
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  height: 100vh;
+}
+.popup-mode .chat-head {
+  padding: 14px 16px 10px;
+}
+.popup-mode .message-list {
+  padding: 14px;
+}
+.popup-mode .composer {
+  padding: 10px 12px 12px;
+}
 .panel { background: var(--white); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow-sm); overflow: hidden; }
 .sidebar-head, .chat-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--surface); }
 .sidebar-title, .chat-title { font-family: var(--font-display); color: var(--navy); font-size: 1.12rem; }
@@ -280,6 +299,7 @@ let activePresenceIds = new Set();
 let friendsLoadToken = 0;
 const queryParams = new URLSearchParams(location.search);
 const isTrayMode = queryParams.get("tray") === "1";
+const isPopupMode = queryParams.get("popup") === "1";
 
 const CHAT_IMAGE_PREFIX = "__CHAT_IMAGE__";
 const ACTIVE_WINDOW_MS = 2 * 60 * 1000;
@@ -298,6 +318,9 @@ async function createNotification(userId, type, message, refId) {
 async function init() {
   if (isTrayMode) {
     document.documentElement.classList.add("tray-mode");
+  }
+  if (isPopupMode) {
+    document.documentElement.classList.add("popup-mode");
   }
   const { data: { user } } = await sb.auth.getUser();
   if (!user) {

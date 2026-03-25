@@ -960,7 +960,7 @@ window.openChatPopupForUser = function(userId) {
   const popup = document.getElementById("chatPopup");
   const frame = document.getElementById("chatPopupFrame");
   if (!popup || !frame || !userId) return;
-  frame.src = "messages.html?user=" + encodeURIComponent(userId);
+  frame.src = "messages.html?popup=1&user=" + encodeURIComponent(userId);
   frame.dataset.loaded = frame.src;
   popup.classList.add("open");
 };
