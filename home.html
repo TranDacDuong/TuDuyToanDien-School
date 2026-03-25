@@ -127,7 +127,7 @@ body {
   margin-bottom: 14px;
   flex-wrap: wrap;
 }
-.hub-link {
+.hub-link, .hub-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -143,8 +143,12 @@ body {
   font-weight: 600;
   transition: .15s;
   position: relative;
+  cursor: pointer;
 }
-.hub-link:hover {
+.hub-button {
+  appearance: none;
+}
+.hub-link:hover, .hub-button:hover {
   transform: translateY(-2px);
   border-color: var(--gold-border);
   background: #fffaf0;
@@ -178,6 +182,67 @@ body {
   justify-content: center;
 }
 .hub-badge.show { display: inline-flex; }
+.social-panel {
+  display: none;
+  margin-bottom: 18px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 16px 36px rgba(15,31,61,.1);
+  overflow: hidden;
+}
+.social-panel.open { display: block; }
+.social-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--surface);
+}
+.social-panel-title {
+  font-weight: 700;
+  color: var(--navy);
+}
+.social-panel-frame {
+  width: 100%;
+  height: 520px;
+  border: none;
+  background: #fff;
+}
+.chat-popup {
+  display: none;
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  width: min(380px, calc(100vw - 24px));
+  height: 560px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(15,31,61,.18);
+  overflow: hidden;
+  z-index: 1100;
+}
+.chat-popup.open { display: block; }
+.chat-popup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
+  color: #fff;
+}
+.chat-popup-title {
+  font-weight: 700;
+}
+.chat-popup-frame {
+  width: 100%;
+  height: calc(100% - 50px);
+  border: none;
+  background: #fff;
+}
 .feed-tools {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
 }
@@ -199,6 +264,9 @@ body {
   padding: 18px;
   margin-bottom: 20px;
   display: none;
+}
+.compose-shell {
+  position: relative;
 }
 .compose-header {
   display: flex;
@@ -231,6 +299,7 @@ body {
   transition: .18s;
   background: linear-gradient(180deg, #fafbff 0%, #f8f5ef 100%);
   color: var(--ink);
+  padding-bottom: 64px;
 }
 .compose-textarea:focus {
   outline: none; border-color: var(--gold); background: var(--white);
@@ -239,6 +308,73 @@ body {
 .compose-footer {
   display: flex; align-items: center; justify-content: space-between;
   margin-top: 10px; flex-wrap: wrap; gap: 8px;
+}
+.compose-footer.hidden-bar { display: none; }
+.compose-inline-tools {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+}
+.compose-inline-left,
+.compose-inline-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+.compose-icon-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(15,31,61,.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: .15s;
+}
+.compose-icon-btn:hover {
+  background: #fff8ea;
+  border-color: var(--gold-border);
+}
+.visibility-menu {
+  display: none;
+  position: absolute;
+  left: 0;
+  bottom: 50px;
+  min-width: 150px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 14px 32px rgba(15,31,61,.12);
+  overflow: hidden;
+}
+.visibility-menu.open { display: block; }
+.visibility-option {
+  width: 100%;
+  border: none;
+  background: #fff;
+  text-align: left;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  color: var(--ink);
+}
+.visibility-option:hover {
+  background: var(--surface);
+}
+.compose-status {
+  font-size: .76rem;
+  color: var(--ink-light);
 }
 .compose-tools {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -267,6 +403,7 @@ body {
   max-width: 230px;
   font-size: .78rem;
 }
+.compose-file.hidden-input { display: none; }
 .compose-file::-webkit-file-upload-button {
   border: none;
   background: var(--surface);
@@ -604,6 +741,7 @@ let feedChannel = null;
 let feedRefreshTimer = null;
 let feedRefreshRunning = false;
 let homeBadgeChannel = null;
+let activeSocialPanel = "";
 
 async function createNotification(userId, type, message, refId) {
   if (!userId || userId === currentUser.id) return;
@@ -633,7 +771,212 @@ window.previewPostImage = function(event) {
   reader.readAsDataURL(file);
 };
 
+function ensureHomeOverlayShell() {
+  if (!document.getElementById("socialPanel")) {
+    const panel = document.createElement("div");
+    panel.className = "social-panel";
+    panel.id = "socialPanel";
+    panel.innerHTML = `
+      <div class="social-panel-head">
+        <div class="social-panel-title" id="socialPanelTitle">Tiện ích</div>
+        <button class="btn btn-outline btn-sm" type="button" onclick="closeSocialPanel()">Đóng</button>
+      </div>
+      <iframe class="social-panel-frame" id="socialPanelFrame" src="about:blank" loading="lazy"></iframe>
+    `;
+    const feedWrap = document.querySelector(".feed-wrap");
+    const feedHeader = document.querySelector(".feed-header");
+    if (feedWrap && feedHeader) {
+      feedWrap.insertBefore(panel, feedHeader);
+    }
+  }
+
+  if (!document.getElementById("chatPopup")) {
+    const popup = document.createElement("div");
+    popup.className = "chat-popup";
+    popup.id = "chatPopup";
+    popup.innerHTML = `
+      <div class="chat-popup-head">
+        <div class="chat-popup-title">Nhắn tin</div>
+        <button class="btn btn-outline btn-sm" type="button" onclick="closeChatPopup()">Đóng</button>
+      </div>
+      <iframe class="chat-popup-frame" id="chatPopupFrame" src="about:blank" loading="lazy"></iframe>
+    `;
+    document.body.appendChild(popup);
+  }
+}
+
+function enhanceHomeHub() {
+  const hub = document.querySelector(".social-hub");
+  if (!hub) return;
+  hub.innerHTML = `
+    <button class="hub-button" type="button" title="Tìm kiếm" onclick="toggleSocialPanel('search')">
+      <span class="hub-icon">🔎</span>
+    </button>
+    <button class="hub-button" type="button" title="Thông báo" onclick="toggleSocialPanel('notifications')">
+      <span class="hub-icon">🔔</span>
+      <span class="hub-badge" id="homeNotificationBadge">0</span>
+    </button>
+    <button class="hub-button" type="button" title="Lời mời kết bạn" onclick="toggleSocialPanel('friend_requests')">
+      <span class="hub-icon">🤝</span>
+      <span class="hub-badge" id="homeFriendRequestBadge">0</span>
+    </button>
+    <button class="hub-button" type="button" title="Nhắn tin" onclick="toggleChatPopup()">
+      <span class="hub-icon">💬</span>
+      <span class="hub-badge" id="homeMessageBadge">0</span>
+    </button>
+    <a class="hub-link" id="homeProfileLink" href="profile.html" title="Trang cá nhân">
+      <img class="hub-icon" id="homeProfileAvatar" src="default-avatar.png" alt="Avatar" onerror="this.src='default-avatar.png'">
+    </a>
+  `;
+}
+
+function enhanceComposerUI() {
+  const card = document.getElementById("composeCard");
+  if (!card || card.dataset.enhanced === "true") return;
+  card.dataset.enhanced = "true";
+  card.innerHTML = `
+    <div class="compose-shell">
+      <div class="compose-header">
+        <img class="compose-avatar" id="composeAvatar" src="default-avatar.png">
+        <div>
+          <div class="compose-name" id="composeName"></div>
+          <div class="compose-headline">Chia sẻ điều bạn đang nghĩ với mọi người</div>
+        </div>
+      </div>
+      <textarea class="compose-textarea" id="postContent" rows="3" placeholder="Bạn đang nghĩ gì?"></textarea>
+      <div class="compose-inline-tools">
+        <div class="compose-inline-left">
+          <div style="position:relative;">
+            <button class="compose-icon-btn" type="button" title="Quyền riêng tư" onclick="toggleVisibilityMenu(event)">🌍</button>
+            <div class="visibility-menu" id="visibilityMenu">
+              <button class="visibility-option" type="button" onclick="setComposeVisibility('public')">🌍 Công khai</button>
+              <button class="visibility-option" type="button" onclick="setComposeVisibility('friends')">👥 Bạn bè</button>
+              <button class="visibility-option" type="button" onclick="setComposeVisibility('private')">🔒 Riêng tư</button>
+            </div>
+          </div>
+          <button class="compose-icon-btn" type="button" title="Chọn ảnh" onclick="document.getElementById('postImage').click()">🖼️</button>
+          <span class="compose-status" id="composeStatus">🌍 Công khai</span>
+        </div>
+        <div class="compose-inline-right">
+          <span class="compose-note" id="composeNote">⏳ Bài sẽ được duyệt trước khi hiển thị</span>
+          <button class="compose-icon-btn" type="button" title="Đăng bài" onclick="createPost()">📨</button>
+        </div>
+      </div>
+      <div class="compose-footer hidden-bar">
+        <div class="compose-tools">
+          <select class="compose-select" id="postVisibility">
+            <option value="public">Công khai</option>
+            <option value="friends">Bạn bè</option>
+            <option value="private">Riêng tư</option>
+          </select>
+          <div class="compose-media">
+            <input class="compose-file" type="file" id="postImage" accept="image/*" onchange="previewPostImage(event)">
+          </div>
+        </div>
+      </div>
+      <div class="compose-preview" id="composePreview">
+        <img id="composePreviewImg" src="" alt="Xem trước ảnh bài viết">
+      </div>
+    </div>
+  `;
+}
+
+const socialPanelConfig = {
+  search: { title: "Tìm kiếm", src: "search.html" },
+  notifications: { title: "Thông báo", src: "notifications.html" },
+  friend_requests: { title: "Lời mời kết bạn", src: "friend_requests.html" }
+};
+
+window.toggleSocialPanel = function(type) {
+  ensureHomeOverlayShell();
+  closeChatPopup();
+  const panel = document.getElementById("socialPanel");
+  const title = document.getElementById("socialPanelTitle");
+  const frame = document.getElementById("socialPanelFrame");
+  const config = socialPanelConfig[type];
+  if (!panel || !title || !frame || !config) return;
+
+  if (panel.classList.contains("open") && activeSocialPanel === type) {
+    closeSocialPanel();
+    return;
+  }
+
+  title.textContent = config.title;
+  if (!frame.dataset.loaded || frame.dataset.loaded !== config.src) {
+    frame.src = config.src;
+    frame.dataset.loaded = config.src;
+  }
+  activeSocialPanel = type;
+  panel.classList.add("open");
+};
+
+window.closeSocialPanel = function() {
+  const panel = document.getElementById("socialPanel");
+  if (!panel) return;
+  panel.classList.remove("open");
+  activeSocialPanel = "";
+};
+
+window.toggleChatPopup = function() {
+  ensureHomeOverlayShell();
+  closeSocialPanel();
+  const popup = document.getElementById("chatPopup");
+  const frame = document.getElementById("chatPopupFrame");
+  if (!popup || !frame) return;
+
+  const isOpen = popup.classList.contains("open");
+  popup.classList.toggle("open", !isOpen);
+  if (!isOpen && !frame.dataset.loaded) {
+    frame.src = "messages.html";
+    frame.dataset.loaded = "messages.html";
+  }
+};
+
+window.closeChatPopup = function() {
+  const popup = document.getElementById("chatPopup");
+  if (!popup) return;
+  popup.classList.remove("open");
+};
+
+window.toggleVisibilityMenu = function(event) {
+  event?.stopPropagation();
+  const menu = document.getElementById("visibilityMenu");
+  if (!menu) return;
+  menu.classList.toggle("open");
+};
+
+window.setComposeVisibility = function(value) {
+  const select = document.getElementById("postVisibility");
+  const status = document.getElementById("composeStatus");
+  const menu = document.getElementById("visibilityMenu");
+  const labelMap = {
+    public: "🌍 Công khai",
+    friends: "👥 Bạn bè",
+    private: "🔒 Riêng tư"
+  };
+  if (select) select.value = value;
+  if (status) status.textContent = labelMap[value] || "🌍 Công khai";
+  if (menu) menu.classList.remove("open");
+};
+
+document.addEventListener("click", (event) => {
+  const menu = document.getElementById("visibilityMenu");
+  if (menu && !event.target.closest(".compose-inline-left")) {
+    menu.classList.remove("open");
+  }
+
+  const panel = document.getElementById("socialPanel");
+  if (panel && panel.classList.contains("open")) {
+    const clickedHub = event.target.closest(".social-hub");
+    const clickedPanel = event.target.closest("#socialPanel");
+    if (!clickedHub && !clickedPanel) closeSocialPanel();
+  }
+});
+
 async function init() {
+  enhanceHomeHub();
+  ensureHomeOverlayShell();
+  enhanceComposerUI();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) { location.href = "index.html"; return; }
   currentUser = user;
@@ -670,7 +1013,7 @@ async function loadLikedPosts() {
 }
 
 function setupHomeLinks() {
-  const profileLink = document.querySelector('.hub-link[href="profile.html"]');
+  const profileLink = document.getElementById("homeProfileLink");
   if (profileLink && currentUser?.id) {
     profileLink.href = "profile.html?id=" + currentUser.id;
   }
@@ -798,6 +1141,9 @@ async function createPost() {
   document.getElementById("postContent").value = "";
   document.getElementById("postVisibility").value = "public";
   document.getElementById("postImage").value = "";
+  const composeStatus = document.getElementById("composeStatus");
+  if (composeStatus) composeStatus.textContent = "🌍 Công khai";
+  document.getElementById("visibilityMenu")?.classList.remove("open");
   document.getElementById("composePreview").classList.remove("show");
   document.getElementById("composePreviewImg").src = "";
   loadPosts();
