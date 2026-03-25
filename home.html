@@ -50,8 +50,26 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
   display: flex; align-items: center; justify-content: space-between;
   margin-top: 10px; flex-wrap: wrap; gap: 8px;
 }
+.compose-tools {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
 .compose-note { font-size: .74rem; color: var(--amber); display: none; }
 .compose-note.show { display: block; }
+.compose-select {
+  min-width: 150px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-family: var(--font-body);
+  font-size: .82rem;
+  background: var(--white);
+  color: var(--ink);
+}
+.compose-select:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(200,150,42,.08);
+}
 
 /* ── Post card ── */
 .post-card {
@@ -81,6 +99,7 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
 .badge-pin      { font-size: .68rem; font-weight: 700; background: var(--gold-pale); color: var(--gold); border: 1px solid var(--gold-border); padding: 1px 8px; border-radius: 20px; }
 .badge-pending  { font-size: .68rem; font-weight: 700; background: var(--amber-bg); color: var(--amber); padding: 1px 8px; border-radius: 20px; }
 .badge-rejected { font-size: .68rem; font-weight: 700; background: var(--red-bg);   color: var(--red);   padding: 1px 8px; border-radius: 20px; }
+.badge-visibility { font-size: .68rem; font-weight: 700; background: var(--blue-bg); color: var(--blue); padding: 1px 8px; border-radius: 20px; }
 
 .post-body {
   padding: 10px 16px 12px; font-size: .9rem; line-height: 1.65;
@@ -177,7 +196,14 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
     <textarea class="compose-textarea" id="postContent" rows="3"
       placeholder="Chia sẻ thông báo hoặc bài viết..."></textarea>
     <div class="compose-footer">
-      <span class="compose-note" id="composeNote">⏳ Bài sẽ được duyệt trước khi hiển thị</span>
+      <div class="compose-tools">
+        <span class="compose-note" id="composeNote">⏳ Bài sẽ được duyệt trước khi hiển thị</span>
+        <select class="compose-select" id="postVisibility">
+          <option value="public">Công khai</option>
+          <option value="friends">Bạn bè</option>
+          <option value="private">Riêng tư</option>
+        </select>
+      </div>
       <button class="btn btn-primary btn-sm" onclick="createPost()">Đăng bài</button>
     </div>
   </div>
@@ -206,11 +232,13 @@ async function init() {
 
 async function createPost() {
   const text = document.getElementById("postContent").value.trim();
+  const visibility = document.getElementById("postVisibility").value;
   if (!text) return;
   const status = (role === "admin" || role === "teacher") ? "approved" : "pending";
-  const { error } = await sb.from("posts").insert({ user_id: currentUser.id, content: text, status });
+  const { error } = await sb.from("posts").insert({ user_id: currentUser.id, content: text, status, visibility });
   if (error) { alert("Lỗi: " + error.message); return; }
   document.getElementById("postContent").value = "";
+  document.getElementById("postVisibility").value = "public";
   loadPosts();
 }
 
@@ -255,6 +283,11 @@ function buildCard(post) {
 
   const statusBadge = isPending  ? `<span class="badge-pending">Chờ duyệt</span>`
                     : isRejected ? `<span class="badge-rejected">Từ chối</span>` : "";
+  const visibilityBadge = post.visibility === "friends"
+    ? `<span class="badge-visibility">Bạn bè</span>`
+    : post.visibility === "private"
+      ? `<span class="badge-visibility">Riêng tư</span>`
+      : `<span class="badge-visibility">Công khai</span>`;
 
   const modBar = (canMod && isPending) ? `
     <div class="mod-bar">
@@ -290,6 +323,7 @@ function buildCard(post) {
         <div class="post-author">
           <a class="post-author-link" href="profile.html?id=${post.user_id}">${esc(post.users?.full_name??"Người dùng")}</a>
           ${post.is_pinned ? '<span class="badge-pin">📌 Đã ghim</span>' : ""}
+          ${visibilityBadge}
           ${statusBadge}
         </div>
         <div class="post-time">${timeStr}</div>
