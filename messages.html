@@ -35,6 +35,16 @@ body { margin: 0; font-family: var(--font-body); background: var(--cream); color
 .avatar { width: 46px; height: 46px; border-radius: 14px; object-fit: cover; border: 2px solid var(--gold-border); background: var(--surface); }
 .name { color: var(--navy); font-weight: 700; font-size: .9rem; }
 .meta { color: var(--ink-light); font-size: .78rem; margin-top: 3px; }
+.preview {
+  color: var(--ink-mid);
+  font-size: .78rem;
+  margin-top: 4px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .chat-panel { display: grid; grid-template-rows: auto 1fr auto; min-height: 0; }
 .message-list { padding: 18px; overflow: auto; display: flex; flex-direction: column; gap: 10px; background: linear-gradient(180deg,#fafbff 0%,#f8f5ef 100%); }
 .message-row { display: flex; }
@@ -135,9 +145,35 @@ async function loadFriends() {
     return;
   }
 
-  allFriends = data;
-  friendMap = new Map(data.map(item => [item.friend_id, item]));
-  renderFriendList(data);
+  const enriched = await Promise.all((data || []).map(async item => {
+    const directKey = [currentUser.id, item.friend_id].sort().join("_");
+    const { data: conversation } = await sb
+      .from("conversations")
+      .select("id")
+      .eq("direct_key", directKey)
+      .maybeSingle();
+
+    let preview = "";
+    if (conversation?.id) {
+      const { data: lastMessage } = await sb
+        .from("messages")
+        .select("content, sender_id, created_at")
+        .eq("conversation_id", conversation.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (lastMessage?.content) {
+        preview = (lastMessage.sender_id === currentUser.id ? "Bạn: " : "") + lastMessage.content;
+      }
+    }
+
+    return { ...item, preview };
+  }));
+
+  allFriends = enriched;
+  friendMap = new Map(enriched.map(item => [item.friend_id, item]));
+  renderFriendList(enriched);
 
   const params = new URLSearchParams(location.search);
   const selectedUserId = params.get("user");
@@ -165,6 +201,7 @@ function renderFriendList(list) {
       <div>
         <div class="name">${esc(item.users?.full_name || "Người dùng")}</div>
         <div class="meta">${esc(formatRole(item.users?.role || ""))}</div>
+        <div class="preview">${esc(item.preview || "Chưa có tin nhắn nào")}</div>
       </div>
     </div>
   `).join("");
