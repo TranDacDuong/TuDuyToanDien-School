@@ -198,6 +198,10 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
   font-size: .72rem; color: var(--red); cursor: pointer; font-weight: 500;
 }
 .delete-link:hover { text-decoration: underline; }
+.edit-link {
+  font-size: .72rem; color: var(--blue); cursor: pointer; font-weight: 500;
+}
+.edit-link:hover { text-decoration: underline; }
 .reply-indent { margin-left: 36px; }
 .reply-box { display: none; align-items: center; gap: 8px; margin-top: 6px; padding-left: 36px; }
 .reply-box.open { display: flex; }
@@ -697,6 +701,28 @@ window.deleteComment = async function(pid, cid) {
   loadPosts();
 };
 
+window.editComment = async function(pid, cid, oldContent) {
+  const next = prompt("Sửa nội dung bình luận:", oldContent || "");
+  if (next === null) return;
+  const content = next.trim();
+  if (!content) {
+    alert("Nội dung bình luận không được để trống");
+    return;
+  }
+
+  const { error } = await sb
+    .from("comments")
+    .update({ content })
+    .eq("id", cid);
+
+  if (error) {
+    alert("Lỗi khi sửa bình luận: " + error.message);
+    return;
+  }
+
+  loadComments(pid);
+};
+
 async function loadComments(pid) {
   const { data } = await sb
     .from("comments")
@@ -710,13 +736,14 @@ async function loadComments(pid) {
   list.innerHTML = tops.map(c => {
     const t = new Date(c.created_at).toLocaleString("vi-VN",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
     const canDeleteTop = role === "admin" || c.user_id === currentUser.id;
+    const canEditTop = role === "admin" || c.user_id === currentUser.id;
     const rHtml = replies.filter(r => r.parent_id === c.id).map(r => `
       <div class="cmt-item reply-indent">
         <img class="cmt-avatar" src="${r.users?.avatar_url||'default-avatar.png'}" onerror="this.src='default-avatar.png'">
         <div class="cmt-bubble">
           <div class="cmt-name">${esc(r.users?.full_name??"User")}</div>
           <div class="cmt-text">${esc(r.content)}</div>
-          ${(role === "admin" || r.user_id === currentUser.id) ? `<div class="cmt-tools"><span class="delete-link" onclick="deleteComment('${pid}','${r.id}')">Xóa</span></div>` : ""}
+          ${(role === "admin" || r.user_id === currentUser.id) ? `<div class="cmt-tools"><span class="edit-link" onclick="editComment('${pid}','${r.id}',${JSON.stringify(String(r.content || ""))})">Sửa</span><span class="delete-link" onclick="deleteComment('${pid}','${r.id}')">Xóa</span></div>` : ""}
         </div>
       </div>`).join("");
     return `
@@ -730,6 +757,7 @@ async function loadComments(pid) {
           </div>
           <div class="cmt-tools">
             <span class="reply-link" onclick="showReply('${c.id}')">Trả lời</span>
+            ${canEditTop ? `<span class="edit-link" onclick="editComment('${pid}','${c.id}',${JSON.stringify(String(c.content || ""))})">Sửa</span>` : ""}
             ${canDeleteTop ? `<span class="delete-link" onclick="deleteComment('${pid}','${c.id}')">Xóa</span>` : ""}
           </div>
           <div class="reply-box" id="rbox_${c.id}">
