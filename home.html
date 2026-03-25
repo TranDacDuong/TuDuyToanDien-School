@@ -692,12 +692,7 @@ body {
   <div class="feed-header">
     <div class="feed-title">Bảng tin</div>
     <div class="feed-tools">
-      <select class="compose-select" id="feedFilter" onchange="loadPosts()">
-        <option value="all">Tất cả</option>
-        <option value="mine">Bài của tôi</option>
-        <option value="friends">Bạn bè</option>
-      </select>
-      <button class="btn btn-outline btn-sm" onclick="loadPosts()">Tải lại</button>
+      <button class="btn btn-outline btn-sm" id="feedFilterButton" type="button" onclick="cycleFeedFilter()">Chế độ: Tất cả</button>
     </div>
   </div>
 
@@ -747,6 +742,7 @@ let feedRefreshTimer = null;
 let feedRefreshRunning = false;
 let homeBadgeChannel = null;
 let activeSocialPanel = "";
+let currentFeedFilter = "all";
 
 async function createNotification(userId, type, message, refId) {
   if (!userId || userId === currentUser.id) return;
@@ -1031,6 +1027,7 @@ async function init() {
   document.getElementById("composeName").textContent = p.full_name || "Bạn";
   if (role === "student") document.getElementById("composeNote").classList.add("show");
   setupHomeLinks();
+  updateFeedFilterButton();
   loadHomeHubBadges();
   subscribeHomeHubBadges();
   loadPosts();
@@ -1094,6 +1091,25 @@ function subscribeHomeHubBadges() {
     .on("postgres_changes", { event: "*", schema: "public", table: "friend_requests", filter: "receiver_id=eq." + currentUser.id }, () => loadHomeHubBadges())
     .subscribe();
 }
+
+function updateFeedFilterButton() {
+  const button = document.getElementById("feedFilterButton");
+  if (!button) return;
+  const labelMap = {
+    all: "Chế độ: Tất cả",
+    mine: "Chế độ: Bài của tôi",
+    friends: "Chế độ: Bạn bè"
+  };
+  button.textContent = labelMap[currentFeedFilter] || labelMap.all;
+}
+
+window.cycleFeedFilter = function() {
+  const order = ["all", "mine", "friends"];
+  const nextIndex = (order.indexOf(currentFeedFilter) + 1) % order.length;
+  currentFeedFilter = order[nextIndex];
+  updateFeedFilterButton();
+  loadPosts();
+};
 
 function scheduleFeedRefresh(options = {}) {
   const { withLikes = false, postId = null } = options;
@@ -1199,10 +1215,9 @@ async function loadPosts() {
     .select(`*, users(full_name,avatar_url), likes(count), comments(count), post_media(file_url,file_type,sort_order)`)
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false });
-  const filter = document.getElementById("feedFilter")?.value || "all";
   const visiblePosts = (posts || [])
     .filter(canViewPost)
-    .filter(post => matchFeedFilter(post, filter));
+    .filter(post => matchFeedFilter(post, currentFeedFilter));
 
   if (!visiblePosts.length) {
     wrap.innerHTML = `<div class="empty-feed"><div class="icon">📭</div><p>Chưa có bài viết nào.</p></div>`;
