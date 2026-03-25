@@ -378,6 +378,20 @@ body {
 .overview-admin.show {
   display: block;
 }
+.overview-admin .admin-section:not(.news-admin) {
+  display: none;
+}
+.inline-admin-block {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(15,31,61,.08);
+}
+.inline-admin-title {
+  color: var(--navy);
+  font-size: .8rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
 .admin-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1368,12 +1382,12 @@ body {
     <div class="overview-main" id="overviewMain">
       <div class="overview-card overview-admin" id="overviewAdminCard">
         <div class="overview-card-head">
-          <div class="overview-card-title">Quản trị Trang chủ</div>
-          <div class="overview-card-sub">Tạo bài ghim riêng cho Trang chủ, quản lý kỳ thi và cập nhật liên hệ.</div>
+          <div class="overview-card-title">Tin tức Trang chủ</div>
+          <div class="overview-card-sub">Đăng bài tin tức để hiển thị ở cột phải của Trang chủ.</div>
         </div>
         <div class="overview-card-body">
           <div class="admin-grid">
-            <div class="admin-section full">
+            <div class="admin-section full news-admin">
               <div class="admin-title">Đăng bài cho Trang chủ</div>
               <input class="admin-field" id="overviewPostTitle" type="text" placeholder="Tiêu đề bài viết">
               <div style="height:10px;"></div>
@@ -1436,6 +1450,14 @@ body {
           <div class="teacher-grid" id="overviewTeachers">
             <div class="empty-feed" style="padding:24px 16px;"><p>Đang tải giáo viên...</p></div>
           </div>
+          <div class="inline-admin-block" id="overviewTeachersAdminBlock" style="display:none;">
+            <div class="inline-admin-title">Quản lý giáo viên trên Trang chủ</div>
+            <select class="admin-select" id="homeTeacherSelectInline"></select>
+            <div class="admin-actions">
+              <button class="btn btn-primary btn-sm" type="button" onclick="addTeacherToHome()">Thêm giáo viên</button>
+            </div>
+            <div class="admin-list" id="homeTeacherAdminListInline"></div>
+          </div>
         </div>
       </div>
       <div class="overview-card">
@@ -1446,6 +1468,15 @@ body {
         <div class="overview-card-body">
           <div class="overview-list" id="overviewIntro">
             <div class="empty-feed" style="padding:24px 16px;"><p>Đang tải bài giới thiệu...</p></div>
+          </div>
+          <div class="inline-admin-block" id="overviewIntroAdminBlock" style="display:none;">
+            <div class="inline-admin-title">Chỉnh sửa giới thiệu trung tâm</div>
+            <input class="admin-field" id="centerIntroTitleInline" type="text" placeholder="Tiêu đề giới thiệu">
+            <div style="height:10px;"></div>
+            <textarea class="admin-textarea" id="centerIntroContentInline" placeholder="Nội dung giới thiệu về trung tâm..."></textarea>
+            <div class="admin-actions">
+              <button class="btn btn-primary btn-sm" type="button" onclick="saveCenterIntro()">Lưu bài giới thiệu</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1480,6 +1511,17 @@ body {
         </div>
         <div class="overview-card-body">
           <div class="countdown-box" id="countdownBox"></div>
+          <div class="inline-admin-block" id="countdownAdminBlock" style="display:none;">
+            <div class="inline-admin-title">Quản lý các kỳ thi</div>
+            <div class="admin-inline">
+              <input class="admin-field" id="examEventTitleInline" type="text" placeholder="Tên kỳ thi">
+              <input class="admin-field" id="examEventAtInline" type="datetime-local">
+            </div>
+            <div class="admin-actions">
+              <button class="btn btn-primary btn-sm" type="button" onclick="createExamEvent()">Lưu kỳ thi</button>
+            </div>
+            <div class="admin-list" id="examAdminListInline"></div>
+          </div>
         </div>
       </div>
       <div class="overview-card">
@@ -1488,6 +1530,13 @@ body {
         </div>
         <div class="overview-card-body">
           <div class="contact-list" id="contactList"></div>
+          <div class="inline-admin-block" id="contactAdminBlock" style="display:none;">
+            <div class="inline-admin-title">Chỉnh sửa liên hệ</div>
+            <textarea class="admin-textarea" id="contactInfoInputInline" placeholder="Mỗi dòng là một nội dung liên hệ"></textarea>
+            <div class="admin-actions">
+              <button class="btn btn-primary btn-sm" type="button" onclick="saveContactInfo()">Lưu liên hệ</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="overview-card">
@@ -1879,6 +1928,10 @@ async function init() {
   document.getElementById("composeName").textContent = p.full_name || "Bạn";
   if (role === "student") document.getElementById("composeNote").classList.add("show");
   document.getElementById("overviewAdminCard")?.classList.toggle("show", role === "admin");
+  document.getElementById("countdownAdminBlock")?.style.setProperty("display", role === "admin" ? "block" : "none");
+  document.getElementById("contactAdminBlock")?.style.setProperty("display", role === "admin" ? "block" : "none");
+  document.getElementById("overviewTeachersAdminBlock")?.style.setProperty("display", role === "admin" ? "block" : "none");
+  document.getElementById("overviewIntroAdminBlock")?.style.setProperty("display", role === "admin" ? "block" : "none");
   document.getElementById("overviewPostCategory")?.style.setProperty("display", "none");
   setupHomeLinks();
   updateFeedFilterButton();
@@ -1955,13 +2008,13 @@ async function loadOverviewSettings() {
 }
 
 function syncContactInput() {
-  const input = document.getElementById("contactInfoInput");
+  const input = document.getElementById("contactInfoInputInline") || document.getElementById("contactInfoInput");
   if (input) input.value = contactInfo || "";
 }
 
 function syncCenterIntroInputs() {
-  const titleInput = document.getElementById("centerIntroTitle");
-  const contentInput = document.getElementById("centerIntroContent");
+  const titleInput = document.getElementById("centerIntroTitleInline") || document.getElementById("centerIntroTitle");
+  const contentInput = document.getElementById("centerIntroContentInline") || document.getElementById("centerIntroContent");
   if (titleInput) titleInput.value = centerIntro?.title || "";
   if (contentInput) contentInput.value = centerIntro?.content || "";
 }
@@ -1980,7 +2033,7 @@ function renderContactInfo() {
 }
 
 function renderAdminExamList() {
-  const wrap = document.getElementById("examAdminList");
+  const wrap = document.getElementById("examAdminListInline") || document.getElementById("examAdminList");
   if (!wrap) return;
   wrap.innerHTML = examEvents.length
     ? examEvents.map(event => `
@@ -1996,7 +2049,7 @@ function renderAdminExamList() {
 }
 
 function renderTeacherSelectOptions() {
-  const select = document.getElementById("homeTeacherSelect");
+  const select = document.getElementById("homeTeacherSelectInline") || document.getElementById("homeTeacherSelect");
   if (!select) return;
   const usedIds = new Set(homeTeachers.map(item => item.user_id));
   const available = allTeachers.filter(teacher => !usedIds.has(teacher.id));
@@ -2027,7 +2080,7 @@ function renderHomeTeachers() {
 }
 
 function renderHomeTeacherAdminList() {
-  const wrap = document.getElementById("homeTeacherAdminList");
+  const wrap = document.getElementById("homeTeacherAdminListInline") || document.getElementById("homeTeacherAdminList");
   if (!wrap) return;
   if (!homeTeachers.length) {
     wrap.innerHTML = `<div class="empty-feed" style="padding:14px 12px;"><p>Chưa có giáo viên nào trên Trang chủ.</p></div>`;
@@ -2993,8 +3046,8 @@ window.createOverviewPost = async function() {
 
 window.createExamEvent = async function() {
   if (role !== "admin") return;
-  const titleInput = document.getElementById("examEventTitle");
-  const timeInput = document.getElementById("examEventAt");
+  const titleInput = document.getElementById("examEventTitleInline") || document.getElementById("examEventTitle");
+  const timeInput = document.getElementById("examEventAtInline") || document.getElementById("examEventAt");
   const title = titleInput?.value.trim();
   const examAt = timeInput?.value;
   if (!title || !examAt) {
@@ -3031,7 +3084,7 @@ window.deleteExamEvent = async function(eventId) {
 
 window.saveContactInfo = async function() {
   if (role !== "admin") return;
-  const input = document.getElementById("contactInfoInput");
+  const input = document.getElementById("contactInfoInputInline") || document.getElementById("contactInfoInput");
   const value = input?.value.trim() || "";
   const { error } = await sb.from("site_settings").upsert({
     setting_key: "home_contact_info",
@@ -3288,8 +3341,8 @@ window.removeTeacherFromHome = async function(homeTeacherId) {
 
 window.saveCenterIntro = async function() {
   if (role !== "admin") return;
-  const title = document.getElementById("centerIntroTitle")?.value.trim() || "Giới thiệu trung tâm";
-  const content = document.getElementById("centerIntroContent")?.value.trim() || "";
+  const title = (document.getElementById("centerIntroTitleInline") || document.getElementById("centerIntroTitle"))?.value.trim() || "Giới thiệu trung tâm";
+  const content = (document.getElementById("centerIntroContentInline") || document.getElementById("centerIntroContent"))?.value.trim() || "";
   const value = JSON.stringify({ title, content });
   const { error } = await sb.from("site_settings").upsert({
     setting_key: "home_center_intro",
