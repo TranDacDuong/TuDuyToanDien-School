@@ -3323,9 +3323,20 @@ window.addTeacherToHome = async function() {
     alert("Hãy chọn một giáo viên trước khi thêm vào Trang chủ.");
     return;
   }
+  const exists = homeTeachers.some(item => item.user_id === userId);
+  if (exists) {
+    alert("Giáo viên này đã có trên Trang chủ rồi.");
+    await loadOverviewSettings();
+    return;
+  }
   const nextOrder = homeTeachers.length + 1;
   const { error } = await sb.from("home_teachers").insert({ user_id: userId, sort_order: nextOrder, created_by: currentUser.id });
   if (error) {
+    if (error.message?.includes("home_teachers_user_id_key")) {
+      alert("Giáo viên này đã có trên Trang chủ rồi.");
+      await loadOverviewSettings();
+      return;
+    }
     alert("Lỗi khi thêm giáo viên: " + error.message + (error.message?.includes("home_teachers") ? "\nHãy kiểm tra lại SQL đã chạy cho bảng home_teachers." : ""));
     return;
   }
