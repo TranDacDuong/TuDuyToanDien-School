@@ -302,6 +302,7 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
 <script src="supabaseClient.js"></script>
 <script>
 let currentUser, role, currentProfile;
+let friendIds = new Set();
 
 window.previewPostImage = function(event) {
   const file = event.target.files?.[0];
@@ -326,12 +327,21 @@ async function init() {
   currentUser = user;
   const { data: p } = await sb.from("users").select("*").eq("id", user.id).single();
   role = p.role; currentProfile = p;
+  await loadFriendIds();
   const card = document.getElementById("composeCard");
   card.style.display = "block";
   document.getElementById("composeAvatar").src = p.avatar_url || "default-avatar.png";
   document.getElementById("composeName").textContent = p.full_name || "Bạn";
   if (role === "student") document.getElementById("composeNote").classList.add("show");
   loadPosts();
+}
+
+async function loadFriendIds() {
+  const { data } = await sb
+    .from("friendships")
+    .select("friend_id")
+    .eq("user_id", currentUser.id);
+  friendIds = new Set((data || []).map(item => item.friend_id));
 }
 
 async function createPost() {
@@ -382,15 +392,31 @@ async function loadPosts() {
     .order("created_at", { ascending: false });
 
   const wrap = document.getElementById("posts");
-  if (!posts?.length) {
+  const visiblePosts = (posts || []).filter(canViewPost);
+
+  if (!visiblePosts.length) {
     wrap.innerHTML = `<div class="empty-feed"><div class="icon">📭</div><p>Chưa có bài viết nào.</p></div>`;
     return;
   }
   wrap.innerHTML = "";
-  for (const post of posts) {
+  for (const post of visiblePosts) {
     wrap.appendChild(buildCard(post));
     loadComments(post.id);
   }
+}
+
+function canViewPost(post) {
+  if (!post) return false;
+  if (post.user_id === currentUser.id) return true;
+  if (post.status === "pending" || post.status === "rejected") {
+    return role === "admin" || role === "teacher";
+  }
+
+  const visibility = post.visibility || "public";
+  if (visibility === "public") return true;
+  if (visibility === "friends") return friendIds.has(post.user_id);
+  if (visibility === "private") return false;
+  return true;
 }
 
 function buildCard(post) {
