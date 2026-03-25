@@ -116,6 +116,11 @@ body {
   min-width: 132px;
   justify-content: center;
 }
+.friend-response {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .layout {
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
@@ -453,6 +458,25 @@ async function setupFriendButton() {
     return;
   }
 
+  const { data: received } = await sb
+    .from("friend_requests")
+    .select("id")
+    .eq("sender_id", viewedProfile.id)
+    .eq("receiver_id", currentUser.id)
+    .eq("status", "pending")
+    .maybeSingle();
+  if (received) {
+    const actionBox = document.getElementById("actionBox");
+    actionBox.innerHTML = `
+      <div class="friend-response">
+        <button class="btn btn-gold" type="button" onclick="acceptFriendRequest('${received.id}')">Chấp nhận</button>
+        <button class="btn btn-outline" type="button" onclick="rejectFriendRequest('${received.id}')">Từ chối</button>
+      </div>
+      <a class="btn btn-outline" href="home.html">Về bảng tin</a>
+    `;
+    return;
+  }
+
   btn.onclick = async function() {
     btn.disabled = true;
     const { error } = await sb.from("friend_requests").insert({
@@ -469,6 +493,48 @@ async function setupFriendButton() {
     btn.className = "btn btn-outline";
   };
 }
+
+window.acceptFriendRequest = async function(requestId) {
+  const { error: requestError } = await sb
+    .from("friend_requests")
+    .update({ status: "accepted", responded_at: new Date().toISOString() })
+    .eq("id", requestId);
+
+  if (requestError) {
+    alert("Không thể chấp nhận lời mời: " + requestError.message);
+    return;
+  }
+
+  const payload = [
+    { user_id: currentUser.id, friend_id: viewedProfile.id },
+    { user_id: viewedProfile.id, friend_id: currentUser.id }
+  ];
+
+  const { error: friendError } = await sb.from("friendships").upsert(payload, { onConflict: "user_id,friend_id" });
+  if (friendError) {
+    alert("Đã duyệt lời mời nhưng tạo quan hệ bạn bè lỗi: " + friendError.message);
+    return;
+  }
+
+  const actionBox = document.getElementById("actionBox");
+  actionBox.innerHTML = '<button class="btn btn-outline" type="button" disabled>Bạn bè</button><a class="btn btn-outline" href="home.html">Về bảng tin</a>';
+};
+
+window.rejectFriendRequest = async function(requestId) {
+  const { error } = await sb
+    .from("friend_requests")
+    .update({ status: "rejected", responded_at: new Date().toISOString() })
+    .eq("id", requestId);
+
+  if (error) {
+    alert("Không thể từ chối lời mời: " + error.message);
+    return;
+  }
+
+  const actionBox = document.getElementById("actionBox");
+  actionBox.innerHTML = '<button class="btn btn-gold" id="friendBtn" type="button">Kết bạn</button><a class="btn btn-outline" href="home.html">Về bảng tin</a>';
+  setupFriendButton();
+};
 
 async function renderPostsAndStats() {
   const isOwner = viewedProfile.id === currentUser.id;
