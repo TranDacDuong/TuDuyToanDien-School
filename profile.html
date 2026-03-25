@@ -200,6 +200,45 @@ body {
   color: var(--ink);
   font-size: .88rem;
 }
+.friend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.friend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--surface);
+}
+.friend-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.friend-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  object-fit: cover;
+  border: 1px solid var(--gold-border);
+  background: var(--surface);
+}
+.friend-name {
+  color: var(--navy);
+  font-size: .88rem;
+  font-weight: 700;
+}
+.friend-link {
+  text-decoration: none;
+}
+.friend-link:hover .friend-name {
+  text-decoration: underline;
+}
+.friend-empty {
+  color: var(--ink-light);
+  font-size: .84rem;
+}
 .posts {
   display: flex;
   flex-direction: column;
@@ -332,6 +371,18 @@ body {
             <div id="infoBox" class="info"></div>
           </div>
         </section>
+
+        <section class="box" style="margin-top:20px;">
+          <div class="panel-head">
+            <div class="panel-title">Bạn bè</div>
+            <div class="panel-sub">Những kết nối gần đây trên trang cá nhân</div>
+          </div>
+          <div class="panel-body">
+            <div id="friendListBox" class="friend-list">
+              <div class="friend-empty">Đang tải danh sách bạn bè...</div>
+            </div>
+          </div>
+        </section>
       </aside>
       <main>
         <section class="box">
@@ -373,6 +424,7 @@ async function init() {
 
   renderHeader();
   await renderPostsAndStats();
+  await renderFriendList();
 
   document.getElementById("loadingBox").classList.add("hidden");
   document.getElementById("profileView").classList.remove("hidden");
@@ -660,6 +712,35 @@ async function renderPostsAndStats() {
       </article>
     `;
   }).join("");
+}
+
+async function renderFriendList() {
+  const { data, error } = await sb
+    .from("friendships")
+    .select("friend_id, users!friendships_friend_id_fkey(full_name, avatar_url)")
+    .eq("user_id", viewedProfile.id)
+    .order("created_at", { ascending: false })
+    .limit(8);
+
+  const wrap = document.getElementById("friendListBox");
+  if (error) {
+    wrap.innerHTML = '<div class="friend-empty">Không tải được danh sách bạn bè.</div>';
+    return;
+  }
+
+  if (!data || !data.length) {
+    wrap.innerHTML = '<div class="friend-empty">Chưa có bạn bè nào.</div>';
+    return;
+  }
+
+  wrap.innerHTML = data.map(item => `
+    <a class="friend-link" href="profile.html?id=${item.friend_id}">
+      <div class="friend-item">
+        <img class="friend-avatar" src="${safeUrl(item.users?.avatar_url || "default-avatar.png")}" alt="Avatar" onerror="this.src='default-avatar.png'">
+        <div class="friend-name">${esc(item.users?.full_name || "Người dùng")}</div>
+      </div>
+    </a>
+  `).join("");
 }
 
 function statCard(label, value) {
