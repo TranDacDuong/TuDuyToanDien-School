@@ -171,6 +171,7 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
 .act-btn.liked        { color: #e11d48; }
 .act-btn.pin:hover    { background: var(--gold-pale); color: var(--gold); }
 .act-btn.danger:hover { background: var(--red-bg); color: var(--red); }
+.act-btn.edit:hover   { background: var(--blue-bg); color: var(--blue); }
 .act-btn.mod-ok:hover { background: var(--green-bg); color: var(--green); }
 .act-btn.mod-no:hover { background: var(--red-bg); color: var(--red); }
 .act-spacer { flex: 1; }
@@ -195,6 +196,43 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
 .reply-indent { margin-left: 36px; }
 .reply-box { display: none; align-items: center; gap: 8px; margin-top: 6px; padding-left: 36px; }
 .reply-box.open { display: flex; }
+
+.edit-box {
+  display: none;
+  padding: 0 16px 14px;
+  border-top: 1px solid var(--surface);
+}
+.edit-box.open { display: block; }
+.edit-textarea {
+  width: 100%;
+  min-height: 100px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  resize: vertical;
+  font-family: var(--font-body);
+  font-size: .88rem;
+  background: var(--white);
+  color: var(--ink);
+}
+.edit-textarea:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(200,150,42,.08);
+}
+.edit-tools {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.edit-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
 .cmt-input-row {
   display: flex; align-items: center; gap: 8px; padding-top: 10px;
@@ -402,8 +440,23 @@ function buildCard(post) {
       <button class="act-btn" id="likeBtn_${post.id}" onclick="likePost('${post.id}')">❤️ <span id="likeCount_${post.id}">${likeCount}</span></button>
       <button class="act-btn" onclick="toggleCmt('${post.id}')">💬 ${cmtCount}</button>
       <div class="act-spacer"></div>
+      ${(isAdmin || isMyPost) ? `<button class="act-btn edit" onclick="toggleEditPost('${post.id}')">✏️ Sửa</button>` : ""}
       ${isAdmin && !post.is_pinned ? `<button class="act-btn pin" onclick="pinPost('${post.id}')">📌 Ghim</button>` : ""}
       ${(isAdmin || isMyPost) ? `<button class="act-btn danger" onclick="deletePost('${post.id}')">🗑</button>` : ""}
+    </div>
+    <div class="edit-box" id="edit_${post.id}">
+      <textarea class="edit-textarea" id="editContent_${post.id}">${esc(post.content)}</textarea>
+      <div class="edit-tools">
+        <select class="compose-select" id="editVisibility_${post.id}">
+          <option value="public" ${post.visibility === "public" ? "selected" : ""}>Công khai</option>
+          <option value="friends" ${post.visibility === "friends" ? "selected" : ""}>Bạn bè</option>
+          <option value="private" ${post.visibility === "private" ? "selected" : ""}>Riêng tư</option>
+        </select>
+        <div class="edit-actions">
+          <button class="btn btn-outline btn-sm" onclick="toggleEditPost('${post.id}')">Hủy</button>
+          <button class="btn btn-primary btn-sm" onclick="savePostEdit('${post.id}')">Lưu thay đổi</button>
+        </div>
+      </div>
     </div>
     <div class="cmt-section" id="cmt_${post.id}">
       <div id="cmtList_${post.id}"></div>
@@ -441,6 +494,36 @@ window.toggleCmt = function(pid) {
   const open = s.style.display === "block";
   s.style.display = open ? "none" : "block";
   if (!open) { loadComments(pid); setTimeout(()=>document.getElementById("cmtIn_"+pid)?.focus(),80); }
+};
+
+window.toggleEditPost = function(pid) {
+  const box = document.getElementById("edit_" + pid);
+  if (!box) return;
+  box.classList.toggle("open");
+  if (box.classList.contains("open")) {
+    setTimeout(() => document.getElementById("editContent_" + pid)?.focus(), 50);
+  }
+};
+
+window.savePostEdit = async function(pid) {
+  const content = document.getElementById("editContent_" + pid)?.value.trim();
+  const visibility = document.getElementById("editVisibility_" + pid)?.value || "public";
+  if (!content) {
+    alert("Nội dung bài viết không được để trống");
+    return;
+  }
+
+  const { error } = await sb
+    .from("posts")
+    .update({ content, visibility })
+    .eq("id", pid);
+
+  if (error) {
+    alert("Lỗi khi cập nhật bài viết: " + error.message);
+    return;
+  }
+
+  loadPosts();
 };
 
 window.likePost = async function(pid) {
