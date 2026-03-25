@@ -734,7 +734,7 @@
           }
 
           const aPart = document.createElement("div");
-          aPart.style.cssText = "flex:" + (type === "true_false" ? "3.2" : "2") + ";padding:10px 12px;background:var(--surface);min-width:0";
+          aPart.style.cssText = "flex:2;padding:10px 12px;background:var(--surface);min-width:0";
           aPart.innerHTML = ansHtml;
 
           body.appendChild(qPart);

@@ -910,7 +910,7 @@
 
           /* â”€â”€ Pháº§n Ä‘Ã¡p Ã¡n: flex:2 â”€â”€ */
           const answerPart = document.createElement("div");
-          answerPart.style.cssText = "flex:" + (type === "true_false" ? "3.2" : "2") + ";padding:10px 12px;background:var(--surface);min-width:0";
+          answerPart.style.cssText = "flex:2;padding:10px 12px;background:var(--surface);min-width:0";
           answerPart.innerHTML = ansHtml;
 
           body.appendChild(questionPart);
