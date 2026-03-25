@@ -154,6 +154,7 @@ async function loadFriends() {
       .maybeSingle();
 
     let preview = "";
+    let lastActivity = null;
     if (conversation?.id) {
       const { data: lastMessage } = await sb
         .from("messages")
@@ -165,11 +166,19 @@ async function loadFriends() {
 
       if (lastMessage?.content) {
         preview = (lastMessage.sender_id === currentUser.id ? "Bạn: " : "") + lastMessage.content;
+        lastActivity = lastMessage.created_at || null;
       }
     }
 
-    return { ...item, preview };
+    return { ...item, preview, lastActivity };
   }));
+
+  enriched.sort((a, b) => {
+    const timeA = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
+    const timeB = b.lastActivity ? new Date(b.lastActivity).getTime() : 0;
+    if (timeA !== timeB) return timeB - timeA;
+    return String(a.users?.full_name || "").localeCompare(String(b.users?.full_name || ""), "vi");
+  });
 
   allFriends = enriched;
   friendMap = new Map(enriched.map(item => [item.friend_id, item]));
