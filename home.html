@@ -251,6 +251,46 @@ body {
 .feed-tools {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
 }
+.feed-filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--navy);
+  font-weight: 700;
+  box-shadow: 0 8px 20px rgba(15,31,61,.08);
+  transition: .15s;
+}
+.feed-filter-toggle:hover {
+  transform: translateY(-1px);
+  border-color: var(--gold-border);
+}
+.feed-filter-toggle[data-filter="all"] {
+  background: linear-gradient(135deg, #fff8ea 0%, #ffffff 100%);
+}
+.feed-filter-toggle[data-filter="mine"] {
+  background: linear-gradient(135deg, #eef4ff 0%, #ffffff 100%);
+  color: #1d4ed8;
+  border-color: rgba(37,99,235,.18);
+}
+.feed-filter-toggle[data-filter="friends"] {
+  background: linear-gradient(135deg, #eefbf2 0%, #ffffff 100%);
+  color: #15803d;
+  border-color: rgba(22,163,74,.18);
+}
+.feed-filter-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,.95);
+  font-size: .9rem;
+}
 .feed-title {
   font-family: var(--font-display); font-size: 1.35rem; color: var(--navy);
   display: flex; align-items: center; gap: 10px;
@@ -692,7 +732,7 @@ body {
   <div class="feed-header">
     <div class="feed-title">Bảng tin</div>
     <div class="feed-tools">
-      <button class="btn btn-outline btn-sm" id="feedFilterButton" type="button" onclick="cycleFeedFilter()">Chế độ: Tất cả</button>
+      <button class="feed-filter-toggle" id="feedFilterButton" type="button" onclick="cycleFeedFilter()">Chế độ: Tất cả</button>
     </div>
   </div>
 
@@ -1095,12 +1135,14 @@ function subscribeHomeHubBadges() {
 function updateFeedFilterButton() {
   const button = document.getElementById("feedFilterButton");
   if (!button) return;
-  const labelMap = {
-    all: "Chế độ: Tất cả",
-    mine: "Chế độ: Bài của tôi",
-    friends: "Chế độ: Bạn bè"
+  const configMap = {
+    all: { icon: "🌐", label: "Tất cả" },
+    mine: { icon: "👤", label: "Bài của tôi" },
+    friends: { icon: "👥", label: "Bạn bè" }
   };
-  button.textContent = labelMap[currentFeedFilter] || labelMap.all;
+  const config = configMap[currentFeedFilter] || configMap.all;
+  button.dataset.filter = currentFeedFilter;
+  button.innerHTML = `<span class="feed-filter-icon">${config.icon}</span><span>Chế độ: ${config.label}</span>`;
 }
 
 window.cycleFeedFilter = function() {
