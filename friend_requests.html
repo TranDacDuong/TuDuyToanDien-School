@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Lời mời kết bạn</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--cream);
+  color: var(--ink);
+}
+.page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 20px 48px;
+}
+.hero {
+  margin-bottom: 22px;
+}
+.hero h1 {
+  margin-bottom: 6px;
+}
+.hero p {
+  color: var(--ink-mid);
+}
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.panel {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.panel-head {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--surface);
+}
+.panel-title {
+  font-family: var(--font-display);
+  color: var(--navy);
+  font-size: 1.08rem;
+}
+.panel-sub {
+  margin-top: 4px;
+  color: var(--ink-light);
+  font-size: .8rem;
+}
+.panel-body {
+  padding: 18px 20px 20px;
+}
+.request-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.request-card {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+  background: linear-gradient(180deg, #fff 0%, #fbfbfe 100%);
+}
+.request-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  object-fit: cover;
+  border: 2px solid var(--gold-border);
+  background: var(--surface);
+}
+.name {
+  font-weight: 700;
+  color: var(--navy);
+  font-size: .92rem;
+}
+.meta {
+  color: var(--ink-light);
+  font-size: .78rem;
+  margin-top: 3px;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--ink-light);
+  background: var(--surface);
+  border-radius: 14px;
+}
+.loading {
+  padding: 16px;
+  text-align: center;
+  color: var(--ink-mid);
+}
+@media (max-width: 860px) {
+  .grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="hero">
+    <h1>Lời mời kết bạn</h1>
+    <p>Quản lý các lời mời bạn nhận được và những lời mời bạn đã gửi.</p>
+  </div>
+
+  <div class="grid">
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title">Bạn nhận được</div>
+        <div class="panel-sub">Chấp nhận hoặc từ chối lời mời đang chờ</div>
+      </div>
+      <div class="panel-body">
+        <div id="incomingList" class="request-list">
+          <div class="loading">Đang tải...</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title">Bạn đã gửi</div>
+        <div class="panel-sub">Theo dõi và hủy lời mời đã gửi nếu cần</div>
+      </div>
+      <div class="panel-body">
+        <div id="outgoingList" class="request-list">
+          <div class="loading">Đang tải...</div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script>
+let currentUser = null;
+
+async function init() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) {
+    location.href = "index.html";
+    return;
+  }
+  currentUser = user;
+  await Promise.all([loadIncoming(), loadOutgoing()]);
+}
+
+async function loadIncoming() {
+  const { data, error } = await sb
+    .from("friend_requests")
+    .select("id, created_at, sender_id, users!friend_requests_sender_id_fkey(full_name, avatar_url)")
+    .eq("receiver_id", currentUser.id)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  const wrap = document.getElementById("incomingList");
+  if (error) {
+    wrap.innerHTML = '<div class="empty">Không tải được danh sách lời mời.</div>';
+    return;
+  }
+  if (!data || !data.length) {
+    wrap.innerHTML = '<div class="empty">Bạn chưa có lời mời nào.</div>';
+    return;
+  }
+
+  wrap.innerHTML = data.map(item => `
+    <div class="request-card">
+      <div class="request-top">
+        <img class="avatar" src="${item.users?.avatar_url || "default-avatar.png"}" alt="Avatar" onerror="this.src='default-avatar.png'">
+        <div>
+          <div class="name">${esc(item.users?.full_name || "Người dùng")}</div>
+          <div class="meta">${formatTime(item.created_at)}</div>
+        </div>
+      </div>
+      <div class="actions">
+        <a class="btn btn-outline btn-sm" href="profile.html?id=${item.sender_id}">Xem hồ sơ</a>
+        <button class="btn btn-gold btn-sm" onclick="acceptRequest('${item.id}','${item.sender_id}')">Chấp nhận</button>
+        <button class="btn btn-outline btn-sm" onclick="rejectRequest('${item.id}')">Từ chối</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function loadOutgoing() {
+  const { data, error } = await sb
+    .from("friend_requests")
+    .select("id, created_at, receiver_id, users!friend_requests_receiver_id_fkey(full_name, avatar_url)")
+    .eq("sender_id", currentUser.id)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  const wrap = document.getElementById("outgoingList");
+  if (error) {
+    wrap.innerHTML = '<div class="empty">Không tải được danh sách lời mời đã gửi.</div>';
+    return;
+  }
+  if (!data || !data.length) {
+    wrap.innerHTML = '<div class="empty">Bạn chưa gửi lời mời nào.</div>';
+    return;
+  }
+
+  wrap.innerHTML = data.map(item => `
+    <div class="request-card">
+      <div class="request-top">
+        <img class="avatar" src="${item.users?.avatar_url || "default-avatar.png"}" alt="Avatar" onerror="this.src='default-avatar.png'">
+        <div>
+          <div class="name">${esc(item.users?.full_name || "Người dùng")}</div>
+          <div class="meta">${formatTime(item.created_at)}</div>
+        </div>
+      </div>
+      <div class="actions">
+        <a class="btn btn-outline btn-sm" href="profile.html?id=${item.receiver_id}">Xem hồ sơ</a>
+        <button class="btn btn-outline btn-sm" onclick="cancelRequest('${item.id}')">Hủy lời mời</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+window.acceptRequest = async function(requestId, senderId) {
+  const { error: requestError } = await sb
+    .from("friend_requests")
+    .update({ status: "accepted", responded_at: new Date().toISOString() })
+    .eq("id", requestId);
+
+  if (requestError) {
+    alert("Không thể chấp nhận lời mời: " + requestError.message);
+    return;
+  }
+
+  const payload = [
+    { user_id: currentUser.id, friend_id: senderId },
+    { user_id: senderId, friend_id: currentUser.id }
+  ];
+  const { error: friendError } = await sb.from("friendships").upsert(payload, { onConflict: "user_id,friend_id" });
+  if (friendError) {
+    alert("Đã duyệt lời mời nhưng tạo quan hệ bạn bè lỗi: " + friendError.message);
+    return;
+  }
+
+  await Promise.all([loadIncoming(), loadOutgoing()]);
+};
+
+window.rejectRequest = async function(requestId) {
+  const { error } = await sb
+    .from("friend_requests")
+    .update({ status: "rejected", responded_at: new Date().toISOString() })
+    .eq("id", requestId);
+
+  if (error) {
+    alert("Không thể từ chối lời mời: " + error.message);
+    return;
+  }
+
+  await loadIncoming();
+};
+
+window.cancelRequest = async function(requestId) {
+  const { error } = await sb
+    .from("friend_requests")
+    .update({ status: "cancelled", responded_at: new Date().toISOString() })
+    .eq("id", requestId);
+
+  if (error) {
+    alert("Không thể hủy lời mời: " + error.message);
+    return;
+  }
+
+  await loadOutgoing();
+};
+
+function formatTime(value) {
+  return new Date(value).toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function esc(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+init();
+</script>
+</body>
+</html>
