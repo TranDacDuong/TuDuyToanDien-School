@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Trang ca nhan</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: linear-gradient(180deg, #f6f1e6 0%, var(--cream) 24%, #fafbff 100%);
+  color: var(--ink);
+}
+.hidden { display: none !important; }
+.page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 28px 20px 56px;
+}
+.box {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-sm);
+}
+.loading,
+.error,
+.empty {
+  padding: 22px;
+  text-align: center;
+  color: var(--ink-mid);
+}
+.error { color: var(--red); }
+.hero {
+  overflow: hidden;
+  border-radius: 24px;
+  box-shadow: var(--shadow-lg);
+  background: var(--white);
+  margin-bottom: 22px;
+}
+.cover {
+  height: 240px;
+  background:
+    radial-gradient(circle at top right, rgba(228,184,77,.28), transparent 34%),
+    linear-gradient(135deg, rgba(15,31,61,.96) 0%, rgba(31,65,128,.92) 50%, rgba(200,150,42,.76) 100%);
+  background-size: cover;
+  background-position: center;
+}
+.hero-body {
+  padding: 0 26px 26px;
+  margin-top: -56px;
+}
+.hero-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.identity {
+  display: flex;
+  gap: 18px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.avatar {
+  width: 122px;
+  height: 122px;
+  border-radius: 28px;
+  object-fit: cover;
+  background: var(--surface);
+  border: 5px solid rgba(255,255,255,.96);
+  box-shadow: 0 12px 30px rgba(15,31,61,.18);
+}
+.name {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  color: var(--navy);
+  line-height: 1.08;
+  margin-bottom: 8px;
+}
+.role {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--gold-pale);
+  color: var(--gold);
+  border: 1px solid var(--gold-border);
+  font-size: .78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.meta {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--ink-mid);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: .8rem;
+}
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.actions .btn {
+  min-width: 132px;
+  justify-content: center;
+}
+.layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 20px;
+}
+.panel-head {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--surface);
+}
+.panel-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--navy);
+}
+.panel-sub {
+  margin-top: 4px;
+  color: var(--ink-light);
+  font-size: .78rem;
+}
+.panel-body {
+  padding: 18px 20px 20px;
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.stat {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+  background: linear-gradient(180deg, #fff 0%, #fbfbfd 100%);
+}
+.stat-label {
+  font-size: .74rem;
+  color: var(--ink-light);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.stat-value {
+  margin-top: 6px;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+.bio {
+  white-space: pre-wrap;
+  line-height: 1.72;
+  font-size: .9rem;
+}
+.bio-empty {
+  color: var(--ink-light);
+  font-size: .85rem;
+}
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.info-row {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--surface);
+}
+.info-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.info-key {
+  min-width: 84px;
+  color: var(--ink-light);
+  font-size: .78rem;
+  text-transform: uppercase;
+}
+.info-value {
+  color: var(--ink);
+  font-size: .88rem;
+}
+.posts {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.post {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #fff 0%, #fcfcfe 100%);
+  box-shadow: var(--shadow-sm);
+}
+.post-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 0;
+}
+.post-author {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.post-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 16px;
+  object-fit: cover;
+  border: 2px solid var(--gold-border);
+  background: var(--surface);
+}
+.post-name {
+  font-size: .9rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+.post-time {
+  margin-top: 3px;
+  color: var(--ink-light);
+  font-size: .77rem;
+}
+.post-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.post-body {
+  padding: 14px 20px 16px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.7;
+  font-size: .92rem;
+}
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  padding: 0 20px 16px;
+}
+.media-item {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.post-foot {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 20px 18px;
+  border-top: 1px solid var(--surface);
+  color: var(--ink-mid);
+  font-size: .84rem;
+}
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; }
+  .cover { height: 210px; }
+  .hero-body { padding: 0 18px 20px; }
+}
+@media (max-width: 560px) {
+  .page { padding: 18px 12px 32px; }
+  .avatar { width: 96px; height: 96px; border-radius: 22px; }
+  .name { font-size: 1.55rem; }
+  .actions .btn { flex: 1; min-width: 0; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <div id="loadingBox" class="box loading">Dang tai trang ca nhan...</div>
+  <div id="profileView" class="hidden">
+    <section class="hero">
+      <div class="cover" id="coverBox"></div>
+      <div class="hero-body">
+        <div class="hero-top">
+          <div class="identity">
+            <img id="avatarBox" class="avatar" src="default-avatar.png" alt="Avatar">
+            <div>
+              <div id="nameBox" class="name">Nguoi dung</div>
+              <div id="roleBox" class="role">Thanh vien</div>
+              <div id="metaBox" class="meta"></div>
+            </div>
+          </div>
+          <div id="actionBox" class="actions"></div>
+        </div>
+      </div>
+    </section>
+    <div class="layout">
+      <aside>
+        <section class="box">
+          <div class="panel-head">
+            <div class="panel-title">Tong quan</div>
+            <div class="panel-sub">Nhung thong tin noi bat tren ho so</div>
+          </div>
+          <div class="panel-body">
+            <div id="statsBox" class="stats"></div>
+          </div>
+        </section>
+        <section class="box" style="margin-top:20px;">
+          <div class="panel-head">
+            <div class="panel-title">Gioi thieu</div>
+            <div class="panel-sub">Thong tin ca nhan co ban</div>
+          </div>
+          <div class="panel-body">
+            <div id="bioBox" class="bio-empty">Chua co mo ta ca nhan.</div>
+            <div class="divider"></div>
+            <div id="infoBox" class="info"></div>
+          </div>
+        </section>
+      </aside>
+      <main>
+        <section class="box">
+          <div class="panel-head">
+            <div class="panel-title">Bai viet</div>
+            <div id="postSubBox" class="panel-sub">Bai viet tren trang ca nhan</div>
+          </div>
+          <div class="panel-body">
+            <div id="postList" class="posts"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <div id="errorBox" class="box error hidden"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script>
+let currentUser = null;
+let viewedProfile = null;
+let viewedUserId = null;
+
+async function init() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) {
+    location.href = "index.html";
+    return;
+  }
+
+  currentUser = user;
+  const params = new URLSearchParams(location.search);
+  viewedUserId = params.get("id") || user.id;
+
+  const { data: profile, error } = await sb.from("users").select("*").eq("id", viewedUserId).single();
+  if (error || !profile) throw new Error("Khong tim thay trang ca nhan nay.");
+  viewedProfile = profile;
+
+  renderHeader();
+  await renderPostsAndStats();
+
+  document.getElementById("loadingBox").classList.add("hidden");
+  document.getElementById("profileView").classList.remove("hidden");
+}
+
+function renderHeader() {
+  document.getElementById("nameBox").textContent = viewedProfile.full_name || "Nguoi dung";
+  document.getElementById("roleBox").textContent = formatRole(viewedProfile.role);
+  document.getElementById("avatarBox").src = viewedProfile.avatar_url || "default-avatar.png";
+  document.getElementById("avatarBox").onerror = function() { this.src = "default-avatar.png"; };
+
+  if (viewedProfile.cover_url) {
+    document.getElementById("coverBox").style.backgroundImage =
+      "linear-gradient(180deg, rgba(15,31,61,.18), rgba(15,31,61,.38)), url('" + safeUrl(viewedProfile.cover_url) + "')";
+  }
+
+  const meta = [];
+  if (viewedProfile.school) meta.push(viewedProfile.school);
+  if (viewedProfile.province) meta.push(viewedProfile.province);
+  if (viewedProfile.subject) meta.push("Mon: " + viewedProfile.subject);
+  document.getElementById("metaBox").innerHTML = meta.length
+    ? meta.map(item => '<span class="chip">' + esc(item) + '</span>').join("")
+    : '<span class="chip">Ho so dang duoc hoan thien</span>';
+
+  const bioBox = document.getElementById("bioBox");
+  if (viewedProfile.bio && viewedProfile.bio.trim()) {
+    bioBox.className = "bio";
+    bioBox.textContent = viewedProfile.bio;
+  }
+
+  const info = [
+    { key: "Email", value: viewedProfile.email || "Chua cap nhat" },
+    { key: "Dien thoai", value: viewedProfile.phone || "Chua cap nhat" },
+    { key: "Nam sinh", value: viewedProfile.birth_year || "Chua cap nhat" },
+    { key: "Truong", value: viewedProfile.school || "Chua cap nhat" },
+    { key: "Tinh", value: viewedProfile.province || "Chua cap nhat" }
+  ];
+  document.getElementById("infoBox").innerHTML = info.map(item => `
+    <div class="info-row">
+      <div class="info-key">${esc(item.key)}</div>
+      <div class="info-value">${esc(String(item.value))}</div>
+    </div>
+  `).join("");
+
+  const actionBox = document.getElementById("actionBox");
+  if (viewedProfile.id === currentUser.id) {
+    actionBox.innerHTML = '<a class="btn btn-primary" href="account.html">Chinh sua ho so</a><a class="btn btn-outline" href="home.html">Ve bang tin</a>';
+    document.getElementById("postSubBox").textContent = "Cac bai viet ban da chia se";
+  } else {
+    actionBox.innerHTML = '<button class="btn btn-gold" id="friendBtn" type="button">Ket ban</button><a class="btn btn-outline" href="home.html">Ve bang tin</a>';
+    document.getElementById("postSubBox").textContent = "Nhung bai viet co the xem duoc";
+    setupFriendButton();
+  }
+}
+
+async function setupFriendButton() {
+  const btn = document.getElementById("friendBtn");
+  if (!btn) return;
+
+  const { data: friendship } = await sb
+    .from("friendships")
+    .select("id")
+    .eq("user_id", currentUser.id)
+    .eq("friend_id", viewedProfile.id)
+    .maybeSingle();
+  if (friendship) {
+    btn.textContent = "Ban be";
+    btn.disabled = true;
+    return;
+  }
+
+  const { data: sent } = await sb
+    .from("friend_requests")
+    .select("id")
+    .eq("sender_id", currentUser.id)
+    .eq("receiver_id", viewedProfile.id)
+    .eq("status", "pending")
+    .maybeSingle();
+  if (sent) {
+    btn.textContent = "Da gui loi moi";
+    btn.className = "btn btn-outline";
+    btn.disabled = true;
+    return;
+  }
+
+  btn.onclick = async function() {
+    btn.disabled = true;
+    const { error } = await sb.from("friend_requests").insert({
+      sender_id: currentUser.id,
+      receiver_id: viewedProfile.id,
+      status: "pending"
+    });
+    if (error) {
+      alert("Khong gui duoc loi moi ket ban: " + error.message);
+      btn.disabled = false;
+      return;
+    }
+    btn.textContent = "Da gui loi moi";
+    btn.className = "btn btn-outline";
+  };
+}
+
+async function renderPostsAndStats() {
+  const isOwner = viewedProfile.id === currentUser.id;
+  const { data: friendship } = isOwner ? { data: { id: "self" } } : await sb
+    .from("friendships")
+    .select("id")
+    .eq("user_id", currentUser.id)
+    .eq("friend_id", viewedProfile.id)
+    .maybeSingle();
+
+  const { data: posts, error } = await sb
+    .from("posts")
+    .select(`
+      *,
+      users(full_name, avatar_url),
+      likes(count),
+      comments(count),
+      post_media(file_url, file_type, sort_order)
+    `)
+    .eq("user_id", viewedProfile.id)
+    .eq("status", "approved")
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error("Khong tai duoc bai viet tren trang ca nhan.");
+
+  const visiblePosts = (posts || []).filter(post => {
+    if (isOwner) return true;
+    if (post.visibility === "public" || !post.visibility) return true;
+    if (post.visibility === "friends" && friendship) return true;
+    return false;
+  });
+
+  const { count: friendCount } = await sb
+    .from("friendships")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", viewedProfile.id);
+
+  document.getElementById("statsBox").innerHTML = [
+    statCard("Bai viet", visiblePosts.length),
+    statCard("Ban be", friendCount || 0),
+    statCard("Luot thich", visiblePosts.reduce((sum, post) => sum + (post.likes?.[0]?.count || 0), 0)),
+    statCard("Binh luan", visiblePosts.reduce((sum, post) => sum + (post.comments?.[0]?.count || 0), 0))
+  ].join("");
+
+  const postList = document.getElementById("postList");
+  if (!visiblePosts.length) {
+    postList.innerHTML = '<div class="empty">Chua co bai viet nao de hien thi.</div>';
+    return;
+  }
+
+  postList.innerHTML = visiblePosts.map(post => {
+    const media = (post.post_media || [])
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+      .map(item => item.file_type === "video"
+        ? '<video class="media-item" src="' + safeUrl(item.file_url) + '" controls></video>'
+        : '<img class="media-item" src="' + safeUrl(item.file_url) + '" alt="Anh bai viet">')
+      .join("");
+
+    const badges = [];
+    if (post.is_pinned) badges.push('<span class="badge badge-gold">Da ghim</span>');
+    if (post.visibility === "friends") badges.push('<span class="badge badge-blue">Ban be</span>');
+    if (post.visibility === "private") badges.push('<span class="badge badge-navy">Rieng tu</span>');
+
+    return `
+      <article class="post">
+        <div class="post-head">
+          <div class="post-author">
+            <img class="post-avatar" src="${safeUrl(post.users?.avatar_url || "default-avatar.png")}" alt="Avatar" onerror="this.src='default-avatar.png'">
+            <div>
+              <div class="post-name">${esc(post.users?.full_name || "Nguoi dung")}</div>
+              <div class="post-time">${formatTime(post.created_at)}</div>
+            </div>
+          </div>
+          <div class="post-badges">${badges.join("")}</div>
+        </div>
+        <div class="post-body">${esc(post.content || "")}</div>
+        ${media ? '<div class="media-grid">' + media + '</div>' : ""}
+        <div class="post-foot">
+          <span>${post.likes?.[0]?.count || 0} luot thich</span>
+          <span>${post.comments?.[0]?.count || 0} binh luan</span>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function statCard(label, value) {
+  return '<div class="stat"><div class="stat-label">' + esc(label) + '</div><div class="stat-value">' + esc(String(value)) + '</div></div>';
+}
+
+function formatRole(role) {
+  if (role === "admin") return "Quan tri vien";
+  if (role === "teacher") return "Giao vien";
+  if (role === "student") return "Hoc sinh";
+  return "Thanh vien";
+}
+
+function formatTime(value) {
+  return new Date(value).toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function esc(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function safeUrl(value) {
+  return String(value || "").replace(/"/g, "&quot;");
+}
+
+init().catch(err => {
+  document.getElementById("loadingBox").classList.add("hidden");
+  const errorBox = document.getElementById("errorBox");
+  errorBox.textContent = err.message || "Co loi xay ra khi tai trang ca nhan.";
+  errorBox.classList.remove("hidden");
+});
+</script>
+</body>
+</html>

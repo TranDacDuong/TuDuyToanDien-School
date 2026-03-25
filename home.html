@@ -74,6 +74,8 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
   font-weight: 600; font-size: .88rem; color: var(--navy);
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
 }
+.post-author-link { color: inherit; text-decoration: none; }
+.post-author-link:hover { text-decoration: underline; }
 .post-time { font-size: .71rem; color: var(--ink-light); margin-top: 1px; }
 
 .badge-pin      { font-size: .68rem; font-weight: 700; background: var(--gold-pale); color: var(--gold); border: 1px solid var(--gold-border); padding: 1px 8px; border-radius: 20px; }
@@ -286,7 +288,7 @@ function buildCard(post) {
       <img class="post-avatar" src="${post.users?.avatar_url||'default-avatar.png'}" onerror="this.src='default-avatar.png'">
       <div class="post-meta">
         <div class="post-author">
-          ${esc(post.users?.full_name??"Người dùng")}
+          <a class="post-author-link" href="profile.html?id=${post.user_id}">${esc(post.users?.full_name??"Người dùng")}</a>
           ${post.is_pinned ? '<span class="badge-pin">📌 Đã ghim</span>' : ""}
           ${statusBadge}
         </div>
