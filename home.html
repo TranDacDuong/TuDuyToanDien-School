@@ -124,25 +124,26 @@ body {
 .social-hub {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 14px;
   flex-wrap: wrap;
+  align-items: center;
 }
 .hub-link, .hub-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 46px;
-  height: 46px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border-radius: 50%;
   text-decoration: none;
   color: var(--navy);
-  background: rgba(255,255,255,.95);
-  border: 1px solid var(--border);
-  box-shadow: 0 10px 24px rgba(15,31,61,.08);
+  background: #eef1f5;
+  border: 1px solid rgba(15,31,61,.06);
+  box-shadow: none;
   font-weight: 600;
-  transition: .15s;
+  transition: .16s ease;
   position: relative;
   cursor: pointer;
 }
@@ -150,9 +151,9 @@ body {
   appearance: none;
 }
 .hub-link:hover, .hub-button:hover {
-  transform: translateY(-2px);
-  border-color: var(--gold-border);
-  background: #fffaf0;
+  transform: translateY(-1px);
+  background: #e4e8ee;
+  border-color: rgba(15,31,61,.08);
 }
 .hub-icon {
   width: 100%;
@@ -162,25 +163,30 @@ body {
   align-items: center;
   justify-content: center;
   background: transparent;
-  font-size: 1.12rem;
+  font-size: 1.06rem;
   flex-shrink: 0;
+}
+.hub-link img.hub-icon {
+  object-fit: cover;
+  border: 2px solid rgba(255,255,255,.95);
 }
 .hub-copy { display: none; }
 .hub-badge {
   display: none;
   position: absolute;
-  top: -2px;
-  right: -2px;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
+  top: -3px;
+  right: -3px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
   border-radius: 999px;
   background: #ef4444;
   color: #fff;
-  font-size: .72rem;
+  font-size: .68rem;
   font-weight: 700;
   align-items: center;
   justify-content: center;
+  border: 2px solid #fff;
 }
 .hub-badge.show { display: inline-flex; }
 .social-panel {
