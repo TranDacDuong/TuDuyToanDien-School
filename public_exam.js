@@ -69,7 +69,7 @@
   async function loadExamList() {
     const sb   = getSb();
     const grid = document.getElementById("examGrid");
-    grid.innerHTML = '<div style="color:var(--ink-light);padding:20px">Đang tải...</div>';
+    grid.innerHTML = '<div style="color:var(--ink-light);padding:20px">Äang táº£i...</div>';
 
     const { data, error } = await sb
       .from("public_exams")
@@ -83,7 +83,7 @@
     if (!_allExams.length) {
       grid.innerHTML = `<div class="empty-state">
         <div style="font-size:2.5rem;margin-bottom:10px">ðŸ“„</div>
-        <p>Chưa có đề thi nào.</p>
+        <p>ChÆ°a cÃ³ Ä‘á» thi nÃ o.</p>
       </div>`;
       return;
     }
@@ -124,8 +124,8 @@
       return { section, innerGrid };
     }
 
-    const officialSection = buildSection("Đề thi thật", "#ef4444", officialExams);
-    const trialSection    = buildSection("Đề thi thử",  "var(--gold)", trialExams);
+    const officialSection = buildSection("ðŸŽ¯ Äá» thi tháº­t", "#ef4444", officialExams);
+    const trialSection    = buildSection("ðŸ“ Äá» thi thá»­",  "var(--gold)", trialExams);
 
     function buildCard(pe) {
       const ex         = pe.exam;
@@ -146,16 +146,16 @@
       let timeStatus = "", canDo = true;
       if (pe.starts_at && pe.ends_at) {
         const s = new Date(pe.starts_at), e = new Date(pe.ends_at);
-        if (now < s)      { canDo = false; timeStatus = "Chưa đến giờ thi"; }
-        else if (now > e) { canDo = false; timeStatus = "Đã kết thúc"; }
-        else              { timeStatus = "Đang mở"; }
+        if (now < s)      { canDo = false; timeStatus = "â° ChÆ°a Ä‘áº¿n giá» thi"; }
+        else if (now > e) { canDo = false; timeStatus = "ðŸ”’ ÄÃ£ káº¿t thÃºc"; }
+        else              { timeStatus = "ðŸŸ¢ Äang má»Ÿ"; }
       } else {
-        timeStatus = "Không giới hạn";
+        timeStatus = "ðŸ“… KhÃ´ng giá»›i háº¡n";
       }
 
       const timeStr = pe.starts_at && pe.ends_at
-        ? `${fmtDT(pe.starts_at)} -> ${fmtDT(pe.ends_at)}`
-        : "Không giới hạn";
+        ? `ðŸ• ${fmtDT(pe.starts_at)} â†’ ${fmtDT(pe.ends_at)}`
+        : "ðŸ“… KhÃ´ng giá»›i háº¡n";
 
       let actionHtml = "";
       if (_role === "student") {
@@ -183,9 +183,9 @@
           if (canReview) {
             reviewBtn = `<button class="btn btn-outline btn-sm"
               onclick="openReview('${pe.id}','${best.id}','${ex.title.replace(/'/g,"\\'")}',${isOfficial})">
-              Xem lại</button>`;
+              ðŸ‘ Xem láº¡i</button>`;
           } else {
-            reviewBtn = `<span style="font-size:.75rem;color:var(--ink-light)">Xem lại sau khi hết giờ</span>`;
+            reviewBtn = `<span style="font-size:.75rem;color:var(--ink-light)">Xem láº¡i sau khi háº¿t giá»</span>`;
           }
         }
 
@@ -200,11 +200,11 @@
             `<button class="btn btn-sm" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none"
               onclick="resumePublicExam('${pe.id}','${ex.id}','${ex.title.replace(/'/g,"\\'")}',
                 ${ex.duration_minutes},${ex.total_points},'${pe.exam_type}','${inProgress.id}',${secsLeft})">
-              Làm tiếp (${m}:${String(s2).padStart(2,"0")})</button>`;
+              â–¶ LÃ m tiáº¿p (${m}:${String(s2).padStart(2,"0")})</button>`;
         } else if (best && isOfficial) {
           actionHtml = `${scoreBadge}${reviewBtn}`;
         } else {
-          const btnLabel = best ? "Làm lại" : "Làm bài";
+          const btnLabel = best ? "ðŸ”„ LÃ m láº¡i" : "ðŸ“ LÃ m bÃ i";
           actionHtml = scoreBadge +
             `<button class="btn btn-primary btn-sm"
               onclick="startPublicExam('${pe.id}','${ex.id}','${ex.title.replace(/'/g,"\\'")}',
@@ -217,25 +217,25 @@
       let adminHtml = "";
       if (_role === "admin") {
         const pinBtn = pe.is_pinned
-          ? `<button class="btn btn-outline btn-sm" onclick="togglePin('${pe.id}',false)">Bỏ ghim</button>`
-          : `<button class="btn btn-outline btn-sm" onclick="togglePin('${pe.id}',true)">Ghim</button>`;
+          ? `<button class="btn btn-outline btn-sm" onclick="togglePin('${pe.id}',false)">ðŸ“Œ Bá» ghim</button>`
+          : `<button class="btn btn-outline btn-sm" onclick="togglePin('${pe.id}',true)">ðŸ“Œ Ghim</button>`;
         adminHtml = `
           <div class="admin-card-actions">
             ${pinBtn}
-            <button class="btn btn-outline btn-sm" onclick="openEditExamModal('${pe.id}')">Sửa</button>
+            <button class="btn btn-outline btn-sm" onclick="openEditExamModal('${pe.id}')">âœ Sá»­a</button>
             <button class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5"
-              onclick="deletePublicExam('${pe.id}','${ex.title.replace(/'/g,"\\'")}')">Xóa</button>
+              onclick="deletePublicExam('${pe.id}','${ex.title.replace(/'/g,"\\'")}')">ðŸ—‘ XÃ³a</button>
           </div>`;
       }
 
       card.innerHTML = `
-        ${pe.is_pinned ? '<div style="font-size:.72rem;font-weight:700;color:var(--gold);margin-bottom:4px">Đã ghim</div>' : ""}
+        ${pe.is_pinned ? '<div style="font-size:.72rem;font-weight:700;color:var(--gold);margin-bottom:4px">ðŸ“Œ ÄÃ£ ghim</div>' : ""}
         <div class="exam-badge ${isOfficial ? "badge-official" : "badge-trial"}">
-          ${isOfficial ? "Thi thật" : "Thi thử"}
+          ${isOfficial ? "ðŸŽ¯ Thi tháº­t" : "ðŸ“ Thi thá»­"}
         </div>
         <div class="exam-title">${ex.title}</div>
         <div class="exam-meta">
-          ${ex.duration_minutes} phút &nbsp;•&nbsp; ${ex.total_points}đ<br>
+          â± ${ex.duration_minutes} phÃºt &nbsp;â€¢&nbsp; ðŸ† ${ex.total_points}Ä‘<br>
           ${timeStr}<br>
           ${timeStatus ? `<span style="font-weight:600">${timeStatus}</span>` : ""}
         </div>
@@ -265,13 +265,13 @@
   window.togglePin = async function(peId, pin) {
     const sb = getSb();
     const { error } = await sb.from("public_exams").update({ is_pinned: pin }).eq("id", peId);
-    if (error) { alert("Lỗi: " + error.message); return; }
+    if (error) { alert("Lá»—i: " + error.message); return; }
     await loadExamList();
   };
 
   window.openAddExamModal = async function() {
     _editingPeId = null;
-    document.querySelector("#addExamModal .modal-card h3").textContent = "Thêm đề thi công khai";
+    document.querySelector("#addExamModal .modal-card h3").textContent = "ThÃªm Ä‘á» thi cÃ´ng khai";
     document.getElementById("peExamId").value = "";
     document.getElementById("peType").value   = "trial";
     document.getElementById("peStartsAt").value = "";
@@ -282,8 +282,8 @@
       .select("id,title,duration_minutes,total_points")
       .order("created_at", { ascending: false });
     const sel = document.getElementById("peExamId");
-    sel.innerHTML = '<option value="">-- Chọn đề --</option>';
-    (data||[]).forEach(e => sel.appendChild(new Option(`${e.title} (${e.duration_minutes}p / ${e.total_points}đ)`, e.id)));
+    sel.innerHTML = '<option value="">-- Chá»n Ä‘á» --</option>';
+    (data||[]).forEach(e => sel.appendChild(new Option(`${e.title} (${e.duration_minutes}p / ${e.total_points}Ä‘)`, e.id)));
 
     document.getElementById("addExamModal").classList.remove("hidden");
   };
@@ -311,9 +311,9 @@
     const startsAt = document.getElementById("peStartsAt").value || null;
     const endsAt   = document.getElementById("peEndsAt").value   || null;
 
-    if (!examId) { alert("Vui lòng chọn đề!"); return; }
+    if (!examId) { alert("Vui lÃ²ng chá»n Ä‘á»!"); return; }
     if (startsAt && endsAt && startsAt >= endsAt) {
-      alert("Thời gian kết thúc phải sau thời gian bắt đầu!"); return;
+      alert("Thá»i gian káº¿t thÃºc pháº£i sau thá»i gian báº¯t Ä‘áº§u!"); return;
     }
 
     const sb = getSb();
@@ -327,10 +327,10 @@
 
     if (_editingPeId) {
       const { error } = await sb.from("public_exams").update(payload).eq("id", _editingPeId);
-      if (error) { alert("Lỗi: " + error.message); return; }
+      if (error) { alert("Lá»—i: " + error.message); return; }
     } else {
       const { error } = await sb.from("public_exams").insert([payload]);
-      if (error) { alert("Lỗi: " + error.message); return; }
+      if (error) { alert("Lá»—i: " + error.message); return; }
     }
 
     closeAddExamModal();
@@ -338,7 +338,7 @@
   };
 
   window.deletePublicExam = async function(peId, title) {
-    if (!confirm(`Xóa đề thi "${title}"? Toàn bộ kết quả liên quan sẽ bị xóa.`)) return;
+    if (!confirm(`XÃ³a Ä‘á» thi "${title}"? ToÃ n bá»™ káº¿t quáº£ liÃªn quan sáº½ bá»‹ xÃ³a.`)) return;
     const sb = getSb();
     const { data: results } = await sb.from("exam_results").select("id").eq("public_exam_id", peId);
     if (results?.length) {
@@ -347,7 +347,7 @@
       await sb.from("exam_results").delete().in("id", ids);
     }
     const { error } = await sb.from("public_exams").delete().eq("id", peId);
-    if (error) { alert("Lỗi: " + error.message); return; }
+    if (error) { alert("Lá»—i: " + error.message); return; }
     await loadExamList();
   };
 
@@ -357,7 +357,7 @@
   async function loadResultsView() {
     const grid = document.getElementById("examGrid");
     grid.style.display = "block";
-    grid.innerHTML = '<div style="color:var(--ink-light);padding:20px">Đang tải...</div>';
+    grid.innerHTML = '<div style="color:var(--ink-light);padding:20px">Äang táº£i...</div>';
 
     const sb = getSb();
     const { data: publicExams } = await sb
@@ -366,7 +366,7 @@
       .order("created_at", { ascending: false });
 
     if (!publicExams?.length) {
-      grid.innerHTML = '<p style="color:var(--ink-light)">Chưa có đề thi nào.</p>';
+      grid.innerHTML = '<p style="color:var(--ink-light)">ChÆ°a cÃ³ Ä‘á» thi nÃ o.</p>';
       return;
     }
 
@@ -797,27 +797,27 @@
             <div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;
               background:var(--white);border-radius:8px;border:1px solid var(--border);margin-bottom:8px;flex-wrap:wrap">
               <span style="font-weight:700;min-width:20px;color:var(--navy);flex-shrink:0">${lbl})</span>
-              <span style="flex:1 1 280px;font-size:1.02rem;color:var(--ink);line-height:1.62;min-width:0">${tfOpts[lbl]||""}</span>
-              <div style="display:flex;gap:6px;flex-wrap:nowrap;flex:0 1 96px;min-width:96px;justify-content:flex-end">
-              <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.82rem;
-                padding:7px 6px;border-radius:8px;background:#f0fdf4;color:#15803d;font-weight:700;flex:1 1 0;justify-content:center;min-width:0">
+              <span style="flex:1 1 320px;font-size:1.08rem;color:var(--ink);line-height:1.65;min-width:0">${tfOpts[lbl]||""}</span>
+              <div style="display:flex;gap:6px;flex-wrap:nowrap;flex:0 1 104px;min-width:104px;justify-content:flex-end">
+              <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.95rem;
+                padding:8px 8px;border-radius:8px;background:#f0fdf4;color:#15803d;font-weight:700;flex:1 1 0;justify-content:center;min-width:0">
                 <input type="radio" name="tf_${qid}_${lbl}" value="T" onchange="window.peTF('${qid}')"
-                  ${saved.includes(lbl+"T")?"checked":""} style="accent-color:#16a34a;margin:0;width:13px;height:13px;flex-shrink:0"> Đ</label>
-              <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.82rem;
-                padding:7px 6px;border-radius:8px;background:#fef2f2;color:#b91c1c;font-weight:700;flex:1 1 0;justify-content:center;min-width:0">
+                  ${saved.includes(lbl+"T")?"checked":""} style="accent-color:#16a34a"> Đ</label>
+              <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.95rem;
+                padding:8px 8px;border-radius:8px;background:#fef2f2;color:#b91c1c;font-weight:700;flex:1 1 0;justify-content:center;min-width:0">
                 <input type="radio" name="tf_${qid}_${lbl}" value="F" onchange="window.peTF('${qid}')"
-                  ${saved.includes(lbl+"F")?"checked":""} style="accent-color:#dc2626;margin:0;width:13px;height:13px;flex-shrink:0"> S</label>
+                  ${saved.includes(lbl+"F")?"checked":""} style="accent-color:#dc2626"> S</label>
               </div>
             </div>`).join("");
         } else if (type === "short_answer") {
-          ansHtml = `<input type="text" placeholder="Nhập câu trả lời..."
+          ansHtml = `<input type="text" placeholder="Nháº­p cÃ¢u tráº£ lá»i..."
             value="${(_examAnswers[qid]||"").replace(/"/g,"&quot;")}"
             oninput="window._peAnswers('${qid}',this.value)"
             style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;
               font-family:var(--font-body);font-size:.9rem;box-sizing:border-box;outline:none"
             onfocus="this.style.borderColor='var(--navy)'" onblur="this.style.borderColor='var(--border)'">`;
         } else if (type === "essay") {
-          ansHtml = `<textarea placeholder="Viết câu trả lời của bạn..."
+          ansHtml = `<textarea placeholder="Viáº¿t cÃ¢u tráº£ lá»i cá»§a báº¡n..."
             oninput="window._peAnswers('${qid}',this.value)"
             style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;
               font-family:var(--font-body);font-size:.9rem;resize:vertical;min-height:120px;
@@ -837,8 +837,8 @@
         header.innerHTML = `
           <span style="width:26px;height:26px;border-radius:50%;background:var(--navy);color:var(--gold-light);
             display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;flex-shrink:0">${globalNum}</span>
-          <span style="font-size:1.08rem;font-weight:700;color:var(--ink-mid)">Câu ${globalNum}</span>
-          <span style="margin-left:auto;font-size:.75rem;color:var(--ink-mid)">${eq.points} điểm</span>`;
+          <span style="font-size:1.1rem;font-weight:700;color:var(--ink-mid)">CÃ¢u ${globalNum}</span>
+          <span style="margin-left:auto;font-size:.75rem;color:var(--ink-mid)">${eq.points} Ä‘iá»ƒm</span>`;
         card.appendChild(header);
 
         /* â”€â”€ Essay: layout dá»c â€” cÃ¢u há»i trÃªn, textarea to bÃªn dÆ°á»›i â”€â”€ */
@@ -848,7 +848,7 @@
           body.style.cssText = "display:flex;flex-direction:column;padding:14px 16px;gap:10px";
 
           const qEl = document.createElement("div");
-          qEl.style.cssText = "font-size:1.2rem;line-height:1.9;color:var(--navy);white-space:pre-line";
+          qEl.style.cssText = "font-size:1.24rem;line-height:1.95;color:var(--navy);white-space:pre-line";
           qEl.textContent = q.question_text||"";
           body.appendChild(qEl);
 
@@ -874,7 +874,7 @@
           if (type === "true_false") {
             const mainQ = (q.question_text||"").split("\n")[0];
             const qEl = document.createElement("div");
-            qEl.style.cssText = "font-size:1.2rem;line-height:1.9;color:var(--navy);white-space:pre-line";
+            qEl.style.cssText = "font-size:1.24rem;line-height:1.95;color:var(--navy);white-space:pre-line";
             qEl.textContent = mainQ;
             questionPart.appendChild(qEl);
             if (hasImg) {
@@ -891,7 +891,7 @@
             }
           } else if (hasImg) {
             const textCol = document.createElement("div");
-            textCol.style.cssText = "flex:8;font-size:1.2rem;line-height:1.9;color:var(--navy);white-space:pre-line";
+            textCol.style.cssText = "flex:8;font-size:1.24rem;line-height:1.95;color:var(--navy);white-space:pre-line";
             textCol.textContent = q.question_text||"";
             const imgCol = document.createElement("div");
             imgCol.style.cssText = "flex:5;display:flex;align-items:center;justify-content:center";
@@ -903,14 +903,14 @@
             questionPart.appendChild(imgCol);
           } else {
             const qEl = document.createElement("div");
-            qEl.style.cssText = "flex:1;font-size:1.2rem;line-height:1.9;color:var(--navy);white-space:pre-line";
+            qEl.style.cssText = "flex:1;font-size:1.24rem;line-height:1.95;color:var(--navy);white-space:pre-line";
             qEl.textContent = q.question_text||"";
             questionPart.appendChild(qEl);
           }
 
           /* â”€â”€ Pháº§n Ä‘Ã¡p Ã¡n: flex:2 â”€â”€ */
           const answerPart = document.createElement("div");
-          answerPart.style.cssText = "flex:" + (type === "true_false" ? "4.1" : "2") + ";padding:10px 12px;background:var(--surface);min-width:0";
+          answerPart.style.cssText = "flex:" + (type === "true_false" ? "4.4" : "2") + ";padding:10px 12px;background:var(--surface);min-width:0";
           answerPart.innerHTML = ansHtml;
 
           body.appendChild(questionPart);
@@ -931,30 +931,30 @@
         gap:14px;padding:0 20px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.2)">
         <button onclick="peExitExam()" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);
           color:#fff;padding:5px 12px;border-radius:7px;font-size:12px;font-weight:600;
-          cursor:pointer;font-family:var(--font-body)">← Thoát</button>
+          cursor:pointer;font-family:var(--font-body)">â† ThoÃ¡t</button>
         <span style="font-family:var(--font-display);font-size:1.2rem;flex:1">${examTitle}</span>
         <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);
           padding:7px 16px;border-radius:8px">
-          <span style="font-size:.8rem;color:rgba(255,255,255,.7)">Thời gian</span>
+          <span style="font-size:.8rem;color:rgba(255,255,255,.7)">â±</span>
           <span id="peClock" style="font-size:1.22rem;font-weight:700;font-family:monospace;
             color:var(--gold-light);min-width:72px;text-align:center">${formatClock(_examSeconds)}</span>
         </div>
         <button onclick="submitPublicExam(false)" style="background:var(--gold);color:var(--navy);
           border:none;padding:9px 20px;border-radius:8px;font-size:.95rem;font-weight:700;
-          cursor:pointer;font-family:var(--font-body)">Nộp bài</button>
+          cursor:pointer;font-family:var(--font-body)">âœ… Ná»™p bÃ i</button>
       </div>
       <div style="flex:1;display:flex;overflow:hidden;min-height:0">
         <!-- Nav: chá»‰ Ã´ trÃ²n sá»‘ -->
         <div style="width:120px;flex-shrink:0;background:var(--white);border-right:1px solid var(--border);
           overflow-y:auto;padding:10px 8px">
           <div style="font-size:.82rem;font-weight:700;color:var(--ink-light);text-transform:uppercase;
-            letter-spacing:.05em;margin-bottom:8px">Danh sách câu</div>
+            letter-spacing:.05em;margin-bottom:8px">Danh sÃ¡ch cÃ¢u</div>
           ${navHtml}
           <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
             <button onclick="submitPublicExam(false)"
               style="width:100%;background:var(--navy);color:var(--gold-light);border:none;
               padding:10px;border-radius:8px;font-size:.85rem;font-weight:700;cursor:pointer;
-              font-family:var(--font-body)">Nộp bài</button>
+              font-family:var(--font-body)">âœ… Ná»™p bÃ i</button>
           </div>
         </div>
         <!-- Main content -->
@@ -1213,7 +1213,7 @@
         hdr.innerHTML =
           '<span style="width:26px;height:26px;border-radius:50%;background:var(--navy);color:var(--gold-light);'
           + 'display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;flex-shrink:0">' + globalNum + '</span>'
-          + '<span style="font-size:1.18rem;font-weight:700;color:var(--ink-mid)">CÃ¢u ' + globalNum + '</span>'
+          + '<span style="font-size:1.1rem;font-weight:700;color:var(--ink-mid)">CÃ¢u ' + globalNum + '</span>'
           + '<span style="font-size:.72rem;color:var(--ink-light);margin-left:4px">Â· ' + TYPE_LABEL[type] + '</span>'
           + '<span style="margin-left:auto;font-size:.75rem;color:var(--ink-mid)">' + eq.points + ' Ä‘iá»ƒm</span>';
         card.appendChild(hdr);
@@ -1330,3 +1330,4 @@
   window.loadExamList = loadExamList;
   init();
 })();
+
