@@ -16,6 +16,50 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
 }
+.social-hub {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.hub-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  text-decoration: none;
+  color: var(--navy);
+  background: var(--white);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  font-weight: 600;
+  transition: .15s;
+  position: relative;
+}
+.hub-link:hover {
+  transform: translateY(-1px);
+  border-color: var(--gold-border);
+  background: var(--gold-pale);
+}
+.hub-badge {
+  display: none;
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: .72rem;
+  font-weight: 700;
+  align-items: center;
+  justify-content: center;
+}
+.hub-badge.show { display: inline-flex; }
 .feed-tools {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
 }
@@ -295,6 +339,14 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
 <body>
 <div class="feed-wrap">
 
+  <div class="social-hub">
+    <a class="hub-link" href="search.html">🔎 Tìm kiếm</a>
+    <a class="hub-link" href="notifications.html">🔔 Thông báo<span class="hub-badge" id="homeNotificationBadge">0</span></a>
+    <a class="hub-link" href="friend_requests.html">🤝 Lời mời<span class="hub-badge" id="homeFriendRequestBadge">0</span></a>
+    <a class="hub-link" href="messages.html">💬 Nhắn tin<span class="hub-badge" id="homeMessageBadge">0</span></a>
+    <a class="hub-link" href="profile.html">🪪 Trang cá nhân</a>
+  </div>
+
   <div class="feed-header">
     <div class="feed-title">Bảng tin</div>
     <div class="feed-tools">
@@ -351,6 +403,7 @@ let likedPostIds = new Set();
 let feedChannel = null;
 let feedRefreshTimer = null;
 let feedRefreshRunning = false;
+let homeBadgeChannel = null;
 
 async function createNotification(userId, type, message, refId) {
   if (!userId || userId === currentUser.id) return;
@@ -394,6 +447,9 @@ async function init() {
   document.getElementById("composeAvatar").src = p.avatar_url || "default-avatar.png";
   document.getElementById("composeName").textContent = p.full_name || "Bạn";
   if (role === "student") document.getElementById("composeNote").classList.add("show");
+  setupHomeLinks();
+  loadHomeHubBadges();
+  subscribeHomeHubBadges();
   loadPosts();
 }
 
@@ -411,6 +467,45 @@ async function loadLikedPosts() {
     .select("post_id")
     .eq("user_id", currentUser.id);
   likedPostIds = new Set((data || []).map(item => item.post_id));
+}
+
+function setupHomeLinks() {
+  const profileLink = document.querySelector('.hub-link[href="profile.html"]');
+  if (profileLink && currentUser?.id) {
+    profileLink.href = "profile.html?id=" + currentUser.id;
+  }
+}
+
+async function loadHomeHubBadges() {
+  const [notificationRes, friendRequestRes, messageRes] = await Promise.all([
+    sb.from("notifications").select("*", { count: "exact", head: true }).eq("user_id", currentUser.id).eq("is_read", false),
+    sb.from("friend_requests").select("*", { count: "exact", head: true }).eq("receiver_id", currentUser.id).eq("status", "pending"),
+    sb.from("notifications").select("*", { count: "exact", head: true }).eq("user_id", currentUser.id).eq("type", "message_new").eq("is_read", false)
+  ]);
+
+  updateHubBadge("homeNotificationBadge", notificationRes.count || 0);
+  updateHubBadge("homeFriendRequestBadge", friendRequestRes.count || 0);
+  updateHubBadge("homeMessageBadge", messageRes.count || 0);
+}
+
+function updateHubBadge(id, count) {
+  const badge = document.getElementById(id);
+  if (!badge) return;
+  badge.textContent = count > 99 ? "99+" : String(count || 0);
+  badge.classList.toggle("show", count > 0);
+}
+
+function subscribeHomeHubBadges() {
+  if (homeBadgeChannel) {
+    sb.removeChannel(homeBadgeChannel);
+    homeBadgeChannel = null;
+  }
+
+  homeBadgeChannel = sb
+    .channel("home-hub-badges:" + currentUser.id)
+    .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: "user_id=eq." + currentUser.id }, () => loadHomeHubBadges())
+    .on("postgres_changes", { event: "*", schema: "public", table: "friend_requests", filter: "receiver_id=eq." + currentUser.id }, () => loadHomeHubBadges())
+    .subscribe();
 }
 
 function scheduleFeedRefresh(options = {}) {
@@ -457,6 +552,10 @@ window.addEventListener("beforeunload", () => {
   if (feedChannel) {
     sb.removeChannel(feedChannel);
     feedChannel = null;
+  }
+  if (homeBadgeChannel) {
+    sb.removeChannel(homeBadgeChannel);
+    homeBadgeChannel = null;
   }
 });
 
