@@ -304,6 +304,43 @@ body {
   content: ''; display: inline-block; width: 4px; height: 26px;
   background: linear-gradient(180deg,var(--gold),var(--gold-light)); border-radius: 2px;
 }
+.feed-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.shortcut-card {
+  border: 1px solid rgba(15,31,61,.08);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fff 0%, #fbfcff 100%);
+  box-shadow: 0 10px 24px rgba(15,31,61,.05);
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+.shortcut-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef1f5;
+  color: var(--navy);
+}
+.shortcut-title {
+  font-weight: 700;
+  color: var(--navy);
+  font-size: .86rem;
+}
+.shortcut-sub {
+  color: var(--ink-light);
+  font-size: .74rem;
+  line-height: 1.45;
+}
 
 /* ── Compose ── */
 .compose-card {
@@ -538,41 +575,79 @@ body {
   .feed-wrap {
     padding: 14px 10px 34px;
   }
+  .feed-shortcuts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .shortcut-card {
+    padding: 12px 10px;
+    border-radius: 16px;
+  }
   .social-panel {
     right: 10px;
     width: calc(100% - 20px);
-    top: 64px;
+    top: 58px;
     border-radius: 18px;
   }
   .social-panel-frame {
-    height: 66vh;
+    height: 72vh;
   }
   .chat-popup {
-    left: 10px;
-    right: 10px;
+    left: 6px;
+    right: 6px;
     width: auto;
-    height: 68vh;
-    bottom: 10px;
-    border-radius: 18px;
+    height: 74vh;
+    bottom: 6px;
+    border-radius: 16px;
   }
   .feed-header {
-    align-items: flex-start;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .feed-title {
+    font-size: 1.15rem;
+  }
+  .feed-filter-toggle {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 14px;
   }
   .compose-card {
     padding: 14px;
+  }
+  .compose-textarea {
+    min-height: 104px;
+    padding-bottom: 82px;
   }
   .compose-inline-tools {
     left: 12px;
     right: 12px;
     bottom: 12px;
     gap: 8px;
+    align-items: flex-end;
   }
   .compose-inline-left,
   .compose-inline-right {
     gap: 6px;
+    flex-wrap: wrap;
   }
   .compose-status {
     font-size: .72rem;
+  }
+  .post-stats {
+    font-size: .75rem;
+    gap: 8px;
+  }
+  .post-actions {
+    gap: 8px;
+    padding: 10px;
+  }
+  .act-btn.main {
+    flex-basis: calc(50% - 4px);
+  }
+  .act-btn.soft {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: center;
   }
 }
 
@@ -907,6 +982,29 @@ body {
     <div class="feed-title">Bảng tin</div>
     <div class="feed-tools">
       <button class="feed-filter-toggle" id="feedFilterButton" type="button" onclick="cycleFeedFilter()">Chế độ: Tất cả</button>
+    </div>
+  </div>
+
+  <div class="feed-shortcuts">
+    <div class="shortcut-card">
+      <span class="shortcut-icon">🏠</span>
+      <div class="shortcut-title">Bảng tin của bạn</div>
+      <div class="shortcut-sub">Xem nhanh bài mới, lượt thích và bình luận gần đây.</div>
+    </div>
+    <div class="shortcut-card">
+      <span class="shortcut-icon">👥</span>
+      <div class="shortcut-title">Bạn bè</div>
+      <div class="shortcut-sub">Theo dõi kết nối mới và các hoạt động từ bạn bè.</div>
+    </div>
+    <div class="shortcut-card">
+      <span class="shortcut-icon">🔔</span>
+      <div class="shortcut-title">Tương tác mới</div>
+      <div class="shortcut-sub">Thông báo, lời mời và nhắn tin được gom ngay tại đây.</div>
+    </div>
+    <div class="shortcut-card">
+      <span class="shortcut-icon">📝</span>
+      <div class="shortcut-title">Đăng bài nhanh</div>
+      <div class="shortcut-sub">Chia sẻ trạng thái, hình ảnh và cập nhật của bạn chỉ trong vài giây.</div>
     </div>
   </div>
 
