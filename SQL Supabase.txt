@@ -313,3 +313,275 @@ CREATE TABLE IF NOT EXISTS public.messages (
 
 CREATE INDEX IF NOT EXISTS messages_conversation_created_idx
   ON public.messages (conversation_id, created_at ASC);
+
+-- ============================================
+-- Social RLS policies
+-- Review before running in production
+-- ============================================
+
+ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.post_media ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.likes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.friend_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.friendships ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.conversation_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS posts_select_policy ON public.posts;
+CREATE POLICY posts_select_policy ON public.posts
+FOR SELECT
+USING (
+  auth.uid() = user_id
+  OR visibility = 'public'
+  OR (
+    visibility = 'friends'
+    AND EXISTS (
+      SELECT 1
+      FROM public.friendships f
+      WHERE f.user_id = auth.uid() AND f.friend_id = posts.user_id
+    )
+  )
+  OR (
+    status IN ('pending', 'rejected')
+    AND EXISTS (
+      SELECT 1
+      FROM public.users u
+      WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+    )
+  )
+);
+
+DROP POLICY IF EXISTS posts_insert_policy ON public.posts;
+CREATE POLICY posts_insert_policy ON public.posts
+FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS posts_update_policy ON public.posts;
+CREATE POLICY posts_update_policy ON public.posts
+FOR UPDATE
+USING (
+  auth.uid() = user_id
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+)
+WITH CHECK (
+  auth.uid() = user_id
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS posts_delete_policy ON public.posts;
+CREATE POLICY posts_delete_policy ON public.posts
+FOR DELETE
+USING (
+  auth.uid() = user_id
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS post_media_select_policy ON public.post_media;
+CREATE POLICY post_media_select_policy ON public.post_media
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.posts p
+    WHERE p.id = post_media.post_id
+      AND (
+        auth.uid() = p.user_id
+        OR p.visibility = 'public'
+        OR (
+          p.visibility = 'friends'
+          AND EXISTS (
+            SELECT 1 FROM public.friendships f
+            WHERE f.user_id = auth.uid() AND f.friend_id = p.user_id
+          )
+        )
+      )
+  )
+);
+
+DROP POLICY IF EXISTS post_media_insert_policy ON public.post_media;
+CREATE POLICY post_media_insert_policy ON public.post_media
+FOR INSERT
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.posts p
+    WHERE p.id = post_media.post_id AND p.user_id = auth.uid()
+  )
+);
+
+DROP POLICY IF EXISTS post_media_delete_policy ON public.post_media;
+CREATE POLICY post_media_delete_policy ON public.post_media
+FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.posts p
+    WHERE p.id = post_media.post_id AND p.user_id = auth.uid()
+  )
+);
+
+DROP POLICY IF EXISTS likes_select_policy ON public.likes;
+CREATE POLICY likes_select_policy ON public.likes
+FOR SELECT
+USING (true);
+
+DROP POLICY IF EXISTS likes_insert_policy ON public.likes;
+CREATE POLICY likes_insert_policy ON public.likes
+FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS likes_delete_policy ON public.likes;
+CREATE POLICY likes_delete_policy ON public.likes
+FOR DELETE
+USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS comments_select_policy ON public.comments;
+CREATE POLICY comments_select_policy ON public.comments
+FOR SELECT
+USING (true);
+
+DROP POLICY IF EXISTS comments_insert_policy ON public.comments;
+CREATE POLICY comments_insert_policy ON public.comments
+FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS comments_update_policy ON public.comments;
+CREATE POLICY comments_update_policy ON public.comments
+FOR UPDATE
+USING (
+  auth.uid() = user_id
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+)
+WITH CHECK (
+  auth.uid() = user_id
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS comments_delete_policy ON public.comments;
+CREATE POLICY comments_delete_policy ON public.comments
+FOR DELETE
+USING (
+  auth.uid() = user_id
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS friend_requests_select_policy ON public.friend_requests;
+CREATE POLICY friend_requests_select_policy ON public.friend_requests
+FOR SELECT
+USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+
+DROP POLICY IF EXISTS friend_requests_insert_policy ON public.friend_requests;
+CREATE POLICY friend_requests_insert_policy ON public.friend_requests
+FOR INSERT
+WITH CHECK (auth.uid() = sender_id);
+
+DROP POLICY IF EXISTS friend_requests_update_policy ON public.friend_requests;
+CREATE POLICY friend_requests_update_policy ON public.friend_requests
+FOR UPDATE
+USING (auth.uid() = sender_id OR auth.uid() = receiver_id)
+WITH CHECK (auth.uid() = sender_id OR auth.uid() = receiver_id);
+
+DROP POLICY IF EXISTS friendships_select_policy ON public.friendships;
+CREATE POLICY friendships_select_policy ON public.friendships
+FOR SELECT
+USING (true);
+
+DROP POLICY IF EXISTS friendships_insert_policy ON public.friendships;
+CREATE POLICY friendships_insert_policy ON public.friendships
+FOR INSERT
+WITH CHECK (
+  auth.uid() = user_id
+  OR auth.uid() = friend_id
+);
+
+DROP POLICY IF EXISTS friendships_delete_policy ON public.friendships;
+CREATE POLICY friendships_delete_policy ON public.friendships
+FOR DELETE
+USING (
+  auth.uid() = user_id
+  OR auth.uid() = friend_id
+);
+
+DROP POLICY IF EXISTS notifications_select_policy ON public.notifications;
+CREATE POLICY notifications_select_policy ON public.notifications
+FOR SELECT
+USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS notifications_insert_policy ON public.notifications;
+CREATE POLICY notifications_insert_policy ON public.notifications
+FOR INSERT
+WITH CHECK (auth.uid() = actor_id);
+
+DROP POLICY IF EXISTS notifications_update_policy ON public.notifications;
+CREATE POLICY notifications_update_policy ON public.notifications
+FOR UPDATE
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS conversation_members_select_policy ON public.conversation_members;
+CREATE POLICY conversation_members_select_policy ON public.conversation_members
+FOR SELECT
+USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS conversation_members_insert_policy ON public.conversation_members;
+CREATE POLICY conversation_members_insert_policy ON public.conversation_members
+FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS conversations_select_policy ON public.conversations;
+CREATE POLICY conversations_select_policy ON public.conversations
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM public.conversation_members cm
+    WHERE cm.conversation_id = conversations.id
+      AND cm.user_id = auth.uid()
+  )
+);
+
+DROP POLICY IF EXISTS conversations_insert_policy ON public.conversations;
+CREATE POLICY conversations_insert_policy ON public.conversations
+FOR INSERT
+WITH CHECK (true);
+
+DROP POLICY IF EXISTS messages_select_policy ON public.messages;
+CREATE POLICY messages_select_policy ON public.messages
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM public.conversation_members cm
+    WHERE cm.conversation_id = messages.conversation_id
+      AND cm.user_id = auth.uid()
+  )
+);
+
+DROP POLICY IF EXISTS messages_insert_policy ON public.messages;
+CREATE POLICY messages_insert_policy ON public.messages
+FOR INSERT
+WITH CHECK (
+  auth.uid() = sender_id
+  AND EXISTS (
+    SELECT 1 FROM public.conversation_members cm
+    WHERE cm.conversation_id = messages.conversation_id
+      AND cm.user_id = auth.uid()
+  )
+);
