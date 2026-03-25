@@ -32,7 +32,7 @@ body {
 }
 .hero p {
   margin: 10px 0 0;
-  color: rgba(255,255,255,.82);
+  color: rgba(255,255,255,.84);
   max-width: 720px;
   line-height: 1.7;
 }
@@ -183,12 +183,12 @@ body {
   margin: 6px 0 2px;
 }
 .empty, .loading {
-  padding: 20px;
+  padding: 22px;
   text-align: center;
   color: var(--ink-light);
   border: 1px dashed var(--border);
   border-radius: 16px;
-  background: var(--surface);
+  background: linear-gradient(180deg, #fcfcff 0%, #f8f6ef 100%);
 }
 .user-item {
   display: flex;
@@ -354,7 +354,7 @@ body {
 <div class="page">
   <section class="hero">
     <h1>Tìm kiếm</h1>
-    <p>Tìm người dùng và bài viết trong hệ thống. Kết quả sẽ tự lọc theo những gì bạn có quyền xem.</p>
+    <p>Tìm người dùng và bài viết trong hệ thống. Kết quả sẽ tự lọc theo những gì bạn có quyền xem để tránh tải dữ liệu không cần thiết.</p>
   </section>
 
   <section class="search-panel">
@@ -397,8 +397,8 @@ body {
             <div class="tip-text">Nhập từ khóa xuất hiện trong nội dung bài viết để mở nhanh sang trang chi tiết.</div>
           </div>
           <div class="tip">
-            <div class="tip-title">Lọc kết quả</div>
-            <div class="tip-text">Dùng các tab phía trên để chỉ xem người dùng hoặc chỉ xem bài viết.</div>
+            <div class="tip-title">Tối ưu hệ thống</div>
+            <div class="tip-text">Tìm kiếm chỉ bắt đầu khi từ khóa đủ dài và có cache kết quả để giảm request lặp.</div>
           </div>
         </div>
       </div>
@@ -462,6 +462,7 @@ window.setTab = function(tab) {
 
 window.resetSearch = function() {
   if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+  searchCache.clear();
   document.getElementById("keywordInput").value = "";
   document.getElementById("metaLine").textContent = "Nhập từ khóa để bắt đầu tìm kiếm.";
   document.getElementById("resultList").innerHTML = '<div class="empty">Chưa có kết quả nào. Hãy nhập từ khóa rồi bấm tìm kiếm.</div>';
@@ -480,6 +481,20 @@ window.performSearch = async function() {
   if (!keyword) {
     resultList.innerHTML = '<div class="empty">Hãy nhập từ khóa để tìm kiếm.</div>';
     metaLine.textContent = "Hãy nhập ít nhất một từ khóa.";
+    return;
+  }
+
+  if (keyword.length < 2) {
+    resultList.innerHTML = '<div class="empty">Hãy nhập ít nhất 2 ký tự để giảm tải hệ thống và cho kết quả chính xác hơn.</div>';
+    metaLine.textContent = "Từ khóa quá ngắn để tìm kiếm hiệu quả.";
+    return;
+  }
+
+  const cacheKey = activeTab + "::" + keyword.toLowerCase();
+  if (searchCache.has(cacheKey)) {
+    const cached = searchCache.get(cacheKey);
+    resultList.innerHTML = cached.html;
+    metaLine.textContent = cached.meta;
     return;
   }
 
@@ -503,13 +518,19 @@ window.performSearch = async function() {
   }
 
   if (!parts.length) {
-    resultList.innerHTML = '<div class="empty">Không tìm thấy kết quả phù hợp.</div>';
-    metaLine.textContent = 'Không có kết quả cho từ khóa "' + keyword + '".';
+    const emptyHtml = '<div class="empty">Không tìm thấy kết quả phù hợp.</div>';
+    const emptyMeta = 'Không có kết quả cho từ khóa "' + keyword + '".';
+    resultList.innerHTML = emptyHtml;
+    metaLine.textContent = emptyMeta;
+    searchCache.set(cacheKey, { html: emptyHtml, meta: emptyMeta });
     return;
   }
 
-  resultList.innerHTML = parts.join("");
-  metaLine.textContent = 'Đang hiển thị kết quả cho từ khóa "' + keyword + '".';
+  const nextHtml = parts.join("");
+  const nextMeta = 'Đang hiển thị kết quả cho từ khóa "' + keyword + '".';
+  resultList.innerHTML = nextHtml;
+  metaLine.textContent = nextMeta;
+  searchCache.set(cacheKey, { html: nextHtml, meta: nextMeta });
 };
 
 async function searchUsers(keyword) {
@@ -674,74 +695,6 @@ function esc(value) {
 function safeUrl(value) {
   return String(value || "").replace(/"/g, "&quot;");
 }
-
-window.resetSearch = function() {
-  if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
-  searchCache.clear();
-  document.getElementById("keywordInput").value = "";
-  document.getElementById("metaLine").textContent = "Nhập từ khóa để bắt đầu tìm kiếm.";
-  document.getElementById("resultList").innerHTML = '<div class="empty">Chưa có kết quả nào. Hãy nhập từ khóa rồi bấm tìm kiếm.</div>';
-};
-
-window.performSearch = async function() {
-  const keyword = document.getElementById("keywordInput").value.trim();
-  const resultList = document.getElementById("resultList");
-  const metaLine = document.getElementById("metaLine");
-
-  if (!keyword) {
-    resultList.innerHTML = '<div class="empty">Hãy nhập từ khóa để tìm kiếm.</div>';
-    metaLine.textContent = "Hãy nhập ít nhất một từ khóa.";
-    return;
-  }
-
-  if (keyword.length < 2) {
-    resultList.innerHTML = '<div class="empty">Hãy nhập ít nhất 2 ký tự để giảm tải hệ thống và cho kết quả chính xác hơn.</div>';
-    metaLine.textContent = "Từ khóa quá ngắn để tìm kiếm hiệu quả.";
-    return;
-  }
-
-  const cacheKey = activeTab + "::" + keyword.toLowerCase();
-  if (searchCache.has(cacheKey)) {
-    const cached = searchCache.get(cacheKey);
-    resultList.innerHTML = cached.html;
-    metaLine.textContent = cached.meta;
-    return;
-  }
-
-  resultList.innerHTML = '<div class="loading">Đang tìm kiếm...</div>';
-
-  const parts = [];
-  if (activeTab === "all" || activeTab === "users") {
-    const users = await searchUsers(keyword);
-    if (users.length) {
-      parts.push('<div class="section-label">Người dùng</div>');
-      parts.push(users.map(renderUserItem).join(""));
-    }
-  }
-
-  if (activeTab === "all" || activeTab === "posts") {
-    const posts = await searchPosts(keyword);
-    if (posts.length) {
-      parts.push('<div class="section-label">Bài viết</div>');
-      parts.push(posts.map(renderPostItem).join(""));
-    }
-  }
-
-  if (!parts.length) {
-    const emptyHtml = '<div class="empty">Không tìm thấy kết quả phù hợp.</div>';
-    const emptyMeta = 'Không có kết quả cho từ khóa "' + keyword + '".';
-    resultList.innerHTML = emptyHtml;
-    metaLine.textContent = emptyMeta;
-    searchCache.set(cacheKey, { html: emptyHtml, meta: emptyMeta });
-    return;
-  }
-
-  const nextHtml = parts.join("");
-  const nextMeta = 'Đang hiển thị kết quả cho từ khóa "' + keyword + '".';
-  resultList.innerHTML = nextHtml;
-  metaLine.textContent = nextMeta;
-  searchCache.set(cacheKey, { html: nextHtml, meta: nextMeta });
-};
 
 init();
 </script>
