@@ -249,3 +249,118 @@ CREATE TABLE public.users (
   subject text,
   CONSTRAINT users_pkey PRIMARY KEY (id)
 );
+
+-- ============================================
+-- Phase 1 social features migration (safe draft)
+-- Run these statements in Supabase SQL editor
+-- one section at a time after reviewing.
+-- ============================================
+
+-- 1) Extend user profile data for a social-style profile page.
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS bio text,
+  ADD COLUMN IF NOT EXISTS cover_url text,
+  ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone DEFAULT now();
+
+-- 2) Extend posts for editing timestamps and visibility control.
+ALTER TABLE public.posts
+  ADD COLUMN IF NOT EXISTS visibility text NOT NULL DEFAULT 'public'
+    CHECK (visibility IN ('public', 'friends', 'private')),
+  ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone DEFAULT now();
+
+-- 3) Store media attachments for posts.
+CREATE TABLE IF NOT EXISTS public.post_media (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  post_id uuid NOT NULL,
+  file_url text NOT NULL,
+  file_type text NOT NULL CHECK (file_type IN ('image', 'video')),
+  sort_order integer NOT NULL DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT post_media_pkey PRIMARY KEY (id),
+  CONSTRAINT post_media_post_id_fkey FOREIGN KEY (post_id) REFERENCES public.posts(id) ON DELETE CASCADE
+);
+
+-- 4) Friend request flow for a Facebook-like relationship model.
+CREATE TABLE IF NOT EXISTS public.friend_requests (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  sender_id uuid NOT NULL,
+  receiver_id uuid NOT NULL,
+  status text NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'accepted', 'rejected', 'cancelled')),
+  created_at timestamp with time zone DEFAULT now(),
+  responded_at timestamp with time zone,
+  CONSTRAINT friend_requests_pkey PRIMARY KEY (id),
+  CONSTRAINT friend_requests_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES public.users(id) ON DELETE CASCADE,
+  CONSTRAINT friend_requests_receiver_id_fkey FOREIGN KEY (receiver_id) REFERENCES public.users(id) ON DELETE CASCADE,
+  CONSTRAINT friend_requests_no_self CHECK (sender_id <> receiver_id)
+);
+
+-- Optional but recommended: only one pending request per direction.
+CREATE UNIQUE INDEX IF NOT EXISTS friend_requests_pending_unique
+  ON public.friend_requests (sender_id, receiver_id)
+  WHERE status = 'pending';
+
+-- 5) Accepted friendship edges.
+CREATE TABLE IF NOT EXISTS public.friendships (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  friend_id uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT friendships_pkey PRIMARY KEY (id),
+  CONSTRAINT friendships_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE,
+  CONSTRAINT friendships_friend_id_fkey FOREIGN KEY (friend_id) REFERENCES public.users(id) ON DELETE CASCADE,
+  CONSTRAINT friendships_no_self CHECK (user_id <> friend_id)
+);
+
+-- One directed edge per pair. When accepting a request, insert two rows:
+-- (A, B) and (B, A) to simplify querying mutual access.
+CREATE UNIQUE INDEX IF NOT EXISTS friendships_pair_unique
+  ON public.friendships (user_id, friend_id);
+
+-- 6) Helpful indexes for feed/profile queries.
+CREATE INDEX IF NOT EXISTS posts_user_created_idx
+  ON public.posts (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS posts_visibility_status_idx
+  ON public.posts (visibility, status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS comments_post_created_idx
+  ON public.comments (post_id, created_at ASC);
+
+CREATE INDEX IF NOT EXISTS likes_post_idx
+  ON public.likes (post_id);
+
+CREATE INDEX IF NOT EXISTS post_media_post_sort_idx
+  ON public.post_media (post_id, sort_order ASC);
+
+CREATE INDEX IF NOT EXISTS friendships_user_idx
+  ON public.friendships (user_id, friend_id);
+
+-- 7) Recommended trigger for updated_at maintenance.
+-- Create once if your project does not already have a generic update trigger.
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS set_users_updated_at ON public.users;
+CREATE TRIGGER set_users_updated_at
+BEFORE UPDATE ON public.users
+FOR EACH ROW
+EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS set_posts_updated_at ON public.posts;
+CREATE TRIGGER set_posts_updated_at
+BEFORE UPDATE ON public.posts
+FOR EACH ROW
+EXECUTE FUNCTION public.set_updated_at();
+
+-- 8) Notes for the next implementation steps.
+-- Profile page will use: users.bio, users.cover_url, posts by user_id, post_media
+-- Feed page will use: posts.visibility + friendships to decide who can view
+-- Friend UI will use: friend_requests + friendships

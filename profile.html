@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Trang cá nhân</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: linear-gradient(180deg, #f7f2e8 0%, var(--cream) 24%, #f8f8fb 100%); color: var(--ink); font-family: var(--font-body); }
+a { color: inherit; text-decoration: none; }
+.hidden { display: none !important; }
+
+.profile-wrap { max-width: 980px; margin: 0 auto; padding: 28px 20px 56px; }
+.loading-state, .empty-posts, .error-box {
+  background: var(--white); border-radius: 18px; border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm); padding: 22px; text-align: center; color: var(--ink-mid);
+}
+.error-box { color: var(--red); }
+
+.hero {
+  position: relative; overflow: hidden; border-radius: 26px;
+  background: var(--white); border: 1px solid rgba(15, 31, 61, .08);
+  box-shadow: var(--shadow-lg); margin-bottom: 22px;
+}
+.cover {
+  height: 240px;
+  background:
+    radial-gradient(circle at top right, rgba(228, 184, 77, .34), transparent 34%),
+    linear-gradient(135deg, rgba(15,31,61,.96) 0%, rgba(31,65,128,.92) 48%, rgba(200,150,42,.78) 100%);
+  background-size: cover;
+  background-position: center;
+}
+.hero-body {
+  position: relative; padding: 0 28px 26px; margin-top: -54px;
+}
+.identity-row {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap;
+}
+.identity-main { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
+.avatar {
+  width: 124px; height: 124px; border-radius: 28px; object-fit: cover;
+  border: 5px solid rgba(255,255,255,.94); background: var(--surface);
+  box-shadow: 0 12px 30px rgba(15,31,61,.18);
+}
+.identity-copy { padding-bottom: 6px; }
+.profile-name {
+  font-family: var(--font-display); font-size: 2rem; color: var(--navy);
+  line-height: 1.08; margin-bottom: 6px;
+}
+.role-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--gold-pale); color: var(--gold); border: 1px solid var(--gold-border);
+  border-radius: 999px; padding: 4px 10px; font-size: .78rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.profile-meta {
+  margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap;
+}
+.meta-chip {
+  background: var(--surface); color: var(--ink-mid); border-radius: 999px;
+  padding: 7px 12px; font-size: .8rem; border: 1px solid var(--border);
+}
+.hero-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.hero-actions .btn { min-width: 128px; justify-content: center; }
+
+.layout {
+  display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 20px;
+  align-items: start;
+}
+.panel {
+  background: var(--white); border-radius: 18px; border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm); overflow: hidden;
+}
+.panel-head {
+  padding: 18px 20px 14px; border-bottom: 1px solid var(--surface);
+}
+.panel-title {
+  font-family: var(--font-display); font-size: 1.1rem; color: var(--navy);
+}
+.panel-sub {
+  margin-top: 4px; color: var(--ink-light); font-size: .78rem;
+}
+.panel-body { padding: 18px 20px 20px; }
+
+.stats-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+}
+.stat-card {
+  border-radius: 16px; padding: 14px;
+  background: linear-gradient(180deg, #fff 0%, #fbfbfd 100%);
+  border: 1px solid var(--border);
+}
+.stat-label {
+  font-size: .74rem; color: var(--ink-light); text-transform: uppercase; letter-spacing: .05em;
+}
+.stat-value {
+  margin-top: 6px; font-size: 1.4rem; color: var(--navy); font-weight: 700;
+}
+
+.about-text {
+  white-space: pre-wrap; color: var(--ink); line-height: 1.72; font-size: .9rem;
+}
+.about-empty { color: var(--ink-light); font-size: .85rem; }
+.info-list { display: flex; flex-direction: column; gap: 12px; }
+.info-item {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 12px 0; border-bottom: 1px solid var(--surface);
+}
+.info-item:last-child { border-bottom: none; padding-bottom: 0; }
+.info-key {
+  min-width: 84px; color: var(--ink-light); font-size: .78rem; text-transform: uppercase; letter-spacing: .04em;
+}
+.info-value { color: var(--ink); font-size: .88rem; }
+
+.post-list { display: flex; flex-direction: column; gap: 16px; }
+.post-card {
+  background: linear-gradient(180deg, #fff 0%, #fcfcfe 100%);
+  border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow-sm); overflow: hidden;
+}
+.post-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px 0; }
+.post-author { display: flex; align-items: center; gap: 12px; }
+.post-avatar {
+  width: 44px; height: 44px; border-radius: 16px; object-fit: cover;
+  border: 2px solid var(--gold-border); background: var(--surface);
+}
+.post-author-name { font-weight: 700; color: var(--navy); font-size: .9rem; }
+.post-time { color: var(--ink-light); font-size: .77rem; margin-top: 3px; }
+.post-badges { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.post-body {
+  padding: 14px 20px 16px; white-space: pre-wrap; word-break: break-word;
+  line-height: 1.7; color: var(--ink); font-size: .92rem;
+}
+.post-media-grid {
+  display: grid; gap: 10px; padding: 0 20px 16px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.post-media {
+  width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 16px;
+  border: 1px solid var(--border); background: var(--surface);
+}
+.post-foot {
+  display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+  padding: 14px 20px 18px; border-top: 1px solid var(--surface);
+  color: var(--ink-mid); font-size: .84rem;
+}
+
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; }
+  .hero-body { padding: 0 18px 20px; }
+  .cover { height: 210px; }
+  .identity-row { align-items: flex-start; }
+  .hero-actions { width: 100%; }
+}
+
+@media (max-width: 560px) {
+  .profile-wrap { padding: 18px 12px 32px; }
+  .avatar { width: 96px; height: 96px; border-radius: 22px; }
+  .profile-name { font-size: 1.55rem; }
+  .hero-actions .btn { flex: 1; min-width: 0; }
+}
+</style>
+</head>
+<body>
+<div class="profile-wrap">
+  <div id="loadingBox" class="loading-state">Đang tải trang cá nhân...</div>
+
+  <div id="profileView" class="hidden">
+    <section class="hero">
+      <div class="cover" id="coverBox"></div>
+      <div class="hero-body">
+        <div class="identity-row">
+          <div class="identity-main">
+            <img class="avatar" id="profileAvatar" src="default-avatar.png" alt="Avatar">
+            <div class="identity-copy">
+              <div class="profile-name" id="profileName">Người dùng</div>
+              <div class="role-pill" id="profileRole">Thành viên</div>
+              <div class="profile-meta" id="profileMeta"></div>
+            </div>
+          </div>
+          <div class="hero-actions" id="heroActions"></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="layout">
+      <aside>
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">Tổng quan</div>
+            <div class="panel-sub">Những thông tin nổi bật trên hồ sơ</div>
+          </div>
+          <div class="panel-body">
+            <div class="stats-grid" id="statsGrid"></div>
+          </div>
+        </section>
+
+        <section class="panel" style="margin-top:20px;">
+          <div class="panel-head">
+            <div class="panel-title">Giới thiệu</div>
+            <div class="panel-sub">Thông tin cá nhân cơ bản</div>
+          </div>
+          <div class="panel-body">
+            <div id="bioBox" class="about-empty">Chưa có mô tả cá nhân.</div>
+            <div class="divider"></div>
+            <div class="info-list" id="infoList"></div>
+          </div>
+        </section>
+      </aside>
+
+      <main>
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">Bài viết</div>
+            <div class="panel-sub" id="postsSub">Bài viết gần đây trên trang cá nhân</div>
+          </div>
+          <div class="panel-body">
+            <div id="postList" class="post-list"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div id="errorBox" class="error-box hidden"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script>
+let currentUser = null;
+let currentProfile = null;
+let viewedProfile = null;
+let viewedUserId = null;
+
+async function init() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) {
+    window.location.href = "index.html";
+    return;
+  }
+
+  currentUser = user;
+  const params = new URLSearchParams(window.location.search);
+  viewedUserId = params.get("id") || user.id;
+
+  await loadCurrentProfile();
+  await loadViewedProfile();
+  await loadStatsAndPosts();
+
+  document.getElementById("loadingBox").classList.add("hidden");
+  document.getElementById("profileView").classList.remove("hidden");
+}
+
+async function loadCurrentProfile() {
+  const { data, error } = await sb.from("users").select("*").eq("id", currentUser.id).single();
+  if (error) throw new Error("Không tải được thông tin người dùng hiện tại.");
+  currentProfile = data;
+}
+
+async function loadViewedProfile() {
+  const { data, error } = await sb.from("users").select("*").eq("id", viewedUserId).single();
+  if (error || !data) throw new Error("Không tìm thấy trang cá nhân này.");
+  viewedProfile = data;
+  renderProfileHeader();
+  renderProfileInfo();
+}
+
+function renderProfileHeader() {
+  document.title = (viewedProfile.full_name || "Trang cá nhân") + " - Trang cá nhân";
+  document.getElementById("profileName").textContent = viewedProfile.full_name || "Người dùng";
+  document.getElementById("profileRole").textContent = formatRole(viewedProfile.role);
+  document.getElementById("profileAvatar").src = viewedProfile.avatar_url || "default-avatar.png";
+
+  const cover = document.getElementById("coverBox");
+  if (viewedProfile.cover_url) {
+    cover.style.backgroundImage = "linear-gradient(180deg, rgba(15,31,61,.18), rgba(15,31,61,.38)), url('" + safeUrl(viewedProfile.cover_url) + "')";
+  }
+
+  const meta = document.getElementById("profileMeta");
+  const metaItems = [];
+  if (viewedProfile.school) metaItems.push(viewedProfile.school);
+  if (viewedProfile.province) metaItems.push(viewedProfile.province);
+  if (viewedProfile.subject) metaItems.push("Môn: " + viewedProfile.subject);
+  meta.innerHTML = metaItems.length
+    ? metaItems.map(item => '<span class="meta-chip">' + esc(item) + '</span>').join("")
+    : '<span class="meta-chip">Hồ sơ đang được hoàn thiện</span>';
+
+  const actions = document.getElementById("heroActions");
+  if (viewedProfile.id === currentUser.id) {
+    actions.innerHTML = '<a class="btn btn-primary" href="account.html">Chỉnh sửa hồ sơ</a><a class="btn btn-outline" href="home.html">Về bảng tin</a>';
+  } else {
+    actions.innerHTML = '<button class="btn btn-gold" id="friendActionBtn" type="button">Kết bạn</button><a class="btn btn-outline" href="home.html">Về bảng tin</a>';
+    setupFriendButton();
+  }
+}
+
+function renderProfileInfo() {
+  const bioBox = document.getElementById("bioBox");
+  if (viewedProfile.bio && viewedProfile.bio.trim()) {
+    bioBox.className = "about-text";
+    bioBox.textContent = viewedProfile.bio;
+  }
+
+  const info = [
+    { key: "Email", value: viewedProfile.email || "Chưa cập nhật" },
+    { key: "Điện thoại", value: viewedProfile.phone || "Chưa cập nhật" },
+    { key: "Năm sinh", value: viewedProfile.birth_year || "Chưa cập nhật" },
+    { key: "Trường", value: viewedProfile.school || "Chưa cập nhật" },
+    { key: "Tỉnh", value: viewedProfile.province || "Chưa cập nhật" }
+  ];
+
+  document.getElementById("infoList").innerHTML = info.map(item => `
+    <div class="info-item">
+      <div class="info-key">${esc(item.key)}</div>
+      <div class="info-value">${esc(String(item.value))}</div>
+    </div>
+  `).join("");
+
+  document.getElementById("postsSub").textContent = viewedProfile.id === currentUser.id
+    ? "Các bài viết bạn đã chia sẻ"
+    : "Những bài viết công khai hoặc được phép xem";
+}
+
+async function setupFriendButton() {
+  const btn = document.getElementById("friendActionBtn");
+  if (!btn) return;
+
+  const { data: friendship } = await sb
+    .from("friendships")
+    .select("id")
+    .eq("user_id", currentUser.id)
+    .eq("friend_id", viewedProfile.id)
+    .maybeSingle();
+
+  if (friendship) {
+    btn.textContent = "Bạn bè";
+    btn.disabled = true;
+    return;
+  }
+
+  const { data: requestSent } = await sb
+    .from("friend_requests")
+    .select("id")
+    .eq("sender_id", currentUser.id)
+    .eq("receiver_id", viewedProfile.id)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  if (requestSent) {
+    btn.textContent = "Đã gửi lời mời";
+    btn.className = "btn btn-outline";
+    btn.disabled = true;
+    return;
+  }
+
+  const { data: requestReceived } = await sb
+    .from("friend_requests")
+    .select("id")
+    .eq("sender_id", viewedProfile.id)
+    .eq("receiver_id", currentUser.id)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  if (requestReceived) {
+    btn.textContent = "Đã nhận lời mời";
+    btn.className = "btn btn-outline";
+    btn.disabled = true;
+    return;
+  }
+
+  btn.onclick = sendFriendRequest;
+}
+
+async function sendFriendRequest() {
+  const btn = document.getElementById("friendActionBtn");
+  if (!btn) return;
+
+  btn.disabled = true;
+  const { error } = await sb.from("friend_requests").insert({
+    sender_id: currentUser.id,
+    receiver_id: viewedProfile.id,
+    status: "pending"
+  });
+
+  if (error) {
+    alert("Không gửi được lời mời kết bạn: " + error.message);
+    btn.disabled = false;
+    return;
+  }
+
+  btn.textContent = "Đã gửi lời mời";
+  btn.className = "btn btn-outline";
+}
+
+async function loadStatsAndPosts() {
+  const isOwner = viewedProfile.id === currentUser.id;
+  const allowedVisibilities = isOwner ? ["public", "friends", "private"] : ["public", "friends"];
+  const canViewFriends = isOwner ? true : await hasFriendAccess();
+
+  const { data: posts, error } = await sb
+    .from("posts")
+    .select(`
+      *,
+      users(full_name, avatar_url),
+      likes(count),
+      comments(count),
+      post_media(file_url, file_type, sort_order)
+    `)
+    .eq("user_id", viewedProfile.id)
+    .eq("status", "approved")
+    .in("visibility", allowedVisibilities)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error("Không tải được bài viết trên trang cá nhân.");
+
+  const visiblePosts = (posts || []).filter(post =>
+    post.visibility === "public" ||
+    (post.visibility === "friends" && canViewFriends) ||
+    (post.visibility === "private" && isOwner)
+  );
+
+  const stats = {
+    posts: visiblePosts.length,
+    friends: await fetchCount("friendships", "user_id", viewedProfile.id),
+    likes: visiblePosts.reduce((sum, post) => sum + (post.likes?.[0]?.count || 0), 0),
+    comments: visiblePosts.reduce((sum, post) => sum + (post.comments?.[0]?.count || 0), 0)
+  };
+
+  renderStats(stats);
+  renderPosts(visiblePosts);
+}
+
+async function hasFriendAccess() {
+  const { data } = await sb
+    .from("friendships")
+    .select("id")
+    .eq("user_id", currentUser.id)
+    .eq("friend_id", viewedProfile.id)
+    .maybeSingle();
+  return !!data;
+}
+
+async function fetchCount(table, field, value) {
+  const { count } = await sb
+    .from(table)
+    .select("*", { count: "exact", head: true })
+    .eq(field, value);
+  return count || 0;
+}
+
+function renderStats(stats) {
+  document.getElementById("statsGrid").innerHTML = [
+    statCard("Bài viết", stats.posts),
+    statCard("Bạn bè", stats.friends),
+    statCard("Lượt thích", stats.likes),
+    statCard("Bình luận", stats.comments)
+  ].join("");
+}
+
+function statCard(label, value) {
+  return '<div class="stat-card"><div class="stat-label">' + esc(label) + '</div><div class="stat-value">' + esc(String(value)) + '</div></div>';
+}
+
+function renderPosts(posts) {
+  const postList = document.getElementById("postList");
+  if (!posts.length) {
+    postList.innerHTML = '<div class="empty-posts">Chưa có bài viết nào để hiển thị.</div>';
+    return;
+  }
+
+  postList.innerHTML = posts.map(post => {
+    const likeCount = post.likes?.[0]?.count || 0;
+    const cmtCount = post.comments?.[0]?.count || 0;
+    const timeText = new Date(post.created_at).toLocaleString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+
+    const media = (post.post_media || [])
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+      .map(item => item.file_type === "image"
+        ? '<img class="post-media" src="' + safeUrl(item.file_url) + '" alt="Ảnh bài viết">'
+        : '<video class="post-media" src="' + safeUrl(item.file_url) + '" controls></video>')
+      .join("");
+
+    const badges = [];
+    if (post.is_pinned) badges.push('<span class="badge badge-gold">Đã ghim</span>');
+    if (post.visibility === "friends") badges.push('<span class="badge badge-blue">Bạn bè</span>');
+    if (post.visibility === "private") badges.push('<span class="badge badge-navy">Riêng tư</span>');
+    if (post.updated_at && post.updated_at !== post.created_at) badges.push('<span class="badge badge-amber">Đã chỉnh sửa</span>');
+
+    return `
+      <article class="post-card">
+        <div class="post-head">
+          <div class="post-author">
+            <img class="post-avatar" src="${safeUrl(post.users?.avatar_url || "default-avatar.png")}" alt="Avatar" onerror="this.src='default-avatar.png'">
+            <div>
+              <div class="post-author-name">${esc(post.users?.full_name || "Người dùng")}</div>
+              <div class="post-time">${timeText}</div>
+            </div>
+          </div>
+          <div class="post-badges">${badges.join("")}</div>
+        </div>
+        <div class="post-body">${esc(post.content || "")}</div>
+        ${media ? `<div class="post-media-grid">${media}</div>` : ""}
+        <div class="post-foot">
+          <span>${likeCount} lượt thích</span>
+          <span>${cmtCount} bình luận</span>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function formatRole(role) {
+  if (role === "admin") return "Quản trị viên";
+  if (role === "teacher") return "Giáo viên";
+  if (role === "student") return "Học sinh";
+  return "Thành viên";
+}
+
+function esc(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function safeUrl(value) {
+  return String(value || "").replace(/"/g, "&quot;");
+}
+
+init().catch(err => {
+  document.getElementById("loadingBox").classList.add("hidden");
+  const errorBox = document.getElementById("errorBox");
+  errorBox.textContent = err.message || "Có lỗi xảy ra khi tải trang cá nhân.";
+  errorBox.classList.remove("hidden");
+});
+</script>
+</body>
+</html>
