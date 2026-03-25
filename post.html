@@ -67,6 +67,8 @@ body { margin: 0; font-family: var(--font-body); background: var(--cream); color
 <script>
 let currentUser = null;
 let currentPostId = null;
+let postChannel = null;
+let commentChannel = null;
 
 async function init() {
   const { data: { user } } = await sb.auth.getUser();
@@ -80,6 +82,7 @@ async function init() {
     renderError("Thiếu mã bài viết.");
     return;
   }
+  subscribeRealtime();
   await loadPost();
   await loadComments();
 }
@@ -197,6 +200,40 @@ window.addComment = async function() {
   await loadComments();
 };
 
+function subscribeRealtime() {
+  if (!currentPostId) return;
+
+  if (postChannel) {
+    sb.removeChannel(postChannel);
+    postChannel = null;
+  }
+  if (commentChannel) {
+    sb.removeChannel(commentChannel);
+    commentChannel = null;
+  }
+
+  postChannel = sb
+    .channel("post-detail:" + currentPostId)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "posts", filter: "id=eq." + currentPostId },
+      () => loadPost()
+    )
+    .subscribe();
+
+  commentChannel = sb
+    .channel("post-comments:" + currentPostId)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "comments", filter: "post_id=eq." + currentPostId },
+      async () => {
+        await loadPost();
+        await loadComments();
+      }
+    )
+    .subscribe();
+}
+
 function renderError(message) {
   const wrap = document.getElementById("postBox");
   wrap.className = "error";
@@ -222,6 +259,11 @@ function safeUrl(value) {
 }
 
 init();
+
+window.addEventListener("beforeunload", () => {
+  if (postChannel) sb.removeChannel(postChannel);
+  if (commentChannel) sb.removeChannel(commentChannel);
+});
 </script>
 </body>
 </html>
