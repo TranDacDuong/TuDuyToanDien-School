@@ -121,6 +121,177 @@ body {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 18px; flex-wrap: wrap; gap: 12px;
 }
+.home-tabs {
+  display: inline-flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.home-tab-btn {
+  border: 1px solid rgba(15,31,61,.08);
+  background: #f2f4f7;
+  color: var(--ink-mid);
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-family: var(--font-body);
+  font-size: .84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: .15s;
+}
+.home-tab-btn.active {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 10px 22px rgba(15,31,61,.16);
+}
+.overview-section {
+  display: none;
+}
+.overview-section.active {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, .8fr);
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.overview-main,
+.overview-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.overview-card {
+  background: var(--white);
+  border: 1px solid rgba(15,31,61,.08);
+  border-radius: 20px;
+  box-shadow: 0 10px 26px rgba(15,31,61,.06);
+  overflow: hidden;
+}
+.overview-card-head {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid rgba(15,31,61,.06);
+}
+.overview-card-title {
+  font-family: var(--font-display);
+  color: var(--navy);
+  font-size: 1rem;
+}
+.overview-card-sub {
+  margin-top: 4px;
+  color: var(--ink-light);
+  font-size: .76rem;
+}
+.overview-card-body {
+  padding: 16px 18px 18px;
+}
+.overview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.overview-post {
+  border: 1px solid rgba(15,31,61,.08);
+  border-radius: 16px;
+  padding: 14px;
+  background: linear-gradient(180deg, #fff 0%, #fbfcff 100%);
+}
+.overview-post-title {
+  color: var(--navy);
+  font-weight: 700;
+  text-decoration: none;
+  font-size: .9rem;
+}
+.overview-post-title:hover {
+  text-decoration: underline;
+}
+.overview-post-meta {
+  margin-top: 6px;
+  color: var(--ink-light);
+  font-size: .74rem;
+}
+.overview-post-text {
+  margin-top: 8px;
+  color: var(--ink);
+  font-size: .84rem;
+  line-height: 1.65;
+}
+.overview-news-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.overview-news-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(15,31,61,.06);
+}
+.overview-news-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.overview-news-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1877f2;
+  margin-top: 7px;
+  flex-shrink: 0;
+}
+.overview-news-link {
+  color: var(--navy);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: .84rem;
+  line-height: 1.5;
+}
+.overview-news-link:hover {
+  text-decoration: underline;
+}
+.countdown-box {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.countdown-pill {
+  flex: 1 1 80px;
+  min-width: 80px;
+  padding: 12px 10px;
+  border-radius: 16px;
+  background: #f6f7f9;
+  text-align: center;
+}
+.countdown-number {
+  display: block;
+  color: var(--navy);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.countdown-label {
+  color: var(--ink-light);
+  font-size: .72rem;
+  margin-top: 4px;
+}
+.contact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.contact-item {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #f6f7f9;
+  color: var(--ink-mid);
+  font-size: .82rem;
+  line-height: 1.5;
+}
+.discussion-section {
+  display: none;
+}
+.discussion-section.active {
+  display: block;
+}
 .social-hub {
   display: flex;
   justify-content: flex-end;
@@ -575,6 +746,16 @@ body {
   .feed-wrap {
     padding: 14px 10px 34px;
   }
+  .overview-section.active {
+    grid-template-columns: 1fr;
+  }
+  .home-tabs {
+    width: 100%;
+  }
+  .home-tab-btn {
+    flex: 1 1 0;
+    text-align: center;
+  }
   .feed-shortcuts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
@@ -985,6 +1166,72 @@ body {
     </div>
   </div>
 
+  <div class="home-tabs">
+    <button class="home-tab-btn active" id="homeTabOverview" type="button" onclick="setHomeTab('overview')">Trang chủ</button>
+    <button class="home-tab-btn" id="homeTabDiscussion" type="button" onclick="setHomeTab('discussion')">Thảo luận</button>
+  </div>
+
+  <section class="overview-section active" id="overviewSection">
+    <div class="overview-main" id="overviewMain">
+      <div class="overview-card">
+        <div class="overview-card-head">
+          <div class="overview-card-title">Thông tin từ giáo viên và trung tâm</div>
+          <div class="overview-card-sub">Các cập nhật quan trọng từ giáo viên và quản trị viên</div>
+        </div>
+        <div class="overview-card-body">
+          <div class="overview-list" id="overviewUpdates">
+            <div class="empty-feed" style="padding:24px 16px;"><p>Đang tải nội dung...</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="overview-card">
+        <div class="overview-card-head">
+          <div class="overview-card-title">Khóa học nổi bật</div>
+          <div class="overview-card-sub">Các bài viết nổi bật do admin tạo</div>
+        </div>
+        <div class="overview-card-body">
+          <div class="overview-list" id="overviewCourses">
+            <div class="empty-feed" style="padding:24px 16px;"><p>Đang tải nội dung...</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <aside class="overview-side">
+      <div class="overview-card">
+        <div class="overview-card-head">
+          <div class="overview-card-title">Đếm ngược ngày thi</div>
+          <div class="overview-card-sub">Mốc ngày thi có thể chỉnh lại theo lịch thực tế</div>
+        </div>
+        <div class="overview-card-body">
+          <div class="countdown-box" id="countdownBox"></div>
+        </div>
+      </div>
+      <div class="overview-card">
+        <div class="overview-card-head">
+          <div class="overview-card-title">Liên hệ</div>
+        </div>
+        <div class="overview-card-body">
+          <div class="contact-list">
+            <div class="contact-item">Trung tâm: liên hệ quản trị viên để được hỗ trợ nhanh.</div>
+            <div class="contact-item">Giáo viên: theo dõi thông báo hoặc nhắn tin trực tiếp trong hệ thống.</div>
+            <div class="contact-item">Khóa học: xem các cập nhật mới trong mục thông tin trung tâm.</div>
+          </div>
+        </div>
+      </div>
+      <div class="overview-card">
+        <div class="overview-card-head">
+          <div class="overview-card-title">Tin tức</div>
+        </div>
+        <div class="overview-card-body">
+          <div class="overview-news-list" id="overviewNews">
+            <div class="empty-feed" style="padding:24px 16px;"><p>Đang tải tin tức...</p></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  <section class="discussion-section" id="discussionSection">
   <div class="feed-shortcuts">
     <div class="shortcut-card">
       <span class="shortcut-icon">🏠</span>
@@ -1041,6 +1288,7 @@ body {
       <p>Dữ liệu bài viết đang được chuẩn bị...</p>
     </div>
   </div>
+  </section>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1055,6 +1303,9 @@ let feedRefreshRunning = false;
 let homeBadgeChannel = null;
 let activeSocialPanel = "";
 let currentFeedFilter = "all";
+let currentHomeTab = "overview";
+let cachedVisiblePosts = [];
+const EXAM_DATE_ISO = "2026-06-26T00:00:00+07:00";
 const uiIcons = {
   search: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="6"></circle><path d="M20 20l-4.2-4.2"></path></svg>',
   bell: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M15 17H5.5a1 1 0 0 1-.8-1.6L6 13.5V10a6 6 0 1 1 12 0v3.5l1.3 1.9A1 1 0 0 1 18.5 17H15"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg>',
@@ -1351,6 +1602,9 @@ async function init() {
   if (role === "student") document.getElementById("composeNote").classList.add("show");
   setupHomeLinks();
   updateFeedFilterButton();
+  updateHomeTabs();
+  renderCountdown();
+  setInterval(renderCountdown, 60000);
   loadHomeHubBadges();
   subscribeHomeHubBadges();
   loadPosts();
@@ -1426,6 +1680,136 @@ function updateFeedFilterButton() {
   const config = configMap[currentFeedFilter] || configMap.all;
   button.dataset.filter = currentFeedFilter;
   button.innerHTML = `<span class="feed-filter-icon">${config.icon}</span><span>Chế độ: ${config.label}</span>`;
+}
+
+function updateHomeTabs() {
+  document.getElementById("homeTabOverview")?.classList.toggle("active", currentHomeTab === "overview");
+  document.getElementById("homeTabDiscussion")?.classList.toggle("active", currentHomeTab === "discussion");
+  document.getElementById("overviewSection")?.classList.toggle("active", currentHomeTab === "overview");
+  document.getElementById("discussionSection")?.classList.toggle("active", currentHomeTab === "discussion");
+  const filterButton = document.getElementById("feedFilterButton");
+  if (filterButton) {
+    filterButton.style.display = currentHomeTab === "discussion" ? "inline-flex" : "none";
+  }
+  const feedTitle = document.querySelector(".feed-title");
+  if (feedTitle) {
+    feedTitle.textContent = currentHomeTab === "overview" ? "Trang chủ" : "Thảo luận";
+  }
+}
+
+window.setHomeTab = function(tab) {
+  currentHomeTab = tab;
+  updateHomeTabs();
+  renderHomeContent();
+};
+
+function renderHomeContent() {
+  if (currentHomeTab === "overview") {
+    renderOverviewSection(cachedVisiblePosts);
+  } else {
+    renderDiscussionPosts(cachedVisiblePosts);
+  }
+}
+
+function renderDiscussionPosts(posts) {
+  const wrap = document.getElementById("posts");
+  if (!wrap) return;
+  if (!posts.length) {
+    wrap.innerHTML = `<div class="empty-feed"><div class="icon">📭</div><p>Chưa có bài viết nào.</p></div>`;
+    return;
+  }
+  wrap.innerHTML = "";
+  for (const post of posts) {
+    wrap.appendChild(buildCard(post));
+    loadComments(post.id);
+  }
+}
+
+function renderOverviewSection(posts) {
+  const updatesWrap = document.getElementById("overviewUpdates");
+  const coursesWrap = document.getElementById("overviewCourses");
+  const newsWrap = document.getElementById("overviewNews");
+  if (!updatesWrap || !coursesWrap || !newsWrap) return;
+
+  const approved = (posts || []).filter(post => post.status === "approved");
+  const adminPosts = approved.filter(post => post.users?.role === "admin");
+  const teacherPosts = approved.filter(post => post.users?.role === "teacher");
+  const centerUpdates = [...adminPosts, ...teacherPosts]
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 6);
+  const coursePosts = adminPosts
+    .filter(post => !post.is_pinned)
+    .slice(0, 4);
+  const newsPosts = adminPosts
+    .filter(post => post.is_pinned)
+    .slice(0, 6);
+
+  updatesWrap.innerHTML = centerUpdates.length
+    ? centerUpdates.map(post => renderOverviewPost(post)).join("")
+    : `<div class="empty-feed" style="padding:24px 16px;"><p>Chưa có cập nhật nào từ giáo viên hoặc trung tâm.</p></div>`;
+
+  coursesWrap.innerHTML = coursePosts.length
+    ? coursePosts.map(post => renderOverviewPost(post, true)).join("")
+    : `<div class="empty-feed" style="padding:24px 16px;"><p>Chưa có khóa học nổi bật nào.</p></div>`;
+
+  newsWrap.innerHTML = newsPosts.length
+    ? newsPosts.map(post => `
+        <div class="overview-news-item">
+          <span class="overview-news-dot"></span>
+          <a class="overview-news-link" href="post.html?id=${post.id}">${esc(extractPostTitle(post))}</a>
+        </div>
+      `).join("")
+    : `<div class="empty-feed" style="padding:24px 16px;"><p>Chưa có tin tức ghim nào.</p></div>`;
+
+  renderCountdown();
+}
+
+function renderOverviewPost(post, compact = false) {
+  return `
+    <article class="overview-post">
+      <a class="overview-post-title" href="post.html?id=${post.id}">${esc(extractPostTitle(post))}</a>
+      <div class="overview-post-meta">${esc(post.users?.full_name || "Hệ thống")} • ${formatPostTime(post.created_at)}</div>
+      <div class="overview-post-text">${esc(extractPostExcerpt(post, compact ? 120 : 180))}</div>
+    </article>
+  `;
+}
+
+function extractPostTitle(post) {
+  const content = String(post?.content || "").trim();
+  const firstLine = content.split("\n").find(Boolean) || content;
+  return firstLine.length > 72 ? firstLine.slice(0, 72) + "..." : firstLine || "Bài viết cập nhật";
+}
+
+function extractPostExcerpt(post, maxLength = 160) {
+  const content = String(post?.content || "").replace(/\s+/g, " ").trim();
+  if (!content) return "Nội dung đang được cập nhật.";
+  return content.length > maxLength ? content.slice(0, maxLength) + "..." : content;
+}
+
+function formatPostTime(value) {
+  return new Date(value).toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function renderCountdown() {
+  const wrap = document.getElementById("countdownBox");
+  if (!wrap) return;
+  const target = new Date(EXAM_DATE_ISO).getTime();
+  const now = Date.now();
+  const diff = Math.max(0, target - now);
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+  const minutes = Math.floor((diff / (1000 * 60)) % 60);
+  wrap.innerHTML = `
+    <div class="countdown-pill"><span class="countdown-number">${days}</span><span class="countdown-label">Ngày</span></div>
+    <div class="countdown-pill"><span class="countdown-number">${hours}</span><span class="countdown-label">Giờ</span></div>
+    <div class="countdown-pill"><span class="countdown-number">${minutes}</span><span class="countdown-label">Phút</span></div>
+  `;
 }
 
 window.cycleFeedFilter = function() {
@@ -1537,12 +1921,16 @@ async function loadPosts() {
   }
   const { data: posts } = await sb
     .from("posts")
-    .select(`*, users(full_name,avatar_url), likes(count), comments(count), post_media(file_url,file_type,sort_order)`)
+    .select(`*, users(full_name,avatar_url,role), likes(count), comments(count), post_media(file_url,file_type,sort_order)`)
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false });
-  const visiblePosts = (posts || [])
+  cachedVisiblePosts = (posts || [])
     .filter(canViewPost)
     .filter(post => matchFeedFilter(post, currentFeedFilter));
+  const visiblePosts = cachedVisiblePosts;
+  wrap.dataset.loadedOnce = "true";
+  renderHomeContent();
+  return;
 
   if (!visiblePosts.length) {
     wrap.innerHTML = `<div class="empty-feed"><div class="icon">📭</div><p>Chưa có bài viết nào.</p></div>`;
