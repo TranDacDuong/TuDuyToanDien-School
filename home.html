@@ -329,6 +329,7 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
 let currentUser, role, currentProfile;
 let friendIds = new Set();
 let likedPostIds = new Set();
+let feedChannel = null;
 
 async function createNotification(userId, type, message, refId) {
   if (!userId || userId === currentUser.id) return;
@@ -366,6 +367,7 @@ async function init() {
   role = p.role; currentProfile = p;
   await loadFriendIds();
   await loadLikedPosts();
+  subscribeFeedRealtime();
   const card = document.getElementById("composeCard");
   card.style.display = "block";
   document.getElementById("composeAvatar").src = p.avatar_url || "default-avatar.png";
@@ -389,6 +391,39 @@ async function loadLikedPosts() {
     .eq("user_id", currentUser.id);
   likedPostIds = new Set((data || []).map(item => item.post_id));
 }
+
+function subscribeFeedRealtime() {
+  if (feedChannel) {
+    sb.removeChannel(feedChannel);
+    feedChannel = null;
+  }
+
+  feedChannel = sb
+    .channel("home-feed")
+    .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, async () => {
+      await loadLikedPosts();
+      await loadPosts();
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "likes" }, async () => {
+      await loadLikedPosts();
+      await loadPosts();
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "comments" }, async payload => {
+      await loadPosts();
+      const postId = payload?.new?.post_id || payload?.old?.post_id;
+      if (postId && document.getElementById("cmt_" + postId)?.style.display === "block") {
+        await loadComments(postId);
+      }
+    })
+    .subscribe();
+}
+
+window.addEventListener("beforeunload", () => {
+  if (feedChannel) {
+    sb.removeChannel(feedChannel);
+    feedChannel = null;
+  }
+});
 
 async function createPost() {
   const text = document.getElementById("postContent").value.trim();
