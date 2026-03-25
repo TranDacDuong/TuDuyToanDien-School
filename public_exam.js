@@ -794,19 +794,19 @@
           const tfOpts = {};
           tfLines.forEach(line => { const m=line.match(/^([a-d])\)\s*(.*)/); if(m) tfOpts[m[1]]=m[2].trim(); });
           ansHtml = lbls.map(lbl => `
-            <div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;
-              background:var(--white);border-radius:8px;border:1px solid var(--border);margin-bottom:8px;flex-wrap:wrap">
-              <span style="font-weight:700;min-width:20px;color:var(--navy);flex-shrink:0">${lbl})</span>
-              <span style="flex:1 1 320px;font-size:1.08rem;color:var(--ink);line-height:1.65;min-width:0">${tfOpts[lbl]||""}</span>
-              <div style="display:flex;gap:6px;flex-wrap:nowrap;flex:0 1 104px;min-width:104px;justify-content:flex-end">
-              <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.95rem;
-                padding:8px 8px;border-radius:8px;background:#f0fdf4;color:#15803d;font-weight:700;flex:1 1 0;justify-content:center;min-width:0">
-                <input type="radio" name="tf_${qid}_${lbl}" value="T" onchange="window.peTF('${qid}')"
-                  ${saved.includes(lbl+"T")?"checked":""} style="accent-color:#16a34a"> Đ</label>
-              <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.95rem;
-                padding:8px 8px;border-radius:8px;background:#fef2f2;color:#b91c1c;font-weight:700;flex:1 1 0;justify-content:center;min-width:0">
-                <input type="radio" name="tf_${qid}_${lbl}" value="F" onchange="window.peTF('${qid}')"
-                  ${saved.includes(lbl+"F")?"checked":""} style="accent-color:#dc2626"> S</label>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;
+              background:var(--white);border-radius:8px;border:1px solid var(--border);margin-bottom:8px">
+              <span style="font-weight:700;min-width:24px;color:var(--navy);flex-shrink:0">${lbl})</span>
+              <span style="flex:1;min-width:0;font-size:.95rem;color:var(--ink);line-height:1.5">${tfOpts[lbl]||""}</span>
+              <div style="display:flex;align-items:center;gap:14px;flex-shrink:0;white-space:nowrap">
+                <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.88rem;color:#15803d;font-weight:700">
+                  <input type="radio" name="tf_${qid}_${lbl}" value="T" onchange="window.peTF('${qid}')"
+                    ${saved.includes(lbl+"T")?"checked":""} style="accent-color:#16a34a"> Đ
+                </label>
+                <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.88rem;color:#b91c1c;font-weight:700">
+                  <input type="radio" name="tf_${qid}_${lbl}" value="F" onchange="window.peTF('${qid}')"
+                    ${saved.includes(lbl+"F")?"checked":""} style="accent-color:#dc2626"> S
+                </label>
               </div>
             </div>`).join("");
         } else if (type === "short_answer") {
@@ -910,7 +910,7 @@
 
           /* â”€â”€ Pháº§n Ä‘Ã¡p Ã¡n: flex:2 â”€â”€ */
           const answerPart = document.createElement("div");
-          answerPart.style.cssText = "flex:" + (type === "true_false" ? "4.4" : "2") + ";padding:10px 12px;background:var(--surface);min-width:0";
+          answerPart.style.cssText = "flex:" + (type === "true_false" ? "3.2" : "2") + ";padding:10px 12px;background:var(--surface);min-width:0";
           answerPart.innerHTML = ansHtml;
 
           body.appendChild(questionPart);
