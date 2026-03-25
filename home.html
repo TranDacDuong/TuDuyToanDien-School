@@ -274,9 +274,22 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
 .btn-no  { background: var(--red-bg);   color: var(--red);   border: 1px solid #fca5a5; padding: 4px 12px; border-radius: 7px; font-size: .78rem; font-weight: 600; cursor: pointer; font-family: var(--font-body); transition: .15s; }
 .btn-no:hover  { background: var(--red);   color: #fff; }
 
-/* ── Empty ── */
-.empty-feed { text-align: center; padding: 60px 20px; color: var(--ink-light); }
+/* ── Empty / Loading ── */
+.empty-feed {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--ink-light);
+  border: 1px dashed var(--border);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fcfcff 0%, #f8f6ef 100%);
+}
 .empty-feed .icon { font-size: 3rem; margin-bottom: 12px; }
+.empty-feed strong {
+  display: block;
+  color: var(--navy);
+  margin-bottom: 6px;
+  font-size: .96rem;
+}
 </style>
 </head>
 <body>
@@ -320,7 +333,13 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
     </div>
   </div>
 
-  <div id="posts"></div>
+  <div id="posts">
+    <div class="empty-feed">
+      <div class="icon">⏳</div>
+      <strong>Đang tải bảng tin</strong>
+      <p>Dữ liệu bài viết đang được chuẩn bị...</p>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -482,13 +501,15 @@ async function createPost() {
 }
 
 async function loadPosts() {
+  const wrap = document.getElementById("posts");
+  if (!wrap.dataset.loadedOnce) {
+    wrap.innerHTML = `<div class="empty-feed"><div class="icon">⏳</div><strong>Đang tải bảng tin</strong><p>Dữ liệu bài viết đang được chuẩn bị...</p></div>`;
+  }
   const { data: posts } = await sb
     .from("posts")
     .select(`*, users(full_name,avatar_url), likes(count), comments(count), post_media(file_url,file_type,sort_order)`)
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false });
-
-  const wrap = document.getElementById("posts");
   const filter = document.getElementById("feedFilter")?.value || "all";
   const visiblePosts = (posts || [])
     .filter(canViewPost)
@@ -804,6 +825,10 @@ async function loadComments(pid) {
   if (!list) return;
   const tops    = (data||[]).filter(c => !c.parent_id);
   const replies = (data||[]).filter(c =>  c.parent_id);
+  if (!tops.length) {
+    list.innerHTML = `<div class="empty-feed" style="padding:18px 14px; margin-top:10px;"><strong>Chưa có bình luận nào</strong><p>Hãy là người đầu tiên để lại phản hồi cho bài viết này.</p></div>`;
+    return;
+  }
   list.innerHTML = tops.map(c => {
     const t = new Date(c.created_at).toLocaleString("vi-VN",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
     const canDeleteTop = role === "admin" || c.user_id === currentUser.id;
