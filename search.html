@@ -10,49 +10,32 @@
 body {
   margin: 0;
   font-family: var(--font-body);
-  background: linear-gradient(180deg, #f7f2e8 0%, var(--cream) 40%, #f9fbff 100%);
+  background: linear-gradient(180deg, #f7f2e8 0%, var(--cream) 55%, #f9fbff 100%);
   color: var(--ink);
 }
 .page {
-  max-width: 1040px;
+  max-width: 920px;
   margin: 0 auto;
-  padding: 28px 20px 48px;
+  padding: 16px;
 }
-.hero {
-  background: linear-gradient(135deg, rgba(15,31,61,.98) 0%, rgba(31,65,128,.95) 58%, rgba(200,150,42,.9) 100%);
-  border-radius: 24px;
-  color: #fff;
-  padding: 26px;
-  box-shadow: var(--shadow-lg);
-}
-.hero h1 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 2rem;
-}
-.hero p {
-  margin: 10px 0 0;
-  color: rgba(255,255,255,.84);
-  max-width: 720px;
-  line-height: 1.7;
-}
-.search-panel {
-  margin-top: 18px;
+.search-panel,
+.results-card {
   background: var(--white);
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: 20px;
   box-shadow: var(--shadow-sm);
-  padding: 18px;
+}
+.search-panel {
+  padding: 16px;
 }
 .search-row {
   display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 10px;
   align-items: center;
 }
 .search-input {
   flex: 1;
-  min-width: 260px;
+  min-width: 0;
   border: 1.5px solid var(--border);
   border-radius: 14px;
   padding: 13px 15px;
@@ -65,15 +48,10 @@ body {
   border-color: var(--gold);
   box-shadow: 0 0 0 4px rgba(200,150,42,.1);
 }
-.search-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
 .tabs {
   display: inline-flex;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 12px;
   flex-wrap: wrap;
 }
 .tab-btn {
@@ -92,97 +70,19 @@ body {
   border-color: transparent;
   color: var(--navy);
 }
-.quick-suggest {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+.results-card {
   margin-top: 14px;
 }
-.suggest-chip {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--ink-mid);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-family: var(--font-body);
-  font-size: .8rem;
-  cursor: pointer;
-  transition: .15s;
-}
-.suggest-chip:hover {
-  border-color: var(--gold-border);
-  background: var(--gold-pale);
-  color: var(--navy);
-}
-.meta-line {
-  margin-top: 14px;
-  color: var(--ink-light);
-  font-size: .83rem;
-}
-.result-grid {
-  display: grid;
-  grid-template-columns: 320px minmax(0,1fr);
-  gap: 18px;
-  margin-top: 22px;
-}
-.card {
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-}
-.card-head {
-  padding: 18px 20px 14px;
-  border-bottom: 1px solid var(--surface);
-}
-.card-title {
-  font-family: var(--font-display);
-  color: var(--navy);
-  font-size: 1.08rem;
-}
-.card-sub {
-  margin-top: 4px;
-  color: var(--ink-light);
-  font-size: .78rem;
-}
-.card-body {
-  padding: 18px 20px 20px;
-}
-.tips {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.tip {
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 14px;
-  background: linear-gradient(180deg, #fff 0%, #fbfbfe 100%);
-}
-.tip-title {
-  font-weight: 700;
-  color: var(--navy);
-  font-size: .88rem;
-}
-.tip-text {
-  margin-top: 6px;
-  color: var(--ink-mid);
-  font-size: .82rem;
-  line-height: 1.6;
+.results-body {
+  padding: 18px;
 }
 .result-list {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
-.section-label {
-  font-family: var(--font-display);
-  color: var(--navy);
-  font-size: 1.04rem;
-  margin: 6px 0 2px;
-}
-.empty, .loading {
+.empty,
+.loading {
   padding: 22px;
   text-align: center;
   color: var(--ink-light);
@@ -190,50 +90,75 @@ body {
   border-radius: 16px;
   background: linear-gradient(180deg, #fcfcff 0%, #f8f6ef 100%);
 }
-.user-item {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
+.user-item,
+.post-item {
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: 16px;
   background: linear-gradient(180deg, #fff 0%, #fbfbff 100%);
 }
+.user-item {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.user-avatar,
+.post-avatar {
+  background: var(--surface);
+  object-fit: cover;
+}
 .user-avatar {
   width: 58px;
   height: 58px;
   border-radius: 18px;
-  object-fit: cover;
   border: 2px solid var(--gold-border);
-  background: var(--surface);
   flex-shrink: 0;
 }
 .user-main {
   flex: 1;
   min-width: 0;
 }
-.user-top {
+.user-top,
+.post-head {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
 }
-.user-name {
+.user-name,
+.post-author-name {
   color: var(--navy);
   font-weight: 700;
-  font-size: 1rem;
   text-decoration: none;
 }
-.user-name:hover { text-decoration: underline; }
-.role-chip {
+.user-name:hover,
+.post-author-name:hover {
+  text-decoration: underline;
+}
+.role-chip,
+.badge {
   display: inline-flex;
+  align-items: center;
   padding: 4px 10px;
   border-radius: 999px;
+  font-size: .73rem;
+  font-weight: 700;
+}
+.role-chip,
+.badge-gold {
   background: var(--gold-pale);
   color: var(--gold);
   border: 1px solid var(--gold-border);
-  font-size: .73rem;
-  font-weight: 700;
+}
+.badge-blue {
+  background: var(--blue-bg);
+  color: var(--blue);
+  border: 1px solid rgba(37,99,235,.14);
+}
+.badge-navy {
+  background: rgba(15,31,61,.08);
+  color: var(--navy);
+  border: 1px solid rgba(15,31,61,.08);
 }
 .user-meta {
   margin-top: 8px;
@@ -256,48 +181,33 @@ body {
   line-height: 1.65;
   white-space: pre-wrap;
 }
-.user-actions {
+.user-actions,
+.post-actions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  margin-top: 14px;
-}
-.post-item {
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  overflow: hidden;
-  background: linear-gradient(180deg, #fff 0%, #fcfcfe 100%);
+  margin-top: 12px;
 }
 .post-head {
-  display: flex;
   justify-content: space-between;
-  gap: 10px;
-  padding: 16px 18px 0;
+  align-items: flex-start;
 }
 .post-author {
   display: flex;
-  gap: 10px;
-  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 .post-avatar {
-  width: 42px;
-  height: 42px;
+  width: 46px;
+  height: 46px;
   border-radius: 14px;
-  object-fit: cover;
   border: 2px solid var(--gold-border);
-  background: var(--surface);
+  flex-shrink: 0;
 }
-.post-author-name {
-  color: var(--navy);
-  font-weight: 700;
-  font-size: .9rem;
-  text-decoration: none;
-}
-.post-author-name:hover { text-decoration: underline; }
 .post-time {
-  margin-top: 3px;
   color: var(--ink-light);
   font-size: .76rem;
+  margin-top: 4px;
 }
 .post-badges {
   display: flex;
@@ -306,113 +216,63 @@ body {
   justify-content: flex-end;
 }
 .post-body {
-  padding: 12px 18px 16px;
+  margin-top: 12px;
   color: var(--ink);
   line-height: 1.7;
   white-space: pre-wrap;
-  word-break: break-word;
 }
 .post-media {
-  padding: 0 18px 16px;
+  margin-top: 12px;
 }
 .post-media img {
   width: 100%;
-  max-height: 360px;
+  max-height: 300px;
   object-fit: cover;
-  border-radius: 14px;
+  border-radius: 16px;
   border: 1px solid var(--border);
-  background: var(--surface);
 }
 .post-foot {
+  margin-top: 12px;
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  align-items: center;
-  border-top: 1px solid var(--surface);
-  padding: 14px 18px 16px;
-  color: var(--ink-mid);
-  font-size: .83rem;
-}
-.post-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-@media (max-width: 900px) {
-  .result-grid { grid-template-columns: 1fr; }
+  color: var(--ink-light);
+  font-size: .82rem;
 }
 @media (max-width: 560px) {
-  .page { padding: 18px 12px 34px; }
-  .hero { padding: 20px; }
-  .hero h1 { font-size: 1.55rem; }
-  .search-row { flex-direction: column; align-items: stretch; }
+  .page {
+    padding: 10px;
+  }
+  .search-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .user-item {
+    flex-direction: column;
+  }
 }
 </style>
 </head>
 <body>
 <div class="page">
-  <section class="hero">
-    <h1>Tìm kiếm</h1>
-    <p>Tìm người dùng và bài viết trong hệ thống. Kết quả sẽ tự lọc theo những gì bạn có quyền xem để tránh tải dữ liệu không cần thiết.</p>
-  </section>
-
   <section class="search-panel">
     <div class="search-row">
       <input id="keywordInput" class="search-input" placeholder="Nhập tên người dùng, trường học hoặc nội dung bài viết...">
-      <div class="search-actions">
-        <button class="btn btn-primary" onclick="performSearch()">Tìm kiếm</button>
-        <button class="btn btn-outline" onclick="resetSearch()">Xóa</button>
-      </div>
+      <button class="btn btn-primary" onclick="performSearch()">Tìm kiếm</button>
     </div>
     <div class="tabs">
       <button class="tab-btn active" data-tab="all" onclick="setTab('all')">Tất cả</button>
       <button class="tab-btn" data-tab="users" onclick="setTab('users')">Người dùng</button>
       <button class="tab-btn" data-tab="posts" onclick="setTab('posts')">Bài viết</button>
     </div>
-    <div class="quick-suggest">
-      <button class="suggest-chip" type="button" onclick="applySuggestion('giáo viên')">Giáo viên</button>
-      <button class="suggest-chip" type="button" onclick="applySuggestion('học sinh')">Học sinh</button>
-      <button class="suggest-chip" type="button" onclick="applySuggestion('toán')">Toán</button>
-      <button class="suggest-chip" type="button" onclick="applySuggestion('Hà Nội')">Hà Nội</button>
-      <button class="suggest-chip" type="button" onclick="applySuggestion('trường')">Trường</button>
-    </div>
-    <div id="metaLine" class="meta-line">Nhập từ khóa để bắt đầu tìm kiếm.</div>
   </section>
 
-  <section class="result-grid">
-    <aside class="card">
-      <div class="card-head">
-        <div class="card-title">Gợi ý tìm kiếm</div>
-        <div class="card-sub">Một vài cách tìm nhanh trong hệ thống</div>
-      </div>
-      <div class="card-body">
-        <div class="tips">
-          <div class="tip">
-            <div class="tip-title">Tìm người dùng</div>
-            <div class="tip-text">Thử nhập tên, trường học, tỉnh thành hoặc vai trò như giáo viên, học sinh.</div>
-          </div>
-          <div class="tip">
-            <div class="tip-title">Tìm bài viết</div>
-            <div class="tip-text">Nhập từ khóa xuất hiện trong nội dung bài viết để mở nhanh sang trang chi tiết.</div>
-          </div>
-          <div class="tip">
-            <div class="tip-title">Tối ưu hệ thống</div>
-            <div class="tip-text">Tìm kiếm chỉ bắt đầu khi từ khóa đủ dài và có cache kết quả để giảm request lặp.</div>
-          </div>
-        </div>
-      </div>
-    </aside>
-
-    <div class="card">
-      <div class="card-head">
-        <div class="card-title">Kết quả</div>
-        <div class="card-sub">Danh sách phù hợp với từ khóa bạn đang tìm</div>
-      </div>
-      <div class="card-body">
-        <div id="resultList" class="result-list">
-          <div class="empty">Chưa có kết quả nào. Hãy nhập từ khóa rồi bấm tìm kiếm.</div>
-        </div>
+  <section class="results-card">
+    <div class="results-body">
+      <div id="resultList" class="result-list">
+        <div class="empty">Chưa có kết quả nào. Hãy nhập từ khóa rồi bấm tìm kiếm.</div>
       </div>
     </div>
   </section>
@@ -464,37 +324,26 @@ window.resetSearch = function() {
   if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
   searchCache.clear();
   document.getElementById("keywordInput").value = "";
-  document.getElementById("metaLine").textContent = "Nhập từ khóa để bắt đầu tìm kiếm.";
   document.getElementById("resultList").innerHTML = '<div class="empty">Chưa có kết quả nào. Hãy nhập từ khóa rồi bấm tìm kiếm.</div>';
-};
-
-window.applySuggestion = function(keyword) {
-  document.getElementById("keywordInput").value = keyword;
-  performSearch();
 };
 
 window.performSearch = async function() {
   const keyword = document.getElementById("keywordInput").value.trim();
   const resultList = document.getElementById("resultList");
-  const metaLine = document.getElementById("metaLine");
 
   if (!keyword) {
     resultList.innerHTML = '<div class="empty">Hãy nhập từ khóa để tìm kiếm.</div>';
-    metaLine.textContent = "Hãy nhập ít nhất một từ khóa.";
     return;
   }
 
   if (keyword.length < 2) {
-    resultList.innerHTML = '<div class="empty">Hãy nhập ít nhất 2 ký tự để giảm tải hệ thống và cho kết quả chính xác hơn.</div>';
-    metaLine.textContent = "Từ khóa quá ngắn để tìm kiếm hiệu quả.";
+    resultList.innerHTML = '<div class="empty">Hãy nhập ít nhất 2 ký tự.</div>';
     return;
   }
 
   const cacheKey = activeTab + "::" + keyword.toLowerCase();
   if (searchCache.has(cacheKey)) {
-    const cached = searchCache.get(cacheKey);
-    resultList.innerHTML = cached.html;
-    metaLine.textContent = cached.meta;
+    resultList.innerHTML = searchCache.get(cacheKey);
     return;
   }
 
@@ -504,7 +353,6 @@ window.performSearch = async function() {
   if (activeTab === "all" || activeTab === "users") {
     const users = await searchUsers(keyword);
     if (users.length) {
-      parts.push('<div class="section-label">Người dùng</div>');
       parts.push(users.map(renderUserItem).join(""));
     }
   }
@@ -512,25 +360,20 @@ window.performSearch = async function() {
   if (activeTab === "all" || activeTab === "posts") {
     const posts = await searchPosts(keyword);
     if (posts.length) {
-      parts.push('<div class="section-label">Bài viết</div>');
       parts.push(posts.map(renderPostItem).join(""));
     }
   }
 
   if (!parts.length) {
     const emptyHtml = '<div class="empty">Không tìm thấy kết quả phù hợp.</div>';
-    const emptyMeta = 'Không có kết quả cho từ khóa "' + keyword + '".';
     resultList.innerHTML = emptyHtml;
-    metaLine.textContent = emptyMeta;
-    searchCache.set(cacheKey, { html: emptyHtml, meta: emptyMeta });
+    searchCache.set(cacheKey, emptyHtml);
     return;
   }
 
   const nextHtml = parts.join("");
-  const nextMeta = 'Đang hiển thị kết quả cho từ khóa "' + keyword + '".';
   resultList.innerHTML = nextHtml;
-  metaLine.textContent = nextMeta;
-  searchCache.set(cacheKey, { html: nextHtml, meta: nextMeta });
+  searchCache.set(cacheKey, nextHtml);
 };
 
 async function searchUsers(keyword) {
@@ -590,8 +433,8 @@ function canViewPost(post) {
 
 function renderUserItem(user) {
   const meta = [];
-  if (user.school) meta.push('<span>' + esc(user.school) + '</span>');
-  if (user.province) meta.push('<span>' + esc(user.province) + '</span>');
+  if (user.school) meta.push("<span>" + esc(user.school) + "</span>");
+  if (user.province) meta.push("<span>" + esc(user.province) + "</span>");
 
   return `
     <article class="user-item">
