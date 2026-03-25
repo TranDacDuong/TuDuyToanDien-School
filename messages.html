@@ -196,11 +196,23 @@ window.openConversation = async function(friendId, friendName, friendAvatar, fri
   document.getElementById("sendBtn").disabled = false;
 
   currentConversationId = await ensureConversation(friendId);
+  await markMessageNotificationsRead(friendId);
   await loadMessages();
 
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(loadMessages, 5000);
 };
+
+async function markMessageNotificationsRead(friendId) {
+  if (!friendId) return;
+  await sb
+    .from("notifications")
+    .update({ is_read: true })
+    .eq("user_id", currentUser.id)
+    .eq("actor_id", friendId)
+    .eq("type", "message_new")
+    .eq("is_read", false);
+}
 
 async function ensureConversation(friendId) {
   const directKey = [currentUser.id, friendId].sort().join("_");
