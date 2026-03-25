@@ -439,8 +439,12 @@ async function setupFriendButton() {
     .eq("friend_id", viewedProfile.id)
     .maybeSingle();
   if (friendship) {
-    btn.textContent = "Bạn bè";
-    btn.disabled = true;
+    const actionBox = document.getElementById("actionBox");
+    actionBox.innerHTML = `
+      <button class="btn btn-outline" type="button" disabled>Bạn bè</button>
+      <button class="btn btn-outline" type="button" onclick="removeFriend()">Gỡ bạn</button>
+      <a class="btn btn-outline" href="home.html">Về bảng tin</a>
+    `;
     return;
   }
 
@@ -452,9 +456,12 @@ async function setupFriendButton() {
     .eq("status", "pending")
     .maybeSingle();
   if (sent) {
-    btn.textContent = "Đã gửi lời mời";
-    btn.className = "btn btn-outline";
-    btn.disabled = true;
+    const actionBox = document.getElementById("actionBox");
+    actionBox.innerHTML = `
+      <button class="btn btn-outline" type="button" disabled>Đã gửi lời mời</button>
+      <button class="btn btn-outline" type="button" onclick="cancelFriendRequest('${sent.id}')">Hủy lời mời</button>
+      <a class="btn btn-outline" href="home.html">Về bảng tin</a>
+    `;
     return;
   }
 
@@ -528,6 +535,40 @@ window.rejectFriendRequest = async function(requestId) {
 
   if (error) {
     alert("Không thể từ chối lời mời: " + error.message);
+    return;
+  }
+
+  const actionBox = document.getElementById("actionBox");
+  actionBox.innerHTML = '<button class="btn btn-gold" id="friendBtn" type="button">Kết bạn</button><a class="btn btn-outline" href="home.html">Về bảng tin</a>';
+  setupFriendButton();
+};
+
+window.cancelFriendRequest = async function(requestId) {
+  const { error } = await sb
+    .from("friend_requests")
+    .update({ status: "cancelled", responded_at: new Date().toISOString() })
+    .eq("id", requestId);
+
+  if (error) {
+    alert("Không thể hủy lời mời: " + error.message);
+    return;
+  }
+
+  const actionBox = document.getElementById("actionBox");
+  actionBox.innerHTML = '<button class="btn btn-gold" id="friendBtn" type="button">Kết bạn</button><a class="btn btn-outline" href="home.html">Về bảng tin</a>';
+  setupFriendButton();
+};
+
+window.removeFriend = async function() {
+  if (!confirm("Bạn có chắc muốn gỡ bạn không?")) return;
+
+  const { error } = await sb
+    .from("friendships")
+    .delete()
+    .or(`and(user_id.eq.${currentUser.id},friend_id.eq.${viewedProfile.id}),and(user_id.eq.${viewedProfile.id},friend_id.eq.${currentUser.id})`);
+
+  if (error) {
+    alert("Không thể gỡ bạn: " + error.message);
     return;
   }
 
