@@ -14,8 +14,8 @@
   const daysMap = { 1:"T2", 2:"T3", 3:"T4", 4:"T5", 5:"T6", 6:"T7", 7:"CN" };
 
   function fmt(v) { return new Intl.NumberFormat("vi-VN").format(v); }
-  const tuitionLabel = { per_session:"buÃ¡Â»â€¢i", per_month:"thÃƒÂ¡ng", per_course:"khoÃƒÂ¡" };
-  function fmtTuition(fee, type) { return fmt(fee) + "Ã„â€˜/" + (tuitionLabel[type]||type); }
+  const tuitionLabel = { per_session:"buổi", per_month:"tháng", per_course:"khóa" };
+  function fmtTuition(fee, type) { return fmt(fee) + "đ/" + (tuitionLabel[type]||type); }
 
   function todayStr() {
     const n = new Date();
@@ -60,12 +60,12 @@
       'box-shadow:0 2px 8px rgba(0,0,0,.2)">' +
         '<button onclick="closeStudentClassView()" style="background:rgba(255,255,255,.12);' +
         'border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 14px;border-radius:7px;' +
-        'font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">â† Quay láº¡i</button>' +
+        'font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">← Quay lại</button>' +
         '<span style="font-family:var(--font-display);font-size:1.1rem;flex:1">' + className + "</span>" +
         '<span id="scv-date" style="font-size:.8rem;color:rgba(255,255,255,.6)">' + todayStr() + "</span>" +
       "</div>" +
       '<div id="scv-body" style="flex:1;overflow-y:auto;padding:22px 24px;min-height:0">' +
-        '<p style="color:var(--ink-light);padding:20px">Äang táº£i...</p>' +
+        '<p style="color:var(--ink-light);padding:20px">Đang tải...</p>' +
       "</div>";
 
     await loadStudentView(classId);
@@ -73,10 +73,10 @@
 
   /* Ã¢â€â‚¬Ã¢â€â‚¬ ThoÃƒÂ¡t khÃ¡Â»Âi bÃƒÂ i thi: lÃ†Â°u tiÃ¡ÂºÂ¿n trÃƒÂ¬nh rÃ¡Â»â€œi vÃ¡Â»Â trang lÃ¡Â»â€ºp Ã¢â€â‚¬Ã¢â€â‚¬ */
   window.exitExam = async function () {
-    if (!confirm("Báº¡n muá»‘n thoÃ¡t? Tiáº¿n trÃ¬nh sáº½ Ä‘Æ°á»£c lÆ°u láº¡i, thá»i gian lÃ m bÃ i sáº½ bá»‹ trá»« 5 phÃºt khi vÃ o láº¡i.")) return;
+    if (!confirm("Bạn muốn thoát? Tiến trình sẽ được lưu lại, thời gian làm bài sẽ bị trừ 5 phút khi vào lại.")) return;
 
     const btn = document.getElementById("examExitBtn");
-    if (btn) { btn.disabled = true; btn.textContent = "Äang lÆ°u..."; }
+    if (btn) { btn.disabled = true; btn.textContent = "Đang lưu..."; }
 
     clearInterval(_examTimer);
 
@@ -232,7 +232,7 @@
       const userMap = {};
       (usersData||[]).forEach(u => { userMap[u.id] = u; });
       studentsWithInfo = activeStudents.map(cs => ({
-        ...cs, user: userMap[cs.student_id] || { full_name: "Ã¢â‚¬â€" }
+        ...cs, user: userMap[cs.student_id] || { full_name: "—" }
       }));
     }
 
@@ -282,14 +282,14 @@
       ? monthSchedules.map(s =>
           '<span style="background:var(--blue-bg);color:var(--blue);padding:3px 11px;' +
           'border-radius:12px;font-size:.78rem;font-weight:600;margin-right:6px;display:inline-block;margin-bottom:4px">' +
-          daysMap[s.weekday] + " " + s.start_time.slice(0,5) + "Ã¢â‚¬â€œ" + s.end_time.slice(0,5) +
-          (s.rooms ? " Ã¢â‚¬Â¢ " + s.rooms.room_name : "") + "</span>"
+          daysMap[s.weekday] + " " + s.start_time.slice(0,5) + "–" + s.end_time.slice(0,5) +
+          (s.rooms ? " • " + s.rooms.room_name : "") + "</span>"
         ).join("")
-      : '<span style="color:var(--ink-light);font-size:.82rem">ChÃ†Â°a cÃƒÂ³ lÃ¡Â»â€¹ch</span>';
+      : '<span style="color:var(--ink-light);font-size:.82rem">Chưa có lịch</span>';
 
     /* Ã¢â€â‚¬Ã¢â€â‚¬ Attendance Ã¢â€â‚¬Ã¢â€â‚¬ */
     const attColor = { present:"var(--green)", absent:"var(--red)", makeup:"var(--amber)" };
-    const attLabel = { present:"CÃƒÂ³ mÃ¡ÂºÂ·t", absent:"VÃ¡ÂºÂ¯ng", makeup:"HÃ¡Â»Âc bÃƒÂ¹" };
+    const attLabel = { present:"Có mặt", absent:"Vắng", makeup:"Học bù" };
 
     const attHtml = totalSessions > 0
       ? '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
@@ -302,7 +302,7 @@
             "</div>"
           ).join("") +
         "</div>"
-      : '<p style="color:var(--ink-light);font-size:.85rem">ChÃ†Â°a cÃƒÂ³ dÃ¡Â»Â¯ liÃ¡Â»â€¡u Ã„â€˜iÃ¡Â»Æ’m danh thÃƒÂ¡ng nÃƒÂ y.</p>';
+      : '<p style="color:var(--ink-light);font-size:.85rem">Chưa có dữ liệu điểm danh tháng này.</p>';
 
     /* Ã¢â€â‚¬Ã¢â€â‚¬ Danh sÃƒÂ¡ch hÃ¡Â»Âc sinh Ã¢â€â‚¬Ã¢â€â‚¬ */
     const studentsHtml = classStudents.length
@@ -317,11 +317,11 @@
             'color:var(--gold-light);display:flex;align-items:center;justify-content:center;' +
             'font-size:.75rem;font-weight:700;flex-shrink:0">' + (i+1) + "</div>" +
             '<span style="font-size:.82rem;font-weight:' + (isMe ? "700" : "500") + ';color:var(--navy)">' +
-            (cs.user?.full_name || "Ã¢â‚¬â€") + (isMe ? " (TÃƒÂ´i)" : "") + "</span>" +
+            (cs.user?.full_name || "—") + (isMe ? " (Tôi)" : "") + "</span>" +
             "</div>";
         }).join("") +
         "</div>"
-      : '<p style="color:var(--ink-light);font-size:.85rem">KhÃƒÂ´ng cÃƒÂ³ hÃ¡Â»Âc sinh.</p>';
+      : '<p style="color:var(--ink-light);font-size:.85rem">Không có học sinh.</p>';
 
     /* Ã¢â€â‚¬Ã¢â€â‚¬ Danh sÃƒÂ¡ch Ã„â€˜Ã¡Â»Â thi Ã¢â€â‚¬Ã¢â€â‚¬ */
     const examsHtml = exams.length
@@ -341,9 +341,9 @@
           if (ex.starts_at && ex.ends_at) {
             const startDt = new Date(ex.starts_at);
             const endDt   = new Date(ex.ends_at);
-            if (now < startDt)    { canDo = false; scheduleNote = "Ã¢ÂÂ° ChÃ†Â°a Ã„â€˜Ã¡ÂºÂ¿n giÃ¡Â»Â thi"; }
-            else if (now > endDt) { canDo = false; scheduleNote = "Ã°Å¸â€â€™ Ã„ÂÃƒÂ£ hÃ¡ÂºÂ¿t giÃ¡Â»Â thi";  }
-            else                  { scheduleNote = "Ã°Å¸Å¸Â¢ Ã„Âang trong giÃ¡Â»Â thi"; }
+            if (now < startDt)    { canDo = false; scheduleNote = "Chưa đến giờ thi"; }
+            else if (now > endDt) { canDo = false; scheduleNote = "Đã hết giờ thi";  }
+            else                  { scheduleNote = "Đang trong giờ thi"; }
           }
 
           const fmtDT = iso => new Date(iso).toLocaleString("vi-VN", {
@@ -352,9 +352,9 @@
           });
           let scheduleStr = "";
           if (ex.starts_at && ex.ends_at) {
-            scheduleStr = "Ã°Å¸â€¢Â " + fmtDT(ex.starts_at) + " Ã¢â€ â€™ " + fmtDT(ex.ends_at);
+            scheduleStr = "🕐 " + fmtDT(ex.starts_at) + " → " + fmtDT(ex.ends_at);
           } else {
-            scheduleStr = "Ã°Å¸â€œâ€¦ KhÃƒÂ´ng giÃ¡Â»â€ºi hÃ¡ÂºÂ¡n";
+            scheduleStr = "📅 Không giới hạn";
           }
 
           const examHasEssay = (ex.exam_questions || [])
@@ -366,8 +366,8 @@
             const pendingEssay    = examHasEssay && lastResult.score_essay === null;
             scoreBadge =
               '<span style="background:#dcfce7;color:#15803d;font-size:.78rem;font-weight:700;' +
-              'padding:3px 10px;border-radius:20px;white-space:nowrap">Ã¢Å“â€œ ' + score + ' / ' + ex.total_points + ' Ã„â€˜</span>' +
-              (pendingEssay ? ' <span style="background:#fef3c7;color:#b45309;font-size:.72rem;padding:2px 8px;border-radius:20px">Ã¢ÂÂ³ ChÃ¡Â»Â chÃ¡ÂºÂ¥m tÃ¡Â»Â± luÃ¡ÂºÂ­n</span>' : "");
+              'padding:3px 10px;border-radius:20px;white-space:nowrap">✓ ' + score + ' / ' + ex.total_points + ' đ</span>' +
+              (pendingEssay ? ' <span style="background:#fef3c7;color:#b45309;font-size:.72rem;padding:2px 8px;border-radius:20px">⏳ Chờ chấm tự luận</span>' : "");
           }
 
           let actionBtn = "";
@@ -384,18 +384,18 @@
               'style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;' +
               'border:none;padding:8px 14px;border-radius:8px;font-size:.82rem;font-weight:600;' +
               'cursor:pointer;white-space:nowrap;font-family:var(--font-body);flex-shrink:0">' +
-              "Ã¢â€“Â¶ LÃƒÂ m bÃƒÂ i tiÃ¡ÂºÂ¿p (" + timeStr + ")</button>";
+              "▶ Làm bài tiếp (" + timeStr + ")</button>";
           } else if (lastResult && !examHasEssay) {
             actionBtn =
               '<div style="font-size:.78rem;font-weight:600;color:var(--green);padding:6px 12px;' +
-              'background:#dcfce7;border-radius:8px;white-space:nowrap">Ã¢Å“â€¦ Ã„ÂÃƒÂ£ hoÃƒÂ n thÃƒÂ nh</div>';
+              'background:#dcfce7;border-radius:8px;white-space:nowrap">✔ Đã hoàn thành</div>';
           } else {
             actionBtn =
               '<button onclick="startExam(\'' + ex.id + '\',\'' + ex.title.replace(/'/g,"\\'") + '\',' + ex.duration_minutes + ',' + ex.total_points + ')" ' +
               'style="background:linear-gradient(135deg,var(--navy),var(--navy-mid));color:var(--gold-light);' +
               'border:none;padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;' +
               'cursor:pointer;white-space:nowrap;font-family:var(--font-body);flex-shrink:0">' +
-              (attemptCount > 0 ? "Ã°Å¸â€â€ž LÃƒÂ m lÃ¡ÂºÂ¡i" : "Ã°Å¸â€œÂ LÃƒÂ m bÃƒÂ i") + "</button>";
+              (attemptCount > 0 ? "🔄 Làm lại" : "📝 Làm bài") + "</button>";
           }
 
           return '<div style="padding:14px 16px;background:var(--white);border:1px solid var(--border);' +
@@ -404,7 +404,7 @@
               '<div style="flex:1;min-width:0">' +
                 '<div style="font-weight:600;font-size:.9rem;color:var(--navy);margin-bottom:3px">' + ex.title + "</div>" +
                 '<div style="font-size:.75rem;color:var(--ink-mid)">' +
-                "Ã¢ÂÂ± " + ex.duration_minutes + " phÃƒÂºt &nbsp;Ã¢â‚¬Â¢&nbsp; Ã°Å¸Ââ€  " + ex.total_points + "Ã„â€˜ &nbsp;Ã¢â‚¬Â¢&nbsp; " + scheduleStr +
+                "⏱ " + ex.duration_minutes + " phút &nbsp;•&nbsp; 🏆 " + ex.total_points + "đ &nbsp;•&nbsp; " + scheduleStr +
                 "</div>" +
                 (scheduleNote && canDo ? '<div style="font-size:.72rem;color:#16a34a;margin-top:2px">' + scheduleNote + "</div>" : "") +
               "</div>" +
@@ -415,7 +415,7 @@
             "</div>";
         }).join("") +
         "</div>"
-      : '<p style="color:var(--ink-light);font-size:.85rem">ChÃ†Â°a cÃƒÂ³ Ã„â€˜Ã¡Â»Â thi nÃƒÂ o.</p>';
+      : '<p style="color:var(--ink-light);font-size:.85rem">Chưa có đề thi nào.</p>';
 
     body.innerHTML =
       '<div style="background:var(--white);border-radius:12px;padding:18px 20px;' +
@@ -423,13 +423,13 @@
         '<div style="display:flex;gap:16px;flex-wrap:wrap">' +
           '<div style="flex:1;min-width:200px">' +
             '<div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;' +
-            'color:var(--ink-light);margin-bottom:6px">ThÃƒÂ´ng tin lÃ¡Â»â€ºp</div>' +
+            'color:var(--ink-light);margin-bottom:6px">Thông tin lớp</div>' +
             '<div style="margin-bottom:4px">' + schHtml + "</div>" +
             '<div style="font-size:.82rem;color:var(--ink-mid)">' +
-            "Ã°Å¸â€™Â° " + fmtTuition(cls?.tuition_fee||0, cls?.tuition_type) + " &nbsp;Ã¢â‚¬Â¢&nbsp; " +
-            "Ã°Å¸â€˜Â¨Ã¢â‚¬ÂÃ°Å¸Å½â€œ " + classStudents.length + " hÃ¡Â»Âc sinh" +
-            (cls?.subjects?.name ? " &nbsp;Ã¢â‚¬Â¢&nbsp; Ã°Å¸â€œÅ¡ " + cls.subjects.name : "") +
-            (cls?.grades?.name   ? " &nbsp;Ã¢â‚¬Â¢&nbsp; Ã°Å¸ÂÂ« KhÃ¡Â»â€˜i " + cls.grades.name : "") +
+            "💰 " + fmtTuition(cls?.tuition_fee||0, cls?.tuition_type) + " &nbsp;•&nbsp; " +
+            "👨‍🎓 " + classStudents.length + " học sinh" +
+            (cls?.subjects?.name ? " &nbsp;•&nbsp; 📚 " + cls.subjects.name : "") +
+            (cls?.grades?.name   ? " &nbsp;•&nbsp; 🏫 Khối " + cls.grades.name : "") +
             "</div>" +
           "</div>" +
         "</div>" +
@@ -437,19 +437,19 @@
       '<div style="background:var(--white);border-radius:12px;padding:18px 20px;' +
       'box-shadow:var(--shadow-sm);margin-bottom:18px">' +
         '<h3 style="font-family:var(--font-display);font-size:1rem;color:var(--navy);margin-bottom:12px">' +
-        "Ã°Å¸â€œâ€¹ Ã„ÂiÃ¡Â»Æ’m danh thÃƒÂ¡ng nÃƒÂ y</h3>" +
+        "📋 Điểm danh tháng này</h3>" +
         attHtml +
       "</div>" +
       '<div style="background:var(--white);border-radius:12px;padding:18px 20px;' +
       'box-shadow:var(--shadow-sm);margin-bottom:18px">' +
         '<h3 style="font-family:var(--font-display);font-size:1rem;color:var(--navy);margin-bottom:12px">' +
-        "Ã°Å¸â€˜Â¥ Danh sÃƒÂ¡ch hÃ¡Â»Âc sinh (" + classStudents.length + ")</h3>" +
+        "👥 Danh sách học sinh (" + classStudents.length + ")</h3>" +
         studentsHtml +
       "</div>" +
       '<div style="background:var(--white);border-radius:12px;padding:18px 20px;' +
       'box-shadow:var(--shadow-sm);margin-bottom:18px">' +
         '<h3 style="font-family:var(--font-display);font-size:1rem;color:var(--navy);margin-bottom:12px">' +
-        "Ã°Å¸â€œâ€ž Ã„ÂÃ¡Â»Â kiÃ¡Â»Æ’m tra (" + exams.length + ")</h3>" +
+        "📝 Đề kiểm tra (" + exams.length + ")</h3>" +
         examsHtml +
       "</div>";
   }
@@ -488,7 +488,7 @@
     console.log("[startExam] eqs raw:", eqs?.length, "first question:", eqs?.[0]?.question, "error:", error?.message);
 
     if (error || !eqs?.length) {
-      alert("LÃ¡Â»â€”i tÃ¡ÂºÂ£i Ã„â€˜Ã¡Â»Â hoÃ¡ÂºÂ·c Ã„â€˜Ã¡Â»Â chÃ†Â°a cÃƒÂ³ cÃƒÂ¢u hÃ¡Â»Âi.\n" + (error?.message||"KhÃƒÂ´ng cÃƒÂ³ cÃƒÂ¢u hÃ¡Â»Âi nÃƒÂ o.")); return;
+      alert("Lỗi tải đề hoặc đề chưa có câu hỏi.\n" + (error?.message||"Không có câu hỏi nào.")); return;
     }
     _examQuestions = eqs.filter(eq => eq.question !== null);
     console.log("[startExam] _examQuestions:", _examQuestions.length);
@@ -521,9 +521,9 @@
         .select("id").single();
       if (!re) { newResult = data; break; }
       if (re.code === "23505") { tryAttempt++; continue; }
-      alert("LÃ¡Â»â€”i tÃ¡ÂºÂ¡o bÃƒÂ i thi: " + re.message); return;
+      alert("Lỗi tạo bài thi: " + re.message); return;
     }
-    if (!newResult) { alert("KhÃƒÂ´ng thÃ¡Â»Æ’ tÃ¡ÂºÂ¡o bÃƒÂ i thi, vui lÃƒÂ²ng thÃ¡Â»Â­ lÃ¡ÂºÂ¡i."); return; }
+    if (!newResult) { alert("Không thể tạo bài thi, vui lòng thử lại."); return; }
     _examResultId = newResult.id;
     console.log("[startExam] result created:", _examResultId, "classId:", classId);
 
@@ -543,10 +543,10 @@
   function renderExamUI(overlay, examTitle, durationMin) {
     const SECTION_ORDER  = ["multi_choice","true_false","short_answer","essay"];
     const SECTION_TITLES = {
-      multi_choice: "PhÃ¡ÂºÂ§n I. TrÃ¡ÂºÂ¯c nghiÃ¡Â»â€¡m",
-      true_false:   "PhÃ¡ÂºÂ§n II. Ä / Sai",
-      short_answer: "PhÃ¡ÂºÂ§n III. TrÃ¡ÂºÂ£ lÃ¡Â»Âi ngÃ¡ÂºÂ¯n",
-      essay:        "PhÃ¡ÂºÂ§n IV. TÃ¡Â»Â± luÃ¡ÂºÂ­n",
+      multi_choice: "Phần I. Trắc nghiệm",
+      true_false:   "Phần II. Đ / Sai",
+      short_answer: "Phần III. Trả lời ngắn",
+      essay:        "Phần IV. Tự luận",
     };
 
     const groups = {};
@@ -568,7 +568,7 @@
         globalNum++;
         navHtml += `<div id="nav_${eq.question.id}"
           onclick="window.peScrollToQ('${eq.question.id}')"
-          title="CÃƒÂ¢u ${globalNum}"
+          title="Câu ${globalNum}"
           style="width:32px;height:32px;border-radius:50%;background:var(--navy);
             color:var(--gold-light);display:flex;align-items:center;justify-content:center;
             font-size:.72rem;font-weight:700;cursor:pointer;position:relative;
@@ -935,7 +935,7 @@
     const { data: eqs, error } = await sb
       .from("exam_questions").select("*, question:question_bank(*)")
       .eq("exam_id", examId).order("order_no");
-    if (error || !eqs?.length) { alert("LÃ¡Â»â€”i tÃ¡ÂºÂ£i Ã„â€˜Ã¡Â»Â."); return; }
+    if (error || !eqs?.length) { alert("Lỗi tải đề."); return; }
     _examQuestions = eqs.filter(eq => eq.question !== null);
 
     const { data: savedAnswers } = await sb
@@ -959,7 +959,7 @@
   };
 
   window.submitExam = async function (auto = false) {
-    if (!auto && !confirm("BÃ¡ÂºÂ¡n chÃ¡ÂºÂ¯c chÃ¡ÂºÂ¯n muÃ¡Â»â€˜n nÃ¡Â»â„¢p bÃƒÂ i?")) return;
+    if (!auto && !confirm("Bạn chắc chắn muốn nộp bài?")) return;
     clearInterval(_examTimer);
     console.log("[submitExam] called, auto:", auto, "_examResultId:", _examResultId);
 
@@ -1039,20 +1039,20 @@
     _examResultId = null;
     const pct   = Math.round((scoreAuto / _examTotal) * 100);
     const color = pct >= 80 ? "var(--green)" : pct >= 50 ? "var(--amber)" : "var(--red)";
-    const msg   = pct >= 80 ? "XuÃ¡ÂºÂ¥t sÃ¡ÂºÂ¯c! Ã°Å¸Å½â€°" : pct >= 50 ? "KhÃƒÂ¡ tÃ¡Â»â€˜t! Ã°Å¸â€˜Â" : "CÃ¡ÂºÂ§n cÃ¡Â»â€˜ gÃ¡ÂºÂ¯ng thÃƒÂªm Ã°Å¸â€™Âª";
+    const msg   = pct >= 80 ? "Xuất sắc! 🎉" : pct >= 50 ? "Khá tốt! 👍" : "Cần cố gắng thêm 💪";
     const scoreDisplay = Math.round(scoreAuto*100)/100;
     const resultHtml =
       '<div style="max-width:480px;width:100%;text-align:center;margin:40px auto">' +
-        '<div style="font-size:4rem;margin-bottom:8px">' + (pct>=80?"Ã°Å¸Ââ€ ":pct>=50?"Ã°Å¸â€œÂ":"Ã°Å¸â€œâ€“") + "</div>" +
+        '<div style="font-size:4rem;margin-bottom:8px">' + (pct>=80?"🏆":pct>=50?"📝":"📖") + "</div>" +
         '<div style="font-family:var(--font-display);font-size:1.5rem;color:var(--navy);margin-bottom:4px">' + msg + "</div>" +
-        '<div style="font-size:.9rem;color:var(--ink-mid);margin-bottom:24px">BÃƒÂ i thi Ã„â€˜ÃƒÂ£ Ã„â€˜Ã†Â°Ã¡Â»Â£c nÃ¡Â»â„¢p thÃƒÂ nh cÃƒÂ´ng</div>' +
+        '<div style="font-size:.9rem;color:var(--ink-mid);margin-bottom:24px">Bài thi đã được nộp thành công</div>' +
         '<div style="background:var(--white);border-radius:16px;padding:28px;box-shadow:0 8px 30px rgba(0,0,0,.08);margin-bottom:20px">' +
           '<div style="font-size:3rem;font-weight:800;color:' + color + ';line-height:1">' + scoreDisplay + "<span style='font-size:1.4rem'>/" + _examTotal + "</span></div>" +
-          '<div style="font-size:.9rem;color:var(--ink-mid);margin-top:4px">Ã„â€˜iÃ¡Â»Æ’m tÃ¡Â»Â± Ã„â€˜Ã¡Â»â„¢ng</div>' +
-          (hasEssay ? '<div style="margin-top:14px;padding:10px 14px;background:#fef3c7;border-radius:8px;font-size:.82rem;color:#b45309">Ã¢ÂÂ³ PhÃ¡ÂºÂ§n tÃ¡Â»Â± luÃ¡ÂºÂ­n sÃ¡ÂºÂ½ Ã„â€˜Ã†Â°Ã¡Â»Â£c giÃƒÂ¡o viÃƒÂªn chÃ¡ÂºÂ¥m sau</div>' : "") +
+          '<div style="font-size:.9rem;color:var(--ink-mid);margin-top:4px">Điểm tự động</div>' +
+          (hasEssay ? '<div style="margin-top:14px;padding:10px 14px;background:#fef3c7;border-radius:8px;font-size:.82rem;color:#b45309">⏳ Phần tự luận sẽ được giáo viên chấm sau</div>' : "") +
         "</div>" +
-        '<button onclick="cvGoBackToExams()" style="background:var(--navy);color:var(--gold-light);border:none;padding:12px 32px;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);margin-right:10px">Ã¢â€ Â Quay lÃ¡ÂºÂ¡i danh sÃƒÂ¡ch Ã„â€˜Ã¡Â»Â thi</button>' +
-        '<button onclick="cvReviewExamDetail()" style="background:var(--surface);color:var(--navy);border:1.5px solid var(--border);padding:12px 24px;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">Ã°Å¸â€œâ€¹ Xem lÃ¡ÂºÂ¡i tÃ¡Â»Â«ng cÃƒÂ¢u</button>' +
+        '<button onclick="cvGoBackToExams()" style="background:var(--navy);color:var(--gold-light);border:none;padding:12px 32px;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);margin-right:10px">← Quay lại danh sách đề thi</button>' +
+        '<button onclick="cvReviewExamDetail()" style="background:var(--surface);color:var(--navy);border:1.5px solid var(--border);padding:12px 24px;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">📋 Xem lại từng câu</button>' +
       "</div>";
 
     const doRender = async () => {
@@ -1071,7 +1071,7 @@
         const overlay = getOrCreateOverlay();
         overlay.innerHTML =
           '<div style="height:54px;background:var(--navy);color:#fff;display:flex;align-items:center;gap:12px;padding:0 18px;flex-shrink:0">' +
-            '<span style="font-family:var(--font-display);font-size:1rem;flex:1">KÃ¡ÂºÂ¿t quÃ¡ÂºÂ£ bÃƒÂ i thi</span>' +
+            '<span style="font-family:var(--font-display);font-size:1rem;flex:1">Kết quả bài thi</span>' +
           "</div>" +
           '<div id="cvBody" style="flex:1;overflow-y:auto;padding:40px 24px;background:#f8fafc">' + resultHtml + "</div>";
       }

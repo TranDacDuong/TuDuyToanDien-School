@@ -498,7 +498,7 @@
   window.openExamDetailAdmin = async function(resultId, studentName, peId, totalPts) {
     const grid = document.getElementById("examGrid");
     grid.style.display = "block";
-    grid.innerHTML = '<div style="color:var(--ink-light)">Äang táº£i bÃ i lÃ m...</div>';
+    grid.innerHTML = '<div style="color:var(--ink-light)">Đang tải bài làm...</div>';
     const sb = getSb();
 
     const [{ data: result }, { data: answers }, { data: pe }] = await Promise.all([
@@ -515,7 +515,7 @@
     const hasEssay = essayQs.length > 0;
     const scoreAuto  = result?.score_auto ?? 0;
     const scoreEssay = result?.score_essay ?? 0;
-    const typeLabel  = { multi_choice:"Tráº¯c nghiá»‡m", true_false:"Đ/Sai", short_answer:"Tráº£ lá»i ngáº¯n", essay:"Tá»± luáº­n" };
+    const typeLabel  = { multi_choice:"Trắc nghiệm", true_false:"Đ/Sai", short_answer:"Trả lời ngắn", essay:"Tự luận" };
 
     const qHtml = eqs.map((eq,i) => {
       const q = eq.question; if (!q) return "";
@@ -527,26 +527,26 @@
           const ok = ans.is_correct;
           ansDisplay = '<div style="margin-top:8px;padding:8px 12px;border-radius:8px;'
             + 'background:'+(ok?"#f0fdf4":"#fef2f2")+';border:1px solid '+(ok?"#86efac":"#fca5a5")+'>'
-            + '<span style="font-weight:700;font-size:.8rem;color:'+(ok?"var(--green)":"var(--red)")+'">'+(ok?"âœ“ Đ":"âœ— Sai")+'</span>'
-            + '<span style="font-size:.82rem;margin-left:8px">HS: <b>'+ans.answer+'</b>'+(q.answer&&!ok?' &nbsp;â€¢&nbsp; ÄÃ¡p Ã¡n: <b>'+q.answer+'</b>':"")+'</span>'
-            + '<span style="float:right;font-size:.8rem;font-weight:700;color:'+(ok?"var(--green)":"var(--red)")+'">'+(ans.score_earned??0)+'/'+eq.points+'Ä‘</span>'
+            + '<span style="font-weight:700;font-size:.8rem;color:'+(ok?"var(--green)":"var(--red)")+'">'+(ok?"✓ Đúng":"✗ Sai")+'</span>'
+            + '<span style="font-size:.82rem;margin-left:8px">HS: <b>'+ans.answer+'</b>'+(q.answer&&!ok?' &nbsp;•&nbsp; Đáp án: <b>'+q.answer+'</b>':"")+'</span>'
+            + '<span style="float:right;font-size:.8rem;font-weight:700;color:'+(ok?"var(--green)":"var(--red)")+'">'+(ans.score_earned??0)+'/'+eq.points+'đ</span>'
             + '</div>';
         } else {
           ansDisplay = '<div style="margin-top:8px;font-size:.8rem;color:var(--ink-light);padding:8px 12px;'
-            + 'background:var(--surface);border-radius:8px">â€” KhÃ´ng cÃ³ cÃ¢u tráº£ lá»i</div>';
+            + 'background:var(--surface);border-radius:8px">— Không có câu trả lời</div>';
         }
       } else {
         ansDisplay = '<div style="margin-top:8px;padding:10px 12px;background:var(--surface);'
           + 'border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;font-size:.85rem;min-height:40px">'
-          + (ans?.answer || '<span style="color:var(--ink-light);font-style:italic">Há»c sinh khÃ´ng tráº£ lá»i</span>')
+          + (ans?.answer || '<span style="color:var(--ink-light);font-style:italic">Học sinh không trả lời</span>')
           + '</div>'
           + '<div style="margin-top:8px;display:flex;align-items:center;gap:10px">'
-          + '<label style="font-size:.78rem;font-weight:700;color:var(--ink-mid)">Äiá»ƒm:</label>'
+          + '<label style="font-size:.78rem;font-weight:700;color:var(--ink-mid)">Điểm:</label>'
           + '<input type="number" id="pe_essay_'+q.id+'" value="'+(ans?.score_earned||0)+'"'
           + ' min="0" max="'+eq.points+'" step="0.5"'
           + ' style="width:70px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:.85rem;text-align:center"'
           + ' oninput="peUpdateEssayTotal()">'
-          + '<span style="font-size:.78rem;color:var(--ink-mid)">/ '+eq.points+' Ä‘iá»ƒm</span>'
+          + '<span style="font-size:.78rem;color:var(--ink-mid)">/ '+eq.points+' điểm</span>'
           + '</div>';
       }
       return '<div style="padding:14px 16px;background:var(--white);border:1px solid var(--border);border-radius:10px;margin-bottom:8px">'
@@ -554,7 +554,7 @@
         + '<span style="width:26px;height:26px;border-radius:50%;background:var(--navy);color:var(--gold-light);'
         + 'display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0">'+(i+1)+'</span>'
         + '<span style="font-size:.72rem;color:var(--ink-light);font-weight:600">'+typeLabel[q.question_type]+'</span>'
-        + '<span style="margin-left:auto;font-size:.75rem;color:var(--ink-mid)">'+eq.points+' Ä‘iá»ƒm</span>'
+        + '<span style="margin-left:auto;font-size:.75rem;color:var(--ink-mid)">'+eq.points+' điểm</span>'
         + '</div>'
         + (q.question_img ? '<img src="'+q.question_img+'" style="max-width:100%;border-radius:6px;margin-bottom:8px;display:block">' : "")
         + '<div style="font-size:.88rem;line-height:1.6;color:var(--navy);white-space:pre-line">'+(q.question_text||"")+'</div>'
@@ -566,20 +566,20 @@
     const headerRight = hasEssay
       ? '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
         + '<div style="text-align:right;font-size:.8rem;color:var(--ink-mid)">'
-        + 'Tá»± Ä‘á»™ng: <b>'+scoreAuto+'</b><br>'
-        + 'Tá»± luáº­n: <b id="pe_essayTotal">'+(scoreEssay||0)+'</b><br>'
-        + '<b style="color:var(--navy)">Tá»•ng: <span id="pe_grandTotal">'+(result?.score_total??"ChÆ°a cháº¥m")+'</span>/'+totalPts+'</b>'
+        + 'Tự động: <b>'+scoreAuto+'</b><br>'
+        + 'Tự luận: <b id="pe_essayTotal">'+(scoreEssay||0)+'</b><br>'
+        + '<b style="color:var(--navy)">Tổng: <span id="pe_grandTotal">'+(result?.score_total??"Chưa chấm")+'</span>/'+totalPts+'</b>'
         + '</div>'
-        + '<button class="btn btn-primary btn-sm" id="peSaveBtn">ðŸ’¾ LÆ°u Ä‘iá»ƒm</button>'
+        + '<button class="btn btn-primary btn-sm" id="peSaveBtn">💾 Lưu điểm</button>'
         + '</div>'
-      : '<div style="font-size:.9rem;font-weight:700;color:var(--navy)">Tá»•ng: '+(result?.score_total??scoreAuto)+'/'+totalPts+'</div>';
+      : '<div style="font-size:.9rem;font-weight:700;color:var(--navy)">Tổng: '+(result?.score_total??scoreAuto)+'/'+totalPts+'</div>';
 
     grid.innerHTML =
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">'
-      + '<button class="btn btn-outline btn-sm" id="peBackBtn">â† Quay láº¡i</button>'
+      + '<button class="btn btn-outline btn-sm" id="peBackBtn">← Quay lại</button>'
       + '<div style="flex:1">'
       + '<div style="font-weight:700;font-size:.95rem;color:var(--navy)">'+studentName+'</div>'
-      + '<div style="font-size:.75rem;color:var(--ink-mid)">'+(pe?.exam?.title||"")+'&nbsp;â€¢&nbsp; Ná»™p: '+(result?.submitted_at?fmtDT(result.submitted_at):"â€”")+'</div>'
+      + '<div style="font-size:.75rem;color:var(--ink-mid)">'+(pe?.exam?.title||"")+'&nbsp;•&nbsp; Nộp: '+(result?.submitted_at?fmtDT(result.submitted_at):"—")+'</div>'
       + '</div>'
       + headerRight
       + '</div>'
@@ -618,7 +618,7 @@
       score_total: grand,
     }).eq("id", resultId);
     const toast = document.createElement("div");
-    toast.textContent = "âœ… ÄÃ£ lÆ°u Ä‘iá»ƒm " + studentName + ": " + grand + "/" + totalPts;
+    toast.textContent = "✅ Đã lưu điểm " + studentName + ": " + grand + "/" + totalPts;
     toast.style.cssText = "position:fixed;bottom:24px;right:24px;background:var(--navy);color:var(--gold-light);"+
       "padding:10px 18px;border-radius:10px;font-size:.85rem;font-weight:600;z-index:9999;box-shadow:var(--shadow-lg)";
     document.body.appendChild(toast); setTimeout(()=>toast.remove(),2500);
@@ -638,7 +638,7 @@
       .from("exam_questions").select("*, question:question_bank(*)")
       .eq("exam_id", examId).order("order_no");
 
-    if (error || !eqs?.length) { alert("Lá»—i táº£i Ä‘á» hoáº·c Ä‘á» chÆ°a cÃ³ cÃ¢u há»i."); return; }
+    if (error || !eqs?.length) { alert("Lỗi tải đề hoặc đề chưa có câu hỏi."); return; }
     _examQuestions = eqs.filter(eq => eq.question !== null);
 
     const { data: stale } = await sb.from("exam_results").select("id")
@@ -661,9 +661,9 @@
         .select("id").single();
       if (!re) { newResult=data; break; }
       if (re.code==="23505") { tryAttempt++; continue; }
-      alert("Lá»—i: "+re.message); return;
+      alert("Lỗi: "+re.message); return;
     }
-    if (!newResult) { alert("KhÃ´ng thá»ƒ táº¡o bÃ i thi."); return; }
+    if (!newResult) { alert("Không thể tạo bài thi."); return; }
     _examResultId = newResult.id;
     _examSeconds  = durationMin * 60;
 
@@ -709,10 +709,10 @@
 
     const SECTION_ORDER  = ["multi_choice","true_false","short_answer","essay"];
     const SECTION_TITLES = {
-      multi_choice: "Pháº§n I. Tráº¯c nghiá»‡m",
-      true_false:   "Pháº§n II. Đ / Sai",
-      short_answer: "Pháº§n III. Tráº£ lá»i ngáº¯n",
-      essay:        "Pháº§n IV. Tá»± luáº­n",
+      multi_choice: "Phần I. Trắc nghiệm",
+      true_false:   "Phần II. Đ / Sai",
+      short_answer: "Phần III. Trả lời ngắn",
+      essay:        "Phần IV. Tự luận",
     };
 
     const groups = {};
@@ -734,7 +734,7 @@
         globalNum++;
         navHtml += `<div id="nav_${eq.question.id}"
           onclick="window.peScrollToQ('${eq.question.id}')"
-          title="CÃ¢u ${globalNum}"
+          title="Câu ${globalNum}"
           style="width:32px;height:32px;border-radius:50%;background:var(--navy);
             color:var(--gold-light);display:flex;align-items:center;justify-content:center;
             font-size:.72rem;font-weight:700;cursor:pointer;position:relative;
@@ -1041,7 +1041,7 @@
   }
 
   window.peExitExam = async function() {
-    if (!confirm("ThoÃ¡t? Tiáº¿n trÃ¬nh Ä‘Æ°á»£c lÆ°u, thá»i gian bá»‹ trá»« 5 phÃºt khi vÃ o láº¡i.")) return;
+    if (!confirm("Thoát? Tiến trình được lưu, thời gian bị trừ 5 phút khi vào lại.")) return;
     clearInterval(_examTimer);
     if (_examResultId) { await saveProgress(); _examResultId=null; }
     getOverlay().style.display="none";
@@ -1049,7 +1049,7 @@
   };
 
   window.submitPublicExam = async function(auto=false) {
-    if (!auto && !confirm("Báº¡n cháº¯c cháº¯n muá»‘n ná»™p bÃ i?")) return;
+    if (!auto && !confirm("Bạn chắc chắn muốn nộp bài?")) return;
     clearInterval(_examTimer);
     const sb=getSb();
     let scoreAuto=0;
@@ -1114,25 +1114,25 @@
     getOverlay().style.display="none";
     const pct=Math.round((scoreAuto/_examTotal)*100);
     const color=pct>=80?"var(--green)":pct>=50?"var(--amber)":"var(--red)";
-    const msg=pct>=80?"Xuáº¥t sáº¯c! ðŸŽ‰":pct>=50?"KhÃ¡ tá»‘t! ðŸ‘":"Cáº§n cá»‘ gáº¯ng thÃªm ðŸ’ª";
+    const msg=pct>=80?"Xuất sắc! 🎉":pct>=50?"Khá tốt! 👍":"Cần cố gắng thêm 💪";
 
     const grid=document.getElementById("examGrid");
     grid.style.display="block";
     grid.innerHTML=`
       <div style="max-width:480px;margin:40px auto;text-align:center">
-        <div style="font-size:4rem;margin-bottom:8px">${pct>=80?"ðŸ†":pct>=50?"ðŸ“":"ðŸ“–"}</div>
+        <div style="font-size:4rem;margin-bottom:8px">${pct>=80?"🏆":pct>=50?"📝":"📖"}</div>
         <div style="font-family:var(--font-display);font-size:1.5rem;color:var(--navy);margin-bottom:4px">${msg}</div>
-        <div style="font-size:.9rem;color:var(--ink-mid);margin-bottom:24px">BÃ i thi Ä‘Ã£ Ä‘Æ°á»£c ná»™p thÃ nh cÃ´ng</div>
+        <div style="font-size:.9rem;color:var(--ink-mid);margin-bottom:24px">Bài thi đã được nộp thành công</div>
         <div style="background:var(--white);border-radius:16px;padding:28px;box-shadow:0 8px 30px rgba(0,0,0,.08);margin-bottom:20px">
           <div style="font-size:3rem;font-weight:800;color:${color};line-height:1">
             ${Math.round(scoreAuto*100)/100}<span style="font-size:1.4rem">/${_examTotal}</span>
           </div>
-          <div style="font-size:.9rem;color:var(--ink-mid);margin-top:4px">Ä‘iá»ƒm tá»± Ä‘á»™ng</div>
-          ${hasEssay?`<div style="margin-top:14px;padding:10px 14px;background:#fef3c7;border-radius:8px;font-size:.82rem;color:#b45309">â³ Pháº§n tá»± luáº­n sáº½ Ä‘Æ°á»£c giÃ¡o viÃªn cháº¥m sau</div>`:""}
+          <div style="font-size:.9rem;color:var(--ink-mid);margin-top:4px">Điểm tự động</div>
+          ${hasEssay?`<div style="margin-top:14px;padding:10px 14px;background:#fef3c7;border-radius:8px;font-size:.82rem;color:#b45309">⏳ Phần tự luận sẽ được giáo viên chấm sau</div>`:""}
         </div>
         <button onclick="loadExamList()" style="background:var(--navy);color:var(--gold-light);border:none;
           padding:12px 32px;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">
-          â† Quay láº¡i danh sÃ¡ch Ä‘á» thi</button>
+          ← Quay lại danh sách đề thi</button>
       </div>`;
   }
 
@@ -1142,7 +1142,7 @@
   window.openReview = async function(peId, resultId, examTitle, isOfficial) {
     const grid = document.getElementById("examGrid");
     grid.style.display = "block";
-    grid.innerHTML = '<div style="color:var(--ink-light)">Äang táº£i bÃ i lÃ m...</div>';
+    grid.innerHTML = '<div style="color:var(--ink-light)">Đang tải bài làm...</div>';
     const sb = getSb();
 
     const [{data:result},{data:answers},{data:pe}] = await Promise.all([
@@ -1160,12 +1160,12 @@
 
     const SECTION_ORDER  = ["multi_choice","true_false","short_answer","essay"];
     const SECTION_TITLES = {
-      multi_choice: "Pháº§n I. Tráº¯c nghiá»‡m",
-      true_false:   "Pháº§n II. Đ / Sai",
-      short_answer: "Pháº§n III. Tráº£ lá»i ngáº¯n",
-      essay:        "Pháº§n IV. Tá»± luáº­n",
+      multi_choice: "Phần I. Trắc nghiệm",
+      true_false:   "Phần II. Đ / Sai",
+      short_answer: "Phần III. Trả lời ngắn",
+      essay:        "Phần IV. Tự luận",
     };
-    const TYPE_LABEL = { multi_choice:"Tráº¯c nghiá»‡m", true_false:"Đ/Sai", short_answer:"Tráº£ lá»i ngáº¯n", essay:"Tá»± luáº­n" };
+    const TYPE_LABEL = { multi_choice:"Trắc nghiệm", true_false:"Đ/Sai", short_answer:"Trả lời ngắn", essay:"Tự luận" };
 
     const groups = {};
     SECTION_ORDER.forEach(t => { groups[t] = []; });
@@ -1174,11 +1174,11 @@
     /* Header */
     grid.innerHTML =
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap">'
-      + '<button class="btn btn-outline btn-sm" onclick="loadExamList()">â† Quay láº¡i</button>'
+      + '<button class="btn btn-outline btn-sm" onclick="loadExamList()">← Quay lại</button>'
       + '<div style="flex:1">'
       + '<div style="font-weight:700;font-size:.95rem;color:var(--navy)">' + examTitle + '</div>'
-      + '<div style="font-size:.75rem;color:var(--ink-mid)">Ná»™p: ' + (result?.submitted_at ? fmtDT(result.submitted_at) : "â€”")
-      + ' &nbsp;â€¢&nbsp; Äiá»ƒm: <b style="color:var(--navy)">' + (score ?? 'ChÆ°a cháº¥m') + '/' + totalPts + '</b></div>'
+      + '<div style="font-size:.75rem;color:var(--ink-mid)">Nộp: ' + (result?.submitted_at ? fmtDT(result.submitted_at) : "—")
+      + ' &nbsp;•&nbsp; Điểm: <b style="color:var(--navy)">' + (score ?? 'Chưa chấm') + '/' + totalPts + '</b></div>'
       + '</div></div>';
 
     /* Build cards â€” giá»‘ng há»‡t layout lÃºc thi */
@@ -1285,7 +1285,7 @@
           } else {
             const res = document.createElement("div");
             res.style.cssText = "padding:6px 8px;border-radius:7px;background:var(--surface);border:1px solid var(--border);font-size:.78rem;color:var(--ink-light)";
-            res.innerHTML = '- Bỏ qua'
+            res.innerHTML = '— Bỏ qua'
               + (q.answer ? '<div style="color:var(--green);margin-top:2px">Đúng: <b>' + q.answer + '</b></div>' : '')
               + '<div style="font-weight:700;color:var(--red);margin-top:4px">0/' + eq.points + 'đ</div>';
             aPart.appendChild(res);
@@ -1297,14 +1297,14 @@
           if (ans?.answer) {
             ansEl.textContent = ans.answer;
           } else {
-            ansEl.innerHTML = '<span style="color:var(--ink-light);font-style:italic">KhÃ´ng tráº£ lá»i</span>';
+            ansEl.innerHTML = '<span style="color:var(--ink-light);font-style:italic">Không trả lời</span>';
           }
           aPart.appendChild(ansEl);
 
           const scored = ans?.score_earned != null;
           const scoreEl = document.createElement("div");
           scoreEl.style.cssText = "font-size:.78rem;font-weight:700;" + (scored ? "color:var(--navy)" : "color:var(--amber)");
-          scoreEl.textContent = scored ? "Äiá»ƒm: " + (ans.score_earned||0) + "/" + eq.points + "Ä‘" : "â³ ChÆ°a cháº¥m";
+          scoreEl.textContent = scored ? "Điểm: " + (ans.score_earned||0) + "/" + eq.points + "đ" : "⏳ Chưa chấm";
           aPart.appendChild(scoreEl);
         }
 
