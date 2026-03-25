@@ -1213,9 +1213,9 @@
         hdr.innerHTML =
           '<span style="width:26px;height:26px;border-radius:50%;background:var(--navy);color:var(--gold-light);'
           + 'display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;flex-shrink:0">' + globalNum + '</span>'
-          + '<span style="font-size:1.1rem;font-weight:700;color:var(--ink-mid)">CÃ¢u ' + globalNum + '</span>'
-          + '<span style="font-size:.72rem;color:var(--ink-light);margin-left:4px">Â· ' + TYPE_LABEL[type] + '</span>'
-          + '<span style="margin-left:auto;font-size:.75rem;color:var(--ink-mid)">' + eq.points + ' Ä‘iá»ƒm</span>';
+          + '<span style="font-size:1.1rem;font-weight:700;color:var(--ink-mid)">Câu ' + globalNum + '</span>'
+          + '<span style="font-size:.72rem;color:var(--ink-light);margin-left:4px">· ' + TYPE_LABEL[type] + '</span>'
+          + '<span style="margin-left:auto;font-size:.75rem;color:var(--ink-mid)">' + eq.points + ' điểm</span>';
         card.appendChild(hdr);
 
         /* Body: 15 pháº§n ngang â€” cÃ¢u há»i flex:13, Ä‘Ã¡p Ã¡n flex:2 */
@@ -1277,17 +1277,17 @@
             const res = document.createElement("div");
             res.style.cssText = "padding:6px 8px;border-radius:7px;background:" + (ok?"#f0fdf4":"#fef2f2") + ";border:1px solid " + (ok?"#86efac":"#fca5a5");
             res.innerHTML =
-              '<div style="font-weight:700;font-size:.8rem;color:' + (ok?"var(--green)":"var(--red)") + '">' + (ok?"âœ“ Đ":"âœ— Sai") + '</div>'
-              + '<div style="font-size:.78rem;margin-top:2px">Báº¡n: <b>' + ans.answer + '</b></div>'
-              + (!ok && q.answer ? '<div style="font-size:.78rem;color:var(--green);margin-top:2px">Đ: <b>' + q.answer + '</b></div>' : '')
-              + '<div style="font-size:.78rem;font-weight:700;color:' + (ok?"var(--green)":"var(--red)") + ';margin-top:4px">' + (ans.score_earned??0) + '/' + eq.points + 'Ä‘</div>';
+              '<div style="font-weight:700;font-size:.8rem;color:' + (ok?"var(--green)":"var(--red)") + '">' + (ok?"Đúng":"Sai") + '</div>'
+              + '<div style="font-size:.78rem;margin-top:2px">Bạn: <b>' + ans.answer + '</b></div>'
+              + (!ok && q.answer ? '<div style="font-size:.78rem;color:var(--green);margin-top:2px">Đúng: <b>' + q.answer + '</b></div>' : '')
+              + '<div style="font-size:.78rem;font-weight:700;color:' + (ok?"var(--green)":"var(--red)") + ';margin-top:4px">' + (ans.score_earned??0) + '/' + eq.points + 'đ</div>';
             aPart.appendChild(res);
           } else {
             const res = document.createElement("div");
             res.style.cssText = "padding:6px 8px;border-radius:7px;background:var(--surface);border:1px solid var(--border);font-size:.78rem;color:var(--ink-light)";
-            res.innerHTML = 'â€” Bá» qua'
-              + (q.answer ? '<div style="color:var(--green);margin-top:2px">Đ: <b>' + q.answer + '</b></div>' : '')
-              + '<div style="font-weight:700;color:var(--red);margin-top:4px">0/' + eq.points + 'Ä‘</div>';
+            res.innerHTML = '- Bỏ qua'
+              + (q.answer ? '<div style="color:var(--green);margin-top:2px">Đúng: <b>' + q.answer + '</b></div>' : '')
+              + '<div style="font-weight:700;color:var(--red);margin-top:4px">0/' + eq.points + 'đ</div>';
             aPart.appendChild(res);
           }
         } else {
