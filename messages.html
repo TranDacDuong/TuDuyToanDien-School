@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="theme.css">
 <style>
 * { box-sizing: border-box; }
-body { margin: 0; font-family: var(--font-body); background: var(--cream); color: var(--ink); }
+body { margin: 0; font-family: var(--font-body); background: linear-gradient(180deg, #f6f0e4 0%, var(--cream) 55%, #f8fbff 100%); color: var(--ink); }
 .page { height: 100vh; padding: 18px; }
 .shell { display: grid; grid-template-columns: 320px minmax(0,1fr); gap: 18px; height: calc(100vh - 36px); }
 .tray-mode body { background: transparent; }
@@ -48,8 +48,8 @@ body { margin: 0; font-family: var(--font-body); background: var(--cream); color
 .popup-mode .composer {
   padding: 10px 12px 12px;
 }
-.panel { background: var(--white); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow-sm); overflow: hidden; }
-.sidebar-head, .chat-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--surface); }
+.panel { background: var(--white); border: 1px solid rgba(15,31,61,.08); border-radius: 20px; box-shadow: 0 10px 24px rgba(15,31,61,.06); overflow: hidden; }
+.sidebar-head, .chat-head { padding: 18px 20px 14px; border-bottom: 1px solid rgba(15,31,61,.06); }
 .sidebar-title, .chat-title { font-family: var(--font-display); color: var(--navy); font-size: 1.12rem; }
 .sidebar-sub, .chat-sub { margin-top: 4px; color: var(--ink-light); font-size: .78rem; }
 .sidebar-sub, .chat-sub { display: none; }
@@ -73,15 +73,15 @@ body { margin: 0; font-family: var(--font-body); background: var(--cream); color
   display: flex;
   align-items: center;
   gap: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(15,31,61,.08);
   border-radius: 16px;
   padding: 12px;
   cursor: pointer;
   transition: .15s;
   background: linear-gradient(180deg,#fff 0%,#fbfbfe 100%);
 }
-.friend-card:hover, .friend-card.active { border-color: var(--gold-border); background: var(--gold-pale); }
-.avatar { width: 46px; height: 46px; border-radius: 14px; object-fit: cover; border: 2px solid var(--gold-border); background: var(--surface); }
+.friend-card:hover, .friend-card.active { border-color: rgba(37,99,235,.16); background: #f4f8ff; }
+.avatar { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(15,31,61,.08); background: var(--surface); }
 .name { color: var(--navy); font-weight: 700; font-size: .9rem; }
 .meta { color: var(--ink-light); font-size: .78rem; margin-top: 3px; }
 .preview {
@@ -136,7 +136,7 @@ body { margin: 0; font-family: var(--font-body); background: var(--cream); color
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: linear-gradient(180deg,#fafbff 0%,#f8f5ef 100%);
+  background: linear-gradient(180deg,#fafbff 0%,#f3f4f6 100%);
 }
 .message-row { display: flex; }
 .message-row.mine { justify-content: flex-end; }
@@ -167,7 +167,7 @@ body { margin: 0; font-family: var(--font-body); background: var(--cream); color
 }
 .bubble-time { margin-top: 6px; font-size: .72rem; opacity: .75; }
 .composer {
-  border-top: 1px solid var(--surface);
+  border-top: 1px solid rgba(15,31,61,.06);
   padding: 14px;
   display: flex;
   flex-direction: column;

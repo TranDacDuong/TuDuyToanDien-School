@@ -7,20 +7,21 @@
 <link rel="stylesheet" href="theme.css">
 <style>
 * { box-sizing: border-box; }
-body { margin: 0; font-family: var(--font-body); background: var(--cream); color: var(--ink); }
-.page { max-width: 920px; margin: 0 auto; padding: 28px 20px 48px; }
-.header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+body { margin: 0; font-family: var(--font-body); background: linear-gradient(180deg, #f6f0e4 0%, var(--cream) 55%, #f8fbff 100%); color: var(--ink); }
+.page { max-width: 920px; margin: 0 auto; padding: 18px 16px 28px; }
+.header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
 .header p { display: none; }
-.list { display: flex; flex-direction: column; gap: 14px; }
-.card { background: var(--white); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow-sm); padding: 16px; }
-.card.unread { border-color: var(--gold-border); box-shadow: 0 0 0 1px rgba(200,150,42,.22), var(--shadow-sm); }
+.header h1 { margin: 0; font-size: 1.35rem; }
+.list { display: flex; flex-direction: column; gap: 12px; }
+.card { background: var(--white); border: 1px solid rgba(15,31,61,.08); border-radius: 18px; box-shadow: 0 10px 24px rgba(15,31,61,.06); padding: 16px; }
+.card.unread { border-color: rgba(37,99,235,.18); box-shadow: 0 0 0 1px rgba(37,99,235,.12), 0 10px 24px rgba(15,31,61,.06); }
 .row { display: flex; gap: 12px; align-items: flex-start; }
-.avatar { width: 46px; height: 46px; border-radius: 14px; object-fit: cover; border: 2px solid var(--gold-border); background: var(--surface); }
+.avatar { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(15,31,61,.08); background: var(--surface); }
 .title { font-weight: 700; color: var(--navy); font-size: .92rem; }
 .message { margin-top: 6px; color: var(--ink-mid); font-size: .88rem; line-height: 1.6; }
 .meta { margin-top: 4px; color: var(--ink-light); font-size: .78rem; }
 .actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
-.empty { background: var(--white); border: 1px solid var(--border); border-radius: 18px; padding: 22px; text-align: center; color: var(--ink-light); }
+.empty { background: var(--white); border: 1px solid rgba(15,31,61,.08); border-radius: 18px; padding: 22px; text-align: center; color: var(--ink-light); }
 </style>
 </head>
 <body>
