@@ -1,9 +1,9 @@
-﻿/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+﻿/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
    CLASS_STUDENT.JS
-   Full-screen view cho student khi nháº¥n vÃ o lá»›p há»c
-   Hiá»ƒn thá»‹: thÃ´ng tin lá»›p, Ä‘iá»ƒm danh cÃ¡ nhÃ¢n, danh sÃ¡ch
-   há»c sinh, danh sÃ¡ch Ä‘á» thi (lÃ m bÃ i)
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   Full-screen view cho student khi nhÃ¡ÂºÂ¥n vÃƒÂ o lÃ¡Â»â€ºp hÃ¡Â»Âc
+   HiÃ¡Â»Æ’n thÃ¡Â»â€¹: thÃƒÂ´ng tin lÃ¡Â»â€ºp, Ã„â€˜iÃ¡Â»Æ’m danh cÃƒÂ¡ nhÃƒÂ¢n, danh sÃƒÂ¡ch
+   hÃ¡Â»Âc sinh, danh sÃƒÂ¡ch Ã„â€˜Ã¡Â»Â thi (lÃƒÂ m bÃƒÂ i)
+Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
 (function () {
 
   function getSb() {
@@ -14,8 +14,8 @@
   const daysMap = { 1:"T2", 2:"T3", 3:"T4", 4:"T5", 5:"T6", 6:"T7", 7:"CN" };
 
   function fmt(v) { return new Intl.NumberFormat("vi-VN").format(v); }
-  const tuitionLabel = { per_session:"buá»•i", per_month:"thÃ¡ng", per_course:"khoÃ¡" };
-  function fmtTuition(fee, type) { return fmt(fee) + "Ä‘/" + (tuitionLabel[type]||type); }
+  const tuitionLabel = { per_session:"buÃ¡Â»â€¢i", per_month:"thÃƒÂ¡ng", per_course:"khoÃƒÂ¡" };
+  function fmtTuition(fee, type) { return fmt(fee) + "Ã„â€˜/" + (tuitionLabel[type]||type); }
 
   function todayStr() {
     const n = new Date();
@@ -31,7 +31,7 @@
     return eligible.filter(s => (s.effective_from||"2000-01-01") === maxEf);
   }
 
-  /* â”€â”€ DÃ¹ng unified overlay tá»« class_manage.js â”€â”€ */
+  /* Ã¢â€â‚¬Ã¢â€â‚¬ DÃƒÂ¹ng unified overlay tÃ¡Â»Â« class_manage.js Ã¢â€â‚¬Ã¢â€â‚¬ */
   function getOrCreateOverlay() {
     let overlay = document.getElementById("classViewOverlay");
     if (!overlay) {
@@ -45,9 +45,9 @@
     return overlay;
   }
 
-  /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-     OPEN â€” entry point
-  â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+  /* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+     OPEN Ã¢â‚¬â€ entry point
+  Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
   window.openStudentClassView = async function (classId, className) {
     const overlay = getOrCreateOverlay();
     overlay.style.display = "flex";
@@ -60,23 +60,23 @@
       'box-shadow:0 2px 8px rgba(0,0,0,.2)">' +
         '<button onclick="closeStudentClassView()" style="background:rgba(255,255,255,.12);' +
         'border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 14px;border-radius:7px;' +
-        'font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">← Quay lại</button>' +
+        'font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">â† Quay láº¡i</button>' +
         '<span style="font-family:var(--font-display);font-size:1.1rem;flex:1">' + className + "</span>" +
         '<span id="scv-date" style="font-size:.8rem;color:rgba(255,255,255,.6)">' + todayStr() + "</span>" +
       "</div>" +
       '<div id="scv-body" style="flex:1;overflow-y:auto;padding:22px 24px;min-height:0">' +
-        '<p style="color:var(--ink-light);padding:20px">Đang tải...</p>' +
+        '<p style="color:var(--ink-light);padding:20px">Äang táº£i...</p>' +
       "</div>";
 
     await loadStudentView(classId);
   };
 
-  /* â”€â”€ ThoÃ¡t khá»i bÃ i thi: lÆ°u tiáº¿n trÃ¬nh rá»“i vá» trang lá»›p â”€â”€ */
+  /* Ã¢â€â‚¬Ã¢â€â‚¬ ThoÃƒÂ¡t khÃ¡Â»Âi bÃƒÂ i thi: lÃ†Â°u tiÃ¡ÂºÂ¿n trÃƒÂ¬nh rÃ¡Â»â€œi vÃ¡Â»Â trang lÃ¡Â»â€ºp Ã¢â€â‚¬Ã¢â€â‚¬ */
   window.exitExam = async function () {
-    if (!confirm("Bạn muốn thoát? Tiến trình sẽ được lưu lại, thời gian làm bài sẽ bị trừ 5 phút khi vào lại.")) return;
+    if (!confirm("Báº¡n muá»‘n thoÃ¡t? Tiáº¿n trÃ¬nh sáº½ Ä‘Æ°á»£c lÆ°u láº¡i, thá»i gian lÃ m bÃ i sáº½ bá»‹ trá»« 5 phÃºt khi vÃ o láº¡i.")) return;
 
     const btn = document.getElementById("examExitBtn");
-    if (btn) { btn.disabled = true; btn.textContent = "Đang lưu..."; }
+    if (btn) { btn.disabled = true; btn.textContent = "Äang lÆ°u..."; }
 
     clearInterval(_examTimer);
 
@@ -85,12 +85,12 @@
       _examResultId = null;
     }
 
-    // Quay vá» tab Ä‘á» thi trong unified overlay
+    // Quay vÃ¡Â»Â tab Ã„â€˜Ã¡Â»Â thi trong unified overlay
     const sysTopbar = document.getElementById('topbar') || document.querySelector('header') || document.querySelector('nav');
     if (sysTopbar) sysTopbar.style.display = '';
 
     if (window.cvSwitchTab) {
-      // Rebuild shell trÆ°á»›c rá»“i chuyá»ƒn sang tab exams
+      // Rebuild shell trÃ†Â°Ã¡Â»â€ºc rÃ¡Â»â€œi chuyÃ¡Â»Æ’n sang tab exams
       if (window._cachedClassForView) {
         window.cvSwitchTab('exams');
       } else if (window.openClassView && window._cvCurrentClassId) {
@@ -111,9 +111,9 @@
     if (sysTopbar) sysTopbar.style.display = '';
   };
 
-  /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  /* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
      LOAD DATA
-  â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+  Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
   async function loadStudentView(classId) {
     const sb   = getSb();
     const body = document.getElementById("scv-body");
@@ -126,14 +126,14 @@
     const mEnd   = (() => {
       const last = new Date(now.getFullYear(), now.getMonth()+1, 0);
       return last.getFullYear() + "-" + String(last.getMonth()+1).padStart(2,"0") + "-" + String(last.getDate()).padStart(2,"0");
-      /* â”€â”€ LÆ°u tiáº¿n trÃ¬nh khi reload/Ä‘Ã³ng tab â”€â”€ */
+      /* Ã¢â€â‚¬Ã¢â€â‚¬ LÃ†Â°u tiÃ¡ÂºÂ¿n trÃƒÂ¬nh khi reload/Ã„â€˜ÃƒÂ³ng tab Ã¢â€â‚¬Ã¢â€â‚¬ */
   window.addEventListener("beforeunload", function () {
     if (!_examResultId) return;
-    // DÃ¹ng sendBeacon Ä‘á»ƒ gá»­i request ngay cáº£ khi trang Ä‘ang Ä‘Ã³ng
-    // LÆ°u seconds_left = hiá»‡n táº¡i (khÃ´ng trá»« 5 phÃºt â€” sáº½ trá»« khi hiá»ƒn thá»‹)
+    // DÃƒÂ¹ng sendBeacon Ã„â€˜Ã¡Â»Æ’ gÃ¡Â»Â­i request ngay cÃ¡ÂºÂ£ khi trang Ã„â€˜ang Ã„â€˜ÃƒÂ³ng
+    // LÃ†Â°u seconds_left = hiÃ¡Â»â€¡n tÃ¡ÂºÂ¡i (khÃƒÂ´ng trÃ¡Â»Â« 5 phÃƒÂºt Ã¢â‚¬â€ sÃ¡ÂºÂ½ trÃ¡Â»Â« khi hiÃ¡Â»Æ’n thÃ¡Â»â€¹)
     const sb = getSb();
-    // KhÃ´ng thá»ƒ await trong beforeunload, dÃ¹ng sync approach
-    // LÆ°u vÃ o localStorage lÃ m backup phÃ²ng trÆ°á»ng há»£p beacon fail
+    // KhÃƒÂ´ng thÃ¡Â»Æ’ await trong beforeunload, dÃƒÂ¹ng sync approach
+    // LÃ†Â°u vÃƒÂ o localStorage lÃƒÂ m backup phÃƒÂ²ng trÃ†Â°Ã¡Â»Âng hÃ¡Â»Â£p beacon fail
     try {
       localStorage.setItem("examBackup_" + _examResultId, JSON.stringify({
         resultId: _examResultId,
@@ -145,7 +145,7 @@
     } catch(e) {}
   });
 
-  /* â”€â”€ Khi táº£i láº¡i trang, khÃ´i phá»¥c backup tá»« localStorage vÃ o DB â”€â”€ */
+  /* Ã¢â€â‚¬Ã¢â€â‚¬ Khi tÃ¡ÂºÂ£i lÃ¡ÂºÂ¡i trang, khÃƒÂ´i phÃ¡Â»Â¥c backup tÃ¡Â»Â« localStorage vÃƒÂ o DB Ã¢â€â‚¬Ã¢â€â‚¬ */
   (async function restoreBackup() {
     const sb = getSb();
     const { data: { user } } = await sb.auth.getUser().catch(() => ({ data: { user: null } }));
@@ -157,7 +157,7 @@
         const backup = JSON.parse(localStorage.getItem(key));
         if (!backup || !backup.resultId) { localStorage.removeItem(key); continue; }
 
-        // Kiá»ƒm tra record cÃ²n tá»“n táº¡i vÃ  chÆ°a ná»™p
+        // KiÃ¡Â»Æ’m tra record cÃƒÂ²n tÃ¡Â»â€œn tÃ¡ÂºÂ¡i vÃƒÂ  chÃ†Â°a nÃ¡Â»â„¢p
         const { data: rec } = await sb
           .from("exam_results")
           .select("id, submitted_at")
@@ -169,12 +169,12 @@
           localStorage.removeItem(key); continue;
         }
 
-        // Cáº­p nháº­t seconds_left vÃ o DB
+        // CÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t seconds_left vÃƒÂ o DB
         await sb.from("exam_results")
           .update({ seconds_left: backup.secondsLeft })
           .eq("id", backup.resultId);
 
-        // Upsert cÃ¢u tráº£ lá»i
+        // Upsert cÃƒÂ¢u trÃ¡ÂºÂ£ lÃ¡Â»Âi
         const rows = Object.entries(backup.answers || {})
           .filter(([, ans]) => ans && ans.trim())
           .map(([question_id, answer]) => ({
@@ -232,13 +232,13 @@
       const userMap = {};
       (usersData||[]).forEach(u => { userMap[u.id] = u; });
       studentsWithInfo = activeStudents.map(cs => ({
-        ...cs, user: userMap[cs.student_id] || { full_name: "â€”" }
+        ...cs, user: userMap[cs.student_id] || { full_name: "Ã¢â‚¬â€" }
       }));
     }
 
-    // Láº¥y káº¿t quáº£ thi cá»§a há»c sinh nÃ y
+    // LÃ¡ÂºÂ¥y kÃ¡ÂºÂ¿t quÃ¡ÂºÂ£ thi cÃ¡Â»Â§a hÃ¡Â»Âc sinh nÃƒÂ y
     const examIds = (exams||[]).map(e => e.id);
-    let resultsMap = {}; // examId â†’ result[]
+    let resultsMap = {}; // examId Ã¢â€ â€™ result[]
     if (examIds.length > 0) {
       const { data: results } = await sb
         .from("exam_results")
@@ -260,9 +260,9 @@
     });
   }
 
-  /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  /* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
      RENDER
-  â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+  Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
   function renderStudentView(body, { cls, monthSchedules, attData, classStudents, exams, resultsMap, userId, classId }) {
     const now = new Date();
 
@@ -277,19 +277,19 @@
     });
     const totalSessions = presentCount + absentCount + makeupCount;
 
-    /* â”€â”€ Schedule pills â”€â”€ */
+    /* Ã¢â€â‚¬Ã¢â€â‚¬ Schedule pills Ã¢â€â‚¬Ã¢â€â‚¬ */
     const schHtml = monthSchedules.length
       ? monthSchedules.map(s =>
           '<span style="background:var(--blue-bg);color:var(--blue);padding:3px 11px;' +
           'border-radius:12px;font-size:.78rem;font-weight:600;margin-right:6px;display:inline-block;margin-bottom:4px">' +
-          daysMap[s.weekday] + " " + s.start_time.slice(0,5) + "â€“" + s.end_time.slice(0,5) +
-          (s.rooms ? " â€¢ " + s.rooms.room_name : "") + "</span>"
+          daysMap[s.weekday] + " " + s.start_time.slice(0,5) + "Ã¢â‚¬â€œ" + s.end_time.slice(0,5) +
+          (s.rooms ? " Ã¢â‚¬Â¢ " + s.rooms.room_name : "") + "</span>"
         ).join("")
-      : '<span style="color:var(--ink-light);font-size:.82rem">ChÆ°a cÃ³ lá»‹ch</span>';
+      : '<span style="color:var(--ink-light);font-size:.82rem">ChÃ†Â°a cÃƒÂ³ lÃ¡Â»â€¹ch</span>';
 
-    /* â”€â”€ Attendance â”€â”€ */
+    /* Ã¢â€â‚¬Ã¢â€â‚¬ Attendance Ã¢â€â‚¬Ã¢â€â‚¬ */
     const attColor = { present:"var(--green)", absent:"var(--red)", makeup:"var(--amber)" };
-    const attLabel = { present:"CÃ³ máº·t", absent:"Váº¯ng", makeup:"Há»c bÃ¹" };
+    const attLabel = { present:"CÃƒÂ³ mÃ¡ÂºÂ·t", absent:"VÃ¡ÂºÂ¯ng", makeup:"HÃ¡Â»Âc bÃƒÂ¹" };
 
     const attHtml = totalSessions > 0
       ? '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
@@ -302,9 +302,9 @@
             "</div>"
           ).join("") +
         "</div>"
-      : '<p style="color:var(--ink-light);font-size:.85rem">ChÆ°a cÃ³ dá»¯ liá»‡u Ä‘iá»ƒm danh thÃ¡ng nÃ y.</p>';
+      : '<p style="color:var(--ink-light);font-size:.85rem">ChÃ†Â°a cÃƒÂ³ dÃ¡Â»Â¯ liÃ¡Â»â€¡u Ã„â€˜iÃ¡Â»Æ’m danh thÃƒÂ¡ng nÃƒÂ y.</p>';
 
-    /* â”€â”€ Danh sÃ¡ch há»c sinh â”€â”€ */
+    /* Ã¢â€â‚¬Ã¢â€â‚¬ Danh sÃƒÂ¡ch hÃ¡Â»Âc sinh Ã¢â€â‚¬Ã¢â€â‚¬ */
     const studentsHtml = classStudents.length
       ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">' +
         classStudents.map((cs, i) => {
@@ -317,13 +317,13 @@
             'color:var(--gold-light);display:flex;align-items:center;justify-content:center;' +
             'font-size:.75rem;font-weight:700;flex-shrink:0">' + (i+1) + "</div>" +
             '<span style="font-size:.82rem;font-weight:' + (isMe ? "700" : "500") + ';color:var(--navy)">' +
-            (cs.user?.full_name || "â€”") + (isMe ? " (TÃ´i)" : "") + "</span>" +
+            (cs.user?.full_name || "Ã¢â‚¬â€") + (isMe ? " (TÃƒÂ´i)" : "") + "</span>" +
             "</div>";
         }).join("") +
         "</div>"
-      : '<p style="color:var(--ink-light);font-size:.85rem">KhÃ´ng cÃ³ há»c sinh.</p>';
+      : '<p style="color:var(--ink-light);font-size:.85rem">KhÃƒÂ´ng cÃƒÂ³ hÃ¡Â»Âc sinh.</p>';
 
-    /* â”€â”€ Danh sÃ¡ch Ä‘á» thi â”€â”€ */
+    /* Ã¢â€â‚¬Ã¢â€â‚¬ Danh sÃƒÂ¡ch Ã„â€˜Ã¡Â»Â thi Ã¢â€â‚¬Ã¢â€â‚¬ */
     const examsHtml = exams.length
       ? '<div style="display:flex;flex-direction:column;gap:10px">' +
         exams.map(ex => {
@@ -341,9 +341,9 @@
           if (ex.starts_at && ex.ends_at) {
             const startDt = new Date(ex.starts_at);
             const endDt   = new Date(ex.ends_at);
-            if (now < startDt)    { canDo = false; scheduleNote = "â° ChÆ°a Ä‘áº¿n giá» thi"; }
-            else if (now > endDt) { canDo = false; scheduleNote = "ðŸ”’ ÄÃ£ háº¿t giá» thi";  }
-            else                  { scheduleNote = "ðŸŸ¢ Äang trong giá» thi"; }
+            if (now < startDt)    { canDo = false; scheduleNote = "Ã¢ÂÂ° ChÃ†Â°a Ã„â€˜Ã¡ÂºÂ¿n giÃ¡Â»Â thi"; }
+            else if (now > endDt) { canDo = false; scheduleNote = "Ã°Å¸â€â€™ Ã„ÂÃƒÂ£ hÃ¡ÂºÂ¿t giÃ¡Â»Â thi";  }
+            else                  { scheduleNote = "Ã°Å¸Å¸Â¢ Ã„Âang trong giÃ¡Â»Â thi"; }
           }
 
           const fmtDT = iso => new Date(iso).toLocaleString("vi-VN", {
@@ -352,9 +352,9 @@
           });
           let scheduleStr = "";
           if (ex.starts_at && ex.ends_at) {
-            scheduleStr = "ðŸ• " + fmtDT(ex.starts_at) + " â†’ " + fmtDT(ex.ends_at);
+            scheduleStr = "Ã°Å¸â€¢Â " + fmtDT(ex.starts_at) + " Ã¢â€ â€™ " + fmtDT(ex.ends_at);
           } else {
-            scheduleStr = "ðŸ“… KhÃ´ng giá»›i háº¡n";
+            scheduleStr = "Ã°Å¸â€œâ€¦ KhÃƒÂ´ng giÃ¡Â»â€ºi hÃ¡ÂºÂ¡n";
           }
 
           const examHasEssay = (ex.exam_questions || [])
@@ -366,8 +366,8 @@
             const pendingEssay    = examHasEssay && lastResult.score_essay === null;
             scoreBadge =
               '<span style="background:#dcfce7;color:#15803d;font-size:.78rem;font-weight:700;' +
-              'padding:3px 10px;border-radius:20px;white-space:nowrap">âœ“ ' + score + ' / ' + ex.total_points + ' Ä‘</span>' +
-              (pendingEssay ? ' <span style="background:#fef3c7;color:#b45309;font-size:.72rem;padding:2px 8px;border-radius:20px">â³ Chá» cháº¥m tá»± luáº­n</span>' : "");
+              'padding:3px 10px;border-radius:20px;white-space:nowrap">Ã¢Å“â€œ ' + score + ' / ' + ex.total_points + ' Ã„â€˜</span>' +
+              (pendingEssay ? ' <span style="background:#fef3c7;color:#b45309;font-size:.72rem;padding:2px 8px;border-radius:20px">Ã¢ÂÂ³ ChÃ¡Â»Â chÃ¡ÂºÂ¥m tÃ¡Â»Â± luÃ¡ÂºÂ­n</span>' : "");
           }
 
           let actionBtn = "";
@@ -384,18 +384,18 @@
               'style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;' +
               'border:none;padding:8px 14px;border-radius:8px;font-size:.82rem;font-weight:600;' +
               'cursor:pointer;white-space:nowrap;font-family:var(--font-body);flex-shrink:0">' +
-              "â–¶ LÃ m bÃ i tiáº¿p (" + timeStr + ")</button>";
+              "Ã¢â€“Â¶ LÃƒÂ m bÃƒÂ i tiÃ¡ÂºÂ¿p (" + timeStr + ")</button>";
           } else if (lastResult && !examHasEssay) {
             actionBtn =
               '<div style="font-size:.78rem;font-weight:600;color:var(--green);padding:6px 12px;' +
-              'background:#dcfce7;border-radius:8px;white-space:nowrap">âœ… ÄÃ£ hoÃ n thÃ nh</div>';
+              'background:#dcfce7;border-radius:8px;white-space:nowrap">Ã¢Å“â€¦ Ã„ÂÃƒÂ£ hoÃƒÂ n thÃƒÂ nh</div>';
           } else {
             actionBtn =
               '<button onclick="startExam(\'' + ex.id + '\',\'' + ex.title.replace(/'/g,"\\'") + '\',' + ex.duration_minutes + ',' + ex.total_points + ')" ' +
               'style="background:linear-gradient(135deg,var(--navy),var(--navy-mid));color:var(--gold-light);' +
               'border:none;padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;' +
               'cursor:pointer;white-space:nowrap;font-family:var(--font-body);flex-shrink:0">' +
-              (attemptCount > 0 ? "ðŸ”„ LÃ m láº¡i" : "ðŸ“ LÃ m bÃ i") + "</button>";
+              (attemptCount > 0 ? "Ã°Å¸â€â€ž LÃƒÂ m lÃ¡ÂºÂ¡i" : "Ã°Å¸â€œÂ LÃƒÂ m bÃƒÂ i") + "</button>";
           }
 
           return '<div style="padding:14px 16px;background:var(--white);border:1px solid var(--border);' +
@@ -404,7 +404,7 @@
               '<div style="flex:1;min-width:0">' +
                 '<div style="font-weight:600;font-size:.9rem;color:var(--navy);margin-bottom:3px">' + ex.title + "</div>" +
                 '<div style="font-size:.75rem;color:var(--ink-mid)">' +
-                "â± " + ex.duration_minutes + " phÃºt &nbsp;â€¢&nbsp; ðŸ† " + ex.total_points + "Ä‘ &nbsp;â€¢&nbsp; " + scheduleStr +
+                "Ã¢ÂÂ± " + ex.duration_minutes + " phÃƒÂºt &nbsp;Ã¢â‚¬Â¢&nbsp; Ã°Å¸Ââ€  " + ex.total_points + "Ã„â€˜ &nbsp;Ã¢â‚¬Â¢&nbsp; " + scheduleStr +
                 "</div>" +
                 (scheduleNote && canDo ? '<div style="font-size:.72rem;color:#16a34a;margin-top:2px">' + scheduleNote + "</div>" : "") +
               "</div>" +
@@ -415,7 +415,7 @@
             "</div>";
         }).join("") +
         "</div>"
-      : '<p style="color:var(--ink-light);font-size:.85rem">ChÆ°a cÃ³ Ä‘á» thi nÃ o.</p>';
+      : '<p style="color:var(--ink-light);font-size:.85rem">ChÃ†Â°a cÃƒÂ³ Ã„â€˜Ã¡Â»Â thi nÃƒÂ o.</p>';
 
     body.innerHTML =
       '<div style="background:var(--white);border-radius:12px;padding:18px 20px;' +
@@ -423,13 +423,13 @@
         '<div style="display:flex;gap:16px;flex-wrap:wrap">' +
           '<div style="flex:1;min-width:200px">' +
             '<div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;' +
-            'color:var(--ink-light);margin-bottom:6px">ThÃ´ng tin lá»›p</div>' +
+            'color:var(--ink-light);margin-bottom:6px">ThÃƒÂ´ng tin lÃ¡Â»â€ºp</div>' +
             '<div style="margin-bottom:4px">' + schHtml + "</div>" +
             '<div style="font-size:.82rem;color:var(--ink-mid)">' +
-            "ðŸ’° " + fmtTuition(cls?.tuition_fee||0, cls?.tuition_type) + " &nbsp;â€¢&nbsp; " +
-            "ðŸ‘¨â€ðŸŽ“ " + classStudents.length + " há»c sinh" +
-            (cls?.subjects?.name ? " &nbsp;â€¢&nbsp; ðŸ“š " + cls.subjects.name : "") +
-            (cls?.grades?.name   ? " &nbsp;â€¢&nbsp; ðŸ« Khá»‘i " + cls.grades.name : "") +
+            "Ã°Å¸â€™Â° " + fmtTuition(cls?.tuition_fee||0, cls?.tuition_type) + " &nbsp;Ã¢â‚¬Â¢&nbsp; " +
+            "Ã°Å¸â€˜Â¨Ã¢â‚¬ÂÃ°Å¸Å½â€œ " + classStudents.length + " hÃ¡Â»Âc sinh" +
+            (cls?.subjects?.name ? " &nbsp;Ã¢â‚¬Â¢&nbsp; Ã°Å¸â€œÅ¡ " + cls.subjects.name : "") +
+            (cls?.grades?.name   ? " &nbsp;Ã¢â‚¬Â¢&nbsp; Ã°Å¸ÂÂ« KhÃ¡Â»â€˜i " + cls.grades.name : "") +
             "</div>" +
           "</div>" +
         "</div>" +
@@ -437,26 +437,26 @@
       '<div style="background:var(--white);border-radius:12px;padding:18px 20px;' +
       'box-shadow:var(--shadow-sm);margin-bottom:18px">' +
         '<h3 style="font-family:var(--font-display);font-size:1rem;color:var(--navy);margin-bottom:12px">' +
-        "ðŸ“‹ Äiá»ƒm danh thÃ¡ng nÃ y</h3>" +
+        "Ã°Å¸â€œâ€¹ Ã„ÂiÃ¡Â»Æ’m danh thÃƒÂ¡ng nÃƒÂ y</h3>" +
         attHtml +
       "</div>" +
       '<div style="background:var(--white);border-radius:12px;padding:18px 20px;' +
       'box-shadow:var(--shadow-sm);margin-bottom:18px">' +
         '<h3 style="font-family:var(--font-display);font-size:1rem;color:var(--navy);margin-bottom:12px">' +
-        "ðŸ‘¥ Danh sÃ¡ch há»c sinh (" + classStudents.length + ")</h3>" +
+        "Ã°Å¸â€˜Â¥ Danh sÃƒÂ¡ch hÃ¡Â»Âc sinh (" + classStudents.length + ")</h3>" +
         studentsHtml +
       "</div>" +
       '<div style="background:var(--white);border-radius:12px;padding:18px 20px;' +
       'box-shadow:var(--shadow-sm);margin-bottom:18px">' +
         '<h3 style="font-family:var(--font-display);font-size:1rem;color:var(--navy);margin-bottom:12px">' +
-        "ðŸ“„ Äá» kiá»ƒm tra (" + exams.length + ")</h3>" +
+        "Ã°Å¸â€œâ€ž Ã„ÂÃ¡Â»Â kiÃ¡Â»Æ’m tra (" + exams.length + ")</h3>" +
         examsHtml +
       "</div>";
   }
 
-  /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-     GIAO DIá»†N THI
-  â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+  /* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+     GIAO DIÃ¡Â»â€ N THI
+  Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
 
   let _examTimer      = null;
   let _examSeconds    = 0;
@@ -488,7 +488,7 @@
     console.log("[startExam] eqs raw:", eqs?.length, "first question:", eqs?.[0]?.question, "error:", error?.message);
 
     if (error || !eqs?.length) {
-      alert("Lá»—i táº£i Ä‘á» hoáº·c Ä‘á» chÆ°a cÃ³ cÃ¢u há»i.\n" + (error?.message||"KhÃ´ng cÃ³ cÃ¢u há»i nÃ o.")); return;
+      alert("LÃ¡Â»â€”i tÃ¡ÂºÂ£i Ã„â€˜Ã¡Â»Â hoÃ¡ÂºÂ·c Ã„â€˜Ã¡Â»Â chÃ†Â°a cÃƒÂ³ cÃƒÂ¢u hÃ¡Â»Âi.\n" + (error?.message||"KhÃƒÂ´ng cÃƒÂ³ cÃƒÂ¢u hÃ¡Â»Âi nÃƒÂ o.")); return;
     }
     _examQuestions = eqs.filter(eq => eq.question !== null);
     console.log("[startExam] _examQuestions:", _examQuestions.length);
@@ -521,9 +521,9 @@
         .select("id").single();
       if (!re) { newResult = data; break; }
       if (re.code === "23505") { tryAttempt++; continue; }
-      alert("Lá»—i táº¡o bÃ i thi: " + re.message); return;
+      alert("LÃ¡Â»â€”i tÃ¡ÂºÂ¡o bÃƒÂ i thi: " + re.message); return;
     }
-    if (!newResult) { alert("KhÃ´ng thá»ƒ táº¡o bÃ i thi, vui lÃ²ng thá»­ láº¡i."); return; }
+    if (!newResult) { alert("KhÃƒÂ´ng thÃ¡Â»Æ’ tÃ¡ÂºÂ¡o bÃƒÂ i thi, vui lÃƒÂ²ng thÃ¡Â»Â­ lÃ¡ÂºÂ¡i."); return; }
     _examResultId = newResult.id;
     console.log("[startExam] result created:", _examResultId, "classId:", classId);
 
@@ -539,14 +539,14 @@
       if (_examSeconds <= 0) { clearInterval(_examTimer); submitExam(true); }
     }, 1000);
   };
-  /* â”€â”€ Render giao diá»‡n thi â€” giá»‘ng há»‡t renderPublicExamUI â”€â”€ */
+  /* Ã¢â€â‚¬Ã¢â€â‚¬ Render giao diÃ¡Â»â€¡n thi Ã¢â‚¬â€ giÃ¡Â»â€˜ng hÃ¡Â»â€¡t renderPublicExamUI Ã¢â€â‚¬Ã¢â€â‚¬ */
   function renderExamUI(overlay, examTitle, durationMin) {
     const SECTION_ORDER  = ["multi_choice","true_false","short_answer","essay"];
     const SECTION_TITLES = {
-      multi_choice: "Pháº§n I. Tráº¯c nghiá»‡m",
-      true_false:   "Pháº§n II. Đ / Sai",
-      short_answer: "Pháº§n III. Tráº£ lá»i ngáº¯n",
-      essay:        "Pháº§n IV. Tá»± luáº­n",
+      multi_choice: "PhÃ¡ÂºÂ§n I. TrÃ¡ÂºÂ¯c nghiÃ¡Â»â€¡m",
+      true_false:   "PhÃ¡ÂºÂ§n II. Ä / Sai",
+      short_answer: "PhÃ¡ÂºÂ§n III. TrÃ¡ÂºÂ£ lÃ¡Â»Âi ngÃ¡ÂºÂ¯n",
+      essay:        "PhÃ¡ÂºÂ§n IV. TÃ¡Â»Â± luÃ¡ÂºÂ­n",
     };
 
     const groups = {};
@@ -556,7 +556,7 @@
       if (groups[t]) groups[t].push(eq);
     });
 
-    /* â”€â”€ Nav: Ã´ trÃ²n sá»‘ â”€â”€ */
+    /* Ã¢â€â‚¬Ã¢â€â‚¬ Nav: ÃƒÂ´ trÃƒÂ²n sÃ¡Â»â€˜ Ã¢â€â‚¬Ã¢â€â‚¬ */
     let navHtml = "", globalNum = 0;
     SECTION_ORDER.forEach(type => {
       if (!groups[type].length) return;
@@ -568,7 +568,7 @@
         globalNum++;
         navHtml += `<div id="nav_${eq.question.id}"
           onclick="window.peScrollToQ('${eq.question.id}')"
-          title="CÃ¢u ${globalNum}"
+          title="CÃƒÂ¢u ${globalNum}"
           style="width:32px;height:32px;border-radius:50%;background:var(--navy);
             color:var(--gold-light);display:flex;align-items:center;justify-content:center;
             font-size:.72rem;font-weight:700;cursor:pointer;position:relative;
@@ -584,7 +584,7 @@
       navHtml += `</div>`;
     });
 
-    /* â”€â”€ CÃ¢u há»i: DOM-based, layout 15 pháº§n ngang â”€â”€ */
+    /* Ã¢â€â‚¬Ã¢â€â‚¬ CÃƒÂ¢u hÃ¡Â»Âi: DOM-based, layout 15 phÃ¡ÂºÂ§n ngang Ã¢â€â‚¬Ã¢â€â‚¬ */
     let sectionsHtml = "";
     const _pendingCards = [];
     globalNum = 0;
@@ -635,7 +635,7 @@
               <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.95rem;
                 padding:8px 8px;border-radius:8px;background:#f0fdf4;color:#15803d;font-weight:700;flex:1 1 0;justify-content:center;min-width:0">
                 <input type="radio" name="tf_${qid}_${lbl}" value="T" onchange="window.peTF('${qid}')"
-                  ${saved.includes(lbl+"T")?"checked":""} style="accent-color:#16a34a"> Đ</label>
+                  ${saved.includes(lbl+"T")?"checked":""} style="accent-color:#16a34a"> Ä</label>
               <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.95rem;
                 padding:8px 8px;border-radius:8px;background:#fef2f2;color:#b91c1c;font-weight:700;flex:1 1 0;justify-content:center;min-width:0">
                 <input type="radio" name="tf_${qid}_${lbl}" value="F" onchange="window.peTF('${qid}')"
@@ -643,14 +643,14 @@
               </div>
             </div>`).join("");
         } else if (type === "short_answer") {
-          ansHtml = `<input type="text" placeholder="Nhập câu trả lời..."
+          ansHtml = `<input type="text" placeholder="Nháº­p cÃ¢u tráº£ lá»i..."
             value="${(_examAnswers[qid]||"").replace(/"/g,"&quot;")}"
             oninput="window._peAnswers('${qid}',this.value)"
             style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;
               font-family:var(--font-body);font-size:.9rem;box-sizing:border-box;outline:none"
             onfocus="this.style.borderColor='var(--navy)'" onblur="this.style.borderColor='var(--border)'">`;
         } else if (type === "essay") {
-          ansHtml = `<textarea placeholder="Viết câu trả lời của bạn..."
+          ansHtml = `<textarea placeholder="Viáº¿t cÃ¢u tráº£ lá»i cá»§a báº¡n..."
             oninput="window._peAnswers('${qid}',this.value)"
             style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;
               font-family:var(--font-body);font-size:.9rem;resize:vertical;min-height:120px;
@@ -668,14 +668,14 @@
         hdr.innerHTML = `
           <span style="width:26px;height:26px;border-radius:50%;background:var(--navy);color:var(--gold-light);
             display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;flex-shrink:0">${globalNum}</span>
-          <span style="font-size:1.1rem;font-weight:700;color:var(--ink-mid)">Câu ${globalNum}</span>
-          <span style="margin-left:auto;font-size:.75rem;color:var(--ink-mid)">${eq.points} điểm</span>`;
+          <span style="font-size:1.1rem;font-weight:700;color:var(--ink-mid)">CÃ¢u ${globalNum}</span>
+          <span style="margin-left:auto;font-size:.75rem;color:var(--ink-mid)">${eq.points} Ä‘iá»ƒm</span>`;
         card.appendChild(hdr);
 
         const body = document.createElement("div");
 
         if (type === "essay") {
-          /* â”€â”€ Essay: layout dá»c â€” cÃ¢u há»i trÃªn, textarea to bÃªn dÆ°á»›i â”€â”€ */
+          /* Ã¢â€â‚¬Ã¢â€â‚¬ Essay: layout dÃ¡Â»Âc Ã¢â‚¬â€ cÃƒÂ¢u hÃ¡Â»Âi trÃƒÂªn, textarea to bÃƒÂªn dÃ†Â°Ã¡Â»â€ºi Ã¢â€â‚¬Ã¢â€â‚¬ */
           body.style.cssText = "display:flex;flex-direction:column;padding:14px 16px;gap:10px";
 
           const qEl = document.createElement("div");
@@ -695,7 +695,7 @@
           body.appendChild(aPart);
 
         } else {
-          /* â”€â”€ Layout 15 pháº§n NGANG: cÃ¢u há»i flex:13, Ä‘Ã¡p Ã¡n flex:2 â”€â”€ */
+          /* Ã¢â€â‚¬Ã¢â€â‚¬ Layout 15 phÃ¡ÂºÂ§n NGANG: cÃƒÂ¢u hÃ¡Â»Âi flex:13, Ã„â€˜ÃƒÂ¡p ÃƒÂ¡n flex:2 Ã¢â€â‚¬Ã¢â€â‚¬ */
           body.style.cssText = "display:flex;flex-direction:row;min-height:100px";
 
           const qPart = document.createElement("div");
@@ -754,28 +754,28 @@
         gap:14px;padding:0 20px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.2)">
         <button id="examExitBtn" onclick="exitExam()" style="background:rgba(255,255,255,.12);
           border:1px solid rgba(255,255,255,.25);color:#fff;padding:5px 12px;border-radius:7px;
-          font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-body)">← Thoát</button>
+          font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-body)">â† ThoÃ¡t</button>
         <span style="font-family:var(--font-display);font-size:1.2rem;flex:1">${examTitle}</span>
         <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);padding:7px 16px;border-radius:8px">
-          <span style="font-size:.8rem;color:rgba(255,255,255,.7)">Thời gian</span>
+          <span style="font-size:.8rem;color:rgba(255,255,255,.7)">Thá»i gian</span>
           <span id="examClock" style="font-size:1.22rem;font-weight:700;font-family:monospace;
             color:var(--gold-light);min-width:72px;text-align:center">${formatClock(_examSeconds)}</span>
         </div>
         <button onclick="submitExam(false)" style="background:var(--gold);color:var(--navy);
           border:none;padding:9px 20px;border-radius:8px;font-size:.95rem;font-weight:700;
-          cursor:pointer;font-family:var(--font-body)">Nộp bài</button>
+          cursor:pointer;font-family:var(--font-body)">Ná»™p bÃ i</button>
       </div>
       <div style="flex:1;display:flex;overflow:hidden;min-height:0">
         <div style="width:120px;flex-shrink:0;background:var(--white);border-right:1px solid var(--border);
           overflow-y:auto;padding:10px 8px">
           <div style="font-size:.82rem;font-weight:700;color:var(--ink-light);text-transform:uppercase;
-            letter-spacing:.05em;margin-bottom:8px">Danh sách câu</div>
+            letter-spacing:.05em;margin-bottom:8px">Danh sÃ¡ch cÃ¢u</div>
           ${navHtml}
           <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
             <button onclick="submitExam(false)"
               style="width:100%;background:var(--navy);color:var(--gold-light);border:none;
               padding:11px;border-radius:8px;font-size:.95rem;font-weight:700;cursor:pointer;
-              font-family:var(--font-body)">Nộp bài</button>
+              font-family:var(--font-body)">Ná»™p bÃ i</button>
           </div>
         </div>
         <div style="flex:1;overflow-y:auto;padding:18px 20px;background:#f8fafc">${sectionsHtml}</div>
@@ -795,7 +795,7 @@
     }
   }
 
-  /* â”€â”€ Helpers Ä‘á»“ng há»“ â”€â”€ */
+  /* Ã¢â€â‚¬Ã¢â€â‚¬ Helpers Ã„â€˜Ã¡Â»â€œng hÃ¡Â»â€œ Ã¢â€â‚¬Ã¢â€â‚¬ */
   function formatClock(secs) {
     const m = String(Math.floor(Math.max(0,secs) / 60)).padStart(2,"0");
     const s = String(Math.max(0,secs) % 60).padStart(2,"0");
@@ -808,7 +808,7 @@
     el.style.color = _examSeconds < 300 ? "#ef4444" : "var(--gold-light)";
   }
 
-  /* â”€â”€ Helpers tÆ°Æ¡ng tÃ¡c â€” pe* (giá»‘ng public_exam.js) â”€â”€ */
+  /* Ã¢â€â‚¬Ã¢â€â‚¬ Helpers tÃ†Â°Ã†Â¡ng tÃƒÂ¡c Ã¢â‚¬â€ pe* (giÃ¡Â»â€˜ng public_exam.js) Ã¢â€â‚¬Ã¢â€â‚¬ */
   window._peAnswers = function(qid, val) { _examAnswers[qid] = val; peUpdateNavDot(qid); };
   window.peTF = function(qid) {
     const radios = document.querySelectorAll(`input[name^="tf_${qid}_"]`);
@@ -843,16 +843,16 @@
   window.peScrollToQ = function(qid) {
     document.getElementById("qcard_" + qid)?.scrollIntoView({ behavior:"smooth", block:"start" });
   };
-  /* Aliases Ä‘á»ƒ _collectAnswersFromDOM khÃ´ng lá»—i */
+  /* Aliases Ã„â€˜Ã¡Â»Æ’ _collectAnswersFromDOM khÃƒÂ´ng lÃ¡Â»â€”i */
   window.updateTF     = window.peTF;
   window.updateMC     = window.peMC;
   window.updateNavDot = peUpdateNavDot;
   window.scrollToQ    = window.peScrollToQ;
   window.refreshMCLabel = window.peRefreshMC;
 
-  /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-     Ná»˜P BÃ€I
-  â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+  /* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+     NÃ¡Â»ËœP BÃƒâ‚¬I
+  Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
   function _collectAnswersFromDOM() {
     const answers = {};
     _examQuestions.forEach(eq => {
@@ -935,7 +935,7 @@
     const { data: eqs, error } = await sb
       .from("exam_questions").select("*, question:question_bank(*)")
       .eq("exam_id", examId).order("order_no");
-    if (error || !eqs?.length) { alert("Lá»—i táº£i Ä‘á»."); return; }
+    if (error || !eqs?.length) { alert("LÃ¡Â»â€”i tÃ¡ÂºÂ£i Ã„â€˜Ã¡Â»Â."); return; }
     _examQuestions = eqs.filter(eq => eq.question !== null);
 
     const { data: savedAnswers } = await sb
@@ -959,7 +959,7 @@
   };
 
   window.submitExam = async function (auto = false) {
-    if (!auto && !confirm("Báº¡n cháº¯c cháº¯n muá»‘n ná»™p bÃ i?")) return;
+    if (!auto && !confirm("BÃ¡ÂºÂ¡n chÃ¡ÂºÂ¯c chÃ¡ÂºÂ¯n muÃ¡Â»â€˜n nÃ¡Â»â„¢p bÃƒÂ i?")) return;
     clearInterval(_examTimer);
     console.log("[submitExam] called, auto:", auto, "_examResultId:", _examResultId);
 
@@ -1039,20 +1039,20 @@
     _examResultId = null;
     const pct   = Math.round((scoreAuto / _examTotal) * 100);
     const color = pct >= 80 ? "var(--green)" : pct >= 50 ? "var(--amber)" : "var(--red)";
-    const msg   = pct >= 80 ? "Xuáº¥t sáº¯c! ðŸŽ‰" : pct >= 50 ? "KhÃ¡ tá»‘t! ðŸ‘" : "Cáº§n cá»‘ gáº¯ng thÃªm ðŸ’ª";
+    const msg   = pct >= 80 ? "XuÃ¡ÂºÂ¥t sÃ¡ÂºÂ¯c! Ã°Å¸Å½â€°" : pct >= 50 ? "KhÃƒÂ¡ tÃ¡Â»â€˜t! Ã°Å¸â€˜Â" : "CÃ¡ÂºÂ§n cÃ¡Â»â€˜ gÃ¡ÂºÂ¯ng thÃƒÂªm Ã°Å¸â€™Âª";
     const scoreDisplay = Math.round(scoreAuto*100)/100;
     const resultHtml =
       '<div style="max-width:480px;width:100%;text-align:center;margin:40px auto">' +
-        '<div style="font-size:4rem;margin-bottom:8px">' + (pct>=80?"ðŸ†":pct>=50?"ðŸ“":"ðŸ“–") + "</div>" +
+        '<div style="font-size:4rem;margin-bottom:8px">' + (pct>=80?"Ã°Å¸Ââ€ ":pct>=50?"Ã°Å¸â€œÂ":"Ã°Å¸â€œâ€“") + "</div>" +
         '<div style="font-family:var(--font-display);font-size:1.5rem;color:var(--navy);margin-bottom:4px">' + msg + "</div>" +
-        '<div style="font-size:.9rem;color:var(--ink-mid);margin-bottom:24px">BÃ i thi Ä‘Ã£ Ä‘Æ°á»£c ná»™p thÃ nh cÃ´ng</div>' +
+        '<div style="font-size:.9rem;color:var(--ink-mid);margin-bottom:24px">BÃƒÂ i thi Ã„â€˜ÃƒÂ£ Ã„â€˜Ã†Â°Ã¡Â»Â£c nÃ¡Â»â„¢p thÃƒÂ nh cÃƒÂ´ng</div>' +
         '<div style="background:var(--white);border-radius:16px;padding:28px;box-shadow:0 8px 30px rgba(0,0,0,.08);margin-bottom:20px">' +
           '<div style="font-size:3rem;font-weight:800;color:' + color + ';line-height:1">' + scoreDisplay + "<span style='font-size:1.4rem'>/" + _examTotal + "</span></div>" +
-          '<div style="font-size:.9rem;color:var(--ink-mid);margin-top:4px">Ä‘iá»ƒm tá»± Ä‘á»™ng</div>' +
-          (hasEssay ? '<div style="margin-top:14px;padding:10px 14px;background:#fef3c7;border-radius:8px;font-size:.82rem;color:#b45309">â³ Pháº§n tá»± luáº­n sáº½ Ä‘Æ°á»£c giÃ¡o viÃªn cháº¥m sau</div>' : "") +
+          '<div style="font-size:.9rem;color:var(--ink-mid);margin-top:4px">Ã„â€˜iÃ¡Â»Æ’m tÃ¡Â»Â± Ã„â€˜Ã¡Â»â„¢ng</div>' +
+          (hasEssay ? '<div style="margin-top:14px;padding:10px 14px;background:#fef3c7;border-radius:8px;font-size:.82rem;color:#b45309">Ã¢ÂÂ³ PhÃ¡ÂºÂ§n tÃ¡Â»Â± luÃ¡ÂºÂ­n sÃ¡ÂºÂ½ Ã„â€˜Ã†Â°Ã¡Â»Â£c giÃƒÂ¡o viÃƒÂªn chÃ¡ÂºÂ¥m sau</div>' : "") +
         "</div>" +
-        '<button onclick="cvGoBackToExams()" style="background:var(--navy);color:var(--gold-light);border:none;padding:12px 32px;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);margin-right:10px">â† Quay láº¡i danh sÃ¡ch Ä‘á» thi</button>' +
-        '<button onclick="cvReviewExamDetail()" style="background:var(--surface);color:var(--navy);border:1.5px solid var(--border);padding:12px 24px;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">ðŸ“‹ Xem láº¡i tá»«ng cÃ¢u</button>' +
+        '<button onclick="cvGoBackToExams()" style="background:var(--navy);color:var(--gold-light);border:none;padding:12px 32px;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);margin-right:10px">Ã¢â€ Â Quay lÃ¡ÂºÂ¡i danh sÃƒÂ¡ch Ã„â€˜Ã¡Â»Â thi</button>' +
+        '<button onclick="cvReviewExamDetail()" style="background:var(--surface);color:var(--navy);border:1.5px solid var(--border);padding:12px 24px;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">Ã°Å¸â€œâ€¹ Xem lÃ¡ÂºÂ¡i tÃ¡Â»Â«ng cÃƒÂ¢u</button>' +
       "</div>";
 
     const doRender = async () => {
@@ -1071,7 +1071,7 @@
         const overlay = getOrCreateOverlay();
         overlay.innerHTML =
           '<div style="height:54px;background:var(--navy);color:#fff;display:flex;align-items:center;gap:12px;padding:0 18px;flex-shrink:0">' +
-            '<span style="font-family:var(--font-display);font-size:1rem;flex:1">Káº¿t quáº£ bÃ i thi</span>' +
+            '<span style="font-family:var(--font-display);font-size:1rem;flex:1">KÃ¡ÂºÂ¿t quÃ¡ÂºÂ£ bÃƒÂ i thi</span>' +
           "</div>" +
           '<div id="cvBody" style="flex:1;overflow-y:auto;padding:40px 24px;background:#f8fafc">' + resultHtml + "</div>";
       }
@@ -1110,8 +1110,8 @@
     const wrap = document.createElement("div");
     const hdr  = document.createElement("div");
     hdr.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:16px";
-    hdr.innerHTML = '<button onclick="cvGoBackToExams()" class="btn btn-outline btn-sm">â† Quay láº¡i</button>'
-      + '<div style="font-weight:700;font-size:.95rem;color:var(--navy)">Xem láº¡i bÃ i thi</div>';
+    hdr.innerHTML = '<button onclick="cvGoBackToExams()" class="btn btn-outline btn-sm">← Quay lại</button>'
+      + '<div style="font-weight:700;font-size:.95rem;color:var(--navy)">Xem lại bài thi</div>';
     wrap.appendChild(hdr);
 
     const sortedEqs = (eqs||[]).slice().sort((a,b)=>(a.order_no??0)-(b.order_no??0)).filter(eq=>eq.question);
@@ -1133,5 +1133,7 @@
   };
 
 })();
+
+
 
 
