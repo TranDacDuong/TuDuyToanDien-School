@@ -141,6 +141,22 @@ aside li.active {
   background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
   color: var(--navy); font-weight: 700;
 }
+.menu-label { flex: 1; }
+.menu-badge {
+  display: none;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: .72rem;
+  font-weight: 700;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.menu-badge.show { display: inline-flex; }
 
 /* Overlay mờ khi sidebar mở */
 #sidebarOverlay {
@@ -198,16 +214,16 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   </div>
 
   <ul id="menu">
-    <li data-role="admin,teacher,student" data-page="home.html">🏠 Trang chủ</li>
-    <li data-role="admin,teacher,student" data-page="friend_requests.html">🤝 Lời mời kết bạn</li>
-    <li data-role="admin,teacher,student" data-page="class.html">📘 Lớp học</li>
-    <li data-role="admin,teacher,student" data-page="public_exam.html">🎯 Đề thi</li>
-    <li data-role="admin,teacher"         data-page="question.html">📝 Ngân hàng câu hỏi</li>
-    <li data-role="admin,teacher"         data-page="exam.html">📄 Đề kiểm tra</li>
-    <li data-role="admin,student"         data-page="tuition.html">💰 Học phí</li>
-    <li data-role="admin"                 data-page="sourcedata.html">⚙️ Hệ thống</li>
-    <li data-role="admin,teacher,student" data-page="profile.html">🪪 Trang cá nhân</li>
-    <li data-role="admin,teacher,student" data-page="account.html">👤 Tài khoản</li>
+    <li data-role="admin,teacher,student" data-page="home.html"><span class="menu-label">🏠 Trang chủ</span></li>
+    <li data-role="admin,teacher,student" data-page="friend_requests.html"><span class="menu-label">🤝 Lời mời kết bạn</span><span class="menu-badge" id="friendRequestBadge">0</span></li>
+    <li data-role="admin,teacher,student" data-page="class.html"><span class="menu-label">📘 Lớp học</span></li>
+    <li data-role="admin,teacher,student" data-page="public_exam.html"><span class="menu-label">🎯 Đề thi</span></li>
+    <li data-role="admin,teacher"         data-page="question.html"><span class="menu-label">📝 Ngân hàng câu hỏi</span></li>
+    <li data-role="admin,teacher"         data-page="exam.html"><span class="menu-label">📄 Đề kiểm tra</span></li>
+    <li data-role="admin,student"         data-page="tuition.html"><span class="menu-label">💰 Học phí</span></li>
+    <li data-role="admin"                 data-page="sourcedata.html"><span class="menu-label">⚙️ Hệ thống</span></li>
+    <li data-role="admin,teacher,student" data-page="profile.html"><span class="menu-label">🪪 Trang cá nhân</span></li>
+    <li data-role="admin,teacher,student" data-page="account.html"><span class="menu-label">👤 Tài khoản</span></li>
   </ul>
 </aside>
 
@@ -276,6 +292,7 @@ async function initDashboard(){
   setupMenu();
   checkProfile(profile);
   loadUserInfo(profile);
+  loadFriendRequestBadge(user.id);
   document.body.style.visibility = "visible";
 }
 
@@ -325,6 +342,26 @@ function goToAccount(){
       item.click();
     }
   });
+}
+
+async function loadFriendRequestBadge(userId){
+  const badge = document.getElementById("friendRequestBadge");
+  if(!badge) return;
+
+  const { count, error } = await sb
+    .from("friend_requests")
+    .select("*", { count: "exact", head: true })
+    .eq("receiver_id", userId)
+    .eq("status", "pending");
+
+  if(error || !count){
+    badge.classList.remove("show");
+    badge.textContent = "0";
+    return;
+  }
+
+  badge.textContent = count > 99 ? "99+" : String(count);
+  badge.classList.add("show");
 }
 
 initDashboard();
