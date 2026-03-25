@@ -87,6 +87,10 @@ display:flex;
 flex-direction:column;
 }
 
+.form-group.full{
+grid-column:1 / -1;
+}
+
 label{
 font-weight:600;
 margin-bottom:6px;
@@ -94,7 +98,7 @@ font-size:14px;
 color:#475569;
 }
 
-input,select{
+input,select,textarea{
 padding:11px;
 border:1px solid #e2e8f0;
 border-radius:8px;
@@ -102,7 +106,13 @@ font-size:14px;
 background:#fafafa;
 }
 
-input:focus,select:focus{
+textarea{
+font-family:'Inter',sans-serif;
+resize:vertical;
+min-height:110px;
+}
+
+input:focus,select:focus,textarea:focus{
 outline:none;
 border-color:#2563eb;
 background:white;
@@ -276,6 +286,11 @@ transform:translateY(0);
 <input id="school">
 </div>
 
+<div class="form-group full">
+<label>Giới thiệu bản thân</label>
+<textarea id="bio" placeholder="Viết vài dòng giới thiệu về bạn..."></textarea>
+</div>
+
 </div>
 
 <button onclick="saveProfile()">Lưu thông tin</button>
@@ -340,6 +355,7 @@ document.getElementById("phone").value=data.phone ?? "";
 document.getElementById("birthYear").value=data.birth_year ?? "";
 document.getElementById("province").value=data.province ?? "";
 document.getElementById("school").value=data.school ?? "";
+document.getElementById("bio").value=data.bio ?? "";
 
 if(data.avatar_url){
 document.getElementById("avatarPreview").src=data.avatar_url;
@@ -354,6 +370,7 @@ const phone=document.getElementById("phone").value.trim();
 const birthYear=parseInt(document.getElementById("birthYear").value);
 const province=document.getElementById("province").value;
 const school=document.getElementById("school").value;
+const bio=document.getElementById("bio").value.trim();
 
 if(!fullName || !phone || !birthYear){
 alert("Vui lòng nhập đầy đủ thông tin");
@@ -367,7 +384,8 @@ full_name:fullName,
 phone:phone,
 birth_year:birthYear,
 province:province,
-school:school
+school:school,
+bio:bio
 })
 .eq("id",currentUser.id);
 
