@@ -249,3 +249,24 @@ CREATE TABLE public.users (
   subject text,
   CONSTRAINT users_pkey PRIMARY KEY (id)
 );
+
+-- ============================================
+-- Notifications feature migration
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  actor_id uuid,
+  type text NOT NULL CHECK (type IN ('friend_request', 'friend_accept', 'post_like', 'post_comment', 'post_approved', 'post_rejected')),
+  ref_id uuid,
+  message text,
+  is_read boolean NOT NULL DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT notifications_pkey PRIMARY KEY (id),
+  CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE,
+  CONSTRAINT notifications_actor_id_fkey FOREIGN KEY (actor_id) REFERENCES public.users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS notifications_user_read_created_idx
+  ON public.notifications (user_id, is_read, created_at DESC);

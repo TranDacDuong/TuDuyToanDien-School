@@ -233,6 +233,11 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
   gap: 8px;
   flex-wrap: wrap;
 }
+.edit-media-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
 .cmt-input-row {
   display: flex; align-items: center; gap: 8px; padding-top: 10px;
@@ -303,6 +308,17 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
 <script>
 let currentUser, role, currentProfile;
 let friendIds = new Set();
+
+async function createNotification(userId, type, message, refId) {
+  if (!userId || userId === currentUser.id) return;
+  await sb.from("notifications").insert({
+    user_id: userId,
+    actor_id: currentUser.id,
+    type,
+    ref_id: refId || null,
+    message
+  });
+}
 
 window.previewPostImage = function(event) {
   const file = event.target.files?.[0];
@@ -473,11 +489,14 @@ function buildCard(post) {
     <div class="edit-box" id="edit_${post.id}">
       <textarea class="edit-textarea" id="editContent_${post.id}">${esc(post.content)}</textarea>
       <div class="edit-tools">
-        <select class="compose-select" id="editVisibility_${post.id}">
-          <option value="public" ${post.visibility === "public" ? "selected" : ""}>Công khai</option>
-          <option value="friends" ${post.visibility === "friends" ? "selected" : ""}>Bạn bè</option>
-          <option value="private" ${post.visibility === "private" ? "selected" : ""}>Riêng tư</option>
-        </select>
+        <div class="edit-media-actions">
+          <select class="compose-select" id="editVisibility_${post.id}">
+            <option value="public" ${post.visibility === "public" ? "selected" : ""}>Công khai</option>
+            <option value="friends" ${post.visibility === "friends" ? "selected" : ""}>Bạn bè</option>
+            <option value="private" ${post.visibility === "private" ? "selected" : ""}>Riêng tư</option>
+          </select>
+          ${(post.post_media || []).some(item => item.file_type === "image") ? `<button class="btn btn-outline btn-sm" onclick="removePostImage('${post.id}')">Xóa ảnh</button>` : ""}
+        </div>
         <div class="edit-actions">
           <button class="btn btn-outline btn-sm" onclick="toggleEditPost('${post.id}')">Hủy</button>
           <button class="btn btn-primary btn-sm" onclick="savePostEdit('${post.id}')">Lưu thay đổi</button>
@@ -552,12 +571,33 @@ window.savePostEdit = async function(pid) {
   loadPosts();
 };
 
+window.removePostImage = async function(pid) {
+  if (!confirm("Bạn có chắc muốn xóa ảnh đính kèm khỏi bài viết không?")) return;
+
+  const { error } = await sb
+    .from("post_media")
+    .delete()
+    .eq("post_id", pid)
+    .eq("file_type", "image");
+
+  if (error) {
+    alert("Lỗi khi xóa ảnh bài viết: " + error.message);
+    return;
+  }
+
+  loadPosts();
+};
+
 window.likePost = async function(pid) {
   const { error } = await sb.from("likes").insert({ post_id: pid, user_id: currentUser.id });
   if (error) return;
   const el = document.getElementById("likeCount_" + pid);
   if (el) el.textContent = parseInt(el.textContent) + 1;
   document.getElementById("likeBtn_" + pid)?.classList.add("liked");
+  const { data: post } = await sb.from("posts").select("user_id").eq("id", pid).maybeSingle();
+  if (post?.user_id) {
+    await createNotification(post.user_id, "post_like", (currentProfile?.full_name || currentUser.email || "Một người dùng") + " đã thích bài viết của bạn.", pid);
+  }
 };
 
 window.pinPost = async function(pid) {
@@ -568,8 +608,16 @@ window.pinPost = async function(pid) {
 
 window.moderatePost = async function(pid, status) {
   if (!confirm(status === "approved" ? "Duyệt bài này?" : "Từ chối bài này?")) return;
-  const { error } = await sb.from("posts").update({ status }).eq("id", pid);
+  const { data: updatedPost, error } = await sb.from("posts").update({ status }).eq("id", pid).select("user_id").single();
   if (error) { alert("Lỗi: " + error.message); return; }
+  if (updatedPost?.user_id) {
+    await createNotification(
+      updatedPost.user_id,
+      status === "approved" ? "post_approved" : "post_rejected",
+      status === "approved" ? "Bài viết của bạn đã được duyệt." : "Bài viết của bạn đã bị từ chối.",
+      pid
+    );
+  }
   loadPosts();
 };
 
@@ -588,6 +636,10 @@ window.commentPost = async function(pid) {
   if (!txt) return;
   await sb.from("comments").insert({ post_id: pid, user_id: currentUser.id, content: txt });
   inp.value = "";
+  const { data: post } = await sb.from("posts").select("user_id").eq("id", pid).maybeSingle();
+  if (post?.user_id) {
+    await createNotification(post.user_id, "post_comment", (currentProfile?.full_name || currentUser.email || "Một người dùng") + " đã bình luận vào bài viết của bạn.", pid);
+  }
   loadComments(pid);
 };
 

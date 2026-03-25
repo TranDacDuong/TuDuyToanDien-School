@@ -407,6 +407,17 @@ let currentUser = null;
 let viewedProfile = null;
 let viewedUserId = null;
 
+async function createNotification(userId, type, message, refId) {
+  if (!userId || userId === currentUser.id) return;
+  await sb.from("notifications").insert({
+    user_id: userId,
+    actor_id: currentUser.id,
+    type,
+    ref_id: refId || null,
+    message
+  });
+}
+
 async function init() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) {
@@ -548,6 +559,7 @@ async function setupFriendButton() {
       btn.disabled = false;
       return;
     }
+    await createNotification(viewedProfile.id, "friend_request", (currentUser.email || "Một người dùng") + " đã gửi cho bạn lời mời kết bạn.", null);
     btn.textContent = "Đã gửi lời mời";
     btn.className = "btn btn-outline";
   };
@@ -574,6 +586,7 @@ window.acceptFriendRequest = async function(requestId) {
     alert("Đã duyệt lời mời nhưng tạo quan hệ bạn bè lỗi: " + friendError.message);
     return;
   }
+  await createNotification(viewedProfile.id, "friend_accept", (currentUser.email || "Một người dùng") + " đã chấp nhận lời mời kết bạn của bạn.", null);
 
   const actionBox = document.getElementById("actionBox");
   actionBox.innerHTML = '<button class="btn btn-outline" type="button" disabled>Bạn bè</button><a class="btn btn-outline" href="home.html">Về bảng tin</a>';

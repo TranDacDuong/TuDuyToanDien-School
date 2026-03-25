@@ -152,6 +152,17 @@ body {
 <script>
 let currentUser = null;
 
+async function createNotification(userId, type, message, refId) {
+  if (!userId || userId === currentUser.id) return;
+  await sb.from("notifications").insert({
+    user_id: userId,
+    actor_id: currentUser.id,
+    type,
+    ref_id: refId || null,
+    message
+  });
+}
+
 async function init() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) {
@@ -253,6 +264,7 @@ window.acceptRequest = async function(requestId, senderId) {
     alert("Đã duyệt lời mời nhưng tạo quan hệ bạn bè lỗi: " + friendError.message);
     return;
   }
+  await createNotification(senderId, "friend_accept", "Lời mời kết bạn của bạn đã được chấp nhận.", null);
 
   await Promise.all([loadIncoming(), loadOutgoing()]);
 };

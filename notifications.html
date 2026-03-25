@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Thông báo</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-body); background: var(--cream); color: var(--ink); }
+.page { max-width: 920px; margin: 0 auto; padding: 28px 20px 48px; }
+.header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.list { display: flex; flex-direction: column; gap: 14px; }
+.card { background: var(--white); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow-sm); padding: 16px; }
+.card.unread { border-color: var(--gold-border); box-shadow: 0 0 0 1px rgba(200,150,42,.22), var(--shadow-sm); }
+.row { display: flex; gap: 12px; align-items: flex-start; }
+.avatar { width: 46px; height: 46px; border-radius: 14px; object-fit: cover; border: 2px solid var(--gold-border); background: var(--surface); }
+.title { font-weight: 700; color: var(--navy); font-size: .92rem; }
+.message { margin-top: 6px; color: var(--ink-mid); font-size: .88rem; line-height: 1.6; }
+.meta { margin-top: 4px; color: var(--ink-light); font-size: .78rem; }
+.actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+.empty { background: var(--white); border: 1px solid var(--border); border-radius: 18px; padding: 22px; text-align: center; color: var(--ink-light); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div>
+      <h1>Thông báo</h1>
+      <p>Những hoạt động mới liên quan đến tài khoản của bạn.</p>
+    </div>
+    <button class="btn btn-outline" onclick="markAllRead()">Đánh dấu đã đọc</button>
+  </div>
+  <div id="notificationList" class="list">
+    <div class="empty">Đang tải thông báo...</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script>
+let currentUser = null;
+
+async function init() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) {
+    location.href = "index.html";
+    return;
+  }
+  currentUser = user;
+  await loadNotifications();
+}
+
+async function loadNotifications() {
+  const { data, error } = await sb
+    .from("notifications")
+    .select("id, type, ref_id, message, is_read, created_at, actor_id, users!notifications_actor_id_fkey(full_name, avatar_url)")
+    .eq("user_id", currentUser.id)
+    .order("created_at", { ascending: false });
+
+  const wrap = document.getElementById("notificationList");
+  if (error) {
+    wrap.innerHTML = '<div class="empty">Không tải được thông báo.</div>';
+    return;
+  }
+  if (!data || !data.length) {
+    wrap.innerHTML = '<div class="empty">Bạn chưa có thông báo nào.</div>';
+    return;
+  }
+
+  wrap.innerHTML = data.map(item => `
+    <div class="card ${item.is_read ? "" : "unread"}">
+      <div class="row">
+        <img class="avatar" src="${item.users?.avatar_url || "default-avatar.png"}" alt="Avatar" onerror="this.src='default-avatar.png'">
+        <div style="flex:1">
+          <div class="title">${esc(item.users?.full_name || "Hệ thống")}</div>
+          <div class="message">${esc(item.message || formatType(item.type))}</div>
+          <div class="meta">${formatTime(item.created_at)}</div>
+          <div class="actions">
+            ${buildLink(item)}
+            ${item.is_read ? "" : `<button class="btn btn-outline btn-sm" onclick="markRead('${item.id}')">Đã đọc</button>`}
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function buildLink(item) {
+  if (item.type === "friend_request" || item.type === "friend_accept") {
+    return `<a class="btn btn-outline btn-sm" href="friend_requests.html">Mở lời mời</a>`;
+  }
+  if (item.actor_id) {
+    return `<a class="btn btn-outline btn-sm" href="profile.html?id=${item.actor_id}">Xem hồ sơ</a>`;
+  }
+  return "";
+}
+
+window.markRead = async function(id) {
+  await sb.from("notifications").update({ is_read: true }).eq("id", id);
+  loadNotifications();
+};
+
+window.markAllRead = async function() {
+  await sb.from("notifications").update({ is_read: true }).eq("user_id", currentUser.id).eq("is_read", false);
+  loadNotifications();
+};
+
+function formatType(type) {
+  if (type === "friend_request") return "đã gửi cho bạn một lời mời kết bạn.";
+  if (type === "friend_accept") return "đã chấp nhận lời mời kết bạn.";
+  if (type === "post_like") return "đã thích bài viết của bạn.";
+  if (type === "post_comment") return "đã bình luận vào bài viết của bạn.";
+  if (type === "post_approved") return "đã duyệt bài viết của bạn.";
+  if (type === "post_rejected") return "đã từ chối bài viết của bạn.";
+  return "Bạn có một thông báo mới.";
+}
+
+function formatTime(value) {
+  return new Date(value).toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function esc(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+init();
+</script>
+</body>
+</html>
