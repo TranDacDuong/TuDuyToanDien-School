@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Tìm kiếm</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: linear-gradient(180deg, #f7f2e8 0%, var(--cream) 40%, #f9fbff 100%);
+  color: var(--ink);
+}
+.page {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 28px 20px 48px;
+}
+.hero {
+  background: linear-gradient(135deg, rgba(15,31,61,.98) 0%, rgba(31,65,128,.95) 58%, rgba(200,150,42,.9) 100%);
+  border-radius: 24px;
+  color: #fff;
+  padding: 26px;
+  box-shadow: var(--shadow-lg);
+}
+.hero h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 2rem;
+}
+.hero p {
+  margin: 10px 0 0;
+  color: rgba(255,255,255,.82);
+  max-width: 720px;
+  line-height: 1.7;
+}
+.search-panel {
+  margin-top: 18px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  box-shadow: var(--shadow-sm);
+  padding: 18px;
+}
+.search-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.search-input {
+  flex: 1;
+  min-width: 260px;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 13px 15px;
+  font-family: var(--font-body);
+  font-size: .94rem;
+  background: var(--white);
+}
+.search-input:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 4px rgba(200,150,42,.1);
+}
+.search-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.tabs {
+  display: inline-flex;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.tab-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-mid);
+  border-radius: 999px;
+  padding: 9px 14px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  cursor: pointer;
+  transition: .15s;
+}
+.tab-btn.active {
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
+  border-color: transparent;
+  color: var(--navy);
+}
+.meta-line {
+  margin-top: 14px;
+  color: var(--ink-light);
+  font-size: .83rem;
+}
+.result-grid {
+  display: grid;
+  grid-template-columns: 320px minmax(0,1fr);
+  gap: 18px;
+  margin-top: 22px;
+}
+.card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.card-head {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--surface);
+}
+.card-title {
+  font-family: var(--font-display);
+  color: var(--navy);
+  font-size: 1.08rem;
+}
+.card-sub {
+  margin-top: 4px;
+  color: var(--ink-light);
+  font-size: .78rem;
+}
+.card-body {
+  padding: 18px 20px 20px;
+}
+.tips {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tip {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+  background: linear-gradient(180deg, #fff 0%, #fbfbfe 100%);
+}
+.tip-title {
+  font-weight: 700;
+  color: var(--navy);
+  font-size: .88rem;
+}
+.tip-text {
+  margin-top: 6px;
+  color: var(--ink-mid);
+  font-size: .82rem;
+  line-height: 1.6;
+}
+.result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.empty, .loading {
+  padding: 20px;
+  text-align: center;
+  color: var(--ink-light);
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.user-item {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 16px;
+  background: linear-gradient(180deg, #fff 0%, #fbfbff 100%);
+}
+.user-avatar {
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  object-fit: cover;
+  border: 2px solid var(--gold-border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.user-main {
+  flex: 1;
+  min-width: 0;
+}
+.user-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.user-name {
+  color: var(--navy);
+  font-weight: 700;
+  font-size: 1rem;
+  text-decoration: none;
+}
+.user-name:hover { text-decoration: underline; }
+.role-chip {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--gold-pale);
+  color: var(--gold);
+  border: 1px solid var(--gold-border);
+  font-size: .73rem;
+  font-weight: 700;
+}
+.user-meta {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.user-meta span {
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--ink-mid);
+  font-size: .76rem;
+  padding: 6px 10px;
+}
+.user-bio {
+  margin-top: 10px;
+  color: var(--ink);
+  font-size: .86rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+.user-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.post-item {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #fff 0%, #fcfcfe 100%);
+}
+.post-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 18px 0;
+}
+.post-author {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.post-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  object-fit: cover;
+  border: 2px solid var(--gold-border);
+  background: var(--surface);
+}
+.post-author-name {
+  color: var(--navy);
+  font-weight: 700;
+  font-size: .9rem;
+  text-decoration: none;
+}
+.post-author-name:hover { text-decoration: underline; }
+.post-time {
+  margin-top: 3px;
+  color: var(--ink-light);
+  font-size: .76rem;
+}
+.post-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.post-body {
+  padding: 12px 18px 16px;
+  color: var(--ink);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.post-media {
+  padding: 0 18px 16px;
+}
+.post-media img {
+  width: 100%;
+  max-height: 360px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.post-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  border-top: 1px solid var(--surface);
+  padding: 14px 18px 16px;
+  color: var(--ink-mid);
+  font-size: .83rem;
+}
+.post-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+@media (max-width: 900px) {
+  .result-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .page { padding: 18px 12px 34px; }
+  .hero { padding: 20px; }
+  .hero h1 { font-size: 1.55rem; }
+  .search-row { flex-direction: column; align-items: stretch; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <section class="hero">
+    <h1>Tìm kiếm</h1>
+    <p>Tìm người dùng và bài viết trong hệ thống. Kết quả sẽ tự lọc theo những gì bạn có quyền xem.</p>
+  </section>
+
+  <section class="search-panel">
+    <div class="search-row">
+      <input id="keywordInput" class="search-input" placeholder="Nhập tên người dùng, trường học hoặc nội dung bài viết...">
+      <div class="search-actions">
+        <button class="btn btn-primary" onclick="performSearch()">Tìm kiếm</button>
+        <button class="btn btn-outline" onclick="resetSearch()">Xóa</button>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="all" onclick="setTab('all')">Tất cả</button>
+      <button class="tab-btn" data-tab="users" onclick="setTab('users')">Người dùng</button>
+      <button class="tab-btn" data-tab="posts" onclick="setTab('posts')">Bài viết</button>
+    </div>
+    <div id="metaLine" class="meta-line">Nhập từ khóa để bắt đầu tìm kiếm.</div>
+  </section>
+
+  <section class="result-grid">
+    <aside class="card">
+      <div class="card-head">
+        <div class="card-title">Gợi ý tìm kiếm</div>
+        <div class="card-sub">Một vài cách tìm nhanh trong hệ thống</div>
+      </div>
+      <div class="card-body">
+        <div class="tips">
+          <div class="tip">
+            <div class="tip-title">Tìm người dùng</div>
+            <div class="tip-text">Thử nhập tên, trường học, tỉnh thành hoặc vai trò như giáo viên, học sinh.</div>
+          </div>
+          <div class="tip">
+            <div class="tip-title">Tìm bài viết</div>
+            <div class="tip-text">Nhập từ khóa xuất hiện trong nội dung bài viết để mở nhanh sang trang chi tiết.</div>
+          </div>
+          <div class="tip">
+            <div class="tip-title">Lọc kết quả</div>
+            <div class="tip-text">Dùng các tab phía trên để chỉ xem người dùng hoặc chỉ xem bài viết.</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Kết quả</div>
+        <div class="card-sub">Danh sách phù hợp với từ khóa bạn đang tìm</div>
+      </div>
+      <div class="card-body">
+        <div id="resultList" class="result-list">
+          <div class="empty">Chưa có kết quả nào. Hãy nhập từ khóa rồi bấm tìm kiếm.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script>
+let currentUser = null;
+let currentProfile = null;
+let activeTab = "all";
+let friendIds = new Set();
+
+async function init() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) {
+    location.href = "index.html";
+    return;
+  }
+
+  currentUser = user;
+  const { data: profile } = await sb.from("users").select("*").eq("id", user.id).single();
+  currentProfile = profile;
+  await loadFriendIds();
+
+  const keyword = new URLSearchParams(location.search).get("q");
+  if (keyword) {
+    document.getElementById("keywordInput").value = keyword;
+    await performSearch();
+  }
+}
+
+async function loadFriendIds() {
+  const { data } = await sb
+    .from("friendships")
+    .select("friend_id")
+    .eq("user_id", currentUser.id);
+  friendIds = new Set((data || []).map(item => item.friend_id));
+}
+
+window.setTab = function(tab) {
+  activeTab = tab;
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.tab === tab);
+  });
+  performSearch();
+};
+
+window.resetSearch = function() {
+  document.getElementById("keywordInput").value = "";
+  document.getElementById("metaLine").textContent = "Nhập từ khóa để bắt đầu tìm kiếm.";
+  document.getElementById("resultList").innerHTML = '<div class="empty">Chưa có kết quả nào. Hãy nhập từ khóa rồi bấm tìm kiếm.</div>';
+};
+
+window.performSearch = async function() {
+  const keyword = document.getElementById("keywordInput").value.trim();
+  const resultList = document.getElementById("resultList");
+  const metaLine = document.getElementById("metaLine");
+
+  if (!keyword) {
+    resultList.innerHTML = '<div class="empty">Hãy nhập từ khóa để tìm kiếm.</div>';
+    metaLine.textContent = "Hãy nhập ít nhất một từ khóa.";
+    return;
+  }
+
+  resultList.innerHTML = '<div class="loading">Đang tìm kiếm...</div>';
+
+  const parts = [];
+  if (activeTab === "all" || activeTab === "users") {
+    const users = await searchUsers(keyword);
+    if (users.length) {
+      parts.push(renderSectionTitle("Người dùng"));
+      parts.push(users.map(renderUserItem).join(""));
+    }
+  }
+
+  if (activeTab === "all" || activeTab === "posts") {
+    const posts = await searchPosts(keyword);
+    if (posts.length) {
+      parts.push(renderSectionTitle("Bài viết"));
+      parts.push(posts.map(renderPostItem).join(""));
+    }
+  }
+
+  if (!parts.length) {
+    resultList.innerHTML = '<div class="empty">Không tìm thấy kết quả phù hợp.</div>';
+    metaLine.textContent = 'Không có kết quả cho từ khóa "' + keyword + '".';
+    return;
+  }
+
+  resultList.innerHTML = parts.join("");
+  metaLine.textContent = 'Đang hiển thị kết quả cho từ khóa "' + keyword + '".';
+};
+
+async function searchUsers(keyword) {
+  const lowerKeyword = keyword.toLowerCase();
+  const { data, error } = await sb
+    .from("users")
+    .select("id, full_name, avatar_url, role, school, province, bio")
+    .or([
+      "full_name.ilike.%" + keyword + "%",
+      "school.ilike.%" + keyword + "%",
+      "province.ilike.%" + keyword + "%"
+    ].join(","))
+    .limit(12);
+
+  if (error) return [];
+
+  return (data || []).filter(item => {
+    const roleText = formatRole(item.role).toLowerCase();
+    if (roleText.includes(lowerKeyword)) return true;
+    return true;
+  });
+}
+
+async function searchPosts(keyword) {
+  const { data, error } = await sb
+    .from("posts")
+    .select(`
+      id,
+      user_id,
+      content,
+      created_at,
+      visibility,
+      is_pinned,
+      users(full_name, avatar_url),
+      likes(count),
+      comments(count),
+      post_media(file_url, file_type, sort_order)
+    `)
+    .eq("status", "approved")
+    .ilike("content", "%" + keyword + "%")
+    .order("created_at", { ascending: false })
+    .limit(12);
+
+  if (error) return [];
+
+  return (data || []).filter(canViewPost);
+}
+
+function canViewPost(post) {
+  if (post.user_id === currentUser.id) return true;
+  if (!post.visibility || post.visibility === "public") return true;
+  if (post.visibility === "friends" && friendIds.has(post.user_id)) return true;
+  return false;
+}
+
+function renderSectionTitle(title) {
+  return '<div class="card-title" style="margin:4px 0 2px;">' + esc(title) + '</div>';
+}
+
+function renderUserItem(user) {
+  const meta = [];
+  if (user.school) meta.push('<span>' + esc(user.school) + '</span>');
+  if (user.province) meta.push('<span>' + esc(user.province) + '</span>');
+
+  return `
+    <article class="user-item">
+      <img class="user-avatar" src="${safeUrl(user.avatar_url || "default-avatar.png")}" alt="Avatar" onerror="this.src='default-avatar.png'">
+      <div class="user-main">
+        <div class="user-top">
+          <a class="user-name" href="profile.html?id=${user.id}">${esc(user.full_name || "Người dùng")}</a>
+          <span class="role-chip">${esc(formatRole(user.role))}</span>
+        </div>
+        ${meta.length ? `<div class="user-meta">${meta.join("")}</div>` : ""}
+        ${user.bio ? `<div class="user-bio">${esc(user.bio)}</div>` : ""}
+        <div class="user-actions">
+          <a class="btn btn-outline" href="profile.html?id=${user.id}">Xem hồ sơ</a>
+          ${user.id !== currentUser.id ? `<a class="btn btn-outline" href="messages.html?user=${user.id}">Nhắn tin</a>` : ""}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderPostItem(post) {
+  const badges = [];
+  if (post.is_pinned) badges.push('<span class="badge badge-gold">Đã ghim</span>');
+  if (!post.visibility || post.visibility === "public") badges.push('<span class="badge badge-blue">Công khai</span>');
+  if (post.visibility === "friends") badges.push('<span class="badge badge-blue">Bạn bè</span>');
+  if (post.visibility === "private") badges.push('<span class="badge badge-navy">Riêng tư</span>');
+
+  const firstImage = (post.post_media || [])
+    .filter(item => item.file_type === "image")
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))[0];
+
+  return `
+    <article class="post-item">
+      <div class="post-head">
+        <div class="post-author">
+          <img class="post-avatar" src="${safeUrl(post.users?.avatar_url || "default-avatar.png")}" alt="Avatar" onerror="this.src='default-avatar.png'">
+          <div>
+            <a class="post-author-name" href="profile.html?id=${post.user_id}">${esc(post.users?.full_name || "Người dùng")}</a>
+            <div class="post-time">${formatTime(post.created_at)}</div>
+          </div>
+        </div>
+        <div class="post-badges">${badges.join("")}</div>
+      </div>
+      <div class="post-body">${esc(post.content || "")}</div>
+      ${firstImage ? `<div class="post-media"><img src="${safeUrl(firstImage.file_url)}" alt="Ảnh bài viết"></div>` : ""}
+      <div class="post-foot">
+        <span>${post.likes?.[0]?.count || 0} lượt thích • ${post.comments?.[0]?.count || 0} bình luận</span>
+        <div class="post-actions">
+          <a class="btn btn-outline" href="post.html?id=${post.id}">Mở bài viết</a>
+          <a class="btn btn-outline" href="profile.html?id=${post.user_id}">Xem tác giả</a>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+document.getElementById("keywordInput").addEventListener("keydown", function(event) {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    performSearch();
+  }
+});
+
+function formatRole(role) {
+  if (role === "admin") return "Quản trị viên";
+  if (role === "teacher") return "Giáo viên";
+  if (role === "student") return "Học sinh";
+  return "Thành viên";
+}
+
+function formatTime(value) {
+  return new Date(value).toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function esc(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function safeUrl(value) {
+  return String(value || "").replace(/"/g, "&quot;");
+}
+
+init();
+</script>
+</body>
+</html>
