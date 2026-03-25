@@ -95,6 +95,9 @@ function buildLink(item) {
   if (item.type === "message_new") {
     return `<a class="btn btn-outline btn-sm" href="messages.html?user=${item.actor_id}">Mở chat</a>`;
   }
+  if (item.type === "post_like" || item.type === "post_comment" || item.type === "post_approved" || item.type === "post_rejected") {
+    return `<a class="btn btn-outline btn-sm" href="post.html?id=${item.ref_id}">Mở bài viết</a>`;
+  }
   if (item.actor_id) {
     return `<a class="btn btn-outline btn-sm" href="profile.html?id=${item.actor_id}">Xem hồ sơ</a>`;
   }

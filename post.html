@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Chi tiết bài viết</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-body); background: var(--cream); color: var(--ink); }
+.page { max-width: 860px; margin: 0 auto; padding: 28px 20px 48px; }
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+.card { background: var(--white); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow-sm); overflow: hidden; }
+.post-head { display: flex; gap: 12px; align-items: center; padding: 18px 20px 0; }
+.avatar { width: 48px; height: 48px; border-radius: 16px; object-fit: cover; border: 2px solid var(--gold-border); background: var(--surface); }
+.author { font-weight: 700; color: var(--navy); font-size: .92rem; }
+.meta { color: var(--ink-light); font-size: .78rem; margin-top: 3px; }
+.badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.post-body { padding: 14px 20px 16px; white-space: pre-wrap; word-break: break-word; line-height: 1.7; font-size: .92rem; }
+.media-wrap { padding: 0 20px 16px; }
+.media-img { width: 100%; max-height: 460px; object-fit: cover; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); }
+.stats { display: flex; gap: 16px; flex-wrap: wrap; padding: 14px 20px 16px; border-top: 1px solid var(--surface); color: var(--ink-mid); font-size: .85rem; }
+.comment-section { margin-top: 20px; }
+.comment-list { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+.comment-card { background: var(--white); border: 1px solid var(--border); border-radius: 16px; padding: 14px; box-shadow: var(--shadow-sm); }
+.comment-row { display: flex; gap: 10px; align-items: flex-start; }
+.comment-avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border); background: var(--surface); }
+.comment-name { font-weight: 700; color: var(--navy); font-size: .83rem; }
+.comment-text { margin-top: 4px; color: var(--ink); font-size: .86rem; line-height: 1.6; white-space: pre-wrap; }
+.comment-time { margin-top: 6px; color: var(--ink-light); font-size: .74rem; }
+.reply-list { margin-top: 10px; margin-left: 44px; display: flex; flex-direction: column; gap: 10px; }
+.reply-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px; }
+.composer { margin-top: 16px; display: flex; gap: 10px; align-items: center; }
+.composer input { flex: 1; }
+.empty, .error { background: var(--white); border: 1px solid var(--border); border-radius: 18px; padding: 22px; text-align: center; color: var(--ink-light); }
+.error { color: var(--red); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="topbar">
+    <h1>Chi tiết bài viết</h1>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <a class="btn btn-outline" href="home.html">Về bảng tin</a>
+      <a class="btn btn-outline" id="authorProfileLink" href="profile.html">Trang cá nhân</a>
+    </div>
+  </div>
+
+  <div id="postBox" class="empty">Đang tải bài viết...</div>
+
+  <section class="comment-section">
+    <h2>Bình luận</h2>
+    <div class="card" style="padding:16px; margin-top:12px;">
+      <div class="composer">
+        <input id="commentInput" placeholder="Viết bình luận..." />
+        <button class="btn btn-primary" onclick="addComment()">Gửi</button>
+      </div>
+    </div>
+    <div id="commentList" class="comment-list">
+      <div class="empty">Đang tải bình luận...</div>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script>
+let currentUser = null;
+let currentPostId = null;
+
+async function init() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) {
+    location.href = "index.html";
+    return;
+  }
+  currentUser = user;
+  currentPostId = new URLSearchParams(location.search).get("id");
+  if (!currentPostId) {
+    renderError("Thiếu mã bài viết.");
+    return;
+  }
+  await loadPost();
+  await loadComments();
+}
+
+async function loadPost() {
+  const { data, error } = await sb
+    .from("posts")
+    .select("*, users(full_name,avatar_url), likes(count), comments(count), post_media(file_url,file_type,sort_order)")
+    .eq("id", currentPostId)
+    .maybeSingle();
+
+  if (error || !data) {
+    renderError("Không tìm thấy bài viết này.");
+    return;
+  }
+
+  const timeText = new Date(data.created_at).toLocaleString("vi-VN", {
+    day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
+  });
+  const badges = [];
+  if (data.is_pinned) badges.push('<span class="badge badge-gold">Đã ghim</span>');
+  if (data.visibility === "friends") badges.push('<span class="badge badge-blue">Bạn bè</span>');
+  if (data.visibility === "private") badges.push('<span class="badge badge-navy">Riêng tư</span>');
+  if (!data.visibility || data.visibility === "public") badges.push('<span class="badge badge-blue">Công khai</span>');
+  const mediaHtml = (data.post_media || [])
+    .filter(item => item.file_type === "image")
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+    .map(item => `<div class="media-wrap"><img class="media-img" src="${safeUrl(item.file_url)}" alt="Ảnh bài viết"></div>`)
+    .join("");
+
+  const wrap = document.getElementById("postBox");
+  wrap.className = "card";
+  wrap.innerHTML = `
+    <div class="post-head">
+      <img class="avatar" src="${safeUrl(data.users?.avatar_url || "default-avatar.png")}" alt="Avatar" onerror="this.src='default-avatar.png'">
+      <div>
+        <div class="author">${esc(data.users?.full_name || "Người dùng")}</div>
+        <div class="meta">${timeText}</div>
+        <div class="badges">${badges.join("")}</div>
+      </div>
+    </div>
+    <div class="post-body">${esc(data.content || "")}</div>
+    ${mediaHtml}
+    <div class="stats">
+      <span>${data.likes?.[0]?.count || 0} lượt thích</span>
+      <span>${data.comments?.[0]?.count || 0} bình luận</span>
+    </div>
+  `;
+  document.getElementById("authorProfileLink").href = "profile.html?id=" + data.user_id;
+}
+
+async function loadComments() {
+  const { data, error } = await sb
+    .from("comments")
+    .select("*, users(full_name,avatar_url)")
+    .eq("post_id", currentPostId)
+    .order("created_at", { ascending: true });
+
+  const wrap = document.getElementById("commentList");
+  if (error) {
+    wrap.innerHTML = '<div class="error">Không tải được bình luận.</div>';
+    return;
+  }
+
+  const tops = (data || []).filter(item => !item.parent_id);
+  const replies = (data || []).filter(item => item.parent_id);
+  if (!tops.length) {
+    wrap.innerHTML = '<div class="empty">Chưa có bình luận nào.</div>';
+    return;
+  }
+
+  wrap.innerHTML = tops.map(comment => {
+    const replyHtml = replies.filter(reply => reply.parent_id === comment.id).map(reply => `
+      <div class="reply-card">
+        <div class="comment-name">${esc(reply.users?.full_name || "Người dùng")}</div>
+        <div class="comment-text">${esc(reply.content || "")}</div>
+        <div class="comment-time">${formatTime(reply.created_at)}</div>
+      </div>
+    `).join("");
+
+    return `
+      <div class="comment-card">
+        <div class="comment-row">
+          <img class="comment-avatar" src="${safeUrl(comment.users?.avatar_url || "default-avatar.png")}" alt="Avatar" onerror="this.src='default-avatar.png'">
+          <div style="flex:1;">
+            <div class="comment-name">${esc(comment.users?.full_name || "Người dùng")}</div>
+            <div class="comment-text">${esc(comment.content || "")}</div>
+            <div class="comment-time">${formatTime(comment.created_at)}</div>
+          </div>
+        </div>
+        ${replyHtml ? `<div class="reply-list">${replyHtml}</div>` : ""}
+      </div>
+    `;
+  }).join("");
+}
+
+window.addComment = async function() {
+  const input = document.getElementById("commentInput");
+  const content = input.value.trim();
+  if (!content) return;
+
+  const { error } = await sb.from("comments").insert({
+    post_id: currentPostId,
+    user_id: currentUser.id,
+    content
+  });
+
+  if (error) {
+    alert("Không gửi được bình luận: " + error.message);
+    return;
+  }
+
+  input.value = "";
+  await loadPost();
+  await loadComments();
+};
+
+function renderError(message) {
+  const wrap = document.getElementById("postBox");
+  wrap.className = "error";
+  wrap.textContent = message;
+}
+
+function formatTime(value) {
+  return new Date(value).toLocaleString("vi-VN", {
+    day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
+  });
+}
+
+function esc(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function safeUrl(value) {
+  return String(value || "").replace(/"/g, "&quot;");
+}
+
+init();
+</script>
+</body>
+</html>

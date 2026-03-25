@@ -563,7 +563,7 @@ function buildCard(post) {
           ${visibilityBadge}
           ${statusBadge}
         </div>
-        <div class="post-time">${timeStr}</div>
+        <div class="post-time"><a class="post-author-link" href="post.html?id=${post.id}">${timeStr}</a></div>
       </div>
     </div>
     <div class="post-body">${esc(post.content)}</div>
