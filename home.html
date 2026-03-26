@@ -151,38 +151,54 @@ body {
 .overview-section.active {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(280px, .8fr);
-  gap: 16px;
-  margin-bottom: 18px;
+  gap: 18px;
+  margin-bottom: 22px;
 }
 .overview-main,
 .overview-side {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 .overview-card {
   background: var(--white);
   border: 1px solid rgba(15,31,61,.08);
-  border-radius: 20px;
-  box-shadow: 0 10px 26px rgba(15,31,61,.06);
+  border-radius: 24px;
+  box-shadow: 0 14px 36px rgba(15,31,61,.08);
   overflow: hidden;
+  position: relative;
 }
 .overview-card-head {
-  padding: 16px 18px 12px;
+  padding: 18px 20px 14px;
   border-bottom: 1px solid rgba(15,31,61,.06);
+  background:
+    radial-gradient(circle at top right, rgba(24,119,242,.08), transparent 32%),
+    linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+}
+.overview-card-head::before {
+  content: "";
+  position: absolute;
+  left: 20px;
+  top: 16px;
+  width: 5px;
+  height: 28px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--gold), #1877f2);
 }
 .overview-card-title {
   font-family: var(--font-display);
   color: var(--navy);
-  font-size: 1rem;
+  font-size: 1.04rem;
+  padding-left: 14px;
 }
 .overview-card-sub {
   margin-top: 4px;
   color: var(--ink-light);
   font-size: .76rem;
+  padding-left: 14px;
 }
 .overview-card-body {
-  padding: 14px 16px 16px;
+  padding: 16px 18px 18px;
 }
 .overview-list {
   display: flex;
@@ -198,17 +214,21 @@ body {
 .teacher-card {
   display: block;
   padding: 10px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, #fff 0%, #fbfcff 100%);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at top, rgba(24,119,242,.08), transparent 38%),
+    linear-gradient(180deg, #fff 0%, #f8fbff 100%);
   border: 1px solid rgba(15,31,61,.08);
   text-decoration: none;
   color: inherit;
   transition: .16s ease;
   text-align: center;
+  min-height: 170px;
 }
 .teacher-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 22px rgba(15,31,61,.08);
+  transform: translateY(-3px);
+  box-shadow: 0 16px 28px rgba(15,31,61,.1);
+  border-color: rgba(24,119,242,.14);
 }
 .teacher-card-avatar {
   width: 84px;
@@ -219,6 +239,7 @@ body {
   border: 1px solid rgba(15,31,61,.08);
   display: block;
   margin: 0 auto;
+  box-shadow: 0 8px 18px rgba(15,31,61,.08);
 }
 .teacher-card-name {
   margin-top: 8px;
@@ -232,17 +253,31 @@ body {
   font-size: .74rem;
   line-height: 1.45;
 }
+#overviewTeachers:empty::before,
+#overviewIntro:empty::before,
+#countdownBox:empty::before,
+#contactList:empty::before,
+#overviewNews:empty::before {
+  content: "Đang tải nội dung...";
+  display: block;
+  padding: 18px 14px;
+  border: 1px dashed rgba(15,31,61,.12);
+  border-radius: 16px;
+  color: var(--ink-light);
+  text-align: center;
+  background: #fbfcff;
+}
 .intro-card-title {
   color: var(--navy);
-  font-size: 1rem;
+  font-size: 1.08rem;
   font-weight: 700;
   line-height: 1.4;
 }
 .intro-card-text {
   margin-top: 10px;
   color: var(--ink);
-  font-size: .84rem;
-  line-height: 1.7;
+  font-size: .85rem;
+  line-height: 1.78;
 }
 .intro-card-text a,
 .overview-post-text a,
@@ -254,9 +289,11 @@ body {
 }
 .overview-post {
   border: 1px solid rgba(15,31,61,.08);
-  border-radius: 16px;
-  padding: 14px;
-  background: linear-gradient(180deg, #fff 0%, #fbfcff 100%);
+  border-radius: 18px;
+  padding: 16px;
+  background:
+    radial-gradient(circle at top right, rgba(24,119,242,.05), transparent 28%),
+    linear-gradient(180deg, #fff 0%, #fbfcff 100%);
 }
 .overview-post-title {
   color: var(--navy);
@@ -287,7 +324,7 @@ body {
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  padding: 12px 0;
+  padding: 12px 2px;
   border-bottom: 1px solid rgba(15,31,61,.06);
 }
 .overview-news-item:last-child {
@@ -319,9 +356,11 @@ body {
 }
 .countdown-event {
   border: 1px solid rgba(15,31,61,.08);
-  border-radius: 16px;
-  padding: 12px;
-  background: linear-gradient(180deg, #fff 0%, #fbfcff 100%);
+  border-radius: 18px;
+  padding: 14px;
+  background:
+    radial-gradient(circle at top right, rgba(200,150,42,.08), transparent 32%),
+    linear-gradient(180deg, #fff 0%, #fbfcff 100%);
 }
 .countdown-event-head {
   display: flex;
@@ -347,10 +386,11 @@ body {
 .countdown-pill {
   flex: 1 1 72px;
   min-width: 72px;
-  padding: 10px 8px;
+  padding: 11px 8px;
   border-radius: 16px;
-  background: #f6f7f9;
+  background: #f5f7fb;
   text-align: center;
+  border: 1px solid rgba(15,31,61,.05);
 }
 .countdown-number {
   display: block;
@@ -371,10 +411,12 @@ body {
 .contact-item {
   padding: 10px 12px;
   border-radius: 16px;
-  background: #f6f7f9;
+  background:
+    linear-gradient(180deg, #f8fbff 0%, #f4f7fb 100%);
   color: var(--ink-mid);
   font-size: .82rem;
   line-height: 1.5;
+  border: 1px solid rgba(15,31,61,.06);
 }
 .overview-admin {
   display: none;
@@ -389,6 +431,7 @@ body {
   margin-top: 14px;
   padding-top: 14px;
   border-top: 1px solid rgba(15,31,61,.08);
+  background: linear-gradient(180deg, rgba(248,251,255,.7) 0%, rgba(255,255,255,0) 100%);
 }
 .inline-admin-title {
   color: var(--navy);
@@ -440,6 +483,13 @@ body {
 .admin-select {
   appearance: none;
 }
+.admin-field:focus,
+.admin-textarea:focus,
+.admin-select:focus {
+  outline: none;
+  border-color: rgba(24,119,242,.18);
+  box-shadow: 0 0 0 3px rgba(24,119,242,.08);
+}
 .admin-actions {
   display: flex;
   justify-content: flex-end;
@@ -489,6 +539,9 @@ body {
   font-size: .74rem;
   font-weight: 700;
   cursor: pointer;
+}
+.tiny-btn:hover {
+  background: #feeceb;
 }
 .discussion-section {
   display: none;
