@@ -1964,7 +1964,7 @@ async function loadOverviewSettings() {
     sb.from("exam_events").select("*").order("exam_at", { ascending: true }),
     sb.from("site_settings").select("setting_key,setting_value").in("setting_key", ["home_contact_info", "home_center_intro"]),
     sb.from("users").select("id, full_name, avatar_url, subject").eq("role", "teacher").order("full_name", { ascending: true }),
-    sb.from("home_teachers").select("id, user_id, sort_order, users(id, full_name, avatar_url, subject)").order("sort_order", { ascending: true })
+    sb.from("home_teachers").select("id, user_id, sort_order").order("sort_order", { ascending: true })
   ]);
 
   if (!examRes.error) {
@@ -1987,12 +1987,13 @@ async function loadOverviewSettings() {
     allTeachers = teacherRes.data || [];
   }
   if (!homeTeacherRes.error) {
+    const teacherMap = new Map((allTeachers || []).map(item => [item.id, item]));
     homeTeachers = (homeTeacherRes.data || []).map(item => ({
       id: item.id,
       user_id: item.user_id,
       sort_order: item.sort_order,
-      user: item.users
-    }));
+      user: teacherMap.get(item.user_id) || null
+    })).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   }
 
   homeSettingsLoaded = true;
@@ -2068,7 +2069,7 @@ function renderHomeTeachers() {
     return;
   }
   wrap.innerHTML = homeTeachers.map(item => {
-    const teacher = item.user || {};
+    const teacher = item.user || allTeachers.find(entry => entry.id === item.user_id) || {};
     return `
       <a class="teacher-card" href="profile.html?id=${item.user_id}">
         <img class="teacher-card-avatar" src="${teacher.avatar_url || 'default-avatar.png'}" alt="${esc(teacher.full_name || 'Giáo viên')}" onerror="this.src='default-avatar.png'">
