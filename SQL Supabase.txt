@@ -999,3 +999,106 @@ USING (
     WHERE u.id = auth.uid() AND u.role = 'admin'
   )
 );
+
+-- ============================================
+-- Courses refinement migration
+-- ============================================
+
+ALTER TABLE public.courses
+  ADD COLUMN IF NOT EXISTS start_date date,
+  ADD COLUMN IF NOT EXISTS end_date date;
+
+ALTER TABLE public.courses
+  DROP CONSTRAINT IF EXISTS courses_status_check;
+
+UPDATE public.courses
+SET status = CASE
+  WHEN status IN ('open', 'published') THEN 'open'
+  ELSE 'closed'
+END;
+
+ALTER TABLE public.courses
+  ADD CONSTRAINT courses_status_check
+  CHECK (status IN ('open', 'closed'));
+
+ALTER TABLE public.course_sessions
+  ADD COLUMN IF NOT EXISTS exam_id uuid,
+  ADD COLUMN IF NOT EXISTS open_day integer NOT NULL DEFAULT 1;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.table_constraints
+    WHERE constraint_name = 'course_sessions_exam_id_fkey'
+      AND table_schema = 'public'
+      AND table_name = 'course_sessions'
+  ) THEN
+    ALTER TABLE public.course_sessions
+      ADD CONSTRAINT course_sessions_exam_id_fkey
+      FOREIGN KEY (exam_id) REFERENCES public.exams(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS course_sessions_exam_idx
+  ON public.course_sessions (exam_id);
+
+CREATE TABLE IF NOT EXISTS public.course_enrollments (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  course_id uuid NOT NULL,
+  student_id uuid NOT NULL,
+  enrolled_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT course_enrollments_pkey PRIMARY KEY (id),
+  CONSTRAINT course_enrollments_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id) ON DELETE CASCADE,
+  CONSTRAINT course_enrollments_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.users(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS course_enrollments_unique
+  ON public.course_enrollments (course_id, student_id);
+
+ALTER TABLE public.course_enrollments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS courses_select_policy ON public.courses;
+CREATE POLICY courses_select_policy ON public.courses
+FOR SELECT
+USING (
+  status = 'open'
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS course_enrollments_select_policy ON public.course_enrollments;
+CREATE POLICY course_enrollments_select_policy ON public.course_enrollments
+FOR SELECT
+USING (
+  student_id = auth.uid()
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS course_enrollments_insert_policy ON public.course_enrollments;
+CREATE POLICY course_enrollments_insert_policy ON public.course_enrollments
+FOR INSERT
+WITH CHECK (
+  student_id = auth.uid()
+  AND EXISTS (
+    SELECT 1
+    FROM public.courses c
+    WHERE c.id = course_id AND c.status = 'open'
+  )
+);
+
+DROP POLICY IF EXISTS course_enrollments_delete_policy ON public.course_enrollments;
+CREATE POLICY course_enrollments_delete_policy ON public.course_enrollments
+FOR DELETE
+USING (
+  student_id = auth.uid()
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);

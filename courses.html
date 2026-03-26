@@ -6,182 +6,127 @@
 <title>Khóa học</title>
 <link rel="stylesheet" href="theme.css">
 <style>
-body { margin: 0; font-family: var(--font-body); background: #f6f8fb; color: var(--ink); }
-.page-shell { max-width: 1280px; margin: 0 auto; padding: 24px; }
-.hero { display: grid; grid-template-columns: 1fr 280px; gap: 18px; align-items: start; margin-bottom: 18px; }
-.hero-card, .mini-stat, .course-card, .empty-state, .detail-panel, .modal-card { background: #fff; border: 1px solid rgba(33,54,95,.08); border-radius: 22px; box-shadow: 0 16px 36px rgba(28,44,77,.08); }
-.hero-card { padding: 22px 24px; background: linear-gradient(135deg, #ffffff 0%, #f4f7ff 100%); }
-.hero h1 { margin: 0 0 10px; font-size: 1.9rem; color: var(--navy); }
-.hero p { margin: 0; color: #5f6f86; line-height: 1.6; }
-.hero-side { display: grid; gap: 12px; }
-.mini-stat { padding: 16px 18px; }
-.mini-stat strong { display: block; font-size: 1.4rem; color: var(--navy); margin-bottom: 4px; }
-.muted { color: #7a8aa1; font-size: .88rem; }
-.toolbar, .form-grid, .detail-shell, .course-grid { display: grid; gap: 16px; }
-.toolbar { grid-template-columns: 1.3fr repeat(4, minmax(140px, 1fr)) auto; margin-bottom: 20px; }
-.input, .select, textarea { width: 100%; border: 1px solid rgba(39,58,91,.14); border-radius: 14px; padding: 12px 14px; font: inherit; background: #fff; color: var(--ink); }
-textarea { min-height: 110px; resize: vertical; }
-.course-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
-.course-card { overflow: hidden; display: flex; flex-direction: column; }
-.course-cover { min-height: 150px; padding: 18px; background: linear-gradient(135deg, #103d74 0%, #1d6bd1 100%); color: #fff; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; }
-.course-name { margin: 0; font-size: 1.15rem; line-height: 1.35; }
-.course-body { padding: 18px; display: grid; gap: 14px; }
-.cover-badges, .manager-list, .selected-managers, .meta-badges, .inline-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 6px 10px; font-size: .78rem; font-weight: 600; }
-.pill.light { background: rgba(255,255,255,.18); color: #fff; }
-.pill.soft { background: #eef3fb; color: #35507c; }
-.course-desc { margin: 0; color: #5f6f86; line-height: 1.55; }
-.meta-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.meta-box { border-radius: 16px; background: #f7f9fc; padding: 12px; }
-.meta-box span { display: block; font-size: .78rem; color: #72829a; margin-bottom: 6px; }
-.meta-box strong { color: var(--navy); font-size: .96rem; }
-.action-row { display: flex; flex-wrap: wrap; gap: 10px; }
-.manager-chip { display: inline-flex; align-items: center; gap: 8px; background: #f2f6fc; border: 1px solid rgba(39,58,91,.08); border-radius: 999px; padding: 6px 10px; }
-.manager-chip img { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; }
-.empty-state { padding: 40px 22px; text-align: center; color: #677892; }
-.modal { position: fixed; inset: 0; background: rgba(10,20,40,.45); display: none; align-items: center; justify-content: center; padding: 24px; z-index: 1000; }
-.modal.show { display: flex; }
-.modal-card { width: min(1100px, 100%); max-height: calc(100vh - 48px); overflow: auto; }
-.modal-header { display: flex; justify-content: space-between; align-items: center; padding: 22px 24px 16px; border-bottom: 1px solid rgba(39,58,91,.08); }
-.modal-header h2, .modal-header h3 { margin: 0; color: var(--navy); }
-.modal-body { padding: 20px 24px 24px; }
-.form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.full { grid-column: 1 / -1; }
-.field { display: grid; gap: 8px; }
-.field label { font-size: .88rem; font-weight: 600; color: #41526d; }
-.footer-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-.detail-shell { grid-template-columns: 1.05fr .95fr; }
-.detail-panel { padding: 18px; background: #fbfcff; }
-.detail-panel h4 { margin: 0 0 12px; color: var(--navy); }
-.session-list { display: grid; gap: 12px; }
-.session-item { border: 1px solid rgba(39,58,91,.08); border-radius: 16px; padding: 14px; background: #fff; }
-.session-item h5 { margin: 0 0 8px; font-size: 1rem; color: var(--navy); }
-.session-item p { margin: 0; color: #607089; font-size: .9rem; }
-.session-item a, .course-desc a, .detail-panel a { color: #1c67cf; text-decoration: none; }
-.session-item a:hover, .course-desc a:hover, .detail-panel a:hover { text-decoration: underline; }
-@media (max-width: 980px) {
-  .hero, .toolbar, .form-grid, .detail-shell { grid-template-columns: 1fr; }
-}
-@media (max-width: 640px) {
-  .page-shell { padding: 16px; }
-  .course-grid { grid-template-columns: 1fr; }
-  .modal { padding: 12px; }
-  .modal-header, .modal-body { padding-left: 16px; padding-right: 16px; }
-}
+body{margin:0;font-family:var(--font-body);background:#f4f7fb;color:var(--ink)}
+.page{max-width:1240px;margin:0 auto;padding:24px}
+.hero,.toolbar,.form-grid,.screen-grid{display:grid;gap:16px}
+.hero{grid-template-columns:1fr 280px;margin-bottom:18px}
+.card,.stat,.course-card,.modal-card,.screen-panel,.empty{background:#fff;border:1px solid rgba(35,56,92,.08);border-radius:22px;box-shadow:0 16px 36px rgba(15,23,42,.08)}
+.card{padding:22px 24px;background:linear-gradient(135deg,#fff 0%,#f4f7ff 100%)}
+h1{margin:0 0 10px;font-size:1.9rem;color:var(--navy)}
+.muted{color:#72829a;font-size:.88rem}
+.stat{padding:16px 18px}.stat strong{display:block;font-size:1.4rem;color:var(--navy)}
+.toolbar{grid-template-columns:1.2fr repeat(3,minmax(150px,1fr)) auto;margin-bottom:18px}
+.input,.select,textarea{width:100%;border:1px solid rgba(39,58,91,.14);border-radius:14px;padding:12px 14px;font:inherit;background:#fff}
+textarea{min-height:110px;resize:vertical}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.course-card{overflow:hidden;display:flex;flex-direction:column}
+.cover{min-height:164px;padding:18px;display:flex;flex-direction:column;justify-content:space-between;background:linear-gradient(135deg,#103d74 0%,#1d6bd1 100%);color:#fff}
+.course-body{padding:18px;display:grid;gap:14px}
+.meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.meta>div{background:#f7f9fc;border-radius:16px;padding:12px}
+.meta span{display:block;font-size:.78rem;color:#72829a;margin-bottom:4px}
+.chips,.actions,.teachers,.selected,.practice{display:flex;flex-wrap:wrap;gap:8px}
+.pill{display:inline-flex;align-items:center;border-radius:999px;padding:6px 10px;font-size:.77rem;font-weight:700}
+.pill.light{background:rgba(255,255,255,.16);color:#fff}.pill.soft{background:#edf4ff;color:#35507c}
+.teacher{display:inline-flex;align-items:center;gap:8px;background:#f2f6fc;border:1px solid rgba(39,58,91,.08);border-radius:999px;padding:6px 10px}
+.teacher img{width:28px;height:28px;border-radius:50%;object-fit:cover}
+.empty{padding:40px 22px;text-align:center}.hidden{display:none!important}
+.modal{position:fixed;inset:0;background:rgba(10,20,40,.45);display:none;align-items:center;justify-content:center;padding:24px;z-index:2000}
+.modal.show{display:flex}
+.modal-card{width:min(980px,100%);max-height:calc(100vh - 48px);overflow:auto}
+.mh{display:flex;justify-content:space-between;align-items:center;padding:20px 24px 14px;border-bottom:1px solid rgba(39,58,91,.08)}
+.mb{padding:18px 24px 24px}
+.form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.full{grid-column:1/-1}.field{display:grid;gap:8px}
+.preview{height:160px;border:1px dashed rgba(39,58,91,.16);border-radius:18px;display:flex;align-items:center;justify-content:center;background:#f7f9fc;overflow:hidden}
+.preview img{width:100%;height:100%;object-fit:cover}
+.toggle{display:grid;grid-template-columns:1fr auto;gap:12px;padding:12px 14px;background:#f8fbff;border:1px solid rgba(39,58,91,.08);border-radius:16px}
+.switch{position:relative;width:56px;height:32px}.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;border-radius:999px;background:#d4dce8}.slider:before{content:"";position:absolute;width:24px;height:24px;left:4px;top:4px;border-radius:50%;background:#fff;transition:.2s}
+.switch input:checked + .slider{background:#1d6bd1}.switch input:checked + .slider:before{transform:translateX(24px)}
+.screen{position:fixed;inset:0;background:#eef3fb;display:none;flex-direction:column;z-index:1800}.screen.show{display:flex}
+.stop{height:62px;background:var(--navy);color:#fff;display:flex;align-items:center;gap:12px;padding:0 18px}.stop h2{margin:0;flex:1;font-size:1.05rem}
+.sbody{flex:1;overflow:auto;padding:20px 24px}.screen-grid{grid-template-columns:1.05fr .95fr}
+.screen-panel{padding:18px}.session-list{display:grid;gap:10px}
+.session{display:grid;grid-template-columns:94px 1fr auto;gap:14px;align-items:center;padding:14px 16px;border:1px solid rgba(39,58,91,.08);border-radius:18px;background:#fff}
+.order{width:94px;min-height:58px;border-radius:14px;background:linear-gradient(135deg,#0f3c73 0%,#1d6bd1 100%);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.order strong{font-size:.8rem}.order span{font-size:1.25rem;font-weight:800}.session h5{margin:0 0 6px;color:var(--navy)}.session p{margin:0;color:#607089;line-height:1.55}
+.register{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px 16px;border-radius:16px;background:#fff7ed;border:1px solid #fed7aa;margin-bottom:14px}
+@media(max-width:1024px){.hero,.toolbar,.form-grid,.screen-grid{grid-template-columns:1fr}}
+@media(max-width:720px){.page{padding:16px}.grid{grid-template-columns:1fr}.session{grid-template-columns:1fr}.order{width:100%;flex-direction:row;justify-content:flex-start;padding:0 14px}}
 </style>
 </head>
 <body>
-<div class="page-shell">
-  <section class="hero">
-    <div class="hero-card">
-      <h1>Khóa học online</h1>
-      <p>Module riêng để bạn test mô hình khóa học trước. Ở bản đầu này, admin có thể tạo khóa, gán giáo viên quản lý, ghim khóa học lên Trang chủ và tạo từng buổi học online gắn với bài học.</p>
+<div class="page">
+  <div class="hero">
+    <div class="card"><h1>Khóa học online</h1><p>Module riêng để test mô hình khóa học trước khi gắn chung với phần Lớp học. Học sinh đăng ký, học theo buổi, và từng buổi mở theo ngày thứ x của khóa.</p></div>
+    <div style="display:grid;gap:12px">
+      <div class="stat"><strong id="totalValue">0</strong><span class="muted">Tổng khóa học</span></div>
+      <div class="stat"><strong id="openValue">0</strong><span class="muted">Khóa học đang mở</span></div>
     </div>
-    <div class="hero-side">
-      <div class="mini-stat"><strong id="totalCoursesValue">0</strong><span class="muted">Tổng số khóa học</span></div>
-      <div class="mini-stat"><strong id="publishedCoursesValue">0</strong><span class="muted">Khóa học đang mở</span></div>
-    </div>
-  </section>
-
-  <section class="toolbar">
-    <input id="keywordInput" class="input" type="text" placeholder="Tìm theo tên khóa học, mô tả hoặc giáo viên quản lý">
+  </div>
+  <div id="toolbar" class="toolbar">
+    <input id="keyword" class="input" placeholder="Tìm theo tên khóa học hoặc giáo viên quản lý">
     <select id="gradeFilter" class="select"><option value="">Tất cả khối</option></select>
     <select id="subjectFilter" class="select"><option value="">Tất cả môn</option></select>
-    <select id="statusFilter" class="select">
-      <option value="">Tất cả trạng thái</option>
-      <option value="draft">Bản nháp</option>
-      <option value="published">Đang mở</option>
-      <option value="archived">Lưu trữ</option>
-    </select>
-    <select id="progressFilter" class="select">
-      <option value="">Tất cả kiểu mở bài</option>
-      <option value="sequential">Mở tuần tự</option>
-      <option value="free">Mở toàn bộ</option>
-      <option value="scheduled">Mở theo lịch</option>
-    </select>
-    <button id="openCreateCourseBtn" class="btn btn-primary" type="button">Tạo khóa học</button>
-  </section>
-
-  <div id="adminHint" class="muted" style="display:none; margin-bottom:14px;">Bản test hiện tại để admin toàn quyền tạo, sửa, xóa khóa học. Giáo viên mới chỉ được gán vào quản lý khóa học.</div>
-  <section id="coursesGrid" class="course-grid"></section>
-  <section id="emptyState" class="empty-state" style="display:none;">Chưa có khóa học nào phù hợp bộ lọc hiện tại.</section>
+    <select id="statusFilter" class="select"><option value="">Tất cả trạng thái</option><option value="open">Mở</option><option value="closed">Đóng</option></select>
+    <button id="openCreateBtn" class="btn btn-primary" type="button">Tạo khóa học</button>
+  </div>
+  <div id="grid" class="grid"></div>
+<div id="empty" class="empty hidden"><strong>Chưa có khóa học phù hợp</strong><div class="muted">Hãy đổi bộ lọc hoặc tạo khóa học đầu tiên.</div></div>
 </div>
 
 <div id="courseModal" class="modal">
   <div class="modal-card">
-    <div class="modal-header">
-      <h2 id="courseModalTitle">Tạo khóa học</h2>
-      <button class="btn btn-outline" type="button" onclick="closeCourseModal()">Đóng</button>
-    </div>
-    <div class="modal-body">
+    <div class="mh"><h2 id="courseModalTitle">Tạo khóa học</h2><button class="btn btn-outline" type="button" onclick="closeCourseModal()">Đóng</button></div>
+    <div class="mb">
       <form id="courseForm">
         <div class="form-grid">
-          <div class="field"><label for="courseName">Tên khóa học</label><input id="courseName" class="input" type="text" required></div>
-          <div class="field"><label for="courseCoverUrl">Ảnh bìa</label><input id="courseCoverUrl" class="input" type="url" placeholder="https://..."></div>
-          <div class="field"><label for="courseGrade">Khối</label><select id="courseGrade" class="select"></select></div>
-          <div class="field"><label for="courseSubject">Môn học</label><select id="courseSubject" class="select"></select></div>
-          <div class="field"><label for="courseDuration">Thời lượng (tuần)</label><input id="courseDuration" class="input" type="number" min="1" value="12"></div>
-          <div class="field"><label for="coursePlannedSessions">Số buổi dự kiến</label><input id="coursePlannedSessions" class="input" type="number" min="1" value="30"></div>
-          <div class="field"><label for="courseStatus">Trạng thái</label><select id="courseStatus" class="select"><option value="draft">Bản nháp</option><option value="published">Đang mở</option><option value="archived">Lưu trữ</option></select></div>
-          <div class="field"><label for="courseProgressMode">Kiểu mở buổi học</label><select id="courseProgressMode" class="select"><option value="sequential">Mở tuần tự</option><option value="free">Mở toàn bộ</option><option value="scheduled">Mở theo lịch</option></select></div>
-          <div class="field full"><label for="courseDescription">Mô tả khóa học</label><textarea id="courseDescription" placeholder="Giới thiệu ngắn về khóa học, đối tượng học, kết quả mong đợi..."></textarea></div>
-          <div class="field"><label for="managerPicker">Thêm giáo viên quản lý</label><select id="managerPicker" class="select"></select></div>
-          <div class="field"><label>&nbsp;</label><button id="addManagerBtn" class="btn btn-outline" type="button">Thêm giáo viên</button></div>
-          <div class="field full"><label>Giáo viên quản lý</label><div id="selectedManagers" class="selected-managers"></div></div>
-          <div class="field full"><label style="display:flex; align-items:center; gap:10px;"><input id="coursePinned" type="checkbox">Ghim khóa học này lên Trang chủ</label></div>
+          <div class="field"><label>Tên khóa học</label><input id="courseName" class="input" required></div>
+          <div class="field"><label>Trạng thái</label><select id="courseStatus" class="select"><option value="open">Mở</option><option value="closed">Đóng</option></select></div>
+          <div class="field"><label>Khối</label><select id="courseGrade" class="select"></select></div>
+          <div class="field"><label>Môn học</label><select id="courseSubject" class="select"></select></div>
+          <div class="field"><label>Ngày bắt đầu</label><input id="courseStartDate" class="input" type="date"></div>
+          <div class="field"><label>Ngày kết thúc</label><input id="courseEndDate" class="input" type="date"></div>
+          <div class="field"><label>Số buổi dự kiến</label><input id="coursePlannedSessions" class="input" type="number" min="1" value="30"></div>
+          <div class="field full"><label>Mô tả khóa học</label><textarea id="courseDescription"></textarea></div>
+          <div class="field full"><label>Ảnh bìa</label><div id="coverPreview" class="preview"><span>Chưa chọn ảnh bìa</span></div><input id="courseCoverFile" class="input" type="file" accept="image/*"></div>
+          <div class="field full"><label>Giáo viên quản lý</label><div style="display:grid;grid-template-columns:1fr auto;gap:10px"><select id="managerPicker" class="select"></select><button id="addManagerBtn" class="btn btn-outline" type="button">Thêm giáo viên</button></div><div id="selectedManagers" class="selected"></div></div>
+          <div class="field full"><label>Hiển thị ngoài Trang chủ</label><div class="toggle"><div><strong>Ghim khóa học lên Trang chủ</strong><div class="muted">Nếu bật, khóa học sẽ hiện trong tab Trang chủ của dashboard.</div></div><label class="switch"><input id="coursePinned" type="checkbox"><span class="slider"></span></label></div></div>
         </div>
-        <div class="footer-actions">
-          <button class="btn btn-outline" type="button" onclick="closeCourseModal()">Hủy</button>
-          <button class="btn btn-primary" type="submit">Lưu khóa học</button>
-        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px"><button class="btn btn-outline" type="button" onclick="closeCourseModal()">Hủy</button><button class="btn btn-primary" type="submit">Lưu khóa học</button></div>
       </form>
     </div>
   </div>
 </div>
 
-<div id="detailModal" class="modal">
+<div id="sessionModal" class="modal">
   <div class="modal-card">
-    <div class="modal-header">
-      <h3 id="detailTitle">Chi tiết khóa học</h3>
-      <button class="btn btn-outline" type="button" onclick="closeDetailModal()">Đóng</button>
+    <div class="mh"><h2 id="sessionModalTitle">Thêm buổi học</h2><button class="btn btn-outline" type="button" onclick="closeSessionModal()">Đóng</button></div>
+    <div class="mb">
+      <form id="sessionForm">
+        <div class="form-grid">
+          <div class="field"><label>Số buổi</label><input id="sessionOrder" class="input" type="number" min="1" required></div>
+          <div class="field"><label>Ngày thứ x trong khóa</label><input id="sessionOpenDay" class="input" type="number" min="1" required></div>
+          <div class="field full"><label>Tên bài học</label><input id="sessionLessonName" class="input" required></div>
+          <div class="field full"><label>Nội dung buổi học</label><textarea id="sessionLessonSummary"></textarea></div>
+          <div class="field"><label>Video bài giảng</label><input id="sessionLectureVideo" class="input" type="url"></div>
+          <div class="field"><label>Video chữa bài</label><input id="sessionSolutionVideo" class="input" type="url"></div>
+          <div class="field full"><label>Đề luyện tập</label><select id="sessionExamId" class="select"></select></div>
+          <div class="field full"><label style="display:flex;gap:10px;align-items:center"><input id="sessionPreview" type="checkbox">Cho phép học thử buổi này</label></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px"><button class="btn btn-outline" type="button" onclick="closeSessionModal()">Hủy</button><button class="btn btn-primary" type="submit">Lưu buổi học</button></div>
+      </form>
     </div>
-    <div class="modal-body">
-      <div class="detail-shell">
-        <section class="detail-panel">
-          <h4>Tổng quan khóa học</h4>
-          <div id="detailSummary"></div>
-          <div id="detailManagers" class="manager-list" style="margin-top:14px;"></div>
-        </section>
-        <section class="detail-panel">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;">
-            <h4 style="margin:0;">Danh sách buổi học</h4>
-            <button id="openSessionFormBtn" class="btn btn-primary" type="button">Thêm buổi học</button>
-          </div>
-          <div id="sessionList" class="session-list"></div>
-        </section>
-      </div>
+  </div>
+</div>
 
-      <section id="sessionEditor" class="detail-panel" style="margin-top:18px; display:none;">
-        <h4 id="sessionEditorTitle">Thêm buổi học</h4>
-        <form id="sessionForm">
-          <div class="form-grid">
-            <div class="field"><label for="sessionOrder">Thứ tự buổi</label><input id="sessionOrder" class="input" type="number" min="1" required></div>
-            <div class="field"><label for="sessionUnlockMode">Kiểu mở buổi</label><select id="sessionUnlockMode" class="select"><option value="course_default">Theo mặc định của khóa</option><option value="manual">Mở thủ công</option><option value="scheduled">Mở theo lịch</option></select></div>
-            <div class="field"><label for="sessionLessonName">Tên bài học</label><input id="sessionLessonName" class="input" type="text" required></div>
-            <div class="field"><label for="sessionChapter">Chương</label><select id="sessionChapter" class="select"></select></div>
-            <div class="field full"><label for="sessionLessonSummary">Tóm tắt bài học</label><textarea id="sessionLessonSummary" placeholder="Nội dung trọng tâm của buổi học..."></textarea></div>
-            <div class="field"><label for="sessionLectureVideo">Video bài giảng</label><input id="sessionLectureVideo" class="input" type="url" placeholder="https://youtube.com/..."></div>
-            <div class="field"><label for="sessionSolutionVideo">Video chữa bài</label><input id="sessionSolutionVideo" class="input" type="url" placeholder="https://youtube.com/..."></div>
-            <div class="field"><label for="sessionPracticeLink">Link đề luyện tập</label><input id="sessionPracticeLink" class="input" type="url" placeholder="https://..."></div>
-            <div class="field"><label for="sessionOpenAt">Thời điểm mở</label><input id="sessionOpenAt" class="input" type="datetime-local"></div>
-            <div class="field full"><label style="display:flex; align-items:center; gap:10px;"><input id="sessionPreview" type="checkbox">Cho phép học thử buổi này</label></div>
-          </div>
-          <div class="footer-actions">
-            <button class="btn btn-outline" type="button" onclick="closeSessionEditor()">Hủy</button>
-            <button class="btn btn-primary" type="submit">Lưu buổi học</button>
-          </div>
-        </form>
-      </section>
+<div id="courseScreen" class="screen">
+  <div class="stop"><button class="btn btn-outline btn-sm" type="button" onclick="closeCourseScreen()">← Quay lại</button><h2 id="screenTitle">Chi tiết khóa học</h2><button id="screenRegisterBtn" class="btn btn-primary hidden" type="button">Đăng ký</button><button id="screenEditBtn" class="btn btn-outline btn-sm hidden" type="button">Sửa khóa</button></div>
+  <div class="sbody">
+    <div id="registerBanner" class="register hidden"><div><strong>Bạn chưa đăng ký khóa học này</strong><div class="muted">Hiện tại bạn chỉ xem được các buổi học thử.</div></div><button id="bannerRegisterBtn" class="btn btn-primary" type="button">Đăng ký ngay</button></div>
+    <div class="screen-grid">
+      <div class="screen-panel"><h4>Tổng quan khóa học</h4><div id="summaryBox"></div></div>
+      <div class="screen-panel"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px"><h4 style="margin:0">Danh sách buổi học</h4><button id="openSessionBtn" class="btn btn-primary hidden" type="button">Thêm buổi học</button></div><div id="sessionList" class="session-list"></div></div>
     </div>
   </div>
 </div>
@@ -189,448 +134,47 @@ textarea { min-height: 110px; resize: vertical; }
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
 <script>
-const fallbackAvatar = "default-avatar.png";
-const state = { currentUser: null, role: null, grades: [], subjects: [], chapters: [], teachers: [], courses: [], managers: [], sessions: [], lessons: [], editingCourseId: null, selectedManagers: [], detailCourseId: null, editingSessionId: null };
-const els = {
-  grid: document.getElementById("coursesGrid"), empty: document.getElementById("emptyState"), totalCourses: document.getElementById("totalCoursesValue"), publishedCourses: document.getElementById("publishedCoursesValue"),
-  adminHint: document.getElementById("adminHint"), keyword: document.getElementById("keywordInput"), gradeFilter: document.getElementById("gradeFilter"), subjectFilter: document.getElementById("subjectFilter"), statusFilter: document.getElementById("statusFilter"), progressFilter: document.getElementById("progressFilter"),
-  courseModal: document.getElementById("courseModal"), courseModalTitle: document.getElementById("courseModalTitle"), courseForm: document.getElementById("courseForm"), detailModal: document.getElementById("detailModal"), detailTitle: document.getElementById("detailTitle"), detailSummary: document.getElementById("detailSummary"), detailManagers: document.getElementById("detailManagers"), sessionList: document.getElementById("sessionList"), sessionEditor: document.getElementById("sessionEditor"), sessionEditorTitle: document.getElementById("sessionEditorTitle"), sessionForm: document.getElementById("sessionForm"), selectedManagers: document.getElementById("selectedManagers"), managerPicker: document.getElementById("managerPicker"), chapterPicker: document.getElementById("sessionChapter")
-};
-
-document.getElementById("openCreateCourseBtn").addEventListener("click", openCreateCourseModal);
-document.getElementById("addManagerBtn").addEventListener("click", addSelectedManager);
-document.getElementById("openSessionFormBtn").addEventListener("click", () => openSessionEditor());
-els.courseForm.addEventListener("submit", submitCourseForm);
-els.sessionForm.addEventListener("submit", submitSessionForm);
-[els.keyword, els.gradeFilter, els.subjectFilter, els.statusFilter, els.progressFilter].forEach((el) => el.addEventListener("input", renderCourses));
-
-init();
-
-async function init() {
-  const { data: authData } = await sb.auth.getUser();
-  if (!authData?.user) {
-    location.href = "index.html";
-    return;
-  }
-  state.currentUser = authData.user;
-
-  const { data: profile } = await sb.from("users").select("id, role").eq("id", authData.user.id).single();
-  state.role = profile?.role || "student";
-
-  const isAdmin = state.role === "admin";
-  document.getElementById("openCreateCourseBtn").style.display = isAdmin ? "inline-flex" : "none";
-  document.getElementById("openSessionFormBtn").style.display = isAdmin ? "inline-flex" : "none";
-  els.adminHint.style.display = isAdmin ? "block" : "none";
-
-  await Promise.all([loadBaseOptions(), loadCourses()]);
-}
-
-async function loadBaseOptions() {
-  const [{ data: grades }, { data: subjects }, { data: chapters }, { data: teachers }] = await Promise.all([
-    sb.from("grades").select("id, name").order("name"),
-    sb.from("subjects").select("id, name, grade_id").order("name"),
-    sb.from("chapters").select("id, name, subject_id").order("name"),
-    sb.from("users").select("id, full_name, avatar_url, subject, role").in("role", ["teacher", "admin"]).order("full_name")
-  ]);
-
-  state.grades = grades || [];
-  state.subjects = subjects || [];
-  state.chapters = chapters || [];
-  state.teachers = teachers || [];
-
-  fillSelect(els.gradeFilter, state.grades, "Tất cả khối");
-  fillSelect(document.getElementById("courseGrade"), state.grades, "Chọn khối");
-  fillSelectSubject(els.subjectFilter, "", "Tất cả môn");
-  fillSelectSubject(document.getElementById("courseSubject"), "", "Chọn môn");
-  fillTeacherPicker();
-  fillChapterPicker("");
-
-  els.gradeFilter.addEventListener("change", () => {
-    fillSelectSubject(els.subjectFilter, els.gradeFilter.value, "Tất cả môn");
-    renderCourses();
-  });
-  document.getElementById("courseGrade").addEventListener("change", () => {
-    fillSelectSubject(document.getElementById("courseSubject"), document.getElementById("courseGrade").value, "Chọn môn");
-  });
-}
-
-async function loadCourses() {
-  const [{ data: courses }, { data: managers }, { data: sessions }, { data: lessons }] = await Promise.all([
-    sb.from("courses").select("*").order("created_at", { ascending: false }),
-    sb.from("course_managers").select("*"),
-    sb.from("course_sessions").select("*").order("session_order"),
-    sb.from("lessons").select("*")
-  ]);
-
-  state.courses = courses || [];
-  state.managers = managers || [];
-  state.sessions = sessions || [];
-  state.lessons = lessons || [];
-  renderCourses();
-}
-
-function fillSelect(selectEl, items, placeholder) {
-  selectEl.innerHTML = `<option value="">${placeholder}</option>` + items.map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join("");
-}
-
-function fillSelectSubject(selectEl, gradeId, placeholder) {
-  const items = gradeId ? state.subjects.filter((item) => item.grade_id === gradeId) : state.subjects;
-  selectEl.innerHTML = `<option value="">${placeholder}</option>` + items.map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join("");
-}
-
-function fillTeacherPicker() {
-  els.managerPicker.innerHTML = `<option value="">Chọn giáo viên quản lý</option>` + state.teachers.map((teacher) => `<option value="${teacher.id}">${escapeHtml(teacher.full_name || "Giáo viên")}${teacher.subject ? ` - ${escapeHtml(teacher.subject)}` : ""}</option>`).join("");
-}
-
-function fillChapterPicker(subjectId) {
-  const items = subjectId ? state.chapters.filter((item) => item.subject_id === subjectId) : state.chapters;
-  els.chapterPicker.innerHTML = `<option value="">Chưa chọn chương</option>` + items.map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join("");
-}
-
-function renderCourses() {
-  const keyword = els.keyword.value.trim().toLowerCase();
-  const gradeId = els.gradeFilter.value;
-  const subjectId = els.subjectFilter.value;
-  const status = els.statusFilter.value;
-  const progressMode = els.progressFilter.value;
-
-  const filtered = state.courses.filter((course) => {
-    const managers = getCourseManagers(course.id);
-    const managerText = managers.map((teacher) => `${teacher.full_name || ""} ${teacher.subject || ""}`).join(" ").toLowerCase();
-    const searchText = `${course.name || ""} ${course.description || ""}`.toLowerCase();
-    if (keyword && !(`${searchText} ${managerText}`).includes(keyword)) return false;
-    if (gradeId && course.grade_id !== gradeId) return false;
-    if (subjectId && course.subject_id !== subjectId) return false;
-    if (status && course.status !== status) return false;
-    if (progressMode && course.progress_mode !== progressMode) return false;
-    return true;
-  });
-
-  els.totalCourses.textContent = String(state.courses.length);
-  els.publishedCourses.textContent = String(state.courses.filter((course) => course.status === "published").length);
-  els.empty.style.display = filtered.length ? "none" : "block";
-  els.grid.innerHTML = filtered.map(renderCourseCard).join("");
-  bindCourseCardActions();
-}
-
-function renderCourseCard(course) {
-  const managers = getCourseManagers(course.id);
-  const subject = state.subjects.find((item) => item.id === course.subject_id)?.name || "Chưa chọn môn";
-  const grade = state.grades.find((item) => item.id === course.grade_id)?.name || "Chưa chọn khối";
-  const sessionCount = state.sessions.filter((item) => item.course_id === course.id).length || course.planned_sessions || 0;
-  const coverStyle = course.cover_url
-    ? `style="background-image: linear-gradient(180deg, rgba(10,20,40,.18), rgba(10,20,40,.45)), url('${escapeAttribute(course.cover_url)}'); background-size: cover; background-position: center;"`
-    : "";
-  return `
-    <article class="course-card">
-      <div class="course-cover" ${coverStyle}>
-        <div class="cover-badges">
-          <span class="pill light">${course.status === "published" ? "Đang mở" : course.status === "archived" ? "Lưu trữ" : "Bản nháp"}</span>
-          <span class="pill light">${course.progress_mode === "free" ? "Mở toàn bộ" : course.progress_mode === "scheduled" ? "Mở theo lịch" : "Mở tuần tự"}</span>
-          ${course.is_home_pinned ? `<span class="pill light">Ghim Trang chủ</span>` : ""}
-        </div>
-        <h3 class="course-name">${escapeHtml(course.name)}</h3>
-      </div>
-      <div class="course-body">
-        <p class="course-desc">${linkify(escapeHtml(course.description || "Chưa có mô tả cho khóa học này."))}</p>
-        <div class="meta-row">
-          <div class="meta-box"><span>Khối / Môn</span><strong>${escapeHtml(grade)} - ${escapeHtml(subject)}</strong></div>
-          <div class="meta-box"><span>Thời lượng / Số buổi</span><strong>${course.duration_weeks || 0} tuần - ${sessionCount} buổi</strong></div>
-        </div>
-        <div class="manager-list">
-          ${managers.length ? managers.map((teacher) => `
-            <span class="manager-chip">
-              <img src="${escapeAttribute(teacher.avatar_url || fallbackAvatar)}" alt="">
-              <span>${escapeHtml(teacher.full_name || "Giáo viên")}</span>
-            </span>
-          `).join("") : `<span class="muted">Chưa gán giáo viên quản lý</span>`}
-        </div>
-        <div class="action-row">
-          <button class="btn btn-outline" type="button" data-action="detail" data-id="${course.id}">Xem chi tiết</button>
-          ${state.role === "admin" ? `<button class="btn btn-outline" type="button" data-action="edit" data-id="${course.id}">Sửa khóa</button>` : ""}
-          ${state.role === "admin" ? `<button class="btn btn-danger" type="button" data-action="delete" data-id="${course.id}">Xóa</button>` : ""}
-        </div>
-      </div>
-    </article>
-  `;
-}
-
-function bindCourseCardActions() {
-  document.querySelectorAll("[data-action='detail']").forEach((btn) => btn.onclick = () => openDetailModal(btn.dataset.id));
-  document.querySelectorAll("[data-action='edit']").forEach((btn) => btn.onclick = () => openEditCourseModal(btn.dataset.id));
-  document.querySelectorAll("[data-action='delete']").forEach((btn) => btn.onclick = () => deleteCourse(btn.dataset.id));
-}
-
-function getCourseManagers(courseId) {
-  const managerIds = state.managers.filter((item) => item.course_id === courseId).map((item) => item.teacher_id);
-  return managerIds.map((teacherId) => state.teachers.find((teacher) => teacher.id === teacherId)).filter(Boolean);
-}
-
-function openCreateCourseModal() {
-  if (state.role !== "admin") return;
-  state.editingCourseId = null;
-  state.selectedManagers = [];
-  els.courseModalTitle.textContent = "Tạo khóa học";
-  els.courseForm.reset();
-  document.getElementById("courseDuration").value = 12;
-  document.getElementById("coursePlannedSessions").value = 30;
-  document.getElementById("courseStatus").value = "draft";
-  document.getElementById("courseProgressMode").value = "sequential";
-  renderSelectedManagers();
-  els.courseModal.classList.add("show");
-}
-
-function openEditCourseModal(courseId) {
-  const course = state.courses.find((item) => item.id === courseId);
-  if (!course) return;
-  state.editingCourseId = courseId;
-  state.selectedManagers = getCourseManagers(courseId).map((teacher) => teacher.id);
-  els.courseModalTitle.textContent = "Sửa khóa học";
-  document.getElementById("courseName").value = course.name || "";
-  document.getElementById("courseCoverUrl").value = course.cover_url || "";
-  document.getElementById("courseGrade").value = course.grade_id || "";
-  fillSelectSubject(document.getElementById("courseSubject"), course.grade_id || "", "Chọn môn");
-  document.getElementById("courseSubject").value = course.subject_id || "";
-  document.getElementById("courseDuration").value = course.duration_weeks || 12;
-  document.getElementById("coursePlannedSessions").value = course.planned_sessions || 30;
-  document.getElementById("courseStatus").value = course.status || "draft";
-  document.getElementById("courseProgressMode").value = course.progress_mode || "sequential";
-  document.getElementById("courseDescription").value = course.description || "";
-  document.getElementById("coursePinned").checked = !!course.is_home_pinned;
-  renderSelectedManagers();
-  els.courseModal.classList.add("show");
-}
-
-function closeCourseModal() { els.courseModal.classList.remove("show"); }
-
-function addSelectedManager() {
-  const teacherId = els.managerPicker.value;
-  if (!teacherId) return alert("Hãy chọn giáo viên trước khi thêm.");
-  if (!state.selectedManagers.includes(teacherId)) state.selectedManagers.push(teacherId);
-  els.managerPicker.value = "";
-  renderSelectedManagers();
-}
-
-function removeSelectedManager(teacherId) {
-  state.selectedManagers = state.selectedManagers.filter((id) => id !== teacherId);
-  renderSelectedManagers();
-}
-
-function renderSelectedManagers() {
-  els.selectedManagers.innerHTML = state.selectedManagers.length ? state.selectedManagers.map((teacherId) => {
-    const teacher = state.teachers.find((item) => item.id === teacherId);
-    if (!teacher) return "";
-    return `<span class="manager-chip"><img src="${escapeAttribute(teacher.avatar_url || fallbackAvatar)}" alt=""><span>${escapeHtml(teacher.full_name || "Giáo viên")}</span><button class="btn btn-outline" type="button" onclick="removeSelectedManager('${teacherId}')" style="padding:4px 8px;">Xóa</button></span>`;
-  }).join("") : `<span class="muted">Chưa chọn giáo viên quản lý nào.</span>`;
-}
-
-async function submitCourseForm(event) {
-  event.preventDefault();
-  if (state.role !== "admin") return;
-
-  const payload = {
-    name: document.getElementById("courseName").value.trim(),
-    cover_url: document.getElementById("courseCoverUrl").value.trim() || null,
-    grade_id: document.getElementById("courseGrade").value || null,
-    subject_id: document.getElementById("courseSubject").value || null,
-    duration_weeks: Number(document.getElementById("courseDuration").value || 12),
-    planned_sessions: Number(document.getElementById("coursePlannedSessions").value || 30),
-    status: document.getElementById("courseStatus").value,
-    progress_mode: document.getElementById("courseProgressMode").value,
-    description: document.getElementById("courseDescription").value.trim(),
-    is_home_pinned: document.getElementById("coursePinned").checked,
-    created_by: state.currentUser.id
-  };
-
-  if (!payload.name) return alert("Tên khóa học không được để trống.");
-
-  let courseId = state.editingCourseId;
-  if (courseId) {
-    const { error } = await sb.from("courses").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", courseId);
-    if (error) return alert("Không thể cập nhật khóa học: " + error.message);
-    await sb.from("course_managers").delete().eq("course_id", courseId);
-  } else {
-    const { data, error } = await sb.from("courses").insert(payload).select("id").single();
-    if (error) return alert("Không thể tạo khóa học: " + error.message);
-    courseId = data.id;
-  }
-
-  if (state.selectedManagers.length) {
-    const rows = state.selectedManagers.map((teacherId) => ({ course_id: courseId, teacher_id: teacherId, assigned_by: state.currentUser.id }));
-    const { error } = await sb.from("course_managers").insert(rows);
-    if (error) alert("Khóa học đã lưu nhưng chưa gán được giáo viên quản lý: " + error.message);
-  }
-
-  closeCourseModal();
-  await loadCourses();
-}
-
-async function deleteCourse(courseId) {
-  if (state.role !== "admin") return;
-  if (!confirm("Bạn có chắc muốn xóa khóa học này không?")) return;
-  const { error } = await sb.from("courses").delete().eq("id", courseId);
-  if (error) return alert("Không thể xóa khóa học: " + error.message);
-  await loadCourses();
-}
-
-async function openDetailModal(courseId) {
-  state.detailCourseId = courseId;
-  state.editingSessionId = null;
-  const course = state.courses.find((item) => item.id === courseId);
-  if (!course) return;
-  const grade = state.grades.find((item) => item.id === course.grade_id)?.name || "Chưa chọn khối";
-  const subject = state.subjects.find((item) => item.id === course.subject_id)?.name || "Chưa chọn môn";
-  els.detailTitle.textContent = course.name || "Chi tiết khóa học";
-  els.detailSummary.innerHTML = `
-    <div class="meta-badges">
-      <span class="pill soft">${escapeHtml(grade)}</span>
-      <span class="pill soft">${escapeHtml(subject)}</span>
-      <span class="pill soft">${course.duration_weeks || 0} tuần</span>
-      <span class="pill soft">${course.progress_mode === "free" ? "Mở toàn bộ" : course.progress_mode === "scheduled" ? "Mở theo lịch" : "Mở tuần tự"}</span>
-    </div>
-    <p style="margin:14px 0 0; line-height:1.65; color:#607089;">${linkify(escapeHtml(course.description || "Chưa có mô tả."))}</p>
-  `;
-  const managers = getCourseManagers(course.id);
-  els.detailManagers.innerHTML = managers.length ? managers.map((teacher) => `<span class="manager-chip"><img src="${escapeAttribute(teacher.avatar_url || fallbackAvatar)}" alt=""><span>${escapeHtml(teacher.full_name || "Giáo viên")}</span></span>`).join("") : `<span class="muted">Chưa có giáo viên quản lý.</span>`;
-  renderSessions();
-  document.getElementById("openSessionFormBtn").style.display = state.role === "admin" ? "inline-flex" : "none";
-  els.detailModal.classList.add("show");
-}
-
-function renderSessions() {
-  const sessions = state.sessions.filter((item) => item.course_id === state.detailCourseId).sort((a, b) => a.session_order - b.session_order);
-  els.sessionList.innerHTML = sessions.length ? sessions.map((session) => {
-    const lesson = state.lessons.find((item) => item.id === session.lesson_id);
-    const chapter = state.chapters.find((item) => item.id === lesson?.chapter_id);
-    return `
-      <article class="session-item">
-        <h5>Buổi ${session.session_order}: ${escapeHtml(lesson?.name || "Chưa có bài học")}</h5>
-        <p>${escapeHtml(lesson?.summary || "Chưa có tóm tắt bài học.")}</p>
-        <div class="meta-badges" style="margin-top:10px;">
-          ${chapter ? `<span class="pill soft">${escapeHtml(chapter.name)}</span>` : ""}
-          <span class="pill soft">${session.unlock_mode === "scheduled" ? "Mở theo lịch" : session.unlock_mode === "manual" ? "Mở thủ công" : "Theo mặc định khóa"}</span>
-          ${session.is_preview ? `<span class="pill soft">Học thử</span>` : ""}
-        </div>
-        <div class="inline-actions">
-          ${lesson?.lecture_video_url ? `<a href="${escapeAttribute(lesson.lecture_video_url)}" target="_blank" rel="noopener">Video bài giảng</a>` : ""}
-          ${lesson?.solution_video_url ? `<a href="${escapeAttribute(lesson.solution_video_url)}" target="_blank" rel="noopener">Video chữa bài</a>` : ""}
-          ${lesson?.practice_link ? `<a href="${escapeAttribute(lesson.practice_link)}" target="_blank" rel="noopener">Đề luyện tập</a>` : ""}
-        </div>
-        ${state.role === "admin" ? `<div class="inline-actions"><button class="btn btn-outline" type="button" onclick="openSessionEditor('${session.id}')">Sửa buổi</button><button class="btn btn-danger" type="button" onclick="deleteSession('${session.id}')">Xóa buổi</button></div>` : ""}
-      </article>
-    `;
-  }).join("") : `<div class="muted">Khóa học này chưa có buổi học nào.</div>`;
-}
-
-function openSessionEditor(sessionId = null) {
-  if (state.role !== "admin") return;
-  state.editingSessionId = sessionId;
-  els.sessionEditor.style.display = "block";
-  const currentCourse = state.courses.find((item) => item.id === state.detailCourseId);
-  fillChapterPicker(currentCourse?.subject_id || "");
-
-  if (!sessionId) {
-    els.sessionEditorTitle.textContent = "Thêm buổi học";
-    els.sessionForm.reset();
-    document.getElementById("sessionOrder").value = state.sessions.filter((item) => item.course_id === state.detailCourseId).length + 1;
-    document.getElementById("sessionUnlockMode").value = "course_default";
-    return;
-  }
-
-  const session = state.sessions.find((item) => item.id === sessionId);
-  const lesson = state.lessons.find((item) => item.id === session?.lesson_id);
-  if (!session || !lesson) return;
-  els.sessionEditorTitle.textContent = "Sửa buổi học";
-  document.getElementById("sessionOrder").value = session.session_order || "";
-  document.getElementById("sessionUnlockMode").value = session.unlock_mode || "course_default";
-  document.getElementById("sessionLessonName").value = lesson.name || "";
-  document.getElementById("sessionChapter").value = lesson.chapter_id || "";
-  document.getElementById("sessionLessonSummary").value = lesson.summary || "";
-  document.getElementById("sessionLectureVideo").value = lesson.lecture_video_url || "";
-  document.getElementById("sessionSolutionVideo").value = lesson.solution_video_url || "";
-  document.getElementById("sessionPracticeLink").value = lesson.practice_link || "";
-  document.getElementById("sessionOpenAt").value = session.open_at ? toDatetimeLocal(session.open_at) : "";
-  document.getElementById("sessionPreview").checked = !!session.is_preview;
-}
-
-function closeSessionEditor() { els.sessionEditor.style.display = "none"; state.editingSessionId = null; }
-
-async function submitSessionForm(event) {
-  event.preventDefault();
-  if (state.role !== "admin" || !state.detailCourseId) return;
-
-  const lessonPayload = {
-    chapter_id: document.getElementById("sessionChapter").value || null,
-    name: document.getElementById("sessionLessonName").value.trim(),
-    summary: document.getElementById("sessionLessonSummary").value.trim(),
-    lecture_video_url: document.getElementById("sessionLectureVideo").value.trim() || null,
-    solution_video_url: document.getElementById("sessionSolutionVideo").value.trim() || null,
-    practice_link: document.getElementById("sessionPracticeLink").value.trim() || null,
-    created_by: state.currentUser.id
-  };
-  if (!lessonPayload.name) return alert("Tên bài học không được để trống.");
-
-  const sessionPayload = {
-    course_id: state.detailCourseId,
-    session_order: Number(document.getElementById("sessionOrder").value),
-    unlock_mode: document.getElementById("sessionUnlockMode").value,
-    open_at: document.getElementById("sessionOpenAt").value ? new Date(document.getElementById("sessionOpenAt").value).toISOString() : null,
-    is_preview: document.getElementById("sessionPreview").checked,
-    created_by: state.currentUser.id
-  };
-
-  if (state.editingSessionId) {
-    const existingSession = state.sessions.find((item) => item.id === state.editingSessionId);
-    const { error: lessonError } = await sb.from("lessons").update(lessonPayload).eq("id", existingSession.lesson_id);
-    if (lessonError) return alert("Không thể cập nhật bài học: " + lessonError.message);
-    const { error: sessionError } = await sb.from("course_sessions").update(sessionPayload).eq("id", state.editingSessionId);
-    if (sessionError) return alert("Không thể cập nhật buổi học: " + sessionError.message);
-  } else {
-    const { data: lesson, error: lessonError } = await sb.from("lessons").insert(lessonPayload).select("id").single();
-    if (lessonError) return alert("Không thể tạo bài học: " + lessonError.message);
-    const { error: sessionError } = await sb.from("course_sessions").insert({ ...sessionPayload, lesson_id: lesson.id });
-    if (sessionError) return alert("Không thể tạo buổi học: " + sessionError.message);
-  }
-
-  closeSessionEditor();
-  await loadCourses();
-  await openDetailModal(state.detailCourseId);
-}
-
-async function deleteSession(sessionId) {
-  if (state.role !== "admin") return;
-  if (!confirm("Bạn có chắc muốn xóa buổi học này không?")) return;
-  const session = state.sessions.find((item) => item.id === sessionId);
-  const { error } = await sb.from("course_sessions").delete().eq("id", sessionId);
-  if (error) return alert("Không thể xóa buổi học: " + error.message);
-  if (session?.lesson_id) await sb.from("lessons").delete().eq("id", session.lesson_id);
-  await loadCourses();
-  await openDetailModal(state.detailCourseId);
-}
-
-function closeDetailModal() {
-  els.detailModal.classList.remove("show");
-  closeSessionEditor();
-  state.detailCourseId = null;
-}
-
-function escapeHtml(value) {
-  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
-
-function escapeAttribute(value) {
-  return escapeHtml(value).replace(/`/g, "&#96;");
-}
-
-function linkify(text) {
-  return text.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
-}
-
-function toDatetimeLocal(value) {
-  const date = new Date(value);
-  const pad = (num) => String(num).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
+const q=new URLSearchParams(location.search),avatarFallback="default-avatar.png";
+const S={user:null,role:"student",grades:[],subjects:[],teachers:[],exams:[],courses:[],managers:[],lessons:[],sessions:[],enrollments:[],selectedManagers:[],editingCourseId:null,editingSessionId:null,activeCourseId:null,existingCoverUrl:""};
+const E={toolbar:document.getElementById("toolbar"),keyword:document.getElementById("keyword"),gradeFilter:document.getElementById("gradeFilter"),subjectFilter:document.getElementById("subjectFilter"),statusFilter:document.getElementById("statusFilter"),openCreateBtn:document.getElementById("openCreateBtn"),grid:document.getElementById("grid"),empty:document.getElementById("empty"),totalValue:document.getElementById("totalValue"),openValue:document.getElementById("openValue"),courseModal:document.getElementById("courseModal"),courseForm:document.getElementById("courseForm"),courseModalTitle:document.getElementById("courseModalTitle"),courseGrade:document.getElementById("courseGrade"),courseSubject:document.getElementById("courseSubject"),managerPicker:document.getElementById("managerPicker"),selectedManagers:document.getElementById("selectedManagers"),coverPreview:document.getElementById("coverPreview"),courseCoverFile:document.getElementById("courseCoverFile"),sessionModal:document.getElementById("sessionModal"),sessionForm:document.getElementById("sessionForm"),sessionModalTitle:document.getElementById("sessionModalTitle"),sessionExamId:document.getElementById("sessionExamId"),screen:document.getElementById("courseScreen"),screenTitle:document.getElementById("screenTitle"),screenRegisterBtn:document.getElementById("screenRegisterBtn"),bannerRegisterBtn:document.getElementById("bannerRegisterBtn"),registerBanner:document.getElementById("registerBanner"),screenEditBtn:document.getElementById("screenEditBtn"),openSessionBtn:document.getElementById("openSessionBtn"),summaryBox:document.getElementById("summaryBox"),sessionList:document.getElementById("sessionList")};
+E.openCreateBtn.addEventListener("click",openCreateCourseModal);document.getElementById("addManagerBtn").addEventListener("click",addSelectedManager);E.courseForm.addEventListener("submit",submitCourseForm);E.sessionForm.addEventListener("submit",submitSessionForm);E.screenRegisterBtn.addEventListener("click",()=>registerCourse(S.activeCourseId));E.bannerRegisterBtn.addEventListener("click",()=>registerCourse(S.activeCourseId));E.screenEditBtn.addEventListener("click",()=>S.activeCourseId&&openEditCourseModal(S.activeCourseId));E.openSessionBtn.addEventListener("click",()=>openSessionModal());E.courseCoverFile.addEventListener("change",previewCover);[E.keyword,E.gradeFilter,E.subjectFilter,E.statusFilter].forEach(el=>el.addEventListener("input",renderCourses));init();
+async function init(){const{data:a}=await sb.auth.getUser();if(!a?.user){location.href="index.html";return;}S.user=a.user;const{data:p}=await sb.from("users").select("role").eq("id",S.user.id).single();S.role=p?.role||"student";if(S.role==="student"){E.keyword.classList.add("hidden");E.statusFilter.classList.add("hidden");E.openCreateBtn.classList.add("hidden");E.toolbar.style.gridTemplateColumns="repeat(2,minmax(150px,220px))";}await Promise.all([loadBase(),loadData()]);const courseId=q.get("courseId");if(courseId)openCourseScreen(courseId)}
+async function loadBase(){const[{data:g},{data:su},{data:t},{data:ex}]=await Promise.all([sb.from("grades").select("id,name").order("name"),sb.from("subjects").select("id,name,grade_id").order("name"),sb.from("users").select("id,full_name,avatar_url,subject,role").in("role",["teacher","admin"]).order("full_name"),sb.from("exams").select("id,title,total_points,duration_minutes").order("created_at",{ascending:false})]);S.grades=g||[];S.subjects=su||[];S.teachers=(t||[]).filter(x=>x.role==="teacher"||x.role==="admin");S.exams=ex||[];fillSelect(E.gradeFilter,S.grades,"Tất cả khối");fillSelect(E.courseGrade,S.grades,"Chọn khối");fillSubjects(E.subjectFilter,"","Tất cả môn");fillSubjects(E.courseSubject,"","Chọn môn");fillTeachers();fillExams();E.gradeFilter.addEventListener("change",()=>{fillSubjects(E.subjectFilter,E.gradeFilter.value,"Tất cả môn");renderCourses()});E.courseGrade.addEventListener("change",()=>fillSubjects(E.courseSubject,E.courseGrade.value,"Chọn môn"))}
+async function loadData(){const cq=S.role==="student"?sb.from("courses").select("*").eq("status","open").order("created_at",{ascending:false}):sb.from("courses").select("*").order("created_at",{ascending:false});const eq=S.role==="student"?sb.from("course_enrollments").select("*").eq("student_id",S.user.id):sb.from("course_enrollments").select("*");const[{data:c},{data:m},{data:l},{data:ss},{data:e}]=await Promise.all([cq,sb.from("course_managers").select("*"),sb.from("lessons").select("*"),sb.from("course_sessions").select("*").order("session_order"),eq]);S.courses=c||[];S.managers=m||[];S.lessons=l||[];S.sessions=ss||[];S.enrollments=e||[];renderCourses()}
+function fillSelect(el,items,ph){el.innerHTML=`<option value="">${ph}</option>`+items.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join("")}
+function fillSubjects(el,gradeId,ph){const list=gradeId?S.subjects.filter(x=>x.grade_id===gradeId):S.subjects;el.innerHTML=`<option value="">${ph}</option>`+list.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join("")}
+function fillTeachers(){E.managerPicker.innerHTML=`<option value="">Chọn giáo viên quản lý</option>`+S.teachers.map(x=>`<option value="${x.id}">${esc(x.full_name||"Giáo viên")}${x.subject?` - ${esc(x.subject)}`:""}</option>`).join("")}
+function fillExams(selected=""){E.sessionExamId.innerHTML=`<option value="">Chưa gắn đề luyện tập</option>`+S.exams.map(x=>`<option value="${x.id}" ${selected===x.id?"selected":""}>${esc(x.title)} - ${x.duration_minutes||0} phút</option>`).join("")}
+function getManagers(courseId){const ids=S.managers.filter(x=>x.course_id===courseId).map(x=>x.teacher_id);return ids.map(id=>S.teachers.find(t=>t.id===id)).filter(Boolean)}
+function isEnrolled(courseId){return S.role==="student"&&S.enrollments.some(x=>x.course_id===courseId&&x.student_id===S.user.id)}
+function fmtDate(v){if(!v)return"Chưa thiết lập";const d=new Date(v);return Number.isNaN(d.getTime())?"Chưa thiết lập":d.toLocaleDateString("vi-VN")}
+function esc(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}
+function escAttr(v){return esc(v).replace(/`/g,"&#96;")}
+function linkify(t){return t.replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>')}
+function renderCourses(){const k=(E.keyword.value||"").trim().toLowerCase(),g=E.gradeFilter.value,s=E.subjectFilter.value,st=S.role==="student"?"open":E.statusFilter.value;const list=S.courses.filter(c=>{const mt=getManagers(c.id).map(t=>`${t.full_name||""} ${t.subject||""}`).join(" ").toLowerCase(),txt=`${c.name||""} ${c.description||""}`.toLowerCase();if(k&&!(`${txt} ${mt}`).includes(k))return false;if(g&&c.grade_id!==g)return false;if(s&&c.subject_id!==s)return false;if(st&&c.status!==st)return false;return true});E.totalValue.textContent=String(S.courses.length);E.openValue.textContent=String(S.courses.filter(c=>c.status==="open").length);E.empty.classList.toggle("hidden",list.length>0);E.grid.innerHTML=list.map(renderCourseCard).join("");document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openCourseScreen(b.dataset.open));document.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openEditCourseModal(b.dataset.edit));document.querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>deleteCourse(b.dataset.delete));document.querySelectorAll("[data-register]").forEach(b=>b.onclick=()=>registerCourse(b.dataset.register))}
+function renderCourseCard(c){const grade=S.grades.find(x=>x.id===c.grade_id)?.name||"Chưa thiết lập",subject=S.subjects.find(x=>x.id===c.subject_id)?.name||"Chưa thiết lập",managers=getManagers(c.id),enrolled=isEnrolled(c.id),cnt=S.sessions.filter(x=>x.course_id===c.id).length||c.planned_sessions||0,style=c.cover_url?`style="background-image:linear-gradient(180deg,rgba(10,20,40,.12),rgba(10,20,40,.5)),url('${escAttr(c.cover_url)}');background-size:cover;background-position:center"`:"";return `<article class="course-card"><div class="cover" ${style}><div class="chips"><span class="pill light">${c.status==="open"?"Mở":"Đóng"}</span>${c.is_home_pinned?`<span class="pill light">Ghim Trang chủ</span>`:""}${S.role==="student"&&enrolled?`<span class="pill light">Đã đăng ký</span>`:""}</div><div><h3 style="margin:0;font-size:1.18rem;line-height:1.35">${esc(c.name)}</h3><div style="margin-top:4px;font-size:.84rem;color:rgba(255,255,255,.8)">${fmtDate(c.start_date)} - ${fmtDate(c.end_date)}</div></div></div><div class="course-body"><p style="margin:0;color:#607089;line-height:1.6">${linkify(esc(c.description||"Chưa có mô tả cho khóa học này."))}</p><div class="meta"><div><span>Khối / Môn</span><strong>${esc(grade)} - ${esc(subject)}</strong></div><div><span>Số buổi</span><strong>${cnt} buổi</strong></div></div><div class="teachers">${managers.length?managers.map(t=>`<span class="teacher"><img src="${escAttr(t.avatar_url||avatarFallback)}"><span>${esc(t.full_name||"Giáo viên")}</span></span>`).join(""):`<span class="muted">Chưa gán giáo viên quản lý</span>`}</div><div class="actions"><button class="btn btn-outline" type="button" data-open="${c.id}">Xem chi tiết</button>${S.role==="student"&&!enrolled?`<button class="btn btn-primary" type="button" data-register="${c.id}">Đăng ký</button>`:""}${S.role==="admin"?`<button class="btn btn-outline" type="button" data-edit="${c.id}">Sửa khóa</button><button class="btn btn-danger" type="button" data-delete="${c.id}">Xóa</button>`:""}</div></div></article>`}
+function openCreateCourseModal(){if(S.role!=="admin")return;S.editingCourseId=null;S.selectedManagers=[];S.existingCoverUrl="";E.courseModalTitle.textContent="Tạo khóa học";E.courseForm.reset();setPreview("");fillSubjects(E.courseSubject,"","Chọn môn");renderSelectedManagers();E.courseModal.classList.add("show")}
+function openEditCourseModal(courseId){const c=S.courses.find(x=>x.id===courseId);if(!c)return;S.editingCourseId=courseId;S.selectedManagers=getManagers(courseId).map(t=>t.id);S.existingCoverUrl=c.cover_url||"";E.courseModalTitle.textContent="Sửa khóa học";document.getElementById("courseName").value=c.name||"";document.getElementById("courseStatus").value=c.status||"open";document.getElementById("courseStartDate").value=c.start_date||"";document.getElementById("courseEndDate").value=c.end_date||"";document.getElementById("coursePlannedSessions").value=c.planned_sessions||30;document.getElementById("courseDescription").value=c.description||"";document.getElementById("coursePinned").checked=!!c.is_home_pinned;E.courseGrade.value=c.grade_id||"";fillSubjects(E.courseSubject,c.grade_id||"","Chọn môn");E.courseSubject.value=c.subject_id||"";E.courseCoverFile.value="";setPreview(c.cover_url||"");renderSelectedManagers();E.courseModal.classList.add("show")}
+function closeCourseModal(){E.courseModal.classList.remove("show")}
+function setPreview(url){E.coverPreview.innerHTML=url?`<img src="${escAttr(url)}">`:`<span>Chưa chọn ảnh bìa</span>`}
+function previewCover(ev){const f=ev.target.files?.[0];if(!f){setPreview(S.existingCoverUrl||"");return;}const r=new FileReader();r.onload=e=>setPreview(e.target.result);r.readAsDataURL(f)}
+function addSelectedManager(){const id=E.managerPicker.value;if(!id)return alert("Hãy chọn giáo viên trước khi thêm.");if(!S.selectedManagers.includes(id))S.selectedManagers.push(id);E.managerPicker.value="";renderSelectedManagers()}
+function removeSelectedManager(id){S.selectedManagers=S.selectedManagers.filter(x=>x!==id);renderSelectedManagers()}
+function renderSelectedManagers(){E.selectedManagers.innerHTML=S.selectedManagers.length?S.selectedManagers.map(id=>{const t=S.teachers.find(x=>x.id===id);if(!t)return"";return `<span class="teacher"><img src="${escAttr(t.avatar_url||avatarFallback)}"><span>${esc(t.full_name||"Giáo viên")}</span><button class="btn btn-outline btn-sm" type="button" onclick="removeSelectedManager('${id}')">Xóa</button></span>`}).join(""):`<span class="muted">Chưa chọn giáo viên quản lý nào.</span>`}
+async function submitCourseForm(ev){ev.preventDefault();if(S.role!=="admin")return;const name=document.getElementById("courseName").value.trim();if(!name)return alert("Tên khóa học không được để trống.");let coverUrl=S.existingCoverUrl||null;const file=E.courseCoverFile.files?.[0];if(file){const folder=S.editingCourseId||crypto.randomUUID(),path=`covers/${folder}/${Date.now()}-${file.name}`.replace(/\s+/g,"-");const{error:uErr}=await sb.storage.from("course-covers").upload(path,file,{upsert:true});if(uErr)return alert("Không thể upload ảnh bìa. Hãy kiểm tra bucket 'course-covers'. Lỗi: "+uErr.message);coverUrl=sb.storage.from("course-covers").getPublicUrl(path).data.publicUrl}const payload={name,description:document.getElementById("courseDescription").value.trim(),grade_id:E.courseGrade.value||null,subject_id:E.courseSubject.value||null,start_date:document.getElementById("courseStartDate").value||null,end_date:document.getElementById("courseEndDate").value||null,planned_sessions:Number(document.getElementById("coursePlannedSessions").value||0),status:document.getElementById("courseStatus").value,is_home_pinned:document.getElementById("coursePinned").checked,cover_url:coverUrl,created_by:S.user.id};let courseId=S.editingCourseId;if(courseId){const{error}=await sb.from("courses").update({...payload,updated_at:new Date().toISOString()}).eq("id",courseId);if(error)return alert("Không thể cập nhật khóa học: "+error.message);await sb.from("course_managers").delete().eq("course_id",courseId)}else{const{data,error}=await sb.from("courses").insert(payload).select("id").single();if(error)return alert("Không thể tạo khóa học: "+error.message);courseId=data.id}if(S.selectedManagers.length){const rows=S.selectedManagers.map(id=>({course_id:courseId,teacher_id:id,assigned_by:S.user.id}));const{error}=await sb.from("course_managers").insert(rows);if(error)alert("Khóa học đã lưu nhưng chưa gán được giáo viên quản lý: "+error.message)}closeCourseModal();await loadData()}
+async function deleteCourse(courseId){if(S.role!=="admin")return;if(!confirm("Bạn có chắc muốn xóa khóa học này không?"))return;const{error}=await sb.from("courses").delete().eq("id",courseId);if(error)return alert("Không thể xóa khóa học: "+error.message);closeCourseScreen();await loadData()}
+async function registerCourse(courseId){if(!courseId||S.role!=="student")return;if(isEnrolled(courseId))return alert("Bạn đã đăng ký khóa học này rồi.");const{error}=await sb.from("course_enrollments").insert({course_id:courseId,student_id:S.user.id});if(error)return alert("Không thể đăng ký khóa học: "+error.message);await loadData();if(S.activeCourseId===courseId)openCourseScreen(courseId)}
+function closeCourseScreen(){E.screen.classList.remove("show");S.activeCourseId=null}
+function getOpenDate(startDate,openDay){if(!startDate)return new Date();const d=new Date(startDate);d.setDate(d.getDate()+Math.max(0,Number(openDay||1)-1));return d}
+function startOfDay(d){const x=new Date(d);x.setHours(0,0,0,0);return x}
+function getVisibleSessions(course){const all=S.sessions.filter(x=>x.course_id===course.id).sort((a,b)=>a.session_order-b.session_order);if(S.role==="admin"||S.role==="teacher")return all;if(!isEnrolled(course.id))return all.filter(x=>x.is_preview);return all.filter(x=>x.is_preview||startOfDay(getOpenDate(course.start_date,x.open_day)).getTime()<=startOfDay(new Date()).getTime())}
+function renderSession(course,s){const l=S.lessons.find(x=>x.id===s.lesson_id),exam=S.exams.find(x=>x.id===s.exam_id),d=getOpenDate(course.start_date,s.open_day);return `<div class="session"><div class="order"><strong>Buổi</strong><span>${s.session_order}</span></div><div><h5>${esc(l?.name||"Chưa có tên bài học")}</h5><p>${esc(l?.summary||"Chưa có mô tả cho buổi học này.")}</p><div class="muted" style="margin-top:8px">Mở vào ngày thứ ${s.open_day||1} của khóa • ${fmtDate(d?.toISOString())}${s.is_preview?" • Học thử":""}</div><div class="practice" style="margin-top:10px">${l?.lecture_video_url?`<a class="btn btn-outline btn-sm" href="${escAttr(l.lecture_video_url)}" target="_blank" rel="noopener">Video bài giảng</a>`:""}${l?.solution_video_url?`<a class="btn btn-outline btn-sm" href="${escAttr(l.solution_video_url)}" target="_blank" rel="noopener">Video chữa bài</a>`:""}${exam?`<button class="btn btn-outline btn-sm" type="button" data-practice="${exam.id}">Làm đề luyện tập</button>`:""}</div></div><div class="actions" style="flex-direction:column;align-items:flex-end">${S.role==="admin"?`<button class="btn btn-outline btn-sm" type="button" data-session-edit="${s.id}">Sửa buổi</button><button class="btn btn-danger btn-sm" type="button" data-session-delete="${s.id}">Xóa buổi</button>`:""}</div></div>`}
+function openCourseScreen(courseId){const c=S.courses.find(x=>x.id===courseId);if(!c)return;S.activeCourseId=courseId;E.screen.classList.add("show");E.screenTitle.textContent=c.name||"Chi tiết khóa học";E.screenEditBtn.classList.toggle("hidden",S.role!=="admin");E.openSessionBtn.classList.toggle("hidden",S.role!=="admin");const grade=S.grades.find(x=>x.id===c.grade_id)?.name||"Chưa thiết lập",subject=S.subjects.find(x=>x.id===c.subject_id)?.name||"Chưa thiết lập",managers=getManagers(c.id),enrolled=isEnrolled(c.id),allCount=S.sessions.filter(x=>x.course_id===c.id).length||c.planned_sessions||0;E.screenRegisterBtn.classList.toggle("hidden",!(S.role==="student"&&!enrolled));E.registerBanner.classList.toggle("hidden",!(S.role==="student"&&!enrolled));E.summaryBox.innerHTML=`<div class="chips"><span class="pill soft">${esc(c.status==="open"?"Đang mở":"Đã đóng")}</span><span class="pill soft">${esc(grade)}</span><span class="pill soft">${esc(subject)}</span><span class="pill soft">${allCount} buổi</span></div><p style="margin:14px 0 0;color:#607089;line-height:1.7">${linkify(esc(c.description||"Chưa có mô tả khóa học."))}</p><div class="meta" style="margin-top:16px"><div><span>Thời gian khóa học</span><strong>${fmtDate(c.start_date)} - ${fmtDate(c.end_date)}</strong></div><div><span>Quyền truy cập</span><strong>${S.role==="student"?(enrolled?"Đã đăng ký":"Chỉ xem buổi học thử"):"Quản trị / giáo viên"}</strong></div></div><div style="margin-top:14px"><div class="muted" style="margin-bottom:8px">Giáo viên quản lý</div><div class="teachers">${managers.length?managers.map(t=>`<span class="teacher"><img src="${escAttr(t.avatar_url||avatarFallback)}"><span>${esc(t.full_name||"Giáo viên")}</span></span>`).join(""):`<span class="muted">Chưa gán giáo viên quản lý</span>`}</div></div>`;const list=getVisibleSessions(c);E.sessionList.innerHTML=list.length?list.map(s=>renderSession(c,s)).join(""):`<div class="empty"><strong>Chưa có buổi học nào</strong><div class="muted">Admin có thể thêm buổi học đầu tiên cho khóa này.</div></div>`;document.querySelectorAll("[data-session-edit]").forEach(b=>b.onclick=()=>openSessionModal(b.dataset.sessionEdit));document.querySelectorAll("[data-session-delete]").forEach(b=>b.onclick=()=>deleteSession(b.dataset.sessionDelete));document.querySelectorAll("[data-practice]").forEach(b=>b.onclick=()=>openPractice(b.dataset.practice,c.id))}
+function openPractice(examId,courseId){window.open(`course_practice.html?examId=${encodeURIComponent(examId)}&courseId=${encodeURIComponent(courseId)}`,"_blank")}
+function openSessionModal(sessionId=null){if(S.role!=="admin"||!S.activeCourseId)return;S.editingSessionId=sessionId;E.sessionForm.reset();fillExams("");const next=S.sessions.filter(x=>x.course_id===S.activeCourseId).length+1;document.getElementById("sessionOrder").value=next;document.getElementById("sessionOpenDay").value=next;document.getElementById("sessionPreview").checked=false;E.sessionModalTitle.textContent=sessionId?"Sửa buổi học":"Thêm buổi học";if(sessionId){const s=S.sessions.find(x=>x.id===sessionId),l=S.lessons.find(x=>x.id===s?.lesson_id);if(!s||!l)return;document.getElementById("sessionOrder").value=s.session_order||"";document.getElementById("sessionOpenDay").value=s.open_day||1;document.getElementById("sessionLessonName").value=l.name||"";document.getElementById("sessionLessonSummary").value=l.summary||"";document.getElementById("sessionLectureVideo").value=l.lecture_video_url||"";document.getElementById("sessionSolutionVideo").value=l.solution_video_url||"";document.getElementById("sessionPreview").checked=!!s.is_preview;fillExams(s.exam_id||"")}E.sessionModal.classList.add("show")}
+function closeSessionModal(){E.sessionModal.classList.remove("show");S.editingSessionId=null}
+async function submitSessionForm(ev){ev.preventDefault();if(S.role!=="admin"||!S.activeCourseId)return;const lessonPayload={name:document.getElementById("sessionLessonName").value.trim(),summary:document.getElementById("sessionLessonSummary").value.trim(),lecture_video_url:document.getElementById("sessionLectureVideo").value.trim()||null,solution_video_url:document.getElementById("sessionSolutionVideo").value.trim()||null,created_by:S.user.id};if(!lessonPayload.name)return alert("Tên bài học không được để trống.");const sessionPayload={course_id:S.activeCourseId,session_order:Number(document.getElementById("sessionOrder").value),open_day:Number(document.getElementById("sessionOpenDay").value),is_preview:document.getElementById("sessionPreview").checked,exam_id:document.getElementById("sessionExamId").value||null,created_by:S.user.id};if(S.editingSessionId){const current=S.sessions.find(x=>x.id===S.editingSessionId);const{error:le}=await sb.from("lessons").update(lessonPayload).eq("id",current.lesson_id);if(le)return alert("Không thể cập nhật bài học: "+le.message);const{error:se}=await sb.from("course_sessions").update(sessionPayload).eq("id",S.editingSessionId);if(se)return alert("Không thể cập nhật buổi học: "+se.message)}else{const{data:l,error:le}=await sb.from("lessons").insert(lessonPayload).select("id").single();if(le)return alert("Không thể tạo bài học: "+le.message);const{error:se}=await sb.from("course_sessions").insert({...sessionPayload,lesson_id:l.id});if(se)return alert("Không thể tạo buổi học: "+se.message)}closeSessionModal();await loadData();openCourseScreen(S.activeCourseId)}
+async function deleteSession(id){if(S.role!=="admin")return;if(!confirm("Bạn có chắc muốn xóa buổi học này không?"))return;const s=S.sessions.find(x=>x.id===id);const{error}=await sb.from("course_sessions").delete().eq("id",id);if(error)return alert("Không thể xóa buổi học: "+error.message);if(s?.lesson_id)await sb.from("lessons").delete().eq("id",s.lesson_id);await loadData();openCourseScreen(S.activeCourseId)}
 </script>
 </body>
 </html>

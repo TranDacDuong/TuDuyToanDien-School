@@ -1688,6 +1688,7 @@ let contactInfo = "Trung tâm: liên hệ quản trị viên để được hỗ
 let homeSettingsLoaded = false;
 let allTeachers = [];
 let homeTeachers = [];
+let pinnedHomeCourses = [];
 let centerIntro = { title: "Giới thiệu trung tâm", content: "" };
 const uiIcons = {
   search: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="6"></circle><path d="M20 20l-4.2-4.2"></path></svg>',
@@ -2017,11 +2018,16 @@ async function loadLikedPosts() {
 }
 
 async function loadOverviewSettings() {
-  const [examRes, settingRes, teacherRes, homeTeacherRes] = await Promise.all([
+  const courseQuery = role === "student"
+    ? sb.from("courses").select("id, name, description, cover_url, start_date, end_date, status").eq("is_home_pinned", true).eq("status", "open").order("updated_at", { ascending: false })
+    : sb.from("courses").select("id, name, description, cover_url, start_date, end_date, status").eq("is_home_pinned", true).order("updated_at", { ascending: false });
+
+  const [examRes, settingRes, teacherRes, homeTeacherRes, courseRes] = await Promise.all([
     sb.from("exam_events").select("*").order("exam_at", { ascending: true }),
     sb.from("site_settings").select("setting_key,setting_value").in("setting_key", ["home_contact_info", "home_center_intro"]),
     sb.from("users").select("id, full_name, avatar_url, subject").eq("role", "teacher").order("full_name", { ascending: true }),
-    sb.from("home_teachers").select("id, user_id, sort_order").order("sort_order", { ascending: true })
+    sb.from("home_teachers").select("id, user_id, sort_order").order("sort_order", { ascending: true }),
+    courseQuery
   ]);
 
   if (!examRes.error) {
@@ -2066,6 +2072,9 @@ async function loadOverviewSettings() {
       sort_order: item.sort_order,
       user: teacherMap.get(item.user_id) || null
     })).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  }
+  if (!courseRes.error) {
+    pinnedHomeCourses = courseRes.data || [];
   }
 
   homeSettingsLoaded = true;
@@ -3330,14 +3339,32 @@ function renderOverviewPost(post, compact = false) {
   `;
 }
 
+function renderPinnedCourseCard(course) {
+  const dateLabel = course.start_date || course.end_date
+    ? `${course.start_date ? formatPostTime(course.start_date) : "Chưa rõ"}${course.end_date ? ` - ${formatPostTime(course.end_date)}` : ""}`
+    : "Đang cập nhật lịch học";
+  return `
+    <article class="overview-post">
+      <a class="overview-post-title" href="courses.html?courseId=${course.id}">${esc(course.name || "Khóa học")}</a>
+      <div class="overview-post-meta">${esc(course.status === "open" ? "Đang mở" : "Đã đóng")} • ${esc(dateLabel)}</div>
+      <div class="overview-post-text">${formatRichText(((course.description || "").trim().slice(0, 180) || "Khóa học đang được cập nhật nội dung.").replace(/\n/g, " "))}</div>
+    </article>
+  `;
+}
+
 function renderOverviewSection(posts) {
+  const coursesWrap = document.getElementById("overviewCourses");
   const newsWrap = document.getElementById("overviewNews");
-  if (!newsWrap) return;
+  if (!newsWrap || !coursesWrap) return;
   const approved = (posts || []).filter(post => post.status === "approved");
   const newsPosts = approved
     .filter(post => (post.home_category || "update") === "news")
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     .slice(0, 8);
+
+  coursesWrap.innerHTML = pinnedHomeCourses.length
+    ? pinnedHomeCourses.map(renderPinnedCourseCard).join("")
+    : `<div class="empty-feed" style="padding:24px 16px;"><p>Chưa có khóa học nổi bật nào.</p></div>`;
 
   newsWrap.innerHTML = newsPosts.length
     ? newsPosts.map(post => `
@@ -3349,7 +3376,7 @@ function renderOverviewSection(posts) {
     : `<div class="empty-feed" style="padding:24px 16px;"><p>Chưa có tin tức nào.</p></div>`;
 
   document.getElementById("overviewUpdates")?.closest(".overview-card")?.style.setProperty("display", "none");
-  document.getElementById("overviewCourses")?.closest(".overview-card")?.style.setProperty("display", "none");
+  document.getElementById("overviewCourses")?.closest(".overview-card")?.style.setProperty("display", "");
   renderHomeTeachers();
   renderCenterIntro();
   renderContactInfo();
