@@ -753,3 +753,249 @@ USING (
     WHERE u.id = auth.uid() AND u.role = 'admin'
   )
 );
+
+-- ============================================
+-- Standalone courses module
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS public.courses (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  description text,
+  grade_id uuid,
+  subject_id uuid,
+  duration_weeks integer NOT NULL DEFAULT 12,
+  planned_sessions integer NOT NULL DEFAULT 30,
+  status text NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft', 'published', 'archived')),
+  progress_mode text NOT NULL DEFAULT 'sequential'
+    CHECK (progress_mode IN ('sequential', 'free', 'scheduled')),
+  cover_url text,
+  is_home_pinned boolean NOT NULL DEFAULT false,
+  created_by uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT courses_pkey PRIMARY KEY (id),
+  CONSTRAINT courses_grade_id_fkey FOREIGN KEY (grade_id) REFERENCES public.grades(id) ON DELETE SET NULL,
+  CONSTRAINT courses_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES public.subjects(id) ON DELETE SET NULL,
+  CONSTRAINT courses_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS public.course_managers (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  course_id uuid NOT NULL,
+  teacher_id uuid NOT NULL,
+  assigned_by uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT course_managers_pkey PRIMARY KEY (id),
+  CONSTRAINT course_managers_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id) ON DELETE CASCADE,
+  CONSTRAINT course_managers_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.users(id) ON DELETE CASCADE,
+  CONSTRAINT course_managers_assigned_by_fkey FOREIGN KEY (assigned_by) REFERENCES public.users(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS course_managers_unique
+  ON public.course_managers (course_id, teacher_id);
+
+CREATE TABLE IF NOT EXISTS public.lessons (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  chapter_id uuid,
+  name text NOT NULL,
+  summary text,
+  lecture_video_url text,
+  solution_video_url text,
+  practice_link text,
+  created_by uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT lessons_pkey PRIMARY KEY (id),
+  CONSTRAINT lessons_chapter_id_fkey FOREIGN KEY (chapter_id) REFERENCES public.chapters(id) ON DELETE SET NULL,
+  CONSTRAINT lessons_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS public.course_sessions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  course_id uuid NOT NULL,
+  lesson_id uuid NOT NULL,
+  session_order integer NOT NULL,
+  unlock_mode text NOT NULL DEFAULT 'course_default'
+    CHECK (unlock_mode IN ('course_default', 'manual', 'scheduled')),
+  open_at timestamp with time zone,
+  is_preview boolean NOT NULL DEFAULT false,
+  created_by uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT course_sessions_pkey PRIMARY KEY (id),
+  CONSTRAINT course_sessions_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id) ON DELETE CASCADE,
+  CONSTRAINT course_sessions_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(id) ON DELETE CASCADE,
+  CONSTRAINT course_sessions_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS course_sessions_course_order_unique
+  ON public.course_sessions (course_id, session_order);
+
+CREATE INDEX IF NOT EXISTS courses_status_created_idx
+  ON public.courses (status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS courses_home_pinned_idx
+  ON public.courses (is_home_pinned, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS lessons_chapter_idx
+  ON public.lessons (chapter_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS course_sessions_course_idx
+  ON public.course_sessions (course_id, session_order ASC);
+
+ALTER TABLE public.courses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.course_managers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.lessons ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.course_sessions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS courses_select_policy ON public.courses;
+CREATE POLICY courses_select_policy ON public.courses
+FOR SELECT
+USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS courses_insert_policy ON public.courses;
+CREATE POLICY courses_insert_policy ON public.courses
+FOR INSERT
+WITH CHECK (
+  auth.uid() = created_by
+  AND EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS courses_update_policy ON public.courses;
+CREATE POLICY courses_update_policy ON public.courses
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS courses_delete_policy ON public.courses;
+CREATE POLICY courses_delete_policy ON public.courses
+FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS course_managers_select_policy ON public.course_managers;
+CREATE POLICY course_managers_select_policy ON public.course_managers
+FOR SELECT
+USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS course_managers_insert_policy ON public.course_managers;
+CREATE POLICY course_managers_insert_policy ON public.course_managers
+FOR INSERT
+WITH CHECK (
+  auth.uid() = assigned_by
+  AND EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS course_managers_delete_policy ON public.course_managers;
+CREATE POLICY course_managers_delete_policy ON public.course_managers
+FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS lessons_select_policy ON public.lessons;
+CREATE POLICY lessons_select_policy ON public.lessons
+FOR SELECT
+USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS lessons_insert_policy ON public.lessons;
+CREATE POLICY lessons_insert_policy ON public.lessons
+FOR INSERT
+WITH CHECK (
+  auth.uid() = created_by
+  AND EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS lessons_update_policy ON public.lessons;
+CREATE POLICY lessons_update_policy ON public.lessons
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS lessons_delete_policy ON public.lessons;
+CREATE POLICY lessons_delete_policy ON public.lessons
+FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS course_sessions_select_policy ON public.course_sessions;
+CREATE POLICY course_sessions_select_policy ON public.course_sessions
+FOR SELECT
+USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS course_sessions_insert_policy ON public.course_sessions;
+CREATE POLICY course_sessions_insert_policy ON public.course_sessions
+FOR INSERT
+WITH CHECK (
+  auth.uid() = created_by
+  AND EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS course_sessions_update_policy ON public.course_sessions;
+CREATE POLICY course_sessions_update_policy ON public.course_sessions
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS course_sessions_delete_policy ON public.course_sessions;
+CREATE POLICY course_sessions_delete_policy ON public.course_sessions
+FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
