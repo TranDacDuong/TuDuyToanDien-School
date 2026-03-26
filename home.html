@@ -191,41 +191,44 @@ body {
 }
 .teacher-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
   gap: 12px;
 }
 .teacher-card {
   display: block;
-  padding: 12px;
+  padding: 10px;
   border-radius: 18px;
   background: linear-gradient(180deg, #fff 0%, #fbfcff 100%);
   border: 1px solid rgba(15,31,61,.08);
   text-decoration: none;
   color: inherit;
   transition: .16s ease;
+  text-align: center;
 }
 .teacher-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 22px rgba(15,31,61,.08);
 }
 .teacher-card-avatar {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  border-radius: 18px;
+  width: 84px;
+  height: 84px;
+  border-radius: 16px;
   object-fit: cover;
   background: #eef2f7;
   border: 1px solid rgba(15,31,61,.08);
+  display: block;
+  margin: 0 auto;
 }
 .teacher-card-name {
-  margin-top: 10px;
+  margin-top: 8px;
   color: var(--navy);
-  font-size: .84rem;
+  font-size: .8rem;
   font-weight: 700;
 }
 .teacher-card-subject {
   margin-top: 4px;
   color: var(--ink-light);
-  font-size: .76rem;
+  font-size: .74rem;
   line-height: 1.45;
 }
 .intro-card-title {
@@ -1987,8 +1990,23 @@ async function loadOverviewSettings() {
     allTeachers = teacherRes.data || [];
   }
   if (!homeTeacherRes.error) {
+    const rawHomeTeachers = homeTeacherRes.data || [];
+    const missingTeacherIds = rawHomeTeachers
+      .map(item => item.user_id)
+      .filter(userId => userId && !(allTeachers || []).some(teacher => teacher.id === userId));
+
+    if (missingTeacherIds.length) {
+      const { data: fallbackTeachers } = await sb
+        .from("users")
+        .select("id, full_name, avatar_url, subject")
+        .in("id", missingTeacherIds);
+      if (fallbackTeachers?.length) {
+        allTeachers = [...allTeachers, ...fallbackTeachers.filter(item => !allTeachers.some(existing => existing.id === item.id))];
+      }
+    }
+
     const teacherMap = new Map((allTeachers || []).map(item => [item.id, item]));
-    homeTeachers = (homeTeacherRes.data || []).map(item => ({
+    homeTeachers = rawHomeTeachers.map(item => ({
       id: item.id,
       user_id: item.user_id,
       sort_order: item.sort_order,
