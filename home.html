@@ -185,6 +185,20 @@ body {
   border-radius: 999px;
   background: linear-gradient(180deg, var(--gold), #1877f2);
 }
+.overview-card-head[data-icon]::after {
+  content: attr(data-icon);
+  position: absolute;
+  right: 18px;
+  top: 16px;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(24,119,242,.08);
+  font-size: 1rem;
+}
 .overview-card-title {
   font-family: var(--font-display);
   color: var(--navy);
@@ -1072,12 +1086,51 @@ body {
   .compose-status {
     font-size: .72rem;
   }
+  .overview-card {
+    border-radius: 20px;
+  }
+  .overview-card-head {
+    padding: 16px 16px 12px;
+  }
+  .overview-card-head::before {
+    left: 16px;
+    top: 14px;
+    height: 24px;
+  }
+  .overview-card-head[data-icon]::after {
+    right: 14px;
+    top: 12px;
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+    font-size: .92rem;
+  }
+  .overview-card-title,
+  .overview-card-sub {
+    padding-left: 12px;
+  }
   .admin-grid,
   .admin-inline {
     grid-template-columns: 1fr;
   }
   .admin-section {
     padding: 10px;
+  }
+  .teacher-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .teacher-card {
+    min-height: 156px;
+    padding: 10px 8px;
+  }
+  .teacher-card-avatar {
+    width: 72px;
+    height: 72px;
+  }
+  .countdown-event-head {
+    flex-direction: column;
+    align-items: flex-start;
   }
   .post-stats {
     font-size: .75rem;
@@ -1438,7 +1491,7 @@ body {
   <section class="overview-section active" id="overviewSection">
     <div class="overview-main" id="overviewMain">
       <div class="overview-card overview-admin" id="overviewAdminCard">
-        <div class="overview-card-head">
+        <div class="overview-card-head" data-icon="📰">
           <div class="overview-card-title">Tin tức Trang chủ</div>
           <div class="overview-card-sub">Đăng bài tin tức để hiển thị ở cột phải của Trang chủ.</div>
         </div>
@@ -1498,8 +1551,8 @@ body {
           </div>
         </div>
       </div>
-      <div class="overview-card">
-        <div class="overview-card-head">
+      <div class="overview-card" id="legacyOverviewUpdatesCard">
+        <div class="overview-card-head" data-icon="👩‍🏫">
           <div class="overview-card-title">Giáo viên của trung tâm</div>
           <div class="overview-card-sub">Danh sách giáo viên do quản trị viên chọn và sắp xếp.</div>
         </div>
@@ -1517,8 +1570,8 @@ body {
           </div>
         </div>
       </div>
-      <div class="overview-card">
-        <div class="overview-card-head">
+      <div class="overview-card" id="legacyOverviewCoursesCard">
+        <div class="overview-card-head" data-icon="🏫">
           <div class="overview-card-title">Giới thiệu trung tâm</div>
           <div class="overview-card-sub">Bài giới thiệu duy nhất do quản trị viên cập nhật.</div>
         </div>
@@ -1538,7 +1591,7 @@ body {
         </div>
       </div>
       <div class="overview-card">
-        <div class="overview-card-head">
+        <div class="overview-card-head" data-icon="⏳">
           <div class="overview-card-title">Thông tin từ giáo viên và trung tâm</div>
           <div class="overview-card-sub">Các cập nhật quan trọng từ giáo viên và quản trị viên</div>
         </div>
@@ -1549,7 +1602,7 @@ body {
         </div>
       </div>
       <div class="overview-card">
-        <div class="overview-card-head">
+        <div class="overview-card-head" data-icon="📞">
           <div class="overview-card-title">Khóa học nổi bật</div>
           <div class="overview-card-sub">Các bài viết nổi bật do admin tạo</div>
         </div>
@@ -1562,7 +1615,7 @@ body {
     </div>
     <aside class="overview-side">
       <div class="overview-card">
-        <div class="overview-card-head">
+        <div class="overview-card-head" data-icon="🗞️">
           <div class="overview-card-title">Đếm ngược ngày thi</div>
           <div class="overview-card-sub">Mốc ngày thi có thể chỉnh lại theo lịch thực tế</div>
         </div>
@@ -3348,8 +3401,8 @@ function renderOverviewSection(posts) {
       `).join("")
     : `<div class="empty-feed" style="padding:24px 16px;"><p>Chưa có tin tức nào.</p></div>`;
 
-  document.getElementById("overviewUpdates")?.closest(".overview-card")?.style.setProperty("display", "none");
-  document.getElementById("overviewCourses")?.closest(".overview-card")?.style.setProperty("display", "none");
+  document.getElementById("legacyOverviewUpdatesCard")?.style.setProperty("display", "none");
+  document.getElementById("legacyOverviewCoursesCard")?.style.setProperty("display", "none");
   renderHomeTeachers();
   renderCenterIntro();
   renderContactInfo();
