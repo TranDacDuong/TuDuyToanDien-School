@@ -193,6 +193,7 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
   gap: 12px;
+  align-items: start;
 }
 .teacher-card {
   display: block;
@@ -3390,6 +3391,54 @@ window.saveCenterIntro = async function() {
   centerIntro = { title, content };
   renderCenterIntro();
 };
+
+function renderHomeTeachers() {
+  const wrap = document.getElementById("overviewTeachers");
+  if (!wrap) return;
+  if (!homeTeachers.length) {
+    wrap.innerHTML = `<div class="empty-feed" style="padding:24px 16px;"><p>Chưa có giáo viên nào được ghim trên Trang chủ.</p></div>`;
+    return;
+  }
+
+  wrap.innerHTML = homeTeachers.map(item => {
+    const teacher = item.user || allTeachers.find(entry => entry.id === item.user_id) || {};
+    const teacherName = teacher.full_name || `Giáo viên ${String(item.user_id || "").slice(0, 8)}`;
+    const teacherSubject = teacher.subject || "Chưa cập nhật môn";
+    return `
+      <a class="teacher-card" href="profile.html?id=${item.user_id}">
+        <img class="teacher-card-avatar" src="${teacher.avatar_url || 'default-avatar.png'}" alt="${esc(teacherName)}" onerror="this.src='default-avatar.png'">
+        <div class="teacher-card-name">${esc(teacherName)}</div>
+        <div class="teacher-card-subject">${esc(teacherSubject)}</div>
+      </a>
+    `;
+  }).join("");
+}
+
+function renderHomeTeacherAdminList() {
+  const wrap = document.getElementById("homeTeacherAdminListInline") || document.getElementById("homeTeacherAdminList");
+  if (!wrap) return;
+  if (!homeTeachers.length) {
+    wrap.innerHTML = `<div class="empty-feed" style="padding:14px 12px;"><p>Chưa có giáo viên nào trên Trang chủ.</p></div>`;
+    return;
+  }
+
+  wrap.innerHTML = homeTeachers.map((item, index) => `
+    <div class="admin-list-item teacher-admin-item" draggable="true" data-home-teacher-id="${item.id}" data-index="${index}">
+      <div>
+        <div>${esc(item.user?.full_name || `Giáo viên ${String(item.user_id || "").slice(0, 8)}`)}</div>
+        <div class="admin-list-meta">${esc(item.user?.subject || "Chưa cập nhật môn")}</div>
+      </div>
+      <button class="tiny-btn" type="button" onclick="removeTeacherFromHome('${item.id}')">Xóa</button>
+    </div>
+  `).join("");
+
+  wrap.querySelectorAll(".teacher-admin-item").forEach(item => {
+    item.addEventListener("dragstart", handleTeacherDragStart);
+    item.addEventListener("dragover", handleTeacherDragOver);
+    item.addEventListener("drop", handleTeacherDrop);
+    item.addEventListener("dragend", handleTeacherDragEnd);
+  });
+}
 
 window.createOverviewPost = async function() {
   if (role !== "admin") return;
