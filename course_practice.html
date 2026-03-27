@@ -1,41 +1,35 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Luyện tập khóa học</title>
+<title>Làm bài khóa học</title>
 <link rel="stylesheet" href="theme.css">
 <style>
-body{margin:0;font-family:var(--font-body);background:#f4f7fb;color:var(--ink)}.shell{max-width:980px;margin:0 auto;padding:24px}.card,.question,.result{background:#fff;border:1px solid rgba(35,56,92,.08);border-radius:22px;box-shadow:0 16px 36px rgba(15,23,42,.08)}.card{padding:22px 24px;margin-bottom:18px}.question{padding:18px;margin-bottom:14px}.question h3{margin:0 0 10px;color:var(--navy)}.option{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid rgba(39,58,91,.12);border-radius:12px;margin-top:8px}.option input{margin-top:3px}.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}.hidden{display:none!important}
+body{margin:0;background:#eef3fb;color:var(--ink);font-family:var(--font-body)}
+.exam-shell{position:fixed;inset:0;display:flex;flex-direction:column}
+.topbar{height:58px;background:var(--navy);color:#fff;display:flex;align-items:center;gap:12px;padding:0 18px}
+.topbar h1{margin:0;flex:1;font-size:1.05rem;font-family:var(--font-display)}
+.clock{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);padding:7px 16px;border-radius:8px}
+.clock strong{font-size:1.2rem;font-family:monospace;color:var(--gold-light)}
+.exam-body{flex:1;display:flex;min-height:0}
+.exam-nav{width:120px;flex-shrink:0;background:#fff;border-right:1px solid var(--border);overflow:auto;padding:10px 8px}
+.exam-main{flex:1;overflow:auto;padding:18px 20px;background:#f8fafc}
+.nav-dot{width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:#fff;cursor:pointer;margin-bottom:8px}
+.nav-indicator{width:12px;height:12px;border-radius:999px;background:var(--border)}
+.qcard{background:#fff;border:1px solid var(--border);border-radius:14px;margin-bottom:16px;overflow:hidden}
+.qhead{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border)}
+.qnum{width:30px;height:30px;border-radius:999px;background:var(--navy);color:var(--gold-light);display:flex;align-items:center;justify-content:center;font-weight:700}
+.qbody{padding:16px}.choice{display:flex;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;margin-top:10px;align-items:flex-start;background:#fff}.choice.active{border-color:var(--navy);background:#eff6ff}
+.result-wrap{max-width:640px;margin:40px auto;text-align:center}
+@media(max-width:760px){.exam-body{flex-direction:column}.exam-nav{width:auto;border-right:none;border-bottom:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.nav-dot{margin-bottom:0}}
 </style>
 </head>
 <body>
-<div class="shell">
-  <div class="card">
-    <div class="row" style="justify-content:space-between">
-      <div>
-        <h1 id="title" style="margin:0 0 8px;color:var(--navy)">Đề luyện tập</h1>
-        <div id="meta" class="muted">Đang tải đề...</div>
-      </div>
-      <div class="row">
-        <a class="btn btn-outline" href="courses.html">Quay lại Khóa học</a>
-        <button id="submitBtn" class="btn btn-primary" type="button">Nộp bài</button>
-      </div>
-    </div>
-  </div>
-  <div id="questions"></div>
-  <div id="result" class="result hidden" style="padding:24px;text-align:center"></div>
-</div>
+<div id="app"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
-<script>
-const params=new URLSearchParams(location.search);const examId=params.get("examId");let exam=null,eqs=[],resultId=null;
-document.getElementById("submitBtn").addEventListener("click",submitExam);init();
-async function init(){const{data:{user}}=await sb.auth.getUser();if(!user){location.href="index.html";return;}const[{data:ex},{data:questions,error},{data:prevResults}]=await Promise.all([sb.from("exams").select("id,title,duration_minutes,total_points").eq("id",examId).single(),sb.from("exam_questions").select("*,question:question_bank(*)").eq("exam_id",examId).order("order_no"),sb.from("exam_results").select("attempt_no").eq("exam_id",examId).eq("student_id",user.id).order("attempt_no",{ascending:false}).limit(1)]);if(error||!questions?.length){document.getElementById("questions").innerHTML='<div class="card">Không tải được đề luyện tập.</div>';document.getElementById("submitBtn").classList.add("hidden");return;}exam=ex;eqs=questions.filter(x=>x.question);document.getElementById("title").textContent=exam?.title||"Đề luyện tập";document.getElementById("meta").textContent=`${exam?.duration_minutes||0} phút • ${exam?.total_points||0} điểm`;const nextAttempt=prevResults?.length?(prevResults[0].attempt_no||0)+1:1;const {data:r,error:re}=await sb.from("exam_results").insert({exam_id:examId,student_id:user.id,attempt_no:nextAttempt,class_id:null}).select("id").single();if(!re)resultId=r.id;renderQuestions()}
-function renderQuestions(){const wrap=document.getElementById("questions");wrap.innerHTML=eqs.map((eq,index)=>renderQuestion(eq,index+1)).join("")}
-function renderQuestion(eq,index){const q=eq.question;const type=q.question_type;let body="";if(type==="multi_choice"){const opts=Array.from({length:Math.max(2,parseInt(q.answer_count)||4)},(_,i)=>String.fromCharCode(65+i));body=opts.map(opt=>`<label class="option"><input type="checkbox" data-q="${q.id}" value="${opt}"><span><strong>${opt}.</strong></span></label>`).join("")}else if(type==="true_false"){const rows=(q.question_text||"").split("\n").filter(Boolean).slice(1);body=rows.map((line,i)=>`<div class="option"><span style="min-width:24px"><strong>${String.fromCharCode(97+i)})</strong></span><span style="flex:1">${esc(line.replace(/^[a-d]\)\s*/,""))}</span><label><input type="radio" name="tf_${q.id}_${i}" value="T"> Đúng</label><label><input type="radio" name="tf_${q.id}_${i}" value="F"> Sai</label></div>`).join("")}else if(type==="short_answer"){body=`<input class="input" data-short="${q.id}" placeholder="Nhập câu trả lời">`}else{body=`<textarea class="input" data-essay="${q.id}" style="min-height:140px" placeholder="Viết câu trả lời"></textarea>`}return `<div class="question"><h3>Câu ${index}</h3><div style="line-height:1.7;color:var(--navy);white-space:pre-line">${esc(q.question_text||"")}</div>${q.question_img?`<img src="${q.question_img}" style="max-width:100%;border-radius:12px;margin-top:12px">`:""}<div style="margin-top:12px">${body}</div></div>`}
-async function submitExam(){if(!confirm("Bạn chắc chắn muốn nộp bài?"))return;const answers=[];let score=0;for(const eq of eqs){const q=eq.question;const correct=(q.answer||"").trim();let answer="",earned=0,isCorrect=null;if(q.question_type==="multi_choice"){answer=Array.from(document.querySelectorAll(`input[data-q="${q.id}"]:checked`)).map(x=>x.value).join("");const a=new Set(answer.split(""));const b=new Set(correct.split(""));isCorrect=a.size===b.size&&[...a].every(x=>b.has(x));earned=isCorrect?(eq.points||0):0}else if(q.question_type==="true_false"){const count=Math.max(2,parseInt(q.answer_count)||4);for(let i=0;i<count;i++){const checked=document.querySelector(`input[name="tf_${q.id}_${i}"]:checked`);if(checked)answer+=`${String.fromCharCode(97+i)}${checked.value}`}isCorrect=answer.toLowerCase()===correct.toLowerCase();earned=isCorrect?(eq.points||0):0}else if(q.question_type==="short_answer"){answer=(document.querySelector(`[data-short="${q.id}"]`)?.value||"").trim();isCorrect=correct.split(";").map(x=>x.trim().toLowerCase()).includes(answer.toLowerCase());earned=isCorrect?(eq.points||0):0}else{answer=(document.querySelector(`[data-essay="${q.id}"]`)?.value||"").trim();isCorrect=null;earned=0}if(q.question_type!=="essay")score+=earned;answers.push({result_id:resultId,question_id:q.id,answer,is_correct:isCorrect,score_earned:earned})}if(resultId&&answers.length)await sb.from("exam_answers").upsert(answers,{onConflict:"result_id,question_id"});if(resultId)await sb.from("exam_results").update({submitted_at:new Date().toISOString(),score_auto:Math.round(score*100)/100,score_total:Math.round(score*100)/100,seconds_left:null}).eq("id",resultId);document.getElementById("result").classList.remove("hidden");document.getElementById("result").innerHTML=`<h2 style="margin:0 0 10px;color:var(--navy)">Đã nộp bài</h2><div style="font-size:2rem;font-weight:800;color:#1d6bd1">${Math.round(score*100)/100}/${exam?.total_points||0}</div><div class="muted" style="margin-top:8px">Kết quả phần tự động đã được lưu.</div>`;document.getElementById("submitBtn").classList.add("hidden");window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"})}
-function esc(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}
-</script>
+<script src="review_helper.js"></script>
+<script src="course_practice.js"></script>
 </body>
 </html>

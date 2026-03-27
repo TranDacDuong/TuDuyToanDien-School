@@ -1102,3 +1102,25 @@ USING (
     WHERE u.id = auth.uid() AND u.role = 'admin'
   )
 );
+
+-- Course exam result scoping
+ALTER TABLE public.exam_results
+  ADD COLUMN IF NOT EXISTS course_id uuid;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.table_constraints
+    WHERE constraint_name = 'exam_results_course_id_fkey'
+      AND table_schema = 'public'
+      AND table_name = 'exam_results'
+  ) THEN
+    ALTER TABLE public.exam_results
+      ADD CONSTRAINT exam_results_course_id_fkey
+      FOREIGN KEY (course_id) REFERENCES public.courses(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS exam_results_course_exam_student_idx
+  ON public.exam_results (course_id, exam_id, student_id, submitted_at DESC);
