@@ -742,6 +742,81 @@ function renderPartialScoreEditor(existing = null) {
     </div>`;
 }
 
+function renderDraftQuestionList() {
+  PDF_EL.draftQuestionList.className = "draft-answer-list";
+  PDF_EL.draftQuestionList.innerHTML = PDF_STATE.draftQuestions.length
+    ? PDF_STATE.draftQuestions
+      .sort((a, b) => (a.order_no || 0) - (b.order_no || 0))
+      .map((q, idx) => `<div class="draft-answer-item" id="pdfDraftRow_${q.id}">
+        <div class="draft-answer-head">
+          <div class="draft-answer-title">
+            <div class="draft-answer-num">${idx + 1}</div>
+            <div>
+              <strong>Câu ${idx + 1}</strong>
+              <div class="hint">Tạo đáp án trực tiếp ngay trong form đề PDF</div>
+            </div>
+          </div>
+          <button class="btn btn-danger btn-sm" type="button" onclick="deletePdfQuestion('${q.id}')">Xóa</button>
+        </div>
+        <div class="draft-answer-grid">
+          <div class="draft-answer-meta">
+            <label>Loại câu</label>
+            <select class="select" onchange="updatePdfDraftType('${q.id}',this.value)">
+              <option value="multi_choice" ${q.question_type === "multi_choice" ? "selected" : ""}>Trắc nghiệm</option>
+              <option value="true_false" ${q.question_type === "true_false" ? "selected" : ""}>Đúng / Sai</option>
+              <option value="short_answer" ${q.question_type === "short_answer" ? "selected" : ""}>Trả lời ngắn</option>
+              <option value="essay" ${q.question_type === "essay" ? "selected" : ""}>Tự luận</option>
+            </select>
+          </div>
+          <div class="draft-answer-meta">
+            <label>Điểm câu</label>
+            <input class="input" type="number" min="0" step="0.25" value="${q.points ?? 0}" oninput="updatePdfDraftField('${q.id}','points',this.value)">
+          </div>
+          <div class="draft-answer-meta">
+            <label>Số đáp án / số ý</label>
+            <input class="input" type="number" min="1" max="8" value="${q.question_type === "essay" ? 1 : (q.answer_count || 1)}" oninput="updatePdfDraftAnswerCount('${q.id}',this.value)">
+          </div>
+          <div class="draft-answer-meta">
+            <label>Nhãn câu</label>
+            <input class="input" type="text" value="${escAttr(q.label || `Câu ${idx + 1}`)}" oninput="updatePdfDraftField('${q.id}','label',this.value)">
+          </div>
+        </div>
+        <div class="draft-answer-body">
+          <div>
+            <label>Đáp án đúng</label>
+            ${renderInlinePdfAnswerEditor(q)}
+          </div>
+          <div>
+            <label>Điểm theo số ý đúng</label>
+            ${renderInlinePdfPartialEditor(q)}
+          </div>
+        </div>
+      </div>`).join("")
+    : `<div class="empty"><strong>Chưa có đáp án nào</strong><div>Hãy bấm + Thêm đáp án để thêm trực tiếp một dòng bên dưới.</div></div>`;
+}
+
+function openPdfQuestionModal(questionId = null) {
+  if (questionId) {
+    document.getElementById(`pdfDraftRow_${questionId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+  addPdfDraftQuestionInline();
+}
+
+if (PDF_EL.openDraftQuestionBtn?.parentNode) {
+  const addClone = PDF_EL.openDraftQuestionBtn.cloneNode(true);
+  PDF_EL.openDraftQuestionBtn.parentNode.replaceChild(addClone, PDF_EL.openDraftQuestionBtn);
+  PDF_EL.openDraftQuestionBtn = addClone;
+  PDF_EL.openDraftQuestionBtn.addEventListener("click", addPdfDraftQuestionInline);
+}
+
+if (PDF_EL.removeDraftQuestionBtn?.parentNode) {
+  const removeClone = PDF_EL.removeDraftQuestionBtn.cloneNode(true);
+  PDF_EL.removeDraftQuestionBtn.parentNode.replaceChild(removeClone, PDF_EL.removeDraftQuestionBtn);
+  PDF_EL.removeDraftQuestionBtn = removeClone;
+  PDF_EL.removeDraftQuestionBtn.addEventListener("click", removeLastPdfDraftQuestion);
+}
+
 function getPdfDefaultAnswerValue(type, count) {
   if (type === "multi_choice") return "A";
   if (type === "true_false") return Array.from({ length: count }, (_, i) => `${String.fromCharCode(97 + i)}F`).join("");
