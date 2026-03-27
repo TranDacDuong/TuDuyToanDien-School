@@ -1124,3 +1124,298 @@ END $$;
 
 CREATE INDEX IF NOT EXISTS exam_results_course_exam_student_idx
   ON public.exam_results (course_id, exam_id, student_id, submitted_at DESC);
+
+-- ============================================
+-- PDF Exams module
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS public.pdf_exams (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  description text,
+  grade_id uuid,
+  subject_id uuid,
+  drive_file_id text NOT NULL,
+  drive_preview_url text,
+  duration_minutes integer NOT NULL DEFAULT 60,
+  total_points numeric(10,2) NOT NULL DEFAULT 10,
+  status text NOT NULL DEFAULT 'open'
+    CHECK (status IN ('open', 'closed')),
+  created_by uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT pdf_exams_pkey PRIMARY KEY (id),
+  CONSTRAINT pdf_exams_grade_id_fkey FOREIGN KEY (grade_id) REFERENCES public.grades(id) ON DELETE SET NULL,
+  CONSTRAINT pdf_exams_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES public.subjects(id) ON DELETE SET NULL,
+  CONSTRAINT pdf_exams_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS public.pdf_exam_questions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  pdf_exam_id uuid NOT NULL,
+  order_no integer NOT NULL DEFAULT 1,
+  label text NOT NULL,
+  question_type text NOT NULL
+    CHECK (question_type IN ('multi_choice', 'true_false', 'short_answer', 'essay')),
+  question_text text,
+  answer text NOT NULL,
+  answer_count integer NOT NULL DEFAULT 4,
+  points numeric(10,2) NOT NULL DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT pdf_exam_questions_pkey PRIMARY KEY (id),
+  CONSTRAINT pdf_exam_questions_pdf_exam_id_fkey FOREIGN KEY (pdf_exam_id) REFERENCES public.pdf_exams(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS pdf_exam_questions_order_unique
+  ON public.pdf_exam_questions (pdf_exam_id, order_no);
+
+CREATE TABLE IF NOT EXISTS public.pdf_exam_results (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  pdf_exam_id uuid NOT NULL,
+  student_id uuid NOT NULL,
+  attempt_no integer NOT NULL DEFAULT 1,
+  submitted_at timestamp with time zone,
+  seconds_left integer,
+  score_auto numeric(10,2),
+  score_total numeric(10,2),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT pdf_exam_results_pkey PRIMARY KEY (id),
+  CONSTRAINT pdf_exam_results_pdf_exam_id_fkey FOREIGN KEY (pdf_exam_id) REFERENCES public.pdf_exams(id) ON DELETE CASCADE,
+  CONSTRAINT pdf_exam_results_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.users(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS pdf_exam_results_attempt_unique
+  ON public.pdf_exam_results (pdf_exam_id, student_id, attempt_no);
+
+CREATE TABLE IF NOT EXISTS public.pdf_exam_answers (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  result_id uuid NOT NULL,
+  question_id uuid NOT NULL,
+  answer text,
+  is_correct boolean,
+  score_earned numeric(10,2) NOT NULL DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT pdf_exam_answers_pkey PRIMARY KEY (id),
+  CONSTRAINT pdf_exam_answers_result_id_fkey FOREIGN KEY (result_id) REFERENCES public.pdf_exam_results(id) ON DELETE CASCADE,
+  CONSTRAINT pdf_exam_answers_question_id_fkey FOREIGN KEY (question_id) REFERENCES public.pdf_exam_questions(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS pdf_exam_answers_unique
+  ON public.pdf_exam_answers (result_id, question_id);
+
+CREATE INDEX IF NOT EXISTS pdf_exams_status_created_idx
+  ON public.pdf_exams (status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS pdf_exam_results_exam_student_idx
+  ON public.pdf_exam_results (pdf_exam_id, student_id, submitted_at DESC);
+
+ALTER TABLE public.pdf_exams ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pdf_exam_questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pdf_exam_results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pdf_exam_answers ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS pdf_exams_select_policy ON public.pdf_exams;
+CREATE POLICY pdf_exams_select_policy ON public.pdf_exams
+FOR SELECT
+USING (
+  status = 'open'
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS pdf_exams_insert_policy ON public.pdf_exams;
+CREATE POLICY pdf_exams_insert_policy ON public.pdf_exams
+FOR INSERT
+WITH CHECK (
+  auth.uid() = created_by
+  AND EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS pdf_exams_update_policy ON public.pdf_exams;
+CREATE POLICY pdf_exams_update_policy ON public.pdf_exams
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS pdf_exams_delete_policy ON public.pdf_exams;
+CREATE POLICY pdf_exams_delete_policy ON public.pdf_exams
+FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS pdf_exam_questions_select_policy ON public.pdf_exam_questions;
+CREATE POLICY pdf_exam_questions_select_policy ON public.pdf_exam_questions
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.pdf_exams e
+    WHERE e.id = pdf_exam_questions.pdf_exam_id
+      AND (
+        e.status = 'open'
+        OR EXISTS (
+          SELECT 1 FROM public.users u
+          WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+        )
+      )
+  )
+);
+
+DROP POLICY IF EXISTS pdf_exam_questions_insert_policy ON public.pdf_exam_questions;
+CREATE POLICY pdf_exam_questions_insert_policy ON public.pdf_exam_questions
+FOR INSERT
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS pdf_exam_questions_update_policy ON public.pdf_exam_questions;
+CREATE POLICY pdf_exam_questions_update_policy ON public.pdf_exam_questions
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS pdf_exam_questions_delete_policy ON public.pdf_exam_questions;
+CREATE POLICY pdf_exam_questions_delete_policy ON public.pdf_exam_questions
+FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS pdf_exam_results_select_policy ON public.pdf_exam_results;
+CREATE POLICY pdf_exam_results_select_policy ON public.pdf_exam_results
+FOR SELECT
+USING (
+  student_id = auth.uid()
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS pdf_exam_results_insert_policy ON public.pdf_exam_results;
+CREATE POLICY pdf_exam_results_insert_policy ON public.pdf_exam_results
+FOR INSERT
+WITH CHECK (
+  student_id = auth.uid()
+);
+
+DROP POLICY IF EXISTS pdf_exam_results_update_policy ON public.pdf_exam_results;
+CREATE POLICY pdf_exam_results_update_policy ON public.pdf_exam_results
+FOR UPDATE
+USING (
+  student_id = auth.uid()
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+)
+WITH CHECK (
+  student_id = auth.uid()
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS pdf_exam_answers_select_policy ON public.pdf_exam_answers;
+CREATE POLICY pdf_exam_answers_select_policy ON public.pdf_exam_answers
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.pdf_exam_results r
+    WHERE r.id = pdf_exam_answers.result_id
+      AND (
+        r.student_id = auth.uid()
+        OR EXISTS (
+          SELECT 1 FROM public.users u
+          WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+        )
+      )
+  )
+);
+
+DROP POLICY IF EXISTS pdf_exam_answers_insert_policy ON public.pdf_exam_answers;
+CREATE POLICY pdf_exam_answers_insert_policy ON public.pdf_exam_answers
+FOR INSERT
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.pdf_exam_results r
+    WHERE r.id = pdf_exam_answers.result_id
+      AND r.student_id = auth.uid()
+  )
+);
+
+DROP POLICY IF EXISTS pdf_exam_answers_update_policy ON public.pdf_exam_answers;
+CREATE POLICY pdf_exam_answers_update_policy ON public.pdf_exam_answers
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.pdf_exam_results r
+    WHERE r.id = pdf_exam_answers.result_id
+      AND (
+        r.student_id = auth.uid()
+        OR EXISTS (
+          SELECT 1 FROM public.users u
+          WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+        )
+      )
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.pdf_exam_results r
+    WHERE r.id = pdf_exam_answers.result_id
+      AND (
+        r.student_id = auth.uid()
+        OR EXISTS (
+          SELECT 1 FROM public.users u
+          WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+        )
+      )
+  )
+);
+
+DROP TRIGGER IF EXISTS set_pdf_exams_updated_at ON public.pdf_exams;
+CREATE TRIGGER set_pdf_exams_updated_at
+BEFORE UPDATE ON public.pdf_exams
+FOR EACH ROW
+EXECUTE FUNCTION public.set_updated_at();

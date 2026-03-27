@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Đề PDF</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:24px;background:var(--cream);font-family:var(--font-body);color:var(--ink)}
+.page-hd{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.page-hd h1{margin:0;font-family:var(--font-display);font-size:1.45rem;color:var(--navy);display:flex;align-items:center;gap:10px}
+.page-hd h1::before{content:'';width:4px;height:24px;border-radius:3px;background:linear-gradient(180deg,var(--gold),var(--gold-light))}
+.toolbar{display:grid;grid-template-columns:1.2fr repeat(3,minmax(150px,220px)) auto;gap:10px;margin-bottom:18px}
+.input,.select,textarea{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font:inherit;background:#fff;outline:none}
+textarea{min-height:110px;resize:vertical}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.card{background:#fff;border-radius:16px;border:1px solid var(--border);box-shadow:var(--shadow-sm);overflow:hidden}
+.card-cover{min-height:120px;background:linear-gradient(135deg,#103d74 0%,#1d6bd1 100%);padding:18px;color:#fff;display:flex;flex-direction:column;justify-content:space-between}
+.card-body{padding:16px;display:grid;gap:12px}
+.meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.meta>div{background:var(--surface);padding:11px 12px;border-radius:12px}
+.meta span{display:block;font-size:.75rem;color:var(--ink-light);margin-bottom:3px}
+.chips,.actions{display:flex;gap:8px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;font-size:.75rem;font-weight:700}
+.pill.light{background:rgba(255,255,255,.16);color:#fff}
+.pill.soft{background:#edf4ff;color:#365a8c}
+.empty{padding:44px 22px;text-align:center;border:1px dashed var(--border);border-radius:16px;background:#fff;color:var(--ink-light)}
+.modal{position:fixed;inset:0;background:rgba(10,20,40,.48);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:24px;z-index:1000}
+.modal.show{display:flex}
+.modal-card{width:min(940px,100%);max-height:calc(100vh - 48px);overflow:auto;background:#fff;border-radius:18px;border-top:4px solid var(--gold);box-shadow:var(--shadow-lg)}
+.mh{display:flex;justify-content:space-between;align-items:center;padding:20px 24px 14px;border-bottom:1px solid var(--border)}
+.mb{padding:18px 24px 24px}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.full{grid-column:1/-1}
+.field{display:grid;gap:8px}
+.field label{font-size:.78rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em}
+.hint{font-size:.75rem;color:var(--ink-light)}
+.screen{position:fixed;inset:0;background:#eef3fb;display:none;flex-direction:column;z-index:900}
+.screen.show{display:flex}
+.stop{height:62px;background:var(--navy);color:#fff;display:flex;align-items:center;gap:12px;padding:0 18px}
+.stop h2{margin:0;flex:1;font-size:1.05rem}
+.sbody{flex:1;overflow:auto;padding:20px 24px}
+.detail-stack{display:grid;gap:18px}
+.detail-card{background:#fff;border:1px solid rgba(39,58,91,.08);border-radius:20px;box-shadow:0 14px 32px rgba(15,23,42,.08);padding:18px}
+.question-list{display:grid;gap:12px}
+.question-row{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:14px;align-items:center;padding:16px;border:1px solid rgba(39,58,91,.08);border-radius:18px;background:#fff}
+.question-badge{min-height:62px;border-radius:14px;background:linear-gradient(135deg,#0f3c73 0%,#1d6bd1 100%);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px}
+.question-badge strong{font-size:.78rem}.question-badge span{font-size:1.15rem;font-weight:800}
+.question-actions{display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.review-modal-card{width:min(1080px,100%)}
+.exam-shell{position:fixed;inset:0;background:#eef3fb;display:none;flex-direction:column;z-index:1200}
+.exam-shell.show{display:flex}
+.exam-topbar{height:62px;background:var(--navy);color:#fff;display:flex;align-items:center;gap:12px;padding:0 18px}
+.exam-topbar h2{margin:0;flex:1;font-size:1.05rem}
+.exam-clock{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);padding:7px 16px;border-radius:8px}
+.exam-clock strong{font-size:1.18rem;font-family:monospace;color:var(--gold-light)}
+.exam-body{flex:1;display:grid;grid-template-columns:minmax(480px,1.2fr) minmax(360px,.8fr);min-height:0}
+.pdf-pane{background:#0f172a;padding:16px;display:flex;flex-direction:column;gap:12px}
+.pdf-frame{flex:1;background:#111827;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.08)}
+.pdf-frame iframe{width:100%;height:100%;border:none;background:#fff}
+.answer-pane{background:#f8fafc;border-left:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
+.answer-scroll{flex:1;overflow:auto;padding:18px}
+.nav-strip{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.nav-pill{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--navy);color:var(--gold-light);font-size:.76rem;font-weight:700;position:relative;cursor:pointer;border:2px solid transparent}
+.nav-pill span{position:absolute;top:1px;right:1px;width:8px;height:8px;border-radius:50%;background:var(--border);border:1px solid #fff}
+.answer-card{background:#fff;border:1px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden}
+.answer-card-hd{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
+.answer-card-hd .num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--navy);color:var(--gold-light);font-weight:700;font-size:.78rem}
+.answer-card-bd{display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:14px;padding:14px 16px}
+.opt-col{display:grid;gap:8px}
+.option-label{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border);background:#fff;cursor:pointer;transition:.15s}
+.option-label.active{border-color:var(--navy);background:#eff6ff}
+.option-key{width:22px;font-weight:700;color:var(--navy);flex-shrink:0}
+.tf-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:#fff}
+.tf-actions{display:flex;gap:8px;align-items:center}
+.essay-box,.short-input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font:inherit;background:#fff;outline:none}
+.essay-box{min-height:140px;resize:vertical}
+.review-wrap{display:grid;gap:16px}
+@media(max-width:1080px){.toolbar,.form-grid,.exam-body,.answer-card-bd{grid-template-columns:1fr}.question-row{grid-template-columns:1fr}.question-actions{align-items:flex-start;flex-direction:row;flex-wrap:wrap}.exam-body{grid-template-columns:1fr}.pdf-pane{min-height:360px}}
+</style>
+</head>
+<body>
+<div class="page-hd">
+  <h1>Đề PDF</h1>
+  <div id="adminToolbar" style="display:none">
+    <button class="btn btn-primary" id="openPdfExamBtn" type="button">+ Tạo đề PDF</button>
+  </div>
+</div>
+
+<div class="toolbar" id="toolbar">
+  <input id="keyword" class="input" placeholder="Tìm theo tên đề PDF">
+  <select id="gradeFilter" class="select"><option value="">Tất cả khối</option></select>
+  <select id="subjectFilter" class="select"><option value="">Tất cả môn</option></select>
+  <select id="statusFilter" class="select"><option value="">Tất cả trạng thái</option><option value="open">Mở</option><option value="closed">Đóng</option></select>
+  <button class="btn btn-outline" type="button" id="reloadPdfExamBtn">Tải lại</button>
+</div>
+
+<div id="pdfExamGrid" class="grid"></div>
+<div id="pdfExamEmpty" class="empty" style="display:none">
+  <strong>Chưa có đề PDF phù hợp</strong>
+  <div>Hãy đổi bộ lọc hoặc tạo đề PDF đầu tiên.</div>
+</div>
+
+<div id="pdfExamModal" class="modal">
+  <div class="modal-card">
+    <div class="mh">
+      <h2 id="pdfExamModalTitle">Tạo đề PDF</h2>
+      <button class="btn btn-outline" type="button" onclick="closePdfExamModal()">Đóng</button>
+    </div>
+    <div class="mb">
+      <form id="pdfExamForm">
+        <div class="form-grid">
+          <div class="field">
+            <label>Tên đề</label>
+            <input id="pdfExamTitle" class="input" required>
+          </div>
+          <div class="field">
+            <label>Trạng thái</label>
+            <select id="pdfExamStatus" class="select">
+              <option value="open">Mở</option>
+              <option value="closed">Đóng</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Khối</label>
+            <select id="pdfExamGrade" class="select"></select>
+          </div>
+          <div class="field">
+            <label>Môn</label>
+            <select id="pdfExamSubject" class="select"></select>
+          </div>
+          <div class="field">
+            <label>Thời lượng (phút)</label>
+            <input id="pdfExamDuration" class="input" type="number" min="1" value="60">
+          </div>
+          <div class="field">
+            <label>Tổng điểm</label>
+            <input id="pdfExamTotal" class="input" type="number" min="0" step="0.25" value="10">
+          </div>
+          <div class="field full">
+            <label>Google Drive file ID hoặc link chia sẻ</label>
+            <input id="pdfExamDriveInput" class="input" placeholder="Dán file ID hoặc link Google Drive">
+            <div class="hint">Nên đặt file ở chế độ “Anyone with the link can view”.</div>
+          </div>
+          <div class="field full">
+            <label>Mô tả</label>
+            <textarea id="pdfExamDescription"></textarea>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
+          <button class="btn btn-outline" type="button" onclick="closePdfExamModal()">Hủy</button>
+          <button class="btn btn-primary" type="submit">Lưu đề PDF</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="pdfQuestionModal" class="modal">
+  <div class="modal-card">
+    <div class="mh">
+      <h2 id="pdfQuestionModalTitle">Thêm câu trả lời</h2>
+      <button class="btn btn-outline" type="button" onclick="closePdfQuestionModal()">Đóng</button>
+    </div>
+    <div class="mb">
+      <form id="pdfQuestionForm">
+        <div class="form-grid">
+          <div class="field">
+            <label>Thứ tự</label>
+            <input id="pdfQuestionOrder" class="input" type="number" min="1" required>
+          </div>
+          <div class="field">
+            <label>Nhãn câu</label>
+            <input id="pdfQuestionLabel" class="input" placeholder="Ví dụ: Câu 1" required>
+          </div>
+          <div class="field">
+            <label>Loại câu</label>
+            <select id="pdfQuestionType" class="select">
+              <option value="multi_choice">Trắc nghiệm</option>
+              <option value="true_false">Đúng / Sai</option>
+              <option value="short_answer">Trả lời ngắn</option>
+              <option value="essay">Tự luận</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Số điểm</label>
+            <input id="pdfQuestionPoints" class="input" type="number" min="0" step="0.25" value="0.25">
+          </div>
+          <div class="field">
+            <label>Số đáp án / số ý</label>
+            <input id="pdfQuestionAnswerCount" class="input" type="number" min="1" max="8" value="4">
+          </div>
+          <div class="field">
+            <label>Đáp án đúng</label>
+            <input id="pdfQuestionAnswer" class="input" placeholder="Ví dụ: A | AB | aTbF | 3.14 | bài viết">
+          </div>
+          <div class="field full">
+            <label>Ghi chú / mô tả ngắn ở panel phải</label>
+            <textarea id="pdfQuestionText" placeholder="Có thể để trống nếu học sinh chỉ đọc đề PDF bên trái."></textarea>
+          </div>
+        </div>
+        <div class="hint" style="margin-top:10px">
+          Trắc nghiệm: nhập đáp án dạng <b>A</b> hoặc <b>AB</b>. Đúng/Sai: nhập dạng <b>aTbFcT...</b>. Trả lời ngắn: nhiều đáp án cách nhau bằng dấu <b>;</b>.
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
+          <button class="btn btn-outline" type="button" onclick="closePdfQuestionModal()">Hủy</button>
+          <button class="btn btn-primary" type="submit">Lưu câu</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="pdfSubmissionModal" class="modal">
+  <div class="modal-card review-modal-card">
+    <div class="mh">
+      <h2 id="pdfSubmissionTitle">Bài đã nộp</h2>
+      <button class="btn btn-outline" type="button" onclick="closePdfSubmissionModal()">Đóng</button>
+    </div>
+    <div class="mb" id="pdfSubmissionBody"></div>
+  </div>
+</div>
+
+<div id="pdfExamScreen" class="screen">
+  <div class="stop">
+    <button class="btn btn-outline btn-sm" type="button" onclick="closePdfExamScreen()">← Quay lại</button>
+    <h2 id="pdfExamScreenTitle">Chi tiết đề PDF</h2>
+    <button class="btn btn-primary hidden" id="pdfExamTakeBtn" type="button">Làm bài</button>
+    <button class="btn btn-outline btn-sm hidden" id="pdfExamEditBtn" type="button">Sửa đề</button>
+  </div>
+  <div class="sbody">
+    <div class="detail-stack">
+      <div class="detail-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
+          <div style="display:grid;gap:12px;flex:1;min-width:280px">
+            <div class="chips" id="pdfExamSummaryChips"></div>
+            <div id="pdfExamSummaryText"></div>
+            <div class="meta" id="pdfExamSummaryMeta"></div>
+          </div>
+          <div style="display:grid;gap:10px;min-width:250px">
+            <button class="btn btn-outline" id="pdfExamOpenDriveBtn" type="button">Mở PDF trên Google Drive</button>
+            <button class="btn btn-outline hidden" id="pdfExamSubmissionBtn" type="button">Bài đã nộp</button>
+            <button class="btn btn-primary hidden" id="pdfExamAddQuestionBtn" type="button">Thêm câu trả lời</button>
+          </div>
+        </div>
+      </div>
+      <div class="detail-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+          <h4 style="margin:0">Danh sách câu trả lời</h4>
+          <div class="hint">Panel phải khi làm bài sẽ lấy dữ liệu từ danh sách này.</div>
+        </div>
+        <div id="pdfQuestionList" class="question-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="pdfAttemptShell" class="exam-shell">
+  <div class="exam-topbar">
+    <button class="btn btn-outline btn-sm" type="button" onclick="closePdfAttempt()">← Thoát</button>
+    <h2 id="pdfAttemptTitle">Làm đề PDF</h2>
+    <div class="exam-clock">
+      <span style="font-size:.8rem;color:rgba(255,255,255,.72)">Thời gian</span>
+      <strong id="pdfAttemptClock">00:00</strong>
+    </div>
+    <button class="btn btn-primary btn-sm" type="button" id="pdfSubmitBtn">Nộp bài</button>
+  </div>
+  <div class="exam-body">
+    <div class="pdf-pane">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;color:#e2e8f0;font-size:.84rem">
+        <div id="pdfPaneLabel">Đề PDF</div>
+        <a id="pdfPaneOpenLink" href="#" target="_blank" rel="noopener" style="color:#fde68a">Mở riêng</a>
+      </div>
+      <div class="pdf-frame">
+        <iframe id="pdfDriveFrame" allow="autoplay"></iframe>
+      </div>
+    </div>
+    <div class="answer-pane">
+      <div class="answer-scroll">
+        <div class="nav-strip" id="pdfAttemptNav"></div>
+        <div id="pdfAttemptQuestions"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script src="pdf_exam.js"></script>
+</body>
+</html>
