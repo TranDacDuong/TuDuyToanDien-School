@@ -817,6 +817,200 @@ if (PDF_EL.removeDraftQuestionBtn?.parentNode) {
   PDF_EL.removeDraftQuestionBtn.addEventListener("click", removeLastPdfDraftQuestion);
 }
 
+function withPdfPartialDefaults(question) {
+  const count = Math.max(1, Number(question.answer_count || 1));
+  const points = Number(question.points || 0);
+  const partial = { ...(question.partial_points || {}) };
+  if (question.question_type === "multi_choice" || question.question_type === "true_false") {
+    if (partial[count] == null || partial[count] === "") partial[count] = points;
+  }
+  return {
+    ...question,
+    answer_count: count,
+    partial_points: Object.keys(partial).length ? partial : null,
+  };
+}
+
+function updatePdfDraftField(id, field, value) {
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.map((q) => {
+    if (q.id !== id) return q;
+    const next = { ...q, [field]: field === "points" ? Number(value || 0) : value };
+    if (field === "points" && (next.question_type === "multi_choice" || next.question_type === "true_false")) {
+      const count = Math.max(1, Number(next.answer_count || 1));
+      next.partial_points = { ...(next.partial_points || {}), [count]: Number(value || 0) };
+    }
+    return withPdfPartialDefaults(next);
+  });
+  renderDraftQuestionList();
+}
+
+function updatePdfDraftType(id, type) {
+  const normalized = normalizePdfQuestionType(type);
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.map((q) => {
+    if (q.id !== id) return q;
+    const count = (normalized === "multi_choice" || normalized === "true_false") ? 4 : 1;
+    const next = {
+      ...q,
+      question_type: normalized,
+      answer_count: count,
+      answer: getPdfDefaultAnswerValue(normalized, count),
+      partial_points: normalized === "multi_choice" || normalized === "true_false" ? { [count]: Number(q.points || 0) } : null,
+    };
+    return withPdfPartialDefaults(next);
+  });
+  renderDraftQuestionList();
+}
+
+function updatePdfDraftAnswerCount(id, delta) {
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.map((q) => {
+    if (q.id !== id) return q;
+    if (!(q.question_type === "multi_choice" || q.question_type === "true_false")) return q;
+    const nextCount = Math.max(1, Math.min(8, Number(q.answer_count || 1) + delta));
+    const next = {
+      ...q,
+      answer_count: nextCount,
+      answer: normalizePdfDraftAnswer(q.question_type, q.answer, nextCount),
+      partial_points: trimPdfPartialPoints(q.partial_points, nextCount),
+    };
+    return withPdfPartialDefaults(next);
+  });
+  renderDraftQuestionList();
+}
+
+function updatePdfDraftPartial(id, count, value) {
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.map((q) => {
+    if (q.id !== id) return q;
+    const partial = { ...(q.partial_points || {}) };
+    if (String(value).trim() === "") delete partial[count];
+    else partial[count] = Number(value || 0);
+    const next = { ...q, partial_points: Object.keys(partial).length ? partial : null };
+    return withPdfPartialDefaults(next);
+  });
+}
+
+function renderInlinePdfAnswerEditor(q) {
+  const safeQuestion = withPdfPartialDefaults(q);
+  if (safeQuestion.question_type === "multi_choice") {
+    const selected = new Set(String(safeQuestion.answer || "").toUpperCase().split("").filter(Boolean));
+    return `
+      <div class="count-stepper" style="margin-bottom:8px">
+        <button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${safeQuestion.id}',-1)">-</button>
+        <strong>${safeQuestion.answer_count}</strong>
+        <button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${safeQuestion.id}',1)">+</button>
+      </div>
+      <div class="answer-editor-row">
+        ${Array.from({ length: safeQuestion.answer_count }, (_, i) => {
+          const key = String.fromCharCode(65 + i);
+          return `<label class="answer-box ${selected.has(key) ? "active" : ""}">
+            <input type="checkbox" ${selected.has(key) ? "checked" : ""} onchange="updatePdfDraftMC('${safeQuestion.id}','${key}',this.checked)">
+            <span class="answer-box-key">${key}</span>
+            <span>Đáp án ${key}</span>
+          </label>`;
+        }).join("")}
+      </div>`;
+  }
+  if (safeQuestion.question_type === "true_false") {
+    const parsed = parsePdfTrueFalse(safeQuestion.answer, safeQuestion.answer_count);
+    return `
+      <div class="count-stepper" style="margin-bottom:8px">
+        <button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${safeQuestion.id}',-1)">-</button>
+        <strong>${safeQuestion.answer_count}</strong>
+        <button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${safeQuestion.id}',1)">+</button>
+      </div>
+      <div class="answer-editor">
+        ${Array.from({ length: safeQuestion.answer_count }, (_, i) => {
+          const key = String.fromCharCode(97 + i);
+          const state = parsed[key] || "F";
+          return `<div class="tf-editor-row">
+            <div><strong>${key})</strong> Ý ${key.toUpperCase()}</div>
+            <div class="tf-toggle">
+              <button class="tf-state ${state === "T" ? "correct" : "wrong"}" type="button" onclick="updatePdfDraftTF('${safeQuestion.id}','${key}')">${state === "T" ? "Đúng" : "Sai"}</button>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>`;
+  }
+  if (safeQuestion.question_type === "short_answer") {
+    const values = String(safeQuestion.answer || "").split(";").map((item) => item.trim());
+    return `<div class="answer-editor">
+      ${Array.from({ length: Math.max(1, safeQuestion.answer_count || 1) }, (_, i) => `<div class="short-editor-row">
+        <span>${i + 1}</span>
+        <input class="input" type="text" value="${escAttr(values[i] || "")}" placeholder="Đáp án ${i + 1}" oninput="updatePdfDraftShort('${safeQuestion.id}',${i},this.value)">
+      </div>`).join("")}
+    </div>`;
+  }
+  return `<div class="editor-note">Câu tự luận không có đáp án chấm tự động.</div>`;
+}
+
+function renderInlinePdfPartialEditor(q) {
+  const safeQuestion = withPdfPartialDefaults(q);
+  if (!(safeQuestion.question_type === "multi_choice" || safeQuestion.question_type === "true_false")) {
+    return `<div class="hint">Loại câu này không dùng điểm theo số ý đúng.</div>`;
+  }
+  const partial = safeQuestion.partial_points || {};
+  return `<div class="draft-answer-partial">
+    <div class="hint">Số ý đúng bằng số đáp án. Mặc định mức đúng hết sẽ bằng đúng điểm câu.</div>
+    <div style="display:grid;grid-template-columns:repeat(${Math.min(safeQuestion.answer_count, 4)},minmax(110px,1fr));gap:8px">
+      ${Array.from({ length: safeQuestion.answer_count }, (_, i) => {
+        const count = i + 1;
+        const value = partial[count] ?? (count === safeQuestion.answer_count ? Number(safeQuestion.points || 0) : "");
+        return `<label style="display:grid;gap:6px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#fff">
+          <span style="font-size:.78rem;font-weight:700;color:var(--ink-mid)">${count} ý đúng</span>
+          <input class="input" type="number" min="0" step="0.25" value="${value}" oninput="updatePdfDraftPartial('${safeQuestion.id}','${count}',this.value)">
+        </label>`;
+      }).join("")}
+    </div>
+  </div>`;
+}
+
+function renderDraftQuestionList() {
+  PDF_EL.draftQuestionList.className = "draft-answer-list";
+  PDF_EL.draftQuestionList.innerHTML = PDF_STATE.draftQuestions.length
+    ? PDF_STATE.draftQuestions
+      .sort((a, b) => (a.order_no || 0) - (b.order_no || 0))
+      .map((item, idx) => {
+        const q = withPdfPartialDefaults({ ...item, order_no: idx + 1 });
+        return `<div class="draft-answer-item" id="pdfDraftRow_${q.id}">
+          <div class="draft-answer-head">
+            <div class="draft-answer-title">
+              <div class="draft-answer-num">${idx + 1}</div>
+              <div>
+                <strong>Câu ${idx + 1}</strong>
+                <div class="hint">Thiết lập đáp án trực tiếp ngay trong popup sửa đề</div>
+              </div>
+            </div>
+            <button class="btn btn-danger btn-sm" type="button" onclick="deletePdfQuestion('${q.id}')">Xóa</button>
+          </div>
+          <div class="draft-answer-grid">
+            <div class="draft-answer-meta">
+              <label>Loại câu</label>
+              <select class="select" onchange="updatePdfDraftType('${q.id}',this.value)">
+                <option value="multi_choice" ${q.question_type === "multi_choice" ? "selected" : ""}>Trắc nghiệm</option>
+                <option value="true_false" ${q.question_type === "true_false" ? "selected" : ""}>Đúng / Sai</option>
+                <option value="short_answer" ${q.question_type === "short_answer" ? "selected" : ""}>Trả lời ngắn</option>
+                <option value="essay" ${q.question_type === "essay" ? "selected" : ""}>Tự luận</option>
+              </select>
+            </div>
+            <div class="draft-answer-meta">
+              <label>Điểm câu</label>
+              <input class="input" type="number" min="0" step="0.25" value="${q.points ?? 0}" oninput="updatePdfDraftField('${q.id}','points',this.value)">
+            </div>
+          </div>
+          <div class="draft-answer-body">
+            <div>
+              <label>Đáp án đúng</label>
+              ${renderInlinePdfAnswerEditor(q)}
+            </div>
+            <div>
+              <label>Điểm theo số ý đúng</label>
+              ${renderInlinePdfPartialEditor(q)}
+            </div>
+          </div>
+        </div>`;
+      }).join("")
+    : `<div class="empty"><strong>Chưa có đáp án nào</strong><div>Hãy bấm + Thêm đáp án để thêm trực tiếp từng câu bên dưới.</div></div>`;
+}
+
 function getPdfDefaultAnswerValue(type, count) {
   if (type === "multi_choice") return "A";
   if (type === "true_false") return Array.from({ length: count }, (_, i) => `${String.fromCharCode(97 + i)}F`).join("");
