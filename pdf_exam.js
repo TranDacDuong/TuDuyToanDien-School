@@ -742,6 +742,266 @@ function renderPartialScoreEditor(existing = null) {
     </div>`;
 }
 
+function getPdfDefaultAnswerValue(type, count) {
+  if (type === "multi_choice") return "A";
+  if (type === "true_false") return Array.from({ length: count }, (_, i) => `${String.fromCharCode(97 + i)}F`).join("");
+  return "";
+}
+
+function addPdfDraftQuestionInline() {
+  const next = PDF_STATE.draftQuestions.length + 1;
+  PDF_STATE.draftQuestions.push(getPdfDefaultQuestion(next));
+  renderDraftQuestionList();
+}
+
+function updatePdfDraftField(id, field, value) {
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.map((q) => {
+    if (q.id !== id) return q;
+    if (field === "points") return { ...q, points: Number(value || 0) };
+    return { ...q, [field]: value };
+  });
+}
+
+function updatePdfDraftType(id, type) {
+  const normalized = normalizePdfQuestionType(type);
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.map((q) => {
+    if (q.id !== id) return q;
+    const count = (normalized === "multi_choice" || normalized === "true_false") ? 4 : 1;
+    return {
+      ...q,
+      question_type: normalized,
+      answer_count: count,
+      answer: getPdfDefaultAnswerValue(normalized, count),
+      partial_points: null,
+    };
+  });
+  renderDraftQuestionList();
+}
+
+function updatePdfDraftAnswerCount(id, value) {
+  const count = Math.max(1, Math.min(8, Number(value || 1)));
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.map((q) => {
+    if (q.id !== id) return q;
+    const nextCount = q.question_type === "essay" ? 1 : count;
+    return {
+      ...q,
+      answer_count: nextCount,
+      answer: normalizePdfDraftAnswer(q.question_type, q.answer, nextCount),
+      partial_points: trimPdfPartialPoints(q.partial_points, nextCount),
+    };
+  });
+  renderDraftQuestionList();
+}
+
+function normalizePdfDraftAnswer(type, answer, count) {
+  if (type === "multi_choice") {
+    const allowed = new Set(Array.from({ length: count }, (_, i) => String.fromCharCode(65 + i)));
+    const picked = String(answer || "").toUpperCase().split("").filter((item, idx, arr) => allowed.has(item) && arr.indexOf(item) === idx);
+    return picked.length ? picked.join("") : "A";
+  }
+  if (type === "true_false") {
+    const parsed = parsePdfTrueFalse(answer, count);
+    return Array.from({ length: count }, (_, i) => {
+      const key = String.fromCharCode(97 + i);
+      return `${key}${parsed[key] || "F"}`;
+    }).join("");
+  }
+  if (type === "short_answer") {
+    const values = String(answer || "").split(";").map((item) => item.trim()).filter(Boolean).slice(0, count);
+    return values.join(";");
+  }
+  return "";
+}
+
+function trimPdfPartialPoints(partialPoints, count) {
+  if (!partialPoints) return null;
+  const out = {};
+  Object.entries(partialPoints).forEach(([key, value]) => {
+    if (Number(key) <= count) out[key] = value;
+  });
+  return Object.keys(out).length ? out : null;
+}
+
+function updatePdfDraftMC(id, key, checked) {
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.map((q) => {
+    if (q.id !== id) return q;
+    const set = new Set(String(q.answer || "").toUpperCase().split("").filter(Boolean));
+    if (checked) set.add(key);
+    else set.delete(key);
+    const answer = Array.from(set).sort().join("") || "A";
+    return { ...q, answer };
+  });
+  renderDraftQuestionList();
+}
+
+function updatePdfDraftTF(id, key) {
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.map((q) => {
+    if (q.id !== id) return q;
+    const parsed = parsePdfTrueFalse(q.answer, q.answer_count || 4);
+    parsed[key] = parsed[key] === "T" ? "F" : "T";
+    const answer = Array.from({ length: q.answer_count || 4 }, (_, i) => {
+      const label = String.fromCharCode(97 + i);
+      return `${label}${parsed[label] || "F"}`;
+    }).join("");
+    return { ...q, answer };
+  });
+  renderDraftQuestionList();
+}
+
+function updatePdfDraftShort(id, index, value) {
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.map((q) => {
+    if (q.id !== id) return q;
+    const values = String(q.answer || "").split(";").map((item) => item.trim());
+    values[index] = value.trim();
+    return { ...q, answer: values.filter(Boolean).join(";") };
+  });
+}
+
+function updatePdfDraftPartial(id, count, value) {
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.map((q) => {
+    if (q.id !== id) return q;
+    const partial = { ...(q.partial_points || {}) };
+    if (String(value).trim() === "") delete partial[count];
+    else partial[count] = Number(value || 0);
+    return { ...q, partial_points: Object.keys(partial).length ? partial : null };
+  });
+}
+
+function renderInlinePdfAnswerEditor(q) {
+  if (q.question_type === "multi_choice") {
+    const selected = new Set(String(q.answer || "").toUpperCase().split("").filter(Boolean));
+    return `<div class="answer-editor-row">
+      ${Array.from({ length: q.answer_count || 4 }, (_, i) => {
+        const key = String.fromCharCode(65 + i);
+        return `<label class="answer-box ${selected.has(key) ? "active" : ""}">
+          <input type="checkbox" ${selected.has(key) ? "checked" : ""} onchange="updatePdfDraftMC('${q.id}','${key}',this.checked)">
+          <span class="answer-box-key">${key}</span>
+          <span>Đáp án ${key}</span>
+        </label>`;
+      }).join("")}
+    </div>`;
+  }
+  if (q.question_type === "true_false") {
+    const parsed = parsePdfTrueFalse(q.answer, q.answer_count || 4);
+    return `<div class="answer-editor">
+      ${Array.from({ length: q.answer_count || 4 }, (_, i) => {
+        const key = String.fromCharCode(97 + i);
+        const state = parsed[key] || "F";
+        return `<div class="tf-editor-row">
+          <div><strong>${key})</strong> Ý ${key.toUpperCase()}</div>
+          <div class="tf-toggle">
+            <button class="tf-state ${state === "T" ? "correct" : "wrong"}" type="button" onclick="updatePdfDraftTF('${q.id}','${key}')">${state === "T" ? "Đúng" : "Sai"}</button>
+          </div>
+        </div>`;
+      }).join("")}
+    </div>`;
+  }
+  if (q.question_type === "short_answer") {
+    const values = String(q.answer || "").split(";").map((item) => item.trim());
+    return `<div class="answer-editor">
+      ${Array.from({ length: q.answer_count || 1 }, (_, i) => `<div class="short-editor-row">
+        <span>${i + 1}</span>
+        <input class="input" type="text" value="${escAttr(values[i] || "")}" placeholder="Đáp án ${i + 1}" oninput="updatePdfDraftShort('${q.id}',${i},this.value)">
+      </div>`).join("")}
+    </div>`;
+  }
+  return `<div class="editor-note">Câu tự luận không có đáp án chấm tự động.</div>`;
+}
+
+function renderInlinePdfPartialEditor(q) {
+  if (!(q.question_type === "multi_choice" || q.question_type === "true_false")) {
+    return `<div class="hint">Loại câu này không dùng điểm theo số ý đúng.</div>`;
+  }
+  const partial = q.partial_points || {};
+  return `<div class="draft-answer-partial">
+    <div class="hint">Điền điểm cho từng mức số ý đúng. Nếu bỏ trống, chỉ khi đúng hoàn toàn mới được điểm.</div>
+    <div style="display:grid;grid-template-columns:repeat(${Math.min(q.answer_count || 1, 4)},minmax(110px,1fr));gap:8px">
+      ${Array.from({ length: q.answer_count || 1 }, (_, i) => {
+        const count = i + 1;
+        return `<label style="display:grid;gap:6px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#fff">
+          <span style="font-size:.78rem;font-weight:700;color:var(--ink-mid)">${count} ý đúng</span>
+          <input class="input" type="number" min="0" step="0.25" value="${partial[count] ?? ""}" oninput="updatePdfDraftPartial('${q.id}','${count}',this.value)">
+        </label>`;
+      }).join("")}
+    </div>
+  </div>`;
+}
+
+function renderDraftQuestionList() {
+  PDF_EL.draftQuestionList.className = "draft-answer-list";
+  PDF_EL.draftQuestionList.innerHTML = PDF_STATE.draftQuestions.length
+    ? PDF_STATE.draftQuestions
+      .sort((a, b) => (a.order_no || 0) - (b.order_no || 0))
+      .map((q, idx) => `<div class="draft-answer-item">
+        <div class="draft-answer-head">
+          <div class="draft-answer-title">
+            <div class="draft-answer-num">${idx + 1}</div>
+            <div>
+              <strong>Câu ${idx + 1}</strong>
+              <div class="hint">Thiết lập đáp án trực tiếp cho đề PDF</div>
+            </div>
+          </div>
+          <button class="btn btn-danger btn-sm" type="button" onclick="deletePdfQuestion('${q.id}')">Xóa</button>
+        </div>
+        <div class="draft-answer-grid">
+          <div class="draft-answer-meta">
+            <label>Loại câu</label>
+            <select class="select" onchange="updatePdfDraftType('${q.id}',this.value)">
+              <option value="multi_choice" ${q.question_type === "multi_choice" ? "selected" : ""}>Trắc nghiệm</option>
+              <option value="true_false" ${q.question_type === "true_false" ? "selected" : ""}>Đúng / Sai</option>
+              <option value="short_answer" ${q.question_type === "short_answer" ? "selected" : ""}>Trả lời ngắn</option>
+              <option value="essay" ${q.question_type === "essay" ? "selected" : ""}>Tự luận</option>
+            </select>
+          </div>
+          <div class="draft-answer-meta">
+            <label>Điểm câu</label>
+            <input class="input" type="number" min="0" step="0.25" value="${q.points ?? 0}" oninput="updatePdfDraftField('${q.id}','points',this.value)">
+          </div>
+          <div class="draft-answer-meta">
+            <label>Số đáp án / số ý</label>
+            <input class="input" type="number" min="1" max="8" value="${q.question_type === "essay" ? 1 : (q.answer_count || 1)}" oninput="updatePdfDraftAnswerCount('${q.id}',this.value)">
+          </div>
+          <div class="draft-answer-meta">
+            <label>Nhãn câu</label>
+            <input class="input" type="text" value="${escAttr(q.label || `Câu ${idx + 1}`)}" oninput="updatePdfDraftField('${q.id}','label',this.value)">
+          </div>
+        </div>
+        <div class="draft-answer-body">
+          <div>
+            <label>Đáp án đúng</label>
+            ${renderInlinePdfAnswerEditor(q)}
+          </div>
+          <div>
+            <label>Điểm theo số ý đúng</label>
+            ${renderInlinePdfPartialEditor(q)}
+          </div>
+        </div>
+      </div>`).join("")
+    : `<div class="empty"><strong>Chưa có đáp án nào</strong><div>Hãy bấm + Thêm đáp án để tạo trực tiếp ngay trong form này.</div></div>`;
+}
+
+window.updatePdfDraftField = updatePdfDraftField;
+window.updatePdfDraftType = updatePdfDraftType;
+window.updatePdfDraftAnswerCount = updatePdfDraftAnswerCount;
+window.updatePdfDraftMC = updatePdfDraftMC;
+window.updatePdfDraftTF = updatePdfDraftTF;
+window.updatePdfDraftShort = updatePdfDraftShort;
+window.updatePdfDraftPartial = updatePdfDraftPartial;
+
+if (PDF_EL.openDraftQuestionBtn?.parentNode) {
+  const addClone = PDF_EL.openDraftQuestionBtn.cloneNode(true);
+  PDF_EL.openDraftQuestionBtn.parentNode.replaceChild(addClone, PDF_EL.openDraftQuestionBtn);
+  PDF_EL.openDraftQuestionBtn = addClone;
+  PDF_EL.openDraftQuestionBtn.addEventListener("click", addPdfDraftQuestionInline);
+}
+
+if (PDF_EL.removeDraftQuestionBtn?.parentNode) {
+  const removeClone = PDF_EL.removeDraftQuestionBtn.cloneNode(true);
+  PDF_EL.removeDraftQuestionBtn.parentNode.replaceChild(removeClone, PDF_EL.removeDraftQuestionBtn);
+  PDF_EL.removeDraftQuestionBtn = removeClone;
+  PDF_EL.removeDraftQuestionBtn.addEventListener("click", removeLastPdfDraftQuestion);
+}
+
 function readPartialScores() {
   const inputs = Array.from(document.querySelectorAll(".pdf-partial-input"));
   if (!inputs.length) return null;
