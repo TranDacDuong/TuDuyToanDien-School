@@ -140,13 +140,20 @@ textarea{min-height:110px;resize:vertical}
             <input id="pdfExamTotal" class="input" type="number" min="0" step="0.25" value="10">
           </div>
           <div class="field full">
-            <label>Google Drive file ID hoặc link chia sẻ</label>
+            <label>Link đề thi</label>
             <input id="pdfExamDriveInput" class="input" placeholder="Dán file ID hoặc link Google Drive">
             <div class="hint">Nên đặt file ở chế độ “Anyone with the link can view”.</div>
           </div>
           <div class="field full">
             <label>Mô tả</label>
             <textarea id="pdfExamDescription"></textarea>
+          </div>
+          <div class="field full">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+              <label style="margin:0">Tạo đáp án</label>
+              <button class="btn btn-outline btn-sm" id="openPdfDraftQuestionBtn" type="button">+ Thêm đáp án</button>
+            </div>
+            <div id="pdfDraftQuestionList" style="display:grid;gap:10px"></div>
           </div>
         </div>
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
@@ -168,7 +175,7 @@ textarea{min-height:110px;resize:vertical}
       <form id="pdfQuestionForm">
         <div class="form-grid">
           <div class="field">
-            <label>Thứ tự</label>
+            <label>Câu</label>
             <input id="pdfQuestionOrder" class="input" type="number" min="1" required>
           </div>
           <div class="field">
@@ -185,7 +192,7 @@ textarea{min-height:110px;resize:vertical}
             </select>
           </div>
           <div class="field">
-            <label>Số điểm</label>
+            <label>Điểm câu</label>
             <input id="pdfQuestionPoints" class="input" type="number" min="0" step="0.25" value="0.25">
           </div>
           <div class="field">
@@ -197,8 +204,8 @@ textarea{min-height:110px;resize:vertical}
             <input id="pdfQuestionAnswer" class="input" placeholder="Ví dụ: A | AB | aTbF | 3.14 | bài viết">
           </div>
           <div class="field full">
-            <label>Ghi chú / mô tả ngắn ở panel phải</label>
-            <textarea id="pdfQuestionText" placeholder="Có thể để trống nếu học sinh chỉ đọc đề PDF bên trái."></textarea>
+            <label>Điểm theo số ý đúng</label>
+            <div id="pdfPartialScoreWrap" style="display:grid;gap:8px"></div>
           </div>
         </div>
         <div class="hint" style="margin-top:10px">
