@@ -47,10 +47,11 @@ const PDF_EL = {
   questionType: document.getElementById("pdfQuestionType"),
   questionPoints: document.getElementById("pdfQuestionPoints"),
   questionAnswerCount: document.getElementById("pdfQuestionAnswerCount"),
-  questionAnswer: document.getElementById("pdfQuestionAnswer"),
+  answerEditor: document.getElementById("pdfAnswerEditor"),
   partialScoreWrap: document.getElementById("pdfPartialScoreWrap"),
   draftQuestionList: document.getElementById("pdfDraftQuestionList"),
   openDraftQuestionBtn: document.getElementById("openPdfDraftQuestionBtn"),
+  removeDraftQuestionBtn: document.getElementById("removePdfDraftQuestionBtn"),
   screen: document.getElementById("pdfExamScreen"),
   screenTitle: document.getElementById("pdfExamScreenTitle"),
   summaryChips: document.getElementById("pdfExamSummaryChips"),
@@ -81,6 +82,7 @@ PDF_EL.reloadBtn?.addEventListener("click", () => loadPdfData(true));
 PDF_EL.examForm?.addEventListener("submit", submitPdfExamForm);
 PDF_EL.questionForm?.addEventListener("submit", submitPdfQuestionForm);
 PDF_EL.openDraftQuestionBtn?.addEventListener("click", () => openPdfQuestionModal());
+PDF_EL.removeDraftQuestionBtn?.addEventListener("click", removeLastPdfDraftQuestion);
 PDF_EL.editBtn?.addEventListener("click", () => PDF_STATE.activeExamId && openPdfExamModal(PDF_STATE.activeExamId));
 PDF_EL.addQuestionBtn?.addEventListener("click", () => PDF_STATE.activeExamId && openPdfExamModal(PDF_STATE.activeExamId));
 PDF_EL.takeBtn?.addEventListener("click", () => PDF_STATE.activeExamId && openPdfAttempt(PDF_STATE.activeExamId));
@@ -92,8 +94,8 @@ PDF_EL.gradeFilter?.addEventListener("change", () => {
   renderPdfExamGrid();
 });
 PDF_EL.examGrade?.addEventListener("change", () => fillPdfSubjects(PDF_EL.examSubject, PDF_EL.examGrade.value, "Chọn môn"));
-PDF_EL.questionType?.addEventListener("change", renderPartialScoreEditor);
-PDF_EL.questionAnswerCount?.addEventListener("input", renderPartialScoreEditor);
+PDF_EL.questionType?.addEventListener("change", handlePdfQuestionTypeChange);
+PDF_EL.questionAnswerCount?.addEventListener("input", () => rerenderPdfQuestionEditors());
 
 initPdfExam();
 
@@ -486,27 +488,182 @@ function renderPdfQuestionRow(q) {
   </div>`;
 }
 
+function getPdfDefaultQuestion(order) {
+  return {
+    id: crypto.randomUUID(),
+    order_no: order,
+    label: `Câu ${order}`,
+    question_type: "multi_choice",
+    question_text: null,
+    answer: "A",
+    answer_count: 4,
+    points: 0.25,
+    partial_points: null,
+  };
+}
+
+function removeLastPdfDraftQuestion() {
+  if (!PDF_STATE.draftQuestions.length) return;
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions
+    .slice(0, -1)
+    .map((q, idx) => ({ ...q, order_no: idx + 1, label: `Câu ${idx + 1}` }));
+  renderDraftQuestionList();
+}
+
+function normalizePdfQuestionType(type) {
+  return ["multi_choice", "true_false", "short_answer", "essay"].includes(type) ? type : "multi_choice";
+}
+
+function parsePdfTrueFalse(answer, count) {
+  const out = {};
+  const regex = /([a-z])([TF])/gi;
+  let match;
+  while ((match = regex.exec(String(answer || "")))) {
+    out[match[1].toLowerCase()] = match[2].toUpperCase();
+  }
+  for (let i = 0; i < count; i++) {
+    const key = String.fromCharCode(97 + i);
+    if (!out[key]) out[key] = "F";
+  }
+  return out;
+}
+
+function collectPdfAnswerValue(allowEmpty = false) {
+  const type = normalizePdfQuestionType(PDF_EL.questionType.value);
+  if (type === "multi_choice") {
+    const picked = Array.from(PDF_EL.answerEditor?.querySelectorAll('input[type="checkbox"]:checked') || [])
+      .map((input) => String(input.value || "").toUpperCase())
+      .filter(Boolean)
+      .sort()
+      .join("");
+    return allowEmpty ? picked : picked || "";
+  }
+  if (type === "true_false") {
+    const rows = Array.from(PDF_EL.answerEditor?.querySelectorAll("[data-pdf-tf-row]") || []);
+    const value = rows.map((row) => {
+      const key = row.dataset.key;
+      const state = row.querySelector(".tf-state")?.dataset.value || "F";
+      return `${key}${state}`;
+    }).join("");
+    return allowEmpty ? value : value || "";
+  }
+  if (type === "short_answer") {
+    const value = Array.from(PDF_EL.answerEditor?.querySelectorAll("[data-pdf-short-input]") || [])
+      .map((input) => String(input.value || "").trim())
+      .filter(Boolean)
+      .join(";");
+    return allowEmpty ? value : value || "";
+  }
+  return "";
+}
+
+function renderPdfAnswerEditor(type, count, existingAnswer = "") {
+  if (!PDF_EL.answerEditor) return;
+  if (type === "multi_choice") {
+    const selected = new Set(String(existingAnswer || "").toUpperCase().split("").filter(Boolean));
+    PDF_EL.answerEditor.innerHTML = `
+      <div class="editor-note">Chọn đáp án đúng giống phần tạo câu hỏi. Mặc định trắc nghiệm có 4 đáp án.</div>
+      <div class="answer-editor-row">
+        ${Array.from({ length: count }, (_, i) => {
+          const key = String.fromCharCode(65 + i);
+          return `<label class="answer-box ${selected.has(key) ? "active" : ""}" data-pdf-answer-box>
+            <input type="checkbox" value="${key}" ${selected.has(key) ? "checked" : ""}>
+            <span class="answer-box-key">${key}</span>
+            <span>Đáp án ${key}</span>
+          </label>`;
+        }).join("")}
+      </div>`;
+  } else if (type === "true_false") {
+    const map = parsePdfTrueFalse(existingAnswer, count);
+    PDF_EL.answerEditor.innerHTML = `
+      <div class="editor-note">Mỗi ý a, b, c... chọn Đúng hoặc Sai như phần tạo đề kiểm tra.</div>
+      <div class="answer-editor">
+        ${Array.from({ length: count }, (_, i) => {
+          const key = String.fromCharCode(97 + i);
+          const state = map[key] || "F";
+          return `<div class="tf-editor-row" data-pdf-tf-row data-key="${key}">
+            <div><strong>${key})</strong> Ý ${key.toUpperCase()}</div>
+            <div class="tf-toggle">
+              <button class="tf-state ${state === "T" ? "correct" : "wrong"}" type="button" data-value="${state}">${state === "T" ? "Đúng" : "Sai"}</button>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>`;
+  } else if (type === "short_answer") {
+    const values = String(existingAnswer || "").split(";").map((item) => item.trim());
+    PDF_EL.answerEditor.innerHTML = `
+      <div class="editor-note">Nhập các đáp án đúng. Nhiều đáp án sẽ được nối bằng dấu <b>;</b>.</div>
+      <div class="answer-editor">
+        ${Array.from({ length: count }, (_, i) => `<div class="short-editor-row">
+          <span>${i + 1}</span>
+          <input class="input" data-pdf-short-input type="text" value="${escAttr(values[i] || "")}" placeholder="Đáp án ${i + 1}">
+        </div>`).join("")}
+      </div>`;
+  } else {
+    PDF_EL.answerEditor.innerHTML = `<div class="editor-note">Câu tự luận không có đáp án chấm tự động. Hệ thống sẽ để trống phần đáp án đúng.</div>`;
+  }
+
+  PDF_EL.answerEditor.querySelectorAll("[data-pdf-answer-box]").forEach((label) => {
+    const input = label.querySelector("input");
+    const sync = () => label.classList.toggle("active", !!input.checked);
+    input.addEventListener("change", sync);
+    label.addEventListener("click", (ev) => {
+      if (ev.target.tagName === "INPUT") return;
+      input.checked = !input.checked;
+      input.dispatchEvent(new Event("change"));
+    });
+    sync();
+  });
+
+  PDF_EL.answerEditor.querySelectorAll("[data-pdf-tf-row] .tf-state").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const isTrue = btn.dataset.value === "T";
+      btn.dataset.value = isTrue ? "F" : "T";
+      btn.textContent = isTrue ? "Sai" : "Đúng";
+      btn.classList.toggle("correct", !isTrue);
+      btn.classList.toggle("wrong", isTrue);
+    });
+  });
+}
+
+function rerenderPdfQuestionEditors(existingPartialScores = null, existingAnswer = null) {
+  const type = normalizePdfQuestionType(PDF_EL.questionType.value);
+  let count = Math.max(1, Number(PDF_EL.questionAnswerCount.value || 1));
+  count = type === "essay" ? 1 : Math.min(count, 8);
+  PDF_EL.questionAnswerCount.value = count;
+  renderPdfAnswerEditor(type, count, existingAnswer ?? collectPdfAnswerValue(true));
+  renderPartialScoreEditor(existingPartialScores);
+}
+
+function handlePdfQuestionTypeChange() {
+  const type = normalizePdfQuestionType(PDF_EL.questionType.value);
+  PDF_EL.questionAnswerCount.value = (type === "multi_choice" || type === "true_false") ? 4 : 1;
+  rerenderPdfQuestionEditors();
+}
+
 function openPdfQuestionModal(questionId = null) {
   if (!(PDF_STATE.role === "admin" || PDF_STATE.role === "teacher")) return;
   PDF_STATE.editingQuestionId = questionId;
   PDF_EL.questionForm.reset();
 
   const next = PDF_STATE.draftQuestions.length + 1;
-  PDF_EL.questionOrder.value = next;
-  PDF_EL.questionType.value = "multi_choice";
-  PDF_EL.questionPoints.value = "0.25";
-  PDF_EL.questionAnswerCount.value = "4";
+  const base = getPdfDefaultQuestion(next);
+  PDF_EL.questionOrder.value = base.order_no;
+  PDF_EL.questionLabel.value = base.label;
+  PDF_EL.questionType.value = base.question_type;
+  PDF_EL.questionPoints.value = base.points;
+  PDF_EL.questionAnswerCount.value = base.answer_count;
 
   if (questionId) {
     const q = PDF_STATE.draftQuestions.find((x) => x.id === questionId);
     if (!q) return;
     PDF_EL.questionModalTitle.textContent = "Sửa câu trả lời";
     PDF_EL.questionOrder.value = q.order_no || next;
-    PDF_EL.questionLabel.value = q.label || "";
+    PDF_EL.questionLabel.value = q.label || `Câu ${q.order_no || next}`;
     PDF_EL.questionType.value = q.question_type || "multi_choice";
     PDF_EL.questionPoints.value = q.points ?? 0;
     PDF_EL.questionAnswerCount.value = q.answer_count || 4;
-    PDF_EL.questionAnswer.value = q.answer || "";
+    rerenderPdfQuestionEditors(q.partial_points || null, q.answer || "");
   } else {
     PDF_EL.questionModalTitle.textContent = "Thêm câu trả lời";
   }
@@ -916,4 +1073,107 @@ function getPartialScore(q, correctCount, hasWrong) {
   if (!q.partial_points || hasWrong) return 0;
   const value = q.partial_points[String(correctCount)];
   return value == null ? 0 : Number(value);
+}
+
+function openPdfQuestionModal(questionId = null) {
+  if (!(PDF_STATE.role === "admin" || PDF_STATE.role === "teacher")) return;
+  PDF_STATE.editingQuestionId = questionId;
+  PDF_EL.questionForm.reset();
+
+  const next = PDF_STATE.draftQuestions.length + 1;
+  const base = getPdfDefaultQuestion(next);
+  PDF_EL.questionOrder.value = base.order_no;
+  PDF_EL.questionLabel.value = base.label;
+  PDF_EL.questionType.value = base.question_type;
+  PDF_EL.questionPoints.value = base.points;
+  PDF_EL.questionAnswerCount.value = base.answer_count;
+
+  if (questionId) {
+    const q = PDF_STATE.draftQuestions.find((x) => x.id === questionId);
+    if (!q) return;
+    PDF_EL.questionModalTitle.textContent = "Sửa câu trả lời";
+    PDF_EL.questionOrder.value = q.order_no || next;
+    PDF_EL.questionLabel.value = q.label || `Câu ${q.order_no || next}`;
+    PDF_EL.questionType.value = q.question_type || "multi_choice";
+    PDF_EL.questionPoints.value = q.points ?? 0;
+    PDF_EL.questionAnswerCount.value = q.answer_count || 4;
+    rerenderPdfQuestionEditors(q.partial_points || null, q.answer || "");
+  } else {
+    PDF_EL.questionModalTitle.textContent = "Thêm câu trả lời";
+    rerenderPdfQuestionEditors(null, base.answer);
+  }
+
+  PDF_EL.questionModal.classList.add("show");
+}
+
+async function submitPdfQuestionForm(ev) {
+  ev.preventDefault();
+  const orderNo = Number(PDF_EL.questionOrder.value || 1);
+  const questionType = normalizePdfQuestionType(PDF_EL.questionType.value);
+  const answerCount = Math.max(1, Number(PDF_EL.questionAnswerCount.value || 1));
+  const answerValue = collectPdfAnswerValue();
+
+  const payload = {
+    order_no: orderNo,
+    label: PDF_EL.questionLabel.value.trim() || `Câu ${orderNo}`,
+    question_type: questionType,
+    question_text: null,
+    answer: answerValue,
+    answer_count: answerCount,
+    points: Number(PDF_EL.questionPoints.value || 0),
+    partial_points: readPartialScores(),
+  };
+
+  if (!payload.label) return alert("Nhãn câu không được để trống.");
+  if (payload.question_type !== "essay" && !payload.answer) return alert("Hãy chọn hoặc nhập đáp án đúng.");
+
+  if (PDF_STATE.editingQuestionId) {
+    PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.map((q) => q.id === PDF_STATE.editingQuestionId ? { ...q, ...payload } : q);
+  } else {
+    PDF_STATE.draftQuestions.push({ ...payload, id: crypto.randomUUID() });
+  }
+
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions
+    .sort((a, b) => (a.order_no || 0) - (b.order_no || 0))
+    .map((q, idx) => ({ ...q, order_no: idx + 1, label: `Câu ${idx + 1}` }));
+
+  closePdfQuestionModal();
+  renderDraftQuestionList();
+}
+
+function renderDraftQuestionList() {
+  PDF_EL.draftQuestionList.innerHTML = PDF_STATE.draftQuestions.length
+    ? PDF_STATE.draftQuestions
+      .sort((a, b) => (a.order_no || 0) - (b.order_no || 0))
+      .map((q) => `<div style="display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid rgba(39,58,91,.08);border-radius:14px;background:#fff">
+        <div style="font-weight:800;color:var(--navy)">Câu ${q.order_no || 1}</div>
+        <div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+            <strong>${esc(q.label || "")}</strong>
+            <span class="pill soft">${typeLabel(q.question_type)}</span>
+            <span class="pill soft">${q.points || 0} điểm</span>
+            <span class="pill soft">${q.answer_count || 1} ${q.question_type === "true_false" ? "ý" : "đáp án"}</span>
+          </div>
+          <div class="hint">Đáp án đúng: <b>${esc(q.answer || "")}</b>${q.partial_points ? ` • Điểm theo số ý đúng: ${Object.entries(q.partial_points).map(([k, v]) => `${k}=${v}`).join(", ")}` : ""}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+          <button class="btn btn-outline btn-sm" type="button" onclick="openPdfQuestionModal('${q.id}')">Sửa</button>
+          <button class="btn btn-danger btn-sm" type="button" onclick="deletePdfQuestion('${q.id}')">Xóa</button>
+        </div>
+      </div>`).join("")
+    : `<div class="empty"><strong>Chưa có đáp án nào</strong><div>Hãy thêm đáp án cho đề PDF ngay trong form này.</div></div>`;
+}
+
+function renderPartialScoreEditor(existing = null) {
+  const type = PDF_EL.questionType.value;
+  const count = Math.max(1, Number(PDF_EL.questionAnswerCount.value || 1));
+  if (!(type === "multi_choice" || type === "true_false")) {
+    PDF_EL.partialScoreWrap.innerHTML = `<div class="hint">Loại câu này không dùng điểm theo số ý đúng.</div>`;
+    return;
+  }
+  const scores = existing || readPartialScores() || {};
+  PDF_EL.partialScoreWrap.innerHTML = `<div class="hint">Nhập điểm tương ứng với số ý làm đúng. Đúng hoàn toàn sẽ luôn được trọn điểm câu.</div>
+    <div style="display:grid;grid-template-columns:repeat(${Math.min(count, 4)},minmax(110px,1fr));gap:8px">
+      ${Array.from({ length: count }, (_, i) => i + 1).map((num) => `<label style="display:grid;gap:6px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#fff"><span style="font-size:.78rem;font-weight:700;color:var(--ink-mid)">${num} ý đúng</span><input class="input pdf-partial-input" data-count="${num}" type="number" min="0" step="0.25" value="${scores[num] ?? ""}"></label>`).join("")}
+    </div>`;
 }

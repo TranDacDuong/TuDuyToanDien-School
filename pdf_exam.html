@@ -78,6 +78,20 @@ textarea{min-height:110px;resize:vertical}
 .essay-box,.short-input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font:inherit;background:#fff;outline:none}
 .essay-box{min-height:140px;resize:vertical}
 .review-wrap{display:grid;gap:16px}
+.answer-editor{display:grid;gap:10px}
+.answer-editor-row{display:flex;flex-wrap:wrap;gap:8px}
+.answer-box{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:12px;background:#fff;cursor:pointer;transition:.15s}
+.answer-box input{margin:0}
+.answer-box.active{border-color:var(--navy);background:#eff6ff}
+.answer-box-key{font-weight:800;color:var(--navy);min-width:20px}
+.tf-editor-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;border:1.5px solid var(--border);border-radius:12px;background:#fff}
+.tf-toggle{display:flex;gap:8px;align-items:center}
+.tf-state{min-width:74px;padding:8px 10px;border-radius:10px;border:1.5px solid var(--border);background:#fff;text-align:center;font-weight:700;cursor:pointer;transition:.15s}
+.tf-state.correct{border-color:#0f766e;background:#ecfeff;color:#115e59}
+.tf-state.wrong{border-color:#d1d5db;background:#f8fafc;color:#475569}
+.short-editor-row{display:grid;grid-template-columns:40px minmax(0,1fr);gap:10px;align-items:center}
+.short-editor-row span{display:flex;align-items:center;justify-content:center;height:42px;border-radius:10px;background:#eff6ff;color:var(--navy);font-weight:800}
+.editor-note{padding:12px 14px;border:1px dashed var(--border);border-radius:12px;background:var(--surface);color:var(--ink-light);font-size:.86rem;line-height:1.6}
 @media(max-width:1080px){.toolbar,.form-grid,.exam-body,.answer-card-bd{grid-template-columns:1fr}.question-row{grid-template-columns:1fr}.question-actions{align-items:flex-start;flex-direction:row;flex-wrap:wrap}.exam-body{grid-template-columns:1fr}.pdf-pane{min-height:360px}}
 </style>
 </head>
@@ -151,7 +165,10 @@ textarea{min-height:110px;resize:vertical}
           <div class="field full">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
               <label style="margin:0">Tạo đáp án</label>
-              <button class="btn btn-outline btn-sm" id="openPdfDraftQuestionBtn" type="button">+ Thêm đáp án</button>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-outline btn-sm" id="removePdfDraftQuestionBtn" type="button">- Bớt đáp án</button>
+                <button class="btn btn-outline btn-sm" id="openPdfDraftQuestionBtn" type="button">+ Thêm đáp án</button>
+              </div>
             </div>
             <div id="pdfDraftQuestionList" style="display:grid;gap:10px"></div>
           </div>
@@ -199,9 +216,9 @@ textarea{min-height:110px;resize:vertical}
             <label>Số đáp án / số ý</label>
             <input id="pdfQuestionAnswerCount" class="input" type="number" min="1" max="8" value="4">
           </div>
-          <div class="field">
+          <div class="field full">
             <label>Đáp án đúng</label>
-            <input id="pdfQuestionAnswer" class="input" placeholder="Ví dụ: A | AB | aTbF | 3.14 | bài viết">
+            <div id="pdfAnswerEditor" style="display:grid;gap:8px"></div>
           </div>
           <div class="field full">
             <label>Điểm theo số ý đúng</label>
