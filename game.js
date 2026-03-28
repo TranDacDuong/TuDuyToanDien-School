@@ -23,6 +23,7 @@
     keyword: document.getElementById("gameKeyword"),
     gradeFilter: document.getElementById("gameGradeFilter"),
     subjectFilter: document.getElementById("gameSubjectFilter"),
+    visibilityFilter: document.getElementById("gameVisibilityFilter"),
     sortFilter: document.getElementById("gameSortFilter"),
     statusFilter: document.getElementById("gameStatusFilter"),
     roomGrid: document.getElementById("gameRoomGrid"),
@@ -184,7 +185,7 @@
       fillSubjects(EL.subjectFilter, EL.gradeFilter.value, "Tất cả môn");
       renderRooms();
     });
-    [EL.keyword, EL.subjectFilter, EL.sortFilter, EL.statusFilter].forEach((el) => {
+    [EL.keyword, EL.subjectFilter, EL.visibilityFilter, EL.sortFilter, EL.statusFilter].forEach((el) => {
       el?.addEventListener("input", renderRooms);
       el?.addEventListener("change", renderRooms);
     });
@@ -289,6 +290,16 @@
     return { combo, best };
   }
 
+  function getCurrentComboValue() {
+    const ordered = [...(GAME.myAnswers || [])].sort((a, b) => new Date(a.answered_at || 0) - new Date(b.answered_at || 0));
+    let combo = 0;
+    ordered.forEach((answer) => {
+      if (answer.is_correct) combo += 1;
+      else combo = 0;
+    });
+    return combo;
+  }
+
   function getArenaTier(totalScore) {
     if (totalScore >= 6000) return { name: "Kim cương", icon: "◆" };
     if (totalScore >= 3500) return { name: "Bạch kim", icon: "⬡" };
@@ -361,6 +372,7 @@
     const keyword = String(EL.keyword?.value || "").trim().toLowerCase();
     const gradeId = EL.gradeFilter?.value || "";
     const subjectId = EL.subjectFilter?.value || "";
+    const visibility = EL.visibilityFilter?.value || "";
     const sortMode = EL.sortFilter?.value || "recommended";
     const status = EL.statusFilter?.value || "";
     const playerMap = buildRoomPlayerMap();
@@ -371,6 +383,7 @@
     }
     if (gradeId) list = list.filter((room) => room.grade_id === gradeId);
     if (subjectId) list = list.filter((room) => room.subject_id === subjectId);
+    if (visibility) list = list.filter((room) => (room.visibility || "public") === visibility);
     if (status) list = list.filter((room) => room.status === status);
     list.sort((a, b) => compareTupleDesc(getRoomSortValue(a, sortMode), getRoomSortValue(b, sortMode)));
 
@@ -1099,7 +1112,7 @@
   }
 
   function renderAnsweredHint(answered) {
-    return `<div class="hint" style="margin-top:10px;color:${answered?.is_correct ? "#15803d" : "#c2410c"}">${answered?.is_correct ? "Bạn đã trả lời đúng." : "Bạn đã gửi đáp án cho câu này."}</div>`;
+    return `<div class="hint" style="margin-top:10px;color:${answered?.is_correct ? "#15803d" : "#c2410c"}">${answered?.is_correct ? "Bạn đã trả lời đúng." : "Bạn đã gửi đáp án cho câu này."}${answered?.combo_bonus ? ` Combo +${answered.combo_bonus}` : ""}</div>`;
   }
 
   function parseTrueFalseAnswer(raw) {
@@ -1181,7 +1194,8 @@
     if (GAME.roomQuestions[questionIndex]?.id !== questionId) return;
 
     const remaining = Math.max(0, room.time_per_question - (elapsed % room.time_per_question));
-    const scored = evaluateAnswer(question, answerValue, remaining, room.time_per_question);
+    const currentCombo = getCurrentComboValue();
+    const scored = evaluateAnswer(question, answerValue, remaining, room.time_per_question, currentCombo);
 
     const { error: insertErr } = await sb.from("game_room_answers").insert({
       room_id: room.id,
@@ -1205,24 +1219,25 @@
     await refreshActiveRoom(room.id, true);
   }
 
-  function evaluateAnswer(question, answerValue, remaining, totalTime) {
+  function evaluateAnswer(question, answerValue, remaining, totalTime, currentCombo) {
     const speedBonus = Math.round((remaining / totalTime) * 35);
     const base = Number(question.points || 0);
+    const comboBonus = currentCombo >= 2 ? Math.min(60, currentCombo * 10) : 0;
     if (question.question_type === "multi_choice") {
       const correct = normalizeAnswer(question.answer);
       const mine = normalizeAnswer(answerValue);
       const ok = correct === mine;
-      return { isCorrect: ok, score: ok ? base + speedBonus : 0 };
+      return { isCorrect: ok, score: ok ? base + speedBonus + comboBonus : 0, comboBonus: ok ? comboBonus : 0 };
     }
     if (question.question_type === "true_false") {
       const correct = normalizeAnswer(question.answer);
       const mine = normalizeAnswer(answerValue);
       const ok = correct === mine;
-      return { isCorrect: ok, score: ok ? base + speedBonus : 0 };
+      return { isCorrect: ok, score: ok ? base + speedBonus + comboBonus : 0, comboBonus: ok ? comboBonus : 0 };
     }
     const accepted = shortAnswerAccepted(question.answer);
     const ok = accepted.includes(String(answerValue || "").trim().toLowerCase());
-    return { isCorrect: ok, score: ok ? base + speedBonus : 0 };
+    return { isCorrect: ok, score: ok ? base + speedBonus + comboBonus : 0, comboBonus: ok ? comboBonus : 0 };
   }
 
   async function recalcPlayerScore(playerId) {
