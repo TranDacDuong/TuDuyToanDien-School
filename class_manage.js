@@ -661,7 +661,7 @@
     const sb=getSb(), role=_role;
 
     const {data:classExams,error:classExamsError}=await sb.from("class_exams")
-      .select("id,starts_at,ends_at,exam:exams(id,title,duration_minutes,total_points,exam_questions(question:question_bank(question_type))),pdf:pdf_exams(id,title,duration_minutes,total_points)")
+      .select("id,starts_at,ends_at,exam_id,pdf_exam_id")
       .eq("class_id",_classId)
       .order("created_at",{ascending:false});
 
@@ -670,27 +670,58 @@
       return;
     }
 
+    const regularIds = [...new Set((classExams||[]).map(ce=>ce.exam_id).filter(Boolean))];
+    const pdfIds = [...new Set((classExams||[]).map(ce=>ce.pdf_exam_id).filter(Boolean))];
+
+    const [
+      {data:regularExams,error:regularExamsError},
+      {data:pdfExams,error:pdfExamsError}
+    ] = await Promise.all([
+      regularIds.length
+        ? sb.from("exams")
+            .select("id,title,duration_minutes,total_points,exam_questions(question:question_bank(question_type))")
+            .in("id", regularIds)
+        : Promise.resolve({data:[],error:null}),
+      pdfIds.length
+        ? sb.from("pdf_exams")
+            .select("id,title,duration_minutes,total_points")
+            .in("id", pdfIds)
+        : Promise.resolve({data:[],error:null})
+    ]);
+
+    if(regularExamsError || pdfExamsError){
+      const msg = regularExamsError?.message || pdfExamsError?.message || "Không thể tải danh sách đề thi.";
+      tc.innerHTML = '<p style="color:var(--red);font-size:.85rem;padding:12px">Lỗi tải đề thi: '+esc(msg)+'</p>';
+      return;
+    }
+
+    const regularMap = Object.fromEntries((regularExams||[]).map(ex => [ex.id, ex]));
+    const pdfMap = Object.fromEntries((pdfExams||[]).map(ex => [ex.id, ex]));
+
     const exams=(classExams||[]).map(ce=>{
-      if(ce.exam){
+      const regularExam = ce.exam_id ? regularMap[ce.exam_id] : null;
+      const pdfExam = ce.pdf_exam_id ? pdfMap[ce.pdf_exam_id] : null;
+
+      if(regularExam){
         return {
           type:"exam",
-          id:ce.exam.id,
-          title:ce.exam.title,
-          duration_minutes:ce.exam.duration_minutes,
-          total_points:ce.exam.total_points,
-          exam_questions:ce.exam.exam_questions,
+          id:regularExam.id,
+          title:regularExam.title,
+          duration_minutes:regularExam.duration_minutes,
+          total_points:regularExam.total_points,
+          exam_questions:regularExam.exam_questions,
           class_exam_id: ce.id,
           starts_at: ce.starts_at,
           ends_at:   ce.ends_at,
         };
       }
-      if(ce.pdf){
+      if(pdfExam){
         return {
           type:"pdf",
-          id:ce.pdf.id,
-          title:ce.pdf.title + " (PDF)",
-          duration_minutes:ce.pdf.duration_minutes,
-          total_points:ce.pdf.total_points,
+          id:pdfExam.id,
+          title:pdfExam.title + " (PDF)",
+          duration_minutes:pdfExam.duration_minutes,
+          total_points:pdfExam.total_points,
           class_exam_id: ce.id,
           starts_at: ce.starts_at,
           ends_at:   ce.ends_at,
