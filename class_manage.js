@@ -25,6 +25,14 @@
   function fmtDT(iso){
     return new Date(iso).toLocaleString("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
   }
+  function esc(value){
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
   function generateDates(schedules, month, year){
     const dates=[], days=new Date(year,month+1,0).getDate();
     for(let d=1;d<=days;d++){
