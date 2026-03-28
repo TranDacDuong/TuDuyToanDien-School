@@ -50,6 +50,7 @@
   const PAGE_SIZE   = 15;
   let bankTotal     = 0;
   let bankData      = [];
+  let currentExamMode = "normal";
 
   /* ── Init ── */
   async function initUser() {
@@ -59,6 +60,41 @@
     currentUser = user;
     const { data: profile } = await sb.from("users").select("role").eq("id", user.id).single();
     currentRole = String(profile?.role || "teacher");
+    syncExamModeUI();
+  }
+
+  function syncExamModeUI() {
+    const normalBtn = document.getElementById("modeNormalBtn");
+    const pdfBtn = document.getElementById("modePdfBtn");
+    const createBtn = document.getElementById("createExamBtn") || document.querySelector(".toolbar .btn");
+    const subtitle = document.querySelector(".subtitle");
+    if (normalBtn) normalBtn.classList.toggle("active", currentExamMode === "normal");
+    if (pdfBtn) pdfBtn.classList.toggle("active", currentExamMode === "pdf");
+    if (createBtn) {
+      createBtn.textContent = currentExamMode === "pdf" ? "+ Tạo đề PDF" : "+ Tạo đề mới";
+      createBtn.onclick = () => {
+        if (currentExamMode === "pdf") openPdfExamModule("", "create");
+        else openEditor(null);
+      };
+    }
+    if (subtitle) {
+      subtitle.textContent = currentExamMode === "pdf"
+        ? "Quản lý đề PDF và mở trình tạo đề PDF"
+        : "Tạo và quản lý đề kiểm tra từ ngân hàng câu hỏi";
+    }
+  }
+
+  window.switchExamMode = function (mode) {
+    currentExamMode = mode === "pdf" ? "pdf" : "normal";
+    syncExamModeUI();
+    loadExamList();
+  };
+
+  function openPdfExamModule(examId = "", action = "") {
+    const params = new URLSearchParams();
+    if (examId) params.set("exam", examId);
+    if (action) params.set("action", action);
+    location.href = "pdf_exam.html" + (params.toString() ? `?${params.toString()}` : "");
   }
 
   /* ══════════════════════════════════════════════
@@ -66,6 +102,44 @@
   ══════════════════════════════════════════════ */
   async function loadExamList() {
     const sb = getSb();
+    if (currentExamMode === "pdf") {
+      let pdfQuery = sb
+        .from("pdf_exams")
+        .select("id, title, duration_minutes, total_points, created_by, created_at, status, description")
+        .order("created_at", { ascending: false });
+
+      const { data: pdfRaw } = await pdfQuery;
+      let data = pdfRaw || [];
+      if (currentRole === "teacher") data = data.filter(e => e.created_by === currentUser.id);
+
+      const grid = document.getElementById("examGrid");
+      if (!data.length) {
+        grid.innerHTML = `<p style="color:var(--muted);font-size:13px">Chưa có đề PDF nào. Nhấn "+ Tạo đề PDF" để bắt đầu.</p>`;
+        return;
+      }
+
+      grid.innerHTML = "";
+      data.forEach(e => {
+        const canEdit = currentRole === "admin" || e.created_by === currentUser.id;
+        const card = document.createElement("div");
+        card.className = "exam-card";
+        card.innerHTML = `
+          <h3>${e.title || "Không tên"} <span style="font-size:11px;color:#2563eb">PDF</span></h3>
+          <div class="meta">
+            ⏱ ${e.duration_minutes} phút &nbsp;•&nbsp; 🏆 ${e.total_points ?? 10}đ
+            <br>📌 ${e.status === "open" ? "Mở" : "Đóng"}
+            ${e.description ? `<br>${e.description}` : ""}
+          </div>
+          <div class="actions">
+            <button class="edit-btn" onclick="openPdfExamFromExamPage('${e.id}')">Mở</button>
+            ${canEdit ? `<button class="edit-btn" onclick="editPdfExamFromExamPage('${e.id}')">Sửa</button>
+            <button class="delete-btn" onclick="deletePdfExamFromExamPage('${e.id}')">Xóa</button>` : ""}
+          </div>`;
+        grid.appendChild(card);
+      });
+      return;
+    }
+
     let query = sb
       .from("exams")
       .select("id, title, duration_minutes, total_points, created_by, created_at")
@@ -118,6 +192,26 @@
     await sb.from("class_exams").delete().eq("exam_id", id);
     await sb.from("exam_questions").delete().eq("exam_id", id);
     const { error } = await sb.from("exams").delete().eq("id", id);
+    if (error) { alert("Lỗi: " + error.message); return; }
+    loadExamList();
+  };
+
+  window.openPdfExamFromExamPage = function (id) {
+    openPdfExamModule(id);
+  };
+
+  window.editPdfExamFromExamPage = function (id) {
+    openPdfExamModule(id, "edit");
+  };
+
+  window.deletePdfExamFromExamPage = async function (id) {
+    if (!confirm("Xóa đề PDF này?")) return;
+    const sb = getSb();
+    const { data: exam } = await sb.from("pdf_exams").select("created_by").eq("id", id).single();
+    if (currentRole === "teacher" && exam?.created_by !== currentUser.id) {
+      alert("Bạn không có quyền xóa đề PDF này."); return;
+    }
+    const { error } = await sb.from("pdf_exams").delete().eq("id", id);
     if (error) { alert("Lỗi: " + error.message); return; }
     loadExamList();
   };

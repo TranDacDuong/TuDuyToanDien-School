@@ -21,6 +21,9 @@ body { font-family:Inter,system-ui,sans-serif; background:var(--bg); color:#0f17
 h1 { font-size:22px; margin-bottom:4px; }
 .subtitle { color:var(--muted); font-size:13px; margin-bottom:20px; }
 .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:18px; }
+.mode-switch{display:flex;gap:8px;align-items:center;padding:4px;background:#e8eef8;border-radius:999px}
+.mode-switch button{padding:7px 14px;border:none;border-radius:999px;background:transparent;color:var(--accent);font-size:13px;font-weight:700;cursor:pointer}
+.mode-switch button.active{background:#fff;box-shadow:0 1px 4px rgba(2,6,23,.08)}
 
 .btn {
   padding:7px 16px; border:none; border-radius:8px;
@@ -209,6 +212,10 @@ h1 { font-size:22px; margin-bottom:4px; }
   <h1>📄 Đề kiểm tra</h1>
   <p class="subtitle">Tạo và quản lý đề kiểm tra từ ngân hàng câu hỏi</p>
   <div class="toolbar">
+    <div class="mode-switch">
+      <button id="modeNormalBtn" class="active" type="button" onclick="switchExamMode('normal')">Đề thường</button>
+      <button id="modePdfBtn" type="button" onclick="switchExamMode('pdf')">Đề PDF</button>
+    </div>
     <button class="btn" onclick="openEditor(null)">+ Tạo đề mới</button>
   </div>
   <div class="exam-grid" id="examGrid">

@@ -126,6 +126,24 @@ async function initPdfExam() {
   }
 
   await loadPdfData(false);
+  handlePdfRouteParams();
+}
+
+function handlePdfRouteParams() {
+  const params = new URLSearchParams(location.search);
+  const examId = params.get("exam");
+  const action = params.get("action");
+  if (!examId && action === "create" && (PDF_STATE.role === "admin" || PDF_STATE.role === "teacher")) {
+    openPdfExamModal();
+    return;
+  }
+  if (!examId) return;
+  if (action === "edit" && (PDF_STATE.role === "admin" || PDF_STATE.role === "teacher")) {
+    openPdfExamModal(examId);
+    return;
+  }
+  if (PDF_STATE.role === "student") openPdfAttempt(examId);
+  else openPdfExamScreen(examId);
 }
 
 async function loadPdfData(reopenScreen) {
