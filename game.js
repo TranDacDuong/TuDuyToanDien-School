@@ -384,6 +384,14 @@
         <div style="color:rgba(235,245,255,.78)">Chọn chế độ, khối và môn. Hệ thống sẽ tự vào phòng đang chờ, nếu phòng hiện tại đầy mới tạo phòng mới.</div>
       </div>
       <div id="gameModeCardGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px"></div>
+      <div style="display:grid;gap:10px;margin-top:8px">
+        <div style="font-weight:800;font-size:1rem;color:#fef3c7">Chọn khối</div>
+        <div id="gameGradeCardGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px"></div>
+      </div>
+      <div style="display:grid;gap:10px;margin-top:8px">
+        <div style="font-weight:800;font-size:1rem;color:#fef3c7">Chọn môn</div>
+        <div id="gameSubjectCardGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px"></div>
+      </div>
     `;
     hero.parentElement.insertBefore(deck, hero.nextSibling);
     const grid = deck.querySelector("#gameModeCardGrid");
@@ -396,6 +404,44 @@
     `).join("");
   }
 
+  function renderGradeCards() {
+    const grid = document.getElementById("gameGradeCardGrid");
+    if (!grid) return;
+    grid.innerHTML = (GAME.grades || []).map((grade) => {
+      const selected = EL.gradeFilter?.value === grade.id;
+      return `<button type="button" data-grade-card="${grade.id}" style="padding:14px 16px;border-radius:18px;border:${selected ? "2px solid #facc15" : "1px solid rgba(125,211,252,.18)"};background:${selected ? "linear-gradient(135deg,rgba(250,204,21,.18) 0%,rgba(251,191,36,.08) 100%)" : "linear-gradient(135deg,rgba(10,20,40,.96) 0%,rgba(16,32,61,.96) 100%)"};color:#eff6ff;font-weight:800;cursor:pointer">${esc(grade.name)}</button>`;
+    }).join("");
+    document.querySelectorAll("[data-grade-card]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (EL.gradeFilter) EL.gradeFilter.value = button.dataset.gradeCard || "";
+        if (EL.subjectFilter) EL.subjectFilter.value = "";
+        fillSubjects(EL.subjectFilter, EL.gradeFilter?.value || "", "Tất cả môn");
+        renderGradeCards();
+        renderSubjectCards();
+      });
+    });
+  }
+
+  function renderSubjectCards() {
+    const grid = document.getElementById("gameSubjectCardGrid");
+    if (!grid) return;
+    const gradeId = EL.gradeFilter?.value || "";
+    const subjects = gradeId ? GAME.subjects.filter((item) => item.grade_id === gradeId) : [];
+    grid.innerHTML = subjects.length
+      ? subjects.map((subject) => {
+          const selected = EL.subjectFilter?.value === subject.id;
+          return `<button type="button" data-subject-card="${subject.id}" style="padding:14px 16px;border-radius:18px;border:${selected ? "2px solid #67e8f9" : "1px solid rgba(125,211,252,.18)"};background:${selected ? "linear-gradient(135deg,rgba(34,211,238,.18) 0%,rgba(59,130,246,.08) 100%)" : "linear-gradient(135deg,rgba(10,20,40,.96) 0%,rgba(16,32,61,.96) 100%)"};color:#eff6ff;font-weight:700;cursor:pointer">${esc(subject.name)}</button>`;
+        }).join("")
+      : `<div class="hint">Chọn khối trước để hiện môn tương ứng.</div>`;
+    document.querySelectorAll("[data-subject-card]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (EL.subjectFilter) EL.subjectFilter.value = button.dataset.subjectCard || "";
+        renderSubjectCards();
+        if (GAME.selectedAutoMode && EL.gradeFilter?.value && EL.subjectFilter?.value) autoMatchSelectedMode();
+      });
+    });
+  }
+
   function refreshLobbyActions() {
     if (EL.openRoomBtn) {
       EL.openRoomBtn.textContent = "Phòng bạn bè";
@@ -405,6 +451,9 @@
     if (EL.reloadRoomsBtn) EL.reloadRoomsBtn.classList.add("hidden");
     if (EL.keyword) EL.keyword.classList.add("hidden");
     [EL.visibilityFilter, EL.sortFilter, EL.statusFilter, EL.modeFilter].forEach((el) => el?.classList.add("hidden"));
+    if (EL.roomGrid) EL.roomGrid.classList.add("hidden");
+    if (EL.roomEmpty) EL.roomEmpty.classList.add("hidden");
+    document.querySelector(".toolbar")?.classList.add("hidden");
   }
 
   function shuffle(list) {
@@ -467,6 +516,8 @@
     fillSubjects(EL.subjectFilter, "", "Tất cả môn");
     fillSubjects(EL.roomSubject, "", "Chọn môn");
     fillClasses(EL.roomClass, "Không gắn lớp");
+    renderGradeCards();
+    renderSubjectCards();
 
     bindEvents();
     setupListRealtime();
@@ -562,12 +613,14 @@
   function fillGrades(el, placeholder) {
     if (!el) return;
     el.innerHTML = `<option value="">${placeholder}</option>` + GAME.grades.map((grade) => `<option value="${grade.id}">${esc(grade.name)}</option>`).join("");
+    if (el === EL.gradeFilter) renderGradeCards();
   }
 
   function fillSubjects(el, gradeId, placeholder) {
     if (!el) return;
     const list = gradeId ? GAME.subjects.filter((subject) => subject.grade_id === gradeId) : GAME.subjects;
     el.innerHTML = `<option value="">${placeholder}</option>` + list.map((subject) => `<option value="${subject.id}">${esc(subject.name)}</option>`).join("");
+    if (el === EL.subjectFilter) renderSubjectCards();
   }
 
   function fillClasses(el, placeholder) {
@@ -1398,6 +1451,16 @@
     if (room) await joinRoom(room.id);
   }
 
+  async function cleanupRoomIfFinished(roomId) {
+    if (!roomId) return;
+    await sb.from("game_room_answers").delete().eq("room_id", roomId);
+    await sb.from("game_room_questions").delete().eq("room_id", roomId);
+    await sb.from("game_room_players").delete().eq("room_id", roomId);
+    await sb.from("game_rooms").delete().eq("id", roomId);
+    if (GAME.activeRoom?.id === roomId) hideGameScreen();
+    await loadRooms();
+  }
+
   async function joinRoomByCode() {
     const code = String(EL.joinCode?.value || "").trim().toUpperCase();
     if (!code) {
@@ -1952,6 +2015,11 @@
       await sb.from("game_rooms").update({ status: "finished", ended_at: new Date().toISOString() }).eq("id", room.id);
     }
     await refreshActiveRoom(room.id, true);
+    if (room.host_id === GAME.user.id) {
+      setTimeout(() => {
+        cleanupRoomIfFinished(room.id);
+      }, 6000);
+    }
   }
 
   function renderFinishedRoom() {
