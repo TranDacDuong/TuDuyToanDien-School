@@ -26,6 +26,7 @@
     statusFilter: document.getElementById("gameStatusFilter"),
     roomGrid: document.getElementById("gameRoomGrid"),
     roomEmpty: document.getElementById("gameRoomEmpty"),
+    heroBadges: document.getElementById("gameHeroBadges"),
     statsGrid: document.getElementById("gameStatsGrid"),
     historyList: document.getElementById("gameHistoryList"),
     historyModal: document.getElementById("gameHistoryModal"),
@@ -248,6 +249,14 @@
     return roomPlayerCount(room.id) < Number(room.max_players || 8);
   }
 
+  function getArenaTier(totalScore) {
+    if (totalScore >= 6000) return { name: "Kim cương", icon: "◆" };
+    if (totalScore >= 3500) return { name: "Bạch kim", icon: "⬡" };
+    if (totalScore >= 2000) return { name: "Vàng", icon: "★" };
+    if (totalScore >= 800) return { name: "Bạc", icon: "✦" };
+    return { name: "Đồng", icon: "•" };
+  }
+
   function filterVisibleRooms(rooms) {
     const playerMap = buildRoomPlayerMap();
     return (rooms || []).filter((room) => {
@@ -401,19 +410,38 @@
     const myFinished = finishedPlayers.filter((player) => player.user_id === GAME.user.id);
     const myBest = myFinished.reduce((max, item) => Math.max(max, Number(item.score || 0)), 0);
     const totalMatches = myFinished.length;
+    const totalScore = myFinished.reduce((sum, item) => sum + Number(item.score || 0), 0);
     const wins = myFinished.filter((player) => {
       const sameRoom = finishedPlayers.filter((row) => row.room_id === player.room_id);
       const best = sameRoom.reduce((max, row) => Math.max(max, Number(row.score || 0)), 0);
       return Number(player.score || 0) === best;
     }).length;
     const avgScore = totalMatches ? Math.round(myFinished.reduce((sum, item) => sum + Number(item.score || 0), 0) / totalMatches) : 0;
+    const winRate = totalMatches ? Math.round((wins / totalMatches) * 100) : 0;
+    const sortedMyFinished = [...myFinished].sort((a, b) => new Date(getRoomById(b.room_id)?.ended_at || 0) - new Date(getRoomById(a.room_id)?.ended_at || 0));
+    let streak = 0;
+    for (const player of sortedMyFinished) {
+      const sameRoom = finishedPlayers.filter((row) => row.room_id === player.room_id);
+      const best = sameRoom.reduce((max, row) => Math.max(max, Number(row.score || 0)), 0);
+      if (Number(player.score || 0) === best) streak += 1;
+      else break;
+    }
+    const tier = getArenaTier(totalScore);
+
+    if (EL.heroBadges) {
+      EL.heroBadges.innerHTML = `
+        <div class="hero-badge">${tier.icon} Hạng ${tier.name}</div>
+        <div class="hero-badge">Tỉ lệ thắng ${winRate}%</div>
+        <div class="hero-badge">Chuỗi thắng ${streak}</div>
+      `;
+    }
 
     if (EL.statsGrid) {
       EL.statsGrid.innerHTML = `
         <div class="stat-card"><span>Trận đã chơi</span><strong>${totalMatches}</strong></div>
-        <div class="stat-card"><span>Trận thắng</span><strong>${wins}</strong></div>
-        <div class="stat-card"><span>Điểm cao nhất</span><strong>${myBest}</strong></div>
-        <div class="stat-card"><span>Điểm trung bình</span><strong>${avgScore}</strong></div>
+        <div class="stat-card"><span>Trận thắng</span><strong>${wins}</strong><small>Tỉ lệ thắng ${winRate}%</small></div>
+        <div class="stat-card"><span>Điểm cao nhất</span><strong>${myBest}</strong><small>Tổng điểm ${totalScore}</small></div>
+        <div class="stat-card"><span>Điểm trung bình</span><strong>${avgScore}</strong><small>Chuỗi thắng ${streak}</small></div>
       `;
     }
 
@@ -470,15 +498,17 @@
     if (!room || !EL.historyModalBody) return;
     EL.historyModal.classList.add("show");
     EL.historyModalBody.innerHTML = `<div class="empty" style="grid-column:1/-1">Đang tải chi tiết trận đấu...</div>`;
-    const [{ data: players }, { data: answers }] = await Promise.all([
+    const [{ data: players }, { data: answers }, { data: questions }] = await Promise.all([
       sb.from("game_room_players").select("id,room_id,user_id,score,joined_at").eq("room_id", roomId).order("score", { ascending: false }),
       sb.from("game_room_answers").select("player_id,is_correct,score_earned,answered_at").eq("room_id", roomId),
+      sb.from("game_room_questions").select("id,order_no,question_type,points").eq("room_id", roomId).order("order_no"),
     ]);
     const ordered = [...(players || [])].sort((a, b) => (b.score || 0) - (a.score || 0) || new Date(a.joined_at) - new Date(b.joined_at));
     const myPlayer = ordered.find((item) => item.user_id === GAME.user.id);
     const myAnswers = (answers || []).filter((item) => item.player_id === myPlayer?.id);
     const correctCount = myAnswers.filter((item) => item.is_correct).length;
     const accuracy = myAnswers.length ? Math.round((correctCount / myAnswers.length) * 100) : 0;
+    const answerMap = Object.fromEntries(myAnswers.map((item) => [item.game_question_id, item]));
     EL.historyModalBody.innerHTML = `
       <div class="panel">
         <h3>${esc(room.title || "Phòng thi đấu")}</h3>
@@ -503,6 +533,24 @@
             </div>
             <strong style="color:var(--navy)">${player.score || 0}</strong>
           </div>`).join("")}
+        </div>
+        <div style="height:16px"></div>
+        <h3>Chi tiết từng câu</h3>
+        <div class="question-breakdown">
+          ${(questions || []).map((question) => {
+            const answer = answerMap[question.id];
+            const stateClass = !answer ? "pending" : answer.is_correct ? "good" : "bad";
+            const stateLabel = !answer ? "Chưa trả lời" : answer.is_correct ? "Đúng" : "Sai";
+            return `<div class="question-breakdown-item ${stateClass}">
+              <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+                <strong style="color:var(--navy)">Câu ${question.order_no}</strong>
+                <span class="hint">${question.points || 0} điểm</span>
+              </div>
+              <div class="hint" style="margin-top:6px">Loại: ${question.question_type === "multi_choice" ? "Trắc nghiệm" : question.question_type === "true_false" ? "Đúng / Sai" : "Trả lời ngắn"}</div>
+              <div style="margin-top:8px;font-weight:700;color:var(--navy)">${stateLabel}</div>
+              <div class="hint" style="margin-top:4px">Điểm nhận được: ${answer?.score_earned || 0}</div>
+            </div>`;
+          }).join("")}
         </div>
       </div>
     `;
@@ -791,10 +839,12 @@
 
   function renderPlayerRow(player, index, showScore) {
     const canKick = GAME.activeRoom?.status === "waiting" && GAME.activeRoom?.host_id === GAME.user?.id && player.user_id !== GAME.user?.id;
+    const rankClass = showScore ? (index === 1 ? "top-1" : index === 2 ? "top-2" : index === 3 ? "top-3" : "") : "";
+    const meClass = player.user_id === GAME.user?.id ? "me" : "";
     const readyTag = GAME.activeRoom?.status === "waiting"
       ? `<span class="status-tag ${player.ready ? "ready" : "waiting"}">${player.ready ? "Sẵn sàng" : "Chưa sẵn sàng"}</span>`
       : "";
-    return `<div class="player-row">
+    return `<div class="player-row ${rankClass} ${meClass}">
       <div class="player-main">
         <img class="avatar" src="${escAttr(getPlayerAvatar(player.user_id))}" alt="avatar">
         <div>
@@ -1040,6 +1090,7 @@
 
   function renderFinishedRoom() {
     const ordered = [...GAME.roomPlayers].sort((a, b) => (b.score || 0) - (a.score || 0) || new Date(a.joined_at) - new Date(b.joined_at));
+    const winner = ordered[0];
     EL.finishedMeta.textContent = `Phòng ${GAME.activeRoom?.title || ""} đã kết thúc. Người có điểm cao hơn sẽ xếp trên, nếu bằng điểm thì ai vào phòng sớm hơn sẽ xếp trên.`;
     if (EL.myStats) {
       const myPlayer = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
@@ -1056,7 +1107,7 @@
     }
     EL.resultsList.innerHTML = ordered.map((player, idx) => {
       const medalClass = idx === 0 ? "first" : idx === 1 ? "second" : idx === 2 ? "third" : "normal";
-      return `<div class="result-card">
+      return `<div class="result-card ${winner && player.id === winner.id ? "winner" : ""}">
         <div style="display:flex;align-items:center;gap:12px">
           <div class="medal ${medalClass}">${idx + 1}</div>
           <div>
