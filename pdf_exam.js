@@ -67,6 +67,11 @@ const PDF_EL = {
   attemptNav: document.getElementById("pdfAttemptNav"),
   attemptQuestions: document.getElementById("pdfAttemptQuestions"),
   pdfFrame: document.getElementById("pdfDriveFrame"),
+  reviewShell: document.getElementById("pdfReviewShell"),
+  reviewTitle: document.getElementById("pdfReviewTitle"),
+  reviewScore: document.getElementById("pdfReviewScore"),
+  reviewFrame: document.getElementById("pdfReviewFrame"),
+  reviewQuestions: document.getElementById("pdfReviewQuestions"),
   pdfPaneLabel: document.getElementById("pdfPaneLabel"),
   pdfPaneOpenLink: document.getElementById("pdfPaneOpenLink"),
   detailFrame: document.getElementById("pdfDetailFrame"),
@@ -873,7 +878,7 @@ async function submitPdfAttempt(auto) {
   await sb.from("pdf_exam_results").update({ submitted_at: new Date().toISOString(), score_auto: finalScore, score_total: hasEssay ? null : finalScore, seconds_left: null }).eq("id", PDF_STATE.attemptResultId);
 
   PDF_EL.attemptShell.classList.remove("show");
-  await loadPdfData(true);
+  await loadPdfData(false);
   await openPdfReview(PDF_STATE.attemptResultId, exam?.title || "Đề PDF");
 }
 
@@ -912,10 +917,15 @@ async function openPdfReview(resultId, title) {
   const questions = getPdfQuestions(result?.pdf_exam_id || "");
   const answerMap = {};
   (answerRows || []).forEach((row) => { answerMap[row.question_id] = row; });
-
-  PDF_EL.submissionTitle.textContent = `Xem lại bài - ${title}`;
-  PDF_EL.submissionBody.innerHTML = `<div class="review-wrap"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><div style="font-weight:700;color:var(--navy)">${esc(title)}</div><div class="hint">Kết quả bài làm đề PDF</div></div><div style="font-size:.92rem;color:var(--ink-mid)">Tự động: <b>${result?.score_auto ?? 0}</b><br><span style="color:var(--navy);font-weight:700">Tổng: ${result?.score_total ?? "Chưa chấm"} / ${exam?.total_points || 0}</span></div></div>${questions.map((question, idx) => renderPdfReviewCard(question, answerMap[question.id], idx + 1)).join("")}</div>`;
-  PDF_EL.submissionModal.classList.add("show");
+  const totalText = `${result?.score_total ?? "Chưa chấm"} / ${exam?.total_points || 0}`;
+  if (PDF_EL.reviewTitle) PDF_EL.reviewTitle.textContent = `Xem lại bài - ${title}`;
+  if (PDF_EL.reviewScore) PDF_EL.reviewScore.textContent = totalText;
+  if (PDF_EL.reviewFrame && exam) PDF_EL.reviewFrame.src = getPdfPreviewUrl(exam);
+  if (PDF_EL.reviewQuestions) {
+    PDF_EL.reviewQuestions.innerHTML = `<div class="review-wrap"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><div style="font-weight:700;color:var(--navy)">${esc(title)}</div><div class="hint">Kết quả bài làm đề PDF</div></div><div style="font-size:.92rem;color:var(--ink-mid)">Tự động: <b>${result?.score_auto ?? 0}</b><br><span style="color:var(--navy);font-weight:700">Tổng: ${totalText}</span></div></div>${questions.map((question, idx) => renderPdfReviewCard(question, answerMap[question.id], idx + 1)).join("")}</div>`;
+  }
+  PDF_EL.submissionModal.classList.remove("show");
+  PDF_EL.reviewShell?.classList.add("show");
   setPdfRouteLoading(false);
 }
 
@@ -929,6 +939,11 @@ function renderPdfReviewCard(question, answerRow, index) {
 
 function closePdfSubmissionModal() {
   PDF_EL.submissionModal.classList.remove("show");
+}
+
+function closePdfReview() {
+  PDF_EL.reviewShell?.classList.remove("show");
+  if (returnFromPdfContext()) return;
 }
 
 function countTrueFalseMatches(answer, correct) {
@@ -961,6 +976,7 @@ function getPartialScore(question, correctCount, hasWrong) {
 window.closePdfExamModal = closePdfExamModal;
 window.closePdfExamScreen = closePdfExamScreen;
 window.closePdfSubmissionModal = closePdfSubmissionModal;
+window.closePdfReview = closePdfReview;
 window.closePdfAttempt = closePdfAttempt;
 window.openPdfQuestionModal = addPdfDraftQuestionInline;
 window.deletePdfQuestion = deletePdfQuestion;
