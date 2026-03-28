@@ -4,6 +4,8 @@
     role: "student",
     grades: [],
     subjects: [],
+    friends: [],
+    roomsRaw: [],
     rooms: [],
     players: [],
     activeRoom: null,
@@ -33,6 +35,7 @@
     roomForm: document.getElementById("gameRoomForm"),
     roomTitle: document.getElementById("gameRoomTitle"),
     roomCode: document.getElementById("gameRoomCode"),
+    roomVisibility: document.getElementById("gameRoomVisibility"),
     roomGrade: document.getElementById("gameRoomGrade"),
     roomSubject: document.getElementById("gameRoomSubject"),
     roomQuestionCount: document.getElementById("gameRoomQuestionCount"),
@@ -47,6 +50,11 @@
     roomSummary: document.getElementById("gameRoomSummary"),
     roomDescriptionView: document.getElementById("gameRoomDescriptionView"),
     roomStartHint: document.getElementById("gameRoomStartHint"),
+    inviteCode: document.getElementById("gameInviteCode"),
+    inviteVisibility: document.getElementById("gameInviteVisibility"),
+    copyGameCodeBtn: document.getElementById("copyGameCodeBtn"),
+    shareGameCodeBtn: document.getElementById("shareGameCodeBtn"),
+    friendInviteList: document.getElementById("gameFriendInviteList"),
     playerList: document.getElementById("gamePlayerList"),
     liveView: document.getElementById("gameLiveView"),
     questionTitle: document.getElementById("gameQuestionTitle"),
@@ -145,7 +153,7 @@
     fillSubjects(EL.roomSubject, "", "Chọn môn");
 
     bindEvents();
-    await loadRooms();
+    await Promise.all([loadRooms(), loadFriends()]);
   }
 
   function bindEvents() {
@@ -171,6 +179,8 @@
     EL.startGameBtn?.addEventListener("click", startGameMatch);
     EL.toggleReadyBtn?.addEventListener("click", toggleReadyState);
     EL.leaveGameBtn?.addEventListener("click", leaveRoom);
+    EL.copyGameCodeBtn?.addEventListener("click", copyRoomCode);
+    EL.shareGameCodeBtn?.addEventListener("click", copyRoomInvite);
     document.querySelectorAll("[data-rank-period]").forEach((button) => {
       button.addEventListener("click", () => {
         GAME.leaderboardPeriod = button.dataset.rankPeriod || "day";
@@ -191,6 +201,50 @@
     el.innerHTML = `<option value="">${placeholder}</option>` + list.map((subject) => `<option value="${subject.id}">${esc(subject.name)}</option>`).join("");
   }
 
+  function roomVisibilityLabel(value) {
+    return value === "private" ? "Riêng tư" : "Công khai";
+  }
+
+  function filterVisibleRooms(rooms) {
+    const playerMap = buildRoomPlayerMap();
+    return (rooms || []).filter((room) => {
+      if ((room.visibility || "public") !== "private") return true;
+      if (room.host_id === GAME.user?.id) return true;
+      return (playerMap[room.id] || []).some((player) => player.user_id === GAME.user?.id);
+    });
+  }
+
+  async function loadFriends() {
+    const { data: links, error } = await sb
+      .from("friendships")
+      .select("user_id,friend_id")
+      .or(`user_id.eq.${GAME.user.id},friend_id.eq.${GAME.user.id}`);
+    if (error) {
+      GAME.friends = [];
+      return;
+    }
+    const friendIds = [...new Set((links || []).map((row) => row.user_id === GAME.user.id ? row.friend_id : row.user_id).filter(Boolean))];
+    if (!friendIds.length) {
+      GAME.friends = [];
+      return;
+    }
+    const { data: users } = await sb.from("users").select("id,full_name,avatar_url").in("id", friendIds);
+    GAME.friends = (users || []).sort((a, b) => String(a.full_name || "").localeCompare(String(b.full_name || ""), "vi"));
+    window.__gameUserCache = window.__gameUserCache || {};
+    GAME.friends.forEach((user) => {
+      window.__gameUserCache[user.id] = user;
+    });
+  }
+
+  async function copyText(text, successMessage) {
+    try {
+      await navigator.clipboard.writeText(text);
+      alert(successMessage);
+    } catch (_) {
+      window.prompt("Sao chép nội dung sau:", text);
+    }
+  }
+
   async function loadRooms() {
     const [{ data: rooms, error: roomErr }, { data: players, error: playerErr }] = await Promise.all([
       sb.from("game_rooms").select("*").order("created_at", { ascending: false }),
@@ -203,8 +257,9 @@
       return;
     }
 
-    GAME.rooms = rooms || [];
+    GAME.roomsRaw = rooms || [];
     GAME.players = players || [];
+    GAME.rooms = filterVisibleRooms(GAME.roomsRaw);
     renderRooms();
     await ensureArenaUserCache();
     renderArenaInsights();
@@ -249,6 +304,7 @@
     const joined = players.some((player) => player.user_id === GAME.user.id);
     const grade = GAME.grades.find((item) => item.id === room.grade_id)?.name || "—";
     const subject = GAME.subjects.find((item) => item.id === room.subject_id)?.name || "—";
+    const visibility = roomVisibilityLabel(room.visibility || "public");
     const statusLabel = room.status === "waiting" ? "Đang chờ" : room.status === "live" ? "Đang đấu" : "Đã kết thúc";
     const statusClass = room.status === "waiting" ? "waiting" : room.status === "live" ? "live" : "done";
     const canEnter = joined || room.status === "waiting";
@@ -263,6 +319,7 @@
       <div class="room-meta">
         <div><span>Khối</span><strong>${esc(grade)}</strong></div>
         <div><span>Môn</span><strong>${esc(subject)}</strong></div>
+        <div><span>Phòng</span><strong>${esc(visibility)}</strong></div>
         <div><span>Số câu</span><strong>${room.question_count || 0} câu</strong></div>
         <div><span>Người chơi</span><strong>${players.length} người</strong></div>
       </div>
@@ -358,6 +415,7 @@
   function openGameRoomModal() {
     EL.roomForm?.reset();
     EL.roomCode.value = randomCode();
+    if (EL.roomVisibility) EL.roomVisibility.value = "public";
     fillSubjects(EL.roomSubject, EL.roomGrade.value, "Chọn môn");
     EL.roomModal.classList.add("show");
   }
@@ -376,6 +434,7 @@
       question_count: Number(EL.roomQuestionCount.value || 10),
       time_per_question: Number(EL.roomTimePerQuestion.value || 20),
       description: String(EL.roomDescription.value || "").trim(),
+      visibility: EL.roomVisibility?.value || "public",
       status: "waiting",
       host_id: GAME.user.id,
       created_by: GAME.user.id,
@@ -410,7 +469,7 @@
       alert("Hãy nhập mã phòng trước.");
       return;
     }
-    const room = GAME.rooms.find((item) => String(item.join_code || "").toUpperCase() === code);
+    const room = (GAME.roomsRaw || []).find((item) => String(item.join_code || "").toUpperCase() === code);
     if (!room) {
       alert("Không tìm thấy phòng với mã này.");
       return;
@@ -454,6 +513,27 @@
       }
     }
     closeGameScreen();
+  }
+
+  function buildInviteText(room, friendName) {
+    const prefix = friendName ? `${friendName} ơi, ` : "";
+    return `${prefix}mời bạn vào phòng thi đấu "${room.title || "Game"}". Mã phòng: ${room.join_code || "—"}.`;
+  }
+
+  async function copyRoomCode() {
+    if (!GAME.activeRoom?.join_code) return;
+    await copyText(GAME.activeRoom.join_code, "Đã sao chép mã phòng.");
+  }
+
+  async function copyRoomInvite() {
+    if (!GAME.activeRoom) return;
+    await copyText(buildInviteText(GAME.activeRoom), "Đã sao chép lời mời.");
+  }
+
+  async function inviteFriend(friendId) {
+    const friend = GAME.friends.find((item) => item.id === friendId);
+    if (!GAME.activeRoom || !friend) return;
+    await copyText(buildInviteText(GAME.activeRoom, friend.full_name), `Đã sao chép lời mời cho ${friend.full_name || "bạn bè"}.`);
   }
 
   async function openRoomScreen(roomId) {
@@ -506,6 +586,7 @@
     if (!room) return;
     const grade = GAME.grades.find((item) => item.id === room.grade_id)?.name || "—";
     const subject = GAME.subjects.find((item) => item.id === room.subject_id)?.name || "—";
+    const visibility = roomVisibilityLabel(room.visibility || "public");
     const isHost = room.host_id === GAME.user.id;
     const me = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
     const others = GAME.roomPlayers.filter((item) => item.user_id !== room.host_id);
@@ -521,12 +602,15 @@
         setScreenState("waiting");
         EL.roomSummary.innerHTML = `
           <div><span>Mã phòng</span><strong>${esc(room.join_code || "—")}</strong></div>
+          <div><span>Hiển thị</span><strong>${esc(visibility)}</strong></div>
           <div><span>Khối</span><strong>${esc(grade)}</strong></div>
           <div><span>Môn</span><strong>${esc(subject)}</strong></div>
           <div><span>Số câu</span><strong>${room.question_count} câu</strong></div>
           <div><span>Giây mỗi câu</span><strong>${room.time_per_question}s</strong></div>
           <div><span>Tạo lúc</span><strong>${fmtDateTime(room.created_at)}</strong></div>
         `;
+        if (EL.inviteCode) EL.inviteCode.textContent = room.join_code || "—";
+        if (EL.inviteVisibility) EL.inviteVisibility.textContent = visibility;
         EL.roomDescriptionView.textContent = room.description || "Mời bạn bè cùng vào phòng, khi đủ người thì chủ phòng bắt đầu trận.";
         if (EL.roomStartHint) {
           if (isHost) {
@@ -542,6 +626,7 @@
         EL.playerList.innerHTML = GAME.roomPlayers.length
           ? GAME.roomPlayers.map((player, idx) => renderPlayerRow(player, idx + 1, false)).join("")
           : `<div class="empty">Chưa có người chơi nào trong phòng.</div>`;
+        renderFriendInviteList(room);
         return;
       }
 
@@ -570,6 +655,24 @@
       </div>
       ${showScore ? `<strong style="color:var(--navy)">${player.score || 0}</strong>` : `<div style="display:grid;justify-items:end;gap:4px">${readyTag}<span class="hint">${fmtDateTime(player.joined_at)}</span></div>`}
     </div>`;
+  }
+
+  function renderFriendInviteList(room) {
+    if (!EL.friendInviteList) return;
+    const joinedIds = new Set((GAME.roomPlayers || []).map((player) => player.user_id));
+    const availableFriends = (GAME.friends || []).filter((friend) => !joinedIds.has(friend.id));
+    EL.friendInviteList.innerHTML = availableFriends.length
+      ? availableFriends.map((friend) => `<div class="friend-invite-row">
+          <div class="player-main">
+            <img class="avatar" src="${escAttr(friend.avatar_url || "default-avatar.png")}" alt="avatar">
+            <div>
+              <div style="font-weight:700;color:var(--navy)">${esc(friend.full_name || "Bạn bè")}</div>
+              <div class="hint">${room.visibility === "private" ? "Phòng riêng tư" : "Có thể vào bằng mã"}</div>
+            </div>
+          </div>
+          <button class="btn btn-outline btn-sm" type="button" onclick="inviteGameFriend('${friend.id}')">Mời</button>
+        </div>`).join("")
+      : `<div class="empty">Không còn bạn bè nào để mời vào phòng này.</div>`;
   }
 
   function getPlayerName(userId) {
@@ -933,6 +1036,7 @@
     submitAnswer(questionId, value.trim());
   };
 
+  window.inviteGameFriend = inviteFriend;
   window.closeGameRoomModal = closeGameRoomModal;
   window.closeGameScreen = closeGameScreen;
 })();

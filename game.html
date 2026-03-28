@@ -39,6 +39,9 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
 .stat-card strong{font-size:1.45rem;color:var(--navy)}
 .section-card{background:#fff;border:1px solid rgba(39,58,91,.08);border-radius:20px;box-shadow:0 14px 32px rgba(15,23,42,.06);padding:18px}
 .section-card h3{margin:0 0 12px;color:var(--navy)}
+.invite-tools{display:grid;gap:10px}
+.friend-invite-list{display:grid;gap:8px}
+.friend-invite-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:14px;background:#f8fafc;border:1px solid rgba(39,58,91,.06)}
 .rank-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .rank-tab{padding:7px 12px;border:none;border-radius:999px;background:#eff6ff;color:var(--navy);font-weight:700;cursor:pointer}
 .rank-tab.active{background:var(--navy);color:var(--gold-light)}
@@ -61,7 +64,7 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
 .topbar h2{margin:0;flex:1;font-size:1.05rem}
 .topbar-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .screen-body{flex:1;overflow:auto;padding:20px 24px}
-.room-shell{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,.9fr);gap:18px}
+.room-shell{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(280px,.85fr) minmax(280px,.95fr);gap:18px}
 .panel{background:#fff;border:1px solid rgba(39,58,91,.08);border-radius:20px;box-shadow:0 14px 32px rgba(15,23,42,.06);padding:18px}
 .panel h3{margin:0 0 12px;color:var(--navy);font-size:1rem}
 .player-list{display:grid;gap:10px}
@@ -185,6 +188,13 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
             <input id="gameRoomCode" class="input" maxlength="8" placeholder="Để trống sẽ tự tạo">
           </div>
           <div class="field">
+            <label>Hiển thị phòng</label>
+            <select id="gameRoomVisibility" class="select">
+              <option value="public">Công khai</option>
+              <option value="private">Riêng tư</option>
+            </select>
+          </div>
+          <div class="field">
             <label>Khối</label>
             <select id="gameRoomGrade" class="select" required></select>
           </div>
@@ -238,6 +248,18 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
       <div class="panel">
         <h3>Người chơi trong phòng</h3>
         <div id="gamePlayerList" class="player-list"></div>
+      </div>
+      <div class="panel">
+        <h3>Mời bạn bè</h3>
+        <div class="invite-tools">
+          <div class="hint">Mã phòng: <b id="gameInviteCode">—</b></div>
+          <div class="hint">Chế độ: <b id="gameInviteVisibility">Công khai</b></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" type="button" id="copyGameCodeBtn">Sao chép mã</button>
+            <button class="btn btn-outline btn-sm" type="button" id="shareGameCodeBtn">Sao chép lời mời</button>
+          </div>
+        </div>
+        <div id="gameFriendInviteList" class="friend-invite-list"></div>
       </div>
     </div>
 
