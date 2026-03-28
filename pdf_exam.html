@@ -65,7 +65,11 @@ textarea{min-height:110px;resize:vertical}
 .exam-topbar h2{margin:0;flex:1;font-size:1.05rem}
 .exam-clock{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);padding:7px 16px;border-radius:8px}
 .exam-clock strong{font-size:1.18rem;font-family:monospace;color:var(--gold-light)}
-.exam-body{flex:1;display:grid;grid-template-columns:minmax(480px,1.2fr) minmax(360px,.8fr);min-height:0}
+.exam-body{flex:1;display:grid;grid-template-columns:220px minmax(0,13fr) minmax(0,2fr);gap:12px;min-height:0}
+.nav-pane{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:10px;overflow-y:auto;min-height:0}
+.nav-pane .nav-strip{flex-direction:column;gap:8px}
+.nav-pane .nav-pill{width:100%;justify-content:flex-start}
+.nav-pane .nav-pill span{margin-left:auto}
 .pdf-pane{background:#0f172a;padding:16px;display:flex;flex-direction:column;gap:12px}
 .pdf-frame{flex:1;background:#111827;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.08)}
 .pdf-frame iframe{width:100%;height:100%;border:none;background:#fff}
@@ -123,7 +127,7 @@ textarea{min-height:110px;resize:vertical}
 .draft-inline-partials{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .draft-inline-partial{display:flex;align-items:center;gap:4px;font-size:.76rem;color:var(--ink-mid)}
 .draft-inline-partial input{width:58px}
-@media(max-width:1080px){.toolbar,.form-grid,.exam-body,.answer-card-bd,.detail-layout{grid-template-columns:1fr}.question-actions{align-items:flex-start;flex-direction:row;flex-wrap:wrap}.exam-body{grid-template-columns:1fr}.pdf-pane{min-height:360px}.detail-preview{min-height:360px}}
+@media(max-width:1080px){.toolbar,.form-grid,.answer-card-bd,.detail-layout{grid-template-columns:1fr}.question-actions{align-items:flex-start;flex-direction:row;flex-wrap:wrap}.exam-body{grid-template-columns:1fr}.nav-pane{display:none}.pdf-pane{min-height:360px}.detail-preview{min-height:360px}}
 @media(max-width:1080px){.draft-answer-topline,.draft-answer-bottomline{grid-template-columns:1fr}}
 </style>
 </head>
@@ -335,6 +339,9 @@ textarea{min-height:110px;resize:vertical}
     <button class="btn btn-primary btn-sm" type="button" id="pdfSubmitBtn">Nộp bài</button>
   </div>
   <div class="exam-body">
+    <div class="nav-pane">
+      <div class="nav-strip" id="pdfAttemptNav"></div>
+    </div>
     <div class="pdf-pane">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;color:#e2e8f0;font-size:.84rem">
         <div id="pdfPaneLabel">Đề PDF</div>
@@ -346,7 +353,6 @@ textarea{min-height:110px;resize:vertical}
     </div>
     <div class="answer-pane">
       <div class="answer-scroll">
-        <div class="nav-strip" id="pdfAttemptNav"></div>
         <div id="pdfAttemptQuestions"></div>
       </div>
     </div>
