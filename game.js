@@ -418,6 +418,7 @@
         fillSubjects(EL.subjectFilter, EL.gradeFilter?.value || "", "Tất cả môn");
         renderGradeCards();
         renderSubjectCards();
+        tryAutoJoinReadySelection();
       });
     });
   }
@@ -437,7 +438,7 @@
       button.addEventListener("click", () => {
         if (EL.subjectFilter) EL.subjectFilter.value = button.dataset.subjectCard || "";
         renderSubjectCards();
-        if (GAME.selectedAutoMode && EL.gradeFilter?.value && EL.subjectFilter?.value) autoMatchSelectedMode();
+        tryAutoJoinReadySelection();
       });
     });
   }
@@ -454,6 +455,13 @@
     if (EL.roomGrid) EL.roomGrid.classList.add("hidden");
     if (EL.roomEmpty) EL.roomEmpty.classList.add("hidden");
     document.querySelector(".toolbar")?.classList.add("hidden");
+  }
+
+  function tryAutoJoinReadySelection() {
+    if (!GAME.selectedAutoMode) return;
+    if (!EL.gradeFilter?.value) return;
+    if (!EL.subjectFilter?.value) return;
+    autoMatchSelectedMode();
   }
 
   function shuffle(list) {
@@ -551,9 +559,10 @@
       fillSubjects(EL.subjectFilter, EL.gradeFilter.value, "Tất cả môn");
       renderRooms();
       if (!EL.gradeFilter.value) GAME.selectedAutoMode = "";
+      tryAutoJoinReadySelection();
     });
     EL.subjectFilter?.addEventListener("change", () => {
-      if (GAME.selectedAutoMode && EL.gradeFilter?.value && EL.subjectFilter?.value) autoMatchSelectedMode();
+      tryAutoJoinReadySelection();
     });
     [EL.keyword, EL.subjectFilter, EL.modeFilter, EL.visibilityFilter, EL.sortFilter, EL.statusFilter].forEach((el) => {
       el?.addEventListener("input", renderRooms);
@@ -578,7 +587,7 @@
           item.style.outline = item === button ? "2px solid #facc15" : "none";
           item.style.transform = item === button ? "translateY(-2px)" : "none";
         });
-        if (EL.gradeFilter?.value && EL.subjectFilter?.value) autoMatchSelectedMode();
+        tryAutoJoinReadySelection();
       });
     });
   }
