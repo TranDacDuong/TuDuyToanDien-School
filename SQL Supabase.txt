@@ -1730,9 +1730,16 @@ ALTER TABLE public.game_room_players
 ALTER TABLE public.game_rooms
   ADD COLUMN IF NOT EXISTS visibility text NOT NULL DEFAULT 'public';
 
+ALTER TABLE public.game_rooms
+  ADD COLUMN IF NOT EXISTS max_players integer NOT NULL DEFAULT 8;
+
 UPDATE public.game_rooms
 SET visibility = 'public'
 WHERE visibility IS NULL OR visibility NOT IN ('public', 'private');
+
+UPDATE public.game_rooms
+SET max_players = 8
+WHERE max_players IS NULL OR max_players < 2;
 
 ALTER TABLE public.game_rooms
   DROP CONSTRAINT IF EXISTS game_rooms_visibility_check;
@@ -1740,3 +1747,10 @@ ALTER TABLE public.game_rooms
 ALTER TABLE public.game_rooms
   ADD CONSTRAINT game_rooms_visibility_check
   CHECK (visibility IN ('public', 'private'));
+
+ALTER TABLE public.game_rooms
+  DROP CONSTRAINT IF EXISTS game_rooms_max_players_check;
+
+ALTER TABLE public.game_rooms
+  ADD CONSTRAINT game_rooms_max_players_check
+  CHECK (max_players BETWEEN 2 AND 20);

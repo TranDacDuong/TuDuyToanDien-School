@@ -28,6 +28,7 @@
     historyList: document.getElementById("gameHistoryList"),
     globalLeaderboard: document.getElementById("gameGlobalLeaderboard"),
     openRoomBtn: document.getElementById("openGameRoomBtn"),
+    quickMatchBtn: document.getElementById("quickMatchBtn"),
     reloadRoomsBtn: document.getElementById("reloadGameRoomsBtn"),
     joinCode: document.getElementById("gameJoinCode"),
     joinByCodeBtn: document.getElementById("joinByCodeBtn"),
@@ -36,6 +37,7 @@
     roomTitle: document.getElementById("gameRoomTitle"),
     roomCode: document.getElementById("gameRoomCode"),
     roomVisibility: document.getElementById("gameRoomVisibility"),
+    roomMaxPlayers: document.getElementById("gameRoomMaxPlayers"),
     roomGrade: document.getElementById("gameRoomGrade"),
     roomSubject: document.getElementById("gameRoomSubject"),
     roomQuestionCount: document.getElementById("gameRoomQuestionCount"),
@@ -158,6 +160,7 @@
 
   function bindEvents() {
     EL.openRoomBtn?.addEventListener("click", () => openGameRoomModal());
+    EL.quickMatchBtn?.addEventListener("click", quickMatch);
     EL.reloadRoomsBtn?.addEventListener("click", () => loadRooms());
     EL.joinByCodeBtn?.addEventListener("click", joinRoomByCode);
     EL.joinCode?.addEventListener("keydown", (event) => {
@@ -203,6 +206,14 @@
 
   function roomVisibilityLabel(value) {
     return value === "private" ? "Riêng tư" : "Công khai";
+  }
+
+  function roomPlayerCount(roomId) {
+    return (GAME.players || []).filter((player) => player.room_id === roomId).length;
+  }
+
+  function roomHasCapacity(room) {
+    return roomPlayerCount(room.id) < Number(room.max_players || 8);
   }
 
   function filterVisibleRooms(rooms) {
@@ -307,7 +318,8 @@
     const visibility = roomVisibilityLabel(room.visibility || "public");
     const statusLabel = room.status === "waiting" ? "Đang chờ" : room.status === "live" ? "Đang đấu" : "Đã kết thúc";
     const statusClass = room.status === "waiting" ? "waiting" : room.status === "live" ? "live" : "done";
-    const canEnter = joined || room.status === "waiting";
+    const hasCapacity = roomHasCapacity(room);
+    const canEnter = joined || (room.status === "waiting" && hasCapacity);
     return `<div class="room-card">
       <div class="room-top">
         <div>
@@ -321,7 +333,7 @@
         <div><span>Môn</span><strong>${esc(subject)}</strong></div>
         <div><span>Phòng</span><strong>${esc(visibility)}</strong></div>
         <div><span>Số câu</span><strong>${room.question_count || 0} câu</strong></div>
-        <div><span>Người chơi</span><strong>${players.length} người</strong></div>
+        <div><span>Người chơi</span><strong>${players.length}/${room.max_players || 8}</strong></div>
       </div>
       <div class="hint">${esc(room.description || "Phòng thi đấu không có mô tả.")}</div>
       <div class="room-actions">
@@ -329,7 +341,7 @@
           ? `<button class="btn btn-primary" type="button" data-enter-room="${room.id}">${room.status === "finished" ? "Xem kết quả" : "Vào phòng"}</button>`
           : canEnter
             ? `<button class="btn btn-primary" type="button" data-join-room="${room.id}">Tham gia</button>`
-            : `<button class="btn btn-outline" type="button" disabled>Đã khóa</button>`}
+            : `<button class="btn btn-outline" type="button" disabled>${room.status !== "waiting" ? "Đã khóa" : "Đã đầy"}</button>`}
       </div>
     </div>`;
   }
@@ -416,6 +428,7 @@
     EL.roomForm?.reset();
     EL.roomCode.value = randomCode();
     if (EL.roomVisibility) EL.roomVisibility.value = "public";
+    if (EL.roomMaxPlayers) EL.roomMaxPlayers.value = "8";
     fillSubjects(EL.roomSubject, EL.roomGrade.value, "Chọn môn");
     EL.roomModal.classList.add("show");
   }
@@ -433,6 +446,7 @@
       subject_id: EL.roomSubject.value,
       question_count: Number(EL.roomQuestionCount.value || 10),
       time_per_question: Number(EL.roomTimePerQuestion.value || 20),
+      max_players: Number(EL.roomMaxPlayers?.value || 8),
       description: String(EL.roomDescription.value || "").trim(),
       visibility: EL.roomVisibility?.value || "public",
       status: "waiting",
@@ -451,6 +465,15 @@
   }
 
   async function joinRoom(roomId) {
+    const room = (GAME.roomsRaw || []).find((item) => item.id === roomId);
+    if (!room) {
+      alert("Không tìm thấy phòng này.");
+      return;
+    }
+    if (!roomHasCapacity(room) && !GAME.players.some((player) => player.room_id === roomId && player.user_id === GAME.user.id)) {
+      alert("Phòng này đã đầy.");
+      return;
+    }
     const exists = GAME.players.find((player) => player.room_id === roomId && player.user_id === GAME.user.id);
     if (!exists) {
       const { error } = await sb.from("game_room_players").insert({ room_id: roomId, user_id: GAME.user.id, score: 0, ready: false });
@@ -461,6 +484,24 @@
     }
     await loadRooms();
     openRoomScreen(roomId);
+  }
+
+  async function quickMatch() {
+    const gradeId = EL.gradeFilter?.value || "";
+    const subjectId = EL.subjectFilter?.value || "";
+    const keyword = String(EL.keyword?.value || "").trim().toLowerCase();
+    const bestRoom = [...(GAME.rooms || [])]
+      .filter((room) => room.status === "waiting" && (room.visibility || "public") === "public")
+      .filter((room) => !gradeId || room.grade_id === gradeId)
+      .filter((room) => !subjectId || room.subject_id === subjectId)
+      .filter((room) => !keyword || String(room.title || "").toLowerCase().includes(keyword) || String(room.join_code || "").toLowerCase().includes(keyword))
+      .filter((room) => roomHasCapacity(room) || GAME.players.some((player) => player.room_id === room.id && player.user_id === GAME.user.id))
+      .sort((a, b) => roomPlayerCount(b.id) - roomPlayerCount(a.id) || new Date(b.created_at) - new Date(a.created_at))[0];
+    if (!bestRoom) {
+      alert("Chưa có phòng công khai phù hợp để ghép nhanh. Hãy đổi bộ lọc hoặc tự tạo phòng mới.");
+      return;
+    }
+    await joinRoom(bestRoom.id);
   }
 
   async function joinRoomByCode() {
@@ -536,6 +577,22 @@
     await copyText(buildInviteText(GAME.activeRoom, friend.full_name), `Đã sao chép lời mời cho ${friend.full_name || "bạn bè"}.`);
   }
 
+  async function kickPlayer(playerId) {
+    const room = GAME.activeRoom;
+    if (!room || room.host_id !== GAME.user.id) return;
+    const player = GAME.roomPlayers.find((item) => item.id === playerId);
+    if (!player || player.user_id === GAME.user.id) return;
+    if (!confirm(`Mời ${getPlayerName(player.user_id)} ra khỏi phòng này?`)) return;
+    await sb.from("game_room_answers").delete().eq("player_id", player.id);
+    const { error } = await sb.from("game_room_players").delete().eq("id", player.id);
+    if (error) {
+      alert(`Không thể mời người chơi ra khỏi phòng: ${error.message}`);
+      return;
+    }
+    await refreshActiveRoom(room.id, true);
+    await loadRooms();
+  }
+
   async function openRoomScreen(roomId) {
     clearIntervals();
     EL.roomScreen.classList.add("show");
@@ -606,6 +663,7 @@
           <div><span>Khối</span><strong>${esc(grade)}</strong></div>
           <div><span>Môn</span><strong>${esc(subject)}</strong></div>
           <div><span>Số câu</span><strong>${room.question_count} câu</strong></div>
+          <div><span>Số người</span><strong>${GAME.roomPlayers.length}/${room.max_players || 8}</strong></div>
           <div><span>Giây mỗi câu</span><strong>${room.time_per_question}s</strong></div>
           <div><span>Tạo lúc</span><strong>${fmtDateTime(room.created_at)}</strong></div>
         `;
@@ -642,6 +700,7 @@
   }
 
   function renderPlayerRow(player, index, showScore) {
+    const canKick = GAME.activeRoom?.status === "waiting" && GAME.activeRoom?.host_id === GAME.user?.id && player.user_id !== GAME.user?.id;
     const readyTag = GAME.activeRoom?.status === "waiting"
       ? `<span class="status-tag ${player.ready ? "ready" : "waiting"}">${player.ready ? "Sẵn sàng" : "Chưa sẵn sàng"}</span>`
       : "";
@@ -653,7 +712,7 @@
           <div class="hint">${player.user_id === GAME.activeRoom?.host_id ? "Chủ phòng" : "Người chơi"}</div>
         </div>
       </div>
-      ${showScore ? `<strong style="color:var(--navy)">${player.score || 0}</strong>` : `<div style="display:grid;justify-items:end;gap:4px">${readyTag}<span class="hint">${fmtDateTime(player.joined_at)}</span></div>`}
+      ${showScore ? `<strong style="color:var(--navy)">${player.score || 0}</strong>` : `<div style="display:grid;justify-items:end;gap:4px">${readyTag}${canKick ? `<button class="btn btn-outline btn-sm" type="button" onclick="kickGamePlayer('${player.id}')">Mời ra</button>` : ""}<span class="hint">${fmtDateTime(player.joined_at)}</span></div>`}
     </div>`;
   }
 
@@ -1037,6 +1096,7 @@
   };
 
   window.inviteGameFriend = inviteFriend;
+  window.kickGamePlayer = kickPlayer;
   window.closeGameRoomModal = closeGameRoomModal;
   window.closeGameScreen = closeGameScreen;
 })();

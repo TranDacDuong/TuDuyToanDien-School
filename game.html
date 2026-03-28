@@ -122,6 +122,7 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
     </div>
     <div class="hero-actions">
       <button class="btn btn-primary" type="button" id="openGameRoomBtn">+ Tạo phòng mới</button>
+      <button class="btn btn-outline" type="button" id="quickMatchBtn">Ghép nhanh</button>
       <button class="btn btn-outline" type="button" id="reloadGameRoomsBtn">Tải lại</button>
       <div class="join-code-box">
         <input id="gameJoinCode" class="input" placeholder="Nhập mã phòng">
@@ -193,6 +194,10 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
               <option value="public">Công khai</option>
               <option value="private">Riêng tư</option>
             </select>
+          </div>
+          <div class="field">
+            <label>Số người tối đa</label>
+            <input id="gameRoomMaxPlayers" class="input" type="number" min="2" max="20" value="8" required>
           </div>
           <div class="field">
             <label>Khối</label>
