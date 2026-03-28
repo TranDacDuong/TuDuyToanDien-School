@@ -705,7 +705,9 @@ async function openPdfAttempt(examId) {
 }
 
 function renderPdfAttemptUI(exam, questions) {
-  PDF_EL.attemptNav.innerHTML = questions.map((question, idx) => `<div class="nav-pill" id="pdfNav_${question.id}" onclick="scrollPdfQuestion('${question.id}')" title="${escAttr(question.label || `Câu ${idx + 1}`)}">${idx + 1}<span class="pill-dot" id="pdfNavDot_${question.id}"></span></div>`).join("");
+  if (PDF_EL.attemptNav) {
+    PDF_EL.attemptNav.innerHTML = questions.map((question, idx) => `<div class="nav-pill" id="pdfNav_${question.id}" onclick="scrollPdfQuestion('${question.id}')" title="${escAttr(question.label || `Câu ${idx + 1}`)}">${idx + 1}<span class="pill-dot" id="pdfNavDot_${question.id}"></span></div>`).join("");
+  }
   PDF_EL.attemptQuestions.innerHTML = questions.map((question, idx) => renderPdfAttemptQuestion(question, idx + 1)).join("");
   questions.forEach((question) => updatePdfNav(question.id));
   updatePdfAttemptClock();
