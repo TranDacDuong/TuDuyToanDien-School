@@ -657,7 +657,7 @@
   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
   async function renderExamsTab(){
     const tc=document.getElementById("cvTabContent"); if(!tc) return;
-    tc.innerHTML='<p style="color:var(--ink-light);font-size:.85rem">Äang táº£i Ä‘á» thi...</p>';
+    tc.innerHTML='<p style="color:var(--ink-light);font-size:.85rem">Đang tải đề thi...</p>';
     const sb=getSb(), role=_role;
 
     const {data:classExams}=await sb.from("class_exams")
@@ -696,13 +696,13 @@
 
     const addExamBtn = (role==="admin"||role==="teacher")
       ? '<div style="margin-bottom:14px;display:flex;gap:8px">'+
-        '<button onclick="cvOpenAddExam()" class="btn btn-primary btn-sm">+ ThÃªm Ä‘á» kiá»ƒm tra</button>'+
+        '<button onclick="cvOpenAddExam()" class="btn btn-primary btn-sm">+ Thêm đề kiểm tra</button>'+
         '</div>'
       : "";
 
     if(!exams.length){
       tc.innerHTML=addExamBtn+
-        '<p style="color:var(--ink-light);font-size:.85rem;padding:12px">ChÆ°a cÃ³ Ä‘á» thi nÃ o.</p>';
+        '<p style="color:var(--ink-light);font-size:.85rem;padding:12px">Chưa có đề thi nào.</p>';
       return;
     }
 
@@ -734,10 +734,10 @@
         return `<div style="border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
           <div>
             <div style="font-weight:700;color:var(--navy);font-size:.95rem">${esc(ex.title)}</div>
-            <div style="font-size:.82rem;color:var(--ink-mid)">PDF â€¢ ${ex.duration_minutes||0} phÃºt â€¢ ${ex.total_points||0} Ä‘iá»ƒm</div>
+            <div style="font-size:.82rem;color:var(--ink-mid)">PDF • ${ex.duration_minutes||0} phút • ${ex.total_points||0} điểm</div>
           </div>
           <div style="display:flex;gap:8px;align-items:center">
-            <button class="btn btn-primary btn-sm" type="button" onclick="window.open('pdf_exam.html?exam=${encodeURIComponent(ex.id)}&classId=${encodeURIComponent(_classId)}','_blank')">ðŸ“ LÃ m bÃ i</button>
+            <button class="btn btn-primary btn-sm" type="button" onclick="window.open('pdf_exam.html?exam=${encodeURIComponent(ex.id)}&classId=${encodeURIComponent(_classId)}','_blank')">Làm bài</button>
           </div>
         </div>`;
       }
@@ -751,13 +751,13 @@
       let canDo=true, scheduleNote="";
       if(ex.starts_at&&ex.ends_at){
         const startDt=new Date(ex.starts_at), endDt=new Date(ex.ends_at);
-        if(now<startDt){canDo=false;scheduleNote="â° ChÆ°a Ä‘áº¿n giá» thi";}
-        else if(now>endDt){canDo=false;scheduleNote="ðŸ”’ ÄÃ£ háº¿t giá» thi";}
-        else scheduleNote="ðŸŸ¢ Äang trong giá» thi";
+        if(now<startDt){canDo=false;scheduleNote="Chưa đến giờ thi";}
+        else if(now>endDt){canDo=false;scheduleNote="Đã hết giờ thi";}
+        else scheduleNote="Đang trong giờ thi";
       }
       const schStr=ex.starts_at&&ex.ends_at
-        ?"ðŸ• "+fmtDT(ex.starts_at)+" â†’ "+fmtDT(ex.ends_at)
-        :"ðŸ“… KhÃ´ng giá»›i háº¡n";
+        ?"🕐 "+fmtDT(ex.starts_at)+" → "+fmtDT(ex.ends_at)
+        :"🗓 Không giới hạn";
 
       const examHasEssay=(ex.exam_questions||[]).some(eq=>eq.question?.question_type==="essay");
       let scoreBadge="";
@@ -765,10 +765,10 @@
         const score=lastResult.score_total??lastResult.score_auto??"?";
         const pendingEssay=examHasEssay&&lastResult.score_essay===null&&lastResult.score_total===null;
         scoreBadge='<span style="background:#dcfce7;color:#15803d;font-size:.78rem;font-weight:700;'+
-          'padding:3px 10px;border-radius:20px;white-space:nowrap">âœ“ '+score+" / "+ex.total_points+" Ä‘</span>"+
-          (pendingEssay?' <span style="background:#fef3c7;color:#b45309;font-size:.72rem;padding:2px 8px;border-radius:20px">â³ Chá» cháº¥m tá»± luáº­n</span>':"");
+          'padding:3px 10px;border-radius:20px;white-space:nowrap">✓ '+score+" / "+ex.total_points+" đ</span>"+
+          (pendingEssay?' <span style="background:#fef3c7;color:#b45309;font-size:.72rem;padding:2px 8px;border-radius:20px">⏳ Chờ chấm tự luận</span>':"");
         scoreBadge+=' <button onclick="cvOpenStudentReview(\''+lastResult.id+'\',\''+ex.id+'\',\''+ex.title.replace(/'/g,"\\'")+'\')\" '+
-          'class="btn btn-outline btn-sm" style="font-size:.75rem">ðŸ‘ Xem láº¡i</button>';
+          'class="btn btn-outline btn-sm" style="font-size:.75rem">Xem lại</button>';
       }
 
       let actionBtn="";
@@ -782,19 +782,19 @@
         actionBtn='<button onclick="resumeExam(\''+ex.id+'\',\''+ex.title.replace(/'/g,"\\'")+'\','+ex.total_points+',\''+inProgress.id+'\','+secsLeft+')" '+
           'style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;'+
           'padding:8px 14px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;'+
-          'white-space:nowrap;font-family:var(--font-body);flex-shrink:0">â–¶ LÃ m bÃ i tiáº¿p ('+timeStr+")</button>";
+          'white-space:nowrap;font-family:var(--font-body);flex-shrink:0">Làm bài tiếp ('+timeStr+")</button>";
       } else if(lastResult&&!examHasEssay){
         actionBtn='<div style="font-size:.78rem;font-weight:600;color:var(--green);padding:6px 12px;'+
-          'background:#dcfce7;border-radius:8px;white-space:nowrap">âœ… ÄÃ£ hoÃ n thÃ nh</div>'+
+          'background:#dcfce7;border-radius:8px;white-space:nowrap">Đã hoàn thành</div>'+
           '<button onclick="cvOpenStudentReview(\''+lastResult.id+'\',\''+ex.id+'\',\''+ex.title.replace(/'/g,"\\'")+'\')" '+
-          'class="btn btn-outline btn-sm" style="font-size:.78rem">ðŸ‘ Xem láº¡i</button>';
+          'class="btn btn-outline btn-sm" style="font-size:.78rem">Xem lại</button>';
       } else if(submitted.length>0){
         actionBtn="";
       } else {
         actionBtn='<button onclick="startExam(\''+ex.id+'\',\''+ex.title.replace(/'/g,"\\'")+'\','+ex.duration_minutes+','+ex.total_points+',\''+_classId+'\')" '+
           'style="background:linear-gradient(135deg,var(--navy),var(--navy-mid));color:var(--gold-light);'+
           'border:none;padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;'+
-          'white-space:nowrap;font-family:var(--font-body);flex-shrink:0">ðŸ“ LÃ m bÃ i</button>';
+          'white-space:nowrap;font-family:var(--font-body);flex-shrink:0">Làm bài</button>';
       }
 
       return '<div style="padding:14px 16px;background:var(--white);border:1px solid var(--border);'+
@@ -802,7 +802,7 @@
         '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">'+
           '<div style="flex:1;min-width:0">'+
             '<div style="font-weight:600;font-size:.9rem;color:var(--navy);margin-bottom:3px">'+ex.title+"</div>"+
-            '<div style="font-size:.75rem;color:var(--ink-mid)">â± '+ex.duration_minutes+" phÃºt &nbsp;â€¢&nbsp; ðŸ† "+ex.total_points+"Ä‘ &nbsp;â€¢&nbsp; "+schStr+"</div>"+
+            '<div style="font-size:.75rem;color:var(--ink-mid)">⏱ '+ex.duration_minutes+" phút &nbsp;•&nbsp; 🏆 "+ex.total_points+"đ &nbsp;•&nbsp; "+schStr+"</div>"+
             (scheduleNote&&canDo?'<div style="font-size:.72rem;color:#16a34a;margin-top:2px">'+scheduleNote+"</div>":"")+
           "</div>"+
           '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap">'+
@@ -826,17 +826,17 @@
     tc.innerHTML=addExamBtn+'<div style="display:flex;flex-direction:column;gap:8px">'+
       exams.map(ex=>{
         const schStr=ex.starts_at&&ex.ends_at
-          ?"Time "+fmtDT(ex.starts_at)+" -> "+fmtDT(ex.ends_at)
-          :"Khong gioi han";
+          ?"🕐 "+fmtDT(ex.starts_at)+" → "+fmtDT(ex.ends_at)
+          :"🗓 Không giới hạn";
         if(ex.type==="pdf"){
           return '<div style="padding:14px 16px;background:var(--white);border:1px solid var(--border);'+
             'border-radius:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+
             '<div style="flex:1;min-width:0">'+
               '<div style="font-weight:600;font-size:.9rem;color:var(--navy);margin-bottom:3px">'+ex.title+'</div>'+
-              '<div style="font-size:.75rem;color:var(--ink-mid)">PDF | Time '+ex.duration_minutes+' min &nbsp;|&nbsp; Score '+ex.total_points+' &nbsp;|&nbsp; '+schStr+'</div>'+
+              '<div style="font-size:.75rem;color:var(--ink-mid)">📄 PDF &nbsp;•&nbsp; ⏱ '+ex.duration_minutes+' phút &nbsp;•&nbsp; 🏆 '+ex.total_points+' điểm &nbsp;•&nbsp; '+schStr+'</div>'+
             '</div>'+
-            '<button onclick="window.open(\'pdf_exam.html?exam='+ex.id+'&classId='+_classId+'\',\'_blank\')" class="btn btn-outline btn-sm" style="font-size:.75rem;flex-shrink:0">Mo de PDF</button>'+
-            '<button onclick="cvRemoveExamFromClass(\''+ex.class_exam_id+'\',\''+ex.title.replace(/'/g,"\\'")+'\',0)" class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5;font-size:.75rem;flex-shrink:0">Go</button>'+
+            '<button onclick="window.open(\'pdf_exam.html?exam='+ex.id+'&classId='+_classId+'\',\'_blank\')" class="btn btn-outline btn-sm" style="font-size:.75rem;flex-shrink:0">Mở đề PDF</button>'+
+            '<button onclick="cvRemoveExamFromClass(\''+ex.class_exam_id+'\',\''+ex.title.replace(/'/g,"\\'")+'\',0)" class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5;font-size:.75rem;flex-shrink:0">Gỡ</button>'+
             '</div>';
         }
         const cnt=submitCount[ex.id]||0;
@@ -846,16 +846,16 @@
             '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">'+
               '<div style="flex:1">'+
                 '<div style="font-weight:600;font-size:.9rem;color:var(--navy);margin-bottom:3px">'+ex.title+'</div>'+
-                '<div style="font-size:.75rem;color:var(--ink-mid)">? '+ex.duration_minutes+' ph?t &nbsp;?&nbsp; ?? '+ex.total_points+' ?i?m &nbsp;?&nbsp; '+schStr+'</div>'+
+                '<div style="font-size:.75rem;color:var(--ink-mid)">⏱ '+ex.duration_minutes+' phút &nbsp;•&nbsp; 🏆 '+ex.total_points+' điểm &nbsp;•&nbsp; '+schStr+'</div>'+
               '</div>'+
               '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'+
-                '<span style="background:var(--navy);color:var(--gold-light);padding:3px 12px;border-radius:20px;font-size:.78rem;font-weight:700">'+cnt+' b?i ?? n?p</span>'+
-                '<span style="color:var(--ink-light);font-size:1.2rem">?</span>'+
+                '<span style="background:var(--navy);color:var(--gold-light);padding:3px 12px;border-radius:20px;font-size:.78rem;font-weight:700">'+cnt+' bài đã nộp</span>'+
+                '<span style="color:var(--ink-light);font-size:1.2rem">›</span>'+
               '</div>'+
             '</div>'+
           '</div>'+
-          '<button onclick="cvEditClassExam(\''+ex.class_exam_id+'\',\''+ex.title.replace(/'/g,"\\'")+'\',\''+ex.id+'\')" class="btn btn-outline btn-sm" style="font-size:.75rem;flex-shrink:0">? ??t gi?</button>'+
-          '<button onclick="cvRemoveExamFromClass(\''+ex.class_exam_id+'\',\''+ex.title.replace(/'/g,"\\'")+'\','+cnt+')" class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5;font-size:.75rem;flex-shrink:0">Go</button>'+
+          '<button onclick="cvEditClassExam(\''+ex.class_exam_id+'\',\''+ex.title.replace(/'/g,"\\'")+'\',\''+ex.id+'\')" class="btn btn-outline btn-sm" style="font-size:.75rem;flex-shrink:0">Đặt giờ</button>'+
+          '<button onclick="cvRemoveExamFromClass(\''+ex.class_exam_id+'\',\''+ex.title.replace(/'/g,"\\'")+'\','+cnt+')" class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5;font-size:.75rem;flex-shrink:0">Gỡ</button>'+
           '</div>';
       }).join("")+
       '</div>';
@@ -1040,10 +1040,10 @@
       '<div style="background:var(--white);border-radius:14px;padding:20px;width:min(95vw,620px);'+
       'max-height:80vh;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);border-top:4px solid var(--gold)">'+
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
-          '<h3 style="font-family:var(--font-display);font-size:1rem;color:var(--navy);margin:0">Them de kiem tra vao lop</h3>'+
-          '<button onclick="document.getElementById(\'cvAddExamModal\').remove()" style="background:var(--surface);border:none;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px;color:var(--ink-mid)">X</button>'+
+          '<h3 style="font-family:var(--font-display);font-size:1rem;color:var(--navy);margin:0">Thêm đề kiểm tra vào lớp</h3>'+
+          '<button onclick="document.getElementById(\'cvAddExamModal\').remove()" style="background:var(--surface);border:none;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px;color:var(--ink-mid)">✕</button>'+
         '</div>'+
-        '<input id="cvExamSearchInput" type="text" placeholder="Tim de theo ten..." oninput="cvFilterExamList()" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:.85rem;margin-bottom:12px;width:100%;box-sizing:border-box;outline:none">'+
+        '<input id="cvExamSearchInput" type="text" placeholder="Tìm đề theo tên..." oninput="cvFilterExamList()" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:.85rem;margin-bottom:12px;width:100%;box-sizing:border-box;outline:none">'+
         '<div id="cvExamList" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px">'+
         allItems.map(ex=>{
           const key = `${ex.kind}:${ex.id}`;
@@ -1051,11 +1051,11 @@
           return '<div class="cv-exam-pick-item" data-title="'+ex.title.toLowerCase()+'" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:'+(added?"var(--surface)":"var(--white)")+'">'+
             '<div>'+
               '<div style="font-weight:600;font-size:.85rem;color:var(--navy)">'+ex.title+'</div>'+
-              '<div style="font-size:.72rem;color:var(--ink-mid)">'+(ex.kind==="pdf"?"PDF &nbsp;|&nbsp; ":"")+'Time '+(ex.duration_minutes||0)+' min &nbsp;|&nbsp; Score '+(ex.total_points||0)+(ex.kind==="pdf"&&ex.status!=="open"?' &nbsp;|&nbsp; Closed':'')+'</div>'+
+              '<div style="font-size:.72rem;color:var(--ink-mid)">'+(ex.kind==="pdf"?"PDF &nbsp;•&nbsp; ":"")+'⏱ '+(ex.duration_minutes||0)+' phút &nbsp;•&nbsp; 🏆 '+(ex.total_points||0)+' điểm'+(ex.kind==="pdf"&&ex.status!=="open"?' &nbsp;•&nbsp; Đóng':'')+'</div>'+
             '</div>'+
             (added
-              ?'<span style="font-size:.75rem;color:var(--ink-light)">Da them</span>'
-              :'<button onclick="cvConfirmAddExam(\''+ex.kind+'\',\''+ex.id+'\',\''+ex.title.replace(/'/g,"\\'")+'\')" class="btn btn-primary btn-sm" style="flex-shrink:0">+ Them</button>')+
+              ?'<span style="font-size:.75rem;color:var(--ink-light)">Đã thêm</span>'
+              :'<button onclick="cvConfirmAddExam(\''+ex.kind+'\',\''+ex.id+'\',\''+ex.title.replace(/'/g,"\\'")+'\')" class="btn btn-primary btn-sm" style="flex-shrink:0">+ Thêm</button>')+
             '</div>';
         }).join("")+
         '</div>'+
@@ -1076,7 +1076,7 @@
       ? {class_id:_classId,pdf_exam_id:examId}
       : {class_id:_classId,exam_id:examId};
     const {error}=await sb.from("class_exams").insert(payload);
-    if(error){alert("Loi: "+error.message);return;}
+    if(error){alert("Lỗi: "+error.message);return;}
     document.getElementById("cvAddExamModal")?.remove();
     await cvSwitchTab("exams");
   };
