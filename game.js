@@ -1415,6 +1415,7 @@
   }
 
   function renderAnswerArea(question) {
+    const room = GAME.activeRoom;
     const me = GAME.roomPlayers.find((player) => player.user_id === GAME.user.id);
     const answered = GAME.myAnswers.find((item) => item.game_question_id === question.id);
     const isEliminated = me ? isPlayerEliminated(me.id, GAME.activeRoom, GAME.roomAnswers || []) : false;
@@ -1451,9 +1452,10 @@
     }
 
     if (question.question_type === "true_false") {
+      const draft = window.__gameTfDraft?.[me?.id || "guest"]?.[question.id] || {};
       EL.answerArea.innerHTML = `<div class="tf-grid">${Array.from({ length: Math.max(2, Number(question.answer_count || 4)) }, (_, idx) => {
         const key = String.fromCharCode(97 + idx);
-        const current = parseTrueFalseAnswer(answered?.answer || "")[key] || "";
+        const current = answered ? (parseTrueFalseAnswer(answered?.answer || "")[key] || "") : (draft[key] || "");
         return `<div class="tf-row"><strong>${key})</strong><div class="tf-actions"><button class="btn ${current === "Đ" ? "btn-primary" : "btn-outline"}" type="button" ${disabled ? "disabled" : ""} onclick="submitGameTrueFalse('${question.id}','${key}','Đ')">Đ</button><button class="btn ${current === "S" ? "btn-primary" : "btn-outline"}" type="button" ${disabled ? "disabled" : ""} onclick="submitGameTrueFalse('${question.id}','${key}','S')">S</button></div></div>`;
       }).join("")}</div>${disabled ? renderAnsweredHint(answered) : `<div class="hint" style="margin-top:10px">Mỗi câu chỉ nộp một lần. Hãy chọn đủ các ý rồi mới xác nhận.</div><button class="btn btn-primary" style="margin-top:10px" type="button" onclick="submitGameTrueFalseFinal('${question.id}')">Xác nhận đáp án</button>`}`;
       return;
@@ -1469,6 +1471,7 @@
     window.__gameTfDraft = window.__gameTfDraft || {};
     if (me) {
       window.__gameTfDraft[me.id] = window.__gameTfDraft[me.id] || {};
+      window.__gameTfDraft[me.id][question.id] = window.__gameTfDraft[me.id][question.id] || {};
     }
   }
 
@@ -1668,14 +1671,15 @@
     if (!player) return;
     window.__gameTfDraft = window.__gameTfDraft || {};
     window.__gameTfDraft[player.id] = window.__gameTfDraft[player.id] || {};
-    window.__gameTfDraft[player.id][key] = value;
+    window.__gameTfDraft[player.id][questionId] = window.__gameTfDraft[player.id][questionId] || {};
+    window.__gameTfDraft[player.id][questionId][key] = value;
     renderAnswerArea(GAME.roomQuestions.find((item) => item.id === questionId));
   };
 
   window.submitGameTrueFalseFinal = function (questionId) {
     const player = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
     if (!player) return;
-    const draft = window.__gameTfDraft?.[player.id] || {};
+    const draft = window.__gameTfDraft?.[player.id]?.[questionId] || {};
     const packed = Object.keys(draft).sort().map((key) => `${key}${draft[key]}`).join("");
     if (!packed) {
       alert("Hãy chọn ít nhất một đáp án.");
