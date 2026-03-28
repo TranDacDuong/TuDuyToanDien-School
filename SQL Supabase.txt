@@ -1775,3 +1775,23 @@ ALTER TABLE public.game_rooms
 
 CREATE INDEX IF NOT EXISTS game_rooms_class_idx
   ON public.game_rooms (class_id, status, created_at DESC);
+
+ALTER TABLE public.game_rooms
+  ADD COLUMN IF NOT EXISTS mode text NOT NULL DEFAULT 'quick';
+
+UPDATE public.game_rooms
+SET mode = CASE
+  WHEN visibility = 'private' THEN 'friends'
+  ELSE 'quick'
+END
+WHERE mode IS NULL OR mode NOT IN ('quick', 'friends', 'ranked');
+
+ALTER TABLE public.game_rooms
+  DROP CONSTRAINT IF EXISTS game_rooms_mode_check;
+
+ALTER TABLE public.game_rooms
+  ADD CONSTRAINT game_rooms_mode_check
+  CHECK (mode IN ('quick', 'friends', 'ranked'));
+
+CREATE INDEX IF NOT EXISTS game_rooms_mode_idx
+  ON public.game_rooms (mode, status, created_at DESC);

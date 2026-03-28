@@ -19,7 +19,7 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
 .hero-actions{display:flex;gap:10px;flex-wrap:wrap}
 .join-code-box{display:flex;gap:8px;flex-wrap:wrap}
 .join-code-box .input{min-width:180px}
-.toolbar{display:grid;grid-template-columns:minmax(220px,1.2fr) repeat(2,minmax(160px,220px)) auto;gap:10px;margin-bottom:18px}
+.toolbar{display:grid;grid-template-columns:minmax(220px,1.2fr) repeat(5,minmax(140px,200px));gap:10px;margin-bottom:18px}
 .input,.select,textarea{width:100%;padding:11px 12px;border:1.5px solid rgba(39,58,91,.14);border-radius:12px;background:#fff;font:inherit;outline:none}
 .room-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
 .room-card{background:#fff;border:1px solid rgba(39,58,91,.08);border-radius:18px;box-shadow:0 16px 36px rgba(15,23,42,.06);padding:16px;display:grid;gap:12px}
@@ -163,6 +163,12 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
     <input id="gameKeyword" class="input" placeholder="Tìm theo tên phòng hoặc mã phòng">
     <select id="gameGradeFilter" class="select"><option value="">Tất cả khối</option></select>
     <select id="gameSubjectFilter" class="select"><option value="">Tất cả môn</option></select>
+    <select id="gameModeFilter" class="select">
+      <option value="">Má»i cháº¿ Ä‘á»™</option>
+      <option value="quick">Äáº¥u nhanh</option>
+      <option value="friends">PhÃ²ng báº¡n bÃ¨</option>
+      <option value="ranked">Leo háº¡ng</option>
+    </select>
     <select id="gameVisibilityFilter" class="select">
       <option value="">Mọi kiểu phòng</option>
       <option value="public">Công khai</option>
@@ -229,6 +235,15 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
           </div>
           <div class="field">
             <label>Hiển thị phòng</label>
+            <label>Cháº¿ Ä‘á»™</label>
+            <select id="gameRoomMode" class="select">
+              <option value="quick">Äáº¥u nhanh</option>
+              <option value="friends">PhÃ²ng báº¡n bÃ¨</option>
+              <option value="ranked">Leo háº¡ng</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Hiá»ƒn thá»‹ phÃ²ng</label>
             <select id="gameRoomVisibility" class="select">
               <option value="public">Công khai</option>
               <option value="private">Riêng tư</option>

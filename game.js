@@ -28,6 +28,7 @@
     keyword: document.getElementById("gameKeyword"),
     gradeFilter: document.getElementById("gameGradeFilter"),
     subjectFilter: document.getElementById("gameSubjectFilter"),
+    modeFilter: document.getElementById("gameModeFilter"),
     visibilityFilter: document.getElementById("gameVisibilityFilter"),
     sortFilter: document.getElementById("gameSortFilter"),
     statusFilter: document.getElementById("gameStatusFilter"),
@@ -48,6 +49,7 @@
     roomForm: document.getElementById("gameRoomForm"),
     roomTitle: document.getElementById("gameRoomTitle"),
     roomCode: document.getElementById("gameRoomCode"),
+    roomMode: document.getElementById("gameRoomMode"),
     roomVisibility: document.getElementById("gameRoomVisibility"),
     roomMaxPlayers: document.getElementById("gameRoomMaxPlayers"),
     roomClass: document.getElementById("gameRoomClass"),
@@ -92,6 +94,31 @@
   };
 
   init();
+
+  if (EL.roomMode?.closest(".field")) {
+    const modeLabels = EL.roomMode.closest(".field").querySelectorAll("label");
+    if (modeLabels[0]) modeLabels[0].textContent = "Chế độ";
+    if (modeLabels[1]) modeLabels[1].remove();
+  }
+  if (EL.roomVisibility?.closest(".field")) {
+    const visibilityLabel = EL.roomVisibility.closest(".field").querySelector("label");
+    if (visibilityLabel) visibilityLabel.textContent = "Hiển thị phòng";
+  }
+  if (EL.modeFilter) {
+    EL.modeFilter.innerHTML = `
+      <option value="">Mọi chế độ</option>
+      <option value="quick">Đấu nhanh</option>
+      <option value="friends">Phòng bạn bè</option>
+      <option value="ranked">Leo hạng</option>
+    `;
+  }
+  if (EL.roomMode) {
+    EL.roomMode.innerHTML = `
+      <option value="quick">Đấu nhanh</option>
+      <option value="friends">Phòng bạn bè</option>
+      <option value="ranked">Leo hạng</option>
+    `;
+  }
 
   function esc(value) {
     return String(value ?? "")
@@ -200,12 +227,13 @@
     EL.roomClass?.addEventListener("change", () => {
       if (EL.roomClass.value) syncRoomFiltersFromClass(EL.roomClass.value);
     });
+    EL.roomMode?.addEventListener("change", () => applyModeDefaults(EL.roomMode.value, true));
     EL.roomGrade?.addEventListener("change", () => fillSubjects(EL.roomSubject, EL.roomGrade.value, "Chọn môn"));
     EL.gradeFilter?.addEventListener("change", () => {
       fillSubjects(EL.subjectFilter, EL.gradeFilter.value, "Tất cả môn");
       renderRooms();
     });
-    [EL.keyword, EL.subjectFilter, EL.visibilityFilter, EL.sortFilter, EL.statusFilter].forEach((el) => {
+    [EL.keyword, EL.subjectFilter, EL.modeFilter, EL.visibilityFilter, EL.sortFilter, EL.statusFilter].forEach((el) => {
       el?.addEventListener("input", renderRooms);
       el?.addEventListener("change", renderRooms);
     });
@@ -281,6 +309,35 @@
 
   function roomVisibilityLabel(value) {
     return value === "private" ? "Riêng tư" : "Công khai";
+  }
+
+  function roomModeValue(room) {
+    if (room?.mode) return room.mode;
+    return (room?.visibility || "public") === "private" ? "friends" : "quick";
+  }
+
+  function roomModeLabel(mode) {
+    if (mode === "ranked") return "Leo hạng";
+    if (mode === "friends") return "Phòng bạn bè";
+    return "Đấu nhanh";
+  }
+
+  function getModeDefaults(mode) {
+    if (mode === "friends") {
+      return { visibility: "private", maxPlayers: 6, questionCount: 10, timePerQuestion: 20 };
+    }
+    if (mode === "ranked") {
+      return { visibility: "public", maxPlayers: 2, questionCount: 12, timePerQuestion: 18 };
+    }
+    return { visibility: "public", maxPlayers: 8, questionCount: 10, timePerQuestion: 20 };
+  }
+
+  function applyModeDefaults(mode, force) {
+    const defaults = getModeDefaults(mode);
+    if (EL.roomVisibility && (force || !EL.roomVisibility.value)) EL.roomVisibility.value = defaults.visibility;
+    if (EL.roomMaxPlayers && (force || !EL.roomMaxPlayers.value)) EL.roomMaxPlayers.value = String(defaults.maxPlayers);
+    if (EL.roomQuestionCount && (force || !EL.roomQuestionCount.value)) EL.roomQuestionCount.value = String(defaults.questionCount);
+    if (EL.roomTimePerQuestion && (force || !EL.roomTimePerQuestion.value)) EL.roomTimePerQuestion.value = String(defaults.timePerQuestion);
   }
 
   function roomPlayerCount(roomId) {
@@ -413,6 +470,8 @@
       EL.roomClass.value = GAME.initialClassId;
       syncRoomFiltersFromClass(GAME.initialClassId);
     }
+    if (EL.roomMode && !EL.roomMode.value) EL.roomMode.value = "quick";
+    applyModeDefaults(EL.roomMode?.value || "quick", false);
   }
 
   async function copyText(text, successMessage) {
@@ -448,6 +507,7 @@
     const keyword = String(EL.keyword?.value || "").trim().toLowerCase();
     const gradeId = EL.gradeFilter?.value || "";
     const subjectId = EL.subjectFilter?.value || "";
+    const modeFilter = EL.modeFilter?.value || "";
     const visibility = EL.visibilityFilter?.value || "";
     const sortMode = EL.sortFilter?.value || "recommended";
     const status = EL.statusFilter?.value || "";
@@ -459,6 +519,7 @@
     }
     if (gradeId) list = list.filter((room) => room.grade_id === gradeId);
     if (subjectId) list = list.filter((room) => room.subject_id === subjectId);
+    if (modeFilter) list = list.filter((room) => roomModeValue(room) === modeFilter);
     if (visibility) list = list.filter((room) => (room.visibility || "public") === visibility);
     if (status) list = list.filter((room) => room.status === status);
     list.sort((a, b) => compareTupleDesc(getRoomSortValue(a, sortMode), getRoomSortValue(b, sortMode)));
@@ -489,6 +550,8 @@
     const subject = GAME.subjects.find((item) => item.id === room.subject_id)?.name || "—";
     const className = room.class_id ? getClassName(room.class_id) : "";
     const visibility = roomVisibilityLabel(room.visibility || "public");
+    const mode = roomModeValue(room);
+    const modeLabel = roomModeLabel(mode);
     const statusLabel = room.status === "waiting" ? "Đang chờ" : room.status === "live" ? "Đang đấu" : "Đã kết thúc";
     const statusClass = room.status === "waiting" ? "waiting" : room.status === "live" ? "live" : "done";
     const hasCapacity = roomHasCapacity(room);
@@ -500,6 +563,7 @@
           <div class="room-title">${esc(room.title || "Phòng thi đấu")}</div>
           <div class="hint">Mã phòng: <b>${esc(room.join_code || "—")}</b></div>
           ${className ? `<div class="hint">Lớp: <b>${esc(className)}</b></div>` : ""}
+          <div class="hint">Chế độ: <b>${esc(modeLabel)}</b></div>
         </div>
         <span class="pill ${statusClass}">${statusLabel}</span>
       </div>
@@ -538,11 +602,56 @@
     return start;
   }
 
+  function getOrderedPlayersForRoom(roomId, players) {
+    return [...(players || [])]
+      .filter((player) => player.room_id === roomId)
+      .sort((a, b) => (b.score || 0) - (a.score || 0) || new Date(a.joined_at) - new Date(b.joined_at));
+  }
+
+  function getRankedDeltaMap(orderedPlayers) {
+    const total = orderedPlayers.length;
+    if (!total) return {};
+    const map = {};
+    orderedPlayers.forEach((player, index) => {
+      let delta = 0;
+      if (total === 2) {
+        delta = index === 0 ? 30 : -20;
+      } else if (index === 0) {
+        delta = 35;
+      } else if (index === 1) {
+        delta = 15;
+      } else if (index === total - 1) {
+        delta = -20;
+      } else {
+        delta = 0;
+      }
+      map[player.user_id] = delta;
+    });
+    return map;
+  }
+
+  function getRankedProfile(finishedRooms, finishedPlayers, userId) {
+    const rankedRooms = (finishedRooms || []).filter((room) => roomModeValue(room) === "ranked");
+    let points = 1000;
+    let matches = 0;
+    let wins = 0;
+    rankedRooms.forEach((room) => {
+      const ordered = getOrderedPlayersForRoom(room.id, finishedPlayers);
+      if (!ordered.some((player) => player.user_id === userId)) return;
+      const deltas = getRankedDeltaMap(ordered);
+      points += Number(deltas[userId] || 0);
+      matches += 1;
+      if (ordered[0]?.user_id === userId) wins += 1;
+    });
+    return { points, matches, wins };
+  }
+
   function renderArenaInsights() {
     const finishedRooms = GAME.rooms.filter((room) => room.status === "finished");
     const finishedIds = new Set(finishedRooms.map((room) => room.id));
     const finishedPlayers = GAME.players.filter((player) => finishedIds.has(player.room_id));
     const myFinished = finishedPlayers.filter((player) => player.user_id === GAME.user.id);
+    const rankedProfile = getRankedProfile(finishedRooms, finishedPlayers, GAME.user.id);
     const myBest = myFinished.reduce((max, item) => Math.max(max, Number(item.score || 0)), 0);
     const totalMatches = myFinished.length;
     const totalScore = myFinished.reduce((sum, item) => sum + Number(item.score || 0), 0);
@@ -561,10 +670,11 @@
       if (Number(player.score || 0) === best) streak += 1;
       else break;
     }
-    const tier = getArenaTier(totalScore);
+    const tier = getArenaTier(rankedProfile.points);
 
     if (EL.heroBadges) {
       EL.heroBadges.innerHTML = `
+        <div class="hero-badge">RP ${rankedProfile.points} • ${rankedProfile.wins}/${rankedProfile.matches} trận rank thắng</div>
         <div class="hero-badge">${tier.icon} Hạng ${tier.name}</div>
         <div class="hero-badge">Tỉ lệ thắng ${winRate}%</div>
         <div class="hero-badge">Chuỗi thắng ${streak}</div>
@@ -573,6 +683,7 @@
 
     if (EL.statsGrid) {
       EL.statsGrid.innerHTML = `
+        <div class="stat-card"><span>Điểm rank</span><strong>${rankedProfile.points}</strong><small>Thắng rank ${rankedProfile.wins}/${rankedProfile.matches}</small></div>
         <div class="stat-card"><span>Trận đã chơi</span><strong>${totalMatches}</strong></div>
         <div class="stat-card"><span>Trận thắng</span><strong>${wins}</strong><small>Tỉ lệ thắng ${winRate}%</small></div>
         <div class="stat-card"><span>Điểm cao nhất</span><strong>${myBest}</strong><small>Tổng điểm ${totalScore}</small></div>
@@ -698,9 +809,11 @@
   function openGameRoomModal() {
     EL.roomForm?.reset();
     EL.roomCode.value = randomCode();
+    if (EL.roomMode) EL.roomMode.value = GAME.initialAction === "create_room_ranked" ? "ranked" : "quick";
     if (EL.roomVisibility) EL.roomVisibility.value = "public";
     if (EL.roomMaxPlayers) EL.roomMaxPlayers.value = "8";
     if (EL.roomClass) EL.roomClass.value = GAME.initialClassId && GAME.classIds.includes(GAME.initialClassId) ? GAME.initialClassId : "";
+    applyModeDefaults(EL.roomMode?.value || "quick", true);
     if (EL.roomClass?.value) syncRoomFiltersFromClass(EL.roomClass.value);
     if (!EL.roomClass?.value) fillSubjects(EL.roomSubject, EL.roomGrade.value, "Chọn môn");
     EL.roomModal.classList.add("show");
@@ -712,9 +825,11 @@
 
   async function submitCreateRoom(event) {
     event.preventDefault();
+    const mode = EL.roomMode?.value || "quick";
     const payload = {
       title: String(EL.roomTitle.value || "").trim(),
       join_code: String(EL.roomCode.value || "").trim().toUpperCase() || randomCode(),
+      mode,
       grade_id: EL.roomGrade.value,
       subject_id: EL.roomSubject.value,
       question_count: Number(EL.roomQuestionCount.value || 10),
@@ -722,7 +837,7 @@
       max_players: Number(EL.roomMaxPlayers?.value || 8),
       class_id: EL.roomClass?.value || null,
       description: String(EL.roomDescription.value || "").trim(),
-      visibility: EL.roomVisibility?.value || "public",
+      visibility: EL.roomVisibility?.value || (mode === "friends" ? "private" : "public"),
       status: "waiting",
       host_id: GAME.user.id,
       created_by: GAME.user.id,
@@ -770,13 +885,17 @@
     const keyword = String(EL.keyword?.value || "").trim().toLowerCase();
     const bestRoom = [...(GAME.rooms || [])]
       .filter((room) => room.status === "waiting" && (room.visibility || "public") === "public")
+      .filter((room) => roomModeValue(room) === "quick")
       .filter((room) => !gradeId || room.grade_id === gradeId)
       .filter((room) => !subjectId || room.subject_id === subjectId)
       .filter((room) => !keyword || String(room.title || "").toLowerCase().includes(keyword) || String(room.join_code || "").toLowerCase().includes(keyword))
       .filter((room) => roomHasCapacity(room) || GAME.players.some((player) => player.room_id === room.id && player.user_id === GAME.user.id))
       .sort((a, b) => roomPlayerCount(b.id) - roomPlayerCount(a.id) || new Date(b.created_at) - new Date(a.created_at))[0];
     if (!bestRoom) {
-      alert("Chưa có phòng công khai phù hợp để ghép nhanh. Hãy đổi bộ lọc hoặc tự tạo phòng mới.");
+      if (EL.roomMode) EL.roomMode.value = "quick";
+      applyModeDefaults("quick", true);
+      openGameRoomModal();
+      alert("Chưa có phòng đấu nhanh phù hợp. Mình đã mở sẵn form tạo phòng đấu nhanh cho bạn.");
       return;
     }
     await joinRoom(bestRoom.id);
@@ -941,6 +1060,7 @@
         EL.roomSummary.innerHTML = `
           <div><span>Mã phòng</span><strong>${esc(room.join_code || "—")}</strong></div>
           <div><span>Hiển thị</span><strong>${esc(visibility)}</strong></div>
+          <div><span>Chế độ</span><strong>${esc(modeLabel)}</strong></div>
           <div><span>Lớp</span><strong>${esc(className || "Không gắn lớp")}</strong></div>
           <div><span>Khối</span><strong>${esc(grade)}</strong></div>
           <div><span>Môn</span><strong>${esc(subject)}</strong></div>
@@ -1238,6 +1358,7 @@
   function renderFinishedRoom() {
     const ordered = [...GAME.roomPlayers].sort((a, b) => (b.score || 0) - (a.score || 0) || new Date(a.joined_at) - new Date(b.joined_at));
     const winner = ordered[0];
+    const rankedDeltaMap = roomModeValue(GAME.activeRoom) === "ranked" ? getRankedDeltaMap(ordered) : {};
     EL.finishedMeta.textContent = `Phòng ${GAME.activeRoom?.title || ""} đã kết thúc. Người có điểm cao hơn sẽ xếp trên, nếu bằng điểm thì ai vào phòng sớm hơn sẽ xếp trên.`;
     if (EL.myStats) {
       const myPlayer = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
@@ -1259,6 +1380,7 @@
           <div class="medal ${medalClass}">${idx + 1}</div>
           <div>
             <div style="font-weight:800;color:var(--navy)">${esc(getPlayerName(player.user_id))}</div>
+            ${roomModeValue(GAME.activeRoom) === "ranked" ? `<div class="hint">${Number(rankedDeltaMap[player.user_id] || 0) >= 0 ? "+" : ""}${Number(rankedDeltaMap[player.user_id] || 0)} RP</div>` : ""}
             <div class="hint">${player.user_id === GAME.user.id ? "Bạn" : "Người chơi"}</div>
           </div>
         </div>
