@@ -95,6 +95,7 @@
   };
 
   init();
+  normalizeStaticGameText();
 
   if (EL.roomMode?.closest(".field")) {
     const modeLabels = EL.roomMode.closest(".field").querySelectorAll("label");
@@ -136,6 +137,105 @@
 
   function escAttr(value) {
     return esc(value).replace(/`/g, "&#96;");
+  }
+
+  function normalizeStaticGameText() {
+    document.title = "Game thi đấu";
+    const heroTitle = document.querySelector(".hero-copy h1");
+    if (heroTitle) heroTitle.textContent = "Đấu trường tri thức";
+    const heroDesc = document.querySelector(".hero-copy p");
+    if (heroDesc) {
+      heroDesc.textContent = "Biến việc luyện đề thành một trận đấu thật sự. Học sinh có thể tạo phòng, mời bạn vào thi, trả lời câu hỏi nhanh để leo hạng và xem bảng xếp hạng ngay trong phòng.";
+    }
+    if (EL.openRoomBtn) EL.openRoomBtn.textContent = "+ Tạo phòng mới";
+    if (EL.quickMatchBtn) EL.quickMatchBtn.textContent = "Ghép nhanh";
+    if (EL.reloadRoomsBtn) EL.reloadRoomsBtn.textContent = "Tải lại";
+    if (EL.joinCode) EL.joinCode.placeholder = "Nhập mã phòng";
+    if (EL.joinByCodeBtn) EL.joinByCodeBtn.textContent = "Vào phòng";
+
+    if (EL.keyword) EL.keyword.placeholder = "Tìm theo tên phòng hoặc mã phòng";
+    if (EL.gradeFilter?.options[0]) EL.gradeFilter.options[0].text = "Tất cả khối";
+    if (EL.subjectFilter?.options[0]) EL.subjectFilter.options[0].text = "Tất cả môn";
+    if (EL.visibilityFilter) {
+      EL.visibilityFilter.innerHTML = `
+        <option value="">Mọi kiểu phòng</option>
+        <option value="public">Công khai</option>
+        <option value="private">Riêng tư</option>
+      `;
+    }
+    if (EL.sortFilter) {
+      EL.sortFilter.innerHTML = `
+        <option value="recommended">Phù hợp nhất</option>
+        <option value="hot">Đang đông</option>
+        <option value="new">Mới nhất</option>
+        <option value="spots">Còn nhiều chỗ</option>
+      `;
+    }
+    if (EL.statusFilter) {
+      EL.statusFilter.innerHTML = `
+        <option value="">Tất cả trạng thái</option>
+        <option value="waiting">Đang chờ</option>
+        <option value="live">Đang đấu</option>
+        <option value="finished">Đã kết thúc</option>
+      `;
+    }
+
+    const emptyTitle = document.querySelector("#gameRoomEmpty strong");
+    if (emptyTitle) emptyTitle.textContent = "Chưa có phòng nào phù hợp";
+    const emptyDesc = document.querySelector("#gameRoomEmpty div");
+    if (emptyDesc) emptyDesc.textContent = "Hãy đổi bộ lọc hoặc tạo một phòng mới để bắt đầu thi đấu.";
+
+    document.querySelectorAll(".section-card h3")[0] && (document.querySelectorAll(".section-card h3")[0].textContent = "Lịch sử thi đấu gần đây");
+    document.querySelectorAll(".section-card h3")[1] && (document.querySelectorAll(".section-card h3")[1].textContent = "Bảng xếp hạng");
+    document.querySelectorAll("[data-rank-period='day']").forEach((el) => el.textContent = "Hôm nay");
+    document.querySelectorAll("[data-rank-period='week']").forEach((el) => el.textContent = "Tuần");
+    document.querySelectorAll("[data-rank-period='month']").forEach((el) => el.textContent = "Tháng");
+
+    const modalTitle = document.querySelector("#gameRoomModal .mh h2");
+    if (modalTitle) modalTitle.textContent = "Tạo phòng thi đấu";
+    const modalClose = document.querySelector("#gameRoomModal .mh .btn");
+    if (modalClose) modalClose.textContent = "Đóng";
+    if (EL.roomTitle?.closest(".field")?.querySelector("label")) EL.roomTitle.closest(".field").querySelector("label").textContent = "Tên phòng";
+    if (EL.roomCode?.closest(".field")?.querySelector("label")) EL.roomCode.closest(".field").querySelector("label").textContent = "Mã phòng";
+    if (EL.roomCode) EL.roomCode.placeholder = "Để trống sẽ tự tạo";
+    if (EL.roomMaxPlayers?.closest(".field")?.querySelector("label")) EL.roomMaxPlayers.closest(".field").querySelector("label").textContent = "Số người tối đa";
+    if (EL.roomClass?.closest(".field")?.querySelector("label")) EL.roomClass.closest(".field").querySelector("label").textContent = "Lớp liên kết";
+    if (EL.roomGrade?.closest(".field")?.querySelector("label")) EL.roomGrade.closest(".field").querySelector("label").textContent = "Khối";
+    if (EL.roomSubject?.closest(".field")?.querySelector("label")) EL.roomSubject.closest(".field").querySelector("label").textContent = "Môn";
+    if (EL.roomQuestionCount?.closest(".field")?.querySelector("label")) EL.roomQuestionCount.closest(".field").querySelector("label").textContent = "Số câu hỏi";
+    if (EL.roomTimePerQuestion?.closest(".field")?.querySelector("label")) EL.roomTimePerQuestion.closest(".field").querySelector("label").textContent = "Giây cho mỗi câu";
+    if (EL.roomDescription?.closest(".field")?.querySelector("label")) EL.roomDescription.closest(".field").querySelector("label").textContent = "Mô tả";
+    if (EL.roomDescription) EL.roomDescription.placeholder = "Ví dụ: Thi đấu 10 câu Toán 12 trong 1 lượt, ai nhanh và chính xác hơn sẽ thắng.";
+    const roomHint = document.querySelector("#gameRoomForm .field.full .hint");
+    if (roomHint) roomHint.innerHTML = "Bản đầu tiên sẽ dùng lại câu hỏi từ <b>Ngân hàng câu hỏi</b>, ưu tiên các câu trắc nghiệm, đúng/sai và trả lời ngắn. Tự luận sẽ chưa đưa vào game để giữ nhịp thi đấu nhanh.";
+    const footerBtns = document.querySelectorAll("#gameRoomForm + div .btn, #gameRoomForm .btn");
+    footerBtns.forEach((btn) => {
+      if (btn.type === "submit") btn.textContent = "Tạo phòng";
+      else if (btn.getAttribute("onclick") === "closeGameRoomModal()") btn.textContent = "Hủy";
+    });
+
+    if (EL.roomScreenTitle) EL.roomScreenTitle.textContent = "Phòng thi đấu";
+    const backBtn = document.querySelector("#gameRoomScreen .topbar .btn");
+    if (backBtn) backBtn.textContent = "← Quay lại";
+    if (EL.toggleReadyBtn) EL.toggleReadyBtn.textContent = "Sẵn sàng";
+    if (EL.leaveGameBtn) EL.leaveGameBtn.textContent = "Rời phòng";
+    if (EL.startGameBtn) EL.startGameBtn.textContent = "Bắt đầu trận";
+    document.querySelector("#gameWaitingView .panel h3") && (document.querySelector("#gameWaitingView .panel h3").textContent = "Thông tin phòng");
+    document.querySelectorAll("#gameWaitingView .panel h3")[1] && (document.querySelectorAll("#gameWaitingView .panel h3")[1].textContent = "Người chơi trong phòng");
+    document.querySelectorAll("#gameWaitingView .panel h3")[2] && (document.querySelectorAll("#gameWaitingView .panel h3")[2].textContent = "Mời bạn bè");
+    if (EL.inviteVisibility?.parentElement) EL.inviteVisibility.parentElement.firstChild.textContent = "Hiển thị: ";
+    if (EL.copyGameCodeBtn) EL.copyGameCodeBtn.textContent = "Sao chép mã";
+    if (EL.shareGameCodeBtn) EL.shareGameCodeBtn.textContent = "Sao chép lời mời";
+    if (EL.questionTitle) EL.questionTitle.textContent = "Câu hỏi";
+    if (EL.questionClock?.parentElement?.firstChild) EL.questionClock.parentElement.firstChild.textContent = "Còn lại";
+    if (EL.progressText) EL.progressText.textContent = "Tiến độ trận đấu";
+    document.querySelectorAll("#gameLiveView .panel h3")[0] && (document.querySelectorAll("#gameLiveView .panel h3")[0].textContent = "Đáp án của bạn");
+    document.querySelectorAll("#gameLiveView .panel h3")[1] && (document.querySelectorAll("#gameLiveView .panel h3")[1].textContent = "Bảng xếp hạng");
+    if (EL.finishedView?.querySelector("h3")) EL.finishedView.querySelector("h3").textContent = "Kết quả trận đấu";
+    const historyModalTitle = document.querySelector("#gameHistoryModal .mh h2");
+    if (historyModalTitle) historyModalTitle.textContent = "Chi tiết trận đấu";
+    const historyClose = document.querySelector("#gameHistoryModal .mh .btn");
+    if (historyClose) historyClose.textContent = "Đóng";
   }
 
   function fmtDateTime(value) {

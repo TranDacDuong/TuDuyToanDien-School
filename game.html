@@ -164,10 +164,12 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
     <select id="gameGradeFilter" class="select"><option value="">Tất cả khối</option></select>
     <select id="gameSubjectFilter" class="select"><option value="">Tất cả môn</option></select>
     <select id="gameModeFilter" class="select">
-      <option value="">Má»i cháº¿ Ä‘á»™</option>
-      <option value="quick">Äáº¥u nhanh</option>
-      <option value="friends">PhÃ²ng báº¡n bÃ¨</option>
-      <option value="ranked">Leo háº¡ng</option>
+      <option value="">Mọi chế độ</option>
+      <option value="quick">Đấu nhanh</option>
+      <option value="friends">Phòng bạn bè</option>
+      <option value="ranked">Leo hạng</option>
+      <option value="survival">Sinh tồn</option>
+      <option value="speed">Đua tốc độ</option>
     </select>
     <select id="gameVisibilityFilter" class="select">
       <option value="">Mọi kiểu phòng</option>
@@ -200,16 +202,16 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
     <div style="display:grid;gap:18px">
       <div id="gameStatsGrid" class="stats-grid"></div>
       <div class="section-card">
-        <h3>Lá»‹ch sá»­ thi Ä‘áº¥u gáº§n Ä‘Ã¢y</h3>
+        <h3>Lịch sử thi đấu gần đây</h3>
         <div id="gameHistoryList" class="history-list"></div>
       </div>
     </div>
     <div class="section-card">
-      <h3>Báº£ng xáº¿p háº¡ng</h3>
+      <h3>Bảng xếp hạng</h3>
       <div class="rank-tabs">
-        <button class="rank-tab active" type="button" data-rank-period="day">HÃ´m nay</button>
-        <button class="rank-tab" type="button" data-rank-period="week">Tuáº§n</button>
-        <button class="rank-tab" type="button" data-rank-period="month">ThÃ¡ng</button>
+        <button class="rank-tab active" type="button" data-rank-period="day">Hôm nay</button>
+        <button class="rank-tab" type="button" data-rank-period="week">Tuần</button>
+        <button class="rank-tab" type="button" data-rank-period="month">Tháng</button>
       </div>
       <div id="gameGlobalLeaderboard" class="player-list leaderboard"></div>
     </div>
@@ -234,16 +236,17 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
             <input id="gameRoomCode" class="input" maxlength="8" placeholder="Để trống sẽ tự tạo">
           </div>
           <div class="field">
-            <label>Hiển thị phòng</label>
-            <label>Cháº¿ Ä‘á»™</label>
+            <label>Chế độ</label>
             <select id="gameRoomMode" class="select">
-              <option value="quick">Äáº¥u nhanh</option>
-              <option value="friends">PhÃ²ng báº¡n bÃ¨</option>
-              <option value="ranked">Leo háº¡ng</option>
+              <option value="quick">Đấu nhanh</option>
+              <option value="friends">Phòng bạn bè</option>
+              <option value="ranked">Leo hạng</option>
+              <option value="survival">Sinh tồn</option>
+              <option value="speed">Đua tốc độ</option>
             </select>
           </div>
           <div class="field">
-            <label>Hiá»ƒn thá»‹ phÃ²ng</label>
+            <label>Hiển thị phòng</label>
             <select id="gameRoomVisibility" class="select">
               <option value="public">Công khai</option>
               <option value="private">Riêng tư</option>
@@ -318,7 +321,7 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
         <h3>Mời bạn bè</h3>
         <div class="invite-tools">
           <div class="hint">Mã phòng: <b id="gameInviteCode">—</b></div>
-          <div class="hint">Chế độ: <b id="gameInviteVisibility">Công khai</b></div>
+          <div class="hint">Hiển thị: <b id="gameInviteVisibility">Công khai</b></div>
           <div style="display:flex;gap:10px;flex-wrap:wrap">
             <button class="btn btn-outline btn-sm" type="button" id="copyGameCodeBtn">Sao chép mã</button>
             <button class="btn btn-outline btn-sm" type="button" id="shareGameCodeBtn">Sao chép lời mời</button>
@@ -388,5 +391,6 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
 <script src="game.js"></script>
+<script src="game_fix.js"></script>
 </body>
 </html>
