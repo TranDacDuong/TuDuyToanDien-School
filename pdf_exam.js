@@ -724,7 +724,18 @@ function renderPdfAttemptQuestion(question, index) {
   } else {
     answerCol = `<textarea class="essay-box" oninput="updatePdfText('${question.id}',this.value)" placeholder="Viết câu trả lời">${esc(answer)}</textarea>`;
   }
-  return `<div class="answer-card" id="pdfQCard_${question.id}"><div class="answer-card-hd"><span class="num">${index}</span><strong>${esc(question.label || `Câu ${index}`)}</strong><span class="pill soft">${typeLabel(question.question_type)}</span><span style="margin-left:auto;font-size:.78rem;color:var(--ink-mid)">${question.points || 0} điểm</span></div><div class="answer-card-bd" style="grid-template-columns:1fr">${answerCol}</div></div>`;
+  return `<div class="answer-card" id="pdfQCard_${question.id}">
+    <div class="answer-card-hd">
+      <span class="num">${index}</span>
+      <strong>${esc(question.label || `Câu ${index}`)}</strong>
+      <span class="pill soft">${typeLabel(question.question_type)}</span>
+      <span style="margin-left:auto;font-size:.78rem;color:var(--ink-mid)">${question.points || 0} điểm</span>
+    </div>
+    <div class="answer-card-bd" style="display:grid;grid-template-columns:13fr 2fr;gap:12px;align-items:flex-start">
+      <div class="question-stem" style="color:var(--ink-light);font-size:.85rem;">Xem đề trong PDF bên trái.</div>
+      <div class="answer-col">${answerCol}</div>
+    </div>
+  </div>`;
 }
 
 function updatePdfText(questionId, value) {
