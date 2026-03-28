@@ -742,6 +742,243 @@ function renderPartialScoreEditor(existing = null) {
     </div>`;
 }
 
+// Final business rules + compact renderer for PDF answer rows.
+function getPdfQuestionDefaultsByType(type, count = 4) {
+  if (type === "true_false") {
+    const safeCount = Math.max(1, count);
+    const partial = {};
+    if (safeCount === 4) {
+      partial[0] = 0;
+      partial[1] = 0.1;
+      partial[2] = 0.25;
+      partial[3] = 0.5;
+      partial[4] = 1;
+    } else {
+      partial[safeCount] = 1;
+    }
+    return {
+      points: 1,
+      answer_count: safeCount,
+      answer: Array.from({ length: safeCount }, (_, i) => `${String.fromCharCode(97 + i)}F`).join(""),
+      partial_points: partial,
+    };
+  }
+  if (type === "short_answer") {
+    return {
+      points: 0.5,
+      answer_count: Math.max(1, count),
+      answer: "",
+      partial_points: { [Math.max(1, count)]: 0.5 },
+    };
+  }
+  if (type === "essay") {
+    return {
+      points: 1,
+      answer_count: 1,
+      answer: "",
+      partial_points: null,
+    };
+  }
+  const safeCount = Math.max(1, count);
+  return {
+    points: 0.25,
+    answer_count: safeCount,
+    answer: "A",
+    partial_points: { [safeCount]: 0.25 },
+  };
+}
+
+function getPdfDefaultQuestion(order) {
+  const defaults = getPdfQuestionDefaultsByType("multi_choice", 4);
+  return {
+    id: crypto.randomUUID(),
+    order_no: order,
+    label: `Câu ${order}`,
+    question_type: "multi_choice",
+    question_text: null,
+    answer: defaults.answer,
+    answer_count: defaults.answer_count,
+    points: defaults.points,
+    partial_points: defaults.partial_points,
+  };
+}
+
+function withPdfPartialDefaults(question) {
+  const type = normalizePdfQuestionType(question.question_type || "multi_choice");
+  const count = Math.max(1, Number(question.answer_count || 1));
+  const defaults = getPdfQuestionDefaultsByType(type, count);
+  const partial = { ...(question.partial_points || {}) };
+
+  if (type === "multi_choice" || type === "short_answer") {
+    partial[count] = Number(question.points ?? defaults.points);
+  } else if (type === "true_false") {
+    if (count === 4) {
+      partial[0] = partial[0] ?? 0;
+      partial[1] = partial[1] ?? 0.1;
+      partial[2] = partial[2] ?? 0.25;
+      partial[3] = partial[3] ?? 0.5;
+      partial[4] = partial[4] ?? 1;
+    } else {
+      partial[count] = partial[count] ?? Number(question.points ?? defaults.points);
+    }
+  }
+
+  return {
+    ...question,
+    question_type: type,
+    answer_count: count,
+    points: Number(question.points ?? defaults.points),
+    partial_points: type === "essay" ? null : partial,
+  };
+}
+
+function updatePdfDraftField(id, field, value) {
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.map((q) => {
+    if (q.id !== id) return q;
+    const next = { ...q, [field]: field === "points" ? Number(value || 0) : value };
+    return withPdfPartialDefaults(next);
+  });
+  renderDraftQuestionList();
+}
+
+function updatePdfDraftType(id, type) {
+  const normalized = normalizePdfQuestionType(type);
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.map((q) => {
+    if (q.id !== id) return q;
+    const defaults = getPdfQuestionDefaultsByType(normalized, normalized === "essay" ? 1 : 4);
+    return {
+      ...q,
+      question_type: normalized,
+      answer_count: defaults.answer_count,
+      answer: defaults.answer,
+      points: defaults.points,
+      partial_points: defaults.partial_points,
+    };
+  });
+  renderDraftQuestionList();
+}
+
+function updatePdfDraftAnswerCount(id, delta) {
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.map((q) => {
+    if (q.id !== id) return q;
+    if (q.question_type === "essay") return q;
+    const nextCount = Math.max(1, Math.min(8, Number(q.answer_count || 1) + delta));
+    const next = {
+      ...q,
+      answer_count: nextCount,
+      answer: normalizePdfDraftAnswer(q.question_type, q.answer, nextCount),
+      partial_points: trimPdfPartialPoints(q.partial_points, nextCount + 1),
+    };
+    return withPdfPartialDefaults(next);
+  });
+  renderDraftQuestionList();
+}
+
+function updatePdfDraftPartial(id, count, value) {
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.map((q) => {
+    if (q.id !== id) return q;
+    const partial = { ...(q.partial_points || {}) };
+    partial[count] = Number(value || 0);
+    return withPdfPartialDefaults({ ...q, partial_points: partial });
+  });
+}
+
+function renderInlinePdfAnswerEditor(q) {
+  const safe = withPdfPartialDefaults(q);
+  if (safe.question_type === "multi_choice") {
+    const selected = new Set(String(safe.answer || "").toUpperCase().split("").filter(Boolean));
+    return `<div class="draft-inline-row">
+      <button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${safe.id}',-1)">-</button>
+      ${Array.from({ length: safe.answer_count }, (_, i) => {
+        const key = String.fromCharCode(65 + i);
+        return `<label class="answer-box ${selected.has(key) ? "active" : ""}">
+          <input type="checkbox" ${selected.has(key) ? "checked" : ""} onchange="updatePdfDraftMC('${safe.id}','${key}',this.checked)">
+          <span class="answer-box-key">${key}</span>
+        </label>`;
+      }).join("")}
+      <button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${safe.id}',1)">+</button>
+    </div>`;
+  }
+  if (safe.question_type === "true_false") {
+    const parsed = parsePdfTrueFalse(safe.answer, safe.answer_count);
+    return `<div class="draft-inline-row">
+      <button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${safe.id}',-1)">-</button>
+      ${Array.from({ length: safe.answer_count }, (_, i) => {
+        const key = String.fromCharCode(97 + i);
+        const state = parsed[key] || "F";
+        return `<button class="tf-state ${state === "T" ? "correct" : "wrong"}" type="button" onclick="updatePdfDraftTF('${safe.id}','${key}')">${key.toUpperCase()}</button>`;
+      }).join("")}
+      <button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${safe.id}',1)">+</button>
+    </div>`;
+  }
+  if (safe.question_type === "short_answer") {
+    return `<div class="draft-inline-row">
+      <button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${safe.id}',-1)">-</button>
+      ${Array.from({ length: safe.answer_count }, (_, i) => `<input class="input" style="width:88px" type="text" placeholder="${i + 1}" value="${escAttr(String(safe.answer || '').split(';')[i] || '')}" oninput="updatePdfDraftShort('${safe.id}',${i},this.value)">`).join("")}
+      <button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${safe.id}',1)">+</button>
+    </div>`;
+  }
+  return `<div class="editor-note">Câu tự luận không có đáp án tự động.</div>`;
+}
+
+function renderInlinePdfPartialEditor(q) {
+  const safe = withPdfPartialDefaults(q);
+  if (safe.question_type === "essay") {
+    return `<div class="hint">Câu tự luận không có điểm chi tiết tự động.</div>`;
+  }
+  const counts = safe.question_type === "true_false"
+    ? Array.from({ length: safe.answer_count + 1 }, (_, i) => i)
+    : Array.from({ length: safe.answer_count }, (_, i) => i + 1);
+  return `<div class="draft-inline-row">
+    ${counts.map((count) => `<label style="display:flex;align-items:center;gap:4px">
+      <span class="draft-inline-label">${count} ý</span>
+      <input class="input" style="width:64px" type="number" min="0" step="0.05" value="${safe.partial_points?.[count] ?? 0}" oninput="updatePdfDraftPartial('${safe.id}','${count}',this.value)">
+    </label>`).join("")}
+  </div>`;
+}
+
+function renderDraftQuestionList() {
+  PDF_EL.draftQuestionList.className = "draft-answer-list";
+  PDF_EL.draftQuestionList.innerHTML = PDF_STATE.draftQuestions.length
+    ? PDF_STATE.draftQuestions
+      .sort((a, b) => (a.order_no || 0) - (b.order_no || 0))
+      .map((item, idx) => {
+        const q = withPdfPartialDefaults({ ...item, order_no: idx + 1 });
+        return `<div class="draft-answer-item" id="pdfDraftRow_${q.id}">
+          <div class="draft-answer-compact">
+            <div class="draft-answer-top">
+              <div class="draft-inline-title">Câu ${idx + 1}</div>
+              <div class="draft-inline-row">
+                <span class="draft-inline-label">Loại câu:</span>
+                <select class="select" style="width:150px" onchange="updatePdfDraftType('${q.id}',this.value)">
+                  <option value="multi_choice" ${q.question_type === "multi_choice" ? "selected" : ""}>Trắc nghiệm</option>
+                  <option value="true_false" ${q.question_type === "true_false" ? "selected" : ""}>Đúng / Sai</option>
+                  <option value="short_answer" ${q.question_type === "short_answer" ? "selected" : ""}>Trả lời ngắn</option>
+                  <option value="essay" ${q.question_type === "essay" ? "selected" : ""}>Tự luận</option>
+                </select>
+              </div>
+              <div class="draft-inline-row">
+                <span class="draft-inline-label">Đáp án:</span>
+                ${renderInlinePdfAnswerEditor(q)}
+              </div>
+              <button class="btn btn-danger btn-sm" type="button" onclick="deletePdfQuestion('${q.id}')">Xóa</button>
+            </div>
+            <div class="draft-answer-bottom">
+              <div class="draft-inline-row">
+                <span class="draft-inline-label">Điểm câu:</span>
+                <input class="input" style="width:76px" type="number" min="0" step="0.05" value="${q.points ?? 0}" oninput="updatePdfDraftField('${q.id}','points',this.value)">
+              </div>
+              <div>
+                <span class="draft-inline-label">Điểm chi tiết:</span>
+                ${renderInlinePdfPartialEditor(q)}
+              </div>
+            </div>
+          </div>
+        </div>`;
+      }).join("")
+    : `<div class="empty"><strong>Chưa có đáp án nào</strong><div>Hãy bấm + Thêm đáp án để thêm trực tiếp từng câu ngay bên dưới.</div></div>`;
+}
+
 // Final compact inline renderer
 function renderDraftQuestionList() {
   PDF_EL.draftQuestionList.className = "draft-answer-list";
