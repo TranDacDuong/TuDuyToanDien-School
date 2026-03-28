@@ -67,6 +67,9 @@ const PDF_EL = {
   pdfFrame: document.getElementById("pdfDriveFrame"),
   pdfPaneLabel: document.getElementById("pdfPaneLabel"),
   pdfPaneOpenLink: document.getElementById("pdfPaneOpenLink"),
+  detailFrame: document.getElementById("pdfDetailFrame"),
+  detailPaneLabel: document.getElementById("pdfDetailPaneLabel"),
+  detailPaneOpenLink: document.getElementById("pdfDetailPaneOpenLink"),
 };
 
 bindPdfEvents();
@@ -628,6 +631,9 @@ function openPdfExamScreen(examId) {
   PDF_EL.summaryText.innerHTML = `<div style="color:#607089;line-height:1.7">${linkify(esc(exam.description || "Đề PDF dùng Google Drive preview để hiển thị đề ở bên trái màn làm bài."))}</div>`;
   PDF_EL.summaryMeta.innerHTML = `<div><span>Thời lượng</span><strong>${exam.duration_minutes || 0} phút</strong></div><div><span>Tổng điểm</span><strong>${exam.total_points || 0} điểm</strong></div><div><span>Google Drive</span><strong>${esc(exam.drive_file_id || "")}</strong></div><div><span>Kết quả gần nhất</span><strong>${latest ? `${latest.score_total ?? latest.score_auto ?? "?"}/${exam.total_points || 0} điểm` : "Chưa làm bài"}</strong></div>`;
   PDF_EL.openDriveBtn.onclick = () => window.open(getPdfOpenUrl(exam), "_blank");
+  if (PDF_EL.detailFrame) PDF_EL.detailFrame.src = getPdfPreviewUrl(exam);
+  if (PDF_EL.detailPaneOpenLink) PDF_EL.detailPaneOpenLink.href = getPdfOpenUrl(exam);
+  if (PDF_EL.detailPaneLabel) PDF_EL.detailPaneLabel.textContent = `Nội dung đề PDF • ${exam.title || ""}`;
 
   const canManage = PDF_STATE.role === "admin" || PDF_STATE.role === "teacher";
   PDF_EL.editBtn.classList.toggle("hidden", !canManage);

@@ -43,6 +43,12 @@ textarea{min-height:110px;resize:vertical}
 .stop h2{margin:0;flex:1;font-size:1.05rem}
 .sbody{flex:1;overflow:auto;padding:20px 24px}
 .detail-stack{display:grid;gap:18px}
+.detail-layout{display:grid;grid-template-columns:minmax(420px,1.05fr) minmax(360px,.95fr);gap:18px;min-height:0}
+.detail-left,.detail-right{display:grid;gap:18px;min-height:0}
+.detail-preview{background:#0f172a;border-radius:18px;padding:16px;display:grid;gap:12px;min-height:520px}
+.detail-preview-top{display:flex;justify-content:space-between;align-items:center;gap:10px;color:#e2e8f0;font-size:.84rem}
+.detail-preview-frame{flex:1;min-height:0;border-radius:14px;overflow:hidden;background:#111827;border:1px solid rgba(255,255,255,.08)}
+.detail-preview-frame iframe{width:100%;height:100%;border:none;background:#fff}
 .detail-card{background:#fff;border:1px solid rgba(39,58,91,.08);border-radius:20px;box-shadow:0 14px 32px rgba(15,23,42,.08);padding:18px}
 .question-list{display:grid;gap:12px}
 .question-row{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:14px;align-items:center;padding:16px;border:1px solid rgba(39,58,91,.08);border-radius:18px;background:#fff}
@@ -114,7 +120,7 @@ textarea{min-height:110px;resize:vertical}
 .draft-inline-partials{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .draft-inline-partial{display:flex;align-items:center;gap:4px;font-size:.76rem;color:var(--ink-mid)}
 .draft-inline-partial input{width:58px}
-@media(max-width:1080px){.toolbar,.form-grid,.exam-body,.answer-card-bd{grid-template-columns:1fr}.question-row{grid-template-columns:1fr}.question-actions{align-items:flex-start;flex-direction:row;flex-wrap:wrap}.exam-body{grid-template-columns:1fr}.pdf-pane{min-height:360px}}
+@media(max-width:1080px){.toolbar,.form-grid,.exam-body,.answer-card-bd,.detail-layout{grid-template-columns:1fr}.question-row{grid-template-columns:1fr}.question-actions{align-items:flex-start;flex-direction:row;flex-wrap:wrap}.exam-body{grid-template-columns:1fr}.pdf-pane{min-height:360px}.detail-preview{min-height:360px}}
 @media(max-width:1080px){.draft-answer-topline,.draft-answer-bottomline{grid-template-columns:1fr}}
 </style>
 </head>
@@ -278,7 +284,8 @@ textarea{min-height:110px;resize:vertical}
     <button class="btn btn-outline btn-sm hidden" id="pdfExamEditBtn" type="button">Sửa đề</button>
   </div>
   <div class="sbody">
-    <div class="detail-stack">
+    <div class="detail-layout">
+      <div class="detail-left">
       <div class="detail-card">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
           <div style="display:grid;gap:12px;flex:1;min-width:280px">
@@ -293,12 +300,24 @@ textarea{min-height:110px;resize:vertical}
           </div>
         </div>
       </div>
+      <div class="detail-preview">
+        <div class="detail-preview-top">
+          <div id="pdfDetailPaneLabel">Nội dung đề PDF</div>
+          <a id="pdfDetailPaneOpenLink" href="#" target="_blank" rel="noopener" style="color:#fde68a">Mở riêng</a>
+        </div>
+        <div class="detail-preview-frame">
+          <iframe id="pdfDetailFrame" allow="autoplay"></iframe>
+        </div>
+      </div>
+      </div>
+      <div class="detail-right">
       <div class="detail-card">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
           <h4 style="margin:0">Danh sách câu trả lời</h4>
           <div class="hint">Panel phải khi làm bài sẽ lấy dữ liệu từ danh sách này.</div>
         </div>
         <div id="pdfQuestionList" class="question-list"></div>
+      </div>
       </div>
     </div>
   </div>
