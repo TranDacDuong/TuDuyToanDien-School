@@ -71,7 +71,7 @@ function renderPdfTypeToggle(q) {
 function updatePdfDraftAnswerCount(id, delta) {
   PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.map((q) => {
     if (q.id !== id || q.question_type === "essay") return q;
-    const nextCount = Math.max(1, Math.min(8, Number(q.answer_count || 1) + delta));
+    const nextCount = Math.max(1, Math.min(20, Number(q.answer_count || 1) + delta));
     const defaults = getPdfQuestionDefaultsByType(q.question_type, nextCount);
     let nextAnswer = defaults.answer;
 
