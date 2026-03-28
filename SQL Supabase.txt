@@ -1536,6 +1536,7 @@ CREATE TABLE IF NOT EXISTS public.game_room_players (
   room_id uuid NOT NULL,
   user_id uuid NOT NULL,
   score integer NOT NULL DEFAULT 0,
+  ready boolean NOT NULL DEFAULT false,
   joined_at timestamp with time zone DEFAULT now(),
   CONSTRAINT game_room_players_pkey PRIMARY KEY (id),
   CONSTRAINT game_room_players_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.game_rooms(id) ON DELETE CASCADE,
@@ -1722,3 +1723,6 @@ WITH CHECK (
     WHERE p.id = player_id AND p.user_id = auth.uid()
   )
 );
+
+ALTER TABLE public.game_room_players
+  ADD COLUMN IF NOT EXISTS ready boolean NOT NULL DEFAULT false;

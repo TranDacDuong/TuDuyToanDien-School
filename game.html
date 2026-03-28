@@ -46,6 +46,7 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
 .screen.show{display:flex}
 .topbar{height:64px;background:var(--navy);color:#fff;display:flex;align-items:center;gap:12px;padding:0 18px}
 .topbar h2{margin:0;flex:1;font-size:1.05rem}
+.topbar-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .screen-body{flex:1;overflow:auto;padding:20px 24px}
 .room-shell{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,.9fr);gap:18px}
 .panel{background:#fff;border:1px solid rgba(39,58,91,.08);border-radius:20px;box-shadow:0 14px 32px rgba(15,23,42,.06);padding:18px}
@@ -76,6 +77,16 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
 .big{font-size:1.35rem;font-weight:800;color:var(--gold-light)}
 .countdown{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);padding:8px 14px;border-radius:10px}
 .countdown strong{font-size:1.1rem;color:var(--gold-light);font-family:monospace}
+.progress-wrap{display:grid;gap:8px}
+.progress-bar{height:10px;border-radius:999px;background:#dbe7fb;overflow:hidden}
+.progress-fill{height:100%;width:0;background:linear-gradient(90deg,#d97706,#f59e0b,#facc15);transition:width .3s ease}
+.status-tag{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:.74rem;font-weight:700}
+.status-tag.ready{background:#ecfdf5;color:#047857}
+.status-tag.waiting{background:#fff7ed;color:#c2410c}
+.feedback-box{margin-top:12px;padding:12px 14px;border-radius:14px;font-weight:700}
+.feedback-box.good{background:#ecfdf5;color:#047857;border:1px solid #86efac}
+.feedback-box.bad{background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5}
+.feedback-box.pending{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
 .results-grid{display:grid;gap:14px}
 .result-card{padding:14px 16px;border-radius:18px;background:#fff;border:1px solid rgba(39,58,91,.08);display:flex;align-items:center;justify-content:space-between;gap:12px}
 .medal{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff}
@@ -176,7 +187,11 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
   <div class="topbar">
     <button class="btn btn-outline btn-sm" type="button" onclick="closeGameScreen()">← Quay lại</button>
     <h2 id="gameRoomScreenTitle">Phòng thi đấu</h2>
-    <button class="btn btn-primary btn-sm hidden" id="startGameBtn" type="button">Bắt đầu trận</button>
+    <div class="topbar-actions">
+      <button class="btn btn-outline btn-sm hidden" id="toggleReadyBtn" type="button">Sẵn sàng</button>
+      <button class="btn btn-outline btn-sm" id="leaveGameBtn" type="button">Rời phòng</button>
+      <button class="btn btn-primary btn-sm hidden" id="startGameBtn" type="button">Bắt đầu trận</button>
+    </div>
   </div>
   <div class="screen-body">
     <div id="gameWaitingView" class="room-shell">
@@ -184,6 +199,7 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
         <h3>Thông tin phòng</h3>
         <div class="room-meta" id="gameRoomSummary"></div>
         <div class="hint" id="gameRoomDescriptionView" style="margin-top:12px"></div>
+        <div class="hint" id="gameRoomStartHint" style="margin-top:12px"></div>
       </div>
       <div class="panel">
         <h3>Người chơi trong phòng</h3>
@@ -197,6 +213,10 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
           <strong id="gameQuestionTitle">Câu hỏi</strong>
           <div class="countdown"><span>Còn lại</span><strong id="gameQuestionClock">00</strong></div>
         </div>
+        <div class="progress-wrap">
+          <div class="hint" id="gameProgressText">Tiến độ trận đấu</div>
+          <div class="progress-bar"><div id="gameProgressFill" class="progress-fill"></div></div>
+        </div>
         <div id="gameQuestionBody" class="question-text"></div>
         <img id="gameQuestionImg" class="question-img hidden" alt="question">
       </div>
@@ -204,6 +224,7 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
         <div class="panel">
           <h3>Đáp án của bạn</h3>
           <div id="gameAnswerArea"></div>
+          <div id="gameAnswerFeedback"></div>
         </div>
         <div class="panel">
           <h3>Bảng xếp hạng</h3>
@@ -220,6 +241,7 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
       <div class="panel">
         <h3>Kết quả trận đấu</h3>
         <div id="gameFinishedMeta" class="hint" style="margin-bottom:14px"></div>
+        <div id="gameMyStats" class="room-meta" style="margin-bottom:14px"></div>
         <div id="gameResultsList" class="results-grid"></div>
       </div>
     </div>
