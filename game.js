@@ -23,6 +23,7 @@
     keyword: document.getElementById("gameKeyword"),
     gradeFilter: document.getElementById("gameGradeFilter"),
     subjectFilter: document.getElementById("gameSubjectFilter"),
+    sortFilter: document.getElementById("gameSortFilter"),
     statusFilter: document.getElementById("gameStatusFilter"),
     roomGrid: document.getElementById("gameRoomGrid"),
     roomEmpty: document.getElementById("gameRoomEmpty"),
@@ -75,6 +76,8 @@
     leaderboard: document.getElementById("gameLeaderboard"),
     myScore: document.getElementById("myGameScore"),
     myRank: document.getElementById("myGameRank"),
+    myCombo: document.getElementById("myGameCombo"),
+    myBestCombo: document.getElementById("myGameBestCombo"),
     finishedView: document.getElementById("gameFinishedView"),
     finishedMeta: document.getElementById("gameFinishedMeta"),
     myStats: document.getElementById("gameMyStats"),
@@ -181,7 +184,7 @@
       fillSubjects(EL.subjectFilter, EL.gradeFilter.value, "Tất cả môn");
       renderRooms();
     });
-    [EL.keyword, EL.subjectFilter, EL.statusFilter].forEach((el) => {
+    [EL.keyword, EL.subjectFilter, EL.sortFilter, EL.statusFilter].forEach((el) => {
       el?.addEventListener("input", renderRooms);
       el?.addEventListener("change", renderRooms);
     });
@@ -247,6 +250,43 @@
 
   function roomHasCapacity(room) {
     return roomPlayerCount(room.id) < Number(room.max_players || 8);
+  }
+
+  function getRoomSortValue(room, mode) {
+    const playerCount = roomPlayerCount(room.id);
+    const maxPlayers = Number(room.max_players || 8);
+    if (mode === "hot") return [playerCount, -new Date(room.created_at).getTime()];
+    if (mode === "new") return [new Date(room.created_at).getTime(), playerCount];
+    if (mode === "spots") return [maxPlayers - playerCount, -playerCount];
+    const joined = (GAME.players || []).some((player) => player.room_id === room.id && player.user_id === GAME.user?.id) ? 1000 : 0;
+    const waiting = room.status === "waiting" ? 200 : room.status === "live" ? 100 : 0;
+    const publicBonus = (room.visibility || "public") === "public" ? 50 : 0;
+    return [joined + waiting + publicBonus + playerCount, -new Date(room.created_at).getTime()];
+  }
+
+  function compareTupleDesc(a, b) {
+    const len = Math.max(a.length, b.length);
+    for (let i = 0; i < len; i += 1) {
+      const av = Number(a[i] || 0);
+      const bv = Number(b[i] || 0);
+      if (av !== bv) return bv - av;
+    }
+    return 0;
+  }
+
+  function getMyComboStats() {
+    const ordered = [...(GAME.myAnswers || [])].sort((a, b) => new Date(a.answered_at || 0) - new Date(b.answered_at || 0));
+    let combo = 0;
+    let best = 0;
+    ordered.forEach((answer) => {
+      if (answer.is_correct) {
+        combo += 1;
+        best = Math.max(best, combo);
+      } else {
+        combo = 0;
+      }
+    });
+    return { combo, best };
   }
 
   function getArenaTier(totalScore) {
@@ -321,6 +361,7 @@
     const keyword = String(EL.keyword?.value || "").trim().toLowerCase();
     const gradeId = EL.gradeFilter?.value || "";
     const subjectId = EL.subjectFilter?.value || "";
+    const sortMode = EL.sortFilter?.value || "recommended";
     const status = EL.statusFilter?.value || "";
     const playerMap = buildRoomPlayerMap();
 
@@ -331,6 +372,7 @@
     if (gradeId) list = list.filter((room) => room.grade_id === gradeId);
     if (subjectId) list = list.filter((room) => room.subject_id === subjectId);
     if (status) list = list.filter((room) => room.status === status);
+    list.sort((a, b) => compareTupleDesc(getRoomSortValue(a, sortMode), getRoomSortValue(b, sortMode)));
 
     EL.roomGrid.innerHTML = list.map((room) => renderRoomCard(room, playerMap[room.id] || [])).join("");
     EL.roomEmpty.classList.toggle("hidden", list.length > 0);
@@ -360,6 +402,7 @@
     const statusLabel = room.status === "waiting" ? "Đang chờ" : room.status === "live" ? "Đang đấu" : "Đã kết thúc";
     const statusClass = room.status === "waiting" ? "waiting" : room.status === "live" ? "live" : "done";
     const hasCapacity = roomHasCapacity(room);
+    const fillPercent = Math.max(0, Math.min(100, Math.round((players.length / Number(room.max_players || 8)) * 100)));
     const canEnter = joined || (room.status === "waiting" && hasCapacity);
     return `<div class="room-card">
       <div class="room-top">
@@ -376,6 +419,7 @@
         <div><span>Số câu</span><strong>${room.question_count || 0} câu</strong></div>
         <div><span>Người chơi</span><strong>${players.length}/${room.max_players || 8}</strong></div>
       </div>
+      <div class="room-fill"><div class="room-fill-bar" style="width:${fillPercent}%"></div></div>
       <div class="hint">${esc(room.description || "Phòng thi đấu không có mô tả.")}</div>
       <div class="room-actions">
         ${joined
@@ -1071,11 +1115,14 @@
 
   function renderLeaderboard() {
     const ordered = [...GAME.roomPlayers].sort((a, b) => (b.score || 0) - (a.score || 0) || new Date(a.joined_at) - new Date(b.joined_at));
+    const comboStats = getMyComboStats();
     EL.leaderboard.innerHTML = ordered.map((player, idx) => renderPlayerRow(player, idx + 1, true)).join("");
     const myIndex = ordered.findIndex((item) => item.user_id === GAME.user.id);
     const myRow = ordered[myIndex];
     EL.myScore.textContent = myRow?.score || 0;
     EL.myRank.textContent = myIndex >= 0 ? `#${myIndex + 1}` : "#-";
+    if (EL.myCombo) EL.myCombo.textContent = comboStats.combo;
+    if (EL.myBestCombo) EL.myBestCombo.textContent = comboStats.best;
   }
 
   async function finishRoomIfNeeded() {

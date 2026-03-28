@@ -23,6 +23,8 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
 .input,.select,textarea{width:100%;padding:11px 12px;border:1.5px solid rgba(39,58,91,.14);border-radius:12px;background:#fff;font:inherit;outline:none}
 .room-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
 .room-card{background:#fff;border:1px solid rgba(39,58,91,.08);border-radius:18px;box-shadow:0 16px 36px rgba(15,23,42,.06);padding:16px;display:grid;gap:12px}
+.room-fill{height:8px;border-radius:999px;background:#e7eefc;overflow:hidden}
+.room-fill-bar{height:100%;background:linear-gradient(90deg,#1d4ed8,#38bdf8);border-radius:999px}
 .room-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 .room-title{font-size:1.05rem;font-weight:800;color:var(--navy)}
 .pill{display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;font-size:.75rem;font-weight:700}
@@ -101,6 +103,9 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
 .score-box div{padding:12px 14px;border-radius:16px;background:#0f3c73;color:#fff}
 .score-box span{display:block;font-size:.76rem;color:rgba(255,255,255,.72);margin-bottom:4px}
 .big{font-size:1.35rem;font-weight:800;color:var(--gold-light)}
+.combo-box{padding:12px 14px;border-radius:16px;background:linear-gradient(135deg,#fff7ed 0%,#fffbeb 100%);border:1px solid rgba(245,158,11,.25)}
+.combo-box span{display:block;font-size:.76rem;color:#92400e;margin-bottom:4px}
+.combo-box strong{font-size:1.2rem;color:#b45309}
 .countdown{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);padding:8px 14px;border-radius:10px}
 .countdown strong{font-size:1.1rem;color:var(--gold-light);font-family:monospace}
 .progress-wrap{display:grid;gap:8px}
@@ -158,6 +163,12 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
     <input id="gameKeyword" class="input" placeholder="Tìm theo tên phòng hoặc mã phòng">
     <select id="gameGradeFilter" class="select"><option value="">Tất cả khối</option></select>
     <select id="gameSubjectFilter" class="select"><option value="">Tất cả môn</option></select>
+    <select id="gameSortFilter" class="select">
+      <option value="recommended">Phù hợp nhất</option>
+      <option value="hot">Đang đông</option>
+      <option value="new">Mới nhất</option>
+      <option value="spots">Còn nhiều chỗ</option>
+    </select>
     <select id="gameStatusFilter" class="select">
       <option value="">Tất cả trạng thái</option>
       <option value="waiting">Đang chờ</option>
@@ -315,6 +326,10 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
           <div class="score-box" style="margin-bottom:12px">
             <div><span>Điểm của bạn</span><strong class="big" id="myGameScore">0</strong></div>
             <div><span>Hạng hiện tại</span><strong class="big" id="myGameRank">#-</strong></div>
+          </div>
+          <div class="score-box" style="margin-bottom:12px">
+            <div class="combo-box"><span>Combo hiện tại</span><strong id="myGameCombo">0</strong></div>
+            <div class="combo-box"><span>Chuỗi tốt nhất</span><strong id="myGameBestCombo">0</strong></div>
           </div>
           <div id="gameLeaderboard" class="player-list leaderboard"></div>
         </div>
