@@ -692,7 +692,9 @@
     const [
       {data:regularExams,error:regularExamsError},
       {data:pdfExams,error:pdfExamsError},
-      {data:pdfQuestionRows,error:pdfQuestionRowsError}
+      {data:pdfQuestionRows,error:pdfQuestionRowsError},
+      {data:gameRooms,error:gameRoomsError},
+      {data:gamePlayers,error:gamePlayersError}
     ] = await Promise.all([
       regularIds.length
         ? sb.from("exams")
@@ -708,11 +710,13 @@
         ? sb.from("pdf_exam_questions")
             .select("pdf_exam_id,question_type")
             .in("pdf_exam_id", pdfIds)
-        : Promise.resolve({data:[],error:null})
+        : Promise.resolve({data:[],error:null}),
+      sb.from("game_rooms").select("id,title,join_code,status,question_count,time_per_question,max_players,visibility,class_id,created_at").eq("class_id",_classId).order("created_at",{ascending:false}),
+      sb.from("game_room_players").select("id,room_id,user_id,score,ready,joined_at")
     ]);
 
-    if(regularExamsError || pdfExamsError || pdfQuestionRowsError){
-      const msg = regularExamsError?.message || pdfExamsError?.message || pdfQuestionRowsError?.message || "Không thể tải danh sách đề thi.";
+    if(regularExamsError || pdfExamsError || pdfQuestionRowsError || gameRoomsError || gamePlayersError){
+      const msg = regularExamsError?.message || pdfExamsError?.message || pdfQuestionRowsError?.message || gameRoomsError?.message || gamePlayersError?.message || "Không thể tải danh sách đề thi.";
       tc.innerHTML = '<p style="color:var(--red);font-size:.85rem;padding:12px">Lỗi tải đề thi: '+esc(msg)+'</p>';
       return;
     }
@@ -764,17 +768,60 @@
         '</div>'
       : "";
 
+    const gameSectionHtml = buildClassGamesSection(role, gameRooms||[], gamePlayers||[]);
+
     if(!exams.length){
-      tc.innerHTML=addExamBtn+
+      tc.innerHTML=gameSectionHtml+addExamBtn+
         '<p style="color:var(--ink-light);font-size:.85rem;padding:12px">Chưa có đề thi nào.</p>';
       return;
     }
 
     if(role==="student"){
-      await renderExamsForStudent(tc, exams, addExamBtn);
+      await renderExamsForStudent(tc, exams, gameSectionHtml+addExamBtn);
     } else {
-      await renderExamsForAdmin(tc, exams, addExamBtn);
+      await renderExamsForAdmin(tc, exams, gameSectionHtml+addExamBtn);
     }
+  }
+
+  function buildClassGamesSection(role, rooms, players){
+    const uid = window._currentUserId;
+    const playerMap = {};
+    (players||[]).forEach(p=>{
+      if(!playerMap[p.room_id]) playerMap[p.room_id]=[];
+      playerMap[p.room_id].push(p);
+    });
+    const openCreateBtn = (role==="admin"||role==="teacher")
+      ? '<button onclick="cvOpenClassGame()" class="btn btn-outline btn-sm">🎮 Tạo phòng game cho lớp</button>'
+      : "";
+    const roomsHtml = (rooms||[]).length
+      ? rooms.map(room=>{
+          const rows = playerMap[room.id] || [];
+          const joined = rows.some(p=>p.user_id===uid);
+          const isWaiting = room.status === "waiting";
+          const isFull = rows.length >= Number(room.max_players||8);
+          const canJoin = !joined && isWaiting && !isFull;
+          const action = joined
+            ? '<button onclick="location.href=\'game.html?action=open_room&roomId='+encodeURIComponent(room.id)+'&classId='+encodeURIComponent(_classId)+'\'" class="btn btn-primary btn-sm">Vào phòng</button>'
+            : canJoin
+              ? '<button onclick="location.href=\'game.html?action=join_room&roomId='+encodeURIComponent(room.id)+'&classId='+encodeURIComponent(_classId)+'\'" class="btn btn-primary btn-sm">Tham gia</button>'
+              : '<button class="btn btn-outline btn-sm" disabled>'+(isWaiting?'Đã đầy':'Đã khóa')+'</button>';
+          const statusText = room.status==="waiting"?"Đang chờ":room.status==="live"?"Đang đấu":"Đã kết thúc";
+          return '<div style="padding:14px 16px;background:var(--white);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+
+            '<div style="flex:1;min-width:0">'+
+              '<div style="font-weight:600;font-size:.9rem;color:var(--navy);margin-bottom:3px">'+esc(room.title||"Phòng game")+'</div>'+
+              '<div style="font-size:.75rem;color:var(--ink-mid)">🎮 '+esc(statusText)+' &nbsp;•&nbsp; Mã: '+esc(room.join_code||"—")+' &nbsp;•&nbsp; 👥 '+rows.length+'/'+(room.max_players||8)+' &nbsp;•&nbsp; ⏱ '+(room.time_per_question||0)+'s/câu</div>'+
+            '</div>'+
+            '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+action+'</div>'+
+          '</div>';
+        }).join("")
+      : '<div style="color:var(--ink-light);font-size:.82rem;padding:12px">Chưa có phòng game nào gắn với lớp này.</div>';
+    return '<div style="margin-bottom:16px;background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px 16px">'+
+      '<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px">'+
+        '<div><div style="font-weight:700;color:var(--navy)">🎮 Game của lớp</div><div style="font-size:.76rem;color:var(--ink-mid)">Thi đấu nhanh giữa các học sinh trong lớp.</div></div>'+
+        openCreateBtn+
+      '</div>'+
+      '<div style="display:flex;flex-direction:column;gap:8px">'+roomsHtml+'</div>'+
+    '</div>';
   }
 
   async function renderExamsForStudent(tc, exams, addExamBtn=""){

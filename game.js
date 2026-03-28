@@ -4,6 +4,7 @@
     role: "student",
     initialClassId: "",
     initialAction: "",
+    initialRoomId: "",
     grades: [],
     subjects: [],
     classes: [],
@@ -149,6 +150,7 @@
     const params = new URLSearchParams(location.search);
     GAME.initialClassId = params.get("classId") || "";
     GAME.initialAction = params.get("action") || "";
+    GAME.initialRoomId = params.get("roomId") || "";
     const { data: { user } } = await sb.auth.getUser();
     if (!user) {
       location.href = "index.html";
@@ -177,6 +179,9 @@
     await Promise.all([loadRooms(), loadFriends(), loadAccessibleClasses()]);
     if (GAME.initialAction === "create_room") {
       openGameRoomModal();
+    } else if (GAME.initialRoomId) {
+      if (GAME.initialAction === "join_room") await joinRoom(GAME.initialRoomId);
+      else await openRoomScreen(GAME.initialRoomId);
     }
   }
 
