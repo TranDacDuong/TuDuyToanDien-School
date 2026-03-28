@@ -1458,6 +1458,9 @@ CREATE INDEX IF NOT EXISTS pdf_exam_results_course_idx ON public.pdf_exam_result
 ALTER TABLE public.class_exams
   ADD COLUMN IF NOT EXISTS pdf_exam_id uuid;
 
+ALTER TABLE public.class_exams
+  ALTER COLUMN exam_id DROP NOT NULL;
+
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -1472,6 +1475,17 @@ BEGIN
 END $$;
 
 CREATE INDEX IF NOT EXISTS class_exams_pdf_exam_idx ON public.class_exams (pdf_exam_id);
+
+ALTER TABLE public.class_exams
+  DROP CONSTRAINT IF EXISTS class_exams_exam_choice_check;
+
+ALTER TABLE public.class_exams
+  ADD CONSTRAINT class_exams_exam_choice_check
+  CHECK (
+    (exam_id IS NOT NULL AND pdf_exam_id IS NULL)
+    OR
+    (exam_id IS NULL AND pdf_exam_id IS NOT NULL)
+  );
 
 -- Allow course sessions to attach PDF exams
 ALTER TABLE public.course_sessions
