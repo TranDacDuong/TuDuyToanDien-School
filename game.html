@@ -15,6 +15,8 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
 .hero-copy h1{margin:0;font-family:var(--font-display);font-size:2rem;color:var(--navy)}
 .hero-copy p{margin:0;color:var(--ink-mid);max-width:760px;line-height:1.65}
 .hero-actions{display:flex;gap:10px;flex-wrap:wrap}
+.join-code-box{display:flex;gap:8px;flex-wrap:wrap}
+.join-code-box .input{min-width:180px}
 .toolbar{display:grid;grid-template-columns:minmax(220px,1.2fr) repeat(2,minmax(160px,220px)) auto;gap:10px;margin-bottom:18px}
 .input,.select,textarea{width:100%;padding:11px 12px;border:1.5px solid rgba(39,58,91,.14);border-radius:12px;background:#fff;font:inherit;outline:none}
 .room-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
@@ -94,6 +96,10 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
     <div class="hero-actions">
       <button class="btn btn-primary" type="button" id="openGameRoomBtn">+ Tạo phòng mới</button>
       <button class="btn btn-outline" type="button" id="reloadGameRoomsBtn">Tải lại</button>
+      <div class="join-code-box">
+        <input id="gameJoinCode" class="input" placeholder="Nhập mã phòng">
+        <button class="btn btn-outline" type="button" id="joinByCodeBtn">Vào phòng</button>
+      </div>
     </div>
   </div>
 

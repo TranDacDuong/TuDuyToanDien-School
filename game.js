@@ -23,6 +23,8 @@
     roomEmpty: document.getElementById("gameRoomEmpty"),
     openRoomBtn: document.getElementById("openGameRoomBtn"),
     reloadRoomsBtn: document.getElementById("reloadGameRoomsBtn"),
+    joinCode: document.getElementById("gameJoinCode"),
+    joinByCodeBtn: document.getElementById("joinByCodeBtn"),
     roomModal: document.getElementById("gameRoomModal"),
     roomForm: document.getElementById("gameRoomForm"),
     roomTitle: document.getElementById("gameRoomTitle"),
@@ -138,6 +140,13 @@
   function bindEvents() {
     EL.openRoomBtn?.addEventListener("click", () => openGameRoomModal());
     EL.reloadRoomsBtn?.addEventListener("click", () => loadRooms());
+    EL.joinByCodeBtn?.addEventListener("click", joinRoomByCode);
+    EL.joinCode?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        joinRoomByCode();
+      }
+    });
     EL.roomForm?.addEventListener("submit", submitCreateRoom);
     EL.roomGrade?.addEventListener("change", () => fillSubjects(EL.roomSubject, EL.roomGrade.value, "Chọn môn"));
     EL.gradeFilter?.addEventListener("change", () => {
@@ -293,6 +302,20 @@
     }
     await loadRooms();
     openRoomScreen(roomId);
+  }
+
+  async function joinRoomByCode() {
+    const code = String(EL.joinCode?.value || "").trim().toUpperCase();
+    if (!code) {
+      alert("Hãy nhập mã phòng trước.");
+      return;
+    }
+    const room = GAME.rooms.find((item) => String(item.join_code || "").toUpperCase() === code);
+    if (!room) {
+      alert("Không tìm thấy phòng với mã này.");
+      return;
+    }
+    await joinRoom(room.id);
   }
 
   async function openRoomScreen(roomId) {
