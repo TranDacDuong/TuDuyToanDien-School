@@ -700,7 +700,7 @@ async function openPdfAttempt(examId) {
 }
 
 function renderPdfAttemptUI(exam, questions) {
-  PDF_EL.attemptNav.innerHTML = questions.map((question, idx) => `<div class="nav-pill" onclick="scrollPdfQuestion('${question.id}')" title="${escAttr(question.label || `Câu ${idx + 1}`)}">${idx + 1}<span id="pdfNavDot_${question.id}"></span></div>`).join("");
+  PDF_EL.attemptNav.innerHTML = questions.map((question, idx) => `<div class="nav-pill" id="pdfNav_${question.id}" onclick="scrollPdfQuestion('${question.id}')" title="${escAttr(question.label || `Câu ${idx + 1}`)}">${idx + 1}<span class="pill-dot" id="pdfNavDot_${question.id}"></span></div>`).join("");
   PDF_EL.attemptQuestions.innerHTML = questions.map((question, idx) => renderPdfAttemptQuestion(question, idx + 1)).join("");
   questions.forEach((question) => updatePdfNav(question.id));
   updatePdfAttemptClock();
@@ -758,8 +758,11 @@ function updatePdfTF(questionId) {
 }
 
 function updatePdfNav(questionId) {
+  const pill = document.getElementById(`pdfNav_${questionId}`);
   const dot = document.getElementById(`pdfNavDot_${questionId}`);
-  if (dot) dot.style.background = String(PDF_STATE.attemptAnswers[questionId] || "").trim() ? "var(--green)" : "var(--border)";
+  const answered = String(PDF_STATE.attemptAnswers[questionId] || "").trim().length > 0;
+  if (dot) dot.style.background = answered ? "var(--green)" : "var(--border)";
+  if (pill) pill.classList.toggle("active", answered);
 }
 
 function scrollPdfQuestion(questionId) {
