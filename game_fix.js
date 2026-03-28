@@ -59,6 +59,13 @@
 
   function sanitizeTree(root) {
     if (!root) return;
+    if (root.nodeType === Node.TEXT_NODE) {
+      const next = sanitizeText(root.nodeValue);
+      if (next !== root.nodeValue) root.nodeValue = next;
+      return;
+    }
+    if (root.nodeType !== Node.ELEMENT_NODE && root !== document && root !== document.body) return;
+
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
@@ -66,6 +73,7 @@
       const next = sanitizeText(node.nodeValue);
       if (next !== node.nodeValue) node.nodeValue = next;
     });
+
     root.querySelectorAll?.("input[placeholder], textarea[placeholder]").forEach((el) => {
       const next = sanitizeText(el.placeholder);
       if (next !== el.placeholder) el.placeholder = next;
@@ -86,8 +94,8 @@
     }
   }
 
-  function applyAll() {
-    sanitizeTree(document.body);
+  function applyAll(root = document.body) {
+    sanitizeTree(root);
     applyKnownLabels();
   }
 
@@ -105,6 +113,33 @@
     applyAll();
   }
 
-  const observer = new MutationObserver(() => applyAll());
-  observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+  let scheduledNodes = [];
+  let scheduled = false;
+
+  function flushScheduledNodes() {
+    scheduled = false;
+    const nodes = scheduledNodes;
+    scheduledNodes = [];
+    nodes.forEach((node) => sanitizeTree(node));
+    applyKnownLabels();
+  }
+
+  function scheduleSanitize(node) {
+    if (!node) return;
+    scheduledNodes.push(node);
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(flushScheduledNodes);
+  }
+
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.TEXT_NODE) {
+          scheduleSanitize(node);
+        }
+      });
+    });
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
 })();
