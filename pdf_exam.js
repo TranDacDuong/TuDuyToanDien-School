@@ -465,7 +465,11 @@ function renderPdfExamGrid() {
   });
   PDF_EL.empty.style.display = list.length ? "none" : "block";
   PDF_EL.grid.innerHTML = list.map(renderPdfExamCard).join("");
-  document.querySelectorAll("[data-open-pdf-exam]").forEach((button) => button.onclick = () => openPdfExamScreen(button.dataset.openPdfExam));
+  document.querySelectorAll("[data-open-pdf-exam]").forEach((button) => button.onclick = () => {
+    const examId = button.dataset.openPdfExam;
+    if (PDF_STATE.role === "student") openPdfAttempt(examId);
+    else openPdfExamScreen(examId);
+  });
   document.querySelectorAll("[data-edit-pdf-exam]").forEach((button) => button.onclick = () => openPdfExamModal(button.dataset.editPdfExam));
   document.querySelectorAll("[data-delete-pdf-exam]").forEach((button) => button.onclick = () => deletePdfExam(button.dataset.deletePdfExam));
 }
@@ -476,7 +480,7 @@ function renderPdfExamCard(exam) {
   const questions = getPdfQuestions(exam.id);
   const latest = getStudentLatestSubmitted(exam.id);
   const score = latest ? (latest.score_total ?? latest.score_auto ?? "?") : null;
-  return `<article class="card"><div class="card-cover"><div class="chips"><span class="pill light">${exam.status === "open" ? "Mở" : "Đóng"}</span><span class="pill light">${questions.length} câu</span>${latest ? `<span class="pill light">Đã làm ${score}/${exam.total_points || 0}đ</span>` : ""}</div><div><h3 style="margin:0;font-size:1.15rem;line-height:1.35">${esc(exam.title)}</h3><div style="margin-top:4px;font-size:.84rem;color:rgba(255,255,255,.82)">${esc(grade)} • ${esc(subject)}</div></div></div><div class="card-body"><div style="color:#607089;line-height:1.6">${linkify(esc(exam.description || "Đề PDF dùng Google Drive preview để hiển thị đề ở bên trái."))}</div><div class="meta"><div><span>Thời lượng</span><strong>${exam.duration_minutes || 0} phút</strong></div><div><span>Tổng điểm</span><strong>${exam.total_points || 0} điểm</strong></div></div><div class="actions"><button class="btn btn-outline" type="button" data-open-pdf-exam="${exam.id}">Xem chi tiết</button>${(PDF_STATE.role === "admin" || PDF_STATE.role === "teacher") ? `<button class="btn btn-outline" type="button" data-edit-pdf-exam="${exam.id}">Sửa</button><button class="btn btn-danger" type="button" data-delete-pdf-exam="${exam.id}">Xóa</button>` : ""}</div></div></article>`;
+  return `<article class="card"><div class="card-cover"><div class="chips"><span class="pill light">${exam.status === "open" ? "Mở" : "Đóng"}</span><span class="pill light">${questions.length} câu</span>${latest ? `<span class="pill light">Đã làm ${score}/${exam.total_points || 0}đ</span>` : ""}</div><div><h3 style="margin:0;font-size:1.15rem;line-height:1.35">${esc(exam.title)}</h3><div style="margin-top:4px;font-size:.84rem;color:rgba(255,255,255,.82)">${esc(grade)} • ${esc(subject)}</div></div></div><div class="card-body"><div style="color:#607089;line-height:1.6">${linkify(esc(exam.description || "Đề PDF dùng Google Drive preview để hiển thị đề ở bên trái."))}</div><div class="meta"><div><span>Thời lượng</span><strong>${exam.duration_minutes || 0} phút</strong></div><div><span>Tổng điểm</span><strong>${exam.total_points || 0} điểm</strong></div></div><div class="actions"><button class="btn btn-outline" type="button" data-open-pdf-exam="${exam.id}">${PDF_STATE.role === "student" ? "Làm bài" : "Xem chi tiết"}</button>${(PDF_STATE.role === "admin" || PDF_STATE.role === "teacher") ? `<button class="btn btn-outline" type="button" data-edit-pdf-exam="${exam.id}">Sửa</button><button class="btn btn-danger" type="button" data-delete-pdf-exam="${exam.id}">Xóa</button>` : ""}</div></div></article>`;
 }
 
 function openPdfExamModal(examId = null) {
