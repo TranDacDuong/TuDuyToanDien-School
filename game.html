@@ -32,6 +32,19 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
 .room-meta span{display:block;font-size:.75rem;color:var(--ink-light);margin-bottom:3px}
 .room-actions{display:flex;gap:8px;flex-wrap:wrap}
 .empty{padding:42px 20px;text-align:center;color:var(--ink-light);background:#fff;border:1px dashed rgba(39,58,91,.14);border-radius:18px}
+.insight-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(360px,.9fr);gap:18px;margin-top:24px}
+.stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.stat-card{background:#fff;border:1px solid rgba(39,58,91,.08);border-radius:18px;box-shadow:0 14px 32px rgba(15,23,42,.06);padding:16px}
+.stat-card span{display:block;font-size:.76rem;color:var(--ink-light);margin-bottom:6px}
+.stat-card strong{font-size:1.45rem;color:var(--navy)}
+.section-card{background:#fff;border:1px solid rgba(39,58,91,.08);border-radius:20px;box-shadow:0 14px 32px rgba(15,23,42,.06);padding:18px}
+.section-card h3{margin:0 0 12px;color:var(--navy)}
+.rank-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.rank-tab{padding:7px 12px;border:none;border-radius:999px;background:#eff6ff;color:var(--navy);font-weight:700;cursor:pointer}
+.rank-tab.active{background:var(--navy);color:var(--gold-light)}
+.history-list{display:grid;gap:10px}
+.history-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:16px;background:#f8fafc;border:1px solid rgba(39,58,91,.06)}
+.history-item strong{color:var(--navy)}
 .modal{position:fixed;inset:0;background:rgba(10,20,40,.48);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:24px;z-index:1000}
 .modal.show{display:flex}
 .modal-card{width:min(880px,100%);max-height:calc(100vh - 48px);overflow:auto;background:#fff;border-radius:20px;border-top:4px solid var(--gold);box-shadow:var(--shadow-lg)}
@@ -93,7 +106,7 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
 .medal.first{background:#f59e0b}.medal.second{background:#94a3b8}.medal.third{background:#b45309}.medal.normal{background:#1d4ed8}
 .hidden{display:none!important}
 @media(max-width:1024px){
-  .toolbar,.form-grid,.room-shell,.game-stage{grid-template-columns:1fr}
+  .toolbar,.form-grid,.room-shell,.game-stage,.insight-grid,.stats-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -130,6 +143,27 @@ body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 1
   <div id="gameRoomEmpty" class="empty hidden">
     <strong>Chưa có phòng nào phù hợp</strong>
     <div>Hãy đổi bộ lọc hoặc tạo một phòng mới để bắt đầu thi đấu.</div>
+  </div>
+</div>
+
+<div class="page" style="padding-top:0">
+  <div class="insight-grid">
+    <div style="display:grid;gap:18px">
+      <div id="gameStatsGrid" class="stats-grid"></div>
+      <div class="section-card">
+        <h3>Lá»‹ch sá»­ thi Ä‘áº¥u gáº§n Ä‘Ã¢y</h3>
+        <div id="gameHistoryList" class="history-list"></div>
+      </div>
+    </div>
+    <div class="section-card">
+      <h3>Báº£ng xáº¿p háº¡ng</h3>
+      <div class="rank-tabs">
+        <button class="rank-tab active" type="button" data-rank-period="day">HÃ´m nay</button>
+        <button class="rank-tab" type="button" data-rank-period="week">Tuáº§n</button>
+        <button class="rank-tab" type="button" data-rank-period="month">ThÃ¡ng</button>
+      </div>
+      <div id="gameGlobalLeaderboard" class="player-list leaderboard"></div>
+    </div>
   </div>
 </div>
 

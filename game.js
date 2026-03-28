@@ -12,6 +12,7 @@
     myAnswers: [],
     roomPoll: null,
     questionTick: null,
+    leaderboardPeriod: "day",
   };
 
   const EL = {
@@ -21,6 +22,9 @@
     statusFilter: document.getElementById("gameStatusFilter"),
     roomGrid: document.getElementById("gameRoomGrid"),
     roomEmpty: document.getElementById("gameRoomEmpty"),
+    statsGrid: document.getElementById("gameStatsGrid"),
+    historyList: document.getElementById("gameHistoryList"),
+    globalLeaderboard: document.getElementById("gameGlobalLeaderboard"),
     openRoomBtn: document.getElementById("openGameRoomBtn"),
     reloadRoomsBtn: document.getElementById("reloadGameRoomsBtn"),
     joinCode: document.getElementById("gameJoinCode"),
@@ -167,6 +171,13 @@
     EL.startGameBtn?.addEventListener("click", startGameMatch);
     EL.toggleReadyBtn?.addEventListener("click", toggleReadyState);
     EL.leaveGameBtn?.addEventListener("click", leaveRoom);
+    document.querySelectorAll("[data-rank-period]").forEach((button) => {
+      button.addEventListener("click", () => {
+        GAME.leaderboardPeriod = button.dataset.rankPeriod || "day";
+        document.querySelectorAll("[data-rank-period]").forEach((item) => item.classList.toggle("active", item === button));
+        renderArenaInsights();
+      });
+    });
   }
 
   function fillGrades(el, placeholder) {
@@ -195,6 +206,8 @@
     GAME.rooms = rooms || [];
     GAME.players = players || [];
     renderRooms();
+    await ensureArenaUserCache();
+    renderArenaInsights();
   }
 
   function renderRooms() {
@@ -262,6 +275,84 @@
             : `<button class="btn btn-outline" type="button" disabled>Đã khóa</button>`}
       </div>
     </div>`;
+  }
+
+  function getPeriodStart(period) {
+    const now = new Date();
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    if (period === "week") {
+      const day = start.getDay() || 7;
+      start.setDate(start.getDate() - day + 1);
+      return start;
+    }
+    if (period === "month") {
+      start.setDate(1);
+      return start;
+    }
+    return start;
+  }
+
+  function renderArenaInsights() {
+    const finishedRooms = GAME.rooms.filter((room) => room.status === "finished");
+    const finishedIds = new Set(finishedRooms.map((room) => room.id));
+    const finishedPlayers = GAME.players.filter((player) => finishedIds.has(player.room_id));
+    const myFinished = finishedPlayers.filter((player) => player.user_id === GAME.user.id);
+    const myBest = myFinished.reduce((max, item) => Math.max(max, Number(item.score || 0)), 0);
+    const totalMatches = myFinished.length;
+    const wins = myFinished.filter((player) => {
+      const sameRoom = finishedPlayers.filter((row) => row.room_id === player.room_id);
+      const best = sameRoom.reduce((max, row) => Math.max(max, Number(row.score || 0)), 0);
+      return Number(player.score || 0) === best;
+    }).length;
+    const avgScore = totalMatches ? Math.round(myFinished.reduce((sum, item) => sum + Number(item.score || 0), 0) / totalMatches) : 0;
+
+    if (EL.statsGrid) {
+      EL.statsGrid.innerHTML = `
+        <div class="stat-card"><span>Trận đã chơi</span><strong>${totalMatches}</strong></div>
+        <div class="stat-card"><span>Trận thắng</span><strong>${wins}</strong></div>
+        <div class="stat-card"><span>Điểm cao nhất</span><strong>${myBest}</strong></div>
+        <div class="stat-card"><span>Điểm trung bình</span><strong>${avgScore}</strong></div>
+      `;
+    }
+
+    const history = [...myFinished]
+      .sort((a, b) => new Date(getRoomById(b.room_id)?.ended_at || 0) - new Date(getRoomById(a.room_id)?.ended_at || 0))
+      .slice(0, 8);
+    if (EL.historyList) {
+      EL.historyList.innerHTML = history.length
+        ? history.map((player) => {
+          const room = getRoomById(player.room_id);
+          const sameRoom = finishedPlayers.filter((row) => row.room_id === player.room_id).sort((a, b) => (b.score || 0) - (a.score || 0));
+          const rank = sameRoom.findIndex((row) => row.user_id === GAME.user.id) + 1;
+          return `<div class="history-item"><div><strong>${esc(room?.title || "Phòng thi đấu")}</strong><div class="hint">${fmtDateTime(room?.ended_at || room?.created_at)}</div></div><div style="text-align:right"><strong>${player.score || 0} điểm</strong><div class="hint">Hạng #${Math.max(rank, 1)}</div></div></div>`;
+        }).join("")
+        : `<div class="empty">Bạn chưa có trận nào hoàn thành.</div>`;
+    }
+
+    const periodStart = getPeriodStart(GAME.leaderboardPeriod);
+    const scopedRooms = finishedRooms.filter((room) => new Date(room.ended_at || room.created_at) >= periodStart);
+    const scopedIds = new Set(scopedRooms.map((room) => room.id));
+    const totals = {};
+    finishedPlayers.filter((player) => scopedIds.has(player.room_id)).forEach((player) => {
+      if (!totals[player.user_id]) totals[player.user_id] = { score: 0, matches: 0 };
+      totals[player.user_id].score += Number(player.score || 0);
+      totals[player.user_id].matches += 1;
+    });
+    const leaderboard = Object.entries(totals)
+      .map(([userId, info]) => ({ userId, ...info }))
+      .sort((a, b) => b.score - a.score || b.matches - a.matches)
+      .slice(0, 10);
+
+    if (EL.globalLeaderboard) {
+      EL.globalLeaderboard.innerHTML = leaderboard.length
+        ? leaderboard.map((item, idx) => `<div class="player-row"><div class="player-main"><img class="avatar" src="${escAttr(getPlayerAvatar(item.userId))}" alt="avatar"><div><div style="font-weight:700;color:var(--navy)">${idx + 1}. ${esc(getPlayerName(item.userId))}</div><div class="hint">${item.matches} trận</div></div></div><strong style="color:var(--navy)">${item.score}</strong></div>`).join("")
+        : `<div class="empty">Chưa có dữ liệu bảng xếp hạng cho mốc thời gian này.</div>`;
+    }
+  }
+
+  function getRoomById(roomId) {
+    return GAME.rooms.find((room) => room.id === roomId) || null;
   }
 
   function openGameRoomModal() {
@@ -493,6 +584,18 @@
 
   async function ensurePlayerCache() {
     const ids = [...new Set((GAME.roomPlayers || []).map((item) => item.user_id))];
+    if (!ids.length) return;
+    window.__gameUserCache = window.__gameUserCache || {};
+    const missing = ids.filter((id) => !window.__gameUserCache[id]);
+    if (!missing.length) return;
+    const { data } = await sb.from("users").select("id,full_name,avatar_url").in("id", missing);
+    (data || []).forEach((user) => {
+      window.__gameUserCache[user.id] = user;
+    });
+  }
+
+  async function ensureArenaUserCache() {
+    const ids = [...new Set((GAME.players || []).map((item) => item.user_id))];
     if (!ids.length) return;
     window.__gameUserCache = window.__gameUserCache || {};
     const missing = ids.filter((id) => !window.__gameUserCache[id]);
