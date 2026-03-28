@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Game thi đấu</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(180deg,#f7ead8 0%,#f7f9fc 28%,#edf4ff 100%);font-family:var(--font-body);color:var(--ink)}
+.page{padding:24px;max-width:1280px;margin:0 auto}
+.hero{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;flex-wrap:wrap;margin-bottom:20px}
+.hero-copy{display:grid;gap:10px}
+.hero-copy h1{margin:0;font-family:var(--font-display);font-size:2rem;color:var(--navy)}
+.hero-copy p{margin:0;color:var(--ink-mid);max-width:760px;line-height:1.65}
+.hero-actions{display:flex;gap:10px;flex-wrap:wrap}
+.toolbar{display:grid;grid-template-columns:minmax(220px,1.2fr) repeat(2,minmax(160px,220px)) auto;gap:10px;margin-bottom:18px}
+.input,.select,textarea{width:100%;padding:11px 12px;border:1.5px solid rgba(39,58,91,.14);border-radius:12px;background:#fff;font:inherit;outline:none}
+.room-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.room-card{background:#fff;border:1px solid rgba(39,58,91,.08);border-radius:18px;box-shadow:0 16px 36px rgba(15,23,42,.06);padding:16px;display:grid;gap:12px}
+.room-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.room-title{font-size:1.05rem;font-weight:800;color:var(--navy)}
+.pill{display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;font-size:.75rem;font-weight:700}
+.pill.waiting{background:#fff7ed;color:#c2410c}
+.pill.live{background:#ecfeff;color:#0f766e}
+.pill.done{background:#eff6ff;color:#1d4ed8}
+.room-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.room-meta div{padding:10px 12px;border-radius:12px;background:#f8fafc;border:1px solid rgba(39,58,91,.06)}
+.room-meta span{display:block;font-size:.75rem;color:var(--ink-light);margin-bottom:3px}
+.room-actions{display:flex;gap:8px;flex-wrap:wrap}
+.empty{padding:42px 20px;text-align:center;color:var(--ink-light);background:#fff;border:1px dashed rgba(39,58,91,.14);border-radius:18px}
+.modal{position:fixed;inset:0;background:rgba(10,20,40,.48);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:24px;z-index:1000}
+.modal.show{display:flex}
+.modal-card{width:min(880px,100%);max-height:calc(100vh - 48px);overflow:auto;background:#fff;border-radius:20px;border-top:4px solid var(--gold);box-shadow:var(--shadow-lg)}
+.mh{display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid rgba(39,58,91,.1)}
+.mb{padding:20px 22px 24px}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.full{grid-column:1/-1}
+.field{display:grid;gap:8px}
+.field label{font-size:.78rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em}
+.hint{font-size:.78rem;color:var(--ink-light);line-height:1.6}
+.screen{position:fixed;inset:0;background:#eef3fb;display:none;flex-direction:column;z-index:900}
+.screen.show{display:flex}
+.topbar{height:64px;background:var(--navy);color:#fff;display:flex;align-items:center;gap:12px;padding:0 18px}
+.topbar h2{margin:0;flex:1;font-size:1.05rem}
+.screen-body{flex:1;overflow:auto;padding:20px 24px}
+.room-shell{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,.9fr);gap:18px}
+.panel{background:#fff;border:1px solid rgba(39,58,91,.08);border-radius:20px;box-shadow:0 14px 32px rgba(15,23,42,.06);padding:18px}
+.panel h3{margin:0 0 12px;color:var(--navy);font-size:1rem}
+.player-list{display:grid;gap:10px}
+.player-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:14px;background:#f8fafc;border:1px solid rgba(39,58,91,.06)}
+.player-main{display:flex;align-items:center;gap:10px}
+.avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;background:#e5e7eb}
+.leaderboard .player-row{background:#fff}
+.game-stage{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);gap:18px}
+.question-card{background:#fff;border:1px solid rgba(39,58,91,.08);border-radius:24px;box-shadow:0 18px 40px rgba(15,23,42,.08);padding:22px;display:grid;gap:16px}
+.question-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.question-head strong{font-size:1.02rem;color:var(--navy)}
+.question-text{font-size:1.02rem;line-height:1.75;white-space:pre-wrap}
+.question-img{max-width:100%;border-radius:16px;border:1px solid rgba(39,58,91,.1)}
+.options{display:grid;gap:10px}
+.option-btn{padding:12px 14px;border-radius:14px;border:1.5px solid rgba(39,58,91,.14);background:#fff;text-align:left;font:inherit;font-weight:600;cursor:pointer;transition:.15s}
+.option-btn:hover{border-color:var(--navy);background:#eff6ff}
+.option-btn.active{background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border-color:var(--navy);color:var(--navy)}
+.tf-grid{display:grid;gap:10px}
+.tf-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;border:1px solid rgba(39,58,91,.12);background:#fff}
+.tf-actions{display:flex;gap:8px}
+.tf-actions button{min-width:44px}
+.short-input{font-size:1rem}
+.score-box{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.score-box div{padding:12px 14px;border-radius:16px;background:#0f3c73;color:#fff}
+.score-box span{display:block;font-size:.76rem;color:rgba(255,255,255,.72);margin-bottom:4px}
+.big{font-size:1.35rem;font-weight:800;color:var(--gold-light)}
+.countdown{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);padding:8px 14px;border-radius:10px}
+.countdown strong{font-size:1.1rem;color:var(--gold-light);font-family:monospace}
+.results-grid{display:grid;gap:14px}
+.result-card{padding:14px 16px;border-radius:18px;background:#fff;border:1px solid rgba(39,58,91,.08);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.medal{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff}
+.medal.first{background:#f59e0b}.medal.second{background:#94a3b8}.medal.third{background:#b45309}.medal.normal{background:#1d4ed8}
+.hidden{display:none!important}
+@media(max-width:1024px){
+  .toolbar,.form-grid,.room-shell,.game-stage{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="page" id="gameListPage">
+  <div class="hero">
+    <div class="hero-copy">
+      <h1>Đấu trường tri thức</h1>
+      <p>Biến việc luyện đề thành một trận đấu thật sự. Học sinh có thể tạo phòng, mời bạn vào thi, trả lời câu hỏi nhanh để leo hạng và xem bảng xếp hạng ngay trong phòng.</p>
+    </div>
+    <div class="hero-actions">
+      <button class="btn btn-primary" type="button" id="openGameRoomBtn">+ Tạo phòng mới</button>
+      <button class="btn btn-outline" type="button" id="reloadGameRoomsBtn">Tải lại</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <input id="gameKeyword" class="input" placeholder="Tìm theo tên phòng hoặc mã phòng">
+    <select id="gameGradeFilter" class="select"><option value="">Tất cả khối</option></select>
+    <select id="gameSubjectFilter" class="select"><option value="">Tất cả môn</option></select>
+    <select id="gameStatusFilter" class="select">
+      <option value="">Tất cả trạng thái</option>
+      <option value="waiting">Đang chờ</option>
+      <option value="live">Đang đấu</option>
+      <option value="finished">Đã kết thúc</option>
+    </select>
+  </div>
+
+  <div id="gameRoomGrid" class="room-grid"></div>
+  <div id="gameRoomEmpty" class="empty hidden">
+    <strong>Chưa có phòng nào phù hợp</strong>
+    <div>Hãy đổi bộ lọc hoặc tạo một phòng mới để bắt đầu thi đấu.</div>
+  </div>
+</div>
+
+<div id="gameRoomModal" class="modal">
+  <div class="modal-card">
+    <div class="mh">
+      <h2>Tạo phòng thi đấu</h2>
+      <button class="btn btn-outline" type="button" onclick="closeGameRoomModal()">Đóng</button>
+    </div>
+    <div class="mb">
+      <form id="gameRoomForm">
+        <div class="form-grid">
+          <div class="field">
+            <label>Tên phòng</label>
+            <input id="gameRoomTitle" class="input" required>
+          </div>
+          <div class="field">
+            <label>Mã phòng</label>
+            <input id="gameRoomCode" class="input" maxlength="8" placeholder="Để trống sẽ tự tạo">
+          </div>
+          <div class="field">
+            <label>Khối</label>
+            <select id="gameRoomGrade" class="select" required></select>
+          </div>
+          <div class="field">
+            <label>Môn</label>
+            <select id="gameRoomSubject" class="select" required></select>
+          </div>
+          <div class="field">
+            <label>Số câu hỏi</label>
+            <input id="gameRoomQuestionCount" class="input" type="number" min="5" max="30" value="10" required>
+          </div>
+          <div class="field">
+            <label>Giây cho mỗi câu</label>
+            <input id="gameRoomTimePerQuestion" class="input" type="number" min="10" max="60" value="20" required>
+          </div>
+          <div class="field full">
+            <label>Mô tả</label>
+            <textarea id="gameRoomDescription" class="input" rows="3" placeholder="Ví dụ: Thi đấu 10 câu Toán 12 trong 1 lượt, ai nhanh và chính xác hơn sẽ thắng."></textarea>
+          </div>
+          <div class="field full">
+            <div class="hint">Bản đầu tiên sẽ dùng lại câu hỏi từ <b>Ngân hàng câu hỏi</b>, ưu tiên các câu trắc nghiệm, đúng/sai và trả lời ngắn. Tự luận sẽ chưa đưa vào game để giữ nhịp thi đấu nhanh.</div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
+          <button class="btn btn-outline" type="button" onclick="closeGameRoomModal()">Hủy</button>
+          <button class="btn btn-primary" type="submit">Tạo phòng</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="gameRoomScreen" class="screen">
+  <div class="topbar">
+    <button class="btn btn-outline btn-sm" type="button" onclick="closeGameScreen()">← Quay lại</button>
+    <h2 id="gameRoomScreenTitle">Phòng thi đấu</h2>
+    <button class="btn btn-primary btn-sm hidden" id="startGameBtn" type="button">Bắt đầu trận</button>
+  </div>
+  <div class="screen-body">
+    <div id="gameWaitingView" class="room-shell">
+      <div class="panel">
+        <h3>Thông tin phòng</h3>
+        <div class="room-meta" id="gameRoomSummary"></div>
+        <div class="hint" id="gameRoomDescriptionView" style="margin-top:12px"></div>
+      </div>
+      <div class="panel">
+        <h3>Người chơi trong phòng</h3>
+        <div id="gamePlayerList" class="player-list"></div>
+      </div>
+    </div>
+
+    <div id="gameLiveView" class="game-stage hidden">
+      <div class="question-card">
+        <div class="question-head">
+          <strong id="gameQuestionTitle">Câu hỏi</strong>
+          <div class="countdown"><span>Còn lại</span><strong id="gameQuestionClock">00</strong></div>
+        </div>
+        <div id="gameQuestionBody" class="question-text"></div>
+        <img id="gameQuestionImg" class="question-img hidden" alt="question">
+      </div>
+      <div style="display:grid;gap:18px">
+        <div class="panel">
+          <h3>Đáp án của bạn</h3>
+          <div id="gameAnswerArea"></div>
+        </div>
+        <div class="panel">
+          <h3>Bảng xếp hạng</h3>
+          <div class="score-box" style="margin-bottom:12px">
+            <div><span>Điểm của bạn</span><strong class="big" id="myGameScore">0</strong></div>
+            <div><span>Hạng hiện tại</span><strong class="big" id="myGameRank">#-</strong></div>
+          </div>
+          <div id="gameLeaderboard" class="player-list leaderboard"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="gameFinishedView" class="hidden">
+      <div class="panel">
+        <h3>Kết quả trận đấu</h3>
+        <div id="gameFinishedMeta" class="hint" style="margin-bottom:14px"></div>
+        <div id="gameResultsList" class="results-grid"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

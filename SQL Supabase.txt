@@ -1505,3 +1505,220 @@ BEGIN
 END $$;
 
 CREATE INDEX IF NOT EXISTS course_sessions_pdf_exam_idx ON public.course_sessions (pdf_exam_id);
+
+-- Game thi dau
+CREATE TABLE IF NOT EXISTS public.game_rooms (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  join_code text NOT NULL,
+  description text,
+  grade_id uuid NOT NULL,
+  subject_id uuid NOT NULL,
+  question_count integer NOT NULL DEFAULT 10,
+  time_per_question integer NOT NULL DEFAULT 20,
+  status text NOT NULL DEFAULT 'waiting'
+    CHECK (status IN ('waiting', 'live', 'finished')),
+  host_id uuid NOT NULL,
+  created_by uuid NOT NULL,
+  started_at timestamp with time zone,
+  ended_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT game_rooms_pkey PRIMARY KEY (id),
+  CONSTRAINT game_rooms_join_code_key UNIQUE (join_code),
+  CONSTRAINT game_rooms_grade_id_fkey FOREIGN KEY (grade_id) REFERENCES public.grades(id) ON DELETE CASCADE,
+  CONSTRAINT game_rooms_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES public.subjects(id) ON DELETE CASCADE,
+  CONSTRAINT game_rooms_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.users(id) ON DELETE CASCADE,
+  CONSTRAINT game_rooms_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS public.game_room_players (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  room_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  score integer NOT NULL DEFAULT 0,
+  joined_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT game_room_players_pkey PRIMARY KEY (id),
+  CONSTRAINT game_room_players_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.game_rooms(id) ON DELETE CASCADE,
+  CONSTRAINT game_room_players_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS game_room_players_unique
+  ON public.game_room_players (room_id, user_id);
+
+CREATE TABLE IF NOT EXISTS public.game_room_questions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  room_id uuid NOT NULL,
+  order_no integer NOT NULL,
+  question_id uuid,
+  question_type text NOT NULL
+    CHECK (question_type IN ('multi_choice', 'true_false', 'short_answer')),
+  question_text text,
+  question_img text,
+  answer text NOT NULL,
+  answer_count integer NOT NULL DEFAULT 4,
+  points integer NOT NULL DEFAULT 100,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT game_room_questions_pkey PRIMARY KEY (id),
+  CONSTRAINT game_room_questions_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.game_rooms(id) ON DELETE CASCADE,
+  CONSTRAINT game_room_questions_question_id_fkey FOREIGN KEY (question_id) REFERENCES public.question_bank(id) ON DELETE SET NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS game_room_questions_unique
+  ON public.game_room_questions (room_id, order_no);
+
+CREATE TABLE IF NOT EXISTS public.game_room_answers (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  room_id uuid NOT NULL,
+  player_id uuid NOT NULL,
+  game_question_id uuid NOT NULL,
+  answer text,
+  is_correct boolean,
+  score_earned integer NOT NULL DEFAULT 0,
+  response_ms integer,
+  answered_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT game_room_answers_pkey PRIMARY KEY (id),
+  CONSTRAINT game_room_answers_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.game_rooms(id) ON DELETE CASCADE,
+  CONSTRAINT game_room_answers_player_id_fkey FOREIGN KEY (player_id) REFERENCES public.game_room_players(id) ON DELETE CASCADE,
+  CONSTRAINT game_room_answers_question_id_fkey FOREIGN KEY (game_question_id) REFERENCES public.game_room_questions(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS game_room_answers_unique
+  ON public.game_room_answers (player_id, game_question_id);
+
+CREATE INDEX IF NOT EXISTS game_rooms_status_created_idx
+  ON public.game_rooms (status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS game_room_players_room_score_idx
+  ON public.game_room_players (room_id, score DESC, joined_at ASC);
+
+CREATE INDEX IF NOT EXISTS game_room_answers_room_player_idx
+  ON public.game_room_answers (room_id, player_id);
+
+ALTER TABLE public.game_rooms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.game_room_players ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.game_room_questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.game_room_answers ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS game_rooms_select_policy ON public.game_rooms;
+CREATE POLICY game_rooms_select_policy ON public.game_rooms
+FOR SELECT
+USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS game_rooms_insert_policy ON public.game_rooms;
+CREATE POLICY game_rooms_insert_policy ON public.game_rooms
+FOR INSERT
+WITH CHECK (
+  auth.uid() = created_by
+  AND auth.uid() = host_id
+);
+
+DROP POLICY IF EXISTS game_rooms_update_policy ON public.game_rooms;
+CREATE POLICY game_rooms_update_policy ON public.game_rooms
+FOR UPDATE
+USING (
+  host_id = auth.uid()
+  OR created_by = auth.uid()
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+)
+WITH CHECK (
+  host_id = auth.uid()
+  OR created_by = auth.uid()
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS game_room_players_select_policy ON public.game_room_players;
+CREATE POLICY game_room_players_select_policy ON public.game_room_players
+FOR SELECT
+USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS game_room_players_insert_policy ON public.game_room_players;
+CREATE POLICY game_room_players_insert_policy ON public.game_room_players
+FOR INSERT
+WITH CHECK (
+  user_id = auth.uid()
+  OR EXISTS (
+    SELECT 1 FROM public.game_rooms r
+    WHERE r.id = room_id AND r.host_id = auth.uid()
+  )
+);
+
+DROP POLICY IF EXISTS game_room_players_update_policy ON public.game_room_players;
+CREATE POLICY game_room_players_update_policy ON public.game_room_players
+FOR UPDATE
+USING (
+  user_id = auth.uid()
+  OR EXISTS (
+    SELECT 1 FROM public.game_rooms r
+    WHERE r.id = room_id AND r.host_id = auth.uid()
+  )
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+)
+WITH CHECK (
+  user_id = auth.uid()
+  OR EXISTS (
+    SELECT 1 FROM public.game_rooms r
+    WHERE r.id = room_id AND r.host_id = auth.uid()
+  )
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS game_room_questions_select_policy ON public.game_room_questions;
+CREATE POLICY game_room_questions_select_policy ON public.game_room_questions
+FOR SELECT
+USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS game_room_questions_insert_policy ON public.game_room_questions;
+CREATE POLICY game_room_questions_insert_policy ON public.game_room_questions
+FOR INSERT
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.game_rooms r
+    WHERE r.id = room_id AND r.host_id = auth.uid()
+  )
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS game_room_questions_delete_policy ON public.game_room_questions;
+CREATE POLICY game_room_questions_delete_policy ON public.game_room_questions
+FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.game_rooms r
+    WHERE r.id = room_id AND r.host_id = auth.uid()
+  )
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS game_room_answers_select_policy ON public.game_room_answers;
+CREATE POLICY game_room_answers_select_policy ON public.game_room_answers
+FOR SELECT
+USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS game_room_answers_insert_policy ON public.game_room_answers;
+CREATE POLICY game_room_answers_insert_policy ON public.game_room_answers
+FOR INSERT
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.game_room_players p
+    WHERE p.id = player_id AND p.user_id = auth.uid()
+  )
+);
