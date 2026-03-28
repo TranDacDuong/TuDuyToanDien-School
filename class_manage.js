@@ -683,7 +683,8 @@
 
     const [
       {data:regularExams,error:regularExamsError},
-      {data:pdfExams,error:pdfExamsError}
+      {data:pdfExams,error:pdfExamsError},
+      {data:pdfQuestionRows,error:pdfQuestionRowsError}
     ] = await Promise.all([
       regularIds.length
         ? sb.from("exams")
@@ -694,17 +695,27 @@
         ? sb.from("pdf_exams")
             .select("id,title,duration_minutes,total_points")
             .in("id", pdfIds)
+        : Promise.resolve({data:[],error:null}),
+      pdfIds.length
+        ? sb.from("pdf_exam_questions")
+            .select("pdf_exam_id,question_type")
+            .in("pdf_exam_id", pdfIds)
         : Promise.resolve({data:[],error:null})
     ]);
 
-    if(regularExamsError || pdfExamsError){
-      const msg = regularExamsError?.message || pdfExamsError?.message || "Không thể tải danh sách đề thi.";
+    if(regularExamsError || pdfExamsError || pdfQuestionRowsError){
+      const msg = regularExamsError?.message || pdfExamsError?.message || pdfQuestionRowsError?.message || "Không thể tải danh sách đề thi.";
       tc.innerHTML = '<p style="color:var(--red);font-size:.85rem;padding:12px">Lỗi tải đề thi: '+esc(msg)+'</p>';
       return;
     }
 
     const regularMap = Object.fromEntries((regularExams||[]).map(ex => [ex.id, ex]));
     const pdfMap = Object.fromEntries((pdfExams||[]).map(ex => [ex.id, ex]));
+    const pdfQuestionTypeMap = {};
+    (pdfQuestionRows||[]).forEach(row => {
+      if(!pdfQuestionTypeMap[row.pdf_exam_id]) pdfQuestionTypeMap[row.pdf_exam_id] = [];
+      pdfQuestionTypeMap[row.pdf_exam_id].push(row.question_type);
+    });
 
     const exams=(classExams||[]).map(ce=>{
       const regularExam = ce.exam_id ? regularMap[ce.exam_id] : null;
@@ -730,6 +741,7 @@
           title:pdfExam.title + " (PDF)",
           duration_minutes:pdfExam.duration_minutes,
           total_points:pdfExam.total_points,
+          question_types: pdfQuestionTypeMap[pdfExam.id] || [],
           class_exam_id: ce.id,
           starts_at: ce.starts_at,
           ends_at:   ce.ends_at,
@@ -761,15 +773,23 @@
     const sb=getSb();
     const uid=window._currentUserId;
     const examIds=exams.filter(e=>e.type==="exam").map(e=>e.id);
+    const pdfIds=exams.filter(e=>e.type==="pdf").map(e=>e.id);
     const {data:myResults,error:myResultsError}=examIds.length
       ? await sb.from("exam_results")
           .select("id,exam_id,attempt_no,submitted_at,score_auto,score_essay,score_total,seconds_left")
           .eq("student_id",uid).eq("class_id",_classId).in("exam_id",examIds)
           .order("attempt_no",{ascending:false})
       : {data:[],error:null};
+    const {data:myPdfResults,error:myPdfResultsError}=pdfIds.length
+      ? await sb.from("pdf_exam_results")
+          .select("id,pdf_exam_id,attempt_no,submitted_at,score_auto,score_total,seconds_left")
+          .eq("student_id",uid).eq("class_id",_classId).in("pdf_exam_id",pdfIds)
+          .order("attempt_no",{ascending:false})
+      : {data:[],error:null};
 
-    if(myResultsError){
-      tc.innerHTML = addExamBtn + '<p style="color:var(--red);font-size:.85rem;padding:12px">Lỗi tải bài làm: '+esc(myResultsError.message)+'</p>';
+    if(myResultsError || myPdfResultsError){
+      const msg = myResultsError?.message || myPdfResultsError?.message || "Không thể tải bài làm.";
+      tc.innerHTML = addExamBtn + '<p style="color:var(--red);font-size:.85rem;padding:12px">Lỗi tải bài làm: '+esc(msg)+'</p>';
       return;
     }
 
@@ -778,17 +798,75 @@
       if(!resultsMap[r.exam_id]) resultsMap[r.exam_id]=[];
       resultsMap[r.exam_id].push(r);
     });
+    const pdfResultsMap={};
+    (myPdfResults||[]).forEach(r=>{
+      if(!pdfResultsMap[r.pdf_exam_id]) pdfResultsMap[r.pdf_exam_id]=[];
+      pdfResultsMap[r.pdf_exam_id].push(r);
+    });
 
     const now=new Date();
     const examsHtml=exams.map(ex=>{
       if(ex.type==="pdf"){
+        const results = pdfResultsMap[ex.id]||[];
+        const submitted = results.filter(r=>r.submitted_at);
+        const lastResult = submitted[0]||null;
+        const inProgress = (submitted.length===0)
+          ? (results.find(r=>!r.submitted_at&&r.seconds_left>0)||null)
+          : null;
+        const pdfHasEssay=(ex.question_types||[]).includes("essay");
+        let canDo=true, scheduleNote="";
+        if(ex.starts_at&&ex.ends_at){
+          const startDt=new Date(ex.starts_at), endDt=new Date(ex.ends_at);
+          if(now<startDt){canDo=false;scheduleNote="Chưa đến giờ thi";}
+          else if(now>endDt){canDo=false;scheduleNote="Đã hết giờ thi";}
+          else scheduleNote="Đang trong giờ thi";
+        }
+        const schStr=ex.starts_at&&ex.ends_at
+          ?"🕐 "+fmtDT(ex.starts_at)+" → "+fmtDT(ex.ends_at)
+          :"🗓 Không giới hạn";
+        let scoreBadge="";
+        if(lastResult){
+          const score=lastResult.score_total??lastResult.score_auto??"?";
+          const pendingEssay=pdfHasEssay&&lastResult.score_total===null;
+          scoreBadge='<span style="background:#dcfce7;color:#15803d;font-size:.78rem;font-weight:700;'+
+            'padding:3px 10px;border-radius:20px;white-space:nowrap">✓ '+score+" / "+ex.total_points+" đ</span>"+
+            (pendingEssay?' <span style="background:#fef3c7;color:#b45309;font-size:.72rem;padding:2px 8px;border-radius:20px">⏳ Chờ chấm tự luận</span>':"");
+          scoreBadge+=' <button onclick="window.open(\'pdf_exam.html?exam='+encodeURIComponent(ex.id)+'&classId='+encodeURIComponent(_classId)+'&action=review&resultId='+encodeURIComponent(lastResult.id)+'\',\'_blank\')" '+
+            'class="btn btn-outline btn-sm" style="font-size:.75rem">Xem lại</button>';
+        }
+        let actionBtn="";
+        if(!canDo&&(ex.starts_at||ex.ends_at)){
+          actionBtn='<div style="font-size:.75rem;color:var(--ink-mid);padding:6px 10px;'+
+            'background:var(--surface);border-radius:8px;white-space:nowrap">'+scheduleNote+"</div>";
+        } else if(inProgress){
+          const secsLeft=Math.max(0,(inProgress.seconds_left||0)-300);
+          const minLeft=Math.floor(secsLeft/60), secLeft2=secsLeft%60;
+          const timeStr=minLeft+":"+String(secLeft2).padStart(2,"0");
+          actionBtn='<button onclick="window.open(\'pdf_exam.html?exam='+encodeURIComponent(ex.id)+'&classId='+encodeURIComponent(_classId)+'\',\'_blank\')" '+
+            'style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;'+
+            'padding:8px 14px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;'+
+            'white-space:nowrap;font-family:var(--font-body);flex-shrink:0">Làm bài tiếp ('+timeStr+")</button>";
+        } else if(lastResult&&!pdfHasEssay){
+          actionBtn='<div style="font-size:.78rem;font-weight:600;color:var(--green);padding:6px 12px;'+
+            'background:#dcfce7;border-radius:8px;white-space:nowrap">Đã hoàn thành</div>'+
+            '<button onclick="window.open(\'pdf_exam.html?exam='+encodeURIComponent(ex.id)+'&classId='+encodeURIComponent(_classId)+'&action=review&resultId='+encodeURIComponent(lastResult.id)+'\',\'_blank\')" '+
+            'class="btn btn-outline btn-sm" style="font-size:.78rem">Xem lại</button>';
+        } else if(submitted.length>0){
+          actionBtn="";
+        } else {
+          actionBtn='<button onclick="window.open(\'pdf_exam.html?exam='+encodeURIComponent(ex.id)+'&classId='+encodeURIComponent(_classId)+'\',\'_blank\')" '+
+            'style="background:linear-gradient(135deg,var(--navy),var(--navy-mid));color:var(--gold-light);'+
+            'border:none;padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;'+
+            'white-space:nowrap;font-family:var(--font-body);flex-shrink:0">Làm bài</button>';
+        }
         return `<div style="border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-          <div>
+          <div style="flex:1;min-width:0">
             <div style="font-weight:700;color:var(--navy);font-size:.95rem">${esc(ex.title)}</div>
-            <div style="font-size:.82rem;color:var(--ink-mid)">PDF • ${ex.duration_minutes||0} phút • ${ex.total_points||0} điểm</div>
+            <div style="font-size:.75rem;color:var(--ink-mid)">📄 PDF • ⏱ ${ex.duration_minutes||0} phút • 🏆 ${ex.total_points||0} điểm • ${schStr}</div>
+            ${(scheduleNote&&canDo)?'<div style="font-size:.72rem;color:#16a34a;margin-top:2px">'+scheduleNote+'</div>':""}
           </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <button class="btn btn-primary btn-sm" type="button" onclick="window.open('pdf_exam.html?exam=${encodeURIComponent(ex.id)}&classId=${encodeURIComponent(_classId)}','_blank')">Làm bài</button>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            ${scoreBadge}${actionBtn}
           </div>
         </div>`;
       }

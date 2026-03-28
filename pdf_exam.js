@@ -140,6 +140,7 @@ function handlePdfRouteParams() {
   PDF_STATE.courseId = params.get("courseId") || null;
   const examId = params.get("exam");
   const action = params.get("action");
+  const resultId = params.get("resultId");
   if (!examId && action === "create" && (PDF_STATE.role === "admin" || PDF_STATE.role === "teacher")) {
     openPdfExamModal();
     return;
@@ -147,6 +148,11 @@ function handlePdfRouteParams() {
   if (!examId) return;
   if (action === "edit" && (PDF_STATE.role === "admin" || PDF_STATE.role === "teacher")) {
     openPdfExamModal(examId);
+    return;
+  }
+  if (action === "review" && resultId) {
+    const title = PDF_STATE.exams.find((item) => item.id === examId)?.title || "Đề PDF";
+    openPdfReview(resultId, title);
     return;
   }
   if (PDF_STATE.role === "student") openPdfAttempt(examId);
