@@ -74,6 +74,10 @@ const PDF_EL = {
   detailPaneOpenLink: document.getElementById("pdfDetailPaneOpenLink"),
 };
 
+function setPdfRouteLoading(active) {
+  document.documentElement.classList.toggle("pdf-route-loading", !!active);
+}
+
 bindPdfEvents();
 initPdfExam();
 
@@ -142,11 +146,16 @@ function handlePdfRouteParams() {
   const action = params.get("action");
   const resultId = params.get("resultId");
   if (!examId && action === "create" && (PDF_STATE.role === "admin" || PDF_STATE.role === "teacher")) {
+    setPdfRouteLoading(false);
     openPdfExamModal();
     return;
   }
-  if (!examId) return;
+  if (!examId) {
+    setPdfRouteLoading(false);
+    return;
+  }
   if (action === "edit" && (PDF_STATE.role === "admin" || PDF_STATE.role === "teacher")) {
+    setPdfRouteLoading(false);
     openPdfExamModal(examId);
     return;
   }
@@ -180,6 +189,7 @@ async function loadPdfData(reopenScreen) {
 
   const firstError = examErr || questionErr || resultErr || answerErr;
   if (firstError) {
+    setPdfRouteLoading(false);
     PDF_EL.grid.innerHTML = `<div class="empty"><strong>Không tải được Đề PDF</strong><div>${esc(firstError.message)}</div></div>`;
     PDF_EL.empty.style.display = "none";
     return;
@@ -635,6 +645,7 @@ function openPdfExamScreen(examId) {
   if (!exam) return;
   PDF_STATE.activeExamId = examId;
   PDF_EL.screen.classList.add("show");
+  setPdfRouteLoading(false);
   PDF_EL.screenTitle.textContent = exam.title || "Chi tiết đề PDF";
   const grade = PDF_STATE.grades.find((item) => item.id === exam.grade_id)?.name || "Chưa chọn khối";
   const subject = PDF_STATE.subjects.find((item) => item.id === exam.subject_id)?.name || "Chưa chọn môn";
@@ -711,6 +722,7 @@ async function openPdfAttempt(examId) {
   if (PDF_EL.pdfFrame) PDF_EL.pdfFrame.src = getPdfPreviewUrl(exam);
   if (PDF_EL.pdfPaneOpenLink) PDF_EL.pdfPaneOpenLink.href = getPdfOpenUrl(exam);
   renderPdfAttemptUI(exam, questions);
+  setPdfRouteLoading(false);
   startPdfAttemptTimer();
 }
 
@@ -904,6 +916,7 @@ async function openPdfReview(resultId, title) {
   PDF_EL.submissionTitle.textContent = `Xem lại bài - ${title}`;
   PDF_EL.submissionBody.innerHTML = `<div class="review-wrap"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><div style="font-weight:700;color:var(--navy)">${esc(title)}</div><div class="hint">Kết quả bài làm đề PDF</div></div><div style="font-size:.92rem;color:var(--ink-mid)">Tự động: <b>${result?.score_auto ?? 0}</b><br><span style="color:var(--navy);font-weight:700">Tổng: ${result?.score_total ?? "Chưa chấm"} / ${exam?.total_points || 0}</span></div></div>${questions.map((question, idx) => renderPdfReviewCard(question, answerMap[question.id], idx + 1)).join("")}</div>`;
   PDF_EL.submissionModal.classList.add("show");
+  setPdfRouteLoading(false);
 }
 
 function renderPdfReviewCard(question, answerRow, index) {

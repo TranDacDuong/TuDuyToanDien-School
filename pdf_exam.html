@@ -9,6 +9,12 @@
 <style>
 *{box-sizing:border-box}
 body{margin:0;padding:24px;background:var(--cream);font-family:var(--font-body);color:var(--ink)}
+html.pdf-route-loading body{overflow:hidden}
+html.pdf-route-loading body>*{visibility:hidden}
+html.pdf-route-loading #pdfAttemptShell,
+html.pdf-route-loading #pdfSubmissionModal,
+html.pdf-route-loading #pdfExamModal{visibility:visible}
+html.pdf-route-loading body::before{content:"Đang mở đề...";position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(238,243,251,.96);color:var(--navy);font-size:1rem;font-weight:700;z-index:2000}
 .page-hd{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:20px}
 .page-hd h1{margin:0;font-family:var(--font-display);font-size:1.45rem;color:var(--navy);display:flex;align-items:center;gap:10px}
 .page-hd h1::before{content:'';width:4px;height:24px;border-radius:3px;background:linear-gradient(180deg,var(--gold),var(--gold-light))}
@@ -123,6 +129,14 @@ textarea{min-height:110px;resize:vertical}
 @media(max-width:1080px){.toolbar,.form-grid,.answer-card-bd,.detail-layout{grid-template-columns:1fr}.question-actions{align-items:flex-start;flex-direction:row;flex-wrap:wrap}.exam-body{grid-template-columns:1fr}.pdf-pane{min-height:360px}.detail-preview{min-height:360px}}
 @media(max-width:1080px){.draft-answer-topline,.draft-answer-bottomline{grid-template-columns:1fr}}
 </style>
+<script>
+(() => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("exam") || params.get("action") || params.get("resultId")) {
+    document.documentElement.classList.add("pdf-route-loading");
+  }
+})();
+</script>
 </head>
 <body>
 <div class="page-hd">
