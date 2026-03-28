@@ -4,6 +4,8 @@
     role: "student",
     grades: [],
     subjects: [],
+    classes: [],
+    classIds: [],
     friends: [],
     roomsRaw: [],
     rooms: [],
@@ -45,6 +47,7 @@
     roomCode: document.getElementById("gameRoomCode"),
     roomVisibility: document.getElementById("gameRoomVisibility"),
     roomMaxPlayers: document.getElementById("gameRoomMaxPlayers"),
+    roomClass: document.getElementById("gameRoomClass"),
     roomGrade: document.getElementById("gameRoomGrade"),
     roomSubject: document.getElementById("gameRoomSubject"),
     roomQuestionCount: document.getElementById("gameRoomQuestionCount"),
@@ -162,10 +165,11 @@
     fillGrades(EL.roomGrade, "Chọn khối");
     fillSubjects(EL.subjectFilter, "", "Tất cả môn");
     fillSubjects(EL.roomSubject, "", "Chọn môn");
+    fillClasses(EL.roomClass, "Không gắn lớp");
 
     bindEvents();
     setupListRealtime();
-    await Promise.all([loadRooms(), loadFriends()]);
+    await Promise.all([loadRooms(), loadFriends(), loadAccessibleClasses()]);
   }
 
   function bindEvents() {
@@ -241,6 +245,11 @@
     el.innerHTML = `<option value="">${placeholder}</option>` + list.map((subject) => `<option value="${subject.id}">${esc(subject.name)}</option>`).join("");
   }
 
+  function fillClasses(el, placeholder) {
+    if (!el) return;
+    el.innerHTML = `<option value="">${placeholder}</option>` + (GAME.classes || []).map((item) => `<option value="${item.id}">${esc(item.class_name)}</option>`).join("");
+  }
+
   function roomVisibilityLabel(value) {
     return value === "private" ? "Riêng tư" : "Công khai";
   }
@@ -251,6 +260,16 @@
 
   function roomHasCapacity(room) {
     return roomPlayerCount(room.id) < Number(room.max_players || 8);
+  }
+
+  function canAccessClassRoom(room) {
+    if (!room?.class_id) return true;
+    if (GAME.role === "admin") return true;
+    return (GAME.classIds || []).includes(room.class_id);
+  }
+
+  function getClassName(classId) {
+    return GAME.classes.find((item) => item.id === classId)?.class_name || "Lớp liên kết";
   }
 
   function getRoomSortValue(room, mode) {
@@ -311,6 +330,7 @@
   function filterVisibleRooms(rooms) {
     const playerMap = buildRoomPlayerMap();
     return (rooms || []).filter((room) => {
+      if (!canAccessClassRoom(room)) return false;
       if ((room.visibility || "public") !== "private") return true;
       if (room.host_id === GAME.user?.id) return true;
       return (playerMap[room.id] || []).some((player) => player.user_id === GAME.user?.id);
@@ -337,6 +357,29 @@
     GAME.friends.forEach((user) => {
       window.__gameUserCache[user.id] = user;
     });
+  }
+
+  async function loadAccessibleClasses() {
+    const tasks = [
+      sb.from("classes").select("id,class_name,grade_id,subject_id,created_by,hidden").eq("created_by", GAME.user.id),
+      sb.from("class_teachers").select("class_id").eq("teacher_id", GAME.user.id),
+      sb.from("class_students").select("class_id").eq("student_id", GAME.user.id).is("left_at", null),
+    ];
+    const [createdRes, teacherRes, studentRes] = await Promise.all(tasks);
+    const ids = new Set();
+    (createdRes.data || []).forEach((row) => ids.add(row.id));
+    (teacherRes.data || []).forEach((row) => row.class_id && ids.add(row.class_id));
+    (studentRes.data || []).forEach((row) => row.class_id && ids.add(row.class_id));
+    if (!ids.size) {
+      GAME.classes = [];
+      GAME.classIds = [];
+      fillClasses(EL.roomClass, "Không gắn lớp");
+      return;
+    }
+    const { data: classes } = await sb.from("classes").select("id,class_name,grade_id,subject_id,hidden").in("id", [...ids]).eq("hidden", false).order("class_name");
+    GAME.classes = classes || [];
+    GAME.classIds = (GAME.classes || []).map((item) => item.id);
+    fillClasses(EL.roomClass, "Không gắn lớp");
   }
 
   async function copyText(text, successMessage) {
@@ -411,6 +454,7 @@
     const joined = players.some((player) => player.user_id === GAME.user.id);
     const grade = GAME.grades.find((item) => item.id === room.grade_id)?.name || "—";
     const subject = GAME.subjects.find((item) => item.id === room.subject_id)?.name || "—";
+    const className = room.class_id ? getClassName(room.class_id) : "";
     const visibility = roomVisibilityLabel(room.visibility || "public");
     const statusLabel = room.status === "waiting" ? "Đang chờ" : room.status === "live" ? "Đang đấu" : "Đã kết thúc";
     const statusClass = room.status === "waiting" ? "waiting" : room.status === "live" ? "live" : "done";
@@ -422,6 +466,7 @@
         <div>
           <div class="room-title">${esc(room.title || "Phòng thi đấu")}</div>
           <div class="hint">Mã phòng: <b>${esc(room.join_code || "—")}</b></div>
+          ${className ? `<div class="hint">Lớp: <b>${esc(className)}</b></div>` : ""}
         </div>
         <span class="pill ${statusClass}">${statusLabel}</span>
       </div>
@@ -622,6 +667,7 @@
     EL.roomCode.value = randomCode();
     if (EL.roomVisibility) EL.roomVisibility.value = "public";
     if (EL.roomMaxPlayers) EL.roomMaxPlayers.value = "8";
+    if (EL.roomClass) EL.roomClass.value = "";
     fillSubjects(EL.roomSubject, EL.roomGrade.value, "Chọn môn");
     EL.roomModal.classList.add("show");
   }
@@ -640,6 +686,7 @@
       question_count: Number(EL.roomQuestionCount.value || 10),
       time_per_question: Number(EL.roomTimePerQuestion.value || 20),
       max_players: Number(EL.roomMaxPlayers?.value || 8),
+      class_id: EL.roomClass?.value || null,
       description: String(EL.roomDescription.value || "").trim(),
       visibility: EL.roomVisibility?.value || "public",
       status: "waiting",
@@ -661,6 +708,10 @@
     const room = (GAME.roomsRaw || []).find((item) => item.id === roomId);
     if (!room) {
       alert("Không tìm thấy phòng này.");
+      return;
+    }
+    if (!canAccessClassRoom(room) && !GAME.players.some((player) => player.room_id === roomId && player.user_id === GAME.user.id)) {
+      alert("Phòng này chỉ dành cho học sinh hoặc giáo viên của lớp được liên kết.");
       return;
     }
     if (!roomHasCapacity(room) && !GAME.players.some((player) => player.room_id === roomId && player.user_id === GAME.user.id)) {
@@ -838,6 +889,7 @@
     if (!room) return;
     const grade = GAME.grades.find((item) => item.id === room.grade_id)?.name || "—";
     const subject = GAME.subjects.find((item) => item.id === room.subject_id)?.name || "—";
+    const className = room.class_id ? getClassName(room.class_id) : "";
     const visibility = roomVisibilityLabel(room.visibility || "public");
     const isHost = room.host_id === GAME.user.id;
     const me = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
@@ -855,6 +907,7 @@
         EL.roomSummary.innerHTML = `
           <div><span>Mã phòng</span><strong>${esc(room.join_code || "—")}</strong></div>
           <div><span>Hiển thị</span><strong>${esc(visibility)}</strong></div>
+          <div><span>Lớp</span><strong>${esc(className || "Không gắn lớp")}</strong></div>
           <div><span>Khối</span><strong>${esc(grade)}</strong></div>
           <div><span>Môn</span><strong>${esc(subject)}</strong></div>
           <div><span>Số câu</span><strong>${room.question_count} câu</strong></div>

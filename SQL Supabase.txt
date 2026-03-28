@@ -1733,6 +1733,24 @@ ALTER TABLE public.game_rooms
 ALTER TABLE public.game_rooms
   ADD COLUMN IF NOT EXISTS max_players integer NOT NULL DEFAULT 8;
 
+ALTER TABLE public.game_rooms
+  ADD COLUMN IF NOT EXISTS class_id uuid;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.table_constraints
+    WHERE constraint_name = 'game_rooms_class_id_fkey'
+      AND table_schema = 'public'
+      AND table_name = 'game_rooms'
+  ) THEN
+    ALTER TABLE public.game_rooms
+      ADD CONSTRAINT game_rooms_class_id_fkey
+      FOREIGN KEY (class_id) REFERENCES public.classes(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
 UPDATE public.game_rooms
 SET visibility = 'public'
 WHERE visibility IS NULL OR visibility NOT IN ('public', 'private');
@@ -1754,3 +1772,6 @@ ALTER TABLE public.game_rooms
 ALTER TABLE public.game_rooms
   ADD CONSTRAINT game_rooms_max_players_check
   CHECK (max_players BETWEEN 2 AND 20);
+
+CREATE INDEX IF NOT EXISTS game_rooms_class_idx
+  ON public.game_rooms (class_id, status, created_at DESC);
