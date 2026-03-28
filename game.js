@@ -16,6 +16,7 @@
     activeRoom: null,
     roomPlayers: [],
     roomQuestions: [],
+    roomAnswers: [],
     myAnswers: [],
     roomPoll: null,
     questionTick: null,
@@ -110,6 +111,8 @@
       <option value="quick">Đấu nhanh</option>
       <option value="friends">Phòng bạn bè</option>
       <option value="ranked">Leo hạng</option>
+      <option value="survival">Sinh tồn</option>
+      <option value="speed">Đua tốc độ</option>
     `;
   }
   if (EL.roomMode) {
@@ -117,6 +120,8 @@
       <option value="quick">Đấu nhanh</option>
       <option value="friends">Phòng bạn bè</option>
       <option value="ranked">Leo hạng</option>
+      <option value="survival">Sinh tồn</option>
+      <option value="speed">Đua tốc độ</option>
     `;
   }
 
@@ -318,6 +323,8 @@
 
   function roomModeLabel(mode) {
     if (mode === "ranked") return "Leo hạng";
+    if (mode === "survival") return "Sinh tồn";
+    if (mode === "speed") return "Đua tốc độ";
     if (mode === "friends") return "Phòng bạn bè";
     return "Đấu nhanh";
   }
@@ -325,6 +332,12 @@
   function getModeDefaults(mode) {
     if (mode === "friends") {
       return { visibility: "private", maxPlayers: 6, questionCount: 10, timePerQuestion: 20 };
+    }
+    if (mode === "survival") {
+      return { visibility: "public", maxPlayers: 8, questionCount: 20, timePerQuestion: 15 };
+    }
+    if (mode === "speed") {
+      return { visibility: "public", maxPlayers: 10, questionCount: 15, timePerQuestion: 12 };
     }
     if (mode === "ranked") {
       return { visibility: "public", maxPlayers: 2, questionCount: 12, timePerQuestion: 18 };
@@ -608,6 +621,22 @@
       .sort((a, b) => (b.score || 0) - (a.score || 0) || new Date(a.joined_at) - new Date(b.joined_at));
   }
 
+  function getPlayerLives(playerId, room, answers) {
+    if (roomModeValue(room) !== "survival") return null;
+    const wrongCount = (answers || []).filter((item) => item.player_id === playerId && item.is_correct === false).length;
+    return Math.max(0, 3 - wrongCount);
+  }
+
+  function isPlayerEliminated(playerId, room, answers) {
+    const lives = getPlayerLives(playerId, room, answers);
+    return lives !== null && lives <= 0;
+  }
+
+  function getAlivePlayers(room, players, answers) {
+    if (roomModeValue(room) !== "survival") return players || [];
+    return (players || []).filter((player) => !isPlayerEliminated(player.id, room, answers));
+  }
+
   function getRankedDeltaMap(orderedPlayers) {
     const total = orderedPlayers.length;
     if (!total) return {};
@@ -678,6 +707,7 @@
         <div class="hero-badge">${tier.icon} Hạng ${tier.name}</div>
         <div class="hero-badge">Tỉ lệ thắng ${winRate}%</div>
         <div class="hero-badge">Chuỗi thắng ${streak}</div>
+        <div class="hero-badge">Mode: Quick / Friends / Rank / Survival / Speed</div>
       `;
     }
 
@@ -1029,6 +1059,7 @@
     GAME.activeRoom = room;
     GAME.roomPlayers = players || [];
     GAME.roomQuestions = questions || [];
+    GAME.roomAnswers = answers || [];
     GAME.myAnswers = (answers || []).filter((item) => {
       const me = GAME.roomPlayers.find((player) => player.user_id === GAME.user.id);
       return me ? item.player_id === me.id : false;
@@ -1044,6 +1075,8 @@
     const subject = GAME.subjects.find((item) => item.id === room.subject_id)?.name || "—";
     const className = room.class_id ? getClassName(room.class_id) : "";
     const visibility = roomVisibilityLabel(room.visibility || "public");
+    const mode = roomModeValue(room);
+    const modeLabel = roomModeLabel(mode);
     const isHost = room.host_id === GAME.user.id;
     const me = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
     const others = GAME.roomPlayers.filter((item) => item.user_id !== room.host_id);
@@ -1105,6 +1138,7 @@
     const canKick = GAME.activeRoom?.status === "waiting" && GAME.activeRoom?.host_id === GAME.user?.id && player.user_id !== GAME.user?.id;
     const rankClass = showScore ? (index === 1 ? "top-1" : index === 2 ? "top-2" : index === 3 ? "top-3" : "") : "";
     const meClass = player.user_id === GAME.user?.id ? "me" : "";
+    const lives = getPlayerLives(player.id, GAME.activeRoom, GAME.roomAnswers || []);
     const readyTag = GAME.activeRoom?.status === "waiting"
       ? `<span class="status-tag ${player.ready ? "ready" : "waiting"}">${player.ready ? "Sẵn sàng" : "Chưa sẵn sàng"}</span>`
       : "";
@@ -1113,7 +1147,7 @@
         <img class="avatar" src="${escAttr(getPlayerAvatar(player.user_id))}" alt="avatar">
         <div>
           <div style="font-weight:700;color:var(--navy)">${index}. ${esc(getPlayerName(player.user_id))}</div>
-          <div class="hint">${player.user_id === GAME.activeRoom?.host_id ? "Chủ phòng" : "Người chơi"}</div>
+          <div class="hint">${player.user_id === GAME.activeRoom?.host_id ? "Chủ phòng" : "Người chơi"}${lives !== null ? ` • ${lives} mạng` : ""}</div>
         </div>
       </div>
       ${showScore ? `<strong style="color:var(--navy)">${player.score || 0}</strong>` : `<div style="display:grid;justify-items:end;gap:4px">${readyTag}${canKick ? `<button class="btn btn-outline btn-sm" type="button" onclick="kickGamePlayer('${player.id}')">Mời ra</button>` : ""}<span class="hint">${fmtDateTime(player.joined_at)}</span></div>`}
@@ -1232,6 +1266,9 @@
   function renderLiveRoom() {
       const room = GAME.activeRoom;
       const questions = GAME.roomQuestions;
+      const mode = roomModeValue(room);
+      const me = GAME.roomPlayers.find((player) => player.user_id === GAME.user.id);
+      const myLives = me ? getPlayerLives(me.id, room, GAME.roomAnswers || []) : null;
       if (!room || !questions.length) {
         EL.questionBody.textContent = "Đang chuẩn bị câu hỏi...";
         EL.answerArea.innerHTML = "";
@@ -1249,7 +1286,13 @@
       const secondsLeft = Math.max(0, room.time_per_question - (elapsed % room.time_per_question));
       EL.questionTitle.textContent = `Câu ${currentIndex + 1} / ${questions.length}`;
       EL.questionClock.textContent = String(secondsLeft).padStart(2, "0");
-      if (EL.progressText) EL.progressText.textContent = `Tiến độ ${currentIndex + 1}/${questions.length}`;
+      if (EL.progressText) {
+        EL.progressText.textContent = mode === "survival"
+          ? `Sinh tồn • ${currentIndex + 1}/${questions.length}${myLives !== null ? ` • ${myLives} mạng` : ""}`
+          : mode === "speed"
+            ? `Đua tốc độ • ${currentIndex + 1}/${questions.length}`
+            : `Tiến độ ${currentIndex + 1}/${questions.length}`;
+      }
       if (EL.progressFill) EL.progressFill.style.width = `${((currentIndex + 1) / questions.length) * 100}%`;
       EL.questionBody.textContent = question.question_text || "Xem nội dung câu hỏi.";
       EL.questionImg.classList.toggle("hidden", !question.question_img);
@@ -1274,16 +1317,27 @@
   function renderAnswerArea(question) {
     const me = GAME.roomPlayers.find((player) => player.user_id === GAME.user.id);
     const answered = GAME.myAnswers.find((item) => item.game_question_id === question.id);
-    const disabled = !!answered;
+    const isEliminated = me ? isPlayerEliminated(me.id, GAME.activeRoom, GAME.roomAnswers || []) : false;
+    const disabled = !!answered || isEliminated;
     if (EL.answerFeedback) {
-      if (answered) {
+      if (isEliminated) {
+        EL.answerFeedback.innerHTML = `<div class="feedback-box bad">Bạn đã hết mạng trong trận sinh tồn này.</div>`;
+      } else if (answered) {
         EL.answerFeedback.innerHTML = `<div class="feedback-box ${answered.is_correct ? "good" : "bad"}">${answered.is_correct ? "Bạn ghi điểm ở câu này." : "Bạn đã gửi đáp án."} +${answered.score_earned || 0} điểm</div>`;
       } else {
         EL.answerFeedback.innerHTML = `<div class="feedback-box pending">Mỗi câu chỉ được trả lời một lần. Hãy chọn thật chắc trước khi xác nhận.</div>`;
       }
     }
 
-    if (question.question_type === "multi_choice") {
+      if (roomModeValue(room) === "survival") {
+        const alivePlayers = getAlivePlayers(room, GAME.roomPlayers, GAME.roomAnswers || []);
+        if (alivePlayers.length <= 1) {
+          finishRoomIfNeeded();
+          return;
+        }
+      }
+
+      if (question.question_type === "multi_choice") {
       const player = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
       window.__gameMcDraft = window.__gameMcDraft || {};
       window.__gameMcDraft[player?.id || "guest"] = window.__gameMcDraft[player?.id || "guest"] || {};
@@ -1334,7 +1388,14 @@
   }
 
   function renderLeaderboard() {
-    const ordered = [...GAME.roomPlayers].sort((a, b) => (b.score || 0) - (a.score || 0) || new Date(a.joined_at) - new Date(b.joined_at));
+    const ordered = [...GAME.roomPlayers].sort((a, b) => {
+      const livesA = getPlayerLives(a.id, GAME.activeRoom, GAME.roomAnswers || []);
+      const livesB = getPlayerLives(b.id, GAME.activeRoom, GAME.roomAnswers || []);
+      if (livesA !== null || livesB !== null) {
+        if ((livesB ?? -1) !== (livesA ?? -1)) return (livesB ?? -1) - (livesA ?? -1);
+      }
+      return (b.score || 0) - (a.score || 0) || new Date(a.joined_at) - new Date(b.joined_at);
+    });
     const comboStats = getMyComboStats();
     EL.leaderboard.innerHTML = ordered.map((player, idx) => renderPlayerRow(player, idx + 1, true)).join("");
     const myIndex = ordered.findIndex((item) => item.user_id === GAME.user.id);
@@ -1349,6 +1410,14 @@
     clearInterval(GAME.questionTick);
     const room = GAME.activeRoom;
     if (!room) return;
+    if (roomModeValue(room) === "survival") {
+      const alivePlayers = getAlivePlayers(room, GAME.roomPlayers, GAME.roomAnswers || []);
+      const elapsed = Math.max(0, Math.floor((Date.now() - new Date(room.started_at).getTime()) / 1000));
+      const currentIndex = Math.floor(elapsed / room.time_per_question);
+      if (alivePlayers.length > 1 && currentIndex < GAME.roomQuestions.length) {
+        return;
+      }
+    }
     if (room.status !== "finished" && room.host_id === GAME.user.id) {
       await sb.from("game_rooms").update({ status: "finished", ended_at: new Date().toISOString() }).eq("id", room.id);
     }
@@ -1356,10 +1425,21 @@
   }
 
   function renderFinishedRoom() {
-    const ordered = [...GAME.roomPlayers].sort((a, b) => (b.score || 0) - (a.score || 0) || new Date(a.joined_at) - new Date(b.joined_at));
+    const ordered = [...GAME.roomPlayers].sort((a, b) => {
+      const livesA = getPlayerLives(a.id, GAME.activeRoom, GAME.roomAnswers || []);
+      const livesB = getPlayerLives(b.id, GAME.activeRoom, GAME.roomAnswers || []);
+      if (livesA !== null || livesB !== null) {
+        if ((livesB ?? -1) !== (livesA ?? -1)) return (livesB ?? -1) - (livesA ?? -1);
+      }
+      return (b.score || 0) - (a.score || 0) || new Date(a.joined_at) - new Date(b.joined_at);
+    });
     const winner = ordered[0];
     const rankedDeltaMap = roomModeValue(GAME.activeRoom) === "ranked" ? getRankedDeltaMap(ordered) : {};
-    EL.finishedMeta.textContent = `Phòng ${GAME.activeRoom?.title || ""} đã kết thúc. Người có điểm cao hơn sẽ xếp trên, nếu bằng điểm thì ai vào phòng sớm hơn sẽ xếp trên.`;
+    EL.finishedMeta.textContent = roomModeValue(GAME.activeRoom) === "survival"
+      ? `Phòng ${GAME.activeRoom?.title || ""} đã kết thúc. Ở chế độ sinh tồn, người còn nhiều mạng hơn sẽ xếp trên, nếu bằng mạng thì so điểm.`
+      : roomModeValue(GAME.activeRoom) === "speed"
+        ? `Phòng ${GAME.activeRoom?.title || ""} đã kết thúc. Ở chế độ đua tốc độ, đúng nhanh sẽ nhận nhiều điểm hơn.`
+        : `Phòng ${GAME.activeRoom?.title || ""} đã kết thúc. Người có điểm cao hơn sẽ xếp trên, nếu bằng điểm thì ai vào phòng sớm hơn sẽ xếp trên.`;
     if (EL.myStats) {
       const myPlayer = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
       const myRows = GAME.myAnswers || [];
@@ -1370,6 +1450,7 @@
         <div><span>Điểm của bạn</span><strong>${myPlayer?.score || 0}</strong></div>
         <div><span>Câu đúng</span><strong>${correctCount}/${GAME.roomQuestions.length || 0}</strong></div>
         <div><span>Độ chính xác</span><strong>${accuracy}%</strong></div>
+        ${getPlayerLives(myPlayer?.id, GAME.activeRoom, GAME.roomAnswers || []) !== null ? `<div><span>Mạng còn lại</span><strong>${getPlayerLives(myPlayer?.id, GAME.activeRoom, GAME.roomAnswers || [])}</strong></div>` : ""}
         <div><span>Xếp hạng</span><strong>#${Math.max(1, ordered.findIndex((item) => item.user_id === GAME.user.id) + 1)}</strong></div>
       `;
     }
@@ -1429,9 +1510,14 @@
   }
 
   function evaluateAnswer(question, answerValue, remaining, totalTime, currentCombo) {
-    const speedBonus = Math.round((remaining / totalTime) * 35);
+    const mode = roomModeValue(GAME.activeRoom);
+    const speedBonus = Math.round((remaining / totalTime) * (mode === "speed" ? 70 : 35));
     const base = Number(question.points || 0);
-    const comboBonus = currentCombo >= 2 ? Math.min(60, currentCombo * 10) : 0;
+    const comboBonus = mode === "speed"
+      ? (currentCombo >= 1 ? Math.min(90, (currentCombo + 1) * 12) : 0)
+      : currentCombo >= 2
+        ? Math.min(60, currentCombo * 10)
+        : 0;
     if (question.question_type === "multi_choice") {
       const correct = normalizeAnswer(question.answer);
       const mine = normalizeAnswer(answerValue);
