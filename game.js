@@ -418,7 +418,7 @@
     if (!grid) return;
     grid.innerHTML = (GAME.grades || []).map((grade) => {
       const selected = EL.gradeFilter?.value === grade.id;
-      return `<button type="button" data-grade-card="${grade.id}" style="${getGradeCardStyle(selected)}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:${selected ? "rgba(250,204,21,.18)" : "rgba(148,163,184,.12)"};color:${selected ? "#fde68a" : "rgba(226,232,240,.78)"};font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">${selected ? "Dang chon" : "Khoi hoc"}</span><span style="font-size:1.1rem;font-weight:900;letter-spacing:.01em">${esc(grade.name)}</span><span style="font-size:.84rem;color:${selected ? "rgba(254,240,138,.9)" : "rgba(226,232,240,.7)"}">Chon khoi nay de mo danh sach mon tuong ung.</span></button>`;
+      return `<button type="button" data-grade-card="${grade.id}" style="${getGradeCardStyle(selected)}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:${selected ? "rgba(250,204,21,.18)" : "rgba(148,163,184,.12)"};color:${selected ? "#fde68a" : "rgba(226,232,240,.78)"};font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">${selected ? "Dang chon" : "Khoi"}</span><span style="font-size:1.1rem;font-weight:900;letter-spacing:.01em">${esc(grade.name)}</span></button>`;
     }).join("");
     document.querySelectorAll("[data-grade-card]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -440,7 +440,7 @@
     grid.innerHTML = subjects.length
       ? subjects.map((subject) => {
           const selected = EL.subjectFilter?.value === subject.id;
-          return `<button type="button" data-subject-card="${subject.id}" style="${getSubjectCardStyle(selected)}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:${selected ? "rgba(34,211,238,.18)" : "rgba(148,163,184,.12)"};color:${selected ? "#a5f3fc" : "rgba(226,232,240,.78)"};font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">${selected ? "San sang" : "Mon hoc"}</span><span style="font-size:1.02rem;font-weight:900;letter-spacing:.01em">${esc(subject.name)}</span><span style="font-size:.84rem;color:${selected ? "rgba(165,243,252,.88)" : "rgba(226,232,240,.7)"}">Chon mon nay de he thong tu dong tim phong dong nguoi nhat.</span></button>`;
+          return `<button type="button" data-subject-card="${subject.id}" style="${getSubjectCardStyle(selected)}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:${selected ? "rgba(34,211,238,.18)" : "rgba(148,163,184,.12)"};color:${selected ? "#a5f3fc" : "rgba(226,232,240,.78)"};font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">${selected ? "Dang chon" : "Mon"}</span><span style="font-size:1.02rem;font-weight:900;letter-spacing:.01em">${esc(subject.name)}</span></button>`;
         }).join("")
       : `<div class="hint">Chọn khối trước để hiện môn tương ứng.</div>`;
     document.querySelectorAll("[data-subject-card]").forEach((button) => {
@@ -1383,7 +1383,15 @@
   }
 
   async function joinRoom(roomId) {
-    const room = (GAME.roomsRaw || []).find((item) => item.id === roomId);
+    let room = (GAME.roomsRaw || []).find((item) => item.id === roomId);
+    if (!room) {
+      const { data, error } = await sb.from("game_rooms").select("*").eq("id", roomId).single();
+      if (error) {
+        alert("Không tìm thấy phòng này.");
+        return;
+      }
+      room = data;
+    }
     if (!room) {
       alert("Không tìm thấy phòng này.");
       return;
@@ -1490,7 +1498,13 @@
       .find((room) => roomHasCapacity(room) || GAME.players.some((player) => player.room_id === room.id && player.user_id === GAME.user.id));
 
     const room = targetRoom || await createAutoRoomForMode(mode, EL.gradeFilter.value, EL.subjectFilter.value);
-    if (room) await joinRoom(room.id);
+    if (!room) return;
+    if (targetRoom) {
+      await joinRoom(room.id);
+      return;
+    }
+    await loadRooms();
+    await joinRoom(room.id);
   }
 
   async function cleanupRoomIfFinished(roomId) {
