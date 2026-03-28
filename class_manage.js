@@ -277,11 +277,14 @@
             (data.subjects?.name?' &nbsp;•&nbsp; 📚 '+data.subjects.name:'')+
             (data.grades?.name?' &nbsp;•&nbsp; 🏫 Khối '+data.grades.name:'')+
             '</div>'+
-          '</div>'+
-          '<div style="display:flex;gap:8px;align-items:center;flex-shrink:0">'+
-            '<button onclick="cvPrevMonth()" class="btn btn-outline btn-sm" style="padding:4px 12px;font-size:1rem">‹</button>'+
-            '<span style="font-weight:700;font-size:.92rem;color:var(--navy);white-space:nowrap">'+
-            'Tháng '+(_currentMonth+1)+'/'+_currentYear+'</span>'+
+        '</div>'+
+        '<div style="display:flex;gap:8px;align-items:center;flex-shrink:0">'+
+          ((_role==="admin"||_role==="teacher")
+            ? '<button onclick="cvOpenClassGame()" class="btn btn-outline btn-sm">🎮 Mở game lớp</button>'
+            : '')+
+          '<button onclick="cvPrevMonth()" class="btn btn-outline btn-sm" style="padding:4px 12px;font-size:1rem">‹</button>'+
+          '<span style="font-weight:700;font-size:.92rem;color:var(--navy);white-space:nowrap">'+
+          'Tháng '+(_currentMonth+1)+'/'+_currentYear+'</span>'+
             '<button onclick="cvNextMonth()" class="btn btn-outline btn-sm" style="padding:4px 12px;font-size:1rem">›</button>'+
           '</div>'+
         '</div>'+
@@ -324,6 +327,11 @@
     renderShell();
     if(_activeTab==="attendance") await renderAttendanceTab();
     else await renderExamsTab();
+  };
+
+  window.cvOpenClassGame = function(){
+    if(!_classId) return;
+    location.href = "game.html?action=create_room&classId=" + encodeURIComponent(_classId);
   };
 
   /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•

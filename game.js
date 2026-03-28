@@ -2,6 +2,8 @@
   const GAME = {
     user: null,
     role: "student",
+    initialClassId: "",
+    initialAction: "",
     grades: [],
     subjects: [],
     classes: [],
@@ -144,6 +146,9 @@
   }
 
   async function init() {
+    const params = new URLSearchParams(location.search);
+    GAME.initialClassId = params.get("classId") || "";
+    GAME.initialAction = params.get("action") || "";
     const { data: { user } } = await sb.auth.getUser();
     if (!user) {
       location.href = "index.html";
@@ -170,6 +175,9 @@
     bindEvents();
     setupListRealtime();
     await Promise.all([loadRooms(), loadFriends(), loadAccessibleClasses()]);
+    if (GAME.initialAction === "create_room") {
+      openGameRoomModal();
+    }
   }
 
   function bindEvents() {
@@ -380,6 +388,9 @@
     GAME.classes = classes || [];
     GAME.classIds = (GAME.classes || []).map((item) => item.id);
     fillClasses(EL.roomClass, "Không gắn lớp");
+    if (GAME.initialClassId && GAME.classIds.includes(GAME.initialClassId) && EL.roomClass) {
+      EL.roomClass.value = GAME.initialClassId;
+    }
   }
 
   async function copyText(text, successMessage) {
@@ -667,7 +678,7 @@
     EL.roomCode.value = randomCode();
     if (EL.roomVisibility) EL.roomVisibility.value = "public";
     if (EL.roomMaxPlayers) EL.roomMaxPlayers.value = "8";
-    if (EL.roomClass) EL.roomClass.value = "";
+    if (EL.roomClass) EL.roomClass.value = GAME.initialClassId && GAME.classIds.includes(GAME.initialClassId) ? GAME.initialClassId : "";
     fillSubjects(EL.roomSubject, EL.roomGrade.value, "Chọn môn");
     EL.roomModal.classList.add("show");
   }
