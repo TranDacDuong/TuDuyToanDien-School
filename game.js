@@ -23,6 +23,7 @@
     roomChannel: null,
     listChannel: null,
     leaderboardPeriod: "day",
+    leavingRoom: false,
   };
 
   const EL = {
@@ -171,6 +172,16 @@
         <option value="spots">Còn nhiều chỗ</option>
       `;
     }
+    if (EL.sortFilter) {
+      EL.sortFilter.innerHTML = `
+        <option value="players">ÄÃ´ng ngÆ°á»i nháº¥t</option>
+        <option value="recommended">PhÃ¹ há»£p nháº¥t</option>
+        <option value="hot">Äang sá»‘i Ä‘á»™ng</option>
+        <option value="new">Má»›i nháº¥t</option>
+        <option value="spots">CÃ²n nhiá»u chá»—</option>
+      `;
+      EL.sortFilter.value = "players";
+    }
     if (EL.statusFilter) {
       EL.statusFilter.innerHTML = `
         <option value="">Tất cả trạng thái</option>
@@ -232,6 +243,10 @@
     document.querySelectorAll("#gameLiveView .panel h3")[0] && (document.querySelectorAll("#gameLiveView .panel h3")[0].textContent = "Đáp án của bạn");
     document.querySelectorAll("#gameLiveView .panel h3")[1] && (document.querySelectorAll("#gameLiveView .panel h3")[1].textContent = "Bảng xếp hạng");
     if (EL.finishedView?.querySelector("h3")) EL.finishedView.querySelector("h3").textContent = "Kết quả trận đấu";
+    if (backBtn) backBtn.textContent = "Rá»i phÃ²ng";
+    if (EL.leaveGameBtn) EL.leaveGameBtn.textContent = "ThoÃ¡t háº³n";
+    if (EL.myScore?.previousElementSibling) EL.myScore.previousElementSibling.textContent = "Äiá»ƒm trÃ¢n";
+    if (EL.myRank?.previousElementSibling) EL.myRank.previousElementSibling.textContent = "Vá»‹ trÃ­ hiá»‡n táº¡i";
     const historyModalTitle = document.querySelector("#gameHistoryModal .mh h2");
     if (historyModalTitle) historyModalTitle.textContent = "Chi tiết trận đấu";
     const historyClose = document.querySelector("#gameHistoryModal .mh .btn");
@@ -246,6 +261,72 @@
 
   function randomCode() {
     return Math.random().toString(36).slice(2, 8).toUpperCase();
+  }
+
+  function getRoomDisplayTitle(room) {
+    const modeLabel = roomModeLabel(roomModeValue(room));
+    const code = room?.join_code || "----";
+    return room?.title || `${modeLabel} • ${code}`;
+  }
+
+  function getCreateRoomPolicy() {
+    if (GAME.role === "admin") {
+      return {
+        visibility: "public",
+        classRequired: false,
+        allowClass: false,
+        lockVisibility: true,
+        description: "Admin tạo phòng công khai để mọi người có thể tham gia trực tiếp từ sảnh game.",
+      };
+    }
+    if (GAME.role === "teacher") {
+      return {
+        visibility: "private",
+        classRequired: true,
+        allowClass: true,
+        lockVisibility: true,
+        description: "Giáo viên tạo phòng gắn với lớp học. Người chơi vào bằng mã phòng để giữ đúng nhóm lớp.",
+      };
+    }
+    return {
+      visibility: "private",
+      classRequired: false,
+      allowClass: false,
+      lockVisibility: true,
+      description: "Học sinh tạo phòng riêng tư và mời bạn bè vào bằng mã phòng.",
+    };
+  }
+
+  function configureCreateRoomForm() {
+    const policy = getCreateRoomPolicy();
+    if (EL.roomVisibility) {
+      EL.roomVisibility.value = policy.visibility;
+      EL.roomVisibility.disabled = !!policy.lockVisibility;
+    }
+    if (EL.roomClass) {
+      EL.roomClass.disabled = !policy.allowClass;
+      if (!policy.allowClass) EL.roomClass.value = "";
+    }
+    const classField = EL.roomClass?.closest(".field");
+    if (classField) classField.classList.toggle("hidden", !policy.allowClass);
+    const visibilityField = EL.roomVisibility?.closest(".field");
+    if (visibilityField) visibilityField.classList.toggle("hidden", !!policy.lockVisibility);
+    const roomTitleField = EL.roomTitle?.closest(".field");
+    if (roomTitleField) roomTitleField.classList.add("hidden");
+    if (EL.roomTitle) {
+      EL.roomTitle.required = false;
+      EL.roomTitle.tabIndex = -1;
+    }
+    if (EL.roomDescription?.closest(".field")) {
+      const hintNode = EL.roomDescription.closest(".field").nextElementSibling?.querySelector?.(".hint");
+      if (hintNode) hintNode.innerHTML = `${policy.description}<br>Bản đầu tiên sẽ dùng lại câu hỏi từ <b>Ngân hàng câu hỏi</b>, ưu tiên các câu trắc nghiệm, đúng/sai và trả lời ngắn.`;
+    }
+  }
+
+  function getRoomRoleMeta(room) {
+    if (room?.class_id) return { label: "Phòng lớp học", accent: "Lớp riêng" };
+    if ((room?.visibility || "public") === "public") return { label: "Phòng công khai", accent: "Mở toàn sảnh" };
+    return { label: "Phòng riêng", accent: "Vào bằng mã" };
   }
 
   function shuffle(list) {
@@ -299,6 +380,7 @@
     GAME.role = profile?.role || "student";
     GAME.grades = grades || [];
     GAME.subjects = subjects || [];
+    configureCreateRoomForm();
 
     fillGrades(EL.gradeFilter, "Tất cả khối");
     fillGrades(EL.roomGrade, "Chọn khối");
@@ -434,15 +516,15 @@
       return { visibility: "private", maxPlayers: 6, questionCount: 10, timePerQuestion: 20 };
     }
     if (mode === "survival") {
-      return { visibility: "public", maxPlayers: 8, questionCount: 20, timePerQuestion: 15 };
+      return { visibility: "private", maxPlayers: 8, questionCount: 20, timePerQuestion: 15 };
     }
     if (mode === "speed") {
-      return { visibility: "public", maxPlayers: 10, questionCount: 15, timePerQuestion: 12 };
+      return { visibility: "private", maxPlayers: 10, questionCount: 15, timePerQuestion: 12 };
     }
     if (mode === "ranked") {
-      return { visibility: "public", maxPlayers: 2, questionCount: 12, timePerQuestion: 18 };
+      return { visibility: GAME.role === "admin" ? "public" : "private", maxPlayers: 2, questionCount: 12, timePerQuestion: 18 };
     }
-    return { visibility: "public", maxPlayers: 8, questionCount: 10, timePerQuestion: 20 };
+    return { visibility: GAME.role === "admin" ? "public" : "private", maxPlayers: 8, questionCount: 10, timePerQuestion: 20 };
   }
 
   function applyModeDefaults(mode, force) {
@@ -451,6 +533,7 @@
     if (EL.roomMaxPlayers && (force || !EL.roomMaxPlayers.value)) EL.roomMaxPlayers.value = String(defaults.maxPlayers);
     if (EL.roomQuestionCount && (force || !EL.roomQuestionCount.value)) EL.roomQuestionCount.value = String(defaults.questionCount);
     if (EL.roomTimePerQuestion && (force || !EL.roomTimePerQuestion.value)) EL.roomTimePerQuestion.value = String(defaults.timePerQuestion);
+    configureCreateRoomForm();
   }
 
   function roomPlayerCount(roomId) {
@@ -474,13 +557,14 @@
   function getRoomSortValue(room, mode) {
     const playerCount = roomPlayerCount(room.id);
     const maxPlayers = Number(room.max_players || 8);
+    const waiting = room.status === "waiting" ? 500 : room.status === "live" ? 250 : 0;
+    const joined = (GAME.players || []).some((player) => player.room_id === room.id && player.user_id === GAME.user?.id) ? 1000 : 0;
+    if (mode === "players") return [joined + waiting, playerCount, -new Date(room.created_at).getTime()];
     if (mode === "hot") return [playerCount, -new Date(room.created_at).getTime()];
     if (mode === "new") return [new Date(room.created_at).getTime(), playerCount];
     if (mode === "spots") return [maxPlayers - playerCount, -playerCount];
-    const joined = (GAME.players || []).some((player) => player.room_id === room.id && player.user_id === GAME.user?.id) ? 1000 : 0;
-    const waiting = room.status === "waiting" ? 200 : room.status === "live" ? 100 : 0;
     const publicBonus = (room.visibility || "public") === "public" ? 50 : 0;
-    return [joined + waiting + publicBonus + playerCount, -new Date(room.created_at).getTime()];
+    return [joined + waiting + publicBonus, playerCount, -new Date(room.created_at).getTime()];
   }
 
   function compareTupleDesc(a, b) {
@@ -585,6 +669,7 @@
     }
     if (EL.roomMode && !EL.roomMode.value) EL.roomMode.value = "quick";
     applyModeDefaults(EL.roomMode?.value || "quick", false);
+    configureCreateRoomForm();
   }
 
   async function copyText(text, successMessage) {
@@ -608,7 +693,10 @@
       return;
     }
 
-    GAME.roomsRaw = rooms || [];
+    GAME.roomsRaw = (rooms || []).map((room) => ({
+      ...room,
+      title: room.title || getRoomDisplayTitle(room),
+    }));
     GAME.players = players || [];
     GAME.rooms = filterVisibleRooms(GAME.roomsRaw);
     renderRooms();
@@ -622,7 +710,7 @@
     const subjectId = EL.subjectFilter?.value || "";
     const modeFilter = EL.modeFilter?.value || "";
     const visibility = EL.visibilityFilter?.value || "";
-    const sortMode = EL.sortFilter?.value || "recommended";
+    const sortMode = EL.sortFilter?.value || "players";
     const status = EL.statusFilter?.value || "";
     const playerMap = buildRoomPlayerMap();
 
@@ -663,6 +751,7 @@
     const subject = GAME.subjects.find((item) => item.id === room.subject_id)?.name || "—";
     const className = room.class_id ? getClassName(room.class_id) : "";
     const visibility = roomVisibilityLabel(room.visibility || "public");
+    const roleMeta = getRoomRoleMeta(room);
     const mode = roomModeValue(room);
     const modeLabel = roomModeLabel(mode);
     const statusLabel = room.status === "waiting" ? "Đang chờ" : room.status === "live" ? "Đang đấu" : "Đã kết thúc";
@@ -775,6 +864,35 @@
     return { points, matches, wins };
   }
 
+  function getArenaTier(elo) {
+    if (elo >= 1800) return { name: "Kim cÆ°Æ¡ng", icon: "â—†" };
+    if (elo >= 1550) return { name: "Báº¡ch kim", icon: "â¬¡" };
+    if (elo >= 1300) return { name: "VÃ ng", icon: "â˜…" };
+    if (elo >= 1100) return { name: "Báº¡c", icon: "âœ¦" };
+    return { name: "Äá»“ng", icon: "â€¢" };
+  }
+
+  function getLeaderboardByElo(scopedRooms, finishedPlayers) {
+    const rankedRooms = [...(scopedRooms || [])]
+      .filter((room) => roomModeValue(room) === "ranked")
+      .sort((a, b) => new Date(a.ended_at || a.created_at) - new Date(b.ended_at || b.created_at));
+    const totals = {};
+    rankedRooms.forEach((room) => {
+      const ordered = getOrderedPlayersForRoom(room.id, finishedPlayers);
+      const deltas = getRankedDeltaMap(ordered);
+      Object.keys(deltas).forEach((userId) => {
+        if (!totals[userId]) totals[userId] = { elo: 1000, matches: 0, wins: 0 };
+        totals[userId].elo += Number(deltas[userId] || 0);
+        totals[userId].matches += 1;
+        if (ordered[0]?.user_id === userId) totals[userId].wins += 1;
+      });
+    });
+    return Object.entries(totals)
+      .map(([userId, info]) => ({ userId, ...info }))
+      .sort((a, b) => b.elo - a.elo || b.wins - a.wins || b.matches - a.matches)
+      .slice(0, 10);
+  }
+
   function renderArenaInsights() {
     const finishedRooms = GAME.rooms.filter((room) => room.status === "finished");
     const finishedIds = new Set(finishedRooms.map((room) => room.id));
@@ -865,6 +983,86 @@
     }
   }
 
+  function renderArenaInsights() {
+    const finishedRooms = GAME.rooms.filter((room) => room.status === "finished");
+    const finishedIds = new Set(finishedRooms.map((room) => room.id));
+    const finishedPlayers = GAME.players.filter((player) => finishedIds.has(player.room_id));
+    const myFinished = finishedPlayers.filter((player) => player.user_id === GAME.user.id);
+    const rankedProfile = getRankedProfile(finishedRooms, finishedPlayers, GAME.user.id);
+    const myBest = myFinished.reduce((max, item) => Math.max(max, Number(item.score || 0)), 0);
+    const totalMatches = myFinished.length;
+    const totalScore = myFinished.reduce((sum, item) => sum + Number(item.score || 0), 0);
+    const wins = myFinished.filter((player) => {
+      const sameRoom = finishedPlayers.filter((row) => row.room_id === player.room_id);
+      const best = sameRoom.reduce((max, row) => Math.max(max, Number(row.score || 0)), 0);
+      return Number(player.score || 0) === best;
+    }).length;
+    const avgScore = totalMatches ? Math.round(totalScore / totalMatches) : 0;
+    const winRate = totalMatches ? Math.round((wins / totalMatches) * 100) : 0;
+    const sortedMyFinished = [...myFinished].sort((a, b) => new Date(getRoomById(b.room_id)?.ended_at || 0) - new Date(getRoomById(a.room_id)?.ended_at || 0));
+    let streak = 0;
+    for (const player of sortedMyFinished) {
+      const sameRoom = finishedPlayers.filter((row) => row.room_id === player.room_id);
+      const best = sameRoom.reduce((max, row) => Math.max(max, Number(row.score || 0)), 0);
+      if (Number(player.score || 0) === best) streak += 1;
+      else break;
+    }
+    const tier = getArenaTier(rankedProfile.points);
+
+    if (EL.heroBadges) {
+      EL.heroBadges.innerHTML = `
+        <div class="hero-badge">Elo ${rankedProfile.points} • ${rankedProfile.wins}/${rankedProfile.matches} trận rank thắng</div>
+        <div class="hero-badge">${tier.icon} Hạng ${tier.name}</div>
+        <div class="hero-badge">Tỉ lệ thắng ${winRate}%</div>
+        <div class="hero-badge">Chuỗi thắng ${streak}</div>
+        <div class="hero-badge">Mode: Quick / Friends / Ranked / Survival / Speed</div>
+      `;
+    }
+
+    if (EL.statsGrid) {
+      EL.statsGrid.innerHTML = `
+        <div class="stat-card"><span>Elo hiện tại</span><strong>${rankedProfile.points}</strong><small>Thắng rank ${rankedProfile.wins}/${rankedProfile.matches}</small></div>
+        <div class="stat-card"><span>Trận đã chơi</span><strong>${totalMatches}</strong></div>
+        <div class="stat-card"><span>Trận thắng</span><strong>${wins}</strong><small>Tỉ lệ thắng ${winRate}%</small></div>
+        <div class="stat-card"><span>Điểm cao nhất</span><strong>${myBest}</strong><small>Tổng điểm ${totalScore}</small></div>
+        <div class="stat-card"><span>Điểm trung bình</span><strong>${avgScore}</strong><small>Chuỗi thắng ${streak}</small></div>
+      `;
+    }
+
+    const history = [...myFinished]
+      .sort((a, b) => new Date(getRoomById(b.room_id)?.ended_at || 0) - new Date(getRoomById(a.room_id)?.ended_at || 0))
+      .slice(0, 8);
+    if (EL.historyList) {
+      EL.historyList.innerHTML = history.length
+        ? history.map((player) => {
+          const room = getRoomById(player.room_id);
+          const sameRoom = finishedPlayers.filter((row) => row.room_id === player.room_id).sort((a, b) => (b.score || 0) - (a.score || 0));
+          const rank = sameRoom.findIndex((row) => row.user_id === GAME.user.id) + 1;
+          return `<div class="history-item">
+            <div class="history-main">
+              <strong>${esc(getRoomDisplayTitle(room || {}))}</strong>
+              <div class="hint">${fmtDateTime(room?.ended_at || room?.created_at)}</div>
+            </div>
+            <div class="history-actions">
+              <div style="text-align:right"><strong>${player.score || 0} điểm</strong><div class="hint">Hạng #${Math.max(rank, 1)}</div></div>
+              <button class="btn btn-outline btn-sm" type="button" onclick="openGameHistoryDetail('${player.room_id}')">Xem chi tiết</button>
+            </div>
+          </div>`;
+        }).join("")
+        : `<div class="empty">Bạn chưa có trận nào hoàn thành.</div>`;
+    }
+
+    const periodStart = getPeriodStart(GAME.leaderboardPeriod);
+    const scopedRooms = finishedRooms.filter((room) => new Date(room.ended_at || room.created_at) >= periodStart);
+    const leaderboard = getLeaderboardByElo(scopedRooms, finishedPlayers);
+
+    if (EL.globalLeaderboard) {
+      EL.globalLeaderboard.innerHTML = leaderboard.length
+        ? leaderboard.map((item, idx) => `<div class="player-row"><div class="player-main"><img class="avatar" src="${escAttr(getPlayerAvatar(item.userId))}" alt="avatar"><div><div style="font-weight:700;color:var(--navy)">${idx + 1}. ${esc(getPlayerName(item.userId))}</div><div class="hint">${item.matches} trận rank • ${item.wins} thắng</div></div></div><strong style="color:var(--navy)">${item.elo}</strong></div>`).join("")
+        : `<div class="empty">Chưa có dữ liệu Elo cho mốc thời gian này.</div>`;
+    }
+  }
+
   function getRoomById(roomId) {
     return GAME.roomsRaw.find((room) => room.id === roomId) || null;
   }
@@ -887,7 +1085,7 @@
     const answerMap = Object.fromEntries(myAnswers.map((item) => [item.game_question_id, item]));
     EL.historyModalBody.innerHTML = `
       <div class="panel">
-        <h3>${esc(room.title || "Phòng thi đấu")}</h3>
+        <h3>${esc(getRoomDisplayTitle(room))}</h3>
         <div class="hint" style="margin-bottom:12px">${fmtDateTime(room.ended_at || room.created_at)}</div>
         <div class="history-stat-grid">
           <div class="history-stat"><span>Điểm của bạn</span><strong>${myPlayer?.score || 0}</strong></div>
@@ -939,8 +1137,9 @@
   function openGameRoomModal() {
     EL.roomForm?.reset();
     EL.roomCode.value = randomCode();
+    if (EL.roomTitle) EL.roomTitle.value = `Game ${EL.roomCode.value}`;
     if (EL.roomMode) EL.roomMode.value = GAME.initialAction === "create_room_ranked" ? "ranked" : "quick";
-    if (EL.roomVisibility) EL.roomVisibility.value = "public";
+    configureCreateRoomForm();
     if (EL.roomMaxPlayers) EL.roomMaxPlayers.value = "8";
     if (EL.roomClass) EL.roomClass.value = GAME.initialClassId && GAME.classIds.includes(GAME.initialClassId) ? GAME.initialClassId : "";
     applyModeDefaults(EL.roomMode?.value || "quick", true);
@@ -956,18 +1155,25 @@
   async function submitCreateRoom(event) {
     event.preventDefault();
     const mode = EL.roomMode?.value || "quick";
+    const policy = getCreateRoomPolicy();
+    const joinCode = String(EL.roomCode.value || "").trim().toUpperCase() || randomCode();
+    const classId = policy.allowClass ? (EL.roomClass?.value || null) : null;
+    if (policy.classRequired && !classId) {
+      alert("Giáo viên cần chọn lớp học trước khi tạo phòng.");
+      return;
+    }
     const payload = {
-      title: String(EL.roomTitle.value || "").trim(),
-      join_code: String(EL.roomCode.value || "").trim().toUpperCase() || randomCode(),
+      title: `${roomModeLabel(mode)} • ${joinCode}`,
+      join_code: joinCode,
       mode,
       grade_id: EL.roomGrade.value,
       subject_id: EL.roomSubject.value,
       question_count: Number(EL.roomQuestionCount.value || 10),
       time_per_question: Number(EL.roomTimePerQuestion.value || 20),
       max_players: Number(EL.roomMaxPlayers?.value || 8),
-      class_id: EL.roomClass?.value || null,
+      class_id: classId,
       description: String(EL.roomDescription.value || "").trim(),
-      visibility: EL.roomVisibility?.value || (mode === "friends" ? "private" : "public"),
+      visibility: policy.visibility,
       status: "waiting",
       host_id: GAME.user.id,
       created_by: GAME.user.id,
@@ -1060,13 +1266,15 @@
     const room = GAME.activeRoom;
     const player = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
     if (!room || !player) {
-      closeGameScreen();
+      hideGameScreen();
       return;
     }
     if (!confirm("Bạn muốn rời phòng này?")) return;
+    GAME.leavingRoom = true;
     clearIntervals();
     await sb.from("game_room_answers").delete().eq("player_id", player.id);
     const { error } = await sb.from("game_room_players").delete().eq("id", player.id);
+    if (error) GAME.leavingRoom = false;
     if (error) {
       alert(`Không thể rời phòng: ${error.message}`);
       return;
@@ -1080,7 +1288,9 @@
         await sb.from("game_rooms").delete().eq("id", room.id);
       }
     }
-    closeGameScreen();
+    GAME.leavingRoom = false;
+    await loadRooms();
+    hideGameScreen();
   }
 
   function buildInviteText(room, friendName) {
@@ -1128,11 +1338,20 @@
     GAME.roomPoll = setInterval(() => refreshActiveRoom(roomId, true), 2500);
   }
 
-  function closeGameScreen() {
+  function hideGameScreen() {
     clearIntervals();
     teardownRoomRealtime();
     GAME.activeRoom = null;
     EL.roomScreen.classList.remove("show");
+  }
+
+  async function closeGameScreen() {
+    const player = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
+    if (GAME.activeRoom && player && GAME.activeRoom.status !== "finished" && !GAME.leavingRoom) {
+      await leaveRoom();
+      return;
+    }
+    hideGameScreen();
     loadRooms();
   }
 
@@ -1152,6 +1371,11 @@
     ]);
 
     if (roomErr || playerErr || questionErr || answerErr) {
+      if (GAME.leavingRoom || String(roomErr?.message || "").toLowerCase().includes("no rows")) {
+        hideGameScreen();
+        await loadRooms();
+        return;
+      }
       if (!silent) alert(`Không tải được phòng: ${roomErr?.message || playerErr?.message || questionErr?.message || answerErr?.message}`);
       return;
     }
@@ -1160,8 +1384,14 @@
     GAME.roomPlayers = players || [];
     GAME.roomQuestions = questions || [];
     GAME.roomAnswers = answers || [];
+    const me = GAME.roomPlayers.find((player) => player.user_id === GAME.user.id);
+    if (!me && room.status !== "finished") {
+      hideGameScreen();
+      await loadRooms();
+      if (!silent) alert("Báº¡n khÃ´ng cÃ²n á»Ÿ trong phÃ²ng nÃ y.");
+      return;
+    }
     GAME.myAnswers = (answers || []).filter((item) => {
-      const me = GAME.roomPlayers.find((player) => player.user_id === GAME.user.id);
       return me ? item.player_id === me.id : false;
     });
 
@@ -1182,7 +1412,7 @@
     const others = GAME.roomPlayers.filter((item) => item.user_id !== room.host_id);
     const canStart = room.status === "waiting" && isHost && GAME.roomPlayers.length >= 2 && others.every((item) => item.ready);
 
-    EL.roomScreenTitle.textContent = room.title || "Phòng thi đấu";
+    EL.roomScreenTitle.textContent = getRoomDisplayTitle(room);
     EL.startGameBtn.classList.toggle("hidden", !(room.status === "waiting" && isHost));
     EL.startGameBtn.disabled = !canStart;
     EL.toggleReadyBtn?.classList.toggle("hidden", room.status !== "waiting" || isHost);
@@ -1344,11 +1574,23 @@
   async function buildGameQuestions(room) {
     const { data: chapters } = await sb.from("chapters").select("id").eq("subject_id", room.subject_id);
     const chapterIds = (chapters || []).map((item) => item.id);
-    if (!chapterIds.length) return [];
-    const { data: bank } = await sb.from("question_bank")
-      .select("id,question_type,question_text,question_img,answer,answer_count,hidden")
-      .in("chapter_id", chapterIds);
-    const usable = (bank || []).filter((item) => !item.hidden && item.question_type !== "essay");
+    let bank = [];
+    if (chapterIds.length) {
+      const { data } = await sb.from("question_bank")
+        .select("id,question_type,question_text,question_img,answer,answer_count,hidden")
+        .in("chapter_id", chapterIds);
+      bank = data || [];
+    }
+    if (bank.length < room.question_count) {
+      const { data: fallbackBank } = await sb.from("question_bank")
+        .select("id,chapter_id,question_type,question_text,question_img,answer,answer_count,hidden");
+      const merged = [...bank];
+      (fallbackBank || []).forEach((question) => {
+        if (!merged.some((item) => item.id === question.id)) merged.push(question);
+      });
+      bank = merged;
+    }
+    const usable = (bank || []).filter((item) => !item.hidden && item.question_type !== "essay" && item.answer);
     const picked = shuffle(usable).slice(0, room.question_count);
     return picked.map((question, index) => ({
       room_id: room.id,
@@ -1564,7 +1806,7 @@
           <div class="medal ${medalClass}">${idx + 1}</div>
           <div>
             <div style="font-weight:800;color:var(--navy)">${esc(getPlayerName(player.user_id))}</div>
-            ${roomModeValue(GAME.activeRoom) === "ranked" ? `<div class="hint">${Number(rankedDeltaMap[player.user_id] || 0) >= 0 ? "+" : ""}${Number(rankedDeltaMap[player.user_id] || 0)} RP</div>` : ""}
+            ${roomModeValue(GAME.activeRoom) === "ranked" ? `<div class="hint">${Number(rankedDeltaMap[player.user_id] || 0) >= 0 ? "+" : ""}${Number(rankedDeltaMap[player.user_id] || 0)} Elo</div>` : ""}
             <div class="hint">${player.user_id === GAME.user.id ? "Bạn" : "Người chơi"}</div>
           </div>
         </div>
