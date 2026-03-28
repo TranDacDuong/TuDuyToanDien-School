@@ -661,6 +661,16 @@ function closePdfExamScreen() {
   PDF_STATE.activeExamId = null;
 }
 
+function returnFromPdfContext() {
+  if (PDF_STATE.classId || PDF_STATE.courseId) {
+    if (window.history.length > 1) {
+      window.history.back();
+      return true;
+    }
+  }
+  return false;
+}
+
 function renderPdfQuestionRow(question) {
   return `<div class="question-row"><div class="question-main"><div class="question-title"><span class="question-index">Câu ${question.order_no || 1}</span><span class="pill soft">${typeLabel(question.question_type)}</span><span class="pill soft">${question.points || 0} điểm</span></div><div class="question-actions"></div></div><div class="question-answer">Đáp án đúng: <strong>${esc(question.answer || "")}</strong></div></div>`;
 }
@@ -802,12 +812,14 @@ async function savePdfAttemptProgress() {
 
 async function closePdfAttempt() {
   if (!PDF_STATE.attemptResultId) {
+    if (returnFromPdfContext()) return;
     PDF_EL.attemptShell.classList.remove("show");
     return;
   }
   if (!confirm("Bạn muốn thoát? Tiến trình sẽ được lưu và khi vào lại sẽ bị trừ 5 phút.")) return;
   clearInterval(PDF_STATE.attemptTimer);
   await savePdfAttemptProgress();
+  if (returnFromPdfContext()) return;
   PDF_EL.attemptShell.classList.remove("show");
 }
 
