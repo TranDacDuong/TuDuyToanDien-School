@@ -92,8 +92,8 @@ function bindPdfEvents() {
     el?.addEventListener("input", renderPdfExamGrid);
     el?.addEventListener("change", renderPdfExamGrid);
   });
-  PDF_EL.gradeFilter?.addEventListener("change", () => fillPdfSubjects(PDF_EL.subjectFilter, PDF_EL.gradeFilter.value, "Táº¥t cáº£ mÃ´n"));
-  PDF_EL.examGrade?.addEventListener("change", () => fillPdfSubjects(PDF_EL.examSubject, PDF_EL.examGrade.value, "Chá»n mÃ´n"));
+  PDF_EL.gradeFilter?.addEventListener("change", () => fillPdfSubjects(PDF_EL.subjectFilter, PDF_EL.gradeFilter.value, "Tất cả môn"));
+  PDF_EL.examGrade?.addEventListener("change", () => fillPdfSubjects(PDF_EL.examSubject, PDF_EL.examGrade.value, "Chọn môn"));
 }
 
 async function initPdfExam() {
@@ -115,10 +115,10 @@ async function initPdfExam() {
   PDF_STATE.grades = grades || [];
   PDF_STATE.subjects = subjects || [];
 
-  fillPdfGrades(PDF_EL.gradeFilter, "Táº¥t cáº£ khá»‘i");
-  fillPdfGrades(PDF_EL.examGrade, "Chá»n khá»‘i");
-  fillPdfSubjects(PDF_EL.subjectFilter, "", "Táº¥t cáº£ mÃ´n");
-  fillPdfSubjects(PDF_EL.examSubject, "", "Chá»n mÃ´n");
+  fillPdfGrades(PDF_EL.gradeFilter, "Tất cả khối");
+  fillPdfGrades(PDF_EL.examGrade, "Chọn khối");
+  fillPdfSubjects(PDF_EL.subjectFilter, "", "Tất cả môn");
+  fillPdfSubjects(PDF_EL.examSubject, "", "Chọn môn");
 
   if (PDF_STATE.role === "admin" || PDF_STATE.role === "teacher") {
     if (PDF_EL.adminToolbar) PDF_EL.adminToolbar.style.display = "";
@@ -174,7 +174,7 @@ async function loadPdfData(reopenScreen) {
 
   const firstError = examErr || questionErr || resultErr || answerErr;
   if (firstError) {
-    PDF_EL.grid.innerHTML = `<div class="empty"><strong>KhÃ´ng táº£i Ä‘Æ°á»£c Äá» PDF</strong><div>${esc(firstError.message)}</div></div>`;
+    PDF_EL.grid.innerHTML = `<div class="empty"><strong>Không tải được Đề PDF</strong><div>${esc(firstError.message)}</div></div>`;
     PDF_EL.empty.style.display = "none";
     return;
   }
@@ -215,17 +215,17 @@ function getStudentLatestSubmitted(examId) {
 
 function typeLabel(type) {
   return ({
-    multi_choice: "Tráº¯c nghiá»‡m",
-    true_false: "ÄÃºng / Sai",
-    short_answer: "Tráº£ lá»i ngáº¯n",
-    essay: "Tá»± luáº­n",
+    multi_choice: "Trắc nghiệm",
+    true_false: "Đúng / Sai",
+    short_answer: "Trả lời ngắn",
+    essay: "Tự luận",
   })[type] || type;
 }
 
 function fmtDateTime(value) {
-  if (!value) return "â€”";
+  if (!value) return "—";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "â€”" : date.toLocaleString("vi-VN");
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("vi-VN");
 }
 
 function esc(value) {
@@ -279,7 +279,7 @@ function getPdfQuestionDefaultsByType(type, count = 4) {
     return {
       points: 1,
       answer_count: safeCount,
-      answer: Array.from({ length: safeCount }, (_, idx) => `${String.fromCharCode(97 + idx)}Ä`).join(""),
+      answer: Array.from({ length: safeCount }, (_, idx) => `${String.fromCharCode(97 + idx)}Đ`).join(""),
       partial_points: safeCount === 4 ? { 0: 0, 1: 0.1, 2: 0.25, 3: 0.5, 4: 1 } : Object.fromEntries(Array.from({ length: safeCount + 1 }, (_, idx) => [idx, idx === safeCount ? 1 : 0])),
     };
   }
@@ -294,7 +294,7 @@ function getPdfQuestionDefaultsByType(type, count = 4) {
 
 function getPdfDefaultQuestion(order) {
   const defaults = getPdfQuestionDefaultsByType("multi_choice", 4);
-  return { id: crypto.randomUUID(), order_no: order, label: `CÃ¢u ${order}`, question_type: "multi_choice", question_text: null, answer: defaults.answer, answer_count: defaults.answer_count, points: defaults.points, partial_points: defaults.partial_points };
+  return { id: crypto.randomUUID(), order_no: order, label: `Câu ${order}`, question_type: "multi_choice", question_text: null, answer: defaults.answer, answer_count: defaults.answer_count, points: defaults.points, partial_points: defaults.partial_points };
 }
 
 function buildPdfPartialDefaults(type, count, points, existing) {
@@ -322,10 +322,10 @@ function normalizePdfDraftAnswer(type, answer, count) {
   if (type === "true_false") {
     const map = {};
     const raw = String(answer || "");
-    for (let idx = 0; idx < raw.length; idx += 2) map[raw[idx]?.toLowerCase()] = raw[idx + 1] || "Ä";
+    for (let idx = 0; idx < raw.length; idx += 2) map[raw[idx]?.toLowerCase()] = raw[idx + 1] || "Đ";
     return Array.from({ length: count }, (_, idx) => {
       const key = String.fromCharCode(97 + idx);
-      return `${key}${map[key] || "Ä"}`;
+      return `${key}${map[key] || "Đ"}`;
     }).join("");
   }
   const values = String(answer || "").split("|");
@@ -362,7 +362,7 @@ function addPdfDraftQuestionInline() {
 
 function removeLastPdfDraftQuestion() {
   if (!PDF_STATE.draftQuestions.length) return;
-  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.slice(0, -1).map((question, idx) => ({ ...question, order_no: idx + 1, label: `CÃ¢u ${idx + 1}` }));
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.slice(0, -1).map((question, idx) => ({ ...question, order_no: idx + 1, label: `Câu ${idx + 1}` }));
   renderDraftQuestionList();
 }
 
@@ -420,7 +420,7 @@ function parsePdfTrueFalse(answer, count) {
     if (key && value) out[key.toLowerCase()] = value.toUpperCase();
   }
   Array.from({ length: count }, (_, idx) => String.fromCharCode(97 + idx)).forEach((key) => {
-    if (!out[key]) out[key] = "Ä";
+    if (!out[key]) out[key] = "Đ";
   });
   return out;
 }
@@ -429,7 +429,7 @@ function updatePdfDraftTF(id, key) {
   const question = PDF_STATE.draftQuestions.find((q) => q.id === id);
   if (!question) return;
   const parsed = parsePdfTrueFalse(question.answer, question.answer_count || 4);
-  parsed[key] = parsed[key] === "Ä" ? "S" : "Ä";
+  parsed[key] = parsed[key] === "Đ" ? "S" : "Đ";
   updatePdfDraftField(id, "answer", Object.keys(parsed).sort().map((item) => `${item}${parsed[item]}`).join(""));
 }
 
@@ -447,35 +447,35 @@ function renderPdfTypeToggle(question) {
 
 function renderInlinePdfAnswerEditor(question) {
   if (question.question_type === "essay") {
-    return `<div class="draft-inline-group"><span class="draft-inline-label">ÄÃ¡p Ã¡n:</span><span class="hint">Tá»± luáº­n khÃ´ng cÃ³ Ä‘Ã¡p Ã¡n tá»± Ä‘á»™ng.</span></div>`;
+    return `<div class="draft-inline-group"><span class="draft-inline-label">Đáp án:</span><span class="hint">Tự luận không có đáp án tự động.</span></div>`;
   }
   if (question.question_type === "multi_choice") {
     const selected = new Set(String(question.answer || "").toUpperCase().split("").filter(Boolean));
-    return `<div class="draft-inline-group"><span class="draft-inline-label">ÄÃ¡p Ã¡n:</span><div class="count-stepper"><button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${question.id}',-1)">-</button><button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${question.id}',1)">+</button></div>${Array.from({ length: question.answer_count }, (_, idx) => { const key = String.fromCharCode(65 + idx); return `<label class="draft-inline-option"><input type="checkbox" ${selected.has(key) ? "checked" : ""} onchange="updatePdfDraftMC('${question.id}','${key}',this.checked)"><span>${key}</span></label>`; }).join("")}</div>`;
+    return `<div class="draft-inline-group"><span class="draft-inline-label">Đáp án:</span><div class="count-stepper"><button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${question.id}',-1)">-</button><button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${question.id}',1)">+</button></div>${Array.from({ length: question.answer_count }, (_, idx) => { const key = String.fromCharCode(65 + idx); return `<label class="draft-inline-option"><input type="checkbox" ${selected.has(key) ? "checked" : ""} onchange="updatePdfDraftMC('${question.id}','${key}',this.checked)"><span>${key}</span></label>`; }).join("")}</div>`;
   }
   if (question.question_type === "true_false") {
     const parsed = parsePdfTrueFalse(question.answer, question.answer_count || 4);
-    return `<div class="draft-inline-group"><span class="draft-inline-label">ÄÃ¡p Ã¡n:</span><div class="count-stepper"><button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${question.id}',-1)">-</button><button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${question.id}',1)">+</button></div>${Array.from({ length: question.answer_count }, (_, idx) => { const key = String.fromCharCode(97 + idx); const state = parsed[key] || "Ä"; return `<button class="tf-state ${state === "Ä" ? "correct" : "wrong"}" type="button" onclick="updatePdfDraftTF('${question.id}','${key}')">${key.toUpperCase()}</button>`; }).join("")}</div>`;
+    return `<div class="draft-inline-group"><span class="draft-inline-label">Đáp án:</span><div class="count-stepper"><button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${question.id}',-1)">-</button><button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${question.id}',1)">+</button></div>${Array.from({ length: question.answer_count }, (_, idx) => { const key = String.fromCharCode(97 + idx); const state = parsed[key] || "Đ"; return `<button class="tf-state ${state === "Đ" ? "correct" : "wrong"}" type="button" onclick="updatePdfDraftTF('${question.id}','${key}')">${key.toUpperCase()}</button>`; }).join("")}</div>`;
   }
   const values = String(question.answer || "").split("|");
-  return `<div class="draft-inline-group"><span class="draft-inline-label">ÄÃ¡p Ã¡n:</span><div class="count-stepper"><button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${question.id}',-1)">-</button><button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${question.id}',1)">+</button></div>${Array.from({ length: question.answer_count }, (_, idx) => `<input class="input draft-inline-text" type="text" value="${escAttr(values[idx] || "")}" oninput="updatePdfDraftShort('${question.id}',${idx},this.value)" placeholder="Ã ${idx + 1}">`).join("")}</div>`;
+  return `<div class="draft-inline-group"><span class="draft-inline-label">Đáp án:</span><div class="count-stepper"><button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${question.id}',-1)">-</button><button class="icon-btn" type="button" onclick="updatePdfDraftAnswerCount('${question.id}',1)">+</button></div>${Array.from({ length: question.answer_count }, (_, idx) => `<input class="input draft-inline-text" type="text" value="${escAttr(values[idx] || "")}" oninput="updatePdfDraftShort('${question.id}',${idx},this.value)" placeholder="Ý ${idx + 1}">`).join("")}</div>`;
 }
 
 function renderInlinePdfPartialEditor(question) {
   if (question.question_type === "essay") {
-    return `<div class="draft-inline-partials"><span class="draft-inline-label">Äiá»ƒm chi tiáº¿t:</span><span class="hint">Tá»± luáº­n cháº¥m thá»§ cÃ´ng.</span></div>`;
+    return `<div class="draft-inline-partials"><span class="draft-inline-label">Điểm chi tiết:</span><span class="hint">Tự luận chấm thủ công.</span></div>`;
   }
-  return `<div class="draft-inline-partials"><span class="draft-inline-label">Äiá»ƒm chi tiáº¿t:</span>${Array.from({ length: question.answer_count + 1 }, (_, idx) => `<label class="draft-inline-partial"><span>${idx} Ã½</span><input class="input" type="number" min="0" step="0.05" value="${question.partial_points?.[idx] ?? 0}" oninput="updatePdfDraftPartial('${question.id}',${idx},this.value)"></label>`).join("")}</div>`;
+  return `<div class="draft-inline-partials"><span class="draft-inline-label">Điểm chi tiết:</span>${Array.from({ length: question.answer_count + 1 }, (_, idx) => `<label class="draft-inline-partial"><span>${idx} ý</span><input class="input" type="number" min="0" step="0.05" value="${question.partial_points?.[idx] ?? 0}" oninput="updatePdfDraftPartial('${question.id}',${idx},this.value)"></label>`).join("")}</div>`;
 }
 
 function renderDraftQuestionList() {
   PDF_EL.draftQuestionList.className = "draft-answer-list";
   PDF_EL.draftQuestionList.innerHTML = PDF_STATE.draftQuestions.length
     ? PDF_STATE.draftQuestions.sort((a, b) => (a.order_no || 0) - (b.order_no || 0)).map((item, idx) => {
-      const question = withPdfPartialDefaults({ ...item, order_no: idx + 1, label: `CÃ¢u ${idx + 1}` });
-      return `<div class="draft-answer-item" id="pdfDraftRow_${question.id}"><div class="draft-answer-topline"><div class="draft-inline-title">CÃ¢u ${idx + 1}</div><div class="draft-inline-group"><span class="draft-inline-label">Loáº¡i cÃ¢u:</span>${renderPdfTypeToggle(question)}${renderInlinePdfAnswerEditor(question)}</div><button class="btn btn-danger btn-sm" type="button" onclick="deletePdfQuestion('${question.id}')">XÃ³a</button></div><div class="draft-answer-bottomline"><div class="draft-inline-group"><span class="draft-inline-label">Äiá»ƒm cÃ¢u:</span><input class="input draft-inline-point" type="number" min="0" step="0.05" value="${question.points ?? 0}" oninput="updatePdfDraftField('${question.id}','points',this.value)"></div><div></div>${renderInlinePdfPartialEditor(question)}</div></div>`;
+      const question = withPdfPartialDefaults({ ...item, order_no: idx + 1, label: `Câu ${idx + 1}` });
+      return `<div class="draft-answer-item" id="pdfDraftRow_${question.id}"><div class="draft-answer-topline"><div class="draft-inline-title">Câu ${idx + 1}</div><div class="draft-inline-group"><span class="draft-inline-label">Loại câu:</span>${renderPdfTypeToggle(question)}${renderInlinePdfAnswerEditor(question)}</div><button class="btn btn-danger btn-sm" type="button" onclick="deletePdfQuestion('${question.id}')">Xóa</button></div><div class="draft-answer-bottomline"><div class="draft-inline-group"><span class="draft-inline-label">Điểm câu:</span><input class="input draft-inline-point" type="number" min="0" step="0.05" value="${question.points ?? 0}" oninput="updatePdfDraftField('${question.id}','points',this.value)"></div><div></div>${renderInlinePdfPartialEditor(question)}</div></div>`;
     }).join("")
-    : `<div class="empty"><strong>ChÆ°a cÃ³ Ä‘Ã¡p Ã¡n nÃ o</strong><div>HÃ£y báº¥m + ThÃªm Ä‘Ã¡p Ã¡n Ä‘á»ƒ thÃªm trá»±c tiáº¿p tá»«ng cÃ¢u bÃªn dÆ°á»›i.</div></div>`;
+    : `<div class="empty"><strong>Chưa có đáp án nào</strong><div>Hãy bấm + Thêm đáp án để thêm trực tiếp từng câu bên dưới.</div></div>`;
 }
 
 function renderPdfExamGrid() {
@@ -503,12 +503,12 @@ function renderPdfExamGrid() {
 }
 
 function renderPdfExamCard(exam) {
-  const grade = PDF_STATE.grades.find((item) => item.id === exam.grade_id)?.name || "ChÆ°a chá»n khá»‘i";
-  const subject = PDF_STATE.subjects.find((item) => item.id === exam.subject_id)?.name || "ChÆ°a chá»n mÃ´n";
+  const grade = PDF_STATE.grades.find((item) => item.id === exam.grade_id)?.name || "Chưa chọn khối";
+  const subject = PDF_STATE.subjects.find((item) => item.id === exam.subject_id)?.name || "Chưa chọn môn";
   const questions = getPdfQuestions(exam.id);
   const latest = getStudentLatestSubmitted(exam.id);
   const score = latest ? (latest.score_total ?? latest.score_auto ?? "?") : null;
-  return `<article class="card"><div class="card-cover"><div class="chips"><span class="pill light">${exam.status === "open" ? "Má»Ÿ" : "ÄÃ³ng"}</span><span class="pill light">${questions.length} cÃ¢u</span>${latest ? `<span class="pill light">ÄÃ£ lÃ m ${score}/${exam.total_points || 0}Ä‘</span>` : ""}</div><div><h3 style="margin:0;font-size:1.15rem;line-height:1.35">${esc(exam.title)}</h3><div style="margin-top:4px;font-size:.84rem;color:rgba(255,255,255,.82)">${esc(grade)} â€¢ ${esc(subject)}</div></div></div><div class="card-body"><div style="color:#607089;line-height:1.6">${linkify(esc(exam.description || "Äá» PDF dÃ¹ng Google Drive preview Ä‘á»ƒ hiá»ƒn thá»‹ Ä‘á» á»Ÿ bÃªn trÃ¡i."))}</div><div class="meta"><div><span>Thá»i lÆ°á»£ng</span><strong>${exam.duration_minutes || 0} phÃºt</strong></div><div><span>Tá»•ng Ä‘iá»ƒm</span><strong>${exam.total_points || 0} Ä‘iá»ƒm</strong></div></div><div class="actions"><button class="btn btn-outline" type="button" data-open-pdf-exam="${exam.id}">${PDF_STATE.role === "student" ? "LÃ m bÃ i" : "Xem chi tiáº¿t"}</button>${(PDF_STATE.role === "admin" || PDF_STATE.role === "teacher") ? `<button class="btn btn-outline" type="button" data-edit-pdf-exam="${exam.id}">Sá»­a</button><button class="btn btn-danger" type="button" data-delete-pdf-exam="${exam.id}">XÃ³a</button>` : ""}</div></div></article>`;
+  return `<article class="card"><div class="card-cover"><div class="chips"><span class="pill light">${exam.status === "open" ? "Mở" : "Đóng"}</span><span class="pill light">${questions.length} câu</span>${latest ? `<span class="pill light">Đã làm ${score}/${exam.total_points || 0}đ</span>` : ""}</div><div><h3 style="margin:0;font-size:1.15rem;line-height:1.35">${esc(exam.title)}</h3><div style="margin-top:4px;font-size:.84rem;color:rgba(255,255,255,.82)">${esc(grade)} • ${esc(subject)}</div></div></div><div class="card-body"><div style="color:#607089;line-height:1.6">${linkify(esc(exam.description || "Đề PDF dùng Google Drive preview để hiển thị đề ở bên trái."))}</div><div class="meta"><div><span>Thời lượng</span><strong>${exam.duration_minutes || 0} phút</strong></div><div><span>Tổng điểm</span><strong>${exam.total_points || 0} điểm</strong></div></div><div class="actions"><button class="btn btn-outline" type="button" data-open-pdf-exam="${exam.id}">${PDF_STATE.role === "student" ? "Làm bài" : "Xem chi tiết"}</button>${(PDF_STATE.role === "admin" || PDF_STATE.role === "teacher") ? `<button class="btn btn-outline" type="button" data-edit-pdf-exam="${exam.id}">Sửa</button><button class="btn btn-danger" type="button" data-delete-pdf-exam="${exam.id}">Xóa</button>` : ""}</div></div></article>`;
 }
 
 function openPdfExamModal(examId = null) {
@@ -516,15 +516,15 @@ function openPdfExamModal(examId = null) {
   PDF_STATE.editingExamId = examId;
   PDF_EL.examForm.reset();
   PDF_STATE.draftQuestions = [];
-  fillPdfSubjects(PDF_EL.examSubject, "", "Chá»n mÃ´n");
+  fillPdfSubjects(PDF_EL.examSubject, "", "Chọn môn");
   if (examId) {
     const exam = PDF_STATE.exams.find((item) => item.id === examId);
     if (!exam) return;
-    PDF_EL.examModalTitle.textContent = "Sá»­a Ä‘á» PDF";
+    PDF_EL.examModalTitle.textContent = "Sửa đề PDF";
     PDF_EL.examTitle.value = exam.title || "";
     PDF_EL.examStatus.value = exam.status || "open";
     PDF_EL.examGrade.value = exam.grade_id || "";
-    fillPdfSubjects(PDF_EL.examSubject, exam.grade_id || "", "Chá»n mÃ´n");
+    fillPdfSubjects(PDF_EL.examSubject, exam.grade_id || "", "Chọn môn");
     PDF_EL.examSubject.value = exam.subject_id || "";
     PDF_EL.examDuration.value = exam.duration_minutes || 60;
     PDF_EL.examTotal.value = exam.total_points || 10;
@@ -532,7 +532,7 @@ function openPdfExamModal(examId = null) {
     PDF_EL.examDescription.value = exam.description || "";
     PDF_STATE.draftQuestions = getPdfQuestions(examId).map((question) => withPdfPartialDefaults({ ...question }));
   } else {
-    PDF_EL.examModalTitle.textContent = "Táº¡o Ä‘á» PDF";
+    PDF_EL.examModalTitle.textContent = "Tạo đề PDF";
     PDF_EL.examStatus.value = "open";
     PDF_EL.examDuration.value = 60;
     PDF_EL.examTotal.value = 10;
@@ -549,9 +549,9 @@ function closePdfExamModal() {
 async function submitPdfExamForm(ev) {
   ev.preventDefault();
   const parsed = parseDriveInput(PDF_EL.examDriveInput.value.trim());
-  if (!parsed.fileId) return alert("HÃ£y nháº­p Google Drive file ID hoáº·c link chia sáº» há»£p lá»‡.");
-  if (!PDF_EL.examTitle.value.trim()) return alert("TÃªn Ä‘á» khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng.");
-  if (!PDF_STATE.draftQuestions.length) return alert("HÃ£y táº¡o Ã­t nháº¥t 1 Ä‘Ã¡p Ã¡n cho Ä‘á» PDF.");
+  if (!parsed.fileId) return alert("Hãy nhập Google Drive file ID hoặc link chia sẻ hợp lệ.");
+  if (!PDF_EL.examTitle.value.trim()) return alert("Tên đề không được để trống.");
+  if (!PDF_STATE.draftQuestions.length) return alert("Hãy tạo ít nhất 1 đáp án cho đề PDF.");
 
   const payload = {
     title: PDF_EL.examTitle.value.trim(),
@@ -575,18 +575,18 @@ async function submitPdfExamForm(ev) {
     examId = data?.id || null;
     error = insertErr;
   }
-  if (error) return alert("KhÃ´ng thá»ƒ lÆ°u Ä‘á» PDF: " + error.message);
+  if (error) return alert("Không thể lưu đề PDF: " + error.message);
 
   const existing = PDF_STATE.editingExamId ? getPdfQuestions(PDF_STATE.editingExamId) : [];
   const currentIds = PDF_STATE.draftQuestions.map((question) => question.id);
   const removedIds = existing.filter((question) => !currentIds.includes(question.id)).map((question) => question.id);
   if (removedIds.length) {
     const { error: removeErr } = await sb.from("pdf_exam_questions").delete().in("id", removedIds);
-    if (removeErr) return alert("Äá» Ä‘Ã£ lÆ°u nhÆ°ng khÃ´ng xÃ³a Ä‘Æ°á»£c Ä‘Ã¡p Ã¡n cÅ©: " + removeErr.message);
+    if (removeErr) return alert("Đề đã lưu nhưng không xóa được đáp án cũ: " + removeErr.message);
   }
 
   for (let idx = 0; idx < PDF_STATE.draftQuestions.length; idx += 1) {
-    const question = withPdfPartialDefaults({ ...PDF_STATE.draftQuestions[idx], order_no: idx + 1, label: `CÃ¢u ${idx + 1}` });
+      const question = withPdfPartialDefaults({ ...PDF_STATE.draftQuestions[idx], order_no: idx + 1, label: `Câu ${idx + 1}` });
     const row = {
       pdf_exam_id: examId,
       order_no: idx + 1,
@@ -600,10 +600,10 @@ async function submitPdfExamForm(ev) {
     };
     if (existing.some((item) => item.id === question.id)) {
       const { error: updateErr } = await sb.from("pdf_exam_questions").update(row).eq("id", question.id);
-      if (updateErr) return alert("Äá» Ä‘Ã£ lÆ°u nhÆ°ng khÃ´ng cáº­p nháº­t Ä‘Æ°á»£c Ä‘Ã¡p Ã¡n: " + updateErr.message);
+      if (updateErr) return alert("Đề đã lưu nhưng không cập nhật được đáp án: " + updateErr.message);
     } else {
       const { error: createErr } = await sb.from("pdf_exam_questions").insert({ ...row, id: question.id });
-      if (createErr) return alert("Äá» Ä‘Ã£ lÆ°u nhÆ°ng khÃ´ng táº¡o Ä‘Æ°á»£c Ä‘Ã¡p Ã¡n: " + createErr.message);
+      if (createErr) return alert("Đề đã lưu nhưng không tạo được đáp án: " + createErr.message);
     }
   }
 
@@ -612,14 +612,14 @@ async function submitPdfExamForm(ev) {
 }
 
 function deletePdfQuestion(questionId) {
-  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.filter((question) => question.id !== questionId).map((question, idx) => ({ ...question, order_no: idx + 1, label: `CÃ¢u ${idx + 1}` }));
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.filter((question) => question.id !== questionId).map((question, idx) => ({ ...question, order_no: idx + 1, label: `Câu ${idx + 1}` }));
   renderDraftQuestionList();
 }
 
 async function deletePdfExam(examId) {
-  if (!confirm("Báº¡n cÃ³ cháº¯c muá»‘n xÃ³a Ä‘á» PDF nÃ y khÃ´ng?")) return;
+  if (!confirm("Bạn có chắc muốn xóa đề PDF này không?")) return;
   const { error } = await sb.from("pdf_exams").delete().eq("id", examId);
-  if (error) return alert("KhÃ´ng thá»ƒ xÃ³a Ä‘á» PDF: " + error.message);
+  if (error) return alert("Không thể xóa đề PDF: " + error.message);
   if (PDF_STATE.activeExamId === examId) closePdfExamScreen();
   await loadPdfData(false);
 }
@@ -629,25 +629,25 @@ function openPdfExamScreen(examId) {
   if (!exam) return;
   PDF_STATE.activeExamId = examId;
   PDF_EL.screen.classList.add("show");
-  PDF_EL.screenTitle.textContent = exam.title || "Chi tiáº¿t Ä‘á» PDF";
-  const grade = PDF_STATE.grades.find((item) => item.id === exam.grade_id)?.name || "ChÆ°a chá»n khá»‘i";
-  const subject = PDF_STATE.subjects.find((item) => item.id === exam.subject_id)?.name || "ChÆ°a chá»n mÃ´n";
+  PDF_EL.screenTitle.textContent = exam.title || "Chi tiết đề PDF";
+  const grade = PDF_STATE.grades.find((item) => item.id === exam.grade_id)?.name || "Chưa chọn khối";
+  const subject = PDF_STATE.subjects.find((item) => item.id === exam.subject_id)?.name || "Chưa chọn môn";
   const questions = getPdfQuestions(exam.id);
   const latest = getStudentLatestSubmitted(exam.id);
-  PDF_EL.summaryChips.innerHTML = `<span class="pill soft">${exam.status === "open" ? "Äang má»Ÿ" : "ÄÃ£ Ä‘Ã³ng"}</span><span class="pill soft">${esc(grade)}</span><span class="pill soft">${esc(subject)}</span><span class="pill soft">${questions.length} cÃ¢u</span>`;
-  PDF_EL.summaryText.innerHTML = `<div style="color:#607089;line-height:1.7">${linkify(esc(exam.description || "Äá» PDF dÃ¹ng Google Drive preview Ä‘á»ƒ hiá»ƒn thá»‹ Ä‘á» á»Ÿ bÃªn trÃ¡i mÃ n lÃ m bÃ i."))}</div>`;
-  PDF_EL.summaryMeta.innerHTML = `<div><span>Thá»i lÆ°á»£ng</span><strong>${exam.duration_minutes || 0} phÃºt</strong></div><div><span>Tá»•ng Ä‘iá»ƒm</span><strong>${exam.total_points || 0} Ä‘iá»ƒm</strong></div><div><span>Google Drive</span><strong>${esc(exam.drive_file_id || "")}</strong></div><div><span>Káº¿t quáº£ gáº§n nháº¥t</span><strong>${latest ? `${latest.score_total ?? latest.score_auto ?? "?"}/${exam.total_points || 0} Ä‘iá»ƒm` : "ChÆ°a lÃ m bÃ i"}</strong></div>`;
+  PDF_EL.summaryChips.innerHTML = `<span class="pill soft">${exam.status === "open" ? "Đang mở" : "Đã đóng"}</span><span class="pill soft">${esc(grade)}</span><span class="pill soft">${esc(subject)}</span><span class="pill soft">${questions.length} câu</span>`;
+  PDF_EL.summaryText.innerHTML = `<div style="color:#607089;line-height:1.7">${linkify(esc(exam.description || "Đề PDF dùng Google Drive preview để hiển thị đề ở bên trái màn làm bài."))}</div>`;
+  PDF_EL.summaryMeta.innerHTML = `<div><span>Thời lượng</span><strong>${exam.duration_minutes || 0} phút</strong></div><div><span>Tổng điểm</span><strong>${exam.total_points || 0} điểm</strong></div><div><span>Google Drive</span><strong>${esc(exam.drive_file_id || "")}</strong></div><div><span>Kết quả gần nhất</span><strong>${latest ? `${latest.score_total ?? latest.score_auto ?? "?"}/${exam.total_points || 0} điểm` : "Chưa làm bài"}</strong></div>`;
   PDF_EL.openDriveBtn.onclick = () => window.open(getPdfOpenUrl(exam), "_blank");
   if (PDF_EL.detailFrame) PDF_EL.detailFrame.src = getPdfPreviewUrl(exam);
   if (PDF_EL.detailPaneOpenLink) PDF_EL.detailPaneOpenLink.href = getPdfOpenUrl(exam);
-  if (PDF_EL.detailPaneLabel) PDF_EL.detailPaneLabel.textContent = `Ná»™i dung Ä‘á» PDF â€¢ ${exam.title || ""}`;
+  if (PDF_EL.detailPaneLabel) PDF_EL.detailPaneLabel.textContent = `Nội dung đề PDF • ${exam.title || ""}`;
 
   const canManage = PDF_STATE.role === "admin" || PDF_STATE.role === "teacher";
   PDF_EL.editBtn.classList.toggle("hidden", !canManage);
   PDF_EL.addQuestionBtn.classList.toggle("hidden", !canManage);
   PDF_EL.submissionBtn.classList.toggle("hidden", !canManage);
   PDF_EL.takeBtn.classList.toggle("hidden", canManage || exam.status !== "open");
-  PDF_EL.questionList.innerHTML = questions.length ? questions.map(renderPdfQuestionRow).join("") : `<div class="empty"><strong>ChÆ°a cÃ³ cÃ¢u tráº£ lá»i nÃ o</strong><div>${canManage ? "HÃ£y thÃªm cÃ¢u Ä‘áº§u tiÃªn cho Ä‘á» PDF nÃ y." : "Äá» nÃ y chÆ°a sáºµn sÃ ng Ä‘á»ƒ lÃ m bÃ i."}</div></div>`;
+  PDF_EL.questionList.innerHTML = questions.length ? questions.map(renderPdfQuestionRow).join("") : `<div class="empty"><strong>Chưa có câu trả lời nào</strong><div>${canManage ? "Hãy thêm câu đầu tiên cho đề PDF này." : "Đề này chưa sẵn sàng để làm bài."}</div></div>`;
 }
 
 function closePdfExamScreen() {
@@ -656,14 +656,14 @@ function closePdfExamScreen() {
 }
 
 function renderPdfQuestionRow(question) {
-  return `<div class="question-row"><div class="question-main"><div class="question-title"><span class="question-index">CÃ¢u ${question.order_no || 1}</span><span class="pill soft">${typeLabel(question.question_type)}</span><span class="pill soft">${question.points || 0} Ä‘iá»ƒm</span></div><div class="question-actions"></div></div><div class="question-answer">ÄÃ¡p Ã¡n Ä‘Ãºng: <strong>${esc(question.answer || "")}</strong></div></div>`;
+  return `<div class="question-row"><div class="question-main"><div class="question-title"><span class="question-index">Câu ${question.order_no || 1}</span><span class="pill soft">${typeLabel(question.question_type)}</span><span class="pill soft">${question.points || 0} điểm</span></div><div class="question-actions"></div></div><div class="question-answer">Đáp án đúng: <strong>${esc(question.answer || "")}</strong></div></div>`;
 }
 
 async function openPdfAttempt(examId) {
   const exam = PDF_STATE.exams.find((item) => item.id === examId);
   if (!exam || exam.status !== "open") return;
   const questions = getPdfQuestions(examId);
-  if (!questions.length) return alert("Äá» PDF nÃ y chÆ°a cÃ³ cÃ¢u tráº£ lá»i Ä‘á»ƒ há»c sinh lÃ m bÃ i.");
+  if (!questions.length) return alert("Đề PDF này chưa có câu trả lời để học sinh làm bài.");
 
   PDF_STATE.attemptExamId = examId;
   PDF_STATE.attemptAnswers = {};
@@ -685,21 +685,21 @@ async function openPdfAttempt(examId) {
       class_id: PDF_STATE.classId,
       course_id: PDF_STATE.courseId,
     }).select("id").single();
-    if (error) return alert("KhÃ´ng thá»ƒ khá»Ÿi táº¡o bÃ i lÃ m: " + error.message);
+    if (error) return alert("Không thể khởi tạo bài làm: " + error.message);
     PDF_STATE.attemptResultId = data.id;
     PDF_STATE.attemptSeconds = (exam.duration_minutes || 60) * 60;
   }
 
   PDF_EL.attemptShell.classList.add("show");
-  if (PDF_EL.attemptTitle) PDF_EL.attemptTitle.textContent = exam.title || "Làm đề PDF"
-    if (PDF_EL.pdfFrame) PDF_EL.pdfFrame.src = getPdfPreviewUrl(exam);
+  if (PDF_EL.attemptTitle) PDF_EL.attemptTitle.textContent = exam.title || "Làm đề PDF";
+  if (PDF_EL.pdfFrame) PDF_EL.pdfFrame.src = getPdfPreviewUrl(exam);
   if (PDF_EL.pdfPaneOpenLink) PDF_EL.pdfPaneOpenLink.href = getPdfOpenUrl(exam);
   renderPdfAttemptUI(exam, questions);
   startPdfAttemptTimer();
 }
 
 function renderPdfAttemptUI(exam, questions) {
-  PDF_EL.attemptNav.innerHTML = questions.map((question, idx) => `<div class="nav-pill" id="pdfNav_${question.id}" onclick="scrollPdfQuestion('${question.id}')" title="${escAttr(question.label || `CÃ¢u ${idx + 1}`)}">${idx + 1}<span class="pill-dot" id="pdfNavDot_${question.id}"></span></div>`).join("");
+  PDF_EL.attemptNav.innerHTML = questions.map((question, idx) => `<div class="nav-pill" id="pdfNav_${question.id}" onclick="scrollPdfQuestion('${question.id}')" title="${escAttr(question.label || `Câu ${idx + 1}`)}">${idx + 1}<span class="pill-dot" id="pdfNavDot_${question.id}"></span></div>`).join("");
   PDF_EL.attemptQuestions.innerHTML = questions.map((question, idx) => renderPdfAttemptQuestion(question, idx + 1)).join("");
   questions.forEach((question) => updatePdfNav(question.id));
   updatePdfAttemptClock();
@@ -716,22 +716,22 @@ function renderPdfAttemptQuestion(question, index) {
   } else if (question.question_type === "true_false") {
     answerCol = `<div class="opt-col">` + Array.from({ length: Math.max(2, Number(question.answer_count || 4)) }, (_, idx) => {
       const label = String.fromCharCode(97 + idx);
-      return `<div class="tf-row"><span><strong>${label})</strong></span><div class="tf-actions"><label><input type="radio" name="pdfTf_${question.id}_${label}" value="Ä" ${answer.includes(label + "Ä") ? "checked" : ""} onchange="updatePdfTF('${question.id}')"> Ä</label><label><input type="radio" name="pdfTf_${question.id}_${label}" value="S" ${answer.includes(label + "S") ? "checked" : ""} onchange="updatePdfTF('${question.id}')"> S</label></div></div>`;
+      return `<div class="tf-row"><span><strong>${label})</strong></span><div class="tf-actions"><label><input type="radio" name="pdfTf_${question.id}_${label}" value="Đ" ${answer.includes(label + "Đ") ? "checked" : ""} onchange="updatePdfTF('${question.id}')"> Đ</label><label><input type="radio" name="pdfTf_${question.id}_${label}" value="S" ${answer.includes(label + "S") ? "checked" : ""} onchange="updatePdfTF('${question.id}')"> S</label></div></div>`;
     }).join("") + `</div>`;
   } else if (question.question_type === "short_answer") {
-    answerCol = `<input class="short-input" value="${escAttr(answer)}" oninput="updatePdfText('${question.id}',this.value)" placeholder="Nháº­p Ä‘Ã¡p Ã¡n">`;
+    answerCol = `<input class="short-input" value="${escAttr(answer)}" oninput="updatePdfText('${question.id}',this.value)" placeholder="Nhập đáp án">`;
   } else {
-    answerCol = `<textarea class="essay-box" oninput="updatePdfText('${question.id}',this.value)" placeholder="Viáº¿t cÃ¢u tráº£ lá»i">${esc(answer)}</textarea>`;
+    answerCol = `<textarea class="essay-box" oninput="updatePdfText('${question.id}',this.value)" placeholder="Viết câu trả lời">${esc(answer)}</textarea>`;
   }
   return `<div class="answer-card" id="pdfQCard_${question.id}">
     <div class="answer-card-hd">
       <span class="num">${index}</span>
-      <strong>${esc(question.label || `CÃ¢u ${index}`)}</strong>
+      <strong>${esc(question.label || `Câu ${index}`)}</strong>
       <span class="pill soft">${typeLabel(question.question_type)}</span>
-      <span style="margin-left:auto;font-size:.78rem;color:var(--ink-mid)">${question.points || 0} Ä‘iá»ƒm</span>
+      <span style="margin-left:auto;font-size:.78rem;color:var(--ink-mid)">${question.points || 0} điểm</span>
     </div>
     <div class="answer-card-bd" style="display:grid;grid-template-columns:13fr 2fr;gap:12px;align-items:flex-start">
-      <div class="question-stem" style="color:var(--ink-light);font-size:.85rem;">Xem Ä‘á» trong PDF bÃªn trÃ¡i.</div>
+      <div class="question-stem" style="color:var(--ink-light);font-size:.85rem;">Xem đề trong PDF bên trái.</div>
       <div class="answer-col">${answerCol}</div>
     </div>
   </div>`;
@@ -800,14 +800,14 @@ async function closePdfAttempt() {
     PDF_EL.attemptShell.classList.remove("show");
     return;
   }
-  if (!confirm("Báº¡n muá»‘n thoÃ¡t? Tiáº¿n trÃ¬nh sáº½ Ä‘Æ°á»£c lÆ°u vÃ  khi vÃ o láº¡i sáº½ bá»‹ trá»« 5 phÃºt.")) return;
+  if (!confirm("Bạn muốn thoát? Tiến trình sẽ được lưu và khi vào lại sẽ bị trừ 5 phút.")) return;
   clearInterval(PDF_STATE.attemptTimer);
   await savePdfAttemptProgress();
   PDF_EL.attemptShell.classList.remove("show");
 }
 
 async function submitPdfAttempt(auto) {
-  if (!auto && !confirm("Báº¡n cháº¯c cháº¯n muá»‘n ná»™p bÃ i?")) return;
+  if (!auto && !confirm("Bạn chắc chắn muốn nộp bài?")) return;
   clearInterval(PDF_STATE.attemptTimer);
   const exam = PDF_STATE.exams.find((item) => item.id === PDF_STATE.attemptExamId);
   const questions = getPdfQuestions(PDF_STATE.attemptExamId);
@@ -845,7 +845,7 @@ async function submitPdfAttempt(auto) {
 
   PDF_EL.attemptShell.classList.remove("show");
   await loadPdfData(true);
-  await openPdfReview(PDF_STATE.attemptResultId, exam?.title || "Äá» PDF");
+  await openPdfReview(PDF_STATE.attemptResultId, exam?.title || "Đề PDF");
 }
 
 async function openPdfSubmissions(examId) {
@@ -862,10 +862,10 @@ async function openPdfSubmissions(examId) {
   const latestByStudent = {};
   results.forEach((result) => { if (!latestByStudent[result.student_id]) latestByStudent[result.student_id] = result; });
 
-  PDF_EL.submissionTitle.textContent = `BÃ i Ä‘Ã£ ná»™p - ${exam.title}`;
+  PDF_EL.submissionTitle.textContent = `Bài đã nộp - ${exam.title}`;
   PDF_EL.submissionBody.innerHTML = results.length
-    ? `<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#0f3c73;color:#fff"><th style="padding:12px;text-align:left">Há»c sinh</th><th style="padding:12px;text-align:center">Äiá»ƒm tá»± Ä‘á»™ng</th><th style="padding:12px;text-align:center">Tá»•ng</th><th style="padding:12px;text-align:center">Ná»™p lÃºc</th><th style="padding:12px;text-align:center">Chi tiáº¿t</th></tr></thead><tbody>${Object.values(latestByStudent).map((result) => `<tr style="border-bottom:1px solid rgba(39,58,91,.08)"><td style="padding:12px"><div style="display:flex;align-items:center;gap:10px"><img src="${escAttr(userMap[result.student_id]?.avatar_url || "default-avatar.png")}" style="width:36px;height:36px;border-radius:50%;object-fit:cover"><strong>${esc(userMap[result.student_id]?.full_name || "Há»c sinh")}</strong></div></td><td style="padding:12px;text-align:center">${result.score_auto ?? "â€”"}</td><td style="padding:12px;text-align:center;font-weight:700;color:var(--navy)">${result.score_total ?? result.score_auto ?? "â€”"}</td><td style="padding:12px;text-align:center">${fmtDateTime(result.submitted_at)}</td><td style="padding:12px;text-align:center"><button class="btn btn-outline btn-sm" type="button" data-open-pdf-review="${result.id}|${escAttr(exam.title)}">Xem bÃ i</button></td></tr>`).join("")}</tbody></table></div>`
-    : `<div class="empty"><strong>ChÆ°a cÃ³ bÃ i ná»™p nÃ o</strong><div>Äá» PDF nÃ y chÆ°a cÃ³ há»c sinh lÃ m bÃ i.</div></div>`;
+    ? `<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#0f3c73;color:#fff"><th style="padding:12px;text-align:left">Học sinh</th><th style="padding:12px;text-align:center">Điểm tự động</th><th style="padding:12px;text-align:center">Tổng</th><th style="padding:12px;text-align:center">Nộp lúc</th><th style="padding:12px;text-align:center">Chi tiết</th></tr></thead><tbody>${Object.values(latestByStudent).map((result) => `<tr style="border-bottom:1px solid rgba(39,58,91,.08)"><td style="padding:12px"><div style="display:flex;align-items:center;gap:10px"><img src="${escAttr(userMap[result.student_id]?.avatar_url || "default-avatar.png")}" style="width:36px;height:36px;border-radius:50%;object-fit:cover"><strong>${esc(userMap[result.student_id]?.full_name || "Học sinh")}</strong></div></td><td style="padding:12px;text-align:center">${result.score_auto ?? "—"}</td><td style="padding:12px;text-align:center;font-weight:700;color:var(--navy)">${result.score_total ?? result.score_auto ?? "—"}</td><td style="padding:12px;text-align:center">${fmtDateTime(result.submitted_at)}</td><td style="padding:12px;text-align:center"><button class="btn btn-outline btn-sm" type="button" data-open-pdf-review="${result.id}|${escAttr(exam.title)}">Xem bài</button></td></tr>`).join("")}</tbody></table></div>`
+    : `<div class="empty"><strong>Chưa có bài nộp nào</strong><div>Đề PDF này chưa có học sinh làm bài.</div></div>`;
 
   PDF_EL.submissionModal.classList.add("show");
   document.querySelectorAll("[data-open-pdf-review]").forEach((button) => button.onclick = () => {
@@ -884,8 +884,8 @@ async function openPdfReview(resultId, title) {
   const answerMap = {};
   (answerRows || []).forEach((row) => { answerMap[row.question_id] = row; });
 
-  PDF_EL.submissionTitle.textContent = `Xem láº¡i bÃ i - ${title}`;
-  PDF_EL.submissionBody.innerHTML = `<div class="review-wrap"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><div style="font-weight:700;color:var(--navy)">${esc(title)}</div><div class="hint">Káº¿t quáº£ bÃ i lÃ m Ä‘á» PDF</div></div><div style="font-size:.92rem;color:var(--ink-mid)">Tá»± Ä‘á»™ng: <b>${result?.score_auto ?? 0}</b><br><span style="color:var(--navy);font-weight:700">Tá»•ng: ${result?.score_total ?? "ChÆ°a cháº¥m"} / ${exam?.total_points || 0}</span></div></div>${questions.map((question, idx) => renderPdfReviewCard(question, answerMap[question.id], idx + 1)).join("")}</div>`;
+  PDF_EL.submissionTitle.textContent = `Xem lại bài - ${title}`;
+  PDF_EL.submissionBody.innerHTML = `<div class="review-wrap"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><div style="font-weight:700;color:var(--navy)">${esc(title)}</div><div class="hint">Kết quả bài làm đề PDF</div></div><div style="font-size:.92rem;color:var(--ink-mid)">Tự động: <b>${result?.score_auto ?? 0}</b><br><span style="color:var(--navy);font-weight:700">Tổng: ${result?.score_total ?? "Chưa chấm"} / ${exam?.total_points || 0}</span></div></div>${questions.map((question, idx) => renderPdfReviewCard(question, answerMap[question.id], idx + 1)).join("")}</div>`;
   PDF_EL.submissionModal.classList.add("show");
 }
 
@@ -894,7 +894,7 @@ function renderPdfReviewCard(question, answerRow, index) {
   const score = answerRow?.score_earned ?? 0;
   const correct = question.answer || "";
   const ok = answerRow?.is_correct;
-  return `<div class="answer-card"><div class="answer-card-hd"><span class="num">${index}</span><strong>${esc(question.label || `CÃ¢u ${index}`)}</strong><span class="pill soft">${typeLabel(question.question_type)}</span><span style="margin-left:auto;font-size:.78rem;color:var(--ink-mid)">${question.points || 0} Ä‘iá»ƒm</span></div><div class="answer-card-bd" style="grid-template-columns:1fr"><div><div style="padding:10px 12px;border-radius:12px;background:${ok === true ? "#f0fdf4" : ok === false ? "#fef2f2" : "#fff7ed"};border:1px solid ${ok === true ? "#86efac" : ok === false ? "#fca5a5" : "#fdba74"}"><div style="font-weight:700;color:${ok === true ? "var(--green)" : ok === false ? "var(--red)" : "#b45309"}">${ok === true ? "ÄÃºng" : ok === false ? "Sai" : "Tá»± luáº­n / chá» cháº¥m"}</div><div style="margin-top:4px;font-size:.84rem">Báº¡n lÃ m: <b>${esc(answer || "Bá» qua")}</b></div>${ok === false || question.question_type === "essay" ? `<div style="margin-top:4px;font-size:.84rem">ÄÃ¡p Ã¡n chuáº©n: <b>${esc(correct || "â€”")}</b></div>` : ""}<div style="margin-top:6px;font-size:.84rem;font-weight:700">Äiá»ƒm: ${score}/${question.points || 0}</div></div></div></div></div>`;
+  return `<div class="answer-card"><div class="answer-card-hd"><span class="num">${index}</span><strong>${esc(question.label || `Câu ${index}`)}</strong><span class="pill soft">${typeLabel(question.question_type)}</span><span style="margin-left:auto;font-size:.78rem;color:var(--ink-mid)">${question.points || 0} điểm</span></div><div class="answer-card-bd" style="grid-template-columns:1fr"><div><div style="padding:10px 12px;border-radius:12px;background:${ok === true ? "#f0fdf4" : ok === false ? "#fef2f2" : "#fff7ed"};border:1px solid ${ok === true ? "#86efac" : ok === false ? "#fca5a5" : "#fdba74"}"><div style="font-weight:700;color:${ok === true ? "var(--green)" : ok === false ? "var(--red)" : "#b45309"}">${ok === true ? "Đúng" : ok === false ? "Sai" : "Tự luận / chờ chấm"}</div><div style="margin-top:4px;font-size:.84rem">Bạn làm: <b>${esc(answer || "Bỏ qua")}</b></div>${ok === false || question.question_type === "essay" ? `<div style="margin-top:4px;font-size:.84rem">Đáp án chuẩn: <b>${esc(correct || "—")}</b></div>` : ""}<div style="margin-top:6px;font-size:.84rem;font-weight:700">Điểm: ${score}/${question.points || 0}</div></div></div></div></div>`;
 }
 
 function closePdfSubmissionModal() {
