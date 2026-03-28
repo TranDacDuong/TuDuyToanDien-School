@@ -1,82 +1,68 @@
 (function () {
   const replacements = [
-    ["Ä‘", "đ"],
-    ["Ä", "Đ"],
-    ["áº¥", "ấ"],
-    ["áº§", "ầ"],
-    ["áº¡", "ạ"],
-    ["áº£", "ả"],
-    ["áº¯", "ắ"],
-    ["áº·", "ặ"],
-    ["áº¿", "ế"],
-    ["á»", "ề"],
-    ["á»‡", "ệ"],
-    ["á»ƒ", "ể"],
-    ["á»", "ỏ"],
-    ["á»‘", "ố"],
-    ["á»“", "ồ"],
-    ["á»“n", "ồn"],
-    ["á»™", "ộ"],
-    ["á»›", "ớ"],
-    ["á»", "ờ"],
-    ["á»£", "ợ"],
-    ["á»“i", "ồi"],
-    ["á»›i", "ới"],
-    ["á»‹", "ị"],
-    ["á»‰", "ỉ"],
-    ["á»©", "ứ"],
-    ["á»«", "ừ"],
-    ["á»±", "ự"],
-    ["á»­", "ử"],
-    ["á»¥", "ụ"],
-    ["á»§", "ủ"],
-    ["á»", "ọ"],
-    ["á»i", "ỏi"],
-    ["á»i", "ời"],
-    ["á»—", "ỗ"],
-    ["á»‹ch", "ịch"],
-    ["á»—i", "ỗi"],
-    ["á»ng", "ờng"],
-    ["Ã ", "à"],
-    ["Ã¡", "á"],
-    ["Ã¢", "â"],
-    ["Ã£", "ã"],
-    ["Ã¨", "è"],
-    ["Ã©", "é"],
-    ["Ãª", "ê"],
-    ["Ã¬", "ì"],
-    ["Ã­", "í"],
-    ["Ã²", "ò"],
-    ["Ã³", "ó"],
-    ["Ã´", "ô"],
-    ["Ãµ", "õ"],
-    ["Ã¶", "ö"],
-    ["Ã¹", "ù"],
-    ["Ãº", "ú"],
-    ["Ã½", "ý"],
-    ["Ã„â€˜", "Đ"],
-    ["Ã†Â°", "ư"],
-    ["Ã‚", ""],
-    ["Â", ""],
-    ["â€¢", "•"],
-    ["â€”", "—"],
-    ["â†", "←"]
+    ["Ã„â€˜", "\u0111"],
+    ["Ã„Â", "\u0110"],
+    ["Ã¡ÂºÂ¥", "\u1ea5"],
+    ["Ã¡ÂºÂ§", "\u1ea7"],
+    ["Ã¡ÂºÂ¡", "\u1ea1"],
+    ["Ã¡ÂºÂ£", "\u1ea3"],
+    ["Ã¡ÂºÂ¯", "\u1eaf"],
+    ["Ã¡ÂºÂ·", "\u1eb7"],
+    ["Ã¡ÂºÂ¿", "\u1ebf"],
+    ["Ã¡Â»Â", "\u1ec1"],
+    ["Ã¡Â»â€¡", "\u1ec7"],
+    ["Ã¡Â»Æ’", "\u1ec3"],
+    ["Ã¡Â»Â", "\u1ecf"],
+    ["Ã¡Â»â€˜", "\u1ed1"],
+    ["Ã¡Â»â€œ", "\u1ed3"],
+    ["Ã¡Â»â„¢", "\u1ed9"],
+    ["Ã¡Â»â€º", "\u1edb"],
+    ["Ã¡Â»Â", "\u1edd"],
+    ["Ã¡Â»Â£", "\u1ee3"],
+    ["Ã¡Â»â€¹", "\u1ecb"],
+    ["Ã¡Â»â€°", "\u1ec9"],
+    ["Ã¡Â»Â©", "\u1ee9"],
+    ["Ã¡Â»Â«", "\u1eeb"],
+    ["Ã¡Â»Â±", "\u1ef1"],
+    ["Ã¡Â»Â­", "\u1eed"],
+    ["Ã¡Â»Â¥", "\u1ee5"],
+    ["Ã¡Â»Â§", "\u1ee7"],
+    ["Ã¡Â»Â", "\u1ecd"],
+    ["Ãƒ ", "\u00e0"],
+    ["ÃƒÂ¡", "\u00e1"],
+    ["ÃƒÂ¢", "\u00e2"],
+    ["ÃƒÂ£", "\u00e3"],
+    ["ÃƒÂ¨", "\u00e8"],
+    ["ÃƒÂ©", "\u00e9"],
+    ["ÃƒÂª", "\u00ea"],
+    ["ÃƒÂ¬", "\u00ec"],
+    ["ÃƒÂ­", "\u00ed"],
+    ["ÃƒÂ²", "\u00f2"],
+    ["ÃƒÂ³", "\u00f3"],
+    ["ÃƒÂ´", "\u00f4"],
+    ["ÃƒÂµ", "\u00f5"],
+    ["ÃƒÂ¹", "\u00f9"],
+    ["ÃƒÂº", "\u00fa"],
+    ["ÃƒÂ½", "\u00fd"],
+    ["Ã¢â‚¬Â¢", "\u2022"],
+    ["Ã¢â‚¬â€", "\u2014"],
+    ["Ã¢â€ Â", "\u2190"]
   ];
 
   function sanitizeText(value) {
     let text = String(value ?? "");
-    replacements.forEach(([bad, good]) => {
+    for (const [bad, good] of replacements) {
       text = text.split(bad).join(good);
-    });
+    }
     return text;
   }
 
-  function sanitizeNode(root) {
+  function sanitizeTree(root) {
     if (!root) return;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-    const textNodes = [];
-    while (walker.nextNode()) textNodes.push(walker.currentNode);
-    textNodes.forEach((node) => {
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach((node) => {
       const next = sanitizeText(node.nodeValue);
       if (next !== node.nodeValue) node.nodeValue = next;
     });
@@ -87,29 +73,31 @@
   }
 
   function applyKnownLabels() {
-    document.title = "Game thi đấu";
+    document.title = "Game thi \u0111\u1ea5u";
     const heroTitle = document.querySelector(".hero-copy h1");
-    if (heroTitle) heroTitle.textContent = "Đấu trường tri thức";
+    if (heroTitle) heroTitle.textContent = "\u0110\u1ea5u tr\u01b0\u1eddng tri th\u1ee9c";
     const heroDesc = document.querySelector(".hero-copy p");
     if (heroDesc) {
-      heroDesc.textContent = "Biến việc luyện đề thành một trận đấu thật sự. Học sinh có thể tạo phòng, mời bạn vào thi, trả lời câu hỏi nhanh để leo hạng và xem bảng xếp hạng ngay trong phòng.";
+      heroDesc.textContent = "Bi\u1ebfn vi\u1ec7c luy\u1ec7n \u0111\u1ec1 th\u00e0nh m\u1ed9t tr\u1eadn \u0111\u1ea5u th\u1eadt s\u1ef1. H\u1ecdc sinh c\u00f3 th\u1ec3 t\u1ea1o ph\u00f2ng, m\u1eddi b\u1ea1n v\u00e0o thi, tr\u1ea3 l\u1eddi c\u00e2u h\u1ecfi nhanh \u0111\u1ec3 leo h\u1ea1ng v\u00e0 xem b\u1ea3ng x\u1ebfp h\u1ea1ng ngay trong ph\u00f2ng.";
     }
     const modeBadge = Array.from(document.querySelectorAll(".hero-badge")).find((el) => el.textContent.includes("Mode:"));
-    if (modeBadge) modeBadge.textContent = "Mode: Quick / Friends / Ranked / Survival / Speed";
+    if (modeBadge) {
+      modeBadge.textContent = "Mode: Quick / Friends / Ranked / Survival / Speed";
+    }
   }
 
   function applyAll() {
-    sanitizeNode(document.body);
+    sanitizeTree(document.body);
     applyKnownLabels();
   }
 
-  const nativeAlert = window.alert.bind(window);
-  const nativeConfirm = window.confirm.bind(window);
-  const nativePrompt = window.prompt.bind(window);
+  const rawAlert = window.alert.bind(window);
+  const rawConfirm = window.confirm.bind(window);
+  const rawPrompt = window.prompt.bind(window);
 
-  window.alert = (message) => nativeAlert(sanitizeText(message));
-  window.confirm = (message) => nativeConfirm(sanitizeText(message));
-  window.prompt = (message, value) => nativePrompt(sanitizeText(message), sanitizeText(value));
+  window.alert = (message) => rawAlert(sanitizeText(message));
+  window.confirm = (message) => rawConfirm(sanitizeText(message));
+  window.prompt = (message, value) => rawPrompt(sanitizeText(message), sanitizeText(value));
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", applyAll);
