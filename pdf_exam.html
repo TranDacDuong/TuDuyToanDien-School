@@ -114,8 +114,19 @@ textarea{min-height:110px;resize:vertical}
 .draft-answer-item .tf-state{min-width:62px;padding:6px 8px;border-radius:8px;font-size:.82rem}
 .draft-answer-item .short-editor-row span{height:34px;border-radius:8px;font-size:.82rem}
 .draft-answer-item .short-editor-row .input{padding:8px 10px}
+.draft-answer-compact{display:grid;gap:6px}
+.draft-answer-top{display:grid;grid-template-columns:auto 160px minmax(0,1fr) auto;gap:10px;align-items:center}
+.draft-answer-bottom{display:grid;grid-template-columns:90px minmax(0,1fr);gap:10px;align-items:start}
+.draft-inline-title{font-size:.92rem;font-weight:800;color:var(--navy);white-space:nowrap}
+.draft-inline-label{font-size:.74rem;font-weight:700;color:var(--ink-mid);white-space:nowrap}
+.draft-inline-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.draft-answer-item .answer-editor-row{gap:6px}
+.draft-answer-item .answer-box{min-height:32px;padding:5px 8px;font-size:.82rem}
+.draft-answer-item .draft-answer-partial>div:last-child{gap:6px}
+.draft-answer-item .draft-answer-partial label{padding:7px 8px !important}
+.draft-answer-item .draft-answer-partial .input{padding:6px 8px}
 @media(max-width:1080px){.toolbar,.form-grid,.exam-body,.answer-card-bd{grid-template-columns:1fr}.question-row{grid-template-columns:1fr}.question-actions{align-items:flex-start;flex-direction:row;flex-wrap:wrap}.exam-body{grid-template-columns:1fr}.pdf-pane{min-height:360px}}
-@media(max-width:1080px){.draft-answer-grid{grid-template-columns:1fr}}
+@media(max-width:1080px){.draft-answer-grid,.draft-answer-top,.draft-answer-bottom{grid-template-columns:1fr}}
 </style>
 </head>
 <body>

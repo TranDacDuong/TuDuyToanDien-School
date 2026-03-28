@@ -742,6 +742,49 @@ function renderPartialScoreEditor(existing = null) {
     </div>`;
 }
 
+// Final compact inline renderer
+function renderDraftQuestionList() {
+  PDF_EL.draftQuestionList.className = "draft-answer-list";
+  PDF_EL.draftQuestionList.innerHTML = PDF_STATE.draftQuestions.length
+    ? PDF_STATE.draftQuestions
+      .sort((a, b) => (a.order_no || 0) - (b.order_no || 0))
+      .map((item, idx) => {
+        const q = withPdfPartialDefaults({ ...item, order_no: idx + 1 });
+        return `<div class="draft-answer-item" id="pdfDraftRow_${q.id}">
+          <div class="draft-answer-compact">
+            <div class="draft-answer-top">
+              <div class="draft-inline-title">Câu ${idx + 1}</div>
+              <div class="draft-inline-row">
+                <span class="draft-inline-label">Loại câu:</span>
+                <select class="select" style="width:150px" onchange="updatePdfDraftType('${q.id}',this.value)">
+                  <option value="multi_choice" ${q.question_type === "multi_choice" ? "selected" : ""}>Trắc nghiệm</option>
+                  <option value="true_false" ${q.question_type === "true_false" ? "selected" : ""}>Đúng / Sai</option>
+                  <option value="short_answer" ${q.question_type === "short_answer" ? "selected" : ""}>Trả lời ngắn</option>
+                  <option value="essay" ${q.question_type === "essay" ? "selected" : ""}>Tự luận</option>
+                </select>
+              </div>
+              <div class="draft-inline-row">
+                <span class="draft-inline-label">Đáp án:</span>
+                ${renderInlinePdfAnswerEditor(q)}
+              </div>
+              <button class="btn btn-danger btn-sm" type="button" onclick="deletePdfQuestion('${q.id}')">Xóa</button>
+            </div>
+            <div class="draft-answer-bottom">
+              <div class="draft-inline-row">
+                <span class="draft-inline-label">Điểm:</span>
+                <input class="input" style="width:76px" type="number" min="0" step="0.25" value="${q.points ?? 0}" oninput="updatePdfDraftField('${q.id}','points',this.value)">
+              </div>
+              <div>
+                <span class="draft-inline-label">Điểm chi tiết:</span>
+                ${renderInlinePdfPartialEditor(q)}
+              </div>
+            </div>
+          </div>
+        </div>`;
+      }).join("")
+    : `<div class="empty"><strong>Chưa có đáp án nào</strong><div>Hãy bấm + Thêm đáp án để thêm trực tiếp từng câu ngay bên dưới.</div></div>`;
+}
+
 // Final renderer for inline PDF answers: no nested edit button, edit directly on each row.
 function renderDraftQuestionList() {
   PDF_EL.draftQuestionList.className = "draft-answer-list";
