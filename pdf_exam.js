@@ -649,7 +649,7 @@ function closePdfExamScreen() {
 }
 
 function renderPdfQuestionRow(question) {
-  return `<div class="question-row"><div class="question-badge"><strong>${esc(question.label || "Câu")}</strong><span>${question.order_no || 1}</span></div><div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px"><strong style="color:var(--navy)">${esc(question.label || "Câu hỏi")}</strong><span class="pill soft">${typeLabel(question.question_type)}</span><span class="pill soft">${question.points || 0} điểm</span></div><div style="color:#607089;line-height:1.65">Học sinh sẽ đọc nội dung chính từ file PDF ở màn làm bài.</div><div class="hint" style="margin-top:8px">Đáp án đúng: <b>${esc(question.answer || "")}</b></div></div><div class="question-actions"></div></div>`;
+  return `<div class="question-row"><div class="question-main"><div class="question-title"><span class="question-index">Câu ${question.order_no || 1}</span><span class="pill soft">${typeLabel(question.question_type)}</span><span class="pill soft">${question.points || 0} điểm</span></div><div class="question-actions"></div></div><div class="question-answer">Đáp án đúng: <strong>${esc(question.answer || "")}</strong></div></div>`;
 }
 
 async function openPdfAttempt(examId) {
