@@ -264,7 +264,7 @@
             'color:var(--ink-light);margin-bottom:5px">Thông tin lớp</div>'+
             '<div style="margin-bottom:5px">'+scheduleHtml+'</div>'+
             '<div style="font-size:.82rem;color:var(--ink-mid)">'+
-            'ðŸ’° '+formatTuition(data.tuition_fee, data.tuition_type)+
+            '💰 '+formatTuition(data.tuition_fee, data.tuition_type)+
             ' &nbsp;•&nbsp; 👨‍🎓 '+activeCount+' học sinh'+
             (data.subjects?.name?' &nbsp;•&nbsp; 📚 '+data.subjects.name:'')+
             (data.grades?.name?' &nbsp;•&nbsp; 🏫 Khối '+data.grades.name:'')+
