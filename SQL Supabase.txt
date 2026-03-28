@@ -1423,3 +1423,71 @@ CREATE TRIGGER set_pdf_exams_updated_at
 BEFORE UPDATE ON public.pdf_exams
 FOR EACH ROW
 EXECUTE FUNCTION public.set_updated_at();
+
+-- Allow linking PDF exams to classes and courses
+ALTER TABLE public.pdf_exam_results
+  ADD COLUMN IF NOT EXISTS class_id uuid,
+  ADD COLUMN IF NOT EXISTS course_id uuid;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'pdf_exam_results_class_id_fkey'
+      AND table_name = 'pdf_exam_results'
+      AND table_schema = 'public'
+  ) THEN
+    ALTER TABLE public.pdf_exam_results
+      ADD CONSTRAINT pdf_exam_results_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id) ON DELETE CASCADE;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'pdf_exam_results_course_id_fkey'
+      AND table_name = 'pdf_exam_results'
+      AND table_schema = 'public'
+  ) THEN
+    ALTER TABLE public.pdf_exam_results
+      ADD CONSTRAINT pdf_exam_results_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS pdf_exam_results_class_idx ON public.pdf_exam_results (class_id, pdf_exam_id, student_id);
+CREATE INDEX IF NOT EXISTS pdf_exam_results_course_idx ON public.pdf_exam_results (course_id, pdf_exam_id, student_id);
+
+-- Allow classes to attach PDF exams
+ALTER TABLE public.class_exams
+  ADD COLUMN IF NOT EXISTS pdf_exam_id uuid;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'class_exams_pdf_exam_id_fkey'
+      AND table_name = 'class_exams'
+      AND table_schema = 'public'
+  ) THEN
+    ALTER TABLE public.class_exams
+      ADD CONSTRAINT class_exams_pdf_exam_id_fkey FOREIGN KEY (pdf_exam_id) REFERENCES public.pdf_exams(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS class_exams_pdf_exam_idx ON public.class_exams (pdf_exam_id);
+
+-- Allow course sessions to attach PDF exams
+ALTER TABLE public.course_sessions
+  ADD COLUMN IF NOT EXISTS pdf_exam_id uuid;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'course_sessions_pdf_exam_id_fkey'
+      AND table_name = 'course_sessions'
+      AND table_schema = 'public'
+  ) THEN
+    ALTER TABLE public.course_sessions
+      ADD CONSTRAINT course_sessions_pdf_exam_id_fkey FOREIGN KEY (pdf_exam_id) REFERENCES public.pdf_exams(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS course_sessions_pdf_exam_idx ON public.course_sessions (pdf_exam_id);

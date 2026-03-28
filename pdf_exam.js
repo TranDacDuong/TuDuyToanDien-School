@@ -15,6 +15,8 @@ const PDF_STATE = {
   attemptSeconds: 0,
   attemptTimer: null,
   attemptAnswers: {},
+  classId: null,
+  courseId: null,
 };
 
 const PDF_TYPE_ORDER = ["multi_choice", "true_false", "short_answer", "essay"];
@@ -134,6 +136,8 @@ async function initPdfExam() {
 
 function handlePdfRouteParams() {
   const params = new URLSearchParams(location.search);
+  PDF_STATE.classId = params.get("classId") || null;
+  PDF_STATE.courseId = params.get("courseId") || null;
   const examId = params.get("exam");
   const action = params.get("action");
   if (!examId && action === "create" && (PDF_STATE.role === "admin" || PDF_STATE.role === "teacher")) {
@@ -154,9 +158,12 @@ async function loadPdfData(reopenScreen) {
     ? sb.from("pdf_exams").select("*").eq("status", "open").order("created_at", { ascending: false })
     : sb.from("pdf_exams").select("*").order("created_at", { ascending: false });
 
+  const baseResult = sb.from("pdf_exam_results").select("*");
+  if (PDF_STATE.classId) baseResult.eq("class_id", PDF_STATE.classId);
+  if (PDF_STATE.courseId) baseResult.eq("course_id", PDF_STATE.courseId);
   const resultQuery = PDF_STATE.role === "student"
-    ? sb.from("pdf_exam_results").select("*").eq("student_id", PDF_STATE.user.id).order("attempt_no", { ascending: false })
-    : sb.from("pdf_exam_results").select("*").order("submitted_at", { ascending: false });
+    ? baseResult.eq("student_id", PDF_STATE.user.id).order("attempt_no", { ascending: false })
+    : baseResult.order("submitted_at", { ascending: false });
 
   const [{ data: exams, error: examErr }, { data: questions, error: questionErr }, { data: results, error: resultErr }, { data: answers, error: answerErr }] = await Promise.all([
     examQuery,
@@ -670,7 +677,14 @@ async function openPdfAttempt(examId) {
     (saved || []).forEach((row) => { PDF_STATE.attemptAnswers[row.question_id] = row.answer || ""; });
   } else {
     const attemptNo = (results[0]?.attempt_no || 0) + 1;
-    const { data, error } = await sb.from("pdf_exam_results").insert({ pdf_exam_id: examId, student_id: PDF_STATE.user.id, attempt_no: attemptNo, seconds_left: (exam.duration_minutes || 60) * 60 }).select("id").single();
+    const { data, error } = await sb.from("pdf_exam_results").insert({
+      pdf_exam_id: examId,
+      student_id: PDF_STATE.user.id,
+      attempt_no: attemptNo,
+      seconds_left: (exam.duration_minutes || 60) * 60,
+      class_id: PDF_STATE.classId,
+      course_id: PDF_STATE.courseId,
+    }).select("id").single();
     if (error) return alert("Không thể khởi tạo bài làm: " + error.message);
     PDF_STATE.attemptResultId = data.id;
     PDF_STATE.attemptSeconds = (exam.duration_minutes || 60) * 60;
