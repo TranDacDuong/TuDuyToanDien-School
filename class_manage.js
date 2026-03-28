@@ -798,6 +798,7 @@
           const rows = playerMap[room.id] || [];
           const joined = rows.some(p=>p.user_id===uid);
           const isWaiting = room.status === "waiting";
+          const isLive = room.status === "live";
           const isFull = rows.length >= Number(room.max_players||8);
           const canJoin = !joined && isWaiting && !isFull;
           const action = joined
@@ -806,10 +807,18 @@
               ? '<button onclick="location.href=\'game.html?action=join_room&roomId='+encodeURIComponent(room.id)+'&classId='+encodeURIComponent(_classId)+'\'" class="btn btn-primary btn-sm">Tham gia</button>'
               : '<button class="btn btn-outline btn-sm" disabled>'+(isWaiting?'Đã đầy':'Đã khóa')+'</button>';
           const statusText = room.status==="waiting"?"Đang chờ":room.status==="live"?"Đang đấu":"Đã kết thúc";
+          const statusBg = isWaiting ? "#eff6ff" : isLive ? "#ecfdf5" : "#f5f5f4";
+          const statusColor = isWaiting ? "#1d4ed8" : isLive ? "#15803d" : "#57534e";
+          const visibilityText = room.visibility==="private" ? "Riêng tư" : "Công khai";
           return '<div style="padding:14px 16px;background:var(--white);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+
             '<div style="flex:1;min-width:0">'+
               '<div style="font-weight:600;font-size:.9rem;color:var(--navy);margin-bottom:3px">'+esc(room.title||"Phòng game")+'</div>'+
-              '<div style="font-size:.75rem;color:var(--ink-mid)">🎮 '+esc(statusText)+' &nbsp;•&nbsp; Mã: '+esc(room.join_code||"—")+' &nbsp;•&nbsp; 👥 '+rows.length+'/'+(room.max_players||8)+' &nbsp;•&nbsp; ⏱ '+(room.time_per_question||0)+'s/câu</div>'+
+              '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:5px">'+
+                '<span style="font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:999px;background:'+statusBg+';color:'+statusColor+'">'+esc(statusText)+'</span>'+
+                '<span style="font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:999px;background:#f8fafc;color:#475569;border:1px solid #e2e8f0">'+esc(visibilityText)+'</span>'+
+                (joined ? '<span style="font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:999px;background:#fff7ed;color:#c2410c">Bạn đang ở trong phòng</span>' : '')+
+              '</div>'+
+              '<div style="font-size:.75rem;color:var(--ink-mid)">Mã: '+esc(room.join_code||"—")+' &nbsp;•&nbsp; 👥 '+rows.length+'/'+(room.max_players||8)+' &nbsp;•&nbsp; ⏱ '+(room.time_per_question||0)+'s/câu &nbsp;•&nbsp; '+(room.question_count||0)+' câu</div>'+
             '</div>'+
             '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+action+'</div>'+
           '</div>';

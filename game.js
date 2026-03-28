@@ -197,6 +197,9 @@
       }
     });
     EL.roomForm?.addEventListener("submit", submitCreateRoom);
+    EL.roomClass?.addEventListener("change", () => {
+      if (EL.roomClass.value) syncRoomFiltersFromClass(EL.roomClass.value);
+    });
     EL.roomGrade?.addEventListener("change", () => fillSubjects(EL.roomSubject, EL.roomGrade.value, "Chọn môn"));
     EL.gradeFilter?.addEventListener("change", () => {
       fillSubjects(EL.subjectFilter, EL.gradeFilter.value, "Tất cả môn");
@@ -261,6 +264,19 @@
   function fillClasses(el, placeholder) {
     if (!el) return;
     el.innerHTML = `<option value="">${placeholder}</option>` + (GAME.classes || []).map((item) => `<option value="${item.id}">${esc(item.class_name)}</option>`).join("");
+  }
+
+  function getSelectedClassMeta(classId) {
+    if (!classId) return null;
+    return (GAME.classes || []).find((item) => item.id === classId) || null;
+  }
+
+  function syncRoomFiltersFromClass(classId) {
+    const classMeta = getSelectedClassMeta(classId);
+    if (!classMeta) return;
+    if (EL.roomGrade) EL.roomGrade.value = classMeta.grade_id || "";
+    fillSubjects(EL.roomSubject, classMeta.grade_id || "", "Chá»n mÃ´n");
+    if (EL.roomSubject) EL.roomSubject.value = classMeta.subject_id || "";
   }
 
   function roomVisibilityLabel(value) {
@@ -395,6 +411,7 @@
     fillClasses(EL.roomClass, "Không gắn lớp");
     if (GAME.initialClassId && GAME.classIds.includes(GAME.initialClassId) && EL.roomClass) {
       EL.roomClass.value = GAME.initialClassId;
+      syncRoomFiltersFromClass(GAME.initialClassId);
     }
   }
 
@@ -684,7 +701,8 @@
     if (EL.roomVisibility) EL.roomVisibility.value = "public";
     if (EL.roomMaxPlayers) EL.roomMaxPlayers.value = "8";
     if (EL.roomClass) EL.roomClass.value = GAME.initialClassId && GAME.classIds.includes(GAME.initialClassId) ? GAME.initialClassId : "";
-    fillSubjects(EL.roomSubject, EL.roomGrade.value, "Chọn môn");
+    if (EL.roomClass?.value) syncRoomFiltersFromClass(EL.roomClass.value);
+    if (!EL.roomClass?.value) fillSubjects(EL.roomSubject, EL.roomGrade.value, "Chọn môn");
     EL.roomModal.classList.add("show");
   }
 
