@@ -27,6 +27,7 @@
     selectedAutoMode: "",
     questionDifficultyMap: {},
     liveRenderKey: "",
+    autoStartTimer: null,
   };
 
   const EL = {
@@ -462,6 +463,29 @@
     if (!EL.gradeFilter?.value) return;
     if (!EL.subjectFilter?.value) return;
     autoMatchSelectedMode();
+  }
+
+  function clearAutoStartTimer() {
+    clearTimeout(GAME.autoStartTimer);
+    GAME.autoStartTimer = null;
+  }
+
+  function isPublicAutoMatchRoom(room) {
+    const mode = roomModeValue(room);
+    return ["quick", "ranked", "survival", "speed"].includes(mode) && (room.visibility || "public") === "public";
+  }
+
+  function queueAutoStart(room) {
+    if (!isPublicAutoMatchRoom(room)) {
+      clearAutoStartTimer();
+      return;
+    }
+    clearAutoStartTimer();
+    GAME.autoStartTimer = setTimeout(() => {
+      if (GAME.activeRoom?.id === room.id && GAME.activeRoom?.status === "waiting") {
+        startGameMatch();
+      }
+    }, 1200);
   }
 
   function shuffle(list) {
@@ -1366,7 +1390,8 @@
     }
     const exists = GAME.players.find((player) => player.room_id === roomId && player.user_id === GAME.user.id);
     if (!exists) {
-      const { error } = await sb.from("game_room_players").insert({ room_id: roomId, user_id: GAME.user.id, score: 0, ready: false });
+      const autoReady = isPublicAutoMatchRoom(room);
+      const { error } = await sb.from("game_room_players").insert({ room_id: roomId, user_id: GAME.user.id, score: 0, ready: autoReady });
       if (error && !String(error.message || "").includes("duplicate")) {
         alert(`Không thể tham gia phòng: ${error.message}`);
         return;
@@ -1573,6 +1598,7 @@
 
   function hideGameScreen() {
     clearIntervals();
+    clearAutoStartTimer();
     teardownRoomRealtime();
     GAME.activeRoom = null;
     EL.roomScreen.classList.remove("show");
@@ -1593,6 +1619,7 @@
     clearInterval(GAME.questionTick);
     GAME.roomPoll = null;
     GAME.questionTick = null;
+    clearAutoStartTimer();
   }
 
   async function refreshActiveRoom(roomId, silent) {
@@ -1647,15 +1674,18 @@
     const visibility = roomVisibilityLabel(room.visibility || "public");
     const mode = roomModeValue(room);
     const modeLabel = roomModeLabel(mode);
+    const autoManagedRoom = isPublicAutoMatchRoom(room);
     const isHost = room.host_id === GAME.user.id;
     const me = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
     const others = GAME.roomPlayers.filter((item) => item.user_id !== room.host_id);
     const canStart = room.status === "waiting" && isHost && GAME.roomPlayers.length >= 2 && others.every((item) => item.ready);
+    if (canStart) queueAutoStart(room);
+    else clearAutoStartTimer();
 
     EL.roomScreenTitle.textContent = getRoomDisplayTitle(room);
-    EL.startGameBtn.classList.toggle("hidden", !(room.status === "waiting" && isHost));
+    EL.startGameBtn.classList.toggle("hidden", !(room.status === "waiting" && isHost) || autoManagedRoom);
     EL.startGameBtn.disabled = !canStart;
-    EL.toggleReadyBtn?.classList.toggle("hidden", room.status !== "waiting" || isHost);
+    EL.toggleReadyBtn?.classList.toggle("hidden", room.status !== "waiting" || isHost || autoManagedRoom);
     if (EL.toggleReadyBtn && me && !isHost) EL.toggleReadyBtn.textContent = me.ready ? "Hủy sẵn sàng" : "Sẵn sàng";
     ensurePlayerCache().then(() => {
       if (room.status === "waiting") {
@@ -1675,7 +1705,15 @@
         if (EL.inviteCode) EL.inviteCode.textContent = room.join_code || "—";
         if (EL.inviteVisibility) EL.inviteVisibility.textContent = visibility;
         EL.roomDescriptionView.textContent = room.description || "Mời bạn bè cùng vào phòng, khi đủ người thì chủ phòng bắt đầu trận.";
+        if (autoManagedRoom) {
+          EL.roomDescriptionView.textContent = "He thong dang ghep nguoi choi. Khi du nguoi, tran dau se tu dong bat dau.";
+        }
         if (EL.roomStartHint) {
+          if (autoManagedRoom) {
+            EL.roomStartHint.textContent = canStart
+              ? "Phong da du nguoi. Tran dau dang tu dong khoi dong."
+              : "Chon xong la vao phong ngay. Hay cho them nguoi choi de he thong tu bat dau tran.";
+          } else
           if (isHost) {
             EL.roomStartHint.textContent = canStart
               ? "Phòng đã đủ điều kiện để bắt đầu trận."
