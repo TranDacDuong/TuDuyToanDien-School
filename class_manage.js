@@ -660,10 +660,15 @@
     tc.innerHTML='<p style="color:var(--ink-light);font-size:.85rem">Đang tải đề thi...</p>';
     const sb=getSb(), role=_role;
 
-    const {data:classExams}=await sb.from("class_exams")
+    const {data:classExams,error:classExamsError}=await sb.from("class_exams")
       .select("id,starts_at,ends_at,exam:exams(id,title,duration_minutes,total_points,exam_questions(question:question_bank(question_type))),pdf:pdf_exams(id,title,duration_minutes,total_points)")
       .eq("class_id",_classId)
       .order("created_at",{ascending:false});
+
+    if(classExamsError){
+      tc.innerHTML = '<p style="color:var(--red);font-size:.85rem;padding:12px">Lỗi tải đề thi: '+esc(classExamsError.message)+'</p>';
+      return;
+    }
 
     const exams=(classExams||[]).map(ce=>{
       if(ce.exam){
@@ -717,10 +722,17 @@
     const sb=getSb();
     const uid=window._currentUserId;
     const examIds=exams.filter(e=>e.type==="exam").map(e=>e.id);
-    const{data:myResults}=await sb.from("exam_results")
-      .select("id,exam_id,attempt_no,submitted_at,score_auto,score_essay,score_total,seconds_left")
-      .eq("student_id",uid).eq("class_id",_classId).in("exam_id",examIds)
-      .order("attempt_no",{ascending:false});
+    const {data:myResults,error:myResultsError}=examIds.length
+      ? await sb.from("exam_results")
+          .select("id,exam_id,attempt_no,submitted_at,score_auto,score_essay,score_total,seconds_left")
+          .eq("student_id",uid).eq("class_id",_classId).in("exam_id",examIds)
+          .order("attempt_no",{ascending:false})
+      : {data:[],error:null};
+
+    if(myResultsError){
+      tc.innerHTML = addExamBtn + '<p style="color:var(--red);font-size:.85rem;padding:12px">Lỗi tải bài làm: '+esc(myResultsError.message)+'</p>';
+      return;
+    }
 
     const resultsMap={};
     (myResults||[]).forEach(r=>{
