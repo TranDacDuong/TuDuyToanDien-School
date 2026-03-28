@@ -405,12 +405,20 @@
     `).join("");
   }
 
+  function getGradeCardStyle(selected) {
+    return `position:relative;display:grid;gap:8px;min-height:108px;padding:16px 18px;border-radius:22px;border:${selected ? "2px solid rgba(250,204,21,.95)" : "1px solid rgba(125,211,252,.18)"};background:${selected ? "radial-gradient(circle at top left,rgba(250,204,21,.28),transparent 42%),linear-gradient(135deg,rgba(59,130,246,.34) 0%,rgba(15,23,42,.98) 58%,rgba(10,20,40,.98) 100%)" : "radial-gradient(circle at top left,rgba(125,211,252,.14),transparent 38%),linear-gradient(135deg,rgba(8,15,30,.98) 0%,rgba(13,27,52,.98) 55%,rgba(10,20,40,.98) 100%)"};box-shadow:${selected ? "0 18px 36px rgba(250,204,21,.18), inset 0 1px 0 rgba(255,255,255,.08)" : "0 14px 30px rgba(2,8,23,.24), inset 0 1px 0 rgba(255,255,255,.04)"};color:#eff6ff;text-align:left;cursor:pointer;overflow:hidden;transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease`;
+  }
+
+  function getSubjectCardStyle(selected) {
+    return `position:relative;display:grid;gap:8px;min-height:116px;padding:16px 18px;border-radius:22px;border:${selected ? "2px solid rgba(103,232,249,.95)" : "1px solid rgba(125,211,252,.18)"};background:${selected ? "radial-gradient(circle at top left,rgba(34,211,238,.24),transparent 42%),linear-gradient(135deg,rgba(8,145,178,.28) 0%,rgba(30,64,175,.2) 45%,rgba(10,20,40,.98) 100%)" : "radial-gradient(circle at top left,rgba(56,189,248,.12),transparent 38%),linear-gradient(135deg,rgba(8,15,30,.98) 0%,rgba(13,27,52,.98) 55%,rgba(10,20,40,.98) 100%)"};box-shadow:${selected ? "0 18px 36px rgba(34,211,238,.16), inset 0 1px 0 rgba(255,255,255,.08)" : "0 14px 30px rgba(2,8,23,.24), inset 0 1px 0 rgba(255,255,255,.04)"};color:#eff6ff;text-align:left;cursor:pointer;overflow:hidden;transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease`;
+  }
+
   function renderGradeCards() {
     const grid = document.getElementById("gameGradeCardGrid");
     if (!grid) return;
     grid.innerHTML = (GAME.grades || []).map((grade) => {
       const selected = EL.gradeFilter?.value === grade.id;
-      return `<button type="button" data-grade-card="${grade.id}" style="padding:14px 16px;border-radius:18px;border:${selected ? "2px solid #facc15" : "1px solid rgba(125,211,252,.18)"};background:${selected ? "linear-gradient(135deg,rgba(250,204,21,.18) 0%,rgba(251,191,36,.08) 100%)" : "linear-gradient(135deg,rgba(10,20,40,.96) 0%,rgba(16,32,61,.96) 100%)"};color:#eff6ff;font-weight:800;cursor:pointer">${esc(grade.name)}</button>`;
+      return `<button type="button" data-grade-card="${grade.id}" style="${getGradeCardStyle(selected)}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:${selected ? "rgba(250,204,21,.18)" : "rgba(148,163,184,.12)"};color:${selected ? "#fde68a" : "rgba(226,232,240,.78)"};font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">${selected ? "Dang chon" : "Khoi hoc"}</span><span style="font-size:1.1rem;font-weight:900;letter-spacing:.01em">${esc(grade.name)}</span><span style="font-size:.84rem;color:${selected ? "rgba(254,240,138,.9)" : "rgba(226,232,240,.7)"}">Chon khoi nay de mo danh sach mon tuong ung.</span></button>`;
     }).join("");
     document.querySelectorAll("[data-grade-card]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -432,7 +440,7 @@
     grid.innerHTML = subjects.length
       ? subjects.map((subject) => {
           const selected = EL.subjectFilter?.value === subject.id;
-          return `<button type="button" data-subject-card="${subject.id}" style="padding:14px 16px;border-radius:18px;border:${selected ? "2px solid #67e8f9" : "1px solid rgba(125,211,252,.18)"};background:${selected ? "linear-gradient(135deg,rgba(34,211,238,.18) 0%,rgba(59,130,246,.08) 100%)" : "linear-gradient(135deg,rgba(10,20,40,.96) 0%,rgba(16,32,61,.96) 100%)"};color:#eff6ff;font-weight:700;cursor:pointer">${esc(subject.name)}</button>`;
+          return `<button type="button" data-subject-card="${subject.id}" style="${getSubjectCardStyle(selected)}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:${selected ? "rgba(34,211,238,.18)" : "rgba(148,163,184,.12)"};color:${selected ? "#a5f3fc" : "rgba(226,232,240,.78)"};font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">${selected ? "San sang" : "Mon hoc"}</span><span style="font-size:1.02rem;font-weight:900;letter-spacing:.01em">${esc(subject.name)}</span><span style="font-size:.84rem;color:${selected ? "rgba(165,243,252,.88)" : "rgba(226,232,240,.7)"}">Chon mon nay de he thong tu dong tim phong dong nguoi nhat.</span></button>`;
         }).join("")
       : `<div class="hint">Chọn khối trước để hiện môn tương ứng.</div>`;
     document.querySelectorAll("[data-subject-card]").forEach((button) => {
