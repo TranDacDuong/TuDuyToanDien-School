@@ -24,6 +24,9 @@
     listChannel: null,
     leaderboardPeriod: "day",
     leavingRoom: false,
+    selectedAutoMode: "",
+    questionDifficultyMap: {},
+    liveRenderKey: "",
   };
 
   const EL = {
@@ -311,8 +314,11 @@
     if (classField) classField.classList.toggle("hidden", !policy.allowClass);
     const visibilityField = EL.roomVisibility?.closest(".field");
     if (visibilityField) visibilityField.classList.toggle("hidden", !!policy.lockVisibility);
+    EL.roomMode?.closest(".field")?.classList.toggle("hidden", GAME.role === "student");
     const roomTitleField = EL.roomTitle?.closest(".field");
     if (roomTitleField) roomTitleField.classList.add("hidden");
+    EL.roomQuestionCount?.closest(".field")?.classList.add("hidden");
+    EL.roomTimePerQuestion?.closest(".field")?.classList.add("hidden");
     if (EL.roomTitle) {
       EL.roomTitle.required = false;
       EL.roomTitle.tabIndex = -1;
@@ -327,6 +333,78 @@
     if (room?.class_id) return { label: "Phòng lớp học", accent: "Lớp riêng" };
     if ((room?.visibility || "public") === "public") return { label: "Phòng công khai", accent: "Mở toàn sảnh" };
     return { label: "Phòng riêng", accent: "Vào bằng mã" };
+  }
+
+  function getQuestionDuration(question, room) {
+    const difficulty = Number(GAME.questionDifficultyMap?.[question?.question_id] || 2);
+    return Math.max(10, difficulty * 10 || Number(room?.time_per_question || 20));
+  }
+
+  function getQuestionTimeline(room, questions) {
+    let elapsed = Math.max(0, Math.floor((Date.now() - new Date(room.started_at).getTime()) / 1000));
+    for (let index = 0; index < questions.length; index += 1) {
+      const duration = getQuestionDuration(questions[index], room);
+      if (elapsed < duration) {
+        return {
+          index,
+          question: questions[index],
+          secondsLeft: Math.max(0, duration - elapsed),
+          duration,
+        };
+      }
+      elapsed -= duration;
+    }
+    return {
+      index: questions.length,
+      question: null,
+      secondsLeft: 0,
+      duration: 0,
+    };
+  }
+
+  function getAutoMatchModeCards() {
+    return [
+      { mode: "quick", title: "Đấu nhanh", art: "⚡", desc: "Vào ngay, ghép ngay, học thật nhanh." },
+      { mode: "ranked", title: "Leo hạng", art: "🏆", desc: "Trận đấu Elo căng hơn, cạnh tranh rõ hơn." },
+      { mode: "survival", title: "Sinh tồn", art: "🛡️", desc: "Sai là mất mạng, càng về cuối càng căng." },
+      { mode: "speed", title: "Đua tốc độ", art: "🚀", desc: "Đúng nhanh ăn nhiều điểm hơn." },
+    ];
+  }
+
+  function injectAutoModeLobby() {
+    if (document.getElementById("gameModeDeck")) return;
+    const hero = document.querySelector("#gameListPage .hero");
+    if (!hero?.parentElement) return;
+    const deck = document.createElement("div");
+    deck.id = "gameModeDeck";
+    deck.style.cssText = "display:grid;gap:14px;margin:18px 0 10px";
+    deck.innerHTML = `
+      <div style="display:grid;gap:10px">
+        <div style="font-weight:800;font-size:1.05rem;color:#fef3c7">Chọn chế độ để hệ thống tự ghép phòng</div>
+        <div style="color:rgba(235,245,255,.78)">Chọn chế độ, khối và môn. Hệ thống sẽ tự vào phòng đang chờ, nếu phòng hiện tại đầy mới tạo phòng mới.</div>
+      </div>
+      <div id="gameModeCardGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px"></div>
+    `;
+    hero.parentElement.insertBefore(deck, hero.nextSibling);
+    const grid = deck.querySelector("#gameModeCardGrid");
+    grid.innerHTML = getAutoMatchModeCards().map((item) => `
+      <button type="button" class="game-mode-card" data-auto-mode="${item.mode}" style="display:grid;gap:10px;text-align:left;padding:18px;border-radius:22px;border:1px solid rgba(125,211,252,.18);background:linear-gradient(135deg,rgba(10,20,40,.96) 0%,rgba(16,32,61,.96) 100%);color:#eff6ff;cursor:pointer;box-shadow:0 16px 36px rgba(2,8,23,.24)">
+        <div style="font-size:2rem;line-height:1">${item.art}</div>
+        <div style="font-size:1.05rem;font-weight:800;color:#fef3c7">${item.title}</div>
+        <div style="font-size:.85rem;color:rgba(235,245,255,.74)">${item.desc}</div>
+      </button>
+    `).join("");
+  }
+
+  function refreshLobbyActions() {
+    if (EL.openRoomBtn) {
+      EL.openRoomBtn.textContent = "Phòng bạn bè";
+      EL.openRoomBtn.classList.toggle("hidden", GAME.role !== "student");
+    }
+    if (EL.quickMatchBtn) EL.quickMatchBtn.classList.add("hidden");
+    if (EL.reloadRoomsBtn) EL.reloadRoomsBtn.classList.add("hidden");
+    if (EL.keyword) EL.keyword.classList.add("hidden");
+    [EL.visibilityFilter, EL.sortFilter, EL.statusFilter, EL.modeFilter].forEach((el) => el?.classList.add("hidden"));
   }
 
   function shuffle(list) {
@@ -381,6 +459,8 @@
     GAME.grades = grades || [];
     GAME.subjects = subjects || [];
     configureCreateRoomForm();
+    injectAutoModeLobby();
+    refreshLobbyActions();
 
     fillGrades(EL.gradeFilter, "Tất cả khối");
     fillGrades(EL.roomGrade, "Chọn khối");
@@ -419,6 +499,10 @@
     EL.gradeFilter?.addEventListener("change", () => {
       fillSubjects(EL.subjectFilter, EL.gradeFilter.value, "Tất cả môn");
       renderRooms();
+      if (!EL.gradeFilter.value) GAME.selectedAutoMode = "";
+    });
+    EL.subjectFilter?.addEventListener("change", () => {
+      if (GAME.selectedAutoMode && EL.gradeFilter?.value && EL.subjectFilter?.value) autoMatchSelectedMode();
     });
     [EL.keyword, EL.subjectFilter, EL.modeFilter, EL.visibilityFilter, EL.sortFilter, EL.statusFilter].forEach((el) => {
       el?.addEventListener("input", renderRooms);
@@ -434,6 +518,16 @@
         GAME.leaderboardPeriod = button.dataset.rankPeriod || "day";
         document.querySelectorAll("[data-rank-period]").forEach((item) => item.classList.toggle("active", item === button));
         renderArenaInsights();
+      });
+    });
+    document.querySelectorAll("[data-auto-mode]").forEach((button) => {
+      button.addEventListener("click", () => {
+        GAME.selectedAutoMode = button.dataset.autoMode || "";
+        document.querySelectorAll("[data-auto-mode]").forEach((item) => {
+          item.style.outline = item === button ? "2px solid #facc15" : "none";
+          item.style.transform = item === button ? "translateY(-2px)" : "none";
+        });
+        if (EL.gradeFilter?.value && EL.subjectFilter?.value) autoMatchSelectedMode();
       });
     });
   }
@@ -513,18 +607,18 @@
 
   function getModeDefaults(mode) {
     if (mode === "friends") {
-      return { visibility: "private", maxPlayers: 6, questionCount: 10, timePerQuestion: 20 };
+      return { visibility: "private", maxPlayers: 6, questionCount: 5, timePerQuestion: 20 };
     }
     if (mode === "survival") {
-      return { visibility: "private", maxPlayers: 8, questionCount: 20, timePerQuestion: 15 };
+      return { visibility: "private", maxPlayers: 8, questionCount: 5, timePerQuestion: 20 };
     }
     if (mode === "speed") {
-      return { visibility: "private", maxPlayers: 10, questionCount: 15, timePerQuestion: 12 };
+      return { visibility: "private", maxPlayers: 10, questionCount: 5, timePerQuestion: 20 };
     }
     if (mode === "ranked") {
-      return { visibility: GAME.role === "admin" ? "public" : "private", maxPlayers: 2, questionCount: 12, timePerQuestion: 18 };
+      return { visibility: GAME.role === "admin" ? "public" : "private", maxPlayers: 2, questionCount: 5, timePerQuestion: 20 };
     }
-    return { visibility: GAME.role === "admin" ? "public" : "private", maxPlayers: 8, questionCount: 10, timePerQuestion: 20 };
+    return { visibility: GAME.role === "admin" ? "public" : "private", maxPlayers: 8, questionCount: 5, timePerQuestion: 20 };
   }
 
   function applyModeDefaults(mode, force) {
@@ -732,6 +826,11 @@
       button.onclick = () => joinRoom(button.dataset.joinRoom);
     });
     document.querySelectorAll("[data-enter-room]").forEach((button) => {
+      if ((button.textContent || "").toLowerCase().includes("xem")) {
+        button.textContent = "Đã kết thúc";
+        button.disabled = true;
+        return;
+      }
       button.onclick = () => openRoomScreen(button.dataset.enterRoom);
     });
   }
@@ -893,7 +992,7 @@
       .slice(0, 10);
   }
 
-  function renderArenaInsights() {
+  function renderArenaInsightsLegacy() {
     const finishedRooms = GAME.rooms.filter((room) => room.status === "finished");
     const finishedIds = new Set(finishedRooms.map((room) => room.id));
     const finishedPlayers = GAME.players.filter((player) => finishedIds.has(player.room_id));
@@ -1138,7 +1237,7 @@
     EL.roomForm?.reset();
     EL.roomCode.value = randomCode();
     if (EL.roomTitle) EL.roomTitle.value = `Game ${EL.roomCode.value}`;
-    if (EL.roomMode) EL.roomMode.value = GAME.initialAction === "create_room_ranked" ? "ranked" : "quick";
+    if (EL.roomMode) EL.roomMode.value = GAME.role === "student" ? "friends" : (GAME.initialAction === "create_room_ranked" ? "ranked" : "quick");
     configureCreateRoomForm();
     if (EL.roomMaxPlayers) EL.roomMaxPlayers.value = "8";
     if (EL.roomClass) EL.roomClass.value = GAME.initialClassId && GAME.classIds.includes(GAME.initialClassId) ? GAME.initialClassId : "";
@@ -1168,8 +1267,8 @@
       mode,
       grade_id: EL.roomGrade.value,
       subject_id: EL.roomSubject.value,
-      question_count: Number(EL.roomQuestionCount.value || 10),
-      time_per_question: Number(EL.roomTimePerQuestion.value || 20),
+      question_count: 5,
+      time_per_question: 20,
       max_players: Number(EL.roomMaxPlayers?.value || 8),
       class_id: classId,
       description: String(EL.roomDescription.value || "").trim(),
@@ -1216,6 +1315,10 @@
   }
 
   async function quickMatch() {
+    if (GAME.selectedAutoMode) {
+      await autoMatchSelectedMode();
+      return;
+    }
     const gradeId = EL.gradeFilter?.value || "";
     const subjectId = EL.subjectFilter?.value || "";
     const keyword = String(EL.keyword?.value || "").trim().toLowerCase();
@@ -1235,6 +1338,64 @@
       return;
     }
     await joinRoom(bestRoom.id);
+  }
+
+  async function createAutoRoomForMode(mode, gradeId, subjectId) {
+    const joinCode = randomCode();
+    const defaults = getModeDefaults(mode);
+    const payload = {
+      title: `${roomModeLabel(mode)} • ${joinCode}`,
+      join_code: joinCode,
+      mode,
+      grade_id: gradeId,
+      subject_id: subjectId,
+      question_count: 5,
+      time_per_question: 20,
+      max_players: Number(defaults.maxPlayers || 8),
+      class_id: null,
+      description: `Phòng tự ghép cho chế độ ${roomModeLabel(mode)}.`,
+      visibility: "public",
+      status: "waiting",
+      host_id: GAME.user.id,
+      created_by: GAME.user.id,
+    };
+    const { data: room, error } = await sb.from("game_rooms").insert(payload).select("*").single();
+    if (error) {
+      alert(`Không thể tạo phòng tự động: ${error.message}`);
+      return null;
+    }
+    await sb.from("game_room_players").insert({ room_id: room.id, user_id: GAME.user.id, score: 0, ready: true });
+    return room;
+  }
+
+  async function autoMatchSelectedMode() {
+    const mode = GAME.selectedAutoMode || EL.modeFilter?.value || "";
+    if (!mode) return;
+    if (!EL.gradeFilter?.value || !EL.subjectFilter?.value) {
+      alert("Hãy chọn Khối và Môn trước khi vào trận.");
+      return;
+    }
+    if (mode === "friends") {
+      if (GAME.role !== "student") {
+        alert("Phòng bạn bè chỉ dành cho học sinh tạo và vào bằng mã phòng.");
+        return;
+      }
+      if (EL.roomMode) EL.roomMode.value = "friends";
+      openGameRoomModal();
+      return;
+    }
+    await loadRooms();
+    const targetRoom = [...(GAME.roomsRaw || [])]
+      .filter((room) => room.status === "waiting")
+      .filter((room) => room.mode === mode)
+      .filter((room) => room.grade_id === EL.gradeFilter.value)
+      .filter((room) => room.subject_id === EL.subjectFilter.value)
+      .filter((room) => (room.visibility || "public") === "public")
+      .sort((a, b) => roomPlayerCount(b.id) - roomPlayerCount(a.id) || new Date(a.created_at) - new Date(b.created_at))
+      .find((room) => roomHasCapacity(room) || GAME.players.some((player) => player.room_id === room.id && player.user_id === GAME.user.id));
+
+    const room = targetRoom || await createAutoRoomForMode(mode, EL.gradeFilter.value, EL.subjectFilter.value);
+    if (room) await joinRoom(room.id);
   }
 
   async function joinRoomByCode() {
@@ -1335,7 +1496,7 @@
     EL.roomScreen.classList.add("show");
     setupRoomRealtime(roomId);
     await refreshActiveRoom(roomId);
-    GAME.roomPoll = setInterval(() => refreshActiveRoom(roomId, true), 2500);
+    GAME.roomPoll = setInterval(() => refreshActiveRoom(roomId, true), 4000);
   }
 
   function hideGameScreen() {
@@ -1384,6 +1545,13 @@
     GAME.roomPlayers = players || [];
     GAME.roomQuestions = questions || [];
     GAME.roomAnswers = answers || [];
+    const questionIds = [...new Set((questions || []).map((item) => item.question_id).filter(Boolean))];
+    if (questionIds.length) {
+      const { data: difficultyRows } = await sb.from("question_bank").select("id,difficulty").in("id", questionIds);
+      GAME.questionDifficultyMap = Object.fromEntries((difficultyRows || []).map((item) => [item.id, Number(item.difficulty || 2)]));
+    } else {
+      GAME.questionDifficultyMap = {};
+    }
     const me = GAME.roomPlayers.find((player) => player.user_id === GAME.user.id);
     if (!me && room.status !== "finished") {
       hideGameScreen();
@@ -1545,13 +1713,15 @@
       return;
     }
     const questions = await buildGameQuestions(room);
+    GAME.questionDifficultyMap = Object.fromEntries(questions.map((item) => [item.question_id, Number(item.difficulty || 2)]));
+    const dbQuestions = questions.map(({ difficulty, ...rest }) => rest);
     if (questions.length < room.question_count) {
       alert("Chưa đủ câu hỏi phù hợp trong Ngân hàng câu hỏi để bắt đầu trận.");
       return;
     }
 
     await sb.from("game_room_questions").delete().eq("room_id", room.id);
-    const { error: insertErr } = await sb.from("game_room_questions").insert(questions);
+    const { error: insertErr } = await sb.from("game_room_questions").insert(dbQuestions);
     if (insertErr) {
       alert(`Không thể chuẩn bị câu hỏi: ${insertErr.message}`);
       return;
@@ -1577,21 +1747,21 @@
     let bank = [];
     if (chapterIds.length) {
       const { data } = await sb.from("question_bank")
-        .select("id,question_type,question_text,question_img,answer,answer_count,hidden")
+        .select("id,question_type,question_text,question_img,answer,answer_count,hidden,difficulty")
         .in("chapter_id", chapterIds);
       bank = data || [];
     }
     if (bank.length < room.question_count) {
       const { data: fallbackBank } = await sb.from("question_bank")
-        .select("id,chapter_id,question_type,question_text,question_img,answer,answer_count,hidden");
+        .select("id,chapter_id,question_type,question_text,question_img,answer,answer_count,hidden,difficulty");
       const merged = [...bank];
       (fallbackBank || []).forEach((question) => {
         if (!merged.some((item) => item.id === question.id)) merged.push(question);
       });
       bank = merged;
     }
-    const usable = (bank || []).filter((item) => !item.hidden && item.question_type !== "essay" && item.answer);
-    const picked = shuffle(usable).slice(0, room.question_count);
+    const usable = (bank || []).filter((item) => !item.hidden && ["multi_choice", "short_answer"].includes(item.question_type) && item.answer);
+    const picked = shuffle(usable).slice(0, 5);
     return picked.map((question, index) => ({
       room_id: room.id,
       order_no: index + 1,
@@ -1602,6 +1772,7 @@
       answer: question.answer,
       answer_count: question.answer_count || (question.question_type === "short_answer" ? 1 : 4),
       points: defaultQuestionPoints(question.question_type),
+      difficulty: question.difficulty || 2,
     }));
   }
 
@@ -1617,15 +1788,15 @@
         return;
       }
 
-      const elapsed = Math.max(0, Math.floor((Date.now() - new Date(room.started_at).getTime()) / 1000));
-      const currentIndex = Math.floor(elapsed / room.time_per_question);
-      if (currentIndex >= questions.length) {
+      const timeline = getQuestionTimeline(room, questions);
+      const currentIndex = timeline.index;
+      if (!timeline.question || currentIndex >= questions.length) {
         finishRoomIfNeeded();
         return;
       }
 
-      const question = questions[currentIndex];
-      const secondsLeft = Math.max(0, room.time_per_question - (elapsed % room.time_per_question));
+      const question = timeline.question;
+      const secondsLeft = timeline.secondsLeft;
       EL.questionTitle.textContent = `Câu ${currentIndex + 1} / ${questions.length}`;
       EL.questionClock.textContent = String(secondsLeft).padStart(2, "0");
       if (EL.progressText) {
@@ -1640,17 +1811,21 @@
       EL.questionImg.classList.toggle("hidden", !question.question_img);
       if (question.question_img) EL.questionImg.src = question.question_img;
 
-      renderAnswerArea(question);
+      const answered = GAME.myAnswers.find((item) => item.game_question_id === question.id);
+      const renderKey = `${question.id}:${answered?.id || "pending"}:${myLives ?? "na"}`;
+      if (GAME.liveRenderKey !== renderKey) {
+        GAME.liveRenderKey = renderKey;
+        renderAnswerArea(question);
+      }
       renderLeaderboard();
 
       clearInterval(GAME.questionTick);
       GAME.questionTick = setInterval(() => {
-        const innerElapsed = Math.max(0, Math.floor((Date.now() - new Date(room.started_at).getTime()) / 1000));
-        const innerIndex = Math.floor(innerElapsed / room.time_per_question);
-        const remain = Math.max(0, room.time_per_question - (innerElapsed % room.time_per_question));
-        EL.questionClock.textContent = String(remain).padStart(2, "0");
-        if (innerIndex !== currentIndex) {
+        const nextTimeline = getQuestionTimeline(room, questions);
+        EL.questionClock.textContent = String(nextTimeline.secondsLeft).padStart(2, "0");
+        if (nextTimeline.index !== currentIndex) {
           clearInterval(GAME.questionTick);
+          GAME.liveRenderKey = "";
           refreshActiveRoom(room.id, true);
         }
       }, 1000);
@@ -1703,12 +1878,23 @@
       return;
     }
 
+    window.__gameShortDraft = window.__gameShortDraft || {};
+    if (me) window.__gameShortDraft[me.id] = window.__gameShortDraft[me.id] || {};
+    const shortDraft = answered?.answer || window.__gameShortDraft?.[me?.id || "guest"]?.[question.id] || "";
     EL.answerArea.innerHTML = `
-      <input id="gameShortAnswerInput" class="input short-input" placeholder="Nhập đáp án ngắn" ${disabled ? "disabled" : ""} value="${escAttr(answered?.answer || "")}">
+      <input id="gameShortAnswerInput" class="input short-input" placeholder="Nhập đáp án ngắn" ${disabled ? "disabled" : ""} value="${escAttr(shortDraft)}">
       ${disabled
         ? renderAnsweredHint(answered)
         : `<button class="btn btn-primary" style="margin-top:12px" type="button" onclick="submitGameShortAnswer('${question.id}')">Gửi đáp án</button>`}
     `;
+    if (!disabled) {
+      document.getElementById("gameShortAnswerInput")?.addEventListener("input", (event) => {
+        if (!me) return;
+        window.__gameShortDraft = window.__gameShortDraft || {};
+        window.__gameShortDraft[me.id] = window.__gameShortDraft[me.id] || {};
+        window.__gameShortDraft[me.id][question.id] = event.target.value || "";
+      });
+    }
 
     window.__gameTfDraft = window.__gameTfDraft || {};
     if (me) {
@@ -1757,8 +1943,7 @@
     if (!room) return;
     if (roomModeValue(room) === "survival") {
       const alivePlayers = getAlivePlayers(room, GAME.roomPlayers, GAME.roomAnswers || []);
-      const elapsed = Math.max(0, Math.floor((Date.now() - new Date(room.started_at).getTime()) / 1000));
-      const currentIndex = Math.floor(elapsed / room.time_per_question);
+      const currentIndex = getQuestionTimeline(room, GAME.roomQuestions).index;
       if (alivePlayers.length > 1 && currentIndex < GAME.roomQuestions.length) {
         return;
       }
@@ -1824,13 +2009,14 @@
     const existing = GAME.myAnswers.find((item) => item.game_question_id === questionId);
     if (existing) return;
 
-    const elapsed = Math.max(0, Math.floor((Date.now() - new Date(room.started_at).getTime()) / 1000));
-    const questionIndex = Math.floor(elapsed / room.time_per_question);
+    const timeline = getQuestionTimeline(room, GAME.roomQuestions);
+    const questionIndex = timeline.index;
     if (GAME.roomQuestions[questionIndex]?.id !== questionId) return;
 
-    const remaining = Math.max(0, room.time_per_question - (elapsed % room.time_per_question));
+    const remaining = Math.max(0, timeline.secondsLeft);
+    const totalTime = Math.max(10, timeline.duration || getQuestionDuration(question, room));
     const currentCombo = getCurrentComboValue();
-    const scored = evaluateAnswer(question, answerValue, remaining, room.time_per_question, currentCombo);
+    const scored = evaluateAnswer(question, answerValue, remaining, totalTime, currentCombo);
 
     const { error: insertErr } = await sb.from("game_room_answers").insert({
       room_id: room.id,
@@ -1839,7 +2025,7 @@
       answer: answerValue,
       is_correct: scored.isCorrect,
       score_earned: scored.score,
-      response_ms: (room.time_per_question - remaining) * 1000,
+      response_ms: (totalTime - remaining) * 1000,
     });
 
     if (insertErr) {
@@ -1935,6 +2121,12 @@
     if (!String(value).trim()) {
       alert("Hãy nhập đáp án trước khi gửi.");
       return;
+    }
+    const player = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
+    if (player) {
+      window.__gameShortDraft = window.__gameShortDraft || {};
+      window.__gameShortDraft[player.id] = window.__gameShortDraft[player.id] || {};
+      window.__gameShortDraft[player.id][questionId] = value.trim();
     }
     submitAnswer(questionId, value.trim());
   };
