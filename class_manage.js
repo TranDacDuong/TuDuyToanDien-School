@@ -831,7 +831,7 @@
           scoreBadge='<span style="background:#dcfce7;color:#15803d;font-size:.78rem;font-weight:700;'+
             'padding:3px 10px;border-radius:20px;white-space:nowrap">✓ '+score+" / "+ex.total_points+" đ</span>"+
             (pendingEssay?' <span style="background:#fef3c7;color:#b45309;font-size:.72rem;padding:2px 8px;border-radius:20px">⏳ Chờ chấm tự luận</span>':"");
-          scoreBadge+=' <button onclick="window.open(\'pdf_exam.html?exam='+encodeURIComponent(ex.id)+'&classId='+encodeURIComponent(_classId)+'&action=review&resultId='+encodeURIComponent(lastResult.id)+'\',\'_blank\')" '+
+          scoreBadge+=' <button onclick="location.href=\'pdf_exam.html?exam='+encodeURIComponent(ex.id)+'&classId='+encodeURIComponent(_classId)+'&action=review&resultId='+encodeURIComponent(lastResult.id)+'\'" '+
             'class="btn btn-outline btn-sm" style="font-size:.75rem">Xem lại</button>';
         }
         let actionBtn="";
@@ -842,19 +842,19 @@
           const secsLeft=Math.max(0,(inProgress.seconds_left||0)-300);
           const minLeft=Math.floor(secsLeft/60), secLeft2=secsLeft%60;
           const timeStr=minLeft+":"+String(secLeft2).padStart(2,"0");
-          actionBtn='<button onclick="window.open(\'pdf_exam.html?exam='+encodeURIComponent(ex.id)+'&classId='+encodeURIComponent(_classId)+'\',\'_blank\')" '+
+          actionBtn='<button onclick="location.href=\'pdf_exam.html?exam='+encodeURIComponent(ex.id)+'&classId='+encodeURIComponent(_classId)+'\'" '+
             'style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;'+
             'padding:8px 14px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;'+
             'white-space:nowrap;font-family:var(--font-body);flex-shrink:0">Làm bài tiếp ('+timeStr+")</button>";
         } else if(lastResult&&!pdfHasEssay){
           actionBtn='<div style="font-size:.78rem;font-weight:600;color:var(--green);padding:6px 12px;'+
             'background:#dcfce7;border-radius:8px;white-space:nowrap">Đã hoàn thành</div>'+
-            '<button onclick="window.open(\'pdf_exam.html?exam='+encodeURIComponent(ex.id)+'&classId='+encodeURIComponent(_classId)+'&action=review&resultId='+encodeURIComponent(lastResult.id)+'\',\'_blank\')" '+
+            '<button onclick="location.href=\'pdf_exam.html?exam='+encodeURIComponent(ex.id)+'&classId='+encodeURIComponent(_classId)+'&action=review&resultId='+encodeURIComponent(lastResult.id)+'\'" '+
             'class="btn btn-outline btn-sm" style="font-size:.78rem">Xem lại</button>';
         } else if(submitted.length>0){
           actionBtn="";
         } else {
-          actionBtn='<button onclick="window.open(\'pdf_exam.html?exam='+encodeURIComponent(ex.id)+'&classId='+encodeURIComponent(_classId)+'\',\'_blank\')" '+
+          actionBtn='<button onclick="location.href=\'pdf_exam.html?exam='+encodeURIComponent(ex.id)+'&classId='+encodeURIComponent(_classId)+'\'" '+
             'style="background:linear-gradient(135deg,var(--navy),var(--navy-mid));color:var(--gold-light);'+
             'border:none;padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;'+
             'white-space:nowrap;font-family:var(--font-body);flex-shrink:0">Làm bài</button>';
@@ -964,7 +964,7 @@
               '<div style="font-weight:600;font-size:.9rem;color:var(--navy);margin-bottom:3px">'+ex.title+'</div>'+
               '<div style="font-size:.75rem;color:var(--ink-mid)">📄 PDF &nbsp;•&nbsp; ⏱ '+ex.duration_minutes+' phút &nbsp;•&nbsp; 🏆 '+ex.total_points+' điểm &nbsp;•&nbsp; '+schStr+'</div>'+
             '</div>'+
-            '<button onclick="window.open(\'pdf_exam.html?exam='+ex.id+'&classId='+_classId+'\',\'_blank\')" class="btn btn-outline btn-sm" style="font-size:.75rem;flex-shrink:0">Mở đề PDF</button>'+
+            '<button onclick="location.href=\'pdf_exam.html?exam='+ex.id+'&classId='+_classId+'\'" class="btn btn-outline btn-sm" style="font-size:.75rem;flex-shrink:0">Mở đề PDF</button>'+
             '<button onclick="cvRemoveExamFromClass(\''+ex.class_exam_id+'\',\''+ex.title.replace(/'/g,"\\'")+'\',0)" class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5;font-size:.75rem;flex-shrink:0">Gỡ</button>'+
             '</div>';
         }
