@@ -15,29 +15,107 @@ function renderPartialScoreEditor() {
   return;
 }
 
+function getPdfQuestionDefaultsByType(type, count = 4) {
+  const safeCount = Math.max(1, count);
+  if (type === "true_false") {
+    return {
+      points: 1,
+      answer_count: safeCount,
+      answer: Array.from({ length: safeCount }, (_, i) => `${String.fromCharCode(97 + i)}Đ`).join(""),
+      partial_points: safeCount === 4
+        ? { 0: 0, 1: 0.1, 2: 0.25, 3: 0.5, 4: 1 }
+        : Object.fromEntries(Array.from({ length: safeCount + 1 }, (_, i) => [i, i === safeCount ? 1 : 0])),
+    };
+  }
+  if (type === "short_answer") {
+    return {
+      points: 0.5,
+      answer_count: safeCount,
+      answer: "",
+      partial_points: Object.fromEntries(Array.from({ length: safeCount + 1 }, (_, i) => [i, i === safeCount ? 0.5 : 0])),
+    };
+  }
+  if (type === "essay") {
+    return {
+      points: 0.5,
+      answer_count: 1,
+      answer: "",
+      partial_points: null,
+    };
+  }
+  return {
+    points: 0.25,
+    answer_count: safeCount,
+    answer: "A",
+    partial_points: Object.fromEntries(Array.from({ length: safeCount + 1 }, (_, i) => [i, i === safeCount ? 0.25 : 0])),
+  };
+}
+
+function cyclePdfDraftType(id) {
+  const order = ["multi_choice", "true_false", "short_answer", "essay"];
+  const current = PDF_STATE.draftQuestions.find((q) => q.id === id)?.question_type || "multi_choice";
+  const next = order[(order.indexOf(current) + 1) % order.length];
+  updatePdfDraftType(id, next);
+}
+
 function renderPdfTypeToggle(q) {
-  const items = [
-    ["multi_choice", "Trắc nghiệm"],
-    ["true_false", "Đúng Sai"],
-    ["short_answer", "Trả lời ngắn"],
-    ["essay", "Tự luận"],
-  ];
-  return `<div class="draft-type-toggle">
-    ${items.map(([value, label]) => `
-      <button
-        class="draft-type-btn ${q.question_type === value ? "active" : ""}"
-        type="button"
-        onclick="updatePdfDraftType('${q.id}','${value}')"
-      >${label}</button>
-    `).join("")}
-  </div>`;
+  const labels = {
+    multi_choice: "Trắc nghiệm",
+    true_false: "Đúng Sai",
+    short_answer: "Trả lời ngắn",
+    essay: "Tự luận",
+  };
+  return `<button class="draft-type-btn active" type="button" onclick="cyclePdfDraftType('${q.id}')">${labels[q.question_type] || "Trắc nghiệm"}</button>`;
+}
+
+function updatePdfDraftAnswerCount(id, delta) {
+  PDF_STATE.draftQuestions = PDF_STATE.draftQuestions.map((q) => {
+    if (q.id !== id || q.question_type === "essay") return q;
+    const nextCount = Math.max(1, Math.min(8, Number(q.answer_count || 1) + delta));
+    const defaults = getPdfQuestionDefaultsByType(q.question_type, nextCount);
+    let nextAnswer = defaults.answer;
+
+    if (q.question_type === "multi_choice") {
+      const allowed = Array.from({ length: nextCount }, (_, idx) => String.fromCharCode(65 + idx));
+      nextAnswer = String(q.answer || "")
+        .toUpperCase()
+        .split("")
+        .filter((letter, index, arr) => allowed.includes(letter) && arr.indexOf(letter) === index)
+        .join("") || "A";
+    } else if (q.question_type === "true_false") {
+      const current = {};
+      const src = String(q.answer || "");
+      for (let i = 0; i < src.length; i += 2) current[src[i].toLowerCase()] = src[i + 1] || "Đ";
+      nextAnswer = Array.from({ length: nextCount }, (_, idx) => {
+        const key = String.fromCharCode(97 + idx);
+        return `${key}${current[key] || "Đ"}`;
+      }).join("");
+    } else if (q.question_type === "short_answer") {
+      const current = String(q.answer || "").split("|");
+      nextAnswer = Array.from({ length: nextCount }, (_, idx) => current[idx] || "").join("|").replace(/\|+$/g, "");
+    }
+
+    const currentPartial = q.partial_points || {};
+    const nextPartial = {};
+    const partialLength = q.question_type === "essay" ? 0 : nextCount + 1;
+    for (let i = 0; i < partialLength; i += 1) {
+      nextPartial[i] = currentPartial[i] != null ? Number(currentPartial[i]) : Number(defaults.partial_points?.[i] ?? 0);
+    }
+    return withPdfPartialDefaults({
+      ...q,
+      answer_count: defaults.answer_count,
+      answer: nextAnswer,
+      partial_points: q.question_type === "essay" ? null : nextPartial,
+    });
+  });
+  renderDraftQuestionList();
 }
 
 function renderInlinePdfAnswerEditor(q) {
   const count = Math.max(1, Number(q.answer_count || 1));
 
   if (q.question_type === "essay") {
-    return `<div class="hint">Tự luận không có đáp án chấm tự động.</div>`;
+    return `<div class="hint">Tự luận không có đáp án tự động.</div>`;
   }
 
   if (q.question_type === "multi_choice") {
@@ -122,15 +200,13 @@ function renderInlinePdfAnswerEditor(q) {
 
 function renderInlinePdfPartialEditor(q) {
   if (q.question_type === "essay") {
-    return `<div class="hint">Tự luận chấm thủ công.</div>`;
+    return `<div class="draft-inline-group"><span class="draft-inline-label">Điểm chi tiết:</span><span class="hint">Tự luận chấm thủ công.</span></div>`;
   }
 
   const count = Math.max(1, Number(q.answer_count || 1));
   const points = Number(q.points || 0);
   const partial = q.partial_points || {};
-  const range = q.question_type === "true_false"
-    ? Array.from({ length: count + 1 }, (_, idx) => idx)
-    : Array.from({ length: count }, (_, idx) => idx + 1);
+  const range = Array.from({ length: count + 1 }, (_, idx) => idx);
 
   return `<div class="draft-inline-partials">
     <span class="draft-inline-label">Điểm chi tiết:</span>
@@ -154,11 +230,7 @@ function renderDraftQuestionList() {
         return `<div class="draft-answer-item" id="pdfDraftRow_${q.id}">
           <div class="draft-answer-topline">
             <div class="draft-inline-title">Câu ${idx + 1}</div>
-            <div class="draft-inline-group">
-              <span class="draft-inline-label">Loại câu:</span>
-              ${renderPdfTypeToggle(q)}
-              ${renderInlinePdfAnswerEditor(q)}
-            </div>
+            <div class="draft-inline-group"><span class="draft-inline-label">Loại câu:</span>${renderPdfTypeToggle(q)}${renderInlinePdfAnswerEditor(q)}</div>
             <button class="btn btn-danger btn-sm" type="button" onclick="deletePdfQuestion('${q.id}')">Xóa</button>
           </div>
           <div class="draft-answer-bottomline">
