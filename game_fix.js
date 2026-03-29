@@ -1,7 +1,8 @@
 (function () {
+  // ─── 1. ENCODING FIXES ───────────────────────────────────────────────────────
   const replacements = [
     ["Ã„â€˜", "\u0111"],
-    ["Ã„Â", "\u0110"],
+    ["Ã„Â", "\u0110"],
     ["Ã¡ÂºÂ¥", "\u1ea5"],
     ["Ã¡ÂºÂ§", "\u1ea7"],
     ["Ã¡ÂºÂ¡", "\u1ea1"],
@@ -9,15 +10,15 @@
     ["Ã¡ÂºÂ¯", "\u1eaf"],
     ["Ã¡ÂºÂ·", "\u1eb7"],
     ["Ã¡ÂºÂ¿", "\u1ebf"],
-    ["Ã¡Â»Â", "\u1ec1"],
+    ["Ã¡Â»Â", "\u1ec1"],
     ["Ã¡Â»â€¡", "\u1ec7"],
-    ["Ã¡Â»Æ’", "\u1ec3"],
-    ["Ã¡Â»Â", "\u1ecf"],
+    ["Ã¡Â»Æ'", "\u1ec3"],
+    ["Ã¡Â»Â", "\u1ecf"],
     ["Ã¡Â»â€˜", "\u1ed1"],
     ["Ã¡Â»â€œ", "\u1ed3"],
     ["Ã¡Â»â„¢", "\u1ed9"],
     ["Ã¡Â»â€º", "\u1edb"],
-    ["Ã¡Â»Â", "\u1edd"],
+    ["Ã¡Â»Â", "\u1edd"],
     ["Ã¡Â»Â£", "\u1ee3"],
     ["Ã¡Â»â€¹", "\u1ecb"],
     ["Ã¡Â»â€°", "\u1ec9"],
@@ -27,7 +28,7 @@
     ["Ã¡Â»Â­", "\u1eed"],
     ["Ã¡Â»Â¥", "\u1ee5"],
     ["Ã¡Â»Â§", "\u1ee7"],
-    ["Ã¡Â»Â", "\u1ecd"],
+    ["Ã¡Â»Â", "\u1ecd"],
     ["Ãƒ ", "\u00e0"],
     ["ÃƒÂ¡", "\u00e1"],
     ["ÃƒÂ¢", "\u00e2"],
@@ -45,8 +46,8 @@
     ["ÃƒÂº", "\u00fa"],
     ["ÃƒÂ½", "\u00fd"],
     ["Ã¢â‚¬Â¢", "\u2022"],
-    ["Ã¢â‚¬â€", "\u2014"],
-    ["Ã¢â€ Â", "\u2190"]
+    ["Ã¢â‚¬â€", "\u2014"],
+    ["Ã¢â€ Â", "\u2190"]
   ];
 
   function sanitizeText(value) {
@@ -142,4 +143,140 @@
     });
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
+
+  // ─── 2. FIX: HỦY COUNTDOWN KHI SỐ NGƯỜI GIẢM XUỐNG DƯỚI 2 ─────────────────
+  //
+  // Root cause trong game.js (3 điểm lỗi):
+  //
+  // (A) queueAutoStart() dùng setTimeout nhưng KHÔNG kiểm tra lại player count
+  //     khi timer kích hoạt → nếu player 2 rời trong 10 giây đếm ngược,
+  //     startGameMatch() vẫn được gọi với chỉ 1 người.
+  //
+  // (B) removePlayerFromRoom() chỉ reset `started_at = null` khi người rời
+  //     KHÔNG phải coordinator. Nếu coordinator rời → transfer host nhưng
+  //     QUÊN reset started_at → player còn lại thấy countdown vẫn tiếp tục.
+  //
+  // (C) renderActiveRoom() không xử lý trường hợp started_at != null nhưng
+  //     roomPlayers.length < 2 (nên reset started_at trên DB để ngăn auto-start).
+  //
+  // FIX ở đây (không sửa game.js):
+  //   - Theo dõi countdown overlay bằng MutationObserver
+  //   - Khi overlay hiện, poll DB mỗi 800ms để kiểm tra player count thực tế
+  //   - Nếu phòng còn < 2 người: ẩn overlay ngay + reset started_at trên DB
+  //   - game.js sẽ nhận Realtime event → clearWaitingCountdown() + clearAutoStartTimer()
+  // ────────────────────────────────────────────────────────────────────────────
+
+  let _guardTick = null;
+
+  function getSb() {
+    return window.sb || window.supabase || null;
+  }
+
+  /**
+   * Đọc room id từ tên Supabase Realtime channel đang active.
+   * game.js đặt tên: "game-room-{uuid}-{timestamp}"
+   */
+  function getActiveRoomId() {
+    try {
+      const sbClient = getSb();
+      if (!sbClient?.getChannels) return null;
+      for (const ch of sbClient.getChannels()) {
+        const match = String(ch.topic || "").match(/game-room-([0-9a-f-]{36})-\d+/i);
+        if (match) return match[1];
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function stopGuard() {
+    clearInterval(_guardTick);
+    _guardTick = null;
+  }
+
+  function startGuard() {
+    stopGuard();
+    _guardTick = setInterval(runGuardCheck, 800);
+  }
+
+  async function runGuardCheck() {
+    const overlay = document.getElementById("gameRoomCountdownOverlay");
+    if (!overlay || overlay.classList.contains("hidden")) {
+      stopGuard();
+      return;
+    }
+
+    const roomId = getActiveRoomId();
+    if (!roomId) return;
+
+    const sbClient = getSb();
+    if (!sbClient) return;
+
+    try {
+      const [{ data: room }, { data: players }] = await Promise.all([
+        sbClient
+          .from("game_rooms")
+          .select("id,status,started_at")
+          .eq("id", roomId)
+          .maybeSingle(),
+        sbClient
+          .from("game_room_players")
+          .select("id,user_id,joined_at")
+          .eq("room_id", roomId)
+          .order("joined_at", { ascending: true }),
+      ]);
+
+      // Phòng đã live/finished hoặc started_at đã được reset → dừng guard
+      if (!room || room.status !== "waiting" || !room.started_at) {
+        stopGuard();
+        return;
+      }
+
+      // Vẫn đủ 2+ người → countdown hợp lệ, không làm gì
+      if ((players || []).length >= 2) return;
+
+      // Dưới 2 người → ẩn overlay ngay lập tức
+      overlay.classList.add("hidden");
+      stopGuard();
+
+      // Chỉ coordinator (người vào phòng sớm nhất còn lại) mới reset DB
+      const { data: authData } = await sbClient.auth.getUser();
+      const currentUserId = authData?.user?.id;
+      if (!currentUserId) return;
+
+      const coordinator = (players || [])[0]?.user_id;
+      if (coordinator !== currentUserId) return;
+
+      // Reset started_at → game.js nhận Realtime event →
+      // renderActiveRoom() → countdownActive = false →
+      // clearWaitingCountdown() + clearAutoStartTimer()
+      await sbClient
+        .from("game_rooms")
+        .update({ started_at: null })
+        .eq("id", roomId)
+        .eq("status", "waiting"); // tránh race condition nếu game vừa start
+    } catch (_) {}
+  }
+
+  function watchOverlay() {
+    const overlay = document.getElementById("gameRoomCountdownOverlay");
+    if (!overlay) return;
+
+    new MutationObserver(() => {
+      if (overlay.classList.contains("hidden")) {
+        stopGuard();
+      } else {
+        startGuard();
+      }
+    }).observe(overlay, { attributes: true, attributeFilter: ["class"] });
+
+    // Trường hợp overlay đang hiện sẵn khi script load
+    if (!overlay.classList.contains("hidden")) startGuard();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", watchOverlay);
+  } else {
+    watchOverlay();
+  }
+  // ────────────────────────────────────────────────────────────────────────────
 })();
