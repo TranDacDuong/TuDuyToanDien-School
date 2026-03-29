@@ -6,6 +6,13 @@
 <title>Game thi đấu</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="theme.css">
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [["$","$"],["\\(","\\)"]], displayMath: [["$$","$$"],["\\[","\\]"]] },
+    options: { skipHtmlTags: ["script","noscript","style","textarea"] },
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:
@@ -72,6 +79,12 @@ font-family:var(--font-body);color:#ebf5ff;min-height:100vh}
 .hint{font-size:.78rem;color:var(--ink-light);line-height:1.6}
 .screen{position:fixed;inset:0;background:#eef3fb;display:none;flex-direction:column;z-index:900}
 .screen.show{display:flex}
+.screen-countdown{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:940;background:radial-gradient(circle,rgba(8,15,30,.18) 0%,rgba(8,15,30,.48) 58%,rgba(8,15,30,.72) 100%)}
+.screen-countdown.hidden{display:none}
+.screen-countdown-card{display:grid;gap:10px;justify-items:center;padding:28px 34px;border-radius:28px;background:linear-gradient(180deg,rgba(10,20,40,.94) 0%,rgba(16,32,61,.96) 100%);border:1px solid rgba(125,211,252,.18);box-shadow:0 24px 60px rgba(2,8,23,.42)}
+.screen-countdown-label{font-size:.92rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#a5f3fc}
+.screen-countdown-value{font-size:5rem;line-height:1;font-weight:900;color:#fde68a;text-shadow:0 0 28px rgba(250,204,21,.28)}
+.screen-countdown-sub{font-size:1rem;color:rgba(235,245,255,.86)}
 .topbar{height:64px;background:var(--navy);color:#fff;display:flex;align-items:center;gap:12px;padding:0 18px}
 .topbar h2{margin:0;flex:1;font-size:1.05rem}
 .topbar-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -338,6 +351,13 @@ font-family:var(--font-body);color:#ebf5ff;min-height:100vh}
 </div>
 
 <div id="gameRoomScreen" class="screen">
+  <div id="gameRoomCountdownOverlay" class="screen-countdown hidden">
+    <div class="screen-countdown-card">
+      <div class="screen-countdown-label">Countdown</div>
+      <div id="gameRoomCountdownValue" class="screen-countdown-value">10</div>
+      <div id="gameRoomCountdownLabel" class="screen-countdown-sub">Tran dau sap bat dau</div>
+    </div>
+  </div>
   <div class="topbar">
     <button class="btn btn-outline btn-sm" type="button" onclick="closeGameScreen()">← Quay lại</button>
     <h2 id="gameRoomScreenTitle">Phòng thi đấu</h2>

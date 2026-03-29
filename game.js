@@ -20,6 +20,7 @@
     myAnswers: [],
     roomPoll: null,
     questionTick: null,
+    waitingTick: null,
     roomChannel: null,
     listChannel: null,
     leaderboardPeriod: "day",
@@ -73,6 +74,9 @@
     roomSummary: document.getElementById("gameRoomSummary"),
     roomDescriptionView: document.getElementById("gameRoomDescriptionView"),
     roomStartHint: document.getElementById("gameRoomStartHint"),
+    roomCountdownOverlay: document.getElementById("gameRoomCountdownOverlay"),
+    roomCountdownValue: document.getElementById("gameRoomCountdownValue"),
+    roomCountdownLabel: document.getElementById("gameRoomCountdownLabel"),
     inviteCode: document.getElementById("gameInviteCode"),
     inviteVisibility: document.getElementById("gameInviteVisibility"),
     copyGameCodeBtn: document.getElementById("copyGameCodeBtn"),
@@ -142,6 +146,21 @@
 
   function escAttr(value) {
     return esc(value).replace(/`/g, "&#96;");
+  }
+
+  function triggerMathJax(el) {
+    if (window.MathJax?.typesetPromise) {
+      window.MathJax.typesetPromise([el]).catch(() => {});
+    } else if (window.MathJax?.Hub) {
+      window.MathJax.Hub.Queue(["Typeset", window.MathJax.Hub, el]);
+    }
+  }
+
+  function renderMathText(el, text) {
+    if (!el) return;
+    const safeText = String(text || "Xem noi dung cau hoi.");
+    el.innerHTML = esc(safeText).replace(/\n/g, "<br>");
+    triggerMathJax(el);
   }
 
   function normalizeStaticGameText() {
@@ -478,22 +497,53 @@
     GAME.autoStartTimer = null;
   }
 
+  function clearWaitingCountdown() {
+    clearInterval(GAME.waitingTick);
+    GAME.waitingTick = null;
+    if (EL.roomCountdownOverlay) EL.roomCountdownOverlay.classList.add("hidden");
+  }
+
+  function getWaitingCountdownSeconds(room) {
+    if (!room?.started_at) return null;
+    const elapsedMs = Date.now() - new Date(room.started_at).getTime();
+    if (!Number.isFinite(elapsedMs)) return null;
+    return Math.max(0, 10 - Math.floor(elapsedMs / 1000));
+  }
+
+  function renderWaitingCountdown(room) {
+    if (!EL.roomCountdownOverlay || !EL.roomCountdownValue || !EL.roomCountdownLabel || !room?.started_at) {
+      clearWaitingCountdown();
+      return;
+    }
+    const tick = () => {
+      const secondsLeft = getWaitingCountdownSeconds(room);
+      if (secondsLeft === null) {
+        clearWaitingCountdown();
+        return;
+      }
+      EL.roomCountdownOverlay.classList.remove("hidden");
+      EL.roomCountdownValue.textContent = String(secondsLeft).padStart(2, "0");
+      EL.roomCountdownLabel.textContent = secondsLeft > 0
+        ? "Tran dau sap bat dau"
+        : "Dang vao tran";
+    };
+    clearInterval(GAME.waitingTick);
+    tick();
+    GAME.waitingTick = setInterval(tick, 250);
+  }
+
   function isPublicAutoMatchRoom(room) {
     const mode = roomModeValue(room);
     return ["quick", "ranked", "survival", "speed"].includes(mode) && (room.visibility || "public") === "public";
   }
 
-  function queueAutoStart(room) {
-    if (!isPublicAutoMatchRoom(room)) {
-      clearAutoStartTimer();
-      return;
-    }
+  function queueAutoStart(room, delayMs = 1200) {
     clearAutoStartTimer();
     GAME.autoStartTimer = setTimeout(() => {
       if (GAME.activeRoom?.id === room.id && GAME.activeRoom?.status === "waiting") {
         startGameMatch();
       }
-    }, 1200);
+    }, Math.max(0, Number(delayMs || 0)));
   }
 
   function shuffle(list) {
@@ -710,7 +760,7 @@
       return { visibility: "private", maxPlayers: 10, questionCount: 5, timePerQuestion: 20 };
     }
     if (mode === "ranked") {
-      return { visibility: GAME.role === "admin" ? "public" : "private", maxPlayers: 2, questionCount: 5, timePerQuestion: 20 };
+      return { visibility: GAME.role === "admin" ? "public" : "private", maxPlayers: 4, questionCount: 5, timePerQuestion: 20 };
     }
     return { visibility: GAME.role === "admin" ? "public" : "private", maxPlayers: 8, questionCount: 5, timePerQuestion: 20 };
   }
@@ -1023,20 +1073,13 @@
     const total = orderedPlayers.length;
     if (!total) return {};
     const map = {};
+    const rewards = total >= 4
+      ? [20, 10, 0, -10]
+      : total === 3
+        ? [20, 10, 0]
+        : [20, -10];
     orderedPlayers.forEach((player, index) => {
-      let delta = 0;
-      if (total === 2) {
-        delta = index === 0 ? 30 : -20;
-      } else if (index === 0) {
-        delta = 35;
-      } else if (index === 1) {
-        delta = 15;
-      } else if (index === total - 1) {
-        delta = -20;
-      } else {
-        delta = 0;
-      }
-      map[player.user_id] = delta;
+      map[player.user_id] = Number(rewards[index] ?? 0);
     });
     return map;
   }
@@ -1351,6 +1394,7 @@
     const policy = getCreateRoomPolicy();
     const joinCode = String(EL.roomCode.value || "").trim().toUpperCase() || randomCode();
     const classId = policy.allowClass ? (EL.roomClass?.value || null) : null;
+    const maxPlayers = mode === "ranked" ? 4 : Number(EL.roomMaxPlayers?.value || 8);
     if (policy.classRequired && !classId) {
       alert("Giáo viên cần chọn lớp học trước khi tạo phòng.");
       return;
@@ -1363,7 +1407,7 @@
       subject_id: EL.roomSubject.value,
       question_count: 5,
       time_per_question: 20,
-      max_players: Number(EL.roomMaxPlayers?.value || 8),
+      max_players: maxPlayers,
       class_id: classId,
       description: String(EL.roomDescription.value || "").trim(),
       visibility: policy.visibility,
@@ -1507,7 +1551,7 @@
     await joinRoom(room.id);
   }
 
-  async function cleanupRoomIfFinished(roomId) {
+  async function cleanupRoomCompletely(roomId) {
     if (!roomId) return;
     await sb.from("game_room_answers").delete().eq("room_id", roomId);
     await sb.from("game_room_questions").delete().eq("room_id", roomId);
@@ -1515,6 +1559,14 @@
     await sb.from("game_rooms").delete().eq("id", roomId);
     if (GAME.activeRoom?.id === roomId) hideGameScreen();
     await loadRooms();
+  }
+
+  async function cleanupRoomIfFinished(roomId) {
+    if (!roomId) return;
+    const { data: room } = await sb.from("game_rooms").select("id,status").eq("id", roomId).maybeSingle();
+    if (!room || room.status === "finished") {
+      await cleanupRoomCompletely(roomId);
+    }
   }
 
   async function joinRoomByCode() {
@@ -1559,14 +1611,17 @@
       alert(`Không thể rời phòng: ${error.message}`);
       return;
     }
+    const { data: remain = [] } = await sb.from("game_room_players").select("id,user_id").eq("room_id", room.id).order("joined_at", { ascending: true });
+    if (!remain.length) {
+      GAME.leavingRoom = false;
+      await cleanupRoomCompletely(room.id);
+      hideGameScreen();
+      return;
+    }
     if (room.host_id === GAME.user.id) {
-      const remain = GAME.roomPlayers.filter((item) => item.id !== player.id);
-      if (remain.length) {
-        await sb.from("game_rooms").update({ host_id: remain[0].user_id }).eq("id", room.id);
-      } else {
-        await sb.from("game_room_questions").delete().eq("room_id", room.id);
-        await sb.from("game_rooms").delete().eq("id", room.id);
-      }
+      await sb.from("game_rooms").update({ host_id: remain[0].user_id, started_at: remain.length >= 2 ? room.started_at : null }).eq("id", room.id);
+    } else if (remain.length < 2) {
+      await sb.from("game_rooms").update({ started_at: null }).eq("id", room.id);
     }
     GAME.leavingRoom = false;
     await loadRooms();
@@ -1621,6 +1676,7 @@
   function hideGameScreen() {
     clearIntervals();
     clearAutoStartTimer();
+    clearWaitingCountdown();
     teardownRoomRealtime();
     GAME.activeRoom = null;
     EL.roomScreen.classList.remove("show");
@@ -1639,8 +1695,10 @@
   function clearIntervals() {
     clearInterval(GAME.roomPoll);
     clearInterval(GAME.questionTick);
+    clearInterval(GAME.waitingTick);
     GAME.roomPoll = null;
     GAME.questionTick = null;
+    GAME.waitingTick = null;
     clearAutoStartTimer();
   }
 
@@ -1699,15 +1757,30 @@
     const autoManagedRoom = isPublicAutoMatchRoom(room);
     const isHost = room.host_id === GAME.user.id;
     const me = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
-    const others = GAME.roomPlayers.filter((item) => item.user_id !== room.host_id);
-    const canStart = room.status === "waiting" && isHost && GAME.roomPlayers.length >= 2 && others.every((item) => item.ready);
-    if (canStart) queueAutoStart(room);
-    else clearAutoStartTimer();
+    const canStart = room.status === "waiting" && isHost && GAME.roomPlayers.length >= 2;
+    const countdownActive = room.status === "waiting" && GAME.roomPlayers.length >= 2;
+    if (countdownActive && room.started_at) {
+      renderWaitingCountdown(room);
+      if (isHost) {
+        const delayMs = Math.max(0, new Date(room.started_at).getTime() + 10000 - Date.now());
+        queueAutoStart(room, delayMs);
+      }
+    } else {
+      clearAutoStartTimer();
+      clearWaitingCountdown();
+      if (isHost && room.status === "waiting" && room.started_at) {
+        sb.from("game_rooms").update({ started_at: null }).eq("id", room.id).then(() => refreshActiveRoom(room.id, true)).catch(() => {});
+      }
+    }
+    if (isHost && room.status === "waiting" && countdownActive && !room.started_at) {
+      clearAutoStartTimer();
+      sb.from("game_rooms").update({ started_at: new Date().toISOString() }).eq("id", room.id).then(() => refreshActiveRoom(room.id, true)).catch(() => {});
+    }
 
     EL.roomScreenTitle.textContent = getRoomDisplayTitle(room);
-    EL.startGameBtn.classList.toggle("hidden", !(room.status === "waiting" && isHost) || autoManagedRoom);
+    EL.startGameBtn.classList.toggle("hidden", !(room.status === "waiting" && isHost) || autoManagedRoom || countdownActive);
     EL.startGameBtn.disabled = !canStart;
-    EL.toggleReadyBtn?.classList.toggle("hidden", room.status !== "waiting" || isHost || autoManagedRoom);
+    EL.toggleReadyBtn?.classList.add("hidden");
     if (EL.toggleReadyBtn && me && !isHost) EL.toggleReadyBtn.textContent = me.ready ? "Hủy sẵn sàng" : "Sẵn sàng";
     ensurePlayerCache().then(() => {
       if (room.status === "waiting") {
@@ -1732,19 +1805,22 @@
         }
         if (EL.roomStartHint) {
           if (autoManagedRoom) {
-            EL.roomStartHint.textContent = canStart
-              ? "Phong da du nguoi. Tran dau dang tu dong khoi dong."
+            EL.roomStartHint.textContent = countdownActive
+              ? "Phong da du nguoi. He thong dang dem nguoc de vao tran."
               : "Chon xong la vao phong ngay. Hay cho them nguoi choi de he thong tu bat dau tran.";
           } else
           if (isHost) {
-            EL.roomStartHint.textContent = canStart
+            EL.roomStartHint.textContent = countdownActive
               ? "Phòng đã đủ điều kiện để bắt đầu trận."
-              : "Cần ít nhất 2 người chơi và tất cả người chơi còn lại phải sẵn sàng.";
+              : "Can it nhat 2 nguoi choi de bat dau tran.";
           } else {
-            EL.roomStartHint.textContent = me?.ready
-              ? "Bạn đã sẵn sàng. Hãy chờ chủ phòng bắt đầu trận."
-              : "Nhấn Sẵn sàng để báo chủ phòng rằng bạn đã chuẩn bị xong.";
+            EL.roomStartHint.textContent = "Hay cho them nguoi choi vao phong de bat dau.";
           }
+        }
+        if (EL.roomStartHint && countdownActive && !autoManagedRoom) {
+          EL.roomStartHint.textContent = isHost
+            ? "Phong da du 2 nguoi tro len. He thong dang dem nguoc 10 giay."
+            : "Phong dang dem nguoc. Hay san sang vao tran.";
         }
         EL.playerList.innerHTML = GAME.roomPlayers.length
           ? GAME.roomPlayers.map((player, idx) => renderPlayerRow(player, idx + 1, false)).join("")
@@ -1839,9 +1915,8 @@
   async function startGameMatch() {
     const room = GAME.activeRoom;
     if (!room || room.host_id !== GAME.user.id) return;
-    const others = GAME.roomPlayers.filter((item) => item.user_id !== room.host_id);
-    if (GAME.roomPlayers.length < 2 || others.some((item) => !item.ready)) {
-      alert("Cần ít nhất 2 người chơi và tất cả người chơi còn lại phải sẵn sàng.");
+    if (GAME.roomPlayers.length < 2) {
+      alert("Cần ít nhất 2 người chơi để bắt đầu trận.");
       return;
     }
     const questions = await buildGameQuestions(room);
@@ -1915,7 +1990,7 @@
       const me = GAME.roomPlayers.find((player) => player.user_id === GAME.user.id);
       const myLives = me ? getPlayerLives(me.id, room, GAME.roomAnswers || []) : null;
       if (!room || !questions.length) {
-        EL.questionBody.textContent = "Đang chuẩn bị câu hỏi...";
+        renderMathText(EL.questionBody, "Dang chuan bi cau hoi...");
         EL.answerArea.innerHTML = "";
         return;
       }
@@ -1939,7 +2014,7 @@
             : `Tiến độ ${currentIndex + 1}/${questions.length}`;
       }
       if (EL.progressFill) EL.progressFill.style.width = `${((currentIndex + 1) / questions.length) * 100}%`;
-      EL.questionBody.textContent = question.question_text || "Xem nội dung câu hỏi.";
+      renderMathText(EL.questionBody, question.question_text || "Xem noi dung cau hoi.");
       EL.questionImg.classList.toggle("hidden", !question.question_img);
       if (question.question_img) EL.questionImg.src = question.question_img;
 
