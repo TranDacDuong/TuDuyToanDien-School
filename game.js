@@ -1596,14 +1596,12 @@
     const [{ data: players }, { data: answers }, { data: questions }] = await Promise.all([
       sb.from("game_room_players").select("id,room_id,user_id,score,joined_at").eq("room_id", roomId).order("score", { ascending: false }),
       sb.from("game_room_answers").select("player_id,is_correct,score_earned,answered_at").eq("room_id", roomId),
-      sb.from("game_room_questions").select("id,order_no,question_type,points").eq("room_id", roomId).order("order_no"),
     ]);
     const ordered = [...(players || [])].sort((a, b) => (b.score || 0) - (a.score || 0) || new Date(a.joined_at) - new Date(b.joined_at));
     const myPlayer = ordered.find((item) => item.user_id === GAME.user.id);
     const myAnswers = (answers || []).filter((item) => item.player_id === myPlayer?.id);
     const correctCount = myAnswers.filter((item) => item.is_correct).length;
     const accuracy = myAnswers.length ? Math.round((correctCount / myAnswers.length) * 100) : 0;
-    const answerMap = Object.fromEntries(myAnswers.map((item) => [item.game_question_id, item]));
     EL.historyModalBody.innerHTML = `
       <div class="panel">
         <h3>${esc(getRoomDisplayTitle(room))}</h3>
@@ -1629,6 +1627,11 @@
             <strong style="color:var(--navy)">${player.score || 0}</strong>
           </div>`).join("")}
         </div>
+      </div>
+    `;
+    return;
+    EL.historyModalBody.innerHTML = `
+      <div class="panel">
         <div style="height:16px"></div>
         <h3>Chi tiết từng câu</h3>
         <div class="question-breakdown">
