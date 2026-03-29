@@ -93,7 +93,7 @@ async function loadNotifications() {
 
 function buildLink(item) {
   if (item.target_url) {
-    return `<a class="btn btn-outline btn-sm" href="${escAttr(item.target_url)}" onclick="markRead('${item.id}')">Mở chi tiết</a>`;
+    return `<a class="btn btn-outline btn-sm" href="${escAttr(item.target_url)}" onclick="openNotificationTarget(event, '${item.id}', '${escAttr(item.target_url)}')">Mở chi tiết</a>`;
   }
   if (item.type === "friend_request" || item.type === "friend_accept") {
     return `<a class="btn btn-outline btn-sm" href="friend_requests.html">Mở lời mời</a>`;
@@ -119,6 +119,62 @@ window.markAllRead = async function() {
   await sb.from("notifications").update({ is_read: true }).eq("user_id", currentUser.id).eq("is_read", false);
   loadNotifications();
 };
+
+window.openNotificationTarget = async function(event, id, targetUrl) {
+  if (event) event.preventDefault();
+  if (!targetUrl) return;
+  await markRead(id);
+  navigateToTarget(targetUrl);
+};
+
+function navigateToTarget(targetUrl) {
+  const cleanUrl = String(targetUrl || "").trim();
+  if (!cleanUrl) return;
+
+  const pageName = cleanUrl.split("?")[0];
+  const ancestors = [];
+  let cursor = window;
+  while (cursor && !ancestors.includes(cursor)) {
+    ancestors.push(cursor);
+    if (cursor === cursor.parent) break;
+    cursor = cursor.parent;
+  }
+
+  for (const frameWindow of ancestors) {
+    try {
+      const frame = frameWindow.document.getElementById("contentFrame");
+      if (!frame) continue;
+      frame.src = cleanUrl;
+
+      const menuItems = frameWindow.document.querySelectorAll("#menu li");
+      menuItems.forEach(item => {
+        item.classList.toggle("active", item.dataset.page === pageName);
+      });
+
+      if (typeof frameWindow.closeSidebar === "function") {
+        frameWindow.closeSidebar();
+      }
+      if (typeof window.parent?.closeSocialPanel === "function") {
+        window.parent.closeSocialPanel();
+      }
+      return;
+    } catch (error) {}
+  }
+
+  for (const frameWindow of ancestors) {
+    try {
+      if (typeof frameWindow.closeSocialPanel === "function") {
+        frameWindow.closeSocialPanel();
+      }
+    } catch (error) {}
+  }
+
+  try {
+    window.top.location.href = cleanUrl;
+  } catch (error) {
+    window.location.href = cleanUrl;
+  }
+}
 
 function subscribeNotifications() {
   if (notificationChannel) {
