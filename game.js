@@ -25,6 +25,7 @@
     roomNoticeTimer: null,
     roomChannel: null,
     listChannel: null,
+    roomPresenceIds: [],
     accessToken: "",
     unloadingLeaveSent: false,
     leaderboardPeriod: "day",
@@ -797,6 +798,7 @@
       sb.removeChannel(GAME.roomChannel);
       GAME.roomChannel = null;
     }
+    GAME.roomPresenceIds = [];
   }
 
   function setupRoomRealtime(roomId) {
@@ -805,13 +807,31 @@
       refreshActiveRoom(roomId, true);
       loadRooms();
     };
-    GAME.roomChannel = sb.channel(`game-room-${roomId}-${Date.now()}`);
+    GAME.roomChannel = sb.channel(`game-room-${roomId}-${Date.now()}`, {
+      config: {
+        presence: { key: GAME.user.id },
+      },
+    });
     GAME.roomChannel
       .on("postgres_changes", { event: "*", schema: "public", table: "game_rooms", filter: `id=eq.${roomId}` }, syncRoom)
       .on("postgres_changes", { event: "*", schema: "public", table: "game_room_players", filter: `room_id=eq.${roomId}` }, syncRoom)
       .on("postgres_changes", { event: "*", schema: "public", table: "game_room_questions", filter: `room_id=eq.${roomId}` }, syncRoom)
       .on("postgres_changes", { event: "*", schema: "public", table: "game_room_answers", filter: `room_id=eq.${roomId}` }, syncRoom)
-      .subscribe();
+      .on("presence", { event: "sync" }, () => {
+        handleRoomPresenceSync(roomId);
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          try {
+            await GAME.roomChannel.track({
+              user_id: GAME.user.id,
+              room_id: roomId,
+              online_at: new Date().toISOString(),
+            });
+          } catch (_) {}
+          handleRoomPresenceSync(roomId);
+        }
+      });
   }
 
   function fillGrades(el, placeholder) {
@@ -1682,6 +1702,55 @@
     }
   }
 
+  async function removePlayerFromRoom(room, player) {
+    if (!room || !player) return;
+    await sb.from("game_room_answers").delete().eq("player_id", player.id);
+    const { error } = await sb.from("game_room_players").delete().eq("id", player.id);
+    if (error) throw error;
+    const { data: remain = [] } = await sb.from("game_room_players").select("id,user_id").eq("room_id", room.id).order("joined_at", { ascending: true });
+    if (!remain.length) {
+      await cleanupRoomCompletely(room.id);
+      return;
+    }
+    if (room.host_id === player.user_id) {
+      await sb.from("game_rooms").update({ host_id: remain[0].user_id, started_at: remain.length >= 2 ? room.started_at : null }).eq("id", room.id);
+    } else if (remain.length < 2) {
+      await sb.from("game_rooms").update({ started_at: null }).eq("id", room.id);
+    }
+  }
+
+  function getPresenceUserIds() {
+    if (!GAME.roomChannel?.presenceState) return [];
+    const state = GAME.roomChannel.presenceState();
+    const ids = new Set();
+    Object.values(state || {}).forEach((entries) => {
+      (entries || []).forEach((entry) => {
+        if (entry?.user_id) ids.add(entry.user_id);
+      });
+    });
+    return [...ids];
+  }
+
+  async function handleRoomPresenceSync(roomId) {
+    const presentIds = getPresenceUserIds();
+    GAME.roomPresenceIds = presentIds;
+    if (!presentIds.length) return;
+    if (GAME.activeRoom?.id !== roomId) return;
+    if (GAME.activeRoom?.status === "finished") return;
+    if (GAME.activeRoom?.host_id !== GAME.user?.id) return;
+    const stalePlayers = (GAME.roomPlayers || []).filter((player) => !presentIds.includes(player.user_id));
+    for (const stalePlayer of stalePlayers) {
+      try {
+        await removePlayerFromRoom(GAME.activeRoom, stalePlayer);
+      } catch (_) {}
+    }
+    if (stalePlayers.length) {
+      showRoomNotice(`${formatPlayerNames(stalePlayers.map((item) => item.user_id))} đã mất kết nối và bị đưa ra khỏi phòng.`);
+      await refreshActiveRoom(roomId, true);
+      await loadRooms();
+    }
+  }
+
   async function joinRoomByCode() {
     const code = String(EL.joinCode?.value || "").trim().toUpperCase();
     if (!code) {
@@ -1717,24 +1786,12 @@
     if (!confirm("Bạn muốn rời phòng này?")) return;
     GAME.leavingRoom = true;
     clearIntervals();
-    await sb.from("game_room_answers").delete().eq("player_id", player.id);
-    const { error } = await sb.from("game_room_players").delete().eq("id", player.id);
-    if (error) GAME.leavingRoom = false;
-    if (error) {
+    try {
+      await removePlayerFromRoom(room, player);
+    } catch (error) {
       alert(`Không thể rời phòng: ${error.message}`);
-      return;
-    }
-    const { data: remain = [] } = await sb.from("game_room_players").select("id,user_id").eq("room_id", room.id).order("joined_at", { ascending: true });
-    if (!remain.length) {
       GAME.leavingRoom = false;
-      await cleanupRoomCompletely(room.id);
-      hideGameScreen();
       return;
-    }
-    if (room.host_id === GAME.user.id) {
-      await sb.from("game_rooms").update({ host_id: remain[0].user_id, started_at: remain.length >= 2 ? room.started_at : null }).eq("id", room.id);
-    } else if (remain.length < 2) {
-      await sb.from("game_rooms").update({ started_at: null }).eq("id", room.id);
     }
     GAME.leavingRoom = false;
     await loadRooms();
@@ -1768,9 +1825,9 @@
     const player = GAME.roomPlayers.find((item) => item.id === playerId);
     if (!player || player.user_id === GAME.user.id) return;
     if (!confirm(`Mời ${getPlayerName(player.user_id)} ra khỏi phòng này?`)) return;
-    await sb.from("game_room_answers").delete().eq("player_id", player.id);
-    const { error } = await sb.from("game_room_players").delete().eq("id", player.id);
-    if (error) {
+    try {
+      await removePlayerFromRoom(room, player);
+    } catch (error) {
       alert(`Không thể mời người chơi ra khỏi phòng: ${error.message}`);
       return;
     }
