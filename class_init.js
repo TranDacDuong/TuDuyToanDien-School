@@ -10,6 +10,9 @@
 
   async function init(){
     try{
+      const qs = new URLSearchParams(location.search);
+      const openClassId = qs.get("openClassId");
+      const openTab = qs.get("tab");
       const { data:{ user } } = await getSb().auth.getUser();
       if(!user) return;
 
@@ -49,6 +52,15 @@
 
       /* Gọi load AFTER set role+uid */
       if(window.loadMyClasses) window.loadMyClasses();
+
+      if(openClassId && window.openClassView){
+        setTimeout(async () => {
+          await window.openClassView(openClassId, qs.get("className") || "Chi tiết lớp");
+          if(openTab === "exams" && window.cvSwitchTab){
+            setTimeout(() => window.cvSwitchTab("exams"), 250);
+          }
+        }, 400);
+      }
 
     }catch(e){ console.error(e); }
   }

@@ -1821,6 +1821,38 @@
       }
     }
 
+    if(window.NotificationHelper){
+      const hasLecture = !!lessonPayload.lecture_video_url;
+      const hasSolution = !!lessonPayload.solution_video_url;
+      const hasPractice = !!practiceId;
+      const summaryBits = [
+        hasLecture ? "video bài giảng" : "",
+        hasSolution ? "video chữa bài" : "",
+        hasPractice ? "đề luyện tập" : ""
+      ].filter(Boolean);
+      const actionLabel = sessionId ? "cập nhật" : "thêm";
+      const type = sessionId ? "class_session_updated" : "class_session_added";
+      const extraText = summaryBits.length ? " Kèm " + summaryBits.join(", ") + "." : "";
+
+      try {
+        await window.NotificationHelper.notifyClassStudents(_classId, () => ({
+          type,
+          title: `${_className || "Lớp học"} có buổi học ${actionLabel}`,
+          message: `Buổi ${sessionOrder}: ${lessonName}.${extraText}`,
+          targetUrl: `class.html?openClassId=${encodeURIComponent(_classId)}&tab=exams&className=${encodeURIComponent(_className || "Lớp học")}`,
+          meta: {
+            class_id: _classId,
+            class_name: _className || "",
+            session_order: sessionOrder,
+            session_date: sessionDate,
+            lesson_name: lessonName
+          }
+        }));
+      } catch (notifyError) {
+        console.warn("Không gửi được thông báo buổi học lớp:", notifyError);
+      }
+    }
+
     document.getElementById("cvClassSessionModal")?.remove();
     await cvSwitchTab("exams");
   };
@@ -1906,6 +1938,26 @@
       : {class_id:_classId,exam_id:examId};
     const {error}=await sb.from("class_exams").insert(payload);
     if(error){alert("Lỗi: "+error.message);return;}
+
+    if(window.NotificationHelper){
+      try {
+        await window.NotificationHelper.notifyClassStudents(_classId, () => ({
+          type: "class_exam_added",
+          title: `${_className || "Lớp học"} có đề kiểm tra mới`,
+          message: `Đề "${examTitle}" vừa được thêm vào lớp của bạn.`,
+          targetUrl: `class.html?openClassId=${encodeURIComponent(_classId)}&tab=exams&className=${encodeURIComponent(_className || "Lớp học")}`,
+          meta: {
+            class_id: _classId,
+            class_name: _className || "",
+            exam_id: examId,
+            exam_kind: kind
+          }
+        }));
+      } catch (notifyError) {
+        console.warn("Không gửi được thông báo đề kiểm tra lớp:", notifyError);
+      }
+    }
+
     document.getElementById("cvAddExamModal")?.remove();
     await cvSwitchTab("exams");
   };

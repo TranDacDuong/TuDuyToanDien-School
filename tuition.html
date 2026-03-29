@@ -8,6 +8,7 @@
 <title>Thu học phí</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="./supabaseClient.js"></script>
+<script src="./notification_helper.js"></script>
 <style>
 * { box-sizing: border-box; }
 :root {
@@ -478,6 +479,7 @@ tr:hover td { background: #f8fbff; }
       <option value="overpaid">Nộp thừa</option>
     </select>
     <button onclick="loadTuition()">Tải lại</button>
+    <button class="secondary" id="notifyTuitionBtn" onclick="notifyPendingTuition()" style="display:none">Thông báo học phí</button>
     <button class="secondary" onclick="printInvoices()">In hóa đơn</button>
     <span class="badge" id="rowCount">0 học sinh</span>
   </div>

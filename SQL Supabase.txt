@@ -271,6 +271,39 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 CREATE INDEX IF NOT EXISTS notifications_user_read_created_idx
   ON public.notifications (user_id, is_read, created_at DESC);
 
+ALTER TABLE public.notifications
+  ADD COLUMN IF NOT EXISTS title text,
+  ADD COLUMN IF NOT EXISTS target_url text,
+  ADD COLUMN IF NOT EXISTS meta jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+ALTER TABLE public.notifications
+  DROP CONSTRAINT IF EXISTS notifications_type_check;
+
+ALTER TABLE public.notifications
+  ADD CONSTRAINT notifications_type_check
+  CHECK (
+    type IN (
+      'friend_request',
+      'friend_accept',
+      'post_like',
+      'post_comment',
+      'post_approved',
+      'post_rejected',
+      'message_new',
+      'course_created',
+      'course_enrolled',
+      'course_request_approved',
+      'course_request_rejected',
+      'course_session_added',
+      'course_session_updated',
+      'class_session_added',
+      'class_session_updated',
+      'class_exam_added',
+      'tuition_due',
+      'tuition_reminder'
+    )
+  );
+
 -- ============================================
 -- Messaging feature migration
 -- ============================================

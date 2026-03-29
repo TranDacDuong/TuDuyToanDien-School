@@ -134,6 +134,11 @@
     return currentRole === "admin" || currentRole === "teacher";
   }
 
+  function syncToolbarVisibility() {
+    const notifyBtn = document.getElementById("notifyTuitionBtn");
+    if (notifyBtn) notifyBtn.style.display = currentRole === "admin" ? "" : "none";
+  }
+
   function fmtDate(iso) {
     if (!iso) return "—";
     return new Date(iso).toLocaleDateString("vi-VN");
@@ -332,7 +337,8 @@ Nhập số tiền hoàn lại (>0):`,
      INIT CONTROLS
   ───────────────────────────────────────────── */
   const monthPicker = document.getElementById("monthPicker");
-  monthPicker.value = todayYM();
+  const monthQuery = new URLSearchParams(location.search).get("month");
+  monthPicker.value = /^\d{4}-\d{2}$/.test(monthQuery || "") ? monthQuery : todayYM();
 
   async function loadViewerContext() {
     const sb = getSb();
@@ -870,6 +876,55 @@ Nhập số tiền hoàn lại (>0):`,
   /* ─────────────────────────────────────────────
      INIT
   ───────────────────────────────────────────── */
+  window.notifyPendingTuition = async function () {
+    if (currentRole !== "admin") {
+      alert("Chỉ admin mới có thể gửi thông báo học phí.");
+      return;
+    }
+    if (!window.NotificationHelper) {
+      alert("Không tải được bộ gửi thông báo.");
+      return;
+    }
+
+    const ym = monthPicker.value;
+    const pendingRows = (currentRows || []).filter(group => {
+      const amountPaid = paymentMap[group.studentId]?.amount_paid || 0;
+      const status = getStatus(group.amount, amountPaid);
+      return status === "unpaid" || status === "partial";
+    });
+
+    if (!pendingRows.length) {
+      alert("Không có học sinh nào đang chưa nộp hoặc chưa nộp đủ trong bộ lọc hiện tại.");
+      return;
+    }
+    if (!confirm(`Gửi thông báo học phí cho ${pendingRows.length} học sinh đang chưa nộp hoặc chưa nộp đủ?`)) {
+      return;
+    }
+
+    try {
+      await window.NotificationHelper.createBulkNotifications(
+        pendingRows.map(group => {
+          const amountPaid = paymentMap[group.studentId]?.amount_paid || 0;
+          const remaining = Math.max(0, Math.round(group.amount - amountPaid));
+          const status = getStatus(group.amount, amountPaid);
+          return {
+            userId: group.studentId,
+            type: status === "unpaid" ? "tuition_due" : "tuition_reminder",
+            title: `Học phí tháng ${ym}`,
+            message: status === "unpaid"
+              ? `Bạn có học phí tháng ${ym} chưa thanh toán. Số tiền cần nộp là ${fmt(group.amount)}đ.`
+              : `Bạn còn thiếu ${fmt(remaining)}đ học phí tháng ${ym}. Hãy kiểm tra và hoàn tất thanh toán.`,
+            targetUrl: `tuition.html?month=${encodeURIComponent(ym)}`,
+            meta: { month: ym, remaining_amount: remaining, total_amount: Math.round(group.amount) }
+          };
+        })
+      );
+      alert(`Đã gửi thông báo học phí cho ${pendingRows.length} học sinh.`);
+    } catch (error) {
+      alert("Không thể gửi thông báo học phí: " + error.message);
+    }
+  };
+
   async function init() {
     await loadViewerContext();
     syncToolbarVisibility();

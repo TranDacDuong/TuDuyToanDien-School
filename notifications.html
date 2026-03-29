@@ -40,6 +40,7 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
+<script src="notification_helper.js"></script>
 <script>
 let currentUser = null;
 let notificationChannel = null;
@@ -58,7 +59,7 @@ async function init() {
 async function loadNotifications() {
   const { data, error } = await sb
     .from("notifications")
-    .select("id, type, ref_id, message, is_read, created_at, actor_id, users!notifications_actor_id_fkey(full_name, avatar_url)")
+    .select("id, type, title, ref_id, target_url, meta, message, is_read, created_at, actor_id, users!notifications_actor_id_fkey(full_name, avatar_url)")
     .eq("user_id", currentUser.id)
     .order("created_at", { ascending: false });
 
@@ -77,7 +78,7 @@ async function loadNotifications() {
       <div class="row">
         <img class="avatar" src="${item.users?.avatar_url || "default-avatar.png"}" alt="Avatar" onerror="this.src='default-avatar.png'">
         <div style="flex:1">
-          <div class="title">${esc(item.users?.full_name || "Hệ thống")}</div>
+          <div class="title">${esc(item.title || item.users?.full_name || "Hệ thống")}</div>
           <div class="message">${esc(item.message || formatType(item.type))}</div>
           <div class="meta">${formatTime(item.created_at)}</div>
           <div class="actions">
@@ -91,6 +92,9 @@ async function loadNotifications() {
 }
 
 function buildLink(item) {
+  if (item.target_url) {
+    return `<a class="btn btn-outline btn-sm" href="${escAttr(item.target_url)}" onclick="markRead('${item.id}')">Mở chi tiết</a>`;
+  }
   if (item.type === "friend_request" || item.type === "friend_accept") {
     return `<a class="btn btn-outline btn-sm" href="friend_requests.html">Mở lời mời</a>`;
   }
@@ -140,6 +144,17 @@ function formatType(type) {
   if (type === "post_approved") return "đã duyệt bài viết của bạn.";
   if (type === "post_rejected") return "đã từ chối bài viết của bạn.";
   if (type === "message_new") return "đã gửi cho bạn một tin nhắn mới.";
+  if (type === "course_created") return "có một khóa học mới dành cho bạn.";
+  if (type === "course_enrolled") return "đã thêm bạn vào khóa học.";
+  if (type === "course_request_approved") return "đã duyệt yêu cầu đăng ký khóa học của bạn.";
+  if (type === "course_request_rejected") return "đã từ chối yêu cầu đăng ký khóa học của bạn.";
+  if (type === "course_session_added") return "đã thêm buổi học mới trong khóa học của bạn.";
+  if (type === "course_session_updated") return "đã cập nhật nội dung học tập trong khóa học của bạn.";
+  if (type === "class_session_added") return "đã thêm buổi học mới trong lớp học của bạn.";
+  if (type === "class_session_updated") return "đã cập nhật buổi học trong lớp của bạn.";
+  if (type === "class_exam_added") return "đã thêm đề kiểm tra mới trong lớp học của bạn.";
+  if (type === "tuition_due") return "có học phí mới cần thanh toán.";
+  if (type === "tuition_reminder") return "nhắc bạn hoàn tất học phí còn thiếu.";
   return "Bạn có một thông báo mới.";
 }
 
@@ -159,6 +174,10 @@ function esc(value) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function escAttr(value) {
+  return esc(value).replace(/'/g, "&#39;");
 }
 
 init();
