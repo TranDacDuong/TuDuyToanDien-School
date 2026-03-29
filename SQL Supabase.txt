@@ -1062,6 +1062,27 @@ CREATE UNIQUE INDEX IF NOT EXISTS course_enrollments_unique
 
 ALTER TABLE public.course_enrollments ENABLE ROW LEVEL SECURITY;
 
+CREATE TABLE IF NOT EXISTS public.course_registration_requests (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  course_id uuid NOT NULL,
+  student_id uuid NOT NULL,
+  message text,
+  status text NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'approved', 'rejected')),
+  handled_by uuid,
+  handled_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT course_registration_requests_pkey PRIMARY KEY (id),
+  CONSTRAINT course_registration_requests_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id) ON DELETE CASCADE,
+  CONSTRAINT course_registration_requests_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.users(id) ON DELETE CASCADE,
+  CONSTRAINT course_registration_requests_handled_by_fkey FOREIGN KEY (handled_by) REFERENCES public.users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS course_registration_requests_course_status_idx
+  ON public.course_registration_requests (course_id, status, created_at DESC);
+
+ALTER TABLE public.course_registration_requests ENABLE ROW LEVEL SECURITY;
+
 DROP POLICY IF EXISTS courses_select_policy ON public.courses;
 CREATE POLICY courses_select_policy ON public.courses
 FOR SELECT
@@ -1088,11 +1109,17 @@ DROP POLICY IF EXISTS course_enrollments_insert_policy ON public.course_enrollme
 CREATE POLICY course_enrollments_insert_policy ON public.course_enrollments
 FOR INSERT
 WITH CHECK (
-  student_id = auth.uid()
-  AND EXISTS (
-    SELECT 1
-    FROM public.courses c
-    WHERE c.id = course_id AND c.status = 'open'
+  (
+    student_id = auth.uid()
+    AND EXISTS (
+      SELECT 1
+      FROM public.courses c
+      WHERE c.id = course_id AND c.status = 'open'
+    )
+  )
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
   )
 );
 
@@ -1104,6 +1131,46 @@ USING (
   OR EXISTS (
     SELECT 1 FROM public.users u
     WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS course_registration_requests_select_policy ON public.course_registration_requests;
+CREATE POLICY course_registration_requests_select_policy ON public.course_registration_requests
+FOR SELECT
+USING (
+  student_id = auth.uid()
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS course_registration_requests_insert_policy ON public.course_registration_requests;
+CREATE POLICY course_registration_requests_insert_policy ON public.course_registration_requests
+FOR INSERT
+WITH CHECK (
+  student_id = auth.uid()
+  AND status = 'pending'
+  AND EXISTS (
+    SELECT 1
+    FROM public.courses c
+    WHERE c.id = course_id AND c.status = 'open'
+  )
+);
+
+DROP POLICY IF EXISTS course_registration_requests_update_policy ON public.course_registration_requests;
+CREATE POLICY course_registration_requests_update_policy ON public.course_registration_requests
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
   )
 );
 
