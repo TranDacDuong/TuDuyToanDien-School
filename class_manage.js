@@ -952,7 +952,7 @@
 
     const lessonPayloads = missingDates.map(date => ({
       name: "Chưa cập nhật nội dung buổi học",
-      summary: "Admin có thể bấm Sửa buổi để thêm tiêu đề, mô tả, video và đề luyện tập cho buổi học này.",
+      summary: "",
       lecture_video_url: null,
       solution_video_url: null,
       created_by: window._currentUserId
