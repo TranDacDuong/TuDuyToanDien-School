@@ -896,25 +896,23 @@
         '</div>'
       : "";
     const orderLabel = session.display_order || session.session_order || "—";
-    return '<div style="background:var(--white);border:1px solid var(--border);border-radius:14px;padding:16px 18px">'+
-      '<div style="display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">'+
-        '<div style="display:flex;gap:14px;flex:1;min-width:260px">'+
-          '<div style="width:72px;min-width:72px;border-radius:16px;background:linear-gradient(135deg,var(--navy),var(--navy-mid));color:var(--gold-light);padding:10px 8px;text-align:center;box-shadow:0 8px 20px rgba(13,39,80,.12)">'+
-            '<div style="font-size:.74rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase">Buổi</div>'+
-            '<div style="font-size:1.3rem;font-weight:800;line-height:1.1;margin-top:4px">'+orderLabel+'</div>'+
-          '</div>'+
-          '<div style="flex:1;min-width:0">'+
-            '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">'+
-              '<span style="font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8">'+esc(fmtSessionDate(session.session_date))+'</span>'+
-              (examInfo ? '<span style="font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#fff7ed;color:#c2410c">Có đề luyện tập</span>' : '<span style="font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#f5f5f4;color:#57534e">Chưa gắn đề luyện tập</span>')+
-            '</div>'+
-            '<div style="font-weight:700;font-size:1rem;color:var(--navy)">'+esc(lesson?.name || "Chưa có tên bài học")+'</div>'+
-            '<div style="font-size:.84rem;line-height:1.65;color:var(--ink-mid);margin-top:6px">'+summary+'</div>'+
-            mediaHtml+
-            practiceHtml+
-          '</div>'+
+    return '<div style="background:var(--white);border:1px solid var(--border);border-radius:18px;padding:16px 18px">'+
+      '<div style="display:grid;grid-template-columns:94px minmax(0,1fr) auto;gap:16px;align-items:center">'+
+        '<div style="width:94px;min-height:58px;border-radius:14px;background:linear-gradient(135deg,#0f3c73 0%,#1d6bd1 100%);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center">'+
+          '<div style="font-size:.8rem;font-weight:700">Buổi</div>'+
+          '<div style="font-size:1.25rem;font-weight:800;line-height:1.1">'+orderLabel+'</div>'+
         '</div>'+
-        actionHtml+
+        '<div style="min-width:0">'+
+          '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">'+
+            '<span style="font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8">'+esc(fmtSessionDate(session.session_date))+'</span>'+
+            (examInfo ? '<span style="font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#fff7ed;color:#c2410c">Có đề luyện tập</span>' : '<span style="font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#f5f5f4;color:#57534e">Chưa gắn đề luyện tập</span>')+
+          '</div>'+
+          '<div style="font-weight:700;font-size:1rem;color:var(--navy)">'+esc(lesson?.name || "Chưa có tên bài học")+'</div>'+
+          '<div style="font-size:.84rem;line-height:1.65;color:var(--ink-mid);margin-top:6px">'+summary+'</div>'+
+          mediaHtml+
+          practiceHtml+
+        '</div>'+
+        '<div style="display:flex;justify-content:flex-end">'+actionHtml+'</div>'+
       '</div>'+
     '</div>';
   }
