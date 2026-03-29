@@ -908,47 +908,57 @@ body {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 .shortcut-card {
   border: 1px solid rgba(15,31,61,.08);
-  border-radius: 18px;
-  background: linear-gradient(180deg, #fff 0%, #fbfcff 100%);
-  box-shadow: 0 10px 24px rgba(15,31,61,.05);
-  padding: 14px 12px;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, rgba(200,150,42,.12), transparent 26%),
+    linear-gradient(180deg, #fff 0%, #fbfcff 100%);
+  box-shadow: 0 16px 32px rgba(15,31,61,.07);
+  padding: 16px 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   align-items: flex-start;
+  transition: .18s ease;
+}
+.shortcut-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 38px rgba(15,31,61,.1);
 }
 .shortcut-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 14px;
+  width: 42px;
+  height: 42px;
+  border-radius: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #eef1f5;
+  background: linear-gradient(135deg, rgba(15,60,115,.12) 0%, rgba(29,107,209,.16) 100%);
   color: var(--navy);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
 }
 .shortcut-title {
   font-weight: 700;
   color: var(--navy);
-  font-size: .86rem;
+  font-size: .88rem;
 }
 .shortcut-sub {
   color: var(--ink-light);
-  font-size: .74rem;
-  line-height: 1.45;
+  font-size: .76rem;
+  line-height: 1.55;
 }
 
 /* ── Compose ── */
 .compose-card {
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
-  border-radius: 22px;
-  box-shadow: 0 14px 32px rgba(15,31,61,.07);
+  background:
+    radial-gradient(circle at top right, rgba(200,150,42,.12), transparent 26%),
+    linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+  border-radius: 26px;
+  box-shadow: 0 18px 38px rgba(15,31,61,.08);
   border: 1px solid rgba(15,31,61,.08);
-  padding: 16px;
+  padding: 18px;
   margin-bottom: 22px;
   display: none;
 }
@@ -978,13 +988,13 @@ body {
 .compose-textarea {
   width: 100%;
   border: 1px solid rgba(15,31,61,.08);
-  border-radius: 22px;
+  border-radius: 24px;
   padding: 16px 18px;
   font-family: var(--font-body);
   font-size: .94rem;
   resize: none;
   transition: .18s;
-  background: #f0f2f5;
+  background: linear-gradient(180deg, #f3f6fb 0%, #eef3f8 100%);
   color: var(--ink);
   min-height: 118px;
   padding-bottom: 72px;
@@ -1025,7 +1035,7 @@ body {
   height: 36px;
   border-radius: 50%;
   border: 1px solid rgba(15,31,61,.06);
-  background: #eef1f5;
+  background: #eef3f8;
   box-shadow: none;
   display: inline-flex;
   align-items: center;
@@ -1117,9 +1127,9 @@ body {
 }
 .compose-preview img {
   width: 100%;
-  max-height: 240px;
+  max-height: 260px;
   object-fit: cover;
-  border-radius: 16px;
+  border-radius: 18px;
   border: 1px solid rgba(15,31,61,.08);
 }
 
@@ -1291,17 +1301,19 @@ body {
 
 /* ── Post card ── */
 .post-card {
-  background: var(--white);
-  border-radius: 18px;
-  box-shadow: 0 10px 26px rgba(15,31,61,.07);
+  background:
+    radial-gradient(circle at top right, rgba(24,119,242,.05), transparent 28%),
+    linear-gradient(180deg, #fff 0%, #fbfcff 100%);
+  border-radius: 22px;
+  box-shadow: 0 14px 30px rgba(15,31,61,.08);
   border: 1px solid rgba(15,31,61,.08);
-  margin-bottom: 16px;
+  margin-bottom: 18px;
   overflow: hidden;
   transition: box-shadow .2s, transform .2s;
 }
 .post-card:hover {
-  box-shadow: 0 16px 34px rgba(15,31,61,.1);
-  transform: translateY(-1px);
+  box-shadow: 0 20px 40px rgba(15,31,61,.11);
+  transform: translateY(-2px);
 }
 .post-card.pinned  { border-top: 3px solid var(--gold); }
 .post-card.pending-card  { border-left: 3px solid var(--amber); opacity: .92; }
@@ -1311,7 +1323,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 16px 0;
+  padding: 18px 18px 0;
 }
 .post-avatar {
   width: 42px;
@@ -1342,13 +1354,13 @@ body {
 .badge-visibility { font-size: .68rem; font-weight: 700; background: var(--blue-bg); color: var(--blue); padding: 1px 8px; border-radius: 20px; }
 
 .post-body {
-  padding: 12px 16px 14px;
+  padding: 12px 18px 16px;
   font-size: .92rem;
   line-height: 1.68;
   color: var(--ink); white-space: pre-wrap; word-break: break-word;
 }
 .post-media-wrap {
-  padding: 0 16px 14px;
+  padding: 0 18px 16px;
 }
 .post-media-img {
   width: 100%;
@@ -1359,11 +1371,11 @@ body {
   background: var(--surface);
 }
 .post-pending-notice {
-  margin: 0 16px 10px; padding: 8px 12px;
-  background: var(--amber-bg); border-radius: 8px;
+  margin: 0 18px 12px; padding: 9px 12px;
+  background: var(--amber-bg); border-radius: 12px;
   font-size: .78rem; color: var(--amber); font-weight: 500;
 }
-.mod-bar { display: flex; gap: 6px; padding: 0 16px 10px; flex-wrap: wrap; }
+.mod-bar { display: flex; gap: 6px; padding: 0 18px 12px; flex-wrap: wrap; }
 
 /* ── Actions ── */
 .post-stats {
@@ -1371,7 +1383,7 @@ body {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  padding: 0 16px 10px;
+  padding: 0 18px 12px;
   color: var(--ink-light);
   font-size: .8rem;
 }
@@ -1379,9 +1391,10 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 12px 12px;
+  padding: 12px 14px 14px;
   border-top: 1px solid rgba(15,31,61,.06);
   flex-wrap: wrap;
+  background: rgba(248,251,255,.74);
 }
 .act-btn {
   display: inline-flex;
@@ -1423,7 +1436,7 @@ body {
 /* ── Comments ── */
 .cmt-section {
   border-top: 1px solid rgba(15,31,61,.06);
-  padding: 0 16px 14px;
+  padding: 0 18px 16px;
   display: none;
   background: linear-gradient(180deg, #fff 0%, #fbfcff 100%);
 }
@@ -1577,11 +1590,13 @@ body {
 /* ── Empty / Loading ── */
 .empty-feed {
   text-align: center;
-  padding: 60px 20px;
+  padding: 32px 20px;
   color: var(--ink-light);
   border: 1px dashed var(--border);
-  border-radius: 18px;
-  background: linear-gradient(180deg, #fcfcff 0%, #f8f6ef 100%);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, rgba(200,150,42,.08), transparent 26%),
+    linear-gradient(180deg, #fcfcff 0%, #f8f6ef 100%);
 }
 .empty-feed .icon { font-size: 3rem; margin-bottom: 12px; }
 .empty-feed strong {
