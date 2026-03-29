@@ -109,6 +109,63 @@
     resultsList: document.getElementById("gameResultsList"),
   };
 
+  function supportsModeElo(mode) {
+    return mode === "quick" || mode === "ranked" || mode === "survival" || mode === "speed";
+  }
+
+  function roundToNearestTen(value) {
+    return Math.round(Number(value || 0) / 10) * 10;
+  }
+
+  function getCleanModeLabel(mode) {
+    if (mode === "ranked") return "Leo hạng";
+    if (mode === "survival") return "Sinh tồn";
+    if (mode === "speed") return "Đua tốc độ";
+    if (mode === "friends") return "Phòng bạn bè";
+    return "Đấu nhanh";
+  }
+
+  function getModeEloRule(mode) {
+    if (mode === "ranked") {
+      return "Top 1 +100 Elo, top 2 +50 Elo, các vị trí còn lại bị trừ đều tổng 150 Elo.";
+    }
+    if (mode === "quick" || mode === "survival" || mode === "speed") {
+      return "Top 25% +20 Elo, 25% tiếp theo +10 Elo, còn lại không đổi Elo.";
+    }
+    return "Chế độ này không tính Elo.";
+  }
+
+  function getModeEloDeltaMap(mode, orderedPlayers) {
+    const total = orderedPlayers.length;
+    if (!total || !supportsModeElo(mode)) return {};
+
+    const map = {};
+    if (mode === "ranked") {
+      orderedPlayers.forEach((player, index) => {
+        if (index === 0) {
+          map[player.user_id] = 100;
+          return;
+        }
+        if (index === 1) {
+          map[player.user_id] = 50;
+          return;
+        }
+        const losers = Math.max(1, total - 2);
+        map[player.user_id] = -roundToNearestTen(150 / losers);
+      });
+      return map;
+    }
+
+    const topCount = Math.max(1, Math.ceil(total * 0.25));
+    const secondCount = Math.max(1, Math.ceil(total * 0.25));
+    orderedPlayers.forEach((player, index) => {
+      if (index < topCount) map[player.user_id] = 20;
+      else if (index < topCount + secondCount) map[player.user_id] = 10;
+      else map[player.user_id] = 0;
+    });
+    return map;
+  }
+
   init();
   normalizeStaticGameText();
 
@@ -270,6 +327,25 @@
 
   function normalizeStaticGameText() {
     document.title = "Game thi đấu";
+    const cleanHeroTitle = document.querySelector(".hero-copy h1");
+    if (cleanHeroTitle) cleanHeroTitle.textContent = "Đấu trường tri thức";
+    const cleanHeroDesc = document.querySelector(".hero-copy p");
+    if (cleanHeroDesc) {
+      cleanHeroDesc.textContent = "Chọn chế độ, vào phòng và trả lời thật nhanh. Luật cộng/trừ Elo của từng chế độ được hiển thị rõ để người chơi dễ theo dõi.";
+    }
+    if (EL.openRoomBtn) EL.openRoomBtn.textContent = "+ Tạo phòng mới";
+    if (EL.quickMatchBtn) EL.quickMatchBtn.textContent = "Ghép nhanh";
+    if (EL.reloadRoomsBtn) EL.reloadRoomsBtn.textContent = "Tải lại";
+    if (EL.joinCode) EL.joinCode.placeholder = "Nhập mã phòng";
+    if (EL.joinByCodeBtn) EL.joinByCodeBtn.textContent = "Vào phòng";
+    if (EL.keyword) EL.keyword.placeholder = "Tìm theo tên phòng hoặc mã phòng";
+    if (EL.questionTitle) EL.questionTitle.textContent = "Câu hỏi";
+    if (EL.questionClock?.previousElementSibling) EL.questionClock.previousElementSibling.textContent = "Còn lại";
+    EL.progressText?.remove();
+    document.querySelectorAll("[style*='color:var(--navy)']").forEach((node) => {
+      node.style.color = "#f8fafc";
+    });
+    document.title = "Game thi đấu";
     const heroTitle = document.querySelector(".hero-copy h1");
     if (heroTitle) heroTitle.textContent = "Đấu trường tri thức";
     const heroDesc = document.querySelector(".hero-copy p");
@@ -379,7 +455,30 @@
     if (historyModalTitle) historyModalTitle.textContent = "Chi tiết trận đấu";
     const historyClose = document.querySelector("#gameHistoryModal .mh .btn");
     if (historyClose) historyClose.textContent = "Đóng";
+    if (heroTitle) heroTitle.textContent = "Đấu trường tri thức";
+    if (heroDesc) heroDesc.textContent = "Chọn chế độ, vào phòng và trả lời thật nhanh. Luật cộng/trừ Elo của từng chế độ được hiển thị rõ để người chơi dễ theo dõi.";
+    if (EL.openRoomBtn) EL.openRoomBtn.textContent = "+ Tạo phòng mới";
+    if (EL.quickMatchBtn) EL.quickMatchBtn.textContent = "Ghép nhanh";
+    if (EL.reloadRoomsBtn) EL.reloadRoomsBtn.textContent = "Tải lại";
+    if (EL.joinCode) EL.joinCode.placeholder = "Nhập mã phòng";
+    if (EL.joinByCodeBtn) EL.joinByCodeBtn.textContent = "Vào phòng";
+    if (EL.keyword) EL.keyword.placeholder = "Tìm theo tên phòng hoặc mã phòng";
+    if (EL.roomScreenTitle) EL.roomScreenTitle.textContent = "Phòng thi đấu";
+    if (EL.toggleReadyBtn) EL.toggleReadyBtn.textContent = "Sẵn sàng";
+    if (EL.leaveGameBtn) EL.leaveGameBtn.textContent = "Rời phòng";
+    if (EL.startGameBtn) EL.startGameBtn.textContent = "Bắt đầu trận";
+    if (EL.questionTitle) EL.questionTitle.textContent = "Câu hỏi";
+    if (EL.questionClock?.parentElement?.firstChild) EL.questionClock.parentElement.firstChild.textContent = "Còn lại";
+    EL.progressText?.remove();
+    if (EL.myScore?.previousElementSibling) EL.myScore.previousElementSibling.textContent = "Điểm của bạn";
+    if (EL.myRank?.previousElementSibling) EL.myRank.previousElementSibling.textContent = "Hạng hiện tại";
+    document.querySelectorAll("#gameLiveView .panel h3")[0] && (document.querySelectorAll("#gameLiveView .panel h3")[0].textContent = "Đáp án của bạn");
+    document.querySelectorAll("#gameLiveView .panel h3")[1] && (document.querySelectorAll("#gameLiveView .panel h3")[1].textContent = "Bảng xếp hạng");
+    if (EL.finishedView?.querySelector("h3")) EL.finishedView.querySelector("h3").textContent = "Kết quả trận đấu";
   }
+
+  if (EL.myScore?.previousElementSibling) EL.myScore.previousElementSibling.textContent = "Điểm của bạn";
+  if (EL.myRank?.previousElementSibling) EL.myRank.previousElementSibling.textContent = "Hạng hiện tại";
 
   function fmtDateTime(value) {
     if (!value) return "—";
@@ -505,6 +604,15 @@
     ];
   }
 
+  function getAutoMatchModeCards() {
+    return [
+      { mode: "quick", title: "Đấu nhanh", art: "⚡", desc: "Vào nhanh, ghép nhanh.", elo: getModeEloRule("quick") },
+      { mode: "ranked", title: "Leo hạng", art: "🏆", desc: "Chế độ cạnh tranh Elo rõ ràng.", elo: getModeEloRule("ranked") },
+      { mode: "survival", title: "Sinh tồn", art: "🛡️", desc: "Sai là mất mạng, càng về cuối càng căng.", elo: getModeEloRule("survival") },
+      { mode: "speed", title: "Đua tốc độ", art: "🚀", desc: "Đúng nhanh để bứt lên.", elo: getModeEloRule("speed") },
+    ];
+  }
+
   function injectAutoModeLobby() {
     if (document.getElementById("gameModeDeck")) return;
     const hero = document.querySelector("#gameListPage .hero");
@@ -533,7 +641,8 @@
       <button type="button" class="game-mode-card" data-auto-mode="${item.mode}" style="display:grid;gap:10px;text-align:left;padding:18px;border-radius:22px;border:1px solid rgba(125,211,252,.18);background:linear-gradient(135deg,rgba(10,20,40,.96) 0%,rgba(16,32,61,.96) 100%);color:#eff6ff;cursor:pointer;box-shadow:0 16px 36px rgba(2,8,23,.24)">
         <div style="font-size:2rem;line-height:1">${item.art}</div>
         <div style="font-size:1.05rem;font-weight:800;color:#fef3c7">${item.title}</div>
-        <div style="font-size:.85rem;color:rgba(235,245,255,.74)">${item.desc}</div>
+        <div style="font-size:.85rem;color:rgba(235,245,255,.88)">${item.desc}</div>
+        <div style="font-size:.78rem;color:#fde68a;line-height:1.5">${item.elo}</div>
       </button>
     `).join("");
   }
@@ -1223,18 +1332,7 @@
   }
 
   function getRankedDeltaMap(orderedPlayers) {
-    const total = orderedPlayers.length;
-    if (!total) return {};
-    const map = {};
-    const rewards = total >= 4
-      ? [20, 10, 0, -10]
-      : total === 3
-        ? [20, 10, 0]
-        : [20, -10];
-    orderedPlayers.forEach((player, index) => {
-      map[player.user_id] = Number(rewards[index] ?? 0);
-    });
-    return map;
+    return getModeEloDeltaMap("ranked", orderedPlayers);
   }
 
   function getRankedProfile(finishedRooms, finishedPlayers, userId) {
@@ -1254,11 +1352,11 @@
   }
 
   function getArenaTier(elo) {
-    if (elo >= 1800) return { name: "Kim cương", icon: "â—†" };
-    if (elo >= 1550) return { name: "Bạch kim", icon: "â¬¡" };
-    if (elo >= 1300) return { name: "Vàng", icon: "â˜…" };
-    if (elo >= 1100) return { name: "Bạc", icon: "âœ¦" };
-    return { name: "Äá»“ng", icon: "Đồng" };
+    if (elo >= 1800) return { name: "Kim cương", icon: "◆" };
+    if (elo >= 1550) return { name: "Bạch kim", icon: "⬡" };
+    if (elo >= 1300) return { name: "Vàng", icon: "★" };
+    if (elo >= 1100) return { name: "Bạc", icon: "✦" };
+    return { name: "Đồng", icon: "●" };
   }
 
   function getLeaderboardByElo(scopedRooms, finishedPlayers) {
@@ -1983,6 +2081,7 @@
           <div><span>Số câu</span><strong>${room.question_count} câu</strong></div>
           <div><span>Số người</span><strong>${GAME.roomPlayers.length}/${room.max_players || 8}</strong></div>
           <div><span>Giây mỗi câu</span><strong>${room.time_per_question}s</strong></div>
+          <div><span>Luật Elo</span><strong>${supportsModeElo(roomModeValue(room)) ? getModeEloRule(roomModeValue(room)) : "Không tính Elo"}</strong></div>
           <div><span>Tạo lúc</span><strong>${fmtDateTime(room.created_at)}</strong></div>
         `;
         if (EL.inviteCode) EL.inviteCode.textContent = room.join_code || "—";
@@ -2039,11 +2138,11 @@
       <div class="player-main">
         <img class="avatar" src="${escAttr(getPlayerAvatar(player.user_id))}" alt="avatar">
         <div>
-          <div style="font-weight:700;color:var(--navy)">${index}. ${esc(getPlayerName(player.user_id))}</div>
+          <div style="font-weight:700;color:#f8fafc">${index}. ${esc(getPlayerName(player.user_id))}</div>
           <div class="hint">Người chơi${lives !== null ? ` • ${lives} mạng` : ""}</div>
         </div>
       </div>
-      ${showScore ? `<strong style="color:var(--navy)">${player.score || 0}</strong>` : `<div style="display:grid;justify-items:end;gap:4px">${readyTag}<span class="hint">${fmtDateTime(player.joined_at)}</span></div>`}
+      ${showScore ? `<strong style="color:#fde68a">${player.score || 0}</strong>` : `<div style="display:grid;justify-items:end;gap:4px">${readyTag}<span class="hint">${fmtDateTime(player.joined_at)}</span></div>`}
     </div>`;
   }
 
@@ -2056,7 +2155,7 @@
           <div class="player-main">
             <img class="avatar" src="${escAttr(friend.avatar_url || "default-avatar.png")}" alt="avatar">
             <div>
-              <div style="font-weight:700;color:var(--navy)">${esc(friend.full_name || "Bạn bè")}</div>
+              <div style="font-weight:700;color:#f8fafc">${esc(friend.full_name || "Bạn bè")}</div>
               <div class="hint">${room.visibility === "private" ? "Phòng riêng tư" : "Có thể vào bằng mã"}</div>
             </div>
           </div>
@@ -2363,12 +2462,17 @@
       return (b.score || 0) - (a.score || 0) || new Date(a.joined_at) - new Date(b.joined_at);
     });
     const winner = ordered[0];
-    const rankedDeltaMap = roomModeValue(GAME.activeRoom) === "ranked" ? getRankedDeltaMap(ordered) : {};
-    EL.finishedMeta.textContent = roomModeValue(GAME.activeRoom) === "survival"
+    const roomMode = roomModeValue(GAME.activeRoom);
+    const eloDeltaMap = getModeEloDeltaMap(roomMode, ordered);
+    const rankedDeltaMap = roomMode === "ranked" ? getRankedDeltaMap(ordered) : {};
+    EL.finishedMeta.textContent = roomMode === "survival"
       ? `Phòng ${GAME.activeRoom?.title || ""} đã kết thúc. Ở chế độ sinh tồn, người còn nhiều mạng hơn sẽ xếp trên, nếu bằng mạng thì so điểm.`
-      : roomModeValue(GAME.activeRoom) === "speed"
+      : roomMode === "speed"
         ? `Phòng ${GAME.activeRoom?.title || ""} đã kết thúc. Ở chế độ đua tốc độ, đúng nhanh sẽ nhận nhiều điểm hơn.`
         : `Phòng ${GAME.activeRoom?.title || ""} đã kết thúc. Người có điểm cao hơn sẽ xếp trên, nếu bằng điểm thì ai vào phòng sớm hơn sẽ xếp trên.`;
+    if (supportsModeElo(roomMode)) {
+      EL.finishedMeta.textContent += ` ${getModeEloRule(roomMode)}`;
+    }
     if (EL.myStats) {
       const myPlayer = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
       const myRows = GAME.myAnswers || [];
@@ -2389,12 +2493,12 @@
         <div style="display:flex;align-items:center;gap:12px">
           <div class="medal ${medalClass}">${idx + 1}</div>
           <div>
-            <div style="font-weight:800;color:var(--navy)">${esc(getPlayerName(player.user_id))}</div>
-            ${roomModeValue(GAME.activeRoom) === "ranked" ? `<div class="hint">${Number(rankedDeltaMap[player.user_id] || 0) >= 0 ? "+" : ""}${Number(rankedDeltaMap[player.user_id] || 0)} Elo</div>` : ""}
+            <div style="font-weight:800;color:#f8fafc">${esc(getPlayerName(player.user_id))}</div>
+            ${supportsModeElo(roomMode) ? `<div class="hint">${Number((roomMode === "ranked" ? rankedDeltaMap[player.user_id] : eloDeltaMap[player.user_id]) || 0) >= 0 ? "+" : ""}${Number((roomMode === "ranked" ? rankedDeltaMap[player.user_id] : eloDeltaMap[player.user_id]) || 0)} Elo</div>` : ""}
             <div class="hint">${player.user_id === GAME.user.id ? "Bạn" : "Người chơi"}</div>
           </div>
         </div>
-        <div style="font-size:1.1rem;font-weight:800;color:var(--navy)">${player.score || 0} điểm</div>
+        <div style="font-size:1.1rem;font-weight:800;color:#fde68a">${player.score || 0} điểm</div>
       </div>`;
     }).join("");
   }
