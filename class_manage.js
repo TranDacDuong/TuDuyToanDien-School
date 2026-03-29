@@ -324,9 +324,6 @@
             capacityWarningHtml+
         '</div>'+
         '<div style="display:flex;gap:8px;align-items:center;flex-shrink:0">'+
-          ((_role==="admin"||_role==="teacher")
-            ? '<button onclick="cvOpenClassGame()" class="btn btn-outline btn-sm">🎮 Mở game lớp</button>'
-            : '')+
           '<button onclick="cvPrevMonth()" class="btn btn-outline btn-sm" style="padding:4px 12px;font-size:1rem">‹</button>'+
           '<span style="font-weight:700;font-size:.92rem;color:var(--navy);white-space:nowrap">'+
           'Tháng '+(_currentMonth+1)+'/'+_currentYear+'</span>'+
@@ -344,7 +341,7 @@
         '<button id="cvTab_exams" onclick="cvSwitchTab(\'exams\')" '+
         'style="padding:7px 20px;border:none;border-radius:7px;font-size:.83rem;font-weight:600;'+
         'cursor:pointer;font-family:var(--font-body);background:transparent;color:var(--ink-mid)">'+
-        '📄 Đề thi</button>'+
+        '📘 Học tập</button>'+
       '</div>'+
       '<div id="cvTabContent">Đang tải...</div>';
   }
@@ -1195,7 +1192,7 @@
     const actionsHtml = (role==="admin"||role==="teacher")
       ? '<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">'+
           '<button onclick="cvOpenAddClassSession()" class="btn btn-primary btn-sm">+ Thêm buổi học</button>'+
-          '<button onclick="cvOpenAddExam()" class="btn btn-outline btn-sm">+ Thêm đề kiểm tra cũ</button>'+
+          '<button onclick="cvOpenAddExam()" class="btn btn-outline btn-sm">+ Thêm đề kiểm tra</button>'+
         '</div>'
       : "";
     const sessionHint = sessionTableMissing
@@ -1209,7 +1206,7 @@
     tc.innerHTML = gameSectionHtml +
       '<div style="background:var(--white);border:1px solid var(--border);border-radius:14px;padding:16px 18px">'+
         '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">'+
-          '<div><div style="font-weight:700;color:var(--navy)">Danh sách buổi học trong tháng</div><div style="font-size:.8rem;color:var(--ink-mid)">Hiển thị theo tháng đang xem, giống cách Khóa học trình bày bài học và đề luyện tập.</div></div>'+
+          '<div><div style="font-weight:700;color:var(--navy)">Danh sách buổi học trong tháng</div></div>'+
           '<span style="font-size:.78rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8">'+sessionCards.length+' buổi</span>'+
         '</div>'+
         actionsHtml+
