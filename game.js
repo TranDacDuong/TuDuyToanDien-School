@@ -21,6 +21,8 @@
     roomPoll: null,
     questionTick: null,
     waitingTick: null,
+    localCountdownStartedAt: null,
+    roomNoticeTimer: null,
     roomChannel: null,
     listChannel: null,
     leaderboardPeriod: "day",
@@ -74,6 +76,7 @@
     roomSummary: document.getElementById("gameRoomSummary"),
     roomDescriptionView: document.getElementById("gameRoomDescriptionView"),
     roomStartHint: document.getElementById("gameRoomStartHint"),
+    roomPresenceNotice: document.getElementById("gameRoomPresenceNotice"),
     roomCountdownOverlay: document.getElementById("gameRoomCountdownOverlay"),
     roomCountdownValue: document.getElementById("gameRoomCountdownValue"),
     roomCountdownLabel: document.getElementById("gameRoomCountdownLabel"),
@@ -158,9 +161,43 @@
 
   function renderMathText(el, text) {
     if (!el) return;
-    const safeText = String(text || "Xem noi dung cau hoi.");
+    const safeText = String(text || "Xem nội dung câu hỏi.");
     el.innerHTML = esc(safeText).replace(/\n/g, "<br>");
     triggerMathJax(el);
+  }
+
+  function showRoomNotice(message) {
+    if (!EL.roomPresenceNotice) return;
+    clearTimeout(GAME.roomNoticeTimer);
+    EL.roomPresenceNotice.textContent = message || "";
+    if (!message) return;
+    GAME.roomNoticeTimer = setTimeout(() => {
+      if (EL.roomPresenceNotice?.textContent === message) {
+        EL.roomPresenceNotice.textContent = "";
+      }
+    }, 3500);
+  }
+
+  function formatPlayerNames(userIds) {
+    const names = (userIds || []).map((userId) => getPlayerName(userId)).filter(Boolean);
+    if (!names.length) return "Người chơi";
+    if (names.length === 1) return names[0];
+    if (names.length === 2) return `${names[0]} và ${names[1]}`;
+    return `${names.slice(0, -1).join(", ")} và ${names[names.length - 1]}`;
+  }
+
+  function announceRoomPresenceChanges(prevPlayers, nextPlayers) {
+    const previousIds = new Set((prevPlayers || []).map((item) => item.user_id));
+    const nextIds = new Set((nextPlayers || []).map((item) => item.user_id));
+    const joined = [...nextIds].filter((userId) => !previousIds.has(userId));
+    const left = [...previousIds].filter((userId) => !nextIds.has(userId));
+    if (left.length) {
+      showRoomNotice(`${formatPlayerNames(left)} đã rời phòng.`);
+      return;
+    }
+    if (joined.length) {
+      showRoomNotice(`${formatPlayerNames(joined)} đã vào phòng.`);
+    }
   }
 
   function normalizeStaticGameText() {
@@ -437,7 +474,7 @@
     if (!grid) return;
     grid.innerHTML = (GAME.grades || []).map((grade) => {
       const selected = EL.gradeFilter?.value === grade.id;
-      return `<button type="button" data-grade-card="${grade.id}" style="${getGradeCardStyle(selected)}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:${selected ? "rgba(250,204,21,.18)" : "rgba(148,163,184,.12)"};color:${selected ? "#fde68a" : "rgba(226,232,240,.78)"};font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">${selected ? "Dang chon" : "Khoi"}</span><span style="font-size:1.1rem;font-weight:900;letter-spacing:.01em">${esc(grade.name)}</span></button>`;
+      return `<button type="button" data-grade-card="${grade.id}" style="${getGradeCardStyle(selected)}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:${selected ? "rgba(250,204,21,.18)" : "rgba(148,163,184,.12)"};color:${selected ? "#fde68a" : "rgba(226,232,240,.78)"};font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">${selected ? "Đang chọn" : "Khối"}</span><span style="font-size:1.1rem;font-weight:900;letter-spacing:.01em">${esc(grade.name)}</span></button>`;
     }).join("");
     document.querySelectorAll("[data-grade-card]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -459,7 +496,7 @@
     grid.innerHTML = subjects.length
       ? subjects.map((subject) => {
           const selected = EL.subjectFilter?.value === subject.id;
-          return `<button type="button" data-subject-card="${subject.id}" style="${getSubjectCardStyle(selected)}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:${selected ? "rgba(34,211,238,.18)" : "rgba(148,163,184,.12)"};color:${selected ? "#a5f3fc" : "rgba(226,232,240,.78)"};font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">${selected ? "Dang chon" : "Mon"}</span><span style="font-size:1.02rem;font-weight:900;letter-spacing:.01em">${esc(subject.name)}</span></button>`;
+          return `<button type="button" data-subject-card="${subject.id}" style="${getSubjectCardStyle(selected)}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:${selected ? "rgba(34,211,238,.18)" : "rgba(148,163,184,.12)"};color:${selected ? "#a5f3fc" : "rgba(226,232,240,.78)"};font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">${selected ? "Đang chọn" : "Môn"}</span><span style="font-size:1.02rem;font-weight:900;letter-spacing:.01em">${esc(subject.name)}</span></button>`;
         }).join("")
       : `<div class="hint">Chọn khối trước để hiện môn tương ứng.</div>`;
     document.querySelectorAll("[data-subject-card]").forEach((button) => {
@@ -500,6 +537,7 @@
   function clearWaitingCountdown() {
     clearInterval(GAME.waitingTick);
     GAME.waitingTick = null;
+    GAME.localCountdownStartedAt = null;
     if (EL.roomCountdownOverlay) EL.roomCountdownOverlay.classList.add("hidden");
   }
 
@@ -524,8 +562,8 @@
       EL.roomCountdownOverlay.classList.remove("hidden");
       EL.roomCountdownValue.textContent = String(secondsLeft).padStart(2, "0");
       EL.roomCountdownLabel.textContent = secondsLeft > 0
-        ? "Tran dau sap bat dau"
-        : "Dang vao tran";
+        ? "Trận đấu sắp bắt đầu"
+        : "Đang vào trận";
     };
     clearInterval(GAME.waitingTick);
     tick();
@@ -692,12 +730,16 @@
 
   function setupRoomRealtime(roomId) {
     teardownRoomRealtime();
+    const syncRoom = () => {
+      refreshActiveRoom(roomId, true);
+      loadRooms();
+    };
     GAME.roomChannel = sb.channel(`game-room-${roomId}-${Date.now()}`);
     GAME.roomChannel
-      .on("postgres_changes", { event: "*", schema: "public", table: "game_rooms", filter: `id=eq.${roomId}` }, () => refreshActiveRoom(roomId, true))
-      .on("postgres_changes", { event: "*", schema: "public", table: "game_room_players", filter: `room_id=eq.${roomId}` }, () => refreshActiveRoom(roomId, true))
-      .on("postgres_changes", { event: "*", schema: "public", table: "game_room_questions", filter: `room_id=eq.${roomId}` }, () => refreshActiveRoom(roomId, true))
-      .on("postgres_changes", { event: "*", schema: "public", table: "game_room_answers", filter: `room_id=eq.${roomId}` }, () => refreshActiveRoom(roomId, true))
+      .on("postgres_changes", { event: "*", schema: "public", table: "game_rooms", filter: `id=eq.${roomId}` }, syncRoom)
+      .on("postgres_changes", { event: "*", schema: "public", table: "game_room_players", filter: `room_id=eq.${roomId}` }, syncRoom)
+      .on("postgres_changes", { event: "*", schema: "public", table: "game_room_questions", filter: `room_id=eq.${roomId}` }, syncRoom)
+      .on("postgres_changes", { event: "*", schema: "public", table: "game_room_answers", filter: `room_id=eq.${roomId}` }, syncRoom)
       .subscribe();
   }
 
@@ -1670,13 +1712,14 @@
     EL.roomScreen.classList.add("show");
     setupRoomRealtime(roomId);
     await refreshActiveRoom(roomId);
-    GAME.roomPoll = setInterval(() => refreshActiveRoom(roomId, true), 4000);
+    GAME.roomPoll = setInterval(() => refreshActiveRoom(roomId, true), 1200);
   }
 
   function hideGameScreen() {
     clearIntervals();
     clearAutoStartTimer();
     clearWaitingCountdown();
+    showRoomNotice("");
     teardownRoomRealtime();
     GAME.activeRoom = null;
     EL.roomScreen.classList.remove("show");
@@ -1720,6 +1763,7 @@
       return;
     }
 
+    const prevPlayers = GAME.roomPlayers || [];
     GAME.activeRoom = room;
     GAME.roomPlayers = players || [];
     GAME.roomQuestions = questions || [];
@@ -1741,6 +1785,7 @@
     GAME.myAnswers = (answers || []).filter((item) => {
       return me ? item.player_id === me.id : false;
     });
+    if (prevPlayers.length) announceRoomPresenceChanges(prevPlayers, GAME.roomPlayers);
 
     renderActiveRoom();
   }
@@ -1759,12 +1804,18 @@
     const me = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
     const canStart = room.status === "waiting" && isHost && GAME.roomPlayers.length >= 2;
     const countdownActive = room.status === "waiting" && GAME.roomPlayers.length >= 2;
+    if (countdownActive && !room.started_at && !GAME.localCountdownStartedAt) {
+      GAME.localCountdownStartedAt = new Date().toISOString();
+    }
     if (countdownActive && room.started_at) {
+      GAME.localCountdownStartedAt = room.started_at;
       renderWaitingCountdown(room);
       if (isHost) {
         const delayMs = Math.max(0, new Date(room.started_at).getTime() + 10000 - Date.now());
         queueAutoStart(room, delayMs);
       }
+    } else if (countdownActive && GAME.localCountdownStartedAt) {
+      renderWaitingCountdown({ started_at: GAME.localCountdownStartedAt });
     } else {
       clearAutoStartTimer();
       clearWaitingCountdown();
@@ -1801,26 +1852,26 @@
         if (EL.inviteVisibility) EL.inviteVisibility.textContent = visibility;
         EL.roomDescriptionView.textContent = room.description || "Mời bạn bè cùng vào phòng, khi đủ người thì chủ phòng bắt đầu trận.";
         if (autoManagedRoom) {
-          EL.roomDescriptionView.textContent = "He thong dang ghep nguoi choi. Khi du nguoi, tran dau se tu dong bat dau.";
+          EL.roomDescriptionView.textContent = "Hệ thống đang ghép người chơi. Khi đủ người, trận đấu sẽ tự động bắt đầu.";
         }
         if (EL.roomStartHint) {
           if (autoManagedRoom) {
             EL.roomStartHint.textContent = countdownActive
-              ? "Phong da du nguoi. He thong dang dem nguoc de vao tran."
-              : "Chon xong la vao phong ngay. Hay cho them nguoi choi de he thong tu bat dau tran.";
+              ? "Phòng đã đủ người. Hệ thống đang đếm ngược để vào trận."
+              : "Chọn xong là vào phòng ngay. Hãy chờ thêm người chơi để hệ thống tự bắt đầu trận.";
           } else
           if (isHost) {
             EL.roomStartHint.textContent = countdownActive
               ? "Phòng đã đủ điều kiện để bắt đầu trận."
-              : "Can it nhat 2 nguoi choi de bat dau tran.";
+              : "Cần ít nhất 2 người chơi để bắt đầu trận.";
           } else {
-            EL.roomStartHint.textContent = "Hay cho them nguoi choi vao phong de bat dau.";
+            EL.roomStartHint.textContent = "Hãy chờ thêm người chơi vào phòng để bắt đầu.";
           }
         }
         if (EL.roomStartHint && countdownActive && !autoManagedRoom) {
           EL.roomStartHint.textContent = isHost
-            ? "Phong da du 2 nguoi tro len. He thong dang dem nguoc 10 giay."
-            : "Phong dang dem nguoc. Hay san sang vao tran.";
+            ? "Phòng đã có từ 2 người trở lên. Hệ thống đang đếm ngược 10 giây."
+            : "Phòng đang đếm ngược. Hãy sẵn sàng vào trận.";
         }
         EL.playerList.innerHTML = GAME.roomPlayers.length
           ? GAME.roomPlayers.map((player, idx) => renderPlayerRow(player, idx + 1, false)).join("")
@@ -1990,7 +2041,7 @@
       const me = GAME.roomPlayers.find((player) => player.user_id === GAME.user.id);
       const myLives = me ? getPlayerLives(me.id, room, GAME.roomAnswers || []) : null;
       if (!room || !questions.length) {
-        renderMathText(EL.questionBody, "Dang chuan bi cau hoi...");
+        renderMathText(EL.questionBody, "Đang chuẩn bị câu hỏi...");
         EL.answerArea.innerHTML = "";
         return;
       }
@@ -2014,7 +2065,7 @@
             : `Tiến độ ${currentIndex + 1}/${questions.length}`;
       }
       if (EL.progressFill) EL.progressFill.style.width = `${((currentIndex + 1) / questions.length) * 100}%`;
-      renderMathText(EL.questionBody, question.question_text || "Xem noi dung cau hoi.");
+      renderMathText(EL.questionBody, question.question_text || "Xem nội dung câu hỏi.");
       EL.questionImg.classList.toggle("hidden", !question.question_img);
       if (question.question_img) EL.questionImg.src = question.question_img;
 
