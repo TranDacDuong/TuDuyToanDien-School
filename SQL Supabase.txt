@@ -1577,6 +1577,128 @@ END $$;
 
 CREATE INDEX IF NOT EXISTS course_sessions_pdf_exam_idx ON public.course_sessions (pdf_exam_id);
 
+-- Buổi học cho lớp học, hiển thị giống Danh sách buổi học trong Khóa học
+CREATE TABLE IF NOT EXISTS public.class_sessions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  class_id uuid NOT NULL,
+  lesson_id uuid NOT NULL,
+  session_order integer NOT NULL,
+  session_date date NOT NULL,
+  exam_id uuid,
+  pdf_exam_id uuid,
+  starts_at timestamp with time zone,
+  ends_at timestamp with time zone,
+  created_by uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT class_sessions_pkey PRIMARY KEY (id),
+  CONSTRAINT class_sessions_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id) ON DELETE CASCADE,
+  CONSTRAINT class_sessions_lesson_id_fkey FOREIGN KEY (lesson_id) REFERENCES public.lessons(id) ON DELETE CASCADE,
+  CONSTRAINT class_sessions_exam_id_fkey FOREIGN KEY (exam_id) REFERENCES public.exams(id) ON DELETE SET NULL,
+  CONSTRAINT class_sessions_pdf_exam_id_fkey FOREIGN KEY (pdf_exam_id) REFERENCES public.pdf_exams(id) ON DELETE SET NULL,
+  CONSTRAINT class_sessions_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE CASCADE,
+  CONSTRAINT class_sessions_exam_choice_check CHECK (
+    (exam_id IS NOT NULL AND pdf_exam_id IS NULL)
+    OR (exam_id IS NULL AND pdf_exam_id IS NOT NULL)
+    OR (exam_id IS NULL AND pdf_exam_id IS NULL)
+  )
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS class_sessions_class_order_unique
+  ON public.class_sessions (class_id, session_order);
+
+CREATE INDEX IF NOT EXISTS class_sessions_class_month_idx
+  ON public.class_sessions (class_id, session_date, session_order);
+
+ALTER TABLE public.class_sessions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS class_sessions_select_policy ON public.class_sessions;
+CREATE POLICY class_sessions_select_policy ON public.class_sessions
+FOR SELECT
+USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS class_sessions_insert_policy ON public.class_sessions;
+CREATE POLICY class_sessions_insert_policy ON public.class_sessions
+FOR INSERT
+WITH CHECK (
+  auth.uid() = created_by
+  AND EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS class_sessions_update_policy ON public.class_sessions;
+CREATE POLICY class_sessions_update_policy ON public.class_sessions
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS class_sessions_delete_policy ON public.class_sessions;
+CREATE POLICY class_sessions_delete_policy ON public.class_sessions
+FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
+
+-- Cho phép teacher cùng admin quản lý lessons dùng chung cho khóa học / lớp học
+DROP POLICY IF EXISTS lessons_insert_policy ON public.lessons;
+CREATE POLICY lessons_insert_policy ON public.lessons
+FOR INSERT
+WITH CHECK (
+  auth.uid() = created_by
+  AND EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS lessons_update_policy ON public.lessons;
+CREATE POLICY lessons_update_policy ON public.lessons
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS lessons_delete_policy ON public.lessons;
+CREATE POLICY lessons_delete_policy ON public.lessons
+FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+  )
+);
+
 -- Game thi dau
 CREATE TABLE IF NOT EXISTS public.game_rooms (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
