@@ -93,7 +93,7 @@ async function loadNotifications() {
 
 function buildLink(item) {
   if (item.target_url) {
-    return `<a class="btn btn-outline btn-sm" href="${escAttr(item.target_url)}" onclick="openNotificationTarget(event, '${item.id}', '${escAttr(item.target_url)}')">Mở chi tiết</a>`;
+    return `<button class="btn btn-outline btn-sm" type="button" data-target="${escAttr(item.target_url)}" onclick="openNotificationTarget(null, '${item.id}', this.dataset.target)">Mở chi tiết</button>`;
   }
   if (item.type === "friend_request" || item.type === "friend_accept") {
     return `<a class="btn btn-outline btn-sm" href="friend_requests.html">Mở lời mời</a>`;
@@ -123,7 +123,7 @@ window.markAllRead = async function() {
 window.openNotificationTarget = async function(event, id, targetUrl) {
   if (event) event.preventDefault();
   if (!targetUrl) return;
-  await markRead(id);
+  await sb.from("notifications").update({ is_read: true }).eq("id", id);
   navigateToTarget(targetUrl);
 };
 
@@ -154,9 +154,6 @@ function navigateToTarget(targetUrl) {
       if (typeof frameWindow.closeSidebar === "function") {
         frameWindow.closeSidebar();
       }
-      if (typeof window.parent?.closeSocialPanel === "function") {
-        window.parent.closeSocialPanel();
-      }
       return;
     } catch (error) {}
   }
@@ -165,6 +162,11 @@ function navigateToTarget(targetUrl) {
     try {
       if (typeof frameWindow.closeSocialPanel === "function") {
         frameWindow.closeSocialPanel();
+      }
+      const socialFrame = frameWindow.document.getElementById("socialPanelFrame");
+      if (socialFrame) {
+        socialFrame.src = "about:blank";
+        delete socialFrame.dataset.loaded;
       }
     } catch (error) {}
   }
