@@ -315,6 +315,148 @@ body {
   font-size: .84rem;
   line-height: 1.65;
 }
+.featured-course-list {
+  display: grid;
+  gap: 14px;
+}
+.featured-course-card {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 16px;
+  padding: 14px;
+  border-radius: 22px;
+  border: 1px solid rgba(15,31,61,.08);
+  background:
+    radial-gradient(circle at top right, rgba(200,150,42,.12), transparent 26%),
+    linear-gradient(145deg, #ffffff 0%, #f7fbff 100%);
+  box-shadow: 0 16px 34px rgba(15,31,61,.08);
+}
+.featured-course-cover {
+  min-height: 178px;
+  border-radius: 18px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(11,31,62,.08), rgba(11,31,62,.38)),
+    linear-gradient(135deg, #103d74 0%, #1d6bd1 62%, #d4a63a 100%);
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  padding: 14px;
+  color: #fff;
+}
+.featured-course-cover img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.featured-course-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(8,21,43,.02) 0%, rgba(8,21,43,.6) 100%);
+}
+.featured-course-cover-content {
+  position: relative;
+  z-index: 1;
+}
+.featured-course-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.16);
+  border: 1px solid rgba(255,255,255,.16);
+  font-size: .74rem;
+  font-weight: 700;
+}
+.featured-course-date {
+  margin-top: 10px;
+  font-size: .78rem;
+  color: rgba(255,255,255,.82);
+}
+.featured-course-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+}
+.featured-course-topline {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.featured-course-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #1d4ed8;
+  font-size: .74rem;
+  font-weight: 700;
+}
+.featured-course-title {
+  color: var(--navy);
+  text-decoration: none;
+  font-family: var(--font-display);
+  font-size: 1.16rem;
+  line-height: 1.28;
+}
+.featured-course-title:hover {
+  text-decoration: underline;
+}
+.featured-course-desc {
+  margin-top: 8px;
+  color: var(--ink-mid);
+  font-size: .84rem;
+  line-height: 1.7;
+}
+.featured-course-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.featured-course-stat {
+  padding: 11px 12px;
+  border-radius: 16px;
+  background: #f6f9fc;
+  border: 1px solid rgba(15,31,61,.06);
+}
+.featured-course-stat-label {
+  color: var(--ink-light);
+  font-size: .72rem;
+}
+.featured-course-stat-value {
+  margin-top: 4px;
+  color: var(--navy);
+  font-size: .84rem;
+  font-weight: 700;
+}
+.featured-course-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.featured-course-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-radius: 999px;
+  text-decoration: none;
+  color: #fff;
+  font-size: .8rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #0f3c73 0%, #1d6bd1 100%);
+  box-shadow: 0 12px 22px rgba(29,107,209,.22);
+}
+.featured-course-link:hover {
+  transform: translateY(-1px);
+}
 .overview-news-list {
   display: flex;
   flex-direction: column;
@@ -993,6 +1135,9 @@ body {
   .feed-side {
     position: static;
   }
+  .featured-course-card {
+    grid-template-columns: 1fr;
+  }
   .social-panel {
     right: 16px;
     width: min(420px, calc(100% - 32px));
@@ -1012,6 +1157,15 @@ body {
   .home-tab-btn {
     flex: 1 1 0;
     text-align: center;
+  }
+  .featured-course-stats {
+    grid-template-columns: 1fr;
+  }
+  .featured-course-actions {
+    justify-content: stretch;
+  }
+  .featured-course-link {
+    width: 100%;
   }
   .feed-shortcuts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2019,8 +2173,8 @@ async function loadLikedPosts() {
 
 async function loadOverviewSettings() {
   const courseQuery = role === "student"
-    ? sb.from("courses").select("id, name, description, cover_url, start_date, end_date, status").eq("is_home_pinned", true).eq("status", "open").order("updated_at", { ascending: false })
-    : sb.from("courses").select("id, name, description, cover_url, start_date, end_date, status").eq("is_home_pinned", true).order("updated_at", { ascending: false });
+    ? sb.from("courses").select("id, name, description, cover_url, start_date, end_date, status, tuition_fee, planned_sessions").eq("is_home_pinned", true).eq("status", "open").order("updated_at", { ascending: false })
+    : sb.from("courses").select("id, name, description, cover_url, start_date, end_date, status, tuition_fee, planned_sessions").eq("is_home_pinned", true).order("updated_at", { ascending: false });
 
   const [examRes, settingRes, teacherRes, homeTeacherRes, courseRes] = await Promise.all([
     sb.from("exam_events").select("*").order("exam_at", { ascending: true }),
@@ -2903,6 +3057,17 @@ function esc(s) {
   return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
+function escAttr(s) {
+  return esc(s || "").replace(/'/g, "&#39;");
+}
+
+function formatMoney(v) {
+  const num = Number(v || 0);
+  return Number.isFinite(num) && num > 0
+    ? new Intl.NumberFormat("vi-VN").format(num) + "đ"
+    : "Chưa cập nhật";
+}
+
 function formatRichText(text) {
   const escaped = esc(text || "");
   return escaped
@@ -3343,11 +3508,50 @@ function renderPinnedCourseCard(course) {
   const dateLabel = course.start_date || course.end_date
     ? `${course.start_date ? formatPostTime(course.start_date) : "Chưa rõ"}${course.end_date ? ` - ${formatPostTime(course.end_date)}` : ""}`
     : "Đang cập nhật lịch học";
+  const description = ((course.description || "").trim().slice(0, 180) || "Khóa học đang được cập nhật nội dung.").replace(/\n/g, " ");
+  const statusLabel = course.status === "open" ? "Đang mở" : "Đã đóng";
+  const sessionsLabel = Number(course.planned_sessions || 0) > 0 ? `${course.planned_sessions} buổi` : "Theo lịch học";
+  const coverMedia = course.cover_url
+    ? `<img src="${escAttr(course.cover_url)}" alt="${escAttr(course.name || "Khóa học")}">`
+    : "";
   return `
-    <article class="overview-post">
-      <a class="overview-post-title" href="courses.html?courseId=${course.id}">${esc(course.name || "Khóa học")}</a>
-      <div class="overview-post-meta">${esc(course.status === "open" ? "Đang mở" : "Đã đóng")} • ${esc(dateLabel)}</div>
-      <div class="overview-post-text">${formatRichText(((course.description || "").trim().slice(0, 180) || "Khóa học đang được cập nhật nội dung.").replace(/\n/g, " "))}</div>
+    <article class="featured-course-card">
+      <div class="featured-course-cover">
+        ${coverMedia}
+        <div class="featured-course-cover-content">
+          <span class="featured-course-status">${esc(statusLabel)}</span>
+          <div class="featured-course-date">${esc(dateLabel)}</div>
+        </div>
+      </div>
+      <div class="featured-course-body">
+        <div>
+          <div class="featured-course-topline">
+            <span class="featured-course-pill">Khóa học online</span>
+            <span class="featured-course-pill">${esc(sessionsLabel)}</span>
+          </div>
+          <a class="featured-course-title" href="courses.html?courseId=${course.id}">${esc(course.name || "Khóa học")}</a>
+          <div class="featured-course-desc">${formatRichText(description)}</div>
+        </div>
+        <div>
+          <div class="featured-course-stats">
+            <div class="featured-course-stat">
+              <div class="featured-course-stat-label">Học phí</div>
+              <div class="featured-course-stat-value">${esc(formatMoney(course.tuition_fee))}</div>
+            </div>
+            <div class="featured-course-stat">
+              <div class="featured-course-stat-label">Lịch học</div>
+              <div class="featured-course-stat-value">${esc(dateLabel)}</div>
+            </div>
+            <div class="featured-course-stat">
+              <div class="featured-course-stat-label">Truy cập</div>
+              <div class="featured-course-stat-value">${course.status === "open" ? "Đăng ký học" : "Chờ mở lại"}</div>
+            </div>
+          </div>
+          <div class="featured-course-actions">
+            <a class="featured-course-link" href="courses.html?courseId=${course.id}">Xem chi tiết khóa học</a>
+          </div>
+        </div>
+      </div>
     </article>
   `;
 }
@@ -3363,7 +3567,7 @@ function renderOverviewSection(posts) {
     .slice(0, 8);
 
   coursesWrap.innerHTML = pinnedHomeCourses.length
-    ? pinnedHomeCourses.map(renderPinnedCourseCard).join("")
+    ? `<div class="featured-course-list">${pinnedHomeCourses.map(renderPinnedCourseCard).join("")}</div>`
     : `<div class="empty-feed" style="padding:24px 16px;"><p>Chưa có khóa học nổi bật nào.</p></div>`;
 
   newsWrap.innerHTML = newsPosts.length
