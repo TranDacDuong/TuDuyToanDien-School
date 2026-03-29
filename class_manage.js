@@ -895,12 +895,13 @@
           '<button onclick="cvDeleteClassSession(\''+session.id+'\')" class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5">Xóa buổi</button>'+
         '</div>'
       : "";
+    const orderLabel = session.display_order || session.session_order || "—";
     return '<div style="background:var(--white);border:1px solid var(--border);border-radius:14px;padding:16px 18px">'+
       '<div style="display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">'+
         '<div style="display:flex;gap:14px;flex:1;min-width:260px">'+
           '<div style="width:72px;min-width:72px;border-radius:16px;background:linear-gradient(135deg,var(--navy),var(--navy-mid));color:var(--gold-light);padding:10px 8px;text-align:center;box-shadow:0 8px 20px rgba(13,39,80,.12)">'+
             '<div style="font-size:.74rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase">Buổi</div>'+
-            '<div style="font-size:1.3rem;font-weight:800;line-height:1.1;margin-top:4px">'+(session.session_order||"—")+'</div>'+
+            '<div style="font-size:1.3rem;font-weight:800;line-height:1.1;margin-top:4px">'+orderLabel+'</div>'+
           '</div>'+
           '<div style="flex:1;min-width:0">'+
             '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">'+
@@ -909,15 +910,13 @@
             '</div>'+
             '<div style="font-weight:700;font-size:1rem;color:var(--navy)">'+esc(lesson?.name || "Chưa có tên bài học")+'</div>'+
             '<div style="font-size:.84rem;line-height:1.65;color:var(--ink-mid);margin-top:6px">'+summary+'</div>'+
-            '+MEDIA_PLACEHOLDER+'+
-            '+PRACTICE_PLACEHOLDER+'+
+            mediaHtml+
+            practiceHtml+
           '</div>'+
         '</div>'+
         actionHtml+
       '</div>'+
-    '</div>'
-      .replace("+MEDIA_PLACEHOLDER+", mediaHtml)
-      .replace("+PRACTICE_PLACEHOLDER+", practiceHtml);
+    '</div>';
   }
 
   function renderLegacyExamCard(examInfo, role, examState){
@@ -934,6 +933,87 @@
         '</div>'
       : "";
     return '<div style="background:var(--white);border:1px dashed #cbd5e1;border-radius:14px;padding:16px 18px">'+header+body+actionRow+'</div>';
+  }
+
+  async function syncClassSessionsForCurrentMonth(sb, sessions){
+    const role = _role;
+    const schedulesThisMonth = getSchedulesForMonth(_cachedClass?.class_schedules || [], _currentMonth, _currentYear);
+    const monthDates = generateDates(schedulesThisMonth, _currentMonth, _currentYear);
+    if(!monthDates.length) return { sessions, createdLessons: [] };
+    if(role !== "admin" && role !== "teacher") return { sessions, createdLessons: [] };
+
+    const existingDates = new Set(
+      (sessions || [])
+        .map(item => (item.session_date || "").slice(0, 10))
+        .filter(Boolean)
+    );
+    const missingDates = monthDates.filter(date => !existingDates.has(date));
+    if(!missingDates.length) return { sessions, createdLessons: [] };
+
+    const baseOrder = (sessions || []).reduce((maxValue, item) => {
+      const nextValue = Number(item?.session_order || 0);
+      return nextValue > maxValue ? nextValue : maxValue;
+    }, 0);
+
+    const lessonPayloads = missingDates.map(date => ({
+      name: "Chưa cập nhật nội dung buổi học",
+      summary: "Admin có thể bấm Sửa buổi để thêm tiêu đề, mô tả, video và đề luyện tập cho buổi học này.",
+      lecture_video_url: null,
+      solution_video_url: null,
+      created_by: window._currentUserId
+    }));
+    const { data: newLessons, error: lessonError } = await sb
+      .from("lessons")
+      .insert(lessonPayloads)
+      .select("id,name,summary,lecture_video_url,solution_video_url");
+    if(lessonError){
+      alert("Không thể tự tạo bài học theo lịch tháng này: " + lessonError.message);
+      return { sessions, createdLessons: [] };
+    }
+
+    const sessionPayloads = (newLessons || []).map((lesson, index) => ({
+      class_id: _classId,
+      lesson_id: lesson.id,
+      session_order: baseOrder + index + 1,
+      session_date: missingDates[index],
+      exam_id: null,
+      pdf_exam_id: null,
+      starts_at: null,
+      ends_at: null,
+      created_by: window._currentUserId
+    }));
+    const { data: insertedSessions, error: sessionError } = await sb
+      .from("class_sessions")
+      .insert(sessionPayloads)
+      .select("id,lesson_id,session_order,session_date,exam_id,pdf_exam_id,starts_at,ends_at,created_at");
+    if(sessionError){
+      const lessonIds = (newLessons || []).map(item => item.id).filter(Boolean);
+      if(lessonIds.length){
+        await sb.from("lessons").delete().in("id", lessonIds);
+      }
+      const msg = String(sessionError.message || "").toLowerCase();
+      if(msg.includes("duplicate") || msg.includes("unique")){
+        const { data: refreshedSessions } = await sb
+          .from("class_sessions")
+          .select("id,lesson_id,session_order,session_date,exam_id,pdf_exam_id,starts_at,ends_at,created_at")
+          .eq("class_id", _classId)
+          .order("session_order", { ascending: true });
+        return { sessions: refreshedSessions || sessions, createdLessons: [] };
+      }
+      alert("Không thể tự tạo buổi học theo lịch tháng này: " + sessionError.message);
+      return { sessions, createdLessons: [] };
+    }
+
+    const mergedSessions = [...(sessions || []), ...(insertedSessions || [])]
+      .sort((a, b) => {
+        const dateCompare = String(a.session_date || "").localeCompare(String(b.session_date || ""));
+        if(dateCompare !== 0) return dateCompare;
+        return Number(a.session_order || 0) - Number(b.session_order || 0);
+      });
+    return {
+      sessions: mergedSessions,
+      createdLessons: newLessons || []
+    };
   }
 
   async function renderExamsTab(){
@@ -966,7 +1046,13 @@
       return;
     }
 
-    const sessions = sessionTableMissing ? [] : (classSessions || []);
+    let sessions = sessionTableMissing ? [] : (classSessions || []);
+    let autoCreatedLessons = [];
+    if(!sessionTableMissing){
+      const syncResult = await syncClassSessionsForCurrentMonth(sb, sessions);
+      sessions = syncResult.sessions || sessions;
+      autoCreatedLessons = syncResult.createdLessons || [];
+    }
     const lessonIds = [...new Set(sessions.map(s=>s.lesson_id).filter(Boolean))];
     const regularIds = [...new Set([
       ...sessions.map(s=>s.exam_id).filter(Boolean),
@@ -1024,7 +1110,8 @@
       return;
     }
 
-    const lessonMap = Object.fromEntries((results[0].data||[]).map(row => [row.id, row]));
+    const lessonRows = [...(results[0].data || []), ...autoCreatedLessons];
+    const lessonMap = Object.fromEntries(lessonRows.map(row => [row.id, row]));
     const regularMap = Object.fromEntries((results[1].data||[]).map(row => [row.id, row]));
     const pdfMap = Object.fromEntries((results[2].data||[]).map(row => [row.id, row]));
     const pdfQuestionTypeMap = {};
@@ -1047,9 +1134,15 @@
           pdfSubmitCount: (results[5].data||[]).reduce((acc,row)=>{ acc[row.pdf_exam_id]=(acc[row.pdf_exam_id]||0)+1; return acc; }, {})
         };
 
-    const sessionCards = sessions
+    const monthSessions = sessions
       .filter(session => !session.session_date || isCurrentMonthDate(session.session_date))
-      .map(session => {
+      .sort((a, b) => {
+        const dateCompare = String(a.session_date || "").localeCompare(String(b.session_date || ""));
+        if(dateCompare !== 0) return dateCompare;
+        return Number(a.session_order || 0) - Number(b.session_order || 0);
+      });
+    const sessionCards = monthSessions
+      .map((session, index) => {
         const lesson = lessonMap[session.lesson_id] || null;
         let examInfo = null;
         if(session.exam_id && regularMap[session.exam_id]){
@@ -1068,7 +1161,10 @@
             ends_at: session.ends_at
           });
         }
-        return renderClassSessionCard(session, lesson, examInfo, role, examState);
+        return renderClassSessionCard({
+          ...session,
+          display_order: index + 1
+        }, lesson, examInfo, role, examState);
       });
 
     const legacyCards = (classExams || []).map(row => {

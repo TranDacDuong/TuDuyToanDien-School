@@ -1606,6 +1606,9 @@ CREATE TABLE IF NOT EXISTS public.class_sessions (
 CREATE UNIQUE INDEX IF NOT EXISTS class_sessions_class_order_unique
   ON public.class_sessions (class_id, session_order);
 
+CREATE UNIQUE INDEX IF NOT EXISTS class_sessions_class_date_unique
+  ON public.class_sessions (class_id, session_date);
+
 CREATE INDEX IF NOT EXISTS class_sessions_class_month_idx
   ON public.class_sessions (class_id, session_date, session_order);
 
