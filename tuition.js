@@ -367,6 +367,7 @@ Nhập số tiền hoàn lại (>0):`,
   function syncToolbarVisibility() {
     const classFilter = document.getElementById("classFilter");
     const paidFilter = document.getElementById("paidFilter");
+    const notifyBtn = document.getElementById("notifyTuitionBtn");
     const rowCount = document.getElementById("rowCount");
     const summary = document.querySelector(".summary-row");
     const tableWrap = document.querySelector(".table-wrap");
@@ -378,6 +379,7 @@ Nhập số tiền hoàn lại (>0):`,
     if (currentRole === "student") {
       if (classFilter) classFilter.style.display = "none";
       if (paidFilter) paidFilter.style.display = "none";
+      if (notifyBtn) notifyBtn.style.display = "none";
       if (reloadBtn) reloadBtn.style.display = "none";
       if (printBtn) printBtn.style.display = "none";
       if (rowCount) rowCount.style.display = "none";
@@ -393,6 +395,7 @@ Nhập số tiền hoàn lại (>0):`,
     if (tableWrap) tableWrap.style.display = "";
     if (reloadBtn) reloadBtn.style.display = "";
     if (printBtn) printBtn.style.display = "";
+    if (notifyBtn) notifyBtn.style.display = currentRole === "admin" ? "" : "none";
     if (studentDetailView) studentDetailView.classList.remove("show");
     if (paidFilter) paidFilter.style.display = canManagePayments() ? "" : "none";
   }
