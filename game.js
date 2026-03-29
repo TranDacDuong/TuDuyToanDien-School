@@ -302,11 +302,11 @@
     }
     if (EL.sortFilter) {
       EL.sortFilter.innerHTML = `
-        <option value="players">ÄÃ´ng ngÆ°á»i nháº¥t</option>
-        <option value="recommended">PhÃ¹ há»£p nháº¥t</option>
-        <option value="hot">Äang sá»‘i Ä‘á»™ng</option>
-        <option value="new">Má»›i nháº¥t</option>
-        <option value="spots">CÃ²n nhiá»u chá»—</option>
+        <option value="players">Đông người nhất</option>
+        <option value="recommended">Phù hợp nhất</option>
+        <option value="hot">Đang sôi động</option>
+        <option value="new">Mới nhất</option>
+        <option value="spots">Còn nhiều chỗ</option>
       `;
       EL.sortFilter.value = "players";
     }
@@ -371,10 +371,10 @@
     document.querySelectorAll("#gameLiveView .panel h3")[0] && (document.querySelectorAll("#gameLiveView .panel h3")[0].textContent = "Đáp án của bạn");
     document.querySelectorAll("#gameLiveView .panel h3")[1] && (document.querySelectorAll("#gameLiveView .panel h3")[1].textContent = "Bảng xếp hạng");
     if (EL.finishedView?.querySelector("h3")) EL.finishedView.querySelector("h3").textContent = "Kết quả trận đấu";
-    if (backBtn) backBtn.textContent = "Rá»i phÃ²ng";
-    if (EL.leaveGameBtn) EL.leaveGameBtn.textContent = "ThoÃ¡t háº³n";
-    if (EL.myScore?.previousElementSibling) EL.myScore.previousElementSibling.textContent = "Äiá»ƒm trÃ¢n";
-    if (EL.myRank?.previousElementSibling) EL.myRank.previousElementSibling.textContent = "Vá»‹ trÃ­ hiá»‡n táº¡i";
+    if (backBtn) backBtn.textContent = "← Quay lại";
+    if (EL.leaveGameBtn) EL.leaveGameBtn.textContent = "Rời phòng";
+    if (EL.myScore?.previousElementSibling) EL.myScore.previousElementSibling.textContent = "Điểm của bạn";
+    if (EL.myRank?.previousElementSibling) EL.myRank.previousElementSibling.textContent = "Hạng hiện tại";
     const historyModalTitle = document.querySelector("#gameHistoryModal .mh h2");
     if (historyModalTitle) historyModalTitle.textContent = "Chi tiết trận đấu";
     const historyClose = document.querySelector("#gameHistoryModal .mh .btn");
@@ -881,7 +881,7 @@
     const classMeta = getSelectedClassMeta(classId);
     if (!classMeta) return;
     if (EL.roomGrade) EL.roomGrade.value = classMeta.grade_id || "";
-    fillSubjects(EL.roomSubject, classMeta.grade_id || "", "Chá»n mÃ´n");
+    fillSubjects(EL.roomSubject, classMeta.grade_id || "", "Chọn môn");
     if (EL.roomSubject) EL.roomSubject.value = classMeta.subject_id || "";
   }
 
@@ -1254,11 +1254,11 @@
   }
 
   function getArenaTier(elo) {
-    if (elo >= 1800) return { name: "Kim cÆ°Æ¡ng", icon: "â—†" };
-    if (elo >= 1550) return { name: "Báº¡ch kim", icon: "â¬¡" };
-    if (elo >= 1300) return { name: "VÃ ng", icon: "â˜…" };
-    if (elo >= 1100) return { name: "Báº¡c", icon: "âœ¦" };
-    return { name: "Äá»“ng", icon: "â€¢" };
+    if (elo >= 1800) return { name: "Kim cương", icon: "â—†" };
+    if (elo >= 1550) return { name: "Bạch kim", icon: "â¬¡" };
+    if (elo >= 1300) return { name: "Vàng", icon: "â˜…" };
+    if (elo >= 1100) return { name: "Bạc", icon: "âœ¦" };
+    return { name: "Äá»“ng", icon: "Đồng" };
   }
 
   function getLeaderboardByElo(scopedRooms, finishedPlayers) {
@@ -1916,7 +1916,7 @@
     if (!me && room.status !== "finished") {
       hideGameScreen();
       await loadRooms();
-      if (!silent) alert("Báº¡n khÃ´ng cÃ²n á»Ÿ trong phÃ²ng nÃ y.");
+      if (!silent) alert("Bạn không còn ở trong phòng này.");
       return;
     }
     GAME.myAnswers = (answers || []).filter((item) => {
