@@ -25,6 +25,8 @@
     roomNoticeTimer: null,
     roomChannel: null,
     listChannel: null,
+    accessToken: "",
+    unloadingLeaveSent: false,
     leaderboardPeriod: "day",
     leavingRoom: false,
     selectedAutoMode: "",
@@ -197,6 +199,71 @@
     }
     if (joined.length) {
       showRoomNotice(`${formatPlayerNames(joined)} đã vào phòng.`);
+    }
+  }
+
+  function getRestBaseUrl() {
+    return typeof SUPABASE_URL === "string" ? `${SUPABASE_URL}/rest/v1` : "";
+  }
+
+  function getRestHeaders(preferJson) {
+    const headers = {
+      apikey: typeof SUPABASE_KEY === "string" ? SUPABASE_KEY : "",
+      Authorization: `Bearer ${GAME.accessToken || SUPABASE_KEY || ""}`,
+      Prefer: preferJson || "return=minimal",
+    };
+    return headers;
+  }
+
+  function sendKeepaliveRequest(url, options) {
+    try {
+      fetch(url, { ...options, keepalive: true });
+    } catch (_) {}
+  }
+
+  function leaveRoomOnUnload() {
+    if (GAME.unloadingLeaveSent) return;
+    const room = GAME.activeRoom;
+    const player = (GAME.roomPlayers || []).find((item) => item.user_id === GAME.user?.id);
+    if (!room || !player || room.status === "finished") return;
+    GAME.unloadingLeaveSent = true;
+    const baseUrl = getRestBaseUrl();
+    if (!baseUrl) return;
+    sendKeepaliveRequest(`${baseUrl}/game_room_answers?player_id=eq.${encodeURIComponent(player.id)}`, {
+      method: "DELETE",
+      headers: getRestHeaders(),
+    });
+    sendKeepaliveRequest(`${baseUrl}/game_room_players?id=eq.${encodeURIComponent(player.id)}`, {
+      method: "DELETE",
+      headers: getRestHeaders(),
+    });
+    const remain = (GAME.roomPlayers || []).filter((item) => item.id !== player.id);
+    if (!remain.length) {
+      sendKeepaliveRequest(`${baseUrl}/game_room_questions?room_id=eq.${encodeURIComponent(room.id)}`, {
+        method: "DELETE",
+        headers: getRestHeaders(),
+      });
+      sendKeepaliveRequest(`${baseUrl}/game_rooms?id=eq.${encodeURIComponent(room.id)}`, {
+        method: "DELETE",
+        headers: getRestHeaders(),
+      });
+      return;
+    }
+    if (room.host_id === GAME.user?.id) {
+      sendKeepaliveRequest(`${baseUrl}/game_rooms?id=eq.${encodeURIComponent(room.id)}`, {
+        method: "PATCH",
+        headers: { ...getRestHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          host_id: remain[0].user_id,
+          started_at: remain.length >= 2 ? room.started_at : null,
+        }),
+      });
+    } else if (remain.length < 2) {
+      sendKeepaliveRequest(`${baseUrl}/game_rooms?id=eq.${encodeURIComponent(room.id)}`, {
+        method: "PATCH",
+        headers: { ...getRestHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ started_at: null }),
+      });
     }
   }
 
@@ -620,11 +687,13 @@
     GAME.initialAction = params.get("action") || "";
     GAME.initialRoomId = params.get("roomId") || "";
     const { data: { user } } = await sb.auth.getUser();
+    const { data: { session } } = await sb.auth.getSession();
     if (!user) {
       location.href = "index.html";
       return;
     }
     GAME.user = user;
+    GAME.accessToken = session?.access_token || "";
 
     const [{ data: profile }, { data: grades }, { data: subjects }] = await Promise.all([
       sb.from("users").select("role").eq("id", user.id).single(),
@@ -659,6 +728,8 @@
   }
 
   function bindEvents() {
+    window.addEventListener("pagehide", leaveRoomOnUnload);
+    window.addEventListener("beforeunload", leaveRoomOnUnload);
     EL.openRoomBtn?.addEventListener("click", () => openGameRoomModal());
     EL.quickMatchBtn?.addEventListener("click", quickMatch);
     EL.reloadRoomsBtn?.addEventListener("click", () => loadRooms());
@@ -1716,6 +1787,7 @@
   }
 
   function hideGameScreen() {
+    GAME.unloadingLeaveSent = false;
     clearIntervals();
     clearAutoStartTimer();
     clearWaitingCountdown();
