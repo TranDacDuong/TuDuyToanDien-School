@@ -652,10 +652,21 @@
     return ["quick", "ranked", "survival", "speed"].includes(mode) && (room.visibility || "public") === "public";
   }
 
+  // TRƯỚC (lỗi)
   function queueAutoStart(room, delayMs = 1200) {
     clearAutoStartTimer();
     GAME.autoStartTimer = setTimeout(() => {
       if (GAME.activeRoom?.id === room.id && GAME.activeRoom?.status === "waiting") {
+        startGameMatch();
+      }
+    }, Math.max(0, Number(delayMs || 0)));
+  }
+  
+  // SAU (fix)
+  function queueAutoStart(room, delayMs = 1200) {
+    clearAutoStartTimer();
+    GAME.autoStartTimer = setTimeout(() => {
+      if (GAME.activeRoom?.id === room.id && GAME.activeRoom?.status === "waiting" && GAME.roomPlayers.length >= 2) {
         startGameMatch();
       }
     }, Math.max(0, Number(delayMs || 0)));
