@@ -250,7 +250,7 @@
       });
       return;
     }
-    if (room.host_id === GAME.user?.id) {
+    if (getRoomCoordinatorUserId(room, GAME.roomPlayers) === GAME.user?.id) {
       sendKeepaliveRequest(`${baseUrl}/game_rooms?id=eq.${encodeURIComponent(room.id)}`, {
         method: "PATCH",
         headers: { ...getRestHeaders(), "Content-Type": "application/json" },
@@ -458,6 +458,15 @@
     if (room?.class_id) return { label: "Phòng lớp học", accent: "Lớp riêng" };
     if ((room?.visibility || "public") === "public") return { label: "Phòng công khai", accent: "Mở toàn sảnh" };
     return { label: "Phòng riêng", accent: "Vào bằng mã" };
+  }
+
+  function sortPlayersByJoin(players) {
+    return [...(players || [])].sort((a, b) => new Date(a.joined_at || 0) - new Date(b.joined_at || 0) || String(a.user_id || "").localeCompare(String(b.user_id || "")));
+  }
+
+  function getRoomCoordinatorUserId(room, players) {
+    const ordered = sortPlayersByJoin(players);
+    return ordered[0]?.user_id || room?.host_id || room?.created_by || "";
   }
 
   function getQuestionDuration(question, room) {
@@ -986,7 +995,7 @@
     return (rooms || []).filter((room) => {
       if (!canAccessClassRoom(room)) return false;
       if ((room.visibility || "public") !== "private") return true;
-      if (room.host_id === GAME.user?.id) return true;
+      if (room.created_by === GAME.user?.id) return true;
       return (playerMap[room.id] || []).some((player) => player.user_id === GAME.user?.id);
     });
   }
@@ -1712,7 +1721,7 @@
       await cleanupRoomCompletely(room.id);
       return;
     }
-    if (room.host_id === player.user_id) {
+    if (getRoomCoordinatorUserId(room, GAME.roomPlayers) === player.user_id) {
       await sb.from("game_rooms").update({ host_id: remain[0].user_id, started_at: remain.length >= 2 ? room.started_at : null }).eq("id", room.id);
     } else if (remain.length < 2) {
       await sb.from("game_rooms").update({ started_at: null }).eq("id", room.id);
@@ -1737,7 +1746,7 @@
     if (!presentIds.length) return;
     if (GAME.activeRoom?.id !== roomId) return;
     if (GAME.activeRoom?.status === "finished") return;
-    if (GAME.activeRoom?.host_id !== GAME.user?.id) return;
+    if (getRoomCoordinatorUserId(GAME.activeRoom, GAME.roomPlayers) !== GAME.user?.id) return;
     const stalePlayers = (GAME.roomPlayers || []).filter((player) => !presentIds.includes(player.user_id));
     for (const stalePlayer of stalePlayers) {
       try {
@@ -1820,19 +1829,7 @@
   }
 
   async function kickPlayer(playerId) {
-    const room = GAME.activeRoom;
-    if (!room || room.host_id !== GAME.user.id) return;
-    const player = GAME.roomPlayers.find((item) => item.id === playerId);
-    if (!player || player.user_id === GAME.user.id) return;
-    if (!confirm(`Mời ${getPlayerName(player.user_id)} ra khỏi phòng này?`)) return;
-    try {
-      await removePlayerFromRoom(room, player);
-    } catch (error) {
-      alert(`Không thể mời người chơi ra khỏi phòng: ${error.message}`);
-      return;
-    }
-    await refreshActiveRoom(room.id, true);
-    await loadRooms();
+    return;
   }
 
   async function openRoomScreen(roomId) {
@@ -1929,9 +1926,9 @@
     const mode = roomModeValue(room);
     const modeLabel = roomModeLabel(mode);
     const autoManagedRoom = isPublicAutoMatchRoom(room);
-    const isHost = room.host_id === GAME.user.id;
+    const isCoordinator = getRoomCoordinatorUserId(room, GAME.roomPlayers) === GAME.user.id;
     const me = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
-    const canStart = room.status === "waiting" && isHost && GAME.roomPlayers.length >= 2;
+    const canStart = room.status === "waiting" && isCoordinator && GAME.roomPlayers.length >= 2;
     const countdownActive = room.status === "waiting" && GAME.roomPlayers.length >= 2;
     if (countdownActive && !room.started_at && !GAME.localCountdownStartedAt) {
       GAME.localCountdownStartedAt = new Date().toISOString();
@@ -1939,7 +1936,7 @@
     if (countdownActive && room.started_at) {
       GAME.localCountdownStartedAt = room.started_at;
       renderWaitingCountdown(room);
-      if (isHost) {
+      if (isCoordinator) {
         const delayMs = Math.max(0, new Date(room.started_at).getTime() + 10000 - Date.now());
         queueAutoStart(room, delayMs);
       }
@@ -1948,20 +1945,20 @@
     } else {
       clearAutoStartTimer();
       clearWaitingCountdown();
-      if (isHost && room.status === "waiting" && room.started_at) {
+      if (isCoordinator && room.status === "waiting" && room.started_at) {
         sb.from("game_rooms").update({ started_at: null }).eq("id", room.id).then(() => refreshActiveRoom(room.id, true)).catch(() => {});
       }
     }
-    if (isHost && room.status === "waiting" && countdownActive && !room.started_at) {
+    if (isCoordinator && room.status === "waiting" && countdownActive && !room.started_at) {
       clearAutoStartTimer();
       sb.from("game_rooms").update({ started_at: new Date().toISOString() }).eq("id", room.id).then(() => refreshActiveRoom(room.id, true)).catch(() => {});
     }
 
     EL.roomScreenTitle.textContent = getRoomDisplayTitle(room);
-    EL.startGameBtn.classList.toggle("hidden", !(room.status === "waiting" && isHost) || autoManagedRoom || countdownActive);
+    EL.startGameBtn.classList.add("hidden");
     EL.startGameBtn.disabled = !canStart;
     EL.toggleReadyBtn?.classList.add("hidden");
-    if (EL.toggleReadyBtn && me && !isHost) EL.toggleReadyBtn.textContent = me.ready ? "Hủy sẵn sàng" : "Sẵn sàng";
+    if (EL.toggleReadyBtn && me && !isCoordinator) EL.toggleReadyBtn.textContent = me.ready ? "Hủy sẵn sàng" : "Sẵn sàng";
     ensurePlayerCache().then(() => {
       if (room.status === "waiting") {
         setScreenState("waiting");
@@ -1979,7 +1976,7 @@
         `;
         if (EL.inviteCode) EL.inviteCode.textContent = room.join_code || "—";
         if (EL.inviteVisibility) EL.inviteVisibility.textContent = visibility;
-        EL.roomDescriptionView.textContent = room.description || "Mời bạn bè cùng vào phòng, khi đủ người thì chủ phòng bắt đầu trận.";
+        EL.roomDescriptionView.textContent = room.description || "Mời bạn bè cùng vào phòng, khi đủ người hệ thống sẽ tự động bắt đầu trận.";
         if (autoManagedRoom) {
           EL.roomDescriptionView.textContent = "Hệ thống đang ghép người chơi. Khi đủ người, trận đấu sẽ tự động bắt đầu.";
         }
@@ -1989,7 +1986,7 @@
               ? "Phòng đã đủ người. Hệ thống đang đếm ngược để vào trận."
               : "Chọn xong là vào phòng ngay. Hãy chờ thêm người chơi để hệ thống tự bắt đầu trận.";
           } else
-          if (isHost) {
+          if (isCoordinator) {
             EL.roomStartHint.textContent = countdownActive
               ? "Phòng đã đủ điều kiện để bắt đầu trận."
               : "Cần ít nhất 2 người chơi để bắt đầu trận.";
@@ -1998,7 +1995,7 @@
           }
         }
         if (EL.roomStartHint && countdownActive && !autoManagedRoom) {
-          EL.roomStartHint.textContent = isHost
+          EL.roomStartHint.textContent = isCoordinator
             ? "Phòng đã có từ 2 người trở lên. Hệ thống đang đếm ngược 10 giây."
             : "Phòng đang đếm ngược. Hãy sẵn sàng vào trận.";
         }
@@ -2021,7 +2018,6 @@
   }
 
   function renderPlayerRow(player, index, showScore) {
-    const canKick = GAME.activeRoom?.status === "waiting" && GAME.activeRoom?.host_id === GAME.user?.id && player.user_id !== GAME.user?.id;
     const rankClass = showScore ? (index === 1 ? "top-1" : index === 2 ? "top-2" : index === 3 ? "top-3" : "") : "";
     const meClass = player.user_id === GAME.user?.id ? "me" : "";
     const lives = getPlayerLives(player.id, GAME.activeRoom, GAME.roomAnswers || []);
@@ -2033,10 +2029,10 @@
         <img class="avatar" src="${escAttr(getPlayerAvatar(player.user_id))}" alt="avatar">
         <div>
           <div style="font-weight:700;color:var(--navy)">${index}. ${esc(getPlayerName(player.user_id))}</div>
-          <div class="hint">${player.user_id === GAME.activeRoom?.host_id ? "Chủ phòng" : "Người chơi"}${lives !== null ? ` • ${lives} mạng` : ""}</div>
+          <div class="hint">Người chơi${lives !== null ? ` • ${lives} mạng` : ""}</div>
         </div>
       </div>
-      ${showScore ? `<strong style="color:var(--navy)">${player.score || 0}</strong>` : `<div style="display:grid;justify-items:end;gap:4px">${readyTag}${canKick ? `<button class="btn btn-outline btn-sm" type="button" onclick="kickGamePlayer('${player.id}')">Mời ra</button>` : ""}<span class="hint">${fmtDateTime(player.joined_at)}</span></div>`}
+      ${showScore ? `<strong style="color:var(--navy)">${player.score || 0}</strong>` : `<div style="display:grid;justify-items:end;gap:4px">${readyTag}<span class="hint">${fmtDateTime(player.joined_at)}</span></div>`}
     </div>`;
   }
 
@@ -2094,7 +2090,7 @@
 
   async function startGameMatch() {
     const room = GAME.activeRoom;
-    if (!room || room.host_id !== GAME.user.id) return;
+    if (!room || getRoomCoordinatorUserId(room, GAME.roomPlayers) !== GAME.user.id) return;
     if (GAME.roomPlayers.length < 2) {
       alert("Cần ít nhất 2 người chơi để bắt đầu trận.");
       return;
@@ -2335,11 +2331,11 @@
         return;
       }
     }
-    if (room.status !== "finished" && room.host_id === GAME.user.id) {
+    if (room.status !== "finished" && getRoomCoordinatorUserId(room, GAME.roomPlayers) === GAME.user.id) {
       await sb.from("game_rooms").update({ status: "finished", ended_at: new Date().toISOString() }).eq("id", room.id);
     }
     await refreshActiveRoom(room.id, true);
-    if (room.host_id === GAME.user.id) {
+    if (getRoomCoordinatorUserId(room, GAME.roomPlayers) === GAME.user.id) {
       setTimeout(() => {
         cleanupRoomIfFinished(room.id);
       }, 6000);
@@ -2524,7 +2520,6 @@
   };
 
   window.inviteGameFriend = inviteFriend;
-  window.kickGamePlayer = kickPlayer;
   window.openGameHistoryDetail = openHistoryDetail;
   window.closeGameHistoryModal = closeGameHistoryModal;
   window.closeGameRoomModal = closeGameRoomModal;
