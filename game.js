@@ -168,6 +168,7 @@
 
   init();
   normalizeStaticGameText();
+  applyCleanModeOptions();
 
   if (EL.roomMode?.closest(".field")) {
     const modeLabels = EL.roomMode.closest(".field").querySelectorAll("label");
@@ -197,6 +198,30 @@
       <option value="speed">Đua tốc độ</option>
     `;
   }
+
+  function applyCleanModeOptions() {
+    if (EL.modeFilter) {
+      EL.modeFilter.innerHTML = `
+        <option value="">Mọi chế độ</option>
+        <option value="quick">Đấu nhanh</option>
+        <option value="friends">Phòng bạn bè</option>
+        <option value="ranked">Leo hạng</option>
+        <option value="survival">Sinh tồn</option>
+        <option value="speed">Đua tốc độ</option>
+      `;
+    }
+    if (EL.roomMode) {
+      EL.roomMode.innerHTML = `
+        <option value="quick">Đấu nhanh</option>
+        <option value="friends">Phòng bạn bè</option>
+        <option value="ranked">Leo hạng</option>
+        <option value="survival">Sinh tồn</option>
+        <option value="speed">Đua tốc độ</option>
+      `;
+    }
+  }
+
+  applyCleanModeOptions();
 
   function esc(value) {
     return String(value ?? "")
@@ -601,6 +626,15 @@
       { mode: "ranked", title: "Leo hạng", art: "🏆", desc: "Trận đấu Elo căng hơn, cạnh tranh rõ hơn." },
       { mode: "survival", title: "Sinh tồn", art: "🛡️", desc: "Sai là mất mạng, càng về cuối càng căng." },
       { mode: "speed", title: "Đua tốc độ", art: "🚀", desc: "Đúng nhanh ăn nhiều điểm hơn." },
+    ];
+  }
+
+  function getAutoMatchModeCards() {
+    return [
+      { mode: "quick", title: "Đấu nhanh", art: "⚡", desc: "Vào nhanh, ghép nhanh.", elo: getModeEloRule("quick") },
+      { mode: "ranked", title: "Leo hạng", art: "🏆", desc: "Chế độ cạnh tranh Elo rõ ràng.", elo: getModeEloRule("ranked") },
+      { mode: "survival", title: "Sinh tồn", art: "🛡️", desc: "Sai là mất mạng, càng về cuối càng căng.", elo: getModeEloRule("survival") },
+      { mode: "speed", title: "Đua tốc độ", art: "🚀", desc: "Đúng nhanh để bứt lên.", elo: getModeEloRule("speed") },
     ];
   }
 
