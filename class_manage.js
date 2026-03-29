@@ -54,6 +54,13 @@
     return eligible.filter(s=>(s.effective_from||"2000-01-01")===maxEf);
   }
 
+  function getMinRoomCapacity(schedules){
+    const capacities = (schedules || [])
+      .map(s => Number(s?.rooms?.capacity || 0))
+      .filter(cap => Number.isFinite(cap) && cap > 0);
+    return capacities.length ? Math.min(...capacities) : 0;
+  }
+
   /* â”€â”€ Attendance status â”€â”€ */
   const statusCycle = ["present","absent","makeup"];
   const statusMap = {
@@ -229,7 +236,7 @@
     const { data, error } = await sb.from("classes").select([
       "id,class_name,tuition_fee,tuition_type,makeup_fee",
       "grades(name),subjects(name)",
-      "class_schedules(id,weekday,start_time,end_time,effective_from,rooms:rooms(room_name))",
+      "class_schedules(id,weekday,start_time,end_time,effective_from,rooms:rooms(room_name,capacity))",
       "students:class_students!fk_class(id,student_id,joined_at,left_at,user:users!fk_student(id,full_name))"
     ].join(",")).eq("id",_classId).single();
 
@@ -250,6 +257,8 @@
     const activeCount = (data.students||[]).filter(s=>!s.left_at||s.left_at.slice(0,10)>=today).length;
 
     const schThisMonth = getSchedulesForMonth(data.class_schedules||[], _currentMonth, _currentYear);
+    const roomCapacity = getMinRoomCapacity(schThisMonth);
+    const shouldWarnCapacity = (role === "admin" || role === "teacher") && roomCapacity > 0 && activeCount >= roomCapacity;
     const scheduleHtml = schThisMonth.length
       ? schThisMonth.map(s=>
           '<span style="font-size:.78rem;background:var(--blue-bg);color:var(--blue);'+
@@ -259,6 +268,16 @@
           (s.rooms?" • "+s.rooms.room_name:"")+
           "</span>").join("")
       : '<span style="color:var(--ink-light);font-size:.82rem">Chưa có lịch học</span>';
+    const capacityWarningHtml = shouldWarnCapacity
+      ? '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;'+
+        'background:'+(activeCount > roomCapacity ? 'rgba(239,68,68,.12)' : 'rgba(245,158,11,.12)')+';'+
+        'border:1px solid '+(activeCount > roomCapacity ? 'rgba(239,68,68,.28)' : 'rgba(245,158,11,.28)')+';'+
+        'color:'+(activeCount > roomCapacity ? '#b91c1c' : '#92400e')+';font-size:.82rem;font-weight:600">'+
+        '⚠ Cảnh báo: Số lượng học sinh hiện tại ('+activeCount+') '+
+        (activeCount > roomCapacity ? 'đã vượt quá' : 'đã chạm tới')+
+        ' sức chứa phòng học ('+roomCapacity+').'+
+        '</div>'
+      : '';
 
     const body = document.getElementById("cvBody");
     if(!body) return;
@@ -277,6 +296,7 @@
             (data.subjects?.name?' &nbsp;•&nbsp; 📚 '+data.subjects.name:'')+
             (data.grades?.name?' &nbsp;•&nbsp; 🏫 Khối '+data.grades.name:'')+
             '</div>'+
+            capacityWarningHtml+
         '</div>'+
         '<div style="display:flex;gap:8px;align-items:center;flex-shrink:0">'+
           ((_role==="admin"||_role==="teacher")

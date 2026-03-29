@@ -16,6 +16,13 @@
   let _teacherNameMap = {};
   let _allSubjects   = [];
 
+  function getMinRoomCapacity(schedules){
+    const capacities = (schedules || [])
+      .map(s => Number(s?.rooms?.capacity || 0))
+      .filter(cap => Number.isFinite(cap) && cap > 0);
+    return capacities.length ? Math.min(...capacities) : 0;
+  }
+
   async function loadMyClasses(){
     container.innerHTML = '<div style="color:var(--ink-light);padding:20px">Đang tải...</div>';
     try{
@@ -63,7 +70,7 @@
         { data: students },
       ] = await Promise.all([
         classQuery,
-        sb.from("class_schedules").select("*,rooms(room_name)")
+        sb.from("class_schedules").select("*,rooms(room_name,capacity)")
           .order("weekday",    { ascending: true })
           .order("start_time", { ascending: true }),
         sb.from("class_teachers").select("class_id,teacher_id"),
@@ -250,6 +257,11 @@
           .map(tid => _teacherNameMap[tid]||"").filter(Boolean);
         const stuCount    = _studentCount[cls.id] || 0;
         const subjectName = cls.subjects?.name || "";
+        const roomCapacity = getMinRoomCapacity(_scheduleMap[cls.id]);
+        const showCapacityWarning = (role === "admin" || role === "teacher") && roomCapacity > 0 && stuCount >= roomCapacity;
+        const capacityWarningHtml = showCapacityWarning
+          ? `<div class="class-info" style="margin-top:6px;padding:8px 10px;border-radius:10px;background:${stuCount > roomCapacity ? "rgba(239,68,68,.12)" : "rgba(245,158,11,.12)"};border:1px solid ${stuCount > roomCapacity ? "rgba(239,68,68,.28)" : "rgba(245,158,11,.28)"};color:${stuCount > roomCapacity ? "#b91c1c" : "#92400e"};font-weight:700">⚠ ${stuCount > roomCapacity ? "Số lượng học sinh đang vượt quá" : "Số lượng học sinh đã chạm tới"} sức chứa phòng học (${roomCapacity}).</div>`
+          : "";
 
         card.innerHTML = `
           <div>
@@ -258,6 +270,7 @@
             <div class="class-info">📅 ${sch || "<span style='color:var(--ink-light);font-size:.75rem'>Chưa có lịch</span>"}</div>
             <div class="class-info">💰 ${new Intl.NumberFormat("vi-VN").format(cls.tuition_fee||0)}đ</div>
             <div class="class-info">👨‍🎓 ${stuCount} học sinh</div>
+            ${capacityWarningHtml}
             ${teacherList.length ? `<div class="class-teacher-tag">👨‍🏫 ${teacherList.join(", ")}</div>` : ""}
           </div>`;
 
