@@ -463,6 +463,58 @@ tr:hover td { background: #f8fbff; }
   border-bottom: none;
   padding-top: 10px;
 }
+.qr-payment-card {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid rgba(15,31,61,.08);
+}
+.qr-payment-media {
+  width: 180px;
+  min-width: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid rgba(15,31,61,.08);
+}
+.qr-payment-image {
+  width: 160px;
+  height: 160px;
+  object-fit: contain;
+}
+.qr-payment-text {
+  flex: 1;
+  min-width: 240px;
+}
+.qr-payment-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--navy);
+  margin-bottom: 10px;
+}
+.qr-payment-line {
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.7;
+}
+.qr-payment-line span {
+  display: inline-block;
+  min-width: 110px;
+  color: #64748b;
+}
+.qr-payment-note {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.6;
+}
 
 /* print */
 @media print {
@@ -486,8 +538,14 @@ tr:hover td { background: #f8fbff; }
   .invoice-table th,
   .invoice-table td,
   .invoice-note,
-  .invoice-summary-row { font-size: 11px; }
+  .invoice-summary-row,
+  .qr-payment-line,
+  .qr-payment-note { font-size: 11px; }
   .invoice-summary-row.total { font-size: 13px; }
+  .qr-payment-card { padding: 12px; gap: 12px; }
+  .qr-payment-media { width: 150px; min-width: 150px; }
+  .qr-payment-image { width: 130px; height: 130px; }
+  .qr-payment-title { font-size: 14px; margin-bottom: 8px; }
 }
 @media (max-width: 820px) {
   .page { padding: 16px 14px 34px; }
@@ -500,6 +558,10 @@ tr:hover td { background: #f8fbff; }
   .summary-card,
   .table-wrap,
   .modal-card { border-radius: 20px; }
+  .qr-payment-media {
+    width: 100%;
+    min-width: 0;
+  }
 }
 </style>
 </head>

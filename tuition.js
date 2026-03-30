@@ -13,6 +13,55 @@
     return new Intl.NumberFormat("vi-VN").format(Math.round(v));
   }
 
+  function toAscii(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .replace(/[^a-zA-Z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function buildTransferContent(studentName, ym) {
+    const [year, month] = String(ym || "").split("-");
+    const cleanName = toAscii(studentName).replace(/\s+/g, " ").toUpperCase();
+    const cleanMonth = [month, year].filter(Boolean).join(" ").trim();
+    return `${cleanName} NOP TIEN HOC THANG ${cleanMonth}`.trim();
+  }
+
+  function buildPaymentQrUrl(studentName, ym, amount) {
+    const finalAmount = Math.max(0, Math.round(Number(amount) || 0));
+    if (!finalAmount) return "";
+    const addInfo = buildTransferContent(studentName, ym);
+    return `https://img.vietqr.io/image/TCB-8209224001-compact2.png?amount=${encodeURIComponent(finalAmount)}&addInfo=${encodeURIComponent(addInfo)}`;
+  }
+
+  function buildPaymentQrBlock(studentName, ym, amount) {
+    const finalAmount = Math.max(0, Math.round(Number(amount) || 0));
+    if (!finalAmount) {
+      return `<div class="qr-payment-card"><div class="qr-payment-text"><div class="qr-payment-title">Mã QR thanh toán</div><div class="qr-payment-note">Học phí đã được thanh toán đủ nên không cần tạo mã QR.</div></div></div>`;
+    }
+    const qrUrl = buildPaymentQrUrl(studentName, ym, finalAmount);
+    const transferContent = buildTransferContent(studentName, ym);
+    return `
+      <div class="qr-payment-card">
+        <div class="qr-payment-media">
+          <img class="qr-payment-image" src="${qrUrl}" alt="QR thanh toán học phí" referrerpolicy="no-referrer">
+        </div>
+        <div class="qr-payment-text">
+          <div class="qr-payment-title">Quét mã để thanh toán học phí</div>
+          <div class="qr-payment-line"><span>Ngân hàng:</span><b>Techcombank</b></div>
+          <div class="qr-payment-line"><span>Số tài khoản:</span><b>8209224001</b></div>
+          <div class="qr-payment-line"><span>Số tiền:</span><b>${fmt(finalAmount)}đ</b></div>
+          <div class="qr-payment-line"><span>Nội dung CK:</span><b>${transferContent}</b></div>
+          <div class="qr-payment-note">Khi quét QR, ứng dụng ngân hàng sẽ tự điền sẵn số tiền và nội dung chuyển khoản.</div>
+        </div>
+      </div>
+    `;
+  }
+
   function todayYM() {
     const n = new Date();
     return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`;
@@ -156,6 +205,7 @@
     const status = getStatus(group.amount, amountPaid);
     const remaining = Math.max(0, group.amount - amountPaid);
     const overpaid = Math.max(0, amountPaid - group.amount);
+    const qrAmount = remaining > 0 ? remaining : 0;
 
     return `
       <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
@@ -224,6 +274,7 @@
           </div>
         </div>
         ${payment?.note ? `<div class="invoice-note" style="margin-top:12px">${payment.note}</div>` : ""}
+        <div style="margin-top:16px">${buildPaymentQrBlock(group.studentName, group.ym, qrAmount)}</div>
       </div>
     `;
   }
@@ -843,6 +894,10 @@ Nhập số tiền hoàn lại (>0):`,
             <div class="invoice-summary-row"><span>Còn thiếu</span><b>${fmt(remaining)}đ</b></div>
             <div class="invoice-summary-row"><span>Nộp thừa</span><b>${fmt(overpaid)}đ</b></div>
             <div class="invoice-summary-row total"><span>Trạng thái</span><span>${statusLabel[status]}</span></div>
+          </div>
+
+          <div style="margin-top:18px">
+            ${buildPaymentQrBlock(g.studentName, g.ym, remaining > 0 ? remaining : 0)}
           </div>
         </section>
       `;
