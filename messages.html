@@ -593,12 +593,24 @@ function showConversationError(error) {
 async function ensureConversationMembership(conversationId) {
   if (!conversationId) return;
 
+  const { data: existingMembership, error: membershipLookupError } = await sb
+    .from("conversation_members")
+    .select("conversation_id")
+    .eq("conversation_id", conversationId)
+    .eq("user_id", currentUser.id)
+    .maybeSingle();
+
+  if (membershipLookupError) {
+    throw membershipLookupError;
+  }
+
+  if (existingMembership?.conversation_id) {
+    return;
+  }
+
   const selfMembership = await sb
     .from("conversation_members")
-    .upsert(
-      [{ conversation_id: conversationId, user_id: currentUser.id }],
-      { onConflict: "conversation_id,user_id" }
-    );
+    .insert([{ conversation_id: conversationId, user_id: currentUser.id }]);
 
   if (selfMembership.error) {
     throw selfMembership.error;
