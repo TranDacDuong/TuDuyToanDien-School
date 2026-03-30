@@ -232,17 +232,17 @@
 
   function getArenaTierProgress(elo) {
     const tiers = [
-      { name: "Dong", icon: "•", min: 1000, max: 1099 },
-      { name: "Bac", icon: "✦", min: 1100, max: 1299 },
-      { name: "Vang", icon: "★", min: 1300, max: 1549 },
-      { name: "Bach kim", icon: "⬡", min: 1550, max: 1799 },
-      { name: "Kim cuong", icon: "◆", min: 1800, max: Infinity },
+      { name: "Đồng", icon: "•", min: 1000, max: 1099 },
+      { name: "Bạc", icon: "✦", min: 1100, max: 1299 },
+      { name: "Vàng", icon: "★", min: 1300, max: 1549 },
+      { name: "Bạch kim", icon: "⬡", min: 1550, max: 1799 },
+      { name: "Kim cương", icon: "◆", min: 1800, max: Infinity },
     ];
     const value = Math.max(1000, Number(elo || 1000));
     const current = tiers.find((tier) => value >= tier.min && value <= tier.max) || tiers[0];
     const next = tiers[tiers.indexOf(current) + 1] || null;
     if (!next) {
-      return { current, next, percent: 100, text: "Ban da o bac cao nhat." };
+      return { current, next, percent: 100, text: "Bạn đã ở bậc cao nhất." };
     }
     const span = Math.max(1, next.min - current.min);
     const percent = Math.max(0, Math.min(100, Math.round(((value - current.min) / span) * 100)));
@@ -251,7 +251,7 @@
       current,
       next,
       percent,
-      text: `Con ${remain} Elo de len ${next.name}.`,
+      text: `Còn ${remain} Elo để lên ${next.name}.`,
     };
   }
 
