@@ -54,8 +54,9 @@ h1 {
 /* Toolbar */
 .toolbar {
   display: flex;
-  gap: 10px;
+  gap: 14px;
   align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
   margin-bottom: 20px;
   padding: 14px;
@@ -63,6 +64,19 @@ h1 {
   background: rgba(255,255,255,.9);
   border: 1px solid rgba(15,31,61,.08);
   box-shadow: 0 14px 28px rgba(15,31,61,.07);
+}
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.toolbar-group.filters {
+  flex: 1 1 560px;
+  min-width: 0;
+}
+.toolbar-group.actions {
+  justify-content: flex-end;
 }
 .toolbar button {
   padding: 10px 16px;
@@ -91,6 +105,11 @@ h1 {
   background: #fff;
   cursor: pointer;
   color: var(--navy);
+}
+.toolbar-group.filters select,
+.toolbar-group.filters input[type=month] {
+  flex: 1 1 170px;
+  min-width: 0;
 }
 .badge {
   background: rgba(15,60,115,.08);
@@ -453,6 +472,9 @@ tr:hover td { background: #f8fbff; }
   .page-head,
   .toolbar,
   .student-detail-view { border-radius: 20px; }
+  .toolbar-group.filters,
+  .toolbar-group.actions { width: 100%; }
+  .toolbar-group.actions { justify-content: flex-start; }
   .summary-card,
   .table-wrap,
   .modal-card { border-radius: 20px; }
@@ -467,21 +489,25 @@ tr:hover td { background: #f8fbff; }
   </div>
 
   <div class="toolbar">
-    <input type="month" id="monthPicker">
-    <select id="classFilter" onchange="renderRows()">
-      <option value="">Tất cả lớp</option>
-    </select>
-    <select id="paidFilter" onchange="renderRows()">
-      <option value="">Tất cả trạng thái</option>
-      <option value="unpaid">Chưa nộp</option>
-      <option value="partial">Chưa nộp đủ</option>
-      <option value="paid">Đã nộp đủ</option>
-      <option value="overpaid">Nộp thừa</option>
-    </select>
-    <button onclick="loadTuition()">Tải lại</button>
-    <button class="secondary" id="notifyTuitionBtn" onclick="notifyPendingTuition()" style="display:none">Thông báo học phí</button>
-    <button class="secondary" onclick="printInvoices()">In hóa đơn</button>
-    <span class="badge" id="rowCount">0 học sinh</span>
+    <div class="toolbar-group filters">
+      <input type="month" id="monthPicker">
+      <select id="classFilter" onchange="renderRows()">
+        <option value="">Tất cả lớp</option>
+      </select>
+      <select id="paidFilter" onchange="renderRows()">
+        <option value="">Tất cả trạng thái</option>
+        <option value="unpaid">Chưa nộp</option>
+        <option value="partial">Chưa nộp đủ</option>
+        <option value="paid">Đã nộp đủ</option>
+        <option value="overpaid">Nộp thừa</option>
+      </select>
+    </div>
+    <div class="toolbar-group actions">
+      <button onclick="loadTuition()">Tải lại</button>
+      <button class="secondary" id="notifyTuitionBtn" onclick="notifyPendingTuition()" style="display:none">Thông báo học phí</button>
+      <button class="secondary" onclick="printInvoices()">In hóa đơn</button>
+      <span class="badge" id="rowCount">0 học sinh</span>
+    </div>
   </div>
 
   <div class="summary-row">
