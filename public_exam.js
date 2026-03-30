@@ -8,6 +8,41 @@
     });
   }
   function fmtMoney(v) { return new Intl.NumberFormat("vi-VN").format(v); }
+  function parseQuestionLayout(questionText, type, answerCount) {
+    const rawLines = String(questionText || "").split(/\r?\n/);
+    const stemLines = [];
+    const options = [];
+    const optionPattern = type === "true_false"
+      ? /^([a-z])[\)\.\:\-]\s*(.*)$/i
+      : /^([A-Z])[\)\.\:\-]\s*(.*)$/;
+
+    rawLines.forEach(line => {
+      const match = line.match(optionPattern);
+      if (match) {
+        options.push({
+          key: match[1],
+          text: match[2].trim(),
+        });
+      } else {
+        stemLines.push(line);
+      }
+    });
+
+    const expectedCount = Math.max(1, parseInt(answerCount, 10) || 0);
+    const normalizedOptions = [];
+    for (let i = 0; i < expectedCount; i++) {
+      const key = type === "true_false"
+        ? String.fromCharCode(97 + i)
+        : String.fromCharCode(65 + i);
+      const found = options.find(option => option.key.toLowerCase() === key.toLowerCase());
+      normalizedOptions.push({ key, text: found?.text || "" });
+    }
+
+    return {
+      stem: stemLines.join("\n").trim() || String(questionText || "").trim(),
+      options: normalizedOptions,
+    };
+  }
 
   /* â”€â”€ State â”€â”€ */
   let _role        = "student";
@@ -768,56 +803,65 @@
         const qid = q.id;
         const n   = Math.max(2, parseInt(q.answer_count)||4);
         const hasImg = !!q.question_img;
+        const layout = parseQuestionLayout(q.question_text, type, n);
 
         /* â”€â”€ Answer HTML â”€â”€ */
         let ansHtml = "";
         if (type === "multi_choice") {
           const opts = []; for (let i=0;i<n;i++) opts.push(String.fromCharCode(65+i));
           const saved = _examAnswers[qid] || "";
-          ansHtml = opts.map(opt => `
+          ansHtml = `<div style="font-size:.74rem;font-weight:800;color:var(--ink-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Nội dung đáp án và chọn đáp án</div>${opts.map((opt, index) => `
             <label id="lbl_${qid}_${opt}"
-              style="display:flex;align-items:center;gap:10px;padding:9px 12px;
+              style="display:flex;align-items:flex-start;gap:12px;padding:11px 12px;
                 border-radius:8px;border:1.5px solid ${saved.includes(opt)?"var(--navy)":"var(--border)"};
                 background:${saved.includes(opt)?"#eff6ff":"var(--white)"};
                 cursor:pointer;margin-bottom:6px;transition:.15s;user-select:none"
               onmouseover="this.style.borderColor='var(--navy)'"
               onmouseout="window.peRefreshMC('${qid}','${opt}')">
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:${layout.options[index]?.text ? "4px" : "0"}">
+                  <span style="font-weight:700;font-size:.92rem;color:var(--navy);width:22px;flex-shrink:0">${opt}</span>
+                  <span style="font-size:.72rem;font-weight:700;color:var(--ink-light);text-transform:uppercase;letter-spacing:.05em">Chọn đáp án</span>
+                </div>
+                ${layout.options[index]?.text ? `<div style="font-size:.94rem;line-height:1.55;color:var(--ink);white-space:pre-line">${layout.options[index].text}</div>` : ""}
+              </div>
               <input type="checkbox" value="${opt}" id="cb_${qid}_${opt}" ${saved.includes(opt)?"checked":""}
                 onchange="window.peMC('${qid}')"
-                style="width:16px;height:16px;accent-color:var(--navy);flex-shrink:0">
-              <span style="font-weight:700;font-size:.9rem;color:var(--navy);width:22px;flex-shrink:0">${opt}</span>
-            </label>`).join("");
+                style="width:18px;height:18px;accent-color:var(--navy);flex-shrink:0;margin-top:2px">
+            </label>`).join("")}`;
         } else if (type === "true_false") {
           const lbls = []; for (let i=0;i<n;i++) lbls.push(String.fromCharCode(97+i));
           const saved = _examAnswers[qid] || "";
-          const tfLines = (q.question_text||"").split("\n");
-          const tfOpts = {};
-          tfLines.forEach(line => { const m=line.match(/^([a-d])\)\s*(.*)/); if(m) tfOpts[m[1]]=m[2].trim(); });
-          ansHtml = lbls.map(lbl => `
-            <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;
+          ansHtml = `<div style="font-size:.74rem;font-weight:800;color:var(--ink-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Nội dung đáp án và chọn đáp án</div>${lbls.map((lbl, index) => `
+            <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 12px;
               background:var(--white);border-radius:6px;border:1px solid var(--border);margin-bottom:6px">
-              <span style="font-weight:700;min-width:22px;color:var(--navy);flex-shrink:0;font-size:.86rem">${lbl})</span>
-              <span style="flex:1;min-width:0;font-size:.88rem;color:var(--ink);line-height:1.4">${tfOpts[lbl]||""}</span>
-              <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;white-space:nowrap">
-                <label style="display:inline-flex;align-items:center;gap:3px;cursor:pointer;font-size:.82rem;color:#15803d;font-weight:700">
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:${layout.options[index]?.text ? "4px" : "0"}">
+                  <span style="font-weight:700;min-width:22px;color:var(--navy);flex-shrink:0;font-size:.9rem">${lbl})</span>
+                  <span style="font-size:.72rem;font-weight:700;color:var(--ink-light);text-transform:uppercase;letter-spacing:.05em">Chọn đáp án</span>
+                </div>
+                ${layout.options[index]?.text ? `<div style="font-size:.94rem;color:var(--ink);line-height:1.5;white-space:pre-line">${layout.options[index].text}</div>` : ""}
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;white-space:nowrap;padding-top:2px">
+                <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.86rem;color:#15803d;font-weight:700">
                   <input type="radio" name="tf_${qid}_${lbl}" value="T" onchange="window.peTF('${qid}')"
-                    ${saved.includes(lbl+"T")?"checked":""} style="accent-color:#16a34a;width:14px;height:14px"> Đ
+                    ${saved.includes(lbl+"T")?"checked":""} style="accent-color:#16a34a;width:16px;height:16px"> Đúng
                 </label>
-                <label style="display:inline-flex;align-items:center;gap:3px;cursor:pointer;font-size:.82rem;color:#b91c1c;font-weight:700">
+                <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.86rem;color:#b91c1c;font-weight:700">
                   <input type="radio" name="tf_${qid}_${lbl}" value="F" onchange="window.peTF('${qid}')"
-                    ${saved.includes(lbl+"F")?"checked":""} style="accent-color:#dc2626;width:14px;height:14px"> S
+                    ${saved.includes(lbl+"F")?"checked":""} style="accent-color:#dc2626;width:16px;height:16px"> Sai
                 </label>
               </div>
-            </div>`).join("");
+            </div>`).join("")}`;
         } else if (type === "short_answer") {
-          ansHtml = `<input type="text" placeholder="Nhập câu trả lời..."
+          ansHtml = `<div style="font-size:.74rem;font-weight:800;color:var(--ink-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Câu trả lời</div><input type="text" placeholder="Nhập câu trả lời..."
             value="${(_examAnswers[qid]||"").replace(/"/g,"&quot;")}"
             oninput="window._peAnswers('${qid}',this.value)"
             style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;
               font-family:var(--font-body);font-size:.9rem;box-sizing:border-box;outline:none"
             onfocus="this.style.borderColor='var(--navy)'" onblur="this.style.borderColor='var(--border)'">`;
         } else if (type === "essay") {
-          ansHtml = `<textarea placeholder="Viết câu trả lời của bạn..."
+          ansHtml = `<div style="font-size:.74rem;font-weight:800;color:var(--ink-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Câu trả lời</div><textarea placeholder="Viết câu trả lời của bạn..."
             oninput="window._peAnswers('${qid}',this.value)"
             style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;
               font-family:var(--font-body);font-size:.9rem;resize:vertical;min-height:120px;
@@ -841,81 +885,33 @@
           <span style="margin-left:auto;font-size:.75rem;color:var(--ink-mid)">${eq.points} điểm</span>`;
         card.appendChild(header);
 
-        /* â”€â”€ Essay: layout dá»c â€” cÃ¢u há»i trÃªn, textarea to bÃªn dÆ°á»›i â”€â”€ */
         const body = document.createElement("div");
+        body.style.cssText = "display:flex;flex-direction:column";
 
-        if (type === "essay") {
-          body.style.cssText = "display:flex;flex-direction:column;padding:14px 16px;gap:10px";
+        const questionPart = document.createElement("div");
+        questionPart.style.cssText = "padding:16px 18px;display:flex;flex-direction:column;gap:12px";
 
-          const qEl = document.createElement("div");
-          qEl.style.cssText = "font-size:1.24rem;line-height:1.95;color:var(--navy);white-space:pre-line";
-          qEl.textContent = q.question_text||"";
-          body.appendChild(qEl);
+        const qEl = document.createElement("div");
+        qEl.style.cssText = "font-size:1.18rem;line-height:1.9;color:var(--navy);white-space:pre-line";
+        qEl.textContent = (type === "multi_choice" || type === "true_false") ? layout.stem : (q.question_text||"");
+        questionPart.appendChild(qEl);
 
-          if (hasImg) {
-            const imgEl = document.createElement("img");
-            imgEl.src = q.question_img;
-            imgEl.style.cssText = "max-width:60%;max-height:220px;object-fit:contain;border-radius:6px";
-            body.appendChild(imgEl);
-          }
-
-          const answerPart = document.createElement("div");
-          answerPart.innerHTML = ansHtml;
-          body.appendChild(answerPart);
-
-        } else {
-          /* Body: layout 15 pháº§n NGANG â€” cÃ¢u há»i flex:13, Ä‘Ã¡p Ã¡n flex:2 */
-          body.style.cssText = "display:flex;flex-direction:row;min-height:100px";
-
-          /* â”€â”€ Pháº§n cÃ¢u há»i: flex:13 â”€â”€ */
-          const questionPart = document.createElement("div");
-          questionPart.style.cssText = "flex:13;padding:14px 16px;border-right:1px solid var(--border);display:flex;gap:12px;align-items:flex-start";
-
-          if (type === "true_false") {
-            const mainQ = (q.question_text||"").split("\n")[0];
-            const qEl = document.createElement("div");
-            qEl.style.cssText = "font-size:1.24rem;line-height:1.95;color:var(--navy);white-space:pre-line";
-            qEl.textContent = mainQ;
-            questionPart.appendChild(qEl);
-            if (hasImg) {
-              qEl.style.flex = "8";
-              const imgCol = document.createElement("div");
-              imgCol.style.cssText = "flex:5;display:flex;align-items:center;justify-content:center";
-              const imgEl = document.createElement("img");
-              imgEl.src = q.question_img;
-              imgEl.style.cssText = "max-width:100%;max-height:200px;object-fit:contain;border-radius:6px";
-              imgCol.appendChild(imgEl);
-              questionPart.appendChild(imgCol);
-            } else {
-              qEl.style.flex = "1";
-            }
-          } else if (hasImg) {
-            const textCol = document.createElement("div");
-            textCol.style.cssText = "flex:8;font-size:1.24rem;line-height:1.95;color:var(--navy);white-space:pre-line";
-            textCol.textContent = q.question_text||"";
-            const imgCol = document.createElement("div");
-            imgCol.style.cssText = "flex:5;display:flex;align-items:center;justify-content:center";
-            const imgEl = document.createElement("img");
-            imgEl.src = q.question_img;
-            imgEl.style.cssText = "max-width:100%;max-height:200px;object-fit:contain;border-radius:6px";
-            imgCol.appendChild(imgEl);
-            questionPart.appendChild(textCol);
-            questionPart.appendChild(imgCol);
-          } else {
-            const qEl = document.createElement("div");
-            qEl.style.cssText = "flex:1;font-size:1.24rem;line-height:1.95;color:var(--navy);white-space:pre-line";
-            qEl.textContent = q.question_text||"";
-            questionPart.appendChild(qEl);
-          }
-
-          /* â”€â”€ Pháº§n Ä‘Ã¡p Ã¡n: flex:2 â”€â”€ */
-          const answerPart = document.createElement("div");
-          answerPart.style.cssText = "flex:2;padding:10px 12px;background:var(--surface);min-width:0";
-          answerPart.innerHTML = ansHtml;
-
-          body.appendChild(questionPart);
-          body.appendChild(answerPart);
+        if (hasImg) {
+          const imgWrap = document.createElement("div");
+          imgWrap.style.cssText = "display:flex;justify-content:flex-start";
+          const imgEl = document.createElement("img");
+          imgEl.src = q.question_img;
+          imgEl.style.cssText = "max-width:min(100%,420px);max-height:240px;object-fit:contain;border-radius:8px";
+          imgWrap.appendChild(imgEl);
+          questionPart.appendChild(imgWrap);
         }
+
+        const answerPart = document.createElement("div");
+        answerPart.style.cssText = "padding:14px 18px;background:var(--surface);border-top:1px solid var(--border)";
+        answerPart.innerHTML = ansHtml;
+
+        body.appendChild(questionPart);
+        body.appendChild(answerPart);
 
         card.appendChild(body);
         _pendingCards.push(card);
@@ -1202,6 +1198,7 @@
         const q      = eq.question;
         const ans    = ansMap[q.id];
         const hasImg = !!q.question_img;
+        const layout = parseQuestionLayout(q.question_text, type, Math.max(2, parseInt(q.answer_count)||4));
 
         /* â”€â”€ Card â”€â”€ */
         const card = document.createElement("div");
@@ -1218,56 +1215,33 @@
           + '<span style="margin-left:auto;font-size:.75rem;color:var(--ink-mid)">' + eq.points + ' điểm</span>';
         card.appendChild(hdr);
 
-        /* Body: 15 pháº§n ngang â€” cÃ¢u há»i flex:13, Ä‘Ã¡p Ã¡n flex:2 */
         const body = document.createElement("div");
-        body.style.cssText = "display:flex;flex-direction:row;min-height:80px";
+        body.style.cssText = "display:flex;flex-direction:column";
 
-        /* â”€â”€ Pháº§n cÃ¢u há»i: flex:13 â”€â”€ */
         const qPart = document.createElement("div");
-        qPart.style.cssText = "flex:13;padding:14px 16px;border-right:1px solid var(--border);display:flex;gap:12px;align-items:flex-start";
+        qPart.style.cssText = "padding:16px 18px;display:flex;flex-direction:column;gap:12px";
 
         const buildQText = (text) => {
           const el = document.createElement("div");
-          el.style.cssText = "flex:1;font-size:.9rem;line-height:1.8;color:var(--navy);white-space:pre-line";
+          el.style.cssText = "flex:1;font-size:1rem;line-height:1.8;color:var(--navy);white-space:pre-line";
           el.textContent = text || "";
           return el;
         };
 
-        if (type === "true_false") {
-          /* Chá»‰ dÃ²ng Ä‘áº§u (khÃ´ng cÃ³ a,b,c,d) */
-          const mainQ = (q.question_text||"").split("\n")[0];
-          const qEl = buildQText(mainQ);
-          qPart.appendChild(qEl);
-          if (hasImg) {
-            qEl.style.flex = "8";
-            const imgCol = document.createElement("div");
-            imgCol.style.cssText = "flex:5;display:flex;align-items:center;justify-content:center";
-            const imgEl = document.createElement("img");
-            imgEl.src = q.question_img;
-            imgEl.style.cssText = "max-width:100%;max-height:200px;object-fit:contain;border-radius:6px";
-            imgCol.appendChild(imgEl);
-            qPart.appendChild(imgCol);
-          }
-        } else if (hasImg) {
-          /* text:8 áº£nh:5 */
-          const textCol = buildQText(q.question_text);
-          textCol.style.flex = "8";
+        qPart.appendChild(buildQText((type === "multi_choice" || type === "true_false") ? layout.stem : q.question_text));
+        if (hasImg) {
           const imgCol = document.createElement("div");
-          imgCol.style.cssText = "flex:5;display:flex;align-items:center;justify-content:center";
+          imgCol.style.cssText = "display:flex;align-items:center;justify-content:flex-start";
           const imgEl = document.createElement("img");
           imgEl.src = q.question_img;
-          imgEl.style.cssText = "max-width:100%;max-height:200px;object-fit:contain;border-radius:6px";
+          imgEl.style.cssText = "max-width:min(100%,420px);max-height:220px;object-fit:contain;border-radius:8px";
           imgCol.appendChild(imgEl);
-          qPart.appendChild(textCol);
           qPart.appendChild(imgCol);
-        } else {
-          qPart.appendChild(buildQText(q.question_text));
         }
         body.appendChild(qPart);
 
-        /* â”€â”€ Pháº§n Ä‘Ã¡p Ã¡n + káº¿t quáº£: flex:2 â”€â”€ */
         const aPart = document.createElement("div");
-        aPart.style.cssText = "flex:2;padding:10px 12px;background:var(--surface);min-width:0;display:flex;flex-direction:column;gap:6px;justify-content:center";
+        aPart.style.cssText = "padding:14px 18px;background:var(--surface);border-top:1px solid var(--border);min-width:0;display:flex;flex-direction:column;gap:8px;justify-content:center";
 
         const isEssay = type === "essay";
         if (!isEssay) {
