@@ -899,9 +899,9 @@
     const orderLabel = session.display_order || session.session_order || "—";
     return '<div style="background:var(--white);border:1px solid var(--border);border-radius:18px;padding:'+(isCompactMobile ? '16px' : '16px 18px')+'">'+
       '<div style="display:grid;grid-template-columns:'+(isCompactMobile ? '1fr' : '94px minmax(0,1fr) auto')+';gap:16px;align-items:'+(isCompactMobile ? 'stretch' : 'center')+'">'+
-        '<div style="width:'+(isCompactMobile ? '100%' : '94px')+';min-height:58px;border-radius:14px;background:linear-gradient(135deg,#0f3c73 0%,#1d6bd1 100%);color:#fff;display:flex;flex-direction:'+(isCompactMobile ? 'row' : 'column')+';align-items:center;justify-content:center;gap:'+(isCompactMobile ? '8px' : '0')+'">'+
-          '<div style="font-size:.8rem;font-weight:700">Buổi</div>'+
-          '<div style="font-size:1.25rem;font-weight:800;line-height:1.1">'+orderLabel+'</div>'+
+        '<div style="width:'+(isCompactMobile ? '100%' : '110px')+';min-height:58px;border-radius:16px;background:linear-gradient(135deg,#0f3c73 0%,#1d6bd1 100%);box-shadow:0 12px 28px rgba(15,60,115,.18);color:#fff;display:flex;flex-direction:'+(isCompactMobile ? 'row' : 'column')+';align-items:center;justify-content:center;gap:'+(isCompactMobile ? '10px' : '2px')+';padding:'+(isCompactMobile ? '12px 14px' : '10px 12px')+'">'+
+          '<div style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.78)">Buổi học</div>'+
+          '<div style="font-size:'+(isCompactMobile ? '1.18rem' : '1.4rem')+';font-weight:800;line-height:1.1">'+orderLabel+'</div>'+
         '</div>'+
         '<div style="min-width:0">'+
           '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">'+
