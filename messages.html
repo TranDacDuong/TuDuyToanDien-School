@@ -546,7 +546,7 @@ async function ensureConversation(friendId) {
     .maybeSingle();
 
   if (existing?.id) {
-    await ensureConversationMembership(existing.id, friendId);
+    await ensureConversationMembership(existing.id);
     return existing.id;
   }
 
@@ -566,7 +566,7 @@ async function ensureConversation(friendId) {
     throw error;
   }
 
-  await ensureConversationMembership(conversation.id, friendId);
+  await ensureConversationMembership(conversation.id);
 
   return conversation.id;
 }
@@ -590,7 +590,7 @@ function showConversationError(error) {
   wrap.innerHTML = `<div class="empty"><strong>Không mở được cuộc trò chuyện</strong>${esc(message || "Vui lòng thử lại sau.")}</div>`;
 }
 
-async function ensureConversationMembership(conversationId, friendId) {
+async function ensureConversationMembership(conversationId) {
   if (!conversationId) return;
 
   const selfMembership = await sb
@@ -602,19 +602,6 @@ async function ensureConversationMembership(conversationId, friendId) {
 
   if (selfMembership.error) {
     throw selfMembership.error;
-  }
-
-  if (!friendId) return;
-
-  const friendMembership = await sb
-    .from("conversation_members")
-    .upsert(
-      [{ conversation_id: conversationId, user_id: friendId }],
-      { onConflict: "conversation_id,user_id" }
-    );
-
-  if (friendMembership.error) {
-    console.warn("Khong them duoc thanh vien con lai vao cuoc tro chuyen:", friendMembership.error.message);
   }
 }
 
