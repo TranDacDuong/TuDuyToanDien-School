@@ -74,6 +74,40 @@ th {
 }
 td { padding: 11px 12px; border-bottom: 1px solid #eef3f8; vertical-align: middle; background: rgba(255,255,255,.9); }
 
+.pager {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(15,31,61,.08);
+  box-shadow: 0 12px 24px rgba(15,31,61,.05);
+}
+.pager-info {
+  font-size: .82rem;
+  color: var(--ink-light);
+  font-weight: 600;
+}
+.pager-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pager-controls button {
+  min-width: 42px;
+}
+.pager-status {
+  font-size: .82rem;
+  color: var(--navy);
+  font-weight: 700;
+  padding: 0 6px;
+}
+
 /* ── Clickable row ── */
 .q-row { cursor: pointer; transition: background .13s; }
 .q-row:hover { background: #f8fbff !important; }
@@ -305,6 +339,14 @@ button {
       <tr><td colspan="10" style="text-align:center;padding:32px;color:var(--ink-light)">⏳ Đang tải câu hỏi...</td></tr>
     </tbody>
   </table>
+  <div class="pager">
+    <div class="pager-info" id="questionPagerInfo">Đang tải danh sách câu hỏi...</div>
+    <div class="pager-controls">
+      <button type="button" class="btn btn-outline btn-sm" id="questionPrevPage">Trang trước</button>
+      <span class="pager-status" id="questionPagerStatus">Trang 1/1</span>
+      <button type="button" class="btn btn-outline btn-sm" id="questionNextPage">Trang sau</button>
+    </div>
+  </div>
 
   <div id="tab-ai" class="tab-content">
     <div class="ai-wrap" style="padding:20px 24px">

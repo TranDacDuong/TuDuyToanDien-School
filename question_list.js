@@ -2,6 +2,8 @@ let grades = []
 let questions = []
 let editingQuestionId = null
 let isAdmin = false
+let currentPage = 1
+const PAGE_SIZE = 25
 
 const formTitle = document.getElementById("formTitle")
 const saveBtn   = document.getElementById("saveBtn")
@@ -10,6 +12,10 @@ const typeText  = {
   true_false:    "Đúng/Sai",
   short_answer:  "Trả lời ngắn",
   essay:         "Tự luận"
+}
+
+function resetToFirstPage(){
+  currentPage = 1
 }
 
 /* ── Difficulty options ── */
@@ -30,6 +36,7 @@ async function loadGrades(){
 
 /* ── Khối → Môn ── */
 f_grade.onchange = async () => {
+  resetToFirstPage()
   f_subject.innerHTML = "<option value=''>Môn</option>"
   f_chapter.innerHTML = "<option value=''>Chương</option>"
   if(!f_grade.value){ render(); return }
@@ -40,15 +47,16 @@ f_grade.onchange = async () => {
 
 /* ── Môn → Chương ── */
 f_subject.onchange = async () => {
+  resetToFirstPage()
   f_chapter.innerHTML = "<option value=''>Chương</option>"
   if(!f_subject.value){ render(); return }
   const {data} = await sb.from("chapters").select("*").eq("subject_id", f_subject.value)
   ;(data||[]).forEach(c => f_chapter.innerHTML += `<option value="${c.id}">${c.name}</option>`)
   render()
 }
-f_chapter.onchange    = render
-f_type.onchange       = render
-f_difficulty.onchange = render
+f_chapter.onchange    = () => { resetToFirstPage(); render() }
+f_type.onchange       = () => { resetToFirstPage(); render() }
+f_difficulty.onchange = () => { resetToFirstPage(); render() }
 
 /* ── Load dropdown người tạo ── */
 async function loadCreatorFilter(){
@@ -57,7 +65,7 @@ async function loadCreatorFilter(){
   if(!sel) return
   sel.innerHTML = "<option value=''>Người tạo</option>"
   ;(data||[]).forEach(u => sel.innerHTML += `<option value="${u.id}">${u.full_name}</option>`)
-  sel.onchange = render
+  sel.onchange = () => { resetToFirstPage(); render() }
 }
 
 /* ══════════════════════════════
@@ -91,7 +99,13 @@ function render(){
   const creatorEl = document.getElementById("f_creator")
   if(creatorEl?.value) list = list.filter(q => q.created_by === creatorEl.value)
 
-  questionTable.innerHTML = list.map((q, i) => {
+  const totalItems = list.length
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE))
+  currentPage = Math.min(currentPage, totalPages)
+  const startIndex = (currentPage - 1) * PAGE_SIZE
+  const pageList = list.slice(startIndex, startIndex + PAGE_SIZE)
+
+  questionTable.innerHTML = pageList.length ? pageList.map((q, i) => {
     const faded  = q.hidden ? "faded" : ""
     const hidden = q.hidden ? `style="opacity:.45"` : ""
     const hiddenBadge = q.hidden
@@ -99,7 +113,7 @@ function render(){
       : ""
     return `
       <tr class="q-row" onclick="editQ('${q.id}')" title="Click để sửa câu hỏi" ${hidden}>
-        <td class="${faded}">${i+1}</td>
+        <td class="${faded}">${startIndex + i + 1}</td>
         <td class="questionCell ${faded}">
           <div class="questionText">${q.question_text || ""}${hiddenBadge}</div>
           ${q.question_img ? `<div class="questionImgBox"><img class="questionImg" src="${q.question_img}" onclick="event.stopPropagation();window.open('${q.question_img}')"></div>` : ""}
@@ -113,10 +127,28 @@ function render(){
         <td class="answerCell ${faded}">${q.answer || ""}</td>
         <td class="${faded}" style="font-size:.78rem;color:var(--ink-mid);white-space:nowrap">${q.creator?.full_name || ""}</td>
       </tr>`
-  }).join("")
+  }).join("") : `<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--ink-light)">Chưa có câu hỏi phù hợp với bộ lọc hiện tại.</td></tr>`
 
   /* Style con trỏ chuột cho row */
   document.querySelectorAll(".q-row").forEach(r => r.style.cursor = "pointer")
+  renderPagination(totalItems, totalPages, pageList.length, startIndex)
+}
+
+function renderPagination(totalItems, totalPages, visibleCount, startIndex){
+  const infoEl = document.getElementById("questionPagerInfo")
+  const statusEl = document.getElementById("questionPagerStatus")
+  const prevBtn = document.getElementById("questionPrevPage")
+  const nextBtn = document.getElementById("questionNextPage")
+  if(infoEl){
+    if(totalItems){
+      infoEl.textContent = `Hiển thị ${startIndex + 1}-${startIndex + visibleCount} trên tổng ${totalItems} câu hỏi`
+    }else{
+      infoEl.textContent = "Không có câu hỏi nào để hiển thị"
+    }
+  }
+  if(statusEl) statusEl.textContent = `Trang ${currentPage}/${totalPages}`
+  if(prevBtn) prevBtn.disabled = currentPage <= 1
+  if(nextBtn) nextBtn.disabled = currentPage >= totalPages
 }
 
 /* ══════════════════════════════
@@ -287,5 +319,28 @@ async function init(){
   await loadCreatorFilter()
   await loadQuestions()
 }
+
+document.getElementById("questionPrevPage")?.addEventListener("click", () => {
+  if(currentPage <= 1) return
+  currentPage -= 1
+  render()
+})
+
+document.getElementById("questionNextPage")?.addEventListener("click", () => {
+  const totalPages = Math.max(1, Math.ceil(questions.filter(q => {
+    if(!isAdmin && q.hidden) return false
+    if(f_grade.value && q.chapters?.subjects?.grades?.id != f_grade.value) return false
+    if(f_subject.value && q.chapters?.subjects?.id != f_subject.value) return false
+    if(f_chapter.value && q.chapter_id != f_chapter.value) return false
+    if(f_type.value && q.question_type !== f_type.value) return false
+    if(f_difficulty.value && q.difficulty != f_difficulty.value) return false
+    const creatorEl = document.getElementById("f_creator")
+    if(creatorEl?.value && q.created_by !== creatorEl.value) return false
+    return true
+  }).length / PAGE_SIZE))
+  if(currentPage >= totalPages) return
+  currentPage += 1
+  render()
+})
 
 init()
