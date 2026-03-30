@@ -795,6 +795,7 @@
     /* â”€â”€ Render cÃ¢u há»i â”€â”€ */
     let sectionsHtml = "";
     const _pendingCards = [];
+    const isCompactMobile = window.matchMedia("(max-width: 768px)").matches;
     globalNum = 0;
 
     SECTION_ORDER.forEach(type => {
@@ -819,37 +820,37 @@
           const saved = _examAnswers[qid] || "";
           ansHtml = `<div style="font-size:.74rem;font-weight:800;color:var(--ink-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Nội dung đáp án và chọn đáp án</div>${opts.map((opt, index) => `
             <label id="lbl_${qid}_${opt}"
-              style="display:flex;align-items:flex-start;gap:12px;padding:11px 12px;
+              style="display:flex;align-items:flex-start;gap:${isCompactMobile ? "10px" : "12px"};padding:${isCompactMobile ? "12px" : "11px 12px"};
                 border-radius:8px;border:1.5px solid ${saved.includes(opt)?"var(--navy)":"var(--border)"};
                 background:${saved.includes(opt)?"#eff6ff":"var(--white)"};
                 cursor:pointer;margin-bottom:6px;transition:.15s;user-select:none"
               onmouseover="this.style.borderColor='var(--navy)'"
               onmouseout="window.peRefreshMC('${qid}','${opt}')">
               <div style="flex:1;min-width:0">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:${layout.options[index]?.text ? "4px" : "0"}">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:${layout.options[index]?.text ? "4px" : "0"};flex-wrap:wrap">
                   <span style="font-weight:700;font-size:.92rem;color:var(--navy);width:22px;flex-shrink:0">${layout.options[index]?.key || opt}</span>
                   <span style="font-size:.72rem;font-weight:700;color:var(--ink-light);text-transform:uppercase;letter-spacing:.05em">Chọn đáp án</span>
                 </div>
-                ${layout.options[index]?.text ? `<div style="font-size:.94rem;line-height:1.55;color:var(--ink);white-space:pre-line;text-transform:none">${layout.options[index].text}</div>` : ""}
+                ${layout.options[index]?.text ? `<div style="font-size:${isCompactMobile ? "1rem" : ".94rem"};line-height:${isCompactMobile ? "1.65" : "1.55"};color:var(--ink);white-space:pre-line;text-transform:none">${layout.options[index].text}</div>` : ""}
               </div>
               <input type="checkbox" value="${opt}" id="cb_${qid}_${opt}" ${saved.includes(opt)?"checked":""}
                 onchange="window.peMC('${qid}')"
-                style="width:18px;height:18px;accent-color:var(--navy);flex-shrink:0;margin-top:2px">
+                style="width:${isCompactMobile ? "20px" : "18px"};height:${isCompactMobile ? "20px" : "18px"};accent-color:var(--navy);flex-shrink:0;margin-top:2px">
             </label>`).join("")}`;
         } else if (type === "true_false") {
           const lbls = []; for (let i=0;i<n;i++) lbls.push(String.fromCharCode(97+i));
           const saved = _examAnswers[qid] || "";
           ansHtml = `<div style="font-size:.74rem;font-weight:800;color:var(--ink-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Nội dung đáp án và chọn đáp án</div>${lbls.map((lbl, index) => `
-            <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 12px;
+            <div style="display:flex;align-items:flex-start;gap:${isCompactMobile ? "10px" : "12px"};padding:${isCompactMobile ? "12px" : "10px 12px"};
               background:var(--white);border-radius:6px;border:1px solid var(--border);margin-bottom:6px">
               <div style="flex:1;min-width:0">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:${layout.options[index]?.text ? "4px" : "0"}">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:${layout.options[index]?.text ? "4px" : "0"};flex-wrap:wrap">
                   <span style="font-weight:700;min-width:22px;color:var(--navy);flex-shrink:0;font-size:.9rem">${lbl})</span>
                   <span style="font-size:.72rem;font-weight:700;color:var(--ink-light);text-transform:uppercase;letter-spacing:.05em">Chọn đáp án</span>
                 </div>
-                ${layout.options[index]?.text ? `<div style="font-size:.94rem;color:var(--ink);line-height:1.5;white-space:pre-line;text-transform:none">${layout.options[index].text}</div>` : ""}
+                ${layout.options[index]?.text ? `<div style="font-size:${isCompactMobile ? "1rem" : ".94rem"};color:var(--ink);line-height:${isCompactMobile ? "1.65" : "1.5"};white-space:pre-line;text-transform:none">${layout.options[index].text}</div>` : ""}
               </div>
-              <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;white-space:nowrap;padding-top:2px">
+              <div style="display:flex;align-items:center;gap:${isCompactMobile ? "10px" : "12px"};flex-shrink:0;white-space:nowrap;padding-top:2px;flex-wrap:${isCompactMobile ? "wrap" : "nowrap"};justify-content:${isCompactMobile ? "flex-start" : "flex-end"}">
                 <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.86rem;color:#15803d;font-weight:700">
                   <input type="radio" name="tf_${qid}_${lbl}" value="T" onchange="window.peTF('${qid}')"
                     ${saved.includes(lbl+"T")?"checked":""} style="accent-color:#16a34a;width:16px;height:16px"> Đúng
@@ -899,17 +900,21 @@
         questionPart.style.cssText = "padding:16px 18px;display:flex;flex-direction:column;gap:12px";
 
         const qEl = document.createElement("div");
-        qEl.style.cssText = `font-size:1.18rem;line-height:1.9;color:var(--navy);white-space:pre-line;flex:${hasImg ? 2 : 1}`;
+        qEl.style.cssText = `font-size:${isCompactMobile ? "1.08rem" : "1.18rem"};line-height:${isCompactMobile ? "1.82" : "1.9"};color:var(--navy);white-space:pre-line;flex:${hasImg && !isCompactMobile ? 2 : 1}`;
         qEl.textContent = (type === "multi_choice" || type === "true_false") ? layout.stem : (q.question_text||"");
         if (hasImg) {
-          questionPart.style.flexDirection = "row";
+          questionPart.style.flexDirection = isCompactMobile ? "column" : "row";
           questionPart.style.alignItems = "flex-start";
           questionPart.style.gap = "16px";
            const imgWrap = document.createElement("div");
-          imgWrap.style.cssText = "flex:1;display:flex;justify-content:flex-end;align-items:flex-start";
+          imgWrap.style.cssText = isCompactMobile
+            ? "width:100%;display:flex;justify-content:center;align-items:flex-start"
+            : "flex:1;display:flex;justify-content:flex-end;align-items:flex-start";
           const imgEl = document.createElement("img");
           imgEl.src = q.question_img;
-          imgEl.style.cssText = "max-width:100%;max-height:240px;object-fit:contain;border-radius:8px";
+          imgEl.style.cssText = isCompactMobile
+            ? "width:100%;max-width:100%;max-height:320px;object-fit:contain;border-radius:10px"
+            : "max-width:100%;max-height:240px;object-fit:contain;border-radius:8px";
           questionPart.appendChild(qEl);
           imgWrap.appendChild(imgEl);
           questionPart.appendChild(imgWrap);
@@ -950,12 +955,12 @@
           border:none;padding:9px 20px;border-radius:8px;font-size:.95rem;font-weight:700;
           cursor:pointer;font-family:var(--font-body)">Nộp bài</button>
       </div>
-      <div style="flex:1;display:flex;overflow:hidden;min-height:0">
+      <div style="flex:1;display:flex;flex-direction:${isCompactMobile ? 'column' : 'row'};overflow:hidden;min-height:0">
         <!-- Nav: chá»‰ Ã´ trÃ²n sá»‘ -->
-        <div style="width:120px;flex-shrink:0;background:var(--white);border-right:1px solid var(--border);
-          overflow-y:auto;padding:10px 8px">
-          <div style="font-size:.82rem;font-weight:700;color:var(--ink-light);text-transform:uppercase;
-            letter-spacing:.05em;margin-bottom:8px">Danh sách câu</div>
+        <div id="peNavPanel" style="${isCompactMobile
+          ? 'display:none;background:var(--white);border-bottom:1px solid var(--border);padding:10px 12px;overflow-y:auto;max-height:42vh'
+          : 'width:120px;flex-shrink:0;background:var(--white);border-right:1px solid var(--border);overflow-y:auto;padding:10px 8px'}">
+          ${isCompactMobile ? '' : '<div style="font-size:.82rem;font-weight:700;color:var(--ink-light);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Danh sách câu</div>'}
           ${navHtml}
           <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
             <button onclick="submitPublicExam(false)"
@@ -964,8 +969,12 @@
               font-family:var(--font-body)">Nộp bài</button>
           </div>
         </div>
+        ${isCompactMobile ? `<div style="padding:10px 12px;background:var(--white);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <button onclick="peToggleNav()" style="background:#eff6ff;color:var(--navy);border:1px solid #bfdbfe;padding:9px 12px;border-radius:10px;font-size:.86rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">Danh sách câu</button>
+          <div style="font-size:.8rem;color:var(--ink-mid);line-height:1.5">Chạm để chuyển nhanh giữa các câu.</div>
+        </div>` : ''}
         <!-- Main content -->
-        <div style="flex:1;overflow-y:auto;padding:18px 20px;background:#f8fafc">${sectionsHtml}</div>
+        <div id="peMainArea" style="flex:1;overflow-y:auto;padding:${isCompactMobile ? '14px 12px 20px' : '18px 20px'};background:#f8fafc">${sectionsHtml}</div>
       </div>`;
 
     updateClock();
@@ -978,7 +987,7 @@
     });
 
     /* MathJax */
-    const mainArea = overlay.querySelector(`div[style*="overflow-y:auto;padding:18px"]`);
+    const mainArea = document.getElementById("peMainArea");
     if (mainArea && window.MathJax?.typesetPromise) {
       window.MathJax.typesetPromise([mainArea]).catch(()=>{});
     }
@@ -995,6 +1004,12 @@
     el.textContent = formatClock(_examSeconds);
     el.style.color = _examSeconds < 300 ? "#ef4444" : "var(--gold-light)";
   }
+
+  window.peToggleNav = function(){
+    const panel = document.getElementById("peNavPanel");
+    if (!panel) return;
+    panel.style.display = panel.style.display === "none" ? "block" : "none";
+  };
 
   window._peAnswers = function(qid, val) {
     _examAnswers[qid] = val;
@@ -1035,6 +1050,10 @@
   }
   window.peScrollToQ = function(qid) {
     document.getElementById("qcard_"+qid)?.scrollIntoView({behavior:"smooth",block:"start"});
+    const panel = document.getElementById("peNavPanel");
+    if (panel && window.matchMedia("(max-width: 768px)").matches) {
+      panel.style.display = "none";
+    }
   };
 
   async function saveProgress() {
@@ -1190,6 +1209,7 @@
 
     /* Build cards â€” giá»‘ng há»‡t layout lÃºc thi */
     let globalNum = 0;
+    const isCompactMobile = window.matchMedia("(max-width: 768px)").matches;
     const pendingCards = []; // Ä‘á»ƒ MathJax xá»­ lÃ½ sau
 
     SECTION_ORDER.forEach(type => {
@@ -1234,20 +1254,24 @@
 
         const buildQText = (text) => {
           const el = document.createElement("div");
-          el.style.cssText = "flex:1;font-size:1rem;line-height:1.8;color:var(--navy);white-space:pre-line";
+          el.style.cssText = "flex:1;font-size:" + (isCompactMobile ? "1.04rem" : "1rem") + ";line-height:" + (isCompactMobile ? "1.82" : "1.8") + ";color:var(--navy);white-space:pre-line";
           el.textContent = text || "";
           return el;
         };
 
         const qTextEl = buildQText((type === "multi_choice" || type === "true_false") ? layout.stem : q.question_text);
-        qTextEl.style.flex = hasImg ? "2" : "1";
+        qTextEl.style.flex = hasImg && !isCompactMobile ? "2" : "1";
         if (hasImg) {
           const imgCol = document.createElement("div");
-          imgCol.style.cssText = "flex:1;display:flex;align-items:flex-start;justify-content:flex-end";
+          imgCol.style.cssText = isCompactMobile
+            ? "width:100%;display:flex;align-items:flex-start;justify-content:center"
+            : "flex:1;display:flex;align-items:flex-start;justify-content:flex-end";
           const imgEl = document.createElement("img");
           imgEl.src = q.question_img;
-          imgEl.style.cssText = "max-width:100%;max-height:220px;object-fit:contain;border-radius:8px";
-          qPart.style.flexDirection = "row";
+          imgEl.style.cssText = isCompactMobile
+            ? "width:100%;max-width:100%;max-height:320px;object-fit:contain;border-radius:10px"
+            : "max-width:100%;max-height:220px;object-fit:contain;border-radius:8px";
+          qPart.style.flexDirection = isCompactMobile ? "column" : "row";
           qPart.style.alignItems = "flex-start";
           imgCol.appendChild(imgEl);
           qPart.appendChild(qTextEl);

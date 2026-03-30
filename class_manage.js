@@ -761,6 +761,7 @@
 
   function renderStudentPracticeBlock(examInfo, resultState){
     if(!examInfo) return "";
+    const isCompactMobile = window.matchMedia("(max-width: 768px)").matches;
     const access = getExamAccessMeta(examInfo.starts_at, examInfo.ends_at);
 
     if(examInfo.type === "pdf"){
@@ -791,14 +792,14 @@
         actionsHtml = '<button onclick="location.href=\'pdf_exam.html?exam='+encodeURIComponent(examInfo.id)+'&classId='+encodeURIComponent(_classId)+'\'" style="background:linear-gradient(135deg,var(--navy),var(--navy-mid));color:var(--gold-light);border:none;padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;white-space:nowrap;font-family:var(--font-body)">Làm bài</button>';
       }
 
-      return '<div style="margin-top:12px;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:#f8fbff">'+
-        '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'+
+      return '<div style="margin-top:12px;padding:'+(isCompactMobile ? '14px' : '12px 14px')+';border-radius:12px;border:1px solid var(--border);background:#f8fbff">'+
+        '<div style="display:flex;justify-content:space-between;align-items:'+(isCompactMobile ? 'stretch' : 'center')+';gap:12px;flex-wrap:wrap;flex-direction:'+(isCompactMobile ? 'column' : 'row')+'">'+
           '<div style="flex:1;min-width:0">'+
             '<div style="font-weight:700;color:var(--navy)">'+esc(examInfo.title)+'</div>'+
-            '<div style="font-size:.75rem;color:var(--ink-mid)">📄 PDF • ⏱ '+(examInfo.duration_minutes||0)+' phút • 🏆 '+(examInfo.total_points||0)+' điểm • '+access.scheduleLabel+'</div>'+
+            '<div style="font-size:'+(isCompactMobile ? '.82rem' : '.75rem')+';color:var(--ink-mid);line-height:1.6">📄 PDF • ⏱ '+(examInfo.duration_minutes||0)+' phút • 🏆 '+(examInfo.total_points||0)+' điểm • '+access.scheduleLabel+'</div>'+
             (access.note && access.canDo ? '<div style="font-size:.72rem;color:#16a34a;margin-top:2px">'+access.note+'</div>' : '')+
           '</div>'+
-          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+actionsHtml+'</div>'+
+          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:'+(isCompactMobile ? '100%' : 'auto')+';justify-content:'+(isCompactMobile ? 'flex-start' : 'flex-end')+'">'+actionsHtml+'</div>'+
         '</div>'+
       '</div>';
     }
@@ -830,30 +831,31 @@
       actionsHtml = '<button onclick="startExam(\''+examInfo.id+'\',\''+examInfo.title.replace(/'/g,"\\'")+'\','+(examInfo.duration_minutes||0)+','+(examInfo.total_points||0)+',\''+_classId+'\')" style="background:linear-gradient(135deg,var(--navy),var(--navy-mid));color:var(--gold-light);border:none;padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;white-space:nowrap;font-family:var(--font-body)">Làm bài</button>';
     }
 
-    return '<div style="margin-top:12px;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:#f8fbff">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'+
+    return '<div style="margin-top:12px;padding:'+(isCompactMobile ? '14px' : '12px 14px')+';border-radius:12px;border:1px solid var(--border);background:#f8fbff">'+
+      '<div style="display:flex;justify-content:space-between;align-items:'+(isCompactMobile ? 'stretch' : 'center')+';gap:12px;flex-wrap:wrap;flex-direction:'+(isCompactMobile ? 'column' : 'row')+'">'+
         '<div style="flex:1;min-width:0">'+
           '<div style="font-weight:700;color:var(--navy)">'+esc(examInfo.title)+'</div>'+
-          '<div style="font-size:.75rem;color:var(--ink-mid)">⏱ '+(examInfo.duration_minutes||0)+' phút • 🏆 '+(examInfo.total_points||0)+' điểm • '+access.scheduleLabel+'</div>'+
+          '<div style="font-size:'+(isCompactMobile ? '.82rem' : '.75rem')+';color:var(--ink-mid);line-height:1.6">⏱ '+(examInfo.duration_minutes||0)+' phút • 🏆 '+(examInfo.total_points||0)+' điểm • '+access.scheduleLabel+'</div>'+
           (access.note && access.canDo ? '<div style="font-size:.72rem;color:#16a34a;margin-top:2px">'+access.note+'</div>' : '')+
         '</div>'+
-        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+actionsHtml+'</div>'+
+        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:'+(isCompactMobile ? '100%' : 'auto')+';justify-content:'+(isCompactMobile ? 'flex-start' : 'flex-end')+'">'+actionsHtml+'</div>'+
       '</div>'+
     '</div>';
   }
 
   function renderAdminPracticeBlock(examInfo, submitState){
     if(!examInfo) return "";
+    const isCompactMobile = window.matchMedia("(max-width: 768px)").matches;
     const access = getExamAccessMeta(examInfo.starts_at, examInfo.ends_at);
     if(examInfo.type === "pdf"){
       const count = submitState.pdfSubmitCount[examInfo.id] || 0;
-      return '<div style="margin-top:12px;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:#f8fbff">'+
-        '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'+
+      return '<div style="margin-top:12px;padding:'+(isCompactMobile ? '14px' : '12px 14px')+';border-radius:12px;border:1px solid var(--border);background:#f8fbff">'+
+        '<div style="display:flex;justify-content:space-between;align-items:'+(isCompactMobile ? 'stretch' : 'center')+';gap:12px;flex-wrap:wrap;flex-direction:'+(isCompactMobile ? 'column' : 'row')+'">'+
           '<div style="flex:1;min-width:0">'+
             '<div style="font-weight:700;color:var(--navy)">'+esc(examInfo.title)+'</div>'+
-            '<div style="font-size:.75rem;color:var(--ink-mid)">📄 PDF • ⏱ '+(examInfo.duration_minutes||0)+' phút • 🏆 '+(examInfo.total_points||0)+' điểm • '+access.scheduleLabel+'</div>'+
+            '<div style="font-size:'+(isCompactMobile ? '.82rem' : '.75rem')+';color:var(--ink-mid);line-height:1.6">📄 PDF • ⏱ '+(examInfo.duration_minutes||0)+' phút • 🏆 '+(examInfo.total_points||0)+' điểm • '+access.scheduleLabel+'</div>'+
           '</div>'+
-          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:'+(isCompactMobile ? '100%' : 'auto')+';justify-content:'+(isCompactMobile ? 'flex-start' : 'flex-end')+'">'+
             '<span style="background:var(--navy);color:var(--gold-light);padding:3px 12px;border-radius:20px;font-size:.78rem;font-weight:700">'+count+' bài đã nộp</span>'+
             '<button onclick="location.href=\'pdf_exam.html?exam='+encodeURIComponent(examInfo.id)+'&classId='+encodeURIComponent(_classId)+'\'" class="btn btn-outline btn-sm">Mở đề PDF</button>'+
           '</div>'+
@@ -862,13 +864,13 @@
     }
 
     const count = submitState.submitCount[examInfo.id] || 0;
-    return '<div style="margin-top:12px;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:#f8fbff">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'+
+    return '<div style="margin-top:12px;padding:'+(isCompactMobile ? '14px' : '12px 14px')+';border-radius:12px;border:1px solid var(--border);background:#f8fbff">'+
+      '<div style="display:flex;justify-content:space-between;align-items:'+(isCompactMobile ? 'stretch' : 'center')+';gap:12px;flex-wrap:wrap;flex-direction:'+(isCompactMobile ? 'column' : 'row')+'">'+
         '<div onclick="cvOpenExamResult(\''+examInfo.id+'\',\''+examInfo.title.replace(/'/g,"\\'")+'\',\''+_classId+'\')" style="flex:1;min-width:0;cursor:pointer">'+
           '<div style="font-weight:700;color:var(--navy)">'+esc(examInfo.title)+'</div>'+
-          '<div style="font-size:.75rem;color:var(--ink-mid)">⏱ '+(examInfo.duration_minutes||0)+' phút • 🏆 '+(examInfo.total_points||0)+' điểm • '+access.scheduleLabel+'</div>'+
+          '<div style="font-size:'+(isCompactMobile ? '.82rem' : '.75rem')+';color:var(--ink-mid);line-height:1.6">⏱ '+(examInfo.duration_minutes||0)+' phút • 🏆 '+(examInfo.total_points||0)+' điểm • '+access.scheduleLabel+'</div>'+
         '</div>'+
-        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:'+(isCompactMobile ? '100%' : 'auto')+';justify-content:'+(isCompactMobile ? 'flex-start' : 'flex-end')+'">'+
           '<span style="background:var(--navy);color:var(--gold-light);padding:3px 12px;border-radius:20px;font-size:.78rem;font-weight:700">'+count+' bài đã nộp</span>'+
           '<button onclick="cvOpenExamResult(\''+examInfo.id+'\',\''+examInfo.title.replace(/'/g,"\\'")+'\',\''+_classId+'\')" class="btn btn-outline btn-sm">Xem kết quả</button>'+
         '</div>'+
@@ -877,6 +879,7 @@
   }
 
   function renderClassSessionCard(session, lesson, examInfo, role, examState){
+    const isCompactMobile = window.matchMedia("(max-width: 768px)").matches;
     const summary = lesson?.summary ? esc(lesson.summary) : "Chưa có mô tả cho buổi học này.";
     const mediaHtml =
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+
@@ -894,9 +897,9 @@
         '</div>'
       : "";
     const orderLabel = session.display_order || session.session_order || "—";
-    return '<div style="background:var(--white);border:1px solid var(--border);border-radius:18px;padding:16px 18px">'+
-      '<div style="display:grid;grid-template-columns:94px minmax(0,1fr) auto;gap:16px;align-items:center">'+
-        '<div style="width:94px;min-height:58px;border-radius:14px;background:linear-gradient(135deg,#0f3c73 0%,#1d6bd1 100%);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center">'+
+    return '<div style="background:var(--white);border:1px solid var(--border);border-radius:18px;padding:'+(isCompactMobile ? '16px' : '16px 18px')+'">'+
+      '<div style="display:grid;grid-template-columns:'+(isCompactMobile ? '1fr' : '94px minmax(0,1fr) auto')+';gap:16px;align-items:'+(isCompactMobile ? 'stretch' : 'center')+'">'+
+        '<div style="width:'+(isCompactMobile ? '100%' : '94px')+';min-height:58px;border-radius:14px;background:linear-gradient(135deg,#0f3c73 0%,#1d6bd1 100%);color:#fff;display:flex;flex-direction:'+(isCompactMobile ? 'row' : 'column')+';align-items:center;justify-content:center;gap:'+(isCompactMobile ? '8px' : '0')+'">'+
           '<div style="font-size:.8rem;font-weight:700">Buổi</div>'+
           '<div style="font-size:1.25rem;font-weight:800;line-height:1.1">'+orderLabel+'</div>'+
         '</div>'+
@@ -910,7 +913,7 @@
           mediaHtml+
           practiceHtml+
         '</div>'+
-        '<div style="display:flex;justify-content:flex-end">'+actionHtml+'</div>'+
+        '<div style="display:flex;justify-content:'+(isCompactMobile ? 'stretch' : 'flex-end')+';width:'+(isCompactMobile ? '100%' : 'auto')+'">'+actionHtml+'</div>'+
       '</div>'+
     '</div>';
   }
