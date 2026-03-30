@@ -340,11 +340,9 @@ function checkProfile(profile){
 
 function goToAccount(){
   document.getElementById("profileModal").style.display = "none";
-  document.querySelectorAll("#menu li").forEach(item => {
-    if(item.dataset.page?.includes("account")){
-      item.click();
-    }
-  });
+  document.querySelectorAll("#menu li").forEach(item => item.classList.remove("active"));
+  document.getElementById("contentFrame").src = "account.html";
+  closeSidebar();
 }
 
 async function loadFriendRequestBadge(userId){
