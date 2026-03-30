@@ -513,11 +513,16 @@ window.openConversation = async function(friendId, friendName, friendAvatar, fri
   document.getElementById("attachBtn").disabled = false;
   document.getElementById("clearImageBtn").disabled = false;
 
-  currentConversationId = await ensureConversation(friendId);
-  await markMessageNotificationsRead(friendId);
-  await loadMessages();
-  await loadFriends();
-  subscribeConversationMessages(currentConversationId);
+  try {
+    currentConversationId = await ensureConversation(friendId);
+    await markMessageNotificationsRead(friendId);
+    await loadMessages();
+    await loadFriends();
+    subscribeConversationMessages(currentConversationId);
+  } catch (error) {
+    currentConversationId = null;
+    showConversationError(error);
+  }
 };
 
 async function markMessageNotificationsRead(friendId) {
@@ -564,6 +569,19 @@ async function ensureConversation(friendId) {
   await ensureConversationMembership(conversation.id, friendId);
 
   return conversation.id;
+}
+
+function showConversationError(error) {
+  const wrap = document.getElementById("messageList");
+  const message = String(error?.message || "");
+
+  if (message.includes('row-level security policy for table "conversations"')) {
+    wrap.innerHTML = '<div class="empty"><strong>Chưa mở được cuộc trò chuyện</strong>Supabase đang chặn tạo cuộc trò chuyện mới vì thiếu policy của bảng conversations. Hãy cập nhật SQL phần chat rồi thử lại.</div>';
+    alert('Chat đang bị chặn bởi RLS của bảng "conversations". Mình sẽ cập nhật SQL để sửa dứt điểm.');
+    return;
+  }
+
+  wrap.innerHTML = `<div class="empty"><strong>Không mở được cuộc trò chuyện</strong>${esc(message || "Vui lòng thử lại sau.")}</div>`;
 }
 
 async function ensureConversationMembership(conversationId, friendId) {
