@@ -607,10 +607,11 @@ DROP POLICY IF EXISTS conversations_select_policy ON public.conversations;
 CREATE POLICY conversations_select_policy ON public.conversations
 FOR SELECT
 USING (
-  EXISTS (
-    SELECT 1 FROM public.conversation_members cm
-    WHERE cm.conversation_id = conversations.id
-      AND cm.user_id = auth.uid()
+  kind = 'direct'
+  AND direct_key IS NOT NULL
+  AND (
+    split_part(direct_key, '_', 1) = auth.uid()::text
+    OR split_part(direct_key, '_', 2) = auth.uid()::text
   )
 );
 
@@ -632,9 +633,15 @@ CREATE POLICY messages_select_policy ON public.messages
 FOR SELECT
 USING (
   EXISTS (
-    SELECT 1 FROM public.conversation_members cm
-    WHERE cm.conversation_id = messages.conversation_id
-      AND cm.user_id = auth.uid()
+    SELECT 1
+    FROM public.conversations c
+    WHERE c.id = messages.conversation_id
+      AND c.kind = 'direct'
+      AND c.direct_key IS NOT NULL
+      AND (
+        split_part(c.direct_key, '_', 1) = auth.uid()::text
+        OR split_part(c.direct_key, '_', 2) = auth.uid()::text
+      )
   )
 );
 
@@ -644,9 +651,15 @@ FOR INSERT
 WITH CHECK (
   auth.uid() = sender_id
   AND EXISTS (
-    SELECT 1 FROM public.conversation_members cm
-    WHERE cm.conversation_id = messages.conversation_id
-      AND cm.user_id = auth.uid()
+    SELECT 1
+    FROM public.conversations c
+    WHERE c.id = messages.conversation_id
+      AND c.kind = 'direct'
+      AND c.direct_key IS NOT NULL
+      AND (
+        split_part(c.direct_key, '_', 1) = auth.uid()::text
+        OR split_part(c.direct_key, '_', 2) = auth.uid()::text
+      )
   )
 );
 

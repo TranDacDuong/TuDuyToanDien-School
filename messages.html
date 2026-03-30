@@ -581,6 +581,12 @@ function showConversationError(error) {
     return;
   }
 
+  if (message.includes('infinite recursion detected in policy for relation "conversations"')) {
+    wrap.innerHTML = '<div class="empty"><strong>Chưa mở được cuộc trò chuyện</strong>Policy chat trên Supabase đang bị lặp vô hạn. Hãy cập nhật lại SQL phần conversations/messages rồi thử lại.</div>';
+    alert('Supabase đang lỗi policy chat kiểu vòng lặp vô hạn ở bảng "conversations". Cần chạy lại SQL chat mới.');
+    return;
+  }
+
   wrap.innerHTML = `<div class="empty"><strong>Không mở được cuộc trò chuyện</strong>${esc(message || "Vui lòng thử lại sau.")}</div>`;
 }
 
