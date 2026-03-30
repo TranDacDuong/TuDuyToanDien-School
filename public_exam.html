@@ -13,15 +13,21 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
 .page-hd {
   display: flex; align-items: center; justify-content: space-between;
   flex-wrap: wrap; gap: 12px; margin-bottom: 24px;
+  padding: 24px 26px;
+  border-radius: 24px;
+  background: radial-gradient(circle at top right, rgba(255,255,255,.2), transparent 30%), linear-gradient(135deg, rgba(15,31,61,.98) 0%, rgba(31,65,128,.95) 55%, rgba(200,150,42,.86) 100%);
+  border: 1px solid rgba(35,56,92,.08);
+  box-shadow: 0 18px 42px rgba(15,23,42,.08);
 }
 .page-hd h1 {
-  font-family: var(--font-display); font-size: 1.4rem; color: var(--navy);
-  margin: 0; display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-display); font-size: 1.9rem; color: #fff;
+  margin: 0;
 }
-.page-hd h1::before {
-  content: ''; width: 4px; height: 24px;
-  background: linear-gradient(180deg,var(--gold),var(--gold-light));
-  border-radius: 2px; display: inline-block;
+.page-hd .btn {
+  background: rgba(255,255,255,.14);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.2);
+  box-shadow: none;
 }
 
 /* Tabs */

@@ -18,19 +18,19 @@ body { font-family:var(--font-body); background:radial-gradient(circle at top le
 
 /* ── LIST PAGE ── */
 .page { padding:24px 24px 52px; max-width:1080px; margin:0 auto; }
-h1 { font-size:28px; margin-bottom:6px; font-family:var(--font-display); color:var(--navy); }
-.subtitle { color:var(--muted); font-size:13px; margin-bottom:20px; }
+h1 { font-size:32px; margin-bottom:8px; font-family:var(--font-display); color:#fff; }
+.subtitle { color:rgba(255,255,255,.84); font-size:13px; margin-bottom:0; line-height:1.7; }
 .page-head{
   margin-bottom:18px;
-  padding:20px 22px;
+  padding:24px 26px;
   border-radius:24px;
-  background:
-    radial-gradient(circle at top right, rgba(200,150,42,.12), transparent 28%),
-    linear-gradient(180deg, rgba(255,255,255,.94) 0%, rgba(248,251,255,.98) 100%);
-  border:1px solid rgba(15,31,61,.08);
-  box-shadow:0 16px 34px rgba(15,31,61,.08);
+  background: radial-gradient(circle at top right, rgba(255,255,255,.2), transparent 30%), linear-gradient(135deg, rgba(15,31,61,.98) 0%, rgba(31,65,128,.95) 55%, rgba(200,150,42,.86) 100%);
+  border:1px solid rgba(35,56,92,.08);
+  box-shadow:0 18px 42px rgba(15,23,42,.08);
 }
 .page-head .subtitle{margin-bottom:0;max-width:620px;line-height:1.7}
+.page > h1,
+.page > .subtitle { display: none; }
 .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:20px; padding:14px; border-radius:22px; background:rgba(255,255,255,.9); border:1px solid rgba(15,31,61,.08); box-shadow:0 14px 30px rgba(15,31,61,.06); }
 .mode-switch{display:flex;gap:8px;align-items:center;padding:4px;background:#eef3fb;border-radius:999px;border:1px solid rgba(15,31,61,.06)}
 .mode-switch button{padding:8px 15px;border:none;border-radius:999px;background:transparent;color:var(--accent);font-size:13px;font-weight:700;cursor:pointer}
@@ -229,6 +229,10 @@ h1 { font-size:28px; margin-bottom:6px; font-family:var(--font-display); color:v
 
 <!-- LIST PAGE -->
 <div class="page" id="listPage">
+  <div class="page-head">
+    <h1>Đề kiểm tra</h1>
+    <p class="subtitle">Tạo và quản lý đề kiểm tra từ ngân hàng câu hỏi với giao diện tập trung, rõ ràng và đồng bộ cùng các khu vực học tập khác.</p>
+  </div>
   <h1>📄 Đề kiểm tra</h1>
   <p class="subtitle">Tạo và quản lý đề kiểm tra từ ngân hàng câu hỏi</p>
   <div class="toolbar">

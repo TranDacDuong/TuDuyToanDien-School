@@ -14,21 +14,24 @@ body { margin: 0; background: radial-gradient(circle at top left, rgba(200,150,4
 .page-hd {
   display: flex; align-items: center; justify-content: space-between;
   flex-wrap: wrap; gap: 12px; margin-bottom: 20px;
-  padding: 18px 20px;
+  padding: 24px 26px;
   border-radius: 24px;
-  background: linear-gradient(145deg, rgba(255,255,255,.94) 0%, rgba(248,251,255,.98) 100%);
-  border: 1px solid rgba(15,31,61,.08);
-  box-shadow: 0 16px 34px rgba(15,31,61,.08);
+  background: radial-gradient(circle at top right, rgba(255,255,255,.2), transparent 30%), linear-gradient(135deg, rgba(15,31,61,.98) 0%, rgba(31,65,128,.95) 55%, rgba(200,150,42,.86) 100%);
+  border: 1px solid rgba(35,56,92,.08);
+  box-shadow: 0 18px 42px rgba(15,23,42,.08);
 }
 .page-hd h1 {
-  font-family: var(--font-display); font-size: 1.48rem; color: var(--navy);
-  margin: 0; display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-display); font-size: 1.9rem; color: #fff;
+  margin: 0 0 8px;
 }
-.page-hd h1::before {
-  content: ''; width: 6px; height: 28px;
-  background: linear-gradient(180deg,var(--gold),#1d6bd1);
-  border-radius: 999px; display: inline-block;
+.page-hd p {
+  margin: 0;
+  max-width: 760px;
+  color: rgba(255,255,255,.84);
+  line-height: 1.72;
+  font-size: .92rem;
 }
+#userInfo { color: rgba(255,255,255,.78) !important; }
 
 /* ── Filter bar ── */
 .filter-bar {
