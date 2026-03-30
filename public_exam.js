@@ -830,7 +830,7 @@
                   <span style="font-weight:700;font-size:.92rem;color:var(--navy);width:22px;flex-shrink:0">${layout.options[index]?.key || opt}</span>
                   <span style="font-size:.72rem;font-weight:700;color:var(--ink-light);text-transform:uppercase;letter-spacing:.05em">Chọn đáp án</span>
                 </div>
-                ${layout.options[index]?.text ? `<div style="font-size:.94rem;line-height:1.55;color:var(--ink);white-space:pre-line">${layout.options[index].text}</div>` : ""}
+                ${layout.options[index]?.text ? `<div style="font-size:.94rem;line-height:1.55;color:var(--ink);white-space:pre-line;text-transform:none">${layout.options[index].text}</div>` : ""}
               </div>
               <input type="checkbox" value="${opt}" id="cb_${qid}_${opt}" ${saved.includes(opt)?"checked":""}
                 onchange="window.peMC('${qid}')"
@@ -847,7 +847,7 @@
                   <span style="font-weight:700;min-width:22px;color:var(--navy);flex-shrink:0;font-size:.9rem">${lbl})</span>
                   <span style="font-size:.72rem;font-weight:700;color:var(--ink-light);text-transform:uppercase;letter-spacing:.05em">Chọn đáp án</span>
                 </div>
-                ${layout.options[index]?.text ? `<div style="font-size:.94rem;color:var(--ink);line-height:1.5;white-space:pre-line">${layout.options[index].text}</div>` : ""}
+                ${layout.options[index]?.text ? `<div style="font-size:.94rem;color:var(--ink);line-height:1.5;white-space:pre-line;text-transform:none">${layout.options[index].text}</div>` : ""}
               </div>
               <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;white-space:nowrap;padding-top:2px">
                 <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.86rem;color:#15803d;font-weight:700">
