@@ -495,7 +495,7 @@
 [
   {
     "question_type": "multi_choice | true_false | short_answer | essay",
-    "question_text": "Nội dung câu hỏi, KHÔNG có Câu 1, Câu 2. Với multi_choice: gộp câu hỏi + A,B,C,D vào đây mỗi phương án 1 dòng. Với true_false: chỉ ghi nội dung câu hỏi chính. Công thức dùng LaTeX: $x^2$",
+    "question_text": "Nội dung câu hỏi, KHÔNG có Câu 1, Câu 2. Với multi_choice: gộp câu hỏi + A,B,C,D vào đây mỗi phương án 1 dòng. Với true_false: chỉ ghi nội dung câu hỏi chính. Công thức dùng LaTeX: $x^2$. Phân số luôn dùng \\dfrac{}{} thay cho \\frac{}{}",
     "options": ["Ý a (chỉ dùng cho true_false)", "Ý b", "Ý c", "Ý d"],
     "difficulty": 5,
     "answer": "multi_choice: A/B/C/D. true_false: PHẢI điền đủ 4 cặp ví dụ aTbFcTdF (a đúng b sai c đúng d sai). short_answer: đáp án",
@@ -513,6 +513,7 @@ QUY TẮC QUAN TRỌNG:
 - difficulty: 1-3 dễ, 4-6 trung bình, 7-10 khó
 - has_figure = true chỉ khi có hình vẽ/biểu đồ/đồ thị thực sự
 - question_bbox: tọa độ pixel của toàn bộ câu hỏi trong ảnh
+- Mọi phân số trong LaTeX phải dùng \\dfrac{}{}, không dùng \\frac{}{}
 - Chỉ trả về JSON, không text thêm`;
   }
 
