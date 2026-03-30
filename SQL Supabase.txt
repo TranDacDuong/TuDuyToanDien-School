@@ -2034,14 +2034,14 @@ SET mode = CASE
   WHEN visibility = 'private' THEN 'friends'
   ELSE 'quick'
 END
-WHERE mode IS NULL OR mode NOT IN ('quick', 'friends', 'ranked', 'survival', 'speed');
+WHERE mode IS NULL OR mode NOT IN ('quick', 'friends', 'ranked', 'survival', 'speed', 'solo');
 
 ALTER TABLE public.game_rooms
   DROP CONSTRAINT IF EXISTS game_rooms_mode_check;
 
 ALTER TABLE public.game_rooms
   ADD CONSTRAINT game_rooms_mode_check
-  CHECK (mode IN ('quick', 'friends', 'ranked', 'survival', 'speed'));
+  CHECK (mode IN ('quick', 'friends', 'ranked', 'survival', 'speed', 'solo'));
 
 CREATE INDEX IF NOT EXISTS game_rooms_mode_idx
   ON public.game_rooms (mode, status, created_at DESC);
