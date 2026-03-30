@@ -470,12 +470,13 @@ tr:hover td { background: #f8fbff; }
     size: A4 portrait;
     margin: 10mm;
   }
-  body.printing-invoices > *:not(#printArea) { display: none !important; }
-  body.printing-invoices #printArea { display: block; }
+  body.printing-invoices .page > *:not(#printArea) { display: none !important; }
+  body.printing-invoices .page { max-width: none; margin: 0; padding: 0; background: #fff; box-shadow: none; }
+  body.printing-invoices #printArea { display: block !important; }
   .toolbar, .summary-row, .modal-overlay { display: none !important; }
   body { padding: 0; background: #fff; }
   .table-wrap { box-shadow: none; border-radius: 0; }
-  #printArea { display: block; }
+  #printArea { display: block !important; }
   .invoice-page {
     min-height: auto;
     padding: 14px 16px;
