@@ -14,7 +14,7 @@
     const options = [];
     const optionPattern = type === "true_false"
       ? /^([a-d])(?:[\)\.\:\-])\s+(.+)$/i
-      : /^([A-D])(?:[\)\.\:\-])\s+(.+)$/;
+      : /^([a-d])(?:[\)\.\:\-])\s+(.+)$/i;
 
     rawLines.forEach(line => {
       const match = line.match(optionPattern);
@@ -42,7 +42,7 @@
         ? String.fromCharCode(97 + i)
         : String.fromCharCode(65 + i);
       const found = options.find(option => option.key.toLowerCase() === key.toLowerCase());
-      normalizedOptions.push({ key, text: found?.text || "" });
+      normalizedOptions.push({ key: found?.key || key, text: found?.text || "" });
     }
 
     return {
@@ -827,7 +827,7 @@
               onmouseout="window.peRefreshMC('${qid}','${opt}')">
               <div style="flex:1;min-width:0">
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:${layout.options[index]?.text ? "4px" : "0"}">
-                  <span style="font-weight:700;font-size:.92rem;color:var(--navy);width:22px;flex-shrink:0">${opt}</span>
+                  <span style="font-weight:700;font-size:.92rem;color:var(--navy);width:22px;flex-shrink:0">${layout.options[index]?.key || opt}</span>
                   <span style="font-size:.72rem;font-weight:700;color:var(--ink-light);text-transform:uppercase;letter-spacing:.05em">Chọn đáp án</span>
                 </div>
                 ${layout.options[index]?.text ? `<div style="font-size:.94rem;line-height:1.55;color:var(--ink);white-space:pre-line">${layout.options[index].text}</div>` : ""}
