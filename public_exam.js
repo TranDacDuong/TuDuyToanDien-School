@@ -13,8 +13,8 @@
     const stemLines = [];
     const options = [];
     const optionPattern = type === "true_false"
-      ? /^([a-z])[\)\.\:\-]\s*(.*)$/i
-      : /^([A-Z])[\)\.\:\-]\s*(.*)$/;
+      ? /^([a-d])(?:[\)\.\:\-])\s+(.+)$/i
+      : /^([A-D])(?:[\)\.\:\-])\s+(.+)$/;
 
     rawLines.forEach(line => {
       const match = line.match(optionPattern);
@@ -27,6 +27,13 @@
         stemLines.push(line);
       }
     });
+
+    if (options.length < Math.min(2, Math.max(1, parseInt(answerCount, 10) || 0))) {
+      return {
+        stem: String(questionText || "").trim(),
+        options: [],
+      };
+    }
 
     const expectedCount = Math.max(1, parseInt(answerCount, 10) || 0);
     const normalizedOptions = [];
@@ -892,18 +899,22 @@
         questionPart.style.cssText = "padding:16px 18px;display:flex;flex-direction:column;gap:12px";
 
         const qEl = document.createElement("div");
-        qEl.style.cssText = "font-size:1.18rem;line-height:1.9;color:var(--navy);white-space:pre-line";
+        qEl.style.cssText = `font-size:1.18rem;line-height:1.9;color:var(--navy);white-space:pre-line;flex:${hasImg ? 2 : 1}`;
         qEl.textContent = (type === "multi_choice" || type === "true_false") ? layout.stem : (q.question_text||"");
-        questionPart.appendChild(qEl);
-
         if (hasImg) {
-          const imgWrap = document.createElement("div");
-          imgWrap.style.cssText = "display:flex;justify-content:flex-start";
+          questionPart.style.flexDirection = "row";
+          questionPart.style.alignItems = "flex-start";
+          questionPart.style.gap = "16px";
+           const imgWrap = document.createElement("div");
+          imgWrap.style.cssText = "flex:1;display:flex;justify-content:flex-end;align-items:flex-start";
           const imgEl = document.createElement("img");
           imgEl.src = q.question_img;
-          imgEl.style.cssText = "max-width:min(100%,420px);max-height:240px;object-fit:contain;border-radius:8px";
+          imgEl.style.cssText = "max-width:100%;max-height:240px;object-fit:contain;border-radius:8px";
+          questionPart.appendChild(qEl);
           imgWrap.appendChild(imgEl);
           questionPart.appendChild(imgWrap);
+        } else {
+          questionPart.appendChild(qEl);
         }
 
         const answerPart = document.createElement("div");
@@ -1228,15 +1239,21 @@
           return el;
         };
 
-        qPart.appendChild(buildQText((type === "multi_choice" || type === "true_false") ? layout.stem : q.question_text));
+        const qTextEl = buildQText((type === "multi_choice" || type === "true_false") ? layout.stem : q.question_text);
+        qTextEl.style.flex = hasImg ? "2" : "1";
         if (hasImg) {
           const imgCol = document.createElement("div");
-          imgCol.style.cssText = "display:flex;align-items:center;justify-content:flex-start";
+          imgCol.style.cssText = "flex:1;display:flex;align-items:flex-start;justify-content:flex-end";
           const imgEl = document.createElement("img");
           imgEl.src = q.question_img;
-          imgEl.style.cssText = "max-width:min(100%,420px);max-height:220px;object-fit:contain;border-radius:8px";
+          imgEl.style.cssText = "max-width:100%;max-height:220px;object-fit:contain;border-radius:8px";
+          qPart.style.flexDirection = "row";
+          qPart.style.alignItems = "flex-start";
           imgCol.appendChild(imgEl);
+          qPart.appendChild(qTextEl);
           qPart.appendChild(imgCol);
+        } else {
+          qPart.appendChild(qTextEl);
         }
         body.appendChild(qPart);
 
