@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tài liệu tham khảo</title>
+<link rel="stylesheet" href="theme.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font-body);background:radial-gradient(circle at top left, rgba(200,150,42,.1), transparent 20%),linear-gradient(180deg,#f4efe4 0%,#f8f5ef 24%,#f7faff 100%);color:var(--ink)}
+.page{max-width:1240px;margin:0 auto;padding:24px 24px 52px}
+.hero{margin-bottom:20px;padding:24px 26px;border-radius:24px;background:radial-gradient(circle at top right, rgba(255,255,255,.2), transparent 30%),linear-gradient(135deg, rgba(15,31,61,.98) 0%, rgba(31,65,128,.95) 55%, rgba(200,150,42,.86) 100%);border:1px solid rgba(35,56,92,.08);box-shadow:0 18px 42px rgba(15,23,42,.08);display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.hero h1{margin:0 0 8px;font-size:2rem;color:#fff;font-family:var(--font-display)}
+.hero p{margin:0;max-width:760px;color:rgba(255,255,255,.84);line-height:1.72}
+.toolbar{display:grid;grid-template-columns:repeat(3,minmax(180px,1fr)) auto;gap:14px;margin-bottom:20px;padding:14px;border-radius:24px;background:rgba(255,255,255,.9);border:1px solid rgba(15,31,61,.08);box-shadow:0 14px 30px rgba(15,31,61,.06)}
+.input,.select,textarea{width:100%;border:1px solid rgba(39,58,91,.14);border-radius:16px;padding:12px 14px;font:inherit;background:#fff}
+textarea{min-height:110px;resize:vertical}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px}
+.card{background:#fff;border:1px solid rgba(35,56,92,.08);border-radius:24px;box-shadow:0 18px 42px rgba(15,23,42,.08);padding:18px;display:grid;gap:14px}
+.chips,.actions{display:flex;gap:8px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;border-radius:999px;padding:6px 10px;font-size:.77rem;font-weight:700;background:#edf4ff;color:#35507c}
+.muted{color:#72829a;font-size:.88rem}
+.empty{background:#fff;border:1px solid rgba(35,56,92,.08);border-radius:24px;box-shadow:0 18px 42px rgba(15,23,42,.08);padding:36px 22px;text-align:center}
+.modal{position:fixed;inset:0;background:rgba(10,20,40,.45);display:none;align-items:center;justify-content:center;padding:24px;z-index:2000}.modal.show{display:flex}
+.modal-card{width:min(760px,100%);max-height:calc(100vh - 48px);overflow:auto;background:#fff;border:1px solid rgba(35,56,92,.08);border-radius:24px;box-shadow:0 18px 42px rgba(15,23,42,.08)}
+.mh{display:flex;justify-content:space-between;align-items:center;padding:20px 24px 14px;border-bottom:1px solid rgba(39,58,91,.08);background:linear-gradient(180deg,#fff 0%,#fbfcff 100%)}
+.mb{padding:18px 24px 24px}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.field{display:grid;gap:8px}
+.full{grid-column:1/-1}
+@media(max-width:900px){.toolbar,.form-grid{grid-template-columns:1fr}.page{padding:16px 12px 32px}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="hero">
+    <div>
+      <h1>Tài liệu tham khảo</h1>
+      <p>Tổng hợp tài liệu học tập dành cho học sinh bằng link Google Drive. Admin và giáo viên có thể cập nhật nhanh để học sinh truy cập theo khối và môn.</p>
+    </div>
+    <button id="openCreateBtn" class="btn btn-outline" type="button" style="display:none">Thêm tài liệu</button>
+  </div>
+
+  <div class="toolbar">
+    <input id="keyword" class="input" placeholder="Tìm theo tên tài liệu hoặc mô tả">
+    <select id="gradeFilter" class="select"><option value="">Tất cả khối</option></select>
+    <select id="subjectFilter" class="select"><option value="">Tất cả môn</option></select>
+    <button class="btn btn-primary" type="button" onclick="loadData()">Tải lại</button>
+  </div>
+
+  <div id="grid" class="grid"></div>
+  <div id="empty" class="empty" style="display:none"><strong>Chưa có tài liệu phù hợp</strong><div class="muted" style="margin-top:8px">Hãy đổi bộ lọc hoặc thêm tài liệu đầu tiên.</div></div>
+</div>
+
+<div id="materialModal" class="modal">
+  <div class="modal-card">
+    <div class="mh">
+      <h2 id="materialModalTitle" style="margin:0">Thêm tài liệu</h2>
+      <button class="btn btn-outline" type="button" onclick="closeMaterialModal()">Đóng</button>
+    </div>
+    <div class="mb">
+      <form id="materialForm">
+        <div class="form-grid">
+          <div class="field"><label>Tên tài liệu</label><input id="materialTitle" class="input" required></div>
+          <div class="field"><label>Link Drive</label><input id="materialDriveUrl" class="input" type="url" placeholder="https://drive.google.com/..." required></div>
+          <div class="field"><label>Khối</label><select id="materialGrade" class="select"></select></div>
+          <div class="field"><label>Môn</label><select id="materialSubject" class="select"></select></div>
+          <div class="field full"><label>Mô tả ngắn</label><textarea id="materialDescription" class="input"></textarea></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px">
+          <button class="btn btn-outline" type="button" onclick="closeMaterialModal()">Hủy</button>
+          <button class="btn btn-primary" type="submit">Lưu tài liệu</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+const S={user:null,role:'student',materials:[],grades:[],subjects:[],editingId:null};
+const E={keyword:document.getElementById('keyword'),gradeFilter:document.getElementById('gradeFilter'),subjectFilter:document.getElementById('subjectFilter'),grid:document.getElementById('grid'),empty:document.getElementById('empty'),openCreateBtn:document.getElementById('openCreateBtn'),materialModal:document.getElementById('materialModal'),materialModalTitle:document.getElementById('materialModalTitle'),materialForm:document.getElementById('materialForm'),materialTitle:document.getElementById('materialTitle'),materialDriveUrl:document.getElementById('materialDriveUrl'),materialGrade:document.getElementById('materialGrade'),materialSubject:document.getElementById('materialSubject'),materialDescription:document.getElementById('materialDescription')};
+E.openCreateBtn.addEventListener('click',openCreateMaterialModal);
+E.materialForm.addEventListener('submit',submitMaterialForm);
+[E.keyword,E.gradeFilter,E.subjectFilter].forEach(el=>el.addEventListener('input',renderMaterials));
+
+function esc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function normalize(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase().trim()}
+function fillSelect(el,items,ph){el.innerHTML=`<option value="">${ph}</option>`+items.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}
+function isDriveUrl(url){return /^https?:\/\/(drive|docs)\.google\.com\//i.test(String(url||'').trim())}
+
+async function init(){
+  const {data:{user}}=await sb.auth.getUser();
+  if(!user){location.href='index.html';return;}
+  S.user=user;
+  const {data:profile}=await sb.from('users').select('role').eq('id',user.id).single();
+  S.role=profile?.role||'student';
+  if(S.role==='admin'||S.role==='teacher') E.openCreateBtn.style.display='';
+  await Promise.all([loadBase(),loadData()]);
+}
+
+async function loadBase(){
+  const [{data:g},{data:su}]=await Promise.all([sb.from('grades').select('id,name').order('name'),sb.from('subjects').select('id,name,grade_id').order('name')]);
+  S.grades=g||[];S.subjects=su||[];
+  fillSelect(E.gradeFilter,S.grades,'Tất cả khối');
+  fillSelect(E.materialGrade,S.grades,'Chọn khối');
+  fillSubjects(E.subjectFilter,'','Tất cả môn');
+  fillSubjects(E.materialSubject,'','Chọn môn');
+  E.gradeFilter.addEventListener('change',()=>{fillSubjects(E.subjectFilter,E.gradeFilter.value,'Tất cả môn');renderMaterials()});
+  E.materialGrade.addEventListener('change',()=>fillSubjects(E.materialSubject,E.materialGrade.value,'Chọn môn'));
+}
+
+function fillSubjects(el,gradeId,ph){
+  const list=gradeId?S.subjects.filter(x=>x.grade_id===gradeId):S.subjects;
+  el.innerHTML=`<option value="">${ph}</option>`+list.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
+}
+
+async function loadData(){
+  let query=sb.from('reference_materials').select('*').order('created_at',{ascending:false});
+  if(S.role==='student') query=query.eq('visible',true);
+  const {data,error}=await query;
+  if(error){E.grid.innerHTML=`<div class="empty"><strong>Lỗi tải tài liệu</strong><div class="muted" style="margin-top:8px">${esc(error.message)}</div></div>`;E.empty.style.display='none';return;}
+  S.materials=data||[];
+  renderMaterials();
+}
+
+function renderMaterials(){
+  const k=normalize(E.keyword.value);
+  const g=E.gradeFilter.value;
+  const s=E.subjectFilter.value;
+  const list=S.materials.filter(item=>{
+    if(g&&item.grade_id!==g) return false;
+    if(s&&item.subject_id!==s) return false;
+    if(k&&!normalize(`${item.title||''} ${item.description||''}`).includes(k)) return false;
+    return true;
+  });
+  E.empty.style.display=list.length?'none':'block';
+  E.grid.innerHTML=list.map(renderCard).join('');
+}
+
+function renderCard(item){
+  const grade=S.grades.find(x=>x.id===item.grade_id)?.name||'Tất cả khối';
+  const subject=S.subjects.find(x=>x.id===item.subject_id)?.name||'Tất cả môn';
+  const canManage=S.role==='admin'||S.role==='teacher';
+  return `<article class="card"><div class="chips"><span class="pill">${esc(grade)}</span><span class="pill">${esc(subject)}</span>${item.visible===false?'<span class="pill">Đang ẩn</span>':''}</div><div><h3 style="margin:0 0 8px;color:var(--navy)">${esc(item.title||'Tài liệu')}</h3><p style="margin:0;color:#607089;line-height:1.65">${esc(item.description||'Tài liệu tham khảo dành cho học sinh.')}</p></div><div class="actions"><a class="btn btn-primary" href="${esc(item.drive_url)}" target="_blank" rel="noopener">Mở Drive</a>${canManage?`<button class="btn btn-outline" type="button" onclick="openEditMaterialModal('${item.id}')">Sửa</button><button class="btn btn-danger" type="button" onclick="deleteMaterial('${item.id}')">Xóa</button>`:''}</div></article>`;
+}
+
+function openCreateMaterialModal(){
+  S.editingId=null;
+  E.materialModalTitle.textContent='Thêm tài liệu';
+  E.materialForm.reset();
+  fillSubjects(E.materialSubject,'','Chọn môn');
+  E.materialModal.classList.add('show');
+}
+
+function openEditMaterialModal(id){
+  const item=S.materials.find(x=>x.id===id);if(!item)return;
+  S.editingId=id;
+  E.materialModalTitle.textContent='Sửa tài liệu';
+  E.materialTitle.value=item.title||'';
+  E.materialDriveUrl.value=item.drive_url||'';
+  E.materialDescription.value=item.description||'';
+  E.materialGrade.value=item.grade_id||'';
+  fillSubjects(E.materialSubject,item.grade_id||'','Chọn môn');
+  E.materialSubject.value=item.subject_id||'';
+  E.materialModal.classList.add('show');
+}
+
+function closeMaterialModal(){E.materialModal.classList.remove('show')}
+
+async function submitMaterialForm(ev){
+  ev.preventDefault();
+  if(!(S.role==='admin'||S.role==='teacher')) return;
+  const driveUrl=E.materialDriveUrl.value.trim();
+  if(!isDriveUrl(driveUrl)){alert('Chỉ nhận link Google Drive hoặc Google Docs.');return;}
+  const payload={title:E.materialTitle.value.trim(),description:E.materialDescription.value.trim()||null,grade_id:E.materialGrade.value||null,subject_id:E.materialSubject.value||null,drive_url:driveUrl,visible:true,created_by:S.user.id};
+  if(!payload.title){alert('Tên tài liệu không được để trống.');return;}
+  let error=null;
+  if(S.editingId){({error}=await sb.from('reference_materials').update({...payload,updated_at:new Date().toISOString()}).eq('id',S.editingId));}
+  else{({error}=await sb.from('reference_materials').insert(payload));}
+  if(error){alert('Không thể lưu tài liệu: '+error.message);return;}
+  closeMaterialModal();
+  await loadData();
+}
+
+async function deleteMaterial(id){
+  if(!(S.role==='admin'||S.role==='teacher')) return;
+  if(!confirm('Xóa tài liệu này?')) return;
+  const {error}=await sb.from('reference_materials').delete().eq('id',id);
+  if(error){alert('Không thể xóa tài liệu: '+error.message);return;}
+  await loadData();
+}
+
+window.openEditMaterialModal=openEditMaterialModal;
+window.deleteMaterial=deleteMaterial;
+window.closeMaterialModal=closeMaterialModal;
+window.loadData=loadData;
+init();
+</script>
+</body>
+</html>

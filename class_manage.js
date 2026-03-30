@@ -882,6 +882,7 @@
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+
         (lesson?.lecture_video_url ? '<a class="btn btn-outline btn-sm" href="'+esc(lesson.lecture_video_url)+'" target="_blank" rel="noopener">Video bài giảng</a>' : '')+
         (lesson?.solution_video_url ? '<a class="btn btn-outline btn-sm" href="'+esc(lesson.solution_video_url)+'" target="_blank" rel="noopener">Video chữa bài</a>' : '')+
+        (lesson?.document_link ? '<a class="btn btn-outline btn-sm" href="'+esc(lesson.document_link)+'" target="_blank" rel="noopener">Tài liệu</a>' : '')+
       '</div>';
     const practiceHtml = role === "student"
       ? renderStudentPracticeBlock(examInfo, examState)
@@ -955,12 +956,13 @@
       summary: "",
       lecture_video_url: null,
       solution_video_url: null,
+      document_link: null,
       created_by: window._currentUserId
     }));
     const { data: newLessons, error: lessonError } = await sb
       .from("lessons")
       .insert(lessonPayloads)
-      .select("id,name,summary,lecture_video_url,solution_video_url");
+      .select("id,name,summary,lecture_video_url,solution_video_url,document_link");
     if(lessonError){
       alert("Không thể tự tạo bài học theo lịch tháng này: " + lessonError.message);
       return { sessions, createdLessons: [] };
@@ -1060,7 +1062,7 @@
 
     const queryList = [
       lessonIds.length
-        ? sb.from("lessons").select("id,name,summary,lecture_video_url,solution_video_url").in("id", lessonIds)
+        ? sb.from("lessons").select("id,name,summary,lecture_video_url,solution_video_url,document_link").in("id", lessonIds)
         : Promise.resolve({data:[],error:null}),
       regularIds.length
         ? sb.from("exams").select("id,title,duration_minutes,total_points,exam_questions(question:question_bank(question_type))").in("id", regularIds)
@@ -1696,7 +1698,7 @@
     const currentSession = (sessions || []).find(item => item.id === sessionId) || null;
     let lesson = null;
     if(currentSession?.lesson_id){
-      const { data: lessonData, error: lessonError } = await sb.from("lessons").select("id,name,summary,lecture_video_url,solution_video_url").eq("id", currentSession.lesson_id).single();
+      const { data: lessonData, error: lessonError } = await sb.from("lessons").select("id,name,summary,lecture_video_url,solution_video_url,document_link").eq("id", currentSession.lesson_id).single();
       if(lessonError){
         alert("Không thể tải bài học của buổi này: " + lessonError.message);
         return;
@@ -1726,6 +1728,7 @@
           '<div><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Video bài giảng</label><input id="cvSessionLectureVideo" type="url" value="'+esc(lesson?.lecture_video_url || "")+'" placeholder="https://..." style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"></div>'+
           '<div><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Video chữa bài</label><input id="cvSessionSolutionVideo" type="url" value="'+esc(lesson?.solution_video_url || "")+'" placeholder="https://..." style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"></div>'+
         '</div>'+
+        '<div style="margin-top:14px"><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Link tài liệu tham khảo (Drive)</label><input id="cvSessionDocumentLink" type="url" value="'+esc(lesson?.document_link || "")+'" placeholder="https://drive.google.com/..." style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"></div>'+
         '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:14px">'+
           '<div><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Loại đề luyện tập</label><select id="cvSessionPracticeType" onchange="cvUpdateSessionPracticeOptions(this.value)" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"><option value="">Chưa gắn đề luyện tập</option><option value="exam" '+(practiceType==="exam"?"selected":"")+'>Đề kiểm tra</option><option value="pdf" '+(practiceType==="pdf"?"selected":"")+'>Đề PDF</option></select></div>'+
           '<div><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Chọn đề luyện tập</label><select id="cvSessionPracticeId" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"></select></div>'+
@@ -1783,8 +1786,13 @@
       summary: (document.getElementById("cvSessionSummary")?.value || "").trim(),
       lecture_video_url: (document.getElementById("cvSessionLectureVideo")?.value || "").trim() || null,
       solution_video_url: (document.getElementById("cvSessionSolutionVideo")?.value || "").trim() || null,
+      document_link: (document.getElementById("cvSessionDocumentLink")?.value || "").trim() || null,
       created_by: window._currentUserId
     };
+    if(lessonPayload.document_link && !/^https?:\/\/(drive|docs)\.google\.com\//i.test(lessonPayload.document_link)){
+      alert("Link tài liệu phải là link Google Drive hoặc Google Docs.");
+      return;
+    }
     const sessionPayload = {
       class_id: _classId,
       session_order: sessionOrder,
@@ -1824,10 +1832,12 @@
     if(window.NotificationHelper){
       const hasLecture = !!lessonPayload.lecture_video_url;
       const hasSolution = !!lessonPayload.solution_video_url;
+      const hasDocument = !!lessonPayload.document_link;
       const hasPractice = !!practiceId;
       const summaryBits = [
         hasLecture ? "video bài giảng" : "",
         hasSolution ? "video chữa bài" : "",
+        hasDocument ? "tài liệu tham khảo" : "",
         hasPractice ? "đề luyện tập" : ""
       ].filter(Boolean);
       const actionLabel = sessionId ? "cập nhật" : "thêm";

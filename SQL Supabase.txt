@@ -2024,3 +2024,90 @@ ALTER TABLE public.game_rooms
 
 CREATE INDEX IF NOT EXISTS game_rooms_mode_idx
   ON public.game_rooms (mode, status, created_at DESC);
+
+ALTER TABLE public.lessons
+  ADD COLUMN IF NOT EXISTS document_link text;
+
+CREATE TABLE IF NOT EXISTS public.reference_materials (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  description text,
+  grade_id uuid,
+  subject_id uuid,
+  drive_url text NOT NULL,
+  visible boolean NOT NULL DEFAULT true,
+  created_by uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT reference_materials_pkey PRIMARY KEY (id),
+  CONSTRAINT reference_materials_grade_id_fkey FOREIGN KEY (grade_id) REFERENCES public.grades(id) ON DELETE SET NULL,
+  CONSTRAINT reference_materials_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES public.subjects(id) ON DELETE SET NULL,
+  CONSTRAINT reference_materials_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS reference_materials_grade_subject_idx
+  ON public.reference_materials (grade_id, subject_id, created_at DESC);
+
+ALTER TABLE public.reference_materials ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS reference_materials_select_policy ON public.reference_materials;
+CREATE POLICY reference_materials_select_policy
+ON public.reference_materials
+FOR SELECT
+USING (
+  visible = true
+  OR EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS reference_materials_insert_policy ON public.reference_materials;
+CREATE POLICY reference_materials_insert_policy
+ON public.reference_materials
+FOR INSERT
+WITH CHECK (
+  auth.uid() = created_by
+  AND EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS reference_materials_update_policy ON public.reference_materials;
+CREATE POLICY reference_materials_update_policy
+ON public.reference_materials
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS reference_materials_delete_policy ON public.reference_materials;
+CREATE POLICY reference_materials_delete_policy
+ON public.reference_materials
+FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
