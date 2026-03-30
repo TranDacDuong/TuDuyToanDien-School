@@ -609,7 +609,7 @@
         if (type === "multi_choice") {
           const opts = []; for (let i=0;i<n;i++) opts.push(String.fromCharCode(65+i));
           const saved = _examAnswers[qid] || "";
-          ansHtml = `<div style="font-size:.74rem;font-weight:800;color:var(--ink-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Nội dung đáp án và chọn đáp án</div>${opts.map((opt, index) => `
+          ansHtml = `<div style="font-size:.74rem;font-weight:800;color:var(--ink-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">${isCompactMobile ? "Chọn đáp án" : "Nội dung đáp án và chọn đáp án"}</div>${opts.map((opt, index) => `
             <label id="lbl_${qid}_${opt}"
               style="display:flex;align-items:flex-start;gap:${isCompactMobile ? "10px" : "12px"};padding:${isCompactMobile ? "12px" : "11px 12px"};
                 border-radius:8px;border:1.5px solid ${saved.includes(opt)?"var(--navy)":"var(--border)"};
@@ -631,7 +631,7 @@
         } else if (type === "true_false") {
           const lbls = []; for (let i=0;i<n;i++) lbls.push(String.fromCharCode(97+i));
           const saved = _examAnswers[qid] || "";
-          ansHtml = `<div style="font-size:.74rem;font-weight:800;color:var(--ink-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Nội dung đáp án và chọn đáp án</div>${lbls.map((lbl, index) => `
+          ansHtml = `<div style="font-size:.74rem;font-weight:800;color:var(--ink-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">${isCompactMobile ? "Chọn đáp án" : "Nội dung đáp án và chọn đáp án"}</div>${lbls.map((lbl, index) => `
             <div style="display:flex;align-items:flex-start;gap:${isCompactMobile ? "10px" : "12px"};padding:${isCompactMobile ? "12px" : "10px 12px"};
               background:var(--white);border-radius:6px;border:1px solid var(--border);margin-bottom:6px">
               <div style="flex:1;min-width:0">
@@ -703,6 +703,8 @@
           imgEl.style.cssText = isCompactMobile
             ? "width:100%;max-width:100%;max-height:320px;object-fit:contain;border-radius:10px"
             : "max-width:100%;max-height:240px;object-fit:contain;border-radius:8px";
+          imgEl.onclick = () => window.open(q.question_img, "_blank", "noopener");
+          imgEl.style.cursor = "zoom-in";
           qPart.appendChild(qEl);
           imgCol.appendChild(imgEl);
           qPart.appendChild(imgCol);
@@ -726,20 +728,24 @@
     });
 
     overlay.innerHTML =
-      `<div style="height:64px;background:var(--navy);color:#fff;display:flex;align-items:center;
-        gap:14px;padding:0 20px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.2)">
-        <button id="examExitBtn" onclick="exitExam()" style="background:rgba(255,255,255,.12);
-          border:1px solid rgba(255,255,255,.25);color:#fff;padding:5px 12px;border-radius:7px;
-          font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-body)">← Thoát</button>
-        <span style="font-family:var(--font-display);font-size:1.2rem;flex:1">${examTitle}</span>
-        <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);padding:7px 16px;border-radius:8px">
-          <span style="font-size:.8rem;color:rgba(255,255,255,.7)">Thời gian</span>
-          <span id="examClock" style="font-size:1.22rem;font-weight:700;font-family:monospace;
-            color:var(--gold-light);min-width:72px;text-align:center">${formatClock(_examSeconds)}</span>
+      `<div style="background:var(--navy);color:#fff;display:flex;flex-direction:${isCompactMobile ? 'column' : 'row'};align-items:${isCompactMobile ? 'stretch' : 'center'};
+        gap:${isCompactMobile ? '10px' : '14px'};padding:${isCompactMobile ? '12px' : '0 20px'};min-height:64px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.2)">
+        <div style="display:flex;align-items:center;gap:12px;width:100%">
+          <button id="examExitBtn" onclick="exitExam()" style="background:rgba(255,255,255,.12);
+            border:1px solid rgba(255,255,255,.25);color:#fff;padding:5px 12px;border-radius:7px;
+            font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-body)">← Thoát</button>
+          <span style="font-family:var(--font-display);font-size:${isCompactMobile ? '1rem' : '1.2rem'};flex:1;min-width:0;white-space:${isCompactMobile ? 'nowrap' : 'normal'};overflow:hidden;text-overflow:ellipsis">${examTitle}</span>
         </div>
-        <button onclick="submitExam(false)" style="background:var(--gold);color:var(--navy);
-          border:none;padding:9px 20px;border-radius:8px;font-size:.95rem;font-weight:700;
-          cursor:pointer;font-family:var(--font-body)">Nộp bài</button>
+        <div style="display:flex;align-items:center;gap:10px;justify-content:${isCompactMobile ? 'space-between' : 'flex-end'};width:${isCompactMobile ? '100%' : 'auto'}">
+          <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);padding:7px 14px;border-radius:8px">
+            <span style="font-size:.8rem;color:rgba(255,255,255,.7)">${isCompactMobile ? 'Giờ' : 'Thời gian'}</span>
+            <span id="examClock" style="font-size:1.22rem;font-weight:700;font-family:monospace;
+              color:var(--gold-light);min-width:72px;text-align:center">${formatClock(_examSeconds)}</span>
+          </div>
+          <button onclick="submitExam(false)" style="background:var(--gold);color:var(--navy);
+            border:none;padding:${isCompactMobile ? '10px 16px' : '9px 20px'};border-radius:10px;font-size:.95rem;font-weight:700;
+            cursor:pointer;font-family:var(--font-body)">Nộp bài</button>
+        </div>
       </div>
       <div style="flex:1;display:flex;flex-direction:${isCompactMobile ? 'column' : 'row'};overflow:hidden;min-height:0">
         <div id="classExamNavPanel" style="${isCompactMobile

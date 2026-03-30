@@ -792,7 +792,8 @@
         actionsHtml = '<button onclick="location.href=\'pdf_exam.html?exam='+encodeURIComponent(examInfo.id)+'&classId='+encodeURIComponent(_classId)+'\'" style="background:linear-gradient(135deg,var(--navy),var(--navy-mid));color:var(--gold-light);border:none;padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;white-space:nowrap;font-family:var(--font-body)">Làm bài</button>';
       }
 
-      return '<div style="margin-top:12px;padding:'+(isCompactMobile ? '14px' : '12px 14px')+';border-radius:12px;border:1px solid var(--border);background:#f8fbff">'+
+      return '<div style="margin-top:12px;padding:'+(isCompactMobile ? '14px' : '12px 14px')+';border-radius:14px;border:1px solid #bfdbfe;background:linear-gradient(180deg,#f8fbff 0%,#eef6ff 100%);box-shadow:0 10px 24px rgba(29,107,209,.08)">'+
+        '<div style="font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#1d4ed8;margin-bottom:10px">Đề luyện tập</div>'+
         '<div style="display:flex;justify-content:space-between;align-items:'+(isCompactMobile ? 'stretch' : 'center')+';gap:12px;flex-wrap:wrap;flex-direction:'+(isCompactMobile ? 'column' : 'row')+'">'+
           '<div style="flex:1;min-width:0">'+
             '<div style="font-weight:700;color:var(--navy)">'+esc(examInfo.title)+'</div>'+
@@ -831,7 +832,8 @@
       actionsHtml = '<button onclick="startExam(\''+examInfo.id+'\',\''+examInfo.title.replace(/'/g,"\\'")+'\','+(examInfo.duration_minutes||0)+','+(examInfo.total_points||0)+',\''+_classId+'\')" style="background:linear-gradient(135deg,var(--navy),var(--navy-mid));color:var(--gold-light);border:none;padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;white-space:nowrap;font-family:var(--font-body)">Làm bài</button>';
     }
 
-    return '<div style="margin-top:12px;padding:'+(isCompactMobile ? '14px' : '12px 14px')+';border-radius:12px;border:1px solid var(--border);background:#f8fbff">'+
+    return '<div style="margin-top:12px;padding:'+(isCompactMobile ? '14px' : '12px 14px')+';border-radius:14px;border:1px solid #bfdbfe;background:linear-gradient(180deg,#f8fbff 0%,#eef6ff 100%);box-shadow:0 10px 24px rgba(29,107,209,.08)">'+
+      '<div style="font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#1d4ed8;margin-bottom:10px">Đề luyện tập</div>'+
       '<div style="display:flex;justify-content:space-between;align-items:'+(isCompactMobile ? 'stretch' : 'center')+';gap:12px;flex-wrap:wrap;flex-direction:'+(isCompactMobile ? 'column' : 'row')+'">'+
         '<div style="flex:1;min-width:0">'+
           '<div style="font-weight:700;color:var(--navy)">'+esc(examInfo.title)+'</div>'+
@@ -849,7 +851,8 @@
     const access = getExamAccessMeta(examInfo.starts_at, examInfo.ends_at);
     if(examInfo.type === "pdf"){
       const count = submitState.pdfSubmitCount[examInfo.id] || 0;
-      return '<div style="margin-top:12px;padding:'+(isCompactMobile ? '14px' : '12px 14px')+';border-radius:12px;border:1px solid var(--border);background:#f8fbff">'+
+      return '<div style="margin-top:12px;padding:'+(isCompactMobile ? '14px' : '12px 14px')+';border-radius:14px;border:1px solid #bfdbfe;background:linear-gradient(180deg,#f8fbff 0%,#eef6ff 100%);box-shadow:0 10px 24px rgba(29,107,209,.08)">'+
+        '<div style="font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#1d4ed8;margin-bottom:10px">Đề luyện tập</div>'+
         '<div style="display:flex;justify-content:space-between;align-items:'+(isCompactMobile ? 'stretch' : 'center')+';gap:12px;flex-wrap:wrap;flex-direction:'+(isCompactMobile ? 'column' : 'row')+'">'+
           '<div style="flex:1;min-width:0">'+
             '<div style="font-weight:700;color:var(--navy)">'+esc(examInfo.title)+'</div>'+
@@ -864,7 +867,8 @@
     }
 
     const count = submitState.submitCount[examInfo.id] || 0;
-    return '<div style="margin-top:12px;padding:'+(isCompactMobile ? '14px' : '12px 14px')+';border-radius:12px;border:1px solid var(--border);background:#f8fbff">'+
+    return '<div style="margin-top:12px;padding:'+(isCompactMobile ? '14px' : '12px 14px')+';border-radius:14px;border:1px solid #bfdbfe;background:linear-gradient(180deg,#f8fbff 0%,#eef6ff 100%);box-shadow:0 10px 24px rgba(29,107,209,.08)">'+
+      '<div style="font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#1d4ed8;margin-bottom:10px">Đề luyện tập</div>'+
       '<div style="display:flex;justify-content:space-between;align-items:'+(isCompactMobile ? 'stretch' : 'center')+';gap:12px;flex-wrap:wrap;flex-direction:'+(isCompactMobile ? 'column' : 'row')+'">'+
         '<div onclick="cvOpenExamResult(\''+examInfo.id+'\',\''+examInfo.title.replace(/'/g,"\\'")+'\',\''+_classId+'\')" style="flex:1;min-width:0;cursor:pointer">'+
           '<div style="font-weight:700;color:var(--navy)">'+esc(examInfo.title)+'</div>'+
