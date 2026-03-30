@@ -1788,11 +1788,7 @@
   }
 
   async function cleanupRoomIfFinished(roomId) {
-    if (!roomId) return;
-    const { data: room } = await sb.from("game_rooms").select("id,status").eq("id", roomId).maybeSingle();
-    if (!room || room.status === "finished") {
-      await cleanupRoomCompletely(roomId);
-    }
+    return;
   }
 
   async function removePlayerFromRoom(room, player) {
@@ -1877,6 +1873,11 @@
       return;
     }
     if (!confirm("Bạn muốn rời phòng này?")) return;
+    if (room.status === "finished") {
+      hideGameScreen();
+      await loadRooms();
+      return;
+    }
     GAME.leavingRoom = true;
     clearIntervals();
     try {
@@ -2234,7 +2235,7 @@
       });
       bank = merged;
     }
-    const usable = (bank || []).filter((item) => !item.hidden && ["multi_choice", "short_answer", "true_false"].includes(item.question_type) && item.answer);
+    const usable = (bank || []).filter((item) => !item.hidden && ["multi_choice", "short_answer"].includes(item.question_type) && item.answer);
     const picked = shuffle(usable).slice(0, 5);
     return picked.map((question, index) => ({
       room_id: room.id,
@@ -2293,6 +2294,7 @@
         GAME.liveRenderKey = renderKey;
         renderAnswerArea(question);
       }
+      maybeAdvanceQuestion(question, currentIndex, totalTimeValue(room, question));
       renderLeaderboard();
 
       clearInterval(GAME.questionTick);
@@ -2305,6 +2307,51 @@
           refreshActiveRoom(room.id, true);
         }
       }, 1000);
+  }
+
+  function totalTimeValue(room, question) {
+    return Math.max(10, getQuestionDuration(question, room));
+  }
+
+  function getQuestionAnsweredPlayerIds(questionId) {
+    return new Set((GAME.roomAnswers || []).filter((item) => item.game_question_id === questionId).map((item) => item.player_id));
+  }
+
+  function getRequiredAnswerPlayers(room) {
+    if (roomModeValue(room) === "survival") {
+      return getAlivePlayers(room, GAME.roomPlayers, GAME.roomAnswers || []);
+    }
+    return GAME.roomPlayers || [];
+  }
+
+  function maybeAdvanceQuestion(question, currentIndex, totalTime) {
+    const room = GAME.activeRoom;
+    if (!room || room.status !== "live" || !question) return;
+    if (getRoomCoordinatorUserId(room, GAME.roomPlayers) !== GAME.user.id) return;
+    const requiredPlayers = getRequiredAnswerPlayers(room);
+    if (!requiredPlayers.length) return;
+    const answeredPlayerIds = getQuestionAnsweredPlayerIds(question.id);
+    const everyoneAnswered = requiredPlayers.every((player) => answeredPlayerIds.has(player.id));
+    if (!everyoneAnswered) return;
+    if (currentIndex >= GAME.roomQuestions.length - 1) {
+      finishRoomIfNeeded();
+      return;
+    }
+    const advanceKey = `${room.id}:${question.id}:${requiredPlayers.length}`;
+    if (GAME.advanceLockKey === advanceKey) return;
+    GAME.advanceLockKey = advanceKey;
+    clearInterval(GAME.questionTick);
+    const nextStartedAt = new Date(Date.now() - ((currentIndex + 1) * totalTime * 1000)).toISOString();
+    sb.from("game_rooms")
+      .update({ started_at: nextStartedAt })
+      .eq("id", room.id)
+      .then(() => refreshActiveRoom(room.id, true))
+      .catch(() => {})
+      .finally(() => {
+        setTimeout(() => {
+          if (GAME.advanceLockKey === advanceKey) GAME.advanceLockKey = "";
+        }, 600);
+      });
   }
 
   function renderAnswerArea(question) {
