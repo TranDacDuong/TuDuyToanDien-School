@@ -249,6 +249,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 <script src="supabaseClient.js"></script>
 <script>
 let badgeChannels = [];
+const HIDDEN_NOTIFICATION_TYPES = ["friend_request", "friend_accept", "message_new"];
 /* ── Sidebar toggle ── */
 const sidebar  = document.getElementById("sidebar");
 const tab      = document.getElementById("sidebarTab");
@@ -370,11 +371,13 @@ async function loadNotificationBadge(userId){
   const badge = document.getElementById("notificationBadge");
   if(!badge) return;
 
-  const { count, error } = await sb
+  const { data, error } = await sb
     .from("notifications")
-    .select("*", { count: "exact", head: true })
+    .select("type")
     .eq("user_id", userId)
     .eq("is_read", false);
+
+  const count = (data || []).filter(item => !HIDDEN_NOTIFICATION_TYPES.includes(item.type)).length;
 
   if(error || !count){
     badge.classList.remove("show");

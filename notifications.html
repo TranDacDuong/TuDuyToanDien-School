@@ -44,6 +44,7 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
 <script>
 let currentUser = null;
 let notificationChannel = null;
+const HIDDEN_NOTIFICATION_TYPES = new Set(["friend_request", "friend_accept", "message_new"]);
 
 async function init() {
   const { data: { user } } = await sb.auth.getUser();
@@ -68,12 +69,14 @@ async function loadNotifications() {
     wrap.innerHTML = '<div class="empty">Không tải được thông báo.</div>';
     return;
   }
-  if (!data || !data.length) {
+  const visibleItems = (data || []).filter(item => !HIDDEN_NOTIFICATION_TYPES.has(item.type));
+
+  if (!visibleItems.length) {
     wrap.innerHTML = '<div class="empty">Bạn chưa có thông báo nào.</div>';
     return;
   }
 
-  wrap.innerHTML = data.map(item => `
+  wrap.innerHTML = visibleItems.map(item => `
     <div class="card ${item.is_read ? "" : "unread"}">
       <div class="row">
         <img class="avatar" src="${item.users?.avatar_url || "default-avatar.png"}" alt="Avatar" onerror="this.src='default-avatar.png'">
@@ -92,20 +95,20 @@ async function loadNotifications() {
 }
 
 function buildLink(item) {
-  if (item.target_url) {
-    return `<button class="btn btn-outline btn-sm" type="button" data-target="${escAttr(item.target_url)}" onclick="openNotificationTarget(null, '${item.id}', this.dataset.target)">Mở chi tiết</button>`;
+  const target = item.target_url || getNotificationFallbackTarget(item);
+  if (target) {
+    return `<button class="btn btn-outline btn-sm" type="button" data-target="${escAttr(target)}" onclick="openNotificationTarget(null, '${item.id}', this.dataset.target)">Mở chi tiết</button>`;
   }
-  if (item.type === "friend_request" || item.type === "friend_accept") {
-    return `<a class="btn btn-outline btn-sm" href="friend_requests.html">Mở lời mời</a>`;
-  }
-  if (item.type === "message_new") {
-    return `<a class="btn btn-outline btn-sm" href="messages.html?user=${item.actor_id}">Mở chat</a>`;
-  }
+  return "";
+}
+
+function getNotificationFallbackTarget(item) {
+  if (!item) return "";
   if (item.type === "post_like" || item.type === "post_comment" || item.type === "post_approved" || item.type === "post_rejected") {
-    return `<a class="btn btn-outline btn-sm" href="post.html?id=${item.ref_id}">Mở bài viết</a>`;
+    return item.ref_id ? `post.html?id=${encodeURIComponent(item.ref_id)}` : "";
   }
   if (item.actor_id) {
-    return `<a class="btn btn-outline btn-sm" href="profile.html?id=${item.actor_id}">Xem hồ sơ</a>`;
+    return `profile.html?id=${encodeURIComponent(item.actor_id)}`;
   }
   return "";
 }

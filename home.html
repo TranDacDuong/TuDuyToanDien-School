@@ -1891,6 +1891,7 @@ let activeSocialPanel = "";
 let currentFeedFilter = "all";
 let currentHomeTab = "overview";
 let cachedVisiblePosts = [];
+const HIDDEN_NOTIFICATION_TYPES = ["friend_request", "friend_accept", "message_new"];
 let examEvents = [];
 let contactInfo = "Trung tâm: liên hệ quản trị viên để được hỗ trợ nhanh.\nGiáo viên: theo dõi thông báo hoặc nhắn tin trực tiếp trong hệ thống.\nKhóa học: xem các cập nhật mới trong mục thông tin trung tâm.";
 let homeSettingsLoaded = false;
@@ -2427,12 +2428,13 @@ function setupHomeLinks() {
 
 async function loadHomeHubBadges() {
   const [notificationRes, friendRequestRes, messageRes] = await Promise.all([
-    sb.from("notifications").select("*", { count: "exact", head: true }).eq("user_id", currentUser.id).eq("is_read", false),
+    sb.from("notifications").select("type").eq("user_id", currentUser.id).eq("is_read", false),
     sb.from("friend_requests").select("*", { count: "exact", head: true }).eq("receiver_id", currentUser.id).eq("status", "pending"),
     sb.from("notifications").select("*", { count: "exact", head: true }).eq("user_id", currentUser.id).eq("type", "message_new").eq("is_read", false)
   ]);
 
-  updateHubBadge("homeNotificationBadge", notificationRes.count || 0);
+  const notificationCount = (notificationRes.data || []).filter(item => !HIDDEN_NOTIFICATION_TYPES.includes(item.type)).length;
+  updateHubBadge("homeNotificationBadge", notificationCount);
   updateHubBadge("homeFriendRequestBadge", friendRequestRes.count || 0);
   updateHubBadge("homeMessageBadge", messageRes.count || 0);
 }
