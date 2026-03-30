@@ -205,7 +205,7 @@ async function loadIncoming() {
         </div>
       </div>
       <div class="actions">
-        <a class="btn btn-outline btn-sm" href="profile.html?id=${item.sender_id}">Xem hồ sơ</a>
+        <button class="btn btn-outline btn-sm" type="button" onclick="openProfileTarget('profile.html?id=${item.sender_id}')">Xem hồ sơ</button>
         <button class="btn btn-gold btn-sm" onclick="acceptRequest('${item.id}','${item.sender_id}')">Chấp nhận</button>
         <button class="btn btn-outline btn-sm" onclick="rejectRequest('${item.id}')">Từ chối</button>
       </div>
@@ -241,7 +241,7 @@ async function loadOutgoing() {
         </div>
       </div>
       <div class="actions">
-        <a class="btn btn-outline btn-sm" href="profile.html?id=${item.receiver_id}">Xem hồ sơ</a>
+        <button class="btn btn-outline btn-sm" type="button" onclick="openProfileTarget('profile.html?id=${item.receiver_id}')">Xem hồ sơ</button>
         <button class="btn btn-outline btn-sm" onclick="cancelRequest('${item.id}')">Hủy lời mời</button>
       </div>
     </div>
@@ -299,6 +299,60 @@ window.cancelRequest = async function(requestId) {
   }
 
   await loadOutgoing();
+};
+
+window.openProfileTarget = function(targetUrl) {
+  const cleanUrl = String(targetUrl || "").trim();
+  if (!cleanUrl) return;
+
+  const pageName = cleanUrl.split("?")[0];
+  const ancestors = [];
+  let cursor = window;
+  while (cursor && !ancestors.includes(cursor)) {
+    ancestors.push(cursor);
+    if (cursor === cursor.parent) break;
+    cursor = cursor.parent;
+  }
+
+  for (const frameWindow of ancestors) {
+    try {
+      const frame = frameWindow.document.getElementById("contentFrame");
+      if (!frame) continue;
+      frame.src = cleanUrl;
+
+      const menuItems = frameWindow.document.querySelectorAll("#menu li");
+      menuItems.forEach(item => {
+        item.classList.toggle("active", item.dataset.page === pageName);
+      });
+
+      if (typeof frameWindow.closeSidebar === "function") {
+        frameWindow.closeSidebar();
+      }
+      if (typeof frameWindow.closeSocialPanel === "function") {
+        frameWindow.closeSocialPanel();
+      }
+      return;
+    } catch (error) {}
+  }
+
+  for (const frameWindow of ancestors) {
+    try {
+      if (typeof frameWindow.closeSocialPanel === "function") {
+        frameWindow.closeSocialPanel();
+      }
+      const socialFrame = frameWindow.document.getElementById("socialPanelFrame");
+      if (socialFrame) {
+        socialFrame.src = "about:blank";
+        delete socialFrame.dataset.loaded;
+      }
+    } catch (error) {}
+  }
+
+  try {
+    window.top.location.href = cleanUrl;
+  } catch (error) {
+    window.location.href = cleanUrl;
+  }
 };
 
 function formatTime(value) {
