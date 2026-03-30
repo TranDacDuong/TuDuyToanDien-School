@@ -12,6 +12,9 @@
   const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
   const ANON_KEY     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxneWRqYWFxZnhxemdiZHBxdmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxODY2NDQsImV4cCI6MjA4Nzc2MjY0NH0.l6ojk0fH5wYMK4H_RIGTepatUd1Uy2KHOTiRfAS1JD4";
   const EDGE_URL     = `${SUPABASE_URL}/functions/v1/ai-solution`;
+  const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+  const MAX_PDF_BYTES   = 12 * 1024 * 1024;
+  const ALLOWED_TYPES   = new Set(["multi_choice", "true_false", "short_answer", "essay"]);
 
   const TYPE_LABEL = {
     multi_choice: "Trắc nghiệm",
@@ -25,6 +28,271 @@
     short_answer: "badge-sa",
     essay:        "badge-essay",
   };
+
+  function formatBytes(bytes) {
+    const size = Number(bytes) || 0;
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function getMaxBytes(kind) {
+    return kind === "pdf" ? MAX_PDF_BYTES : MAX_IMAGE_BYTES;
+  }
+
+  function getLimitMessage(kind, size) {
+    const label = kind === "pdf" ? "PDF" : "ảnh";
+    return `File ${label} quá nặng (${formatBytes(size)}). Giới hạn hiện tại là ${formatBytes(getMaxBytes(kind))}.`;
+  }
+
+  function validateFileSize(file, kind) {
+    if (!file?.size) return { ok: true };
+    if (file.size > getMaxBytes(kind)) {
+      return { ok: false, message: getLimitMessage(kind, file.size) };
+    }
+    return { ok: true };
+  }
+
+  function estimateBase64Bytes(base64) {
+    const clean = String(base64 || "").replace(/\s/g, "");
+    if (!clean) return 0;
+    const padding = clean.endsWith("==") ? 2 : clean.endsWith("=") ? 1 : 0;
+    return Math.max(0, Math.floor((clean.length * 3) / 4) - padding);
+  }
+
+  function getDataUrlBytes(dataUrl) {
+    return estimateBase64Bytes(String(dataUrl || "").split(",")[1] || "");
+  }
+
+  function detectDataKind(dataUrl) {
+    return String(dataUrl || "").startsWith("data:application/pdf") ? "pdf" : "image";
+  }
+
+  function validateDataUrlSize(dataUrl, kind) {
+    const actualKind = kind || detectDataKind(dataUrl);
+    const size = getDataUrlBytes(dataUrl);
+    if (size > getMaxBytes(actualKind)) {
+      return { ok: false, message: getLimitMessage(actualKind, size) };
+    }
+    return { ok: true };
+  }
+
+  async function readFileAsDataUrl(file) {
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = ev => resolve(ev.target.result);
+      reader.onerror = () => reject(new Error("Không đọc được file."));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function getMediaTypeFromDataUrl(dataUrl) {
+    const match = String(dataUrl || "").match(/^data:([^;]+);base64,/i);
+    return match?.[1] || "image/jpeg";
+  }
+
+  function getBase64FromDataUrl(dataUrl) {
+    return String(dataUrl || "").split(",")[1] || "";
+  }
+
+  function normalizeQuestionText(text) {
+    return String(text || "")
+      .replace(/^\s*Câu\s*\d+\s*[:.)-]?\s*/i, "")
+      .replace(/^\s*\d+\s*[:.)-]\s*/, "")
+      .trim();
+  }
+
+  function clampDifficulty(value) {
+    const num = parseInt(value, 10);
+    if (!Number.isFinite(num)) return 5;
+    return Math.max(1, Math.min(10, num));
+  }
+
+  function normalizeAnswerCount(value, fallback) {
+    const num = parseInt(value, 10);
+    if (!Number.isFinite(num) || num <= 0) return fallback;
+    return num;
+  }
+
+  function normalizeMultiChoiceAnswer(answer, count) {
+    const letters = [...new Set((String(answer || "").toUpperCase().match(/[A-Z]/g) || []))];
+    const maxIndex = letters.length
+      ? Math.max(...letters.map(letter => letter.charCodeAt(0) - 64))
+      : 4;
+    const answerCount = Math.max(count || 4, maxIndex, 4);
+    const normalizedAnswer = letters
+      .map(letter => ({ letter, idx: letter.charCodeAt(0) - 64 }))
+      .filter(item => item.idx >= 1 && item.idx <= answerCount)
+      .sort((a, b) => a.idx - b.idx)
+      .map(item => item.letter)
+      .join("");
+    return { answer: normalizedAnswer, answerCount };
+  }
+
+  function normalizeTrueFalseAnswer(answer, count) {
+    const pairMap = new Map();
+    [...String(answer || "").matchAll(/([a-z])\s*([TF])/gi)]
+      .forEach(([, label, value]) => pairMap.set(label.toLowerCase(), value.toUpperCase()));
+    const answerCount = Math.max(count || 4, 1);
+    let normalizedAnswer = "";
+    let missing = 0;
+    for (let i = 0; i < answerCount; i++) {
+      const label = String.fromCharCode(97 + i);
+      const value = pairMap.get(label);
+      if (!value) {
+        missing++;
+        normalizedAnswer += `${label}F`;
+      } else {
+        normalizedAnswer += `${label}${value}`;
+      }
+    }
+    return { answer: normalizedAnswer, answerCount, missing };
+  }
+
+  function normalizeAiQuestion(rawQuestion, index) {
+    if (!rawQuestion || typeof rawQuestion !== "object") {
+      return { question: null, warnings: [`Câu ${index + 1} không đúng định dạng object.`] };
+    }
+
+    const warnings = [];
+    const requestedType = String(rawQuestion.question_type || "").trim();
+    const questionType = ALLOWED_TYPES.has(requestedType) ? requestedType : "multi_choice";
+    if (requestedType && !ALLOWED_TYPES.has(requestedType)) {
+      warnings.push(`Câu ${index + 1}: loại "${requestedType}" không hợp lệ, đã đổi sang trắc nghiệm.`);
+    }
+
+    const questionText = normalizeQuestionText(rawQuestion.question_text || rawQuestion.content || rawQuestion.text);
+    if (!questionText) {
+      return { question: null, warnings: [`Câu ${index + 1} bị bỏ qua vì thiếu nội dung.`] };
+    }
+
+    let options = Array.isArray(rawQuestion.options)
+      ? rawQuestion.options.map(item => String(item || "").trim()).filter(Boolean)
+      : [];
+    let answer = String(rawQuestion.answer || "").trim();
+    let answerCount = normalizeAnswerCount(
+      rawQuestion.answer_count,
+      questionType === "essay" ? 0 : questionType === "short_answer" ? 1 : options.length || 4
+    );
+
+    if (questionType === "multi_choice") {
+      const normalized = normalizeMultiChoiceAnswer(answer, answerCount);
+      answer = normalized.answer;
+      answerCount = normalized.answerCount;
+      options = [];
+      if (!answer) {
+        warnings.push(`Câu ${index + 1}: chưa xác định được đáp án A/B/C/D, vui lòng kiểm tra lại.`);
+      }
+    } else if (questionType === "true_false") {
+      if (!options.length) {
+        options = Array.from({ length: answerCount }, (_, optIndex) => `Ý ${String.fromCharCode(97 + optIndex)}`);
+        warnings.push(`Câu ${index + 1}: AI chưa tạo đủ các ý a,b,c,d, mình đã tạo chỗ trống để bạn rà soát.`);
+      }
+      answerCount = Math.max(answerCount, options.length || 4);
+      const normalized = normalizeTrueFalseAnswer(answer, answerCount);
+      answer = normalized.answer;
+      answerCount = normalized.answerCount;
+      if (normalized.missing) {
+        warnings.push(`Câu ${index + 1}: thiếu ${normalized.missing} giá trị đúng/sai, mình tạm điền "Sai" để bạn kiểm tra.`);
+      }
+    } else if (questionType === "short_answer") {
+      answerCount = 1;
+      options = [];
+      if (!answer) {
+        warnings.push(`Câu ${index + 1}: câu trả lời ngắn chưa có đáp án, vui lòng bổ sung trước khi lưu.`);
+      }
+    } else {
+      answer = "";
+      answerCount = 0;
+      options = [];
+    }
+
+    return {
+      question: {
+        question_type: questionType,
+        question_text: questionText,
+        options,
+        difficulty: clampDifficulty(rawQuestion.difficulty),
+        answer,
+        answer_count: answerCount,
+        has_figure: rawQuestion.has_figure === true || String(rawQuestion.has_figure).toLowerCase() === "true",
+        question_bbox: rawQuestion.question_bbox || null,
+      },
+      warnings,
+    };
+  }
+
+  function parseRawAiQuestions(raw) {
+    console.log("[AI raw response]:", String(raw || "").slice(0, 300));
+    let parsed = [];
+    try {
+      const clean = String(raw || "").replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+      parsed = JSON.parse(clean);
+    } catch {
+      const match = String(raw || "").match(/\[[\s\S]*\]/);
+      if (match) {
+        try {
+          parsed = JSON.parse(match[0]);
+        } catch {
+          const objs = [];
+          const objMatches = String(raw || "").matchAll(/\{[\s\S]*?\}(?=\s*[,\]]|\s*$)/g);
+          for (const item of objMatches) {
+            try { objs.push(JSON.parse(item[0])); } catch {}
+          }
+          if (objs.length) parsed = objs;
+        }
+      } else {
+        const single = String(raw || "").match(/\{[\s\S]*\}/);
+        if (single) {
+          try { parsed = [JSON.parse(single[0])]; } catch {}
+        }
+      }
+    }
+
+    if (!Array.isArray(parsed) || !parsed.length) {
+      throw new Error("AI trả về định dạng không đúng, thử lại.");
+    }
+
+    const questions = [];
+    const warnings = [];
+    parsed.forEach((item, index) => {
+      const normalized = normalizeAiQuestion(item, index);
+      if (normalized.question) questions.push(normalized.question);
+      if (normalized.warnings.length) warnings.push(...normalized.warnings);
+    });
+
+    if (!questions.length) {
+      throw new Error("Không tìm thấy câu hỏi hợp lệ. Thử lại với nội dung rõ ràng hơn.");
+    }
+
+    return { questions, warnings };
+  }
+
+  function buildAiMessages(text, dataUrl) {
+    const parts = [];
+    if (dataUrl) {
+      const validation = validateDataUrlSize(dataUrl);
+      if (!validation.ok) throw new Error(validation.message);
+      parts.push({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: getMediaTypeFromDataUrl(dataUrl),
+          data: getBase64FromDataUrl(dataUrl),
+        },
+      });
+    }
+    parts.push({ type: "text", text: `${text || ""}\n\n${buildExtractionPrompt()}` });
+    return [{ role: "user", content: parts }];
+  }
+
+  async function convertAiSourceToQuestions({ text = "", dataUrl = null } = {}) {
+    if (!String(text || "").trim() && !dataUrl) {
+      throw new Error("Vui lòng nhập nội dung hoặc chọn ảnh/PDF trước.");
+    }
+    const raw = await callAI(buildAiMessages(String(text || "").trim(), dataUrl));
+    return { ...parseRawAiQuestions(raw), raw };
+  }
 
   /* ══════════════════════════════════════════════
      INIT
@@ -99,11 +367,23 @@
   /* ── Paste handler ── */
   function setupPasteHandler() {
     document.addEventListener("paste", e => {
+      if (document.getElementById("modal")?.style.display === "flex") return;
       const items = e.clipboardData?.items;
       if (!items) return;
       for (const item of items) {
         if (item.type.startsWith("image/")) {
           const file = item.getAsFile();
+          const validation = validateFileSize(file, "image");
+          if (!validation.ok) {
+            alert(validation.message);
+            const hint = document.getElementById("convertHint");
+            if (hint) {
+              hint.textContent = validation.message;
+              hint.style.color = "var(--red,#ef4444)";
+            }
+            e.preventDefault();
+            break;
+          }
           const reader = new FileReader();
 
           const focused = document.activeElement;
@@ -150,28 +430,21 @@
   }
 
   async function processPdf(file) {
-    setProgress(0, "Đang đọc PDF...");
-    const reader = new FileReader();
-    const b64 = await new Promise(res => {
-      reader.onload = ev => res(ev.target.result.split(",")[1]);
-      reader.readAsDataURL(file);
-    });
+    const validation = validateFileSize(file, "pdf");
+    if (!validation.ok) {
+      alert(validation.message);
+      return;
+    }
 
+    setProgress(0, "Đang đọc PDF...");
+    const dataUrl = await readFileAsDataUrl(file);
     setProgress(20, "Đang gửi PDF lên AI...");
-    const prompt = buildExtractionPrompt();
-    const messages = [{
-      role: "user",
-      content: [
-        { type: "image", source: { type: "base64", media_type: "application/pdf", data: b64 } },
-        { type: "text", text: prompt },
-      ],
-    }];
 
     try {
       setProgress(40, "AI đang phân tích PDF...");
-      const result = await callAI(messages);
+      const result = await convertAiSourceToQuestions({ dataUrl });
       setProgress(80, "Đang xử lý kết quả...");
-      await parseAndRenderQuestions(result);
+      appendQuestions(result.questions, result.warnings);
       setProgress(100, "Hoàn thành!");
       setTimeout(() => hideProgress(), 1000);
     } catch (err) {
@@ -195,19 +468,11 @@
     setProgress(20, "Đang gửi lên AI...");
 
     try {
-      const parts = [];
-      if (_pastedImg) {
-        const mtype = _pastedImg.startsWith("data:image/png") ? "image/png" : "image/jpeg";
-        parts.push({ type: "image", source: { type: "base64", media_type: mtype, data: _pastedImg.split(",")[1] } });
-      }
-      parts.push({ type: "text", text: (text || "") + "\n\n" + buildExtractionPrompt() });
-
-      const messages = [{ role: "user", content: parts }];
       _lastSourceImg = _pastedImg; // lưu trước khi gọi AI để crop sau
       setProgress(50, "AI đang phân tích...");
-      const result = await callAI(messages);
+      const result = await convertAiSourceToQuestions({ text, dataUrl: _pastedImg });
       setProgress(90, "Đang xử lý...");
-      await parseAndRenderQuestions(result);
+      appendQuestions(result.questions, result.warnings);
       setProgress(100, "Hoàn thành!");
       setTimeout(() => hideProgress(), 800);
 
@@ -297,37 +562,7 @@ QUY TẮC QUAN TRỌNG:
   /* ══════════════════════════════════════════════
      PARSE & RENDER
   ══════════════════════════════════════════════ */
-  async function parseAndRenderQuestions(raw) {
-    console.log("[AI raw response]:", raw.slice(0, 300));
-    let parsed = [];
-    try {
-      const clean = raw.replace(/```json\s*/gi,"").replace(/```\s*/g,"").trim();
-      parsed = JSON.parse(clean);
-    } catch {
-      // Thử tìm JSON array hoàn chỉnh nhất có thể
-      const match = raw.match(/\[[\s\S]*\]/);
-      if (match) {
-        try {
-          parsed = JSON.parse(match[0]);
-        } catch {
-          // JSON bị cắt — thử parse từng object riêng lẻ
-          const objs = [];
-          const objMatches = raw.matchAll(/\{[\s\S]*?\}(?=\s*[,\]]|\s*$)/g);
-          for (const m of objMatches) {
-            try { objs.push(JSON.parse(m[0])); } catch {}
-          }
-          if (objs.length) { parsed = objs; }
-          else { alert("AI trả về định dạng không đúng, thử lại."); return; }
-        }
-      } else {
-        alert("AI trả về định dạng không đúng, thử lại."); return;
-      }
-    }
-
-    if (!Array.isArray(parsed) || !parsed.length) {
-      alert("Không tìm thấy câu hỏi nào. Thử lại với nội dung rõ ràng hơn."); return;
-    }
-
+  function appendQuestions(parsed, warnings = []) {
     // Không tự crop — chỉ đánh dấu câu có hình vẽ để giáo viên biết
     // Giáo viên tự Ctrl+V ảnh vào ô phải
 
@@ -346,6 +581,11 @@ QUY TẮC QUAN TRỌNG:
 
     parsed.forEach((q, i) => renderQuestionCard(q, startIdx + i));
     triggerMath();
+
+    if (warnings.length) {
+      console.warn("[AI validation warnings]", warnings);
+      showToast(`AI đã chuẩn hóa ${warnings.length} chi tiết. Hãy rà soát lại trước khi lưu.`);
+    }
   }
 
   function renderQuestionCard(q, idx) {
@@ -687,6 +927,15 @@ QUY TẮC QUAN TRỌNG:
   function escHtml(s) {
     return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   }
+
+  window.QuestionAIShared = {
+    MAX_IMAGE_BYTES,
+    MAX_PDF_BYTES,
+    validateFileSize,
+    validateDataUrlSize,
+    readFileAsDataUrl,
+    convertToQuestions: convertAiSourceToQuestions,
+  };
 
   /* ══════════════════════════════════════════════
      LƯU TẤT CẢ

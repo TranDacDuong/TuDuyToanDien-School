@@ -616,6 +616,12 @@ document.addEventListener("paste", async function(e) {
   for (let item of e.clipboardData.items) {
     if (item.type.startsWith("image/")) {
       const file = item.getAsFile();
+      const validation = window.QuestionAIShared?.validateFileSize(file, "image");
+      if (validation && !validation.ok) {
+        document.getElementById("qAiHint").textContent = validation.message;
+        document.getElementById("qAiHint").style.color = "var(--red,#ef4444)";
+        e.preventDefault(); break;
+      }
       const reader = new FileReader();
       reader.onload = async ev => {
         if (activeField === "figure") {
@@ -954,6 +960,67 @@ function resetQuestionForm() {
   _modalPastedImg = null;
   answerCount = 4; changeType();
 }
+
+/* Override modal AI flow to use the shared engine in question_AI.js */
+async function convertModalWithAI() {
+  const text = document.getElementById("questionText").value.trim();
+  if (!text && !_modalPastedImg) { alert("Nháº­p ná»™i dung hoáº·c paste áº£nh trÆ°á»›c!"); return; }
+
+  const btn = document.getElementById("qAiBtn");
+  const hint = document.getElementById("qAiHint");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">âŸ³</span> Äang phÃ¢n tÃ­ch...';
+  hint.textContent = "AI Ä‘ang xá»­ lÃ½...";
+  hint.style.color = "";
+
+  try {
+    const shared = window.QuestionAIShared;
+    if (!shared?.convertToQuestions) throw new Error("ChÆ°a táº£i xong bá»™ AI dÃ¹ng chung.");
+    const { questions, warnings } = await shared.convertToQuestions({ text, dataUrl: _modalPastedImg });
+    _modalPastedImg = null;
+    if (warnings?.length) {
+      hint.textContent = `âš  AI Ä‘Ã£ chuáº©n hÃ³a ${warnings.length} chi tiáº¿t, nhá»› kiá»ƒm tra láº¡i trÆ°á»›c khi lÆ°u.`;
+      hint.style.color = "#b45309";
+    }
+    startMultiQuestion(questions);
+  } catch (err) {
+    hint.textContent = err.message || "AI khÃ´ng xá»­ lÃ½ Ä‘Æ°á»£c ná»™i dung nÃ y.";
+    hint.style.color = "var(--red,#ef4444)";
+    alert("Lá»—i AI: " + err.message);
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = "âœ¨ Chuyá»ƒn Ä‘á»•i vá»›i AI";
+}
+
+document.getElementById("qPdfFile").onchange = async function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const btn = document.getElementById("qAiBtn");
+  const hint = document.getElementById("qAiHint");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">âŸ³</span> Äang xá»­ lÃ½ PDF...';
+
+  try {
+    const shared = window.QuestionAIShared;
+    const validation = shared?.validateFileSize(file, "pdf");
+    if (validation && !validation.ok) throw new Error(validation.message);
+    if (!shared?.readFileAsDataUrl) throw new Error("ChÆ°a táº£i xong bá»™ AI dÃ¹ng chung.");
+
+    _modalPastedImg = await shared.readFileAsDataUrl(file);
+    hint.textContent = "âœ… ÄÃ£ táº£i PDF â€” báº¥m Chuyá»ƒn Ä‘á»•i";
+    hint.style.color = "var(--green)";
+  } catch (err) {
+    _modalPastedImg = null;
+    hint.textContent = err.message || "PDF khÃ´ng há»£p lá»‡.";
+    hint.style.color = "var(--red,#ef4444)";
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = "âœ¨ Chuyá»ƒn Ä‘á»•i vá»›i AI";
+  e.target.value = "";
+};
 </script>
 
 
