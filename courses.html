@@ -49,7 +49,35 @@ textarea{min-height:110px;resize:vertical}
 .score-badge{background:#dcfce7;color:#15803d;font-size:.78rem;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap}
 .submitted-badge{background:var(--navy);color:var(--gold-light);padding:6px 12px;border-radius:20px;font-size:.78rem;font-weight:700;border:none;cursor:pointer}
 @media(max-width:1024px){.hero,.toolbar,.form-grid,.screen-grid{grid-template-columns:1fr}}
-@media(max-width:720px){.page{padding:16px 12px 32px}.grid{grid-template-columns:1fr}.session{grid-template-columns:1fr}.order{width:100%;flex-direction:row;justify-content:flex-start;padding:0 14px}}
+@media(max-width:720px){
+  .page{padding:14px 10px 28px}
+  .card,.course-card,.modal-card,.screen-panel,.empty{border-radius:20px}
+  .card{padding:20px 18px}
+  h1{font-size:1.55rem}
+  .toolbar{grid-template-columns:1fr;padding:12px;border-radius:18px}
+  .toolbar > *{width:100%}
+  .toolbar button{min-height:48px}
+  .grid{grid-template-columns:1fr}
+  .cover{min-height:156px;padding:18px}
+  .course-body{padding:16px;gap:12px}
+  .meta{grid-template-columns:1fr}
+  .modal{padding:10px;align-items:flex-end}
+  .modal-card{width:100%;max-height:calc(100dvh - 12px);border-radius:22px 22px 0 0}
+  .mh{padding:16px 16px 12px;align-items:flex-start;gap:10px;flex-wrap:wrap}
+  .mb{padding:14px 16px 18px}
+  .form-grid{grid-template-columns:1fr}
+  .field.full{grid-column:auto}
+  .preview{height:140px}
+  .stop{height:auto;min-height:62px;align-items:flex-start;flex-wrap:wrap;padding:12px 14px}
+  .stop h2{width:100%;font-size:1rem}
+  .stop .btn{min-height:42px}
+  .sbody{padding:14px 10px 22px}
+  .register{flex-direction:column;align-items:stretch}
+  .register .btn{width:100%;min-height:46px}
+  .session{grid-template-columns:1fr;padding:14px}
+  .order{width:100%;min-height:52px;flex-direction:row;justify-content:flex-start;padding:0 14px;gap:10px}
+  .actions .btn,.screen-panel .btn{min-height:44px}
+}
 </style>
 </head>
 <body>

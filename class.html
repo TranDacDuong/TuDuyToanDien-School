@@ -180,6 +180,116 @@ input:focus, select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
   cursor: pointer; color: var(--red); font-weight: 700;
   width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
 }
+
+@media (max-width: 860px) {
+  body {
+    padding: 14px 10px 26px;
+  }
+
+  .page-hd,
+  .filter-bar,
+  .popup-card,
+  .class-card {
+    border-radius: 20px;
+  }
+
+  .page-hd {
+    padding: 18px 18px 16px;
+    margin-bottom: 16px;
+  }
+
+  .page-hd h1 {
+    font-size: 1.55rem;
+    margin-bottom: 6px;
+  }
+
+  .page-hd p {
+    font-size: .86rem;
+    line-height: 1.6;
+  }
+
+  .toolbar {
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .toolbar .btn,
+  .toolbar button,
+  #openCreateClass {
+    width: 100%;
+    min-height: 46px;
+  }
+
+  .filter-bar {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .filter-group {
+    min-width: 100%;
+  }
+
+  .filter-reset,
+  .filter-count {
+    width: 100%;
+    text-align: center;
+  }
+
+  .class-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .class-card {
+    padding: 14px;
+  }
+
+  .class-actions {
+    flex-direction: column;
+  }
+
+  .edit-btn,
+  .delete-btn {
+    min-height: 44px;
+  }
+
+  .popup-overlay {
+    padding: 10px;
+    align-items: flex-end;
+  }
+
+  .popup-card {
+    width: 100%;
+    max-height: calc(100dvh - 12px);
+    padding: 16px;
+    border-radius: 22px 22px 0 0;
+  }
+
+  .popup-header {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .schedule-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 14px;
+    background: #f8fbff;
+    border: 1px solid rgba(15,31,61,.08);
+  }
+
+  .remove-btn {
+    width: 100%;
+    height: 42px;
+    border-radius: 12px;
+  }
+}
 </style>
 <script>
   window.MathJax = {

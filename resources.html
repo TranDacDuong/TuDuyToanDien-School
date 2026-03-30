@@ -30,7 +30,28 @@ textarea{min-height:110px;resize:vertical}
 .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .field{display:grid;gap:8px}
 .full{grid-column:1/-1}
-@media(max-width:900px){.toolbar,.form-grid{grid-template-columns:1fr}.page{padding:16px 12px 32px}.grid{grid-template-columns:1fr}}
+@media(max-width:900px){
+  .toolbar,.form-grid{grid-template-columns:1fr}
+  .page{padding:16px 12px 32px}
+  .grid{grid-template-columns:1fr}
+}
+@media(max-width:640px){
+  .page{padding:14px 10px 24px}
+  .hero,.toolbar,.card,.empty,.modal-card{border-radius:20px}
+  .hero{padding:18px}
+  .hero h1{font-size:1.52rem}
+  .hero p{font-size:.86rem;line-height:1.6}
+  .toolbar{padding:12px}
+  .toolbar > *{width:100%}
+  .toolbar .btn,#openCreateBtn{width:100%;min-height:46px}
+  .card{padding:14px}
+  .actions{flex-direction:column}
+  .actions .btn{width:100%;min-height:42px}
+  .modal{padding:10px;align-items:flex-end}
+  .modal-card{width:100%;max-height:calc(100dvh - 12px);border-radius:22px 22px 0 0}
+  .mh{padding:16px 16px 12px;align-items:flex-start;gap:10px;flex-wrap:wrap}
+  .mb{padding:14px 16px 18px}
+}
 </style>
 </head>
 <body>

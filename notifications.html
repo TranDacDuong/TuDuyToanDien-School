@@ -2,6 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Thông báo</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="theme.css">
@@ -22,6 +23,18 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
 .meta { margin-top: 4px; color: var(--ink-light); font-size: .78rem; }
 .actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
 .empty { background: var(--white); border: 1px solid rgba(15,31,61,.08); border-radius: 18px; padding: 22px; text-align: center; color: var(--ink-light); }
+@media (max-width: 640px) {
+  .page { padding: 14px 10px 22px; }
+  .header { align-items: stretch; }
+  .header h1 { font-size: 1.2rem; }
+  .header .btn { width: 100%; min-height: 46px; }
+  .card, .empty { padding: 14px; border-radius: 16px; }
+  .row { gap: 10px; }
+  .avatar { width: 42px; height: 42px; }
+  .title { font-size: .9rem; }
+  .message { font-size: .84rem; line-height: 1.55; }
+  .actions .btn { width: 100%; min-height: 42px; }
+}
 </style>
 </head>
 <body>

@@ -127,6 +127,67 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
   flex-direction: column; overflow: hidden;
   font-family: var(--font-body); min-height: 0;
 }
+
+@media (max-width: 860px) {
+  body {
+    padding: 14px 10px 24px;
+  }
+
+  .page-hd {
+    padding: 18px 18px 16px;
+    margin-bottom: 16px;
+    border-radius: 20px;
+  }
+
+  .page-hd h1 {
+    font-size: 1.55rem;
+  }
+
+  .page-hd .btn {
+    width: 100%;
+    min-height: 46px;
+  }
+
+  .tab-bar {
+    width: 100%;
+    overflow-x: auto;
+    padding: 6px;
+    border-radius: 16px;
+  }
+
+  .tab-btn {
+    flex: 1 0 auto;
+    min-height: 42px;
+    padding: 8px 16px;
+  }
+
+  .exam-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .exam-card {
+    border-radius: 18px;
+    padding: 14px;
+  }
+
+  .exam-actions > * {
+    flex: 1 1 100%;
+    min-height: 42px;
+  }
+
+  .modal-overlay {
+    padding: 10px;
+    align-items: flex-end;
+  }
+
+  .modal-card {
+    width: 100%;
+    max-height: calc(100dvh - 12px);
+    border-radius: 22px 22px 0 0;
+    padding: 18px 16px;
+  }
+}
 </style>
 <script>
   window.MathJax = {

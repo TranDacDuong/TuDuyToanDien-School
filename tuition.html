@@ -561,6 +561,36 @@ tr:hover td { background: #f8fbff; }
     min-width: 0;
   }
 }
+@media (max-width: 640px) {
+  .page { padding: 14px 10px 26px; }
+  .page-head { padding: 18px 18px 16px; }
+  h1 { font-size: 1.52rem; }
+  .subtitle { font-size: .84rem; line-height: 1.6; }
+  .toolbar { padding: 12px; gap: 10px; }
+  .toolbar-group,
+  .toolbar-group.filters,
+  .toolbar-group.actions {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+  .toolbar-group.filters,
+  .toolbar-group.actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .toolbar-group.filters select,
+  .toolbar-group.filters input[type=month],
+  .toolbar button,
+  .toolbar .badge {
+    width: 100%;
+    min-height: 46px;
+  }
+  .summary-row { grid-template-columns: 1fr; }
+  .summary-card { padding: 14px; }
+  .summary-card .value { font-size: 1.25rem; }
+  .table-wrap { max-height: none; overflow: auto; }
+  table { min-width: 860px; font-size: 12px; }
+}
 </style>
 </head>
 <body>

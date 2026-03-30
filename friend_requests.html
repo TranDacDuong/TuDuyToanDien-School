@@ -2,6 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Lời mời kết bạn</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="theme.css">
@@ -114,6 +115,19 @@ body {
 }
 @media (max-width: 860px) {
   .grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .page { padding: 14px 10px 22px; }
+  .panel,
+  .request-card { border-radius: 16px; }
+  .panel-head,
+  .panel-body { padding-left: 14px; padding-right: 14px; }
+  .hero h1 { font-size: 1.24rem; }
+  .request-card { padding: 12px; }
+  .request-top { gap: 10px; }
+  .avatar { width: 46px; height: 46px; }
+  .actions { flex-direction: column; }
+  .actions .btn { width: 100%; min-height: 42px; }
 }
 </style>
 </head>

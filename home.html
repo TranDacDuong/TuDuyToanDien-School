@@ -2,6 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Bảng tin</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="theme.css">
@@ -1604,6 +1605,135 @@ body {
   color: var(--navy);
   margin-bottom: 6px;
   font-size: .96rem;
+}
+
+@media (max-width: 900px) {
+  .feed-wrap {
+    padding: 14px 12px 28px;
+  }
+
+  .feed-shell,
+  .overview-section.active {
+    grid-template-columns: 1fr;
+  }
+
+  .feed-side {
+    position: static;
+    top: auto;
+  }
+
+  .hero-card {
+    padding: 18px;
+    border-radius: 20px;
+    margin-bottom: 14px;
+  }
+
+  .hero-title {
+    font-size: 1.55rem;
+  }
+
+  .hero-sub {
+    font-size: .88rem;
+    line-height: 1.6;
+  }
+
+  .hero-statbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .hero-stat {
+    min-width: 0;
+  }
+
+  .feed-header {
+    padding: 14px 16px;
+    border-radius: 18px;
+  }
+
+  .home-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    border-radius: 18px;
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .home-tab-btn {
+    width: 100%;
+    min-height: 46px;
+    padding: 10px 14px;
+    font-size: .9rem;
+  }
+
+  .social-hub {
+    position: sticky;
+    top: 10px;
+    z-index: 40;
+    margin-bottom: 14px;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  #socialPanel {
+    position: fixed !important;
+    left: 12px !important;
+    right: 12px !important;
+    top: auto !important;
+    bottom: calc(84px + env(safe-area-inset-bottom)) !important;
+    width: auto !important;
+    max-height: calc(100dvh - 120px);
+    z-index: 1500;
+  }
+
+  #socialPanel .social-panel-frame {
+    min-height: 58dvh;
+  }
+
+  #chatPopup {
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    border-radius: 22px 22px 0 0;
+    max-height: 86dvh;
+  }
+
+  #chatPopup .chat-popup-frame {
+    min-height: 70dvh;
+  }
+}
+
+@media (max-width: 640px) {
+  .feed-wrap {
+    padding: 12px 10px 24px;
+  }
+
+  .hero-title {
+    font-size: 1.36rem;
+  }
+
+  .hero-statbar {
+    grid-template-columns: 1fr;
+  }
+
+  .feed-filter-toggle {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .overview-section.active {
+    gap: 14px;
+  }
+
+  .overview-card-head,
+  .overview-card-body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
 }
 </style>
 </head>
