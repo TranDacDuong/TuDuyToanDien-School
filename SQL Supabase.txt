@@ -2021,7 +2021,10 @@ ALTER TABLE public.game_rooms
 
 ALTER TABLE public.game_rooms
   ADD CONSTRAINT game_rooms_max_players_check
-  CHECK (max_players BETWEEN 2 AND 20);
+  CHECK (
+    (mode = 'solo' AND max_players = 1)
+    OR (mode <> 'solo' AND max_players BETWEEN 2 AND 20)
+  );
 
 CREATE INDEX IF NOT EXISTS game_rooms_class_idx
   ON public.game_rooms (class_id, status, created_at DESC);
