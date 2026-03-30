@@ -1636,6 +1636,8 @@
         <div class="stat-card"><span>Điểm cao nhất</span><strong>${myBest}</strong><small>${soloProfile.matches} trận chơi đơn • Tổng điểm ${totalScore}</small></div>
         <div class="stat-card"><span>Điểm trung bình</span><strong>${avgScore}</strong><small>Chuỗi thắng ${streak}</small></div>
       `;
+      const rankProgressLabel = EL.statsGrid.querySelector(".stat-card:nth-child(2) span");
+      if (rankProgressLabel) rankProgressLabel.textContent = "Tiến độ thăng hạng";
     }
 
     const history = [...myFinished]
