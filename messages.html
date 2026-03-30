@@ -51,6 +51,19 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
 }
 .panel { background: var(--white); border: 1px solid rgba(15,31,61,.08); border-radius: 20px; box-shadow: 0 10px 24px rgba(15,31,61,.06); overflow: hidden; }
 .sidebar-head, .chat-head { padding: 18px 20px 14px; border-bottom: 1px solid rgba(15,31,61,.06); }
+.chat-head-bar { display: flex; align-items: center; gap: 10px; }
+.chat-back {
+  display: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(15,31,61,.08);
+  background: #f8fbff;
+  color: var(--navy);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
 .sidebar-title, .chat-title { font-family: var(--font-display); color: var(--navy); font-size: 1.12rem; }
 .sidebar-sub, .chat-sub { margin-top: 4px; color: var(--ink-light); font-size: .78rem; }
 .sidebar-sub, .chat-sub { display: none; }
@@ -173,6 +186,7 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
   display: flex;
   flex-direction: column;
   gap: 10px;
+  background: rgba(255,255,255,.96);
 }
 .composer-row {
   display: flex;
@@ -241,6 +255,19 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
   .composer-row { align-items: stretch; }
   .composer textarea { min-height: 48px; }
   .attach-wrap { width: 100%; }
+  .chat-back { display: inline-flex; align-items: center; justify-content: center; }
+  html:not(.mobile-chat-open) .chat-panel { display: none; }
+  html.mobile-chat-open aside.panel { display: none; }
+  html.mobile-chat-open .chat-panel {
+    display: grid;
+    min-height: calc(100dvh - 20px);
+  }
+  .message-list { padding: 14px; }
+  .bubble { max-width: min(92%, 560px); }
+  .composer {
+    position: sticky;
+    bottom: 0;
+  }
 }
 @media (max-width: 520px) {
   .page { padding: 6px; }
@@ -251,7 +278,7 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
   .name { font-size: .86rem; }
   .preview { font-size: .75rem; }
   .message-list { padding: 12px; }
-  .bubble { max-width: 86%; font-size: .84rem; }
+  .bubble { max-width: 92%; font-size: .84rem; }
   .composer { padding: 10px; }
   .composer-row { gap: 8px; }
   .composer-tools { gap: 8px; }
@@ -286,6 +313,9 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
 
     <section class="panel chat-panel">
       <div class="chat-head">
+        <div class="chat-head-bar">
+          <button class="chat-back" type="button" onclick="closeMobileConversation()">←</button>
+        </div>
         <div id="chatTitle" class="chat-title">Chưa chọn cuộc trò chuyện</div>
         <div id="chatSub" class="chat-sub">Hãy chọn một người ở cột bên trái</div>
       </div>
@@ -336,6 +366,20 @@ const isPopupMode = queryParams.get("popup") === "1";
 const CHAT_IMAGE_PREFIX = "__CHAT_IMAGE__";
 const ACTIVE_WINDOW_MS = 2 * 60 * 1000;
 
+function syncMobileConversationState(forceOpen = null) {
+  if (isTrayMode || isPopupMode) return;
+  if (!window.matchMedia("(max-width: 860px)").matches) {
+    document.documentElement.classList.remove("mobile-chat-open");
+    return;
+  }
+  const shouldOpen = forceOpen === null ? !!activeFriend : !!forceOpen;
+  document.documentElement.classList.toggle("mobile-chat-open", shouldOpen);
+}
+
+window.closeMobileConversation = function() {
+  syncMobileConversationState(false);
+};
+
 async function createNotification(userId, type, message, refId) {
   if (!userId || userId === currentUser.id) return;
   await sb.from("notifications").insert({
@@ -364,6 +408,8 @@ async function init() {
   const { data: profile } = await sb.from("users").select("*").eq("id", user.id).single();
   currentProfile = profile;
   selectedUserFromQuery = queryParams.get("user");
+  document.querySelector(".chat-head-bar")?.appendChild(document.getElementById("chatTitle"));
+  syncMobileConversationState(false);
 
   subscribePresence();
   subscribeNotificationChanges();
@@ -523,6 +569,7 @@ window.openConversation = async function(friendId, friendName, friendAvatar, fri
   document.getElementById("sendBtn").disabled = false;
   document.getElementById("attachBtn").disabled = false;
   document.getElementById("clearImageBtn").disabled = false;
+  syncMobileConversationState(true);
 
   try {
     currentConversationId = await ensureConversation(friendId);
@@ -532,6 +579,7 @@ window.openConversation = async function(friendId, friendName, friendAvatar, fri
     subscribeConversationMessages(currentConversationId);
   } catch (error) {
     currentConversationId = null;
+    syncMobileConversationState(false);
     showConversationError(error);
   }
 };
@@ -718,6 +766,10 @@ async function refreshPresence() {
     online_at: new Date().toISOString()
   });
 }
+
+window.addEventListener("resize", () => {
+  syncMobileConversationState(document.documentElement.classList.contains("mobile-chat-open"));
+});
 
 async function loadMessages() {
   if (!currentConversationId) return;

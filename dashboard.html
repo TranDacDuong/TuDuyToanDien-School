@@ -174,6 +174,54 @@ aside li.active {
 main { flex: 1; display: flex; flex-direction: column; overflow: hidden; width: 100%; }
 .content { flex: 1; padding: 0; overflow: hidden; }
 iframe { width: 100%; height: 100%; border: none; background: var(--white); }
+#mobileNav { display: none; }
+#mobileNav .mobile-nav-item {
+  appearance: none;
+  border: none;
+  background: transparent;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 6px;
+  color: rgba(235,245,255,.74);
+  font-family: var(--font-body);
+  font-size: .72rem;
+  font-weight: 700;
+  border-radius: 16px;
+  position: relative;
+  cursor: pointer;
+  transition: .18s ease;
+}
+#mobileNav .mobile-nav-item span:first-child {
+  font-size: 1.12rem;
+  line-height: 1;
+}
+#mobileNav .mobile-nav-item.active {
+  background: rgba(255,255,255,.12);
+  color: #fff7d6;
+}
+#mobileNav .mobile-nav-item-badge {
+  display: none;
+  position: absolute;
+  top: 4px;
+  right: 10px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: .66rem;
+  font-weight: 800;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border: 2px solid rgba(8,15,30,.8);
+}
+#mobileNav .mobile-nav-item-badge.show { display: inline-flex; }
 
 /* ── Modal ── */
 .modal {
@@ -291,6 +339,38 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     width: 100%;
     min-height: 48px;
   }
+
+  body {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+
+  #sidebarTab {
+    bottom: calc(92px + env(safe-area-inset-bottom));
+    width: 52px;
+    height: 52px;
+    background: linear-gradient(135deg, rgba(15,31,61,.96) 0%, rgba(29,107,209,.88) 100%);
+  }
+
+  #sidebarTab::after {
+    font-size: 1.18rem !important;
+  }
+
+  #mobileNav {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px;
+    border-radius: 24px;
+    background: rgba(8,15,30,.92);
+    border: 1px solid rgba(186,230,253,.16);
+    box-shadow: 0 20px 40px rgba(2,8,23,.34);
+    backdrop-filter: blur(14px);
+    z-index: 1190;
+  }
 }
 </style>
 </head>
@@ -336,6 +416,30 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   </div>
 </main>
 
+<nav id="mobileNav" aria-label="Điều hướng nhanh">
+  <button class="mobile-nav-item" type="button" data-page="home.html">
+    <span>🏠</span>
+    <span>Trang chủ</span>
+  </button>
+  <button class="mobile-nav-item" type="button" data-page="courses.html">
+    <span>🎓</span>
+    <span>Khóa học</span>
+  </button>
+  <button class="mobile-nav-item" type="button" data-page="class.html">
+    <span>📘</span>
+    <span>Lớp học</span>
+  </button>
+  <button class="mobile-nav-item" type="button" data-page="public_exam.html">
+    <span>🎯</span>
+    <span>Đề thi</span>
+  </button>
+  <button class="mobile-nav-item" type="button" data-page="messages.html">
+    <span>💬</span>
+    <span>Tin nhắn</span>
+    <span class="mobile-nav-item-badge" id="messageBadge">0</span>
+  </button>
+</nav>
+
 <div id="profileModal" class="modal">
   <div class="modal-box">
     <h3>⚠ Cập nhật thông tin</h3>
@@ -350,6 +454,8 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 <script>
 let badgeChannels = [];
 const HIDDEN_NOTIFICATION_TYPES = ["friend_request", "friend_accept", "message_new"];
+const contentFrame = document.getElementById("contentFrame");
+const mobileNavItems = [...document.querySelectorAll("#mobileNav .mobile-nav-item")];
 /* ── Sidebar toggle ── */
 const sidebar  = document.getElementById("sidebar");
 const tab      = document.getElementById("sidebarTab");
@@ -418,19 +524,45 @@ function applyRoleMenu(role){
   });
 }
 
+function setActiveMenuItem(page){
+  document.querySelectorAll("#menu li").forEach(item => {
+    item.classList.toggle("active", item.dataset.page === page);
+  });
+}
+
+function setActiveMobileNav(page){
+  mobileNavItems.forEach(item => {
+    item.classList.toggle("active", item.dataset.page === page);
+  });
+}
+
+function openDashboardPage(page, options = {}){
+  const { syncMenu = true, syncMobile = true } = options;
+  if(!page) return;
+  if(syncMenu) setActiveMenuItem(page);
+  else document.querySelectorAll("#menu li").forEach(item => item.classList.remove("active"));
+  if(syncMobile) setActiveMobileNav(page);
+  else setActiveMobileNav("");
+  contentFrame.src = page;
+  closeSidebar();
+}
+
 function setupMenu(){
   const items = document.querySelectorAll("#menu li");
   items.forEach(item => {
     item.addEventListener("click", () => {
-      items.forEach(i => i.classList.remove("active"));
-      item.classList.add("active");
-      if(item.dataset.page) document.getElementById("contentFrame").src = item.dataset.page;
-      closeSidebar();
+      openDashboardPage(item.dataset.page);
+    });
+  });
+  mobileNavItems.forEach(item => {
+    item.addEventListener("click", () => {
+      const hasMenuItem = !!document.querySelector(`#menu li[data-page="${item.dataset.page}"]`);
+      openDashboardPage(item.dataset.page, { syncMenu: hasMenuItem });
     });
   });
   // Click trang đầu tiên visible
   const first = [...items].find(i => i.style.display !== "none");
-  if(first) first.click();
+  if(first) openDashboardPage(first.dataset.page);
 }
 
 function checkProfile(profile){
@@ -442,9 +574,7 @@ function checkProfile(profile){
 
 function goToAccount(){
   document.getElementById("profileModal").style.display = "none";
-  document.querySelectorAll("#menu li").forEach(item => item.classList.remove("active"));
-  document.getElementById("contentFrame").src = "account.html";
-  closeSidebar();
+  openDashboardPage("account.html", { syncMenu: false, syncMobile: false });
 }
 
 async function loadFriendRequestBadge(userId){

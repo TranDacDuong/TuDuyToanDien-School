@@ -1709,7 +1709,7 @@ body {
 
 @media (max-width: 640px) {
   .feed-wrap {
-    padding: 12px 10px 24px;
+    padding: 12px 10px calc(108px + env(safe-area-inset-bottom));
   }
 
   .hero-title {
@@ -1733,6 +1733,74 @@ body {
   .overview-card-body {
     padding-left: 16px;
     padding-right: 16px;
+  }
+
+  .feed-header {
+    padding: 12px 14px;
+  }
+
+  .feed-tools,
+  .feed-filter-toggle {
+    width: 100%;
+  }
+
+  .social-hub {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    top: auto;
+    z-index: 1200;
+    margin: 0;
+    padding: 10px;
+    border-radius: 24px;
+    background: rgba(255,255,255,.94);
+    border: 1px solid rgba(15,31,61,.08);
+    box-shadow: 0 20px 40px rgba(15,31,61,.16);
+    backdrop-filter: blur(14px);
+    justify-content: space-between;
+  }
+
+  .hub-link,
+  .hub-button {
+    width: 48px;
+    height: 48px;
+  }
+
+  #socialPanel {
+    left: 10px !important;
+    right: 10px !important;
+    top: 10px !important;
+    bottom: calc(88px + env(safe-area-inset-bottom)) !important;
+    max-height: none;
+    border-radius: 22px;
+  }
+
+  .social-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(15,31,61,.08);
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  }
+
+  .social-panel-frame {
+    height: calc(100dvh - 174px);
+  }
+
+  #chatPopup {
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+    border-radius: 24px;
+    max-height: calc(100dvh - 20px);
+  }
+
+  #chatPopup .chat-popup-frame {
+    min-height: calc(100dvh - 110px);
   }
 }
 </style>

@@ -588,8 +588,43 @@ tr:hover td { background: #f8fbff; }
   .summary-row { grid-template-columns: 1fr; }
   .summary-card { padding: 14px; }
   .summary-card .value { font-size: 1.25rem; }
-  .table-wrap { max-height: none; overflow: auto; }
+  .table-wrap {
+    max-height: none;
+    overflow: auto;
+    border-radius: 20px;
+    margin: 0 -2px;
+  }
   table { min-width: 860px; font-size: 12px; }
+  .student-detail-view,
+  .modal-card {
+    border-radius: 20px;
+  }
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 8px;
+  }
+  .modal-card {
+    width: 100%;
+    max-height: calc(100dvh - 8px);
+  }
+  .modal-header {
+    padding: 16px 16px 12px;
+  }
+  .modal-body {
+    padding: 14px 14px 18px;
+  }
+  .qr-payment-card {
+    padding: 14px;
+    border-radius: 16px;
+  }
+  .qr-payment-media,
+  .qr-payment-text {
+    width: 100%;
+    min-width: 0;
+  }
+  .qr-payment-line span {
+    min-width: 92px;
+  }
 }
 </style>
 </head>
