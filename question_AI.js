@@ -588,12 +588,14 @@
     const sourceKind = detectDataKind(dataUrl);
     if (sourceKind === "pdf" && dataUrl) {
       const pageImages = await renderPdfToPageImages(dataUrl);
-      const stitchedPdfImage = await stitchImagesVertically(pageImages);
-      if (stitchedPdfImage) {
-        const imageChunks = await splitTallImageIntoChunks(stitchedPdfImage);
-        const parsedPdf = await extractQuestionsFromImageChunks(imageChunks, "image");
-        if (parsedPdf.questions.length) return { ...parsedPdf, raw: "[pdf-as-image]" };
+      const pageChunks = [];
+      for (const pageImage of pageImages) {
+        const imageChunks = await splitTallImageIntoChunks(pageImage);
+        const parsedPage = await extractQuestionsFromImageChunks(imageChunks, "image");
+        pageChunks.push(parsedPage);
       }
+      const parsedPdf = mergeQuestionSets(pageChunks);
+      if (parsedPdf.questions.length) return { ...parsedPdf, raw: "[pdf-pages-as-images]" };
     }
     if (sourceKind === "image" && dataUrl && !cleanText) {
       const imageChunks = await splitTallImageIntoChunks(dataUrl);
