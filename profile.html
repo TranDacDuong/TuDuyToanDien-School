@@ -529,9 +529,12 @@ function renderHeader() {
     bioBox.textContent = viewedProfile.bio;
   }
 
+  const isOwnProfile = viewedProfile.id === currentUser.id;
   const info = [
-    { key: "Email", value: viewedProfile.email || "Chưa cập nhật" },
-    { key: "Điện thoại", value: viewedProfile.phone || "Chưa cập nhật" },
+    ...(isOwnProfile ? [
+      { key: "Email", value: viewedProfile.email || "Chưa cập nhật" },
+      { key: "Điện thoại", value: viewedProfile.phone || "Chưa cập nhật" }
+    ] : []),
     { key: "Năm sinh", value: viewedProfile.birth_year || "Chưa cập nhật" },
     { key: "Trường", value: viewedProfile.school || "Chưa cập nhật" },
     { key: "Tỉnh", value: viewedProfile.province || "Chưa cập nhật" }
