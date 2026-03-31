@@ -242,6 +242,8 @@ CREATE TABLE public.users (
   role USER-DEFINED NOT NULL,
   created_at timestamp with time zone DEFAULT now(),
   phone text,
+  parent_full_name text,
+  parent_phone text,
   birth_year integer,
   avatar_url text,
   province text,
@@ -249,6 +251,12 @@ CREATE TABLE public.users (
   subject text,
   CONSTRAINT users_pkey PRIMARY KEY (id)
 );
+
+ALTER TABLE public.users
+ADD COLUMN IF NOT EXISTS parent_full_name text;
+
+ALTER TABLE public.users
+ADD COLUMN IF NOT EXISTS parent_phone text;
 
 -- ============================================
 -- Notifications feature migration
@@ -2151,6 +2159,8 @@ DECLARE
   v_email_base text;
   v_full_name text;
   v_phone text;
+  v_parent_full_name text;
+  v_parent_phone text;
   v_province text;
   v_school text;
   v_password text;
@@ -2183,6 +2193,8 @@ BEGIN
     v_email := lower(trim(coalesce(row_item->>'email', '')));
     v_full_name := nullif(trim(coalesce(row_item->>'full_name', '')), '');
     v_phone := nullif(trim(coalesce(row_item->>'phone', '')), '');
+    v_parent_full_name := nullif(trim(coalesce(row_item->>'parent_full_name', '')), '');
+    v_parent_phone := nullif(trim(coalesce(row_item->>'parent_phone', '')), '');
     v_province := nullif(trim(coalesce(row_item->>'province', '')), '');
     v_school := nullif(trim(coalesce(row_item->>'school', '')), '');
     v_password := nullif(trim(coalesce(row_item->>'password', '')), '');
@@ -2310,6 +2322,8 @@ BEGIN
         full_name,
         role,
         phone,
+        parent_full_name,
+        parent_phone,
         birth_year,
         province,
         school
@@ -2320,6 +2334,8 @@ BEGIN
         v_full_name,
         'student',
         v_phone,
+        v_parent_full_name,
+        v_parent_phone,
         v_birth_year,
         v_province,
         v_school
@@ -2330,6 +2346,8 @@ BEGIN
         full_name = COALESCE(v_full_name, public.users.full_name),
         role = 'student',
         phone = COALESCE(v_phone, public.users.phone),
+        parent_full_name = COALESCE(v_parent_full_name, public.users.parent_full_name),
+        parent_phone = COALESCE(v_parent_phone, public.users.parent_phone),
         birth_year = COALESCE(v_birth_year, public.users.birth_year),
         province = COALESCE(v_province, public.users.province),
         school = COALESCE(v_school, public.users.school)

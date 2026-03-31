@@ -486,13 +486,15 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
               <th style="width:44px">STT</th>
               <th style="min-width:190px">Học sinh</th>
               <th class="sortable" data-field="phone"      onclick="sSort('phone')">SĐT <span class="sort-icon">↕</span></th>
+              <th class="sortable" data-field="parent_full_name" onclick="sSort('parent_full_name')" style="min-width:150px">Phụ huynh <span class="sort-icon">↕</span></th>
+              <th class="sortable" data-field="parent_phone" onclick="sSort('parent_phone')">SĐT PH <span class="sort-icon">↕</span></th>
               <th class="sortable" data-field="birth_year" onclick="sSort('birth_year')">Năm sinh <span class="sort-icon">↕</span></th>
               <th class="sortable" data-field="province"   onclick="sSort('province')">Tỉnh <span class="sort-icon">↕</span></th>
               <th class="sortable" data-field="school"     onclick="sSort('school')" style="min-width:130px">Trường <span class="sort-icon">↕</span></th>
               <th style="width:110px;text-align:center">Hành động</th>
             </tr>
           </thead>
-          <tbody id="sTable"><tr class="empty-row"><td colspan="7">⏳ Đang tải...</td></tr></tbody>
+          <tbody id="sTable"><tr class="empty-row"><td colspan="9">⏳ Đang tải...</td></tr></tbody>
         </table>
       </div>
       <div class="s-pg">
@@ -512,6 +514,8 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
     </div>
     <div class="fg"><label>Họ tên</label><input id="seN"  placeholder="Họ và tên"></div>
     <div class="fg"><label>SĐT</label><input id="seP"     placeholder="SĐT"></div>
+    <div class="fg"><label>Họ tên phụ huynh</label><input id="seParentN" placeholder="Họ và tên phụ huynh"></div>
+    <div class="fg"><label>SĐT phụ huynh</label><input id="seParentP" placeholder="SĐT phụ huynh"></div>
     <div class="fg"><label>Năm sinh</label><input id="seB" type="number" placeholder="Năm sinh"></div>
     <div class="fg"><label>Tỉnh</label><input id="sePv"   placeholder="Tỉnh/thành"></div>
     <div class="fg"><label>Trường</label><input id="seSc" placeholder="Tên trường"></div>
@@ -948,6 +952,8 @@ function sMapImportRow(row){
     email: pick('email','gmail','mail'),
     full_name: pick('full_name','ho_va_ten','ho_ten','ten','name'),
     phone: pick('phone','sdt','so_dien_thoai','dien_thoai'),
+    parent_full_name: pick('parent_full_name','parent_name','ho_ten_phu_huynh','ten_phu_huynh','phu_huynh'),
+    parent_phone: pick('parent_phone','parent_phone_number','sdt_phu_huynh','so_dien_thoai_phu_huynh','dien_thoai_phu_huynh'),
     birth_year: birthRaw ? parseInt(birthRaw,10) : null,
     province: pick('province','tinh','tinh_thanh','thanh_pho'),
     school: pick('school','truong','truong_hoc'),
@@ -960,7 +966,7 @@ function sPickImportFile(){
 }
 function sDownloadImportTemplate(){
   if(typeof XLSX==='undefined'){alert('Cần thêm thư viện XLSX');return;}
-  const rows=[{full_name:'Nguyen Van A',phone:'0900000001',birth_year:2008,province:'Ha Noi',school:'THPT ABC'}];
+  const rows=[{full_name:'Nguyen Van A',phone:'0900000001',parent_full_name:'Nguyen Thi B',parent_phone:'0911111111',birth_year:2008,province:'Ha Noi',school:'THPT ABC'}];
   const ws=XLSX.utils.json_to_sheet(rows);
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'students_import');
@@ -1074,13 +1080,15 @@ function sRender(){
   const start=(_sPage-1)*S_PAGE, slice=_sFilt.slice(start,start+S_PAGE);
   document.getElementById('sStatShow').textContent=_sFilt.length;
   const tbody=document.getElementById('sTable');
-  if(!slice.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="7">🔍 Không tìm thấy học sinh nào</td></tr>'; sPgRender(); return; }
+  if(!slice.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="9">🔍 Không tìm thấy học sinh nào</td></tr>'; sPgRender(); return; }
   tbody.innerHTML=slice.map((s,i)=>{
     const av=s.avatar_url?`<img class="s-av" src="${esc(s.avatar_url)}" onerror="this.style.display='none'">`:`<div class="s-ini">${sIni(s.full_name)}</div>`;
     return `<tr>
       <td style="color:var(--ink-light);text-align:center">${start+i+1}</td>
       <td><div style="display:flex;align-items:center;gap:8px">${av}<div><div style="font-weight:600;color:var(--navy);font-size:.85rem">${esc(s.full_name||'—')}</div><div style="font-size:.72rem;color:var(--ink-light)">${esc(s.email||'')}</div></div></div></td>
       <td>${s.phone?`<button style="background:none;border:none;color:var(--blue);font-size:.82rem;cursor:pointer;padding:0;font-family:var(--font-body);font-weight:500" onclick="sCopyPhone('${s.phone}')">📞 ${esc(s.phone)}</button>`:'<span style="color:var(--ink-light)">—</span>'}</td>
+      <td>${esc(s.parent_full_name||'—')}</td>
+      <td>${s.parent_phone?`<button style="background:none;border:none;color:var(--blue);font-size:.82rem;cursor:pointer;padding:0;font-family:var(--font-body);font-weight:500" onclick="sCopyPhone('${s.parent_phone}')">📞 ${esc(s.parent_phone)}</button>`:'<span style="color:var(--ink-light)">—</span>'}</td>
       <td>${s.birth_year||'—'}</td>
       <td>${esc(s.province||'—')}</td>
       <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s.school||'')}">${esc(s.school||'—')}</td>
@@ -1113,6 +1121,8 @@ function sEditStudent(id){
   _sEditId=id;
   document.getElementById('seN').value  = s.full_name  ||'';
   document.getElementById('seP').value  = s.phone      ||'';
+  document.getElementById('seParentN').value = s.parent_full_name || '';
+  document.getElementById('seParentP').value = s.parent_phone || '';
   document.getElementById('seB').value  = s.birth_year ||'';
   document.getElementById('sePv').value = s.province   ||'';
   document.getElementById('seSc').value = s.school     ||'';
@@ -1124,6 +1134,8 @@ async function sSaveStudent(){
   const {error}=await sb.from('users').update({
     full_name: document.getElementById('seN').value.trim(),
     phone:     document.getElementById('seP').value.trim(),
+    parent_full_name: document.getElementById('seParentN').value.trim(),
+    parent_phone: document.getElementById('seParentP').value.trim(),
     birth_year:parseInt(document.getElementById('seB').value)||null,
     province:  document.getElementById('sePv').value.trim(),
     school:    document.getElementById('seSc').value.trim(),
@@ -1141,7 +1153,7 @@ async function sDelStudent(id){
 
 function sExportExcel(){
   if(typeof XLSX==='undefined'){alert('Cần thêm thư viện XLSX');return;}
-  const data=_sFilt.map((s,i)=>({'STT':i+1,'Họ tên':s.full_name,'Email':s.email,'SĐT':s.phone,'Năm sinh':s.birth_year,'Tỉnh':s.province,'Trường':s.school}));
+  const data=_sFilt.map((s,i)=>({'STT':i+1,'Họ tên':s.full_name,'Email':s.email,'SĐT':s.phone,'Họ tên phụ huynh':s.parent_full_name,'SĐT phụ huynh':s.parent_phone,'Năm sinh':s.birth_year,'Tỉnh':s.province,'Trường':s.school}));
   const ws=XLSX.utils.json_to_sheet(data); const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Học sinh'); XLSX.writeFile(wb,'danh_sach_hoc_sinh.xlsx');
 }
