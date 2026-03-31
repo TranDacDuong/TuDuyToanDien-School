@@ -361,6 +361,11 @@
     return bytes;
   }
 
+  function dataUrlToBlob(dataUrl) {
+    const bytes = dataUrlToUint8Array(dataUrl);
+    return new Blob([bytes], { type: getMediaTypeFromDataUrl(dataUrl) || "image/jpeg" });
+  }
+
   async function renderPdfToPageImages(dataUrl) {
     if (!window.pdfjsLib?.getDocument) return [dataUrl];
     if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -436,7 +441,7 @@
     } catch {
       const src = String(dataUrl || "");
       if (!/^data:/i.test(src)) throw new Error("Không đọc được ảnh.");
-      const blob = await (await fetch(src)).blob();
+      const blob = dataUrlToBlob(src);
       return await new Promise((resolve, reject) => {
         const img = new Image();
         const objectUrl = URL.createObjectURL(blob);
