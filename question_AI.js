@@ -328,6 +328,100 @@
     return { questions, warnings };
   }
 
+  function buildQuestionKey(question) {
+    return String(question?.question_text || "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .replace(/[^\p{L}\p{N}$\\{}^_()+\-=/.,:; ]/gu, "")
+      .trim()
+      .slice(0, 220);
+  }
+
+  function mergeQuestionSets(chunks) {
+    const seen = new Set();
+    const questions = [];
+    const warnings = [];
+    for (const chunk of chunks) {
+      if (Array.isArray(chunk?.warnings) && chunk.warnings.length) warnings.push(...chunk.warnings);
+      for (const question of (chunk?.questions || [])) {
+        const key = buildQuestionKey(question);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        questions.push(question);
+      }
+    }
+    return { questions, warnings };
+  }
+
+  function dataUrlToUint8Array(dataUrl) {
+    const base64 = getBase64FromDataUrl(dataUrl);
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
+  async function renderPdfToPageImages(dataUrl) {
+    if (!window.pdfjsLib?.getDocument) return [dataUrl];
+    if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
+    }
+    const pdf = await window.pdfjsLib.getDocument({ data: dataUrlToUint8Array(dataUrl) }).promise;
+    const pages = [];
+    for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
+      const page = await pdf.getPage(pageNo);
+      const viewport = page.getViewport({ scale: 1.9 });
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d", { alpha: false });
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      pages.push(canvas.toDataURL("image/jpeg", 0.92));
+    }
+    return pages;
+  }
+
+  function loadImage(dataUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Không đọc được ảnh."));
+      img.src = dataUrl;
+    });
+  }
+
+  async function splitTallImageIntoChunks(dataUrl) {
+    const img = await loadImage(dataUrl);
+    const maxChunkHeight = 1700;
+    const overlap = 180;
+    if (img.naturalHeight <= maxChunkHeight * 1.15) return [dataUrl];
+    const chunks = [];
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    let startY = 0;
+    while (startY < img.naturalHeight) {
+      const chunkHeight = Math.min(maxChunkHeight, img.naturalHeight - startY);
+      canvas.width = img.naturalWidth;
+      canvas.height = chunkHeight;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, startY, img.naturalWidth, chunkHeight, 0, 0, img.naturalWidth, chunkHeight);
+      chunks.push(canvas.toDataURL("image/jpeg", 0.92));
+      if (startY + chunkHeight >= img.naturalHeight) break;
+      startY += Math.max(1, chunkHeight - overlap);
+    }
+    return chunks;
+  }
+
+  async function extractQuestionsFromImageChunks(dataUrls, sourceKind) {
+    const chunks = [];
+    for (let i = 0; i < dataUrls.length; i++) {
+      const raw = await callAI(buildAiMessages("", dataUrls[i], sourceKind));
+      const parsed = parseRawAiQuestions(raw);
+      chunks.push(parsed);
+    }
+    return mergeQuestionSets(chunks);
+  }
+
   function buildAiMessages(text, dataUrl, sourceKind = null) {
     const parts = [];
     const kind = sourceKind || detectDataKind(dataUrl);
@@ -353,6 +447,18 @@
     }
     const cleanText = String(text || "").trim();
     const sourceKind = detectDataKind(dataUrl);
+    if (sourceKind === "pdf" && dataUrl) {
+      const pageImages = await renderPdfToPageImages(dataUrl);
+      const parsedPages = await extractQuestionsFromImageChunks(pageImages, "pdf");
+      if (parsedPages.questions.length) return { ...parsedPages, raw: "[pdf-pages]" };
+    }
+    if (sourceKind === "image" && dataUrl && !cleanText) {
+      const imageChunks = await splitTallImageIntoChunks(dataUrl);
+      if (imageChunks.length > 1) {
+        const parsedChunks = await extractQuestionsFromImageChunks(imageChunks, "image");
+        if (parsedChunks.questions.length > 1) return { ...parsedChunks, raw: "[image-chunks]" };
+      }
+    }
     const raw = await callAI(buildAiMessages(cleanText, dataUrl, sourceKind));
     let parsed = parseRawAiQuestions(raw);
     if (sourceKind === "pdf" && parsed.questions.length <= 1) {
