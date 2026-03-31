@@ -228,6 +228,61 @@
     };
   }
 
+  function extractBalancedJsonArray(raw) {
+    const text = String(raw || "");
+    const start = text.indexOf("[");
+    if (start < 0) return null;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (ch === "\\") escaped = true;
+        else if (ch === '"') inString = false;
+        continue;
+      }
+      if (ch === '"') { inString = true; continue; }
+      if (ch === "[") depth++;
+      else if (ch === "]") {
+        depth--;
+        if (depth === 0) return text.slice(start, i + 1);
+      }
+    }
+    return null;
+  }
+
+  function extractTopLevelObjects(raw) {
+    const text = String(raw || "");
+    const objects = [];
+    let depth = 0;
+    let start = -1;
+    let inString = false;
+    let escaped = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (ch === "\\") escaped = true;
+        else if (ch === '"') inString = false;
+        continue;
+      }
+      if (ch === '"') { inString = true; continue; }
+      if (ch === "{") {
+        if (depth === 0) start = i;
+        depth++;
+      } else if (ch === "}") {
+        depth--;
+        if (depth === 0 && start >= 0) {
+          objects.push(text.slice(start, i + 1));
+          start = -1;
+        }
+      }
+    }
+    return objects;
+  }
+
   function parseRawAiQuestions(raw) {
     console.log("[AI raw response]:", String(raw || "").slice(0, 300));
     let parsed = [];
@@ -235,22 +290,21 @@
       const clean = String(raw || "").replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
       parsed = JSON.parse(clean);
     } catch {
-      const match = String(raw || "").match(/\[[\s\S]*\]/);
+      const match = extractBalancedJsonArray(raw);
       if (match) {
         try {
-          parsed = JSON.parse(match[0]);
+          parsed = JSON.parse(match);
         } catch {
           const objs = [];
-          const objMatches = String(raw || "").matchAll(/\{[\s\S]*?\}(?=\s*[,\]]|\s*$)/g);
-          for (const item of objMatches) {
-            try { objs.push(JSON.parse(item[0])); } catch {}
+          for (const item of extractTopLevelObjects(raw)) {
+            try { objs.push(JSON.parse(item)); } catch {}
           }
           if (objs.length) parsed = objs;
         }
       } else {
-        const single = String(raw || "").match(/\{[\s\S]*\}/);
-        if (single) {
-          try { parsed = [JSON.parse(single[0])]; } catch {}
+        const objs = extractTopLevelObjects(raw);
+        if (objs.length) {
+          try { parsed = objs.map(item => JSON.parse(item)); } catch {}
         }
       }
     }
@@ -274,8 +328,9 @@
     return { questions, warnings };
   }
 
-  function buildAiMessages(text, dataUrl) {
+  function buildAiMessages(text, dataUrl, sourceKind = null) {
     const parts = [];
+    const kind = sourceKind || detectDataKind(dataUrl);
     if (dataUrl) {
       const validation = validateDataUrlSize(dataUrl);
       if (!validation.ok) throw new Error(validation.message);
@@ -288,7 +343,7 @@
         },
       });
     }
-    parts.push({ type: "text", text: `${text || ""}\n\n${buildExtractionPrompt()}` });
+    parts.push({ type: "text", text: `${text || ""}\n\n${buildExtractionPrompt(kind)}` });
     return [{ role: "user", content: parts }];
   }
 
@@ -296,8 +351,19 @@
     if (!String(text || "").trim() && !dataUrl) {
       throw new Error("Vui lòng nhập nội dung hoặc chọn ảnh/PDF trước.");
     }
-    const raw = await callAI(buildAiMessages(String(text || "").trim(), dataUrl));
-    return { ...parseRawAiQuestions(raw), raw };
+    const cleanText = String(text || "").trim();
+    const sourceKind = detectDataKind(dataUrl);
+    const raw = await callAI(buildAiMessages(cleanText, dataUrl, sourceKind));
+    let parsed = parseRawAiQuestions(raw);
+    if (sourceKind === "pdf" && parsed.questions.length <= 1) {
+      const retryRaw = await callAI(buildAiMessages(cleanText, dataUrl, "pdf_retry"));
+      const retryParsed = parseRawAiQuestions(retryRaw);
+      if (retryParsed.questions.length > parsed.questions.length) {
+        parsed = retryParsed;
+        return { ...parsed, raw: retryRaw };
+      }
+    }
+    return { ...parsed, raw };
   }
 
   /* ══════════════════════════════════════════════
@@ -495,7 +561,7 @@
     btn.innerHTML = "✨ Chuyển đổi với AI";
   };
 
-  function buildExtractionPrompt() {
+  function buildExtractionPrompt(sourceKind = "image") {
     return `Trích xuất TẤT CẢ câu hỏi từ ảnh này. Trả về JSON array (không markdown, không backtick):
 
 [
@@ -523,6 +589,46 @@ QUY TẮC QUAN TRỌNG:
   }
 
   /* ── Crop hình vẽ từ ảnh gốc theo tọa độ pixel ── */
+  function buildExtractionPrompt(sourceKind = "image") {
+    const isPdf = sourceKind === "pdf" || sourceKind === "pdf_retry";
+    const intro = isPdf
+      ? "Trích xuất TẤT CẢ câu hỏi từ TOÀN BỘ file PDF này, gồm mọi trang theo đúng thứ tự từ trên xuống dưới."
+      : "Trích xuất TẤT CẢ câu hỏi từ ảnh này.";
+    const pdfRules = isPdf ? `
+- PDF có thể nhiều trang: phải đọc toàn bộ từ trang 1 đến trang cuối
+- Không được chỉ lấy câu đầu tiên
+- Mỗi câu hỏi là 1 object riêng
+- Nếu có nhiều câu thì phải trả về mảng nhiều object theo đúng thứ tự` : "";
+    const retryRules = sourceKind === "pdf_retry" ? `
+- Đây là lần thử lại vì kết quả trước bị thiếu câu
+- Kiểm tra lại từ đầu đến cuối và chỉ dừng khi đã liệt kê hết câu nhận diện được` : "";
+    return `${intro} Trả về JSON array (không markdown, không backtick):
+
+[
+  {
+    "question_type": "multi_choice | true_false | short_answer | essay",
+    "question_text": "Nội dung câu hỏi, KHÔNG có Câu 1, Câu 2. Với multi_choice: gộp câu hỏi + A,B,C,D vào đây mỗi phương án 1 dòng. Với true_false: chỉ ghi nội dung câu hỏi chính. Công thức dùng LaTeX: $x^2$",
+    "options": ["Ý a (chỉ dùng cho true_false)", "Ý b", "Ý c", "Ý d"],
+    "difficulty": 5,
+    "answer": "multi_choice: A/B/C/D. true_false: PHẢI điền đủ 4 cặp ví dụ aTbFcTdF (a đúng b sai c đúng d sai). short_answer: đáp án",
+    "answer_count": 4,
+    "has_figure": false,
+    "question_bbox": { "x": 0, "y": 0, "w": 800, "h": 200 }
+  }
+]
+
+QUY TẮC QUAN TRỌNG:
+- Bỏ hoàn toàn Câu 1, Câu 2, số thứ tự
+- true_false: 1 câu = 1 object DUY NHẤT, các ý a,b,c,d để trong options, KHÔNG tách thành nhiều object
+- true_false answer: PHẢI điền đủ, ví dụ "aTbFcTdF" - 4 ý thì 4 cặp chữ
+- multi_choice: gộp A,B,C,D vào question_text, để options là []
+- difficulty: 1-3 dễ, 4-6 trung bình, 7-10 khó
+- has_figure = true chỉ khi có hình vẽ/biểu đồ/đồ thị thực sự
+- question_bbox: tọa độ pixel của toàn bộ câu hỏi trong ảnh
+- Không được dừng sau câu đầu tiên nếu còn câu khác${pdfRules}${retryRules}
+- Chỉ trả về JSON, không text thêm`;
+  }
+
   function cropFigure(srcDataUrl, bbox) {
     return new Promise(resolve => {
       const img = new Image();
