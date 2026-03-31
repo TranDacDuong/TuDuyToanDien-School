@@ -410,6 +410,16 @@ button:hover{
           </div>
 
           <div class="form-group">
+            <label>Họ tên phụ huynh</label>
+            <input id="parentFullName" placeholder="Nhập họ tên phụ huynh">
+          </div>
+
+          <div class="form-group">
+            <label>SĐT phụ huynh</label>
+            <input id="parentPhone" placeholder="Nhập số điện thoại phụ huynh">
+          </div>
+
+          <div class="form-group">
             <label>Năm sinh</label>
             <input type="number" id="birthYear">
           </div>
@@ -555,6 +565,8 @@ async function loadProfile(){
 
   document.getElementById("fullName").value=data.full_name ?? "";
   document.getElementById("phone").value=data.phone ?? "";
+  document.getElementById("parentFullName").value=data.parent_full_name ?? "";
+  document.getElementById("parentPhone").value=data.parent_phone ?? "";
   document.getElementById("birthYear").value=data.birth_year ?? "";
   document.getElementById("province").value=data.province ?? "";
   document.getElementById("school").value=data.school ?? "";
@@ -568,6 +580,8 @@ async function loadProfile(){
 async function saveProfile(){
   const fullName=document.getElementById("fullName").value.trim();
   const phone=document.getElementById("phone").value.trim();
+  const parentFullName=document.getElementById("parentFullName").value.trim();
+  const parentPhone=document.getElementById("parentPhone").value.trim();
   const birthYear=parseInt(document.getElementById("birthYear").value);
   const province=document.getElementById("province").value;
   const school=document.getElementById("school").value;
@@ -583,6 +597,8 @@ async function saveProfile(){
     .update({
       full_name:fullName,
       phone:phone,
+      parent_full_name:parentFullName,
+      parent_phone:parentPhone,
       birth_year:birthYear,
       province:province,
       school:school,
