@@ -226,7 +226,6 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 .s-stats { display:flex; gap:8px; flex-wrap:wrap; }
 .s-chip { background:var(--white); border:1px solid var(--border); border-radius:20px; padding:4px 12px; font-size:.78rem; color:var(--ink-mid); font-weight:500; box-shadow:var(--shadow-sm); }
 .s-chip b { color:var(--navy); }
-.s-import-card { background:rgba(255,255,255,.94); border:1px solid rgba(15,31,61,.08); border-radius:20px; box-shadow:0 14px 28px rgba(15,31,61,.06); padding:16px; margin-bottom:14px; display:grid; gap:12px; }
 .s-import-result { display:none; padding:10px 12px; border-radius:12px; font-size:.82rem; line-height:1.6; }
 .s-import-result.show { display:block; }
 .s-import-result.ok { background:var(--green-bg); color:var(--green); border:1px solid rgba(34,197,94,.18); }
@@ -469,10 +468,8 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
         <button class="btn btn-outline btn-sm" onclick="sExportExcel()">📥 Xuất Excel</button>
       </div>
     </div>
-    <div class="s-import-card">
-      <div id="sImportResult" class="s-import-result"></div>
-      <input id="sImportFile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="sHandleImportFile(event)">
-    </div>
+    <div id="sImportResult" class="s-import-result" style="margin-bottom:14px"></div>
+    <input id="sImportFile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="sHandleImportFile(event)">
     <div class="s-search">
       <div class="sg"><label>Tên</label><input id="sSName"     placeholder="Nhập tên..."></div>
       <div class="sg"><label>SĐT</label><input id="sSPhone"    placeholder="SĐT..."></div>
