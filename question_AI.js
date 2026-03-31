@@ -153,6 +153,43 @@
     return { answer: normalizedAnswer, answerCount, missing };
   }
 
+  function normalizeQuestionType(value, rawQuestion = {}) {
+    const raw = String(value || "").trim().toLowerCase();
+    const compact = raw.replace(/[\s\-]+/g, "_");
+    const aliasMap = {
+      multi_choice: "multi_choice",
+      multiple_choice: "multi_choice",
+      multiplechoice: "multi_choice",
+      mcq: "multi_choice",
+      trac_nghiem: "multi_choice",
+      trắc_nghiệm: "multi_choice",
+      choice: "multi_choice",
+      true_false: "true_false",
+      truefalse: "true_false",
+      dung_sai: "true_false",
+      đúng_sai: "true_false",
+      short_answer: "short_answer",
+      shortanswer: "short_answer",
+      short: "short_answer",
+      tra_loi_ngan: "short_answer",
+      trả_lời_ngắn: "short_answer",
+      essay: "essay",
+      tu_luan: "essay",
+      tự_luận: "essay",
+      tl: "essay",
+    };
+    if (ALLOWED_TYPES.has(compact)) return compact;
+    if (aliasMap[compact]) return aliasMap[compact];
+
+    const answer = String(rawQuestion.answer || "").trim();
+    const options = Array.isArray(rawQuestion.options) ? rawQuestion.options.filter(Boolean) : [];
+    if (/[a-z]\s*[TF]/i.test(answer)) return "true_false";
+    if (options.length && options.every(opt => /^\s*(ý|y)\s*[a-z]/i.test(String(opt)))) return "true_false";
+    if (answer && !/[A-D]/i.test(answer.toUpperCase()) && options.length <= 1) return "short_answer";
+    if (!answer && !options.length) return "essay";
+    return "multi_choice";
+  }
+
   function normalizeAiQuestion(rawQuestion, index) {
     if (!rawQuestion || typeof rawQuestion !== "object") {
       return { question: null, warnings: [`Câu ${index + 1} không đúng định dạng object.`] };
@@ -160,8 +197,8 @@
 
     const warnings = [];
     const requestedType = String(rawQuestion.question_type || "").trim();
-    const questionType = ALLOWED_TYPES.has(requestedType) ? requestedType : "multi_choice";
-    if (requestedType && !ALLOWED_TYPES.has(requestedType)) {
+    const questionType = normalizeQuestionType(requestedType, rawQuestion);
+    if (requestedType && !ALLOWED_TYPES.has(requestedType) && questionType === "multi_choice") {
       warnings.push(`Câu ${index + 1}: loại "${requestedType}" không hợp lệ, đã đổi sang trắc nghiệm.`);
     }
 
