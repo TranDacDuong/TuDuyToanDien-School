@@ -491,6 +491,31 @@
     return chunks;
   }
 
+  function splitPdfTextIntoQuestionChunks(textChunks) {
+    const batches = [];
+    const questionPattern = /(?:^|\n)\s*(Câu\s*\d+\s*[:.)-]?|\d+\s*[:.)-])/gi;
+    for (const pageText of (textChunks || [])) {
+      const text = String(pageText || "").trim();
+      if (!text) continue;
+      const matches = [...text.matchAll(questionPattern)];
+      if (!matches.length) {
+        batches.push(text);
+        continue;
+      }
+      const questions = matches.map((match, index) => {
+        const start = match.index + (match[0].startsWith("\n") ? 1 : 0);
+        const end = index + 1 < matches.length
+          ? matches[index + 1].index + (matches[index + 1][0].startsWith("\n") ? 1 : 0)
+          : text.length;
+        return text.slice(start, end).trim();
+      }).filter(Boolean);
+      for (let i = 0; i < questions.length; i += 4) {
+        batches.push(questions.slice(i, i + 4).join("\n\n"));
+      }
+    }
+    return batches;
+  }
+
   async function stitchImagesVertically(dataUrls) {
     if (!Array.isArray(dataUrls) || !dataUrls.length) return null;
     if (dataUrls.length === 1) return dataUrls[0];
@@ -644,7 +669,11 @@
     if (sourceKind === "pdf" && dataUrl) {
       const textChunks = await extractPdfTextChunks(dataUrl);
       if (textChunks.length) {
-        const parsedTextPdf = await extractQuestionsFromTextChunks(textChunks, "pdf");
+        const textQuestionChunks = splitPdfTextIntoQuestionChunks(textChunks);
+        const parsedTextPdf = await extractQuestionsFromTextChunks(
+          textQuestionChunks.length ? textQuestionChunks : textChunks,
+          "pdf_text"
+        );
         if (parsedTextPdf.questions.length) {
           return { ...parsedTextPdf, raw: "[pdf-text-pages]" };
         }
@@ -904,7 +933,7 @@ QUY TẮC QUAN TRỌNG:
 
   /* ── Crop hình vẽ từ ảnh gốc theo tọa độ pixel ── */
   function buildExtractionPrompt(sourceKind = "image") {
-    const isPdf = sourceKind === "pdf" || sourceKind === "pdf_retry";
+    const isPdf = sourceKind === "pdf" || sourceKind === "pdf_text" || sourceKind === "pdf_retry";
     const intro = isPdf
       ? "Trích xuất TẤT CẢ câu hỏi từ TOÀN BỘ file PDF này, gồm mọi trang theo đúng thứ tự từ trên xuống dưới."
       : "Trích xuất TẤT CẢ câu hỏi từ ảnh này.";
@@ -912,7 +941,8 @@ QUY TẮC QUAN TRỌNG:
 - PDF có thể nhiều trang: phải đọc toàn bộ từ trang 1 đến trang cuối
 - Không được chỉ lấy câu đầu tiên
 - Mỗi câu hỏi là 1 object riêng
-- Nếu có nhiều câu thì phải trả về mảng nhiều object theo đúng thứ tự` : "";
+- Nếu có nhiều câu thì phải trả về mảng nhiều object theo đúng thứ tự
+- Nếu đầu vào đã chứa nhiều câu hỏi liên tiếp, phải tách hết tất cả câu trong đầu vào đó` : "";
     const retryRules = sourceKind === "pdf_retry" ? `
 - Đây là lần thử lại vì kết quả trước bị thiếu câu
 - Kiểm tra lại từ đầu đến cuối và chỉ dừng khi đã liệt kê hết câu nhận diện được` : "";
