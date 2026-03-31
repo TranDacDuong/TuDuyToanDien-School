@@ -1008,7 +1008,7 @@ async function convertModalWithAI() {
   }
 
   btn.disabled = false;
-  btn.innerHTML = "âœ¨ Chuyá»ƒn Ä‘á»•i vá»›i AI";
+  btn.innerHTML = "Chuyển đổi với AI";
 }
 
 document.getElementById("qPdfFile").onchange = async function(e) {
@@ -1027,7 +1027,7 @@ document.getElementById("qPdfFile").onchange = async function(e) {
     if (!shared?.readFileAsDataUrl) throw new Error("ChÆ°a táº£i xong bá»™ AI dÃ¹ng chung.");
 
     _modalPastedImg = await shared.readFileAsDataUrl(file);
-    hint.textContent = "âœ… ÄÃ£ táº£i PDF â€” báº¥m Chuyá»ƒn Ä‘á»•i";
+    hint.textContent = "Đã tải PDF - bấm Chuyển đổi với AI";
     hint.style.color = "var(--green)";
   } catch (err) {
     _modalPastedImg = null;
@@ -1036,7 +1036,7 @@ document.getElementById("qPdfFile").onchange = async function(e) {
   }
 
   btn.disabled = false;
-  btn.innerHTML = "âœ¨ Chuyá»ƒn Ä‘á»•i vá»›i AI";
+  btn.innerHTML = "Chuyển đổi với AI";
   e.target.value = "";
 };
 </script>
