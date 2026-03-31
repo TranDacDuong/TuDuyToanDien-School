@@ -226,6 +226,14 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 .s-stats { display:flex; gap:8px; flex-wrap:wrap; }
 .s-chip { background:var(--white); border:1px solid var(--border); border-radius:20px; padding:4px 12px; font-size:.78rem; color:var(--ink-mid); font-weight:500; box-shadow:var(--shadow-sm); }
 .s-chip b { color:var(--navy); }
+.s-import-card { background:rgba(255,255,255,.94); border:1px solid rgba(15,31,61,.08); border-radius:20px; box-shadow:0 14px 28px rgba(15,31,61,.06); padding:16px; margin-bottom:14px; display:grid; gap:12px; }
+.s-import-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.s-import-note { font-size:.82rem; color:var(--ink-light); line-height:1.65; }
+.s-import-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.s-import-result { display:none; padding:10px 12px; border-radius:12px; font-size:.82rem; line-height:1.6; }
+.s-import-result.show { display:block; }
+.s-import-result.ok { background:var(--green-bg); color:var(--green); border:1px solid rgba(34,197,94,.18); }
+.s-import-result.warn { background:var(--amber-bg); color:var(--amber); border:1px solid rgba(245,158,11,.18); }
 .s-search { background:rgba(255,255,255,.92); border-radius:18px; box-shadow:0 14px 28px rgba(15,31,61,.06); border:1px solid rgba(15,31,61,.08); padding:14px 16px; margin-bottom:14px; display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; }
 .s-search .sg { flex:1; min-width:110px; }
 .s-table-card { background:linear-gradient(180deg, #ffffff 0%, #fbfdff 100%); border-radius:20px; box-shadow:0 18px 38px rgba(15,31,61,.08); border:1px solid rgba(15,31,61,.08); overflow:hidden; }
@@ -259,6 +267,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   .form-btns .btn,.act-wrap button { width: 100%; min-height: 42px; }
   table { min-width: 720px; }
   .t-grid { grid-template-columns: 1fr; }
+  .s-import-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -458,7 +467,35 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
         <div class="s-chip">Hiển thị: <b id="sStatShow">0</b></div>
         <div class="s-chip">Tổng: <b id="sStatTotal">0</b></div>
       </div>
-      <button class="btn btn-outline btn-sm" onclick="sExportExcel()">📥 Xuất Excel</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="sDownloadImportTemplate()">🧾 Tải file mẫu</button>
+        <button class="btn btn-outline btn-sm" onclick="sExportExcel()">📥 Xuất Excel</button>
+      </div>
+    </div>
+    <div class="s-import-card">
+      <div class="s-import-top">
+        <div>
+          <div style="font-weight:800;color:var(--navy);margin-bottom:4px">Tạo tài khoản học sinh từ file Excel</div>
+          <div class="s-import-note">Nhập file `.xlsx`, `.xls` hoặc `.csv` có các cột như `email`, `full_name`, `phone`, `birth_year`, `province`, `school`, `password`. Nếu không có cột `password`, hệ thống sẽ dùng mật khẩu mặc định bạn nhập bên dưới.</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="sPickImportFile()">📤 Nhập Excel</button>
+      </div>
+      <div class="s-import-grid">
+        <div class="fg" style="margin:0">
+          <label>Mật khẩu mặc định</label>
+          <input id="sImportDefaultPassword" value="123456" placeholder="VD: 123456">
+        </div>
+        <div class="fg" style="margin:0">
+          <label>Tên sheet ưu tiên</label>
+          <input id="sImportSheetName" placeholder="Để trống nếu lấy sheet đầu">
+        </div>
+        <div class="fg" style="margin:0">
+          <label>Trạng thái</label>
+          <input id="sImportFileName" value="Chưa chọn file" disabled>
+        </div>
+      </div>
+      <div id="sImportResult" class="s-import-result"></div>
+      <input id="sImportFile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="sHandleImportFile(event)">
     </div>
     <div class="s-search">
       <div class="sg"><label>Tên</label><input id="sSName"     placeholder="Nhập tên..."></div>
@@ -904,6 +941,97 @@ const S_PAGE=15;
 
 function sRmVN(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đĐ]/g,m=>m==='đ'?'d':'D').toLowerCase(); }
 function sIni(n){ const p=(n||'?').trim().split(' '); return (p[0][0]+(p[p.length-1]?.[0]||'')).toUpperCase(); }
+
+let _sImporting=false;
+
+function sImportStatus(message,type='warn'){
+  const box=document.getElementById('sImportResult');
+  if(!box) return;
+  box.className=`s-import-result show ${type}`;
+  box.innerHTML=message;
+}
+function sNormalizeHeader(v){
+  return sRmVN(String(v||'')).replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+}
+function sMapImportRow(row){
+  const normalized={};
+  Object.keys(row||{}).forEach(key=>{ normalized[sNormalizeHeader(key)] = row[key]; });
+  const pick=(...keys)=>{
+    for(const key of keys){
+      const value = normalized[key];
+      if(value !== undefined && value !== null && String(value).trim() !== '') return String(value).trim();
+    }
+    return '';
+  };
+  const birthRaw = pick('birth_year','nam_sinh','year_of_birth','namsinh');
+  return {
+    email: pick('email','gmail','mail'),
+    full_name: pick('full_name','ho_va_ten','ho_ten','ten','name'),
+    phone: pick('phone','sdt','so_dien_thoai','dien_thoai'),
+    birth_year: birthRaw ? parseInt(birthRaw,10) : null,
+    province: pick('province','tinh','tinh_thanh','thanh_pho'),
+    school: pick('school','truong','truong_hoc'),
+    password: pick('password','mat_khau','matkhau')
+  };
+}
+function sPickImportFile(){
+  if(_sImporting) return;
+  document.getElementById('sImportFile')?.click();
+}
+function sDownloadImportTemplate(){
+  if(typeof XLSX==='undefined'){alert('Cần thêm thư viện XLSX');return;}
+  const rows=[{email:'hocsinh1@gmail.com',full_name:'Nguyen Van A',phone:'0900000001',birth_year:2008,province:'Ha Noi',school:'THPT ABC',password:'123456'}];
+  const ws=XLSX.utils.json_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'students_import');
+  XLSX.writeFile(wb,'mau_import_hoc_sinh.xlsx');
+}
+async function sHandleImportFile(event){
+  const file=(event.target.files||[])[0];
+  if(!file) return;
+  document.getElementById('sImportFileName').value=file.name;
+  if(typeof XLSX==='undefined'){alert('Cần thêm thư viện XLSX');return;}
+  const defaultPassword=(document.getElementById('sImportDefaultPassword').value||'').trim();
+  if(defaultPassword && defaultPassword.length < 6){
+    alert('Mật khẩu mặc định tối thiểu 6 ký tự');
+    event.target.value='';
+    return;
+  }
+  _sImporting=true;
+  sImportStatus('Đang đọc file và chuẩn bị dữ liệu import...', 'warn');
+  try{
+    const buffer=await file.arrayBuffer();
+    const workbook=XLSX.read(buffer,{type:'array'});
+    const preferred=(document.getElementById('sImportSheetName').value||'').trim();
+    const sheetName=preferred && workbook.Sheets[preferred] ? preferred : workbook.SheetNames[0];
+    if(!sheetName) throw new Error('Không tìm thấy sheet nào trong file.');
+    const sheet=workbook.Sheets[sheetName];
+    const rawRows=XLSX.utils.sheet_to_json(sheet,{defval:''});
+    const rows=rawRows.map(sMapImportRow).filter(row=>row.email);
+    if(!rows.length) throw new Error('File không có dòng hợp lệ. Hãy kiểm tra cột email.');
+    const payload=rows.map(row=>({ ...row, password: row.password || defaultPassword || '' }));
+    const { data, error } = await sb.rpc('admin_import_students_batch', { p_rows: payload });
+    if(error) throw error;
+    const created=(data?.created_accounts||[]).map(item=>({'Họ tên':item.full_name||'','Email':item.email||'','Mật khẩu':item.password||'','Trạng thái':item.status||'created'}));
+    if(created.length){
+      const ws=XLSX.utils.json_to_sheet(created);
+      const wb=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb,ws,'tai_khoan_moi');
+      XLSX.writeFile(wb,'tai_khoan_hoc_sinh_moi.xlsx');
+    }
+    sImportStatus(`Đã xử lý <b>${data?.processed || payload.length}</b> dòng. Tạo mới: <b>${data?.inserted || 0}</b>, cập nhật: <b>${data?.updated || 0}</b>, bỏ qua: <b>${data?.skipped || 0}</b>.${created.length ? ' Đã tải xuống file tài khoản mới.' : ''}`, (data?.inserted || 0) > 0 ? 'ok' : 'warn');
+    if(Array.isArray(data?.errors) && data.errors.length){ console.warn('Import student warnings', data.errors); }
+    toast('✅ Đã import danh sách học sinh');
+    await loadStudents();
+  }catch(error){
+    console.error(error);
+    sImportStatus(`Không thể import học sinh: ${esc(error.message || 'Lỗi không xác định')}`, 'warn');
+    alert('Không thể import học sinh: ' + (error.message || 'Lỗi không xác định'));
+  }finally{
+    _sImporting=false;
+    event.target.value='';
+  }
+}
 
 async function loadStudents(){
   const {data} = await sb.from('users').select('*').eq('role','student').order('full_name');

@@ -2135,3 +2135,204 @@ USING (
       AND u.role IN ('admin', 'teacher')
   )
 );
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE OR REPLACE FUNCTION public.admin_import_students_batch(p_rows jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth, extensions
+AS $$
+DECLARE
+  row_item jsonb;
+  v_email text;
+  v_full_name text;
+  v_phone text;
+  v_province text;
+  v_school text;
+  v_password text;
+  v_birth_year integer;
+  v_auth_user_id uuid;
+  v_public_user_id uuid;
+  v_inserted integer := 0;
+  v_updated integer := 0;
+  v_skipped integer := 0;
+  v_processed integer := 0;
+  v_created_accounts jsonb := '[]'::jsonb;
+  v_errors jsonb := '[]'::jsonb;
+BEGIN
+  IF auth.uid() IS NULL OR NOT EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  ) THEN
+    RAISE EXCEPTION 'Chỉ admin mới được import học sinh';
+  END IF;
+
+  IF jsonb_typeof(p_rows) IS DISTINCT FROM 'array' THEN
+    RAISE EXCEPTION 'Dữ liệu import phải là một mảng JSON';
+  END IF;
+
+  FOR row_item IN
+    SELECT value FROM jsonb_array_elements(p_rows)
+  LOOP
+    v_processed := v_processed + 1;
+    v_email := lower(trim(coalesce(row_item->>'email', '')));
+    v_full_name := nullif(trim(coalesce(row_item->>'full_name', '')), '');
+    v_phone := nullif(trim(coalesce(row_item->>'phone', '')), '');
+    v_province := nullif(trim(coalesce(row_item->>'province', '')), '');
+    v_school := nullif(trim(coalesce(row_item->>'school', '')), '');
+    v_password := nullif(trim(coalesce(row_item->>'password', '')), '');
+
+    BEGIN
+      v_birth_year := NULLIF(trim(coalesce(row_item->>'birth_year', '')), '')::integer;
+    EXCEPTION WHEN others THEN
+      v_birth_year := NULL;
+    END;
+
+    IF v_email = '' THEN
+      v_skipped := v_skipped + 1;
+      v_errors := v_errors || jsonb_build_array(jsonb_build_object(
+        'row', v_processed,
+        'email', '',
+        'message', 'Thiếu email'
+      ));
+      CONTINUE;
+    END IF;
+
+    IF v_password IS NULL THEN
+      v_password := '123456';
+    END IF;
+
+    SELECT id INTO v_auth_user_id
+    FROM auth.users
+    WHERE lower(email) = v_email
+    LIMIT 1;
+
+    IF v_auth_user_id IS NULL THEN
+      v_auth_user_id := gen_random_uuid();
+
+      INSERT INTO auth.users (
+        instance_id,
+        id,
+        aud,
+        role,
+        email,
+        encrypted_password,
+        email_confirmed_at,
+        raw_app_meta_data,
+        raw_user_meta_data,
+        created_at,
+        updated_at,
+        confirmation_token,
+        email_change,
+        email_change_token_new,
+        recovery_token
+      )
+      VALUES (
+        '00000000-0000-0000-0000-000000000000',
+        v_auth_user_id,
+        'authenticated',
+        'authenticated',
+        v_email,
+        crypt(v_password, gen_salt('bf')),
+        now(),
+        jsonb_build_object('provider', 'email', 'providers', ARRAY['email']),
+        jsonb_build_object('full_name', coalesce(v_full_name, split_part(v_email, '@', 1))),
+        now(),
+        now(),
+        '',
+        '',
+        '',
+        ''
+      );
+
+      INSERT INTO auth.identities (
+        id,
+        user_id,
+        identity_data,
+        provider,
+        provider_id,
+        last_sign_in_at,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        gen_random_uuid(),
+        v_auth_user_id,
+        jsonb_build_object(
+          'sub', v_auth_user_id::text,
+          'email', v_email,
+          'email_verified', true,
+          'phone_verified', false
+        ),
+        'email',
+        v_email,
+        now(),
+        now(),
+        now()
+      );
+
+      v_inserted := v_inserted + 1;
+      v_created_accounts := v_created_accounts || jsonb_build_array(jsonb_build_object(
+        'email', v_email,
+        'full_name', v_full_name,
+        'password', v_password,
+        'status', 'created'
+      ));
+    END IF;
+
+    SELECT id INTO v_public_user_id
+    FROM public.users
+    WHERE lower(email) = v_email
+    LIMIT 1;
+
+    IF v_public_user_id IS NULL THEN
+      INSERT INTO public.users (
+        id,
+        email,
+        full_name,
+        role,
+        phone,
+        birth_year,
+        province,
+        school
+      )
+      VALUES (
+        v_auth_user_id,
+        v_email,
+        v_full_name,
+        'student',
+        v_phone,
+        v_birth_year,
+        v_province,
+        v_school
+      );
+    ELSE
+      UPDATE public.users
+      SET
+        full_name = COALESCE(v_full_name, public.users.full_name),
+        role = 'student',
+        phone = COALESCE(v_phone, public.users.phone),
+        birth_year = COALESCE(v_birth_year, public.users.birth_year),
+        province = COALESCE(v_province, public.users.province),
+        school = COALESCE(v_school, public.users.school)
+      WHERE id = v_public_user_id;
+
+      v_updated := v_updated + 1;
+    END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'processed', v_processed,
+    'inserted', v_inserted,
+    'updated', v_updated,
+    'skipped', v_skipped,
+    'created_accounts', v_created_accounts,
+    'errors', v_errors
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.admin_import_students_batch(jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.admin_import_students_batch(jsonb) TO authenticated;
