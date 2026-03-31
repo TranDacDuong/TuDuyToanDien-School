@@ -386,7 +386,7 @@
     if (dataUrls.length === 1) return dataUrls[0];
     const images = [];
     for (const dataUrl of dataUrls) {
-      images.push(await loadImage(dataUrl));
+      images.push(await loadImageSafe(dataUrl));
     }
     const maxWidth = Math.max(...images.map(img => img.naturalWidth || img.width || 1));
     const gap = 24;
@@ -412,17 +412,50 @@
     return canvas.toDataURL("image/jpeg", 0.92);
   }
 
-  function loadImage(dataUrl) {
-    return new Promise((resolve, reject) => {
+  async function loadImage(dataUrl) {
+    const src = String(dataUrl || "");
+    if (!src) throw new Error("Không đọc được ảnh.");
+    return await new Promise(async (resolve, reject) => {
       const img = new Image();
-      img.onload = () => resolve(img);
+      let objectUrl = null;
+      const cleanup = () => {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+      };
+      img.onload = () => {
+        cleanup();
+        resolve(img);
+      };
       img.onerror = () => reject(new Error("Không đọc được ảnh."));
       img.src = dataUrl;
     });
   }
 
+  async function loadImageSafe(dataUrl) {
+    try {
+      return await loadImage(dataUrl);
+    } catch {
+      const src = String(dataUrl || "");
+      if (!/^data:/i.test(src)) throw new Error("Không đọc được ảnh.");
+      const blob = await (await fetch(src)).blob();
+      return await new Promise((resolve, reject) => {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(blob);
+        const cleanup = () => URL.revokeObjectURL(objectUrl);
+        img.onload = () => {
+          cleanup();
+          resolve(img);
+        };
+        img.onerror = () => {
+          cleanup();
+          reject(new Error("Không đọc được ảnh."));
+        };
+        img.src = objectUrl;
+      });
+    }
+  }
+
   async function splitTallImageIntoChunks(dataUrl) {
-    const img = await loadImage(dataUrl);
+    const img = await loadImageSafe(dataUrl);
     const maxChunkHeight = 1700;
     const overlap = 180;
     if (img.naturalHeight <= maxChunkHeight * 1.15) return [dataUrl];
