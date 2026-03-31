@@ -381,6 +381,37 @@
     return pages;
   }
 
+  async function stitchImagesVertically(dataUrls) {
+    if (!Array.isArray(dataUrls) || !dataUrls.length) return null;
+    if (dataUrls.length === 1) return dataUrls[0];
+    const images = [];
+    for (const dataUrl of dataUrls) {
+      images.push(await loadImage(dataUrl));
+    }
+    const maxWidth = Math.max(...images.map(img => img.naturalWidth || img.width || 1));
+    const gap = 24;
+    const scaledHeights = images.map(img => Math.max(1, Math.round((img.naturalHeight || img.height || 1) * (maxWidth / (img.naturalWidth || img.width || 1)))));
+    const totalHeight = scaledHeights.reduce((sum, h) => sum + h, 0) + gap * (images.length - 1);
+    const canvas = document.createElement("canvas");
+    canvas.width = maxWidth;
+    canvas.height = totalHeight;
+    const ctx = canvas.getContext("2d", { alpha: false });
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    let y = 0;
+    images.forEach((img, index) => {
+      const drawHeight = scaledHeights[index];
+      ctx.drawImage(img, 0, y, maxWidth, drawHeight);
+      y += drawHeight;
+      if (index < images.length - 1) {
+        ctx.fillStyle = "#f5f5f5";
+        ctx.fillRect(0, y, maxWidth, gap);
+        y += gap;
+      }
+    });
+    return canvas.toDataURL("image/jpeg", 0.92);
+  }
+
   function loadImage(dataUrl) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -449,8 +480,12 @@
     const sourceKind = detectDataKind(dataUrl);
     if (sourceKind === "pdf" && dataUrl) {
       const pageImages = await renderPdfToPageImages(dataUrl);
-      const parsedPages = await extractQuestionsFromImageChunks(pageImages, "pdf");
-      if (parsedPages.questions.length) return { ...parsedPages, raw: "[pdf-pages]" };
+      const stitchedPdfImage = await stitchImagesVertically(pageImages);
+      if (stitchedPdfImage) {
+        const imageChunks = await splitTallImageIntoChunks(stitchedPdfImage);
+        const parsedPdf = await extractQuestionsFromImageChunks(imageChunks, "image");
+        if (parsedPdf.questions.length) return { ...parsedPdf, raw: "[pdf-as-image]" };
+      }
     }
     if (sourceKind === "image" && dataUrl && !cleanText) {
       const imageChunks = await splitTallImageIntoChunks(dataUrl);
