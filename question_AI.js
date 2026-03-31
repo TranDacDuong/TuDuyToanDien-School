@@ -403,6 +403,10 @@
     return new Blob([bytes], { type: getMediaTypeFromDataUrl(dataUrl) || "image/png" });
   }
 
+  function exportCanvasAsJpeg(canvas, quality = 0.92) {
+    return canvas.toDataURL("image/jpeg", quality);
+  }
+
   async function loadRasterImage(dataUrl) {
     const src = String(dataUrl || "");
     if (!src) throw new Error("Không đọc được ảnh.");
@@ -443,13 +447,15 @@
     const pages = [];
     for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
       const page = await pdf.getPage(pageNo);
-      const viewport = page.getViewport({ scale: 1.9 });
+      const viewport = page.getViewport({ scale: 1.6 });
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d", { alpha: false });
       canvas.width = Math.ceil(viewport.width);
       canvas.height = Math.ceil(viewport.height);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       await page.render({ canvasContext: ctx, viewport }).promise;
-      pages.push(canvas.toDataURL("image/png"));
+      pages.push(exportCanvasAsJpeg(canvas));
     }
     return pages;
   }
@@ -527,24 +533,31 @@
     }
   }
 
-  async function splitTallImageIntoChunks(dataUrl) {
+  async function splitTallImageIntoChunks(dataUrl, options = {}) {
     const img = await loadRasterImage(dataUrl);
     const maxChunkHeight = 1700;
     const overlap = 180;
+    const outputType = options.outputType || getMediaTypeFromDataUrl(dataUrl) || "image/png";
+    const jpegQuality = options.jpegQuality ?? 0.92;
     const imgWidth = rasterWidth(img);
     const imgHeight = rasterHeight(img);
     if (imgHeight <= maxChunkHeight * 1.15) return [dataUrl];
     const chunks = [];
     const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { alpha: false });
     let startY = 0;
     while (startY < imgHeight) {
       const chunkHeight = Math.min(maxChunkHeight, imgHeight - startY);
       canvas.width = imgWidth;
       canvas.height = chunkHeight;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, startY, imgWidth, chunkHeight, 0, 0, imgWidth, chunkHeight);
-      chunks.push(canvas.toDataURL("image/png"));
+      chunks.push(
+        outputType === "image/jpeg"
+          ? exportCanvasAsJpeg(canvas, jpegQuality)
+          : canvas.toDataURL(outputType)
+      );
       if (startY + chunkHeight >= imgHeight) break;
       startY += Math.max(1, chunkHeight - overlap);
     }
@@ -590,12 +603,22 @@
       const pageImages = await renderPdfToPageImages(dataUrl);
       const pageChunks = [];
       for (const pageImage of pageImages) {
-        const imageChunks = await splitTallImageIntoChunks(pageImage);
-        const parsedPage = await extractQuestionsFromImageChunks(imageChunks, "image");
-        pageChunks.push(parsedPage);
+        try {
+          const imageChunks = await splitTallImageIntoChunks(pageImage, { outputType: "image/jpeg", jpegQuality: 0.9 });
+          const parsedPage = await extractQuestionsFromImageChunks(imageChunks, "image");
+          pageChunks.push(parsedPage);
+        } catch (pageError) {
+          pageChunks.push({
+            questions: [],
+            warnings: [`Một trang PDF không đọc được hoàn chỉnh: ${pageError.message}`],
+          });
+        }
       }
       const parsedPdf = mergeQuestionSets(pageChunks);
-      if (parsedPdf.questions.length) return { ...parsedPdf, raw: "[pdf-pages-as-images]" };
+      if (!parsedPdf.questions.length) {
+        throw new Error("Không đọc được nội dung PDF. Hãy thử PDF rõ nét hơn hoặc xuất lại PDF rồi tải lên.");
+      }
+      return { ...parsedPdf, raw: "[pdf-pages-as-images]" };
     }
     if (sourceKind === "image" && dataUrl && !cleanText) {
       const imageChunks = await splitTallImageIntoChunks(dataUrl);
@@ -605,15 +628,7 @@
       }
     }
     const raw = await callAI(buildAiMessages(cleanText, dataUrl, sourceKind));
-    let parsed = parseRawAiQuestions(raw);
-    if (sourceKind === "pdf" && parsed.questions.length <= 1) {
-      const retryRaw = await callAI(buildAiMessages(cleanText, dataUrl, "pdf_retry"));
-      const retryParsed = parseRawAiQuestions(retryRaw);
-      if (retryParsed.questions.length > parsed.questions.length) {
-        parsed = retryParsed;
-        return { ...parsed, raw: retryRaw };
-      }
-    }
+    const parsed = parseRawAiQuestions(raw);
     return { ...parsed, raw };
   }
 
