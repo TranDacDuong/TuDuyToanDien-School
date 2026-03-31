@@ -356,14 +356,14 @@ window.performSearch = async function() {
   if (activeTab === "all" || activeTab === "users") {
     const users = await searchUsers(keyword);
     if (users.length) {
-      parts.push(users.map(renderUserItem).join(""));
+      parts.push(users.map(renderUserItemFullscreen).join(""));
     }
   }
 
   if (activeTab === "all" || activeTab === "posts") {
     const posts = await searchPosts(keyword);
     if (posts.length) {
-      parts.push(posts.map(renderPostItem).join(""));
+      parts.push(posts.map(renderPostItemFullscreen).join(""));
     }
   }
 
@@ -431,6 +431,28 @@ function canViewPost(post) {
   if (post.user_id === currentUser.id) return true;
   if (!post.visibility || post.visibility === "public") return true;
   if (post.visibility === "friends" && friendIds.has(post.user_id)) return true;
+  return false;
+}
+
+function openSearchTarget(url) {
+  const target = String(url || "").trim();
+  if (!target) return false;
+  try {
+    if (window.top && window.top !== window && typeof window.top.openDashboardPage === "function") {
+      window.top.openDashboardPage(target, { syncMenu: true, syncMobile: true });
+      return false;
+    }
+  } catch (error) {}
+  try {
+    if (window.parent && window.parent !== window && window.parent.document) {
+      const frame = window.parent.document.getElementById("contentFrame");
+      if (frame) {
+        frame.src = target;
+        return false;
+      }
+    }
+  } catch (error) {}
+  window.location.href = target;
   return false;
 }
 
@@ -540,6 +562,66 @@ function esc(value) {
 
 function safeUrl(value) {
   return String(value || "").replace(/"/g, "&quot;");
+}
+
+function renderUserItemFullscreen(user) {
+  const meta = [];
+  if (user.school) meta.push("<span>" + esc(user.school) + "</span>");
+  if (user.province) meta.push("<span>" + esc(user.province) + "</span>");
+
+  return `
+    <article class="user-item">
+      <img class="user-avatar" src="${safeUrl(user.avatar_url || "default-avatar.png")}" alt="Avatar" onerror="this.src='default-avatar.png'">
+      <div class="user-main">
+        <div class="user-top">
+          <a class="user-name" href="profile.html?id=${user.id}" onclick="return openSearchTarget('profile.html?id=${user.id}')">${esc(user.full_name || "Người dùng")}</a>
+          <span class="role-chip">${esc(formatRole(user.role))}</span>
+        </div>
+        ${meta.length ? `<div class="user-meta">${meta.join("")}</div>` : ""}
+        ${user.bio ? `<div class="user-bio">${esc(user.bio)}</div>` : ""}
+        <div class="user-actions">
+          <button class="btn btn-outline" type="button" onclick="openSearchTarget('profile.html?id=${user.id}')">Xem hồ sơ</button>
+          ${user.id !== currentUser.id ? `<button class="btn btn-outline" type="button" onclick="openSearchTarget('messages.html?user=${user.id}')">Nhắn tin</button>` : ""}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderPostItemFullscreen(post) {
+  const badges = [];
+  if (post.is_pinned) badges.push('<span class="badge badge-gold">Đã ghim</span>');
+  if (!post.visibility || post.visibility === "public") badges.push('<span class="badge badge-blue">Công khai</span>');
+  if (post.visibility === "friends") badges.push('<span class="badge badge-blue">Bạn bè</span>');
+  if (post.visibility === "private") badges.push('<span class="badge badge-navy">Riêng tư</span>');
+
+  const firstImage = (post.post_media || [])
+    .filter(item => item.file_type === "image")
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))[0];
+
+  return `
+    <article class="post-item">
+      <div class="post-head">
+        <div class="post-author">
+          <img class="post-avatar" src="${safeUrl(post.users?.avatar_url || "default-avatar.png")}" alt="Avatar" onerror="this.src='default-avatar.png'">
+          <div>
+            <a class="post-author-name" href="profile.html?id=${post.user_id}" onclick="return openSearchTarget('profile.html?id=${post.user_id}')">${esc(post.users?.full_name || "Người dùng")}</a>
+            <div class="post-time">${formatTime(post.created_at)}</div>
+          </div>
+        </div>
+        <div class="post-badges">${badges.join("")}</div>
+      </div>
+      <div class="post-body">${esc(post.content || "")}</div>
+      ${firstImage ? `<div class="post-media"><img src="${safeUrl(firstImage.file_url)}" alt="Ảnh bài viết"></div>` : ""}
+      <div class="post-foot">
+        <span>${post.likes?.[0]?.count || 0} lượt thích • ${post.comments?.[0]?.count || 0} bình luận</span>
+        <div class="post-actions">
+          <button class="btn btn-outline" type="button" onclick="openSearchTarget('post.html?id=${post.id}')">Mở bài viết</button>
+          <button class="btn btn-outline" type="button" onclick="openSearchTarget('profile.html?id=${post.user_id}')">Xem tác giả</button>
+        </div>
+      </div>
+    </article>
+  `;
 }
 
 init();
