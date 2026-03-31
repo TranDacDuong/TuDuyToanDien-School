@@ -88,7 +88,7 @@
 
   function getMediaTypeFromDataUrl(dataUrl) {
     const match = String(dataUrl || "").match(/^data:([^;]+);base64,/i);
-    return match?.[1] || "image/jpeg";
+    return match?.[1] || "image/png";
   }
 
   function getBase64FromDataUrl(dataUrl) {
@@ -363,7 +363,7 @@
 
   function dataUrlToBlob(dataUrl) {
     const bytes = dataUrlToUint8Array(dataUrl);
-    return new Blob([bytes], { type: getMediaTypeFromDataUrl(dataUrl) || "image/jpeg" });
+    return new Blob([bytes], { type: getMediaTypeFromDataUrl(dataUrl) || "image/png" });
   }
 
   async function loadRasterImage(dataUrl) {
@@ -412,7 +412,7 @@
       canvas.width = Math.ceil(viewport.width);
       canvas.height = Math.ceil(viewport.height);
       await page.render({ canvasContext: ctx, viewport }).promise;
-      pages.push(canvas.toDataURL("image/jpeg", 0.92));
+      pages.push(canvas.toDataURL("image/png"));
     }
     return pages;
   }
@@ -445,7 +445,7 @@
         y += gap;
       }
     });
-    return canvas.toDataURL("image/jpeg", 0.92);
+    return canvas.toDataURL("image/png");
   }
 
   async function loadImage(dataUrl) {
@@ -507,7 +507,7 @@
       canvas.height = chunkHeight;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, startY, imgWidth, chunkHeight, 0, 0, imgWidth, chunkHeight);
-      chunks.push(canvas.toDataURL("image/jpeg", 0.92));
+      chunks.push(canvas.toDataURL("image/png"));
       if (startY + chunkHeight >= imgHeight) break;
       startY += Math.max(1, chunkHeight - overlap);
     }
