@@ -2,313 +2,522 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Tài khoản</title>
 
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 
 <style>
-
-*{
-box-sizing:border-box;
+:root{
+  --bg:#f6efe4;
+  --surface:#fffdf8;
+  --surface-soft:#f8f1e7;
+  --ink:#102542;
+  --ink-soft:#5a6c84;
+  --accent:#1447a6;
+  --line:rgba(16,37,66,.12);
+  --shadow:0 24px 60px rgba(16,37,66,.12);
 }
+
+*{box-sizing:border-box}
 
 body{
-font-family:'Inter',sans-serif;
-margin:0;
-background:#f1f5f9;
-color:#0f172a;
+  margin:0;
+  font-family:"DM Sans",sans-serif;
+  color:var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(216,166,69,.18), transparent 28%),
+    linear-gradient(180deg, #fcf7ef 0%, #f4ecdf 100%);
+  min-height:100dvh;
 }
 
-/* HEADER */
-
 header{
-background:#0f172a;
-color:white;
-padding:18px 30px;
-display:flex;
-justify-content:space-between;
-align-items:center;
+  position:relative;
+  overflow:hidden;
+  padding:34px 28px 88px;
+  background:
+    radial-gradient(circle at top right, rgba(255,255,255,.14), transparent 22%),
+    linear-gradient(135deg, #102542 0%, #183d73 58%, #245fb6 100%);
+  color:#fff8ec;
+}
+
+header::after{
+  content:"";
+  position:absolute;
+  inset:auto -60px -90px auto;
+  width:240px;
+  height:240px;
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(255,255,255,.2), transparent 66%);
+}
+
+.hero-kicker{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 14px;
+  border-radius:999px;
+  background:rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.14);
+  font-size:.8rem;
+  font-weight:700;
+  letter-spacing:.06em;
+  text-transform:uppercase;
 }
 
 header h2{
-margin:0;
-font-size:20px;
-font-weight:600;
+  margin:18px 0 10px;
+  font-family:"Playfair Display",serif;
+  font-size:clamp(2rem, 4vw, 2.8rem);
+  line-height:1.08;
 }
 
-/* MAIN */
+.hero-text{
+  max-width:700px;
+  color:rgba(248,250,252,.84);
+  font-size:1rem;
+  line-height:1.7;
+}
 
 main{
-max-width:900px;
-margin:40px auto;
-padding:20px;
+  max-width:1120px;
+  margin:-52px auto 0;
+  padding:0 20px 40px;
+  position:relative;
+  z-index:1;
 }
-
-/* CARD */
 
 .card{
-background:white;
-border-radius:16px;
-box-shadow:0 10px 30px rgba(0,0,0,0.06);
-padding:30px;
+  background:rgba(255,253,248,.95);
+  backdrop-filter:blur(10px);
+  border-radius:28px;
+  box-shadow:var(--shadow);
+  border:1px solid rgba(255,255,255,.72);
+  padding:28px;
 }
 
-/* PROFILE */
+.profile-layout{
+  display:grid;
+  grid-template-columns:minmax(250px, 320px) minmax(0, 1fr);
+  gap:24px;
+  align-items:start;
+}
 
 .profile-top{
-display:flex;
-align-items:center;
-gap:25px;
-margin-bottom:30px;
+  display:grid;
+  gap:18px;
+  padding:22px;
+  border-radius:24px;
+  background:linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,241,231,.96));
+  border:1px solid var(--line);
+}
+
+.avatar-wrap{
+  display:grid;
+  justify-items:center;
+  gap:14px;
+  text-align:center;
 }
 
 .profile-top img{
-width:110px;
-height:110px;
-border-radius:50%;
-object-fit:cover;
-border:4px solid #f1f5f9;
+  width:128px;
+  height:128px;
+  border-radius:50%;
+  object-fit:cover;
+  border:5px solid rgba(255,255,255,.95);
+  box-shadow:0 18px 34px rgba(16,37,66,.16);
+  background:#fff;
 }
 
-.avatar-actions input{
-margin-bottom:10px;
+.avatar-caption{
+  display:grid;
+  gap:6px;
 }
 
-/* GRID */
+.avatar-caption strong{
+  font-size:1.08rem;
+}
+
+.avatar-caption span{
+  color:var(--ink-soft);
+  font-size:.92rem;
+  line-height:1.6;
+}
+
+.avatar-actions{
+  display:grid;
+  gap:12px;
+}
+
+.section-title{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:18px;
+}
+
+.section-title h3{
+  margin:0;
+  font-size:1.15rem;
+  font-weight:800;
+}
+
+.section-title p{
+  margin:4px 0 0;
+  font-size:.93rem;
+  color:var(--ink-soft);
+}
 
 .form-grid{
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:20px;
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:18px;
 }
 
 .form-group{
-display:flex;
-flex-direction:column;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
 }
 
 .form-group.full{
-grid-column:1 / -1;
+  grid-column:1 / -1;
 }
 
 label{
-font-weight:600;
-margin-bottom:6px;
-font-size:14px;
-color:#475569;
+  font-weight:700;
+  font-size:.92rem;
+  color:var(--ink);
 }
 
 input,select,textarea{
-padding:11px;
-border:1px solid #e2e8f0;
-border-radius:8px;
-font-size:14px;
-background:#fafafa;
+  width:100%;
+  padding:13px 14px;
+  border:1px solid rgba(16,37,66,.12);
+  border-radius:16px;
+  font-size:.95rem;
+  font-family:"DM Sans",sans-serif;
+  background:#fffdfa;
+  color:var(--ink);
+  transition:border-color .18s ease, box-shadow .18s ease, filter .18s ease;
 }
 
 textarea{
-font-family:'Inter',sans-serif;
-resize:vertical;
-min-height:110px;
+  resize:vertical;
+  min-height:140px;
+  line-height:1.6;
 }
 
 input:focus,select:focus,textarea:focus{
-outline:none;
-border-color:#2563eb;
-background:white;
+  outline:none;
+  border-color:rgba(20,71,166,.45);
+  box-shadow:0 0 0 4px rgba(20,71,166,.1);
+  background:#fff;
 }
 
-/* BUTTON */
+input:disabled{
+  background:#f3efe7;
+  color:#6b7280;
+}
+
+.action-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  margin-top:22px;
+}
 
 button{
-margin-top:15px;
-border:none;
-background:#2563eb;
-color:white;
-padding:11px 18px;
-border-radius:8px;
-cursor:pointer;
-font-weight:600;
-transition:0.2s;
+  appearance:none;
+  border:none;
+  background:linear-gradient(135deg, var(--accent) 0%, #2d66cb 100%);
+  color:white;
+  padding:13px 18px;
+  border-radius:16px;
+  cursor:pointer;
+  font-family:"DM Sans",sans-serif;
+  font-weight:800;
+  font-size:.95rem;
+  letter-spacing:.01em;
+  transition:transform .18s ease, box-shadow .18s ease, filter .18s ease;
+  box-shadow:0 14px 28px rgba(20,71,166,.18);
 }
 
 button:hover{
-background:#1d4ed8;
-transform:translateY(-1px);
+  transform:translateY(-1px);
+  filter:brightness(1.02);
 }
 
-/* PASSWORD */
+.secondary-btn{
+  background:linear-gradient(180deg, #fffdfa 0%, #f3eadb 100%);
+  color:var(--ink);
+  border:1px solid rgba(16,37,66,.12);
+  box-shadow:none;
+}
 
 .password-box{
-margin-top:35px;
-padding-top:20px;
-border-top:1px solid #e5e7eb;
+  margin-top:24px;
+  padding:24px;
+  border-radius:24px;
+  background:linear-gradient(180deg, rgba(16,37,66,.04), rgba(16,37,66,.02));
+  border:1px solid var(--line);
 }
 
-/* TOAST */
+.password-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:12px;
+  align-items:end;
+  margin-top:16px;
+}
 
 #toast{
-position:fixed;
-bottom:30px;
-right:30px;
-background:#0f172a;
-color:white;
-padding:14px 22px;
-border-radius:8px;
-opacity:0;
-transform:translateY(20px);
-transition:0.3s;
+  position:fixed;
+  bottom:22px;
+  right:22px;
+  background:#102542;
+  color:#fff8ec;
+  padding:14px 20px;
+  border-radius:16px;
+  opacity:0;
+  transform:translateY(20px);
+  transition:.28s ease;
+  box-shadow:0 18px 34px rgba(16,37,66,.24);
+  z-index:1000;
 }
 
 #toast.show{
-opacity:1;
-transform:translateY(0);
+  opacity:1;
+  transform:translateY(0);
 }
 
+@media (max-width: 860px){
+  main{
+    padding:0 14px 28px;
+    margin:-44px auto 0;
+  }
+
+  .card{
+    padding:20px;
+    border-radius:24px;
+  }
+
+  .profile-layout{
+    grid-template-columns:1fr;
+  }
+
+  .form-grid{
+    grid-template-columns:1fr;
+  }
+
+  .password-grid{
+    grid-template-columns:1fr;
+  }
+
+  button{
+    width:100%;
+  }
+
+  .action-row{
+    display:grid;
+  }
+}
+
+@media (max-width: 640px){
+  header{
+    padding:26px 18px 72px;
+  }
+
+  .hero-kicker{
+    font-size:.74rem;
+  }
+
+  .hero-text{
+    font-size:.94rem;
+  }
+
+  .profile-top{
+    padding:18px;
+  }
+
+  .profile-top img{
+    width:112px;
+    height:112px;
+  }
+
+  input,select,textarea{
+    font-size:16px;
+  }
+
+  #toast{
+    left:14px;
+    right:14px;
+    bottom:16px;
+  }
+}
 </style>
 </head>
 
 <body>
 
 <header>
-<h2>⚙️ Tài khoản</h2>
+  <div class="hero-kicker">Ho so ca nhan</div>
+  <h2>Tài khoản của bạn</h2>
+  <div class="hero-text">Cập nhật thông tin cá nhân, ảnh đại diện và mật khẩu để hồ sơ nhìn chỉn chu hơn và sử dụng đầy đủ các tính năng trong hệ thống.</div>
 </header>
 
 <main>
+  <div class="card">
+    <div class="profile-layout">
+      <div class="profile-top">
+        <div class="avatar-wrap">
+          <img id="avatarPreview" src="default-avatar.png" alt="avatar">
+          <div class="avatar-caption">
+            <strong>Ảnh đại diện</strong>
+            <span>Chọn ảnh rõ mặt để bạn bè, giáo viên và hệ thống nhận diện dễ hơn.</span>
+          </div>
+        </div>
 
-<div class="card">
+        <div class="avatar-actions">
+          <input type="file" id="avatarInput" accept="image/*">
+          <button type="button" class="secondary-btn" onclick="uploadAvatar()">Đổi avatar</button>
+        </div>
+      </div>
 
-<div class="profile-top">
+      <div>
+        <div class="section-title">
+          <div>
+            <h3>Thông tin cá nhân</h3>
+            <p>Điền đầy đủ để hệ thống hiển thị hồ sơ đẹp và mở đủ các chức năng học tập.</p>
+          </div>
+        </div>
 
-<img id="avatarPreview" src="default-avatar.png">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Email</label>
+            <input id="email" disabled>
+          </div>
 
-<div class="avatar-actions">
-<input type="file" id="avatarInput">
-<button onclick="uploadAvatar()">Đổi Avatar</button>
-</div>
+          <div class="form-group">
+            <label>Họ và tên</label>
+            <input id="fullName">
+          </div>
 
-</div>
+          <div class="form-group">
+            <label>Số điện thoại</label>
+            <input id="phone">
+          </div>
 
-<div class="form-grid">
+          <div class="form-group">
+            <label>Năm sinh</label>
+            <input type="number" id="birthYear">
+          </div>
 
-<div class="form-group">
-<label>Email</label>
-<input id="email" disabled>
-</div>
+          <div class="form-group">
+            <label>Tỉnh / Thành phố</label>
+            <select id="province">
+              <option value="">Chọn tỉnh</option>
+              <option>Hà Nội</option>
+              <option>TP Hồ Chí Minh</option>
+              <option>Đà Nẵng</option>
+              <option>Cần Thơ</option>
+              <option>Hải Phòng</option>
+              <option>An Giang</option>
+              <option>Bà Rịa - Vũng Tàu</option>
+              <option>Bắc Giang</option>
+              <option>Bắc Kạn</option>
+              <option>Bạc Liêu</option>
+              <option>Bắc Ninh</option>
+              <option>Bến Tre</option>
+              <option>Bình Định</option>
+              <option>Bình Dương</option>
+              <option>Bình Phước</option>
+              <option>Bình Thuận</option>
+              <option>Cà Mau</option>
+              <option>Cao Bằng</option>
+              <option>Đắk Lắk</option>
+              <option>Đắk Nông</option>
+              <option>Điện Biên</option>
+              <option>Đồng Nai</option>
+              <option>Đồng Tháp</option>
+              <option>Gia Lai</option>
+              <option>Hà Giang</option>
+              <option>Hà Nam</option>
+              <option>Hà Tĩnh</option>
+              <option>Hải Dương</option>
+              <option>Hậu Giang</option>
+              <option>Hòa Bình</option>
+              <option>Hưng Yên</option>
+              <option>Khánh Hòa</option>
+              <option>Kiên Giang</option>
+              <option>Kon Tum</option>
+              <option>Lai Châu</option>
+              <option>Lâm Đồng</option>
+              <option>Lạng Sơn</option>
+              <option>Lào Cai</option>
+              <option>Long An</option>
+              <option>Nam Định</option>
+              <option>Nghệ An</option>
+              <option>Ninh Bình</option>
+              <option>Ninh Thuận</option>
+              <option>Phú Thọ</option>
+              <option>Phú Yên</option>
+              <option>Quảng Bình</option>
+              <option>Quảng Nam</option>
+              <option>Quảng Ngãi</option>
+              <option>Quảng Ninh</option>
+              <option>Quảng Trị</option>
+              <option>Sóc Trăng</option>
+              <option>Sơn La</option>
+              <option>Tây Ninh</option>
+              <option>Thái Bình</option>
+              <option>Thái Nguyên</option>
+              <option>Thanh Hóa</option>
+              <option>Thừa Thiên Huế</option>
+              <option>Tiền Giang</option>
+              <option>Trà Vinh</option>
+              <option>Tuyên Quang</option>
+              <option>Vĩnh Long</option>
+              <option>Vĩnh Phúc</option>
+              <option>Yên Bái</option>
+            </select>
+          </div>
 
-<div class="form-group">
-<label>Họ và tên</label>
-<input id="fullName">
-</div>
+          <div class="form-group">
+            <label>Trường học</label>
+            <input id="school">
+          </div>
 
-<div class="form-group">
-<label>Số điện thoại</label>
-<input id="phone">
-</div>
+          <div class="form-group full">
+            <label>Giới thiệu bản thân</label>
+            <textarea id="bio" placeholder="Viết vài dòng giới thiệu về bạn..."></textarea>
+          </div>
+        </div>
 
-<div class="form-group">
-<label>Năm sinh</label>
-<input type="number" id="birthYear">
-</div>
+        <div class="action-row">
+          <button type="button" onclick="saveProfile()">Lưu thông tin</button>
+        </div>
 
-<div class="form-group">
-<label>Tỉnh / Thành phố</label>
-<select id="province">
-<option value="">Chọn tỉnh</option>
-<option>Hà Nội</option>
-<option>TP Hồ Chí Minh</option>
-<option>Đà Nẵng</option>
-<option>Cần Thơ</option>
-<option>Hải Phòng</option>
-<option>An Giang</option>
-<option>Bà Rịa - Vũng Tàu</option>
-<option>Bắc Giang</option>
-<option>Bắc Kạn</option>
-<option>Bạc Liêu</option>
-<option>Bắc Ninh</option>
-<option>Bến Tre</option>
-<option>Bình Định</option>
-<option>Bình Dương</option>
-<option>Bình Phước</option>
-<option>Bình Thuận</option>
-<option>Cà Mau</option>
-<option>Cao Bằng</option>
-<option>Đắk Lắk</option>
-<option>Đắk Nông</option>
-<option>Điện Biên</option>
-<option>Đồng Nai</option>
-<option>Đồng Tháp</option>
-<option>Gia Lai</option>
-<option>Hà Giang</option>
-<option>Hà Nam</option>
-<option>Hà Tĩnh</option>
-<option>Hải Dương</option>
-<option>Hậu Giang</option>
-<option>Hòa Bình</option>
-<option>Hưng Yên</option>
-<option>Khánh Hòa</option>
-<option>Kiên Giang</option>
-<option>Kon Tum</option>
-<option>Lai Châu</option>
-<option>Lâm Đồng</option>
-<option>Lạng Sơn</option>
-<option>Lào Cai</option>
-<option>Long An</option>
-<option>Nam Định</option>
-<option>Nghệ An</option>
-<option>Ninh Bình</option>
-<option>Ninh Thuận</option>
-<option>Phú Thọ</option>
-<option>Phú Yên</option>
-<option>Quảng Bình</option>
-<option>Quảng Nam</option>
-<option>Quảng Ngãi</option>
-<option>Quảng Ninh</option>
-<option>Quảng Trị</option>
-<option>Sóc Trăng</option>
-<option>Sơn La</option>
-<option>Tây Ninh</option>
-<option>Thái Bình</option>
-<option>Thái Nguyên</option>
-<option>Thanh Hóa</option>
-<option>Thừa Thiên Huế</option>
-<option>Tiền Giang</option>
-<option>Trà Vinh</option>
-<option>Tuyên Quang</option>
-<option>Vĩnh Long</option>
-<option>Vĩnh Phúc</option>
-<option>Yên Bái</option>
-</select>
-</div>
+        <div class="password-box">
+          <div class="section-title">
+            <div>
+              <h3>Đổi mật khẩu</h3>
+              <p>Đặt mật khẩu đủ mạnh để tài khoản an toàn hơn.</p>
+            </div>
+          </div>
 
-<div class="form-group">
-<label>Trường học</label>
-<input id="school">
-</div>
-
-<div class="form-group full">
-<label>Giới thiệu bản thân</label>
-<textarea id="bio" placeholder="Viết vài dòng giới thiệu về bạn..."></textarea>
-</div>
-
-</div>
-
-<button onclick="saveProfile()">Lưu thông tin</button>
-
-<div class="password-box">
-
-<h3>Đổi mật khẩu</h3>
-
-<input type="password" id="newPassword" placeholder="Nhập mật khẩu mới">
-
-<br>
-
-<button onclick="changePassword()">Đổi mật khẩu</button>
-
-</div>
-
-</div>
-
+          <div class="password-grid">
+            <div class="form-group">
+              <label>Mật khẩu mới</label>
+              <input type="password" id="newPassword" placeholder="Nhập mật khẩu mới">
+            </div>
+            <button type="button" onclick="changePassword()">Đổi mật khẩu</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </main>
 
 <div id="toast"></div>
@@ -317,166 +526,146 @@ transform:translateY(0);
 <script src="../supabaseClient.js"></script>
 
 <script>
-
 let currentUser=null;
 
 async function init(){
+  const { data:{user} } = await sb.auth.getUser();
 
-const { data:{user} } = await sb.auth.getUser();
+  if(!user){
+    window.location.href="../index.html";
+    return;
+  }
 
-if(!user){
-window.location.href="../index.html";
-return;
-}
-
-currentUser=user;
-
-document.getElementById("email").value=user.email;
-
-loadProfile();
-
+  currentUser=user;
+  document.getElementById("email").value=user.email;
+  loadProfile();
 }
 
 async function loadProfile(){
+  const { data , error } = await sb
+    .from("users")
+    .select("*")
+    .eq("id",currentUser.id)
+    .single();
 
-const { data , error } = await sb
-.from("users")
-.select("*")
-.eq("id",currentUser.id)
-.single();
+  if(error){
+    console.error(error);
+    return;
+  }
 
-if(error){
-console.error(error);
-return;
-}
+  document.getElementById("fullName").value=data.full_name ?? "";
+  document.getElementById("phone").value=data.phone ?? "";
+  document.getElementById("birthYear").value=data.birth_year ?? "";
+  document.getElementById("province").value=data.province ?? "";
+  document.getElementById("school").value=data.school ?? "";
+  document.getElementById("bio").value=data.bio ?? "";
 
-document.getElementById("fullName").value=data.full_name ?? "";
-document.getElementById("phone").value=data.phone ?? "";
-document.getElementById("birthYear").value=data.birth_year ?? "";
-document.getElementById("province").value=data.province ?? "";
-document.getElementById("school").value=data.school ?? "";
-document.getElementById("bio").value=data.bio ?? "";
-
-if(data.avatar_url){
-document.getElementById("avatarPreview").src=data.avatar_url;
-}
-
+  if(data.avatar_url){
+    document.getElementById("avatarPreview").src=data.avatar_url;
+  }
 }
 
 async function saveProfile(){
+  const fullName=document.getElementById("fullName").value.trim();
+  const phone=document.getElementById("phone").value.trim();
+  const birthYear=parseInt(document.getElementById("birthYear").value);
+  const province=document.getElementById("province").value;
+  const school=document.getElementById("school").value;
+  const bio=document.getElementById("bio").value.trim();
 
-const fullName=document.getElementById("fullName").value.trim();
-const phone=document.getElementById("phone").value.trim();
-const birthYear=parseInt(document.getElementById("birthYear").value);
-const province=document.getElementById("province").value;
-const school=document.getElementById("school").value;
-const bio=document.getElementById("bio").value.trim();
+  if(!fullName || !phone || !birthYear){
+    alert("Vui lòng nhập đầy đủ thông tin");
+    return;
+  }
 
-if(!fullName || !phone || !birthYear){
-alert("Vui lòng nhập đầy đủ thông tin");
-return;
-}
+  const { error } = await sb
+    .from("users")
+    .update({
+      full_name:fullName,
+      phone:phone,
+      birth_year:birthYear,
+      province:province,
+      school:school,
+      bio:bio
+    })
+    .eq("id",currentUser.id);
 
-const { error } = await sb
-.from("users")
-.update({
-full_name:fullName,
-phone:phone,
-birth_year:birthYear,
-province:province,
-school:school,
-bio:bio
-})
-.eq("id",currentUser.id);
+  if(error){
+    console.error(error);
+    alert("Lỗi khi cập nhật");
+    return;
+  }
 
-if(error){
-console.error(error);
-alert("Lỗi khi cập nhật");
-return;
-}
-
-showToast("Cập nhật thành công");
-
+  showToast("Cập nhật thành công");
 }
 
 async function changePassword(){
+  const password=document.getElementById("newPassword").value;
 
-const password=document.getElementById("newPassword").value;
+  if(password.length < 6){
+    alert("Mật khẩu tối thiểu 6 ký tự");
+    return;
+  }
 
-if(password.length < 6){
-alert("Mật khẩu tối thiểu 6 ký tự");
-return;
-}
+  const { error } = await sb.auth.updateUser({
+    password: password
+  });
 
-const { error } = await sb.auth.updateUser({
-password: password
-});
+  if(error){
+    alert("Lỗi đổi mật khẩu");
+    return;
+  }
 
-if(error){
-alert("Lỗi đổi mật khẩu");
-return;
-}
-
-showToast("Đổi mật khẩu thành công");
-
-document.getElementById("newPassword").value="";
-
+  showToast("Đổi mật khẩu thành công");
+  document.getElementById("newPassword").value="";
 }
 
 async function uploadAvatar(){
+  const file=document.getElementById("avatarInput").files[0];
 
-const file=document.getElementById("avatarInput").files[0];
+  if(!file){
+    alert("Chọn ảnh");
+    return;
+  }
 
-if(!file){
-alert("Chọn ảnh");
-return;
-}
+  const filePath=currentUser.id + "-" + Date.now();
 
-const filePath=currentUser.id + "-" + Date.now();
+  const { error } = await sb.storage
+    .from("avatars")
+    .upload(filePath,file);
 
-const { error } = await sb.storage
-.from("avatars")
-.upload(filePath,file);
+  if(error){
+    console.error(error);
+    alert("Upload lỗi");
+    return;
+  }
 
-if(error){
-console.error(error);
-alert("Upload lỗi");
-return;
-}
+  const { data } = sb.storage
+    .from("avatars")
+    .getPublicUrl(filePath);
 
-const { data } = sb.storage
-.from("avatars")
-.getPublicUrl(filePath);
+  const avatarUrl=data.publicUrl;
 
-const avatarUrl=data.publicUrl;
+  await sb
+    .from("users")
+    .update({avatar_url:avatarUrl})
+    .eq("id",currentUser.id);
 
-await sb
-.from("users")
-.update({avatar_url:avatarUrl})
-.eq("id",currentUser.id);
-
-document.getElementById("avatarPreview").src=avatarUrl;
-
-showToast("Đổi avatar thành công");
-
+  document.getElementById("avatarPreview").src=avatarUrl;
+  showToast("Đổi avatar thành công");
 }
 
 function showToast(message){
+  const toast=document.getElementById("toast");
+  toast.innerText=message;
+  toast.classList.add("show");
 
-const toast=document.getElementById("toast");
-
-toast.innerText=message;
-
-toast.classList.add("show");
-
-setTimeout(()=>{
-toast.classList.remove("show");
-},2000);
-
+  setTimeout(()=>{
+    toast.classList.remove("show");
+  },2000);
 }
 
 init();
-
 </script>
 
 </body>
