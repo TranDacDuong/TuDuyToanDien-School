@@ -227,8 +227,6 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 .s-chip { background:var(--white); border:1px solid var(--border); border-radius:20px; padding:4px 12px; font-size:.78rem; color:var(--ink-mid); font-weight:500; box-shadow:var(--shadow-sm); }
 .s-chip b { color:var(--navy); }
 .s-import-card { background:rgba(255,255,255,.94); border:1px solid rgba(15,31,61,.08); border-radius:20px; box-shadow:0 14px 28px rgba(15,31,61,.06); padding:16px; margin-bottom:14px; display:grid; gap:12px; }
-.s-import-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-.s-import-note { font-size:.82rem; color:var(--ink-light); line-height:1.65; }
 .s-import-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
 .s-import-result { display:none; padding:10px 12px; border-radius:12px; font-size:.82rem; line-height:1.6; }
 .s-import-result.show { display:block; }
@@ -469,22 +467,13 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-outline btn-sm" onclick="sDownloadImportTemplate()">🧾 Tải file mẫu</button>
+        <button class="btn btn-primary btn-sm" onclick="sPickImportFile()">📤 Nhập Excel</button>
         <button class="btn btn-outline btn-sm" onclick="sExportExcel()">📥 Xuất Excel</button>
       </div>
     </div>
     <div class="s-import-card">
-      <div class="s-import-top">
-        <div>
-          <div style="font-weight:800;color:var(--navy);margin-bottom:4px">Tạo tài khoản học sinh từ file Excel</div>
-          <div class="s-import-note">Nhập file `.xlsx`, `.xls` hoặc `.csv` với các cột `full_name`, `phone`, `birth_year`, `province`, `school`. Hệ thống sẽ tự tạo email theo dạng `hovaten01@gmail.com`; nếu trùng sẽ tăng thành `02`, `03`... Mật khẩu mặc định là số điện thoại, nếu số điện thoại trống thì dùng `123456`.</div>
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="sPickImportFile()">📤 Nhập Excel</button>
-      </div>
+      <div style="font-weight:800;color:var(--navy)">Tạo tài khoản học sinh từ file Excel</div>
       <div class="s-import-grid">
-        <div class="fg" style="margin:0">
-          <label>Quy tắc mặc định</label>
-          <input value="Email: hovaten01@gmail.com | Mật khẩu: SĐT / 123456" disabled>
-        </div>
         <div class="fg" style="margin:0">
           <label>Tên sheet ưu tiên</label>
           <input id="sImportSheetName" placeholder="Để trống nếu lấy sheet đầu">
