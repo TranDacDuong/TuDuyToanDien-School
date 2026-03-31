@@ -987,8 +987,8 @@ async function convertModalWithAI() {
   const btn = document.getElementById("qAiBtn");
   const hint = document.getElementById("qAiHint");
   btn.disabled = true;
-  btn.innerHTML = '<span class="spin">âŸ³</span> Äang phÃ¢n tÃ­ch...';
-  hint.textContent = "AI Ä‘ang xá»­ lÃ½...";
+  btn.innerHTML = '<span class="spin">↻</span> Đang phân tích...';
+  hint.textContent = "AI đang xử lý...";
   hint.style.color = "";
 
   try {
@@ -1002,7 +1002,7 @@ async function convertModalWithAI() {
     }
     startMultiQuestion(questions);
   } catch (err) {
-    hint.textContent = err.message || "AI khÃ´ng xá»­ lÃ½ Ä‘Æ°á»£c ná»™i dung nÃ y.";
+    hint.textContent = err.message || "AI không xử lý được nội dung này.";
     hint.style.color = "var(--red,#ef4444)";
     alert("Lá»—i AI: " + err.message);
   }
@@ -1018,7 +1018,7 @@ document.getElementById("qPdfFile").onchange = async function(e) {
   const btn = document.getElementById("qAiBtn");
   const hint = document.getElementById("qAiHint");
   btn.disabled = true;
-  btn.innerHTML = '<span class="spin">âŸ³</span> Äang xá»­ lÃ½ PDF...';
+  btn.innerHTML = '<span class="spin">↻</span> Đang xử lý PDF...';
 
   try {
     const shared = window.QuestionAIShared;
