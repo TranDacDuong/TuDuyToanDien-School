@@ -366,6 +366,37 @@
     return new Blob([bytes], { type: getMediaTypeFromDataUrl(dataUrl) || "image/jpeg" });
   }
 
+  async function loadRasterImage(dataUrl) {
+    const src = String(dataUrl || "");
+    if (!src) throw new Error("Không đọc được ảnh.");
+    const blob = /^data:/i.test(src) ? dataUrlToBlob(src) : await (await fetch(src)).blob();
+    if (typeof createImageBitmap === "function") {
+      return await createImageBitmap(blob);
+    }
+    return await new Promise((resolve, reject) => {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(blob);
+      const cleanup = () => URL.revokeObjectURL(objectUrl);
+      img.onload = () => {
+        cleanup();
+        resolve(img);
+      };
+      img.onerror = () => {
+        cleanup();
+        reject(new Error("Không đọc được ảnh."));
+      };
+      img.src = objectUrl;
+    });
+  }
+
+  function rasterWidth(img) {
+    return img?.naturalWidth || img?.videoWidth || img?.width || 1;
+  }
+
+  function rasterHeight(img) {
+    return img?.naturalHeight || img?.videoHeight || img?.height || 1;
+  }
+
   async function renderPdfToPageImages(dataUrl) {
     if (!window.pdfjsLib?.getDocument) return [dataUrl];
     if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -391,11 +422,11 @@
     if (dataUrls.length === 1) return dataUrls[0];
     const images = [];
     for (const dataUrl of dataUrls) {
-      images.push(await loadImageSafe(dataUrl));
+      images.push(await loadRasterImage(dataUrl));
     }
-    const maxWidth = Math.max(...images.map(img => img.naturalWidth || img.width || 1));
+    const maxWidth = Math.max(...images.map(img => rasterWidth(img)));
     const gap = 24;
-    const scaledHeights = images.map(img => Math.max(1, Math.round((img.naturalHeight || img.height || 1) * (maxWidth / (img.naturalWidth || img.width || 1)))));
+    const scaledHeights = images.map(img => Math.max(1, Math.round(rasterHeight(img) * (maxWidth / rasterWidth(img)))));
     const totalHeight = scaledHeights.reduce((sum, h) => sum + h, 0) + gap * (images.length - 1);
     const canvas = document.createElement("canvas");
     canvas.width = maxWidth;
@@ -460,22 +491,24 @@
   }
 
   async function splitTallImageIntoChunks(dataUrl) {
-    const img = await loadImageSafe(dataUrl);
+    const img = await loadRasterImage(dataUrl);
     const maxChunkHeight = 1700;
     const overlap = 180;
-    if (img.naturalHeight <= maxChunkHeight * 1.15) return [dataUrl];
+    const imgWidth = rasterWidth(img);
+    const imgHeight = rasterHeight(img);
+    if (imgHeight <= maxChunkHeight * 1.15) return [dataUrl];
     const chunks = [];
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     let startY = 0;
-    while (startY < img.naturalHeight) {
-      const chunkHeight = Math.min(maxChunkHeight, img.naturalHeight - startY);
-      canvas.width = img.naturalWidth;
+    while (startY < imgHeight) {
+      const chunkHeight = Math.min(maxChunkHeight, imgHeight - startY);
+      canvas.width = imgWidth;
       canvas.height = chunkHeight;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, startY, img.naturalWidth, chunkHeight, 0, 0, img.naturalWidth, chunkHeight);
+      ctx.drawImage(img, 0, startY, imgWidth, chunkHeight, 0, 0, imgWidth, chunkHeight);
       chunks.push(canvas.toDataURL("image/jpeg", 0.92));
-      if (startY + chunkHeight >= img.naturalHeight) break;
+      if (startY + chunkHeight >= imgHeight) break;
       startY += Math.max(1, chunkHeight - overlap);
     }
     return chunks;
