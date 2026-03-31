@@ -227,7 +227,6 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 .s-chip { background:var(--white); border:1px solid var(--border); border-radius:20px; padding:4px 12px; font-size:.78rem; color:var(--ink-mid); font-weight:500; box-shadow:var(--shadow-sm); }
 .s-chip b { color:var(--navy); }
 .s-import-card { background:rgba(255,255,255,.94); border:1px solid rgba(15,31,61,.08); border-radius:20px; box-shadow:0 14px 28px rgba(15,31,61,.06); padding:16px; margin-bottom:14px; display:grid; gap:12px; }
-.s-import-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
 .s-import-result { display:none; padding:10px 12px; border-radius:12px; font-size:.82rem; line-height:1.6; }
 .s-import-result.show { display:block; }
 .s-import-result.ok { background:var(--green-bg); color:var(--green); border:1px solid rgba(34,197,94,.18); }
@@ -265,7 +264,6 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   .form-btns .btn,.act-wrap button { width: 100%; min-height: 42px; }
   table { min-width: 720px; }
   .t-grid { grid-template-columns: 1fr; }
-  .s-import-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -473,16 +471,6 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
     </div>
     <div class="s-import-card">
       <div style="font-weight:800;color:var(--navy)">Tạo tài khoản học sinh từ file Excel</div>
-      <div class="s-import-grid">
-        <div class="fg" style="margin:0">
-          <label>Tên sheet ưu tiên</label>
-          <input id="sImportSheetName" placeholder="Để trống nếu lấy sheet đầu">
-        </div>
-        <div class="fg" style="margin:0">
-          <label>Trạng thái</label>
-          <input id="sImportFileName" value="Chưa chọn file" disabled>
-        </div>
-      </div>
       <div id="sImportResult" class="s-import-result"></div>
       <input id="sImportFile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="sHandleImportFile(event)">
     </div>
@@ -947,7 +935,7 @@ function sSlugName(v){
   return base || 'hocsinh';
 }
 function sImportEmailCandidate(base,index){
-  return `${base}${String(index).padStart(2,'0')}@gmail.com`;
+  return index === 0 ? `${base}@gmail.com` : `${base}${String(index).padStart(2,'0')}@gmail.com`;
 }
 function sMapImportRow(row){
   const normalized={};
@@ -985,15 +973,13 @@ function sDownloadImportTemplate(){
 async function sHandleImportFile(event){
   const file=(event.target.files||[])[0];
   if(!file) return;
-  document.getElementById('sImportFileName').value=file.name;
   if(typeof XLSX==='undefined'){alert('Cần thêm thư viện XLSX');return;}
   _sImporting=true;
   sImportStatus('Đang đọc file và chuẩn bị dữ liệu import...', 'warn');
   try{
     const buffer=await file.arrayBuffer();
     const workbook=XLSX.read(buffer,{type:'array'});
-    const preferred=(document.getElementById('sImportSheetName').value||'').trim();
-    const sheetName=preferred && workbook.Sheets[preferred] ? preferred : workbook.SheetNames[0];
+    const sheetName=workbook.SheetNames[0];
     if(!sheetName) throw new Error('Không tìm thấy sheet nào trong file.');
     const sheet=workbook.Sheets[sheetName];
     const rawRows=XLSX.utils.sheet_to_json(sheet,{defval:''});
@@ -1004,7 +990,7 @@ async function sHandleImportFile(event){
       const next={ ...row };
       if(!next.email){
         let local=sSlugName(next.full_name);
-        let suffix=1;
+        let suffix=0;
         let email=sImportEmailCandidate(local,suffix);
         while(usedEmails.has(email)){
           suffix+=1;
