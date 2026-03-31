@@ -8,6 +8,7 @@
   let _pastedImg     = null; // base64 ảnh paste vào ô trái
   let _lastSourceImg = null; // giữ lại ảnh gốc để crop hình vẽ
   let _rightImg      = null; // base64 ảnh hình vẽ ô phải
+  let _pdfPreviewImg = null; // ảnh dài ghép từ PDF để xem trước
 
   const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
   const ANON_KEY     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxneWRqYWFxZnhxemdiZHBxdmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxODY2NDQsImV4cCI6MjA4Nzc2MjY0NH0.l6ojk0fH5wYMK4H_RIGTepatUd1Uy2KHOTiRfAS1JD4";
@@ -544,8 +545,34 @@
         y += gap;
       }
     });
-    return canvas.toDataURL("image/png");
+    return exportCanvasAsJpeg(canvas, 0.9);
   }
+
+  function showSourcePreview(src, label = "Đã tạo ảnh xem trước") {
+    const wrap = document.getElementById("sourcePreviewWrap");
+    const img = document.getElementById("sourcePreviewImg");
+    const hint = document.getElementById("convertHint");
+    if (!wrap || !img) return;
+    img.src = src;
+    wrap.style.display = "block";
+    if (hint) {
+      hint.textContent = label;
+      hint.style.color = "var(--green)";
+    }
+  }
+
+  window.clearSourcePreview = function () {
+    _pdfPreviewImg = null;
+    const wrap = document.getElementById("sourcePreviewWrap");
+    const img = document.getElementById("sourcePreviewImg");
+    const hint = document.getElementById("convertHint");
+    if (img) img.src = "";
+    if (wrap) wrap.style.display = "none";
+    if (hint) {
+      hint.textContent = "Nhập nội dung hoặc upload PDF rồi bấm chuyển đổi";
+      hint.style.color = "var(--ink-light)";
+    }
+  };
 
   async function loadImage(dataUrl) {
     const src = String(dataUrl || "");
@@ -853,13 +880,18 @@
 
     setProgress(0, "Đang đọc PDF...");
     const dataUrl = await readFileAsDataUrl(file);
-    setProgress(20, "Đang gửi PDF lên AI...");
-
     try {
-      setProgress(40, "AI đang phân tích PDF...");
-      const result = await convertAiSourceToQuestions({ dataUrl });
-      setProgress(80, "Đang xử lý kết quả...");
-      appendQuestions(result.questions, result.warnings);
+      setProgress(35, "Đang tách từng trang PDF...");
+      const pageImages = await renderPdfToPageImages(dataUrl);
+      setProgress(70, "Đang ghép ảnh dài xem trước...");
+      const stitchedImage = await stitchImagesVertically(pageImages);
+      if (!stitchedImage) {
+        throw new Error("Không tạo được ảnh xem trước từ PDF.");
+      }
+      _pdfPreviewImg = stitchedImage;
+      _pastedImg = stitchedImage;
+      _lastSourceImg = stitchedImage;
+      showSourcePreview(stitchedImage, "Đã tạo ảnh dài từ PDF, hãy xem trước rồi mới chuyển đổi AI.");
       setProgress(100, "Hoàn thành!");
       setTimeout(() => hideProgress(), 1000);
     } catch (err) {
