@@ -884,7 +884,9 @@
 
   function renderClassSessionCard(session, lesson, examInfo, role, examState){
     const isCompactMobile = window.matchMedia("(max-width: 768px)").matches;
-    const summary = lesson?.summary ? esc(lesson.summary) : "Chưa có mô tả cho buổi học này.";
+    const summary = lesson?.summary
+      ? '<div style="font-size:.84rem;line-height:1.65;color:var(--ink-mid);margin-top:6px">'+esc(lesson.summary)+'</div>'
+      : '';
     const mediaHtml =
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+
         (lesson?.lecture_video_url ? '<a class="btn btn-outline btn-sm" href="'+esc(lesson.lecture_video_url)+'" target="_blank" rel="noopener">Video bài giảng</a>' : '')+
@@ -913,7 +915,7 @@
             (examInfo ? '<span style="font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#fff7ed;color:#c2410c">Có đề luyện tập</span>' : '<span style="font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#f5f5f4;color:#57534e">Chưa gắn đề luyện tập</span>')+
           '</div>'+
           '<div style="font-weight:700;font-size:1rem;color:var(--navy)">'+esc(lesson?.name || "Chưa có tên bài học")+'</div>'+
-          '<div style="font-size:.84rem;line-height:1.65;color:var(--ink-mid);margin-top:6px">'+summary+'</div>'+
+          summary+
           mediaHtml+
           practiceHtml+
         '</div>'+
