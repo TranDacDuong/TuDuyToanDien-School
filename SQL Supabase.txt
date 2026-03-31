@@ -2137,6 +2137,7 @@ USING (
 );
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS unaccent;
 
 CREATE OR REPLACE FUNCTION public.admin_import_students_batch(p_rows jsonb)
 RETURNS jsonb
@@ -2147,6 +2148,7 @@ AS $$
 DECLARE
   row_item jsonb;
   v_email text;
+  v_email_base text;
   v_full_name text;
   v_phone text;
   v_province text;
@@ -2155,6 +2157,7 @@ DECLARE
   v_birth_year integer;
   v_auth_user_id uuid;
   v_public_user_id uuid;
+  v_suffix integer;
   v_inserted integer := 0;
   v_updated integer := 0;
   v_skipped integer := 0;
@@ -2191,17 +2194,27 @@ BEGIN
     END;
 
     IF v_email = '' THEN
-      v_skipped := v_skipped + 1;
-      v_errors := v_errors || jsonb_build_array(jsonb_build_object(
-        'row', v_processed,
-        'email', '',
-        'message', 'Thiếu email'
-      ));
-      CONTINUE;
+      v_email_base := regexp_replace(lower(unaccent(coalesce(v_full_name, 'hocsinh'))), '[^a-z0-9]+', '', 'g');
+      IF v_email_base = '' THEN
+        v_email_base := 'hocsinh';
+      END IF;
+      v_suffix := 1;
+      LOOP
+        v_email := v_email_base || CASE WHEN v_suffix = 1 THEN '' ELSE v_suffix::text END || '@gmail.com';
+        EXIT WHEN NOT EXISTS (
+          SELECT 1 FROM auth.users au WHERE lower(au.email) = v_email
+        ) AND NOT EXISTS (
+          SELECT 1 FROM public.users pu WHERE lower(pu.email) = v_email
+        );
+        v_suffix := v_suffix + 1;
+      END LOOP;
     END IF;
 
     IF v_password IS NULL THEN
-      v_password := '123456';
+      v_password := nullif(regexp_replace(coalesce(v_phone, ''), '\D+', '', 'g'), '');
+      IF v_password IS NULL OR length(v_password) < 6 THEN
+        v_password := '123456';
+      END IF;
     END IF;
 
     SELECT id INTO v_auth_user_id
