@@ -460,6 +460,37 @@
     return pages;
   }
 
+  async function extractPdfTextChunks(dataUrl) {
+    if (!window.pdfjsLib?.getDocument) return [];
+    if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
+    }
+    const pdf = await window.pdfjsLib.getDocument({ data: dataUrlToUint8Array(dataUrl) }).promise;
+    const chunks = [];
+    for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
+      const page = await pdf.getPage(pageNo);
+      const textContent = await page.getTextContent();
+      const lines = [];
+      let currentLine = [];
+      let lastY = null;
+      for (const item of (textContent.items || [])) {
+        const raw = String(item?.str || "").trim();
+        if (!raw) continue;
+        const y = Number(item?.transform?.[5] ?? 0);
+        if (lastY !== null && Math.abs(y - lastY) > 2.5 && currentLine.length) {
+          lines.push(currentLine.join(" ").trim());
+          currentLine = [];
+        }
+        currentLine.push(raw);
+        lastY = y;
+      }
+      if (currentLine.length) lines.push(currentLine.join(" ").trim());
+      const pageText = lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+      if (pageText.length >= 40) chunks.push(pageText);
+    }
+    return chunks;
+  }
+
   async function stitchImagesVertically(dataUrls) {
     if (!Array.isArray(dataUrls) || !dataUrls.length) return null;
     if (dataUrls.length === 1) return dataUrls[0];
@@ -574,6 +605,17 @@
     return mergeQuestionSets(chunks);
   }
 
+  async function extractQuestionsFromTextChunks(textChunks, sourceKind) {
+    const chunks = [];
+    for (const textChunk of (textChunks || [])) {
+      if (!String(textChunk || "").trim()) continue;
+      const raw = await callAI(buildAiMessages(textChunk, null, sourceKind));
+      const parsed = parseRawAiQuestions(raw);
+      chunks.push(parsed);
+    }
+    return mergeQuestionSets(chunks);
+  }
+
   function buildAiMessages(text, dataUrl, sourceKind = null) {
     const parts = [];
     const kind = sourceKind || detectDataKind(dataUrl);
@@ -600,12 +642,18 @@
     const cleanText = String(text || "").trim();
     const sourceKind = detectDataKind(dataUrl);
     if (sourceKind === "pdf" && dataUrl) {
+      const textChunks = await extractPdfTextChunks(dataUrl);
+      if (textChunks.length) {
+        const parsedTextPdf = await extractQuestionsFromTextChunks(textChunks, "pdf");
+        if (parsedTextPdf.questions.length) {
+          return { ...parsedTextPdf, raw: "[pdf-text-pages]" };
+        }
+      }
       const pageImages = await renderPdfToPageImages(dataUrl);
       const pageChunks = [];
       for (const pageImage of pageImages) {
         try {
-          const imageChunks = await splitTallImageIntoChunks(pageImage, { outputType: "image/jpeg", jpegQuality: 0.9 });
-          const parsedPage = await extractQuestionsFromImageChunks(imageChunks, "image");
+          const parsedPage = await extractQuestionsFromImageChunks([pageImage], "image");
           pageChunks.push(parsedPage);
         } catch (pageError) {
           pageChunks.push({
