@@ -476,14 +476,14 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <div class="s-import-top">
         <div>
           <div style="font-weight:800;color:var(--navy);margin-bottom:4px">Tạo tài khoản học sinh từ file Excel</div>
-          <div class="s-import-note">Nhập file `.xlsx`, `.xls` hoặc `.csv` có các cột như `full_name`, `phone`, `birth_year`, `province`, `school`. Nếu để trống `email`, hệ thống sẽ tự tạo theo dạng `hovaten@gmail.com`. Nếu để trống `password`, hệ thống sẽ dùng số điện thoại; nếu số điện thoại cũng trống thì dùng `123456`.</div>
+          <div class="s-import-note">Nhập file `.xlsx`, `.xls` hoặc `.csv` với các cột `full_name`, `phone`, `birth_year`, `province`, `school`. Hệ thống sẽ tự tạo email theo dạng `hovaten01@gmail.com`; nếu trùng sẽ tăng thành `02`, `03`... Mật khẩu mặc định là số điện thoại, nếu số điện thoại trống thì dùng `123456`.</div>
         </div>
         <button class="btn btn-primary btn-sm" onclick="sPickImportFile()">📤 Nhập Excel</button>
       </div>
       <div class="s-import-grid">
         <div class="fg" style="margin:0">
           <label>Quy tắc mặc định</label>
-          <input value="Email: hovaten@gmail.com | Mật khẩu: SĐT / 123456" disabled>
+          <input value="Email: hovaten01@gmail.com | Mật khẩu: SĐT / 123456" disabled>
         </div>
         <div class="fg" style="margin:0">
           <label>Tên sheet ưu tiên</label>
@@ -957,6 +957,9 @@ function sSlugName(v){
   const base=sRmVN(String(v||'')).replace(/[^a-z0-9]+/g,'');
   return base || 'hocsinh';
 }
+function sImportEmailCandidate(base,index){
+  return `${base}${String(index).padStart(2,'0')}@gmail.com`;
+}
 function sMapImportRow(row){
   const normalized={};
   Object.keys(row||{}).forEach(key=>{ normalized[sNormalizeHeader(key)] = row[key]; });
@@ -984,7 +987,7 @@ function sPickImportFile(){
 }
 function sDownloadImportTemplate(){
   if(typeof XLSX==='undefined'){alert('Cần thêm thư viện XLSX');return;}
-  const rows=[{email:'',full_name:'Nguyen Van A',phone:'0900000001',birth_year:2008,province:'Ha Noi',school:'THPT ABC',password:''}];
+  const rows=[{full_name:'Nguyen Van A',phone:'0900000001',birth_year:2008,province:'Ha Noi',school:'THPT ABC'}];
   const ws=XLSX.utils.json_to_sheet(rows);
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'students_import');
@@ -1012,11 +1015,11 @@ async function sHandleImportFile(event){
       const next={ ...row };
       if(!next.email){
         let local=sSlugName(next.full_name);
-        let email=`${local}@gmail.com`;
         let suffix=1;
+        let email=sImportEmailCandidate(local,suffix);
         while(usedEmails.has(email)){
           suffix+=1;
-          email=`${local}${suffix}@gmail.com`;
+          email=sImportEmailCandidate(local,suffix);
         }
         next.email=email;
       }

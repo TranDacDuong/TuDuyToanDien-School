@@ -2200,7 +2200,7 @@ BEGIN
       END IF;
       v_suffix := 1;
       LOOP
-        v_email := v_email_base || CASE WHEN v_suffix = 1 THEN '' ELSE v_suffix::text END || '@gmail.com';
+        v_email := v_email_base || lpad(v_suffix::text, 2, '0') || '@gmail.com';
         EXIT WHEN NOT EXISTS (
           SELECT 1 FROM auth.users au WHERE lower(au.email) = v_email
         ) AND NOT EXISTS (
