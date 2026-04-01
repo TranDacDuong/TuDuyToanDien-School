@@ -419,28 +419,6 @@
     }
   }
 
-  async function renderPdfToPageImages(dataUrl) {
-    if (!window.pdfjsLib?.getDocument) throw new Error("Chưa tải được bộ đọc PDF.");
-    if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
-    }
-    const pdf = await window.pdfjsLib.getDocument({ data: dataUrlToUint8Array(dataUrl) }).promise;
-    const pages = [];
-    for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
-      const page = await pdf.getPage(pageNo);
-      const viewport = page.getViewport({ scale: 1.7 });
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d", { alpha: false });
-      canvas.width = Math.ceil(viewport.width);
-      canvas.height = Math.ceil(viewport.height);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      await page.render({ canvasContext: ctx, viewport }).promise;
-      pages.push(canvas.toDataURL("image/jpeg", 0.92));
-    }
-    return pages;
-  }
-
   async function stitchImagesVertically(dataUrls) {
     if (!Array.isArray(dataUrls) || !dataUrls.length) return null;
     if (dataUrls.length === 1) return dataUrls[0];
@@ -597,24 +575,6 @@
     }
     parts.push({ type: "text", text: `${text || ""}\n\n${buildExtractionPrompt(kind)}` });
     return [{ role: "user", content: parts }];
-  }
-
-  async function convertAiSourceToQuestions({ text = "", dataUrl = null } = {}) {
-    if (!String(text || "").trim() && !dataUrl) {
-      throw new Error("Vui lòng nhập nội dung hoặc chọn ảnh trước.");
-    }
-    const cleanText = String(text || "").trim();
-    const sourceKind = "image";
-    if (sourceKind === "image" && dataUrl && !cleanText) {
-      const imageChunks = await splitTallImageIntoChunks(dataUrl);
-      if (imageChunks.length > 1) {
-        const parsedChunks = await extractQuestionsFromImageChunks(imageChunks, "image");
-        if (parsedChunks.questions.length > 1) return { ...parsedChunks, raw: "[image-chunks]" };
-      }
-    }
-    const raw = await callAI(buildAiMessages(cleanText, dataUrl, sourceKind));
-    const parsed = parseRawAiQuestions(raw);
-    return { ...parsed, raw };
   }
 
   /* ══════════════════════════════════════════════
@@ -846,10 +806,9 @@ QUY TAC QUAN TRONG:
       if (img) img.src = "";
       if (wrap) wrap.style.display = "none";
       if (hint) {
-        hint.textContent = "Đã upload PDF. Bấm Chuyển sang Ảnh Preview để xem trước.";
+        hint.textContent = "Da upload PDF. Bam Chuyen doi voi AI de xu ly ngay.";
         hint.style.color = "var(--gold)";
       }
-      if (hint) hint.textContent = "Da upload PDF. Bam Chuyen doi voi AI de xu ly ngay.";
       e.target.value = "";
     };
   }
@@ -968,35 +927,6 @@ QUY TAC QUAN TRONG:
     btn.disabled = false;
     btn.innerHTML = "✨ Chuyển đổi với AI";
   };
-
-  /* ── Crop hình vẽ từ ảnh gốc theo tọa độ pixel ── */
-  function buildExtractionPrompt(sourceKind = "image") {
-    return `Trích xuất TẤT CẢ câu hỏi từ ảnh này. Trả về JSON array (không markdown, không backtick):
-
-[
-  {
-    "question_type": "multi_choice | true_false | short_answer | essay",
-    "question_text": "Nội dung câu hỏi, KHÔNG có Câu 1, Câu 2. Với multi_choice: gộp câu hỏi + A,B,C,D vào đây mỗi phương án 1 dòng. Với true_false: chỉ ghi nội dung câu hỏi chính. Công thức dùng LaTeX: $x^2$",
-    "options": ["Ý a (chỉ dùng cho true_false)", "Ý b", "Ý c", "Ý d"],
-    "difficulty": 5,
-    "answer": "multi_choice: A/B/C/D. true_false: PHẢI điền đủ 4 cặp ví dụ aTbFcTdF (a đúng b sai c đúng d sai). short_answer: đáp án",
-    "answer_count": 4,
-    "has_figure": false,
-    "question_bbox": { "x": 0, "y": 0, "w": 800, "h": 200 }
-  }
-]
-
-QUY TẮC QUAN TRỌNG:
-- Bỏ hoàn toàn Câu 1, Câu 2, số thứ tự
-- true_false: 1 câu = 1 object DUY NHẤT, các ý a,b,c,d để trong options, KHÔNG tách thành nhiều object
-- true_false answer: PHẢI điền đủ, ví dụ "aTbFcTdF" - 4 ý thì 4 cặp chữ
-- multi_choice: gộp A,B,C,D vào question_text, để options là []
-- difficulty: 1-3 dễ, 4-6 trung bình, 7-10 khó
-- has_figure = true chỉ khi có hình vẽ/biểu đồ/đồ thị thực sự
-- question_bbox: tọa độ pixel của toàn bộ câu hỏi trong ảnh
-- Không được dừng sau câu đầu tiên nếu còn câu khác
-- Chỉ trả về JSON, không text thêm`;
-  }
 
   function cropFigure(srcDataUrl, bbox) {
     return new Promise(resolve => {
