@@ -60,8 +60,6 @@
     return estimateBase64Bytes(String(dataUrl || "").split(",")[1] || "");
   }
 
-  function detectDataKind() { return "image"; }
-
   function validateDataUrlSize(dataUrl) {
     const size = getDataUrlBytes(dataUrl);
     if (size > getMaxBytes()) {
@@ -396,10 +394,6 @@
     return new Blob([bytes], { type: getMediaTypeFromDataUrl(dataUrl) || "image/png" });
   }
 
-  function exportCanvasAsJpeg(canvas, quality = 0.92) {
-    return canvas.toDataURL("image/jpeg", quality);
-  }
-
   async function loadRasterImage(dataUrl) {
     const src = String(dataUrl || "");
     if (!src) throw new Error("Không đọc được ảnh.");
@@ -493,11 +487,7 @@
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, startY, imgWidth, chunkHeight, 0, 0, imgWidth, chunkHeight);
-      chunks.push(
-        outputType === "image/jpeg"
-          ? exportCanvasAsJpeg(canvas, jpegQuality)
-          : canvas.toDataURL(outputType)
-      );
+      chunks.push(canvas.toDataURL(outputType, jpegQuality));
       if (startY + chunkHeight >= imgHeight) break;
       startY += Math.max(1, chunkHeight - overlap);
     }
@@ -514,20 +504,9 @@
     return mergeQuestionSets(chunks);
   }
 
-  async function extractQuestionsFromTextChunks(textChunks, sourceKind) {
-    const chunks = [];
-    for (const textChunk of (textChunks || [])) {
-      if (!String(textChunk || "").trim()) continue;
-      const raw = await callAI(buildAiMessages(textChunk, null, sourceKind));
-      const parsed = parseRawAiQuestions(raw);
-      chunks.push(parsed);
-    }
-    return mergeQuestionSets(chunks);
-  }
-
   function buildAiMessages(text, dataUrl, sourceKind = null) {
     const parts = [];
-    const kind = sourceKind || detectDataKind(dataUrl);
+    const kind = sourceKind || "image";
     if (dataUrl) {
       const validation = validateDataUrlSize(dataUrl);
       if (!validation.ok) throw new Error(validation.message);
@@ -549,7 +528,7 @@
       throw new Error("Vui lòng nhập nội dung hoặc chọn ảnh trước.");
     }
     const cleanText = String(text || "").trim();
-    const sourceKind = detectDataKind(dataUrl);
+    const sourceKind = "image";
     if (sourceKind === "image" && dataUrl && !cleanText) {
       const imageChunks = await splitTallImageIntoChunks(dataUrl);
       if (imageChunks.length > 1) {
