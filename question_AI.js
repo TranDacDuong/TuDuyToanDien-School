@@ -886,7 +886,7 @@
     _pendingPdfDataUrl = dataUrl;
     const hint = document.getElementById("convertHint");
     if (hint) {
-      hint.textContent = "Đã upload PDF, bấm Chuyển đổi với AI để tạo ảnh preview trước.";
+      hint.textContent = "Đã upload PDF, bấm Xem ảnh preview PDF trước.";
       hint.style.color = "var(--gold)";
     }
   }
@@ -905,7 +905,7 @@
       _pendingPdfDataUrl = null;
       _pastedImg = stitchedImage;
       _lastSourceImg = stitchedImage;
-      showSourcePreview(stitchedImage, "Đã tạo ảnh dài từ PDF. Nếu ổn rồi, bấm Chuyển đổi với AI lần nữa.");
+      showSourcePreview(stitchedImage, "Đã tạo ảnh dài từ PDF. Nếu ổn rồi, bấm Chuyển đổi với AI.");
       setProgress(100, "Hoàn thành!");
       setTimeout(() => hideProgress(), 1000);
     } catch (err) {
@@ -919,10 +919,6 @@
   ══════════════════════════════════════════════ */
   window.convertWithAI = async function () {
     const text = document.getElementById("aiTextInput").value.trim();
-    if (_pendingPdfDataUrl && !_pdfPreviewImg) {
-      await processPdfPreview(_pendingPdfDataUrl);
-      return;
-    }
     if (!text && !_pastedImg) {
       alert("Vui lòng nhập nội dung hoặc paste ảnh câu hỏi!"); return;
     }
@@ -952,6 +948,18 @@
 
     btn.disabled = false;
     btn.innerHTML = "✨ Chuyển đổi với AI";
+  };
+
+  window.previewPdfSource = async function () {
+    if (_pdfPreviewImg) {
+      showSourcePreview(_pdfPreviewImg, "Đây là ảnh dài ghép từ PDF.");
+      return;
+    }
+    if (!_pendingPdfDataUrl) {
+      alert("Vui lòng upload PDF trước.");
+      return;
+    }
+    await processPdfPreview(_pendingPdfDataUrl);
   };
 
   function buildExtractionPrompt(sourceKind = "image") {
