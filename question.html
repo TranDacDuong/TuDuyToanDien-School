@@ -395,10 +395,9 @@ button {
         </div>
       </div>
       <div class="pdf-preview-panel">
-        <div class="panel-title">PDF Preview</div>
+        <div class="panel-title">PDF</div>
         <div class="pdf-tools">
           <label class="upload-pdf-btn">📄 Upload PDF<input type="file" id="aiPdfFile" accept=".pdf" style="display:none"></label>
-          <button class="preview-pdf-btn" id="previewPdfBtn" type="button" onclick="previewPdfSource()" disabled>🖼 Chuyển sang Ảnh Preview</button>
         </div>
       </div>
       <div class="action-bar">
@@ -407,13 +406,6 @@ button {
       </div>
       <div class="progress-bar-wrap" id="progressWrap"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
       <div class="progress-text" id="progressText"></div>
-      <div class="source-preview-wrap" id="sourcePreviewWrap">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px">
-          <div style="font-weight:800;color:var(--ink)">Ảnh Preview từ PDF</div>
-          <button class="btn btn-outline btn-sm" type="button" onclick="clearSourcePreview()">Xóa preview</button>
-        </div>
-        <img id="sourcePreviewImg" alt="Ảnh preview PDF">
-      </div>
       <div id="questionsSection" style="display:none">
         <div class="qs-hd">
           <h3 id="qSectionTitle">Câu hỏi</h3>
@@ -458,20 +450,11 @@ button {
           <label class="upload-pdf-btn" style="padding:7px 14px;font-size:.82rem">
             📄 Upload PDF<input type="file" id="qPdfFile" accept=".pdf" style="display:none">
           </label>
-          <button type="button" id="qPreviewPdfBtn"
-            style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;background:#fff7e6;color:var(--navy);font-size:.82rem;font-weight:700;cursor:pointer;font-family:var(--font-body)"
-            onclick="previewModalPdf()" disabled>
-            🖼 Xem Ảnh Preview
-          </button>
           <button type="button" onclick="convertModalWithAI()" id="qAiBtn"
             style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border:none;border-radius:8px;background:linear-gradient(135deg,var(--navy),#1e3a5f);color:var(--gold-light);font-size:.82rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">
             ✨ Chuyển đổi với AI
           </button>
-          <span id="qAiHint" style="font-size:.75rem;color:var(--ink-light)">Paste ảnh rồi bấm chuyển đổi</span>
-        </div>
-        <div id="qPdfPreviewWrap" style="display:none;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--surface)">
-          <div style="font-size:.76rem;font-weight:700;color:var(--ink-mid);margin-bottom:8px">Ảnh Preview từ PDF</div>
-          <img id="qPdfPreviewImg" alt="PDF preview" style="display:block;width:100%;max-height:420px;object-fit:contain;border-radius:8px;background:#fff;border:1px solid var(--border)">
+          <span id="qAiHint" style="font-size:.75rem;color:var(--ink-light)">Paste ảnh hoặc upload PDF rồi bấm chuyển đổi</span>
         </div>
         <!-- answerText/answerImg ẩn để tương thích với question_create.js -->
         <textarea id="answerText" style="display:none"></textarea>

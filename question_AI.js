@@ -849,7 +849,7 @@ QUY TAC QUAN TRONG:
         hint.textContent = "Đã upload PDF. Bấm Chuyển sang Ảnh Preview để xem trước.";
         hint.style.color = "var(--gold)";
       }
-      setPreviewPdfButtonState(true);
+      if (hint) hint.textContent = "Da upload PDF. Bam Chuyen doi voi AI de xu ly ngay.";
       e.target.value = "";
     };
   }
