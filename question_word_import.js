@@ -33,11 +33,7 @@
         return;
       }
 
-      openImportReviewArea();
-      window.QuestionAIShared?.appendImportedQuestions?.(parsed.questions, parsed.warnings);
-
-      const target = document.getElementById("questionsSection");
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      openImportReviewModal(parsed.questions, parsed.warnings);
     } catch (error) {
       alert("Không đọc được file Word: " + (error?.message || error));
     }
@@ -415,16 +411,29 @@
     return matches;
   }
 
-  function openImportReviewArea() {
-    if (typeof window.switchTab === "function") {
-      try {
-        window.switchTab("ai");
-      } catch (_) {
-        // Fallback below handles pages without a full tab wrapper.
+  function openImportReviewModal(questions, warnings) {
+    if (typeof window.openModal === "function") {
+      window.openModal(true);
+    } else {
+      document.getElementById("modal")?.style?.setProperty("display", "flex");
+    }
+
+    if (typeof window.startMultiQuestion === "function") {
+      window.startMultiQuestion(questions);
+    }
+
+    const hint = document.getElementById("qAiHint");
+    if (hint) {
+      if (warnings?.length) {
+        hint.textContent = `Đã import ${questions.length} câu. Có ${warnings.length} chỗ cần giáo viên rà lại trước khi lưu.`;
+        hint.style.cssText = "font-size:.75rem;color:#b45309;background:#fef3c7;padding:5px 10px;border-radius:7px";
+      } else {
+        hint.textContent = `Đã import ${questions.length} câu từ Word. Giáo viên kiểm tra rồi lưu từng câu.`;
+        hint.style.cssText = "font-size:.75rem;color:var(--green);font-weight:700";
       }
     }
 
-    const aiTab = document.getElementById("tab-ai");
-    if (aiTab) aiTab.classList.add("active");
+    const title = document.getElementById("formTitle");
+    if (title) title.textContent = "Tạo câu hỏi từ file Word";
   }
 })();
