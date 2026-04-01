@@ -1177,6 +1177,73 @@ document.getElementById("qPdfFile").onchange = async function(e) {
 
 
 <script>
+async function convertModalWithAI() {
+  const text = document.getElementById("questionText").value.trim();
+  if (_modalPdfDataUrl && !_modalPdfPreview) {
+    alert("Hãy bấm Xem Ảnh Preview trước để chuyển PDF sang ảnh.");
+    return;
+  }
+  if (!text && !_modalPastedImg) {
+    alert("Nhập nội dung hoặc paste ảnh trước!");
+    return;
+  }
+
+  const btn = document.getElementById("qAiBtn");
+  const hint = document.getElementById("qAiHint");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">↻</span> Đang phân tích...';
+  hint.textContent = "AI đang xử lý...";
+  hint.style.color = "";
+
+  try {
+    const shared = window.QuestionAIShared;
+    if (!shared?.convertToQuestions) throw new Error("Chưa tải xong bộ AI dùng chung.");
+    const { questions, warnings } = await shared.convertToQuestions({ text, dataUrl: _modalPastedImg });
+    _modalPastedImg = null;
+    if (warnings?.length) {
+      hint.textContent = `AI đã chuẩn hóa ${warnings.length} chi tiết, nhớ kiểm tra lại trước khi lưu.`;
+      hint.style.color = "#b45309";
+    }
+    startMultiQuestion(questions);
+  } catch (err) {
+    hint.textContent = err.message || "AI không xử lý được nội dung này.";
+    hint.style.color = "var(--red,#ef4444)";
+    alert("Lỗi AI: " + err.message);
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = "Chuyển đổi với AI";
+}
+
+document.getElementById("qPdfFile").onchange = async function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const hint = document.getElementById("qAiHint");
+  const previewBtn = document.getElementById("qPreviewPdfBtn");
+
+  try {
+    const shared = window.QuestionAIShared;
+    const validation = shared?.validateFileSize(file, "pdf");
+    if (validation && !validation.ok) throw new Error(validation.message);
+    if (!shared?.readFileAsDataUrl) throw new Error("Chưa tải xong bộ AI dùng chung.");
+
+    clearModalPdfPreview();
+    _modalPastedImg = null;
+    _modalPdfDataUrl = await shared.readFileAsDataUrl(file);
+    hint.textContent = "Đã tải PDF - bấm Xem Ảnh Preview.";
+    hint.style.color = "var(--green)";
+    if (previewBtn) previewBtn.disabled = false;
+  } catch (err) {
+    clearModalPdfPreview();
+    _modalPastedImg = null;
+    hint.textContent = err.message || "PDF không hợp lệ.";
+    hint.style.color = "var(--red,#ef4444)";
+  }
+
+  e.target.value = "";
+};
+
 function switchTab(tab) {
   document.querySelectorAll(".tab-btn").forEach((b,i) => b.classList.toggle("active",(i===0&&tab==="bank")||(i===1&&tab==="ai")));
   document.getElementById("tab-bank").classList.toggle("active",tab==="bank");
