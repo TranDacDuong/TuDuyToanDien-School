@@ -626,7 +626,7 @@ async function ensureModalPdfJsLoaded() {
   throw new Error("Chưa tải được bộ đọc PDF.");
 }
 
-async function renderModalPdfPages(dataUrl) {
+async function renderModalPdfPages(dataUrl, onProgress) {
   const pdfjsLib = await ensureModalPdfJsLoaded();
   if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
@@ -635,8 +635,9 @@ async function renderModalPdfPages(dataUrl) {
   const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
   const pages = [];
   for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
+    if (typeof onProgress === "function") onProgress(pageNo, pdf.numPages);
     const page = await pdf.getPage(pageNo);
-    const viewport = page.getViewport({ scale: 1.6 });
+    const viewport = page.getViewport({ scale: 1.2 });
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d", { alpha: false });
     canvas.width = Math.ceil(viewport.width);
@@ -644,7 +645,7 @@ async function renderModalPdfPages(dataUrl) {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     await page.render({ canvasContext: ctx, viewport }).promise;
-    pages.push(canvas.toDataURL("image/jpeg", 0.92));
+    pages.push(canvas.toDataURL("image/jpeg", 0.88));
   }
   return pages;
 }
@@ -1176,6 +1177,45 @@ async function convertModalWithAI() {
 
   btn.disabled = false;
   btn.innerHTML = "Chuyển đổi với AI";
+}
+
+async function previewModalPdf() {
+  if (_modalPdfPreview) {
+    document.getElementById("qPdfPreviewImg").src = _modalPdfPreview;
+    document.getElementById("qPdfPreviewWrap").style.display = "block";
+    return;
+  }
+  if (!_modalPdfDataUrl) {
+    alert("Vui lòng upload PDF trước.");
+    return;
+  }
+
+  const hint = document.getElementById("qAiHint");
+  const btn = document.getElementById("qPreviewPdfBtn");
+  btn.disabled = true;
+  hint.textContent = "Đang chuẩn bị PDF...";
+  hint.style.color = "";
+
+  try {
+    const pageImages = await renderModalPdfPages(_modalPdfDataUrl, (pageNo, totalPages) => {
+      hint.textContent = `Đang chuyển PDF sang ảnh preview... trang ${pageNo}/${totalPages}`;
+    });
+    hint.textContent = `Đang ghép ${pageImages.length} trang thành ảnh preview...`;
+    const stitched = await stitchModalPdfPages(pageImages);
+    if (!stitched) throw new Error("Không tạo được ảnh preview.");
+
+    _modalPdfPreview = stitched;
+    _modalPastedImg = stitched;
+    document.getElementById("qPdfPreviewImg").src = stitched;
+    document.getElementById("qPdfPreviewWrap").style.display = "block";
+    hint.textContent = "Đã tạo ảnh preview từ PDF. Giờ có thể bấm Chuyển đổi với AI.";
+    hint.style.color = "var(--green)";
+  } catch (err) {
+    hint.textContent = err.message || "Không tạo được ảnh preview từ PDF.";
+    hint.style.color = "var(--red,#ef4444)";
+  }
+
+  btn.disabled = false;
 }
 
 document.getElementById("qPdfFile").onchange = async function(e) {
