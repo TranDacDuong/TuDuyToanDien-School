@@ -245,6 +245,8 @@ button {
 .clear-img { position:absolute;top:6px;right:6px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;display:none;align-items:center;justify-content:center; }
 .img-drop-zone:hover .clear-img { display:flex; }
 .action-bar { display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px; }
+.pdf-preview-panel { display:flex;flex-direction:column;gap:10px;margin-bottom:12px;padding:14px 16px;border:1px solid rgba(15,31,61,.08);border-radius:16px;background:linear-gradient(180deg,#fff 0%,#f8fbff 100%);box-shadow:0 10px 24px rgba(15,31,61,.05); }
+.pdf-preview-panel .panel-title { font-size:.8rem;font-weight:800;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em; }
 .pdf-tools { display:flex;flex-direction:column;gap:8px;min-width:200px; }
 .upload-pdf-btn { display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 18px;border:1.5px solid var(--border);border-radius:9px;background:var(--white);color:var(--ink);font-size:.85rem;font-weight:600;cursor:pointer;transition:.15s;font-family:var(--font-body); }
 .upload-pdf-btn:hover { border-color:var(--navy);color:var(--navy); }
@@ -392,11 +394,14 @@ button {
           </div>
         </div>
       </div>
-      <div class="action-bar">
+      <div class="pdf-preview-panel">
+        <div class="panel-title">PDF Preview</div>
         <div class="pdf-tools">
           <label class="upload-pdf-btn">📄 Upload PDF<input type="file" id="aiPdfFile" accept=".pdf" style="display:none"></label>
           <button class="preview-pdf-btn" id="previewPdfBtn" type="button" onclick="previewPdfSource()" disabled>🖼 Chuyển sang Ảnh Preview</button>
         </div>
+      </div>
+      <div class="action-bar">
         <button class="convert-btn" id="convertBtn" onclick="convertWithAI()">✨ Chuyển đổi với AI</button>
         <span id="convertHint" style="font-size:.78rem;color:var(--ink-light)">Nhập nội dung hoặc paste ảnh rồi bấm chuyển đổi</span>
       </div>
