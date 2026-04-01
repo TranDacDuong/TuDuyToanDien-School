@@ -46,6 +46,11 @@ body {
   border: 1px solid rgba(255,255,255,.2);
   box-shadow: none;
 }
+.page-hd-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 
 /* ── Filter bar ── */
 .filterBar {
@@ -307,13 +312,18 @@ button {
   };
 </script>
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
 </head>
 <body>
 
 <div class="container">
   <div class="page-hd">
     <h2>Ngân hàng câu hỏi</h2>
-    <button class="btn btn-primary" onclick="openModal()">+ Tạo câu hỏi</button>
+    <div class="page-hd-actions">
+      <input type="file" id="wordImportInput" accept=".docx" style="display:none">
+      <button class="btn btn-outline" type="button" onclick="document.getElementById('wordImportInput').click()">Upload file Word</button>
+      <button class="btn btn-primary" onclick="openModal()">+ Tạo câu hỏi</button>
+    </div>
   </div>
 
   <div class="filterBar" style="flex-direction:column;align-items:stretch;gap:6px">
@@ -915,13 +925,14 @@ function resetQuestionForm() {
 
 function switchTab(tab) {
   document.querySelectorAll(".tab-btn").forEach((b,i) => b.classList.toggle("active",(i===0&&tab==="bank")||(i===1&&tab==="ai")));
-  document.getElementById("tab-bank").classList.toggle("active",tab==="bank");
-  document.getElementById("tab-ai").classList.toggle("active",tab==="ai");
+  document.getElementById("tab-bank")?.classList.toggle("active",tab==="bank");
+  document.getElementById("tab-ai")?.classList.toggle("active",tab==="ai");
 }
 </script>
 <script src="question_list.js"></script>
 <script src="question_create.js"></script>
 <script src="question_AI.js"></script>
 <script src="question_modal_ai.js"></script>
+<script src="question_word_import.js"></script>
 </body>
 </html>

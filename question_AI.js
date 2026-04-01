@@ -1145,6 +1145,7 @@ QUY TAC QUAN TRONG:
     validateDataUrlSize,
     readFileAsDataUrl,
     convertToQuestions: convertAiSourceToQuestions,
+    appendImportedQuestions: (questions, warnings = []) => appendQuestions(questions, warnings),
   };
 
   /* ══════════════════════════════════════════════
