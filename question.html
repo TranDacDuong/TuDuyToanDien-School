@@ -245,13 +245,6 @@ button {
 .clear-img { position:absolute;top:6px;right:6px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;display:none;align-items:center;justify-content:center; }
 .img-drop-zone:hover .clear-img { display:flex; }
 .action-bar { display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px; }
-.pdf-preview-panel { display:flex;flex-direction:column;gap:10px;margin-bottom:12px;padding:14px 16px;border:1px solid rgba(15,31,61,.08);border-radius:16px;background:linear-gradient(180deg,#fff 0%,#f8fbff 100%);box-shadow:0 10px 24px rgba(15,31,61,.05); }
-.pdf-preview-panel .panel-title { font-size:.8rem;font-weight:800;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em; }
-.pdf-tools { display:flex;flex-direction:column;gap:8px;min-width:200px; }
-.upload-pdf-btn { display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 18px;border:1.5px solid var(--border);border-radius:9px;background:var(--white);color:var(--ink);font-size:.85rem;font-weight:600;cursor:pointer;transition:.15s;font-family:var(--font-body); }
-.upload-pdf-btn:hover { border-color:var(--navy);color:var(--navy); }
-.preview-pdf-btn { display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 18px;border:1.5px solid var(--border);border-radius:9px;background:#fff7e6;color:var(--navy);font-size:.83rem;font-weight:700;cursor:pointer;font-family:var(--font-body); }
-.preview-pdf-btn:disabled { opacity:.55;cursor:not-allowed; }
 .convert-btn { display:inline-flex;align-items:center;gap:7px;padding:9px 22px;border:none;border-radius:9px;background:linear-gradient(135deg,var(--navy),#1e3a5f);color:var(--gold-light);font-size:.85rem;font-weight:700;cursor:pointer;font-family:var(--font-body);box-shadow:0 2px 8px rgba(10,30,60,.18);transition:.15s; }
 .convert-btn:hover { transform:translateY(-1px); }
 .convert-btn:disabled { opacity:.6;cursor:not-allowed;transform:none; }
@@ -394,12 +387,6 @@ button {
           </div>
         </div>
       </div>
-      <div class="pdf-preview-panel">
-        <div class="panel-title">PDF</div>
-        <div class="pdf-tools">
-          <label class="upload-pdf-btn">📄 Upload PDF<input type="file" id="aiPdfFile" accept=".pdf" style="display:none"></label>
-        </div>
-      </div>
       <div class="action-bar">
         <button class="convert-btn" id="convertBtn" onclick="convertWithAI()">✨ Chuyển đổi với AI</button>
         <span id="convertHint" style="font-size:.78rem;color:var(--ink-light)">Nhập nội dung hoặc paste ảnh rồi bấm chuyển đổi</span>
@@ -447,14 +434,11 @@ button {
         <div id="qPreview" style="padding:8px 10px;background:var(--surface);border-radius:8px;border:1px solid var(--border);font-size:.88rem;line-height:1.8;min-height:36px;color:var(--navy);white-space:pre-line;display:none"></div>
         <!-- Nút AI -->
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <label class="upload-pdf-btn" style="padding:7px 14px;font-size:.82rem">
-            📄 Upload PDF<input type="file" id="qPdfFile" accept=".pdf" style="display:none">
-          </label>
           <button type="button" onclick="convertModalWithAI()" id="qAiBtn"
             style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border:none;border-radius:8px;background:linear-gradient(135deg,var(--navy),#1e3a5f);color:var(--gold-light);font-size:.82rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">
             ✨ Chuyển đổi với AI
           </button>
-          <span id="qAiHint" style="font-size:.75rem;color:var(--ink-light)">Paste ảnh hoặc upload PDF rồi bấm chuyển đổi</span>
+          <span id="qAiHint" style="font-size:.75rem;color:var(--ink-light)">Paste ảnh rồi bấm chuyển đổi</span>
         </div>
         <!-- answerText/answerImg ẩn để tương thích với question_create.js -->
         <textarea id="answerText" style="display:none"></textarea>
@@ -509,21 +493,11 @@ button {
 let activeField = null;
 let _modalFigureBase64 = null; // ảnh hình vẽ trong modal (base64)
 let _modalPastedImg   = null; // ảnh paste vào ô text để AI đọc
-let _modalPdfDataUrl  = null;
-let _modalPdfPreview  = null;
 
 Object.defineProperties(window, {
   _modalPastedImg: {
     get: () => _modalPastedImg,
     set: (value) => { _modalPastedImg = value; },
-  },
-  _modalPdfDataUrl: {
-    get: () => _modalPdfDataUrl,
-    set: (value) => { _modalPdfDataUrl = value; },
-  },
-  _modalPdfPreview: {
-    get: () => _modalPdfPreview,
-    set: (value) => { _modalPdfPreview = value; },
   },
   _modalFigureBase64: {
     get: () => _modalFigureBase64,
@@ -582,117 +556,6 @@ function clearFigure() {
   document.getElementById("qFigureCropBtn").style.display = "none";
   const img = document.getElementById("qFigureDrop").querySelector("img.figure-img");
   if (img) img.remove();
-}
-
-function clearModalPdfPreview() {
-  _modalPdfDataUrl = null;
-  _modalPdfPreview = null;
-  const wrap = document.getElementById("qPdfPreviewWrap");
-  const img = document.getElementById("qPdfPreviewImg");
-  const btn = document.getElementById("qPreviewPdfBtn");
-  if (img) img.src = "";
-  if (wrap) wrap.style.display = "none";
-  if (btn) btn.disabled = true;
-}
-
-async function ensureModalPdfJsLoaded() {
-  if (window.pdfjsLib?.getDocument) return window.pdfjsLib;
-  try {
-    const pdfjsLib = await import("./vendor/pdf.min.mjs");
-    window.pdfjsLib = pdfjsLib;
-    return pdfjsLib;
-  } catch (error) {
-    throw new Error("Chưa tải được bộ đọc PDF.");
-  }
-}
-
-async function renderModalPdfPages(dataUrl, onProgress) {
-  const pdfjsLib = await ensureModalPdfJsLoaded();
-  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.mjs";
-  }
-  const bytes = Uint8Array.from(atob(dataUrl.split(",")[1] || ""), c => c.charCodeAt(0));
-  const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
-  const pages = [];
-  for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
-    if (typeof onProgress === "function") onProgress(pageNo, pdf.numPages);
-    const page = await pdf.getPage(pageNo);
-    const viewport = page.getViewport({ scale: 1.2 });
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d", { alpha: false });
-    canvas.width = Math.ceil(viewport.width);
-    canvas.height = Math.ceil(viewport.height);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    await page.render({ canvasContext: ctx, viewport }).promise;
-    pages.push(canvas.toDataURL("image/jpeg", 0.88));
-  }
-  return pages;
-}
-
-async function stitchModalPdfPages(dataUrls) {
-  if (!dataUrls.length) return null;
-  if (dataUrls.length === 1) return dataUrls[0];
-  const images = await Promise.all(dataUrls.map(src => new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("Không đọc được ảnh PDF."));
-    img.src = src;
-  })));
-  const maxWidth = Math.max(...images.map(img => img.naturalWidth || img.width || 1));
-  const gap = 24;
-  const scaledHeights = images.map(img => Math.max(1, Math.round((img.naturalHeight || img.height || 1) * (maxWidth / (img.naturalWidth || img.width || 1)))));
-  const totalHeight = scaledHeights.reduce((sum, h) => sum + h, 0) + gap * (images.length - 1);
-  const canvas = document.createElement("canvas");
-  canvas.width = maxWidth;
-  canvas.height = totalHeight;
-  const ctx = canvas.getContext("2d", { alpha: false });
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  let y = 0;
-  images.forEach((img, index) => {
-    const drawHeight = scaledHeights[index];
-    ctx.drawImage(img, 0, y, maxWidth, drawHeight);
-    y += drawHeight;
-    if (index < images.length - 1) {
-      ctx.fillStyle = "#f5f5f5";
-      ctx.fillRect(0, y, maxWidth, gap);
-      y += gap;
-    }
-  });
-  return canvas.toDataURL("image/jpeg", 0.9);
-}
-
-async function previewModalPdf() {
-  if (_modalPdfPreview) {
-    document.getElementById("qPdfPreviewImg").src = _modalPdfPreview;
-    document.getElementById("qPdfPreviewWrap").style.display = "block";
-    return;
-  }
-  if (!_modalPdfDataUrl) {
-    alert("Vui lòng upload PDF trước.");
-    return;
-  }
-  const hint = document.getElementById("qAiHint");
-  const btn = document.getElementById("qPreviewPdfBtn");
-  btn.disabled = true;
-  hint.textContent = "Đang chuyển PDF sang ảnh preview...";
-  hint.style.color = "";
-  try {
-    const pageImages = await renderModalPdfPages(_modalPdfDataUrl);
-    const stitched = await stitchModalPdfPages(pageImages);
-    if (!stitched) throw new Error("Không tạo được ảnh preview.");
-    _modalPdfPreview = stitched;
-    _modalPastedImg = stitched;
-    document.getElementById("qPdfPreviewImg").src = stitched;
-    document.getElementById("qPdfPreviewWrap").style.display = "block";
-    hint.textContent = "Đã tạo ảnh preview từ PDF. Giờ có thể bấm Chuyển đổi với AI.";
-    hint.style.color = "var(--green)";
-  } catch (err) {
-    hint.textContent = err.message || "Không tạo được ảnh preview từ PDF.";
-    hint.style.color = "var(--red,#ef4444)";
-  }
-  btn.disabled = false;
 }
 
 /* ── Crop figure ── */
@@ -1043,10 +906,9 @@ function resetQuestionForm() {
   document.getElementById("saveBtn").textContent = "Lưu câu hỏi";
   document.getElementById("saveBtn").onclick = () => saveQuestion(true);
   _mqList = []; _mqIndex = 0;
-  document.getElementById("qAiHint").textContent = "Paste ảnh hoặc PDF rồi bấm chuyển đổi";
+  document.getElementById("qAiHint").textContent = "Paste ảnh rồi bấm chuyển đổi";
   document.getElementById("qAiHint").style.color = "";
   clearFigure();
-  clearModalPdfPreview();
   _modalPastedImg = null;
   answerCount = 4; changeType();
 }
