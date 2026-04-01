@@ -122,6 +122,10 @@ td { padding: 11px 12px; border-bottom: 1px solid #eef3f8; vertical-align: middl
 .questionText { white-space: pre-line; line-height: 1.5; margin-bottom: 4px; }
 .questionImg  { max-width: 280px; border-radius: 6px; margin-top: 4px; cursor: pointer; }
 .faded        { opacity: .38; }
+.status-badge { display:inline-flex;align-items:center;justify-content:center;padding:3px 10px;border-radius:999px;font-size:.72rem;font-weight:700;border:1px solid transparent;white-space:nowrap; }
+.status-ok { background:#ecfdf5;color:#15803d;border-color:#86efac; }
+.status-missing { background:#fef2f2;color:#b91c1c;border-color:#fca5a5; }
+.row-missing-answer td { background:rgba(254,242,242,.78); }
 
 .hidden-badge {
   margin-left: 6px; background: #fef3c7; color: #b45309;
@@ -340,6 +344,11 @@ button {
         <option value="short_answer">Trả lời ngắn</option>
         <option value="essay">Tự luận</option>
       </select>
+      <select id="f_answer_status">
+        <option value="">Trạng thái đáp án</option>
+        <option value="complete">Đã có đáp án</option>
+        <option value="missing">Chưa có đáp án</option>
+      </select>
       <select id="f_difficulty"><option value="">Mức độ</option></select>
       <select id="f_creator"><option value="">Người tạo</option></select>
     </div>
@@ -356,6 +365,7 @@ button {
         <th>Môn</th>
         <th>Chương</th>
         <th>Loại</th>
+        <th>Trạng thái đáp án</th>
         <th>Mức độ</th>
         <th>Số ĐA</th>
         <th>Đáp án</th>
@@ -363,7 +373,7 @@ button {
       </tr>
     </thead>
     <tbody id="questionTable">
-      <tr><td colspan="10" style="text-align:center;padding:32px;color:var(--ink-light)">⏳ Đang tải câu hỏi...</td></tr>
+      <tr><td colspan="11" style="text-align:center;padding:32px;color:var(--ink-light)">⏳ Đang tải câu hỏi...</td></tr>
     </tbody>
   </table>
   <div class="pager">
