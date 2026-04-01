@@ -8,14 +8,11 @@
   let _pastedImg     = null; // base64 ảnh paste vào ô trái
   let _lastSourceImg = null; // giữ lại ảnh gốc để crop hình vẽ
   let _rightImg      = null; // base64 ảnh hình vẽ ô phải
-  let _pdfPreviewImg = null; // ảnh dài ghép từ PDF để xem trước
-  let _pendingPdfDataUrl = null; // PDF đã upload, chờ tạo preview
 
   const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
   const ANON_KEY     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxneWRqYWFxZnhxemdiZHBxdmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxODY2NDQsImV4cCI6MjA4Nzc2MjY0NH0.l6ojk0fH5wYMK4H_RIGTepatUd1Uy2KHOTiRfAS1JD4";
   const EDGE_URL     = `${SUPABASE_URL}/functions/v1/ai-solution`;
   const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-  const MAX_PDF_BYTES   = 12 * 1024 * 1024;
   const ALLOWED_TYPES   = new Set(["multi_choice", "true_false", "short_answer", "essay"]);
 
   const TYPE_LABEL = {
@@ -38,19 +35,16 @@
     return `${(size / (1024 * 1024)).toFixed(1)} MB`;
   }
 
-  function getMaxBytes(kind) {
-    return kind === "pdf" ? MAX_PDF_BYTES : MAX_IMAGE_BYTES;
+  function getMaxBytes() { return MAX_IMAGE_BYTES; }
+
+  function getLimitMessage(size) {
+    return `File ảnh quá nặng (${formatBytes(size)}). Giới hạn hiện tại là ${formatBytes(getMaxBytes())}.`;
   }
 
-  function getLimitMessage(kind, size) {
-    const label = kind === "pdf" ? "PDF" : "ảnh";
-    return `File ${label} quá nặng (${formatBytes(size)}). Giới hạn hiện tại là ${formatBytes(getMaxBytes(kind))}.`;
-  }
-
-  function validateFileSize(file, kind) {
+  function validateFileSize(file) {
     if (!file?.size) return { ok: true };
-    if (file.size > getMaxBytes(kind)) {
-      return { ok: false, message: getLimitMessage(kind, file.size) };
+    if (file.size > getMaxBytes()) {
+      return { ok: false, message: getLimitMessage(file.size) };
     }
     return { ok: true };
   }
@@ -66,15 +60,12 @@
     return estimateBase64Bytes(String(dataUrl || "").split(",")[1] || "");
   }
 
-  function detectDataKind(dataUrl) {
-    return String(dataUrl || "").startsWith("data:application/pdf") ? "pdf" : "image";
-  }
+  function detectDataKind() { return "image"; }
 
-  function validateDataUrlSize(dataUrl, kind) {
-    const actualKind = kind || detectDataKind(dataUrl);
+  function validateDataUrlSize(dataUrl) {
     const size = getDataUrlBytes(dataUrl);
-    if (size > getMaxBytes(actualKind)) {
-      return { ok: false, message: getLimitMessage(actualKind, size) };
+    if (size > getMaxBytes()) {
+      return { ok: false, message: getLimitMessage(size) };
     }
     return { ok: true };
   }
@@ -440,142 +431,6 @@
     return img?.naturalHeight || img?.videoHeight || img?.height || 1;
   }
 
-  async function renderPdfToPageImages(dataUrl) {
-    if (!window.pdfjsLib?.getDocument) return [dataUrl];
-    if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
-    }
-    const pdf = await window.pdfjsLib.getDocument({ data: dataUrlToUint8Array(dataUrl) }).promise;
-    const pages = [];
-    for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
-      const page = await pdf.getPage(pageNo);
-      const viewport = page.getViewport({ scale: 1.6 });
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d", { alpha: false });
-      canvas.width = Math.ceil(viewport.width);
-      canvas.height = Math.ceil(viewport.height);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      await page.render({ canvasContext: ctx, viewport }).promise;
-      pages.push(exportCanvasAsJpeg(canvas));
-    }
-    return pages;
-  }
-
-  async function extractPdfTextChunks(dataUrl) {
-    if (!window.pdfjsLib?.getDocument) return [];
-    if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
-    }
-    const pdf = await window.pdfjsLib.getDocument({ data: dataUrlToUint8Array(dataUrl) }).promise;
-    const chunks = [];
-    for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
-      const page = await pdf.getPage(pageNo);
-      const textContent = await page.getTextContent();
-      const lines = [];
-      let currentLine = [];
-      let lastY = null;
-      for (const item of (textContent.items || [])) {
-        const raw = String(item?.str || "").trim();
-        if (!raw) continue;
-        const y = Number(item?.transform?.[5] ?? 0);
-        if (lastY !== null && Math.abs(y - lastY) > 2.5 && currentLine.length) {
-          lines.push(currentLine.join(" ").trim());
-          currentLine = [];
-        }
-        currentLine.push(raw);
-        lastY = y;
-      }
-      if (currentLine.length) lines.push(currentLine.join(" ").trim());
-      const pageText = lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
-      if (pageText.length >= 40) chunks.push(pageText);
-    }
-    return chunks;
-  }
-
-  function splitPdfTextIntoQuestionChunks(textChunks) {
-    const batches = [];
-    const questionPattern = /(?:^|\n)\s*(Câu\s*\d+\s*[:.)-]?|\d+\s*[:.)-])/gi;
-    for (const pageText of (textChunks || [])) {
-      const text = String(pageText || "").trim();
-      if (!text) continue;
-      const matches = [...text.matchAll(questionPattern)];
-      if (!matches.length) {
-        batches.push(text);
-        continue;
-      }
-      const questions = matches.map((match, index) => {
-        const start = match.index + (match[0].startsWith("\n") ? 1 : 0);
-        const end = index + 1 < matches.length
-          ? matches[index + 1].index + (matches[index + 1][0].startsWith("\n") ? 1 : 0)
-          : text.length;
-        return text.slice(start, end).trim();
-      }).filter(Boolean);
-      for (let i = 0; i < questions.length; i += 4) {
-        batches.push(questions.slice(i, i + 4).join("\n\n"));
-      }
-    }
-    return batches;
-  }
-
-  async function stitchImagesVertically(dataUrls) {
-    if (!Array.isArray(dataUrls) || !dataUrls.length) return null;
-    if (dataUrls.length === 1) return dataUrls[0];
-    const images = [];
-    for (const dataUrl of dataUrls) {
-      images.push(await loadRasterImage(dataUrl));
-    }
-    const maxWidth = Math.max(...images.map(img => rasterWidth(img)));
-    const gap = 24;
-    const scaledHeights = images.map(img => Math.max(1, Math.round(rasterHeight(img) * (maxWidth / rasterWidth(img)))));
-    const totalHeight = scaledHeights.reduce((sum, h) => sum + h, 0) + gap * (images.length - 1);
-    const canvas = document.createElement("canvas");
-    canvas.width = maxWidth;
-    canvas.height = totalHeight;
-    const ctx = canvas.getContext("2d", { alpha: false });
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    let y = 0;
-    images.forEach((img, index) => {
-      const drawHeight = scaledHeights[index];
-      ctx.drawImage(img, 0, y, maxWidth, drawHeight);
-      y += drawHeight;
-      if (index < images.length - 1) {
-        ctx.fillStyle = "#f5f5f5";
-        ctx.fillRect(0, y, maxWidth, gap);
-        y += gap;
-      }
-    });
-    return exportCanvasAsJpeg(canvas, 0.9);
-  }
-
-  function showSourcePreview(src, label = "Đã tạo ảnh xem trước") {
-    const wrap = document.getElementById("sourcePreviewWrap");
-    const img = document.getElementById("sourcePreviewImg");
-    const hint = document.getElementById("convertHint");
-    if (!wrap || !img) return;
-    img.src = src;
-    wrap.style.display = "block";
-    if (hint) {
-      hint.textContent = label;
-      hint.style.color = "var(--green)";
-    }
-  }
-
-  window.clearSourcePreview = function () {
-    _pdfPreviewImg = null;
-    _pendingPdfDataUrl = null;
-    const wrap = document.getElementById("sourcePreviewWrap");
-    const img = document.getElementById("sourcePreviewImg");
-    const hint = document.getElementById("convertHint");
-    if (img) img.src = "";
-    if (wrap) wrap.style.display = "none";
-    if (hint) {
-      hint.textContent = "Nhập nội dung hoặc upload PDF rồi bấm chuyển đổi";
-      hint.style.color = "var(--ink-light)";
-    }
-  };
-
   async function loadImage(dataUrl) {
     const src = String(dataUrl || "");
     if (!src) throw new Error("Không đọc được ảnh.");
@@ -691,41 +546,10 @@
 
   async function convertAiSourceToQuestions({ text = "", dataUrl = null } = {}) {
     if (!String(text || "").trim() && !dataUrl) {
-      throw new Error("Vui lòng nhập nội dung hoặc chọn ảnh/PDF trước.");
+      throw new Error("Vui lòng nhập nội dung hoặc chọn ảnh trước.");
     }
     const cleanText = String(text || "").trim();
     const sourceKind = detectDataKind(dataUrl);
-    if (sourceKind === "pdf" && dataUrl) {
-      const textChunks = await extractPdfTextChunks(dataUrl);
-      if (textChunks.length) {
-        const textQuestionChunks = splitPdfTextIntoQuestionChunks(textChunks);
-        const parsedTextPdf = await extractQuestionsFromTextChunks(
-          textQuestionChunks.length ? textQuestionChunks : textChunks,
-          "pdf_text"
-        );
-        if (parsedTextPdf.questions.length) {
-          return { ...parsedTextPdf, raw: "[pdf-text-pages]" };
-        }
-      }
-      const pageImages = await renderPdfToPageImages(dataUrl);
-      const pageChunks = [];
-      for (const pageImage of pageImages) {
-        try {
-          const parsedPage = await extractQuestionsFromImageChunks([pageImage], "image");
-          pageChunks.push(parsedPage);
-        } catch (pageError) {
-          pageChunks.push({
-            questions: [],
-            warnings: [`Một trang PDF không đọc được hoàn chỉnh: ${pageError.message}`],
-          });
-        }
-      }
-      const parsedPdf = mergeQuestionSets(pageChunks);
-      if (!parsedPdf.questions.length) {
-        throw new Error("Không đọc được nội dung PDF. Hãy thử PDF rõ nét hơn hoặc xuất lại PDF rồi tải lên.");
-      }
-      return { ...parsedPdf, raw: "[pdf-pages-as-images]" };
-    }
     if (sourceKind === "image" && dataUrl && !cleanText) {
       const imageChunks = await splitTallImageIntoChunks(dataUrl);
       if (imageChunks.length > 1) {
@@ -749,7 +573,6 @@
 
     await loadFilters();
     setupImageHandlers();
-    setupPdfHandler();
     setupPasteHandler();
 
     // Difficulty options
@@ -862,59 +685,6 @@
   }
 
   /* ══════════════════════════════════════════════
-     PDF HANDLER
-  ══════════════════════════════════════════════ */
-  function setupPdfHandler() {
-    document.getElementById("aiPdfFile").onchange = async e => {
-      const file = e.target.files[0];
-      if (!file) return;
-      await queuePdfPreview(file);
-      e.target.value = "";
-    };
-  }
-
-  async function queuePdfPreview(file) {
-    const validation = validateFileSize(file, "pdf");
-    if (!validation.ok) {
-      alert(validation.message);
-      return;
-    }
-    clearSourcePreview();
-    _pastedImg = null;
-    _lastSourceImg = null;
-    const dataUrl = await readFileAsDataUrl(file);
-    _pendingPdfDataUrl = dataUrl;
-    const hint = document.getElementById("convertHint");
-    if (hint) {
-      hint.textContent = "Đã upload PDF, bấm Xem ảnh preview PDF trước.";
-      hint.style.color = "var(--gold)";
-    }
-  }
-
-  async function processPdfPreview(dataUrl) {
-    try {
-      setProgress(0, "Đang đọc PDF...");
-      setProgress(35, "Đang tách từng trang PDF...");
-      const pageImages = await renderPdfToPageImages(dataUrl);
-      setProgress(70, "Đang ghép ảnh dài xem trước...");
-      const stitchedImage = await stitchImagesVertically(pageImages);
-      if (!stitchedImage) {
-        throw new Error("Không tạo được ảnh xem trước từ PDF.");
-      }
-      _pdfPreviewImg = stitchedImage;
-      _pendingPdfDataUrl = null;
-      _pastedImg = stitchedImage;
-      _lastSourceImg = stitchedImage;
-      showSourcePreview(stitchedImage, "Đã tạo ảnh dài từ PDF. Nếu ổn rồi, bấm Chuyển đổi với AI.");
-      setProgress(100, "Hoàn thành!");
-      setTimeout(() => hideProgress(), 1000);
-    } catch (err) {
-      hideProgress();
-      alert("Lỗi: " + err.message);
-    }
-  }
-
-  /* ══════════════════════════════════════════════
      CONVERT WITH AI
   ══════════════════════════════════════════════ */
   window.convertWithAI = async function () {
@@ -950,61 +720,9 @@
     btn.innerHTML = "✨ Chuyển đổi với AI";
   };
 
-  window.previewPdfSource = async function () {
-    if (_pdfPreviewImg) {
-      showSourcePreview(_pdfPreviewImg, "Đây là ảnh dài ghép từ PDF.");
-      return;
-    }
-    if (!_pendingPdfDataUrl) {
-      alert("Vui lòng upload PDF trước.");
-      return;
-    }
-    await processPdfPreview(_pendingPdfDataUrl);
-  };
-
-  function buildExtractionPrompt(sourceKind = "image") {
-    return `Trích xuất TẤT CẢ câu hỏi từ ảnh này. Trả về JSON array (không markdown, không backtick):
-
-[
-  {
-    "question_type": "multi_choice | true_false | short_answer | essay",
-    "question_text": "Nội dung câu hỏi, KHÔNG có Câu 1, Câu 2. Với multi_choice: gộp câu hỏi + A,B,C,D vào đây mỗi phương án 1 dòng. Với true_false: chỉ ghi nội dung câu hỏi chính. Công thức dùng LaTeX: $x^2$",
-    "options": ["Ý a (chỉ dùng cho true_false)", "Ý b", "Ý c", "Ý d"],
-    "difficulty": 5,
-    "answer": "multi_choice: A/B/C/D. true_false: PHẢI điền đủ 4 cặp ví dụ aTbFcTdF (a đúng b sai c đúng d sai). short_answer: đáp án",
-    "answer_count": 4,
-    "has_figure": false,
-    "question_bbox": { "x": 0, "y": 0, "w": 800, "h": 200 }
-  }
-]
-
-QUY TẮC QUAN TRỌNG:
-- Bỏ hoàn toàn Câu 1, Câu 2, số thứ tự
-- true_false: 1 câu = 1 object DUY NHẤT, các ý a,b,c,d để trong options, KHÔNG tách thành nhiều object
-- true_false answer: PHẢI điền đủ, ví dụ "aTbFcTdF" — 4 ý thì 4 cặp chữ
-- multi_choice: gộp A,B,C,D vào question_text, để options là []
-- difficulty: 1-3 dễ, 4-6 trung bình, 7-10 khó
-- has_figure = true chỉ khi có hình vẽ/biểu đồ/đồ thị thực sự
-- question_bbox: tọa độ pixel của toàn bộ câu hỏi trong ảnh
-- Chỉ trả về JSON, không text thêm`;
-  }
-
   /* ── Crop hình vẽ từ ảnh gốc theo tọa độ pixel ── */
   function buildExtractionPrompt(sourceKind = "image") {
-    const isPdf = sourceKind === "pdf" || sourceKind === "pdf_text" || sourceKind === "pdf_retry";
-    const intro = isPdf
-      ? "Trích xuất TẤT CẢ câu hỏi từ TOÀN BỘ file PDF này, gồm mọi trang theo đúng thứ tự từ trên xuống dưới."
-      : "Trích xuất TẤT CẢ câu hỏi từ ảnh này.";
-    const pdfRules = isPdf ? `
-- PDF có thể nhiều trang: phải đọc toàn bộ từ trang 1 đến trang cuối
-- Không được chỉ lấy câu đầu tiên
-- Mỗi câu hỏi là 1 object riêng
-- Nếu có nhiều câu thì phải trả về mảng nhiều object theo đúng thứ tự
-- Nếu đầu vào đã chứa nhiều câu hỏi liên tiếp, phải tách hết tất cả câu trong đầu vào đó` : "";
-    const retryRules = sourceKind === "pdf_retry" ? `
-- Đây là lần thử lại vì kết quả trước bị thiếu câu
-- Kiểm tra lại từ đầu đến cuối và chỉ dừng khi đã liệt kê hết câu nhận diện được` : "";
-    return `${intro} Trả về JSON array (không markdown, không backtick):
+    return `Trích xuất TẤT CẢ câu hỏi từ ảnh này. Trả về JSON array (không markdown, không backtick):
 
 [
   {
@@ -1027,7 +745,7 @@ QUY TẮC QUAN TRỌNG:
 - difficulty: 1-3 dễ, 4-6 trung bình, 7-10 khó
 - has_figure = true chỉ khi có hình vẽ/biểu đồ/đồ thị thực sự
 - question_bbox: tọa độ pixel của toàn bộ câu hỏi trong ảnh
-- Không được dừng sau câu đầu tiên nếu còn câu khác${pdfRules}${retryRules}
+- Không được dừng sau câu đầu tiên nếu còn câu khác
 - Chỉ trả về JSON, không text thêm`;
   }
 
@@ -1444,7 +1162,6 @@ QUY TẮC QUAN TRỌNG:
 
   window.QuestionAIShared = {
     MAX_IMAGE_BYTES,
-    MAX_PDF_BYTES,
     validateFileSize,
     validateDataUrlSize,
     readFileAsDataUrl,

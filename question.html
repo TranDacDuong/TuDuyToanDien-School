@@ -248,8 +248,6 @@ button {
 .convert-btn { display:inline-flex;align-items:center;gap:7px;padding:9px 22px;border:none;border-radius:9px;background:linear-gradient(135deg,var(--navy),#1e3a5f);color:var(--gold-light);font-size:.85rem;font-weight:700;cursor:pointer;font-family:var(--font-body);box-shadow:0 2px 8px rgba(10,30,60,.18);transition:.15s; }
 .convert-btn:hover { transform:translateY(-1px); }
 .convert-btn:disabled { opacity:.6;cursor:not-allowed;transform:none; }
-.upload-pdf-btn { display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border:1.5px solid var(--border);border-radius:9px;background:var(--white);color:var(--ink);font-size:.85rem;font-weight:600;cursor:pointer;transition:.15s;font-family:var(--font-body); }
-.upload-pdf-btn:hover { border-color:var(--navy);color:var(--navy); }
 .progress-bar-wrap { display:none;background:var(--surface);border-radius:8px;overflow:hidden;height:6px;margin-bottom:6px; }
 .progress-bar-fill { height:100%;background:linear-gradient(90deg,var(--gold),var(--gold-light));border-radius:8px;transition:width .3s; }
 .progress-text { font-size:.78rem;color:var(--ink-mid);display:none;margin-bottom:8px; }
@@ -388,20 +386,11 @@ button {
         </div>
       </div>
       <div class="action-bar">
-        <label class="upload-pdf-btn">📄 Upload PDF<input type="file" id="aiPdfFile" accept=".pdf" style="display:none"></label>
-        <button class="btn btn-outline" id="previewPdfBtn" type="button" onclick="previewPdfSource()">🖼 Xem ảnh preview PDF</button>
         <button class="convert-btn" id="convertBtn" onclick="convertWithAI()">✨ Chuyển đổi với AI</button>
-        <span id="convertHint" style="font-size:.78rem;color:var(--ink-light)">Nhập nội dung hoặc upload PDF rồi bấm chuyển đổi</span>
+        <span id="convertHint" style="font-size:.78rem;color:var(--ink-light)">Nhập nội dung hoặc paste ảnh rồi bấm chuyển đổi</span>
       </div>
       <div class="progress-bar-wrap" id="progressWrap"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
       <div class="progress-text" id="progressText"></div>
-      <div id="sourcePreviewWrap" style="display:none;margin-top:14px;padding:14px;border:1px solid rgba(15,23,42,.08);border-radius:18px;background:#fff">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px">
-          <div style="font-weight:800;color:var(--ink)">Xem trước ảnh nguồn</div>
-          <button class="btn btn-outline btn-sm" type="button" onclick="clearSourcePreview()">Xóa xem trước</button>
-        </div>
-        <img id="sourcePreviewImg" alt="Xem trước nguồn PDF" style="display:block;width:100%;max-height:720px;object-fit:contain;border-radius:14px;border:1px solid rgba(15,23,42,.08);background:#fff" />
-      </div>
       <div id="questionsSection" style="display:none">
         <div class="qs-hd">
           <h3 id="qSectionTitle">Câu hỏi</h3>
@@ -441,16 +430,14 @@ button {
         </div>
         <!-- Preview LaTeX -->
         <div id="qPreview" style="padding:8px 10px;background:var(--surface);border-radius:8px;border:1px solid var(--border);font-size:.88rem;line-height:1.8;min-height:36px;color:var(--navy);white-space:pre-line;display:none"></div>
-        <!-- Nút AI + Upload PDF -->
+        <!-- Nút AI -->
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <label style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;background:var(--white);font-size:.82rem;font-weight:600;cursor:pointer;font-family:var(--font-body)">
-            📄 Upload PDF<input type="file" id="qPdfFile" accept=".pdf" style="display:none">
-          </label>
           <button type="button" onclick="convertModalWithAI()" id="qAiBtn"
             style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border:none;border-radius:8px;background:linear-gradient(135deg,var(--navy),#1e3a5f);color:var(--gold-light);font-size:.82rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">
             ✨ Chuyển đổi với AI
           </button>
-          <span id="qAiHint" style="font-size:.75rem;color:var(--ink-light)">Paste ảnh hoặc PDF rồi bấm chuyển đổi</span>
+          <span id="qAiHint" style="font-size:.75rem;color:var(--ink-light)">Paste ảnh rồi bấm chuyển đổi</span>
+          <input type="file" id="qPdfFile" accept=".pdf" style="display:none">
         </div>
         <!-- answerText/answerImg ẩn để tương thích với question_create.js -->
         <textarea id="answerText" style="display:none"></textarea>
@@ -1059,7 +1046,6 @@ function switchTab(tab) {
 </script>
 <script src="question_list.js"></script>
 <script src="question_create.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js"></script>
 <script src="question_AI.js"></script>
 </body>
 </html>
