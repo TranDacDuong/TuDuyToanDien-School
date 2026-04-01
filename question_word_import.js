@@ -65,6 +65,11 @@
       if (child.nodeType !== Node.ELEMENT_NODE) continue;
       const tag = child.tagName.toLowerCase();
 
+      if (tag === "ol" || tag === "ul") {
+        pieces.push(...extractListPieces(child, getListDepth(child)));
+        continue;
+      }
+
       if (tag === "table") {
         const tableText = tableToText(child);
         if (tableText) {
@@ -97,6 +102,53 @@
     return pieces;
   }
 
+  function extractListPieces(listEl, depth) {
+    const pieces = [];
+    const items = Array.from(listEl.children || []).filter(
+      (child) => child.tagName && child.tagName.toLowerCase() === "li"
+    );
+    const markerType = getOrderedListMarkerType(listEl, depth);
+    const start = Number.parseInt(listEl.getAttribute("start") || "1", 10) || 1;
+
+    items.forEach((item, index) => {
+      const marker = buildListMarker(markerType, start + index);
+      const textParts = [];
+
+      for (const child of Array.from(item.childNodes || [])) {
+        if (child.nodeType === Node.TEXT_NODE) {
+          const text = cleanInlineText(child.textContent);
+          if (text) textParts.push(text);
+          continue;
+        }
+
+        if (child.nodeType !== Node.ELEMENT_NODE) continue;
+        const tag = child.tagName.toLowerCase();
+
+        if (tag === "ol" || tag === "ul") {
+          const nested = extractListPieces(child, depth + 1);
+          if (nested.length) textParts.push(nested.join("\n"));
+          continue;
+        }
+
+        if (tag === "table") {
+          const tableText = tableToText(child);
+          if (tableText) textParts.push(tableText);
+          continue;
+        }
+
+        const text = cleanInlineText(child.textContent);
+        if (text) textParts.push(text);
+      }
+
+      const line = normalizeWordText(textParts.join("\n"));
+      if (line) {
+        pieces.push(`${marker} ${line}`.trim());
+      }
+    });
+
+    return pieces;
+  }
+
   function isBlockLikeTag(tag) {
     return [
       "table",
@@ -118,6 +170,72 @@
       "h6",
       "blockquote",
     ].includes(tag);
+  }
+
+  function getListDepth(node) {
+    let depth = 0;
+    let current = node?.parentElement;
+    while (current) {
+      const tag = current.tagName?.toLowerCase();
+      if (tag === "ol" || tag === "ul") depth += 1;
+      current = current.parentElement;
+    }
+    return depth;
+  }
+
+  function getOrderedListMarkerType(listEl, depth) {
+    const tag = listEl.tagName?.toLowerCase();
+    if (tag === "ul") return "bullet";
+
+    const typeAttr = (listEl.getAttribute("type") || "").toLowerCase();
+    if (typeAttr === "a") return "upper-alpha";
+    if (typeAttr === "A") return "upper-alpha";
+    if (typeAttr === "i" || typeAttr === "I") return "roman";
+
+    const style = (listEl.getAttribute("style") || "").toLowerCase();
+    if (style.includes("lower-alpha") || style.includes("upper-alpha") || style.includes("alpha")) {
+      return "upper-alpha";
+    }
+    if (style.includes("lower-roman") || style.includes("upper-roman") || style.includes("roman")) {
+      return "roman";
+    }
+
+    return depth === 0 ? "question-number" : "upper-alpha";
+  }
+
+  function buildListMarker(markerType, index) {
+    if (markerType === "question-number") return `Câu ${index}:`;
+    if (markerType === "upper-alpha") return `${String.fromCharCode(64 + index)}.`;
+    if (markerType === "roman") return `${toRoman(index)}.`;
+    return "-";
+  }
+
+  function toRoman(num) {
+    const map = [
+      [1000, "M"],
+      [900, "CM"],
+      [500, "D"],
+      [400, "CD"],
+      [100, "C"],
+      [90, "XC"],
+      [50, "L"],
+      [40, "XL"],
+      [10, "X"],
+      [9, "IX"],
+      [5, "V"],
+      [4, "IV"],
+      [1, "I"],
+    ];
+
+    let value = Math.max(1, Number(num) || 1);
+    let result = "";
+    for (const [arabic, roman] of map) {
+      while (value >= arabic) {
+        result += roman;
+        value -= arabic;
+      }
+    }
+    return result;
   }
 
   function tableToText(tableEl) {
