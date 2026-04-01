@@ -14,22 +14,26 @@
       return;
     }
 
-    if (!window.mammoth?.extractRawText) {
+    if (!window.mammoth?.extractRawText || !window.mammoth?.convertToHtml) {
       alert("Chưa tải được bộ đọc file Word.");
       return;
     }
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const result = await window.mammoth.extractRawText({ arrayBuffer });
-      const parsed = parseWordQuestions(result.value || "");
+      const [rawResult, htmlResult] = await Promise.all([
+        window.mammoth.extractRawText({ arrayBuffer }),
+        window.mammoth.convertToHtml({ arrayBuffer }),
+      ]);
+
+      const sourceText = buildStructuredWordText(htmlResult?.value || "", rawResult?.value || "");
+      const parsed = parseWordQuestions(sourceText);
       if (!parsed.questions.length) {
-        alert("Không tìm thấy câu hỏi hợp lệ trong file Word.");
+        alert("Không tìm thấy câu hỏi hợp lệ trong file Word. Hãy kiểm tra file có mốc như 'Câu 1', 'A.', 'B.' không.");
         return;
       }
 
       openImportReviewArea();
-
       window.QuestionAIShared?.appendImportedQuestions?.(parsed.questions, parsed.warnings);
 
       const target = document.getElementById("questionsSection");
@@ -37,6 +41,96 @@
     } catch (error) {
       alert("Không đọc được file Word: " + (error?.message || error));
     }
+  }
+
+  function buildStructuredWordText(html, rawFallback) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html || "", "text/html");
+    const pieces = extractBlockPieces(doc.body || doc.documentElement);
+    const combined = normalizeWordText(pieces.join("\n"));
+    return combined || normalizeWordText(rawFallback);
+  }
+
+  function extractBlockPieces(root) {
+    const pieces = [];
+    if (!root) return pieces;
+
+    for (const child of Array.from(root.childNodes || [])) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const text = cleanInlineText(child.textContent);
+        if (text) pieces.push(text);
+        continue;
+      }
+
+      if (child.nodeType !== Node.ELEMENT_NODE) continue;
+      const tag = child.tagName.toLowerCase();
+
+      if (tag === "table") {
+        const tableText = tableToText(child);
+        if (tableText) {
+          pieces.push(tableText);
+          pieces.push("");
+        }
+        continue;
+      }
+
+      if (tag === "br") {
+        pieces.push("");
+        continue;
+      }
+
+      const nestedBlockChildren = Array.from(child.children || []).filter((el) =>
+        isBlockLikeTag(el.tagName?.toLowerCase())
+      );
+
+      if (nestedBlockChildren.length) {
+        pieces.push(...extractBlockPieces(child));
+        continue;
+      }
+
+      const text = cleanInlineText(child.textContent);
+      if (text) {
+        pieces.push(tag === "li" ? `- ${text}` : text);
+      }
+    }
+
+    return pieces;
+  }
+
+  function isBlockLikeTag(tag) {
+    return [
+      "table",
+      "p",
+      "div",
+      "section",
+      "article",
+      "header",
+      "footer",
+      "aside",
+      "ul",
+      "ol",
+      "li",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "blockquote",
+    ].includes(tag);
+  }
+
+  function tableToText(tableEl) {
+    const rows = Array.from(tableEl.querySelectorAll("tr"))
+      .map((row) => {
+        const cells = Array.from(row.querySelectorAll("th,td"))
+          .map((cell) => cleanInlineText(cell.textContent))
+          .filter(Boolean);
+        return cells.length ? `| ${cells.join(" | ")} |` : "";
+      })
+      .filter(Boolean);
+
+    return rows.length ? ["[BẢNG]", ...rows, "[/BẢNG]"].join("\n") : "";
   }
 
   function parseWordQuestions(rawText) {
@@ -62,21 +156,31 @@
       .replace(/[“”]/g, "\"")
       .replace(/[‘’]/g, "'")
       .replace(/[ \t]+/g, " ")
+      .replace(/[ ]*\n[ ]*/g, "\n")
       .replace(/\n{3,}/g, "\n\n")
       .trim();
   }
 
+  function cleanInlineText(text) {
+    return String(text || "")
+      .replace(/\u00a0/g, " ")
+      .replace(/[ \t]+/g, " ")
+      .trim();
+  }
+
   function splitQuestionBlocks(text) {
-    const regex = /(?:^|\n)\s*(?:Câu|Cau)\s*\d+\s*[:.)-]/gi;
+    const regex = /(?:^|\n)\s*(?:Câu|Cau)\s*\d+\b\s*[:.)-]?/giu;
     const matches = [...text.matchAll(regex)];
-    if (!matches.length) return [];
+
+    if (!matches.length) {
+      return text ? [text] : [];
+    }
 
     const blocks = [];
     for (let i = 0; i < matches.length; i++) {
-      const start = matches[i].index + (matches[i][0].startsWith("\n") ? 1 : 0);
-      const end = i + 1 < matches.length
-        ? matches[i + 1].index
-        : text.length;
+      const matchText = matches[i][0];
+      const start = matches[i].index + (matchText.startsWith("\n") ? 1 : 0);
+      const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
       const block = text.slice(start, end).trim();
       if (block) blocks.push(block);
     }
@@ -85,21 +189,22 @@
 
   function parseQuestionBlock(block, index) {
     const warnings = [];
-    const withoutHeader = block.replace(/^\s*(?:Câu|Cau)\s*\d+\s*[:.)-]?\s*/i, "").trim();
-    if (!withoutHeader) {
+    const withoutHeader = block.replace(/^\s*(?:Câu|Cau)\s*\d+\b\s*[:.)-]?\s*/iu, "").trim();
+    const content = withoutHeader || block.trim();
+    if (!content) {
       return { question: null, warnings: [`Câu ${index + 1} trống nên đã bị bỏ qua.`] };
     }
 
-    const answerMatch = withoutHeader.match(/(?:^|\n|\s)(?:Đáp án|Dap an|DAP AN|DA)\s*[:\-]?\s*([A-D])/i);
+    const answerMatch = content.match(/(?:^|\n|\s)(?:Đáp án|Dap an|DAP AN|ĐA|DA)\s*[:\-]?\s*([A-D])/iu);
     const answer = answerMatch?.[1]?.toUpperCase() || "";
-    const body = answerMatch ? withoutHeader.replace(answerMatch[0], " ").trim() : withoutHeader;
+    const body = answerMatch ? content.replace(answerMatch[0], " ").trim() : content;
 
     const optionMatches = findOptionMatches(body);
-    const labels = optionMatches.map(match => match.label).join("");
+    const labels = optionMatches.map((match) => match.label).join("");
     const hasFullChoiceSet = /A.*B.*C.*D/.test(labels);
 
     if (!hasFullChoiceSet) {
-      warnings.push(`Câu ${index + 1}: không tách được đủ A, B, C, D nên đang để dạng tự luận để bạn rà lại.`);
+      warnings.push(`Câu ${index + 1}: chưa tách được đủ A, B, C, D nên đang để dạng tự luận để bạn rà lại.`);
       return {
         question: {
           question_type: "essay",
@@ -124,7 +229,7 @@
     }
 
     const required = ["A", "B", "C", "D"];
-    if (required.some(label => !optionMap.has(label))) {
+    if (required.some((label) => !optionMap.has(label))) {
       warnings.push(`Câu ${index + 1}: thiếu ít nhất một đáp án A/B/C/D, cần kiểm tra lại.`);
       return {
         question: {
@@ -140,22 +245,19 @@
       };
     }
 
-    const aIndex = optionMap.get("A").index;
-    const questionText = body.slice(0, aIndex).trim();
-    if (!questionText) {
-      warnings.push(`Câu ${index + 1}: không nhận ra phần đề bài, cần kiểm tra lại.`);
-    }
-
-    const options = [];
-    for (let i = 0; i < required.length; i++) {
-      const label = required[i];
+    const questionText = body.slice(0, optionMap.get("A").index).trim();
+    const options = required.map((label, i) => {
       const current = optionMap.get(label);
-      const next = i + 1 < required.length ? optionMap.get(required[i + 1]).index : body.length;
+      const nextIndex = i + 1 < required.length ? optionMap.get(required[i + 1]).index : body.length;
       const optionText = body
-        .slice(current.contentStart, next)
+        .slice(current.contentStart, nextIndex)
         .replace(/\s+/g, " ")
         .trim();
-      options.push(`${label}. ${optionText}`);
+      return `${label}. ${optionText}`;
+    });
+
+    if (!questionText) {
+      warnings.push(`Câu ${index + 1}: không nhận ra rõ phần đề bài, bạn nên kiểm tra lại.`);
     }
 
     if (!answer) {
@@ -165,10 +267,7 @@
     return {
       question: {
         question_type: "multi_choice",
-        question_text: [
-          questionText,
-          ...options,
-        ].filter(Boolean).join("\n"),
+        question_text: [questionText, ...options].filter(Boolean).join("\n"),
         options: [],
         difficulty: 5,
         answer,
@@ -181,17 +280,20 @@
 
   function findOptionMatches(body) {
     const matches = [];
-    const regex = /(^|[\s\n])([A-D])([.)\:])\s+/g;
+    const regex = /(^|[\s\n])([A-Da-d])([.)\]:-])\s+/g;
     let match;
+
     while ((match = regex.exec(body)) !== null) {
+      const label = match[2].toUpperCase();
       const prefixLength = match[1].length;
       const index = match.index + prefixLength;
       matches.push({
-        label: match[2],
+        label,
         index,
-        contentStart: index + 2,
+        contentStart: index + match[2].length + match[3].length,
       });
     }
+
     return matches;
   }
 

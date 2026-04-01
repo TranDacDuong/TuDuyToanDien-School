@@ -759,7 +759,7 @@ QUY TAC QUAN TRONG:
 
     if (warnings.length) {
       console.warn("[AI validation warnings]", warnings);
-      showToast(`AI đã chuẩn hóa ${warnings.length} chi tiết. Hãy rà soát lại trước khi lưu.`);
+      showToast(`Đã chuẩn hóa ${warnings.length} chi tiết. Hãy rà soát lại trước khi lưu.`);
     }
   }
 
