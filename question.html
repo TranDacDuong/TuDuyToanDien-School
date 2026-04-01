@@ -245,12 +245,19 @@ button {
 .clear-img { position:absolute;top:6px;right:6px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;display:none;align-items:center;justify-content:center; }
 .img-drop-zone:hover .clear-img { display:flex; }
 .action-bar { display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px; }
+.pdf-tools { display:flex;flex-direction:column;gap:8px;min-width:200px; }
+.upload-pdf-btn { display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 18px;border:1.5px solid var(--border);border-radius:9px;background:var(--white);color:var(--ink);font-size:.85rem;font-weight:600;cursor:pointer;transition:.15s;font-family:var(--font-body); }
+.upload-pdf-btn:hover { border-color:var(--navy);color:var(--navy); }
+.preview-pdf-btn { display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 18px;border:1.5px solid var(--border);border-radius:9px;background:#fff7e6;color:var(--navy);font-size:.83rem;font-weight:700;cursor:pointer;font-family:var(--font-body); }
+.preview-pdf-btn:disabled { opacity:.55;cursor:not-allowed; }
 .convert-btn { display:inline-flex;align-items:center;gap:7px;padding:9px 22px;border:none;border-radius:9px;background:linear-gradient(135deg,var(--navy),#1e3a5f);color:var(--gold-light);font-size:.85rem;font-weight:700;cursor:pointer;font-family:var(--font-body);box-shadow:0 2px 8px rgba(10,30,60,.18);transition:.15s; }
 .convert-btn:hover { transform:translateY(-1px); }
 .convert-btn:disabled { opacity:.6;cursor:not-allowed;transform:none; }
 .progress-bar-wrap { display:none;background:var(--surface);border-radius:8px;overflow:hidden;height:6px;margin-bottom:6px; }
 .progress-bar-fill { height:100%;background:linear-gradient(90deg,var(--gold),var(--gold-light));border-radius:8px;transition:width .3s; }
 .progress-text { font-size:.78rem;color:var(--ink-mid);display:none;margin-bottom:8px; }
+.source-preview-wrap { display:none;margin-bottom:14px;padding:14px;border:1px solid rgba(15,23,42,.08);border-radius:18px;background:#fff; }
+.source-preview-wrap img { display:block;width:100%;max-height:720px;object-fit:contain;border-radius:14px;border:1px solid rgba(15,23,42,.08);background:#fff; }
 .qs-hd { display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px; }
 .qs-hd h3 { font-family:var(--font-display);font-size:.95rem;color:var(--navy);margin:0; }
 .save-all-btn { padding:9px 22px;border:none;border-radius:9px;background:linear-gradient(135deg,var(--gold),var(--gold-light));color:var(--navy);font-size:.85rem;font-weight:700;cursor:pointer;font-family:var(--font-body);box-shadow:0 2px 8px rgba(200,150,42,.3);transition:.15s; }
@@ -386,11 +393,22 @@ button {
         </div>
       </div>
       <div class="action-bar">
+        <div class="pdf-tools">
+          <label class="upload-pdf-btn">📄 Upload PDF<input type="file" id="aiPdfFile" accept=".pdf" style="display:none"></label>
+          <button class="preview-pdf-btn" id="previewPdfBtn" type="button" onclick="previewPdfSource()" disabled>🖼 Chuyển sang Ảnh Preview</button>
+        </div>
         <button class="convert-btn" id="convertBtn" onclick="convertWithAI()">✨ Chuyển đổi với AI</button>
         <span id="convertHint" style="font-size:.78rem;color:var(--ink-light)">Nhập nội dung hoặc paste ảnh rồi bấm chuyển đổi</span>
       </div>
       <div class="progress-bar-wrap" id="progressWrap"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
       <div class="progress-text" id="progressText"></div>
+      <div class="source-preview-wrap" id="sourcePreviewWrap">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px">
+          <div style="font-weight:800;color:var(--ink)">Ảnh Preview từ PDF</div>
+          <button class="btn btn-outline btn-sm" type="button" onclick="clearSourcePreview()">Xóa preview</button>
+        </div>
+        <img id="sourcePreviewImg" alt="Ảnh preview PDF">
+      </div>
       <div id="questionsSection" style="display:none">
         <div class="qs-hd">
           <h3 id="qSectionTitle">Câu hỏi</h3>
@@ -1046,6 +1064,7 @@ function switchTab(tab) {
 </script>
 <script src="question_list.js"></script>
 <script src="question_create.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js"></script>
 <script src="question_AI.js"></script>
 </body>
 </html>

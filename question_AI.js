@@ -8,11 +8,14 @@
   let _pastedImg     = null; // base64 ảnh paste vào ô trái
   let _lastSourceImg = null; // giữ lại ảnh gốc để crop hình vẽ
   let _rightImg      = null; // base64 ảnh hình vẽ ô phải
+  let _pendingPdfDataUrl = null;
+  let _pdfPreviewImg = null;
 
   const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
   const ANON_KEY     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxneWRqYWFxZnhxemdiZHBxdmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxODY2NDQsImV4cCI6MjA4Nzc2MjY0NH0.l6ojk0fH5wYMK4H_RIGTepatUd1Uy2KHOTiRfAS1JD4";
   const EDGE_URL     = `${SUPABASE_URL}/functions/v1/ai-solution`;
   const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+  const MAX_PDF_BYTES   = 12 * 1024 * 1024;
   const ALLOWED_TYPES   = new Set(["multi_choice", "true_false", "short_answer", "essay"]);
 
   const TYPE_LABEL = {
@@ -35,16 +38,19 @@
     return `${(size / (1024 * 1024)).toFixed(1)} MB`;
   }
 
-  function getMaxBytes() { return MAX_IMAGE_BYTES; }
-
-  function getLimitMessage(size) {
-    return `File ảnh quá nặng (${formatBytes(size)}). Giới hạn hiện tại là ${formatBytes(getMaxBytes())}.`;
+  function getMaxBytes(kind = "image") {
+    return kind === "pdf" ? MAX_PDF_BYTES : MAX_IMAGE_BYTES;
   }
 
-  function validateFileSize(file) {
+  function getLimitMessage(size, kind = "image") {
+    const label = kind === "pdf" ? "PDF" : "ảnh";
+    return `File ${label} quá nặng (${formatBytes(size)}). Giới hạn hiện tại là ${formatBytes(getMaxBytes(kind))}.`;
+  }
+
+  function validateFileSize(file, kind = "image") {
     if (!file?.size) return { ok: true };
-    if (file.size > getMaxBytes()) {
-      return { ok: false, message: getLimitMessage(file.size) };
+    if (file.size > getMaxBytes(kind)) {
+      return { ok: false, message: getLimitMessage(file.size, kind) };
     }
     return { ok: true };
   }
@@ -394,6 +400,57 @@
     return new Blob([bytes], { type: getMediaTypeFromDataUrl(dataUrl) || "image/png" });
   }
 
+  async function renderPdfToPageImages(dataUrl) {
+    if (!window.pdfjsLib?.getDocument) throw new Error("Chưa tải được bộ đọc PDF.");
+    if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
+    }
+    const pdf = await window.pdfjsLib.getDocument({ data: dataUrlToUint8Array(dataUrl) }).promise;
+    const pages = [];
+    for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
+      const page = await pdf.getPage(pageNo);
+      const viewport = page.getViewport({ scale: 1.7 });
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d", { alpha: false });
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      pages.push(canvas.toDataURL("image/jpeg", 0.92));
+    }
+    return pages;
+  }
+
+  async function stitchImagesVertically(dataUrls) {
+    if (!Array.isArray(dataUrls) || !dataUrls.length) return null;
+    if (dataUrls.length === 1) return dataUrls[0];
+    const images = [];
+    for (const dataUrl of dataUrls) images.push(await loadRasterImage(dataUrl));
+    const maxWidth = Math.max(...images.map(img => rasterWidth(img)));
+    const gap = 24;
+    const scaledHeights = images.map(img => Math.max(1, Math.round(rasterHeight(img) * (maxWidth / rasterWidth(img)))));
+    const totalHeight = scaledHeights.reduce((sum, h) => sum + h, 0) + gap * (images.length - 1);
+    const canvas = document.createElement("canvas");
+    canvas.width = maxWidth;
+    canvas.height = totalHeight;
+    const ctx = canvas.getContext("2d", { alpha: false });
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    let y = 0;
+    images.forEach((img, index) => {
+      const drawHeight = scaledHeights[index];
+      ctx.drawImage(img, 0, y, maxWidth, drawHeight);
+      y += drawHeight;
+      if (index < images.length - 1) {
+        ctx.fillStyle = "#f5f5f5";
+        ctx.fillRect(0, y, maxWidth, gap);
+        y += gap;
+      }
+    });
+    return canvas.toDataURL("image/jpeg", 0.9);
+  }
+
   async function loadRasterImage(dataUrl) {
     const src = String(dataUrl || "");
     if (!src) throw new Error("Không đọc được ảnh.");
@@ -552,6 +609,7 @@
 
     await loadFilters();
     setupImageHandlers();
+    setupPdfHandler();
     setupPasteHandler();
 
     // Difficulty options
@@ -609,6 +667,92 @@
     const img = drop.querySelector("img");
     if (img) img.remove();
   }
+
+  function setPreviewPdfButtonState(enabled) {
+    const btn = document.getElementById("previewPdfBtn");
+    if (btn) btn.disabled = !enabled;
+  }
+
+  function showSourcePreview(src, label = "Đã tạo ảnh preview từ PDF.") {
+    const wrap = document.getElementById("sourcePreviewWrap");
+    const img = document.getElementById("sourcePreviewImg");
+    const hint = document.getElementById("convertHint");
+    if (!wrap || !img) return;
+    img.src = src;
+    wrap.style.display = "block";
+    if (hint) {
+      hint.textContent = label;
+      hint.style.color = "var(--green)";
+    }
+  }
+
+  window.clearSourcePreview = function () {
+    _pdfPreviewImg = null;
+    _pendingPdfDataUrl = null;
+    const wrap = document.getElementById("sourcePreviewWrap");
+    const img = document.getElementById("sourcePreviewImg");
+    const hint = document.getElementById("convertHint");
+    if (img) img.src = "";
+    if (wrap) wrap.style.display = "none";
+    if (hint) {
+      hint.textContent = "Nhập nội dung hoặc paste ảnh rồi bấm chuyển đổi";
+      hint.style.color = "var(--ink-light)";
+    }
+    setPreviewPdfButtonState(false);
+  };
+
+  function setupPdfHandler() {
+    const input = document.getElementById("aiPdfFile");
+    if (!input) return;
+    input.onchange = async e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const validation = validateFileSize(file, "pdf");
+      if (!validation.ok) {
+        alert(validation.message);
+        return;
+      }
+      _pendingPdfDataUrl = await readFileAsDataUrl(file);
+      _pdfPreviewImg = null;
+      const wrap = document.getElementById("sourcePreviewWrap");
+      const img = document.getElementById("sourcePreviewImg");
+      const hint = document.getElementById("convertHint");
+      if (img) img.src = "";
+      if (wrap) wrap.style.display = "none";
+      if (hint) {
+        hint.textContent = "Đã upload PDF. Bấm Chuyển sang Ảnh Preview để xem trước.";
+        hint.style.color = "var(--gold)";
+      }
+      setPreviewPdfButtonState(true);
+      e.target.value = "";
+    };
+  }
+
+  window.previewPdfSource = async function () {
+    if (_pdfPreviewImg) {
+      showSourcePreview(_pdfPreviewImg, "Đây là ảnh preview ghép từ PDF.");
+      return;
+    }
+    if (!_pendingPdfDataUrl) {
+      alert("Vui lòng upload PDF trước.");
+      return;
+    }
+    try {
+      setProgress(0, "Đang đọc PDF...");
+      setProgress(35, "Đang tách từng trang PDF...");
+      const pageImages = await renderPdfToPageImages(_pendingPdfDataUrl);
+      setProgress(70, "Đang ghép ảnh preview...");
+      const stitchedImage = await stitchImagesVertically(pageImages);
+      if (!stitchedImage) throw new Error("Không tạo được ảnh preview từ PDF.");
+      _pdfPreviewImg = stitchedImage;
+      showSourcePreview(stitchedImage, "Đã tạo xong ảnh preview từ PDF.");
+      setProgress(100, "Hoàn thành!");
+      setTimeout(() => hideProgress(), 800);
+    } catch (err) {
+      hideProgress();
+      alert("Lỗi: " + err.message);
+    }
+  };
 
   /* ── Paste handler ── */
   function setupPasteHandler() {
