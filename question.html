@@ -595,57 +595,19 @@ function clearModalPdfPreview() {
 
 async function ensureModalPdfJsLoaded() {
   if (window.pdfjsLib?.getDocument) return window.pdfjsLib;
-
-  const urls = [
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js",
-    "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.js"
-  ];
-
-  for (const url of urls) {
-    try {
-      await new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => reject(new Error("Tải PDF.js quá lâu")), 6000);
-        const existing = Array.from(document.scripts).find(script => script.src === url);
-        if (existing) {
-          if (window.pdfjsLib?.getDocument) {
-            clearTimeout(timeoutId);
-            return resolve();
-          }
-          existing.addEventListener("load", () => {
-            clearTimeout(timeoutId);
-            resolve();
-          }, { once: true });
-          existing.addEventListener("error", () => {
-            clearTimeout(timeoutId);
-            reject(new Error("Không tải được PDF.js"));
-          }, { once: true });
-          return;
-        }
-
-        const script = document.createElement("script");
-        script.src = url;
-        script.onload = () => {
-          clearTimeout(timeoutId);
-          resolve();
-        };
-        script.onerror = () => {
-          clearTimeout(timeoutId);
-          reject(new Error("Không tải được PDF.js"));
-        };
-        document.head.appendChild(script);
-      });
-
-      if (window.pdfjsLib?.getDocument) return window.pdfjsLib;
-    } catch (_) {}
+  try {
+    const pdfjsLib = await import("./vendor/pdf.min.mjs");
+    window.pdfjsLib = pdfjsLib;
+    return pdfjsLib;
+  } catch (error) {
+    throw new Error("Chưa tải được bộ đọc PDF.");
   }
-
-  throw new Error("Chưa tải được bộ đọc PDF.");
 }
 
 async function renderModalPdfPages(dataUrl, onProgress) {
   const pdfjsLib = await ensureModalPdfJsLoaded();
   if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.mjs";
   }
   const bytes = Uint8Array.from(atob(dataUrl.split(",")[1] || ""), c => c.charCodeAt(0));
   const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
@@ -1341,7 +1303,6 @@ function switchTab(tab) {
 </script>
 <script src="question_list.js"></script>
 <script src="question_create.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js"></script>
 <script src="question_AI.js"></script>
 </body>
 </html>
