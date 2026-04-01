@@ -248,7 +248,7 @@
   }
 
   function parseWordQuestions(rawText) {
-    const text = normalizeWordText(rawText);
+    const text = normalizeLatexFractions(normalizeWordText(rawText));
     const blocks = splitQuestionBlocks(text);
     const questions = [];
     const warnings = [];
@@ -273,6 +273,10 @@
       .replace(/[ ]*\n[ ]*/g, "\n")
       .replace(/\n{3,}/g, "\n\n")
       .trim();
+  }
+
+  function normalizeLatexFractions(text) {
+    return String(text || "").replace(/\\frac(?=\s*\{)/g, "\\dfrac");
   }
 
   function cleanInlineText(text) {
@@ -322,7 +326,7 @@
       return {
         question: {
           question_type: "essay",
-          question_text: body,
+          question_text: normalizeLatexFractions(body),
           options: [],
           difficulty: 5,
           answer: "",
@@ -348,7 +352,7 @@
       return {
         question: {
           question_type: "essay",
-          question_text: body,
+          question_text: normalizeLatexFractions(body),
           options: [],
           difficulty: 5,
           answer: "",
@@ -359,14 +363,14 @@
       };
     }
 
-    const questionText = body.slice(0, optionMap.get("A").index).trim();
+    const questionText = normalizeLatexFractions(body.slice(0, optionMap.get("A").index).trim());
     const options = required.map((label, i) => {
       const current = optionMap.get(label);
       const nextIndex = i + 1 < required.length ? optionMap.get(required[i + 1]).index : body.length;
-      const optionText = body
+      const optionText = normalizeLatexFractions(body
         .slice(current.contentStart, nextIndex)
         .replace(/\s+/g, " ")
-        .trim();
+        .trim());
       return `${label}. ${optionText}`;
     });
 
