@@ -9,6 +9,7 @@
   let _lastSourceImg = null; // giữ lại ảnh gốc để crop hình vẽ
   let _rightImg      = null; // base64 ảnh hình vẽ ô phải
   let _pdfPreviewImg = null; // ảnh dài ghép từ PDF để xem trước
+  let _pendingPdfDataUrl = null; // PDF đã upload, chờ tạo preview
 
   const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
   const ANON_KEY     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxneWRqYWFxZnhxemdiZHBxdmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxODY2NDQsImV4cCI6MjA4Nzc2MjY0NH0.l6ojk0fH5wYMK4H_RIGTepatUd1Uy2KHOTiRfAS1JD4";
@@ -563,6 +564,7 @@
 
   window.clearSourcePreview = function () {
     _pdfPreviewImg = null;
+    _pendingPdfDataUrl = null;
     const wrap = document.getElementById("sourcePreviewWrap");
     const img = document.getElementById("sourcePreviewImg");
     const hint = document.getElementById("convertHint");
@@ -866,21 +868,32 @@
     document.getElementById("aiPdfFile").onchange = async e => {
       const file = e.target.files[0];
       if (!file) return;
-      await processPdf(file);
+      await queuePdfPreview(file);
       e.target.value = "";
     };
   }
 
-  async function processPdf(file) {
+  async function queuePdfPreview(file) {
     const validation = validateFileSize(file, "pdf");
     if (!validation.ok) {
       alert(validation.message);
       return;
     }
-
-    setProgress(0, "Đang đọc PDF...");
+    clearSourcePreview();
+    _pastedImg = null;
+    _lastSourceImg = null;
     const dataUrl = await readFileAsDataUrl(file);
+    _pendingPdfDataUrl = dataUrl;
+    const hint = document.getElementById("convertHint");
+    if (hint) {
+      hint.textContent = "Đã upload PDF, bấm Chuyển đổi với AI để tạo ảnh preview trước.";
+      hint.style.color = "var(--gold)";
+    }
+  }
+
+  async function processPdfPreview(dataUrl) {
     try {
+      setProgress(0, "Đang đọc PDF...");
       setProgress(35, "Đang tách từng trang PDF...");
       const pageImages = await renderPdfToPageImages(dataUrl);
       setProgress(70, "Đang ghép ảnh dài xem trước...");
@@ -889,9 +902,10 @@
         throw new Error("Không tạo được ảnh xem trước từ PDF.");
       }
       _pdfPreviewImg = stitchedImage;
+      _pendingPdfDataUrl = null;
       _pastedImg = stitchedImage;
       _lastSourceImg = stitchedImage;
-      showSourcePreview(stitchedImage, "Đã tạo ảnh dài từ PDF, hãy xem trước rồi mới chuyển đổi AI.");
+      showSourcePreview(stitchedImage, "Đã tạo ảnh dài từ PDF. Nếu ổn rồi, bấm Chuyển đổi với AI lần nữa.");
       setProgress(100, "Hoàn thành!");
       setTimeout(() => hideProgress(), 1000);
     } catch (err) {
@@ -905,6 +919,10 @@
   ══════════════════════════════════════════════ */
   window.convertWithAI = async function () {
     const text = document.getElementById("aiTextInput").value.trim();
+    if (_pendingPdfDataUrl && !_pdfPreviewImg) {
+      await processPdfPreview(_pendingPdfDataUrl);
+      return;
+    }
     if (!text && !_pastedImg) {
       alert("Vui lòng nhập nội dung hoặc paste ảnh câu hỏi!"); return;
     }
