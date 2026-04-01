@@ -529,6 +529,25 @@ let _modalPastedImg   = null; // ảnh paste vào ô text để AI đọc
 let _modalPdfDataUrl  = null;
 let _modalPdfPreview  = null;
 
+Object.defineProperties(window, {
+  _modalPastedImg: {
+    get: () => _modalPastedImg,
+    set: (value) => { _modalPastedImg = value; },
+  },
+  _modalPdfDataUrl: {
+    get: () => _modalPdfDataUrl,
+    set: (value) => { _modalPdfDataUrl = value; },
+  },
+  _modalPdfPreview: {
+    get: () => _modalPdfPreview,
+    set: (value) => { _modalPdfPreview = value; },
+  },
+  _modalFigureBase64: {
+    get: () => _modalFigureBase64,
+    set: (value) => { _modalFigureBase64 = value; },
+  },
+});
+
 document.getElementById("questionText").onfocus = () => { activeField = "question"; };
 document.getElementById("answerText").onfocus   = () => { activeField = "answer"; };
 document.getElementById("qFigureDrop").onfocus  = () => { activeField = "figure"; };
@@ -1378,9 +1397,11 @@ async function previewModalPdf() {
 
   btn.disabled = false;
 }
+
 </script>
 <script src="question_list.js"></script>
 <script src="question_create.js"></script>
 <script src="question_AI.js"></script>
+<script src="question_modal_ai.js"></script>
 </body>
 </html>

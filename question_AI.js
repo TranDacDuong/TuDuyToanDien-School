@@ -74,6 +74,14 @@
     return { ok: true };
   }
 
+  function validatePdfDataUrlSize(dataUrl) {
+    const size = getDataUrlBytes(dataUrl);
+    if (size > getMaxBytes("pdf")) {
+      return { ok: false, message: getLimitMessage(size, "pdf") };
+    }
+    return { ok: true };
+  }
+
   async function readFileAsDataUrl(file) {
     return await new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -400,6 +408,17 @@
     return new Blob([bytes], { type: getMediaTypeFromDataUrl(dataUrl) || "image/png" });
   }
 
+  async function ensurePdfJsLoaded() {
+    if (window.pdfjsLib?.getDocument) return window.pdfjsLib;
+    try {
+      const pdfjsLib = await import("./vendor/pdf.min.mjs");
+      window.pdfjsLib = pdfjsLib;
+      return pdfjsLib;
+    } catch {
+      throw new Error("Khong tai duoc bo doc PDF.");
+    }
+  }
+
   async function renderPdfToPageImages(dataUrl) {
     if (!window.pdfjsLib?.getDocument) throw new Error("Chưa tải được bộ đọc PDF.");
     if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -601,6 +620,113 @@
   /* ══════════════════════════════════════════════
      INIT
   ══════════════════════════════════════════════ */
+  async function convertPdfToQuestions(pdfDataUrl) {
+    const validation = validatePdfDataUrlSize(pdfDataUrl);
+    if (!validation.ok) throw new Error(validation.message);
+
+    const pageImages = await renderPdfToPageImages(pdfDataUrl);
+    if (!pageImages.length) throw new Error("Khong doc duoc trang nao tu PDF.");
+
+    const parsedPages = [];
+    for (let pageIndex = 0; pageIndex < pageImages.length; pageIndex++) {
+      const pageChunks = await splitTallImageIntoChunks(pageImages[pageIndex], {
+        outputType: "image/jpeg",
+        jpegQuality: 0.92,
+      });
+      const pageResult = await extractQuestionsFromImageChunks(pageChunks, `pdf_page_${pageIndex + 1}`);
+      parsedPages.push(pageResult);
+    }
+
+    const merged = mergeQuestionSets(parsedPages);
+    if (!merged.questions.length) {
+      throw new Error("Khong tim thay cau hoi hop le trong PDF.");
+    }
+    return merged;
+  }
+
+  async function renderPdfToPageImages(dataUrl) {
+    const pdfjsLib = await ensurePdfJsLoaded();
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.mjs";
+    }
+    const pdf = await pdfjsLib.getDocument({ data: dataUrlToUint8Array(dataUrl) }).promise;
+    const pages = [];
+    for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
+      const page = await pdf.getPage(pageNo);
+      const viewport = page.getViewport({ scale: 2.2 });
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d", { alpha: false });
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      pages.push(canvas.toDataURL("image/jpeg", 0.92));
+    }
+    return pages;
+  }
+
+  function buildExtractionPrompt(sourceKind = "image") {
+    const sourceLine = String(sourceKind || "").startsWith("pdf_page_")
+      ? "Nguon la 1 trang PDF da render sang anh. Hay chi trich xuat cac cau xuat hien tren trang nay."
+      : "Nguon la anh cau hoi.";
+    return `${sourceLine}
+
+Trich xuat TAT CA cau hoi tu anh nay. Tra ve JSON array (khong markdown, khong backtick):
+
+[
+  {
+    "question_type": "multi_choice | true_false | short_answer | essay",
+    "question_text": "Noi dung cau hoi, KHONG co Cau 1, Cau 2. Voi multi_choice: gop cau hoi + A,B,C,D vao day moi phuong an 1 dong. Voi true_false: chi ghi noi dung cau hoi chinh. Cong thuc dung LaTeX: $x^2$",
+    "options": ["Y a (chi dung cho true_false)", "Y b", "Y c", "Y d"],
+    "difficulty": 5,
+    "answer": "multi_choice: A/B/C/D. true_false: PHAI dien du 4 cap vi du aTbFcTdF. short_answer: dap an",
+    "answer_count": 4,
+    "has_figure": false,
+    "question_bbox": { "x": 0, "y": 0, "w": 800, "h": 200 }
+  }
+]
+
+QUY TAC QUAN TRONG:
+- Bo hoan toan Cau 1, Cau 2, so thu tu
+- true_false: 1 cau = 1 object DUY NHAT, cac y a,b,c,d de trong options, KHONG tach thanh nhieu object
+- true_false answer: PHAI dien du, vi du "aTbFcTdF" - 4 y thi 4 cap chu
+- multi_choice: gop A,B,C,D vao question_text, de options la []
+- difficulty: 1-3 de, 4-6 trung binh, 7-10 kho
+- has_figure = true chi khi co hinh ve/bieu do/do thi thuc su
+- question_bbox: toa do pixel cua toan bo cau hoi trong anh
+- Khong duoc dung sau cau dau tien neu con cau khac
+- Neu chu bi mo hoac khong chac, chi giu phan doc duoc va KHONG tu suy doan phan con lai
+- Khong lap lai cau hoi da xuat hien do vung overlap giua cac chunk
+- Chi tra ve JSON, khong text them`;
+  }
+
+  async function convertAiSourceToQuestions({ text = "", dataUrl = null, pdfDataUrl = null } = {}) {
+    if (!String(text || "").trim() && !dataUrl && !pdfDataUrl) {
+      throw new Error("Vui long nhap noi dung hoac chon anh/PDF truoc.");
+    }
+    if (pdfDataUrl) {
+      const result = await convertPdfToQuestions(pdfDataUrl);
+      if (String(text || "").trim()) {
+        result.warnings.push("Da uu tien trich xuat tu PDF goc thay vi text nhap tay.");
+      }
+      return result;
+    }
+
+    const cleanText = String(text || "").trim();
+    const sourceKind = "image";
+    if (sourceKind === "image" && dataUrl && !cleanText) {
+      const imageChunks = await splitTallImageIntoChunks(dataUrl);
+      if (imageChunks.length > 1) {
+        const parsedChunks = await extractQuestionsFromImageChunks(imageChunks, "image");
+        if (parsedChunks.questions.length > 1) return { ...parsedChunks, raw: "[image-chunks]" };
+      }
+    }
+    const raw = await callAI(buildAiMessages(cleanText, dataUrl, sourceKind));
+    const parsed = parseRawAiQuestions(raw);
+    return { ...parsed, raw };
+  }
+
   async function init() {
     const sb = getSb();
     const { data: { user } } = await sb.auth.getUser();
@@ -1283,10 +1409,50 @@ QUY TẮC QUAN TRỌNG:
     return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   }
 
+  window.convertWithAI = async function () {
+    const text = document.getElementById("aiTextInput").value.trim();
+    if (!text && !_pastedImg && !_pendingPdfDataUrl) {
+      alert("Vui long nhap noi dung, paste anh, hoac upload PDF truoc!");
+      return;
+    }
+
+    const btn = document.getElementById("convertBtn");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin">...</span> Dang phan tich...';
+    setProgress(20, "Dang gui len AI...");
+
+    try {
+      _lastSourceImg = _pastedImg;
+      setProgress(50, "AI dang phan tich...");
+      const result = await convertAiSourceToQuestions({
+        text,
+        dataUrl: _pastedImg,
+        pdfDataUrl: _pendingPdfDataUrl,
+      });
+      setProgress(90, "Dang xu ly...");
+      appendQuestions(result.questions, result.warnings);
+      setProgress(100, "Hoan thanh!");
+      setTimeout(() => hideProgress(), 800);
+
+      document.getElementById("aiTextInput").value = "";
+      document.getElementById("aiTextInput").placeholder = "Paste noi dung cau hoi vao day...";
+      _pastedImg = null;
+      _pendingPdfDataUrl = null;
+    } catch (err) {
+      hideProgress();
+      alert("Loi: " + err.message);
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = "Chuyen doi voi AI";
+  };
+
   window.QuestionAIShared = {
     MAX_IMAGE_BYTES,
+    MAX_PDF_BYTES,
     validateFileSize,
     validateDataUrlSize,
+    validatePdfDataUrlSize,
     readFileAsDataUrl,
     convertToQuestions: convertAiSourceToQuestions,
   };
