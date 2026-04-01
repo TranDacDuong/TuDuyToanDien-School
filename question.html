@@ -458,11 +458,20 @@ button {
           <label class="upload-pdf-btn" style="padding:7px 14px;font-size:.82rem">
             📄 Upload PDF<input type="file" id="qPdfFile" accept=".pdf" style="display:none">
           </label>
+          <button type="button" id="qPreviewPdfBtn"
+            style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;background:#fff7e6;color:var(--navy);font-size:.82rem;font-weight:700;cursor:pointer;font-family:var(--font-body)"
+            onclick="previewModalPdf()" disabled>
+            🖼 Xem Ảnh Preview
+          </button>
           <button type="button" onclick="convertModalWithAI()" id="qAiBtn"
             style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border:none;border-radius:8px;background:linear-gradient(135deg,var(--navy),#1e3a5f);color:var(--gold-light);font-size:.82rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">
             ✨ Chuyển đổi với AI
           </button>
           <span id="qAiHint" style="font-size:.75rem;color:var(--ink-light)">Paste ảnh rồi bấm chuyển đổi</span>
+        </div>
+        <div id="qPdfPreviewWrap" style="display:none;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--surface)">
+          <div style="font-size:.76rem;font-weight:700;color:var(--ink-mid);margin-bottom:8px">Ảnh Preview từ PDF</div>
+          <img id="qPdfPreviewImg" alt="PDF preview" style="display:block;width:100%;max-height:420px;object-fit:contain;border-radius:8px;background:#fff;border:1px solid var(--border)">
         </div>
         <!-- answerText/answerImg ẩn để tương thích với question_create.js -->
         <textarea id="answerText" style="display:none"></textarea>
@@ -517,6 +526,8 @@ button {
 let activeField = null;
 let _modalFigureBase64 = null; // ảnh hình vẽ trong modal (base64)
 let _modalPastedImg   = null; // ảnh paste vào ô text để AI đọc
+let _modalPdfDataUrl  = null;
+let _modalPdfPreview  = null;
 
 document.getElementById("questionText").onfocus = () => { activeField = "question"; };
 document.getElementById("answerText").onfocus   = () => { activeField = "answer"; };
@@ -569,6 +580,105 @@ function clearFigure() {
   document.getElementById("qFigureCropBtn").style.display = "none";
   const img = document.getElementById("qFigureDrop").querySelector("img.figure-img");
   if (img) img.remove();
+}
+
+function clearModalPdfPreview() {
+  _modalPdfDataUrl = null;
+  _modalPdfPreview = null;
+  const wrap = document.getElementById("qPdfPreviewWrap");
+  const img = document.getElementById("qPdfPreviewImg");
+  const btn = document.getElementById("qPreviewPdfBtn");
+  if (img) img.src = "";
+  if (wrap) wrap.style.display = "none";
+  if (btn) btn.disabled = true;
+}
+
+async function renderModalPdfPages(dataUrl) {
+  if (!window.pdfjsLib?.getDocument) throw new Error("Chưa tải được bộ đọc PDF.");
+  if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
+  }
+  const bytes = Uint8Array.from(atob(dataUrl.split(",")[1] || ""), c => c.charCodeAt(0));
+  const pdf = await window.pdfjsLib.getDocument({ data: bytes }).promise;
+  const pages = [];
+  for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
+    const page = await pdf.getPage(pageNo);
+    const viewport = page.getViewport({ scale: 1.6 });
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d", { alpha: false });
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    pages.push(canvas.toDataURL("image/jpeg", 0.92));
+  }
+  return pages;
+}
+
+async function stitchModalPdfPages(dataUrls) {
+  if (!dataUrls.length) return null;
+  if (dataUrls.length === 1) return dataUrls[0];
+  const images = await Promise.all(dataUrls.map(src => new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Không đọc được ảnh PDF."));
+    img.src = src;
+  })));
+  const maxWidth = Math.max(...images.map(img => img.naturalWidth || img.width || 1));
+  const gap = 24;
+  const scaledHeights = images.map(img => Math.max(1, Math.round((img.naturalHeight || img.height || 1) * (maxWidth / (img.naturalWidth || img.width || 1)))));
+  const totalHeight = scaledHeights.reduce((sum, h) => sum + h, 0) + gap * (images.length - 1);
+  const canvas = document.createElement("canvas");
+  canvas.width = maxWidth;
+  canvas.height = totalHeight;
+  const ctx = canvas.getContext("2d", { alpha: false });
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  let y = 0;
+  images.forEach((img, index) => {
+    const drawHeight = scaledHeights[index];
+    ctx.drawImage(img, 0, y, maxWidth, drawHeight);
+    y += drawHeight;
+    if (index < images.length - 1) {
+      ctx.fillStyle = "#f5f5f5";
+      ctx.fillRect(0, y, maxWidth, gap);
+      y += gap;
+    }
+  });
+  return canvas.toDataURL("image/jpeg", 0.9);
+}
+
+async function previewModalPdf() {
+  if (_modalPdfPreview) {
+    document.getElementById("qPdfPreviewImg").src = _modalPdfPreview;
+    document.getElementById("qPdfPreviewWrap").style.display = "block";
+    return;
+  }
+  if (!_modalPdfDataUrl) {
+    alert("Vui lòng upload PDF trước.");
+    return;
+  }
+  const hint = document.getElementById("qAiHint");
+  const btn = document.getElementById("qPreviewPdfBtn");
+  btn.disabled = true;
+  hint.textContent = "Đang chuyển PDF sang ảnh preview...";
+  hint.style.color = "";
+  try {
+    const pageImages = await renderModalPdfPages(_modalPdfDataUrl);
+    const stitched = await stitchModalPdfPages(pageImages);
+    if (!stitched) throw new Error("Không tạo được ảnh preview.");
+    _modalPdfPreview = stitched;
+    _modalPastedImg = stitched;
+    document.getElementById("qPdfPreviewImg").src = stitched;
+    document.getElementById("qPdfPreviewWrap").style.display = "block";
+    hint.textContent = "Đã tạo ảnh preview từ PDF. Giờ có thể bấm Chuyển đổi với AI.";
+    hint.style.color = "var(--green)";
+  } catch (err) {
+    hint.textContent = err.message || "Không tạo được ảnh preview từ PDF.";
+    hint.style.color = "var(--red,#ef4444)";
+  }
+  btn.disabled = false;
 }
 
 /* ── Crop figure ── */
@@ -741,14 +851,17 @@ QUY TẮC QUAN TRỌNG:
 /* PDF trong modal */
 document.getElementById("qPdfFile").onchange = async function(e) {
   const file = e.target.files[0]; if (!file) return;
-  const btn = document.getElementById("qAiBtn");
-  btn.disabled = true; btn.innerHTML = '<span class="spin">⟳</span> Đang xử lý PDF...';
+  const btn = document.getElementById("qPreviewPdfBtn");
   const reader = new FileReader();
   const b64 = await new Promise(res => { reader.onload = ev => res(ev.target.result.split(",")[1]); reader.readAsDataURL(file); });
-  _modalPastedImg = "data:application/pdf;base64," + b64;
-  document.getElementById("qAiHint").textContent = "✅ Đã tải PDF — bấm Chuyển đổi";
+  _modalPdfDataUrl = "data:application/pdf;base64," + b64;
+  _modalPdfPreview = null;
+  _modalPastedImg = null;
+  document.getElementById("qPdfPreviewWrap").style.display = "none";
+  document.getElementById("qPdfPreviewImg").src = "";
+  document.getElementById("qAiHint").textContent = "✅ Đã tải PDF — bấm Xem Ảnh Preview";
   document.getElementById("qAiHint").style.color = "var(--green)";
-  btn.disabled = false; btn.innerHTML = "✨ Chuyển đổi với AI";
+  if (btn) btn.disabled = false;
   e.target.value = "";
 };
 
@@ -995,6 +1108,7 @@ function resetQuestionForm() {
   document.getElementById("qAiHint").textContent = "Paste ảnh hoặc PDF rồi bấm chuyển đổi";
   document.getElementById("qAiHint").style.color = "";
   clearFigure();
+  clearModalPdfPreview();
   _modalPastedImg = null;
   answerCount = 4; changeType();
 }
