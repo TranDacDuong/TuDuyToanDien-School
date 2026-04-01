@@ -455,12 +455,14 @@ button {
         <div id="qPreview" style="padding:8px 10px;background:var(--surface);border-radius:8px;border:1px solid var(--border);font-size:.88rem;line-height:1.8;min-height:36px;color:var(--navy);white-space:pre-line;display:none"></div>
         <!-- Nút AI -->
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <label class="upload-pdf-btn" style="padding:7px 14px;font-size:.82rem">
+            📄 Upload PDF<input type="file" id="qPdfFile" accept=".pdf" style="display:none">
+          </label>
           <button type="button" onclick="convertModalWithAI()" id="qAiBtn"
             style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border:none;border-radius:8px;background:linear-gradient(135deg,var(--navy),#1e3a5f);color:var(--gold-light);font-size:.82rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">
             ✨ Chuyển đổi với AI
           </button>
           <span id="qAiHint" style="font-size:.75rem;color:var(--ink-light)">Paste ảnh rồi bấm chuyển đổi</span>
-          <input type="file" id="qPdfFile" accept=".pdf" style="display:none">
         </div>
         <!-- answerText/answerImg ẩn để tương thích với question_create.js -->
         <textarea id="answerText" style="display:none"></textarea>
