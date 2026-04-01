@@ -604,18 +604,34 @@ async function ensureModalPdfJsLoaded() {
   for (const url of urls) {
     try {
       await new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => reject(new Error("Tải PDF.js quá lâu")), 6000);
         const existing = Array.from(document.scripts).find(script => script.src === url);
         if (existing) {
-          if (window.pdfjsLib?.getDocument) return resolve();
-          existing.addEventListener("load", () => resolve(), { once: true });
-          existing.addEventListener("error", () => reject(new Error("Không tải được PDF.js")), { once: true });
+          if (window.pdfjsLib?.getDocument) {
+            clearTimeout(timeoutId);
+            return resolve();
+          }
+          existing.addEventListener("load", () => {
+            clearTimeout(timeoutId);
+            resolve();
+          }, { once: true });
+          existing.addEventListener("error", () => {
+            clearTimeout(timeoutId);
+            reject(new Error("Không tải được PDF.js"));
+          }, { once: true });
           return;
         }
 
         const script = document.createElement("script");
         script.src = url;
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error("Không tải được PDF.js"));
+        script.onload = () => {
+          clearTimeout(timeoutId);
+          resolve();
+        };
+        script.onerror = () => {
+          clearTimeout(timeoutId);
+          reject(new Error("Không tải được PDF.js"));
+        };
         document.head.appendChild(script);
       });
 
