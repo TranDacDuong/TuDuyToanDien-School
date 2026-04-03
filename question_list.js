@@ -122,19 +122,7 @@ async function loadQuestions() {
 }
 
 function isAnswerMissing(q) {
-  const type = q?.question_type || ""
   const answer = String(q?.answer || "").trim()
-
-  if (type === "essay") return false
-  if (type === "multi_choice" || type === "short_answer") return !answer
-
-  if (type === "true_false") {
-    const normalized = answer.replace(/\s+/g, "")
-    const expected = Math.max(Number(q?.answer_count) || 0, 1)
-    const pairs = normalized.match(/[a-z][TF]/gi) || []
-    return pairs.length < expected
-  }
-
   return !answer
 }
 
