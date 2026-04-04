@@ -2370,3 +2370,119 @@ $$;
 
 REVOKE ALL ON FUNCTION public.admin_import_students_batch(jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.admin_import_students_batch(jsonb) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.admin_delete_student_cascade(p_student_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth, extensions
+AS $$
+DECLARE
+  v_student public.users%ROWTYPE;
+  v_exam_result_ids uuid[] := '{}'::uuid[];
+  v_post_ids uuid[] := '{}'::uuid[];
+BEGIN
+  IF auth.uid() IS NULL OR NOT EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  ) THEN
+    RAISE EXCEPTION 'Chỉ admin mới được xóa học sinh';
+  END IF;
+
+  SELECT *
+  INTO v_student
+  FROM public.users
+  WHERE id = p_student_id
+    AND role = 'student'
+  LIMIT 1;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Không tìm thấy học sinh cần xóa';
+  END IF;
+
+  SELECT COALESCE(array_agg(id), '{}'::uuid[])
+  INTO v_post_ids
+  FROM public.posts
+  WHERE user_id = p_student_id;
+
+  IF array_length(v_post_ids, 1) IS NOT NULL THEN
+    DELETE FROM public.post_media
+    WHERE post_id = ANY(v_post_ids);
+
+    DELETE FROM public.comments
+    WHERE post_id = ANY(v_post_ids);
+
+    DELETE FROM public.likes
+    WHERE post_id = ANY(v_post_ids);
+  END IF;
+
+  DELETE FROM public.comments
+  WHERE user_id = p_student_id;
+
+  DELETE FROM public.likes
+  WHERE user_id = p_student_id;
+
+  DELETE FROM public.friend_requests
+  WHERE sender_id = p_student_id
+     OR receiver_id = p_student_id;
+
+  DELETE FROM public.friendships
+  WHERE user_id = p_student_id
+     OR friend_id = p_student_id;
+
+  DELETE FROM public.posts
+  WHERE user_id = p_student_id;
+
+  DELETE FROM public.attendance
+  WHERE student_id = p_student_id;
+
+  DELETE FROM public.class_students
+  WHERE student_id = p_student_id;
+
+  DELETE FROM public.tuition_payments
+  WHERE student_id = p_student_id;
+
+  DELETE FROM public.course_registration_requests
+  WHERE student_id = p_student_id;
+
+  DELETE FROM public.course_enrollments
+  WHERE student_id = p_student_id;
+
+  SELECT COALESCE(array_agg(id), '{}'::uuid[])
+  INTO v_exam_result_ids
+  FROM public.exam_results
+  WHERE student_id = p_student_id;
+
+  IF array_length(v_exam_result_ids, 1) IS NOT NULL THEN
+    DELETE FROM public.exam_answers
+    WHERE result_id = ANY(v_exam_result_ids);
+  END IF;
+
+  DELETE FROM public.exam_results
+  WHERE student_id = p_student_id;
+
+  DELETE FROM public.pdf_exam_results
+  WHERE student_id = p_student_id;
+
+  DELETE FROM public.game_room_players
+  WHERE user_id = p_student_id;
+
+  DELETE FROM public.notifications
+  WHERE actor_id = p_student_id;
+
+  DELETE FROM public.users
+  WHERE id = p_student_id;
+
+  DELETE FROM auth.users
+  WHERE id = p_student_id;
+
+  RETURN jsonb_build_object(
+    'deleted', true,
+    'student_id', p_student_id,
+    'email', v_student.email
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.admin_delete_student_cascade(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.admin_delete_student_cascade(uuid) TO authenticated;

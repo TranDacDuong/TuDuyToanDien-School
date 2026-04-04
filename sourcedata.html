@@ -1145,10 +1145,19 @@ async function sSaveStudent(){
 }
 
 async function sDelStudent(id){
-  if(!confirm('Xóa học sinh này?')) return;
-  const {error}=await sb.from('users').delete().eq('id',id);
-  if(error){alert(error.message);return;}
-  toast('🗑 Đã xóa học sinh'); loadStudents();
+  if(!confirm('Xóa vĩnh viễn học sinh này và toàn bộ dữ liệu liên quan? Thao tác này không thể hoàn tác.')) return;
+  const { error } = await sb.rpc('admin_delete_student_cascade', { p_student_id: id });
+  if(error){
+    const msg = String(error.message || '');
+    if(msg.includes('admin_delete_student_cascade')){
+      alert('Chưa có hàm xóa triệt để học sinh trong database. Hãy chạy SQL mới trong file SQL Supabase.txt rồi thử lại.');
+      return;
+    }
+    alert(msg || 'Không thể xóa học sinh');
+    return;
+  }
+  toast('🗑 Đã xóa triệt để học sinh');
+  loadStudents();
 }
 
 function sExportExcel(){
