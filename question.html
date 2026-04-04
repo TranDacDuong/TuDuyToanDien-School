@@ -131,6 +131,20 @@ td { padding: 11px 12px; border-bottom: 1px solid #eef3f8; vertical-align: middl
 .dup-badge-clean { background:#f8fafc;color:#475569;border-color:#cbd5e1; }
 .row-duplicate-exact td { box-shadow: inset 4px 0 0 #6366f1; }
 .row-duplicate-fuzzy td { box-shadow: inset 4px 0 0 #f97316; }
+.dup-review { display:none;margin:18px 0;padding:18px;border-radius:22px;background:rgba(255,255,255,.95);border:1px solid rgba(15,31,61,.08);box-shadow:0 14px 30px rgba(15,31,61,.06); }
+.dup-review-hd { display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px; }
+.dup-review-groups { display:grid;gap:14px; }
+.dup-group { border:1px solid rgba(15,31,61,.08);border-radius:18px;overflow:hidden;background:linear-gradient(180deg,#fff 0%,#fbfdff 100%); }
+.dup-group-hd { display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;background:#f8fbff;border-bottom:1px solid rgba(15,31,61,.08); }
+.dup-group-list { display:grid;gap:0; }
+.dup-item { display:grid;grid-template-columns:minmax(0,1.8fr) repeat(4,minmax(90px,.5fr));gap:12px;align-items:start;padding:14px;border-top:1px solid rgba(15,31,61,.08); }
+.dup-item:first-child { border-top:none; }
+.dup-item.recommended { background:#eefbf3; }
+.dup-item-title { font-weight:700;color:var(--navy);margin-bottom:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap; }
+.dup-item-text { white-space:pre-line;line-height:1.55;color:var(--ink); }
+.dup-meta { font-size:.78rem;color:var(--ink-mid); }
+.dup-actions { display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end; }
+.dup-mini { font-size:.76rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--navy);cursor:pointer;font-family:var(--font-body);font-weight:700; }
 
 .hidden-badge {
   margin-left: 6px; background: #fef3c7; color: #b45309;
@@ -367,6 +381,17 @@ button {
   </div>
 
   <div class="click-hint">👆 Click vào câu hỏi để sửa hoặc xóa</div>
+
+  <div class="dup-review" id="duplicateReview">
+    <div class="dup-review-hd">
+      <div>
+        <div style="font-family:var(--font-display);font-size:1rem;color:var(--navy)">Ra cau trung</div>
+        <div id="duplicateReviewSummary" style="font-size:.82rem;color:var(--ink-light)">Chua chay kiem tra trung.</div>
+      </div>
+      <button class="btn btn-outline btn-sm" type="button" onclick="closeDuplicateReview()">Dong</button>
+    </div>
+    <div class="dup-review-groups" id="duplicateReviewGroups"></div>
+  </div>
 
   <table>
     <thead>

@@ -22,6 +22,7 @@ let exactDuplicateIds = new Set()
 let fuzzySuggestionMap = new Map()
 let fuzzyAuditScopeKey = ""
 let fuzzyAuditLabel = ""
+let duplicateReviewGroups = []
 
 function resetToFirstPage() {
   currentPage = 1
@@ -257,6 +258,8 @@ function invalidateFuzzyAudit() {
   fuzzySuggestionMap = new Map()
   fuzzyAuditScopeKey = ""
   fuzzyAuditLabel = ""
+  duplicateReviewGroups = []
+  closeDuplicateReview()
 }
 
 function render() {
@@ -329,6 +332,145 @@ function buildDuplicateBadge(q) {
   }
 
   return `<span class="status-badge dup-badge-clean">Chưa phát hiện</span>`
+}
+
+function scoreKeepCandidate(q) {
+  let score = 0
+  if (!isAnswerMissing(q)) score += 4
+  if (q.question_img) score += 2
+  if (q.hidden) score -= 2
+  if (q.difficulty) score += 1
+  return score
+}
+
+function buildDuplicateReviewGroups(items) {
+  const itemMap = new Map(items.map((item) => [item.id, item]))
+  const adjacency = new Map()
+  const addEdge = (a, b) => {
+    if (!itemMap.has(a) || !itemMap.has(b) || a === b) return
+    if (!adjacency.has(a)) adjacency.set(a, new Set())
+    if (!adjacency.has(b)) adjacency.set(b, new Set())
+    adjacency.get(a).add(b)
+    adjacency.get(b).add(a)
+  }
+
+  const exactBuckets = new Map()
+  items.forEach((item) => {
+    if (!item._normalized_text) return
+    const bucket = exactBuckets.get(item._normalized_text) || []
+    bucket.push(item.id)
+    exactBuckets.set(item._normalized_text, bucket)
+  })
+
+  exactBuckets.forEach((ids) => {
+    if (ids.length < 2) return
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) addEdge(ids[i], ids[j])
+    }
+  })
+
+  fuzzySuggestionMap.forEach((suggestions, id) => {
+    suggestions.forEach((suggestion) => addEdge(id, suggestion.id))
+  })
+
+  const visited = new Set()
+  const groups = []
+  items.forEach((item) => {
+    if (visited.has(item.id) || !adjacency.has(item.id)) return
+    const queue = [item.id]
+    const ids = []
+    while (queue.length) {
+      const current = queue.shift()
+      if (visited.has(current)) continue
+      visited.add(current)
+      ids.push(current)
+      ;(adjacency.get(current) || []).forEach((neighbor) => {
+        if (!visited.has(neighbor)) queue.push(neighbor)
+      })
+    }
+
+    if (ids.length < 2) return
+
+    const members = ids
+      .map((id) => itemMap.get(id))
+      .filter(Boolean)
+      .sort((a, b) => scoreKeepCandidate(b) - scoreKeepCandidate(a))
+
+    const recommendedId = members[0]?.id || ""
+    const hasExact = members.some((member) => exactDuplicateIds.has(member.id))
+    groups.push({
+      kind: hasExact ? "exact" : "fuzzy",
+      members,
+      recommendedId,
+    })
+  })
+
+  groups.sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === "exact" ? -1 : 1
+    return b.members.length - a.members.length
+  })
+  return groups
+}
+
+function renderDuplicateReview() {
+  const wrap = document.getElementById("duplicateReview")
+  const summary = document.getElementById("duplicateReviewSummary")
+  const groupsEl = document.getElementById("duplicateReviewGroups")
+  if (!wrap || !summary || !groupsEl) return
+
+  if (!duplicateReviewGroups.length) {
+    wrap.style.display = "none"
+    groupsEl.innerHTML = ""
+    return
+  }
+
+  wrap.style.display = "block"
+  summary.textContent = `Có ${duplicateReviewGroups.length} nhóm câu trùng/có thể trùng trong phạm vi đang lọc.`
+  groupsEl.innerHTML = duplicateReviewGroups
+    .map((group, index) => {
+      const groupLabel = group.kind === "exact" ? "Trùng tuyệt đối" : "Có thể trùng"
+      return `
+        <div class="dup-group">
+          <div class="dup-group-hd">
+            <div style="font-weight:700;color:var(--navy)">Nhóm ${index + 1} • ${groupLabel}</div>
+            <div style="font-size:.8rem;color:var(--ink-light)">${group.members.length} câu đứng cạnh nhau để rà nhanh</div>
+          </div>
+          <div class="dup-group-list">
+            ${group.members.map((member) => renderDuplicateReviewItem(member, group)).join("")}
+          </div>
+        </div>
+      `
+    })
+    .join("")
+}
+
+function renderDuplicateReviewItem(member, group) {
+  const recommended = member.id === group.recommendedId
+  const dupState = getDuplicateState(member)
+  const dupLabel = dupState === "exact" ? "Trùng tuyệt đối" : dupState === "fuzzy" ? "Có thể trùng" : "Liên quan"
+  return `
+    <div class="dup-item ${recommended ? "recommended" : ""}">
+      <div>
+        <div class="dup-item-title">
+          <span>${recommended ? "Gợi ý giữ lại" : "Câu cần so"}</span>
+          <span class="status-badge ${dupState === "exact" ? "dup-badge-exact" : dupState === "fuzzy" ? "dup-badge-fuzzy" : "dup-badge-clean"}">${dupLabel}</span>
+        </div>
+        <div class="dup-item-text">${escapeHtml(member.question_text || "").replace(/\n/g, "<br>")}</div>
+      </div>
+      <div class="dup-meta">Môn<br><b>${escapeHtml(member.chapters?.subjects?.name || "")}</b></div>
+      <div class="dup-meta">Chương<br><b>${escapeHtml(member.chapters?.name || "")}</b></div>
+      <div class="dup-meta">Đáp án<br><b>${escapeHtml(member.answer || "(trống)")}</b></div>
+      <div class="dup-actions">
+        <button type="button" class="dup-mini" onclick="event.stopPropagation();editQ('${member.id}')">Sửa</button>
+        <button type="button" class="dup-mini" onclick="event.stopPropagation();deleteQ('${member.id}')">Xóa</button>
+      </div>
+    </div>
+  `
+}
+
+function closeDuplicateReview() {
+  const wrap = document.getElementById("duplicateReview")
+  if (wrap) wrap.style.display = "none"
 }
 
 function renderPagination(totalItems, totalPages, visibleCount, startIndex) {
@@ -477,18 +619,23 @@ async function runDuplicateAudit() {
     fuzzySuggestionMap = new Map()
     fuzzyAuditScopeKey = scopeKey
     fuzzyAuditLabel = "Không có câu nào để kiểm tra trùng"
+    duplicateReviewGroups = []
     render()
+    renderDuplicateReview()
     return
   }
 
   fuzzySuggestionMap = computeFuzzySuggestions(scopeQuestions)
   fuzzyAuditScopeKey = scopeKey
+  duplicateReviewGroups = buildDuplicateReviewGroups(scopeQuestions)
   const count = fuzzySuggestionMap.size
   fuzzyAuditLabel = count
     ? `Đã gợi ý ${count} câu có thể trùng trong phạm vi đang lọc`
     : "Không phát hiện câu gần trùng trong phạm vi đang lọc"
 
   render()
+  renderDuplicateReview()
+  document.getElementById("duplicateReview")?.scrollIntoView({ behavior: "smooth", block: "start" })
 }
 
 function inspectImportedQuestions(importedQuestions) {
@@ -531,6 +678,7 @@ function exposeDuplicateHelpers() {
     getQuestionBankSnapshot: () => questions.map(buildQuestionSnapshot),
   }
   window.runDuplicateAudit = runDuplicateAudit
+  window.closeDuplicateReview = closeDuplicateReview
 }
 
 async function editQ(id) {
