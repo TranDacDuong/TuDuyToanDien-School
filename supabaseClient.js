@@ -70,6 +70,7 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
       } = config || {};
       try {
         const result = await operation();
+        if (result?.error) throw result.error;
         await recordAudit(action, details, "success");
         if (successMessage) alert(successMessage);
         return { ok: true, result };
