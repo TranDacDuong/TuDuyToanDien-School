@@ -415,12 +415,7 @@ button {
 <div class="container">
   <div class="page-hd">
     <h2>Ngân hàng câu hỏi</h2>
-    <div class="page-hd-actions">
-      <input type="file" id="wordImportInput" accept=".docx" style="display:none">
-      <button class="btn btn-outline" type="button" onclick="document.getElementById('wordImportInput').click()">Upload file Word</button>
-      <button class="btn btn-outline" type="button" onclick="runDuplicateAudit()">Kiểm tra câu trùng</button>
-      <button class="btn btn-primary" onclick="openModal()">+ Tạo câu hỏi</button>
-    </div>
+    <input type="file" id="wordImportInput" accept=".docx" style="display:none">
   </div>
 
   <div class="quickOps">
@@ -429,7 +424,7 @@ button {
       <span>Mở ngay bộ lọc chỉ còn các câu chưa có đáp án để rà nhanh trước khi ra đề.</span>
       <span class="quickStat" id="quickMissingCount">0 câu</span>
     </button>
-    <button class="quickOp" type="button" onclick="applyQuickQuestionAction('duplicates')">
+    <button class="quickOp" type="button" onclick="runDuplicateAudit()">
       <strong>Rà Câu Trùng</strong>
       <span>Chạy kiểm tra và mở popup nhóm câu trùng để đối chiếu ngay trong một lượt.</span>
       <span class="quickStat" id="quickDuplicateCount">0 câu</span>
@@ -504,7 +499,7 @@ button {
   <table>
     <thead>
       <tr>
-        <th class="selectCol">Chọn</th>
+        <th class="selectCol" id="questionSelectCol">Chọn</th>
         <th>STT</th>
         <th>Câu hỏi</th>
         <th>Khối</th>

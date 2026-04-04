@@ -2,6 +2,7 @@ let grades = []
 let questions = []
 let editingQuestionId = null
 let isAdmin = false
+let currentRole = ""
 let currentPage = 1
 const PAGE_SIZE = 25
 const FUZZY_THRESHOLD = 0.86
@@ -251,6 +252,14 @@ function pruneQuestionSelection() {
   })
 }
 
+function syncAdminQuestionUi() {
+  const bulkBar = document.getElementById("bulkBar")
+  const selectCol = document.getElementById("questionSelectCol")
+  if (bulkBar) bulkBar.style.display = isAdmin ? "" : "none"
+  if (selectCol) selectCol.style.display = isAdmin ? "" : "none"
+  if (!isAdmin) selectedQuestionIds.clear()
+}
+
 function updateBulkBar(pageList = getVisiblePageQuestions()) {
   const bar = document.getElementById("bulkBar")
   const summary = document.getElementById("bulkSelectionSummary")
@@ -259,6 +268,10 @@ function updateBulkBar(pageList = getVisiblePageQuestions()) {
   const restoreBtn = document.getElementById("bulkRestoreBtn")
   const deleteBtn = document.getElementById("bulkDeleteBtn")
   if (!bar || !summary || !selectPage) return
+  if (!isAdmin) {
+    bar.classList.add("hidden")
+    return
+  }
 
   const selectedCount = selectedQuestionIds.size
   bar.classList.toggle("hidden", !questions.length)
@@ -480,9 +493,9 @@ function render() {
 
           return `
       <tr class="q-row ${rowClass}" onclick="editQ('${q.id}')" title="Click để sửa câu hỏi" ${hidden}>
-        <td class="selectCol ${faded}" onclick="event.stopPropagation()">
+        ${isAdmin ? `<td class="selectCol ${faded}" onclick="event.stopPropagation()">
           <input type="checkbox" class="row-selector" ${checked} onchange="toggleQuestionSelection('${q.id}', this.checked)">
-        </td>
+        </td>` : ""}
         <td class="${faded}">${startIndex + i + 1}</td>
         <td class="questionCell ${faded}">
           <div class="questionText">${escapeHtml(q.question_text || "").replace(/\n/g, "<br>")}${hiddenBadge}</div>
@@ -500,7 +513,7 @@ function render() {
       </tr>`
         })
         .join("")
-    : `<tr><td colspan="12" style="text-align:center;padding:28px;color:var(--ink-light)">Chưa có câu hỏi phù hợp với bộ lọc hiện tại.</td></tr>`
+    : `<tr><td colspan="${isAdmin ? 12 : 11}" style="text-align:center;padding:28px;color:var(--ink-light)">Chưa có câu hỏi phù hợp với bộ lọc hiện tại.</td></tr>`
 
   document.querySelectorAll(".q-row").forEach((r) => {
     r.style.cursor = "pointer"
@@ -595,8 +608,16 @@ function renderDuplicateReview() {
   if (!wrap || !summary || !groupsEl) return
 
   if (!duplicateReviewGroups.length) {
-    wrap.style.display = "none"
-    groupsEl.innerHTML = ""
+    wrap.style.display = "block"
+    summary.textContent = fuzzyAuditLabel || "KhÃ´ng phÃ¡t hiá»‡n cÃ¢u trÃ¹ng trong pháº¡m vi Ä‘ang lá»c."
+    groupsEl.innerHTML = `
+      <div class="dup-group">
+        <div class="dup-group-hd">
+          <div style="font-weight:700;color:var(--navy)">KhÃ´ng cÃ³ nhÃ³m trÃ¹ng nÃ o</div>
+          <div style="font-size:.8rem;color:var(--ink-light)">Há»‡ thá»‘ng Ä‘Ã£ cháº¡y kiá»ƒm tra trong pháº¡m vi hiá»‡n táº¡i.</div>
+        </div>
+      </div>
+    `
     return
   }
 
@@ -1049,7 +1070,9 @@ async function getUserRole() {
   const { data: { user } } = await sb.auth.getUser()
   if (!user) return
   const { data } = await sb.from("users").select("role").eq("id", user.id).single()
-  if (data?.role === "admin") isAdmin = true
+  currentRole = data?.role || ""
+  isAdmin = currentRole === "admin"
+  syncAdminQuestionUi()
 }
 
 async function init() {

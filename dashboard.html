@@ -176,6 +176,7 @@ main { flex: 1; display: flex; flex-direction: column; overflow: hidden; width: 
 iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 #opsHub {
   display: none;
+  flex: 1;
   padding: 18px 18px 0;
   overflow-y: auto;
   background:
@@ -184,6 +185,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   border-bottom: 1px solid rgba(15,31,61,.08);
 }
 #opsHub.show { display: block; }
+.content.hidden { display: none; }
 .ops-shell { max-width: 1440px; margin: 0 auto 14px; display: grid; gap: 14px; }
 .ops-hero {
   padding: 22px 24px; border-radius: 26px; color: #fff;
@@ -458,6 +460,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   </div>
 
   <ul id="menu">
+    <li data-role="admin" data-page="ops-center"><span class="menu-label">Trung tâm admin</span></li>
     <li data-role="admin,teacher,student" data-page="home.html"><span class="menu-label">🏠 Trang chủ</span></li>
     <li data-role="admin,teacher,student" data-page="courses.html"><span class="menu-label">🎓 Khóa học</span></li>
     <li data-role="admin,teacher,student" data-page="class.html"><span class="menu-label">📘 Lớp học</span></li>
@@ -593,17 +596,12 @@ async function initDashboard(){
   setupMenu();
   checkProfile(profile);
   loadUserInfo(profile);
-  toggleOpsHub(profile.role);
   if(profile.role === "admin") loadAdminOps();
   loadFriendRequestBadge(user.id);
   loadNotificationBadge(user.id);
   loadMessageBadge(user.id);
   subscribeBadgeChanges(user.id);
   document.body.style.visibility = "visible";
-}
-
-function toggleOpsHub(role){
-  document.getElementById("opsHub")?.classList.toggle("show", role === "admin");
 }
 
 function setText(id, value){
@@ -706,10 +704,20 @@ function setActiveMobileNav(page){
 function openDashboardPage(page, options = {}){
   const { syncMenu = true, syncMobile = true } = options;
   if(!page) return;
+  const opsHub = document.getElementById("opsHub");
+  const contentWrap = document.querySelector(".content");
   if(syncMenu) setActiveMenuItem(page);
   else document.querySelectorAll("#menu li").forEach(item => item.classList.remove("active"));
   if(syncMobile) setActiveMobileNav(page);
   else setActiveMobileNav("");
+  if(page === "ops-center"){
+    opsHub?.classList.add("show");
+    contentWrap?.classList.add("hidden");
+    closeSidebar();
+    return;
+  }
+  opsHub?.classList.remove("show");
+  contentWrap?.classList.remove("hidden");
   contentFrame.src = page;
   closeSidebar();
 }
