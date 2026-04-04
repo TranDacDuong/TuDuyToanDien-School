@@ -584,6 +584,9 @@ function switchTab(id, btn){
   document.getElementById(id).classList.add("active");
   document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
   btn.classList.add("active");
+  const url = new URL(window.location.href);
+  url.searchParams.set('tab', id);
+  window.history.replaceState({}, '', url.toString());
   if(id === 'adminLogs') loadAdminLogs();
 }
 
@@ -799,6 +802,12 @@ async function init(){
   await loadDropdowns();
   loadRooms(); loadGrades(); loadSubjects(); loadChapters();
   loadTeachers(); loadStudents(); loadAdminLogs();
+  const tab = new URLSearchParams(window.location.search).get('tab');
+  if(tab){
+    const targetBtn = document.querySelector(`.tab[onclick*="'${tab}'"]`);
+    const targetPanel = document.getElementById(tab);
+    if(targetBtn && targetPanel) switchTab(tab, targetBtn);
+  }
 }
 init();
 
