@@ -36,6 +36,13 @@
       const enrichedQuestions = window.QuestionDuplicateShared?.inspectImportedQuestions
         ? window.QuestionDuplicateShared.inspectImportedQuestions(parsed.questions)
         : parsed.questions;
+      window.AppAdminTools?.recordAudit?.("word_question_import_parsed", {
+        target_type: "question_import",
+        details_source: "word",
+        file_name: file.name,
+        question_count: enrichedQuestions.length,
+        warning_count: parsed.warnings?.length || 0,
+      });
       openImportReviewModal(enrichedQuestions, parsed.warnings);
     } catch (error) {
       alert("Không đọc được file Word: " + (error?.message || error));

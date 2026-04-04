@@ -1638,13 +1638,43 @@
 
   window.cvSaveEssayScores = async function(resultId,scoreAuto,examId,studentName,totalPts){
     const sb=getSb(); let essaySum=0;
-    for(const{qid}of(window._cvEssayQIds||[])){
-      const val=parseFloat(document.getElementById("cv_essay_"+qid)?.value||0);
+    const updates = [];
+    for(const{qid,pts}of(window._cvEssayQIds||[])){
+      const raw=document.getElementById("cv_essay_"+qid)?.value||0;
+      const val=parseFloat(raw);
+      if(!Number.isFinite(val) || val < 0){
+        alert("Điểm tự luận phải là số không âm.");
+        return;
+      }
+      if(Number.isFinite(pts) && val > pts){
+        alert(`Điểm câu tự luận không được vượt quá ${pts}.`);
+        return;
+      }
       essaySum+=val;
-      await sb.from("exam_answers").update({score_earned:val}).eq("result_id",resultId).eq("question_id",qid);
+      updates.push({qid,val});
     }
     const grand=Math.round((scoreAuto+essaySum)*100)/100;
-    await sb.from("exam_results").update({score_essay:Math.round(essaySum*100)/100,score_total:grand}).eq("id",resultId);
+    for(const item of updates){
+      const { error } = await sb.from("exam_answers").update({score_earned:item.val}).eq("result_id",resultId).eq("question_id",item.qid);
+      if(error){
+        alert("Không thể lưu điểm tự luận: " + error.message);
+        return;
+      }
+    }
+    const { error: resultErr } = await sb.from("exam_results").update({score_essay:Math.round(essaySum*100)/100,score_total:grand}).eq("id",resultId);
+    if(resultErr){
+      alert("Không thể cập nhật tổng điểm: " + resultErr.message);
+      return;
+    }
+    window.AppAdminTools?.recordAudit?.("essay_score_saved", {
+      target_type: "exam_result",
+      target_id: resultId,
+      student_name: studentName,
+      exam_id: examId,
+      score_auto: scoreAuto,
+      score_essay: Math.round(essaySum*100)/100,
+      score_total: grand
+    });
     const toast=document.createElement("div");
     toast.textContent="✅ Đã lưu điểm "+studentName+": "+grand+"/"+totalPts;
     toast.style.cssText="position:fixed;bottom:24px;right:24px;background:var(--navy);color:var(--gold-light);"+

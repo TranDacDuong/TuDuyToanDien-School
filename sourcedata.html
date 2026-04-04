@@ -1018,10 +1018,23 @@ async function sHandleImportFile(event){
     }
     sImportStatus(`Đã xử lý <b>${data?.processed || payload.length}</b> dòng. Tạo mới: <b>${data?.inserted || 0}</b>, cập nhật: <b>${data?.updated || 0}</b>, bỏ qua: <b>${data?.skipped || 0}</b>.${created.length ? ' Đã tải xuống file tài khoản mới.' : ''}`, (data?.inserted || 0) > 0 ? 'ok' : 'warn');
     if(Array.isArray(data?.errors) && data.errors.length){ console.warn('Import student warnings', data.errors); }
+    window.AppAdminTools?.recordAudit?.('student_batch_import', {
+      target_type: 'student',
+      processed: data?.processed || payload.length,
+      inserted: data?.inserted || 0,
+      updated: data?.updated || 0,
+      skipped: data?.skipped || 0,
+      warning_count: Array.isArray(data?.errors) ? data.errors.length : 0
+    });
     toast('✅ Đã import danh sách học sinh');
     await loadStudents();
   }catch(error){
     console.error(error);
+    window.AppAdminTools?.recordAudit?.('student_batch_import', {
+      target_type: 'student',
+      status_hint: 'failed',
+      error_message: String(error?.message || error || '')
+    }, 'error');
     sImportStatus(`Không thể import học sinh: ${esc(error.message || 'Lỗi không xác định')}`, 'warn');
     alert('Không thể import học sinh: ' + (error.message || 'Lỗi không xác định'));
   }finally{
@@ -1146,16 +1159,26 @@ async function sSaveStudent(){
 
 async function sDelStudent(id){
   if(!confirm('Xóa vĩnh viễn học sinh này và toàn bộ dữ liệu liên quan? Thao tác này không thể hoàn tác.')) return;
-  const { error } = await sb.rpc('admin_delete_student_cascade', { p_student_id: id });
-  if(error){
-    const msg = String(error.message || '');
-    if(msg.includes('admin_delete_student_cascade')){
-      alert('Chưa có hàm xóa triệt để học sinh trong database. Hãy chạy SQL mới trong file SQL Supabase.txt rồi thử lại.');
-      return;
+  const outcome = await window.AppAdminTools?.runAdminAction?.({
+    action: 'student_delete_cascade',
+    details: {
+      target_type: 'student',
+      target_id: id
+    },
+    errorPrefix: 'Không thể xóa học sinh',
+    operation: async () => {
+      const { error } = await sb.rpc('admin_delete_student_cascade', { p_student_id: id });
+      if(error){
+        const msg = String(error.message || '');
+        if(msg.includes('admin_delete_student_cascade')){
+          throw new Error('Chưa có hàm xóa triệt để học sinh trong database. Hãy chạy SQL mới trong file SQL Supabase.txt rồi thử lại.');
+        }
+        throw error;
+      }
+      return true;
     }
-    alert(msg || 'Không thể xóa học sinh');
-    return;
-  }
+  });
+  if(!outcome?.ok) return;
   toast('🗑 Đã xóa triệt để học sinh');
   loadStudents();
 }

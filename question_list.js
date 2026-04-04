@@ -778,20 +778,27 @@ async function deleteQ(id) {
 
     if (!confirm("Câu hỏi không thuộc đề nào. Xóa vĩnh viễn, không thể khôi phục?")) return
 
-    const answerDeleteRes = await sb.from("exam_answers").delete().eq("question_id", id)
-    if (answerDeleteRes.error) {
-      alert(
-        "Không xóa được các bài làm gắn với câu hỏi này: " +
-          answerDeleteRes.error.message
-      )
-      return
-    }
-
-    const res = await sb.from("question_bank").delete().eq("id", id)
-    if (res.error) {
-      alert(res.error.message)
-      return
-    }
+    const outcome = await window.AppAdminTools?.runAdminAction?.({
+      action: "question_delete",
+      details: {
+        target_type: "question",
+        target_id: id,
+      },
+      errorPrefix: "Không thể xóa câu hỏi",
+      operation: async () => {
+        const answerDeleteRes = await sb.from("exam_answers").delete().eq("question_id", id)
+        if (answerDeleteRes.error) {
+          throw new Error(
+            "Không xóa được các bài làm gắn với câu hỏi này: " +
+              answerDeleteRes.error.message
+          )
+        }
+        const res = await sb.from("question_bank").delete().eq("id", id)
+        if (res.error) throw res.error
+        return true
+      },
+    })
+    if (!outcome?.ok) return
   } else {
     const res = await sb.from("question_bank").update({ hidden: true }).eq("id", id)
     if (res.error) {
