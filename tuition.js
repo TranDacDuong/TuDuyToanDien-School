@@ -179,6 +179,10 @@
   let currentRole = "admin";
   let currentUserId = null;
 
+  function canViewStudentPhone() {
+    return currentRole === "admin";
+  }
+
   function canManagePayments() {
     return currentRole === "admin" || currentRole === "teacher";
   }
@@ -511,7 +515,7 @@ Nhập số tiền hoàn lại (>0):`,
 
         sb.from("class_students")
           .select(`id, class_id, student_id, joined_at, left_at,
-                   user:users!fk_student(id, full_name, phone, email)`),
+                   user:users!fk_student(id, full_name, email${canViewStudentPhone() ? ", phone" : ""})`),
 
         sb.from("attendance")
           .select("student_id, class_id, date, status")
@@ -580,7 +584,7 @@ Nhập số tiền hoàn lại (>0):`,
           studentId:   cs.student_id,
           classId:     cs.class_id,
           studentName: cs.user?.full_name || "—",
-          phone:       cs.user?.phone || "",
+          phone:       canViewStudentPhone() ? (cs.user?.phone || "") : "",
           className:   cls.class_name,
           tuitionType: cls.tuition_type,
           tuitionFee:  cls.tuition_fee,
@@ -769,7 +773,7 @@ Nhập số tiền hoàn lại (>0):`,
           <span class="student-trigger">
             <span class="student-name">${g.studentName}</span>
           </span>
-          ${g.phone ? `<div style="font-size:11px;color:var(--muted)">${g.phone}</div>` : ""}
+          ${canViewStudentPhone() && g.phone ? `<div style="font-size:11px;color:var(--muted)">${g.phone}</div>` : ""}
           <div class="hint-link">Xem chi tiết ${g.classes.length} lớp học</div>
           ${noteBlock}
         </td>
@@ -851,7 +855,7 @@ Nhập số tiền hoàn lại (>0):`,
               <div class="invoice-title">Hóa đơn học phí</div>
               <div class="invoice-meta">
                 Học sinh: <b>${g.studentName}</b><br>
-                ${g.phone ? `SĐT: ${g.phone}<br>` : ""}
+                ${canViewStudentPhone() && g.phone ? `SĐT: ${g.phone}<br>` : ""}
                 Tháng: ${g.ym}<br>
                 Trạng thái: ${statusLabel[status]}
               </div>

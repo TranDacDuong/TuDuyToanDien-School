@@ -128,7 +128,7 @@
     const compactKeyword = normKeyword.replace(/\s+/g, "");
     const nameNorm  = normalizeSearchText(student.full_name);
     const emailNorm = normalizeSearchText(student.email);
-    const phoneNorm = normalizeSearchText(student.phone);
+    const phoneNorm = _role === "admin" ? normalizeSearchText(student.phone) : "";
     const initials  = getNameInitials(student.full_name);
 
     return [
@@ -143,9 +143,12 @@
   async function getStudentSearchPool(){
     if(_studentSearchPool) return _studentSearchPool;
     const sb = getSb();
+    const selectFields = _role === "admin"
+      ? "id,full_name,email,phone"
+      : "id,full_name,email";
     const { data, error } = await sb
       .from("users")
-      .select("id,full_name,email,phone")
+      .select(selectFields)
       .eq("role","student")
       .order("full_name");
     if(error) throw error;
@@ -654,7 +657,8 @@
         'background:'+(alreadyIn?"var(--surface)":"var(--white)")+';border:1px solid var(--border)">'+
         "<div>"+
         '<div style="font-weight:600;font-size:.85rem;color:var(--navy)">'+(u.full_name||"—")+"</div>"+
-        '<div style="font-size:.75rem;color:var(--ink-mid)">'+(u.email||"")+(u.phone?" • "+u.phone:"")+"</div>"+
+        '<div style="font-size:.75rem;color:var(--ink-mid)">'+(u.email||"")+
+          (_role === "admin" && u.phone ? " • "+u.phone : "")+"</div>"+
         "</div>"+
         (alreadyIn
           ?'<span style="font-size:.75rem;color:var(--ink-light)">Đã trong lớp</span>'
