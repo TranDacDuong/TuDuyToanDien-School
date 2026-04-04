@@ -22,6 +22,7 @@ let fuzzySuggestionMap = new Map()
 let fuzzyAuditScopeKey = ""
 let fuzzyAuditLabel = ""
 let duplicateReviewGroups = []
+const questionPageParams = new URLSearchParams(window.location.search)
 
 function resetToFirstPage() {
   currentPage = 1
@@ -129,6 +130,7 @@ async function loadQuestions() {
   recomputeExactDuplicates()
   invalidateFuzzyAudit()
   exposeDuplicateHelpers()
+  updateQuickActionStats()
   render()
 }
 
@@ -201,6 +203,13 @@ function getDuplicateState(q) {
   if (exactDuplicateIds.has(q.id)) return "exact"
   if (fuzzySuggestionMap.has(q.id)) return "fuzzy"
   return ""
+}
+
+function updateQuickActionStats() {
+  const missingEl = document.getElementById("quickMissingCount")
+  const duplicateEl = document.getElementById("quickDuplicateCount")
+  if (missingEl) missingEl.textContent = `${questions.filter(isAnswerMissing).length} câu`
+  if (duplicateEl) duplicateEl.textContent = `${exactDuplicateIds.size} câu`
 }
 
 function getBaseFilteredQuestions() {
@@ -290,6 +299,7 @@ function render() {
   document.querySelectorAll(".q-row").forEach((r) => {
     r.style.cursor = "pointer"
   })
+  updateQuickActionStats()
   renderPagination(totalItems, totalPages, pageList.length, startIndex)
 }
 
@@ -640,6 +650,23 @@ function exposeDuplicateHelpers() {
   window.closeDuplicateReview = closeDuplicateReview
 }
 
+function applyQueryFilters() {
+  const answerFilter = questionPageParams.get("answer")
+  if (answerFilter === "missing" && answerStatusFilter) {
+    answerStatusFilter.value = "missing"
+  }
+}
+
+window.applyQuickQuestionAction = function (action) {
+  if (action === "missing" && answerStatusFilter) {
+    answerStatusFilter.value = "missing"
+    resetToFirstPage()
+    render()
+    return
+  }
+  if (action === "duplicates") runDuplicateAudit()
+}
+
 async function editQ(id) {
   const q = questions.find((x) => x.id === id)
   if (!q) return
@@ -820,9 +847,13 @@ async function getUserRole() {
 
 async function init() {
   await getUserRole()
+  applyQueryFilters()
   await loadGrades()
   await loadCreatorFilter()
   await loadQuestions()
+  if (questionPageParams.get("focus") === "duplicates") {
+    setTimeout(() => runDuplicateAudit(), 180)
+  }
 }
 
 document.getElementById("questionPrevPage")?.addEventListener("click", () => {

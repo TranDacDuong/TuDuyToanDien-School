@@ -174,6 +174,61 @@ aside li.active {
 main { flex: 1; display: flex; flex-direction: column; overflow: hidden; width: 100%; }
 .content { flex: 1; padding: 0; overflow: hidden; }
 iframe { width: 100%; height: 100%; border: none; background: var(--white); }
+#opsHub {
+  display: none;
+  padding: 18px 18px 0;
+  overflow-y: auto;
+  background:
+    radial-gradient(circle at top left, rgba(200,150,42,.08), transparent 26%),
+    linear-gradient(180deg, rgba(244,239,228,.92) 0%, rgba(247,250,255,.96) 100%);
+  border-bottom: 1px solid rgba(15,31,61,.08);
+}
+#opsHub.show { display: block; }
+.ops-shell { max-width: 1440px; margin: 0 auto 14px; display: grid; gap: 14px; }
+.ops-hero {
+  padding: 22px 24px; border-radius: 26px; color: #fff;
+  background: radial-gradient(circle at top right, rgba(255,255,255,.18), transparent 34%), linear-gradient(135deg, rgba(15,31,61,.98) 0%, rgba(31,65,128,.95) 55%, rgba(200,150,42,.82) 100%);
+  box-shadow: 0 18px 40px rgba(15,23,42,.14);
+}
+.ops-hero h2 { margin: 0; font-family: var(--font-display); font-size: 1.6rem; }
+.ops-hero p { margin: 8px 0 0; max-width: 760px; color: rgba(255,255,255,.84); line-height: 1.7; font-size: .92rem; }
+.ops-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.ops-kpi {
+  padding: 16px 18px; border-radius: 20px; background: rgba(255,255,255,.94);
+  border: 1px solid rgba(15,31,61,.08); box-shadow: 0 14px 30px rgba(15,31,61,.06);
+}
+.ops-kpi-label { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-light); }
+.ops-kpi-value { margin-top: 10px; font-size: 1.9rem; font-weight: 800; color: var(--navy); }
+.ops-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(340px, .9fr); gap: 14px; }
+.ops-card {
+  padding: 18px; border-radius: 22px; background: rgba(255,255,255,.94);
+  border: 1px solid rgba(15,31,61,.08); box-shadow: 0 14px 30px rgba(15,31,61,.06);
+}
+.ops-card h3 { margin: 0 0 12px; font-size: 1rem; color: var(--navy); font-family: var(--font-display); }
+.ops-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ops-action {
+  padding: 14px 14px 12px; border-radius: 18px; border: 1px solid rgba(15,31,61,.08);
+  background: linear-gradient(180deg,#fff 0%,#fbfdff 100%); cursor: pointer; transition: .16s ease; text-align: left;
+}
+.ops-action:hover { transform: translateY(-1px); border-color: rgba(29,107,209,.28); box-shadow: 0 14px 24px rgba(29,107,209,.12); }
+.ops-action strong { display: block; color: var(--navy); font-size: .92rem; margin-bottom: 6px; }
+.ops-action span { display: block; color: var(--ink-mid); font-size: .8rem; line-height: 1.55; }
+.ops-alerts { display: grid; gap: 10px; }
+.ops-alert {
+  display: flex; justify-content: space-between; gap: 14px; align-items: center;
+  padding: 14px 16px; border-radius: 18px; background: linear-gradient(180deg, #fff 0%, #fbfdff 100%);
+  border: 1px solid rgba(15,31,61,.08);
+}
+.ops-alert.warn { border-color: rgba(245,158,11,.28); background: linear-gradient(180deg, #fffaf0 0%, #fff7ed 100%); }
+.ops-alert.danger { border-color: rgba(239,68,68,.24); background: linear-gradient(180deg, #fff5f5 0%, #fef2f2 100%); }
+.ops-alert strong { display: block; color: var(--navy); font-size: .9rem; }
+.ops-alert span { display: block; margin-top: 4px; color: var(--ink-mid); font-size: .8rem; line-height: 1.55; }
+.ops-link {
+  border: none; background: var(--navy); color: #fff; border-radius: 999px;
+  padding: 8px 12px; font-size: .76rem; font-weight: 800; cursor: pointer; white-space: nowrap;
+}
+.ops-link.secondary { background: rgba(15,31,61,.08); color: var(--navy); }
+.ops-empty { color: var(--ink-light); font-size: .84rem; line-height: 1.7; }
 #mobileNav { display: none; }
 #mobileNav .mobile-nav-item {
   appearance: none;
@@ -371,6 +426,15 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     backdrop-filter: blur(14px);
     z-index: 1190;
   }
+  #opsHub { padding: 12px 12px 0; }
+  .ops-shell { margin-bottom: 10px; }
+  .ops-hero { padding: 18px 18px 16px; border-radius: 22px; }
+  .ops-hero h2 { font-size: 1.28rem; }
+  .ops-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ops-grid { grid-template-columns: 1fr; }
+  .ops-actions { grid-template-columns: 1fr; }
+  .ops-alert { flex-direction: column; align-items: stretch; }
+  .ops-link { width: 100%; min-height: 44px; }
 }
 </style>
 </head>
@@ -411,6 +475,35 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 <div id="sidebarTab" onclick="toggleSidebar()"></div>
 
 <main>
+  <section id="opsHub">
+    <div class="ops-shell">
+      <div class="ops-hero">
+        <h2>Trung Tâm Điều Hành</h2>
+        <p>Theo dõi các điểm nghẽn quan trọng, mở nhanh đúng màn quản trị và xử lý công việc đang tồn trước khi nó lan rộng ra toàn hệ thống.</p>
+      </div>
+      <div class="ops-kpis">
+        <div class="ops-kpi"><div class="ops-kpi-label">Học sinh</div><div class="ops-kpi-value" id="opsStudentCount">0</div></div>
+        <div class="ops-kpi"><div class="ops-kpi-label">Lớp đang hoạt động</div><div class="ops-kpi-value" id="opsClassCount">0</div></div>
+        <div class="ops-kpi"><div class="ops-kpi-label">Câu hỏi</div><div class="ops-kpi-value" id="opsQuestionCount">0</div></div>
+        <div class="ops-kpi"><div class="ops-kpi-label">Đề kiểm tra</div><div class="ops-kpi-value" id="opsExamCount">0</div></div>
+      </div>
+      <div class="ops-grid">
+        <div class="ops-card">
+          <h3>Thao Tác Nhanh</h3>
+          <div class="ops-actions">
+            <button class="ops-action" type="button" onclick="openDashboardPage('question.html?answer=missing')"><strong>Rà câu thiếu đáp án</strong><span>Mở Ngân hàng câu hỏi với bộ lọc chỉ còn các câu đang để trống đáp án.</span></button>
+            <button class="ops-action" type="button" onclick="openDashboardPage('question.html?focus=duplicates')"><strong>Rà câu trùng</strong><span>Đi thẳng vào popup kiểm tra câu trùng trong phạm vi hiện có.</span></button>
+            <button class="ops-action" type="button" onclick="openDashboardPage('exam.html')"><strong>Tạo hoặc nhân bản đề</strong><span>Mở khu quản lý đề để tạo đề mới hoặc clone từ đề đã dùng ổn định.</span></button>
+            <button class="ops-action" type="button" onclick="openDashboardPage('sourcedata.html')"><strong>Đi tới Hệ thống</strong><span>Quản lý học sinh, giáo viên và các thao tác dữ liệu quan trọng.</span></button>
+          </div>
+        </div>
+        <div class="ops-card">
+          <h3>Cảnh Báo Vận Hành</h3>
+          <div class="ops-alerts" id="opsAlerts"><div class="ops-empty">Đang tải cảnh báo vận hành...</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
   <div class="content">
     <iframe id="contentFrame"></iframe>
   </div>
@@ -500,11 +593,85 @@ async function initDashboard(){
   setupMenu();
   checkProfile(profile);
   loadUserInfo(profile);
+  toggleOpsHub(profile.role);
+  if(profile.role === "admin") loadAdminOps();
   loadFriendRequestBadge(user.id);
   loadNotificationBadge(user.id);
   loadMessageBadge(user.id);
   subscribeBadgeChanges(user.id);
   document.body.style.visibility = "visible";
+}
+
+function toggleOpsHub(role){
+  document.getElementById("opsHub")?.classList.toggle("show", role === "admin");
+}
+
+function setText(id, value){
+  const el = document.getElementById(id);
+  if(el) el.textContent = value;
+}
+
+function buildOpsAlert(title, description, page, style = "", buttonLabel = "Mở ngay"){
+  return `<div class="ops-alert ${style}"><div><strong>${title}</strong><span>${description}</span></div><button class="ops-link ${style === "danger" ? "" : "secondary"}" type="button" onclick="openDashboardPage('${page}')">${buttonLabel}</button></div>`;
+}
+
+async function loadAdminOps(){
+  const alertsEl = document.getElementById("opsAlerts");
+  try{
+    const today = new Date();
+    const monthStart = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-01`;
+    const [
+      { data: students },
+      { data: classes },
+      { data: questions },
+      { data: exams },
+      { data: requests },
+      { data: tuitions },
+      { data: logs },
+    ] = await Promise.all([
+      sb.from("users").select("id").eq("role", "student"),
+      sb.from("classes").select("id,hidden"),
+      sb.from("question_bank").select("id,answer,question_text"),
+      sb.from("exams").select("id"),
+      sb.from("course_registration_requests").select("id").eq("status","pending"),
+      sb.from("tuition_payments").select("id,amount_due,amount_paid").eq("month", monthStart),
+      sb.from("admin_action_logs").select("id,status").eq("status","error").order("created_at",{ascending:false}).limit(5),
+    ]);
+
+    const questionList = questions || [];
+    const normalizedMap = new Map();
+    questionList.forEach(item => {
+      const key = String(item.question_text || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+      if(!key) return;
+      const list = normalizedMap.get(key) || [];
+      list.push(item.id);
+      normalizedMap.set(key, list);
+    });
+
+    let duplicateCount = 0;
+    normalizedMap.forEach(ids => { if(ids.length > 1) duplicateCount += ids.length; });
+    const missingAnswerCount = questionList.filter(item => !String(item.answer || "").trim()).length;
+    const tuitionMissingCount = (tuitions || []).filter(item => Number(item.amount_paid || 0) < Number(item.amount_due || 0)).length;
+    const requestCount = (requests || []).length;
+    const adminErrorCount = (logs || []).length;
+
+    setText("opsStudentCount", String((students || []).length));
+    setText("opsClassCount", String((classes || []).filter(item => !item.hidden).length));
+    setText("opsQuestionCount", String(questionList.length));
+    setText("opsExamCount", String((exams || []).length));
+
+    const alerts = [];
+    if(missingAnswerCount) alerts.push(buildOpsAlert(`${missingAnswerCount} câu hỏi chưa có đáp án`, "Đây là nhóm dễ gây lỗi khi tạo đề hoặc nhập dữ liệu hàng loạt. Nên rà trước.", "question.html?answer=missing", "danger", "Rà ngay"));
+    if(duplicateCount) alerts.push(buildOpsAlert(`${duplicateCount} câu nghi trùng`, "Dữ liệu trùng làm giáo viên khó chọn câu đúng và dễ tạo đề lặp.", "question.html?focus=duplicates", "warn", "Kiểm tra"));
+    if(requestCount) alerts.push(buildOpsAlert(`${requestCount} yêu cầu đăng ký khóa học đang chờ`, "Nên xử lý sớm để học sinh vào học đúng tiến độ và tránh tồn đọng.", "courses.html", "warn", "Mở khóa học"));
+    if(tuitionMissingCount) alerts.push(buildOpsAlert(`${tuitionMissingCount} học sinh còn thiếu học phí tháng này`, "Theo dõi sớm giúp hạn chế dồn nợ sang các tháng sau.", "tuition.html", "", "Xem học phí"));
+    if(adminErrorCount) alerts.push(buildOpsAlert(`${adminErrorCount} thao tác admin gần đây bị lỗi`, "Nên kiểm tra lại log thao tác để tránh dữ liệu bị bỏ dở giữa chừng.", "sourcedata.html", "", "Mở hệ thống"));
+
+    alertsEl.innerHTML = alerts.length ? alerts.join("") : '<div class="ops-empty">Hiện chưa có cảnh báo vận hành nổi bật. Hệ thống đang ở trạng thái khá sạch và ổn định.</div>';
+  }catch(error){
+    console.warn("loadAdminOps failed", error);
+    if(alertsEl) alertsEl.innerHTML = '<div class="ops-empty">Không tải được bảng điều hành lúc này. Bạn vẫn có thể mở trực tiếp các màn quản trị để làm việc.</div>';
+  }
 }
 
 function loadUserInfo(profile){

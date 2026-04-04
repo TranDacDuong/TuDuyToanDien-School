@@ -178,6 +178,12 @@
             : `<button class="edit-btn" onclick="openEditorReadOnly('${e.id}')">👁 Xem</button>`
           }
         </div>`;
+      if (canEdit) {
+        card.querySelector(".actions")?.insertAdjacentHTML(
+          "beforeend",
+          `<button class="btn sec" onclick="cloneExam('${e.id}')">Nhân bản</button>`
+        );
+      }
       grid.appendChild(card);
     });
   }
@@ -193,6 +199,65 @@
     await sb.from("exam_questions").delete().eq("exam_id", id);
     const { error } = await sb.from("exams").delete().eq("id", id);
     if (error) { alert("Lỗi: " + error.message); return; }
+    loadExamList();
+  };
+
+  window.cloneExam = async function (id) {
+    const sb = getSb();
+    const { data: exam, error: examErr } = await sb.from("exams").select("*").eq("id", id).single();
+    if (examErr || !exam) {
+      alert("Không tải được đề cần nhân bản.");
+      return;
+    }
+    if (currentRole === "teacher" && exam.created_by !== currentUser.id) {
+      alert("Bạn không có quyền nhân bản đề này.");
+      return;
+    }
+    const { data: examQuestions, error: eqErr } = await sb
+      .from("exam_questions")
+      .select("question_id, order_no, points, partial_points")
+      .eq("exam_id", id)
+      .order("order_no", { ascending: true });
+    if (eqErr) {
+      alert("Không tải được câu hỏi của đề gốc: " + eqErr.message);
+      return;
+    }
+    const clonedPayload = {
+      title: `${exam.title || "Đề kiểm tra"} (Bản sao)`,
+      duration_minutes: exam.duration_minutes,
+      total_points: exam.total_points,
+      created_by: currentUser.id,
+    };
+    const { data: created, error: createErr } = await sb
+      .from("exams")
+      .insert([clonedPayload])
+      .select("id")
+      .single();
+    if (createErr || !created?.id) {
+      alert("Không thể tạo bản sao đề: " + (createErr?.message || "Lỗi không xác định"));
+      return;
+    }
+    const rows = (examQuestions || []).map((item) => ({
+      exam_id: created.id,
+      question_id: item.question_id,
+      order_no: item.order_no,
+      points: item.points,
+      partial_points: item.partial_points,
+    }));
+    if (rows.length) {
+      const { error: insertErr } = await sb.from("exam_questions").insert(rows);
+      if (insertErr) {
+        await sb.from("exams").delete().eq("id", created.id);
+        alert("Không thể sao chép câu hỏi sang đề mới: " + insertErr.message);
+        return;
+      }
+    }
+    window.AppAdminTools?.recordAudit?.("exam_cloned", {
+      target_type: "exam",
+      target_id: created.id,
+      source_exam_id: id,
+    });
+    alert("Đã nhân bản đề thành công.");
     loadExamList();
   };
 
