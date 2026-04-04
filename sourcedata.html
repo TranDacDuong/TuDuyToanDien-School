@@ -222,6 +222,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 
 /* ── Students tab ── */
 #students.panel.active { display: block; }
+#adminLogs.panel.active { display: block; }
 .s-toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
 .s-stats { display:flex; gap:8px; flex-wrap:wrap; }
 .s-chip { background:var(--white); border:1px solid var(--border); border-radius:20px; padding:4px 12px; font-size:.78rem; color:var(--ink-mid); font-weight:500; box-shadow:var(--shadow-sm); }
@@ -284,6 +285,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   <button class="tab" onclick="switchTab('chapters',this)">📖 Chương</button>
   <button class="tab" onclick="switchTab('teachers',this)">👨‍🏫 Giáo viên</button>
   <button class="tab" onclick="switchTab('students',this)">👩‍🎓 Học sinh</button>
+  <button class="tab" onclick="switchTab('adminLogs',this)">Nhật ký admin</button>
 </div>
 
 <!-- ═══════ PHÒNG HỌC ═══════ -->
@@ -505,6 +507,44 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   </div>
 </div>
 
+<div id="adminLogs" class="panel">
+  <div class="table-card">
+    <div class="table-card-hd">
+      <span>Nhật ký vận hành admin</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span class="count-badge" id="adminLogCount">0</span>
+        <button class="btn btn-outline btn-sm" type="button" onclick="loadAdminLogs()">↻ Làm mới</button>
+      </div>
+    </div>
+    <div class="t-search-bar" style="grid-column:1/-1;margin-bottom:14px">
+      <div class="sg"><label>Tác vụ</label><input id="logActionFilter" placeholder="VD: question_delete"></div>
+      <div class="sg"><label>Trạng thái</label>
+        <select id="logStatusFilter">
+          <option value="">Tất cả</option>
+          <option value="success">Thành công</option>
+          <option value="error">Lỗi</option>
+        </select>
+      </div>
+      <div class="sg"><label>Người thao tác</label><input id="logActorFilter" placeholder="Tên admin..."></div>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width:170px">Thời gian</th>
+            <th style="min-width:150px">Admin</th>
+            <th style="min-width:150px">Tác vụ</th>
+            <th style="min-width:110px">Trạng thái</th>
+            <th style="min-width:120px">Đối tượng</th>
+            <th>Chi tiết</th>
+          </tr>
+        </thead>
+        <tbody id="adminLogTable"><tr class="empty-row"><td colspan="6">Đang tải...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <!-- Modal sửa học sinh -->
 <div class="modal-s" id="sModal">
   <div class="modal-s-box">
@@ -544,6 +584,7 @@ function switchTab(id, btn){
   document.getElementById(id).classList.add("active");
   document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
   btn.classList.add("active");
+  if(id === 'adminLogs') loadAdminLogs();
 }
 
 /* ══════════════════════════════
@@ -757,7 +798,7 @@ async function loadSubjectsByGrade(){
 async function init(){
   await loadDropdowns();
   loadRooms(); loadGrades(); loadSubjects(); loadChapters();
-  loadTeachers(); loadStudents();
+  loadTeachers(); loadStudents(); loadAdminLogs();
 }
 init();
 
@@ -1192,6 +1233,95 @@ function sExportExcel(){
 
 // Bind search
 ['sSName','sSPhone','sSBirth','sSProv','sSSchool'].forEach(id=>{let t;document.getElementById(id).addEventListener('input',()=>{clearTimeout(t);t=setTimeout(()=>{_sPage=1;sApplyFilter();},200);});});
+
+/* ──────────────────────────────
+   NHẬT KÝ ADMIN
+────────────────────────────── */
+let _adminLogs = [];
+
+function logFmtTime(value){
+  if(!value) return '—';
+  try{ return new Date(value).toLocaleString('vi-VN'); }
+  catch(_){ return value; }
+}
+
+function logDetailHtml(details){
+  if(!details || typeof details !== 'object') return '<span style="color:var(--ink-light)">—</span>';
+  const items = Object.entries(details).filter(([key]) => !['target_type','target_id'].includes(key)).slice(0,6);
+  if(!items.length) return '<span style="color:var(--ink-light)">—</span>';
+  return items.map(([key,val]) => {
+    const rendered = typeof val === 'object' ? JSON.stringify(val) : String(val ?? '');
+    return `<div style="font-size:.76rem;line-height:1.45;margin-bottom:4px"><b>${esc(key)}</b>: ${esc(rendered)}</div>`;
+  }).join('');
+}
+
+function renderAdminLogs(){
+  const actionNeedle = rmVN(document.getElementById('logActionFilter')?.value || '');
+  const actorNeedle = rmVN(document.getElementById('logActorFilter')?.value || '');
+  const statusNeedle = document.getElementById('logStatusFilter')?.value || '';
+  const rows = _adminLogs.filter(log =>
+    (!actionNeedle || rmVN(log.action).includes(actionNeedle)) &&
+    (!actorNeedle || rmVN(log.actor?.full_name || '').includes(actorNeedle)) &&
+    (!statusNeedle || log.status === statusNeedle)
+  );
+  document.getElementById('adminLogCount').textContent = rows.length;
+  const tbody = document.getElementById('adminLogTable');
+  if(!rows.length){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Không có nhật ký nào phù hợp</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(log => `
+    <tr>
+      <td style="white-space:nowrap">${esc(logFmtTime(log.created_at))}</td>
+      <td>
+        <div style="font-weight:700;color:var(--navy)">${esc(log.actor?.full_name || '—')}</div>
+        <div style="font-size:.76rem;color:var(--ink-light)">${esc(log.actor?.email || '')}</div>
+      </td>
+      <td><span class="grade-badge">${esc(log.action || '')}</span></td>
+      <td>
+        <span style="display:inline-flex;padding:4px 10px;border-radius:999px;font-size:.72rem;font-weight:700;${log.status === 'error' ? 'background:#fef2f2;color:#b91c1c' : 'background:#ecfdf5;color:#047857'}">
+          ${log.status === 'error' ? 'Lỗi' : 'Thành công'}
+        </span>
+      </td>
+      <td>
+        <div style="font-weight:600">${esc(log.target_type || '—')}</div>
+        <div style="font-size:.74rem;color:var(--ink-light)">${esc(log.target_id || '')}</div>
+      </td>
+      <td>${logDetailHtml(log.details)}</td>
+    </tr>
+  `).join('');
+}
+
+async function loadAdminLogs(){
+  const tbody = document.getElementById('adminLogTable');
+  if(tbody) tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Đang tải...</td></tr>';
+  const { data, error } = await sb
+    .from('admin_action_logs')
+    .select('id,actor_id,action,status,target_type,target_id,details,created_at')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if(error){
+    if(tbody) tbody.innerHTML = `<tr class="empty-row"><td colspan="6">${esc(error.message)}</td></tr>`;
+    return;
+  }
+  const rows = data || [];
+  const actorIds = [...new Set(rows.map(item => item.actor_id).filter(Boolean))];
+  let actorMap = {};
+  if(actorIds.length){
+    const { data: actors } = await sb.from('users').select('id,full_name,email').in('id', actorIds);
+    actorMap = Object.fromEntries((actors || []).map(actor => [actor.id, actor]));
+  }
+  _adminLogs = rows.map(item => ({ ...item, actor: actorMap[item.actor_id] || null }));
+  renderAdminLogs();
+}
+
+['logActionFilter','logActorFilter'].forEach(id=>{
+  const el = document.getElementById(id);
+  if(!el) return;
+  let t;
+  el.addEventListener('input',()=>{ clearTimeout(t); t=setTimeout(renderAdminLogs,160); });
+});
+document.getElementById('logStatusFilter')?.addEventListener('change', renderAdminLogs);
 
 </script>
 </body>
