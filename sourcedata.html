@@ -918,6 +918,16 @@ async function loadSubjectsByGrade(){
 
 /* ── Init ── */
 async function init(){
+  const { data: { user } } = await sb.auth.getUser();
+  if(!user){
+    location.href = "index.html";
+    return;
+  }
+  const { data: profile } = await sb.from('users').select('role').eq('id', user.id).single();
+  if(profile?.role !== 'admin'){
+    location.href = "dashboard.html";
+    return;
+  }
   await loadDropdowns();
   loadRooms(); loadGrades(); loadSubjects(); loadChapters();
   loadTeachers(); loadStudents(); loadAdminLogs();
