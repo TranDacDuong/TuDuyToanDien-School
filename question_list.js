@@ -9,7 +9,6 @@ const MAX_FUZZY_RESULTS = 3
 
 const formTitle = document.getElementById("formTitle")
 const saveBtn = document.getElementById("saveBtn")
-const duplicateStatusFilter = document.getElementById("f_duplicate_status")
 const answerStatusFilter = document.getElementById("f_answer_status")
 const typeText = {
   multi_choice: "Nhiều lựa chọn",
@@ -85,20 +84,6 @@ f_chapter.onchange = () => {
 f_type.onchange = () => {
   resetToFirstPage()
   render()
-}
-
-if (duplicateStatusFilter) {
-  duplicateStatusFilter.onchange = async () => {
-    resetToFirstPage()
-    if (duplicateStatusFilter.value === "fuzzy" || duplicateStatusFilter.value === "any") {
-      const scopeQuestions = getBaseFilteredQuestions()
-      if (!isFuzzyScopeFresh(scopeQuestions)) {
-        await runDuplicateAudit()
-        return
-      }
-    }
-    render()
-  }
 }
 
 if (answerStatusFilter) {
@@ -237,9 +222,6 @@ function getBaseFilteredQuestions() {
 function getFilteredQuestions() {
   let list = getBaseFilteredQuestions()
 
-  if (duplicateStatusFilter?.value === "exact") list = list.filter((q) => getDuplicateState(q) === "exact")
-  if (duplicateStatusFilter?.value === "fuzzy") list = list.filter((q) => getDuplicateState(q) === "fuzzy")
-  if (duplicateStatusFilter?.value === "any") list = list.filter((q) => getDuplicateState(q))
   if (answerStatusFilter?.value === "missing") list = list.filter(isAnswerMissing)
   if (answerStatusFilter?.value === "complete") list = list.filter((q) => !isAnswerMissing(q))
 
@@ -276,14 +258,10 @@ function render() {
           const faded = q.hidden ? "faded" : ""
           const hidden = q.hidden ? `style="opacity:.45"` : ""
           const missingAnswer = isAnswerMissing(q)
-          const duplicateState = getDuplicateState(q)
           const rowClass = [
             missingAnswer ? "row-missing-answer" : "",
-            duplicateState === "exact" ? "row-duplicate-exact" : "",
-            duplicateState === "fuzzy" ? "row-duplicate-fuzzy" : "",
           ].filter(Boolean).join(" ")
           const hiddenBadge = q.hidden ? `<span class="hidden-badge">Ẩn</span>` : ""
-          const duplicateBadge = buildDuplicateBadge(q)
           const statusBadge = missingAnswer
             ? `<span class="status-badge status-missing">Chưa có đáp án</span>`
             : `<span class="status-badge status-ok">${q.question_type === "essay" ? "Không bắt buộc" : "Đã có đáp án"}</span>`
@@ -299,7 +277,6 @@ function render() {
         <td class="${faded}">${q.chapters?.subjects?.name || ""}</td>
         <td class="${faded}">${q.chapters?.name || ""}</td>
         <td class="${faded}">${typeText[q.question_type] || q.question_type}</td>
-        <td class="${faded}">${duplicateBadge}</td>
         <td class="${faded}">${statusBadge}</td>
         <td class="${faded}">${q.difficulty ?? ""}</td>
         <td class="${faded}">${q.answer_count || 0}</td>
@@ -308,30 +285,12 @@ function render() {
       </tr>`
         })
         .join("")
-    : `<tr><td colspan="12" style="text-align:center;padding:28px;color:var(--ink-light)">Chưa có câu hỏi phù hợp với bộ lọc hiện tại.</td></tr>`
+    : `<tr><td colspan="11" style="text-align:center;padding:28px;color:var(--ink-light)">Chưa có câu hỏi phù hợp với bộ lọc hiện tại.</td></tr>`
 
   document.querySelectorAll(".q-row").forEach((r) => {
     r.style.cursor = "pointer"
   })
   renderPagination(totalItems, totalPages, pageList.length, startIndex)
-}
-
-function buildDuplicateBadge(q) {
-  const duplicateState = getDuplicateState(q)
-  if (duplicateState === "exact") {
-    return `<span class="status-badge dup-badge-exact" title="Trùng với ít nhất một câu khác sau khi chuẩn hóa nội dung.">Trùng tuyệt đối</span>`
-  }
-
-  if (duplicateState === "fuzzy") {
-    const suggestions = fuzzySuggestionMap.get(q.id) || []
-    const top = suggestions[0]
-    const title = top
-      ? `Câu gần nhất: ${(top.question_text || "").slice(0, 160).replace(/\n/g, " ")} (${Math.round(top.score * 100)}%)`
-      : "Có câu gần giống sau khi kiểm tra trùng."
-    return `<span class="status-badge dup-badge-fuzzy" title="${escapeHtml(title)}">Có thể trùng</span>`
-  }
-
-  return `<span class="status-badge dup-badge-clean">Chưa phát hiện</span>`
 }
 
 function scoreKeepCandidate(q) {
@@ -871,6 +830,10 @@ document.getElementById("questionNextPage")?.addEventListener("click", () => {
   if (currentPage >= totalPages) return
   currentPage += 1
   render()
+})
+
+document.getElementById("duplicateReview")?.addEventListener("click", (event) => {
+  if (event.target?.id === "duplicateReview") closeDuplicateReview()
 })
 
 init()

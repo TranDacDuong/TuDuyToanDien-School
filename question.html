@@ -131,7 +131,8 @@ td { padding: 11px 12px; border-bottom: 1px solid #eef3f8; vertical-align: middl
 .dup-badge-clean { background:#f8fafc;color:#475569;border-color:#cbd5e1; }
 .row-duplicate-exact td { box-shadow: inset 4px 0 0 #6366f1; }
 .row-duplicate-fuzzy td { box-shadow: inset 4px 0 0 #f97316; }
-.dup-review { display:none;margin:18px 0;padding:18px;border-radius:22px;background:rgba(255,255,255,.95);border:1px solid rgba(15,31,61,.08);box-shadow:0 14px 30px rgba(15,31,61,.06); }
+.dup-review { display:none;position:fixed;inset:0;z-index:1200;background:rgba(15,23,42,.45);padding:32px 18px;overflow:auto; }
+.dup-review-box { max-width:1320px;margin:0 auto;background:rgba(255,255,255,.98);border:1px solid rgba(15,31,61,.08);box-shadow:0 20px 46px rgba(15,31,61,.16);border-radius:26px;padding:18px; }
 .dup-review-hd { display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px; }
 .dup-review-groups { display:grid;gap:14px; }
 .dup-group { border:1px solid rgba(15,31,61,.08);border-radius:18px;overflow:hidden;background:linear-gradient(180deg,#fff 0%,#fbfdff 100%); }
@@ -364,12 +365,6 @@ button {
         <option value="short_answer">Trả lời ngắn</option>
         <option value="essay">Tự luận</option>
       </select>
-      <select id="f_duplicate_status">
-        <option value="">Trạng thái trùng</option>
-        <option value="exact">Trùng tuyệt đối</option>
-        <option value="fuzzy">Có thể trùng</option>
-        <option value="any">Mọi câu trùng</option>
-      </select>
       <select id="f_answer_status">
         <option value="">Trạng thái đáp án</option>
         <option value="complete">Đã có đáp án</option>
@@ -383,14 +378,16 @@ button {
   <div class="click-hint">👆 Click vào câu hỏi để sửa hoặc xóa</div>
 
   <div class="dup-review" id="duplicateReview">
-    <div class="dup-review-hd">
-      <div>
-        <div style="font-family:var(--font-display);font-size:1rem;color:var(--navy)">Ra cau trung</div>
-        <div id="duplicateReviewSummary" style="font-size:.82rem;color:var(--ink-light)">Chua chay kiem tra trung.</div>
+    <div class="dup-review-box">
+      <div class="dup-review-hd">
+        <div>
+          <div style="font-family:var(--font-display);font-size:1rem;color:var(--navy)">Ra cau trung</div>
+          <div id="duplicateReviewSummary" style="font-size:.82rem;color:var(--ink-light)">Chua chay kiem tra trung.</div>
+        </div>
+        <button class="btn btn-outline btn-sm" type="button" onclick="closeDuplicateReview()">Dong</button>
       </div>
-      <button class="btn btn-outline btn-sm" type="button" onclick="closeDuplicateReview()">Dong</button>
+      <div class="dup-review-groups" id="duplicateReviewGroups"></div>
     </div>
-    <div class="dup-review-groups" id="duplicateReviewGroups"></div>
   </div>
 
   <table>
@@ -402,7 +399,6 @@ button {
         <th>Môn</th>
         <th>Chương</th>
         <th>Loại</th>
-        <th>Trùng lặp</th>
         <th>Trạng thái đáp án</th>
         <th>Mức độ</th>
         <th>Số ĐA</th>
@@ -411,7 +407,7 @@ button {
       </tr>
     </thead>
     <tbody id="questionTable">
-      <tr><td colspan="12" style="text-align:center;padding:32px;color:var(--ink-light)">⏳ Đang tải câu hỏi...</td></tr>
+      <tr><td colspan="11" style="text-align:center;padding:32px;color:var(--ink-light)">⏳ Đang tải câu hỏi...</td></tr>
     </tbody>
   </table>
   <div class="pager">
