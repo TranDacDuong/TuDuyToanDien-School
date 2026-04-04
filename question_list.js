@@ -647,23 +647,15 @@ async function deleteQ(id) {
   if (!confirm("Xóa câu hỏi này?")) return
 
   if (isAdmin) {
-    const [examUsageRes, answerUsageRes] = await Promise.all([
-      sb.from("exam_questions").select("exam_id, exams(title)").eq("question_id", id),
-      sb.from("exam_answers").select("result_id", { count: "exact" }).eq("question_id", id),
-    ])
+    const { data: usages, error: checkErr } = await sb
+      .from("exam_questions")
+      .select("exam_id, exams(title)")
+      .eq("question_id", id)
 
-    if (examUsageRes.error) {
-      alert("Lỗi kiểm tra đề thi: " + examUsageRes.error.message)
+    if (checkErr) {
+      alert("Lỗi kiểm tra đề thi: " + checkErr.message)
       return
     }
-
-    if (answerUsageRes.error) {
-      alert("Lỗi kiểm tra bài làm: " + answerUsageRes.error.message)
-      return
-    }
-
-    const usages = examUsageRes.data || []
-    const answerCount = Number(answerUsageRes.count || 0)
 
     if (usages.length > 0) {
       const examNames = [...new Set(usages.map((u) => u.exams?.title || u.exam_id).filter(Boolean))]
@@ -677,24 +669,20 @@ async function deleteQ(id) {
       return
     }
 
-    if (answerCount > 0) {
+    if (!confirm("Câu hỏi không thuộc đề nào. Xóa vĩnh viễn, không thể khôi phục?")) return
+
+    const answerDeleteRes = await sb.from("exam_answers").delete().eq("question_id", id)
+    if (answerDeleteRes.error) {
       alert(
-        "⚠ Không thể xóa!\n\nCâu hỏi này đã xuất hiện trong " +
-          answerCount +
-          " bản ghi bài làm của học sinh.\n\nBạn nên ẩn câu hỏi thay vì xóa vĩnh viễn."
+        "Không xóa được các bài làm gắn với câu hỏi này: " +
+          answerDeleteRes.error.message
       )
       return
     }
 
-    if (!confirm("Câu hỏi không thuộc đề nào. Xóa vĩnh viễn, không thể khôi phục?")) return
     const res = await sb.from("question_bank").delete().eq("id", id)
     if (res.error) {
-      const message = String(res.error.message || "")
-      if (message.includes("exam_answers_question_id_fkey")) {
-        alert("Không thể xóa vì câu hỏi này đã có bài làm của học sinh. Bạn nên ẩn câu hỏi thay vì xóa vĩnh viễn.")
-      } else {
-        alert(res.error.message)
-      }
+      alert(res.error.message)
       return
     }
   } else {
