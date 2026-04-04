@@ -604,7 +604,8 @@ function switchTab(id, btn){
   document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
   document.getElementById(id).classList.add("active");
   document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-  btn.classList.add("active");
+  const activeBtn = btn || document.querySelector(`.tab[onclick*="'${id}'"]`);
+  if(activeBtn) activeBtn.classList.add("active");
   const url = new URL(window.location.href);
   url.searchParams.set('tab', id);
   window.history.replaceState({}, '', url.toString());

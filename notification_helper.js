@@ -123,28 +123,37 @@
     return [...new Set((data || []).map(item => item.id).filter(Boolean))];
   }
 
+  function resolveNotificationBuilder(buildItem) {
+    if (typeof buildItem === "function") return buildItem;
+    const staticPayload = buildItem && typeof buildItem === "object" ? buildItem : {};
+    return () => ({ ...staticPayload });
+  }
+
   async function notifyCourseStudents(courseId, buildItem) {
+    const builder = resolveNotificationBuilder(buildItem);
     const studentIds = await getCourseStudentIds(courseId);
     const items = studentIds.map(studentId => {
-      const built = buildItem(studentId) || {};
+      const built = builder(studentId) || {};
       return { ...built, userId: built.userId || studentId };
     });
     return createBulkNotifications(items);
   }
 
   async function notifyClassStudents(classId, buildItem) {
+    const builder = resolveNotificationBuilder(buildItem);
     const studentIds = await getClassStudentIds(classId);
     const items = studentIds.map(studentId => {
-      const built = buildItem(studentId) || {};
+      const built = builder(studentId) || {};
       return { ...built, userId: built.userId || studentId };
     });
     return createBulkNotifications(items);
   }
 
   async function notifyAllStudents(buildItem) {
+    const builder = resolveNotificationBuilder(buildItem);
     const studentIds = await getAllStudentIds();
     const items = studentIds.map(studentId => {
-      const built = buildItem(studentId) || {};
+      const built = builder(studentId) || {};
       return { ...built, userId: built.userId || studentId };
     });
     return createBulkNotifications(items);

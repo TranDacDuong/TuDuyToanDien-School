@@ -6,6 +6,23 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
     SUPABASE_KEY
   );
 
+  const originalGetUser = sb.auth.getUser.bind(sb.auth);
+  sb.auth.getUser = async (...args) => {
+    try {
+      return await originalGetUser(...args);
+    } catch (error) {
+      try {
+        const { data } = await sb.auth.getSession();
+        if (data?.session?.user) {
+          return { data: { user: data.session.user }, error: null };
+        }
+      } catch (_) {
+        // Ignore fallback errors and rethrow the original failure below.
+      }
+      throw error;
+    }
+  };
+
   window.sb = sb;
 
   window.AppAdminTools = (function () {
