@@ -638,6 +638,13 @@ async function saveRoom(){
   if(!room_name){ alert("Vui lòng nhập tên phòng"); return; }
   if(id) await sb.from("rooms").update({room_name,capacity,note}).eq("id",id);
   else   await sb.from("rooms").insert({room_name,capacity,note});
+  await window.AppAdminTools?.recordAudit?.(id ? 'room_updated' : 'room_created', {
+    target_type: 'room',
+    target_id: id || null,
+    room_name,
+    capacity,
+    has_note: !!note,
+  });
   resetRoom(); loadRooms(); toast("✅ Đã lưu phòng học");
 }
 function editRoom(id,name,cap,note){
@@ -651,7 +658,13 @@ function resetRoom(){
 }
 async function deleteRoom(id){
   if(!confirm("Xóa phòng này?")) return;
+  const roomName = document.getElementById("roomName").value.trim() || null;
   await sb.from("rooms").delete().eq("id",id);
+  await window.AppAdminTools?.recordAudit?.('room_deleted', {
+    target_type: 'room',
+    target_id: id,
+    room_name: roomName,
+  });
   loadRooms(); toast("🗑 Đã xóa phòng");
 }
 
@@ -678,6 +691,11 @@ async function saveGrade(){
   if(!name){ alert("Vui lòng nhập tên khối"); return; }
   if(id) await sb.from("grades").update({name}).eq("id",id);
   else   await sb.from("grades").insert({name});
+  await window.AppAdminTools?.recordAudit?.(id ? 'grade_updated' : 'grade_created', {
+    target_type: 'grade',
+    target_id: id || null,
+    grade_name: name,
+  });
   resetGrade(); loadGrades(); loadDropdowns(); toast("✅ Đã lưu khối");
 }
 function editGrade(id,name){
@@ -690,7 +708,13 @@ function resetGrade(){
 }
 async function deleteGrade(id){
   if(!confirm("Xóa khối này? Các môn thuộc khối cũng bị ảnh hưởng.")) return;
+  const gradeName = document.getElementById("gradeName").value.trim() || null;
   await sb.from("grades").delete().eq("id",id);
+  await window.AppAdminTools?.recordAudit?.('grade_deleted', {
+    target_type: 'grade',
+    target_id: id,
+    grade_name: gradeName,
+  });
   loadGrades(); loadDropdowns(); toast("🗑 Đã xóa khối");
 }
 
@@ -722,6 +746,12 @@ async function saveSubject(){
   if(!name || !grade_id){ alert("Vui lòng điền đầy đủ"); return; }
   if(id) await sb.from("subjects").update({name,grade_id}).eq("id",id);
   else   await sb.from("subjects").insert({name,grade_id});
+  await window.AppAdminTools?.recordAudit?.(id ? 'subject_updated' : 'subject_created', {
+    target_type: 'subject',
+    target_id: id || null,
+    subject_name: name,
+    grade_id,
+  });
   resetSubject(); loadSubjects(); loadDropdowns(); toast("✅ Đã lưu môn học");
 }
 function editSubject(id,name,gradeId){
@@ -736,7 +766,13 @@ function resetSubject(){
 }
 async function deleteSubject(id){
   if(!confirm("Xóa môn này?")) return;
+  const subjectName = document.getElementById("subjectName").value.trim() || null;
   await sb.from("subjects").delete().eq("id",id);
+  await window.AppAdminTools?.recordAudit?.('subject_deleted', {
+    target_type: 'subject',
+    target_id: id,
+    subject_name: subjectName,
+  });
   loadSubjects(); toast("🗑 Đã xóa môn học");
 }
 
@@ -772,6 +808,12 @@ async function saveChapter(){
   if(!name || !subject_id){ alert("Vui lòng điền đầy đủ"); return; }
   if(id) await sb.from("chapters").update({name,subject_id}).eq("id",id);
   else   await sb.from("chapters").insert({name,subject_id});
+  await window.AppAdminTools?.recordAudit?.(id ? 'chapter_updated' : 'chapter_created', {
+    target_type: 'chapter',
+    target_id: id || null,
+    chapter_name: name,
+    subject_id,
+  });
   resetChapter(); loadChapters(); toast("✅ Đã lưu chương");
 }
 async function editChapter(id,name,subjectId,gradeId){
@@ -787,7 +829,13 @@ function resetChapter(){
 }
 async function deleteChapter(id){
   if(!confirm("Xóa chương này?")) return;
+  const chapterName = document.getElementById("chapterName").value.trim() || null;
   await sb.from("chapters").delete().eq("id",id);
+  await window.AppAdminTools?.recordAudit?.('chapter_deleted', {
+    target_type: 'chapter',
+    target_id: id,
+    chapter_name: chapterName,
+  });
   loadChapters(); toast("🗑 Đã xóa chương");
 }
 
@@ -932,6 +980,13 @@ async function submitTeacher(){
   if(_tEditId){
     const {error} = await sb.from('users').update({subject,birth_year,phone}).eq('id',_tEditId);
     if(error){ alert(error.message); return; }
+    await window.AppAdminTools?.recordAudit?.('teacher_updated', {
+      target_type: 'teacher',
+      target_id: _tEditId,
+      subject,
+      birth_year,
+      has_phone: !!phone,
+    });
     toast('✅ Đã cập nhật giáo viên');
   } else {
     const email = document.getElementById('tEmail').value.trim();
@@ -943,6 +998,14 @@ async function submitTeacher(){
     if(u.role==='admin')  { alert('Không thể chuyển tài khoản admin'); return; }
     const {error} = await sb.from('users').update({role:'teacher',subject,birth_year,phone}).eq('id',u.id);
     if(error){ alert(error.message); return; }
+    await window.AppAdminTools?.recordAudit?.('teacher_created', {
+      target_type: 'teacher',
+      target_id: u.id,
+      teacher_email: email,
+      subject,
+      birth_year,
+      has_phone: !!phone,
+    });
     toast('✅ Đã thêm giáo viên mới');
   }
   closeTModal(); loadTeachers();
@@ -953,6 +1016,11 @@ async function downgradeT(id, name){
   const {error} = await sb.from('users').update({role:'student',subject:null}).eq('id',id);
   if(error){ alert(error.message); return; }
   await sb.from('class_teachers').delete().eq('teacher_id',id);
+  await window.AppAdminTools?.recordAudit?.('teacher_downgraded', {
+    target_type: 'teacher',
+    target_id: id,
+    teacher_name: name,
+  });
   toast(`↩ Đã chuyển ${name} về học sinh`); loadTeachers();
 }
 
@@ -1215,7 +1283,7 @@ function sEditStudent(id){
 function sCloseModal(){ document.getElementById('sModal').classList.remove('open'); }
 
 async function sSaveStudent(){
-  const {error}=await sb.from('users').update({
+  const payload = {
     full_name: document.getElementById('seN').value.trim(),
     phone:     document.getElementById('seP').value.trim(),
     parent_full_name: document.getElementById('seParentN').value.trim(),
@@ -1223,8 +1291,19 @@ async function sSaveStudent(){
     birth_year:parseInt(document.getElementById('seB').value)||null,
     province:  document.getElementById('sePv').value.trim(),
     school:    document.getElementById('seSc').value.trim(),
+  };
+  const {error}=await sb.from('users').update({
+    ...payload,
   }).eq('id',_sEditId);
   if(error){alert(error.message);return;}
+  await window.AppAdminTools?.recordAudit?.('student_updated', {
+    target_type: 'student',
+    target_id: _sEditId,
+    student_name: payload.full_name,
+    birth_year: payload.birth_year,
+    has_phone: !!payload.phone,
+    has_parent_phone: !!payload.parent_phone,
+  });
   sCloseModal(); toast('✅ Đã cập nhật học sinh'); loadStudents();
 }
 
