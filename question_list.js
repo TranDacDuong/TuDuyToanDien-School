@@ -22,6 +22,7 @@ let fuzzySuggestionMap = new Map()
 let fuzzyAuditScopeKey = ""
 let fuzzyAuditLabel = ""
 let duplicateReviewGroups = []
+let selectedQuestionIds = new Set()
 const questionPageParams = new URLSearchParams(window.location.search)
 
 function resetToFirstPage() {
@@ -237,6 +238,206 @@ function getFilteredQuestions() {
   return list
 }
 
+function getVisiblePageQuestions() {
+  const list = getFilteredQuestions()
+  const startIndex = (currentPage - 1) * PAGE_SIZE
+  return list.slice(startIndex, startIndex + PAGE_SIZE)
+}
+
+function pruneQuestionSelection() {
+  const validIds = new Set(questions.map((q) => q.id))
+  selectedQuestionIds.forEach((id) => {
+    if (!validIds.has(id)) selectedQuestionIds.delete(id)
+  })
+}
+
+function updateBulkBar(pageList = getVisiblePageQuestions()) {
+  const bar = document.getElementById("bulkBar")
+  const summary = document.getElementById("bulkSelectionSummary")
+  const selectPage = document.getElementById("bulkSelectPage")
+  const hideBtn = document.getElementById("bulkHideBtn")
+  const restoreBtn = document.getElementById("bulkRestoreBtn")
+  const deleteBtn = document.getElementById("bulkDeleteBtn")
+  if (!bar || !summary || !selectPage) return
+
+  const selectedCount = selectedQuestionIds.size
+  bar.classList.toggle("hidden", !questions.length)
+  const selectedItems = questions.filter((q) => selectedQuestionIds.has(q.id))
+  const hiddenCount = selectedItems.filter((q) => q.hidden).length
+  const visibleCount = selectedItems.filter((q) => !q.hidden).length
+  const visibleIds = pageList.map((q) => q.id)
+  const checkedOnPage = visibleIds.length > 0 && visibleIds.every((id) => selectedQuestionIds.has(id))
+  selectPage.checked = checkedOnPage
+  selectPage.indeterminate = !checkedOnPage && visibleIds.some((id) => selectedQuestionIds.has(id))
+  if (hideBtn) hideBtn.disabled = visibleCount === 0
+  if (restoreBtn) {
+    restoreBtn.disabled = hiddenCount === 0
+    restoreBtn.style.display = isAdmin ? "" : "none"
+  }
+  if (deleteBtn) deleteBtn.textContent = isAdmin ? "Xoa da chon" : "An da chon"
+
+  if (!selectedCount) {
+    summary.textContent = "Chưa chọn câu nào."
+    return
+  }
+
+  summary.textContent =
+    `Đã chọn ${selectedCount} câu` +
+    (hiddenCount ? ` • ${hiddenCount} câu đang ẩn` : "") +
+    (!isAdmin ? " • Xóa sẽ chuyển thành ẩn" : "")
+}
+
+function toggleQuestionSelection(id, force) {
+  const shouldSelect = typeof force === "boolean" ? force : !selectedQuestionIds.has(id)
+  if (shouldSelect) selectedQuestionIds.add(id)
+  else selectedQuestionIds.delete(id)
+  updateBulkBar()
+}
+
+window.toggleQuestionSelection = toggleQuestionSelection
+
+function clearQuestionSelection() {
+  selectedQuestionIds.clear()
+  document.querySelectorAll(".row-selector").forEach((input) => {
+    input.checked = false
+  })
+  updateBulkBar()
+}
+
+window.clearQuestionSelection = clearQuestionSelection
+
+function toggleSelectVisible(force) {
+  const pageList = getVisiblePageQuestions()
+  pageList.forEach((q) => {
+    if (force) selectedQuestionIds.add(q.id)
+    else selectedQuestionIds.delete(q.id)
+  })
+  render()
+}
+
+function getSelectedQuestions() {
+  return questions.filter((q) => selectedQuestionIds.has(q.id))
+}
+
+async function hideSelectedQuestions() {
+  const selected = getSelectedQuestions().filter((q) => !q.hidden)
+  if (!selected.length) {
+    alert("Chưa có câu nào phù hợp để ẩn.")
+    return
+  }
+  if (!confirm(`Ẩn ${selected.length} câu đã chọn?`)) return
+  const ids = selected.map((q) => q.id)
+  const res = await sb.from("question_bank").update({ hidden: true }).in("id", ids)
+  if (res.error) {
+    alert(res.error.message)
+    return
+  }
+  if (isAdmin) {
+    await window.AppAdminTools?.recordAudit?.("question_bulk_hide", {
+      target_type: "question",
+      question_ids: ids,
+      total: ids.length,
+    })
+  }
+  clearQuestionSelection()
+  loadQuestions()
+}
+
+async function restoreSelectedQuestions() {
+  const selected = getSelectedQuestions().filter((q) => q.hidden)
+  if (!selected.length) {
+    alert("Không có câu ẩn nào trong phần đã chọn để khôi phục.")
+    return
+  }
+  if (!confirm(`Khôi phục ${selected.length} câu đã chọn?`)) return
+  const ids = selected.map((q) => q.id)
+  const res = await sb.from("question_bank").update({ hidden: false }).in("id", ids)
+  if (res.error) {
+    alert(res.error.message)
+    return
+  }
+  if (isAdmin) {
+    await window.AppAdminTools?.recordAudit?.("question_bulk_restore", {
+      target_type: "question",
+      question_ids: ids,
+      total: ids.length,
+    })
+  }
+  clearQuestionSelection()
+  loadQuestions()
+}
+
+async function deleteSelectedQuestions() {
+  const selected = getSelectedQuestions()
+  if (!selected.length) {
+    alert("Chưa chọn câu nào để xóa.")
+    return
+  }
+
+  if (!isAdmin) {
+    return hideSelectedQuestions()
+  }
+
+  if (
+    !confirm(
+      `Đang chọn ${selected.length} câu. Hệ thống sẽ bỏ qua các câu còn nằm trong đề thi và xóa vĩnh viễn các câu hợp lệ. Tiếp tục?`
+    )
+  ) {
+    return
+  }
+
+  const ids = selected.map((q) => q.id)
+  const { data: usages, error: usageError } = await sb
+    .from("exam_questions")
+    .select("question_id")
+    .in("question_id", ids)
+
+  if (usageError) {
+    alert("Lỗi kiểm tra đề thi: " + usageError.message)
+    return
+  }
+
+  const blockedIds = new Set((usages || []).map((item) => item.question_id))
+  const deletableIds = ids.filter((id) => !blockedIds.has(id))
+
+  if (!deletableIds.length) {
+    alert("Tất cả các câu đã chọn đều đang nằm trong đề thi, chưa thể xóa.")
+    return
+  }
+
+  const answerDeleteRes = await sb.from("exam_answers").delete().in("question_id", deletableIds)
+  if (answerDeleteRes.error) {
+    alert("Không xóa được bài làm gắn với các câu đã chọn: " + answerDeleteRes.error.message)
+    return
+  }
+
+  const deleteRes = await sb.from("question_bank").delete().in("id", deletableIds)
+  if (deleteRes.error) {
+    alert("Không thể xóa câu hỏi: " + deleteRes.error.message)
+    return
+  }
+
+  await window.AppAdminTools?.recordAudit?.("question_bulk_delete", {
+    target_type: "question",
+    question_ids: deletableIds,
+    blocked_question_ids: [...blockedIds],
+    deleted_total: deletableIds.length,
+    blocked_total: blockedIds.size,
+  })
+
+  clearQuestionSelection()
+  await loadQuestions()
+  alert(
+    blockedIds.size
+      ? `Đã xóa ${deletableIds.length} câu. Bỏ qua ${blockedIds.size} câu vì vẫn đang nằm trong đề thi.`
+      : `Đã xóa ${deletableIds.length} câu đã chọn.`
+  )
+}
+
+window.hideSelectedQuestions = hideSelectedQuestions
+window.restoreSelectedQuestions = restoreSelectedQuestions
+window.deleteSelectedQuestions = deleteSelectedQuestions
+
 function getScopeKey(items) {
   return (items || []).map((item) => item.id).sort().join("|")
 }
@@ -260,6 +461,7 @@ function render() {
   currentPage = Math.min(currentPage, totalPages)
   const startIndex = (currentPage - 1) * PAGE_SIZE
   const pageList = list.slice(startIndex, startIndex + PAGE_SIZE)
+  pruneQuestionSelection()
 
   questionTable.innerHTML = pageList.length
     ? pageList
@@ -267,6 +469,7 @@ function render() {
           const faded = q.hidden ? "faded" : ""
           const hidden = q.hidden ? `style="opacity:.45"` : ""
           const missingAnswer = isAnswerMissing(q)
+          const checked = selectedQuestionIds.has(q.id) ? "checked" : ""
           const rowClass = [
             missingAnswer ? "row-missing-answer" : "",
           ].filter(Boolean).join(" ")
@@ -277,6 +480,9 @@ function render() {
 
           return `
       <tr class="q-row ${rowClass}" onclick="editQ('${q.id}')" title="Click để sửa câu hỏi" ${hidden}>
+        <td class="selectCol ${faded}" onclick="event.stopPropagation()">
+          <input type="checkbox" class="row-selector" ${checked} onchange="toggleQuestionSelection('${q.id}', this.checked)">
+        </td>
         <td class="${faded}">${startIndex + i + 1}</td>
         <td class="questionCell ${faded}">
           <div class="questionText">${escapeHtml(q.question_text || "").replace(/\n/g, "<br>")}${hiddenBadge}</div>
@@ -294,12 +500,13 @@ function render() {
       </tr>`
         })
         .join("")
-    : `<tr><td colspan="11" style="text-align:center;padding:28px;color:var(--ink-light)">Chưa có câu hỏi phù hợp với bộ lọc hiện tại.</td></tr>`
+    : `<tr><td colspan="12" style="text-align:center;padding:28px;color:var(--ink-light)">Chưa có câu hỏi phù hợp với bộ lọc hiện tại.</td></tr>`
 
   document.querySelectorAll(".q-row").forEach((r) => {
     r.style.cursor = "pointer"
   })
   updateQuickActionStats()
+  updateBulkBar(pageList)
   renderPagination(totalItems, totalPages, pageList.length, startIndex)
 }
 
@@ -868,6 +1075,10 @@ document.getElementById("questionNextPage")?.addEventListener("click", () => {
   if (currentPage >= totalPages) return
   currentPage += 1
   render()
+})
+
+document.getElementById("bulkSelectPage")?.addEventListener("change", (event) => {
+  toggleSelectVisible(Boolean(event.target?.checked))
 })
 
 document.getElementById("duplicateReview")?.addEventListener("click", (event) => {
