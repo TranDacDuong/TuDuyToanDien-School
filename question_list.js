@@ -4,9 +4,12 @@ let editingQuestionId = null
 let isAdmin = false
 let currentPage = 1
 const PAGE_SIZE = 25
+const FUZZY_THRESHOLD = 0.86
+const MAX_FUZZY_RESULTS = 3
 
 const formTitle = document.getElementById("formTitle")
 const saveBtn = document.getElementById("saveBtn")
+const duplicateStatusFilter = document.getElementById("f_duplicate_status")
 const answerStatusFilter = document.getElementById("f_answer_status")
 const typeText = {
   multi_choice: "Nhiều lựa chọn",
@@ -14,6 +17,11 @@ const typeText = {
   short_answer: "Trả lời ngắn",
   essay: "Tự luận",
 }
+
+let exactDuplicateIds = new Set()
+let fuzzySuggestionMap = new Map()
+let fuzzyAuditScopeKey = ""
+let fuzzyAuditLabel = ""
 
 function resetToFirstPage() {
   currentPage = 1
@@ -78,6 +86,20 @@ f_type.onchange = () => {
   render()
 }
 
+if (duplicateStatusFilter) {
+  duplicateStatusFilter.onchange = async () => {
+    resetToFirstPage()
+    if (duplicateStatusFilter.value === "fuzzy" || duplicateStatusFilter.value === "any") {
+      const scopeQuestions = getBaseFilteredQuestions()
+      if (!isFuzzyScopeFresh(scopeQuestions)) {
+        await runDuplicateAudit()
+        return
+      }
+    }
+    render()
+  }
+}
+
 if (answerStatusFilter) {
   answerStatusFilter.onchange = () => {
     resetToFirstPage()
@@ -117,8 +139,71 @@ async function loadQuestions() {
     return
   }
 
-  questions = data || []
+  questions = (data || []).map(prepareQuestionRecord)
+  recomputeExactDuplicates()
+  invalidateFuzzyAudit()
+  exposeDuplicateHelpers()
   render()
+}
+
+function prepareQuestionRecord(q) {
+  const normalized = normalizeDuplicateText(q?.question_text || "")
+  return {
+    ...q,
+    _normalized_text: normalized,
+    _token_set: buildTokenSet(normalized),
+  }
+}
+
+function normalizeDuplicateText(text) {
+  return String(text || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\\dfrac/g, "\\frac")
+    .replace(/^\s*cau\s*\d+\s*[:.)-]?\s*/i, "")
+    .replace(/\[bang\]|\[\/bang\]/g, " ")
+    .replace(/[|]/g, " ")
+    .replace(/[\r\n]+/g, " ")
+    .replace(/[“”"']/g, " ")
+    .replace(/[.,;!?]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function buildTokenSet(normalized) {
+  return new Set(
+    String(normalized || "")
+      .split(" ")
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 2)
+  )
+}
+
+function buildQuestionSnapshot(q) {
+  return {
+    id: q.id,
+    question_type: q.question_type || "essay",
+    chapter_id: q.chapter_id || "",
+    question_text: q.question_text || "",
+    normalized_text: q._normalized_text || normalizeDuplicateText(q.question_text || ""),
+    token_set: q._token_set || buildTokenSet(q._normalized_text || normalizeDuplicateText(q.question_text || "")),
+  }
+}
+
+function recomputeExactDuplicates() {
+  const groups = new Map()
+  questions.forEach((q) => {
+    if (!q._normalized_text) return
+    const list = groups.get(q._normalized_text) || []
+    list.push(q.id)
+    groups.set(q._normalized_text, list)
+  })
+
+  exactDuplicateIds = new Set()
+  groups.forEach((ids) => {
+    if (ids.length > 1) ids.forEach((id) => exactDuplicateIds.add(id))
+  })
 }
 
 function isAnswerMissing(q) {
@@ -126,23 +211,52 @@ function isAnswerMissing(q) {
   return !answer
 }
 
-function getFilteredQuestions() {
+function getDuplicateState(q) {
+  if (exactDuplicateIds.has(q.id)) return "exact"
+  if (fuzzySuggestionMap.has(q.id)) return "fuzzy"
+  return ""
+}
+
+function getBaseFilteredQuestions() {
   let list = [...questions]
 
   if (!isAdmin) list = list.filter((q) => !q.hidden)
-
   if (f_grade.value) list = list.filter((q) => q.chapters?.subjects?.grades?.id == f_grade.value)
   if (f_subject.value) list = list.filter((q) => q.chapters?.subjects?.id == f_subject.value)
   if (f_chapter.value) list = list.filter((q) => q.chapter_id == f_chapter.value)
   if (f_type.value) list = list.filter((q) => q.question_type === f_type.value)
-  if (answerStatusFilter?.value === "missing") list = list.filter(isAnswerMissing)
-  if (answerStatusFilter?.value === "complete") list = list.filter((q) => !isAnswerMissing(q))
   if (f_difficulty.value) list = list.filter((q) => q.difficulty == f_difficulty.value)
 
   const creatorEl = document.getElementById("f_creator")
   if (creatorEl?.value) list = list.filter((q) => q.created_by === creatorEl.value)
 
   return list
+}
+
+function getFilteredQuestions() {
+  let list = getBaseFilteredQuestions()
+
+  if (duplicateStatusFilter?.value === "exact") list = list.filter((q) => getDuplicateState(q) === "exact")
+  if (duplicateStatusFilter?.value === "fuzzy") list = list.filter((q) => getDuplicateState(q) === "fuzzy")
+  if (duplicateStatusFilter?.value === "any") list = list.filter((q) => getDuplicateState(q))
+  if (answerStatusFilter?.value === "missing") list = list.filter(isAnswerMissing)
+  if (answerStatusFilter?.value === "complete") list = list.filter((q) => !isAnswerMissing(q))
+
+  return list
+}
+
+function getScopeKey(items) {
+  return (items || []).map((item) => item.id).sort().join("|")
+}
+
+function isFuzzyScopeFresh(items) {
+  return fuzzyAuditScopeKey && fuzzyAuditScopeKey === getScopeKey(items)
+}
+
+function invalidateFuzzyAudit() {
+  fuzzySuggestionMap = new Map()
+  fuzzyAuditScopeKey = ""
+  fuzzyAuditLabel = ""
 }
 
 function render() {
@@ -159,10 +273,14 @@ function render() {
           const faded = q.hidden ? "faded" : ""
           const hidden = q.hidden ? `style="opacity:.45"` : ""
           const missingAnswer = isAnswerMissing(q)
-          const rowClass = missingAnswer ? "row-missing-answer" : ""
-          const hiddenBadge = q.hidden
-            ? `<span class="hidden-badge">Ẩn</span>`
-            : ""
+          const duplicateState = getDuplicateState(q)
+          const rowClass = [
+            missingAnswer ? "row-missing-answer" : "",
+            duplicateState === "exact" ? "row-duplicate-exact" : "",
+            duplicateState === "fuzzy" ? "row-duplicate-fuzzy" : "",
+          ].filter(Boolean).join(" ")
+          const hiddenBadge = q.hidden ? `<span class="hidden-badge">Ẩn</span>` : ""
+          const duplicateBadge = buildDuplicateBadge(q)
           const statusBadge = missingAnswer
             ? `<span class="status-badge status-missing">Chưa có đáp án</span>`
             : `<span class="status-badge status-ok">${q.question_type === "essay" ? "Không bắt buộc" : "Đã có đáp án"}</span>`
@@ -171,27 +289,46 @@ function render() {
       <tr class="q-row ${rowClass}" onclick="editQ('${q.id}')" title="Click để sửa câu hỏi" ${hidden}>
         <td class="${faded}">${startIndex + i + 1}</td>
         <td class="questionCell ${faded}">
-          <div class="questionText">${q.question_text || ""}${hiddenBadge}</div>
+          <div class="questionText">${escapeHtml(q.question_text || "").replace(/\n/g, "<br>")}${hiddenBadge}</div>
           ${q.question_img ? `<div class="questionImgBox"><img class="questionImg" src="${q.question_img}" onclick="event.stopPropagation();window.open('${q.question_img}')"></div>` : ""}
         </td>
         <td class="${faded}">${q.chapters?.subjects?.grades?.name || ""}</td>
         <td class="${faded}">${q.chapters?.subjects?.name || ""}</td>
         <td class="${faded}">${q.chapters?.name || ""}</td>
         <td class="${faded}">${typeText[q.question_type] || q.question_type}</td>
+        <td class="${faded}">${duplicateBadge}</td>
         <td class="${faded}">${statusBadge}</td>
         <td class="${faded}">${q.difficulty ?? ""}</td>
         <td class="${faded}">${q.answer_count || 0}</td>
-        <td class="answerCell ${faded}">${q.answer || ""}</td>
-        <td class="${faded}" style="font-size:.78rem;color:var(--ink-mid);white-space:nowrap">${q.creator?.full_name || ""}</td>
+        <td class="answerCell ${faded}">${escapeHtml(q.answer || "")}</td>
+        <td class="${faded}" style="font-size:.78rem;color:var(--ink-mid);white-space:nowrap">${escapeHtml(q.creator?.full_name || "")}</td>
       </tr>`
         })
         .join("")
-    : `<tr><td colspan="11" style="text-align:center;padding:28px;color:var(--ink-light)">Chưa có câu hỏi phù hợp với bộ lọc hiện tại.</td></tr>`
+    : `<tr><td colspan="12" style="text-align:center;padding:28px;color:var(--ink-light)">Chưa có câu hỏi phù hợp với bộ lọc hiện tại.</td></tr>`
 
   document.querySelectorAll(".q-row").forEach((r) => {
     r.style.cursor = "pointer"
   })
   renderPagination(totalItems, totalPages, pageList.length, startIndex)
+}
+
+function buildDuplicateBadge(q) {
+  const duplicateState = getDuplicateState(q)
+  if (duplicateState === "exact") {
+    return `<span class="status-badge dup-badge-exact" title="Trùng với ít nhất một câu khác sau khi chuẩn hóa nội dung.">Trùng tuyệt đối</span>`
+  }
+
+  if (duplicateState === "fuzzy") {
+    const suggestions = fuzzySuggestionMap.get(q.id) || []
+    const top = suggestions[0]
+    const title = top
+      ? `Câu gần nhất: ${(top.question_text || "").slice(0, 160).replace(/\n/g, " ")} (${Math.round(top.score * 100)}%)`
+      : "Có câu gần giống sau khi kiểm tra trùng."
+    return `<span class="status-badge dup-badge-fuzzy" title="${escapeHtml(title)}">Có thể trùng</span>`
+  }
+
+  return `<span class="status-badge dup-badge-clean">Chưa phát hiện</span>`
 }
 
 function renderPagination(totalItems, totalPages, visibleCount, startIndex) {
@@ -202,7 +339,8 @@ function renderPagination(totalItems, totalPages, visibleCount, startIndex) {
 
   if (infoEl) {
     if (totalItems) {
-      infoEl.textContent = `Hiển thị ${startIndex + 1}-${startIndex + visibleCount} trên tổng ${totalItems} câu hỏi`
+      const suffix = fuzzyAuditLabel ? ` • ${fuzzyAuditLabel}` : ""
+      infoEl.textContent = `Hiển thị ${startIndex + 1}-${startIndex + visibleCount} trên tổng ${totalItems} câu hỏi${suffix}`
     } else {
       infoEl.textContent = "Không có câu hỏi nào để hiển thị"
     }
@@ -211,6 +349,188 @@ function renderPagination(totalItems, totalPages, visibleCount, startIndex) {
   if (statusEl) statusEl.textContent = `Trang ${currentPage}/${totalPages}`
   if (prevBtn) prevBtn.disabled = currentPage <= 1
   if (nextBtn) nextBtn.disabled = currentPage >= totalPages
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+}
+
+function sharesEnoughTokens(tokensA, tokensB) {
+  let shared = 0
+  for (const token of tokensA) {
+    if (!tokensB.has(token)) continue
+    shared += 1
+    if (shared >= 2) return true
+  }
+  return false
+}
+
+function computeTokenJaccard(tokensA, tokensB) {
+  if (!tokensA.size || !tokensB.size) return 0
+  let intersection = 0
+  for (const token of tokensA) {
+    if (tokensB.has(token)) intersection += 1
+  }
+  const union = new Set([...tokensA, ...tokensB]).size || 1
+  return intersection / union
+}
+
+function buildNgrams(text, size = 3) {
+  const compact = String(text || "").replace(/\s+/g, " ")
+  const grams = new Set()
+  if (!compact) return grams
+  if (compact.length <= size) {
+    grams.add(compact)
+    return grams
+  }
+  for (let i = 0; i <= compact.length - size; i++) {
+    grams.add(compact.slice(i, i + size))
+  }
+  return grams
+}
+
+function computeDiceSimilarity(a, b) {
+  const gramsA = buildNgrams(a)
+  const gramsB = buildNgrams(b)
+  if (!gramsA.size || !gramsB.size) return 0
+
+  let overlap = 0
+  for (const gram of gramsA) {
+    if (gramsB.has(gram)) overlap += 1
+  }
+
+  return (2 * overlap) / (gramsA.size + gramsB.size)
+}
+
+function computeSimilarity(snapshotA, snapshotB) {
+  const tokenScore = computeTokenJaccard(snapshotA.token_set, snapshotB.token_set)
+  const diceScore = computeDiceSimilarity(snapshotA.normalized_text, snapshotB.normalized_text)
+  return (tokenScore * 0.55) + (diceScore * 0.45)
+}
+
+function isCandidatePair(snapshotA, snapshotB) {
+  if (!snapshotA.normalized_text || !snapshotB.normalized_text) return false
+  if (snapshotA.question_type !== snapshotB.question_type) return false
+
+  const lenA = snapshotA.normalized_text.length
+  const lenB = snapshotB.normalized_text.length
+  if (Math.abs(lenA - lenB) > Math.max(24, Math.max(lenA, lenB) * 0.35)) return false
+  if (!sharesEnoughTokens(snapshotA.token_set, snapshotB.token_set)) return false
+
+  return true
+}
+
+function groupSnapshotsForFuzzy(items) {
+  const groups = new Map()
+  items.forEach((item) => {
+    const snapshot = buildQuestionSnapshot(item)
+    if (!snapshot.normalized_text) return
+    const key = `${snapshot.question_type}|${snapshot.chapter_id || "all"}`
+    const list = groups.get(key) || []
+    list.push(snapshot)
+    groups.set(key, list)
+  })
+  return groups
+}
+
+function computeFuzzySuggestions(items) {
+  const results = new Map()
+  const groups = groupSnapshotsForFuzzy(items)
+
+  groups.forEach((snapshots) => {
+    for (let i = 0; i < snapshots.length; i++) {
+      for (let j = i + 1; j < snapshots.length; j++) {
+        const a = snapshots[i]
+        const b = snapshots[j]
+        if (a.normalized_text === b.normalized_text) continue
+        if (!isCandidatePair(a, b)) continue
+
+        const score = computeSimilarity(a, b)
+        if (score < FUZZY_THRESHOLD) continue
+
+        pushSuggestion(results, a.id, { id: b.id, score, question_text: b.question_text })
+        pushSuggestion(results, b.id, { id: a.id, score, question_text: a.question_text })
+      }
+    }
+  })
+
+  return results
+}
+
+function pushSuggestion(map, id, suggestion) {
+  const list = map.get(id) || []
+  if (list.some((item) => item.id === suggestion.id)) return
+  list.push(suggestion)
+  list.sort((a, b) => b.score - a.score)
+  map.set(id, list.slice(0, MAX_FUZZY_RESULTS))
+}
+
+async function runDuplicateAudit() {
+  const scopeQuestions = getBaseFilteredQuestions()
+  const scopeKey = getScopeKey(scopeQuestions)
+
+  if (!scopeQuestions.length) {
+    fuzzySuggestionMap = new Map()
+    fuzzyAuditScopeKey = scopeKey
+    fuzzyAuditLabel = "Không có câu nào để kiểm tra trùng"
+    render()
+    return
+  }
+
+  fuzzySuggestionMap = computeFuzzySuggestions(scopeQuestions)
+  fuzzyAuditScopeKey = scopeKey
+  const count = fuzzySuggestionMap.size
+  fuzzyAuditLabel = count
+    ? `Đã gợi ý ${count} câu có thể trùng trong phạm vi đang lọc`
+    : "Không phát hiện câu gần trùng trong phạm vi đang lọc"
+
+  render()
+}
+
+function inspectImportedQuestions(importedQuestions) {
+  const bankSnapshots = questions.map(buildQuestionSnapshot)
+  return importedQuestions.map((question) => {
+    const snapshot = buildQuestionSnapshot(question)
+    const exactMatches = bankSnapshots.filter(
+      (candidate) =>
+        candidate.normalized_text &&
+        candidate.normalized_text === snapshot.normalized_text &&
+        candidate.question_type === snapshot.question_type
+    )
+
+    const fuzzyMatches = bankSnapshots
+      .filter((candidate) => candidate.id && candidate.normalized_text !== snapshot.normalized_text && isCandidatePair(snapshot, candidate))
+      .map((candidate) => ({
+        id: candidate.id,
+        score: computeSimilarity(snapshot, candidate),
+        question_text: candidate.question_text,
+      }))
+      .filter((candidate) => candidate.score >= FUZZY_THRESHOLD)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, MAX_FUZZY_RESULTS)
+
+    return {
+      ...question,
+      _duplicateMeta: {
+        exactMatches,
+        fuzzyMatches,
+      },
+    }
+  })
+}
+
+function exposeDuplicateHelpers() {
+  window.QuestionDuplicateShared = {
+    normalizeDuplicateText,
+    inspectImportedQuestions,
+    runDuplicateAudit,
+    getQuestionBankSnapshot: () => questions.map(buildQuestionSnapshot),
+  }
+  window.runDuplicateAudit = runDuplicateAudit
 }
 
 async function editQ(id) {

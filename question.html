@@ -126,6 +126,11 @@ td { padding: 11px 12px; border-bottom: 1px solid #eef3f8; vertical-align: middl
 .status-ok { background:#ecfdf5;color:#15803d;border-color:#86efac; }
 .status-missing { background:#fef2f2;color:#b91c1c;border-color:#fca5a5; }
 .row-missing-answer td { background:rgba(254,242,242,.78); }
+.dup-badge-exact { background:#eef2ff;color:#4338ca;border-color:#a5b4fc; }
+.dup-badge-fuzzy { background:#fff7ed;color:#c2410c;border-color:#fdba74; }
+.dup-badge-clean { background:#f8fafc;color:#475569;border-color:#cbd5e1; }
+.row-duplicate-exact td { box-shadow: inset 4px 0 0 #6366f1; }
+.row-duplicate-fuzzy td { box-shadow: inset 4px 0 0 #f97316; }
 
 .hidden-badge {
   margin-left: 6px; background: #fef3c7; color: #b45309;
@@ -326,6 +331,7 @@ button {
     <div class="page-hd-actions">
       <input type="file" id="wordImportInput" accept=".docx" style="display:none">
       <button class="btn btn-outline" type="button" onclick="document.getElementById('wordImportInput').click()">Upload file Word</button>
+      <button class="btn btn-outline" type="button" onclick="runDuplicateAudit()">Kiểm tra câu trùng</button>
       <button class="btn btn-primary" onclick="openModal()">+ Tạo câu hỏi</button>
     </div>
   </div>
@@ -343,6 +349,12 @@ button {
         <option value="true_false">Đúng/Sai</option>
         <option value="short_answer">Trả lời ngắn</option>
         <option value="essay">Tự luận</option>
+      </select>
+      <select id="f_duplicate_status">
+        <option value="">Trạng thái trùng</option>
+        <option value="exact">Trùng tuyệt đối</option>
+        <option value="fuzzy">Có thể trùng</option>
+        <option value="any">Mọi câu trùng</option>
       </select>
       <select id="f_answer_status">
         <option value="">Trạng thái đáp án</option>
@@ -365,6 +377,7 @@ button {
         <th>Môn</th>
         <th>Chương</th>
         <th>Loại</th>
+        <th>Trùng lặp</th>
         <th>Trạng thái đáp án</th>
         <th>Mức độ</th>
         <th>Số ĐA</th>
@@ -373,7 +386,7 @@ button {
       </tr>
     </thead>
     <tbody id="questionTable">
-      <tr><td colspan="11" style="text-align:center;padding:32px;color:var(--ink-light)">⏳ Đang tải câu hỏi...</td></tr>
+      <tr><td colspan="12" style="text-align:center;padding:32px;color:var(--ink-light)">⏳ Đang tải câu hỏi...</td></tr>
     </tbody>
   </table>
   <div class="pager">
@@ -460,6 +473,7 @@ button {
           </button>
           <span id="qAiHint" style="font-size:.75rem;color:var(--ink-light)">Paste ảnh rồi bấm chuyển đổi</span>
         </div>
+        <div id="qDupHint" style="display:none;font-size:.75rem;border-radius:7px;padding:6px 10px"></div>
         <!-- answerText/answerImg ẩn để tương thích với question_create.js -->
         <textarea id="answerText" style="display:none"></textarea>
         <div class="imgWrapper" id="answerImgBox" style="display:none">
@@ -787,6 +801,22 @@ function fillQuestion(idx) {
     hint.style.cssText = "font-size:.75rem;color:var(--green)";
   }
 
+  const dupHint = document.getElementById("qDupHint");
+  const exactDupCount = q._duplicateMeta?.exactMatches?.length || 0;
+  const fuzzyDupTop = q._duplicateMeta?.fuzzyMatches?.[0];
+  if (exactDupCount) {
+    dupHint.style.display = "block";
+    dupHint.textContent = `Trùng tuyệt đối với ${exactDupCount} câu đã có trong ngân hàng. Bạn nên rà lại trước khi lưu.`;
+    dupHint.style.cssText = "display:block;font-size:.75rem;color:#4338ca;background:#eef2ff;border:1px solid #a5b4fc;border-radius:7px;padding:6px 10px";
+  } else if (fuzzyDupTop) {
+    dupHint.style.display = "block";
+    dupHint.textContent = `Có thể trùng với một câu đã có (${Math.round(fuzzyDupTop.score * 100)}%). Đây là gợi ý để giáo viên kiểm tra lại.`;
+    dupHint.style.cssText = "display:block;font-size:.75rem;color:#c2410c;background:#fff7ed;border:1px solid #fdba74;border-radius:7px;padding:6px 10px";
+  } else {
+    dupHint.style.display = "none";
+    dupHint.textContent = "";
+  }
+
   // Nút Lưu — luôn lưu câu hiện tại, không tự chuyển
   const saveBtn = document.getElementById("saveBtn");
   saveBtn.textContent = "💾 Lưu câu này";
@@ -928,6 +958,8 @@ function resetQuestionForm() {
   _mqList = []; _mqIndex = 0;
   document.getElementById("qAiHint").textContent = "Paste ảnh rồi bấm chuyển đổi";
   document.getElementById("qAiHint").style.color = "";
+  document.getElementById("qDupHint").style.display = "none";
+  document.getElementById("qDupHint").textContent = "";
   clearFigure();
   _modalPastedImg = null;
   answerCount = 4; changeType();

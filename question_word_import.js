@@ -33,7 +33,10 @@
         return;
       }
 
-      openImportReviewModal(parsed.questions, parsed.warnings);
+      const enrichedQuestions = window.QuestionDuplicateShared?.inspectImportedQuestions
+        ? window.QuestionDuplicateShared.inspectImportedQuestions(parsed.questions)
+        : parsed.questions;
+      openImportReviewModal(enrichedQuestions, parsed.warnings);
     } catch (error) {
       alert("Không đọc được file Word: " + (error?.message || error));
     }
