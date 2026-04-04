@@ -531,6 +531,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
     </div>
     <div class="t-search-bar" style="grid-column:1/-1;margin-bottom:14px">
       <div class="sg"><label>Tác vụ</label><input id="logActionFilter" placeholder="VD: question_delete"></div>
+      <div class="sg"><label>Đối tượng</label><input id="logTargetFilter" placeholder="VD: course, question, class"></div>
       <div class="sg"><label>Trạng thái</label>
         <select id="logStatusFilter">
           <option value="">Tất cả</option>
@@ -539,6 +540,13 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
         </select>
       </div>
       <div class="sg"><label>Người thao tác</label><input id="logActorFilter" placeholder="Tên admin hoặc giáo viên..."></div>
+    </div>
+    <div class="s-stats" style="margin:-4px 0 14px">
+      <button class="filter-reset" type="button" onclick="applyLogQuickFilter('')">Tất cả log</button>
+      <button class="filter-reset" type="button" onclick="applyLogQuickFilter('errors')">Chỉ log lỗi</button>
+      <button class="filter-reset" type="button" onclick="applyLogQuickFilter('question')">Ngân hàng câu hỏi</button>
+      <button class="filter-reset" type="button" onclick="applyLogQuickFilter('course')">Khóa học</button>
+      <button class="filter-reset" type="button" onclick="applyLogQuickFilter('student')">Học sinh</button>
     </div>
     <div class="table-scroll">
       <table>
@@ -1279,10 +1287,12 @@ function logDetailHtml(details){
 
 function renderAdminLogs(){
   const actionNeedle = rmVN(document.getElementById('logActionFilter')?.value || '');
+  const targetNeedle = rmVN(document.getElementById('logTargetFilter')?.value || '');
   const actorNeedle = rmVN(document.getElementById('logActorFilter')?.value || '');
   const statusNeedle = document.getElementById('logStatusFilter')?.value || '';
   const rows = _adminLogs.filter(log =>
     (!actionNeedle || rmVN(log.action).includes(actionNeedle)) &&
+    (!targetNeedle || rmVN(log.target_type || '').includes(targetNeedle)) &&
     (!actorNeedle || rmVN(log.actor?.full_name || '').includes(actorNeedle)) &&
     (!statusNeedle || log.status === statusNeedle)
   );
@@ -1298,6 +1308,7 @@ function renderAdminLogs(){
       <td>
         <div style="font-weight:700;color:var(--navy)">${esc(log.actor?.full_name || '—')}</div>
         <div style="font-size:.76rem;color:var(--ink-light)">${esc(log.actor?.email || '')}</div>
+        <div style="font-size:.72rem;color:var(--ink-light)">${esc(log.actor?.role || '')}</div>
       </td>
       <td><span class="grade-badge">${esc(log.action || '')}</span></td>
       <td>
@@ -1330,14 +1341,47 @@ async function loadAdminLogs(){
   const actorIds = [...new Set(rows.map(item => item.actor_id).filter(Boolean))];
   let actorMap = {};
   if(actorIds.length){
-    const { data: actors } = await sb.from('users').select('id,full_name,email').in('id', actorIds);
+    const { data: actors } = await sb.from('users').select('id,full_name,email,role').in('id', actorIds);
     actorMap = Object.fromEntries((actors || []).map(actor => [actor.id, actor]));
   }
   _adminLogs = rows.map(item => ({ ...item, actor: actorMap[item.actor_id] || null }));
+  applyAdminLogQueryFilters();
   renderAdminLogs();
 }
 
-['logActionFilter','logActorFilter'].forEach(id=>{
+function applyLogQuickFilter(mode){
+  const actionEl = document.getElementById('logActionFilter');
+  const targetEl = document.getElementById('logTargetFilter');
+  const statusEl = document.getElementById('logStatusFilter');
+  const actorEl = document.getElementById('logActorFilter');
+  if(actionEl) actionEl.value = '';
+  if(targetEl) targetEl.value = '';
+  if(statusEl) statusEl.value = '';
+  if(actorEl) actorEl.value = '';
+  if(mode === 'errors' && statusEl) statusEl.value = 'error';
+  if(mode === 'question' && targetEl) targetEl.value = 'question';
+  if(mode === 'course' && targetEl) targetEl.value = 'course';
+  if(mode === 'student' && targetEl) targetEl.value = 'student';
+  renderAdminLogs();
+}
+
+function applyAdminLogQueryFilters(){
+  const url = new URL(window.location.href);
+  const action = url.searchParams.get('logAction') || '';
+  const target = url.searchParams.get('logTarget') || '';
+  const status = url.searchParams.get('logStatus') || '';
+  const actor = url.searchParams.get('logActor') || '';
+  const actionEl = document.getElementById('logActionFilter');
+  const targetEl = document.getElementById('logTargetFilter');
+  const statusEl = document.getElementById('logStatusFilter');
+  const actorEl = document.getElementById('logActorFilter');
+  if(actionEl) actionEl.value = action;
+  if(targetEl) targetEl.value = target;
+  if(statusEl) statusEl.value = status;
+  if(actorEl) actorEl.value = actor;
+}
+
+['logActionFilter','logTargetFilter','logActorFilter'].forEach(id=>{
   const el = document.getElementById(id);
   if(!el) return;
   let t;

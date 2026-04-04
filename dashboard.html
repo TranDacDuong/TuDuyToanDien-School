@@ -496,7 +496,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
             <button class="ops-action" type="button" onclick="openDashboardPage('question.html?answer=missing')"><strong>Rà câu thiếu đáp án</strong><span>Mở Ngân hàng câu hỏi với bộ lọc chỉ còn các câu đang để trống đáp án.</span></button>
             <button class="ops-action" type="button" onclick="openDashboardPage('question.html?focus=duplicates')"><strong>Rà câu trùng</strong><span>Đi thẳng vào popup kiểm tra câu trùng trong phạm vi hiện có.</span></button>
             <button class="ops-action" type="button" onclick="openDashboardPage('exam.html')"><strong>Tạo hoặc nhân bản đề</strong><span>Mở khu quản lý đề để tạo đề mới hoặc clone từ đề đã dùng ổn định.</span></button>
-            <button class="ops-action" type="button" onclick="openDashboardPage('sourcedata.html?tab=adminLogs')"><strong>Mở nhật ký vận hành</strong><span>Xem nhanh các thao tác import, xóa, clone và lỗi vận hành gần đây.</span></button>
+            <button class="ops-action" type="button" onclick="openDashboardPage('sourcedata.html?tab=adminLogs&logStatus=error')"><strong>Mở nhật ký vận hành</strong><span>Xem nhanh các lỗi vận hành gần đây hoặc lọc tiếp theo tác vụ, đối tượng và người thao tác.</span></button>
           </div>
         </div>
         <div class="ops-card">
@@ -660,9 +660,9 @@ async function loadAdminOps(){
     const alerts = [];
     if(missingAnswerCount) alerts.push(buildOpsAlert(`${missingAnswerCount} câu hỏi chưa có đáp án`, "Đây là nhóm dễ gây lỗi khi tạo đề hoặc nhập dữ liệu hàng loạt. Nên rà trước.", "question.html?answer=missing", "danger", "Rà ngay"));
     if(duplicateCount) alerts.push(buildOpsAlert(`${duplicateCount} câu nghi trùng`, "Dữ liệu trùng làm giáo viên khó chọn câu đúng và dễ tạo đề lặp.", "question.html?focus=duplicates", "warn", "Kiểm tra"));
-    if(requestCount) alerts.push(buildOpsAlert(`${requestCount} yêu cầu đăng ký khóa học đang chờ`, "Nên xử lý sớm để học sinh vào học đúng tiến độ và tránh tồn đọng.", "courses.html", "warn", "Mở khóa học"));
+    if(requestCount) alerts.push(buildOpsAlert(`${requestCount} yêu cầu đăng ký khóa học đang chờ`, "Nên xử lý sớm để học sinh vào học đúng tiến độ và tránh tồn đọng.", "courses.html?focus=requests", "warn", "Mở khóa học"));
     if(tuitionMissingCount) alerts.push(buildOpsAlert(`${tuitionMissingCount} học sinh còn thiếu học phí tháng này`, "Theo dõi sớm giúp hạn chế dồn nợ sang các tháng sau.", "tuition.html", "", "Xem học phí"));
-    if(adminErrorCount) alerts.push(buildOpsAlert(`${adminErrorCount} thao tác admin gần đây bị lỗi`, "Nên kiểm tra lại log thao tác để tránh dữ liệu bị bỏ dở giữa chừng.", "sourcedata.html?tab=adminLogs", "", "Mở log"));
+    if(adminErrorCount) alerts.push(buildOpsAlert(`${adminErrorCount} thao tác admin gần đây bị lỗi`, "Nên kiểm tra lại log thao tác để tránh dữ liệu bị bỏ dở giữa chừng.", "sourcedata.html?tab=adminLogs&logStatus=error", "", "Mở log"));
 
     alertsEl.innerHTML = alerts.length ? alerts.join("") : '<div class="ops-empty">Hiện chưa có cảnh báo vận hành nổi bật. Hệ thống đang ở trạng thái khá sạch và ổn định.</div>';
   }catch(error){
