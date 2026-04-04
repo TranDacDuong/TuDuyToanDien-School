@@ -291,9 +291,17 @@
     if(role === "admin"){
       if(!confirm("Xóa hoàn toàn lớp này? Hành động không thể hoàn tác.")) return;
       await sb.from("classes").delete().eq("id", id);
+      await window.AppAdminTools?.recordAudit?.("class_deleted", {
+        target_type: "class",
+        target_id: id,
+      });
     } else {
       if(!confirm("Ẩn lớp này?")) return;
       await sb.from("classes").update({hidden:true}).eq("id", id);
+      await window.AppAdminTools?.recordAudit?.("class_hidden", {
+        target_type: "class",
+        target_id: id,
+      });
     }
     loadMyClasses();
   };
@@ -301,6 +309,10 @@
   window.restoreClass = async function(id){
     if(!confirm("Khôi phục lớp này?")) return;
     await getSb().from("classes").update({hidden:false}).eq("id", id);
+    await window.AppAdminTools?.recordAudit?.("class_restored", {
+      target_type: "class",
+      target_id: id,
+    });
     loadMyClasses();
   };
 

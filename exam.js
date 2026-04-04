@@ -199,6 +199,10 @@
     await sb.from("exam_questions").delete().eq("exam_id", id);
     const { error } = await sb.from("exams").delete().eq("id", id);
     if (error) { alert("Lỗi: " + error.message); return; }
+    window.AppAdminTools?.recordAudit?.("exam_deleted", {
+      target_type: "exam",
+      target_id: id,
+    });
     loadExamList();
   };
 
@@ -278,6 +282,10 @@
     }
     const { error } = await sb.from("pdf_exams").delete().eq("id", id);
     if (error) { alert("Lỗi: " + error.message); return; }
+    window.AppAdminTools?.recordAudit?.("pdf_exam_deleted", {
+      target_type: "pdf_exam",
+      target_id: id,
+    });
     loadExamList();
   };
 
@@ -861,6 +869,7 @@
     const title    = document.getElementById("fTitle").value.trim();
     const duration = parseInt(document.getElementById("fDuration").value) || 45;
     const total    = parseFloat(document.getElementById("fTotal").value) || 10;
+    const isEditingExam = !!editingExamId;
 
     if (!title) { alert("Vui lòng nhập tên đề!"); return; }
 
@@ -901,6 +910,13 @@
       if (error) { alert("Lỗi lưu câu: " + error.message); return; }
     }
 
+    window.AppAdminTools?.recordAudit?.(isEditingExam ? "exam_updated" : "exam_created", {
+      target_type: "exam",
+      target_id: examId,
+      title,
+      question_count: examItems.length,
+      total_points: total,
+    });
     alert("Đã lưu đề thành công! ✓");
   };
 

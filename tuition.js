@@ -336,6 +336,15 @@ Nhập số tiền thu thêm lần này:`,
         amount_paid: newPaid,
         paid_at:     now,
       });
+      await window.AppAdminTools?.recordAudit?.("tuition_payment_collected", {
+        target_type: "tuition_payment",
+        target_id: paymentMap[studentId]?.id || null,
+        student_id: studentId,
+        month: ym,
+        amount_due: amountDue,
+        added_amount: addAmount,
+        amount_paid: newPaid,
+      });
       renderRows();
     } catch (err) { alert("Lỗi: " + err.message); }
   };
@@ -371,6 +380,15 @@ Nhập số tiền hoàn lại (>0):`,
         amount_paid: newPaid,
         paid_at:     newPaidAt,
       });
+      await window.AppAdminTools?.recordAudit?.("tuition_payment_refunded", {
+        target_type: "tuition_payment",
+        target_id: paymentMap[studentId]?.id || null,
+        student_id: studentId,
+        month: ym,
+        amount_due: amountDue,
+        refund_amount: refund,
+        amount_paid: newPaid,
+      });
       renderRows();
     } catch (err) { alert("Lỗi: " + err.message); }
   };
@@ -384,6 +402,13 @@ Nhập số tiền hoàn lại (>0):`,
     if (newNote === null) return;
     try {
       await upsertPayment(studentId, ym, { amount_due: amountDue, note: newNote || null });
+      await window.AppAdminTools?.recordAudit?.("tuition_note_updated", {
+        target_type: "tuition_payment",
+        target_id: paymentMap[studentId]?.id || null,
+        student_id: studentId,
+        month: ym,
+        has_note: !!(newNote || "").trim(),
+      });
       renderRows();
     } catch (err) { alert("Lỗi: " + err.message); }
   };

@@ -244,10 +244,20 @@
       if(!confirm("Xóa hoàn toàn lớp \""+_className+"\"? Hành động không thể hoàn tác.")) return;
       const { error } = await sb.from("classes").delete().eq("id",_classId);
       if(error){ alert("Lỗi xóa: "+error.message); return; }
+      await window.AppAdminTools?.recordAudit?.("class_deleted", {
+        target_type: "class",
+        target_id: _classId,
+        class_name: _className,
+      });
     } else {
       if(!confirm("Ẩn lớp \""+_className+"\"?")) return;
       const { error } = await sb.from("classes").update({hidden:true}).eq("id",_classId);
       if(error){ alert("Lỗi ẩn lớp: "+error.message); return; }
+      await window.AppAdminTools?.recordAudit?.("class_hidden", {
+        target_type: "class",
+        target_id: _classId,
+        class_name: _className,
+      });
     }
     window.closeClassView();
     if(window.loadMyClasses) window.loadMyClasses();
@@ -591,6 +601,13 @@
     }
     const st=_cachedClass.students.find(s=>s.student_id===studentId);
     if(st) st.left_at=new Date().toISOString();
+    await window.AppAdminTools?.recordAudit?.("class_student_stopped", {
+      target_type: "class_student",
+      target_id: classId,
+      class_id: classId,
+      student_id: studentId,
+      student_name: st?.user?.full_name || null,
+    });
     await renderAttendanceTab();
   };
 
@@ -711,6 +728,13 @@
     }
     const{data:userData}=await sb.from("users").select("id,full_name").eq("id",studentId).single();
     _cachedClass.students.push({id:newRow.id,student_id:studentId,joined_at:newRow.joined_at,left_at:null,user:userData});
+    await window.AppAdminTools?.recordAudit?.("class_student_added", {
+      target_type: "class_student",
+      target_id: classId,
+      class_id: classId,
+      student_id: studentId,
+      student_name: userData?.full_name || studentName || null,
+    });
     await renderAttendanceTab();
   };
 

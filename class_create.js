@@ -210,6 +210,13 @@ form.onsubmit = async (e) => {
     if(error) console.error("Lỗi lưu giáo viên:", error.message);
   }
 
+  await window.AppAdminTools?.recordAudit?.(editingClassId ? "class_updated" : "class_created", {
+    target_type: "class",
+    target_id: classId,
+    class_name,
+    teacher_count: selectedTeacherIds.size,
+    schedule_count: inserts.length,
+  });
   alert("Đã lưu lớp ✓");
   document.getElementById("createClassPopup").classList.add("hidden");
   if(window.loadMyClasses) window.loadMyClasses();
