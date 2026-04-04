@@ -1080,12 +1080,18 @@ async function getUserRole() {
   if (!user) return
   const { data } = await sb.from("users").select("role").eq("id", user.id).single()
   currentRole = data?.role || ""
+  if (!["admin", "teacher"].includes(currentRole)) {
+    window.location.href = "dashboard.html"
+    return false
+  }
   isAdmin = currentRole === "admin"
   syncAdminQuestionUi()
+  return true
 }
 
 async function init() {
-  await getUserRole()
+  const allowed = await getUserRole()
+  if (allowed === false) return
   applyQueryFilters()
   await loadGrades()
   await loadCreatorFilter()

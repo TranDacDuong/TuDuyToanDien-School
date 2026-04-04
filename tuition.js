@@ -184,7 +184,7 @@
   }
 
   function canManagePayments() {
-    return currentRole === "admin" || currentRole === "teacher";
+    return currentRole === "admin";
   }
 
   function syncToolbarVisibility() {
@@ -435,6 +435,10 @@ Nhập số tiền hoàn lại (>0):`,
       .eq("id", user.id)
       .single();
     currentRole = profile?.role || "student";
+    if (currentRole === "teacher") {
+      location.href = "dashboard.html";
+      return false;
+    }
 
     const titleEl = document.querySelector("h1");
     const subtitleEl = document.querySelector(".subtitle");
@@ -442,6 +446,7 @@ Nhập số tiền hoàn lại (>0):`,
       if (titleEl) titleEl.textContent = "Học phí của tôi";
       if (subtitleEl) subtitleEl.textContent = "Xem học phí của bạn theo từng tháng và từng lớp học";
     }
+    return true;
   }
 
   function syncToolbarVisibility() {

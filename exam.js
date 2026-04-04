@@ -60,7 +60,12 @@
     currentUser = user;
     const { data: profile } = await sb.from("users").select("role").eq("id", user.id).single();
     currentRole = String(profile?.role || "teacher");
+    if (!["admin", "teacher"].includes(currentRole)) {
+      location.href = "dashboard.html";
+      return false;
+    }
     syncExamModeUI();
+    return true;
   }
 
   function syncExamModeUI() {
