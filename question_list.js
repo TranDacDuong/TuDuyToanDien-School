@@ -11,6 +11,7 @@ const MAX_FUZZY_RESULTS = 3
 const formTitle = document.getElementById("formTitle")
 const saveBtn = document.getElementById("saveBtn")
 const answerStatusFilter = document.getElementById("f_answer_status")
+let quickAnswerStatusFilter = ""
 const typeText = {
   multi_choice: "Nhiều lựa chọn",
   true_false: "Đúng/Sai",
@@ -232,9 +233,10 @@ function getBaseFilteredQuestions() {
 
 function getFilteredQuestions() {
   let list = getBaseFilteredQuestions()
+  const activeAnswerStatus = answerStatusFilter?.value || quickAnswerStatusFilter
 
-  if (answerStatusFilter?.value === "missing") list = list.filter(isAnswerMissing)
-  if (answerStatusFilter?.value === "complete") list = list.filter((q) => !isAnswerMissing(q))
+  if (activeAnswerStatus === "missing") list = list.filter(isAnswerMissing)
+  if (activeAnswerStatus === "complete") list = list.filter((q) => !isAnswerMissing(q))
 
   return list
 }
@@ -609,12 +611,12 @@ function renderDuplicateReview() {
 
   if (!duplicateReviewGroups.length) {
     wrap.style.display = "block"
-    summary.textContent = fuzzyAuditLabel || "KhÃ´ng phÃ¡t hiá»‡n cÃ¢u trÃ¹ng trong pháº¡m vi Ä‘ang lá»c."
+    summary.textContent = fuzzyAuditLabel || "Không phát hiện câu trùng trong phạm vi đang lọc."
     groupsEl.innerHTML = `
       <div class="dup-group">
         <div class="dup-group-hd">
-          <div style="font-weight:700;color:var(--navy)">KhÃ´ng cÃ³ nhÃ³m trÃ¹ng nÃ o</div>
-          <div style="font-size:.8rem;color:var(--ink-light)">Há»‡ thá»‘ng Ä‘Ã£ cháº¡y kiá»ƒm tra trong pháº¡m vi hiá»‡n táº¡i.</div>
+          <div style="font-weight:700;color:var(--navy)">Không có nhóm trùng nào</div>
+          <div style="font-size:.8rem;color:var(--ink-light)">Hệ thống đã chạy kiểm tra trong phạm vi hiện tại.</div>
         </div>
       </div>
     `
@@ -828,7 +830,7 @@ async function runDuplicateAudit() {
   const count = fuzzySuggestionMap.size
   fuzzyAuditLabel = count
     ? `Đã gợi ý ${count} câu có thể trùng trong phạm vi đang lọc`
-    : "Không phát hiện câu gần trùng trong phạm vi đang lọc"
+    : "Không phát hiện câu trùng trong phạm vi đang lọc"
 
   render()
   renderDuplicateReview()
@@ -880,14 +882,13 @@ function exposeDuplicateHelpers() {
 
 function applyQueryFilters() {
   const answerFilter = questionPageParams.get("answer")
-  if (answerFilter === "missing" && answerStatusFilter) {
-    answerStatusFilter.value = "missing"
-  }
+  if (answerFilter === "missing") quickAnswerStatusFilter = "missing"
 }
 
 window.applyQuickQuestionAction = function (action) {
-  if (action === "missing" && answerStatusFilter) {
-    answerStatusFilter.value = "missing"
+  if (action === "missing") {
+    quickAnswerStatusFilter = quickAnswerStatusFilter === "missing" ? "" : "missing"
+    if (answerStatusFilter) answerStatusFilter.value = quickAnswerStatusFilter
     resetToFirstPage()
     render()
     return
@@ -1001,6 +1002,10 @@ async function restoreQ(id) {
     alert(error.message)
     return
   }
+  await window.AppAdminTools?.recordAudit?.("question_restore", {
+    target_type: "question",
+    target_id: id,
+  })
   closeModal?.()
   loadQuestions()
 }
@@ -1060,6 +1065,10 @@ async function deleteQ(id) {
       alert(res.error.message)
       return
     }
+    await window.AppAdminTools?.recordAudit?.("question_hide", {
+      target_type: "question",
+      target_id: id,
+    })
   }
 
   closeModal?.()

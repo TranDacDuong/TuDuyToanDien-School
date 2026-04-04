@@ -285,7 +285,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   <button class="tab" onclick="switchTab('chapters',this)">📖 Chương</button>
   <button class="tab" onclick="switchTab('teachers',this)">👨‍🏫 Giáo viên</button>
   <button class="tab" onclick="switchTab('students',this)">👩‍🎓 Học sinh</button>
-  <button class="tab" onclick="switchTab('adminLogs',this)">Nhật ký admin</button>
+  <button class="tab" onclick="switchTab('adminLogs',this)">Nhật ký vận hành</button>
 </div>
 
 <!-- ═══════ PHÒNG HỌC ═══════ -->
@@ -510,7 +510,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 <div id="adminLogs" class="panel">
   <div class="table-card">
     <div class="table-card-hd">
-      <span>Nhật ký vận hành admin</span>
+      <span>Nhật ký vận hành</span>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <span class="count-badge" id="adminLogCount">0</span>
         <button class="btn btn-outline btn-sm" type="button" onclick="loadAdminLogs()">↻ Làm mới</button>
@@ -525,14 +525,14 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
           <option value="error">Lỗi</option>
         </select>
       </div>
-      <div class="sg"><label>Người thao tác</label><input id="logActorFilter" placeholder="Tên admin..."></div>
+      <div class="sg"><label>Người thao tác</label><input id="logActorFilter" placeholder="Tên admin hoặc giáo viên..."></div>
     </div>
     <div class="table-scroll">
       <table>
         <thead>
           <tr>
             <th style="min-width:170px">Thời gian</th>
-            <th style="min-width:150px">Admin</th>
+            <th style="min-width:150px">Người thao tác</th>
             <th style="min-width:150px">Tác vụ</th>
             <th style="min-width:110px">Trạng thái</th>
             <th style="min-width:120px">Đối tượng</th>

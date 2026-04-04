@@ -425,7 +425,7 @@ button {
       <span class="quickStat" id="quickMissingCount">0 câu</span>
     </button>
     <button class="quickOp" type="button" onclick="runDuplicateAudit()">
-      <strong>Rà Câu Trùng</strong>
+      <strong>Kiểm Tra Câu Trùng</strong>
       <span>Chạy kiểm tra và mở popup nhóm câu trùng để đối chiếu ngay trong một lượt.</span>
       <span class="quickStat" id="quickDuplicateCount">0 câu</span>
     </button>
@@ -455,11 +455,6 @@ button {
         <option value="short_answer">Trả lời ngắn</option>
         <option value="essay">Tự luận</option>
       </select>
-      <select id="f_answer_status">
-        <option value="">Trạng thái đáp án</option>
-        <option value="complete">Đã có đáp án</option>
-        <option value="missing">Chưa có đáp án</option>
-      </select>
       <select id="f_difficulty"><option value="">Mức độ</option></select>
       <select id="f_creator"><option value="">Người tạo</option></select>
     </div>
@@ -476,7 +471,6 @@ button {
       <span id="bulkSelectionSummary">Chưa chọn câu nào.</span>
     </div>
     <div class="bulkActions">
-      <button class="btn btn-outline btn-sm" type="button" onclick="clearQuestionSelection()">Bỏ chọn</button>
       <button class="btn btn-outline btn-sm" id="bulkHideBtn" type="button" onclick="hideSelectedQuestions()">Ẩn đã chọn</button>
       <button class="btn btn-outline btn-sm" id="bulkRestoreBtn" type="button" onclick="restoreSelectedQuestions()">Khôi phục đã chọn</button>
       <button class="btn btn-primary btn-sm" id="bulkDeleteBtn" type="button" onclick="deleteSelectedQuestions()">Xóa đã chọn</button>
@@ -487,10 +481,10 @@ button {
     <div class="dup-review-box">
       <div class="dup-review-hd">
         <div>
-          <div style="font-family:var(--font-display);font-size:1rem;color:var(--navy)">Ra cau trung</div>
-          <div id="duplicateReviewSummary" style="font-size:.82rem;color:var(--ink-light)">Chua chay kiem tra trung.</div>
+          <div style="font-family:var(--font-display);font-size:1rem;color:var(--navy)">Kiểm tra câu trùng</div>
+          <div id="duplicateReviewSummary" style="font-size:.82rem;color:var(--ink-light)">Chưa chạy kiểm tra câu trùng.</div>
         </div>
-        <button class="btn btn-outline btn-sm" type="button" onclick="closeDuplicateReview()">Dong</button>
+        <button class="btn btn-outline btn-sm" type="button" onclick="closeDuplicateReview()">Đóng</button>
       </div>
       <div class="dup-review-groups" id="duplicateReviewGroups"></div>
     </div>

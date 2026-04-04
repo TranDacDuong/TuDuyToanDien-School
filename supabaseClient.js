@@ -46,7 +46,7 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
     async function recordAudit(action, details = {}, status = "success") {
       try {
         const profile = await getCurrentProfile();
-        if (!profile || profile.role !== "admin") return;
+        if (!profile || !["admin", "teacher"].includes(profile.role)) return;
         await sb.from("admin_action_logs").insert({
           actor_id: profile.id,
           action,
