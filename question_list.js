@@ -1151,7 +1151,7 @@ function buildAiAnswerPrompt(items) {
           "",
           "Quy tắc:",
           "- multi_choice: chỉ trả các chữ cái A-F.",
-          "- true_false: trả chuỗi kiểu aTbFcTdF theo đúng số ý.",
+          "- true_false: chỉ trả các ý đúng bằng chữ cái thường, ví dụ acd.",
           "- short_answer: trả đáp án ngắn gọn nhất có thể.",
           '- essay hoặc không chắc: để answer là chuỗi rỗng "".',
           "- Không thêm mô tả nào ngoài JSON.",
@@ -1217,6 +1217,15 @@ function normalizeAiAnswerValue(question, answerValue) {
   }
 
   if (type === "true_false") {
+    const directLetters = [...new Set(raw.toLowerCase().match(/[a-z]/g) || [])]
+      .filter((letter) => {
+        const index = letter.charCodeAt(0) - 96
+        return index >= 1 && index <= Math.max(Number(question?.answer_count) || 0, 4)
+      })
+      .sort()
+      .join("")
+    if (directLetters) return directLetters
+
     const pairMap = new Map()
     ;[...raw.matchAll(/([a-z])\s*([TF])/gi)].forEach(([, key, value]) => {
       pairMap.set(key.toLowerCase(), value.toUpperCase())
@@ -1227,7 +1236,7 @@ function normalizeAiAnswerValue(question, answerValue) {
       const key = String.fromCharCode(97 + i)
       const value = pairMap.get(key)
       if (!value) return ""
-      normalized += `${key}${value}`
+      if (value === "T") normalized += key
     }
     return normalized
   }
