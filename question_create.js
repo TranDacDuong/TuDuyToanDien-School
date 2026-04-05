@@ -114,12 +114,11 @@ async function saveQuestion(shouldClose = true) {
   if (typeVal === "true_false") {
     const boxes = document.querySelectorAll("#answerArea .answerBox");
     answerCount = boxes.length;
+    const tfStates = [];
     boxes.forEach((box, i) => {
-      // FIX: đọc từ .state (thống nhất với question.html)
-      if (box.querySelector(".state")?.innerText === "Đúng") {
-        correctAnswer += String.fromCharCode(97 + i);
-      }
+      tfStates.push(box.querySelector(".state")?.innerText === "Đúng" ? "T" : "F");
     });
+    correctAnswer = window.QuestionAnswerFormat?.encodeTrueFalseSelections?.(tfStates, answerCount) || tfStates.join("");
   }
 
   if (typeVal === "short_answer") {

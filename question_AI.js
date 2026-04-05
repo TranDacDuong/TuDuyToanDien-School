@@ -127,20 +127,18 @@
   }
 
   function normalizeTrueFalseAnswer(answer, count) {
-    const pairMap = new Map();
-    [...String(answer || "").matchAll(/([a-z])\s*([TF])/gi)]
-      .forEach(([, label, value]) => pairMap.set(label.toLowerCase(), value.toUpperCase()));
     const answerCount = Math.max(count || 4, 1);
-    let normalizedAnswer = "";
+    const source = String(answer || "").trim();
+    const normalizedAnswer =
+      window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(source, answerCount) || "";
     let missing = 0;
-    for (let i = 0; i < answerCount; i++) {
-      const label = String.fromCharCode(97 + i);
-      const value = pairMap.get(label);
-      if (!value) {
-        missing++;
-        normalizedAnswer += `${label}F`;
-      } else {
-        normalizedAnswer += `${label}${value}`;
+    if (!normalizedAnswer) missing = answerCount;
+    else {
+      const dense = source.toUpperCase().replace(/[^TF]/g, "");
+      if (dense) missing = Math.max(0, answerCount - dense.length);
+      else {
+        const pairs = [...source.matchAll(/([a-z])\s*([TF])/gi)].length;
+        missing = Math.max(0, answerCount - pairs);
       }
     }
     return { answer: normalizedAnswer, answerCount, missing };
@@ -498,7 +496,7 @@ Trich xuat TAT CA cau hoi tu anh nay. Tra ve JSON array (khong markdown, khong b
     "question_text": "Noi dung cau hoi, KHONG co Cau 1, Cau 2. Voi multi_choice: gop cau hoi + A,B,C,D vao day moi phuong an 1 dong. Voi true_false: chi ghi noi dung cau hoi chinh. Cong thuc dung LaTeX: $x^2$",
     "options": ["Y a (chi dung cho true_false)", "Y b", "Y c", "Y d"],
     "difficulty": 5,
-    "answer": "multi_choice: A/B/C/D. true_false: PHAI dien du 4 cap vi du aTbFcTdF. short_answer: dap an",
+    "answer": "multi_choice: A/B/C/D. true_false: PHAI dien du 4 ky tu vi du TFTF. short_answer: dap an",
     "answer_count": 4,
     "has_figure": false,
     "question_bbox": { "x": 0, "y": 0, "w": 800, "h": 200 }
@@ -508,7 +506,7 @@ Trich xuat TAT CA cau hoi tu anh nay. Tra ve JSON array (khong markdown, khong b
 QUY TAC QUAN TRONG:
 - Bo hoan toan Cau 1, Cau 2, so thu tu
 - true_false: 1 cau = 1 object DUY NHAT, cac y a,b,c,d de trong options, KHONG tach thanh nhieu object
-- true_false answer: PHAI dien du, vi du "aTbFcTdF" - 4 y thi 4 cap chu
+- true_false answer: PHAI dien du, vi du "TFTF" - 4 y thi 4 ky tu
 - multi_choice: gop A,B,C,D vao question_text, de options la []
 - difficulty: 1-3 de, 4-6 trung binh, 7-10 kho
 - has_figure = true chi khi co hinh ve/bieu do/do thi thuc su
@@ -892,17 +890,17 @@ QUY TAC QUAN TRONG:
       html += "</div>";
       container.innerHTML = html;
 
-    } else if (type === "true_false") {
-      const n = q.answer_count || 4;
-      let html = '<label class="field-label">Đúng/Sai <span style="font-weight:400;text-transform:none;font-size:.75rem;color:var(--ink-light)">(nội dung a,b,c,d đã có trong câu hỏi)</span></label><div class="answer-grid">';
-      for (let i = 0; i < n; i++) {
-        const lbl    = String.fromCharCode(97 + i);
-        const isTrue = answer.includes(lbl + "T");
-        html += `<div class="tf-row">
-          <div class="ans-label" style="width:22px;text-align:center;font-size:.8rem;font-weight:700;color:var(--ink-mid)">${lbl})</div>
-          <label class="tf-true"><input type="radio" name="tf_${idx}_${i}" value="T" ${isTrue?"checked":""} onchange="updateTF(${idx})"> Đúng</label>
-          <label class="tf-false"><input type="radio" name="tf_${idx}_${i}" value="F" ${!isTrue?"checked":""} onchange="updateTF(${idx})"> Sai</label>
-        </div>`;
+      } else if (type === "true_false") {
+        const n = q.answer_count || 4;
+        let html = '<label class="field-label">Đúng/Sai <span style="font-weight:400;text-transform:none;font-size:.75rem;color:var(--ink-light)">(nội dung a,b,c,d đã có trong câu hỏi)</span></label><div class="answer-grid">';
+        for (let i = 0; i < n; i++) {
+          const lbl    = String.fromCharCode(97 + i);
+          const isTrue = window.QuestionAnswerFormat?.isTrueFalseStatementTrue?.(answer, i, n) || false;
+          html += `<div class="tf-row">
+            <div class="ans-label" style="width:22px;text-align:center;font-size:.8rem;font-weight:700;color:var(--ink-mid)">${lbl})</div>
+            <label class="tf-true"><input type="radio" name="tf_${idx}_${i}" value="T" ${isTrue?"checked":""} onchange="updateTF(${idx})"> Đúng</label>
+            <label class="tf-false"><input type="radio" name="tf_${idx}_${i}" value="F" ${!isTrue?"checked":""} onchange="updateTF(${idx})"> Sai</label>
+          </div>`;
       }
       html += "</div>";
       container.innerHTML = html;
@@ -940,13 +938,13 @@ QUY TAC QUAN TRONG:
   window.updateTF = (idx) => {
     if (!_questions[idx]) return;
     const n = _questions[idx].answer_count||4;
-    let ans = "";
+    const states = [];
     for (let i=0;i<n;i++) {
-      const lbl = String.fromCharCode(97+i);
       const val = document.querySelector(`input[name="tf_${idx}_${i}"]:checked`)?.value;
-      if (val) ans += lbl+val;
+      states.push(String(val || "F").toUpperCase() === "T" ? "T" : "F");
     }
-    _questions[idx].answer = ans;
+    _questions[idx].answer =
+      window.QuestionAnswerFormat?.encodeTrueFalseSelections?.(states, n) || states.join("");
   };
   window.changeQuestionType = (idx,t) => {
     if (!_questions[idx]) return;

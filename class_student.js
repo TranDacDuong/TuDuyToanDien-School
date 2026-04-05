@@ -644,11 +644,11 @@
               <div style="display:flex;align-items:center;gap:${isCompactMobile ? "10px" : "12px"};flex-shrink:0;white-space:nowrap;padding-top:2px;flex-wrap:${isCompactMobile ? "wrap" : "nowrap"};justify-content:${isCompactMobile ? "flex-start" : "flex-end"}">
                 <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.86rem;color:#15803d;font-weight:700">
                   <input type="radio" name="tf_${qid}_${lbl}" value="T" onchange="window.peTF('${qid}')"
-                    ${saved.includes(lbl+"T")?"checked":""} style="accent-color:#16a34a;width:16px;height:16px"> Đúng
+                    ${(window.QuestionAnswerFormat?.isTrueFalseStatementTrue?.(saved, index, n) || false) ? "checked" : ""} style="accent-color:#16a34a;width:16px;height:16px"> Đúng
                 </label>
                 <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.86rem;color:#b91c1c;font-weight:700">
                   <input type="radio" name="tf_${qid}_${lbl}" value="F" onchange="window.peTF('${qid}')"
-                    ${saved.includes(lbl+"F")?"checked":""} style="accent-color:#dc2626;width:16px;height:16px"> Sai
+                    ${(window.QuestionAnswerFormat?.isTrueFalseStatementTrue?.(saved, index, n) || false) ? "" : "checked"} style="accent-color:#dc2626;width:16px;height:16px"> Sai
                 </label>
               </div>
             </div>`).join("")}`;
@@ -900,15 +900,15 @@
         if (val) answers[qid] = val;
 
       } else if (type === "true_false") {
-        let val = "";
-        for (let i = 0; i < n; i++) {
-          const lbl = String.fromCharCode(97 + i);
-          const rT  = document.querySelector(`input[name="tf_${qid}_${lbl}"][value="T"]`);
-          const rF  = document.querySelector(`input[name="tf_${qid}_${lbl}"][value="F"]`);
-          if (rT?.checked) val += lbl + "T";
-          else if (rF?.checked) val += lbl + "F";
-        }
-        if (val) answers[qid] = val;
+          const tfStates = [];
+          for (let i = 0; i < n; i++) {
+            const lbl = String.fromCharCode(97 + i);
+            const rT  = document.querySelector(`input[name="tf_${qid}_${lbl}"][value="T"]`);
+            const rF  = document.querySelector(`input[name="tf_${qid}_${lbl}"][value="F"]`);
+            tfStates.push(rT?.checked ? "T" : "F");
+          }
+          const val = window.QuestionAnswerFormat?.encodeTrueFalseSelections?.(tfStates, n) || tfStates.join("");
+          if (val) answers[qid] = val;
 
       } else if (type === "short_answer") {
         const inputs = document.querySelectorAll(`input[oninput*="${qid}"]`);
@@ -1015,11 +1015,13 @@
       } else if (type === "true_false") {
         const labels = []; for (let i=0;i<n;i++) labels.push(String.fromCharCode(97+i));
         let correctCount = 0;
-        labels.forEach(lbl => {
-          const studentChoice = ans.includes(lbl+"T") ? "T" : (ans.includes(lbl+"F") ? "F" : "");
-          const correctChoice = correct.includes(lbl) ? "T" : "F";
-          if (studentChoice === correctChoice) correctCount++;
-        });
+          const normalizedStudent = window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(ans, n) || "";
+          const normalizedCorrect = window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(correct, n) || "";
+          labels.forEach((lbl, index) => {
+            const studentChoice = normalizedStudent[index] || "";
+            const correctChoice = normalizedCorrect[index] || "";
+            if (studentChoice === correctChoice) correctCount++;
+          });
         isCorrect   = correctCount === n;
         scoreEarned = (partial && partial[correctCount] !== undefined) ? partial[correctCount] : (isCorrect ? eq.points : 0);
       } else if (type === "short_answer") {

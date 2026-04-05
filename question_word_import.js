@@ -772,12 +772,13 @@
       );
     if (!looksLikeTrueFalse) return null;
 
-    const answerTokens = matches
-      .map((item) => {
-        const token = extractTrueFalseToken(item.label, rawAnswer);
-        return token ? `${item.label}${token}` : "";
-      })
-      .join("");
+    const hasRawAnswer = Boolean(String(rawAnswer || "").trim());
+    const answerTokensRaw = hasRawAnswer
+      ? matches.map((item) => extractTrueFalseToken(item.label, rawAnswer) || "F").join("")
+      : "";
+    const answerTokens = hasRawAnswer
+      ? (window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(answerTokensRaw, matches.length) || answerTokensRaw)
+      : "";
     warnings.push(`Câu ${index + 1}: hệ thống nhận đây là câu Đúng/Sai, bạn nên rà lại từng mệnh đề trước khi lưu.`);
     const questionStem = normalizeMathText(preparedBody.slice(0, matches[0]?.index || 0).trim());
     return {

@@ -1006,14 +1006,14 @@
               <div style="display:flex;align-items:center;gap:${isCompactMobile ? "10px" : "12px"};flex-shrink:0;white-space:nowrap;padding-top:2px;flex-wrap:${isCompactMobile ? "wrap" : "nowrap"};justify-content:${isCompactMobile ? "flex-start" : "flex-end"}">
                 <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.86rem;color:#15803d;font-weight:700">
                   <input type="radio" name="tf_${qid}_${lbl}" value="T" onchange="window.peTF('${qid}')"
-                    ${saved.includes(lbl+"T")?"checked":""} style="accent-color:#16a34a;width:16px;height:16px"> Đúng
-                </label>
-                <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.86rem;color:#b91c1c;font-weight:700">
-                  <input type="radio" name="tf_${qid}_${lbl}" value="F" onchange="window.peTF('${qid}')"
-                    ${saved.includes(lbl+"F")?"checked":""} style="accent-color:#dc2626;width:16px;height:16px"> Sai
-                </label>
-              </div>
-            </div>`).join("")}`;
+                    ${(window.QuestionAnswerFormat?.isTrueFalseStatementTrue?.(saved, index, n) || false) ? "checked" : ""} style="accent-color:#16a34a;width:16px;height:16px"> Đúng
+                  </label>
+                  <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.86rem;color:#b91c1c;font-weight:700">
+                    <input type="radio" name="tf_${qid}_${lbl}" value="F" onchange="window.peTF('${qid}')"
+                    ${(window.QuestionAnswerFormat?.isTrueFalseStatementTrue?.(saved, index, n) || false) ? "" : "checked"} style="accent-color:#dc2626;width:16px;height:16px"> Sai
+                  </label>
+                </div>
+              </div>`).join("")}`;
         } else if (type === "short_answer") {
           ansHtml = `<div style="font-size:.74rem;font-weight:800;color:var(--ink-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Câu trả lời</div><input type="text" placeholder="Nhập câu trả lời..."
             value="${(_examAnswers[qid]||"").replace(/"/g,"&quot;")}"
@@ -1195,11 +1195,18 @@
   };
   window.peTF = function(qid) {
     const radios = document.querySelectorAll(`input[name^="tf_${qid}_"]`);
-    let val=""; const seen=new Set();
+    const states = [];
+    const seen=new Set();
     radios.forEach(r=>{
-      if(r.checked){ const lbl=r.name.split("_").pop(); if(!seen.has(lbl)){seen.add(lbl);val+=lbl+r.value;} }
+      if (r.checked) {
+        const lbl = r.name.split("_").pop();
+        if (!seen.has(lbl)) {
+          seen.add(lbl);
+          states.push(String(r.value || "F").toUpperCase() === "T" ? "T" : "F");
+        }
+      }
     });
-    _examAnswers[qid]=val;
+    _examAnswers[qid] = window.QuestionAnswerFormat?.encodeTrueFalseSelections?.(states, states.length || 4) || states.join("");
     _examLocalDirty = true;
     persistExamDraft();
     setExamSyncState(navigator.onLine ? "saving" : "offline", navigator.onLine ? "Đã lưu cục bộ, chờ đồng bộ..." : "Mất mạng, đang giữ bản cục bộ");
@@ -1299,14 +1306,16 @@
         const cSet=new Set(correct.toUpperCase().split("").filter(c=>/[A-Z]/.test(c)));
         isCorrect=sSet.size===cSet.size&&[...sSet].every(c=>cSet.has(c));
         scoreEarned=isCorrect?(eq.points||0):0;
-      } else if (type==="true_false") {
-        const lbls=[]; for(let i=0;i<n;i++) lbls.push(String.fromCharCode(97+i));
-        let cnt=0;
-        lbls.forEach(lbl=>{
-          const sc=ans.includes(lbl+"T")?"T":(ans.includes(lbl+"F")?"F":"");
-          const cc=correct.includes(lbl)?"T":"F";
-          if(sc===cc) cnt++;
-        });
+        } else if (type==="true_false") {
+          const lbls=[]; for(let i=0;i<n;i++) lbls.push(String.fromCharCode(97+i));
+          const normalizedStudent = window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(ans, n) || "";
+          const normalizedCorrect = window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(correct, n) || "";
+          let cnt=0;
+          lbls.forEach((lbl, index)=>{
+            const sc = normalizedStudent[index] || "";
+            const cc = normalizedCorrect[index] || "";
+            if(sc===cc) cnt++;
+          });
         isCorrect=cnt===n;
         scoreEarned=(partial&&partial[cnt]!==undefined)?partial[cnt]:(isCorrect?eq.points:0);
       } else if (type==="short_answer") {

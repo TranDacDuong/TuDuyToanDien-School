@@ -73,6 +73,80 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
     };
   })();
 
+  window.QuestionAnswerFormat = (function () {
+    function getTrueFalseCount(answer, fallback = 4) {
+      const direct = String(answer || "").trim();
+      if (!direct) return Math.max(1, Number(fallback) || 4);
+      const dense = direct.toUpperCase().replace(/[^TF]/g, "");
+      if (dense) return Math.max(1, dense.length, Number(fallback) || 0);
+      const pairMatches = [...direct.matchAll(/([a-z])\s*([TF])/gi)];
+      if (pairMatches.length) return Math.max(1, pairMatches.length, Number(fallback) || 0);
+      const letters = [...new Set(direct.toLowerCase().match(/[a-z]/g) || [])]
+        .map((letter) => letter.charCodeAt(0) - 96)
+        .filter((index) => index >= 1);
+      return Math.max(1, ...(letters.length ? letters : [0]), Number(fallback) || 0);
+    }
+
+    function normalizeTrueFalseAnswer(answer, fallback = 4) {
+      const source = String(answer || "").trim();
+      if (!source) return "";
+      const count = getTrueFalseCount(source, fallback);
+
+      const dense = source.toUpperCase().replace(/[^TF]/g, "");
+      if (dense && dense.length >= count) {
+        return dense.slice(0, count);
+      }
+
+      const pairMap = new Map();
+      [...source.matchAll(/([a-z])\s*([TF])/gi)].forEach(([, label, value]) => {
+        pairMap.set(label.toLowerCase(), value.toUpperCase());
+      });
+      if (pairMap.size) {
+        let result = "";
+        for (let i = 0; i < count; i++) {
+          const label = String.fromCharCode(97 + i);
+          result += pairMap.get(label) || "F";
+        }
+        return result;
+      }
+
+      const trueLetters = new Set(
+        [...new Set(source.toLowerCase().match(/[a-z]/g) || [])]
+          .map((letter) => letter.toLowerCase())
+      );
+      if (!trueLetters.size) return "";
+      let result = "";
+      for (let i = 0; i < count; i++) {
+        const label = String.fromCharCode(97 + i);
+        result += trueLetters.has(label) ? "T" : "F";
+      }
+      return result;
+    }
+
+    function isTrueFalseStatementTrue(answer, index, fallback = 4) {
+      const normalized = normalizeTrueFalseAnswer(answer, fallback);
+      if (!normalized) return false;
+      return normalized[index] === "T";
+    }
+
+    function encodeTrueFalseSelections(values, fallback = 4) {
+      const arr = Array.isArray(values) ? values : [];
+      const count = Math.max(Number(fallback) || 0, arr.length, 1);
+      let result = "";
+      for (let i = 0; i < count; i++) {
+        result += String(arr[i] || "F").toUpperCase() === "T" ? "T" : "F";
+      }
+      return result;
+    }
+
+    return {
+      getTrueFalseCount,
+      normalizeTrueFalseAnswer,
+      isTrueFalseStatementTrue,
+      encodeTrueFalseSelections,
+    };
+  })();
+
   window.AppAdminTools = (function () {
     let cachedProfile = null;
     let profileLoadedAt = 0;

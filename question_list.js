@@ -1151,7 +1151,7 @@ function buildAiAnswerPrompt(items) {
           "",
           "Quy tắc:",
           "- multi_choice: chỉ trả các chữ cái A-F.",
-          "- true_false: chỉ trả các ý đúng bằng chữ cái thường, ví dụ acd.",
+          '- true_false: trả đủ chuỗi T/F theo thứ tự các ý, ví dụ TFTF. Nếu cả 4 ý đều sai thì trả FFFF.',
           "- short_answer: trả đáp án ngắn gọn nhất có thể.",
           '- essay hoặc không chắc: để answer là chuỗi rỗng "".',
           "- Không thêm mô tả nào ngoài JSON.",
@@ -1217,28 +1217,12 @@ function normalizeAiAnswerValue(question, answerValue) {
   }
 
   if (type === "true_false") {
-    const directLetters = [...new Set(raw.toLowerCase().match(/[a-z]/g) || [])]
-      .filter((letter) => {
-        const index = letter.charCodeAt(0) - 96
-        return index >= 1 && index <= Math.max(Number(question?.answer_count) || 0, 4)
-      })
-      .sort()
-      .join("")
-    if (directLetters) return directLetters
-
-    const pairMap = new Map()
-    ;[...raw.matchAll(/([a-z])\s*([TF])/gi)].forEach(([, key, value]) => {
-      pairMap.set(key.toLowerCase(), value.toUpperCase())
-    })
-    const count = Math.max(Number(question?.answer_count) || 0, 1)
-    let normalized = ""
-    for (let i = 0; i < count; i++) {
-      const key = String.fromCharCode(97 + i)
-      const value = pairMap.get(key)
-      if (!value) return ""
-      if (value === "T") normalized += key
-    }
-    return normalized
+    return (
+      window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(
+        raw,
+        Math.max(Number(question?.answer_count) || 0, 4)
+      ) || ""
+    )
   }
 
   if (type === "short_answer") {
@@ -1377,9 +1361,14 @@ async function editQ(id) {
   }
 
   if (q.question_type === "true_false") {
+    const tfCount = Math.max(Number(q.answer_count) || 0, boxes.length || 4)
     boxes.forEach((box, idx) => {
       const st = box.querySelector(".state")
-      if (st) st.innerText = q.answer.includes(String.fromCharCode(97 + idx)) ? "Đúng" : "Sai"
+      if (st) {
+        st.innerText = window.QuestionAnswerFormat?.isTrueFalseStatementTrue?.(q.answer, idx, tfCount)
+          ? "Đúng"
+          : "Sai"
+      }
     })
   }
 
