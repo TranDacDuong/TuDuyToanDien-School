@@ -264,7 +264,7 @@ h1 { font-size:32px; margin-bottom:8px; font-family:var(--font-display); color:#
       <button id="modeNormalBtn" class="active" type="button" onclick="switchExamMode('normal')">Đề thường</button>
       <button id="modePdfBtn" type="button" onclick="switchExamMode('pdf')">Đề PDF</button>
     </div>
-    <button class="btn" onclick="openEditor(null)">+ Tạo đề mới</button>
+    <button class="btn" data-testid="exam-create-button" onclick="openEditor(null)">+ Tạo đề mới</button>
   </div>
   <div class="exam-grid" id="examGrid">
     <p style="color:var(--muted);font-size:13px">Đang tải...</p>

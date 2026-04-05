@@ -10,11 +10,11 @@ test.describe("Role UI regression", () => {
     await loginAs(page, teacherCreds);
 
     await page.goto("/question.html");
-    await page.locator(".quickOp").nth(3).click();
+    await page.getByTestId("question-quick-create").click();
     await expect(page.locator("#questionText")).toBeVisible();
 
     await page.goto("/exam.html");
-    await page.locator("button.btn").first().click();
+    await page.getByTestId("exam-create-button").click();
     await expect(page.locator("#fTitle")).toBeVisible();
   });
 
@@ -26,6 +26,6 @@ test.describe("Role UI regression", () => {
     await expect(page.getByText("Học phí của tôi")).toBeVisible();
 
     await page.goto("/courses.html");
-    await expect(page.locator("#openCreateBtn")).toBeHidden();
+    await expect(page.getByTestId("course-create-button")).toBeHidden();
   });
 });

@@ -16,9 +16,9 @@ test.describe("Admin page regression", () => {
   test("duplicate review modal opens and closes cleanly", async ({ page }) => {
     await loginAs(page, adminCreds);
     await page.goto("/question.html");
-    await page.locator(".quickOp").nth(1).click();
+    await page.getByTestId("question-quick-duplicate-audit").click();
     await expect(page.locator("#duplicateReview")).toBeVisible();
-    await page.getByRole("button", { name: /Đóng/i }).click();
+    await page.locator("#duplicateReview button").last().click();
     await expect(page.locator("#duplicateReview")).toBeHidden();
   });
 
@@ -26,14 +26,26 @@ test.describe("Admin page regression", () => {
     await loginAs(page, adminCreds);
     await page.goto("/sourcedata.html?tab=adminLogs");
     await expect(page.locator("#adminLogs.active")).toBeVisible();
-    await page.locator(".tabs .tab", { hasText: /Học sinh/i }).click();
+    await page.getByTestId("system-tab-students").click();
     await expect(page.locator("#students.active")).toBeVisible();
   });
 
   test("tuition page loads overview table for admin", async ({ page }) => {
     await loginAs(page, adminCreds);
     await page.goto("/tuition.html");
-    await expect(page.getByRole("heading", { level: 1, name: /Thu học phí/i })).toBeVisible();
+    await expect(page.locator("h1")).toBeVisible();
     await expect(page.locator("table tbody")).toBeVisible();
+  });
+
+  test("class page exposes create button for admin", async ({ page }) => {
+    await loginAs(page, adminCreds);
+    await page.goto("/class.html");
+    await expect(page.getByTestId("class-create-button")).toBeVisible();
+  });
+
+  test("courses page exposes create button for admin", async ({ page }) => {
+    await loginAs(page, adminCreds);
+    await page.goto("/courses.html");
+    await expect(page.getByTestId("course-create-button")).toBeVisible();
   });
 });

@@ -292,13 +292,13 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 
 <!-- Tabs -->
 <div class="tabs">
-  <button class="tab active" onclick="switchTab('rooms',this)">🏫 Phòng học</button>
-  <button class="tab" onclick="switchTab('grades',this)">🏛 Khối</button>
-  <button class="tab" onclick="switchTab('subjects',this)">📚 Môn học</button>
-  <button class="tab" onclick="switchTab('chapters',this)">📖 Chương</button>
-  <button class="tab" onclick="switchTab('teachers',this)">👨‍🏫 Giáo viên</button>
-  <button class="tab" onclick="switchTab('students',this)">👩‍🎓 Học sinh</button>
-  <button class="tab" onclick="switchTab('adminLogs',this)">Nhật ký vận hành</button>
+  <button class="tab active" data-testid="system-tab-rooms" onclick="switchTab('rooms',this)">🏫 Phòng học</button>
+  <button class="tab" data-testid="system-tab-grades" onclick="switchTab('grades',this)">🏛 Khối</button>
+  <button class="tab" data-testid="system-tab-subjects" onclick="switchTab('subjects',this)">📚 Môn học</button>
+  <button class="tab" data-testid="system-tab-chapters" onclick="switchTab('chapters',this)">📖 Chương</button>
+  <button class="tab" data-testid="system-tab-teachers" onclick="switchTab('teachers',this)">👨‍🏫 Giáo viên</button>
+  <button class="tab" data-testid="system-tab-students" onclick="switchTab('students',this)">👩‍🎓 Học sinh</button>
+  <button class="tab" data-testid="system-tab-logs" onclick="switchTab('adminLogs',this)">Nhật ký vận hành</button>
 </div>
 
 <!-- ═══════ PHÒNG HỌC ═══════ -->

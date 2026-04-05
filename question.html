@@ -424,22 +424,22 @@ button {
   </div>
 
   <div class="quickOps">
-    <button class="quickOp" type="button" onclick="applyQuickQuestionAction('missing')">
+    <button class="quickOp" data-testid="question-quick-missing-answer" type="button" onclick="applyQuickQuestionAction('missing')">
       <strong>Câu Thiếu Đáp Án</strong>
       <span>Mở ngay bộ lọc chỉ còn các câu chưa có đáp án để rà nhanh trước khi ra đề.</span>
       <span class="quickStat" id="quickMissingCount">0 câu</span>
     </button>
-    <button class="quickOp" type="button" onclick="runDuplicateAudit()">
+    <button class="quickOp" data-testid="question-quick-duplicate-audit" type="button" onclick="runDuplicateAudit()">
       <strong>Kiểm tra câu trùng</strong>
       <span>Chạy kiểm tra và mở popup nhóm câu trùng để đối chiếu ngay trong một lượt.</span>
       <span class="quickStat" id="quickDuplicateCount">0 câu</span>
     </button>
-    <button class="quickOp" type="button" onclick="document.getElementById('wordImportInput').click()">
+    <button class="quickOp" data-testid="question-quick-import-word" type="button" onclick="document.getElementById('wordImportInput').click()">
       <strong>Nhập Từ Word</strong>
       <span>Đưa file `.docx` vào popup tạo câu hỏi để giáo viên duyệt và lưu từng câu.</span>
       <span class="quickStat">DOCX</span>
     </button>
-    <button class="quickOp" type="button" onclick="openModal()">
+    <button class="quickOp" data-testid="question-quick-create" type="button" onclick="openModal()">
       <strong>Tạo Nhanh Câu Hỏi</strong>
       <span>Mở form tạo câu hỏi ngay để thêm câu mới mà không cần cuộn xuống bảng.</span>
       <span class="quickStat">Form</span>
