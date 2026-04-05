@@ -37,8 +37,29 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
       return data?.user || null;
     }
 
+    async function getAccessToken() {
+      try {
+        const { data } = await sb.auth.getSession();
+        return data?.session?.access_token || "";
+      } catch (_) {
+        return "";
+      }
+    }
+
+    async function getEdgeFunctionHeaders(extraHeaders = {}) {
+      const token = await getAccessToken();
+      return {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${token || SUPABASE_KEY}`,
+        ...extraHeaders,
+      };
+    }
+
     return {
       getUser,
+      getAccessToken,
+      getEdgeFunctionHeaders,
     };
   })();
 

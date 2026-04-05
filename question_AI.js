@@ -720,13 +720,14 @@ QUY TAC QUAN TRONG:
   }
 
   async function callAI(messages) {
+    const headers = await (window.AppAuth?.getEdgeFunctionHeaders?.() || Promise.resolve({
+      "Content-Type":  "application/json",
+      "apikey":        ANON_KEY,
+      "Authorization": `Bearer ${ANON_KEY}`,
+    }));
     const res = await fetch(EDGE_URL, {
       method: "POST",
-      headers: {
-        "Content-Type":  "application/json",
-        "apikey":        ANON_KEY,
-        "Authorization": `Bearer ${ANON_KEY}`,
-      },
+      headers,
       body: JSON.stringify({ messages }),
     });
     const data = await res.json();

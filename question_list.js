@@ -1180,13 +1180,15 @@ function extractAiJsonArray(raw) {
 }
 
 async function callAiAnswerBatch(items) {
-  const response = await fetch(QUESTION_AI_URL, {
-    method: "POST",
-    headers: {
+  const headers = await (window.AppAuth?.getEdgeFunctionHeaders?.() ||
+    Promise.resolve({
       "Content-Type": "application/json",
       apikey: QUESTION_AI_ANON_KEY,
       Authorization: `Bearer ${QUESTION_AI_ANON_KEY}`,
-    },
+    }))
+  const response = await fetch(QUESTION_AI_URL, {
+    method: "POST",
+    headers,
     body: JSON.stringify({ messages: buildAiAnswerPrompt(items) }),
   })
 
