@@ -797,30 +797,21 @@
   function getOverlay() { return document.getElementById("examOverlay"); }
 
   function buildQuestionReportButton(question, context = {}) {
-    if (_role !== "student" || !question?.id) return "";
-    const encode = (value) => encodeURIComponent(String(value || ""))
-    const stem = encode(String(question.question_text || "").split(/\r?\n/).slice(0, 6).join("\n"))
-    const sourceMode = encode(context.sourceMode || "review")
-    const publicExamId = encode(context.publicExamId || _peId || "")
-    const examResultId = encode(context.examResultId || _examResultId || "")
-    return `<button type="button"
-      onclick="window.openQuestionIssueFromExam('${question.id}', '${stem}', '${publicExamId}', '${examResultId}', '${sourceMode}')"
-      style="margin-top:10px;border:1px solid rgba(245,158,11,.28);background:#fff7ed;color:#b45309;padding:7px 10px;border-radius:999px;font-size:.76rem;font-weight:800;cursor:pointer;font-family:var(--font-body)">
-      Báo lỗi câu hỏi
-    </button>`
-  }
-
-  window.openQuestionIssueFromExam = function(questionId, questionStem, publicExamId, examResultId, sourceMode) {
-    const decode = (value) => {
-      try { return decodeURIComponent(String(value || "")) } catch (_) { return String(value || "") }
-    }
-    window.PublicExamSupport?.openQuestionReportModal?.({
-      questionId,
-      questionStem: decode(questionStem),
-      publicExamId: decode(publicExamId) || _peId || null,
-      examResultId: decode(examResultId) || _examResultId || null,
-      sourceMode: decode(sourceMode) || "review",
+    if (_role !== "student" || !question?.id) return null
+    const button = document.createElement("button")
+    button.type = "button"
+    button.textContent = "Báo lỗi câu hỏi"
+    button.style.cssText = "margin-top:10px;border:1px solid rgba(245,158,11,.28);background:#fff7ed;color:#b45309;padding:7px 10px;border-radius:999px;font-size:.76rem;font-weight:800;cursor:pointer;font-family:var(--font-body)"
+    button.addEventListener("click", () => {
+      window.PublicExamSupport?.openQuestionReportModal?.({
+        questionId: question.id,
+        questionStem: String(question.question_text || "").split(/\r?\n/).slice(0, 6).join("\n"),
+        publicExamId: context.publicExamId || _peId || null,
+        examResultId: context.examResultId || _examResultId || null,
+        sourceMode: context.sourceMode || "review",
+      })
     })
+    return button
   }
 
   window.startPublicExam = async function(peId, examId, examTitle, durationMin, totalPoints, examType) {
@@ -1087,13 +1078,12 @@
         }
 
         if (_role === "student") {
-          const reportWrap = document.createElement("div")
-          reportWrap.innerHTML = buildQuestionReportButton(q, {
+          const reportButton = buildQuestionReportButton(q, {
             sourceMode: "live_exam",
             publicExamId: _peId,
             examResultId: _examResultId,
           })
-          if (reportWrap.firstChild) questionPart.appendChild(reportWrap.firstChild)
+          if (reportButton) questionPart.appendChild(reportButton)
         }
 
         const answerPart = document.createElement("div");
@@ -1497,13 +1487,12 @@
         }
 
         if (_role === "student") {
-          const reportWrap = document.createElement("div")
-          reportWrap.innerHTML = buildQuestionReportButton(q, {
+          const reportButton = buildQuestionReportButton(q, {
             sourceMode: "review",
             publicExamId: peId,
             examResultId: resultId,
           })
-          if (reportWrap.firstChild) qPart.appendChild(reportWrap.firstChild)
+          if (reportButton) qPart.appendChild(reportButton)
         }
         body.appendChild(qPart);
 
