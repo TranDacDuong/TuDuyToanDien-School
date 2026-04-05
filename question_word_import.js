@@ -525,7 +525,7 @@
     const rawAnswer = String(answerMatch?.[1] || "").trim();
     const answer = normalizeChoiceAnswer(rawAnswer);
     const hadImage = /\[HINH\]/u.test(content);
-    const body = normalizeMathText((answerMatch ? content.replace(answerMatch[0], " ").trim() : content).replace(/\[HINH\]/gu, "").trim());
+    const body = normalizeMathText((answerMatch ? content.replace(answerMatch[0], " ").trim() : content).replace(/\[HINH\]/gu, "\n").trim());
     const trueFalseParsed = tryParseTrueFalseQuestion(body, rawAnswer, index, warnings);
     if (trueFalseParsed) {
       if (hadImage) {
