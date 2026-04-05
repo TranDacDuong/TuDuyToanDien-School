@@ -450,7 +450,8 @@
 
     if (!matches.length) {
       const numberedBlocks = splitNumberedBlocks(text);
-      return numberedBlocks.length ? numberedBlocks : (text ? [text] : []);
+      const baseBlocks = numberedBlocks.length ? numberedBlocks : (text ? [text] : []);
+      return baseBlocks.flatMap(splitEmbeddedQuestionHeaders).filter(Boolean);
 
     }
     const blocks = [];
@@ -461,7 +462,7 @@
       const block = text.slice(start, end).trim();
       if (block) blocks.push(block);
     }
-    return blocks;
+    return blocks.flatMap(splitEmbeddedQuestionHeaders).filter(Boolean);
   }
 
   function splitNumberedBlocks(text) {
@@ -478,6 +479,32 @@
       if (block) blocks.push(block);
     }
     return blocks;
+  }
+
+  function splitEmbeddedQuestionHeaders(block) {
+    const source = String(block || "").trim();
+    if (!source) return [];
+
+    const headerRegex = /(?:C\S*u|Cau)\s*\d+\b\s*[:.)-]?/giu;
+    const splitPoints = [0];
+    let match;
+
+    while ((match = headerRegex.exec(source)) !== null) {
+      if (match.index === 0) continue;
+      const prefix = source.slice(Math.max(0, match.index - 120), match.index);
+      const hasHardBoundary = /(?:\$\s*|[.?!]\s*|\\right\s*\.\s*|\\end\{(?:array|align\*?|cases|matrix|pmatrix|bmatrix|vmatrix|Vmatrix)\}\$?\s*)$/iu.test(prefix);
+      if (hasHardBoundary) splitPoints.push(match.index);
+    }
+
+    if (splitPoints.length === 1) return [source];
+    splitPoints.push(source.length);
+
+    const parts = [];
+    for (let i = 0; i < splitPoints.length - 1; i++) {
+      const part = source.slice(splitPoints[i], splitPoints[i + 1]).trim();
+      if (part) parts.push(part);
+    }
+    return parts;
   }
 
   function parseQuestionBlock(block, index) {
