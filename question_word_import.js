@@ -521,7 +521,7 @@
       return { question: null, warnings: [`Câu ${index + 1} trống nên đã bị bỏ qua.`] };
     }
 
-    const answerMatch = content.match(/(?:^|\n|\s)(?:Đáp án đúng|Đáp án|Dap an dung|Dap an|DAP AN|ĐA|DA)\s*[:\-]?\s*([^\n]+)/iu);
+    const answerMatch = content.match(/(?:^|\n|\s)(?:Đáp án đúng|Đáp án|Dap an dung|Dap an|DAP AN|\bĐA\b|\bDA\b)\s*[:\-]?\s*([^\n]+)/iu);
     const rawAnswer = String(answerMatch?.[1] || "").trim();
     const answer = normalizeChoiceAnswer(rawAnswer);
     const hadImage = /\[HINH\]/u.test(content);
