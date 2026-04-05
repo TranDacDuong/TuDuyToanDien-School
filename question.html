@@ -990,6 +990,10 @@ function fillQuestion(idx) {
 
   updateQPreview();
   clearFigure();
+  if (q.question_img && window.showFigure) {
+    window._modalFigureBase64 = q.question_img;
+    showFigure(q.question_img);
+  }
 
   // Progress bar
   const prog = document.getElementById("qProgress");

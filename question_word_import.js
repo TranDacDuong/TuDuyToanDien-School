@@ -26,8 +26,8 @@
         window.mammoth.convertToHtml({ arrayBuffer }),
       ]);
 
-      const sourceText = buildStructuredWordText(htmlResult?.value || "", rawResult?.value || "");
-      const parsed = parseWordQuestions(sourceText);
+      const source = buildStructuredWordSource(htmlResult?.value || "", rawResult?.value || "");
+      const parsed = parseWordQuestions(source.text, source.images);
       if (!parsed.questions.length) {
         alert("Không tìm thấy câu hỏi hợp lệ trong file Word. Hãy kiểm tra file có mốc như 'Câu 1', 'A.', 'B.' không.");
         return;
@@ -49,15 +49,16 @@
     }
   }
 
-  function buildStructuredWordText(html, rawFallback) {
+  function buildStructuredWordSource(html, rawFallback) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html || "", "text/html");
-    const pieces = extractBlockPieces(doc.body || doc.documentElement);
+    const images = {};
+    const pieces = extractBlockPieces(doc.body || doc.documentElement, images);
     const combined = normalizeWordText(pieces.join("\n"));
-    return combined || normalizeWordText(rawFallback);
+    return { text: combined || normalizeWordText(rawFallback), images };
   }
 
-  function extractBlockPieces(root) {
+  function extractBlockPieces(root, images) {
     const pieces = [];
     if (!root) return pieces;
 
@@ -72,7 +73,7 @@
       const tag = child.tagName.toLowerCase();
 
       if (tag === "ol" || tag === "ul") {
-        pieces.push(...extractListPieces(child, getListDepth(child)));
+        pieces.push(...extractListPieces(child, getListDepth(child), images));
         continue;
       }
 
@@ -91,7 +92,7 @@
       }
 
       if (tag === "img") {
-        pieces.push("[HINH]");
+        pieces.push(registerImageMarker(child, images));
         continue;
       }
 
@@ -100,13 +101,14 @@
       );
 
       if (nestedBlockChildren.length) {
-        pieces.push(...extractBlockPieces(child));
+        pieces.push(...extractBlockPieces(child, images));
         continue;
       }
 
       const text = cleanInlineText(child.textContent);
       if (text || child.querySelector?.("img")) {
-        const prefix = child.querySelector?.("img") ? "[HINH] " : "";
+        const imgMarker = child.querySelector?.("img") ? registerImageMarker(child.querySelector("img"), images) : "";
+        const prefix = imgMarker ? `${imgMarker} ` : "";
         pieces.push(tag === "li" ? `- ${prefix}${text}`.trim() : `${prefix}${text}`.trim());
       }
     }
@@ -114,7 +116,7 @@
     return pieces;
   }
 
-  function extractListPieces(listEl, depth) {
+  function extractListPieces(listEl, depth, images) {
     const pieces = [];
     const items = Array.from(listEl.children || []).filter(
       (child) => child.tagName && child.tagName.toLowerCase() === "li"
@@ -137,7 +139,7 @@
         const tag = child.tagName.toLowerCase();
 
         if (tag === "ol" || tag === "ul") {
-          const nested = extractListPieces(child, depth + 1);
+          const nested = extractListPieces(child, depth + 1, images);
           if (nested.length) textParts.push(nested.join("\n"));
           continue;
         }
@@ -149,13 +151,14 @@
         }
 
         if (tag === "img") {
-          textParts.push("[HINH]");
+          textParts.push(registerImageMarker(child, images));
           continue;
         }
 
         const text = cleanInlineText(child.textContent);
         if (text || child.querySelector?.("img")) {
-          textParts.push(`${child.querySelector?.("img") ? "[HINH] " : ""}${text}`.trim());
+          const imgMarker = child.querySelector?.("img") ? registerImageMarker(child.querySelector("img"), images) : "";
+          textParts.push(`${imgMarker ? `${imgMarker} ` : ""}${text}`.trim());
         }
       }
 
@@ -166,6 +169,16 @@
     });
 
     return pieces;
+  }
+
+  function registerImageMarker(imgEl, images) {
+    const src = String(imgEl?.getAttribute?.("src") || imgEl?.src || "").trim();
+    if (!src) return "[HINH]";
+    const existingId = Object.keys(images).find((key) => images[key] === src);
+    if (existingId) return `[HINH_${existingId}]`;
+    const nextId = String(Object.keys(images).length + 1);
+    images[nextId] = src;
+    return `[HINH_${nextId}]`;
   }
 
   function isBlockLikeTag(tag) {
@@ -333,14 +346,14 @@
     return `\n\\[\\begin{array}{${columnSpec}} \\hline ${latexRows.join(" ")} \\end{array}\\]\n`;
   }
 
-  function parseWordQuestions(rawText) {
+  function parseWordQuestions(rawText, imageMap = {}) {
     const text = normalizeMathText(normalizeWordText(rawText));
     const blocks = splitQuestionBlocks(text);
     const questions = [];
     const warnings = [];
 
     blocks.forEach((block, index) => {
-      const parsed = parseQuestionBlock(block, index);
+      const parsed = parseQuestionBlock(block, index, imageMap);
       if (parsed.question) questions.push(parsed.question);
       if (parsed.warnings.length) warnings.push(...parsed.warnings);
     });
@@ -507,7 +520,7 @@
     return parts;
   }
 
-  function parseQuestionBlock(block, index) {
+  function parseQuestionBlock(block, index, imageMap = {}) {
     const warnings = [];
     const withoutHeader = block
       .replace(/^\s*(?:C\S*u|Cau)\s*\d+\b\s*[:.)-]?\s*/iu, "")
@@ -524,9 +537,15 @@
     const answerMatch = content.match(/(?:^|\n|\s)(?:Đáp án đúng|Đáp án|Dap an dung|Dap an|DAP AN|\bĐA\b|\bDA\b)\s*[:\-]?\s*([^\n]+)/iu);
     const rawAnswer = String(answerMatch?.[1] || "").trim();
     const answer = normalizeChoiceAnswer(rawAnswer);
-    const hadImage = /\[HINH\]/u.test(content);
-    const body = normalizeMathText((answerMatch ? content.replace(answerMatch[0], " ").trim() : content).replace(/\[HINH\]/gu, "\n").trim());
-    const trueFalseParsed = tryParseTrueFalseQuestion(body, rawAnswer, index, warnings);
+    const contentWithoutAnswer = answerMatch ? content.replace(answerMatch[0], " ").trim() : content;
+    const imageIds = Array.from(contentWithoutAnswer.matchAll(/\[HINH_(\d+)\]|\[HINH\]/gu))
+      .map((match) => match[1] || "")
+      .filter(Boolean);
+    const questionImage = imageIds.length ? (imageMap[imageIds[0]] || null) : null;
+    const hadImage = imageIds.length > 0 || /\[HINH\]/u.test(contentWithoutAnswer);
+    const body = normalizeMathText(contentWithoutAnswer.replace(/\[HINH(?:_\d+)?\]/gu, "\n").trim());
+    const imageMeta = { hadImage, questionImage };
+    const trueFalseParsed = tryParseTrueFalseQuestion(body, rawAnswer, index, warnings, imageMeta);
     if (trueFalseParsed) {
       if (hadImage) {
         trueFalseParsed.question._importWarnings.push(`Câu ${index + 1}: có ảnh trong file Word, bạn nên kiểm tra lại hình trước khi lưu.`);
@@ -546,7 +565,7 @@
     let confidence = hasTable ? 0.66 : 0.78;
 
     if (!hasChoiceSet) {
-      const shortAnswerParsed = tryParseShortAnswerQuestion(body, rawAnswer, index, warnings);
+      const shortAnswerParsed = tryParseShortAnswerQuestion(body, rawAnswer, index, warnings, imageMeta);
       if (shortAnswerParsed) {
         if (hadImage) {
           shortAnswerParsed.question._importWarnings.push(`Câu ${index + 1}: có ảnh trong file Word, bạn nên kiểm tra lại hình trước khi lưu.`);
@@ -564,7 +583,8 @@
           difficulty: 5,
           answer: "",
           answer_count: 1,
-          has_figure: false,
+          has_figure: hadImage,
+          question_img: questionImage,
           _importConfidence: 0.45,
           _importWarnings: warnings.slice(),
         },
@@ -592,7 +612,8 @@
           difficulty: 5,
           answer: "",
           answer_count: 1,
-          has_figure: false,
+          has_figure: hadImage,
+          question_img: questionImage,
           _importConfidence: 0.5,
           _importWarnings: warnings.slice(),
         },
@@ -644,7 +665,8 @@
         difficulty: 5,
         answer,
         answer_count: required.length,
-        has_figure: false,
+        has_figure: hadImage,
+        question_img: questionImage,
         _importConfidence: Math.max(0.3, Math.min(0.99, Number(confidence.toFixed(2)))),
         _importWarnings: warnings.slice(),
       },
@@ -684,7 +706,7 @@
       .trim();
   }
 
-  function tryParseShortAnswerQuestion(body, rawAnswer, index, warnings) {
+  function tryParseShortAnswerQuestion(body, rawAnswer, index, warnings, imageMeta = {}) {
     const normalizedAnswer = normalizeFreeAnswer(rawAnswer);
     if (!normalizedAnswer) {
       warnings.push(`Câu ${index + 1}: hệ thống đang để mặc định là câu trả lời ngắn vì chưa thấy đáp án hay đáp án lựa chọn.`);
@@ -696,7 +718,8 @@
           difficulty: 5,
           answer: "",
           answer_count: 1,
-          has_figure: false,
+          has_figure: !!imageMeta.hadImage,
+          question_img: imageMeta.questionImage || null,
           _importConfidence: 0.58,
           _importWarnings: warnings.slice(),
         },
@@ -713,7 +736,8 @@
         difficulty: 5,
         answer: normalizedAnswer,
         answer_count: 1,
-        has_figure: false,
+        has_figure: !!imageMeta.hadImage,
+        question_img: imageMeta.questionImage || null,
         _importConfidence: 0.68,
         _importWarnings: warnings.slice(),
       },
@@ -721,7 +745,7 @@
     };
   }
 
-  function tryParseTrueFalseQuestion(body, rawAnswer, index, warnings) {
+  function tryParseTrueFalseQuestion(body, rawAnswer, index, warnings, imageMeta = {}) {
     const matches = [];
     const preparedBody = String(body || "")
       .replace(/(\$)\s*(?=[a-d][.)\]:-]\s+)/g, "$1\n")
@@ -764,7 +788,8 @@
         difficulty: 5,
         answer: answerTokens,
         answer_count: matches.length,
-        has_figure: false,
+        has_figure: !!imageMeta.hadImage,
+        question_img: imageMeta.questionImage || null,
         _importConfidence: 0.72,
         _importWarnings: warnings.slice(),
       },
