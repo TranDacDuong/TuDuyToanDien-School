@@ -1165,6 +1165,10 @@ QUY TAC QUAN TRONG:
     btn.disabled = true; btn.textContent = "Đang lưu...";
 
     let saved = 0, errors = 0;
+    const deriveAnswerStatus = (type, answerValue) => {
+      if (type === "essay") return "reviewed";
+      return String(answerValue || "").trim() ? "reviewed" : "missing";
+    };
 
     for (let i = 0; i < _questions.length; i++) {
       const q = _questions[i]; if (!q) continue;
@@ -1185,6 +1189,7 @@ QUY TAC QUAN TRONG:
         question_text: document.getElementById("qtext_"+i)?.value?.trim() || q.question_text || null,
         question_img:  figureUrl || null,
         answer:        q.answer || null,
+        answer_status: deriveAnswerStatus(q.question_type || "multi_choice", q.answer || null),
         answer_count:  q.answer_count || (q.options?.length) || 4,
         answer_text:   null,
         answer_img:    null,

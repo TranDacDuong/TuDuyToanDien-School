@@ -7,6 +7,9 @@ let currentPage = 1
 const PAGE_SIZE = 25
 const FUZZY_THRESHOLD = 0.86
 const MAX_FUZZY_RESULTS = 3
+const AI_ANSWER_BATCH_SIZE = 15
+const QUESTION_AI_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co/functions/v1/ai-solution"
+const QUESTION_AI_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdWIiLCJyZWYiOiJsZ3lkamFhcWZ4cXpnYmRwcXZrcCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzcyMTg2NjQ0LCJleHAiOjIwODc3NjI2NDR9.l6ojk0fH5wYMK4H_RIGTepatUd1Uy2KHOTiRfAS1JD4"
 
 const formTitle = document.getElementById("formTitle")
 const saveBtn = document.getElementById("saveBtn")
@@ -250,8 +253,23 @@ function recomputeExactDuplicates() {
 }
 
 function isAnswerMissing(q) {
+  if (q?.question_type === "essay") return false
   const answer = String(q?.answer || "").trim()
   return !answer
+}
+
+function getAnswerStatusValue(q) {
+  if (q?.question_type === "essay") return "not_required"
+  if (isAnswerMissing(q)) return "missing"
+  return q?.answer_status === "ai" ? "ai" : "reviewed"
+}
+
+function getAnswerStatusMeta(q) {
+  const status = getAnswerStatusValue(q)
+  if (status === "missing") return { label: "Chưa có đáp án", className: "status-missing" }
+  if (status === "ai") return { label: "Đáp án AI", className: "status-ai" }
+  if (status === "not_required") return { label: "Không bắt buộc", className: "status-neutral" }
+  return { label: "Đã duyệt thủ công", className: "status-ok" }
 }
 
 function getDuplicateState(q) {
@@ -263,9 +281,11 @@ function getDuplicateState(q) {
 function updateQuickActionStats() {
   const missingEl = document.getElementById("quickMissingCount")
   const duplicateEl = document.getElementById("quickDuplicateCount")
+  const aiAnswerEl = document.getElementById("quickAiAnswerCount")
   const reportEl = document.getElementById("quickReportCount")
   if (missingEl) missingEl.textContent = `${questions.filter(isAnswerMissing).length} câu`
   if (duplicateEl) duplicateEl.textContent = `${exactDuplicateIds.size} câu`
+  if (aiAnswerEl) aiAnswerEl.textContent = `${questions.filter(isAnswerMissing).length} chờ xử lý`
   if (reportEl) {
     if (questionIssueTableMissing) reportEl.textContent = "Cần SQL"
     else reportEl.textContent = `${questionIssueReports.filter((item) => item.status === "new").length} mới`
@@ -576,6 +596,13 @@ function render() {
 
   document.querySelectorAll(".q-row").forEach((r) => {
     r.style.cursor = "pointer"
+  })
+  document.querySelectorAll(".q-row").forEach((row, index) => {
+    const question = pageList[index]
+    const statusCell = row.children[isAdmin ? 7 : 6]
+    if (!question || !statusCell) return
+    const meta = getAnswerStatusMeta(question)
+    statusCell.innerHTML = `<span class="status-badge ${meta.className}">${meta.label}</span>`
   })
   updateQuickActionStats()
   updateBulkBar(pageList)
@@ -1092,9 +1119,194 @@ window.applyQuickQuestionAction = function (action) {
     render()
     return
   }
+  if (action === "ai-answer") {
+    fillMissingAnswersWithAI()
+    return
+  }
   if (action === "duplicates") runDuplicateAudit()
   if (action === "reports") openQuestionIssueReview()
 }
+
+function buildAiAnswerPrompt(items) {
+  const payload = items.map((item) => ({
+    id: item.id,
+    question_type: item.question_type || "multi_choice",
+    answer_count: item.answer_count || 0,
+    question_text: item.question_text || "",
+    answer_text: item.answer_text || "",
+  }))
+
+  return [
+    {
+      role: "system",
+      content:
+        "Bạn là trợ lý chọn đáp án cho ngân hàng câu hỏi. Chỉ trả về JSON array hợp lệ, không markdown, không giải thích.",
+    },
+    {
+      role: "user",
+      content:
+        [
+          "Trả về đúng định dạng:",
+          '[{"id":"uuid","answer":"A"}]',
+          "",
+          "Quy tắc:",
+          "- multi_choice: chỉ trả các chữ cái A-F.",
+          "- true_false: trả chuỗi kiểu aTbFcTdF theo đúng số ý.",
+          "- short_answer: trả đáp án ngắn gọn nhất có thể.",
+          '- essay hoặc không chắc: để answer là chuỗi rỗng "".',
+          "- Không thêm mô tả nào ngoài JSON.",
+          "",
+          "Danh sách câu hỏi:",
+          JSON.stringify(payload),
+        ].join("\n"),
+    },
+  ]
+}
+
+function extractAiJsonArray(raw) {
+  const source = String(raw || "")
+    .trim()
+    .replace(/^```json/i, "")
+    .replace(/^```/i, "")
+    .replace(/```$/i, "")
+    .trim()
+  try {
+    return JSON.parse(source)
+  } catch {}
+  const start = source.indexOf("[")
+  const end = source.lastIndexOf("]")
+  if (start >= 0 && end > start) return JSON.parse(source.slice(start, end + 1))
+  throw new Error("Không phân tích được dữ liệu JSON từ phản hồi AI.")
+}
+
+async function callAiAnswerBatch(items) {
+  const response = await fetch(QUESTION_AI_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: QUESTION_AI_ANON_KEY,
+      Authorization: `Bearer ${QUESTION_AI_ANON_KEY}`,
+    },
+    body: JSON.stringify({ messages: buildAiAnswerPrompt(items) }),
+  })
+
+  const rawText = await response.text()
+  if (!response.ok) {
+    throw new Error(rawText || "Không gọi được AI để điền đáp án.")
+  }
+
+  try {
+    const payload = JSON.parse(rawText)
+    const merged = Array.isArray(payload?.content)
+      ? payload.content.map((part) => part?.text || "").join("")
+      : payload?.result || payload?.text || rawText
+    return extractAiJsonArray(merged)
+  } catch {
+    return extractAiJsonArray(rawText)
+  }
+}
+
+function normalizeAiAnswerValue(question, answerValue) {
+  const type = question?.question_type || "multi_choice"
+  const raw = String(answerValue || "").trim()
+  if (!raw) return ""
+
+  if (type === "multi_choice") {
+    return [...new Set(raw.toUpperCase().match(/[A-F]/g) || [])].join("")
+  }
+
+  if (type === "true_false") {
+    const pairMap = new Map()
+    ;[...raw.matchAll(/([a-z])\s*([TF])/gi)].forEach(([, key, value]) => {
+      pairMap.set(key.toLowerCase(), value.toUpperCase())
+    })
+    const count = Math.max(Number(question?.answer_count) || 0, 1)
+    let normalized = ""
+    for (let i = 0; i < count; i++) {
+      const key = String.fromCharCode(97 + i)
+      const value = pairMap.get(key)
+      if (!value) return ""
+      normalized += `${key}${value}`
+    }
+    return normalized
+  }
+
+  if (type === "short_answer") {
+    return raw.replace(/\s+/g, " ").trim()
+  }
+
+  return ""
+}
+
+async function fillMissingAnswersWithAI() {
+  const candidates = getBaseFilteredQuestions().filter(
+    (q) => q.question_type !== "essay" && isAnswerMissing(q)
+  )
+
+  if (!candidates.length) {
+    alert("Không có câu nào đang trống đáp án trong phạm vi hiện tại.")
+    return
+  }
+
+  if (
+    !confirm(
+      `Điền đáp án AI cho ${candidates.length} câu đang trống đáp án trong phạm vi hiện tại?\n\nHệ thống sẽ chạy theo từng lô ${AI_ANSWER_BATCH_SIZE} câu và gắn trạng thái Đáp án AI để giáo viên rà lại sau.`
+    )
+  ) {
+    return
+  }
+
+  const batches = []
+  for (let i = 0; i < candidates.length; i += AI_ANSWER_BATCH_SIZE) {
+    batches.push(candidates.slice(i, i + AI_ANSWER_BATCH_SIZE))
+  }
+
+  let updatedCount = 0
+  let failedCount = 0
+
+  for (const batch of batches) {
+    try {
+      const aiRows = await callAiAnswerBatch(batch)
+      const aiMap = new Map((aiRows || []).map((row) => [row?.id, row]))
+      for (const question of batch) {
+        const answer = normalizeAiAnswerValue(question, aiMap.get(question.id)?.answer)
+        if (!answer) {
+          failedCount += 1
+          continue
+        }
+        const { error } = await sb
+          .from("question_bank")
+          .update({ answer, answer_status: "ai" })
+          .eq("id", question.id)
+        if (error) throw error
+        updatedCount += 1
+      }
+    } catch (error) {
+      console.error(error)
+      failedCount += batch.length
+    }
+  }
+
+  await window.AppAdminTools?.recordAudit?.("question_ai_answers_fill", {
+    target_type: "question_bank",
+    scope: "filtered",
+    processed: candidates.length,
+    updated: updatedCount,
+    failed: failedCount,
+  })
+
+  await loadQuestions()
+  if (!updatedCount) {
+    alert("AI chưa điền được đáp án nào. Hãy thử phạm vi nhỏ hơn hoặc rà lại nội dung câu hỏi.")
+    return
+  }
+  alert(
+    `AI đã điền đáp án cho ${updatedCount} câu.` +
+      (failedCount ? `\n${failedCount} câu vẫn cần giáo viên kiểm tra thủ công.` : "")
+  )
+}
+
+window.fillMissingAnswersWithAI = fillMissingAnswersWithAI
 
 async function editQ(id) {
   const q = questions.find((x) => x.id === id)

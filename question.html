@@ -70,7 +70,7 @@ body {
 .filterBar select:focus { border-color: var(--gold); background: var(--white); }
 .quickOps {
   display:grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 16px;
 }
@@ -193,6 +193,8 @@ td { padding: 11px 12px; border-bottom: 1px solid #eef3f8; vertical-align: middl
 .faded        { opacity: .38; }
 .status-badge { display:inline-flex;align-items:center;justify-content:center;padding:3px 10px;border-radius:999px;font-size:.72rem;font-weight:700;border:1px solid transparent;white-space:nowrap; }
 .status-ok { background:#ecfdf5;color:#15803d;border-color:#86efac; }
+.status-ai { background:#fff7ed;color:#b45309;border-color:#fdba74; }
+.status-neutral { background:#f8fafc;color:#475569;border-color:#cbd5e1; }
 .status-missing { background:#fef2f2;color:#b91c1c;border-color:#fca5a5; }
 .row-missing-answer td { background:rgba(254,242,242,.78); }
 .dup-badge-exact { background:#eef2ff;color:#4338ca;border-color:#a5b4fc; }
@@ -478,6 +480,11 @@ button {
       <strong>Tạo Nhanh Câu Hỏi</strong>
       <span>Mở form tạo câu hỏi ngay để thêm câu mới mà không cần cuộn xuống bảng.</span>
       <span class="quickStat">Form</span>
+    </button>
+    <button class="quickOp" data-testid="question-quick-ai-answer" type="button" onclick="fillMissingAnswersWithAI()">
+      <strong>Điền Đáp Án AI</strong>
+      <span>Chạy AI theo từng lô cho các câu đang trống đáp án và gắn trạng thái Đáp án AI để giáo viên rà lại sau.</span>
+      <span class="quickStat" id="quickAiAnswerCount">0 chờ xử lý</span>
     </button>
     <button class="quickOp" data-testid="question-quick-report-review" type="button" onclick="openQuestionIssueReview()">
       <strong>Báo Lỗi Câu Hỏi</strong>

@@ -2604,3 +2604,24 @@ WITH CHECK (
       AND u.role IN ('admin', 'teacher')
   )
 );
+
+ALTER TABLE public.question_bank
+ADD COLUMN IF NOT EXISTS answer_status text;
+
+UPDATE public.question_bank
+SET answer_status = CASE
+  WHEN question_type = 'essay' THEN 'reviewed'
+  WHEN coalesce(trim(answer), '') = '' THEN 'missing'
+  ELSE 'reviewed'
+END
+WHERE answer_status IS NULL;
+
+ALTER TABLE public.question_bank
+DROP CONSTRAINT IF EXISTS question_bank_answer_status_check;
+
+ALTER TABLE public.question_bank
+ADD CONSTRAINT question_bank_answer_status_check
+CHECK (answer_status IN ('missing', 'ai', 'reviewed'));
+
+CREATE INDEX IF NOT EXISTS question_bank_answer_status_idx
+  ON public.question_bank (answer_status);

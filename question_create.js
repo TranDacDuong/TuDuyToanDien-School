@@ -95,6 +95,11 @@ async function saveQuestion(shouldClose = true) {
   let answerCount   = 0;
   let correctAnswer = "";
 
+  const deriveAnswerStatus = (type, answerValue) => {
+    if (type === "essay") return "reviewed"
+    return String(answerValue || "").trim() ? "reviewed" : "missing"
+  }
+
   /* ── Lấy đáp án đúng ── */
   if (typeVal === "multi_choice") {
     const boxes = document.querySelectorAll("#answerArea .answerBox");
@@ -161,6 +166,7 @@ async function saveQuestion(shouldClose = true) {
     answer_img:    answerImgBox.style.display === "block" ? answerImg.src : null,
     answer_count:  answerCount,
     answer:        correctAnswer || null,
+    answer_status: deriveAnswerStatus(typeVal, correctAnswer),
     created_by:    userId,
   };
 
