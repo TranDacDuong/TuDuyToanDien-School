@@ -358,6 +358,8 @@
       .replace(/\s+(?=(?:PH\S*N|PHAN)\s+[IVX]+)/gu, "\n")
       .replace(/([.?!])\s+(?=(?:C\S*u|Cau)\s*\d+\b)/gu, "$1\n")
       .replace(/(\$)\s+(?=(?:C\S*u|Cau)\s*\d+\b)/gu, "$1\n")
+      .replace(/(\\end\{(?:array|align\*?|cases|matrix|pmatrix|bmatrix|vmatrix|Vmatrix)\}\$?)\s+(?=(?:C\S*u|Cau)\s*\d+\b)/giu, "$1\n")
+      .replace(/(\\right\s*\.)\s+(?=(?:C\S*u|Cau)\s*\d+\b)/giu, "$1\n")
       .replace(/([.?!])\s*(?=(?:[A-F]|[a-d])[.)\]:-]\s+)/g, "$1\n")
       .replace(/[ \t]+/g, " ")
       .replace(/[ ]*\n[ ]*/g, "\n")
@@ -448,8 +450,7 @@
 
     if (!matches.length) {
       const numberedBlocks = splitNumberedBlocks(text);
-      const baseBlocks = numberedBlocks.length ? numberedBlocks : (text ? [text] : []);
-      return baseBlocks.flatMap(splitEmbeddedQuestionHeaders).filter(Boolean);
+      return numberedBlocks.length ? numberedBlocks : (text ? [text] : []);
 
     }
     const blocks = [];
@@ -460,7 +461,7 @@
       const block = text.slice(start, end).trim();
       if (block) blocks.push(block);
     }
-    return blocks.flatMap(splitEmbeddedQuestionHeaders).filter(Boolean);
+    return blocks;
   }
 
   function splitNumberedBlocks(text) {
@@ -477,16 +478,6 @@
       if (block) blocks.push(block);
     }
     return blocks;
-  }
-
-  function splitEmbeddedQuestionHeaders(block) {
-    const source = String(block || "").trim();
-    if (!source) return [];
-    const parts = source
-      .split(/\s+(?=(?:C\S*u|Cau)\s*\d+\b\s*[:.)-]?)/giu)
-      .map((part) => part.trim())
-      .filter(Boolean);
-    return parts.length ? parts : [source];
   }
 
   function parseQuestionBlock(block, index) {
@@ -636,7 +627,7 @@
 
   function findOptionMatches(body) {
     const matches = [];
-    const regex = /(^|[\s\n])(A|B|C|D|E|F)([.)\]:-])(?=\s+)/g;
+    const regex = /(^|[\s\n])(A|B|C|D|E|F)([.)\]:-])(?=\s*(?:\$|\\|[A-Za-zÀ-ỹ0-9([{]))/gu;
     let match;
 
     while ((match = regex.exec(body)) !== null) {
