@@ -493,10 +493,10 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
         <div class="ops-card">
           <h3>Thao Tác Nhanh</h3>
           <div class="ops-actions">
-            <button class="ops-action" type="button" onclick="openDashboardPage('question.html?answer=missing')"><strong>Rà câu thiếu đáp án</strong><span>Mở Ngân hàng câu hỏi với bộ lọc chỉ còn các câu đang để trống đáp án.</span></button>
-            <button class="ops-action" type="button" onclick="openDashboardPage('question.html?focus=duplicates')"><strong>Kiểm tra câu trùng</strong><span>Đi thẳng vào popup kiểm tra câu trùng trong phạm vi hiện có.</span></button>
-            <button class="ops-action" type="button" onclick="openDashboardPage('exam.html')"><strong>Tạo hoặc nhân bản đề</strong><span>Mở khu quản lý đề để tạo đề mới hoặc clone từ đề đã dùng ổn định.</span></button>
-            <button class="ops-action" type="button" onclick="openDashboardPage('sourcedata.html?tab=adminLogs&logStatus=error')"><strong>Mở nhật ký vận hành</strong><span>Xem nhanh các lỗi vận hành gần đây hoặc lọc tiếp theo tác vụ, đối tượng và người thao tác.</span></button>
+            <button class="ops-action" data-testid="dashboard-ops-missing-answer" type="button" onclick="openDashboardPage('question.html?answer=missing')"><strong>Rà câu thiếu đáp án</strong><span>Mở Ngân hàng câu hỏi với bộ lọc chỉ còn các câu đang để trống đáp án.</span></button>
+            <button class="ops-action" data-testid="dashboard-ops-duplicates" type="button" onclick="openDashboardPage('question.html?focus=duplicates')"><strong>Kiểm tra câu trùng</strong><span>Đi thẳng vào popup kiểm tra câu trùng trong phạm vi hiện có.</span></button>
+            <button class="ops-action" data-testid="dashboard-ops-exams" type="button" onclick="openDashboardPage('exam.html')"><strong>Tạo hoặc nhân bản đề</strong><span>Mở khu quản lý đề để tạo đề mới hoặc clone từ đề đã dùng ổn định.</span></button>
+            <button class="ops-action" data-testid="dashboard-ops-logs" type="button" onclick="openDashboardPage('sourcedata.html?tab=adminLogs&logStatus=error')"><strong>Mở nhật ký vận hành</strong><span>Xem nhanh các lỗi vận hành gần đây hoặc lọc tiếp theo tác vụ, đối tượng và người thao tác.</span></button>
           </div>
         </div>
         <div class="ops-card">
