@@ -399,17 +399,20 @@
       return { question: null, warnings: [`Câu ${index + 1} trống nên đã bị bỏ qua.`] };
     }
 
-    const answerMatch = content.match(/(?:^|\n|\s)(?:Đáp án đúng|Đáp án|Dap an dung|Dap an|DAP AN|ĐA|DA)\s*[:\-]?\s*([A-D])/iu);
-    const answer = answerMatch?.[1]?.toUpperCase() || "";
+    const answerMatch = content.match(/(?:^|\n|\s)(?:Đáp án đúng|Đáp án|Dap an dung|Dap an|DAP AN|ĐA|DA)\s*[:\-]?\s*([A-F,\s;và\/]+)/iu);
+    const answer = normalizeChoiceAnswer(answerMatch?.[1] || "");
     const body = answerMatch ? content.replace(answerMatch[0], " ").trim() : content;
 
     const optionMatches = findOptionMatches(body);
     const labels = optionMatches.map((match) => match.label).join("");
-    const hasFullChoiceSet = /A.*B.*C.*D/.test(labels);
+    const orderedLabels = Array.from(new Set(optionMatches.map((match) => match.label)))
+      .filter((label) => /^[A-F]$/.test(label))
+      .sort();
+    const hasChoiceSet = orderedLabels.length >= 4;
     const hasTable = /\[BẢNG\]/u.test(body);
     let confidence = hasTable ? 0.66 : 0.78;
 
-    if (!hasFullChoiceSet) {
+    if (!hasChoiceSet) {
       warnings.push(`Câu ${index + 1}: chưa tách được đủ A, B, C, D nên đang để dạng tự luận để bạn rà lại.`);
       return {
         question: {
@@ -436,7 +439,7 @@
       if (optionMap.size === 4) break;
     }
 
-    const required = ["A", "B", "C", "D"];
+    const required = orderedLabels.filter((label, idx) => idx === 0 || label.charCodeAt(0) === orderedLabels[idx - 1].charCodeAt(0) + 1);
     if (required.some((label) => !optionMap.has(label))) {
       warnings.push(`Câu ${index + 1}: thiếu ít nhất một đáp án A/B/C/D, cần kiểm tra lại.`);
       return {
@@ -481,7 +484,7 @@
       confidence -= 0.08;
     }
 
-    const inlineOptionLayout = required.every((label) => body.includes(`${label}.`) || body.includes(`${label})`));
+    const inlineOptionLayout = required.every((label) => body.includes(`${label}.`) || body.includes(`${label})`) || body.includes(`${label}:`) || body.includes(`${label}-`));
     if (!inlineOptionLayout) {
       confidence -= 0.05;
     }
@@ -493,7 +496,7 @@
         options: [],
         difficulty: 5,
         answer,
-        answer_count: 4,
+        answer_count: required.length,
         has_figure: false,
         _importConfidence: Math.max(0.3, Math.min(0.99, Number(confidence.toFixed(2)))),
         _importWarnings: warnings.slice(),
@@ -504,7 +507,7 @@
 
   function findOptionMatches(body) {
     const matches = [];
-    const regex = /(^|[\s\n])([A-Da-d])([.)\]:-])(?=\s+)/g;
+    const regex = /(^|[\s\n])([A-Fa-f])([.)\]:-])(?=\s+)/g;
     let match;
 
     while ((match = regex.exec(body)) !== null) {
@@ -519,6 +522,13 @@
     }
 
     return matches;
+  }
+
+  function normalizeChoiceAnswer(value) {
+    return String(value || "")
+      .toUpperCase()
+      .replace(/\bVÀ\b/g, "")
+      .replace(/[^A-F]/g, "");
   }
 
   function openImportReviewModal(questions, warnings) {
