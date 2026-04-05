@@ -29,6 +29,16 @@ $env:PLAYWRIGHT_STUDENT_PASSWORD="secret"
 "C:\Program Files\nodejs\npm.cmd" run test:e2e
 ```
 
+Run the main live regression packs:
+
+```powershell
+$env:PLAYWRIGHT_BASE_URL="https://tuduytoandien.vercel.app"
+$env:PLAYWRIGHT_ADMIN_EMAIL="admin@example.com"
+$env:PLAYWRIGHT_ADMIN_PASSWORD="secret"
+"C:\Program Files\nodejs\npm.cmd" run test:e2e:admin
+"C:\Program Files\nodejs\npm.cmd" run test:e2e:regression
+```
+
 Clean temporary live test data by prefix:
 
 ```powershell
