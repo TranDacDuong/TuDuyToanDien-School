@@ -25,6 +25,8 @@ let fuzzyAuditScopeKey = ""
 let fuzzyAuditLabel = ""
 let duplicateReviewGroups = []
 let selectedQuestionIds = new Set()
+let questionIssueReports = []
+let questionIssueTableMissing = false
 const questionPageParams = new URLSearchParams(window.location.search)
 
 function resetToFirstPage() {
@@ -137,6 +139,56 @@ async function loadQuestions() {
   render()
 }
 
+function isMissingQuestionIssueTable(error) {
+  const message = String(error?.message || "").toLowerCase()
+  return message.includes("question_issue_reports") || message.includes("does not exist")
+}
+
+async function loadQuestionIssueReports(silent = false) {
+  if (!["admin", "teacher"].includes(currentRole)) return
+  const listEl = document.getElementById("questionIssueList")
+  const summaryEl = document.getElementById("questionIssueSummary")
+  if (listEl && !silent) listEl.innerHTML = `<div class="empty-state"><strong>Đang tải báo lỗi</strong><p>Hệ thống đang lấy phản hồi từ học sinh.</p></div>`
+
+  const { data, error } = await sb
+    .from("question_issue_reports")
+    .select("*")
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    if (isMissingQuestionIssueTable(error)) {
+      questionIssueTableMissing = true
+      questionIssueReports = []
+      if (summaryEl) summaryEl.textContent = "Chưa có bảng báo lỗi câu hỏi. Hãy chạy SQL mới trong SQL Supabase.txt."
+      if (listEl) listEl.innerHTML = `<div class="empty-state"><strong>Thiếu bảng dữ liệu</strong><p>Chạy SQL mới để bật tính năng báo lỗi câu hỏi.</p></div>`
+      updateQuickActionStats()
+      return
+    }
+    console.error(error)
+    if (summaryEl) summaryEl.textContent = "Không tải được danh sách báo lỗi."
+    if (listEl) listEl.innerHTML = `<div class="empty-state"><strong>Không tải được báo lỗi</strong><p>${escapeHtml(error.message || "Đã xảy ra lỗi không xác định.")}</p></div>`
+    return
+  }
+
+  questionIssueTableMissing = false
+  const rows = data || []
+  const userIds = [...new Set(rows.flatMap((item) => [item.reporter_id, item.resolver_id]).filter(Boolean))]
+  let userMap = {}
+  if (userIds.length) {
+    const { data: users } = await sb.from("users").select("id,full_name,email").in("id", userIds)
+    userMap = Object.fromEntries((users || []).map((user) => [user.id, user]))
+  }
+
+  questionIssueReports = rows.map((item) => ({
+    ...item,
+    reporter: userMap[item.reporter_id] || null,
+    resolver: userMap[item.resolver_id] || null,
+  }))
+
+  renderQuestionIssueReview()
+  updateQuickActionStats()
+}
+
 function prepareQuestionRecord(q) {
   const normalized = normalizeDuplicateText(q?.question_text || "")
   return {
@@ -211,8 +263,13 @@ function getDuplicateState(q) {
 function updateQuickActionStats() {
   const missingEl = document.getElementById("quickMissingCount")
   const duplicateEl = document.getElementById("quickDuplicateCount")
+  const reportEl = document.getElementById("quickReportCount")
   if (missingEl) missingEl.textContent = `${questions.filter(isAnswerMissing).length} câu`
   if (duplicateEl) duplicateEl.textContent = `${exactDuplicateIds.size} câu`
+  if (reportEl) {
+    if (questionIssueTableMissing) reportEl.textContent = "Cần SQL"
+    else reportEl.textContent = `${questionIssueReports.filter((item) => item.status === "new").length} mới`
+  }
 }
 
 function getBaseFilteredQuestions() {
@@ -672,6 +729,148 @@ function closeDuplicateReview() {
   if (wrap) wrap.style.display = "none"
 }
 
+function getQuestionIssueStatusMeta(status) {
+  const value = String(status || "new")
+  if (value === "resolved") return { label: "Đã sửa", className: "report-status-resolved" }
+  if (value === "dismissed") return { label: "Bỏ qua", className: "report-status-dismissed" }
+  if (value === "reviewing") return { label: "Đang kiểm tra", className: "report-status-reviewing" }
+  return { label: "Mới", className: "report-status-new" }
+}
+
+function getQuestionIssueTypeLabel(type) {
+  const map = {
+    question_content: "Nội dung câu hỏi sai",
+    wrong_answer: "Đáp án sai",
+    image_formula: "Hình / công thức lỗi",
+    other: "Khác",
+  }
+  return map[type] || "Khác"
+}
+
+function renderQuestionIssueReview() {
+  const summaryEl = document.getElementById("questionIssueSummary")
+  const listEl = document.getElementById("questionIssueList")
+  const statusFilter = document.getElementById("questionIssueStatusFilter")?.value || ""
+  const typeFilter = document.getElementById("questionIssueTypeFilter")?.value || ""
+  if (!summaryEl || !listEl) return
+
+  if (questionIssueTableMissing) {
+    summaryEl.textContent = "Chưa có bảng báo lỗi câu hỏi. Hãy chạy SQL mới trong SQL Supabase.txt."
+    listEl.innerHTML = `<div class="empty-state"><strong>Thiếu bảng dữ liệu</strong><p>Chạy SQL mới để bật tính năng báo lỗi câu hỏi.</p></div>`
+    return
+  }
+
+  const filtered = questionIssueReports.filter((item) => {
+    if (statusFilter && item.status !== statusFilter) return false
+    if (typeFilter && item.report_type !== typeFilter) return false
+    return true
+  })
+
+  const pendingCount = questionIssueReports.filter((item) => item.status === "new").length
+  summaryEl.textContent = filtered.length
+    ? `Có ${filtered.length} báo lỗi hiển thị • ${pendingCount} báo lỗi mới cần rà.`
+    : "Không có báo lỗi nào phù hợp với bộ lọc hiện tại."
+
+  if (!filtered.length) {
+    listEl.innerHTML = `<div class="empty-state"><strong>Không có báo lỗi nào</strong><p>Hệ thống chưa ghi nhận phản hồi phù hợp với bộ lọc hiện tại.</p></div>`
+    return
+  }
+
+  listEl.innerHTML = filtered
+    .map((item) => {
+      const question = questions.find((questionItem) => questionItem.id === item.question_id)
+      const statusMeta = getQuestionIssueStatusMeta(item.status)
+      const createdAt = item.created_at
+        ? new Date(item.created_at).toLocaleString("vi-VN", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "—"
+      return `
+        <div class="report-item">
+          <div class="report-item-head">
+            <div>
+              <div style="font-weight:800;color:var(--navy);font-size:.92rem">${escapeHtml(getQuestionIssueTypeLabel(item.report_type))}</div>
+              <div style="font-size:.78rem;color:var(--ink-light);margin-top:4px">
+                Học sinh: <b>${escapeHtml(item.reporter?.full_name || item.reporter?.email || "Không rõ")}</b>
+                • ${createdAt}
+              </div>
+            </div>
+            <span class="status-badge ${statusMeta.className}">${statusMeta.label}</span>
+          </div>
+          <div class="report-item-body">
+            <div>
+              <div class="report-item-stem">${escapeHtml(question?.question_text || "Không tìm thấy nội dung câu hỏi hiện tại.").replace(/\n/g, "<br>")}</div>
+              ${item.note ? `<div style="margin-top:10px;padding:10px 12px;background:#fffaf0;border:1px solid #fde68a;border-radius:14px;font-size:.82rem;color:var(--ink)"><b>Ghi chú học sinh:</b><div style="margin-top:6px;white-space:pre-line">${escapeHtml(item.note)}</div></div>` : ""}
+            </div>
+            <div class="report-meta">
+              <div><b>Môn:</b> ${escapeHtml(question?.chapters?.subjects?.name || "—")}</div>
+              <div><b>Chương:</b> ${escapeHtml(question?.chapters?.name || "—")}</div>
+              <div><b>Đề thi:</b> ${escapeHtml(item.public_exam_id || "—")}</div>
+              <div><b>Người xử lý:</b> ${escapeHtml(item.resolver?.full_name || "Chưa xử lý")}</div>
+              ${item.resolution_note ? `<div><b>Ghi chú xử lý:</b><div style="margin-top:4px;white-space:pre-line">${escapeHtml(item.resolution_note)}</div></div>` : ""}
+              <div class="report-actions">
+                <button class="btn btn-outline btn-sm" type="button" onclick="openQuestionIssueTarget('${item.question_id}','${item.id}')">Mở câu hỏi</button>
+                <button class="btn btn-outline btn-sm" type="button" onclick="updateQuestionIssueStatus('${item.id}','reviewing')">Đang kiểm tra</button>
+                <button class="btn btn-primary btn-sm" type="button" onclick="updateQuestionIssueStatus('${item.id}','resolved')">Đã sửa</button>
+                <button class="btn btn-outline btn-sm" type="button" onclick="updateQuestionIssueStatus('${item.id}','dismissed')">Bỏ qua</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `
+    })
+    .join("")
+}
+
+function openQuestionIssueReview() {
+  const wrap = document.getElementById("questionIssueReview")
+  if (!wrap) return
+  if (questionIssueTableMissing) {
+    alert("Chưa có bảng báo lỗi câu hỏi. Hãy chạy SQL mới trong file SQL Supabase.txt.")
+  }
+  renderQuestionIssueReview()
+  wrap.style.display = "block"
+}
+
+function closeQuestionIssueReview() {
+  const wrap = document.getElementById("questionIssueReview")
+  if (wrap) wrap.style.display = "none"
+}
+
+async function updateQuestionIssueStatus(reportId, status) {
+  if (questionIssueTableMissing) {
+    alert("Chưa có bảng báo lỗi câu hỏi. Hãy chạy SQL mới trong file SQL Supabase.txt.")
+    return
+  }
+  const user = await window.AppAuth?.getUser?.()
+  const updates = {
+    status,
+    resolver_id: user?.id || null,
+  }
+  const { error } = await sb.from("question_issue_reports").update(updates).eq("id", reportId)
+  if (error) {
+    alert(error.message)
+    return
+  }
+  await loadQuestionIssueReports(true)
+}
+
+function openQuestionIssueTarget(questionId, reportId) {
+  closeQuestionIssueReview()
+  if (reportId) updateQuestionIssueStatus(reportId, "reviewing")
+  editQ(questionId)
+}
+
+window.openQuestionIssueReview = openQuestionIssueReview
+window.closeQuestionIssueReview = closeQuestionIssueReview
+window.loadQuestionIssueReports = loadQuestionIssueReports
+window.updateQuestionIssueStatus = updateQuestionIssueStatus
+window.openQuestionIssueTarget = openQuestionIssueTarget
+
 function renderPagination(totalItems, totalPages, visibleCount, startIndex) {
   const infoEl = document.getElementById("questionPagerInfo")
   const statusEl = document.getElementById("questionPagerStatus")
@@ -894,6 +1093,7 @@ window.applyQuickQuestionAction = function (action) {
     return
   }
   if (action === "duplicates") runDuplicateAudit()
+  if (action === "reports") openQuestionIssueReview()
 }
 
 async function editQ(id) {
@@ -1096,6 +1296,7 @@ async function init() {
   await loadGrades()
   await loadCreatorFilter()
   await loadQuestions()
+  await loadQuestionIssueReports(true)
   if (questionPageParams.get("focus") === "duplicates") {
     setTimeout(() => runDuplicateAudit(), 180)
   }
@@ -1122,5 +1323,12 @@ document.getElementById("bulkSelectPage")?.addEventListener("change", (event) =>
 document.getElementById("duplicateReview")?.addEventListener("click", (event) => {
   if (event.target?.id === "duplicateReview") closeDuplicateReview()
 })
+
+document.getElementById("questionIssueReview")?.addEventListener("click", (event) => {
+  if (event.target?.id === "questionIssueReview") closeQuestionIssueReview()
+})
+
+document.getElementById("questionIssueStatusFilter")?.addEventListener("change", renderQuestionIssueReview)
+document.getElementById("questionIssueTypeFilter")?.addEventListener("change", renderQuestionIssueReview)
 
 init()

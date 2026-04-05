@@ -2527,3 +2527,80 @@ WITH CHECK (
     WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
   )
 );
+CREATE TABLE IF NOT EXISTS public.question_issue_reports (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  question_id uuid NOT NULL REFERENCES public.question_bank(id) ON DELETE CASCADE,
+  reporter_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  public_exam_id uuid REFERENCES public.public_exams(id) ON DELETE SET NULL,
+  exam_result_id uuid REFERENCES public.exam_results(id) ON DELETE SET NULL,
+  report_type text NOT NULL DEFAULT 'question_content' CHECK (report_type IN ('question_content', 'wrong_answer', 'image_formula', 'other')),
+  source_mode text NOT NULL DEFAULT 'review' CHECK (source_mode IN ('live_exam', 'review', 'other')),
+  note text,
+  status text NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'reviewing', 'resolved', 'dismissed')),
+  resolver_id uuid REFERENCES public.users(id) ON DELETE SET NULL,
+  resolution_note text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT question_issue_reports_pkey PRIMARY KEY (id)
+);
+
+CREATE INDEX IF NOT EXISTS question_issue_reports_question_idx
+  ON public.question_issue_reports (question_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS question_issue_reports_status_idx
+  ON public.question_issue_reports (status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS question_issue_reports_reporter_idx
+  ON public.question_issue_reports (reporter_id, created_at DESC);
+
+ALTER TABLE public.question_issue_reports ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS question_issue_reports_student_insert ON public.question_issue_reports;
+CREATE POLICY question_issue_reports_student_insert ON public.question_issue_reports
+FOR INSERT
+WITH CHECK (
+  reporter_id = auth.uid()
+  AND EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role = 'student'
+  )
+);
+
+DROP POLICY IF EXISTS question_issue_reports_student_select_own ON public.question_issue_reports;
+CREATE POLICY question_issue_reports_student_select_own ON public.question_issue_reports
+FOR SELECT
+USING (reporter_id = auth.uid());
+
+DROP POLICY IF EXISTS question_issue_reports_staff_select ON public.question_issue_reports;
+CREATE POLICY question_issue_reports_staff_select ON public.question_issue_reports
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS question_issue_reports_staff_update ON public.question_issue_reports;
+CREATE POLICY question_issue_reports_staff_update ON public.question_issue_reports
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);

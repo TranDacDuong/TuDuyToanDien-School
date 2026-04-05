@@ -70,7 +70,7 @@ body {
 .filterBar select:focus { border-color: var(--gold); background: var(--white); }
 .quickOps {
   display:grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 16px;
 }
@@ -215,6 +215,22 @@ td { padding: 11px 12px; border-bottom: 1px solid #eef3f8; vertical-align: middl
 .dup-meta { font-size:.78rem;color:var(--ink-mid); }
 .dup-actions { display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end; }
 .dup-mini { font-size:.76rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--navy);cursor:pointer;font-family:var(--font-body);font-weight:700; }
+.report-review { display:none;position:fixed;inset:0;z-index:1250;background:rgba(15,23,42,.5);padding:32px 18px;overflow:auto; }
+.report-review-box { max-width:1320px;margin:0 auto;background:rgba(255,255,255,.98);border:1px solid rgba(15,31,61,.08);box-shadow:0 20px 46px rgba(15,31,61,.16);border-radius:26px;padding:18px; }
+.report-review-hd { display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px; }
+.report-review-toolbar { display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px; }
+.report-review-toolbar select { min-width:180px; }
+.report-list { display:grid;gap:12px; }
+.report-item { border:1px solid rgba(15,31,61,.08);border-radius:18px;background:linear-gradient(180deg,#fff 0%,#fbfdff 100%);overflow:hidden; }
+.report-item-head { display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;padding:12px 14px;background:#f8fbff;border-bottom:1px solid rgba(15,31,61,.08); }
+.report-item-body { display:grid;grid-template-columns:minmax(0,1.4fr) minmax(280px,.9fr);gap:14px;padding:14px; }
+.report-item-stem { font-size:.88rem;line-height:1.6;color:var(--ink);white-space:pre-line; }
+.report-meta { display:grid;gap:8px;font-size:.8rem;color:var(--ink-mid); }
+.report-actions { display:flex;gap:8px;flex-wrap:wrap;margin-top:10px; }
+.report-status-new { background:#eff6ff;color:#1d4ed8;border-color:#93c5fd; }
+.report-status-reviewing { background:#fff7ed;color:#c2410c;border-color:#fdba74; }
+.report-status-resolved { background:#ecfdf5;color:#15803d;border-color:#86efac; }
+.report-status-dismissed { background:#f8fafc;color:#475569;border-color:#cbd5e1; }
 
 .hidden-badge {
   margin-left: 6px; background: #fef3c7; color: #b45309;
@@ -400,6 +416,11 @@ button {
   .dup-item { grid-template-columns: 1fr; gap: 10px; }
   .dup-actions { justify-content: stretch; }
   .dup-actions .dup-mini { width: 100%; }
+  .report-review { padding: 12px 8px; }
+  .report-review-box { padding: 14px; border-radius: 22px; }
+  .report-review-toolbar > * { width: 100%; }
+  .report-item-body { grid-template-columns: 1fr; gap: 10px; }
+  .report-actions .btn { width: 100%; }
   .modal { padding: 10px; align-items: flex-end; }
   .modal-box { width: 100%; max-height: calc(100dvh - 12px); padding: 18px 16px; border-radius: 22px 22px 0 0; }
   .createGrid { grid-template-columns: 1fr; gap: 16px; }
@@ -458,6 +479,11 @@ button {
       <span>Mở form tạo câu hỏi ngay để thêm câu mới mà không cần cuộn xuống bảng.</span>
       <span class="quickStat">Form</span>
     </button>
+    <button class="quickOp" data-testid="question-quick-report-review" type="button" onclick="openQuestionIssueReview()">
+      <strong>BÃ¡o Lá»—i CÃ¢u Há»i</strong>
+      <span>Xem cÃ¡c báo lỗi từ học sinh vÃ  má»Ÿ tháº³ng tá»›i cÃ¢u há»i cáº§n kiá»ƒm tra.</span>
+      <span class="quickStat" id="quickReportCount">0 má»›i</span>
+    </button>
   </div>
 
   <div class="filterBar surface-toolbar" style="flex-direction:column;align-items:stretch;gap:6px">
@@ -506,6 +532,36 @@ button {
         <button class="btn btn-outline btn-sm" type="button" onclick="closeDuplicateReview()">Đóng</button>
       </div>
       <div class="dup-review-groups" id="duplicateReviewGroups"></div>
+    </div>
+  </div>
+
+  <div class="report-review" id="questionIssueReview">
+    <div class="report-review-box">
+      <div class="report-review-hd">
+        <div>
+          <div style="font-family:var(--font-display);font-size:1rem;color:var(--navy)">Báo lỗi câu hỏi</div>
+          <div id="questionIssueSummary" style="font-size:.82rem;color:var(--ink-light)">Chưa tải danh sách báo lỗi.</div>
+        </div>
+        <button class="btn btn-outline btn-sm" type="button" onclick="closeQuestionIssueReview()">Đóng</button>
+      </div>
+      <div class="report-review-toolbar">
+        <select id="questionIssueStatusFilter">
+          <option value="">Tất cả trạng thái</option>
+          <option value="new">Mới</option>
+          <option value="reviewing">Đang kiểm tra</option>
+          <option value="resolved">Đã sửa</option>
+          <option value="dismissed">Bỏ qua</option>
+        </select>
+        <select id="questionIssueTypeFilter">
+          <option value="">Tất cả loại lỗi</option>
+          <option value="question_content">Nội dung câu hỏi sai</option>
+          <option value="wrong_answer">Đáp án sai</option>
+          <option value="image_formula">Hình / công thức lỗi</option>
+          <option value="other">Khác</option>
+        </select>
+        <button class="btn btn-outline btn-sm" type="button" onclick="loadQuestionIssueReports(true)">↻ Làm mới</button>
+      </div>
+      <div class="report-list" id="questionIssueList"></div>
     </div>
   </div>
 
