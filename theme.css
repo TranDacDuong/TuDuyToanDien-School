@@ -179,6 +179,144 @@ label {
 .page-title  { font-family: var(--font-display); font-size: 1.5rem; color: var(--navy); }
 .page-sub    { font-size: .8rem; color: var(--ink-light); margin-top: 2px; }
 
+/* ── Shared page surfaces ── */
+.page-shell { max-width: 1400px; margin: 0 auto; }
+.page-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  padding: 24px 26px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(255,255,255,.22), transparent 30%),
+    linear-gradient(135deg, rgba(15,31,61,.98) 0%, rgba(31,65,128,.95) 55%, rgba(200,150,42,.86) 100%);
+  border: 1px solid rgba(35,56,92,.08);
+  box-shadow: 0 18px 42px rgba(15,23,42,.08);
+  color: #fff;
+}
+.page-hero-copy { flex: 1 1 520px; min-width: min(100%, 320px); }
+.page-hero-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.95rem;
+  color: #fff;
+}
+.page-hero-subtitle {
+  margin: 8px 0 0;
+  max-width: 780px;
+  color: rgba(255,255,255,.84);
+  line-height: 1.72;
+  font-size: .92rem;
+}
+.page-hero-actions {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.hero-kpi {
+  min-width: 150px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.16);
+  backdrop-filter: blur(8px);
+}
+.hero-kpi-label {
+  display: block;
+  font-size: .74rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.74);
+}
+.hero-kpi-value {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #fff;
+}
+.surface-toolbar,
+.surface-card {
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(15,31,61,.08);
+  box-shadow: 0 14px 30px rgba(15,31,61,.06);
+}
+.surface-toolbar {
+  border-radius: 22px;
+  padding: 14px 16px;
+}
+.surface-card {
+  border-radius: 22px;
+}
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.section-head h3,
+.section-head h4 {
+  margin: 0;
+  color: var(--navy);
+}
+.section-copy {
+  font-size: .82rem;
+  color: var(--ink-light);
+  line-height: 1.6;
+}
+.table-shell {
+  background: rgba(255,255,255,.94);
+  border: 1px solid rgba(15,31,61,.08);
+  box-shadow: 0 14px 30px rgba(15,31,61,.06);
+  border-radius: 22px;
+  overflow: hidden;
+}
+.table-shell-scroll { overflow-x: auto; }
+.empty-state {
+  text-align: center;
+  padding: 44px 22px;
+  color: var(--ink-light);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  border-radius: 20px;
+  border: 1px dashed rgba(15,31,61,.14);
+}
+.empty-state strong {
+  display: block;
+  color: var(--navy);
+  font-size: .95rem;
+  margin-bottom: 6px;
+}
+.empty-state p,
+.empty-state .empty-copy {
+  margin: 0;
+  color: var(--ink-light);
+  font-size: .84rem;
+  line-height: 1.7;
+}
+.sheet-modal-card {
+  border-radius: 24px;
+  overflow: auto;
+}
+.sheet-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+.sheet-modal-footer .btn,
+.sheet-modal-footer button {
+  min-height: 42px;
+}
+
 /* ── Section divider ── */
 .divider {
   height: 1px; background: linear-gradient(90deg, var(--gold-border) 0%, transparent 100%);
@@ -258,4 +396,31 @@ label {
 @media (max-width: 640px) {
   .page-wrap { padding: 14px; }
   h1 { font-size: 1.35rem; }
+  .page-hero {
+    padding: 18px 18px 16px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+  }
+  .page-hero-title { font-size: 1.55rem; }
+  .page-hero-subtitle { font-size: .86rem; line-height: 1.62; }
+  .page-hero-actions { width: 100%; }
+  .hero-kpi { flex: 1 1 calc(50% - 10px); min-width: 0; }
+  .surface-toolbar,
+  .surface-card,
+  .table-shell,
+  .empty-state,
+  .sheet-modal-card { border-radius: 20px; }
+  .sheet-modal-footer {
+    position: sticky;
+    bottom: -18px;
+    margin: 18px -16px -18px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: rgba(255,255,255,.96);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--border);
+  }
+  .sheet-modal-footer .btn,
+  .sheet-modal-footer button {
+    width: 100%;
+  }
 }

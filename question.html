@@ -431,7 +431,7 @@ button {
 </head>
 <body>
 
-<div class="container">
+<div class="container page-shell">
   <div class="page-hd">
     <h2>Ngân hàng câu hỏi</h2>
     <input type="file" id="wordImportInput" accept=".docx" style="display:none">
@@ -460,7 +460,7 @@ button {
     </button>
   </div>
 
-  <div class="filterBar" style="flex-direction:column;align-items:stretch;gap:6px">
+  <div class="filterBar surface-toolbar" style="flex-direction:column;align-items:stretch;gap:6px">
     <div style="display:flex;gap:8px;flex-wrap:nowrap;align-items:center">
       <select id="f_grade"><option value="">Khối</option></select>
       <select id="f_subject"><option value="">Môn</option></select>
@@ -497,7 +497,7 @@ button {
   </div>
 
   <div class="dup-review" id="duplicateReview">
-    <div class="dup-review-box">
+    <div class="dup-review-box surface-card">
       <div class="dup-review-hd">
         <div>
           <div style="font-family:var(--font-display);font-size:1rem;color:var(--navy)">Kiểm tra câu trùng</div>
@@ -509,6 +509,8 @@ button {
     </div>
   </div>
 
+  <div class="table-shell">
+    <div class="table-shell-scroll">
   <table>
     <thead>
       <tr>
@@ -530,7 +532,9 @@ button {
       <tr><td colspan="12" style="text-align:center;padding:32px;color:var(--ink-light)">⏳ Đang tải câu hỏi...</td></tr>
     </tbody>
   </table>
-  <div class="pager">
+    </div>
+  </div>
+  <div class="pager surface-toolbar">
     <div class="pager-info" id="questionPagerInfo">Đang tải danh sách câu hỏi...</div>
     <div class="pager-controls">
       <button type="button" class="btn btn-outline btn-sm" id="questionPrevPage">Trang trước</button>

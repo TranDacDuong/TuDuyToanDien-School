@@ -199,7 +199,7 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
 </head>
 <body>
 
-<div class="page-hd">
+<div class="page-hd page-hero">
   <h1>Đề thi</h1>
   <div id="adminToolbar" style="display:none">
     <button class="btn btn-primary" onclick="openAddExamModal()">+ Thêm đề thi</button>
@@ -213,7 +213,7 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
 
 <!-- Modal thêm đề (admin) -->
 <div id="addExamModal" class="modal-overlay hidden">
-  <div class="modal-card">
+  <div class="modal-card sheet-modal-card">
     <h3>Thêm đề thi công khai</h3>
     <div class="fg">
       <label>Chọn đề từ Ngân hàng đề</label>
@@ -236,7 +236,7 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
       <label>Thời gian kết thúc</label>
       <input type="datetime-local" id="peEndsAt">
     </div>
-    <div class="modal-footer">
+<div class="modal-footer sheet-modal-footer">
       <button class="btn btn-primary" onclick="savePublicExam()">💾 Lưu</button>
       <button class="btn btn-outline" onclick="closeAddExamModal()">Hủy</button>
     </div>
