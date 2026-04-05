@@ -355,7 +355,9 @@
       .replace(/[‐‑‒–—]/g, "-")
       .replace(/[“”]/g, "\"")
       .replace(/[‘’]/g, "'")
+      .replace(/\s+(?=(?:PHẦN|PHAN)\s+[IVX]+)/gu, "\n")
       .replace(/([.?!])\s+(?=(?:Câu|Cau)\s*\d+\b)/gu, "$1\n")
+      .replace(/(\$)\s+(?=(?:Câu|Cau)\s*\d+\b)/gu, "$1\n")
       .replace(/([.?!])\s*(?=(?:[A-F]|[a-d])[.)\]:-]\s+)/g, "$1\n")
       .replace(/[ \t]+/g, " ")
       .replace(/[ ]*\n[ ]*/g, "\n")
@@ -482,7 +484,10 @@
       .replace(/^\s*(?:Câu|Cau)\s*\d+\b\s*[:.)-]?\s*/iu, "")
       .replace(/^\s*\d+\s*[:.)-]\s*/u, "")
       .trim();
-    const content = withoutHeader || block.trim();
+    const content = (withoutHeader || block.trim())
+      .replace(/\n?(?:PHẦN|PHAN)\s+[IVX]+[\s\S]*$/iu, "")
+      .replace(/\n?-+\s*HẾT\s*-+$/iu, "")
+      .trim();
     if (!content) {
       return { question: null, warnings: [`Câu ${index + 1} trống nên đã bị bỏ qua.`] };
     }
@@ -703,7 +708,10 @@
     const normalizedAnswer = String(rawAnswer || "").toLowerCase().replace(/\s+/g, "");
     const looksLikeTrueFalse = matches.every((item) => item.label >= "a" && item.label <= "d")
       && (
-        /^(?:[a-d](?:t|f|đ|s|1|0|true|false|dung|sai))+$/u.test(normalizedAnswer)
+        matches.length >= 4
+        || !normalizedAnswer
+        || !String(rawAnswer || "").trim()
+        || /^(?:[a-d](?:t|f|đ|s|1|0|true|false|dung|sai))+$/u.test(normalizedAnswer)
         || /(?:đúng|sai|dung|sai)/iu.test(rawAnswer || "")
       );
     if (!looksLikeTrueFalse) return null;

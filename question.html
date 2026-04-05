@@ -948,8 +948,11 @@ function fillQuestion(idx) {
   // Điền nội dung câu hỏi — với true_false gộp options vào question_text
   let questionText = q.question_text || "";
   if (q.question_type === "true_false" && q.options?.length) {
-    const optLines = q.options.map((opt, i) => `${String.fromCharCode(97+i)}) ${opt}`).join("\n");
-    questionText = questionText.trimEnd() + "\n" + optLines;
+    const hasInlineStatements = /\n\s*a[)\].:-]\s+/i.test(questionText);
+    if (!hasInlineStatements) {
+      const optLines = q.options.map((opt, i) => `${String.fromCharCode(97+i)}) ${opt}`).join("\n");
+      questionText = questionText.trimEnd() + "\n" + optLines;
+    }
   }
   document.getElementById("questionText").value = questionText;
   document.getElementById("question_type").value = q.question_type || "multi_choice";
