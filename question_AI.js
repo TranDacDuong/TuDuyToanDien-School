@@ -720,11 +720,11 @@ QUY TAC QUAN TRONG:
   }
 
   async function callAI(messages) {
-    const headers = await (window.AppAuth?.getEdgeFunctionHeaders?.() || Promise.resolve({
+    const headers = window.AppAuth?.getAnonEdgeFunctionHeaders?.() || {
       "Content-Type":  "application/json",
       "apikey":        ANON_KEY,
       "Authorization": `Bearer ${ANON_KEY}`,
-    }));
+    };
     const res = await fetch(EDGE_URL, {
       method: "POST",
       headers,

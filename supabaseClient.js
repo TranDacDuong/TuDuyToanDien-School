@@ -56,10 +56,20 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
       };
     }
 
+    function getAnonEdgeFunctionHeaders(extraHeaders = {}) {
+      return {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        ...extraHeaders,
+      };
+    }
+
     return {
       getUser,
       getAccessToken,
       getEdgeFunctionHeaders,
+      getAnonEdgeFunctionHeaders,
     };
   })();
 

@@ -28,14 +28,15 @@
     // URL và key hardcode từ supabaseClient.js
     const EDGE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co/functions/v1/ai-solution";
     const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxneWRqYWFxZnhxemdiZHBxdmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxODY2NDQsImV4cCI6MjA4Nzc2MjY0NH0.l6ojk0fH5wYMK4H_RIGTepatUd1Uy2KHOTiRfAS1JD4";
+    const headers = window.AppAuth?.getAnonEdgeFunctionHeaders?.() || {
+      "Content-Type": "application/json",
+      "apikey":        ANON_KEY,
+      "Authorization": `Bearer ${ANON_KEY}`,
+    };
 
     const res = await fetch(EDGE_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey":        ANON_KEY,
-        "Authorization": `Bearer ${ANON_KEY}`,
-      },
+      headers,
       body: JSON.stringify({ messages }),
     });
 
