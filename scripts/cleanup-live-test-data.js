@@ -28,7 +28,7 @@ async function login(page) {
   const result = await page.evaluate(async ({ prefixes }) => {
     const client = window.sb;
     const matchesPrefix = (value) => prefixes.some((prefix) => String(value || "").startsWith(prefix));
-    const summary = { classes: 0, courses: 0, exams: 0, questions: 0 };
+    const summary = { classes: 0, courses: 0, exams: 0, questions: 0, users: 0 };
 
     const { data: classes } = await client.from("classes").select("id,class_name");
     const classIds = (classes || []).filter((row) => matchesPrefix(row.class_name)).map((row) => row.id);
@@ -70,6 +70,20 @@ async function login(page) {
       await client.from("question_bank").delete().in("id", questionIds);
       summary.questions = questionIds.length;
     }
+
+    const { data: users } = await client.from("users").select("id,full_name,role").in("role", ["student", "teacher"]);
+    const matchedUsers = (users || []).filter((row) => matchesPrefix(row.full_name));
+    for (const user of matchedUsers) {
+      if (user.role === "teacher") {
+        await client.from("class_teachers").delete().eq("teacher_id", user.id);
+        await client.from("course_managers").delete().eq("teacher_id", user.id);
+        const downgradeResult = await client.from("users").update({ role: "student", subject: null }).eq("id", user.id);
+        if (downgradeResult?.error) throw downgradeResult.error;
+      }
+      const { error: deleteError } = await client.rpc("admin_delete_student_cascade", { p_student_id: user.id });
+      if (deleteError) throw deleteError;
+    }
+    summary.users = matchedUsers.length;
 
     return summary;
   }, { prefixes });

@@ -39,6 +39,15 @@ $env:PLAYWRIGHT_ADMIN_PASSWORD="secret"
 "C:\Program Files\nodejs\npm.cmd" run test:e2e:regression
 ```
 
+Create temporary teacher/student accounts for role regression:
+
+```powershell
+$env:PLAYWRIGHT_BASE_URL="https://tuduytoandien.vercel.app"
+$env:PLAYWRIGHT_ADMIN_EMAIL="admin@example.com"
+$env:PLAYWRIGHT_ADMIN_PASSWORD="secret"
+"C:\Program Files\nodejs\npm.cmd" run setup:e2e:roles
+```
+
 Clean temporary live test data by prefix:
 
 ```powershell
