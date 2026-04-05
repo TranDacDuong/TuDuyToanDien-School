@@ -1,5 +1,6 @@
 const { test, expect } = require("@playwright/test");
 const { getCred, loginAs } = require("./helpers/auth");
+const { firstVisible } = require("./helpers/ui");
 
 const adminCreds = getCred("ADMIN");
 
@@ -9,7 +10,11 @@ test.describe("Admin UI regression", () => {
   test("question quick-create opens the editor modal", async ({ page }) => {
     await loginAs(page, adminCreds);
     await page.goto("/question.html");
-    await page.getByTestId("question-quick-create").click();
+    const quickCreateButton = firstVisible(page, [
+      '[data-testid="question-quick-create"]',
+      '.quickOps .quickOp:nth-of-type(4)',
+    ]);
+    await quickCreateButton.click();
     await expect(page.locator("#questionText")).toBeVisible();
     await expect(page.locator("#grade")).toBeVisible();
     await expect(page.locator("#subject")).toBeVisible();
@@ -38,7 +43,10 @@ test.describe("Admin UI regression", () => {
   test("exam editor opens from create button", async ({ page }) => {
     await loginAs(page, adminCreds);
     await page.goto("/exam.html");
-    const createButton = page.getByTestId("exam-create-button");
+    const createButton = firstVisible(page, [
+      '[data-testid="exam-create-button"]',
+      'button[onclick="openEditor(null)"]',
+    ]);
     await expect(createButton).toBeVisible();
     await createButton.click();
     await expect(page.locator("#fTitle")).toBeVisible();

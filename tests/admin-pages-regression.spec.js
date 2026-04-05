@@ -1,5 +1,6 @@
 const { test, expect } = require("@playwright/test");
 const { getCred, loginAs } = require("./helpers/auth");
+const { firstVisible } = require("./helpers/ui");
 
 const adminCreds = getCred("ADMIN");
 
@@ -16,7 +17,11 @@ test.describe("Admin page regression", () => {
   test("duplicate review modal opens and closes cleanly", async ({ page }) => {
     await loginAs(page, adminCreds);
     await page.goto("/question.html");
-    await page.getByTestId("question-quick-duplicate-audit").click();
+    const duplicateButton = firstVisible(page, [
+      '[data-testid="question-quick-duplicate-audit"]',
+      '.quickOps .quickOp:nth-of-type(2)',
+    ]);
+    await duplicateButton.click();
     await expect(page.locator("#duplicateReview")).toBeVisible();
     await page.locator("#duplicateReview button").last().click();
     await expect(page.locator("#duplicateReview")).toBeHidden();
@@ -26,7 +31,11 @@ test.describe("Admin page regression", () => {
     await loginAs(page, adminCreds);
     await page.goto("/sourcedata.html?tab=adminLogs");
     await expect(page.locator("#adminLogs.active")).toBeVisible();
-    await page.getByTestId("system-tab-students").click();
+    const studentTab = firstVisible(page, [
+      '[data-testid="system-tab-students"]',
+      '.tabs .tab:nth-of-type(6)',
+    ]);
+    await studentTab.click();
     await expect(page.locator("#students.active")).toBeVisible();
   });
 
@@ -40,12 +49,12 @@ test.describe("Admin page regression", () => {
   test("class page exposes create button for admin", async ({ page }) => {
     await loginAs(page, adminCreds);
     await page.goto("/class.html");
-    await expect(page.getByTestId("class-create-button")).toBeVisible();
+    await expect(firstVisible(page, ['[data-testid="class-create-button"]', '#openCreateClass'])).toBeVisible();
   });
 
   test("courses page exposes create button for admin", async ({ page }) => {
     await loginAs(page, adminCreds);
     await page.goto("/courses.html");
-    await expect(page.getByTestId("course-create-button")).toBeVisible();
+    await expect(firstVisible(page, ['[data-testid="course-create-button"]', '#openCreateBtn'])).toBeVisible();
   });
 });
