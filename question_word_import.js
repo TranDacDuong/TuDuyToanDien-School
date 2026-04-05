@@ -10,12 +10,12 @@
     if (!file) return;
 
     if (!/\.docx$/i.test(file.name)) {
-      alert("Hiá»‡n táº¡i chá»‰ há»— trá»£ file .docx");
+      alert("Hiện tại chỉ hỗ trợ file .docx");
       return;
     }
 
     if (!window.mammoth?.extractRawText || !window.mammoth?.convertToHtml) {
-      alert("ChÆ°a táº£i Ä‘Æ°á»£c bá»™ Ä‘á»c file Word.");
+      alert("Chưa tải được bộ đọc file Word.");
       return;
     }
 
@@ -29,7 +29,7 @@
       const sourceText = buildStructuredWordText(htmlResult?.value || "", rawResult?.value || "");
       const parsed = parseWordQuestions(sourceText);
       if (!parsed.questions.length) {
-        alert("KhÃ´ng tÃ¬m tháº¥y cÃ¢u há»i há»£p lá»‡ trong file Word. HÃ£y kiá»ƒm tra file cÃ³ má»‘c nhÆ° 'CÃ¢u 1', 'A.', 'B.' khÃ´ng.");
+        alert("Không tìm thấy câu hỏi hợp lệ trong file Word. Hãy kiểm tra file có mốc như 'Câu 1', 'A.', 'B.' không.");
         return;
       }
 
@@ -45,7 +45,7 @@
       });
       openImportReviewModal(enrichedQuestions, parsed.warnings);
     } catch (error) {
-      alert("KhÃ´ng Ä‘á»c Ä‘Æ°á»£c file Word: " + (error?.message || error));
+      alert("Không đọc được file Word: " + (error?.message || error));
     }
   }
 
@@ -223,7 +223,7 @@
   }
 
   function buildListMarker(markerType, index) {
-    if (markerType === "question-number") return `CÃ¢u ${index}:`;
+    if (markerType === "question-number") return `Câu ${index}:`;
     if (markerType === "upper-alpha") return `${String.fromCharCode(64 + index)}.`;
     if (markerType === "roman") return `${toRoman(index)}.`;
     return "-";
@@ -281,7 +281,7 @@
           matrix[targetRow] = matrix[targetRow] || [];
           cellMeta[targetRow] = cellMeta[targetRow] || [];
           for (let c = 0; c < colSpan; c++) {
-            matrix[targetRow][columnIndex + c] = r === 0 && c === 0 ? text : "â†³";
+            matrix[targetRow][columnIndex + c] = r === 0 && c === 0 ? text : "↳";
             cellMeta[targetRow][columnIndex + c] = {
               text,
               rowSpan,
@@ -301,11 +301,11 @@
         const cells = [];
         for (let i = 0; i < columnCount; i++) {
           const value = cleanInlineText(row?.[i] || "");
-          cells.push(value || (rowIndex === 0 ? " " : "âˆ…"));
+          cells.push(value || (rowIndex === 0 ? " " : "∅"));
         }
         return cells;
       })
-      .filter((row) => row.some((cell) => cell && cell !== "âˆ…"));
+      .filter((row) => row.some((cell) => cell && cell !== "∅"));
 
     if (!normalizedRows.length) return "";
 
@@ -352,9 +352,9 @@
     return String(text || "")
       .replace(/\r/g, "\n")
       .replace(/\u00a0/g, " ")
-      .replace(/[â€â€‘â€’â€“â€”]/g, "-")
-      .replace(/[â€œâ€]/g, "\"")
-      .replace(/[â€˜â€™]/g, "'")
+      .replace(/[\u2010\u2011\u2012\u2013\u2014]/g, "-")
+      .replace(/[\u201c\u201d]/g, "\"")
+      .replace(/[\u2018\u2019]/g, "'")
       .replace(/\s+(?=(?:PH\S*N|PHAN)\s+[IVX]+)/gu, "\n")
       .replace(/([.?!])\s*(?=(?:C\S*u|Cau)\s*\d+\b)/gu, "$1\n")
       .replace(/(\$)\s*(?=(?:C\S*u|Cau)\s*\d+\b)/gu, "$1\n")
@@ -518,10 +518,10 @@
       .replace(/\n?-+\s*(?:H\S*T|HET)\s*-+$/iu, "")
       .trim();
     if (!content) {
-      return { question: null, warnings: [`CÃ¢u ${index + 1} trá»‘ng nÃªn Ä‘Ã£ bá»‹ bá» qua.`] };
+      return { question: null, warnings: [`Câu ${index + 1} trống nên đã bị bỏ qua.`] };
     }
 
-    const answerMatch = content.match(/(?:^|\n|\s)(?:ÄÃ¡p Ã¡n Ä‘Ãºng|ÄÃ¡p Ã¡n|Dap an dung|Dap an|DAP AN|ÄA|DA)\s*[:\-]?\s*([^\n]+)/iu);
+    const answerMatch = content.match(/(?:^|\n|\s)(?:Đáp án đúng|Đáp án|Dap an dung|Dap an|DAP AN|ĐA|DA)\s*[:\-]?\s*([^\n]+)/iu);
     const rawAnswer = String(answerMatch?.[1] || "").trim();
     const answer = normalizeChoiceAnswer(rawAnswer);
     const hadImage = /\[HINH\]/u.test(content);
@@ -529,8 +529,8 @@
     const trueFalseParsed = tryParseTrueFalseQuestion(body, rawAnswer, index, warnings);
     if (trueFalseParsed) {
       if (hadImage) {
-        trueFalseParsed.question._importWarnings.push(`CÃ¢u ${index + 1}: cÃ³ áº£nh trong file Word, báº¡n nÃªn kiá»ƒm tra láº¡i hÃ¬nh trÆ°á»›c khi lÆ°u.`);
-        trueFalseParsed.warnings.push(`CÃ¢u ${index + 1}: cÃ³ áº£nh trong file Word, báº¡n nÃªn kiá»ƒm tra láº¡i hÃ¬nh trÆ°á»›c khi lÆ°u.`);
+        trueFalseParsed.question._importWarnings.push(`Câu ${index + 1}: có ảnh trong file Word, bạn nên kiểm tra lại hình trước khi lưu.`);
+        trueFalseParsed.warnings.push(`Câu ${index + 1}: có ảnh trong file Word, bạn nên kiểm tra lại hình trước khi lưu.`);
         trueFalseParsed.question._importConfidence = Math.max(0.3, Number((trueFalseParsed.question._importConfidence - 0.08).toFixed(2)));
       }
       return trueFalseParsed;
@@ -549,13 +549,13 @@
       const shortAnswerParsed = tryParseShortAnswerQuestion(body, rawAnswer, index, warnings);
       if (shortAnswerParsed) {
         if (hadImage) {
-          shortAnswerParsed.question._importWarnings.push(`CÃ¢u ${index + 1}: cÃ³ áº£nh trong file Word, báº¡n nÃªn kiá»ƒm tra láº¡i hÃ¬nh trÆ°á»›c khi lÆ°u.`);
-          shortAnswerParsed.warnings.push(`CÃ¢u ${index + 1}: cÃ³ áº£nh trong file Word, báº¡n nÃªn kiá»ƒm tra láº¡i hÃ¬nh trÆ°á»›c khi lÆ°u.`);
+          shortAnswerParsed.question._importWarnings.push(`Câu ${index + 1}: có ảnh trong file Word, bạn nên kiểm tra lại hình trước khi lưu.`);
+          shortAnswerParsed.warnings.push(`Câu ${index + 1}: có ảnh trong file Word, bạn nên kiểm tra lại hình trước khi lưu.`);
           shortAnswerParsed.question._importConfidence = Math.max(0.3, Number((shortAnswerParsed.question._importConfidence - 0.08).toFixed(2)));
         }
         return shortAnswerParsed;
       }
-      warnings.push(`CÃ¢u ${index + 1}: chÆ°a tÃ¡ch Ä‘Æ°á»£c Ä‘á»§ A, B, C, D nÃªn Ä‘ang Ä‘á»ƒ dáº¡ng tráº£ lá»i ngáº¯n Ä‘á»ƒ báº¡n rÃ  láº¡i.`);
+      warnings.push(`Câu ${index + 1}: chưa tách được đủ A, B, C, D nên đang để dạng trả lời ngắn để bạn rà lại.`);
       return {
         question: {
           question_type: "short_answer",
@@ -583,7 +583,7 @@
 
     const required = orderedLabels.filter((label, idx) => idx === 0 || label.charCodeAt(0) === orderedLabels[idx - 1].charCodeAt(0) + 1);
     if (required.some((label) => !optionMap.has(label))) {
-      warnings.push(`CÃ¢u ${index + 1}: thiáº¿u Ã­t nháº¥t má»™t Ä‘Ã¡p Ã¡n A/B/C/D, cáº§n kiá»ƒm tra láº¡i.`);
+      warnings.push(`Câu ${index + 1}: thiếu ít nhất một đáp án A/B/C/D, cần kiểm tra lại.`);
       return {
         question: {
           question_type: "short_answer",
@@ -612,22 +612,22 @@
     });
 
     if (!questionText) {
-      warnings.push(`CÃ¢u ${index + 1}: khÃ´ng nháº­n ra rÃµ pháº§n Ä‘á» bÃ i, báº¡n nÃªn kiá»ƒm tra láº¡i.`);
+      warnings.push(`Câu ${index + 1}: không nhận ra rõ phần đề bài, bạn nên kiểm tra lại.`);
       confidence -= 0.18;
     }
 
     if (!answer) {
-      warnings.push(`CÃ¢u ${index + 1}: chÆ°a tÃ¬m tháº¥y Ä‘Ã¡p Ã¡n Ä‘Ãºng, báº¡n cáº§n bá»• sung trÆ°á»›c khi lÆ°u.`);
+      warnings.push(`Câu ${index + 1}: chưa tìm thấy đáp án đúng, bạn cần bổ sung trước khi lưu.`);
       confidence -= 0.12;
     }
 
     if (hasTable) {
-      warnings.push(`CÃ¢u ${index + 1}: cÃ³ báº£ng trong ná»™i dung, nÃªn rÃ  láº¡i layout trÆ°á»›c khi lÆ°u.`);
+      warnings.push(`Câu ${index + 1}: có bảng trong nội dung, nên rà lại layout trước khi lưu.`);
       confidence -= 0.08;
     }
 
     if (hadImage) {
-      warnings.push(`CÃ¢u ${index + 1}: cÃ³ áº£nh trong file Word, báº¡n nÃªn kiá»ƒm tra láº¡i hÃ¬nh trÆ°á»›c khi lÆ°u.`);
+      warnings.push(`Câu ${index + 1}: có ảnh trong file Word, bạn nên kiểm tra lại hình trước khi lưu.`);
       confidence -= 0.08;
     }
 
@@ -674,7 +674,7 @@
   function normalizeChoiceAnswer(value) {
     return String(value || "")
       .toUpperCase()
-      .replace(/\bVÃ€\b/g, "")
+      .replace(/\bVÀ\b/g, "")
       .replace(/[^A-F]/g, "");
   }
 
@@ -687,7 +687,7 @@
   function tryParseShortAnswerQuestion(body, rawAnswer, index, warnings) {
     const normalizedAnswer = normalizeFreeAnswer(rawAnswer);
     if (!normalizedAnswer) {
-      warnings.push(`CÃ¢u ${index + 1}: há»‡ thá»‘ng Ä‘ang Ä‘á»ƒ máº·c Ä‘á»‹nh lÃ  cÃ¢u tráº£ lá»i ngáº¯n vÃ¬ chÆ°a tháº¥y Ä‘Ã¡p Ã¡n hay Ä‘Ã¡p Ã¡n lá»±a chá»n.`);
+      warnings.push(`Câu ${index + 1}: hệ thống đang để mặc định là câu trả lời ngắn vì chưa thấy đáp án hay đáp án lựa chọn.`);
       return {
         question: {
           question_type: "short_answer",
@@ -704,7 +704,7 @@
       };
     }
     if (/^[A-F]+$/u.test(normalizedAnswer)) return null;
-    warnings.push(`CÃ¢u ${index + 1}: há»‡ thá»‘ng nháº­n Ä‘Ã¢y lÃ  cÃ¢u tráº£ lá»i ngáº¯n, báº¡n nÃªn rÃ  láº¡i Ä‘Ã¡p Ã¡n trÆ°á»›c khi lÆ°u.`);
+    warnings.push(`Câu ${index + 1}: hệ thống nhận đây là câu trả lời ngắn, bạn nên rà lại đáp án trước khi lưu.`);
     return {
       question: {
         question_type: "short_answer",
@@ -723,9 +723,12 @@
 
   function tryParseTrueFalseQuestion(body, rawAnswer, index, warnings) {
     const matches = [];
+    const preparedBody = String(body || "")
+      .replace(/(\$)\s*(?=[a-d][.)\]:-]\s+)/g, "$1\n")
+      .replace(/([.?!])\s*(?=[a-d][.)\]:-]\s+)/g, "$1\n");
     const regex = /(^|\n)\s*([a-d])([.)\]:-])\s+([\s\S]*?)(?=(?:\n\s*[a-d][.)\]:-]\s+)|$)/g;
     let match;
-    while ((match = regex.exec(body)) !== null) {
+    while ((match = regex.exec(preparedBody)) !== null) {
       matches.push({
         index: match.index + match[1].length,
         label: match[2].toLowerCase(),
@@ -740,8 +743,8 @@
         matches.length >= 4
         || !normalizedAnswer
         || !String(rawAnswer || "").trim()
-        || /^(?:[a-d](?:t|f|Ä‘|s|1|0|true|false|dung|sai))+$/u.test(normalizedAnswer)
-        || /(?:Ä‘Ãºng|sai|dung|sai)/iu.test(rawAnswer || "")
+        || /^(?:[a-d](?:t|f|đ|s|1|0|true|false|dung|sai))+$/u.test(normalizedAnswer)
+        || /(?:đúng|sai|dung|sai)/iu.test(rawAnswer || "")
       );
     if (!looksLikeTrueFalse) return null;
 
@@ -751,8 +754,8 @@
         return token ? `${item.label}${token}` : "";
       })
       .join("");
-    warnings.push(`CÃ¢u ${index + 1}: há»‡ thá»‘ng nháº­n Ä‘Ã¢y lÃ  cÃ¢u ÄÃºng/Sai, báº¡n nÃªn rÃ  láº¡i tá»«ng má»‡nh Ä‘á» trÆ°á»›c khi lÆ°u.`);
-    const questionStem = normalizeMathText(body.slice(0, matches[0]?.index || 0).trim());
+    warnings.push(`Câu ${index + 1}: hệ thống nhận đây là câu Đúng/Sai, bạn nên rà lại từng mệnh đề trước khi lưu.`);
+    const questionStem = normalizeMathText(preparedBody.slice(0, matches[0]?.index || 0).trim());
     return {
       question: {
         question_type: "true_false",
@@ -771,9 +774,9 @@
 
   function extractTrueFalseToken(label, rawAnswer) {
     const source = String(rawAnswer || "").toLowerCase();
-    const direct = source.match(new RegExp(`${label}\\s*(Ä‘Ãºng|dung|true|t|1|sai|false|f|0)`, "u"));
+    const direct = source.match(new RegExp(`${label}\\s*(đúng|dung|true|t|1|sai|false|f|0)`, "u"));
     const token = direct?.[1] || "";
-    if (/^(Ä‘Ãºng|dung|true|t|1)$/u.test(token)) return "T";
+    if (/^(đúng|dung|true|t|1)$/u.test(token)) return "T";
     if (/^(sai|false|f|0)$/u.test(token)) return "F";
     return "";
   }
@@ -793,15 +796,15 @@
     if (hint) {
       const lowConfidenceCount = questions.filter((item) => Number(item?._importConfidence || 0) < 0.7).length;
       if (warnings?.length) {
-        hint.textContent = `ÄÃ£ import ${questions.length} cÃ¢u. CÃ³ ${warnings.length} chá»— cáº§n rÃ  láº¡i, ${lowConfidenceCount} cÃ¢u á»Ÿ má»©c nháº­n diá»‡n chÆ°a cháº¯c.`;
+        hint.textContent = `Đã import ${questions.length} câu. Có ${warnings.length} chỗ cần rà lại, ${lowConfidenceCount} câu ở mức nhận diện chưa chắc.`;
         hint.style.cssText = "font-size:.75rem;color:#b45309;background:#fef3c7;padding:5px 10px;border-radius:7px";
       } else {
-        hint.textContent = `ÄÃ£ import ${questions.length} cÃ¢u tá»« Word. GiÃ¡o viÃªn kiá»ƒm tra rá»“i lÆ°u tá»«ng cÃ¢u.`;
+        hint.textContent = `Đã import ${questions.length} câu từ Word. Giáo viên kiểm tra rồi lưu từng câu.`;
         hint.style.cssText = "font-size:.75rem;color:var(--green);font-weight:700";
       }
     }
 
     const title = document.getElementById("formTitle");
-    if (title) title.textContent = "Táº¡o cÃ¢u há»i tá»« file Word";
+    if (title) title.textContent = "Tạo câu hỏi từ file Word";
   }
 })();
