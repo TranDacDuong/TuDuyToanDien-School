@@ -5,8 +5,8 @@
   "description": "Playwright smoke and end-to-end tests for TuDuyToanDien School",
   "scripts": {
     "test:e2e": "playwright test",
-    "test:e2e:regression": "playwright test tests/admin-regression.spec.js tests/admin-ui-regression.spec.js tests/admin-pages-regression.spec.js tests/ui-selector-regression.spec.js tests/dashboard-ops-regression.spec.js tests/dashboard-menu-regression.spec.js tests/dashboard-primary-nav-regression.spec.js tests/role-access.spec.js tests/role-ui-regression.spec.js",
-    "test:e2e:admin": "playwright test tests/admin-regression.spec.js tests/admin-ui-regression.spec.js tests/admin-pages-regression.spec.js tests/ui-selector-regression.spec.js tests/dashboard-ops-regression.spec.js tests/dashboard-menu-regression.spec.js tests/dashboard-primary-nav-regression.spec.js",
+    "test:e2e:regression": "playwright test tests/admin-regression.spec.js tests/admin-ui-regression.spec.js tests/admin-pages-regression.spec.js tests/ui-selector-regression.spec.js tests/dashboard-ops-regression.spec.js tests/dashboard-menu-regression.spec.js tests/dashboard-primary-nav-regression.spec.js tests/dashboard-secondary-nav-regression.spec.js tests/route-smoke-regression.spec.js tests/role-access.spec.js tests/role-ui-regression.spec.js",
+    "test:e2e:admin": "playwright test tests/admin-regression.spec.js tests/admin-ui-regression.spec.js tests/admin-pages-regression.spec.js tests/ui-selector-regression.spec.js tests/dashboard-ops-regression.spec.js tests/dashboard-menu-regression.spec.js tests/dashboard-primary-nav-regression.spec.js tests/dashboard-secondary-nav-regression.spec.js tests/route-smoke-regression.spec.js",
     "test:e2e:roles": "playwright test tests/role-access.spec.js tests/role-ui-regression.spec.js",
     "setup:e2e:roles": "node scripts/ensure-live-role-test-users.js",
     "test:e2e:live-full": "node scripts/run-live-full-regression.js",

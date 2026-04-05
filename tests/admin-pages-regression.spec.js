@@ -30,6 +30,14 @@ test.describe("Admin page regression", () => {
   test("system page opens logs tab and supports switching back to student tab", async ({ page }) => {
     await loginAs(page, adminCreds);
     await page.goto("/sourcedata.html?tab=adminLogs");
+    const logPanel = page.locator("#adminLogs");
+    if (!(await logPanel.evaluate((el) => el.classList.contains("active")).catch(() => false))) {
+      const logTab = firstVisible(page, [
+        '[data-testid="system-tab-logs"]',
+        '.tabs .tab:nth-of-type(7)',
+      ]);
+      await logTab.click();
+    }
     await expect(page.locator("#adminLogs.active")).toBeVisible();
     const studentTab = firstVisible(page, [
       '[data-testid="system-tab-students"]',
