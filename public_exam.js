@@ -798,24 +798,28 @@
 
   function buildQuestionReportButton(question, context = {}) {
     if (_role !== "student" || !question?.id) return "";
-    const stem = JSON.stringify(String(question.question_text || "").split(/\r?\n/).slice(0, 6).join("\n"))
-    const sourceMode = JSON.stringify(context.sourceMode || "review")
-    const publicExamId = JSON.stringify(context.publicExamId || _peId || "")
-    const examResultId = JSON.stringify(context.examResultId || _examResultId || "")
+    const encode = (value) => encodeURIComponent(String(value || ""))
+    const stem = encode(String(question.question_text || "").split(/\r?\n/).slice(0, 6).join("\n"))
+    const sourceMode = encode(context.sourceMode || "review")
+    const publicExamId = encode(context.publicExamId || _peId || "")
+    const examResultId = encode(context.examResultId || _examResultId || "")
     return `<button type="button"
-      onclick="window.openQuestionIssueFromExam('${question.id}', ${stem}, ${publicExamId}, ${examResultId}, ${sourceMode})"
+      onclick="window.openQuestionIssueFromExam('${question.id}', '${stem}', '${publicExamId}', '${examResultId}', '${sourceMode}')"
       style="margin-top:10px;border:1px solid rgba(245,158,11,.28);background:#fff7ed;color:#b45309;padding:7px 10px;border-radius:999px;font-size:.76rem;font-weight:800;cursor:pointer;font-family:var(--font-body)">
       Báo lỗi câu hỏi
     </button>`
   }
 
   window.openQuestionIssueFromExam = function(questionId, questionStem, publicExamId, examResultId, sourceMode) {
+    const decode = (value) => {
+      try { return decodeURIComponent(String(value || "")) } catch (_) { return String(value || "") }
+    }
     window.PublicExamSupport?.openQuestionReportModal?.({
       questionId,
-      questionStem,
-      publicExamId: publicExamId || _peId || null,
-      examResultId: examResultId || _examResultId || null,
-      sourceMode: sourceMode || "review",
+      questionStem: decode(questionStem),
+      publicExamId: decode(publicExamId) || _peId || null,
+      examResultId: decode(examResultId) || _examResultId || null,
+      sourceMode: decode(sourceMode) || "review",
     })
   }
 
