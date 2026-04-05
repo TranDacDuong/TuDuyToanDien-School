@@ -90,6 +90,11 @@
         continue;
       }
 
+      if (tag === "img") {
+        pieces.push("[HINH]");
+        continue;
+      }
+
       const nestedBlockChildren = Array.from(child.children || []).filter((el) =>
         isBlockLikeTag(el.tagName?.toLowerCase())
       );
@@ -100,8 +105,9 @@
       }
 
       const text = cleanInlineText(child.textContent);
-      if (text) {
-        pieces.push(tag === "li" ? `- ${text}` : text);
+      if (text || child.querySelector?.("img")) {
+        const prefix = child.querySelector?.("img") ? "[HINH] " : "";
+        pieces.push(tag === "li" ? `- ${prefix}${text}`.trim() : `${prefix}${text}`.trim());
       }
     }
 
@@ -142,8 +148,15 @@
           continue;
         }
 
+        if (tag === "img") {
+          textParts.push("[HINH]");
+          continue;
+        }
+
         const text = cleanInlineText(child.textContent);
-        if (text) textParts.push(text);
+        if (text || child.querySelector?.("img")) {
+          textParts.push(`${child.querySelector?.("img") ? "[HINH] " : ""}${text}`.trim());
+        }
       }
 
       const line = normalizeWordText(textParts.join("\n"));
@@ -317,7 +330,7 @@
     }
 
     const columnSpec = `|${Array.from({ length: columnCount }, () => "c").join("|")}|`;
-    return `\\[\\begin{array}{${columnSpec}} \\hline ${latexRows.join(" ")} \\end{array}\\]`;
+    return `\n\\[\\begin{array}{${columnSpec}} \\hline ${latexRows.join(" ")} \\end{array}\\]\n`;
   }
 
   function parseWordQuestions(rawText) {
@@ -342,6 +355,8 @@
       .replace(/[‐‑‒–—]/g, "-")
       .replace(/[“”]/g, "\"")
       .replace(/[‘’]/g, "'")
+      .replace(/([.?!])\s+(?=(?:Câu|Cau)\s*\d+\b)/gu, "$1\n")
+      .replace(/([.?!])\s*(?=(?:[A-F]|[a-d])[.)\]:-]\s+)/g, "$1\n")
       .replace(/[ \t]+/g, " ")
       .replace(/[ ]*\n[ ]*/g, "\n")
       .replace(/\n{3,}/g, "\n\n")
@@ -475,9 +490,17 @@
     const answerMatch = content.match(/(?:^|\n|\s)(?:Đáp án đúng|Đáp án|Dap an dung|Dap an|DAP AN|ĐA|DA)\s*[:\-]?\s*([^\n]+)/iu);
     const rawAnswer = String(answerMatch?.[1] || "").trim();
     const answer = normalizeChoiceAnswer(rawAnswer);
-    const body = answerMatch ? content.replace(answerMatch[0], " ").trim() : content;
+    const hadImage = /\[HINH\]/u.test(content);
+    const body = normalizeMathText((answerMatch ? content.replace(answerMatch[0], " ").trim() : content).replace(/\[HINH\]/gu, "").trim());
     const trueFalseParsed = tryParseTrueFalseQuestion(body, rawAnswer, index, warnings);
-    if (trueFalseParsed) return trueFalseParsed;
+    if (trueFalseParsed) {
+      if (hadImage) {
+        trueFalseParsed.question._importWarnings.push(`Câu ${index + 1}: có ảnh trong file Word, bạn nên kiểm tra lại hình trước khi lưu.`);
+        trueFalseParsed.warnings.push(`Câu ${index + 1}: có ảnh trong file Word, bạn nên kiểm tra lại hình trước khi lưu.`);
+        trueFalseParsed.question._importConfidence = Math.max(0.3, Number((trueFalseParsed.question._importConfidence - 0.08).toFixed(2)));
+      }
+      return trueFalseParsed;
+    }
 
     const optionMatches = findOptionMatches(body);
     const labels = optionMatches.map((match) => match.label).join("");
@@ -485,12 +508,19 @@
       .filter((label) => /^[A-F]$/.test(label))
       .sort();
     const hasChoiceSet = orderedLabels.length >= 4;
-    const hasTable = /\[BẢNG\]/u.test(body);
+    const hasTable = /\\begin\{array\}/u.test(body);
     let confidence = hasTable ? 0.66 : 0.78;
 
     if (!hasChoiceSet) {
       const shortAnswerParsed = tryParseShortAnswerQuestion(body, rawAnswer, index, warnings);
-      if (shortAnswerParsed) return shortAnswerParsed;
+      if (shortAnswerParsed) {
+        if (hadImage) {
+          shortAnswerParsed.question._importWarnings.push(`Câu ${index + 1}: có ảnh trong file Word, bạn nên kiểm tra lại hình trước khi lưu.`);
+          shortAnswerParsed.warnings.push(`Câu ${index + 1}: có ảnh trong file Word, bạn nên kiểm tra lại hình trước khi lưu.`);
+          shortAnswerParsed.question._importConfidence = Math.max(0.3, Number((shortAnswerParsed.question._importConfidence - 0.08).toFixed(2)));
+        }
+        return shortAnswerParsed;
+      }
       warnings.push(`Câu ${index + 1}: chưa tách được đủ A, B, C, D nên đang để dạng trả lời ngắn để bạn rà lại.`);
       return {
         question: {
@@ -559,6 +589,11 @@
 
     if (hasTable) {
       warnings.push(`Câu ${index + 1}: có bảng trong nội dung, nên rà lại layout trước khi lưu.`);
+      confidence -= 0.08;
+    }
+
+    if (hadImage) {
+      warnings.push(`Câu ${index + 1}: có ảnh trong file Word, bạn nên kiểm tra lại hình trước khi lưu.`);
       confidence -= 0.08;
     }
 
@@ -654,11 +689,11 @@
 
   function tryParseTrueFalseQuestion(body, rawAnswer, index, warnings) {
     const matches = [];
-    const regex = /(^|\n)\s*([a-dA-D])([.)\]:-])\s+([\s\S]*?)(?=(?:\n\s*[a-dA-D][.)\]:-]\s+)|$)/g;
+    const regex = /(^|\n)\s*([a-d])([.)\]:-])\s+([\s\S]*?)(?=(?:\n\s*[a-d][.)\]:-]\s+)|$)/g;
     let match;
     while ((match = regex.exec(body)) !== null) {
       matches.push({
-        originalLabel: match[2],
+        index: match.index + match[1].length,
         label: match[2].toLowerCase(),
         text: normalizeMathText(match[4].trim()),
       });
@@ -666,11 +701,9 @@
     if (matches.length < 2) return null;
 
     const normalizedAnswer = String(rawAnswer || "").toLowerCase().replace(/\s+/g, "");
-    const allLowercaseOptions = matches.every((item) => item.originalLabel === item.originalLabel.toLowerCase());
     const looksLikeTrueFalse = matches.every((item) => item.label >= "a" && item.label <= "d")
       && (
-        allLowercaseOptions
-        || /^(?:[a-d](?:t|f|đ|s|1|0|true|false|dung|sai))+$/u.test(normalizedAnswer)
+        /^(?:[a-d](?:t|f|đ|s|1|0|true|false|dung|sai))+$/u.test(normalizedAnswer)
         || /(?:đúng|sai|dung|sai)/iu.test(rawAnswer || "")
       );
     if (!looksLikeTrueFalse) return null;
@@ -682,12 +715,11 @@
       })
       .join("");
     warnings.push(`Câu ${index + 1}: hệ thống nhận đây là câu Đúng/Sai, bạn nên rà lại từng mệnh đề trước khi lưu.`);
+    const questionStem = normalizeMathText(body.slice(0, matches[0]?.index || 0).trim());
     return {
       question: {
         question_type: "true_false",
-        question_text: normalizeMathText(
-          body.replace(regex, (_, prefix, label, sep, text) => `${label.toLowerCase()}) ${normalizeMathText(text.trim())}\n`).trim()
-        ),
+        question_text: questionStem,
         options: matches.map((item) => item.text),
         difficulty: 5,
         answer: answerTokens,
