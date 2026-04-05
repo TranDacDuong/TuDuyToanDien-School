@@ -246,10 +246,12 @@
 
   function tableToText(tableEl) {
     const matrix = [];
+    const cellMeta = [];
     const rows = Array.from(tableEl.querySelectorAll("tr"));
 
     rows.forEach((row, rowIndex) => {
       matrix[rowIndex] = matrix[rowIndex] || [];
+      cellMeta[rowIndex] = cellMeta[rowIndex] || [];
       let columnIndex = 0;
       while (matrix[rowIndex][columnIndex] !== undefined) columnIndex += 1;
 
@@ -264,8 +266,15 @@
         for (let r = 0; r < rowSpan; r++) {
           const targetRow = rowIndex + r;
           matrix[targetRow] = matrix[targetRow] || [];
+          cellMeta[targetRow] = cellMeta[targetRow] || [];
           for (let c = 0; c < colSpan; c++) {
             matrix[targetRow][columnIndex + c] = r === 0 && c === 0 ? text : "↳";
+            cellMeta[targetRow][columnIndex + c] = {
+              text,
+              rowSpan,
+              colSpan,
+              isOrigin: r === 0 && c === 0,
+            };
           }
         }
 
@@ -287,14 +296,28 @@
 
     if (!normalizedRows.length) return "";
 
-    const header = normalizedRows[0];
-    const bodyRows = normalizedRows.slice(1);
-    const lines = ["[BẢNG]"];
-    if (header.length) lines.push(`| ${header.join(" | ")} |`);
-    if (bodyRows.length) lines.push(`| ${header.map(() => "---").join(" | ")} |`);
-    bodyRows.forEach((row) => lines.push(`| ${row.join(" | ")} |`));
-    lines.push("[/BẢNG]");
-    return lines.join("\n");
+    const latexRows = [];
+    for (let rowIndex = 0; rowIndex < normalizedRows.length; rowIndex++) {
+      const rowLatex = [];
+      for (let colIndex = 0; colIndex < columnCount; colIndex++) {
+        const meta = cellMeta[rowIndex]?.[colIndex];
+        const text = escapeLatexArrayText(normalizedRows[rowIndex]?.[colIndex] || "");
+        if (!meta) {
+          rowLatex.push(text || "\\text{ }");
+          continue;
+        }
+        if (!meta.isOrigin) continue;
+        if (meta.colSpan > 1) {
+          rowLatex.push(`\\multicolumn{${meta.colSpan}}{|c|}{${text || "\\text{ }"}}`);
+          continue;
+        }
+        rowLatex.push(text || "\\text{ }");
+      }
+      latexRows.push(`${rowLatex.join(" & ")} \\\\ \\hline`);
+    }
+
+    const columnSpec = `|${Array.from({ length: columnCount }, () => "c").join("|")}|`;
+    return `\\[\\begin{array}{${columnSpec}} \\hline ${latexRows.join(" ")} \\end{array}\\]`;
   }
 
   function parseWordQuestions(rawText) {
@@ -326,7 +349,11 @@
   }
 
   function normalizeMathText(text) {
-    return String(text || "")
+    const inlineDisplayMath = String(text || "")
+      .replace(/\\\[\s*([\s\S]*?)\s*\\\]/g, (_, inner) => `$${String(inner || "").trim()}$`)
+      .replace(/\\\(\s*([\s\S]*?)\s*\\\)/g, (_, inner) => `$${String(inner || "").trim()}$`);
+
+    return addSpacingAroundMathSegments(inlineDisplayMath
       .replace(/\\frac(?=\s*\{)/g, "\\dfrac")
       .replace(/\\left\s*/g, "\\left ")
       .replace(/\\right\s*/g, "\\right ")
@@ -342,6 +369,52 @@
       .replace(/\s+\}/g, "}")
       .replace(/[ \t]+/g, " ")
       .replace(/\n{3,}/g, "\n\n")
+      .trim());
+  }
+
+  function addSpacingAroundMathSegments(text) {
+    return String(text || "")
+      .replace(/(\S)(\$[^$]+\$)(?=\S)/g, "$1 $2 ")
+      .replace(/(\S)(\$[^$]+\$)/g, "$1 $2")
+      .replace(/(\$[^$]+\$)(\S)/g, "$1 $2")
+      .replace(/\s{2,}/g, " ")
+      .replace(/[ ]*\n[ ]*/g, "\n")
+      .trim();
+  }
+
+  function escapeLatexArrayText(text) {
+    const source = String(text || "").replace(/\n+/g, " ").trim();
+    if (!source) return "\\text{ }";
+
+    const parts = [];
+    let lastIndex = 0;
+    const mathRegex = /\$([\s\S]*?)\$/g;
+    let match;
+    while ((match = mathRegex.exec(source)) !== null) {
+      const plain = source.slice(lastIndex, match.index).trim();
+      if (plain) parts.push(`\\text{${escapeLatexText(plain)}}`);
+      const math = String(match[1] || "").trim();
+      if (math) parts.push(math);
+      lastIndex = match.index + match[0].length;
+    }
+
+    const tail = source.slice(lastIndex).trim();
+    if (tail) parts.push(`\\text{${escapeLatexText(tail)}}`);
+    return parts.join(" ");
+  }
+
+  function escapeLatexText(text) {
+    return String(text || "")
+      .replace(/\\/g, "\\textbackslash ")
+      .replace(/&/g, "\\&")
+      .replace(/%/g, "\\%")
+      .replace(/#/g, "\\#")
+      .replace(/_/g, "\\_")
+      .replace(/\{/g, "\\{")
+      .replace(/\}/g, "\\}")
+      .replace(/\^/g, "\\textasciicircum ")
+      .replace(/~/g, "\\textasciitilde ")
+      .replace(/\$/g, "\\$")
       .trim();
   }
 
@@ -418,15 +491,15 @@
     if (!hasChoiceSet) {
       const shortAnswerParsed = tryParseShortAnswerQuestion(body, rawAnswer, index, warnings);
       if (shortAnswerParsed) return shortAnswerParsed;
-      warnings.push(`Câu ${index + 1}: chưa tách được đủ A, B, C, D nên đang để dạng tự luận để bạn rà lại.`);
+      warnings.push(`Câu ${index + 1}: chưa tách được đủ A, B, C, D nên đang để dạng trả lời ngắn để bạn rà lại.`);
       return {
         question: {
-          question_type: "essay",
+          question_type: "short_answer",
           question_text: normalizeMathText(body),
           options: [],
           difficulty: 5,
           answer: "",
-          answer_count: 0,
+          answer_count: 1,
           has_figure: false,
           _importConfidence: 0.45,
           _importWarnings: warnings.slice(),
@@ -449,12 +522,12 @@
       warnings.push(`Câu ${index + 1}: thiếu ít nhất một đáp án A/B/C/D, cần kiểm tra lại.`);
       return {
         question: {
-          question_type: "essay",
+          question_type: "short_answer",
           question_text: normalizeMathText(body),
           options: [],
           difficulty: 5,
           answer: "",
-          answer_count: 0,
+          answer_count: 1,
           has_figure: false,
           _importConfidence: 0.5,
           _importWarnings: warnings.slice(),
@@ -512,7 +585,7 @@
 
   function findOptionMatches(body) {
     const matches = [];
-    const regex = /(^|[\s\n])([A-Fa-f])([.)\]:-])(?=\s+)/g;
+    const regex = /(^|[\s\n])(A|B|C|D|E|F)([.)\]:-])(?=\s+)/g;
     let match;
 
     while ((match = regex.exec(body)) !== null) {
@@ -544,7 +617,23 @@
 
   function tryParseShortAnswerQuestion(body, rawAnswer, index, warnings) {
     const normalizedAnswer = normalizeFreeAnswer(rawAnswer);
-    if (!normalizedAnswer) return null;
+    if (!normalizedAnswer) {
+      warnings.push(`Câu ${index + 1}: hệ thống đang để mặc định là câu trả lời ngắn vì chưa thấy đáp án hay đáp án lựa chọn.`);
+      return {
+        question: {
+          question_type: "short_answer",
+          question_text: normalizeMathText(body),
+          options: [],
+          difficulty: 5,
+          answer: "",
+          answer_count: 1,
+          has_figure: false,
+          _importConfidence: 0.58,
+          _importWarnings: warnings.slice(),
+        },
+        warnings,
+      };
+    }
     if (/^[A-F]+$/u.test(normalizedAnswer)) return null;
     warnings.push(`Câu ${index + 1}: hệ thống nhận đây là câu trả lời ngắn, bạn nên rà lại đáp án trước khi lưu.`);
     return {
@@ -569,6 +658,7 @@
     let match;
     while ((match = regex.exec(body)) !== null) {
       matches.push({
+        originalLabel: match[2],
         label: match[2].toLowerCase(),
         text: normalizeMathText(match[4].trim()),
       });
@@ -576,11 +666,21 @@
     if (matches.length < 2) return null;
 
     const normalizedAnswer = String(rawAnswer || "").toLowerCase().replace(/\s+/g, "");
+    const allLowercaseOptions = matches.every((item) => item.originalLabel === item.originalLabel.toLowerCase());
     const looksLikeTrueFalse = matches.every((item) => item.label >= "a" && item.label <= "d")
-      && (/^(?:[a-d](?:t|f|đ|s|1|0|true|false|dung|sai))+$/u.test(normalizedAnswer) || /(?:đúng|sai|dung|sai)/iu.test(rawAnswer || ""));
+      && (
+        allLowercaseOptions
+        || /^(?:[a-d](?:t|f|đ|s|1|0|true|false|dung|sai))+$/u.test(normalizedAnswer)
+        || /(?:đúng|sai|dung|sai)/iu.test(rawAnswer || "")
+      );
     if (!looksLikeTrueFalse) return null;
 
-    const answerTokens = matches.map((item) => `${item.label}${extractTrueFalseToken(item.label, rawAnswer) || "F"}`).join("");
+    const answerTokens = matches
+      .map((item) => {
+        const token = extractTrueFalseToken(item.label, rawAnswer);
+        return token ? `${item.label}${token}` : "";
+      })
+      .join("");
     warnings.push(`Câu ${index + 1}: hệ thống nhận đây là câu Đúng/Sai, bạn nên rà lại từng mệnh đề trước khi lưu.`);
     return {
       question: {
