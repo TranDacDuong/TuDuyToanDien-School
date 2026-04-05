@@ -55,7 +55,7 @@
   /* ── Init ── */
   async function initUser() {
     const sb = getSb();
-    const { data: { user } } = await sb.auth.getUser();
+    const user = await window.AppAuth?.getUser?.();
     if (!user) { location.href = "index.html"; return; }
     currentUser = user;
     const { data: profile } = await sb.from("users").select("role").eq("id", user.id).single();
@@ -925,6 +925,9 @@
     alert("Đã lưu đề thành công! ✓");
   };
 
-  initUser().then(() => loadExamList());
+  initUser().then((allowed) => {
+    if (allowed === false) return;
+    loadExamList();
+  });
 
 })();

@@ -289,7 +289,7 @@ function updateBulkBar(pageList = getVisiblePageQuestions()) {
     restoreBtn.disabled = hiddenCount === 0
     restoreBtn.style.display = isAdmin ? "" : "none"
   }
-  if (deleteBtn) deleteBtn.textContent = isAdmin ? "Xoa da chon" : "An da chon"
+  if (deleteBtn) deleteBtn.textContent = isAdmin ? "Xóa đã chọn" : "Ẩn đã chọn"
 
   if (!selectedCount) {
     summary.textContent = "Chưa chọn câu nào."
@@ -1076,7 +1076,7 @@ async function deleteQ(id) {
 }
 
 async function getUserRole() {
-  const { data: { user } } = await sb.auth.getUser()
+  const user = await window.AppAuth?.getUser?.()
   if (!user) return
   const { data } = await sb.from("users").select("role").eq("id", user.id).single()
   currentRole = data?.role || ""

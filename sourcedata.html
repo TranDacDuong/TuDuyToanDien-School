@@ -918,7 +918,7 @@ async function loadSubjectsByGrade(){
 
 /* ── Init ── */
 async function init(){
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await window.AppAuth?.getUser?.();
   if(!user){
     location.href = "index.html";
     return;

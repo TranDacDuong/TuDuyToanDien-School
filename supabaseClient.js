@@ -24,6 +24,23 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
   };
 
   window.sb = sb;
+  window.AppAuth = (function () {
+    async function getUser() {
+      try {
+        const { data } = await sb.auth.getSession();
+        if (data?.session?.user) return data.session.user;
+      } catch (_) {
+        // Fall back to getUser below.
+      }
+
+      const { data } = await sb.auth.getUser();
+      return data?.user || null;
+    }
+
+    return {
+      getUser,
+    };
+  })();
 
   window.AppAdminTools = (function () {
     let cachedProfile = null;
@@ -40,8 +57,8 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
         return cachedProfile;
       }
       try {
-        const { data: authData } = await sb.auth.getUser();
-        const userId = authData?.user?.id;
+        const authUser = await window.AppAuth?.getUser?.();
+        const userId = authUser?.id;
         if (!userId) {
           cachedProfile = null;
           profileLoadedAt = now;

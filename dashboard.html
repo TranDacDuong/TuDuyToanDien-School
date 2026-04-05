@@ -585,7 +585,7 @@ tab.addEventListener("mouseleave", e => {
 
 /* ── Dashboard init ── */
 async function initDashboard(){
-  const { data:{ user } } = await sb.auth.getUser();
+  const user = await window.AppAuth?.getUser?.();
   if(!user){ window.location.href = "index.html"; return; }
 
   const { data: profile, error } = await sb.from("users").select("*").eq("id", user.id).maybeSingle();

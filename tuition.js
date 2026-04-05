@@ -422,7 +422,7 @@ Nhập số tiền hoàn lại (>0):`,
 
   async function loadViewerContext() {
     const sb = getSb();
-    const { data: { user } } = await sb.auth.getUser();
+    const user = await window.AppAuth?.getUser?.();
     if (!user) {
       location.href = "index.html";
       return;
