@@ -403,6 +403,20 @@ button {
   .modal { padding: 10px; align-items: flex-end; }
   .modal-box { width: 100%; max-height: calc(100dvh - 12px); padding: 18px 16px; border-radius: 22px 22px 0 0; }
   .createGrid { grid-template-columns: 1fr; gap: 16px; }
+  #questionModalMainRow { flex-direction: column !important; }
+  #questionMetaRow { flex-direction: column !important; align-items: stretch !important; }
+  #questionModalMainRow > div { width: 100% !important; }
+  #questionModalMainRow #qFigureDrop { min-height: 180px !important; }
+  .modal-footer-sticky {
+    position: sticky;
+    bottom: -18px;
+    margin: 18px -16px -18px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: rgba(255,255,255,.96);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--border);
+  }
+  .modal-footer-sticky > * { width: 100%; }
   table { min-width: 760px; }
 }
 </style>
@@ -581,7 +595,7 @@ button {
     </div>
 
     <!-- Hàng 2: Nội dung (3) + Hình vẽ (1) -->
-    <div style="display:flex;gap:14px;margin-bottom:12px">
+    <div id="questionModalMainRow" style="display:flex;gap:14px;margin-bottom:12px">
       <!-- Trái: text + preview + nút AI -->
       <div style="flex:3;display:flex;flex-direction:column;gap:8px">
         <label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;display:block">Nội dung câu hỏi</label>
@@ -622,7 +636,7 @@ button {
     </div>
 
     <!-- Hàng 3: Loại câu hỏi / Mức độ / Đáp án -->
-    <div style="display:flex;gap:8px;flex-wrap:nowrap;margin-bottom:10px;align-items:center">
+    <div id="questionMetaRow" style="display:flex;gap:8px;flex-wrap:nowrap;margin-bottom:10px;align-items:center">
       <select id="question_type" onchange="changeType()" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:.85rem;outline:none">
         <option value="multi_choice">Nhiều lựa chọn</option>
         <option value="true_false">Đúng/Sai</option>
@@ -640,7 +654,7 @@ button {
       <div id="answerArea"></div>
     </div>
 
-    <div class="modal-footer">
+    <div class="modal-footer modal-footer-sticky">
       <div id="qProgress" style="display:none;font-size:.8rem;font-weight:700;color:var(--navy);padding:6px 12px;background:var(--surface);border-radius:8px;border:1px solid var(--border)"></div>
       <button id="saveBtn" onclick="saveQuestion()">Lưu câu hỏi</button>
       <button class="btn-close" onclick="closeModal()">Đóng</button>

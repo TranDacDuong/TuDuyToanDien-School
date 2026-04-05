@@ -399,9 +399,12 @@
       return { question: null, warnings: [`Câu ${index + 1} trống nên đã bị bỏ qua.`] };
     }
 
-    const answerMatch = content.match(/(?:^|\n|\s)(?:Đáp án đúng|Đáp án|Dap an dung|Dap an|DAP AN|ĐA|DA)\s*[:\-]?\s*([A-F,\s;và\/]+)/iu);
-    const answer = normalizeChoiceAnswer(answerMatch?.[1] || "");
+    const answerMatch = content.match(/(?:^|\n|\s)(?:Đáp án đúng|Đáp án|Dap an dung|Dap an|DAP AN|ĐA|DA)\s*[:\-]?\s*([^\n]+)/iu);
+    const rawAnswer = String(answerMatch?.[1] || "").trim();
+    const answer = normalizeChoiceAnswer(rawAnswer);
     const body = answerMatch ? content.replace(answerMatch[0], " ").trim() : content;
+    const trueFalseParsed = tryParseTrueFalseQuestion(body, rawAnswer, index, warnings);
+    if (trueFalseParsed) return trueFalseParsed;
 
     const optionMatches = findOptionMatches(body);
     const labels = optionMatches.map((match) => match.label).join("");
@@ -413,6 +416,8 @@
     let confidence = hasTable ? 0.66 : 0.78;
 
     if (!hasChoiceSet) {
+      const shortAnswerParsed = tryParseShortAnswerQuestion(body, rawAnswer, index, warnings);
+      if (shortAnswerParsed) return shortAnswerParsed;
       warnings.push(`Câu ${index + 1}: chưa tách được đủ A, B, C, D nên đang để dạng tự luận để bạn rà lại.`);
       return {
         question: {
@@ -529,6 +534,79 @@
       .toUpperCase()
       .replace(/\bVÀ\b/g, "")
       .replace(/[^A-F]/g, "");
+  }
+
+  function normalizeFreeAnswer(value) {
+    return normalizeMathText(String(value || ""))
+      .replace(/^[=:,\-\s]+/, "")
+      .trim();
+  }
+
+  function tryParseShortAnswerQuestion(body, rawAnswer, index, warnings) {
+    const normalizedAnswer = normalizeFreeAnswer(rawAnswer);
+    if (!normalizedAnswer) return null;
+    if (/^[A-F]+$/u.test(normalizedAnswer)) return null;
+    warnings.push(`Câu ${index + 1}: hệ thống nhận đây là câu trả lời ngắn, bạn nên rà lại đáp án trước khi lưu.`);
+    return {
+      question: {
+        question_type: "short_answer",
+        question_text: normalizeMathText(body),
+        options: [],
+        difficulty: 5,
+        answer: normalizedAnswer,
+        answer_count: 1,
+        has_figure: false,
+        _importConfidence: 0.68,
+        _importWarnings: warnings.slice(),
+      },
+      warnings,
+    };
+  }
+
+  function tryParseTrueFalseQuestion(body, rawAnswer, index, warnings) {
+    const matches = [];
+    const regex = /(^|\n)\s*([a-dA-D])([.)\]:-])\s+([\s\S]*?)(?=(?:\n\s*[a-dA-D][.)\]:-]\s+)|$)/g;
+    let match;
+    while ((match = regex.exec(body)) !== null) {
+      matches.push({
+        label: match[2].toLowerCase(),
+        text: normalizeMathText(match[4].trim()),
+      });
+    }
+    if (matches.length < 2) return null;
+
+    const normalizedAnswer = String(rawAnswer || "").toLowerCase().replace(/\s+/g, "");
+    const looksLikeTrueFalse = matches.every((item) => item.label >= "a" && item.label <= "d")
+      && (/^(?:[a-d](?:t|f|đ|s|1|0|true|false|dung|sai))+$/u.test(normalizedAnswer) || /(?:đúng|sai|dung|sai)/iu.test(rawAnswer || ""));
+    if (!looksLikeTrueFalse) return null;
+
+    const answerTokens = matches.map((item) => `${item.label}${extractTrueFalseToken(item.label, rawAnswer) || "F"}`).join("");
+    warnings.push(`Câu ${index + 1}: hệ thống nhận đây là câu Đúng/Sai, bạn nên rà lại từng mệnh đề trước khi lưu.`);
+    return {
+      question: {
+        question_type: "true_false",
+        question_text: normalizeMathText(
+          body.replace(regex, (_, prefix, label, sep, text) => `${label.toLowerCase()}) ${normalizeMathText(text.trim())}\n`).trim()
+        ),
+        options: matches.map((item) => item.text),
+        difficulty: 5,
+        answer: answerTokens,
+        answer_count: matches.length,
+        has_figure: false,
+        _importConfidence: 0.72,
+        _importWarnings: warnings.slice(),
+      },
+      warnings,
+    };
+  }
+
+  function extractTrueFalseToken(label, rawAnswer) {
+    const source = String(rawAnswer || "").toLowerCase();
+    const direct = source.match(new RegExp(`${label}\\s*(đúng|dung|true|t|1|sai|false|f|0)`, "u"));
+    const token = direct?.[1] || "";
+    if (/^(đúng|dung|true|t|1)$/u.test(token)) return "T";
+    if (/^(sai|false|f|0)$/u.test(token)) return "F";
+    return "";
   }
 
   function openImportReviewModal(questions, warnings) {

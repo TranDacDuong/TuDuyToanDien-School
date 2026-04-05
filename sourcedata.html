@@ -270,13 +270,19 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   .page-hd { padding: 18px 18px 16px; margin-bottom: 16px; }
   .page-hd h1 { font-size: 1.5rem; }
   .page-hd p { font-size: .84rem; line-height: 1.6; }
-  .tabs { width: 100%; overflow-x: auto; padding: 6px; }
+  .tabs { width: 100%; overflow-x: auto; padding: 6px; position: sticky; top: 0; z-index: 20; backdrop-filter: blur(10px); }
   .tab { flex: 1 0 auto; min-height: 42px; justify-content: center; }
   .form-card-body,.table-card-hd { padding-left: 14px; padding-right: 14px; }
   .form-btns,.act-wrap { flex-direction: column; }
   .form-btns .btn,.act-wrap button { width: 100%; min-height: 42px; }
   table { min-width: 720px; }
   .t-grid { grid-template-columns: 1fr; }
+  .modal-ov,
+  .modal-s { padding: 10px; align-items: flex-end; }
+  .modal-box,
+  .modal-s-box { width: 100%; border-radius: 22px 22px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); }
+  .s-search .sg,
+  .t-search-bar .sg { min-width: 100%; }
 }
 </style>
 </head>
