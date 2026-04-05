@@ -923,6 +923,12 @@ function fillQuestion(idx) {
   if (q.has_figure) {
     hint.textContent = "⚠ Câu này có hình vẽ — nhớ Ctrl+V paste ảnh vào ô Hình vẽ bên phải!";
     hint.style.cssText = "font-size:.75rem;color:#b45309;background:#fef3c7;padding:5px 10px;border-radius:7px";
+  } else if (q._importWarnings?.length) {
+    const confidenceLabel = Number.isFinite(Number(q._importConfidence))
+      ? ` (độ chắc ${Math.round(Number(q._importConfidence) * 100)}%)`
+      : "";
+    hint.textContent = `⚠ Câu ${idx + 1}/${n}${confidenceLabel}: ${q._importWarnings[0]}`;
+    hint.style.cssText = "font-size:.75rem;color:#b45309;background:#fef3c7;padding:5px 10px;border-radius:7px";
   } else {
     hint.textContent = `✅ Câu ${idx + 1}/${n} — kiểm tra rồi bấm Lưu`;
     hint.style.cssText = "font-size:.75rem;color:var(--green)";

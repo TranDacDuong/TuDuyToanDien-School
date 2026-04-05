@@ -8,11 +8,21 @@ function getCred(prefix) {
 }
 
 async function loginAs(page, creds) {
-  await page.goto("/index.html");
-  await page.locator("#email").fill(creds.email);
-  await page.locator("#password").fill(creds.password);
-  await page.locator("#submitBtn").click();
-  await page.waitForURL(/dashboard\.html/i, { timeout: 30000 });
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    await page.goto("/index.html");
+    await page.locator("#email").fill(creds.email);
+    await page.locator("#password").fill(creds.password);
+    await page.locator("#submitBtn").click();
+
+    try {
+      await page.waitForURL(/dashboard\.html/i, { timeout: 15000 });
+      return;
+    } catch (error) {
+      const hasInvalidMessage = await page.locator("text=Email hoặc mật khẩu không đúng").isVisible().catch(() => false);
+      if (attempt === 3 || !hasInvalidMessage) throw error;
+      await page.waitForTimeout(2500 * attempt);
+    }
+  }
 }
 
 async function expectRedirectedToDashboard(page, targetPath) {

@@ -67,13 +67,19 @@
   let _peId          = null;
   let _peType        = null;
   let _currentExamId = null;
+  let _examTitle     = "";
+  let _examLastSavedAt = "";
+  let _examLocalDirty = false;
+  let _examSyncState = "idle";
+  let _examDraftNotice = "";
+  let _essayReviewQueue = [];
 
   /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      INIT
   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
   async function init() {
     const sb = getSb();
-    const { data: { user } } = await sb.auth.getUser();
+    const user = await window.AppAuth?.getUser?.();
     if (!user) { location.href = "index.html"; return; }
     _uid = user.id;
 
@@ -86,6 +92,23 @@
 
     await loadExamList();
   }
+
+  window.addEventListener("beforeunload", (event) => {
+    if (!_examResultId) return;
+    persistExamDraft();
+    event.preventDefault();
+    event.returnValue = "";
+  });
+
+  window.addEventListener("online", () => {
+    if (_examResultId) saveProgress({ forceRemote: true, silent: true });
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && _examResultId) {
+      saveProgress({ forceRemote: navigator.onLine, silent: true });
+    }
+  });
 
   /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      TAB
@@ -448,16 +471,21 @@
     const sb = getSb();
     const { data: results, error: rErr } = await sb
       .from("exam_results")
-      .select("id,student_id,attempt_no,submitted_at,score_auto,score_essay,score_total")
+      .select("id,student_id,class_id,attempt_no,submitted_at,score_auto,score_essay,score_total")
       .eq("public_exam_id", peId)
       .not("submitted_at", "is", null)
       .order("submitted_at", { ascending: false });
 
     if (rErr) { grid.innerHTML = `<div style="color:var(--red)">Lỗi: ${rErr.message}</div>`; return; }
 
-    const { data: pe } = await sb.from("public_exams")
-      .select("exam:exams(total_points)").eq("id",peId).single();
+    const [{ data: pe }, { data: classes }] = await Promise.all([
+      sb.from("public_exams")
+        .select("exam:exams(total_points,exam_questions(*,question:question_bank(*)))").eq("id",peId).single(),
+      sb.from("classes").select("id,name"),
+    ]);
     const totalPoints = pe?.exam?.total_points || 10;
+    const classMap = {};
+    (classes || []).forEach((item) => { classMap[item.id] = item.name; });
 
     const studentIds = [...new Set((results||[]).map(r => r.student_id))];
     let nameMap = {};
@@ -465,6 +493,11 @@
       const { data: users } = await sb.from("users").select("id,full_name").in("id", studentIds);
       (users||[]).forEach(u => { nameMap[u.id] = u.full_name; });
     }
+
+    const resultIds = (results || []).map((item) => item.id);
+    const { data: answerRows } = resultIds.length
+      ? await sb.from("exam_answers").select("result_id,question_id,answer,is_correct,score_earned").in("result_id", resultIds)
+      : { data: [] };
 
     const bestMap = {};
     (results||[]).forEach(r => {
@@ -475,6 +508,25 @@
     const ranked = Object.values(bestMap).sort((a,b) => {
       return (b.score_total??b.score_auto??-1) - (a.score_total??a.score_auto??-1);
     });
+    _essayReviewQueue = ranked
+      .filter((item) => item.score_total === null)
+      .map((item) => ({
+        resultId: item.id,
+        studentName: nameMap[item.student_id] || "-",
+      }));
+
+    const analytics = window.PublicExamSupport?.computeAnalytics?.({
+      results: ranked,
+      answers: answerRows || [],
+      examQuestions: pe?.exam?.exam_questions || [],
+      totalPoints,
+      nameMap,
+      classMap,
+    });
+    const avgScoreText = analytics?.averageScore === null ? "—" : `${analytics.averageScore}/${totalPoints}`;
+    const progressRows = (analytics?.studentProgress || []).slice(0, 5);
+    const hardQuestions = analytics?.hardestQuestions || [];
+    const easyQuestions = analytics?.easiestQuestions || [];
 
     grid.innerHTML = `
       <div style="margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
@@ -482,6 +534,65 @@
         <div style="flex:1">
           <div style="font-family:var(--font-display);font-size:1.1rem;font-weight:700;color:var(--navy)">${examTitle}</div>
           <div style="font-size:.78rem;color:var(--ink-mid);margin-top:2px">${ranked.length} thí sinh đã nộp bài &nbsp;•&nbsp; Tổng điểm: ${totalPoints}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">
+        <div style="background:var(--white);border:1px solid var(--border);border-radius:16px;padding:16px">
+          <div style="font-size:.75rem;color:var(--ink-light);text-transform:uppercase;font-weight:800">Điểm trung bình</div>
+          <div style="margin-top:8px;font-size:1.45rem;font-weight:800;color:var(--navy)">${avgScoreText}</div>
+        </div>
+        <div style="background:var(--white);border:1px solid var(--border);border-radius:16px;padding:16px">
+          <div style="font-size:.75rem;color:var(--ink-light);text-transform:uppercase;font-weight:800">Độ khó đề</div>
+          <div style="margin-top:8px;font-size:1.45rem;font-weight:800;color:${analytics?.difficulty?.tone || "var(--ink-light)"}">${analytics?.difficulty?.label || "—"}</div>
+        </div>
+        <div style="background:var(--white);border:1px solid var(--border);border-radius:16px;padding:16px">
+          <div style="font-size:.75rem;color:var(--ink-light);text-transform:uppercase;font-weight:800">Tự luận chờ chấm</div>
+          <div style="margin-top:8px;font-size:1.45rem;font-weight:800;color:var(--amber)">${analytics?.pendingEssayCount || 0}</div>
+        </div>
+        <div style="background:var(--white);border:1px solid var(--border);border-radius:16px;padding:16px">
+          <div style="font-size:.75rem;color:var(--ink-light);text-transform:uppercase;font-weight:800">Bài đã nộp</div>
+          <div style="margin-top:8px;font-size:1.45rem;font-weight:800;color:var(--navy)">${analytics?.submittedCount || ranked.length}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:18px">
+        <div style="background:var(--white);border:1px solid var(--border);border-radius:18px;padding:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px">
+            <strong style="color:var(--navy)">Chấm tự luận hàng loạt</strong>
+            <span style="font-size:.76rem;color:var(--ink-light)">${_essayReviewQueue.length} bài chờ</span>
+          </div>
+          ${_essayReviewQueue.length
+            ? `<div style="display:grid;gap:8px">${_essayReviewQueue.slice(0, 6).map((item, index) => `
+                <button class="btn btn-outline btn-sm" style="justify-content:flex-start;text-align:left" onclick="openExamDetailAdmin('${item.resultId}','${item.studentName.replace(/'/g,"\\'")}','${peId}',${totalPoints},${index})">
+                  ${index + 1}. ${item.studentName}
+                </button>`).join("")}</div>`
+            : `<div style="font-size:.82rem;color:var(--ink-mid);line-height:1.6">Hiện không còn bài tự luận nào đang chờ chấm.</div>`}
+        </div>
+        <div style="background:var(--white);border:1px solid var(--border);border-radius:18px;padding:16px">
+          <strong style="color:var(--navy)">Câu hay sai nhất</strong>
+          <div style="display:grid;gap:8px;margin-top:10px">
+            ${hardQuestions.length
+              ? hardQuestions.map((item) => `<div style="padding:10px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:14px">
+                  <div style="font-size:.78rem;font-weight:800;color:#9a3412">Câu ${item.index} • đúng ${Math.round(item.correctRate * 100)}%</div>
+                  <div style="font-size:.82rem;color:var(--ink-mid);margin-top:4px;line-height:1.55">${item.stem || "Nội dung câu hỏi"}</div>
+                </div>`).join("")
+              : `<div style="font-size:.82rem;color:var(--ink-mid)">Chưa đủ dữ liệu để xếp hạng câu hỏi.</div>`}
+          </div>
+        </div>
+        <div style="background:var(--white);border:1px solid var(--border);border-radius:18px;padding:16px">
+          <strong style="color:var(--navy)">Tiến độ học sinh cần chú ý</strong>
+          <div style="display:grid;gap:8px;margin-top:10px">
+            ${progressRows.length
+              ? progressRows.map((item) => `<div style="padding:10px 12px;background:#f8fafc;border:1px solid var(--border);border-radius:14px">
+                  <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+                    <div>
+                      <div style="font-size:.84rem;font-weight:800;color:var(--navy)">${item.name}</div>
+                      <div style="font-size:.76rem;color:var(--ink-light)">${item.className || "Chưa gắn lớp"}${item.submittedAt ? ` • ${fmtDT(item.submittedAt)}` : ""}</div>
+                    </div>
+                    <div style="font-size:.95rem;font-weight:800;color:${item.ratio < 0.5 ? "var(--red)" : "var(--amber)"}">${item.score}/${totalPoints}</div>
+                  </div>
+                </div>`).join("")
+              : `<div style="font-size:.82rem;color:var(--ink-mid)">Chưa có dữ liệu tiến độ học sinh.</div>`}
+          </div>
         </div>
       </div>
       ${ranked.length === 0
@@ -527,7 +638,7 @@
                   <td style="text-align:center;padding:12px 8px">
                     <button class="btn btn-outline btn-sm" style="font-size:.78rem;padding:5px 12px"
                       onclick="openExamDetailAdmin('${r.id}','${name.replace(/'/g,"\\'")}','${peId}',${totalPoints})">
-                      Xem bài</button>
+                      ${pending ? "Chấm bài" : "Xem bài"}</button>
                   </td>
                 </tr>`;
               }).join("")}
@@ -537,7 +648,7 @@
       }`;
   };
 
-  window.openExamDetailAdmin = async function(resultId, studentName, peId, totalPts) {
+  window.openExamDetailAdmin = async function(resultId, studentName, peId, totalPts, queueIndex = -1) {
     const grid = document.getElementById("examGrid");
     grid.style.display = "block";
     grid.innerHTML = '<div style="color:var(--ink-light)">Đang tải bài làm...</div>';
@@ -605,6 +716,7 @@
     }).join("");
 
     const backTitle = (pe?.exam?.title||"").replace(/'/g,"\\'");
+    const hasNextPending = Number.isInteger(queueIndex) && queueIndex >= 0 && queueIndex < _essayReviewQueue.length - 1;
     const headerRight = hasEssay
       ? '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
         + '<div style="text-align:right;font-size:.8rem;color:var(--ink-mid)">'
@@ -613,6 +725,7 @@
         + '<b style="color:var(--navy)">Tổng: <span id="pe_grandTotal">'+(result?.score_total??"Chưa chấm")+'</span>/'+totalPts+'</b>'
         + '</div>'
         + '<button class="btn btn-primary btn-sm" id="peSaveBtn">💾 Lưu điểm</button>'
+        + (hasNextPending ? '<button class="btn btn-outline btn-sm" id="peSaveNextBtn">Lưu & chấm tiếp</button>' : '')
         + '</div>'
       : '<div style="font-size:.9rem;font-weight:700;color:var(--navy)">Tổng: '+(result?.score_total??scoreAuto)+'/'+totalPts+'</div>';
 
@@ -631,6 +744,18 @@
     if (backBtn) backBtn.addEventListener('click', () => openResultDetail(peId, pe?.exam?.title||'', pe?.exam_type||''));
     const saveBtn = document.getElementById('peSaveBtn');
     if (saveBtn) saveBtn.addEventListener('click', () => peSaveEssay(resultId, scoreAuto, peId, studentName, totalPts));
+    const saveNextBtn = document.getElementById('peSaveNextBtn');
+    if (saveNextBtn) {
+      saveNextBtn.addEventListener('click', async () => {
+        await peSaveEssay(resultId, scoreAuto, peId, studentName, totalPts);
+        const nextItem = _essayReviewQueue[queueIndex + 1];
+        if (nextItem) {
+          openExamDetailAdmin(nextItem.resultId, nextItem.studentName, peId, totalPts, queueIndex + 1);
+        } else {
+          openResultDetail(peId, pe?.exam?.title||'', pe?.exam_type||'');
+        }
+      });
+    }
 
     window._peEssayQIds      = essayQs.map(eq=>({qid:eq.question.id,pts:eq.points}));
     window._peEssayAutoScore = scoreAuto;
@@ -666,6 +791,64 @@
     document.body.appendChild(toast); setTimeout(()=>toast.remove(),2500);
   };
 
+  function persistExamDraft() {
+    if (!_examResultId || !window.PublicExamSupport?.saveDraft) return;
+    window.PublicExamSupport.saveDraft(_examResultId, {
+      answers: _examAnswers,
+      secondsLeft: _examSeconds,
+      examId: _currentExamId,
+      examTitle: _examTitle,
+    });
+  }
+
+  function restoreDraftIfBetter(serverAnswers, serverSeconds) {
+    const draft = window.PublicExamSupport?.getDraft?.(_examResultId);
+    if (!draft) return { answers: serverAnswers || {}, secondsLeft: serverSeconds, restored: false };
+
+    const draftAnswers = draft.answers && typeof draft.answers === "object" ? draft.answers : {};
+    const mergedAnswers = { ...(serverAnswers || {}) };
+    Object.entries(draftAnswers).forEach(([qid, answer]) => {
+      if (String(answer || "").trim()) mergedAnswers[qid] = answer;
+    });
+
+    const mergedSeconds = Number.isFinite(draft.secondsLeft) && draft.secondsLeft > (serverSeconds || 0)
+      ? draft.secondsLeft
+      : serverSeconds;
+
+    _examDraftNotice = `Đã khôi phục bản lưu cục bộ lúc ${window.PublicExamSupport?.formatSyncTime?.(draft.updatedAt) || "gần đây"}.`;
+    return {
+      answers: mergedAnswers,
+      secondsLeft: mergedSeconds,
+      restored: true,
+    };
+  }
+
+  function setExamSyncState(state, message) {
+    _examSyncState = state;
+    if (message) _examDraftNotice = message;
+    const badge = document.getElementById("peSyncStatus");
+    if (!badge) return;
+    const color = state === "error"
+      ? "#fee2e2;color:#b91c1c;border-color:#fecaca"
+      : state === "saving"
+      ? "#eff6ff;color:#1d4ed8;border-color:#bfdbfe"
+      : state === "offline"
+      ? "#fff7ed;color:#c2410c;border-color:#fdba74"
+      : "#ecfdf5;color:#15803d;border-color:#86efac";
+    badge.textContent = message || (state === "ready"
+      ? `Đã lưu ${window.PublicExamSupport?.formatSyncTime?.(_examLastSavedAt) || ""}`.trim()
+      : state === "saving"
+      ? "Đang lưu..."
+      : state === "offline"
+      ? "Mất mạng, đang giữ bản cục bộ"
+      : "Chưa lưu");
+    badge.style.cssText = `font-size:.75rem;font-weight:700;padding:7px 10px;border-radius:999px;background:#fff;border:1px solid transparent;${color}`;
+  }
+
+  window.peManualSave = async function() {
+    await saveProgress({ forceRemote: navigator.onLine, silent: false, forceToast: true });
+  };
+
   /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      STUDENT: LÃ€M BÃ€I
   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
@@ -674,7 +857,8 @@
   window.startPublicExam = async function(peId, examId, examTitle, durationMin, totalPoints, examType) {
     const sb = getSb();
     _peId = peId; _peType = examType; _currentExamId = examId;
-    _examTotal = totalPoints; _examAnswers = {};
+    _examTotal = totalPoints; _examAnswers = {}; _examTitle = examTitle;
+    _examLastSavedAt = ""; _examLocalDirty = false; _examDraftNotice = "";
 
     const { data: eqs, error } = await sb
       .from("exam_questions").select("*, question:question_bank(*)")
@@ -699,7 +883,7 @@
     let newResult = null, tryAttempt = nextAttempt;
     for (let i=0; i<5; i++) {
       const {data,error:re} = await sb.from("exam_results")
-        .insert({exam_id:examId,student_id:_uid,attempt_no:tryAttempt,public_exam_id:peId})
+        .insert({exam_id:examId,student_id:_uid,attempt_no:tryAttempt,public_exam_id:peId,seconds_left: durationMin * 60})
         .select("id").single();
       if (!re) { newResult=data; break; }
       if (re.code==="23505") { tryAttempt++; continue; }
@@ -708,15 +892,18 @@
     if (!newResult) { alert("Không thể tạo bài thi."); return; }
     _examResultId = newResult.id;
     _examSeconds  = durationMin * 60;
+    persistExamDraft();
 
     renderPublicExamUI(examTitle, durationMin);
+    setExamSyncState("ready", "Đã tạo phiên làm bài mới.");
     startExamTimer();
   };
 
   window.resumePublicExam = async function(peId, examId, examTitle, durationMin, totalPoints, examType, resultId, secsLeft) {
     const sb = getSb();
     _peId = peId; _peType = examType; _currentExamId = examId;
-    _examTotal = totalPoints; _examResultId = resultId; _examAnswers = {};
+    _examTotal = totalPoints; _examResultId = resultId; _examAnswers = {}; _examTitle = examTitle;
+    _examLastSavedAt = ""; _examLocalDirty = false;
 
     if (secsLeft <= 0) { await submitPublicExam(true); return; }
 
@@ -725,10 +912,15 @@
     _examQuestions = (eqs||[]).filter(eq=>eq.question!==null);
 
     const { data: saved } = await sb.from("exam_answers").select("question_id,answer").eq("result_id",resultId);
-    (saved||[]).forEach(a => { if(a.answer) _examAnswers[a.question_id]=a.answer; });
+    const serverAnswers = {};
+    (saved||[]).forEach(a => { if(a.answer) serverAnswers[a.question_id]=a.answer; });
 
-    _examSeconds = secsLeft;
+    const restored = restoreDraftIfBetter(serverAnswers, secsLeft);
+    _examAnswers = restored.answers;
+    _examSeconds = restored.secondsLeft;
+
     renderPublicExamUI(examTitle, durationMin);
+    setExamSyncState("ready", restored.restored ? _examDraftNotice : "Đã khôi phục tiến trình làm bài.");
     startExamTimer();
   };
 
@@ -736,8 +928,9 @@
     clearInterval(_examTimer);
     _examTimer = setInterval(() => {
       _examSeconds--;
+      if (_examSeconds > 0 && _examSeconds % 15 === 0) persistExamDraft();
       updateClock();
-      if (_examSeconds % 60 === 0) saveProgress();
+      if (_examSeconds > 0 && _examSeconds % 30 === 0) saveProgress({ forceRemote: navigator.onLine, silent: true });
       if (_examSeconds <= 0) { clearInterval(_examTimer); submitPublicExam(true); }
     }, 1000);
   }
@@ -949,13 +1142,15 @@
             cursor:pointer;font-family:var(--font-body)">← Thoát</button>
           <span style="font-family:var(--font-display);font-size:${isCompactMobile ? '1rem' : '1.2rem'};flex:1;min-width:0;white-space:${isCompactMobile ? 'nowrap' : 'normal'};overflow:hidden;text-overflow:ellipsis">${examTitle}</span>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;justify-content:${isCompactMobile ? 'space-between' : 'flex-end'};width:${isCompactMobile ? '100%' : 'auto'}">
+        <div style="display:flex;align-items:center;gap:10px;justify-content:${isCompactMobile ? 'space-between' : 'flex-end'};width:${isCompactMobile ? '100%' : 'auto'};flex-wrap:wrap">
+          <span id="peSyncStatus" style="font-size:.75rem;font-weight:700;padding:7px 10px;border-radius:999px;background:#fff;color:#15803d">Đang chuẩn bị...</span>
           <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);
             padding:7px 14px;border-radius:8px">
             <span style="font-size:.8rem;color:rgba(255,255,255,.7)">${isCompactMobile ? 'Giờ' : 'Thời gian'}</span>
             <span id="peClock" style="font-size:1.22rem;font-weight:700;font-family:monospace;
               color:var(--gold-light);min-width:72px;text-align:center">${formatClock(_examSeconds)}</span>
           </div>
+          <button onclick="peManualSave()" style="background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);padding:${isCompactMobile ? '10px 14px' : '8px 14px'};border-radius:10px;font-size:.84rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">Lưu ngay</button>
           <button onclick="submitPublicExam(false)" style="background:var(--gold);color:var(--navy);
             border:none;padding:${isCompactMobile ? '10px 16px' : '9px 20px'};border-radius:10px;font-size:.95rem;font-weight:700;
             cursor:pointer;font-family:var(--font-body)">Nộp bài</button>
@@ -980,10 +1175,15 @@
           <div style="font-size:.8rem;color:var(--ink-mid);line-height:1.5">Chạm để chuyển nhanh giữa các câu.</div>
         </div>` : ''}
         <!-- Main content -->
-        <div id="peMainArea" style="flex:1;overflow-y:auto;padding:${isCompactMobile ? '14px 12px 20px' : '18px 20px'};background:#f8fafc">${sectionsHtml}</div>
-      </div>`;
+        <div id="peMainArea" style="flex:1;overflow-y:auto;padding:${isCompactMobile ? '14px 12px 90px' : '18px 20px'};background:#f8fafc">${sectionsHtml}</div>
+      </div>
+      ${isCompactMobile ? `<div style="position:sticky;bottom:0;display:flex;gap:10px;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);backdrop-filter:blur(10px);border-top:1px solid var(--border);box-shadow:0 -8px 20px rgba(15,23,42,.08)">
+        <button onclick="peManualSave()" style="flex:1;border:1px solid var(--border);background:#fff;color:var(--navy);min-height:46px;border-radius:14px;font-weight:700;font-family:var(--font-body)">Lưu tạm</button>
+        <button onclick="submitPublicExam(false)" style="flex:1;border:none;background:var(--navy);color:var(--gold-light);min-height:46px;border-radius:14px;font-weight:800;font-family:var(--font-body)">Nộp bài</button>
+      </div>` : ""}`;
 
     updateClock();
+    setExamSyncState(_examSyncState === "offline" ? "offline" : "ready", _examDraftNotice || "Đã mở giao diện làm bài.");
 
     /* Mount DOM cards vÃ o slots */
     _pendingCards.forEach(cardEl => {
@@ -1019,6 +1219,9 @@
 
   window._peAnswers = function(qid, val) {
     _examAnswers[qid] = val;
+    _examLocalDirty = true;
+    persistExamDraft();
+    setExamSyncState(navigator.onLine ? "saving" : "offline", navigator.onLine ? "Đã lưu cục bộ, chờ đồng bộ..." : "Mất mạng, đang giữ bản cục bộ");
     peUpdateNavDot(qid);
   };
   window.peTF = function(qid) {
@@ -1027,13 +1230,20 @@
     radios.forEach(r=>{
       if(r.checked){ const lbl=r.name.split("_").pop(); if(!seen.has(lbl)){seen.add(lbl);val+=lbl+r.value;} }
     });
-    _examAnswers[qid]=val; peUpdateNavDot(qid);
+    _examAnswers[qid]=val;
+    _examLocalDirty = true;
+    persistExamDraft();
+    setExamSyncState(navigator.onLine ? "saving" : "offline", navigator.onLine ? "Đã lưu cục bộ, chờ đồng bộ..." : "Mất mạng, đang giữ bản cục bộ");
+    peUpdateNavDot(qid);
   };
   window.peMC = function(qid) {
     const cbs = document.querySelectorAll(`input[id^="cb_${qid}_"]`);
     let val="";
     cbs.forEach(cb=>{ if(cb.checked) val+=cb.value; });
     _examAnswers[qid]=val;
+    _examLocalDirty = true;
+    persistExamDraft();
+    setExamSyncState(navigator.onLine ? "saving" : "offline", navigator.onLine ? "Đã lưu cục bộ, chờ đồng bộ..." : "Mất mạng, đang giữ bản cục bộ");
     cbs.forEach(cb=>{
       const lbl=document.getElementById("lbl_"+qid+"_"+cb.value);
       if(lbl){
@@ -1062,20 +1272,40 @@
     }
   };
 
-  async function saveProgress() {
+  async function saveProgress(options = {}) {
     if (!_examResultId) return;
+    const { forceRemote = true, silent = false, forceToast = false } = options;
     const sb = getSb();
-    await sb.from("exam_results").update({seconds_left:_examSeconds}).eq("id",_examResultId);
+    persistExamDraft();
+    if (!forceRemote || !navigator.onLine) {
+      setExamSyncState("offline", "Mất mạng, đang giữ bản cục bộ");
+      return;
+    }
+    setExamSyncState("saving");
+    const { error: resultErr } = await sb.from("exam_results").update({seconds_left:_examSeconds}).eq("id",_examResultId);
     const rows = Object.entries(_examAnswers)
       .filter(([,a])=>a&&a.trim())
       .map(([question_id,answer])=>({result_id:_examResultId,question_id,answer}));
-    if (rows.length) await sb.from("exam_answers").upsert(rows,{onConflict:"result_id,question_id"});
+    let answerErr = null;
+    if (rows.length) {
+      const response = await sb.from("exam_answers").upsert(rows,{onConflict:"result_id,question_id"});
+      answerErr = response.error;
+    }
+    if (resultErr || answerErr) {
+      setExamSyncState("offline", "Chưa đồng bộ được, đang giữ bản cục bộ");
+      if (!silent && forceToast) window.PublicExamSupport?.toast?.("Chưa lưu lên máy chủ, hệ thống vẫn giữ bản cục bộ.", "error");
+      return;
+    }
+    _examLocalDirty = false;
+    _examLastSavedAt = new Date().toISOString();
+    setExamSyncState("ready", `Đã lưu ${window.PublicExamSupport?.formatSyncTime?.(_examLastSavedAt) || ""}`.trim());
+    if (forceToast) window.PublicExamSupport?.toast?.("Đã lưu tiến trình làm bài.", "success");
   }
 
   window.peExitExam = async function() {
     if (!confirm("Thoát? Tiến trình được lưu, thời gian bị trừ 5 phút khi vào lại.")) return;
     clearInterval(_examTimer);
-    if (_examResultId) { await saveProgress(); _examResultId=null; }
+    if (_examResultId) { await saveProgress({ forceRemote: navigator.onLine, silent: false }); _examResultId=null; }
     getOverlay().style.display="none";
     await loadExamList();
   };
@@ -1138,6 +1368,7 @@
       await sb.from("exam_answers").delete().in("result_id",ids);
       await sb.from("exam_results").delete().in("id",ids);
     }
+    window.PublicExamSupport?.clearDraft?.(_examResultId);
     _examResultId=null;
     showPublicExamResult(scoreAuto, hasEssay);
   };

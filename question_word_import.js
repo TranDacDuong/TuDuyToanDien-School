@@ -245,20 +245,60 @@
   }
 
   function tableToText(tableEl) {
-    const rows = Array.from(tableEl.querySelectorAll("tr"))
-      .map((row) => {
-        const cells = Array.from(row.querySelectorAll("th,td"))
-          .map((cell) => cleanInlineText(cell.textContent))
-          .filter(Boolean);
-        return cells.length ? `| ${cells.join(" | ")} |` : "";
-      })
-      .filter(Boolean);
+    const matrix = [];
+    const rows = Array.from(tableEl.querySelectorAll("tr"));
 
-    return rows.length ? ["[BẢNG]", ...rows, "[/BẢNG]"].join("\n") : "";
+    rows.forEach((row, rowIndex) => {
+      matrix[rowIndex] = matrix[rowIndex] || [];
+      let columnIndex = 0;
+      while (matrix[rowIndex][columnIndex] !== undefined) columnIndex += 1;
+
+      Array.from(row.children || []).forEach((cell) => {
+        if (!/^(th|td)$/i.test(cell.tagName || "")) return;
+        while (matrix[rowIndex][columnIndex] !== undefined) columnIndex += 1;
+
+        const text = cleanInlineText(cell.textContent) || " ";
+        const rowSpan = Math.max(1, Number.parseInt(cell.getAttribute("rowspan") || "1", 10) || 1);
+        const colSpan = Math.max(1, Number.parseInt(cell.getAttribute("colspan") || "1", 10) || 1);
+
+        for (let r = 0; r < rowSpan; r++) {
+          const targetRow = rowIndex + r;
+          matrix[targetRow] = matrix[targetRow] || [];
+          for (let c = 0; c < colSpan; c++) {
+            matrix[targetRow][columnIndex + c] = r === 0 && c === 0 ? text : "↳";
+          }
+        }
+
+        columnIndex += colSpan;
+      });
+    });
+
+    const columnCount = matrix.reduce((max, row) => Math.max(max, row?.length || 0), 0);
+    const normalizedRows = matrix
+      .map((row, rowIndex) => {
+        const cells = [];
+        for (let i = 0; i < columnCount; i++) {
+          const value = cleanInlineText(row?.[i] || "");
+          cells.push(value || (rowIndex === 0 ? " " : "∅"));
+        }
+        return cells;
+      })
+      .filter((row) => row.some((cell) => cell && cell !== "∅"));
+
+    if (!normalizedRows.length) return "";
+
+    const header = normalizedRows[0];
+    const bodyRows = normalizedRows.slice(1);
+    const lines = ["[BẢNG]"];
+    if (header.length) lines.push(`| ${header.join(" | ")} |`);
+    if (bodyRows.length) lines.push(`| ${header.map(() => "---").join(" | ")} |`);
+    bodyRows.forEach((row) => lines.push(`| ${row.join(" | ")} |`));
+    lines.push("[/BẢNG]");
+    return lines.join("\n");
   }
 
   function parseWordQuestions(rawText) {
-    const text = normalizeLatexFractions(normalizeWordText(rawText));
+    const text = normalizeMathText(normalizeWordText(rawText));
     const blocks = splitQuestionBlocks(text);
     const questions = [];
     const warnings = [];
@@ -285,8 +325,24 @@
       .trim();
   }
 
-  function normalizeLatexFractions(text) {
-    return String(text || "").replace(/\\frac(?=\s*\{)/g, "\\dfrac");
+  function normalizeMathText(text) {
+    return String(text || "")
+      .replace(/\\frac(?=\s*\{)/g, "\\dfrac")
+      .replace(/\\left\s*/g, "\\left ")
+      .replace(/\\right\s*/g, "\\right ")
+      .replace(/\\(?:to|rightarrow)(?![a-zA-Z])/g, "\\rightarrow")
+      .replace(/\\(?:leftrightarrow|Leftrightarrow)(?![a-zA-Z])/g, "\\Leftrightarrow")
+      .replace(/\$\s+/g, "$")
+      .replace(/\s+\$/g, "$")
+      .replace(/\\\[\s+/g, "\\[")
+      .replace(/\s+\\\]/g, "\\]")
+      .replace(/\\\(\s+/g, "\\(")
+      .replace(/\s+\\\)/g, "\\)")
+      .replace(/\{\s+/g, "{")
+      .replace(/\s+\}/g, "}")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
   }
 
   function cleanInlineText(text) {
@@ -301,8 +357,25 @@
     const matches = [...text.matchAll(regex)];
 
     if (!matches.length) {
-      return text ? [text] : [];
+      const numberedBlocks = splitNumberedBlocks(text);
+      return numberedBlocks.length ? numberedBlocks : (text ? [text] : []);
     }
+
+    const blocks = [];
+    for (let i = 0; i < matches.length; i++) {
+      const matchText = matches[i][0];
+      const start = matches[i].index + (matchText.startsWith("\n") ? 1 : 0);
+      const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
+      const block = text.slice(start, end).trim();
+      if (block) blocks.push(block);
+    }
+    return blocks;
+  }
+
+  function splitNumberedBlocks(text) {
+    const regex = /(?:^|\n)\s*\d+\s*[:.)-]\s+/g;
+    const matches = [...String(text || "").matchAll(regex)];
+    if (matches.length < 2) return [];
 
     const blocks = [];
     for (let i = 0; i < matches.length; i++) {
@@ -317,31 +390,38 @@
 
   function parseQuestionBlock(block, index) {
     const warnings = [];
-    const withoutHeader = block.replace(/^\s*(?:Câu|Cau)\s*\d+\b\s*[:.)-]?\s*/iu, "").trim();
+    const withoutHeader = block
+      .replace(/^\s*(?:Câu|Cau)\s*\d+\b\s*[:.)-]?\s*/iu, "")
+      .replace(/^\s*\d+\s*[:.)-]\s*/u, "")
+      .trim();
     const content = withoutHeader || block.trim();
     if (!content) {
       return { question: null, warnings: [`Câu ${index + 1} trống nên đã bị bỏ qua.`] };
     }
 
-    const answerMatch = content.match(/(?:^|\n|\s)(?:Đáp án|Dap an|DAP AN|ĐA|DA)\s*[:\-]?\s*([A-D])/iu);
+    const answerMatch = content.match(/(?:^|\n|\s)(?:Đáp án đúng|Đáp án|Dap an dung|Dap an|DAP AN|ĐA|DA)\s*[:\-]?\s*([A-D])/iu);
     const answer = answerMatch?.[1]?.toUpperCase() || "";
     const body = answerMatch ? content.replace(answerMatch[0], " ").trim() : content;
 
     const optionMatches = findOptionMatches(body);
     const labels = optionMatches.map((match) => match.label).join("");
     const hasFullChoiceSet = /A.*B.*C.*D/.test(labels);
+    const hasTable = /\[BẢNG\]/u.test(body);
+    let confidence = hasTable ? 0.66 : 0.78;
 
     if (!hasFullChoiceSet) {
       warnings.push(`Câu ${index + 1}: chưa tách được đủ A, B, C, D nên đang để dạng tự luận để bạn rà lại.`);
       return {
         question: {
           question_type: "essay",
-          question_text: normalizeLatexFractions(body),
+          question_text: normalizeMathText(body),
           options: [],
           difficulty: 5,
           answer: "",
           answer_count: 0,
           has_figure: false,
+          _importConfidence: 0.45,
+          _importWarnings: warnings.slice(),
         },
         warnings,
       };
@@ -362,34 +442,48 @@
       return {
         question: {
           question_type: "essay",
-          question_text: normalizeLatexFractions(body),
+          question_text: normalizeMathText(body),
           options: [],
           difficulty: 5,
           answer: "",
           answer_count: 0,
           has_figure: false,
+          _importConfidence: 0.5,
+          _importWarnings: warnings.slice(),
         },
         warnings,
       };
     }
 
-    const questionText = normalizeLatexFractions(body.slice(0, optionMap.get("A").index).trim());
+    const questionText = normalizeMathText(body.slice(0, optionMap.get("A").index).trim());
     const options = required.map((label, i) => {
       const current = optionMap.get(label);
       const nextIndex = i + 1 < required.length ? optionMap.get(required[i + 1]).index : body.length;
-      const optionText = normalizeLatexFractions(body
+      const optionText = normalizeMathText(body
         .slice(current.contentStart, nextIndex)
-        .replace(/\s+/g, " ")
+        .replace(/[ \t]+/g, " ")
         .trim());
       return `${label}. ${optionText}`;
     });
 
     if (!questionText) {
       warnings.push(`Câu ${index + 1}: không nhận ra rõ phần đề bài, bạn nên kiểm tra lại.`);
+      confidence -= 0.18;
     }
 
     if (!answer) {
       warnings.push(`Câu ${index + 1}: chưa tìm thấy đáp án đúng, bạn cần bổ sung trước khi lưu.`);
+      confidence -= 0.12;
+    }
+
+    if (hasTable) {
+      warnings.push(`Câu ${index + 1}: có bảng trong nội dung, nên rà lại layout trước khi lưu.`);
+      confidence -= 0.08;
+    }
+
+    const inlineOptionLayout = required.every((label) => body.includes(`${label}.`) || body.includes(`${label})`));
+    if (!inlineOptionLayout) {
+      confidence -= 0.05;
     }
 
     return {
@@ -401,6 +495,8 @@
         answer,
         answer_count: 4,
         has_figure: false,
+        _importConfidence: Math.max(0.3, Math.min(0.99, Number(confidence.toFixed(2)))),
+        _importWarnings: warnings.slice(),
       },
       warnings,
     };
@@ -408,7 +504,7 @@
 
   function findOptionMatches(body) {
     const matches = [];
-    const regex = /(^|[\s\n])([A-Da-d])([.)\]:-])\s+/g;
+    const regex = /(^|[\s\n])([A-Da-d])([.)\]:-])(?=\s+)/g;
     let match;
 
     while ((match = regex.exec(body)) !== null) {
@@ -438,8 +534,9 @@
 
     const hint = document.getElementById("qAiHint");
     if (hint) {
+      const lowConfidenceCount = questions.filter((item) => Number(item?._importConfidence || 0) < 0.7).length;
       if (warnings?.length) {
-        hint.textContent = `Đã import ${questions.length} câu. Có ${warnings.length} chỗ cần giáo viên rà lại trước khi lưu.`;
+        hint.textContent = `Đã import ${questions.length} câu. Có ${warnings.length} chỗ cần rà lại, ${lowConfidenceCount} câu ở mức nhận diện chưa chắc.`;
         hint.style.cssText = "font-size:.75rem;color:#b45309;background:#fef3c7;padding:5px 10px;border-radius:7px";
       } else {
         hint.textContent = `Đã import ${questions.length} câu từ Word. Giáo viên kiểm tra rồi lưu từng câu.`;
