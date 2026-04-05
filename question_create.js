@@ -115,10 +115,16 @@ async function saveQuestion(shouldClose = true) {
     const boxes = document.querySelectorAll("#answerArea .answerBox");
     answerCount = boxes.length;
     const tfStates = [];
+    let hasUnset = false;
     boxes.forEach((box, i) => {
-      tfStates.push(box.querySelector(".state")?.innerText === "Đúng" ? "T" : "F");
+      const stateText = box.querySelector(".state")?.innerText || "";
+      if (stateText === "Đúng") tfStates.push("T");
+      else if (stateText === "Sai") tfStates.push("F");
+      else hasUnset = true;
     });
-    correctAnswer = window.QuestionAnswerFormat?.encodeTrueFalseSelections?.(tfStates, answerCount) || tfStates.join("");
+    correctAnswer = hasUnset
+      ? ""
+      : (window.QuestionAnswerFormat?.encodeTrueFalseSelections?.(tfStates, answerCount) || tfStates.join(""));
   }
 
   if (typeVal === "short_answer") {

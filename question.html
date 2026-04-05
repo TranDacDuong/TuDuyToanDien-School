@@ -976,10 +976,14 @@ function fillQuestion(idx) {
     document.querySelectorAll("#answerArea .answerBox").forEach((box, i) => {
       const st = box.querySelector(".state");
       if (st) {
-        const lbl = String.fromCharCode(97 + i);
-        const isT = ans.toLowerCase().includes(lbl + "t");
-        st.innerText = isT ? "Đúng" : "Sai";
-        st.className = "state " + (isT ? "correct" : "wrong");
+        if (!String(ans || "").trim()) {
+          st.innerText = "Chưa chọn";
+          st.className = "state";
+        } else {
+          const isT = window.QuestionAnswerFormat?.isTrueFalseStatementTrue?.(ans, i, count) || false;
+          st.innerText = isT ? "Đúng" : "Sai";
+          st.className = "state " + (isT ? "correct" : "wrong");
+        }
       }
     });
   } else if (q.question_type === "short_answer") {
@@ -1095,10 +1099,10 @@ function renderAnswerArea(type, count) {
       const box = document.createElement("div");
       box.className = "answerBox";
       box.style.cssText = "flex:1 1 100%;display:flex;align-items:center;gap:6px";
-      box.innerHTML = `<span style="font-weight:700;flex-shrink:0;min-width:20px">${String.fromCharCode(97 + i)})</span>
-        <input type="text" class="tf-text" placeholder="Nội dung ý ${String.fromCharCode(97+i)}"
-          style="flex:1;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-family:var(--font-body);font-size:.85rem;outline:none">
-        <span class="state wrong" onclick="toggleState(this)">Sai</span>`;
+        box.innerHTML = `<span style="font-weight:700;flex-shrink:0;min-width:20px">${String.fromCharCode(97 + i)})</span>
+          <input type="text" class="tf-text" placeholder="Nội dung ý ${String.fromCharCode(97+i)}"
+            style="flex:1;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-family:var(--font-body);font-size:.85rem;outline:none">
+          <span class="state" onclick="toggleState(this)">Chưa chọn</span>`;
       row.appendChild(box);
     }
     area.appendChild(row);
@@ -1113,14 +1117,18 @@ function renderAnswerArea(type, count) {
 }
 
 function toggleState(el) {
-  if (el.innerText === "Sai") {
+  if (el.innerText === "Chưa chọn") {
     el.innerText = "Đúng";
     el.classList.remove("wrong");
     el.classList.add("correct");
-  } else {
+  } else if (el.innerText === "Đúng") {
     el.innerText = "Sai";
     el.classList.remove("correct");
     el.classList.add("wrong");
+  } else {
+    el.innerText = "Chưa chọn";
+    el.classList.remove("correct");
+    el.classList.remove("wrong");
   }
 }
 
@@ -1136,8 +1144,8 @@ function addAnswer() {
   } else if (type === "true_false") {
     const box = document.createElement("div");
     box.className = "answerBox";
-    box.innerHTML = `<span>${String.fromCharCode(96 + answerCount)})</span>
-      <span class="state wrong" onclick="toggleState(this)">Sai</span>`;
+      box.innerHTML = `<span>${String.fromCharCode(96 + answerCount)})</span>
+        <span class="state" onclick="toggleState(this)">Chưa chọn</span>`;
     area.firstChild.appendChild(box);
   } else if (type === "short_answer") {
     const div = document.createElement("div");

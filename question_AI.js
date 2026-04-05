@@ -895,15 +895,18 @@ QUY TAC QUAN TRONG:
         let html = '<label class="field-label">Đúng/Sai <span style="font-weight:400;text-transform:none;font-size:.75rem;color:var(--ink-light)">(nội dung a,b,c,d đã có trong câu hỏi)</span></label><div class="answer-grid">';
         for (let i = 0; i < n; i++) {
           const lbl    = String.fromCharCode(97 + i);
-          const isTrue = window.QuestionAnswerFormat?.isTrueFalseStatementTrue?.(answer, i, n) || false;
+          const hasAnswer = String(answer || "").trim().length > 0;
+          const isTrue = hasAnswer
+            ? (window.QuestionAnswerFormat?.isTrueFalseStatementTrue?.(answer, i, n) || false)
+            : false;
           html += `<div class="tf-row">
             <div class="ans-label" style="width:22px;text-align:center;font-size:.8rem;font-weight:700;color:var(--ink-mid)">${lbl})</div>
-            <label class="tf-true"><input type="radio" name="tf_${idx}_${i}" value="T" ${isTrue?"checked":""} onchange="updateTF(${idx})"> Đúng</label>
-            <label class="tf-false"><input type="radio" name="tf_${idx}_${i}" value="F" ${!isTrue?"checked":""} onchange="updateTF(${idx})"> Sai</label>
+            <label class="tf-true"><input type="radio" name="tf_${idx}_${i}" value="T" ${hasAnswer && isTrue?"checked":""} onchange="updateTF(${idx})"> Đúng</label>
+            <label class="tf-false"><input type="radio" name="tf_${idx}_${i}" value="F" ${hasAnswer && !isTrue?"checked":""} onchange="updateTF(${idx})"> Sai</label>
           </div>`;
-      }
-      html += "</div>";
-      container.innerHTML = html;
+        }
+        html += "</div>";
+        container.innerHTML = html;
 
     } else if (type === "short_answer") {
       container.innerHTML = `<label class="field-label">Đáp án đúng</label>
@@ -939,12 +942,19 @@ QUY TAC QUAN TRONG:
     if (!_questions[idx]) return;
     const n = _questions[idx].answer_count||4;
     const states = [];
+    let hasUnset = false;
     for (let i=0;i<n;i++) {
       const val = document.querySelector(`input[name="tf_${idx}_${i}"]:checked`)?.value;
-      states.push(String(val || "F").toUpperCase() === "T" ? "T" : "F");
+      if (!val) {
+        hasUnset = true;
+      } else {
+        states.push(String(val || "F").toUpperCase() === "T" ? "T" : "F");
+      }
     }
     _questions[idx].answer =
-      window.QuestionAnswerFormat?.encodeTrueFalseSelections?.(states, n) || states.join("");
+      hasUnset
+        ? ""
+        : (window.QuestionAnswerFormat?.encodeTrueFalseSelections?.(states, n) || states.join(""));
   };
   window.changeQuestionType = (idx,t) => {
     if (!_questions[idx]) return;
