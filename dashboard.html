@@ -263,6 +263,68 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 }
 .ops-link.secondary { background: rgba(15,31,61,.08); color: var(--navy); }
 .ops-empty { color: var(--ink-light); font-size: .84rem; line-height: 1.7; }
+#mobileQuickActions { display: none; }
+#mobileQuickActions .mobile-quick-actions-shell {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(228,184,77,.18), transparent 42%),
+    linear-gradient(135deg, rgba(15,31,61,.98) 0%, rgba(31,65,128,.94) 100%);
+  border: 1px solid rgba(228,184,77,.22);
+  box-shadow: 0 18px 34px rgba(15,31,61,.16);
+}
+#mobileQuickActions .mobile-quick-action {
+  appearance: none;
+  border: none;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 74px;
+  padding: 12px 8px;
+  border-radius: 18px;
+  background: rgba(255,255,255,.08);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: .72rem;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+  transition: .18s ease;
+}
+#mobileQuickActions .mobile-quick-action span:first-child {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+#mobileQuickActions .mobile-quick-action.active {
+  background: linear-gradient(135deg, rgba(228,184,77,.28) 0%, rgba(255,255,255,.18) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+}
+#mobileQuickActions .mobile-quick-action-badge {
+  display: none;
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: .66rem;
+  font-weight: 800;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border: 2px solid rgba(15,31,61,.9);
+}
+#mobileQuickActions .mobile-quick-action-badge.show { display: inline-flex; }
 #mobileNav { display: none; }
 #mobileNav .mobile-nav-item {
   appearance: none;
@@ -430,7 +492,30 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   }
 
   body {
+    display: block;
     padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+
+  main {
+    min-height: 100dvh;
+  }
+
+  #mobileQuickActions {
+    display: block;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+    background: linear-gradient(180deg, rgba(253,250,244,.98) 0%, rgba(253,250,244,.94) 72%, rgba(253,250,244,0) 100%);
+    backdrop-filter: blur(10px);
+  }
+
+  .content {
+    min-height: 0;
+  }
+
+  iframe {
+    height: calc(100dvh - 180px);
   }
 
   #sidebarTab {
@@ -511,6 +596,29 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 <div id="sidebarTab" onclick="toggleSidebar()"></div>
 
 <main>
+  <section id="mobileQuickActions" aria-label="Loi tat mobile">
+    <div class="mobile-quick-actions-shell">
+      <button class="mobile-quick-action" type="button" data-page="search.html">
+        <span>🔎</span>
+        <span>Tìm kiếm</span>
+      </button>
+      <button class="mobile-quick-action" type="button" data-page="notifications.html">
+        <span>🔔</span>
+        <span>Thông báo</span>
+        <span class="mobile-quick-action-badge" id="notificationBadgeTop">0</span>
+      </button>
+      <button class="mobile-quick-action" type="button" data-page="friend_requests.html">
+        <span>🤝</span>
+        <span>Lời mời</span>
+        <span class="mobile-quick-action-badge" id="friendRequestBadgeTop">0</span>
+      </button>
+      <button class="mobile-quick-action" type="button" data-page="messages.html">
+        <span>💬</span>
+        <span>Nhắn tin</span>
+        <span class="mobile-quick-action-badge" id="messageBadgeTop">0</span>
+      </button>
+    </div>
+  </section>
   <section id="opsHub">
     <div class="ops-shell">
       <div class="ops-hero">
@@ -606,6 +714,7 @@ let badgeChannels = [];
 const HIDDEN_NOTIFICATION_TYPES = ["friend_request", "friend_accept", "message_new"];
 const contentFrame = document.getElementById("contentFrame");
 const mobileNavItems = [...document.querySelectorAll("#mobileNav .mobile-nav-item")];
+const mobileQuickActionItems = [...document.querySelectorAll("#mobileQuickActions .mobile-quick-action")];
 /* ── Sidebar toggle ── */
 const sidebar  = document.getElementById("sidebar");
 const tab      = document.getElementById("sidebarTab");
@@ -687,6 +796,27 @@ function setActiveMobileNav(page){
   });
 }
 
+function setActiveMobileQuickActions(page){
+  mobileQuickActionItems.forEach(item => {
+    item.classList.toggle("active", item.dataset.page === page);
+  });
+}
+
+function updateBadgeElements(ids, count){
+  ids
+    .map(id => document.getElementById(id))
+    .filter(Boolean)
+    .forEach(badge => {
+      if(!count){
+        badge.classList.remove("show");
+        badge.textContent = "0";
+        return;
+      }
+      badge.textContent = count > 99 ? "99+" : String(count);
+      badge.classList.add("show");
+    });
+}
+
 function openDashboardPage(page, options = {}){
   const { syncMenu = true, syncMobile = true } = options;
   if(!page) return;
@@ -696,6 +826,7 @@ function openDashboardPage(page, options = {}){
   else document.querySelectorAll("#menu li").forEach(item => item.classList.remove("active"));
   if(syncMobile) setActiveMobileNav(page);
   else setActiveMobileNav("");
+  setActiveMobileQuickActions(page);
   if(page === "ops-center"){
     opsHub?.classList.add("show");
     contentWrap?.classList.add("hidden");
@@ -722,6 +853,11 @@ function setupMenu(){
     });
   });
   // Click trang đầu tiên visible
+  mobileQuickActionItems.forEach(item => {
+    item.addEventListener("click", () => {
+      openDashboardPage(item.dataset.page, { syncMenu: false });
+    });
+  });
   const adminCenterAllowed = !!document.querySelector('#menu li[data-page="sourcedata.html"][style*="display: flex"], #menu li[data-page="sourcedata.html"]:not([style])');
   if(adminCenterAllowed){
     openDashboardPage("ops-center", { syncMenu: false, syncMobile: false });
@@ -744,29 +880,16 @@ function goToAccount(){
 }
 
 async function loadFriendRequestBadge(userId){
-  const badge = document.getElementById("friendRequestBadge");
-  if(!badge) return;
-
   const { count, error } = await sb
     .from("friend_requests")
     .select("*", { count: "exact", head: true })
     .eq("receiver_id", userId)
     .eq("status", "pending");
 
-  if(error || !count){
-    badge.classList.remove("show");
-    badge.textContent = "0";
-    return;
-  }
-
-  badge.textContent = count > 99 ? "99+" : String(count);
-  badge.classList.add("show");
+  updateBadgeElements(["friendRequestBadge", "friendRequestBadgeTop"], error ? 0 : count || 0);
 }
 
 async function loadNotificationBadge(userId){
-  const badge = document.getElementById("notificationBadge");
-  if(!badge) return;
-
   const { data, error } = await sb
     .from("notifications")
     .select("type")
@@ -774,21 +897,10 @@ async function loadNotificationBadge(userId){
     .eq("is_read", false);
 
   const count = (data || []).filter(item => !HIDDEN_NOTIFICATION_TYPES.includes(item.type)).length;
-
-  if(error || !count){
-    badge.classList.remove("show");
-    badge.textContent = "0";
-    return;
-  }
-
-  badge.textContent = count > 99 ? "99+" : String(count);
-  badge.classList.add("show");
+  updateBadgeElements(["notificationBadge", "notificationBadgeTop"], error ? 0 : count);
 }
 
 async function loadMessageBadge(userId){
-  const badge = document.getElementById("messageBadge");
-  if(!badge) return;
-
   const { count, error } = await sb
     .from("notifications")
     .select("*", { count: "exact", head: true })
@@ -796,14 +908,7 @@ async function loadMessageBadge(userId){
     .eq("is_read", false)
     .eq("type", "message_new");
 
-  if(error || !count){
-    badge.classList.remove("show");
-    badge.textContent = "0";
-    return;
-  }
-
-  badge.textContent = count > 99 ? "99+" : String(count);
-  badge.classList.add("show");
+  updateBadgeElements(["messageBadge", "messageBadgeTop"], error ? 0 : count || 0);
 }
 
 function subscribeBadgeChanges(userId){
