@@ -2028,41 +2028,6 @@ body {
     <aside class="overview-side">
       <div class="overview-card">
         <div class="overview-card-head">
-          <div class="overview-card-title">Đếm ngược ngày thi</div>
-          <div class="overview-card-sub">Mốc ngày thi có thể chỉnh lại theo lịch thực tế</div>
-        </div>
-        <div class="overview-card-body">
-          <div class="countdown-box" id="countdownBox"></div>
-          <div class="inline-admin-block" id="countdownAdminBlock" style="display:none;">
-            <div class="inline-admin-title">Quản lý các kỳ thi</div>
-            <div class="admin-inline">
-              <input class="admin-field" id="examEventTitleInline" type="text" placeholder="Tên kỳ thi">
-              <input class="admin-field" id="examEventAtInline" type="datetime-local">
-            </div>
-            <div class="admin-actions">
-              <button class="btn btn-primary btn-sm" type="button" onclick="createExamEvent()">Lưu kỳ thi</button>
-            </div>
-            <div class="admin-list" id="examAdminListInline"></div>
-          </div>
-        </div>
-      </div>
-      <div class="overview-card">
-        <div class="overview-card-head">
-          <div class="overview-card-title">Liên hệ</div>
-        </div>
-        <div class="overview-card-body">
-          <div class="contact-list" id="contactList"></div>
-          <div class="inline-admin-block" id="contactAdminBlock" style="display:none;">
-            <div class="inline-admin-title">Chỉnh sửa liên hệ</div>
-            <textarea class="admin-textarea" id="contactInfoInputInline" placeholder="Mỗi dòng là một nội dung liên hệ"></textarea>
-            <div class="admin-actions">
-              <button class="btn btn-primary btn-sm" type="button" onclick="saveContactInfo()">Lưu liên hệ</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="overview-card">
-        <div class="overview-card-head">
           <div class="overview-card-title">Đăng ký học thử</div>
           <div class="overview-card-sub">Để lại thông tin, admin sẽ nhận yêu cầu và liên hệ lại.</div>
         </div>
@@ -2104,6 +2069,41 @@ body {
             <button class="trial-submit" id="trialSubmitBtn" type="submit">Gửi ngay cho Admin</button>
             <div class="trial-message" id="trialMessage"></div>
           </form>
+        </div>
+      </div>
+      <div class="overview-card">
+        <div class="overview-card-head">
+          <div class="overview-card-title">Đếm ngược ngày thi</div>
+          <div class="overview-card-sub">Mốc ngày thi có thể chỉnh lại theo lịch thực tế</div>
+        </div>
+        <div class="overview-card-body">
+          <div class="countdown-box" id="countdownBox"></div>
+          <div class="inline-admin-block" id="countdownAdminBlock" style="display:none;">
+            <div class="inline-admin-title">Quản lý các kỳ thi</div>
+            <div class="admin-inline">
+              <input class="admin-field" id="examEventTitleInline" type="text" placeholder="Tên kỳ thi">
+              <input class="admin-field" id="examEventAtInline" type="datetime-local">
+            </div>
+            <div class="admin-actions">
+              <button class="btn btn-primary btn-sm" type="button" onclick="createExamEvent()">Lưu kỳ thi</button>
+            </div>
+            <div class="admin-list" id="examAdminListInline"></div>
+          </div>
+        </div>
+      </div>
+      <div class="overview-card">
+        <div class="overview-card-head">
+          <div class="overview-card-title">Liên hệ</div>
+        </div>
+        <div class="overview-card-body">
+          <div class="contact-list" id="contactList"></div>
+          <div class="inline-admin-block" id="contactAdminBlock" style="display:none;">
+            <div class="inline-admin-title">Chỉnh sửa liên hệ</div>
+            <textarea class="admin-textarea" id="contactInfoInputInline" placeholder="Mỗi dòng là một nội dung liên hệ"></textarea>
+            <div class="admin-actions">
+              <button class="btn btn-primary btn-sm" type="button" onclick="saveContactInfo()">Lưu liên hệ</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="overview-card">
