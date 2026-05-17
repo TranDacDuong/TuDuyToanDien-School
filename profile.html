@@ -126,6 +126,12 @@ body {
   grid-template-columns: 320px minmax(0, 1fr);
   gap: 20px;
 }
+.layout.teacher-layout {
+  grid-template-columns: 1fr;
+}
+.layout.teacher-layout > aside {
+  display: none;
+}
 .panel-head {
   padding: 18px 20px 14px;
   border-bottom: 1px solid var(--surface);
@@ -834,6 +840,7 @@ async function renderTeacherProfile() {
   const isTeacher = viewedProfile.role === "teacher" || viewedProfile.role === "admin";
   const wrap = document.getElementById("teacherProfileWrap");
   if (!wrap) return;
+  document.querySelector(".layout")?.classList.toggle("teacher-layout", isTeacher);
   wrap.classList.toggle("show", isTeacher);
   if (!isTeacher) return;
 
