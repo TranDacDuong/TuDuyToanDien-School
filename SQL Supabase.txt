@@ -2717,3 +2717,200 @@ CHECK (answer_status IN ('missing', 'ai', 'reviewed'));
 
 CREATE INDEX IF NOT EXISTS question_bank_answer_status_idx
   ON public.question_bank (answer_status);
+
+-- ============================================
+-- Public offline class schedule policies
+-- Allows guests to view teacher offline schedules on public teacher profiles.
+-- Hidden classes stay private. Admins and teachers keep management access.
+-- ============================================
+
+ALTER TABLE public.classes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.class_teachers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.class_schedules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.rooms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.grades ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.subjects ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS classes_public_schedule_select ON public.classes;
+CREATE POLICY classes_public_schedule_select ON public.classes
+FOR SELECT
+USING (
+  hidden = false
+  OR EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS class_teachers_public_schedule_select ON public.class_teachers;
+CREATE POLICY class_teachers_public_schedule_select ON public.class_teachers
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.classes c
+    WHERE c.id = class_teachers.class_id
+      AND c.hidden = false
+  )
+  OR EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS class_schedules_public_schedule_select ON public.class_schedules;
+CREATE POLICY class_schedules_public_schedule_select ON public.class_schedules
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.classes c
+    WHERE c.id = class_schedules.class_id
+      AND c.hidden = false
+  )
+  OR EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS rooms_public_schedule_select ON public.rooms;
+CREATE POLICY rooms_public_schedule_select ON public.rooms
+FOR SELECT
+USING (true);
+
+DROP POLICY IF EXISTS grades_public_schedule_select ON public.grades;
+CREATE POLICY grades_public_schedule_select ON public.grades
+FOR SELECT
+USING (true);
+
+DROP POLICY IF EXISTS subjects_public_schedule_select ON public.subjects;
+CREATE POLICY subjects_public_schedule_select ON public.subjects
+FOR SELECT
+USING (true);
+
+DROP POLICY IF EXISTS classes_staff_manage ON public.classes;
+CREATE POLICY classes_staff_manage ON public.classes
+FOR ALL
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS class_teachers_staff_manage ON public.class_teachers;
+CREATE POLICY class_teachers_staff_manage ON public.class_teachers
+FOR ALL
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS class_schedules_staff_manage ON public.class_schedules;
+CREATE POLICY class_schedules_staff_manage ON public.class_schedules
+FOR ALL
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS rooms_staff_manage ON public.rooms;
+CREATE POLICY rooms_staff_manage ON public.rooms
+FOR ALL
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS grades_staff_manage ON public.grades;
+CREATE POLICY grades_staff_manage ON public.grades
+FOR ALL
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS subjects_staff_manage ON public.subjects;
+CREATE POLICY subjects_staff_manage ON public.subjects
+FOR ALL
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
