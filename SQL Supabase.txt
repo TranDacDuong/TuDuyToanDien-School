@@ -308,9 +308,32 @@ ALTER TABLE public.notifications
       'class_session_updated',
       'class_exam_added',
       'tuition_due',
-      'tuition_reminder'
+      'tuition_reminder',
+      'trial_lesson_request'
     )
   );
+
+-- ============================================
+-- Trial lesson requests from public homepage
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS public.trial_lesson_requests (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_name text NOT NULL,
+  phone text NOT NULL,
+  grade text NOT NULL,
+  subject text NOT NULL,
+  source_url text,
+  status text NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'contacted', 'closed')),
+  handled_by uuid,
+  handled_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT trial_lesson_requests_pkey PRIMARY KEY (id),
+  CONSTRAINT trial_lesson_requests_handled_by_fkey FOREIGN KEY (handled_by) REFERENCES public.users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS trial_lesson_requests_status_created_idx
+  ON public.trial_lesson_requests (status, created_at DESC);
 
 -- ============================================
 -- Messaging feature migration
@@ -367,6 +390,7 @@ ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.friend_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.friendships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trial_lesson_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.conversation_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
@@ -570,13 +594,54 @@ USING (auth.uid() = user_id);
 DROP POLICY IF EXISTS notifications_insert_policy ON public.notifications;
 CREATE POLICY notifications_insert_policy ON public.notifications
 FOR INSERT
-WITH CHECK (auth.uid() = actor_id);
+WITH CHECK (
+  auth.uid() = actor_id
+  OR (
+    type = 'trial_lesson_request'
+    AND actor_id IS NULL
+    AND EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE u.id = notifications.user_id AND u.role = 'admin'
+    )
+  )
+);
 
 DROP POLICY IF EXISTS notifications_update_policy ON public.notifications;
 CREATE POLICY notifications_update_policy ON public.notifications
 FOR UPDATE
 USING (auth.uid() = user_id)
 WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS trial_lesson_requests_insert_policy ON public.trial_lesson_requests;
+CREATE POLICY trial_lesson_requests_insert_policy ON public.trial_lesson_requests
+FOR INSERT
+WITH CHECK (true);
+
+DROP POLICY IF EXISTS trial_lesson_requests_select_policy ON public.trial_lesson_requests;
+CREATE POLICY trial_lesson_requests_select_policy ON public.trial_lesson_requests
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
+DROP POLICY IF EXISTS trial_lesson_requests_update_policy ON public.trial_lesson_requests;
+CREATE POLICY trial_lesson_requests_update_policy ON public.trial_lesson_requests
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
 
 DROP POLICY IF EXISTS conversation_members_select_policy ON public.conversation_members;
 CREATE POLICY conversation_members_select_policy ON public.conversation_members
@@ -720,7 +785,7 @@ ALTER TABLE public.home_teachers ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS exam_events_select_policy ON public.exam_events;
 CREATE POLICY exam_events_select_policy ON public.exam_events
 FOR SELECT
-USING (auth.uid() IS NOT NULL);
+USING (true);
 
 DROP POLICY IF EXISTS exam_events_insert_policy ON public.exam_events;
 CREATE POLICY exam_events_insert_policy ON public.exam_events
@@ -746,7 +811,7 @@ USING (
 DROP POLICY IF EXISTS site_settings_select_policy ON public.site_settings;
 CREATE POLICY site_settings_select_policy ON public.site_settings
 FOR SELECT
-USING (auth.uid() IS NOT NULL);
+USING (true);
 
 DROP POLICY IF EXISTS site_settings_insert_policy ON public.site_settings;
 CREATE POLICY site_settings_insert_policy ON public.site_settings
@@ -777,7 +842,7 @@ WITH CHECK (
 DROP POLICY IF EXISTS home_teachers_select_policy ON public.home_teachers;
 CREATE POLICY home_teachers_select_policy ON public.home_teachers
 FOR SELECT
-USING (auth.uid() IS NOT NULL);
+USING (true);
 
 DROP POLICY IF EXISTS home_teachers_insert_policy ON public.home_teachers;
 CREATE POLICY home_teachers_insert_policy ON public.home_teachers
@@ -959,7 +1024,7 @@ USING (
 DROP POLICY IF EXISTS course_managers_select_policy ON public.course_managers;
 CREATE POLICY course_managers_select_policy ON public.course_managers
 FOR SELECT
-USING (auth.uid() IS NOT NULL);
+USING (true);
 
 DROP POLICY IF EXISTS course_managers_insert_policy ON public.course_managers;
 CREATE POLICY course_managers_insert_policy ON public.course_managers

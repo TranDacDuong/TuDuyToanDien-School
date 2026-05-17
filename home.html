@@ -583,6 +583,65 @@ body {
   line-height: 1.5;
   border: 1px solid rgba(15,31,61,.06);
 }
+.trial-form {
+  display: grid;
+  gap: 10px;
+}
+.trial-field {
+  display: grid;
+  gap: 5px;
+}
+.trial-field label {
+  color: var(--ink-mid);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.trial-input,
+.trial-select {
+  width: 100%;
+  border: 1px solid rgba(15,31,61,.12);
+  border-radius: 12px;
+  background: #fbfdff;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: .86rem;
+  padding: 11px 12px;
+  outline: none;
+  transition: .16s ease;
+}
+.trial-input:focus,
+.trial-select:focus {
+  border-color: rgba(29,107,209,.34);
+  box-shadow: 0 0 0 3px rgba(29,107,209,.1);
+  background: #fff;
+}
+.trial-submit {
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, var(--navy) 0%, #1d6bd1 100%);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: .88rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: .16s ease;
+}
+.trial-submit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(29,107,209,.18);
+}
+.trial-message {
+  min-height: 18px;
+  color: var(--ink-light);
+  font-size: .78rem;
+  line-height: 1.45;
+}
+.trial-message.success { color: #15803d; }
+.trial-message.error { color: #dc2626; }
 .overview-admin {
   display: none;
 }
@@ -2004,6 +2063,51 @@ body {
       </div>
       <div class="overview-card">
         <div class="overview-card-head">
+          <div class="overview-card-title">Đăng ký học thử</div>
+          <div class="overview-card-sub">Để lại thông tin, admin sẽ nhận yêu cầu và liên hệ lại.</div>
+        </div>
+        <div class="overview-card-body">
+          <form class="trial-form" id="trialLessonForm" onsubmit="submitTrialLessonRequest(event)">
+            <div class="trial-field">
+              <label for="trialName">Tên</label>
+              <input class="trial-input" id="trialName" name="student_name" type="text" autocomplete="name" required>
+            </div>
+            <div class="trial-field">
+              <label for="trialPhone">SĐT</label>
+              <input class="trial-input" id="trialPhone" name="phone" type="tel" autocomplete="tel" required>
+            </div>
+            <div class="trial-field">
+              <label for="trialGrade">Khối</label>
+              <select class="trial-select" id="trialGrade" name="grade" required>
+                <option value="">Chọn khối</option>
+                <option value="6">Khối 6</option>
+                <option value="7">Khối 7</option>
+                <option value="8">Khối 8</option>
+                <option value="9">Khối 9</option>
+                <option value="10">Khối 10</option>
+                <option value="11">Khối 11</option>
+                <option value="12">Khối 12</option>
+              </select>
+            </div>
+            <div class="trial-field">
+              <label for="trialSubject">Môn</label>
+              <input class="trial-input" id="trialSubject" name="subject" type="text" list="trialSubjectOptions" required>
+              <datalist id="trialSubjectOptions">
+                <option value="Toán Học"></option>
+                <option value="Vật Lý"></option>
+                <option value="Hóa Học"></option>
+                <option value="Sinh Học"></option>
+                <option value="Ngữ Văn"></option>
+                <option value="Tiếng Anh"></option>
+              </datalist>
+            </div>
+            <button class="trial-submit" id="trialSubmitBtn" type="submit">Gửi ngay cho Admin</button>
+            <div class="trial-message" id="trialMessage"></div>
+          </form>
+        </div>
+      </div>
+      <div class="overview-card">
+        <div class="overview-card-head">
           <div class="overview-card-title">Tin tức</div>
         </div>
         <div class="overview-card-body">
@@ -2631,6 +2735,83 @@ function renderCenterIntro() {
       <div class="intro-card-text">${formatRichText(centerIntro.content || "")}</div>
     </article>
   `;
+}
+
+window.submitTrialLessonRequest = async function(event) {
+  event.preventDefault();
+  const form = document.getElementById("trialLessonForm");
+  const button = document.getElementById("trialSubmitBtn");
+  const message = document.getElementById("trialMessage");
+  if (!form || !button || !message) return;
+
+  const payload = {
+    student_name: document.getElementById("trialName")?.value.trim() || "",
+    phone: document.getElementById("trialPhone")?.value.trim() || "",
+    grade: document.getElementById("trialGrade")?.value || "",
+    subject: document.getElementById("trialSubject")?.value.trim() || "",
+    source_url: location.href
+  };
+
+  message.className = "trial-message";
+  message.textContent = "";
+  if (!payload.student_name || !payload.phone || !payload.grade || !payload.subject) {
+    message.classList.add("error");
+    message.textContent = "Vui lòng nhập đủ Tên, SĐT, Khối và Môn.";
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "Đang gửi...";
+  try {
+    const { data: inserted, error } = await sb
+      .from("trial_lesson_requests")
+      .insert(payload)
+      .select("id")
+      .single();
+
+    if (error) throw error;
+    await notifyAdminsAboutTrialRequest(inserted?.id, payload);
+    form.reset();
+    message.classList.add("success");
+    message.textContent = "Đã gửi yêu cầu học thử. Admin sẽ liên hệ lại sớm.";
+  } catch (error) {
+    message.classList.add("error");
+    message.textContent = "Chưa gửi được yêu cầu. Vui lòng thử lại hoặc liên hệ trực tiếp với trung tâm.";
+    console.warn("Trial lesson request failed", error);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Gửi ngay cho Admin";
+  }
+};
+
+async function notifyAdminsAboutTrialRequest(requestId, payload) {
+  try {
+    const { data: admins, error: adminError } = await sb
+      .from("users")
+      .select("id")
+      .eq("role", "admin");
+    if (adminError || !admins?.length) return;
+
+    const rows = admins.map(admin => ({
+      user_id: admin.id,
+      actor_id: null,
+      type: "trial_lesson_request",
+      ref_id: requestId || null,
+      title: "Có đăng ký học thử mới",
+      message: `${payload.student_name} - ${payload.phone} - Khối ${payload.grade} - ${payload.subject}`,
+      target_url: "home.html",
+      meta: {
+        student_name: payload.student_name,
+        phone: payload.phone,
+        grade: payload.grade,
+        subject: payload.subject,
+        source_url: payload.source_url
+      }
+    }));
+    await sb.from("notifications").insert(rows);
+  } catch (error) {
+    console.warn("Could not notify admins about trial request", error);
+  }
 }
 
 function setupHomeLinks() {
