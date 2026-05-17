@@ -2175,6 +2175,14 @@ function ensureHomeOverlayShell() {
 function enhanceHomeHub() {
   const hub = document.querySelector(".social-hub");
   if (!hub) return;
+  if (!currentUser) {
+    hub.innerHTML = `
+      <button class="hub-button" type="button" title="Đăng nhập" onclick="parent?.openAuthModal ? parent.openAuthModal('login') : location.href='dashboard.html'">
+        <span class="hub-icon">${uiIcons.search}</span>
+      </button>
+    `;
+    return;
+  }
   hub.innerHTML = `
     <button class="hub-button" type="button" title="Tìm kiếm" onclick="toggleSocialPanel('search')">
       <span class="hub-icon">${uiIcons.search}</span>
@@ -2376,12 +2384,24 @@ window.addEventListener("resize", () => {
 });
 
 async function init() {
-  enhanceHomeHub();
   ensureHomeOverlayShell();
   enhanceComposerUI();
   const { data: { user } } = await sb.auth.getUser();
-  if (!user) { location.href = "index.html"; return; }
-  currentUser = user;
+  currentUser = user || null;
+  if (!currentUser) {
+    role = "guest";
+    currentProfile = null;
+    enhanceHomeHub();
+    await loadOverviewSettings();
+    setupHomeLinks();
+    updateFeedFilterButton();
+    updateHomeTabs();
+    renderCountdown();
+    setInterval(renderCountdown, 60000);
+    await loadPosts();
+    return;
+  }
+  enhanceHomeHub();
   const { data: p } = await sb.from("users").select("*").eq("id", user.id).single();
   role = p.role; currentProfile = p;
   await loadFriendIds();
@@ -2426,7 +2446,7 @@ async function loadLikedPosts() {
 }
 
 async function loadOverviewSettings() {
-  const courseQuery = role === "student"
+  const courseQuery = (role === "student" || role === "guest")
     ? sb.from("courses").select("id, name, description, cover_url, start_date, end_date, status, tuition_fee, planned_sessions").eq("is_home_pinned", true).eq("status", "open").order("updated_at", { ascending: false })
     : sb.from("courses").select("id, name, description, cover_url, start_date, end_date, status, tuition_fee, planned_sessions").eq("is_home_pinned", true).order("updated_at", { ascending: false });
 
@@ -2625,6 +2645,7 @@ function setupHomeLinks() {
 }
 
 async function loadHomeHubBadges() {
+  if (!currentUser) return;
   const [notificationRes, friendRequestRes, messageRes] = await Promise.all([
     sb.from("notifications").select("type").eq("user_id", currentUser.id).eq("is_read", false),
     sb.from("friend_requests").select("*", { count: "exact", head: true }).eq("receiver_id", currentUser.id).eq("status", "pending"),
@@ -2645,6 +2666,7 @@ function updateHubBadge(id, count) {
 }
 
 function subscribeHomeHubBadges() {
+  if (!currentUser) return;
   if (homeBadgeChannel) {
     sb.removeChannel(homeBadgeChannel);
     homeBadgeChannel = null;
@@ -2932,6 +2954,7 @@ async function loadPosts() {
 }
 
 function matchFeedFilter(post, filter) {
+  if (!currentUser) return filter === "all";
   if (filter === "mine") return post.user_id === currentUser.id;
   if (filter === "friends") return friendIds.has(post.user_id);
   return true;
@@ -2939,6 +2962,7 @@ function matchFeedFilter(post, filter) {
 
 function canViewPost(post) {
   if (!post) return false;
+  if (!currentUser) return post.status === "approved" && (post.visibility || "public") === "public";
   if (post.user_id === currentUser.id) return true;
   if (post.status === "pending" || post.status === "rejected") {
     return role === "admin" || role === "teacher";
@@ -2954,7 +2978,7 @@ function canViewPost(post) {
 function buildCard(post) {
   const isPending  = post.status === "pending";
   const isRejected = post.status === "rejected";
-  const isMyPost   = post.user_id === currentUser.id;
+  const isMyPost   = !!currentUser && post.user_id === currentUser.id;
   const canMod     = role === "admin" || role === "teacher";
   const isAdmin    = role === "admin";
 
@@ -2994,7 +3018,10 @@ function buildCard(post) {
     .map(item => `<div class="post-media-wrap"><img class="post-media-img" src="${item.file_url}" alt="Ảnh bài viết"></div>`)
     .join("");
 
-  const actionBar = (!isPending && !isRejected) ? `
+  const actionBar = (!currentUser && !isPending && !isRejected) ? `
+    <div class="post-actions">
+      <button class="act-btn" onclick="parent?.openAuthModal ? parent.openAuthModal('login') : location.href='dashboard.html'">Đăng nhập để tương tác</button>
+    </div>` : (!isPending && !isRejected) ? `
     <div class="post-actions">
       <button class="act-btn ${isLiked ? "liked" : ""}" id="likeBtn_${post.id}" onclick="likePost('${post.id}')">❤️ <span id="likeCount_${post.id}">${likeCount}</span></button>
       <button class="act-btn" onclick="toggleCmt('${post.id}')">💬 ${cmtCount}</button>
@@ -3623,7 +3650,7 @@ window.saveContactInfo = async function() {
 function buildCard(post) {
   const isPending = post.status === "pending";
   const isRejected = post.status === "rejected";
-  const isMyPost = post.user_id === currentUser.id;
+  const isMyPost = !!currentUser && post.user_id === currentUser.id;
   const canMod = role === "admin" || role === "teacher";
   const isAdmin = role === "admin";
 
@@ -3658,7 +3685,10 @@ function buildCard(post) {
     .map(item => `<div class="post-media-wrap"><img class="post-media-img" src="${item.file_url}" alt="Ảnh bài viết"></div>`)
     .join("");
 
-  const actionBar = (!isPending && !isRejected) ? `
+  const actionBar = (!currentUser && !isPending && !isRejected) ? `
+    <div class="post-actions">
+      <button class="act-btn" onclick="parent?.openAuthModal ? parent.openAuthModal('login') : location.href='dashboard.html'">Đăng nhập để tương tác</button>
+    </div>` : (!isPending && !isRejected) ? `
     <div class="post-actions">
       <button class="act-btn ${isLiked ? "liked" : ""}" id="likeBtn_${post.id}" onclick="likePost('${post.id}')">❤️ <span id="likeCount_${post.id}">${likeCount}</span></button>
       <button class="act-btn" onclick="toggleCmt('${post.id}')">💬 ${cmtCount}</button>

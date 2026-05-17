@@ -130,6 +130,15 @@ aside.open ~ #sidebarTab,
   margin-top: 3px; font-family: var(--font-body); transition: .15s;
 }
 .logoutBtn:hover { background: #ef4444; color: #fff; border-color: #ef4444; }
+.authActions { display: grid; gap: 7px; width: 100%; }
+.authBtn {
+  border: 1px solid rgba(228,184,77,.28); border-radius: 8px; padding: 8px 10px;
+  font-family: var(--font-body); font-size: .78rem; font-weight: 700;
+  cursor: pointer; transition: .16s ease;
+}
+.authBtn.primary { background: var(--gold-light); color: var(--navy); }
+.authBtn.secondary { background: rgba(255,255,255,.08); color: rgba(255,255,255,.86); }
+.authBtn:hover { transform: translateY(-1px); }
 
 aside ul { list-style: none; padding: 0; margin: 0; flex: 1; }
 aside li {
@@ -393,6 +402,31 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   font-weight: 600; font-size: .9rem;
 }
 .modal-box button:hover { background: var(--navy-light); }
+.auth-modal-box { width: min(92vw, 420px); padding: 28px; text-align: left; }
+.auth-modal-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 18px; }
+.auth-modal-title { margin: 0; font-family: var(--font-display); color: var(--navy); font-size: 1.45rem; }
+.auth-modal-sub { margin: 5px 0 0; color: var(--ink-mid); font-size: .88rem; line-height: 1.55; }
+.auth-close {
+  width: 36px !important; height: 36px; margin: 0 !important; padding: 0 !important;
+  border-radius: 50% !important; color: var(--navy) !important; background: #eef3fb !important;
+}
+.auth-field { margin-bottom: 14px; }
+.auth-field label {
+  display: block; margin-bottom: 6px; color: var(--ink-mid); font-size: .76rem;
+  font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+}
+.auth-field input {
+  width: 100%; border: 1px solid rgba(15,31,61,.14); border-radius: 10px;
+  padding: 12px 13px; font-family: var(--font-body); font-size: .92rem;
+  background: #fbfdff; color: var(--ink);
+}
+.auth-submit { margin-top: 4px !important; background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%) !important; width: 100%; }
+.auth-switch { margin-top: 16px; text-align: center; color: var(--ink-mid); font-size: .88rem; }
+.auth-switch button {
+  width: auto !important; margin: 0 !important; padding: 0 !important; border: 0 !important;
+  background: transparent !important; color: var(--gold) !important; font-weight: 800;
+}
+.auth-error { min-height: 20px; margin: 0 0 10px; color: #dc2626; font-size: .82rem; line-height: 1.45; }
 
 @media (max-width: 768px) {
   body,
@@ -705,12 +739,46 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   </div>
 </div>
 
+<div id="authModal" class="modal">
+  <div class="modal-box auth-modal-box">
+    <div class="auth-modal-head">
+      <div>
+        <h3 class="auth-modal-title" id="authTitle">Đăng nhập</h3>
+        <p class="auth-modal-sub" id="authSub">Đăng nhập để học tập, nhắn tin và theo dõi tiến độ cá nhân.</p>
+      </div>
+      <button class="auth-close" type="button" onclick="closeAuthModal()">×</button>
+    </div>
+    <div class="auth-field">
+      <label>Email</label>
+      <input id="authEmail" type="email" placeholder="example@email.com" autocomplete="email">
+    </div>
+    <div class="auth-field">
+      <label>Mật khẩu</label>
+      <input id="authPassword" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <div class="auth-field" id="authPassword2Wrap" style="display:none">
+      <label>Nhập lại mật khẩu</label>
+      <input id="authPassword2" type="password" placeholder="••••••••">
+    </div>
+    <div class="auth-error" id="authError"></div>
+    <button class="auth-submit" id="authSubmitBtn" type="button" onclick="submitAuthForm()">Đăng nhập</button>
+    <div class="auth-switch">
+      <span id="authSwitchText">Chưa có tài khoản? </span>
+      <button type="button" onclick="toggleAuthMode()" id="authSwitchBtn">Đăng ký ngay</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
 <script src="dashboard_ops.js"></script>
 <script>
 let badgeChannels = [];
+let currentDashboardUser = null;
+let currentDashboardProfile = null;
+let authMode = "login";
 const HIDDEN_NOTIFICATION_TYPES = ["friend_request", "friend_accept", "message_new"];
+const PUBLIC_DASHBOARD_PAGES = new Set(["home.html", "courses.html", "public_exam.html", "game.html", "resources.html"]);
 const contentFrame = document.getElementById("contentFrame");
 const mobileNavItems = [...document.querySelectorAll("#mobileNav .mobile-nav-item")];
 const mobileQuickActionItems = [...document.querySelectorAll("#mobileQuickActions .mobile-quick-action")];
@@ -749,11 +817,18 @@ tab.addEventListener("mouseleave", e => {
 /* ── Dashboard init ── */
 async function initDashboard(){
   const user = await window.AppAuth?.getUser?.();
-  if(!user){ window.location.href = "index.html"; return; }
+  currentDashboardUser = user || null;
+  if(!user){
+    applyGuestMenu();
+    setupMenu();
+    document.body.style.visibility = "visible";
+    return;
+  }
 
   const { data: profile, error } = await sb.from("users").select("*").eq("id", user.id).maybeSingle();
   if(error || !profile){ alert("Không tìm thấy thông tin người dùng"); return; }
 
+  currentDashboardProfile = profile;
   applyRoleMenu(profile.role);
   setupMenu();
   checkProfile(profile);
@@ -773,7 +848,21 @@ function loadUserInfo(profile){
 
 async function logout(){
   await sb.auth.signOut();
-  window.location.href = "index.html";
+  window.location.href = "dashboard.html";
+}
+
+function applyGuestMenu(){
+  const userBox = document.getElementById("userBox");
+  userBox.innerHTML = `
+    <div class="authActions">
+      <button class="authBtn primary" type="button" onclick="openAuthModal('login')">Đăng nhập</button>
+      <button class="authBtn secondary" type="button" onclick="openAuthModal('register')">Đăng ký</button>
+    </div>
+  `;
+  document.querySelectorAll("#menu li").forEach(item => {
+    item.style.display = PUBLIC_DASHBOARD_PAGES.has(item.dataset.page) ? "flex" : "none";
+  });
+  document.getElementById("mobileQuickActions")?.style.setProperty("display", "none");
 }
 
 function applyRoleMenu(role){
@@ -819,6 +908,11 @@ function updateBadgeElements(ids, count){
 function openDashboardPage(page, options = {}){
   const { syncMenu = true, syncMobile = true } = options;
   if(!page) return;
+  const basePage = page.split("?")[0];
+  if(!currentDashboardUser && !PUBLIC_DASHBOARD_PAGES.has(basePage)){
+    openAuthModal("login");
+    return;
+  }
   const opsHub = document.getElementById("opsHub");
   const contentWrap = document.querySelector(".content");
   if(syncMenu) setActiveMenuItem(page);
@@ -854,6 +948,10 @@ function setupMenu(){
   // Click trang đầu tiên visible
   mobileQuickActionItems.forEach(item => {
     item.addEventListener("click", () => {
+      if(!currentDashboardUser){
+        openAuthModal("login");
+        return;
+      }
       openDashboardPage(item.dataset.page, { syncMenu: false });
     });
   });
@@ -864,6 +962,78 @@ function setupMenu(){
   }
   const first = [...items].find(i => i.style.display !== "none");
   if(first) openDashboardPage(first.dataset.page);
+}
+
+function openAuthModal(mode = "login"){
+  authMode = mode === "register" ? "register" : "login";
+  syncAuthModal();
+  document.getElementById("authModal").style.display = "flex";
+  setTimeout(() => document.getElementById("authEmail")?.focus(), 0);
+}
+
+function closeAuthModal(){
+  document.getElementById("authModal").style.display = "none";
+}
+
+function toggleAuthMode(){
+  authMode = authMode === "login" ? "register" : "login";
+  syncAuthModal();
+}
+
+function syncAuthModal(){
+  const isLogin = authMode === "login";
+  document.getElementById("authTitle").textContent = isLogin ? "Đăng nhập" : "Tạo tài khoản";
+  document.getElementById("authSub").textContent = isLogin
+    ? "Đăng nhập để học tập, nhắn tin và theo dõi tiến độ cá nhân."
+    : "Tạo tài khoản để gửi yêu cầu đăng ký khóa học và tham gia hệ thống.";
+  document.getElementById("authSubmitBtn").textContent = isLogin ? "Đăng nhập" : "Tạo tài khoản";
+  document.getElementById("authSwitchText").textContent = isLogin ? "Chưa có tài khoản? " : "Đã có tài khoản? ";
+  document.getElementById("authSwitchBtn").textContent = isLogin ? "Đăng ký ngay" : "Đăng nhập";
+  document.getElementById("authPassword2Wrap").style.display = isLogin ? "none" : "block";
+  document.getElementById("authError").textContent = "";
+}
+
+async function submitAuthForm(){
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  const password2 = document.getElementById("authPassword2").value;
+  const errorBox = document.getElementById("authError");
+  const btn = document.getElementById("authSubmitBtn");
+  errorBox.textContent = "";
+  if(!email || !password){
+    errorBox.textContent = "Vui lòng nhập email và mật khẩu.";
+    return;
+  }
+  if(authMode === "register" && password !== password2){
+    errorBox.textContent = "Mật khẩu nhập lại không khớp.";
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = "Đang xử lý...";
+  try {
+    if(authMode === "login"){
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if(error){
+        errorBox.textContent = "Email hoặc mật khẩu không đúng.";
+        return;
+      }
+      window.location.href = "dashboard.html";
+      return;
+    }
+    const { error } = await sb.auth.signUp({ email, password });
+    if(error){
+      errorBox.textContent = error.message || "Không thể tạo tài khoản.";
+      return;
+    }
+    authMode = "login";
+    syncAuthModal();
+    errorBox.style.color = "#15803d";
+    errorBox.textContent = "Đăng ký thành công. Hãy đăng nhập để tiếp tục.";
+    setTimeout(() => { errorBox.style.color = ""; }, 2500);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = authMode === "login" ? "Đăng nhập" : "Tạo tài khoản";
+  }
 }
 
 function checkProfile(profile){
