@@ -258,6 +258,12 @@ ADD COLUMN IF NOT EXISTS parent_full_name text;
 ALTER TABLE public.users
 ADD COLUMN IF NOT EXISTS parent_phone text;
 
+ALTER TABLE public.users
+ADD COLUMN IF NOT EXISTS teacher_profile_html text;
+
+ALTER TABLE public.users
+ADD COLUMN IF NOT EXISTS teacher_social_url text;
+
 -- ============================================
 -- Notifications feature migration
 -- ============================================
@@ -323,14 +329,32 @@ CREATE TABLE IF NOT EXISTS public.trial_lesson_requests (
   phone text NOT NULL,
   grade text NOT NULL,
   subject text NOT NULL,
+  teacher_id uuid,
   source_url text,
   status text NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'contacted', 'closed')),
   handled_by uuid,
   handled_at timestamp with time zone,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT trial_lesson_requests_pkey PRIMARY KEY (id),
+  CONSTRAINT trial_lesson_requests_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.users(id) ON DELETE SET NULL,
   CONSTRAINT trial_lesson_requests_handled_by_fkey FOREIGN KEY (handled_by) REFERENCES public.users(id) ON DELETE SET NULL
 );
+
+ALTER TABLE public.trial_lesson_requests
+ADD COLUMN IF NOT EXISTS teacher_id uuid;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'trial_lesson_requests_teacher_id_fkey'
+  ) THEN
+    ALTER TABLE public.trial_lesson_requests
+      ADD CONSTRAINT trial_lesson_requests_teacher_id_fkey
+      FOREIGN KEY (teacher_id) REFERENCES public.users(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS trial_lesson_requests_status_created_idx
   ON public.trial_lesson_requests (status, created_at DESC);
@@ -601,7 +625,7 @@ WITH CHECK (
     AND actor_id IS NULL
     AND EXISTS (
       SELECT 1 FROM public.users u
-      WHERE u.id = notifications.user_id AND u.role = 'admin'
+      WHERE u.id = notifications.user_id AND u.role IN ('admin', 'teacher')
     )
   )
 );
@@ -625,6 +649,7 @@ USING (
     SELECT 1 FROM public.users u
     WHERE u.id = auth.uid() AND u.role = 'admin'
   )
+  OR teacher_id = auth.uid()
 );
 
 DROP POLICY IF EXISTS trial_lesson_requests_update_policy ON public.trial_lesson_requests;
@@ -635,12 +660,14 @@ USING (
     SELECT 1 FROM public.users u
     WHERE u.id = auth.uid() AND u.role = 'admin'
   )
+  OR teacher_id = auth.uid()
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM public.users u
     WHERE u.id = auth.uid() AND u.role = 'admin'
   )
+  OR teacher_id = auth.uid()
 );
 
 DROP POLICY IF EXISTS conversation_members_select_policy ON public.conversation_members;
