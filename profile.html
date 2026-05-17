@@ -330,35 +330,24 @@ body {
 .teacher-profile.show {
   display: grid;
 }
-.teacher-lead {
+.teacher-top-grid {
   display: grid;
-  grid-template-columns: 126px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, .82fr);
   gap: 20px;
-  align-items: center;
-  padding: 22px;
-}
-.teacher-lead .avatar {
-  width: 126px;
-  height: 126px;
-  border-radius: 8px;
-  border: 0;
-  box-shadow: 0 14px 30px rgba(15,31,61,.16);
-}
-.teacher-name {
-  color: #245b91;
-  font-size: 1.24rem;
-  font-weight: 800;
-}
-.teacher-subject {
-  margin-top: 8px;
-  color: #111827;
-  font-size: .96rem;
+  align-items: start;
 }
 .teacher-section-title {
   color: #111827;
   font-size: 1rem;
   font-weight: 800;
+}
+.teacher-section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
   margin-bottom: 14px;
+  flex-wrap: wrap;
 }
 .teacher-rich {
   color: #374151;
@@ -387,8 +376,9 @@ body {
 }
 .editor-toolbar {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
+  align-items: center;
   margin-bottom: 10px;
 }
 .editor-toolbar button,
@@ -398,10 +388,18 @@ body {
   background: #fff;
   color: var(--navy);
   border-radius: 8px;
-  min-height: 34px;
-  padding: 6px 10px;
+  height: 30px;
+  padding: 4px 8px;
   font-family: var(--font-body);
   font-weight: 700;
+  font-size: .76rem;
+}
+.editor-toolbar select {
+  max-width: 86px;
+}
+.editor-toolbar input[type="color"] {
+  width: 32px;
+  padding: 2px;
 }
 .rich-editor {
   min-height: 190px;
@@ -416,13 +414,43 @@ body {
   display: grid;
   gap: 12px;
 }
-.teacher-course,
-.teacher-schedule,
-.teacher-trial {
+.teacher-course {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 14px;
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 14px;
-  background: linear-gradient(180deg,#fff 0%,#fbfdff 100%);
+  background: radial-gradient(circle at top right, rgba(200,150,42,.12), transparent 28%), linear-gradient(180deg,#fff 0%,#fbfdff 100%);
+}
+.teacher-course-cover {
+  min-height: 130px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #103d74 0%, #1d6bd1 62%, #d4a63a 100%);
+  position: relative;
+}
+.teacher-course-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  inset: 0;
+}
+.teacher-course-cover span {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 1;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.18);
+  color: #fff;
+  font-size: .72rem;
+  font-weight: 800;
+}
+.teacher-course-body {
+  min-width: 0;
 }
 .teacher-course h4,
 .teacher-schedule h4 {
@@ -443,6 +471,80 @@ body {
   font-size: .84rem;
   font-weight: 800;
   text-decoration: none;
+}
+.teacher-course-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.teacher-course-stat {
+  border: 1px solid rgba(15,31,61,.08);
+  border-radius: 10px;
+  padding: 8px;
+  background: #f8fbff;
+  color: var(--ink-mid);
+  font-size: .74rem;
+}
+.teacher-course-stat strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--navy);
+  font-size: .8rem;
+}
+.schedule-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+.schedule-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  background: #fff;
+}
+.schedule-table th {
+  background: #f1f6fc;
+  color: var(--navy);
+  font-size: .8rem;
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.schedule-table td {
+  width: 14.285%;
+  min-height: 120px;
+  vertical-align: top;
+  padding: 10px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.schedule-table td:last-child {
+  border-right: none;
+}
+.schedule-cell-item {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 12px;
+  background: linear-gradient(180deg,#fff 0%,#f8fbff 100%);
+  border: 1px solid rgba(29,107,209,.14);
+  color: var(--ink-mid);
+  font-size: .78rem;
+  line-height: 1.35;
+}
+.schedule-cell-item + .schedule-cell-item {
+  margin-top: 8px;
+}
+.schedule-subject {
+  color: var(--navy);
+  font-weight: 800;
+}
+.schedule-class {
+  font-weight: 700;
+}
+.schedule-time {
+  color: #1266b0;
+  font-weight: 800;
 }
 .trial-form {
   display: grid;
@@ -480,7 +582,9 @@ body {
   .layout { grid-template-columns: 1fr; }
   .cover { height: 210px; }
   .hero-body { padding: 0 18px 20px; }
-  .teacher-lead { grid-template-columns: 1fr; }
+  .teacher-top-grid { grid-template-columns: 1fr; }
+  .teacher-course { grid-template-columns: 1fr; }
+  .teacher-course-cover { min-height: 170px; }
 }
 @media (max-width: 560px) {
   .page { padding: 18px 12px 32px; }
@@ -488,6 +592,8 @@ body {
   .name { font-size: 1.55rem; }
   .actions .btn { flex: 1; min-width: 0; }
   .trial-row { grid-template-columns: 1fr; }
+  .teacher-course-stats { grid-template-columns: 1fr; }
+  .editor-toolbar { gap: 5px; }
 }
 </style>
 </head>
@@ -548,24 +654,20 @@ body {
       </aside>
       <main>
         <div id="teacherProfileWrap" class="teacher-profile">
-          <section class="box teacher-lead">
-            <img id="teacherAvatarBox" class="avatar" src="default-avatar.png" alt="Avatar giáo viên">
-            <div>
-              <div id="teacherNameBox" class="teacher-name">Giáo viên</div>
-              <div id="teacherSubjectBox" class="teacher-subject">Giáo viên</div>
-            </div>
-          </section>
-
-          <section class="box">
+          <div class="teacher-top-grid">
+            <section class="box">
             <div class="panel-body">
-              <div id="teacherInfoTitle" class="teacher-section-title">Thông tin giáo viên</div>
+              <div class="teacher-section-head">
+                <div id="teacherInfoTitle" class="teacher-section-title">Thông tin giáo viên</div>
+                <button id="teacherEditToggleBtn" class="btn btn-outline hidden" type="button" onclick="toggleTeacherEditor()">Cập nhật lại thông tin</button>
+              </div>
               <div id="teacherRichBox" class="teacher-rich"></div>
               <div id="teacherEditorBox" class="teacher-editor">
                 <div class="editor-toolbar">
                   <button type="button" onclick="formatTeacherInfo('bold')">B</button>
                   <button type="button" onclick="formatTeacherInfo('italic')">I</button>
                   <button type="button" onclick="formatTeacherInfo('underline')">U</button>
-                  <button type="button" onclick="formatTeacherInfo('insertUnorderedList')">• List</button>
+                  <button type="button" onclick="formatTeacherInfo('insertUnorderedList')">List</button>
                   <select id="teacherFontSize" onchange="formatTeacherInfo('fontSize', this.value)">
                     <option value="">Cỡ chữ</option>
                     <option value="2">Nhỏ</option>
@@ -582,6 +684,57 @@ body {
               </div>
             </div>
           </section>
+
+            <section class="box">
+              <div class="panel-head">
+                <div class="panel-title">Đăng ký học thử với giáo viên này</div>
+                <div class="panel-sub">Yêu cầu sẽ được gửi trực tiếp cho giáo viên</div>
+              </div>
+              <div class="panel-body">
+                <form class="trial-form" id="teacherTrialForm" onsubmit="submitTeacherTrialRequest(event)">
+                  <div class="trial-row">
+                    <div>
+                      <label for="teacherTrialName">Tên</label>
+                      <input id="teacherTrialName" type="text" autocomplete="name" required>
+                    </div>
+                    <div>
+                      <label for="teacherTrialPhone">SĐT</label>
+                      <input id="teacherTrialPhone" type="tel" autocomplete="tel" required>
+                    </div>
+                  </div>
+                  <div class="trial-row">
+                    <div>
+                      <label for="teacherTrialGrade">Khối</label>
+                      <select id="teacherTrialGrade" required>
+                        <option value="">Chọn khối</option>
+                        <option value="6">Khối 6</option>
+                        <option value="7">Khối 7</option>
+                        <option value="8">Khối 8</option>
+                        <option value="9">Khối 9</option>
+                        <option value="10">Khối 10</option>
+                        <option value="11">Khối 11</option>
+                        <option value="12">Khối 12</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label for="teacherTrialSubject">Môn</label>
+                      <input id="teacherTrialSubject" type="text" list="teacherTrialSubjectOptions" required>
+                      <datalist id="teacherTrialSubjectOptions">
+                        <option value="Toán Học"></option>
+                        <option value="Vật Lý"></option>
+                        <option value="Hóa Học"></option>
+                        <option value="Sinh Học"></option>
+                        <option value="Ngữ Văn"></option>
+                        <option value="Tiếng Anh"></option>
+                      </datalist>
+                    </div>
+                  </div>
+                  <button id="teacherTrialSubmitBtn" class="btn btn-primary" type="submit">Gửi đăng ký học thử</button>
+                  <div id="teacherTrialMessage" class="trial-message"></div>
+                </form>
+              </div>
+            </section>
+          </div>
 
           <section class="box">
             <div class="panel-head">
@@ -603,55 +756,6 @@ body {
             </div>
           </section>
 
-          <section class="box">
-            <div class="panel-head">
-              <div class="panel-title">Đăng ký học thử với giáo viên này</div>
-              <div class="panel-sub">Yêu cầu sẽ được gửi trực tiếp cho giáo viên</div>
-            </div>
-            <div class="panel-body">
-              <form class="trial-form" id="teacherTrialForm" onsubmit="submitTeacherTrialRequest(event)">
-                <div class="trial-row">
-                  <div>
-                    <label for="teacherTrialName">Tên</label>
-                    <input id="teacherTrialName" type="text" autocomplete="name" required>
-                  </div>
-                  <div>
-                    <label for="teacherTrialPhone">SĐT</label>
-                    <input id="teacherTrialPhone" type="tel" autocomplete="tel" required>
-                  </div>
-                </div>
-                <div class="trial-row">
-                  <div>
-                    <label for="teacherTrialGrade">Khối</label>
-                    <select id="teacherTrialGrade" required>
-                      <option value="">Chọn khối</option>
-                      <option value="6">Khối 6</option>
-                      <option value="7">Khối 7</option>
-                      <option value="8">Khối 8</option>
-                      <option value="9">Khối 9</option>
-                      <option value="10">Khối 10</option>
-                      <option value="11">Khối 11</option>
-                      <option value="12">Khối 12</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label for="teacherTrialSubject">Môn</label>
-                    <input id="teacherTrialSubject" type="text" list="teacherTrialSubjectOptions" required>
-                    <datalist id="teacherTrialSubjectOptions">
-                      <option value="Toán Học"></option>
-                      <option value="Vật Lý"></option>
-                      <option value="Hóa Học"></option>
-                      <option value="Sinh Học"></option>
-                      <option value="Ngữ Văn"></option>
-                      <option value="Tiếng Anh"></option>
-                    </datalist>
-                  </div>
-                </div>
-                <button id="teacherTrialSubmitBtn" class="btn btn-primary" type="submit">Gửi đăng ký học thử</button>
-                <div id="teacherTrialMessage" class="trial-message"></div>
-              </form>
-            </div>
-          </section>
         </div>
         <section class="box">
           <div class="panel-head">
@@ -844,12 +948,6 @@ async function renderTeacherProfile() {
   wrap.classList.toggle("show", isTeacher);
   if (!isTeacher) return;
 
-  document.getElementById("teacherAvatarBox").src = viewedProfile.avatar_url || "default-avatar.png";
-  document.getElementById("teacherAvatarBox").onerror = function() { this.src = "default-avatar.png"; };
-  document.getElementById("teacherNameBox").textContent = viewedProfile.full_name || "Giáo viên";
-  document.getElementById("teacherSubjectBox").textContent = viewedProfile.subject
-    ? "Giáo viên " + viewedProfile.subject
-    : formatRole(viewedProfile.role);
   document.getElementById("teacherInfoTitle").textContent = "Thông tin " + (viewedProfile.full_name || "giáo viên");
 
   const richHtml = sanitizeTeacherHtml(viewedProfile.teacher_profile_html || "");
@@ -857,7 +955,8 @@ async function renderTeacherProfile() {
   document.getElementById("teacherRichBox").innerHTML = richHtml || fallbackBio || '<div class="bio-empty">Giáo viên chưa cập nhật phần giới thiệu.</div>';
 
   const isOwnTeacherProfile = currentUser && currentUser.id === viewedProfile.id;
-  document.getElementById("teacherEditorBox").classList.toggle("show", !!isOwnTeacherProfile);
+  document.getElementById("teacherEditToggleBtn")?.classList.toggle("hidden", !isOwnTeacherProfile);
+  toggleTeacherEditor(false);
   if (isOwnTeacherProfile) {
     document.getElementById("teacherRichEditor").innerHTML = richHtml || fallbackBio;
   }
@@ -911,6 +1010,15 @@ window.formatTeacherInfo = function(command, value = null) {
   document.execCommand(command, false, value);
 };
 
+window.toggleTeacherEditor = function(force) {
+  const editor = document.getElementById("teacherEditorBox");
+  const button = document.getElementById("teacherEditToggleBtn");
+  if (!editor) return;
+  const shouldShow = typeof force === "boolean" ? force : !editor.classList.contains("show");
+  editor.classList.toggle("show", shouldShow);
+  if (button) button.textContent = shouldShow ? "Ẩn phần cập nhật" : "Cập nhật lại thông tin";
+};
+
 window.saveTeacherInfo = async function() {
   if (!currentUser || currentUser.id !== viewedProfile.id) return;
   const html = sanitizeTeacherHtml(document.getElementById("teacherRichEditor")?.innerHTML || "");
@@ -921,6 +1029,7 @@ window.saveTeacherInfo = async function() {
   }
   viewedProfile.teacher_profile_html = html;
   document.getElementById("teacherRichBox").innerHTML = html || '<div class="bio-empty">Giáo viên chưa cập nhật phần giới thiệu.</div>';
+  toggleTeacherEditor(false);
   alert("Đã lưu thông tin giáo viên.");
 };
 
@@ -942,7 +1051,7 @@ async function renderTeacherCourses() {
   }
   const { data: courses, error } = await sb
     .from("courses")
-    .select("id,name,description,status,tuition_fee,start_date,end_date,planned_sessions")
+    .select("id,name,description,cover_url,status,tuition_fee,start_date,end_date,planned_sessions")
     .in("id", ids)
     .order("created_at", { ascending: false });
   if (error) {
@@ -951,12 +1060,20 @@ async function renderTeacherCourses() {
   }
   wrap.innerHTML = (courses || []).map(course => `
     <article class="teacher-course">
-      <h4>${esc(course.name || "Khóa học")}</h4>
-      <div class="teacher-card-meta">
-        ${esc((course.description || "Chưa có mô tả.").slice(0, 180))}
-        <br>Học phí: ${formatMoney(course.tuition_fee)} • ${course.planned_sessions || 0} buổi
+      <div class="teacher-course-cover">
+        ${course.cover_url ? `<img src="${safeUrl(course.cover_url)}" alt="${esc(course.name || "Khóa học")}">` : ""}
+        <span>${esc(course.status === "open" ? "Đang mở" : "Đã đóng")}</span>
       </div>
-      <a class="teacher-card-link" href="courses.html?courseId=${course.id}">Xem chi tiết khóa học</a>
+      <div class="teacher-course-body">
+        <h4>${esc(course.name || "Khóa học")}</h4>
+        <div class="teacher-card-meta">${esc((course.description || "Chưa có mô tả.").slice(0, 180))}</div>
+        <div class="teacher-course-stats">
+          <div class="teacher-course-stat">Học phí<strong>${formatMoney(course.tuition_fee)}</strong></div>
+          <div class="teacher-course-stat">Số buổi<strong>${course.planned_sessions || 0}</strong></div>
+          <div class="teacher-course-stat">Khai giảng<strong>${course.start_date ? esc(String(course.start_date).slice(0, 10)) : "Chưa cập nhật"}</strong></div>
+        </div>
+        <a class="teacher-card-link" href="courses.html?courseId=${course.id}">Xem chi tiết khóa học</a>
+      </div>
     </article>
   `).join("") || '<div class="empty">Giáo viên chưa có khóa học nào.</div>';
 }
@@ -977,33 +1094,59 @@ async function renderTeacherSchedules() {
     wrap.innerHTML = '<div class="empty">Chưa có lịch học offline.</div>';
     return;
   }
-  const [{ data: classes }, { data: schedules }] = await Promise.all([
+  const [{ data: classes, error: classError }, { data: schedules, error: scheduleError }] = await Promise.all([
     sb.from("classes").select("id,class_name,tuition_fee,hidden,subjects(name),grades(name)").in("id", ids).eq("hidden", false),
-    sb.from("class_schedules").select("class_id,weekday,start_time,end_time,rooms(room_name)").in("class_id", ids).order("weekday")
+    sb.from("class_schedules").select("class_id,weekday,start_time,end_time,rooms(room_name)").in("class_id", ids).order("weekday").order("start_time")
   ]);
-  const scheduleMap = {};
-  (schedules || []).forEach(item => {
-    if (!scheduleMap[item.class_id]) scheduleMap[item.class_id] = [];
-    scheduleMap[item.class_id].push(item);
+  if (classError || scheduleError) {
+    wrap.innerHTML = '<div class="empty">Không tải được lịch học offline.</div>';
+    return;
+  }
+  const classMap = {};
+  (classes || []).forEach(cls => {
+    classMap[cls.id] = cls;
   });
-  wrap.innerHTML = (classes || []).map(cls => {
-    const scheduleText = (scheduleMap[cls.id] || []).map(item => {
-      const day = ["", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"][item.weekday] || "Lịch học";
-      const time = `${String(item.start_time || "").slice(0,5)}-${String(item.end_time || "").slice(0,5)}`;
-      const room = item.rooms?.room_name ? ` • ${item.rooms.room_name}` : "";
-      return `${day} (${time})${room}`;
-    }).join("<br>") || "Chưa có lịch cố định";
-    return `
-      <article class="teacher-schedule">
-        <h4>${esc(cls.class_name || "Lớp học")}</h4>
-        <div class="teacher-card-meta">
-          ${esc(cls.grades?.name || "")}${cls.subjects?.name ? " • " + esc(cls.subjects.name) : ""}
-          <br>${scheduleText}
-          <br>Học phí: ${formatMoney(cls.tuition_fee)}
+  const dayMap = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [] };
+  (schedules || []).forEach(item => {
+    const cls = classMap[item.class_id];
+    if (!cls || !dayMap[item.weekday]) return;
+    dayMap[item.weekday].push({ ...item, cls });
+  });
+  const hasSchedule = Object.values(dayMap).some(items => items.length);
+  if (!hasSchedule) {
+    wrap.innerHTML = '<div class="empty">Chưa có lịch học offline.</div>';
+    return;
+  }
+  const dayLabels = ["Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy", "Chủ nhật"];
+  const renderCell = weekday => {
+    const items = dayMap[weekday] || [];
+    if (!items.length) return '<div class="bio-empty">Chưa có lịch</div>';
+    return items.map(item => {
+      const cls = item.cls;
+      const time = `${String(item.start_time || "").slice(0, 5)} - ${String(item.end_time || "").slice(0, 5)}`;
+      const room = item.rooms?.room_name ? `<span>${esc(item.rooms.room_name)}</span>` : "";
+      return `
+        <div class="schedule-cell-item">
+          <div class="schedule-subject">${esc(cls.subjects?.name || "Môn học")}</div>
+          <div class="schedule-class">${esc(cls.grades?.name || cls.class_name || "Lớp học")}</div>
+          <div class="schedule-time">${esc(time)}</div>
+          ${room}
         </div>
-      </article>
-    `;
-  }).join("") || '<div class="empty">Chưa có lịch học offline.</div>';
+      `;
+    }).join("");
+  };
+  wrap.innerHTML = `
+    <div class="schedule-table-wrap">
+      <table class="schedule-table">
+        <thead>
+          <tr>${dayLabels.map(day => `<th>${day}</th>`).join("")}</tr>
+        </thead>
+        <tbody>
+          <tr>${[1, 2, 3, 4, 5, 6, 7].map(day => `<td>${renderCell(day)}</td>`).join("")}</tr>
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 window.submitTeacherTrialRequest = async function(event) {
