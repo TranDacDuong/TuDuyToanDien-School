@@ -178,6 +178,15 @@ aside li.active {
   backdrop-filter: blur(1px);
 }
 #sidebarOverlay.show { display: block; }
+.guest-auth-bar {
+  position: fixed; top: 18px; right: 18px; z-index: 1205;
+  display: none; gap: 8px; padding: 8px; border-radius: 999px;
+  background: rgba(255,255,255,.88); border: 1px solid rgba(15,31,61,.1);
+  box-shadow: 0 14px 32px rgba(15,31,61,.14); backdrop-filter: blur(12px);
+}
+.guest-auth-bar.show { display: inline-flex; }
+.guest-auth-bar .authBtn { min-width: 104px; border-radius: 999px; }
+.guest-auth-bar .authBtn.secondary { color: var(--navy); background: #fff; border-color: rgba(15,31,61,.12); }
 
 /* ── Main — full width vì sidebar overlay ── */
 main { flex: 1; display: flex; flex-direction: column; overflow: hidden; width: 100%; }
@@ -630,6 +639,10 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 <div id="sidebarTab" onclick="toggleSidebar()"></div>
 
 <main>
+  <div id="guestAuthBar" class="guest-auth-bar">
+    <button class="authBtn primary" type="button" onclick="openAuthModal('login')">Đăng nhập</button>
+    <button class="authBtn secondary" type="button" onclick="openAuthModal('register')">Đăng ký</button>
+  </div>
   <section id="mobileQuickActions" aria-label="Loi tat mobile">
     <div class="mobile-quick-actions-shell">
       <button class="mobile-quick-action" type="button" data-page="search.html">
@@ -778,7 +791,7 @@ let currentDashboardUser = null;
 let currentDashboardProfile = null;
 let authMode = "login";
 const HIDDEN_NOTIFICATION_TYPES = ["friend_request", "friend_accept", "message_new"];
-const PUBLIC_DASHBOARD_PAGES = new Set(["home.html", "courses.html", "public_exam.html", "game.html", "resources.html"]);
+const PUBLIC_DASHBOARD_PAGES = new Set(["home.html", "courses.html"]);
 const contentFrame = document.getElementById("contentFrame");
 const mobileNavItems = [...document.querySelectorAll("#mobileNav .mobile-nav-item")];
 const mobileQuickActionItems = [...document.querySelectorAll("#mobileQuickActions .mobile-quick-action")];
@@ -829,6 +842,7 @@ async function initDashboard(){
   if(error || !profile){ alert("Không tìm thấy thông tin người dùng"); return; }
 
   currentDashboardProfile = profile;
+  document.getElementById("guestAuthBar")?.classList.remove("show");
   applyRoleMenu(profile.role);
   setupMenu();
   checkProfile(profile);
@@ -852,6 +866,7 @@ async function logout(){
 }
 
 function applyGuestMenu(){
+  document.getElementById("guestAuthBar")?.classList.add("show");
   const userBox = document.getElementById("userBox");
   userBox.innerHTML = `
     <div class="authActions">
