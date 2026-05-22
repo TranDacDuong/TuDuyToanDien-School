@@ -59,11 +59,45 @@
     return frag;
   };
 
+  function parseQuestionLayout(questionText, type, answerCount) {
+    const rawLines = String(questionText || "").split(/\r?\n/);
+    const stemLines = [];
+    const options = [];
+    const optionPattern = /^([a-d])(?:[\)\.\:\-])\s+(.+)$/i;
+
+    rawLines.forEach(line => {
+      const match = line.match(optionPattern);
+      if (match) {
+        options.push({ key: match[1], text: match[2].trim() });
+      } else {
+        stemLines.push(line);
+      }
+    });
+
+    if (type !== "true_false" || options.length < Math.min(2, Math.max(1, parseInt(answerCount, 10) || 0))) {
+      return { stem: String(questionText || "").trim(), options: [] };
+    }
+
+    const expectedCount = Math.max(1, parseInt(answerCount, 10) || 0);
+    const normalizedOptions = [];
+    for (let i = 0; i < expectedCount; i++) {
+      const key = String.fromCharCode(97 + i);
+      const found = options.find(option => option.key.toLowerCase() === key);
+      normalizedOptions.push({ key: found?.key || key, text: found?.text || "" });
+    }
+    return {
+      stem: stemLines.join("\n").trim() || String(questionText || "").trim(),
+      options: normalizedOptions,
+    };
+  }
+
   function _buildCard(eq, globalNum, ans, canGradeEssay, options = {}) {
     const q = eq.question;
     const type = q.question_type;
     const hasImg = !!q.question_img;
     const isEssay = type === "essay";
+    const answerCount = Math.max(2, parseInt(q.answer_count) || 4);
+    const layout = parseQuestionLayout(q.question_text, type, answerCount);
 
     const card = document.createElement("div");
     card.style.cssText =
@@ -99,8 +133,7 @@
     };
 
     if (type === "true_false") {
-      const mainQ = (q.question_text||"").split("\n")[0];
-      const qEl = mkText(mainQ, hasImg ? 8 : 1);
+      const qEl = mkText(layout.stem, hasImg ? 8 : 1);
       qPart.appendChild(qEl);
       if (hasImg) qPart.appendChild(_mkImgCol(q.question_img, 5));
     } else if (hasImg) {
@@ -145,6 +178,10 @@
   }
 
   function _buildNonEssayResult(container, q, ans, eq) {
+    if (q.question_type === "true_false") {
+      _buildTrueFalseResult(container, q, ans, eq);
+      return;
+    }
     if (ans?.answer) {
       const ok = ans.is_correct;
       const box = document.createElement("div");
@@ -170,6 +207,64 @@
         `<div style="font-weight:700;color:var(--red);margin-top:4px">0/${eq.points}đ</div>`;
       container.appendChild(box);
     }
+  }
+
+  function _labelTF(value) {
+    if (value === "T") return "Đúng";
+    if (value === "F") return "Sai";
+    return "—";
+  }
+
+  function _buildTrueFalseResult(container, q, ans, eq) {
+    const count = Math.max(2, parseInt(q.answer_count) || 4);
+    const layout = parseQuestionLayout(q.question_text, "true_false", count);
+    const normalizedStudent = window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(ans?.answer || "", count) || "";
+    const normalizedCorrect = window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(q.answer || "", count) || "";
+    const answered = !!String(ans?.answer || "").trim();
+    const ok = answered && ans?.is_correct;
+
+    const box = document.createElement("div");
+    box.style.cssText =
+      "padding:8px 9px;border-radius:8px;background:"+(answered ? (ok ? "#f0fdf4" : "#fef2f2") : "var(--white)")+";"+
+      "border:1px solid "+(answered ? (ok ? "#86efac" : "#fca5a5") : "var(--border)")+";display:flex;flex-direction:column;gap:7px";
+
+    const summary = document.createElement("div");
+    summary.innerHTML =
+      '<div style="font-weight:700;font-size:.8rem;color:'+(answered ? (ok ? "var(--green)" : "var(--red)") : "var(--ink-light)")+'">'+
+        (answered ? (ok ? "Đúng" : "Sai") : "Bỏ qua")+
+      '</div>'+
+      '<div style="font-size:.78rem;font-weight:700;color:'+(ok ? "var(--green)" : "var(--red)")+';margin-top:3px">'+
+        (ans?.score_earned ?? 0)+'/'+eq.points+'đ'+
+      '</div>';
+    box.appendChild(summary);
+
+    const options = layout.options.length
+      ? layout.options
+      : Array.from({ length: count }, (_, i) => ({ key: String.fromCharCode(97 + i), text: "" }));
+
+    options.forEach((option, index) => {
+      const studentValue = normalizedStudent[index] || "";
+      const correctValue = normalizedCorrect[index] || "";
+      const rowOk = !!studentValue && studentValue === correctValue;
+      const row = document.createElement("div");
+      row.style.cssText =
+        "background:var(--white);border:1px solid "+(rowOk ? "#bbf7d0" : "#fecaca")+";border-radius:7px;padding:7px 8px";
+
+      const text = document.createElement("div");
+      text.style.cssText = "font-size:.8rem;line-height:1.55;color:var(--navy);white-space:pre-line;margin-bottom:5px";
+      text.textContent = (option.key || String.fromCharCode(97 + index)) + ") " + (option.text || "");
+      row.appendChild(text);
+
+      const meta = document.createElement("div");
+      meta.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;font-size:.75rem";
+      meta.innerHTML =
+        '<span style="padding:2px 7px;border-radius:999px;background:'+(rowOk ? "#dcfce7" : "#fee2e2")+';color:'+(rowOk ? "#15803d" : "#b91c1c")+';font-weight:700">Bạn: '+_labelTF(studentValue)+'</span>'+
+        '<span style="padding:2px 7px;border-radius:999px;background:#dcfce7;color:#15803d;font-weight:700">Đáp án: '+_labelTF(correctValue)+'</span>';
+      row.appendChild(meta);
+      box.appendChild(row);
+    });
+
+    container.appendChild(box);
   }
 
   function _buildEssayView(container, ans, eq) {

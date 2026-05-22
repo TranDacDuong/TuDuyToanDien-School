@@ -1422,6 +1422,11 @@
       + ' &nbsp;•&nbsp; Điểm: <b style="color:var(--navy)">' + (score ?? 'Chưa chấm') + '/' + totalPts + '</b></div>'
       + '</div></div>';
 
+    if (window.buildReviewCards) {
+      grid.appendChild(window.buildReviewCards(eqs, ansMap, false, { enableAiSolution: true }));
+      return;
+    }
+
     /* Build cards â€” giá»‘ng há»‡t layout lÃºc thi */
     let globalNum = 0;
     const isCompactMobile = window.matchMedia("(max-width: 768px)").matches;
