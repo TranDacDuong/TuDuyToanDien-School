@@ -73,6 +73,27 @@
     return "Buổi "+(s.session_no || 1)+": "+(daysMap[s.weekday] || "?")+" "+String(s.start_time || "").slice(0,5)+"–"+String(s.end_time || "").slice(0,5)+(s.rooms?.room_name ? " • "+s.rooms.room_name : "");
   }
 
+  function renderScheduleSummary(schedules){
+    if(!schedules || !schedules.length){
+      return '<span style="color:var(--ink-light);font-size:.82rem">Chưa có lịch học</span>';
+    }
+    const grouped = groupSchedulesBySession(schedules);
+    return Object.keys(grouped).map(Number).sort((a,b)=>a-b).map(no => {
+      const items = (grouped[no] || [])
+        .slice()
+        .sort((a,b)=>Number(a.weekday || 0)-Number(b.weekday || 0) || String(a.start_time || "").localeCompare(String(b.start_time || "")))
+        .map(s => {
+          const time = String(s.start_time || "").slice(0,5)+"-"+String(s.end_time || "").slice(0,5);
+          return esc((daysMap[s.weekday] || "?")+" "+time+(s.rooms?.room_name ? " "+s.rooms.room_name : ""));
+        })
+        .join("; ");
+      return '<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;line-height:1.45">'+
+        '<span style="flex:0 0 auto;font-size:.82rem;font-weight:800;color:var(--navy)">Buổi '+no+':</span>'+
+        '<span style="font-size:.82rem;font-weight:600;color:var(--ink-mid)">'+items+'</span>'+
+      '</div>';
+    }).join("");
+  }
+
   function groupSchedulesBySession(schedules){
     const map = {};
     (schedules || []).forEach(s => {
@@ -410,15 +431,7 @@
     const schThisMonth = getSchedulesForMonth(data.class_schedules||[], _currentMonth, _currentYear);
     const roomCapacity = getMinRoomCapacity(schThisMonth);
     const shouldWarnCapacity = (role === "admin" || role === "teacher") && roomCapacity > 0 && activeCount >= roomCapacity;
-    const scheduleHtml = schThisMonth.length
-      ? schThisMonth.map(s=>
-          '<span style="font-size:.78rem;background:var(--blue-bg);color:var(--blue);'+
-          'padding:3px 10px;border-radius:12px;margin-right:6px;display:inline-block;margin-bottom:4px;'+
-          'font-weight:600;border:1px solid rgba(26,86,168,.15)">'+
-          "Buổi "+(s.session_no || 1)+" • "+daysMap[s.weekday]+" "+s.start_time.slice(0,5)+"–"+s.end_time.slice(0,5)+
-          (s.rooms?" • "+s.rooms.room_name:"")+
-          "</span>").join("")
-      : '<span style="color:var(--ink-light);font-size:.82rem">Chưa có lịch học</span>';
+    const scheduleHtml = renderScheduleSummary(schThisMonth);
     const capacityWarningHtml = shouldWarnCapacity
       ? '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;'+
         'background:'+(activeCount > roomCapacity ? 'rgba(239,68,68,.12)' : 'rgba(245,158,11,.12)')+';'+
@@ -534,7 +547,7 @@
       dates.forEach(item=>{
         const d = item.date;
         dateHeaders+='<th class="center" style="min-width:58px;white-space:nowrap">'+
-          d.slice(8,10)+"/"+d.slice(5,7)+"<br><span style=\"font-size:.68rem\">B"+item.session_no+"</span></th>";
+          d.slice(8,10)+"/"+d.slice(5,7)+"</th>";
       });
       const me = visibleStudents.find(s => s.student_id === uid);
       if(!me){
@@ -667,7 +680,7 @@
       dates.forEach(item=>{
         const d = item.date;
         dateHeaders+='<th class="center" style="min-width:62px;white-space:nowrap">'+
-        d.slice(8,10)+"/"+d.slice(5,7)+"<br><span style=\"font-size:.68rem\">B"+item.session_no+"</span></th>";
+        d.slice(8,10)+"/"+d.slice(5,7)+"</th>";
       });
 
     const searchModal=
