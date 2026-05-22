@@ -1766,13 +1766,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS class_sessions_class_date_unique
 CREATE INDEX IF NOT EXISTS class_sessions_class_month_idx
   ON public.class_sessions (class_id, session_date, session_order);
 
-ALTER TABLE public.class_sessions
-  ADD COLUMN IF NOT EXISTS is_current boolean NOT NULL DEFAULT false;
-
-CREATE UNIQUE INDEX IF NOT EXISTS class_sessions_one_current_per_class
-  ON public.class_sessions (class_id)
-  WHERE is_current = true;
-
 ALTER TABLE public.class_sessions ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS class_sessions_select_policy ON public.class_sessions;

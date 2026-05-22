@@ -46,30 +46,6 @@
     }
     return [...dates].sort();
   }
-  function toDateOnly(value){
-    if(!value) return null;
-    const d = new Date(value);
-    if(Number.isNaN(d.getTime())) return null;
-    return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
-  }
-  function addDays(date, amount){
-    const next = new Date(date);
-    next.setDate(next.getDate() + amount);
-    return next;
-  }
-  function generateDatesBetween(schedules, startValue, endValue){
-    const start = new Date(startValue);
-    const end = new Date(endValue);
-    if(Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return [];
-    const dates = new Set();
-    for(let cursor = new Date(start); cursor <= end; cursor = addDays(cursor, 1)){
-      const wd = cursor.getDay() === 0 ? 7 : cursor.getDay();
-      if((schedules || []).some(s => Number(s.weekday) === wd)){
-        dates.add(toDateOnly(cursor));
-      }
-    }
-    return [...dates].filter(Boolean).sort();
-  }
   function generateOccurrences(schedules, month, year){
     const items=[], days=new Date(year,month+1,0).getDate();
     for(let d=1;d<=days;d++){
@@ -191,37 +167,6 @@
   function isMissingRelationError(error){
     const msg = String(error?.message || "").toLowerCase();
     return msg.includes("does not exist") || msg.includes("could not find") || msg.includes("relation");
-  }
-
-  function isMissingColumnError(error, columnName){
-    const msg = String(error?.message || "").toLowerCase();
-    return msg.includes(columnName.toLowerCase()) && (msg.includes("column") || msg.includes("could not find"));
-  }
-
-  const classSessionBaseFields = "id,lesson_id,session_order,session_date,exam_id,pdf_exam_id,starts_at,ends_at,created_at";
-  const classSessionFields = classSessionBaseFields + ",is_current";
-  let _classSessionsHasCurrent = true;
-
-  async function fetchClassSessions(sb, includeCreatedAt = true){
-    const fields = includeCreatedAt ? classSessionFields : classSessionFields.replace(",created_at", "");
-    let query = sb.from("class_sessions")
-      .select(fields)
-      .eq("class_id", _classId)
-      .order("session_order", { ascending: true });
-    let { data, error } = await query;
-    if(error && isMissingColumnError(error, "is_current")){
-      _classSessionsHasCurrent = false;
-      const fallbackFields = includeCreatedAt ? classSessionBaseFields : classSessionBaseFields.replace(",created_at", "");
-      const fallback = await sb.from("class_sessions")
-        .select(fallbackFields)
-        .eq("class_id", _classId)
-        .order("session_order", { ascending: true });
-      data = (fallback.data || []).map(row => ({ ...row, is_current: false }));
-      error = fallback.error;
-    } else if(!error) {
-      _classSessionsHasCurrent = true;
-    }
-    return { data, error };
   }
 
   function isCurrentMonthDate(value){
@@ -431,7 +376,7 @@
     if(!body) return;
 
     const { data, error } = await sb.from("classes").select([
-      "id,class_name,tuition_fee,tuition_type,makeup_fee,sessions_per_week,created_at",
+      "id,class_name,tuition_fee,tuition_type,makeup_fee,sessions_per_week",
       "grades(name),subjects(name)",
       "class_schedules(id,session_no,weekday,start_time,end_time,effective_from,rooms:rooms(room_name,capacity))",
       "students:class_students!fk_class(id,student_id,joined_at,left_at,user:users!fk_student(id,full_name))"
@@ -467,12 +412,11 @@
     const shouldWarnCapacity = (role === "admin" || role === "teacher") && roomCapacity > 0 && activeCount >= roomCapacity;
     const scheduleHtml = schThisMonth.length
       ? schThisMonth.map(s=>
-          '<span style="font-size:.82rem;background:#fff;color:var(--navy);'+
-          'padding:7px 11px;border-radius:10px;margin-right:7px;display:inline-flex;margin-bottom:6px;'+
-          'font-weight:800;border:1px solid #bfdbfe;box-shadow:0 6px 14px rgba(29,107,209,.08);align-items:center;gap:6px">'+
-          '<span style="color:#1d4ed8">'+daysMap[s.weekday]+'</span>'+
-          '<span>'+String(s.start_time || "").slice(0,5)+"-"+String(s.end_time || "").slice(0,5)+'</span>'+
-          (s.rooms?'<span style="font-weight:700;color:var(--ink-mid)">• '+s.rooms.room_name+'</span>':"")+
+          '<span style="font-size:.78rem;background:var(--blue-bg);color:var(--blue);'+
+          'padding:3px 10px;border-radius:12px;margin-right:6px;display:inline-block;margin-bottom:4px;'+
+          'font-weight:600;border:1px solid rgba(26,86,168,.15)">'+
+          "Buổi "+(s.session_no || 1)+" • "+daysMap[s.weekday]+" "+s.start_time.slice(0,5)+"–"+s.end_time.slice(0,5)+
+          (s.rooms?" • "+s.rooms.room_name:"")+
           "</span>").join("")
       : '<span style="color:var(--ink-light);font-size:.82rem">Chưa có lịch học</span>';
     const capacityWarningHtml = shouldWarnCapacity
@@ -589,8 +533,8 @@
       let dateHeaders="";
       dates.forEach(item=>{
         const d = item.date;
-        dateHeaders+='<th class="center" style="min-width:64px;white-space:nowrap;line-height:1.25;padding:9px 8px">'+
-          '<span style="font-weight:800">'+d.slice(8,10)+"/"+d.slice(5,7)+"</span></th>";
+        dateHeaders+='<th class="center" style="min-width:58px;white-space:nowrap">'+
+          d.slice(8,10)+"/"+d.slice(5,7)+"<br><span style=\"font-size:.68rem\">B"+item.session_no+"</span></th>";
       });
       const me = visibleStudents.find(s => s.student_id === uid);
       if(!me){
@@ -722,8 +666,8 @@
     let dateHeaders="";
       dates.forEach(item=>{
         const d = item.date;
-        dateHeaders+='<th class="center" style="min-width:68px;white-space:nowrap;line-height:1.25;padding:9px 8px">'+
-        '<span style="font-weight:800">'+d.slice(8,10)+"/"+d.slice(5,7)+"</span></th>";
+        dateHeaders+='<th class="center" style="min-width:62px;white-space:nowrap">'+
+        d.slice(8,10)+"/"+d.slice(5,7)+"<br><span style=\"font-size:.68rem\">B"+item.session_no+"</span></th>";
       });
 
     const searchModal=
@@ -1159,7 +1103,6 @@
 
   function renderClassSessionCard(session, lesson, examInfo, role, examState){
     const isCompactMobile = window.matchMedia("(max-width: 768px)").matches;
-    const isCurrent = !!session.is_current;
     const summary = lesson?.summary
       ? '<div style="font-size:.84rem;line-height:1.65;color:var(--ink-mid);margin-top:6px">'+esc(lesson.summary)+'</div>'
       : '';
@@ -1179,22 +1122,15 @@
         '</div>'
       : "";
     const orderLabel = session.display_order || session.session_order || "—";
-    const canPickCurrent = role === "admin" || role === "teacher";
-    const orderClick = canPickCurrent ? ' onclick="cvSetCurrentClassSession(\''+session.id+'\')"' : '';
-    const orderTitle = canPickCurrent ? ' title="Chọn làm buổi đang học"' : '';
-    const currentBadge = isCurrent
-      ? '<span style="font-size:.74rem;font-weight:800;padding:4px 10px;border-radius:999px;background:#dcfce7;color:#15803d">Buổi đang học</span>'
-      : '';
-    return '<div style="background:'+(isCurrent ? '#f0fdf4' : 'var(--white)')+';border:'+(isCurrent ? '2px solid #22c55e' : '1px solid var(--border)')+';border-radius:18px;padding:'+(isCompactMobile ? '16px' : '16px 18px')+';box-shadow:'+(isCurrent ? '0 14px 34px rgba(34,197,94,.16)' : 'none')+'">'+
+    return '<div style="background:var(--white);border:1px solid var(--border);border-radius:18px;padding:'+(isCompactMobile ? '16px' : '16px 18px')+'">'+
       '<div style="display:grid;grid-template-columns:'+(isCompactMobile ? '1fr' : '94px minmax(0,1fr) auto')+';gap:16px;align-items:'+(isCompactMobile ? 'stretch' : 'center')+'">'+
-        '<div'+orderClick+orderTitle+' style="width:'+(isCompactMobile ? '100%' : '110px')+';min-height:58px;border-radius:16px;background:'+(isCurrent ? 'linear-gradient(135deg,#16a34a 0%,#22c55e 100%)' : 'linear-gradient(135deg,#0f3c73 0%,#1d6bd1 100%)')+';box-shadow:'+(isCurrent ? '0 14px 30px rgba(34,197,94,.26)' : '0 12px 28px rgba(15,60,115,.18)')+';color:#fff;display:flex;flex-direction:'+(isCompactMobile ? 'row' : 'column')+';align-items:center;justify-content:center;gap:'+(isCompactMobile ? '10px' : '2px')+';padding:'+(isCompactMobile ? '12px 14px' : '10px 12px')+';cursor:'+(canPickCurrent ? 'pointer' : 'default')+'">'+
+        '<div style="width:'+(isCompactMobile ? '100%' : '110px')+';min-height:58px;border-radius:16px;background:linear-gradient(135deg,#0f3c73 0%,#1d6bd1 100%);box-shadow:0 12px 28px rgba(15,60,115,.18);color:#fff;display:flex;flex-direction:'+(isCompactMobile ? 'row' : 'column')+';align-items:center;justify-content:center;gap:'+(isCompactMobile ? '10px' : '2px')+';padding:'+(isCompactMobile ? '12px 14px' : '10px 12px')+'">'+
           '<div style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.78)">Buổi học</div>'+
           '<div style="font-size:'+(isCompactMobile ? '1.18rem' : '1.4rem')+';font-weight:800;line-height:1.1">'+orderLabel+'</div>'+
         '</div>'+
         '<div style="min-width:0">'+
           '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">'+
             '<span style="font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8">'+esc(fmtSessionDate(session.session_date))+'</span>'+
-            currentBadge+
             (examInfo ? '<span style="font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#fff7ed;color:#c2410c">Có đề luyện tập</span>' : '<span style="font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#f5f5f4;color:#57534e">Chưa gắn đề luyện tập</span>')+
           '</div>'+
           '<div style="font-weight:700;font-size:1rem;color:var(--navy);margin-top:'+(isCompactMobile ? '8px' : '4px')+'">'+esc(lesson?.name || "Chưa có tên bài học")+'</div>'+
@@ -1223,21 +1159,19 @@
     return '<div style="background:var(--white);border:1px dashed #cbd5e1;border-radius:14px;padding:16px 18px">'+header+body+actionRow+'</div>';
   }
 
-  async function syncClassSessionsForLearningTab(sb, sessions){
+  async function syncClassSessionsForCurrentMonth(sb, sessions){
     const role = _role;
+    const schedulesThisMonth = getSchedulesForMonth(_cachedClass?.class_schedules || [], _currentMonth, _currentYear);
+    const monthDates = generateDates(schedulesThisMonth, _currentMonth, _currentYear);
+    if(!monthDates.length) return { sessions, createdLessons: [] };
     if(role !== "admin" && role !== "teacher") return { sessions, createdLessons: [] };
-    const schedules = getSchedulesForMonth(_cachedClass?.class_schedules || [], _currentMonth, _currentYear);
-    const startDate = toDateOnly(_cachedClass?.created_at) || toDateOnly(new Date());
-    const endDate = monthEnd(_currentMonth, _currentYear);
-    const targetDates = generateDatesBetween(schedules, startDate, endDate);
-    if(!targetDates.length) return { sessions, createdLessons: [] };
 
     const existingDates = new Set(
       (sessions || [])
         .map(item => (item.session_date || "").slice(0, 10))
         .filter(Boolean)
     );
-    const missingDates = targetDates.filter(date => !existingDates.has(date));
+    const missingDates = monthDates.filter(date => !existingDates.has(date));
     if(!missingDates.length) return { sessions, createdLessons: [] };
 
     const baseOrder = (sessions || []).reduce((maxValue, item) => {
@@ -1276,7 +1210,7 @@
     const { data: insertedSessions, error: sessionError } = await sb
       .from("class_sessions")
       .insert(sessionPayloads)
-      .select(_classSessionsHasCurrent ? classSessionFields : classSessionBaseFields);
+      .select("id,lesson_id,session_order,session_date,exam_id,pdf_exam_id,starts_at,ends_at,created_at");
     if(sessionError){
       const lessonIds = (newLessons || []).map(item => item.id).filter(Boolean);
       if(lessonIds.length){
@@ -1284,10 +1218,14 @@
       }
       const msg = String(sessionError.message || "").toLowerCase();
       if(msg.includes("duplicate") || msg.includes("unique")){
-        const { data: refreshedSessions } = await fetchClassSessions(sb);
+        const { data: refreshedSessions } = await sb
+          .from("class_sessions")
+          .select("id,lesson_id,session_order,session_date,exam_id,pdf_exam_id,starts_at,ends_at,created_at")
+          .eq("class_id", _classId)
+          .order("session_order", { ascending: true });
         return { sessions: refreshedSessions || sessions, createdLessons: [] };
       }
-      alert("Không thể tự tạo buổi học theo lịch lớp: " + sessionError.message);
+      alert("Không thể tự tạo buổi học theo lịch tháng này: " + sessionError.message);
       return { sessions, createdLessons: [] };
     }
 
@@ -1314,7 +1252,10 @@
       {data:gameRooms,error:gameRoomsError},
       {data:gamePlayers,error:gamePlayersError}
     ] = await Promise.all([
-      fetchClassSessions(sb),
+      sb.from("class_sessions")
+        .select("id,lesson_id,session_order,session_date,exam_id,pdf_exam_id,starts_at,ends_at,created_at")
+        .eq("class_id",_classId)
+        .order("session_order",{ascending:true}),
       sb.from("class_exams")
         .select("id,starts_at,ends_at,exam_id,pdf_exam_id")
         .eq("class_id",_classId)
@@ -1333,7 +1274,7 @@
     let sessions = sessionTableMissing ? [] : (classSessions || []);
     let autoCreatedLessons = [];
     if(!sessionTableMissing){
-      const syncResult = await syncClassSessionsForLearningTab(sb, sessions);
+      const syncResult = await syncClassSessionsForCurrentMonth(sb, sessions);
       sessions = syncResult.sessions || sessions;
       autoCreatedLessons = syncResult.createdLessons || [];
     }
@@ -1418,13 +1359,14 @@
           pdfSubmitCount: (results[5].data||[]).reduce((acc,row)=>{ acc[row.pdf_exam_id]=(acc[row.pdf_exam_id]||0)+1; return acc; }, {})
         };
 
-    const learningSessions = sessions
+    const monthSessions = sessions
+      .filter(session => !session.session_date || isCurrentMonthDate(session.session_date))
       .sort((a, b) => {
         const dateCompare = String(a.session_date || "").localeCompare(String(b.session_date || ""));
         if(dateCompare !== 0) return dateCompare;
         return Number(a.session_order || 0) - Number(b.session_order || 0);
       });
-    const sessionCards = learningSessions
+    const sessionCards = monthSessions
       .map((session, index) => {
         const lesson = lessonMap[session.lesson_id] || null;
         let examInfo = null;
@@ -1486,7 +1428,7 @@
     const sessionHint = sessionTableMissing
       ? '<div style="margin-bottom:14px;padding:12px 14px;border-radius:12px;background:#fff7ed;border:1px solid rgba(245,158,11,.28);color:#9a3412;font-size:.82rem">Tab này đã sẵn sàng cho kiểu "Buổi 1, Buổi 2..." nhưng database của bạn chưa có bảng <b>class_sessions</b>. Hãy chạy SQL mới rồi reload lại.</div>'
       : "";
-    const sessionEmpty = '<div style="padding:18px;border:1px dashed #cbd5e1;border-radius:14px;background:#fff"><strong style="display:block;color:var(--navy);margin-bottom:6px">Chưa có buổi học nào</strong><div style="font-size:.84rem;color:var(--ink-mid)">Bạn có thể thêm buổi học hoặc cập nhật lịch lớp để hệ thống tự tạo theo ngày học.</div></div>';
+    const sessionEmpty = '<div style="padding:18px;border:1px dashed #cbd5e1;border-radius:14px;background:#fff"><strong style="display:block;color:var(--navy);margin-bottom:6px">Chưa có buổi học nào trong tháng này</strong><div style="font-size:.84rem;color:var(--ink-mid)">Bạn có thể thêm các buổi học của tháng để hiển thị như phần Danh sách buổi học trong Khóa học.</div></div>';
     const legacySection = legacyCards.length
       ? '<div style="margin-top:18px"><div style="font-weight:700;color:var(--navy);margin-bottom:10px">Đề kiểm tra riêng đã tạo trước đây</div><div style="display:flex;flex-direction:column;gap:10px">'+legacyCards.join("")+'</div></div>'
       : "";
@@ -1494,7 +1436,7 @@
     tc.innerHTML = gameSectionHtml +
       '<div style="background:var(--white);border:1px solid var(--border);border-radius:14px;padding:16px 18px">'+
         '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">'+
-          '<div><div style="font-weight:700;color:var(--navy)">Danh sách buổi học</div><div style="font-size:.78rem;color:var(--ink-mid);margin-top:2px">Hiển thị từ ngày tạo lớp đến tháng hiện tại.</div></div>'+
+          '<div><div style="font-weight:700;color:var(--navy)">Danh sách buổi học trong tháng</div></div>'+
           '<span style="font-size:.78rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8">'+sessionCards.length+' buổi</span>'+
         '</div>'+
         actionsHtml+
@@ -1997,7 +1939,7 @@
       { data: allExams, error: examsError },
       { data: allPdfExams, error: pdfExamsError }
     ] = await Promise.all([
-      fetchClassSessions(sb, false),
+      sb.from("class_sessions").select("id,lesson_id,session_order,session_date,exam_id,pdf_exam_id,starts_at,ends_at").eq("class_id", _classId).order("session_order", { ascending: true }),
       sb.from("exams").select("id,title,duration_minutes,total_points").order("created_at", { ascending: false }),
       sb.from("pdf_exams").select("id,title,duration_minutes,total_points,status").order("created_at", { ascending: false })
     ]);
@@ -2022,7 +1964,7 @@
       lesson = lessonData;
     }
 
-    const nextOrder = (sessions || []).reduce((maxValue, item) => Math.max(maxValue, Number(item.session_order || 0)), 0) + 1;
+    const nextOrder = (sessions || []).length + 1;
     const practiceType = currentSession?.pdf_exam_id ? "pdf" : currentSession?.exam_id ? "exam" : "";
     const practiceId = currentSession?.pdf_exam_id || currentSession?.exam_id || "";
     const modal = document.createElement("div");
@@ -2035,7 +1977,7 @@
           '<button onclick="document.getElementById(\'cvClassSessionModal\').remove()" style="background:var(--surface);border:none;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:14px;color:var(--ink-mid)">✕</button>'+
         '</div>'+
         '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">'+
-          (sessionId ? '' : '<div><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Số buổi</label><input id="cvSessionOrder" type="number" min="1" value="'+nextOrder+'" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"></div>')+
+          '<div><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Số buổi</label><input id="cvSessionOrder" type="number" min="1" value="'+(currentSession?.session_order || nextOrder)+'" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"></div>'+
           '<div><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Ngày học</label><input id="cvSessionDate" type="date" value="'+(currentSession?.session_date || "")+'" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"></div>'+
         '</div>'+
         '<div style="margin-top:14px"><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Tên bài học</label><input id="cvSessionLessonName" type="text" value="'+esc(lesson?.name || "")+'" placeholder="Ví dụ: Bài 5. Sự biến thiên của hàm số" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"></div>'+
@@ -2065,8 +2007,7 @@
   window.cvSaveClassSession = async function(sessionId = "", lessonId = ""){
     const sb = getSb();
     const lessonName = (document.getElementById("cvSessionLessonName")?.value || "").trim();
-    const sessionOrderInput = document.getElementById("cvSessionOrder");
-    const sessionOrder = sessionOrderInput ? Number(sessionOrderInput.value || 0) : null;
+    const sessionOrder = Number(document.getElementById("cvSessionOrder")?.value || 0);
     const sessionDate = document.getElementById("cvSessionDate")?.value || null;
     const practiceType = document.getElementById("cvSessionPracticeType")?.value || "";
     const practiceId = document.getElementById("cvSessionPracticeId")?.value || "";
@@ -2077,7 +2018,7 @@
       alert("Tên bài học không được để trống.");
       return;
     }
-    if(!sessionId && (!Number.isFinite(sessionOrder) || sessionOrder <= 0)){
+    if(!Number.isFinite(sessionOrder) || sessionOrder <= 0){
       alert("Số buổi phải lớn hơn 0.");
       return;
     }
@@ -2112,6 +2053,7 @@
     }
     const sessionPayload = {
       class_id: _classId,
+      session_order: sessionOrder,
       session_date: sessionDate,
       exam_id: practiceType === "exam" ? practiceId : null,
       pdf_exam_id: practiceType === "pdf" ? practiceId : null,
@@ -2119,7 +2061,6 @@
       ends_at: endsAt ? new Date(endsAt).toISOString() : null,
       created_by: window._currentUserId
     };
-    if(!sessionId) sessionPayload.session_order = sessionOrder;
 
     if(sessionId){
       const { error: lessonError } = await sb.from("lessons").update(lessonPayload).eq("id", lessonId);
@@ -2165,7 +2106,7 @@
         await window.NotificationHelper.notifyClassStudents(_classId, () => ({
           type,
           title: `${_className || "Lớp học"} có buổi học ${actionLabel}`,
-          message: `${sessionOrder ? `Buổi ${sessionOrder}: ` : "Buổi học: "}${lessonName}.${extraText}`,
+          message: `Buổi ${sessionOrder}: ${lessonName}.${extraText}`,
           targetUrl: `class.html?openClassId=${encodeURIComponent(_classId)}&tab=exams&className=${encodeURIComponent(_className || "Lớp học")}`,
           meta: {
             class_id: _classId,
@@ -2181,26 +2122,6 @@
     }
 
     document.getElementById("cvClassSessionModal")?.remove();
-    await cvSwitchTab("exams");
-  };
-
-  window.cvSetCurrentClassSession = async function(sessionId){
-    if(_role !== "admin" && _role !== "teacher") return;
-    if(!_classSessionsHasCurrent){
-      alert("Database chưa có cột is_current cho class_sessions. Hãy chạy SQL mới rồi reload lại trang.");
-      return;
-    }
-    const sb = getSb();
-    const { error: clearError } = await sb.from("class_sessions").update({ is_current: false }).eq("class_id", _classId);
-    if(clearError){
-      alert("Không thể bỏ chọn buổi đang học cũ: " + clearError.message);
-      return;
-    }
-    const { error: setError } = await sb.from("class_sessions").update({ is_current: true }).eq("id", sessionId).eq("class_id", _classId);
-    if(setError){
-      alert("Không thể chọn buổi đang học: " + setError.message);
-      return;
-    }
     await cvSwitchTab("exams");
   };
 
