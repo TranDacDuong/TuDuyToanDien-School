@@ -91,6 +91,27 @@
     return dates.sort();
   }
 
+  function generateOccurrences(schedules, ym) {
+    const [year, month] = ym.split("-").map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const items = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(year, month - 1, d);
+      const weekday = date.getDay() === 0 ? 7 : date.getDay();
+      schedules.forEach(s => {
+        if (s.weekday === weekday) {
+          items.push({
+            date: `${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`,
+            schedule_id: Number(s.id || 0),
+            session_no: Number(s.session_no || 1),
+            schedule: s
+          });
+        }
+      });
+    }
+    return items.sort((a,b) => a.date.localeCompare(b.date) || a.session_no - b.session_no);
+  }
+
   function getSchedulesForMonth(allSchedules, ym) {
     const mStart = ymToDate(ym);
     const eligible = allSchedules.filter(s => (s.effective_from || "2000-01-01") <= mStart);
@@ -537,10 +558,11 @@ Nhập số tiền hoàn lại (>0):`,
         { data: classStudents, error: e2 },
         { data: attData,       error: e3 },
         { data: payments,      error: e4 },
+        { data: chosenSchedules, error: e5 },
       ] = await Promise.all([
         sb.from("classes")
           .select(`id, class_name, tuition_fee, tuition_type, makeup_fee,
-                   class_schedules(weekday, start_time, end_time, effective_from)`)
+                   class_schedules(id, session_no, weekday, start_time, end_time, effective_from)`)
           .eq("hidden", false),
 
         sb.from("class_students")
@@ -548,25 +570,36 @@ Nhập số tiền hoàn lại (>0):`,
                    user:users!fk_student(id, full_name, email${canViewStudentPhone() ? ", phone" : ""})`),
 
         sb.from("attendance")
-          .select("student_id, class_id, date, status")
+          .select("student_id, class_id, date, status, schedule_id")
           .gte("date", mStart).lte("date", mEnd),
 
         // payment theo student_id + month (không cần class_id nữa)
         sb.from("tuition_payments")
           .select("*").eq("month", mStart),
+
+        sb.from("class_student_schedules")
+          .select("class_id, student_id, schedule_id"),
       ]);
 
       if (e1) throw e1;
       if (e2) throw e2;
       if (e3) throw e3;
       if (e4) throw e4;
+      if (e5) throw e5;
 
       const classMap = {};
       (classes || []).forEach(c => { classMap[c.id] = c; });
 
       const attMap = {};
       (attData || []).forEach(a => {
-        attMap[`${a.student_id}_${a.class_id}_${a.date}`] = a.status;
+        attMap[`${a.student_id}_${a.class_id}_${a.date}_${a.schedule_id || 0}`] = a.status;
+      });
+
+      const chosenMap = {};
+      (chosenSchedules || []).forEach(row => {
+        const key = `${row.student_id}_${row.class_id}`;
+        if (!chosenMap[key]) chosenMap[key] = new Set();
+        chosenMap[key].add(Number(row.schedule_id));
       });
 
       // paymentMap: studentId → record
@@ -584,14 +617,19 @@ Nhập số tiền hoàn lại (>0):`,
         const left   = cs.left_at   ? cs.left_at.slice(0, 10)   : "9999-99-99";
         if (joined > mEnd || left < mStart) return;
 
-        const schedules   = getSchedulesForMonth(cls.class_schedules || [], ym);
-        const allDates    = generateDates(schedules, ym);
-        const activeDates = allDates.filter(d => d >= joined && d <= left);
-        const totalSessions = activeDates.length;
+        const schedules = getSchedulesForMonth(cls.class_schedules || [], ym);
+        const chosenIds = chosenMap[`${cs.student_id}_${cs.class_id}`];
+        const studentSchedules = chosenIds?.size
+          ? schedules.filter(s => chosenIds.has(Number(s.id)))
+          : schedules;
+        const activeOccurrences = generateOccurrences(studentSchedules, ym).filter(item => item.date >= joined && item.date <= left);
+        const totalSessions = activeOccurrences.length;
 
         let present = 0, absent = 0, makeup = 0;
-        activeDates.forEach(d => {
-          const status = attMap[`${cs.student_id}_${cs.class_id}_${d}`] || "present";
+        activeOccurrences.forEach(item => {
+          const status = attMap[`${cs.student_id}_${cs.class_id}_${item.date}_${item.schedule_id}`]
+            || attMap[`${cs.student_id}_${cs.class_id}_${item.date}_0`]
+            || "present";
           if (status === "present")     present++;
           else if (status === "absent") absent++;
           else if (status === "makeup") makeup++;
@@ -606,8 +644,8 @@ Nhập số tiền hoàn lại (>0):`,
 
         // Tạo label lịch học: "T2 (07:00–09:00), T4 (07:00–09:00)"
         const daysMap = {1:"T2",2:"T3",3:"T4",4:"T5",5:"T6",6:"T7",7:"CN"};
-        const scheduleLabel = schedules
-          .map(s => `${daysMap[s.weekday]} (${s.start_time.slice(0,5)}–${s.end_time.slice(0,5)})`)
+        const scheduleLabel = studentSchedules
+          .map(s => `Buổi ${s.session_no || 1}: ${daysMap[s.weekday]} (${s.start_time.slice(0,5)}–${s.end_time.slice(0,5)})`)
           .join(", ");
 
         allRows.push({

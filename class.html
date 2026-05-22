@@ -171,9 +171,25 @@ input:focus, select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
 .row > div { flex: 1; }
 
 .schedules { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.schedule-group {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: var(--surface);
+}
+.schedule-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  color: var(--navy);
+  font-weight: 800;
+}
 .schedule-row {
-  display: grid; grid-template-columns: 96px 120px 1fr 1fr 1fr 40px;
+  display: grid; grid-template-columns: 120px 1fr 1fr 1fr 40px;
   gap: 8px; align-items: center;
+  margin-top: 8px;
 }
 .remove-btn {
   background: var(--red-bg); border: 1px solid #fca5a5; border-radius: 6px;
@@ -403,7 +419,7 @@ input:focus, select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
 
       <h3 style="margin-top:16px;font-family:var(--font-display);font-size:1rem;color:var(--navy)">Lịch học</h3>
       <div class="schedules" id="schedules"></div>
-      <div style="margin-top:8px">
+      <div style="margin-top:8px;display:none">
         <button type="button" id="addSchedule" class="btn btn-outline btn-sm">+ Thêm buổi</button>
       </div>
 

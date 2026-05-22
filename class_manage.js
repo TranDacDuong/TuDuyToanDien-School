@@ -120,17 +120,41 @@
     const picks = [];
     for(const no of sessionNos){
       const options = grouped[no];
-      if(options.length === 1){
-        picks.push(options[0]);
-        continue;
+      const checked = document.querySelector('input[name="cv_schedule_session_'+no+'"]:checked');
+      const selectedId = checked ? Number(checked.value) : Number(options[0]?.id);
+      const selected = options.find(s => Number(s.id) === selectedId);
+      if(!selected){
+        alert("Vui lòng chọn lịch cho Buổi "+no+".");
+        return null;
       }
-      const menu = options.map((s, idx) => (idx + 1)+". "+scheduleLabel(s)).join("\n");
-      const answer = window.prompt('Chọn lịch Buổi '+no+' cho "'+studentName+'":\n'+menu, "1");
-      if(answer === null) return null;
-      const index = Math.max(0, Math.min(options.length - 1, parseInt(answer, 10) - 1 || 0));
-      picks.push(options[index]);
+      picks.push(selected);
     }
     return picks;
+  }
+
+  function buildSchedulePickerHtml(schedules){
+    const grouped = groupSchedulesBySession(schedules);
+    const sessionNos = Object.keys(grouped).map(Number).sort((a,b)=>a-b);
+    if(!sessionNos.length) {
+      return '<p style="font-size:13px;color:var(--ink-light)">Lớp chưa có lịch học để chọn.</p>';
+    }
+    const rows = sessionNos.map(no => {
+      const options = grouped[no].map((s, idx) => `
+        <label style="display:block;margin:4px 0;cursor:pointer">
+          <input type="radio" name="cv_schedule_session_${no}" value="${s.id}" ${idx === 0 ? "checked" : ""} style="width:15px;height:15px;accent-color:var(--navy);vertical-align:middle;margin-right:6px">
+          <span>${esc((daysMap[s.weekday] || "?")+" "+String(s.start_time || "").slice(0,5)+"–"+String(s.end_time || "").slice(0,5)+(s.rooms?.room_name ? " • "+s.rooms.room_name : ""))}</span>
+        </label>
+      `).join("");
+      return `<tr><td style="font-weight:800;color:var(--navy);white-space:nowrap">Buổi ${no}</td><td>${options}</td></tr>`;
+    }).join("");
+    return `
+      <div style="overflow-x:auto;margin-top:10px;border:1px solid var(--border);border-radius:10px">
+        <table class="table" style="font-size:.84rem;margin:0">
+          <thead><tr><th style="width:110px;text-align:left">Buổi</th><th style="text-align:left">Chọn 1 lịch học</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
   }
 
   function getMinRoomCapacity(schedules){
@@ -799,7 +823,7 @@
         "</div>"+
         (alreadyIn
           ?'<span style="font-size:.75rem;color:var(--ink-light)">Đã trong lớp</span>'
-          :'<button onclick="cvConfirmAddStudent(\''+u.id+'\',\''+safeName+'\')" class="btn btn-primary btn-sm">Thêm</button>')+
+          :'<button onclick="cvOpenSchedulePicker(\''+u.id+'\',\''+safeName+'\')" class="btn btn-primary btn-sm">Thêm</button>')+
         "</div>";
     });
     resultsDiv.innerHTML=localHtml;
@@ -825,10 +849,30 @@
         "</div>"+
         (alreadyIn
           ?'<span style="font-size:.75rem;color:var(--ink-light)">Đã trong lớp</span>'
-          :'<button onclick="cvConfirmAddStudent(\''+u.id+'\',\''+safeName+'\')" class="btn btn-primary btn-sm">Thêm</button>')+
+          :'<button onclick="cvOpenSchedulePicker(\''+u.id+'\',\''+safeName+'\')" class="btn btn-primary btn-sm">Thêm</button>')+
         "</div>";
     });
     resultsDiv.innerHTML=html;
+  };
+
+  window.cvOpenSchedulePicker = function(studentId, studentName){
+    const resultsDiv=document.getElementById("cvSearchResults");
+    if(!resultsDiv) return;
+    const sched=getSchedulesForMonth(_cachedClass.class_schedules||[],_currentMonth,_currentYear);
+    resultsDiv.innerHTML =
+      '<div style="padding:10px;border-radius:10px;background:#fff;border:1px solid var(--border)">'+
+        '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center">'+
+          '<div>'+
+            '<div style="font-weight:800;color:var(--navy)">Chọn lịch học</div>'+
+            '<div style="font-size:.82rem;color:var(--ink-mid);margin-top:2px">'+esc(studentName)+'</div>'+
+          '</div>'+
+          '<button onclick="cvSearchStudents()" class="btn btn-outline btn-sm">Đổi học sinh</button>'+
+        '</div>'+
+        buildSchedulePickerHtml(sched)+
+        '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">'+
+          '<button onclick="cvConfirmAddStudent(\''+studentId+'\',\''+String(studentName || '').replace(/'/g,"\\'")+'\')" class="btn btn-primary btn-sm">Xác nhận thêm</button>'+
+        '</div>'+
+      '</div>';
   };
 
   window.cvConfirmAddStudent = async function(studentId,studentName){

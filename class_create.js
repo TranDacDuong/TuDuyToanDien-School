@@ -29,15 +29,10 @@ const WEEKDAYS = [
 /* ══════════════════════════════════════════════
    SCHEDULE ROW
 ══════════════════════════════════════════════ */
-function createScheduleRow(initial={}){
+function createScheduleRow(initial={}, sessionNo=1){
   const row = document.createElement("div");
   row.className = "schedule-row";
-
-  const sessionSelect = document.createElement("select");
-  sessionSelect.className = "schedule-session";
-  const sessionCount = Math.max(1, Math.min(7, parseInt(sessionsPerWeek?.value || initial.session_no || 1, 10) || 1));
-  sessionSelect.innerHTML = Array.from({ length: sessionCount }, (_, i) => `<option value="${i + 1}">Buổi ${i + 1}</option>`).join("");
-  sessionSelect.value = initial.session_no || 1;
+  row.dataset.sessionNo = String(initial.session_no || sessionNo || 1);
 
   const weekdaySelect = document.createElement("select");
   weekdaySelect.innerHTML = `<option value="">- buổi -</option>` +
@@ -57,7 +52,6 @@ function createScheduleRow(initial={}){
   removeBtn.type = "button"; removeBtn.className = "remove-btn";
   removeBtn.innerHTML = "✕"; removeBtn.onclick = () => row.remove();
 
-  row.appendChild(sessionSelect);
   row.appendChild(weekdaySelect);
   row.appendChild(startInput);
   row.appendChild(endInput);
@@ -97,20 +91,48 @@ function createScheduleRow(initial={}){
   return row;
 }
 
-addScheduleBtn.onclick = () => schedulesEl.appendChild(createScheduleRow());
-
-function refreshScheduleSessionOptions(){
-  const sessionCount = Math.max(1, Math.min(7, parseInt(sessionsPerWeek?.value || 1, 10) || 1));
-  [...schedulesEl.querySelectorAll(".schedule-row")].forEach(row => {
-    const select = row.querySelector(".schedule-session");
-    if(!select) return;
-    const current = Math.min(sessionCount, parseInt(select.value || 1, 10) || 1);
-    select.innerHTML = Array.from({ length: sessionCount }, (_, i) => `<option value="${i + 1}">Buổi ${i + 1}</option>`).join("");
-    select.value = current;
-  });
+function createScheduleGroup(sessionNo, rows=[]){
+  const group = document.createElement("div");
+  group.className = "schedule-group";
+  group.dataset.sessionNo = String(sessionNo);
+  group.innerHTML = `
+    <div class="schedule-group-head">
+      <span>Buổi ${sessionNo}</span>
+      <button type="button" class="btn btn-outline btn-sm">+ Thêm lịch</button>
+    </div>
+    <div class="schedule-group-body"></div>
+  `;
+  const body = group.querySelector(".schedule-group-body");
+  const addBtn = group.querySelector("button");
+  const addRow = initial => body.appendChild(createScheduleRow(initial || { session_no: sessionNo }, sessionNo));
+  (rows.length ? rows : [{ session_no: sessionNo }]).forEach(addRow);
+  addBtn.onclick = () => addRow({ session_no: sessionNo });
+  return group;
 }
 
-if(sessionsPerWeek) sessionsPerWeek.onchange = refreshScheduleSessionOptions;
+function renderScheduleGroups(existingSchedules=[]){
+  const sessionCount = Math.max(1, Math.min(7, parseInt(sessionsPerWeek?.value || 1, 10) || 1));
+  const currentRows = existingSchedules.length ? existingSchedules : [...schedulesEl.querySelectorAll(".schedule-row")].map(row => ({
+    session_no: Number(row.dataset.sessionNo || row.closest(".schedule-group")?.dataset.sessionNo || 1),
+    weekday: row.children[0]?.value || "",
+    start_time: row.children[1]?.value || "",
+    end_time: row.children[2]?.value || "",
+    room_id: row.children[3]?.value || null
+  })).filter(row => row.weekday || row.start_time || row.end_time || row.room_id);
+  const grouped = {};
+  currentRows.forEach(row => {
+    const no = Math.max(1, Math.min(sessionCount, Number(row.session_no || 1)));
+    if(!grouped[no]) grouped[no] = [];
+    grouped[no].push({ ...row, session_no: no });
+  });
+  schedulesEl.innerHTML = "";
+  for(let no=1; no<=sessionCount; no++){
+    schedulesEl.appendChild(createScheduleGroup(no, grouped[no] || []));
+  }
+}
+
+if(addScheduleBtn) addScheduleBtn.onclick = () => renderScheduleGroups();
+if(sessionsPerWeek) sessionsPerWeek.onchange = () => renderScheduleGroups();
 
 /* ══════════════════════════════════════════════
    TEACHER PICKER
@@ -204,11 +226,11 @@ form.onsubmit = async (e) => {
   const rows   = [...schedulesEl.querySelectorAll(".schedule-row")];
   const inserts = [];
   rows.forEach(r => {
-    const sessionNo = parseInt(r.children[0].value || 1, 10);
-    const weekday = r.children[1].value;
-    const start   = r.children[2].value;
-    const end     = r.children[3].value;
-    const room    = r.children[4].value || null;
+    const sessionNo = parseInt(r.dataset.sessionNo || r.closest(".schedule-group")?.dataset.sessionNo || 1, 10);
+    const weekday = r.children[0].value;
+    const start   = r.children[1].value;
+    const end     = r.children[2].value;
+    const room    = r.children[3].value || null;
     if(!weekday || !start || !end) return;
     inserts.push({ class_id: classId, session_no: sessionNo, weekday: parseInt(weekday), start_time: start, end_time: end, room_id: room, effective_from: "2000-01-01" });
   });
@@ -254,8 +276,7 @@ window.resetClassForm = function(){
   selectedTeacherIds = new Set();
   form.reset();
   if(sessionsPerWeek) sessionsPerWeek.value = 1;
-  schedulesEl.innerHTML = "";
-  schedulesEl.appendChild(createScheduleRow());
+  renderScheduleGroups();
   renderTeacherPicker();
 };
 
@@ -280,9 +301,8 @@ window.fillEditClass = async function(classId){
   if(sessionsPerWeek) sessionsPerWeek.value = cls.sessions_per_week || Math.max(1, ...((schedules || []).map(s => Number(s.session_no || 1))));
 
   /* Load schedules */
-  schedulesEl.innerHTML = "";
   if(schedules?.length){
-    schedules.forEach(s => schedulesEl.appendChild(createScheduleRow({
+    renderScheduleGroups(schedules.map(s => ({
       weekday:    s.weekday,
       session_no: s.session_no || 1,
       start_time: s.start_time.slice(0,5),
@@ -291,7 +311,7 @@ window.fillEditClass = async function(classId){
       class_id:   classId,
     })));
   } else {
-    schedulesEl.appendChild(createScheduleRow());
+    renderScheduleGroups();
   }
 
   /* Load giáo viên đã assign */
@@ -304,5 +324,6 @@ window.fillEditClass = async function(classId){
 /* ── Init ── */
 loadGrades();
 loadTeacherPicker();
+renderScheduleGroups();
 
 })();
