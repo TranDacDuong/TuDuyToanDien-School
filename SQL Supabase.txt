@@ -2914,3 +2914,105 @@ WITH CHECK (
       AND u.role IN ('admin', 'teacher')
   )
 );
+
+-- ============================================
+-- Class schedule choices per weekly session
+-- A class can have Buổi 1, Buổi 2, ... and each session can offer multiple schedule options.
+-- Each student chooses exactly one schedule option for each session.
+-- Existing schedules are migrated to Buổi 1.
+-- ============================================
+
+ALTER TABLE public.classes
+ADD COLUMN IF NOT EXISTS sessions_per_week integer NOT NULL DEFAULT 1;
+
+ALTER TABLE public.classes
+DROP CONSTRAINT IF EXISTS classes_sessions_per_week_check;
+
+ALTER TABLE public.classes
+ADD CONSTRAINT classes_sessions_per_week_check
+CHECK (sessions_per_week >= 1 AND sessions_per_week <= 7);
+
+ALTER TABLE public.class_schedules
+ADD COLUMN IF NOT EXISTS session_no integer NOT NULL DEFAULT 1;
+
+ALTER TABLE public.class_schedules
+DROP CONSTRAINT IF EXISTS class_schedules_session_no_check;
+
+ALTER TABLE public.class_schedules
+ADD CONSTRAINT class_schedules_session_no_check
+CHECK (session_no >= 1 AND session_no <= 7);
+
+UPDATE public.class_schedules
+SET session_no = 1
+WHERE session_no IS NULL;
+
+CREATE TABLE IF NOT EXISTS public.class_student_schedules (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  class_id uuid NOT NULL,
+  student_id uuid NOT NULL,
+  session_no integer NOT NULL CHECK (session_no >= 1 AND session_no <= 7),
+  schedule_id integer NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT class_student_schedules_pkey PRIMARY KEY (id),
+  CONSTRAINT class_student_schedules_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id) ON DELETE CASCADE,
+  CONSTRAINT class_student_schedules_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.users(id) ON DELETE CASCADE,
+  CONSTRAINT class_student_schedules_schedule_id_fkey FOREIGN KEY (schedule_id) REFERENCES public.class_schedules(id) ON DELETE CASCADE,
+  CONSTRAINT class_student_schedules_unique UNIQUE (class_id, student_id, session_no)
+);
+
+CREATE INDEX IF NOT EXISTS class_student_schedules_class_student_idx
+  ON public.class_student_schedules (class_id, student_id);
+
+ALTER TABLE public.class_student_schedules ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS class_student_schedules_select_policy ON public.class_student_schedules;
+CREATE POLICY class_student_schedules_select_policy ON public.class_student_schedules
+FOR SELECT
+USING (
+  student_id = auth.uid()
+  OR EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
+
+DROP POLICY IF EXISTS class_student_schedules_staff_manage ON public.class_student_schedules;
+CREATE POLICY class_student_schedules_staff_manage ON public.class_student_schedules
+FOR ALL
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role IN ('admin', 'teacher')
+  )
+);
+
+ALTER TABLE public.attendance
+ADD COLUMN IF NOT EXISTS schedule_id integer,
+ADD COLUMN IF NOT EXISTS session_no integer;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'attendance_schedule_id_fkey'
+  ) THEN
+    ALTER TABLE public.attendance
+      ADD CONSTRAINT attendance_schedule_id_fkey
+      FOREIGN KEY (schedule_id) REFERENCES public.class_schedules(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS attendance_class_student_date_schedule_idx
+  ON public.attendance (class_id, student_id, date, schedule_id);

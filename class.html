@@ -172,7 +172,7 @@ input:focus, select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
 
 .schedules { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .schedule-row {
-  display: grid; grid-template-columns: 120px 1fr 1fr 1fr 40px;
+  display: grid; grid-template-columns: 96px 120px 1fr 1fr 1fr 40px;
   gap: 8px; align-items: center;
 }
 .remove-btn {
@@ -387,6 +387,11 @@ input:focus, select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
       <div class="row" style="margin-top:12px">
         <div><label>Học phí</label><input id="tuition_fee" type="number"/></div>
         <div><label>Học phí học bù</label><input id="makeup_fee" type="number" placeholder="Để trống = giống học phí"/></div>
+      </div>
+
+      <div style="margin-top:12px">
+        <label>Số buổi/tuần</label>
+        <input id="sessions_per_week" type="number" min="1" max="7" value="1"/>
       </div>
 
       <!-- Giáo viên phụ trách -->

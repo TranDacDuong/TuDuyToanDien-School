@@ -34,17 +34,31 @@
       .replace(/'/g, "&#39;");
   }
   function generateDates(schedules, month, year){
-    const dates=[], days=new Date(year,month+1,0).getDate();
+    const dates=new Set(), days=new Date(year,month+1,0).getDate();
     for(let d=1;d<=days;d++){
       const date=new Date(year,month,d);
       const wd=date.getDay()===0?7:date.getDay();
       schedules.forEach(s=>{
         if(s.weekday===wd){
-          dates.push(date.getFullYear()+"-"+String(date.getMonth()+1).padStart(2,"0")+"-"+String(d).padStart(2,"0"));
+          dates.add(date.getFullYear()+"-"+String(date.getMonth()+1).padStart(2,"0")+"-"+String(d).padStart(2,"0"));
         }
       });
     }
-    return dates.sort();
+    return [...dates].sort();
+  }
+  function generateOccurrences(schedules, month, year){
+    const items=[], days=new Date(year,month+1,0).getDate();
+    for(let d=1;d<=days;d++){
+      const date=new Date(year,month,d);
+      const wd=date.getDay()===0?7:date.getDay();
+      schedules.forEach(s=>{
+        if(s.weekday===wd){
+          const value=date.getFullYear()+"-"+String(date.getMonth()+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
+          items.push({ date:value, schedule_id:Number(s.id), session_no:Number(s.session_no || 1), schedule:s });
+        }
+      });
+    }
+    return items.sort((a,b)=>a.date.localeCompare(b.date) || a.session_no-b.session_no || String(a.schedule?.start_time || "").localeCompare(String(b.schedule?.start_time || "")));
   }
   function getSchedulesForMonth(all, month, year){
     const mStart=monthStart(month,year);
@@ -52,6 +66,71 @@
     if(!eligible.length) return [];
     const maxEf=eligible.reduce((m,s)=>{ const e=s.effective_from||"2000-01-01"; return e>m?e:m; },"2000-01-01");
     return eligible.filter(s=>(s.effective_from||"2000-01-01")===maxEf);
+  }
+
+  function scheduleLabel(s){
+    if(!s) return "Chưa chọn lịch";
+    return "Buổi "+(s.session_no || 1)+": "+(daysMap[s.weekday] || "?")+" "+String(s.start_time || "").slice(0,5)+"–"+String(s.end_time || "").slice(0,5)+(s.rooms?.room_name ? " • "+s.rooms.room_name : "");
+  }
+
+  function groupSchedulesBySession(schedules){
+    const map = {};
+    (schedules || []).forEach(s => {
+      const no = Number(s.session_no || 1);
+      if(!map[no]) map[no] = [];
+      map[no].push(s);
+    });
+    return map;
+  }
+
+  function getStudentSchedules(studentId, schedules){
+    const selectedIds = _studentScheduleMap[studentId];
+    if(!selectedIds || !selectedIds.size) return schedules || [];
+    return (schedules || []).filter(s => selectedIds.has(Number(s.id)));
+  }
+
+  function isStudentScheduledOn(studentId, dateValue, schedules){
+    const date = new Date(dateValue);
+    const wd = date.getDay() === 0 ? 7 : date.getDay();
+    return getStudentSchedules(studentId, schedules).some(s => s.weekday === wd);
+  }
+
+  function generateStudentDates(studentId, schedules, month, year){
+    return generateDates(getStudentSchedules(studentId, schedules), month, year);
+  }
+
+  function generateStudentOccurrences(studentId, schedules, month, year){
+    return generateOccurrences(getStudentSchedules(studentId, schedules), month, year);
+  }
+
+  function collectDatesForStudents(students, schedules, month, year){
+    const map = new Map();
+    (students || []).forEach(s => {
+      generateStudentOccurrences(s.student_id, schedules, month, year).forEach(item => {
+        map.set(item.date+"_"+item.schedule_id, item);
+      });
+    });
+    if(!map.size) generateOccurrences(schedules, month, year).forEach(item => map.set(item.date+"_"+item.schedule_id, item));
+    return [...map.values()].sort((a,b)=>a.date.localeCompare(b.date) || a.session_no-b.session_no);
+  }
+
+  function chooseSchedulesForStudent(studentName, schedules){
+    const grouped = groupSchedulesBySession(schedules);
+    const sessionNos = Object.keys(grouped).map(Number).sort((a,b)=>a-b);
+    const picks = [];
+    for(const no of sessionNos){
+      const options = grouped[no];
+      if(options.length === 1){
+        picks.push(options[0]);
+        continue;
+      }
+      const menu = options.map((s, idx) => (idx + 1)+". "+scheduleLabel(s)).join("\n");
+      const answer = window.prompt('Chọn lịch Buổi '+no+' cho "'+studentName+'":\n'+menu, "1");
+      if(answer === null) return null;
+      const index = Math.max(0, Math.min(options.length - 1, parseInt(answer, 10) - 1 || 0));
+      picks.push(options[index]);
+    }
+    return picks;
   }
 
   function getMinRoomCapacity(schedules){
@@ -104,6 +183,7 @@
   let _activeTab      = "attendance";
   let _studentSearchPool = null;
   let _classSessionExamCatalog = { exam: [], pdf: [] };
+  let _studentScheduleMap = {};
 
   function normalizeSearchText(value){
     return String(value || "")
@@ -272,9 +352,9 @@
     if(!body) return;
 
     const { data, error } = await sb.from("classes").select([
-      "id,class_name,tuition_fee,tuition_type,makeup_fee",
+      "id,class_name,tuition_fee,tuition_type,makeup_fee,sessions_per_week",
       "grades(name),subjects(name)",
-      "class_schedules(id,weekday,start_time,end_time,effective_from,rooms:rooms(room_name,capacity))",
+      "class_schedules(id,session_no,weekday,start_time,end_time,effective_from,rooms:rooms(room_name,capacity))",
       "students:class_students!fk_class(id,student_id,joined_at,left_at,user:users!fk_student(id,full_name))"
     ].join(",")).eq("id",_classId).single();
 
@@ -283,6 +363,15 @@
       return;
     }
     _cachedClass = data;
+    const { data: chosenSchedules } = await sb
+      .from("class_student_schedules")
+      .select("student_id,schedule_id")
+      .eq("class_id", _classId);
+    _studentScheduleMap = {};
+    (chosenSchedules || []).forEach(row => {
+      if(!_studentScheduleMap[row.student_id]) _studentScheduleMap[row.student_id] = new Set();
+      _studentScheduleMap[row.student_id].add(Number(row.schedule_id));
+    });
     renderShell();
     if(_activeTab === "attendance") await renderAttendanceTab();
     else await renderExamsTab();
@@ -302,7 +391,7 @@
           '<span style="font-size:.78rem;background:var(--blue-bg);color:var(--blue);'+
           'padding:3px 10px;border-radius:12px;margin-right:6px;display:inline-block;margin-bottom:4px;'+
           'font-weight:600;border:1px solid rgba(26,86,168,.15)">'+
-          daysMap[s.weekday]+" "+s.start_time.slice(0,5)+"–"+s.end_time.slice(0,5)+
+          "Buổi "+(s.session_no || 1)+" • "+daysMap[s.weekday]+" "+s.start_time.slice(0,5)+"–"+s.end_time.slice(0,5)+
           (s.rooms?" • "+s.rooms.room_name:"")+
           "</span>").join("")
       : '<span style="color:var(--ink-light);font-size:.82rem">Chưa có lịch học</span>';
@@ -406,19 +495,22 @@
       const l = s.left_at  ?s.left_at.slice(0,10)  :"9999-99-99";
       return j<=mEnd && l>=mStart;
     });
-    const dates = generateDates(schedulesThisMonth, _currentMonth, _currentYear);
+    const dates = role === "student"
+      ? generateStudentOccurrences(window._currentUserId, schedulesThisMonth, _currentMonth, _currentYear)
+      : collectDatesForStudents(visibleStudents, schedulesThisMonth, _currentMonth, _currentYear);
 
-    const {data:attData} = await sb.from("attendance").select("student_id,date,status")
+    const {data:attData} = await sb.from("attendance").select("student_id,date,status,schedule_id")
       .eq("class_id",_classId).gte("date",mStart).lte("date",mEnd);
     _attendanceMap = {};
-    (attData||[]).forEach(a=>{ _attendanceMap[a.student_id+"_"+a.date]=a.status; });
+    (attData||[]).forEach(a=>{ _attendanceMap[a.student_id+"_"+a.date+"_"+(a.schedule_id || 0)]=a.status; });
 
     if(role === "student"){
       const uid = window._currentUserId;
       let dateHeaders="";
-      dates.forEach(d=>{
+      dates.forEach(item=>{
+        const d = item.date;
         dateHeaders+='<th class="center" style="min-width:58px;white-space:nowrap">'+
-          d.slice(8,10)+"/"+d.slice(5,7)+"</th>";
+          d.slice(8,10)+"/"+d.slice(5,7)+"<br><span style=\"font-size:.68rem\">B"+item.session_no+"</span></th>";
       });
       const me = visibleStudents.find(s => s.student_id === uid);
       if(!me){
@@ -428,14 +520,19 @@
       const joined=me.joined_at?me.joined_at.slice(0,10):"0000-00-00";
       const left  =me.left_at  ?me.left_at.slice(0,10)  :"9999-99-99";
       let myCells="";
-      dates.forEach(d=>{
+      dates.forEach(item=>{
+        const d = item.date, scheduleId = item.schedule_id;
+        if(!getStudentSchedules(me.student_id, schedulesThisMonth).some(s => Number(s.id) === scheduleId)){
+          myCells+='<td class="center" style="padding:4px;color:var(--ink-light)">—</td>';
+          return;
+        }
         if(d>left){
-          const status=_attendanceMap[me.student_id+"_"+d]||"absent";
+          const status=_attendanceMap[me.student_id+"_"+d+"_"+scheduleId]||_attendanceMap[me.student_id+"_"+d+"_0"]||"absent";
           const sm=statusMap[status]||statusMap.absent;
           myCells+='<td class="center" style="padding:4px"><span class="att-btn '+sm.cls+'" style="cursor:default;font-weight:700">'+ sm.text+'</span></td>';
         } else {
           const defaultStatus = d < joined ? "absent" : "present";
-          const status=_attendanceMap[me.student_id+"_"+d]||defaultStatus;
+          const status=_attendanceMap[me.student_id+"_"+d+"_"+scheduleId]||_attendanceMap[me.student_id+"_"+d+"_0"]||defaultStatus;
           const sm=statusMap[status]||statusMap.present;
           myCells+='<td class="center" style="padding:4px"><span class="att-btn '+sm.cls+'" style="cursor:default;font-weight:700">'+ sm.text+'</span></td>';
         }
@@ -496,23 +593,28 @@
       const joined  =s.joined_at?s.joined_at.slice(0,10):"0000-00-00";
       const left    =s.left_at  ?s.left_at.slice(0,10)  :"9999-99-99";
       let cells="";
-      dates.forEach(d=>{
+      dates.forEach(item=>{
+        const d = item.date, scheduleId = item.schedule_id, sessionNo = item.session_no;
+        if(!getStudentSchedules(s.student_id, schedulesThisMonth).some(sc => Number(sc.id) === scheduleId)){
+          cells+='<td class="center" style="padding:4px;color:var(--ink-light)">—</td>';
+          return;
+        }
         if(d>left){
-          const status=_attendanceMap[s.student_id+"_"+d]||"absent";
-          const key="cvatt_"+s.student_id+"_"+d;
+          const status=_attendanceMap[s.student_id+"_"+d+"_"+scheduleId]||_attendanceMap[s.student_id+"_"+d+"_0"]||"absent";
+          const key="cvatt_"+s.student_id+"_"+d+"_"+scheduleId;
           const sm=statusMap[status]||statusMap.absent;
           cells+='<td class="center" style="padding:4px">'+
             '<button id="'+key+'" class="att-btn '+sm.cls+'" '+
-            'onclick="cvToggleAtt(\''+_classId+'\',\''+s.student_id+'\',\''+d+'\',\''+status+'\')">'+
+            'onclick="cvToggleAtt(\''+_classId+'\',\''+s.student_id+'\',\''+d+'\',\''+status+'\',\''+scheduleId+'\',\''+sessionNo+'\')">'+
             sm.text+'</button></td>';
         } else {
           const defaultStatus = d < joined ? "absent" : "present";
-          const status=_attendanceMap[s.student_id+"_"+d]||defaultStatus;
-          const key="cvatt_"+s.student_id+"_"+d;
+          const status=_attendanceMap[s.student_id+"_"+d+"_"+scheduleId]||_attendanceMap[s.student_id+"_"+d+"_0"]||defaultStatus;
+          const key="cvatt_"+s.student_id+"_"+d+"_"+scheduleId;
           const sm=statusMap[status]||statusMap.present;
           cells+='<td class="center" style="padding:4px">'+
             '<button id="'+key+'" class="att-btn '+sm.cls+'" '+
-            'onclick="cvToggleAtt(\''+_classId+'\',\''+s.student_id+'\',\''+d+'\',\''+status+'\')">'+
+            'onclick="cvToggleAtt(\''+_classId+'\',\''+s.student_id+'\',\''+d+'\',\''+status+'\',\''+scheduleId+'\',\''+sessionNo+'\')">'+
             sm.text+'</button></td>';
         }
       });
@@ -538,10 +640,11 @@
       "</td></tr>";
 
     let dateHeaders="";
-    dates.forEach(d=>{
-      dateHeaders+='<th class="center" style="min-width:62px;white-space:nowrap">'+
-        d.slice(8,10)+"/"+d.slice(5,7)+"</th>";
-    });
+      dates.forEach(item=>{
+        const d = item.date;
+        dateHeaders+='<th class="center" style="min-width:62px;white-space:nowrap">'+
+        d.slice(8,10)+"/"+d.slice(5,7)+"<br><span style=\"font-size:.68rem\">B"+item.session_no+"</span></th>";
+      });
 
     const searchModal=
       '<div id="cvAddStudentModal" style="display:none;margin-top:14px;padding:14px;'+
@@ -570,20 +673,21 @@
       searchModal;
   }
 
-  window.cvToggleAtt = async function(classId,studentId,date,current){
+  window.cvToggleAtt = async function(classId,studentId,date,current,scheduleId,sessionNo){
     const next=statusCycle[(statusCycle.indexOf(current)+1)%3];
     const sb=getSb();
+    const sid = Number(scheduleId || 0) || null;
     const{error}=await sb.from("attendance").upsert(
-      [{class_id:classId,student_id:studentId,date,status:next}],
-      {onConflict:"class_id,student_id,date"}
+      [{class_id:classId,student_id:studentId,date,status:next,schedule_id:sid,session_no:Number(sessionNo || 1)}],
+      {onConflict:"class_id,student_id,date,schedule_id"}
     );
     if(error){alert("Lỗi: "+error.message);return;}
-    _attendanceMap[studentId+"_"+date]=next;
-    const btn=document.getElementById("cvatt_"+studentId+"_"+date);
+    _attendanceMap[studentId+"_"+date+"_"+(sid || 0)]=next;
+    const btn=document.getElementById("cvatt_"+studentId+"_"+date+"_"+(sid || 0));
     if(btn){
       const s=statusMap[next];
       btn.className="att-btn "+s.cls; btn.textContent=s.text;
-      btn.setAttribute("onclick","cvToggleAtt('"+classId+"','"+studentId+"','"+date+"','"+next+"')");
+      btn.setAttribute("onclick","cvToggleAtt('"+classId+"','"+studentId+"','"+date+"','"+next+"','"+sid+"','"+Number(sessionNo || 1)+"')");
     }
   };
 
@@ -592,11 +696,13 @@
     const sb=getSb(), today=todayStr();
     await sb.from("class_students").update({left_at:new Date().toISOString()}).eq("class_id",classId).eq("student_id",studentId);
     const sched=getSchedulesForMonth(_cachedClass.class_schedules||[],_currentMonth,_currentYear);
-    const futureDates=generateDates(sched,_currentMonth,_currentYear).filter(d=>d>=today);
-    if(futureDates.length>0){
+    const futureRows=generateStudentOccurrences(studentId,sched,_currentMonth,_currentYear)
+      .filter(item=>item.date>=today)
+      .map(item=>({class_id:classId,student_id:studentId,date:item.date,status:"absent",schedule_id:item.schedule_id,session_no:item.session_no}));
+    if(futureRows.length>0){
       await sb.from("attendance").upsert(
-        futureDates.map(d=>({class_id:classId,student_id:studentId,date:d,status:"absent"})),
-        {onConflict:"class_id,student_id,date"}
+        futureRows,
+        {onConflict:"class_id,student_id,date,schedule_id"}
       );
     }
     const st=_cachedClass.students.find(s=>s.student_id===studentId);
@@ -621,19 +727,33 @@
     const active=(_cachedClass.students||[]).filter(s=>{
       const j=s.joined_at?s.joined_at.slice(0,10):"0000-00-00";
       const l=s.left_at  ?s.left_at.slice(0,10)  :"9999-99-99";
-      return j<=today&&l>=today;
+      return j<=today&&l>=today&&isStudentScheduledOn(s.student_id,today,sched);
     });
     if(!active.length) return;
+    const rows = [];
+    active.forEach(s => {
+      getStudentSchedules(s.student_id, sched)
+        .filter(sc => sc.weekday === todayWd)
+        .forEach(sc => rows.push({
+          class_id: classId,
+          student_id: s.student_id,
+          date: today,
+          status: "absent",
+          schedule_id: Number(sc.id),
+          session_no: Number(sc.session_no || 1)
+        }));
+    });
+    if(!rows.length) return;
     await sb.from("attendance").upsert(
-      active.map(s=>({class_id:classId,student_id:s.student_id,date:today,status:"absent"})),
-      {onConflict:"class_id,student_id,date"}
+      rows,
+      {onConflict:"class_id,student_id,date,schedule_id"}
     );
-    active.forEach(s=>{
-      _attendanceMap[s.student_id+"_"+today]="absent";
-      const btn=document.getElementById("cvatt_"+s.student_id+"_"+today);
+    rows.forEach(row=>{
+      _attendanceMap[row.student_id+"_"+today+"_"+row.schedule_id]="absent";
+      const btn=document.getElementById("cvatt_"+row.student_id+"_"+today+"_"+row.schedule_id);
       if(btn){
         btn.className="att-btn absent"; btn.textContent="Vắng";
-        btn.setAttribute("onclick","cvToggleAtt('"+classId+"','"+s.student_id+"','"+today+"','absent')");
+        btn.setAttribute("onclick","cvToggleAtt('"+classId+"','"+row.student_id+"','"+today+"','absent','"+row.schedule_id+"','"+row.session_no+"')");
       }
     });
   };
@@ -714,16 +834,35 @@
   window.cvConfirmAddStudent = async function(studentId,studentName){
     if(!confirm('Thêm "'+studentName+'" vào lớp?')) return;
     const sb=getSb(), classId=_classId, today=todayStr();
+    const sched=getSchedulesForMonth(_cachedClass.class_schedules||[],_currentMonth,_currentYear);
+    const selectedSchedules = chooseSchedulesForStudent(studentName, sched);
+    if(selectedSchedules === null) return;
+    if(!selectedSchedules.length && sched.length){
+      alert("Lớp chưa có lịch học hợp lệ.");
+      return;
+    }
     const{data:newRow,error}=await sb.from("class_students")
       .insert([{class_id:classId,student_id:studentId,joined_at:new Date().toISOString()}])
       .select().single();
     if(error){alert("Lỗi: "+error.message);return;}
-    const sched=getSchedulesForMonth(_cachedClass.class_schedules||[],_currentMonth,_currentYear);
-    const pastDates=generateDates(sched,_currentMonth,_currentYear).filter(d=>d<today);
-    if(pastDates.length>0){
+    if(selectedSchedules.length){
+      const rows = selectedSchedules.map(s => ({
+        class_id: classId,
+        student_id: studentId,
+        session_no: Number(s.session_no || 1),
+        schedule_id: s.id
+      }));
+      const { error: scheduleError } = await sb.from("class_student_schedules").upsert(rows, { onConflict: "class_id,student_id,session_no" });
+      if(scheduleError){ alert("Lỗi lưu lịch học sinh: "+scheduleError.message); return; }
+      _studentScheduleMap[studentId] = new Set(selectedSchedules.map(s => Number(s.id)));
+    }
+    const pastRows=generateOccurrences(selectedSchedules.length ? selectedSchedules : sched,_currentMonth,_currentYear)
+      .filter(item=>item.date<today)
+      .map(item=>({class_id:classId,student_id:studentId,date:item.date,status:"absent",schedule_id:item.schedule_id,session_no:item.session_no}));
+    if(pastRows.length>0){
       await sb.from("attendance").upsert(
-        pastDates.map(d=>({class_id:classId,student_id:studentId,date:d,status:"absent"})),
-        {onConflict:"class_id,student_id,date"}
+        pastRows,
+        {onConflict:"class_id,student_id,date,schedule_id"}
       );
     }
     const{data:userData}=await sb.from("users").select("id,full_name").eq("id",studentId).single();

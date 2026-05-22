@@ -1096,7 +1096,7 @@ async function renderTeacherSchedules() {
   }
   const [{ data: classes, error: classError }, { data: schedules, error: scheduleError }] = await Promise.all([
     sb.from("classes").select("id,class_name,tuition_fee,hidden,subjects(name),grades(name)").in("id", ids).eq("hidden", false),
-    sb.from("class_schedules").select("class_id,weekday,start_time,end_time,rooms(room_name)").in("class_id", ids).order("weekday").order("start_time")
+    sb.from("class_schedules").select("class_id,session_no,weekday,start_time,end_time,rooms(room_name)").in("class_id", ids).order("session_no").order("weekday").order("start_time")
   ]);
   if (classError || scheduleError) {
     wrap.innerHTML = '<div class="empty">Không tải được lịch học offline.</div>';
@@ -1128,7 +1128,7 @@ async function renderTeacherSchedules() {
       return `
         <div class="schedule-cell-item">
           <div class="schedule-subject">${esc(cls.subjects?.name || "Môn học")}</div>
-          <div class="schedule-class">${esc(cls.grades?.name || cls.class_name || "Lớp học")}</div>
+          <div class="schedule-class">Buổi ${esc(item.session_no || 1)} • ${esc(cls.grades?.name || cls.class_name || "Lớp học")}</div>
           <div class="schedule-time">${esc(time)}</div>
           ${room}
         </div>

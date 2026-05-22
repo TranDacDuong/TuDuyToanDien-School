@@ -250,7 +250,7 @@
           const day  = daysMap[s.weekday]||"?";
           const time = s.start_time.slice(0,5)+"–"+s.end_time.slice(0,5);
           const room = s.rooms?.room_name ? " • "+s.rooms.room_name : "";
-          return `${day} (${time})${room}`;
+          return `Buổi ${s.session_no || 1}: ${day} (${time})${room}`;
         }).join("<br>");
 
         const teacherList = (_teacherMap[cls.id]||[])

@@ -8,6 +8,7 @@ const subjectSelect = document.getElementById("subject_id");
 const tuitionType   = document.getElementById("tuition_type");
 const tuitionFee    = document.getElementById("tuition_fee");
 const makeupFee     = document.getElementById("makeup_fee");
+const sessionsPerWeek = document.getElementById("sessions_per_week");
 const schedulesEl   = document.getElementById("schedules");
 const addScheduleBtn= document.getElementById("addSchedule");
 
@@ -32,6 +33,12 @@ function createScheduleRow(initial={}){
   const row = document.createElement("div");
   row.className = "schedule-row";
 
+  const sessionSelect = document.createElement("select");
+  sessionSelect.className = "schedule-session";
+  const sessionCount = Math.max(1, Math.min(7, parseInt(sessionsPerWeek?.value || initial.session_no || 1, 10) || 1));
+  sessionSelect.innerHTML = Array.from({ length: sessionCount }, (_, i) => `<option value="${i + 1}">Buổi ${i + 1}</option>`).join("");
+  sessionSelect.value = initial.session_no || 1;
+
   const weekdaySelect = document.createElement("select");
   weekdaySelect.innerHTML = `<option value="">- buổi -</option>` +
     WEEKDAYS.map(w => `<option value="${w.v}">${w.label}</option>`).join("");
@@ -50,6 +57,7 @@ function createScheduleRow(initial={}){
   removeBtn.type = "button"; removeBtn.className = "remove-btn";
   removeBtn.innerHTML = "✕"; removeBtn.onclick = () => row.remove();
 
+  row.appendChild(sessionSelect);
   row.appendChild(weekdaySelect);
   row.appendChild(startInput);
   row.appendChild(endInput);
@@ -90,6 +98,19 @@ function createScheduleRow(initial={}){
 }
 
 addScheduleBtn.onclick = () => schedulesEl.appendChild(createScheduleRow());
+
+function refreshScheduleSessionOptions(){
+  const sessionCount = Math.max(1, Math.min(7, parseInt(sessionsPerWeek?.value || 1, 10) || 1));
+  [...schedulesEl.querySelectorAll(".schedule-row")].forEach(row => {
+    const select = row.querySelector(".schedule-session");
+    if(!select) return;
+    const current = Math.min(sessionCount, parseInt(select.value || 1, 10) || 1);
+    select.innerHTML = Array.from({ length: sessionCount }, (_, i) => `<option value="${i + 1}">Buổi ${i + 1}</option>`).join("");
+    select.value = current;
+  });
+}
+
+if(sessionsPerWeek) sessionsPerWeek.onchange = refreshScheduleSessionOptions;
 
 /* ══════════════════════════════════════════════
    TEACHER PICKER
@@ -166,14 +187,15 @@ form.onsubmit = async (e) => {
   const tuition_type = tuitionType.value;
   const tuition_fee  = parseInt(tuitionFee.value || 0);
   const makeup_fee   = makeupFee?.value ? parseInt(makeupFee.value) : null;
+  const sessions_per_week = Math.max(1, Math.min(7, parseInt(sessionsPerWeek?.value || 1, 10) || 1));
 
   let classId;
 
   if(editingClassId){
-    await sb.from("classes").update({ class_name, grade_id, subject_id, tuition_type, tuition_fee, makeup_fee }).eq("id", editingClassId);
+    await sb.from("classes").update({ class_name, grade_id, subject_id, tuition_type, tuition_fee, makeup_fee, sessions_per_week }).eq("id", editingClassId);
     classId = editingClassId;
   } else {
-    const {data, error} = await sb.from("classes").insert([{ class_name, grade_id, subject_id, tuition_type, tuition_fee, makeup_fee }]).select("id").single();
+    const {data, error} = await sb.from("classes").insert([{ class_name, grade_id, subject_id, tuition_type, tuition_fee, makeup_fee, sessions_per_week }]).select("id").single();
     if(error) throw error;
     classId = data.id;
   }
@@ -182,12 +204,13 @@ form.onsubmit = async (e) => {
   const rows   = [...schedulesEl.querySelectorAll(".schedule-row")];
   const inserts = [];
   rows.forEach(r => {
-    const weekday = r.children[0].value;
-    const start   = r.children[1].value;
-    const end     = r.children[2].value;
-    const room    = r.children[3].value || null;
+    const sessionNo = parseInt(r.children[0].value || 1, 10);
+    const weekday = r.children[1].value;
+    const start   = r.children[2].value;
+    const end     = r.children[3].value;
+    const room    = r.children[4].value || null;
     if(!weekday || !start || !end) return;
-    inserts.push({ class_id: classId, weekday: parseInt(weekday), start_time: start, end_time: end, room_id: room, effective_from: "2000-01-01" });
+    inserts.push({ class_id: classId, session_no: sessionNo, weekday: parseInt(weekday), start_time: start, end_time: end, room_id: room, effective_from: "2000-01-01" });
   });
   if(editingClassId){
     const { error: delErr } = await sb.from("class_schedules").delete().eq("class_id", classId);
@@ -216,6 +239,7 @@ form.onsubmit = async (e) => {
     class_name,
     teacher_count: selectedTeacherIds.size,
     schedule_count: inserts.length,
+    sessions_per_week,
   });
   alert("Đã lưu lớp ✓");
   document.getElementById("createClassPopup").classList.add("hidden");
@@ -229,6 +253,7 @@ window.resetClassForm = function(){
   editingClassId = null;
   selectedTeacherIds = new Set();
   form.reset();
+  if(sessionsPerWeek) sessionsPerWeek.value = 1;
   schedulesEl.innerHTML = "";
   schedulesEl.appendChild(createScheduleRow());
   renderTeacherPicker();
@@ -252,12 +277,14 @@ window.fillEditClass = async function(classId){
   tuitionType.value      = cls.tuition_type;
   tuitionFee.value       = cls.tuition_fee;
   if(makeupFee) makeupFee.value = cls.makeup_fee || "";
+  if(sessionsPerWeek) sessionsPerWeek.value = cls.sessions_per_week || Math.max(1, ...((schedules || []).map(s => Number(s.session_no || 1))));
 
   /* Load schedules */
   schedulesEl.innerHTML = "";
   if(schedules?.length){
     schedules.forEach(s => schedulesEl.appendChild(createScheduleRow({
       weekday:    s.weekday,
+      session_no: s.session_no || 1,
       start_time: s.start_time.slice(0,5),
       end_time:   s.end_time.slice(0,5),
       room_id:    s.room_id,
