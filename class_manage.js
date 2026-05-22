@@ -1303,12 +1303,6 @@
     }
 
     let sessions = sessionTableMissing ? [] : (classSessions || []);
-    let autoCreatedLessons = [];
-    if(!sessionTableMissing){
-      const syncResult = await syncClassSessionsForCurrentMonth(sb, sessions);
-      sessions = syncResult.sessions || sessions;
-      autoCreatedLessons = syncResult.createdLessons || [];
-    }
     const lessonIds = [...new Set(sessions.map(s=>s.lesson_id).filter(Boolean))];
     const regularIds = [...new Set([
       ...sessions.map(s=>s.exam_id).filter(Boolean),
@@ -1366,7 +1360,7 @@
       return;
     }
 
-    const lessonRows = [...(results[0].data || []), ...autoCreatedLessons];
+    const lessonRows = results[0].data || [];
     const lessonMap = Object.fromEntries(lessonRows.map(row => [row.id, row]));
     const regularMap = Object.fromEntries((results[1].data||[]).map(row => [row.id, row]));
     const pdfMap = Object.fromEntries((results[2].data||[]).map(row => [row.id, row]));
@@ -1390,14 +1384,15 @@
           pdfSubmitCount: (results[5].data||[]).reduce((acc,row)=>{ acc[row.pdf_exam_id]=(acc[row.pdf_exam_id]||0)+1; return acc; }, {})
         };
 
-    const monthSessions = sessions
-      .filter(session => !session.session_date || isCurrentMonthDate(session.session_date))
+    const manualSessions = sessions
       .sort((a, b) => {
-        const dateCompare = String(a.session_date || "").localeCompare(String(b.session_date || ""));
+        const orderCompare = Number(b.session_order || 0) - Number(a.session_order || 0);
+        if(orderCompare !== 0) return orderCompare;
+        const dateCompare = String(b.session_date || "").localeCompare(String(a.session_date || ""));
         if(dateCompare !== 0) return dateCompare;
-        return Number(a.session_order || 0) - Number(b.session_order || 0);
+        return String(b.created_at || "").localeCompare(String(a.created_at || ""));
       });
-    const sessionCards = monthSessions
+    const sessionCards = manualSessions
       .map((session, index) => {
         const lesson = lessonMap[session.lesson_id] || null;
         let examInfo = null;
@@ -1419,7 +1414,7 @@
         }
         return renderClassSessionCard({
           ...session,
-          display_order: index + 1
+          display_order: manualSessions.length - index
         }, lesson, examInfo, role, examState);
       });
 
@@ -1459,7 +1454,7 @@
     const sessionHint = sessionTableMissing
       ? '<div style="margin-bottom:14px;padding:12px 14px;border-radius:12px;background:#fff7ed;border:1px solid rgba(245,158,11,.28);color:#9a3412;font-size:.82rem">Tab này đã sẵn sàng cho kiểu "Buổi 1, Buổi 2..." nhưng database của bạn chưa có bảng <b>class_sessions</b>. Hãy chạy SQL mới rồi reload lại.</div>'
       : "";
-    const sessionEmpty = '<div style="padding:18px;border:1px dashed #cbd5e1;border-radius:14px;background:#fff"><strong style="display:block;color:var(--navy);margin-bottom:6px">Chưa có buổi học nào trong tháng này</strong><div style="font-size:.84rem;color:var(--ink-mid)">Bạn có thể thêm các buổi học của tháng để hiển thị như phần Danh sách buổi học trong Khóa học.</div></div>';
+    const sessionEmpty = '<div style="padding:18px;border:1px dashed #cbd5e1;border-radius:14px;background:#fff"><strong style="display:block;color:var(--navy);margin-bottom:6px">Chưa có buổi học nào</strong><div style="font-size:.84rem;color:var(--ink-mid)">Giáo viên bấm Thêm buổi học để tạo buổi học thủ công cho lớp.</div></div>';
     const legacySection = legacyCards.length
       ? '<div style="margin-top:18px"><div style="font-weight:700;color:var(--navy);margin-bottom:10px">Đề kiểm tra riêng đã tạo trước đây</div><div style="display:flex;flex-direction:column;gap:10px">'+legacyCards.join("")+'</div></div>'
       : "";
@@ -1467,7 +1462,7 @@
     tc.innerHTML = gameSectionHtml +
       '<div style="background:var(--white);border:1px solid var(--border);border-radius:14px;padding:16px 18px">'+
         '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">'+
-          '<div><div style="font-weight:700;color:var(--navy)">Danh sách buổi học trong tháng</div></div>'+
+          '<div><div style="font-weight:700;color:var(--navy)">Các buổi học được tạo thủ công</div><div style="font-size:.78rem;color:var(--ink-mid);margin-top:2px">Buổi mới nhất nằm trên cùng, Buổi 1 nằm dưới cùng.</div></div>'+
           '<span style="font-size:.78rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8">'+sessionCards.length+' buổi</span>'+
         '</div>'+
         actionsHtml+
