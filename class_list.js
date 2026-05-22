@@ -206,6 +206,31 @@
 
   const daysMap = {1:"T2",2:"T3",3:"T4",4:"T5",5:"T6",6:"T7",7:"CN"};
 
+  function renderScheduleSummary(schedules){
+    if(!schedules || !schedules.length){
+      return "<span style='color:var(--ink-light);font-size:.75rem'>Chưa có lịch</span>";
+    }
+    const grouped = {};
+    schedules.forEach(s => {
+      const no = Number(s.session_no || 1);
+      if(!grouped[no]) grouped[no] = [];
+      grouped[no].push(s);
+    });
+    return Object.keys(grouped).map(Number).sort((a,b)=>a-b).map(no => {
+      const items = grouped[no]
+        .slice()
+        .sort((a,b)=>Number(a.weekday || 0)-Number(b.weekday || 0) || String(a.start_time || "").localeCompare(String(b.start_time || "")))
+        .map(s => {
+          const day = daysMap[s.weekday] || "?";
+          const time = String(s.start_time || "").slice(0,5)+"-"+String(s.end_time || "").slice(0,5);
+          const room = s.rooms?.room_name ? " "+s.rooms.room_name : "";
+          return `${day} ${time}${room}`;
+        })
+        .join("; ");
+      return `<div><strong>Buổi ${no}:</strong> ${items}</div>`;
+    }).join("");
+  }
+
   function renderClasses(classes){
     const role    = window._currentRole || "student";
     const countEl = document.getElementById("filterCount");
@@ -246,13 +271,7 @@
         card.className = "class-card";
         if(cls.hidden) card.style.cssText = "opacity:.45;filter:grayscale(.4)";
 
-        const sch = (_scheduleMap[cls.id]||[]).map(s => {
-          const day  = daysMap[s.weekday]||"?";
-          const time = s.start_time.slice(0,5)+"–"+s.end_time.slice(0,5);
-          const room = s.rooms?.room_name ? " • "+s.rooms.room_name : "";
-          return `Buổi ${s.session_no || 1}: ${day} (${time})${room}`;
-        }).join("<br>");
-
+        const schGrouped = renderScheduleSummary(_scheduleMap[cls.id] || []);
         const teacherList = (_teacherMap[cls.id]||[])
           .map(tid => _teacherNameMap[tid]||"").filter(Boolean);
         const stuCount    = _studentCount[cls.id] || 0;
@@ -282,7 +301,7 @@
           <div>
             <div class="class-name">${cls.class_name}${cls.hidden ? ' <span style="font-size:.7rem;color:var(--ink-light);font-weight:400">(Đã ẩn)</span>' : ""}</div>
             ${subjectName ? `<div class="class-info">📚 ${subjectName}</div>` : ""}
-            <div class="class-info">📅 ${sch || "<span style='color:var(--ink-light);font-size:.75rem'>Chưa có lịch</span>"}</div>
+            <div class="class-info">📅 ${schGrouped}</div>
             <div class="class-info">💰 ${new Intl.NumberFormat("vi-VN").format(cls.tuition_fee||0)}đ</div>
             <div class="class-info">👨‍🎓 ${stuCount} học sinh</div>
             ${capacityWarningHtml}

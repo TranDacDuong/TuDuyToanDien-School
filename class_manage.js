@@ -216,6 +216,22 @@
     absent: { text:"Vắng",   cls:"absent"  },
     makeup: { text:"Học bù", cls:"makeup"  },
   };
+  const attendanceSessionColors = [
+    { bg:"#eff6ff", border:"#bfdbfe", text:"#1d4ed8" },
+    { bg:"#f0fdf4", border:"#bbf7d0", text:"#15803d" },
+    { bg:"#fff7ed", border:"#fed7aa", text:"#c2410c" },
+    { bg:"#f5f3ff", border:"#ddd6fe", text:"#7c3aed" },
+    { bg:"#fdf2f8", border:"#fbcfe8", text:"#be185d" },
+    { bg:"#ecfeff", border:"#a5f3fc", text:"#0e7490" },
+    { bg:"#fefce8", border:"#fde68a", text:"#a16207" }
+  ];
+  function attendanceSessionStyle(sessionNo, part = "cell"){
+    const palette = attendanceSessionColors[(Math.max(1, Number(sessionNo || 1)) - 1) % attendanceSessionColors.length];
+    if(part === "header"){
+      return "background:"+palette.bg+";color:"+palette.text+";border-left:1px solid "+palette.border+";border-right:1px solid "+palette.border+";";
+    }
+    return "background:"+palette.bg+";border-left:1px solid "+palette.border+";border-right:1px solid "+palette.border+";";
+  }
 
   /* â”€â”€ State â”€â”€ */
   let _classId        = null;
@@ -546,7 +562,7 @@
       let dateHeaders="";
       dates.forEach(item=>{
         const d = item.date;
-        dateHeaders+='<th class="center" style="min-width:58px;white-space:nowrap">'+
+        dateHeaders+='<th class="center" style="min-width:58px;white-space:nowrap;'+attendanceSessionStyle(item.session_no, "header")+'">'+
           d.slice(8,10)+"/"+d.slice(5,7)+"</th>";
       });
       const me = visibleStudents.find(s => s.student_id === uid);
@@ -559,19 +575,20 @@
       let myCells="";
       dates.forEach(item=>{
         const d = item.date, scheduleId = item.schedule_id;
+        const cellStyle = 'padding:4px;'+attendanceSessionStyle(item.session_no);
         if(!getStudentSchedules(me.student_id, schedulesThisMonth).some(s => Number(s.id) === scheduleId)){
-          myCells+='<td class="center" style="padding:4px;color:var(--ink-light)">—</td>';
+          myCells+='<td class="center" style="'+cellStyle+'color:var(--ink-light)">—</td>';
           return;
         }
         if(d>left){
           const status=_attendanceMap[me.student_id+"_"+d+"_"+scheduleId]||_attendanceMap[me.student_id+"_"+d+"_0"]||"absent";
           const sm=statusMap[status]||statusMap.absent;
-          myCells+='<td class="center" style="padding:4px"><span class="att-btn '+sm.cls+'" style="cursor:default;font-weight:700">'+ sm.text+'</span></td>';
+          myCells+='<td class="center" style="'+cellStyle+'"><span class="att-btn '+sm.cls+'" style="cursor:default;font-weight:700">'+ sm.text+'</span></td>';
         } else {
           const defaultStatus = d < joined ? "absent" : "present";
           const status=_attendanceMap[me.student_id+"_"+d+"_"+scheduleId]||_attendanceMap[me.student_id+"_"+d+"_0"]||defaultStatus;
           const sm=statusMap[status]||statusMap.present;
-          myCells+='<td class="center" style="padding:4px"><span class="att-btn '+sm.cls+'" style="cursor:default;font-weight:700">'+ sm.text+'</span></td>';
+          myCells+='<td class="center" style="'+cellStyle+'"><span class="att-btn '+sm.cls+'" style="cursor:default;font-weight:700">'+ sm.text+'</span></td>';
         }
       });
       const myRow =
@@ -632,15 +649,16 @@
       let cells="";
       dates.forEach(item=>{
         const d = item.date, scheduleId = item.schedule_id, sessionNo = item.session_no;
+        const cellStyle = 'padding:4px;'+attendanceSessionStyle(sessionNo);
         if(!getStudentSchedules(s.student_id, schedulesThisMonth).some(sc => Number(sc.id) === scheduleId)){
-          cells+='<td class="center" style="padding:4px;color:var(--ink-light)">—</td>';
+          cells+='<td class="center" style="'+cellStyle+'color:var(--ink-light)">—</td>';
           return;
         }
         if(d>left){
           const status=_attendanceMap[s.student_id+"_"+d+"_"+scheduleId]||_attendanceMap[s.student_id+"_"+d+"_0"]||"absent";
           const key="cvatt_"+s.student_id+"_"+d+"_"+scheduleId;
           const sm=statusMap[status]||statusMap.absent;
-          cells+='<td class="center" style="padding:4px">'+
+          cells+='<td class="center" style="'+cellStyle+'">'+
             '<button id="'+key+'" class="att-btn '+sm.cls+'" '+
             'onclick="cvToggleAtt(\''+_classId+'\',\''+s.student_id+'\',\''+d+'\',\''+status+'\',\''+scheduleId+'\',\''+sessionNo+'\')">'+
             sm.text+'</button></td>';
@@ -649,7 +667,7 @@
           const status=_attendanceMap[s.student_id+"_"+d+"_"+scheduleId]||_attendanceMap[s.student_id+"_"+d+"_0"]||defaultStatus;
           const key="cvatt_"+s.student_id+"_"+d+"_"+scheduleId;
           const sm=statusMap[status]||statusMap.present;
-          cells+='<td class="center" style="padding:4px">'+
+          cells+='<td class="center" style="'+cellStyle+'">'+
             '<button id="'+key+'" class="att-btn '+sm.cls+'" '+
             'onclick="cvToggleAtt(\''+_classId+'\',\''+s.student_id+'\',\''+d+'\',\''+status+'\',\''+scheduleId+'\',\''+sessionNo+'\')">'+
             sm.text+'</button></td>';
@@ -679,7 +697,7 @@
     let dateHeaders="";
       dates.forEach(item=>{
         const d = item.date;
-        dateHeaders+='<th class="center" style="min-width:62px;white-space:nowrap">'+
+        dateHeaders+='<th class="center" style="min-width:62px;white-space:nowrap;'+attendanceSessionStyle(item.session_no, "header")+'">'+
         d.slice(8,10)+"/"+d.slice(5,7)+"</th>";
       });
 
