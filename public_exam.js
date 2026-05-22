@@ -602,7 +602,10 @@
       sb.from("public_exams").select("exam_id,exam:exams(title,total_points,exam_questions(*,question:question_bank(*)))").eq("id",peId).single(),
     ]);
 
-    const eqs    = pe?.exam?.exam_questions || [];
+    const eqs = (pe?.exam?.exam_questions || [])
+      .slice()
+      .sort((a,b) => (a.order_no ?? 0) - (b.order_no ?? 0))
+      .filter(eq => eq.question);
     const ansMap = {};
     (answers||[]).forEach(a => { ansMap[a.question_id] = a; });
 
@@ -680,7 +683,20 @@
       + '</div>'
       + headerRight
       + '</div>'
-      + qHtml;
+      + '<div id="peReviewCards"></div>';
+
+    const reviewWrap = document.getElementById("peReviewCards");
+    if (window.buildReviewCards && reviewWrap) {
+      reviewWrap.appendChild(window.buildReviewCards(eqs, ansMap, hasEssay, {
+        essayInputPrefix: "pe_essay_",
+        essayUpdateHandler: "peUpdateEssayTotal",
+      }));
+    } else if (reviewWrap) {
+      reviewWrap.innerHTML = qHtml;
+      if (window.MathJax?.typesetPromise) {
+        window.MathJax.typesetPromise([reviewWrap]).catch(() => {});
+      }
+    }
 
     const backBtn = document.getElementById('peBackBtn');
     if (backBtn) backBtn.addEventListener('click', () => openResultDetail(peId, pe?.exam?.title||'', pe?.exam_type||''));

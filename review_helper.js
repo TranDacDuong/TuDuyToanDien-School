@@ -152,7 +152,7 @@
     if (!isEssay) {
       _buildNonEssayResult(aPart, q, ans, eq);
     } else if (canGradeEssay) {
-      _buildEssayGrade(aPart, ans, eq, q.id);
+      _buildEssayGrade(aPart, ans, eq, q.id, options);
     } else {
       _buildEssayView(aPart, ans, eq);
     }
@@ -289,7 +289,10 @@
     container.appendChild(scoreEl);
   }
 
-  function _buildEssayGrade(container, ans, eq, qid) {
+  function _buildEssayGrade(container, ans, eq, qid, options = {}) {
+    const inputPrefix = options.essayInputPrefix || "cv_essay_";
+    const updateHandler = options.essayUpdateHandler || "cvUpdateEssayTotal";
+    const inputId = inputPrefix + qid;
     const ansEl = document.createElement("div");
     ansEl.style.cssText =
       "font-size:.8rem;background:var(--white);border:1px solid var(--border);" +
@@ -305,13 +308,13 @@
     row.style.cssText = "display:flex;align-items:center;gap:6px;margin-top:4px";
     row.innerHTML =
       `<label style="font-size:.72rem;font-weight:700;color:var(--ink-mid)">Điểm:</label>
-       <input type="number" id="cv_essay_${qid}" value="${ans?.score_earned||0}"
+       <input type="number" id="${inputId}" value="${ans?.score_earned||0}"
          min="0" max="${eq.points}" step="0.5"
          style="width:60px;padding:4px 6px;border:1.5px solid var(--border);border-radius:6px;
            font-size:.82rem;text-align:center;outline:none"
          onfocus="this.style.borderColor='var(--gold)'"
          onblur="this.style.borderColor='var(--border)'"
-         oninput="cvUpdateEssayTotal()">
+         oninput="${updateHandler}()">
        <span style="font-size:.72rem;color:var(--ink-mid)">/${eq.points}</span>`;
     container.appendChild(row);
   }
