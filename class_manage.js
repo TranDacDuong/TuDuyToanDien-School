@@ -671,17 +671,17 @@
       });
 
     const searchModal=
-      '<div id="cvAddStudentModal" style="display:none;margin-top:14px;padding:14px;'+
-      'background:var(--surface);border-radius:10px;border:1px solid var(--border)">'+
-      '<b style="font-size:.85rem;color:var(--navy);font-family:var(--font-display)">Tìm học sinh</b>'+
-      '<div style="display:flex;gap:8px;margin-top:8px">'+
-      '<input id="cvStudentSearch" type="text" placeholder="Nhập tên hoặc email..." '+
-      'oninput="cvSearchStudents()" />'+
-      '<button onclick="document.getElementById(\'cvAddStudentModal\').style.display=\'none\'" '+
-      'class="btn btn-outline btn-sm">✕</button>'+
+      '<div id="cvAddStudentModal" class="popup-overlay hidden" style="z-index:1100" onclick="if(event.target===this)cvCloseAddStudent()">'+
+      '<div class="popup-card" style="width:min(94vw,640px);padding:0;max-height:88vh">'+
+      '<div class="popup-header" style="padding:16px 18px 12px;margin:0;border-bottom:1px solid var(--border)">'+
+      '<h3>Thêm học sinh</h3>'+
+      '<button onclick="cvCloseAddStudent()" class="close-btn" type="button">✕</button>'+
       "</div>"+
-      '<div id="cvSearchResults" style="margin-top:8px;max-height:220px;overflow-y:auto"></div>'+
-      "</div>";
+      '<div style="padding:16px 18px 18px">'+
+      '<label for="cvStudentSearch">Tìm học sinh</label>'+
+      '<input id="cvStudentSearch" type="text" placeholder="Nhập tên hoặc email..." oninput="cvSearchStudents()" />'+
+      '<div id="cvSearchResults" style="margin-top:12px;max-height:52vh;overflow-y:auto"></div>'+
+      "</div></div></div>";
 
     tc.innerHTML=
       '<div style="margin-bottom:14px">'+
@@ -785,11 +785,19 @@
   window.cvOpenAddStudent = function(){
     const modal=document.getElementById("cvAddStudentModal");
     if(!modal) return;
-    modal.style.display="block";
+    modal.classList.remove("hidden");
+    modal.style.display="flex";
     const inp=document.getElementById("cvStudentSearch");
     if(inp){inp.value="";inp.focus();}
     const res=document.getElementById("cvSearchResults");
     if(res) res.innerHTML="";
+  };
+
+  window.cvCloseAddStudent = function(){
+    const modal=document.getElementById("cvAddStudentModal");
+    if(!modal) return;
+    modal.classList.add("hidden");
+    modal.style.display="none";
   };
 
   window.cvSearchStudents = async function(){
@@ -876,7 +884,6 @@
   };
 
   window.cvConfirmAddStudent = async function(studentId,studentName){
-    if(!confirm('Thêm "'+studentName+'" vào lớp?')) return;
     const sb=getSb(), classId=_classId, today=todayStr();
     const sched=getSchedulesForMonth(_cachedClass.class_schedules||[],_currentMonth,_currentYear);
     const selectedSchedules = chooseSchedulesForStudent(studentName, sched);
@@ -918,6 +925,7 @@
       student_id: studentId,
       student_name: userData?.full_name || studentName || null,
     });
+    cvCloseAddStudent();
     await renderAttendanceTab();
   };
 
