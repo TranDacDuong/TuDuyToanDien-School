@@ -2354,7 +2354,12 @@
     /* Cards â€” layout 15 pháº§n ngang giá»‘ng lÃºc thi, dÃ¹ng review_helper.js */
     const sortedEqs = (eqs||[]).slice().sort((a,b)=>(a.order_no??0)-(b.order_no??0)).filter(eq=>eq.question);
     if (window.buildReviewCards) {
-      wrap.appendChild(window.buildReviewCards(sortedEqs, ansMap, false, { enableAiSolution: true }));
+      wrap.appendChild(window.buildReviewCards(sortedEqs, ansMap, false, {
+        enableAiSolution: true,
+        enableQuestionReport: true,
+        examResultId: resultId,
+        reportSourceMode: "class_review",
+      }));
     }
 
     tc.innerHTML = "";

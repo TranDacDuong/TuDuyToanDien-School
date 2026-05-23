@@ -51,7 +51,7 @@
             : `<div style="font-size:.82rem;color:var(--ink-mid);line-height:1.6">Hiện không còn bài tự luận nào đang chờ chấm.</div>`}
         </div>
         <div style="background:var(--white);border:1px solid var(--border);border-radius:18px;padding:16px">
-          <strong style="color:var(--navy)">Câu hay sai nhất</strong>
+          <strong style="color:var(--navy)">Câu sai nhiều nhất</strong>
           <div style="display:grid;gap:8px;margin-top:10px">
             ${hardQuestions.length
               ? hardQuestions.map((item) => `<div style="padding:10px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:14px">

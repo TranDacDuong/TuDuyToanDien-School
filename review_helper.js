@@ -50,11 +50,7 @@
       frag.appendChild(section);
     });
 
-    requestAnimationFrame(() => {
-      if (window.MathJax?.typesetPromise && pendingCards.length) {
-        window.MathJax.typesetPromise(pendingCards).catch(() => {});
-      }
-    });
+    typesetWhenReady(pendingCards);
 
     return frag;
   };
@@ -140,6 +136,11 @@
     } else {
       qPart.appendChild(qText);
     }
+
+    if (options.enableQuestionReport) {
+      const reportButton = buildQuestionReportButton(q, options);
+      if (reportButton) qPart.appendChild(reportButton);
+    }
     body.appendChild(qPart);
 
     const aPart = document.createElement("div");
@@ -171,6 +172,38 @@
       `flex:${flexVal || 1};font-size:1.08rem;line-height:1.85;color:var(--navy);white-space:pre-line`;
     el.textContent = text || "";
     return el;
+  }
+
+  function buildQuestionReportButton(question, options = {}) {
+    if (!question?.id || !window.PublicExamSupport?.openQuestionReportModal) return null;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "Báo lỗi";
+    button.style.cssText =
+      "align-self:flex-start;margin-top:6px;border:1px solid rgba(245,158,11,.28);background:#fff7ed;" +
+      "color:#b45309;padding:4px 8px;border-radius:999px;font-size:.68rem;font-weight:800;" +
+      "cursor:pointer;font-family:var(--font-body);line-height:1.2";
+    button.addEventListener("click", () => {
+      window.PublicExamSupport.openQuestionReportModal({
+        questionId: question.id,
+        questionStem: String(question.question_text || "").split(/\r?\n/).slice(0, 6).join("\n"),
+        publicExamId: options.publicExamId || null,
+        examResultId: options.examResultId || null,
+        sourceMode: options.reportSourceMode || "review",
+      });
+    });
+    return button;
+  }
+
+  function typesetWhenReady(elements, attempt = 0) {
+    if (!elements?.length) return;
+    requestAnimationFrame(() => {
+      if (window.MathJax?.typesetPromise) {
+        window.MathJax.typesetPromise(elements).catch(() => {});
+      } else if (attempt < 20) {
+        setTimeout(() => typesetWhenReady(elements, attempt + 1), 150);
+      }
+    });
   }
 
   function buildImageColumn(src, flexVal, isCompactMobile = false) {
