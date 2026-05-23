@@ -553,7 +553,7 @@
             <tbody>
               ${ranked.map((r,i) => {
                 const rank  = i+1;
-                const icon  = rank===1?"ðŸ¥‡":rank===2?"ðŸ¥ˆ":rank===3?"ðŸ¥‰":rank;
+                const icon  = rank===1?"🥇":rank===2?"🥈":rank===3?"🥉":rank;
                 const score = r.score_total ?? r.score_auto ?? null;
                 const pct   = score!==null ? Math.round(score/totalPoints*100) : null;
                 const color = pct===null?"var(--ink-light)":pct>=80?"var(--green)":pct>=50?"var(--amber)":"var(--red)";
