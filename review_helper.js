@@ -55,8 +55,22 @@
     return frag;
   };
 
+  function normalizeReviewText(value) {
+    return String(value || "")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, "&")
+      .replace(/\\\\([()[\]])/g, "\\$1")
+      .replace(/\\\\([a-zA-Z]+)/g, "\\$1")
+      .replace(/\\\$/g, "$");
+  }
+
   function parseQuestionLayout(questionText, type, answerCount) {
-    const rawLines = String(questionText || "").split(/\r?\n/);
+    const normalizedQuestionText = normalizeReviewText(questionText);
+    const rawLines = normalizedQuestionText.split(/\r?\n/);
     const stemLines = [];
     const parsedOptions = [];
     const optionPattern = /^([a-d])(?:[\)\.\:\-])\s+(.+)$/i;
@@ -73,7 +87,7 @@
     const expectedCount = Math.max(1, parseInt(answerCount, 10) || 0);
     if (!["multi_choice", "true_false"].includes(type) ||
         parsedOptions.length < Math.min(2, expectedCount)) {
-      return { stem: String(questionText || "").trim(), options: [] };
+      return { stem: normalizedQuestionText.trim(), options: [] };
     }
 
     const options = [];
@@ -84,7 +98,7 @@
     }
 
     return {
-      stem: stemLines.join("\n").trim() || String(questionText || "").trim(),
+      stem: stemLines.join("\n").trim() || normalizedQuestionText.trim(),
       options,
     };
   }
@@ -124,7 +138,7 @@
     const isCompactMobile = window.matchMedia?.("(max-width: 768px)")?.matches || false;
     const qPart = document.createElement("div");
     qPart.style.cssText = "padding:16px 18px;display:flex;flex-direction:column;gap:12px";
-    const questionText = (type === "multi_choice" || type === "true_false") ? layout.stem : q.question_text;
+    const questionText = (type === "multi_choice" || type === "true_false") ? layout.stem : normalizeReviewText(q.question_text);
     const qText = buildQuestionText(questionText, hasImg ? 2 : 1);
 
     if (hasImg) {
@@ -170,7 +184,7 @@
     const el = document.createElement("div");
     el.style.cssText =
       `flex:${flexVal || 1};font-size:1.08rem;line-height:1.85;color:var(--navy);white-space:pre-line`;
-    el.textContent = text || "";
+    el.textContent = normalizeReviewText(text);
     return el;
   }
 
@@ -246,7 +260,7 @@
     line.style.cssText =
       "margin-top:4px;padding:9px 12px;border-radius:8px;background:#dcfce7;border:1px solid #86efac;" +
       "color:#15803d;font-size:.84rem;font-weight:700;white-space:pre-line";
-    line.textContent = "Đáp án đúng: " + text;
+    line.textContent = "Đáp án đúng: " + normalizeReviewText(text);
     container.appendChild(line);
   }
 
@@ -272,7 +286,7 @@
       const isCorrect = correct.toUpperCase().includes(key.toUpperCase());
       container.appendChild(buildOptionRow({
         key,
-        text: option.text,
+        text: normalizeReviewText(option.text),
         picked,
         isCorrect,
         pickedLabel: "Bạn chọn",
@@ -300,7 +314,7 @@
       const isCorrect = picked && studentValue === correctValue;
       container.appendChild(buildOptionRow({
         key: key + ")",
-        text: option.text,
+        text: normalizeReviewText(option.text),
         picked,
         isCorrect,
         pickedLabel: picked ? "Bạn chọn: " + labelTrueFalse(studentValue) : "",
@@ -339,7 +353,7 @@
     if (text) {
       const textEl = document.createElement("div");
       textEl.style.cssText = "font-size:.94rem;line-height:1.55;color:var(--ink);white-space:pre-line";
-      textEl.textContent = text;
+      textEl.textContent = normalizeReviewText(text);
       body.appendChild(textEl);
     }
 
