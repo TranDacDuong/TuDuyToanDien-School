@@ -45,6 +45,26 @@
     return overlay;
   }
 
+  function buildClassQuestionReportButton(question) {
+    if (!question?.id || !window.PublicExamSupport?.openQuestionReportModal) return null;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "Báo lỗi";
+    button.style.cssText =
+      "align-self:flex-start;margin-top:6px;border:1px solid rgba(245,158,11,.28);background:#fff7ed;" +
+      "color:#b45309;padding:4px 8px;border-radius:999px;font-size:.68rem;font-weight:800;" +
+      "cursor:pointer;font-family:var(--font-body);line-height:1.2";
+    button.addEventListener("click", () => {
+      window.PublicExamSupport.openQuestionReportModal({
+        questionId: question.id,
+        questionStem: String(question.question_text || "").split(/\r?\n/).slice(0, 6).join("\n"),
+        examResultId: _examResultId || null,
+        sourceMode: "class_exam",
+      });
+    });
+    return button;
+  }
+
   /* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
      OPEN Ã¢â‚¬â€ entry point
   Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
@@ -711,6 +731,9 @@
         } else {
           qPart.appendChild(qEl);
         }
+
+        const reportButton = buildClassQuestionReportButton(q);
+        if (reportButton) qPart.appendChild(reportButton);
 
         const aPart = document.createElement("div");
         aPart.style.cssText = "padding:14px 18px;background:var(--surface);border-top:1px solid var(--border)";

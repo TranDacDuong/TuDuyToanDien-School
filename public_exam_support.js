@@ -214,7 +214,8 @@
   }
 
   async function submitQuestionReport(payload) {
-    const user = await window.AppAuth?.getUser?.();
+    const authUser = await window.AppAuth?.getUser?.();
+    const user = authUser || (await getSb().auth.getUser())?.data?.user;
     if (!user) throw new Error("Bạn cần đăng nhập để gửi báo lỗi.");
     const report = {
       question_id: payload.questionId,

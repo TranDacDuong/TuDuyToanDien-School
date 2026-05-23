@@ -817,7 +817,7 @@
     const button = document.createElement("button")
     button.type = "button"
     button.textContent = "Báo lỗi câu hỏi"
-    button.style.cssText = "margin-top:10px;border:1px solid rgba(245,158,11,.28);background:#fff7ed;color:#b45309;padding:7px 10px;border-radius:999px;font-size:.76rem;font-weight:800;cursor:pointer;font-family:var(--font-body)"
+    button.style.cssText = "align-self:flex-start;margin-top:6px;border:1px solid rgba(245,158,11,.28);background:#fff7ed;color:#b45309;padding:4px 8px;border-radius:999px;font-size:.68rem;font-weight:800;cursor:pointer;font-family:var(--font-body);line-height:1.2"
     button.addEventListener("click", () => {
       window.PublicExamSupport?.openQuestionReportModal?.({
         questionId: question.id,
