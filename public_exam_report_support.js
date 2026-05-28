@@ -8,6 +8,19 @@
       .replace(/'/g, "&#39;");
   }
 
+  function normalizeMathText(value) {
+    return String(value || "")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, "&")
+      .replace(/\\\\([()[\]])/g, "\\$1")
+      .replace(/\\\\([a-zA-Z]+)/g, "\\$1")
+      .replace(/\\\$/g, "$");
+  }
+
   function renderAnalyticsPanels({
     analytics,
     totalPoints,
@@ -56,7 +69,7 @@
             ${hardQuestions.length
               ? hardQuestions.map((item) => `<div style="padding:10px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:14px">
                   <div style="font-size:.78rem;font-weight:800;color:#9a3412">Câu ${item.index} • đúng ${Math.round(item.correctRate * 100)}%</div>
-                  <div style="font-size:.82rem;color:var(--ink-mid);margin-top:4px;line-height:1.55">${esc(item.stem || "Nội dung câu hỏi")}</div>
+                  <div style="font-size:.82rem;color:var(--ink-mid);margin-top:4px;line-height:1.55">${esc(normalizeMathText(item.stem || "Nội dung câu hỏi"))}</div>
                 </div>`).join("")
               : `<div style="font-size:.82rem;color:var(--ink-mid)">Chưa đủ dữ liệu để xếp hạng câu hỏi.</div>`}
           </div>

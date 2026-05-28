@@ -588,6 +588,11 @@
           </table>
         </div>`
       }`;
+    requestAnimationFrame(() => {
+      if (window.MathJax?.typesetPromise) {
+        window.MathJax.typesetPromise([grid]).catch(() => {});
+      }
+    });
   };
 
   window.openExamDetailAdmin = async function(resultId, studentName, peId, totalPts, queueIndex = -1) {
