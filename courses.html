@@ -106,7 +106,17 @@ textarea{min-height:110px;resize:vertical}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
 <script src="notification_helper.js"></script>
+<script src="ai_solution.js"></script>
 <script src="review_helper.js"></script>
+<script>
+(function(){
+  const baseBuildReviewCards = window.buildReviewCards;
+  if (!baseBuildReviewCards) return;
+  window.buildReviewCards = function(eqs, ansMap, canGradeEssay, options) {
+    return baseBuildReviewCards(eqs, ansMap, canGradeEssay, { enableAiSolution: true, ...(options || {}) });
+  };
+})();
+</script>
 <script>
 window.MathJax = {
   tex: {
