@@ -23,7 +23,10 @@ async function getGoogleAccessToken(clientId: string, clientSecret: string, refr
     }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data?.error_description || data?.error || "Cannot get Google access token");
+  if (!res.ok) {
+    const detail = data?.error_description || data?.error || "Unknown OAuth error";
+    throw new Error(`Cannot get Google access token: ${detail}`);
+  }
   return data.access_token as string;
 }
 
@@ -33,7 +36,7 @@ function safeFileName(name: string) {
 }
 
 async function createPublicPermission(fileId: string, accessToken: string) {
-  await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/permissions`, {
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/permissions`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -41,6 +44,10 @@ async function createPublicPermission(fileId: string, accessToken: string) {
     },
     body: JSON.stringify({ role: "reader", type: "anyone" }),
   });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(`Cannot make Google Drive image public: ${data?.error?.message || res.statusText}`);
+  }
 }
 
 async function uploadToDrive(file: File, accessToken: string, folderId: string, folderName: string) {
