@@ -859,6 +859,15 @@ async function initDashboard(){
 function loadUserInfo(profile){
   document.getElementById("userName").innerText = profile.full_name || "User";
   if(profile.avatar_url) document.getElementById("userAvatar").src = profile.avatar_url;
+  const userBox = document.getElementById("userBox");
+  if(userBox && profile.id){
+    userBox.style.cursor = "pointer";
+    userBox.title = "Mở trang cá nhân";
+    userBox.onclick = (event) => {
+      if(event.target.closest("button")) return;
+      openDashboardPage("profile.html?id=" + encodeURIComponent(profile.id), { syncMenu: false, syncMobile: false });
+    };
+  }
 }
 
 async function logout(){
@@ -935,6 +944,17 @@ function syncDashboardUrl(page, replace = false){
   if(next === window.location.pathname + window.location.search + window.location.hash) return;
   const method = replace ? "replaceState" : "pushState";
   history[method]({ dashboardPage: normalized }, "", next);
+}
+
+function getFrameDashboardPage(){
+  try {
+    const loc = contentFrame.contentWindow?.location;
+    if(!loc || loc.href === "about:blank") return "";
+    const page = loc.pathname.split("/").pop() + loc.search + loc.hash;
+    return normalizeDashboardPage(page);
+  } catch(_) {
+    return "";
+  }
 }
 
 function updateBadgeElements(ids, count){
@@ -1032,6 +1052,15 @@ window.addEventListener("popstate", () => {
   }
   const first = [...document.querySelectorAll("#menu li")].find(i => i.style.display !== "none");
   if(first) openDashboardPage(first.dataset.page, { updateUrl: false });
+});
+
+contentFrame.addEventListener("load", () => {
+  const framePage = getFrameDashboardPage();
+  if(!framePage) return;
+  const currentPage = getDashboardUrlPage();
+  if(framePage !== currentPage) {
+    syncDashboardUrl(framePage);
+  }
 });
 
 function openAuthModal(mode = "login"){
