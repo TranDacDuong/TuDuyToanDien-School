@@ -23,6 +23,8 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
     }
   };
 
+  window.SUPABASE_URL = SUPABASE_URL;
+  window.SUPABASE_KEY = SUPABASE_KEY;
   window.sb = sb;
   window.AppAuth = (function () {
     async function getUser() {
