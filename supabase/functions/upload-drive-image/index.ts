@@ -24,7 +24,7 @@ async function getGoogleAccessToken(clientId: string, clientSecret: string, refr
   });
   const data = await res.json();
   if (!res.ok) {
-    const detail = data?.error_description || data?.error || "Unknown OAuth error";
+    const detail = [data?.error, data?.error_description].filter(Boolean).join(": ") || "Unknown OAuth error";
     throw new Error(`Cannot get Google access token: ${detail}`);
   }
   return data.access_token as string;
