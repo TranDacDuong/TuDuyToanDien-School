@@ -193,6 +193,11 @@ async function saveQuestion(shouldClose = true) {
     return;
   }
 
+  const savedQuestionId = editingQuestionId;
+  if (savedQuestionId && window.clearActiveQuestionIssueReport) {
+    await window.clearActiveQuestionIssueReport(savedQuestionId);
+  }
+
   alert(editingQuestionId ? "Cập nhật câu hỏi thành công!" : "Tạo câu hỏi thành công!");
   editingQuestionId = null;
   if (shouldClose) closeModal();

@@ -30,6 +30,7 @@ let duplicateReviewGroups = []
 let selectedQuestionIds = new Set()
 let questionIssueReports = []
 let questionIssueTableMissing = false
+let activeQuestionIssueReportId = null
 const questionPageParams = new URLSearchParams(window.location.search)
 
 function resetToFirstPage() {
@@ -886,10 +887,33 @@ async function updateQuestionIssueStatus(reportId, status) {
   await loadQuestionIssueReports(true)
 }
 
+async function clearActiveQuestionIssueReport(questionId) {
+  if (questionIssueTableMissing || !activeQuestionIssueReportId) return
+  const reportId = activeQuestionIssueReportId
+  activeQuestionIssueReportId = null
+  const { error } = await sb
+    .from("question_issue_reports")
+    .delete()
+    .eq("id", reportId)
+    .eq("question_id", questionId)
+  if (error) {
+    console.error(error)
+    return
+  }
+  questionIssueReports = questionIssueReports.filter((item) => item.id !== reportId)
+  renderQuestionIssueReview()
+  updateQuickActionStats()
+}
+
 function openQuestionIssueTarget(questionId, reportId) {
   closeQuestionIssueReview()
+  activeQuestionIssueReportId = reportId || null
   if (reportId) updateQuestionIssueStatus(reportId, "reviewing")
   editQ(questionId)
+}
+
+function clearQuestionIssueEditContext() {
+  activeQuestionIssueReportId = null
 }
 
 window.openQuestionIssueReview = openQuestionIssueReview
@@ -897,6 +921,8 @@ window.closeQuestionIssueReview = closeQuestionIssueReview
 window.loadQuestionIssueReports = loadQuestionIssueReports
 window.updateQuestionIssueStatus = updateQuestionIssueStatus
 window.openQuestionIssueTarget = openQuestionIssueTarget
+window.clearActiveQuestionIssueReport = clearActiveQuestionIssueReport
+window.clearQuestionIssueEditContext = clearQuestionIssueEditContext
 
 function renderPagination(totalItems, totalPages, visibleCount, startIndex) {
   const infoEl = document.getElementById("questionPagerInfo")

@@ -1169,6 +1169,7 @@ function removeAnswer() {
 
 /* ── Reset form ── */
 function resetQuestionForm() {
+  window.clearQuestionIssueEditContext?.();
   if(typeof editingQuestionId !== "undefined") editingQuestionId = null;
   document.getElementById("questionText").value = "";
   document.getElementById("answerText").value   = "";
