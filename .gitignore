@@ -3,3 +3,5 @@ playwright-report/
 test-results/
 blob-report/
 .playwright/
+mindup-web-uploads-*.json
+google-service-account*.json
