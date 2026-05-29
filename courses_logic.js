@@ -56,6 +56,7 @@ function renderSession(course,s){const l=S.lessons.find(x=>x.id===s.lesson_id),e
 async function openCourseScreen(courseId){
  const c=S.courses.find(x=>x.id===courseId);if(!c)return;
  S.activeCourseId=courseId;
+ if(window.parent&&window.parent!==window)window.parent.postMessage({type:'dashboard:navigate-frame',page:`courses.html?courseId=${encodeURIComponent(courseId)}`},'*');
  E.screen.classList.add('show');
  E.screenTitle.textContent=c.name||'Chi tiết khóa học';
  E.screenEditBtn.classList.toggle('hidden',S.role!=='admin');

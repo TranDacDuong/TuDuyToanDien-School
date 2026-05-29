@@ -1063,6 +1063,15 @@ contentFrame.addEventListener("load", () => {
   }
 });
 
+window.addEventListener("message", (event) => {
+  if(event.source !== contentFrame.contentWindow) return;
+  if(event.data?.type !== "dashboard:navigate-frame") return;
+  const page = normalizeDashboardPage(event.data.page || "");
+  if(!page) return;
+  const currentPage = getDashboardUrlPage();
+  if(page !== currentPage) syncDashboardUrl(page);
+});
+
 function openAuthModal(mode = "login"){
   authMode = mode === "register" ? "register" : "login";
   syncAuthModal();

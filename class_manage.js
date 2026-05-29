@@ -326,6 +326,11 @@
 
     window._classId   = classId;
     window._className = className;
+    if(window.parent && window.parent !== window){
+      const page = "class.html?openClassId=" + encodeURIComponent(classId) +
+        "&className=" + encodeURIComponent(className || "Chi tiết lớp");
+      window.parent.postMessage({ type: "dashboard:navigate-frame", page }, "*");
+    }
 
     const ov = getOrCreateOverlay();
     ov.style.display = "flex";
