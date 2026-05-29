@@ -1226,18 +1226,12 @@ QUY TAC QUAN TRONG:
   };
 
   async function uploadImage(dataUrl, filename) {
-    const sb = getSb();
-    const arr = dataUrl.split(",");
-    const mtype = arr[0].match(/:(.*?);/)[1];
-    const bstr  = atob(arr[1]);
-    const u8    = new Uint8Array(bstr.length);
-    for (let i=0;i<bstr.length;i++) u8[i]=bstr.charCodeAt(i);
-    const blob = new Blob([u8], { type: mtype });
-    const path = `questions/${Date.now()}_${filename}`;
-    const { error } = await sb.storage.from("question-images").upload(path, blob, { upsert: true });
-    if (error) { console.error("Upload ảnh lỗi:", error.message); return null; }
-    const { data: url } = sb.storage.from("question-images").getPublicUrl(path);
-    return url.publicUrl;
+    const uploaded = await window.MindupImageUpload.uploadDataUrl(dataUrl, {
+      kind: "question",
+      folder: "questions",
+      fileName: filename,
+    });
+    return window.MindupImageUpload.getDisplayUrl(uploaded);
   }
 
   init();

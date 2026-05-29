@@ -11,56 +11,15 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-function base64Url(input: string | ArrayBuffer) {
-  const bytes = typeof input === "string"
-    ? new TextEncoder().encode(input)
-    : new Uint8Array(input);
-  let binary = "";
-  bytes.forEach((byte) => binary += String.fromCharCode(byte));
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-function pemToArrayBuffer(pem: string) {
-  const base64 = pem
-    .replace("-----BEGIN PRIVATE KEY-----", "")
-    .replace("-----END PRIVATE KEY-----", "")
-    .replace(/\s/g, "");
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return bytes.buffer;
-}
-
-async function getGoogleAccessToken(serviceAccount: Record<string, string>) {
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: "RS256", typ: "JWT" };
-  const payload = {
-    iss: serviceAccount.client_email,
-    scope: "https://www.googleapis.com/auth/drive.file",
-    aud: serviceAccount.token_uri || "https://oauth2.googleapis.com/token",
-    exp: now + 3600,
-    iat: now,
-  };
-  const unsigned = `${base64Url(JSON.stringify(header))}.${base64Url(JSON.stringify(payload))}`;
-  const key = await crypto.subtle.importKey(
-    "pkcs8",
-    pemToArrayBuffer(serviceAccount.private_key),
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const signature = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
-    key,
-    new TextEncoder().encode(unsigned),
-  );
-  const assertion = `${unsigned}.${base64Url(signature)}`;
-  const res = await fetch(serviceAccount.token_uri || "https://oauth2.googleapis.com/token", {
+async function getGoogleAccessToken(clientId: string, clientSecret: string, refreshToken: string) {
+  const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion,
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
     }),
   });
   const data = await res.json();
@@ -124,9 +83,11 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
-    const serviceAccountRaw = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
+    const clientId = Deno.env.get("GOOGLE_DRIVE_CLIENT_ID");
+    const clientSecret = Deno.env.get("GOOGLE_DRIVE_CLIENT_SECRET");
+    const refreshToken = Deno.env.get("GOOGLE_DRIVE_REFRESH_TOKEN");
     const folderId = Deno.env.get("GOOGLE_DRIVE_FOLDER_ID");
-    if (!serviceAccountRaw || !folderId) {
+    if (!clientId || !clientSecret || !refreshToken || !folderId) {
       return jsonResponse({ error: "Missing Google Drive secrets" }, 500);
     }
 
@@ -137,8 +98,7 @@ Deno.serve(async (req) => {
     if (!file.type.startsWith("image/")) return jsonResponse({ error: "Only image uploads are allowed" }, 400);
     if (file.size > 2 * 1024 * 1024) return jsonResponse({ error: "Image is too large after compression" }, 400);
 
-    const serviceAccount = JSON.parse(serviceAccountRaw);
-    const accessToken = await getGoogleAccessToken(serviceAccount);
+    const accessToken = await getGoogleAccessToken(clientId, clientSecret, refreshToken);
     const uploaded = await uploadToDrive(file, accessToken, folderId, folderName);
     const fileId = uploaded.id;
 

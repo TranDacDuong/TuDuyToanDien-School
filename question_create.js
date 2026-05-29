@@ -143,20 +143,14 @@ async function saveQuestion(shouldClose = true) {
       // Đã là URL (khi edit câu hỏi cũ)
       figureImgUrl = figData;
     } else {
-      // Base64 mới — upload lên Storage
+      // Base64 mới — upload lên Drive
       try {
-        const arr = figData.split(",");
-        const mtype = arr[0].match(/:(.*?);/)[1];
-        const bstr = atob(arr[1]);
-        const u8 = new Uint8Array(bstr.length);
-        for (let i = 0; i < bstr.length; i++) u8[i] = bstr.charCodeAt(i);
-        const blob = new Blob([u8], { type: mtype });
-        const fileName = crypto.randomUUID() + ".jpg";
-        const { error: upErr } = await sb.storage.from("question-images").upload(fileName, blob);
-        if (!upErr) {
-          const { data: urlData } = sb.storage.from("question-images").getPublicUrl(fileName);
-          figureImgUrl = urlData.publicUrl;
-        }
+        const uploaded = await window.MindupImageUpload.uploadDataUrl(figData, {
+          kind: "question",
+          folder: "questions",
+          fileName: crypto.randomUUID() + ".jpg",
+        });
+        figureImgUrl = window.MindupImageUpload.getDisplayUrl(uploaded);
       } catch(e) { console.error("Upload hình vẽ lỗi:", e); }
     }
   }

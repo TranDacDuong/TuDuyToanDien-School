@@ -206,6 +206,21 @@
     };
   }
 
+  function dataUrlToFile(dataUrl, fileName = "image.jpg") {
+    const parts = String(dataUrl || "").split(",");
+    const mimeType = parts[0]?.match(/:(.*?);/)?.[1];
+    if (!mimeType || !parts[1]) throw new Error("Invalid image data.");
+    const binary = atob(parts[1]);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    return new File([bytes], fileName, { type: mimeType, lastModified: Date.now() });
+  }
+
+  async function uploadDataUrl(dataUrl, options = {}) {
+    const fileName = options.fileName || "image.jpg";
+    return uploadCompressedImage(dataUrlToFile(dataUrl, fileName), options);
+  }
+
   function getDisplayUrl(uploadResult) {
     return uploadResult?.lh3Url || uploadResult?.url || uploadResult?.downloadUrl || "";
   }
@@ -214,6 +229,7 @@
     presets: DEFAULT_PRESETS,
     compressImageFile,
     uploadCompressedImage,
+    uploadDataUrl,
     getDisplayUrl,
   };
 })();
