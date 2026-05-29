@@ -795,6 +795,7 @@ const PUBLIC_DASHBOARD_PAGES = new Set(["home.html", "courses.html"]);
 const contentFrame = document.getElementById("contentFrame");
 const mobileNavItems = [...document.querySelectorAll("#mobileNav .mobile-nav-item")];
 const mobileQuickActionItems = [...document.querySelectorAll("#mobileQuickActions .mobile-quick-action")];
+let dashboardMenuReady = false;
 /* ── Sidebar toggle ── */
 const sidebar  = document.getElementById("sidebar");
 const tab      = document.getElementById("sidebarTab");
@@ -888,21 +889,52 @@ function applyRoleMenu(role){
 }
 
 function setActiveMenuItem(page){
+  const basePage = String(page || "").split("?")[0].split("#")[0];
   document.querySelectorAll("#menu li").forEach(item => {
-    item.classList.toggle("active", item.dataset.page === page);
+    item.classList.toggle("active", item.dataset.page === page || item.dataset.page === basePage);
   });
 }
 
 function setActiveMobileNav(page){
+  const basePage = String(page || "").split("?")[0].split("#")[0];
   mobileNavItems.forEach(item => {
-    item.classList.toggle("active", item.dataset.page === page);
+    item.classList.toggle("active", item.dataset.page === page || item.dataset.page === basePage);
   });
 }
 
 function setActiveMobileQuickActions(page){
+  const basePage = String(page || "").split("?")[0].split("#")[0];
   mobileQuickActionItems.forEach(item => {
-    item.classList.toggle("active", item.dataset.page === page);
+    item.classList.toggle("active", item.dataset.page === page || item.dataset.page === basePage);
   });
+}
+
+function normalizeDashboardPage(page){
+  const raw = String(page || "").trim();
+  if(!raw) return "";
+  if(raw === "ops-center") return raw;
+  const hash = raw.split("#")[1] ? "#" + raw.split("#").slice(1).join("#") : "";
+  const withoutHash = raw.split("#")[0];
+  const [pathPart, queryPart = ""] = withoutHash.split("?");
+  const cleanPath = pathPart.replace(/^\/+/, "").replace(/^\.\/+/, "");
+  if(!cleanPath || cleanPath.includes("://") || cleanPath.startsWith("..")) return "";
+  return cleanPath + (queryPart ? "?" + queryPart : "") + hash;
+}
+
+function getDashboardUrlPage(){
+  const url = new URL(window.location.href);
+  return normalizeDashboardPage(url.searchParams.get("page") || "");
+}
+
+function syncDashboardUrl(page, replace = false){
+  const normalized = normalizeDashboardPage(page);
+  const url = new URL(window.location.href);
+  if(normalized) url.searchParams.set("page", normalized);
+  else url.searchParams.delete("page");
+  const next = url.pathname + url.search + url.hash;
+  if(next === window.location.pathname + window.location.search + window.location.hash) return;
+  const method = replace ? "replaceState" : "pushState";
+  history[method]({ dashboardPage: normalized }, "", next);
 }
 
 function updateBadgeElements(ids, count){
@@ -921,13 +953,15 @@ function updateBadgeElements(ids, count){
 }
 
 function openDashboardPage(page, options = {}){
-  const { syncMenu = true, syncMobile = true } = options;
+  const { syncMenu = true, syncMobile = true, updateUrl = true, replaceUrl = false } = options;
+  page = normalizeDashboardPage(page);
   if(!page) return;
   const basePage = page.split("?")[0];
   if(!currentDashboardUser && !PUBLIC_DASHBOARD_PAGES.has(basePage)){
     openAuthModal("login");
     return;
   }
+  if(updateUrl) syncDashboardUrl(page, replaceUrl);
   const opsHub = document.getElementById("opsHub");
   const contentWrap = document.querySelector(".content");
   if(syncMenu) setActiveMenuItem(page);
@@ -948,6 +982,7 @@ function openDashboardPage(page, options = {}){
 }
 
 function setupMenu(){
+  dashboardMenuReady = true;
   const items = document.querySelectorAll("#menu li");
   items.forEach(item => {
     item.addEventListener("click", () => {
@@ -970,14 +1005,34 @@ function setupMenu(){
       openDashboardPage(item.dataset.page, { syncMenu: false });
     });
   });
+  const requestedPage = getDashboardUrlPage();
+  if(requestedPage){
+    const requestedBase = requestedPage.split("?")[0].split("#")[0];
+    const hasMenuItem = !!document.querySelector(`#menu li[data-page="${requestedBase}"]`);
+    openDashboardPage(requestedPage, { syncMenu: hasMenuItem, updateUrl: false });
+    return;
+  }
   const adminCenterAllowed = !!document.querySelector('#menu li[data-page="sourcedata.html"][style*="display: flex"], #menu li[data-page="sourcedata.html"]:not([style])');
   if(adminCenterAllowed){
-    openDashboardPage("ops-center", { syncMenu: false, syncMobile: false });
+    openDashboardPage("ops-center", { syncMenu: false, syncMobile: false, replaceUrl: true });
     return;
   }
   const first = [...items].find(i => i.style.display !== "none");
-  if(first) openDashboardPage(first.dataset.page);
+  if(first) openDashboardPage(first.dataset.page, { replaceUrl: true });
 }
+
+window.addEventListener("popstate", () => {
+  if(!dashboardMenuReady) return;
+  const page = getDashboardUrlPage();
+  if(page) {
+    const basePage = page.split("?")[0].split("#")[0];
+    const hasMenuItem = !!document.querySelector(`#menu li[data-page="${basePage}"]`);
+    openDashboardPage(page, { syncMenu: hasMenuItem, updateUrl: false });
+    return;
+  }
+  const first = [...document.querySelectorAll("#menu li")].find(i => i.style.display !== "none");
+  if(first) openDashboardPage(first.dataset.page, { updateUrl: false });
+});
 
 function openAuthModal(mode = "login"){
   authMode = mode === "register" ? "register" : "login";
