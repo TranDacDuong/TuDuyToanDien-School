@@ -240,6 +240,17 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 .s-stats { display:flex; gap:8px; flex-wrap:wrap; }
 .s-chip { background:var(--white); border:1px solid var(--border); border-radius:20px; padding:4px 12px; font-size:.78rem; color:var(--ink-mid); font-weight:500; box-shadow:var(--shadow-sm); }
 .s-chip b { color:var(--navy); }
+.log-filter-group { display:grid; grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); gap:8px; margin:-4px 0 14px; }
+.log-filter-btn {
+  min-height:38px; border:1px solid rgba(15,31,61,.1); border-radius:10px; background:#fff;
+  color:var(--ink-mid); font-family:var(--font-body); font-size:.78rem; font-weight:700; cursor:pointer;
+  display:flex; align-items:center; gap:8px; justify-content:flex-start; padding:8px 10px;
+  box-shadow:0 8px 18px rgba(15,31,61,.06); transition:transform .14s, box-shadow .14s, border-color .14s, background .14s;
+}
+.log-filter-btn:hover { transform:translateY(-1px); border-color:rgba(29,107,209,.24); box-shadow:0 12px 24px rgba(15,31,61,.1); }
+.log-filter-btn.active { background:linear-gradient(135deg,#0f274d 0%,#1d6bd1 100%); color:var(--gold-light); border-color:transparent; }
+.log-filter-btn .log-dot { width:10px; height:10px; border-radius:50%; background:var(--gold); flex:0 0 auto; box-shadow:0 0 0 3px rgba(200,150,42,.16); }
+.log-filter-btn.active .log-dot { background:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.18); }
 .s-import-result { display:none; padding:10px 12px; border-radius:12px; font-size:.82rem; line-height:1.6; }
 .s-import-result.show { display:block; }
 .s-import-result.ok { background:var(--green-bg); color:var(--green); border:1px solid rgba(34,197,94,.18); }
@@ -547,12 +558,19 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       </div>
       <div class="sg"><label>Người thao tác</label><input id="logActorFilter" placeholder="Tên admin hoặc giáo viên..."></div>
     </div>
-    <div class="s-stats" style="margin:-4px 0 14px">
-      <button class="filter-reset" type="button" onclick="applyLogQuickFilter('')">Tất cả log</button>
-      <button class="filter-reset" type="button" onclick="applyLogQuickFilter('errors')">Chỉ log lỗi</button>
-      <button class="filter-reset" type="button" onclick="applyLogQuickFilter('question')">Ngân hàng câu hỏi</button>
-      <button class="filter-reset" type="button" onclick="applyLogQuickFilter('course')">Khóa học</button>
-      <button class="filter-reset" type="button" onclick="applyLogQuickFilter('student')">Học sinh</button>
+    <div class="log-filter-group" id="logQuickFilters">
+      <button class="log-filter-btn active" type="button" data-log-filter="" onclick="applyLogQuickFilter('')"><span class="log-dot"></span>Tất cả log</button>
+      <button class="log-filter-btn" type="button" data-log-filter="errors" onclick="applyLogQuickFilter('errors')"><span class="log-dot"></span>Chỉ log lỗi</button>
+      <button class="log-filter-btn" type="button" data-log-filter="home" onclick="applyLogQuickFilter('home')"><span class="log-dot"></span>Trang chủ</button>
+      <button class="log-filter-btn" type="button" data-log-filter="course" onclick="applyLogQuickFilter('course')"><span class="log-dot"></span>Khóa học</button>
+      <button class="log-filter-btn" type="button" data-log-filter="class" onclick="applyLogQuickFilter('class')"><span class="log-dot"></span>Lớp học</button>
+      <button class="log-filter-btn" type="button" data-log-filter="student" onclick="applyLogQuickFilter('student')"><span class="log-dot"></span>Học sinh</button>
+      <button class="log-filter-btn" type="button" data-log-filter="exam" onclick="applyLogQuickFilter('exam')"><span class="log-dot"></span>Đề thi</button>
+      <button class="log-filter-btn" type="button" data-log-filter="game" onclick="applyLogQuickFilter('game')"><span class="log-dot"></span>Game</button>
+      <button class="log-filter-btn" type="button" data-log-filter="tuition" onclick="applyLogQuickFilter('tuition')"><span class="log-dot"></span>Học phí</button>
+      <button class="log-filter-btn" type="button" data-log-filter="resources" onclick="applyLogQuickFilter('resources')"><span class="log-dot"></span>Tài liệu tham khảo</button>
+      <button class="log-filter-btn" type="button" data-log-filter="question" onclick="applyLogQuickFilter('question')"><span class="log-dot"></span>Ngân hàng câu hỏi</button>
+      <button class="log-filter-btn" type="button" data-log-filter="test" onclick="applyLogQuickFilter('test')"><span class="log-dot"></span>Đề kiểm tra</button>
     </div>
     <div class="table-scroll">
       <table>
@@ -1434,6 +1452,19 @@ function sExportExcel(){
    NHẬT KÝ ADMIN
 ────────────────────────────── */
 let _adminLogs = [];
+let _activeLogQuickFilter = '';
+const LOG_QUICK_FILTERS = {
+  home: { action: ['home', 'banner', 'pin', 'pinned'], target: ['home', 'homepage', 'hero', 'banner'] },
+  course: { action: ['course'], target: ['course', 'course_session', 'course_registration_request', 'lesson'] },
+  class: { action: ['class'], target: ['class', 'class_student'] },
+  student: { action: ['student'], target: ['student'] },
+  exam: { action: ['exam'], target: ['exam', 'exam_result'], excludeAction: ['pdf_exam'], excludeTarget: ['pdf_exam'] },
+  game: { action: ['game'], target: ['game', 'game_room', 'game_match'] },
+  tuition: { action: ['tuition', 'payment'], target: ['tuition', 'tuition_payment'] },
+  resources: { action: ['resource', 'reference', 'document'], target: ['resource', 'resources', 'reference', 'document'] },
+  question: { action: ['question'], target: ['question', 'question_bank', 'question_import'] },
+  test: { action: ['pdf_exam', 'test'], target: ['pdf_exam', 'test', 'assessment'] }
+};
 
 function logFmtTime(value){
   if(!value) return '—';
@@ -1456,13 +1487,16 @@ function renderAdminLogs(){
   const targetNeedle = rmVN(document.getElementById('logTargetFilter')?.value || '');
   const actorNeedle = rmVN(document.getElementById('logActorFilter')?.value || '');
   const statusNeedle = document.getElementById('logStatusFilter')?.value || '';
+  const quickFilter = LOG_QUICK_FILTERS[_activeLogQuickFilter] || null;
   const rows = _adminLogs.filter(log =>
     (!actionNeedle || rmVN(log.action).includes(actionNeedle)) &&
     (!targetNeedle || rmVN(log.target_type || '').includes(targetNeedle)) &&
     (!actorNeedle || rmVN(log.actor?.full_name || '').includes(actorNeedle)) &&
-    (!statusNeedle || log.status === statusNeedle)
+    (!statusNeedle || log.status === statusNeedle) &&
+    (!quickFilter || logMatchesQuickFilter(log, quickFilter))
   );
   document.getElementById('adminLogCount').textContent = rows.length;
+  updateLogQuickFilterButtons();
   const tbody = document.getElementById('adminLogTable');
   if(!rows.length){
     tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Không có nhật ký nào phù hợp</td></tr>';
@@ -1489,6 +1523,21 @@ function renderAdminLogs(){
       <td>${logDetailHtml(log.details)}</td>
     </tr>
   `).join('');
+}
+
+function logMatchesQuickFilter(log, filter){
+  const action = rmVN(log.action || '');
+  const target = rmVN(log.target_type || '');
+  if((filter.excludeAction || []).some(item => action.includes(rmVN(item)))) return false;
+  if((filter.excludeTarget || []).some(item => target.includes(rmVN(item)))) return false;
+  return (filter.action || []).some(item => action.includes(rmVN(item)))
+    || (filter.target || []).some(item => target.includes(rmVN(item)));
+}
+
+function updateLogQuickFilterButtons(){
+  document.querySelectorAll('[data-log-filter]').forEach(btn => {
+    btn.classList.toggle('active', (btn.dataset.logFilter || '') === _activeLogQuickFilter);
+  });
 }
 
 async function loadAdminLogs(){
@@ -1520,14 +1569,12 @@ function applyLogQuickFilter(mode){
   const targetEl = document.getElementById('logTargetFilter');
   const statusEl = document.getElementById('logStatusFilter');
   const actorEl = document.getElementById('logActorFilter');
+  _activeLogQuickFilter = mode || '';
   if(actionEl) actionEl.value = '';
   if(targetEl) targetEl.value = '';
   if(statusEl) statusEl.value = '';
   if(actorEl) actorEl.value = '';
   if(mode === 'errors' && statusEl) statusEl.value = 'error';
-  if(mode === 'question' && targetEl) targetEl.value = 'question';
-  if(mode === 'course' && targetEl) targetEl.value = 'course';
-  if(mode === 'student' && targetEl) targetEl.value = 'student';
   renderAdminLogs();
 }
 
@@ -1541,6 +1588,7 @@ function applyAdminLogQueryFilters(){
   const targetEl = document.getElementById('logTargetFilter');
   const statusEl = document.getElementById('logStatusFilter');
   const actorEl = document.getElementById('logActorFilter');
+  _activeLogQuickFilter = status === 'error' && !action && !target && !actor ? 'errors' : '';
   if(actionEl) actionEl.value = action;
   if(targetEl) targetEl.value = target;
   if(statusEl) statusEl.value = status;
@@ -1551,9 +1599,9 @@ function applyAdminLogQueryFilters(){
   const el = document.getElementById(id);
   if(!el) return;
   let t;
-  el.addEventListener('input',()=>{ clearTimeout(t); t=setTimeout(renderAdminLogs,160); });
+  el.addEventListener('input',()=>{ _activeLogQuickFilter=''; clearTimeout(t); t=setTimeout(renderAdminLogs,160); });
 });
-document.getElementById('logStatusFilter')?.addEventListener('change', renderAdminLogs);
+document.getElementById('logStatusFilter')?.addEventListener('change',()=>{ _activeLogQuickFilter=''; renderAdminLogs(); });
 
 </script>
 </body>
