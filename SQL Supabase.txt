@@ -359,6 +359,13 @@ END $$;
 CREATE INDEX IF NOT EXISTS trial_lesson_requests_status_created_idx
   ON public.trial_lesson_requests (status, created_at DESC);
 
+ALTER TABLE public.trial_lesson_requests
+DROP CONSTRAINT IF EXISTS trial_lesson_requests_status_check;
+
+ALTER TABLE public.trial_lesson_requests
+ADD CONSTRAINT trial_lesson_requests_status_check
+CHECK (status IN ('new', 'contacted', 'scheduled', 'cancelled', 'closed'));
+
 -- ============================================
 -- Messaging feature migration
 -- ============================================

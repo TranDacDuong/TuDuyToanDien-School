@@ -2763,14 +2763,11 @@ window.submitTrialLessonRequest = async function(event) {
   button.disabled = true;
   button.textContent = "Đang gửi...";
   try {
-    const { data: inserted, error } = await sb
+    const { error } = await sb
       .from("trial_lesson_requests")
       .insert(payload)
-      .select("id")
-      .single();
 
     if (error) throw error;
-    await notifyAdminsAboutTrialRequest(inserted?.id, payload);
     form.reset();
     message.classList.add("success");
     message.textContent = "Đã gửi yêu cầu học thử. Admin sẽ liên hệ lại sớm.";
@@ -2783,36 +2780,6 @@ window.submitTrialLessonRequest = async function(event) {
     button.textContent = "Gửi ngay cho Admin";
   }
 };
-
-async function notifyAdminsAboutTrialRequest(requestId, payload) {
-  try {
-    const { data: admins, error: adminError } = await sb
-      .from("users")
-      .select("id")
-      .eq("role", "admin");
-    if (adminError || !admins?.length) return;
-
-    const rows = admins.map(admin => ({
-      user_id: admin.id,
-      actor_id: null,
-      type: "trial_lesson_request",
-      ref_id: requestId || null,
-      title: "Có đăng ký học thử mới",
-      message: `${payload.student_name} - ${payload.phone} - Khối ${payload.grade} - ${payload.subject}`,
-      target_url: "home.html",
-      meta: {
-        student_name: payload.student_name,
-        phone: payload.phone,
-        grade: payload.grade,
-        subject: payload.subject,
-        source_url: payload.source_url
-      }
-    }));
-    await sb.from("notifications").insert(rows);
-  } catch (error) {
-    console.warn("Could not notify admins about trial request", error);
-  }
-}
 
 function setupHomeLinks() {
   const profileLink = document.getElementById("homeProfileLink");

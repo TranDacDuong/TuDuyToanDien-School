@@ -235,6 +235,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 
 /* ── Students tab ── */
 #students.panel.active { display: block; }
+#trialRequests.panel.active { display: block; }
 #adminLogs.panel.active { display: block; }
 .s-toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
 .s-stats { display:flex; gap:8px; flex-wrap:wrap; }
@@ -315,6 +316,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   <button class="tab" data-testid="system-tab-chapters" onclick="switchTab('chapters',this)">📖 Chương</button>
   <button class="tab" data-testid="system-tab-teachers" onclick="switchTab('teachers',this)">👨‍🏫 Giáo viên</button>
   <button class="tab" data-testid="system-tab-students" onclick="switchTab('students',this)">👩‍🎓 Học sinh</button>
+  <button class="tab" data-testid="system-tab-trials" onclick="switchTab('trialRequests',this)">Đăng ký học thử</button>
   <button class="tab" data-testid="system-tab-logs" onclick="switchTab('adminLogs',this)">Nhật ký vận hành</button>
 </div>
 
@@ -537,6 +539,48 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   </div>
 </div>
 
+<div id="trialRequests" class="panel">
+  <div class="table-card">
+    <div class="table-card-hd">
+      <span>Đăng ký học thử</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span class="count-badge" id="trialRequestCount">0</span>
+        <button class="btn btn-outline btn-sm" type="button" onclick="loadTrialRequests()">↻ Làm mới</button>
+      </div>
+    </div>
+    <div class="t-search-bar" style="grid-column:1/-1;margin-bottom:14px">
+      <div class="sg"><label>Tìm kiếm</label><input id="trialRequestSearch" placeholder="Tên, SĐT, môn, giáo viên..."></div>
+      <div class="sg"><label>Trạng thái</label>
+        <select id="trialRequestStatusFilter">
+          <option value="">Tất cả</option>
+          <option value="new">Mới</option>
+          <option value="contacted">Đã liên hệ</option>
+          <option value="scheduled">Đã xếp lớp</option>
+          <option value="cancelled">Hủy</option>
+          <option value="closed">Đã đóng</option>
+        </select>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width:150px">Thời gian</th>
+            <th style="min-width:180px">Học sinh</th>
+            <th style="min-width:110px">SĐT</th>
+            <th style="min-width:100px">Khối</th>
+            <th style="min-width:110px">Môn</th>
+            <th style="min-width:170px">Giáo viên</th>
+            <th style="min-width:130px">Nguồn</th>
+            <th style="min-width:140px">Trạng thái</th>
+          </tr>
+        </thead>
+        <tbody id="trialRequestTable"><tr class="empty-row"><td colspan="8">Đang tải...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <div id="adminLogs" class="panel">
   <div class="table-card">
     <div class="table-card-hd">
@@ -617,6 +661,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 <script>
 /* ── Helpers ── */
 function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function escAttr(s){ return esc(s).replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
 function toast(msg, dur=2000){
   const el = document.getElementById("toast");
   el.textContent = msg; el.classList.add("show");
@@ -633,6 +678,7 @@ function switchTab(id, btn){
   const url = new URL(window.location.href);
   url.searchParams.set('tab', id);
   window.history.replaceState({}, '', url.toString());
+  if(id === 'trialRequests') loadTrialRequests();
   if(id === 'adminLogs') loadAdminLogs();
 }
 
@@ -954,7 +1000,7 @@ async function init(){
   }
   await loadDropdowns();
   loadRooms(); loadGrades(); loadSubjects(); loadChapters();
-  loadTeachers(); loadStudents(); loadAdminLogs();
+  loadTeachers(); loadStudents(); loadTrialRequests(); loadAdminLogs();
   const tab = new URLSearchParams(window.location.search).get('tab');
   if(tab){
     const targetBtn = document.querySelector(`.tab[onclick*="'${tab}'"]`);
@@ -1447,6 +1493,117 @@ function sExportExcel(){
 
 // Bind search
 ['sSName','sSPhone','sSBirth','sSProv','sSSchool'].forEach(id=>{let t;document.getElementById(id).addEventListener('input',()=>{clearTimeout(t);t=setTimeout(()=>{_sPage=1;sApplyFilter();},200);});});
+
+/* ──────────────────────────────
+   ĐĂNG KÝ HỌC THỬ
+────────────────────────────── */
+let _trialRequests = [];
+
+function trialStatusLabel(status){
+  if(status === 'contacted') return 'Đã liên hệ';
+  if(status === 'scheduled') return 'Đã xếp lớp';
+  if(status === 'cancelled') return 'Hủy';
+  if(status === 'closed') return 'Đã đóng';
+  return 'Mới';
+}
+
+function trialSourceLabel(url){
+  const text = String(url || '');
+  if(text.includes('profile.html')) return 'Trang giáo viên';
+  if(text.includes('home.html')) return 'Trang chủ';
+  return text ? 'Website' : 'Không rõ';
+}
+
+async function loadTrialRequests(){
+  const tbody = document.getElementById('trialRequestTable');
+  if(tbody) tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Đang tải...</td></tr>';
+  const { data, error } = await sb
+    .from('trial_lesson_requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if(error){
+    if(tbody) tbody.innerHTML = `<tr class="empty-row"><td colspan="8">${esc(error.message)}</td></tr>`;
+    return;
+  }
+  const rows = data || [];
+  const teacherIds = [...new Set(rows.map(item => item.teacher_id).filter(Boolean))];
+  let teacherMap = {};
+  if(teacherIds.length){
+    const { data: teachers } = await sb.from('users').select('id,full_name,email').in('id', teacherIds);
+    teacherMap = Object.fromEntries((teachers || []).map(t => [t.id, t]));
+  }
+  _trialRequests = rows.map(item => ({ ...item, teacher: teacherMap[item.teacher_id] || null }));
+  renderTrialRequests();
+}
+
+function renderTrialRequests(){
+  const q = rmVN(document.getElementById('trialRequestSearch')?.value || '');
+  const status = document.getElementById('trialRequestStatusFilter')?.value || '';
+  const rows = _trialRequests.filter(item => {
+    const haystack = rmVN(`${item.student_name||''} ${item.phone||''} ${item.grade||''} ${item.subject||''} ${item.teacher?.full_name||''} ${item.teacher?.email||''}`);
+    return (!q || haystack.includes(q)) && (!status || item.status === status);
+  });
+  document.getElementById('trialRequestCount').textContent = rows.length;
+  const tbody = document.getElementById('trialRequestTable');
+  if(!rows.length){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Chưa có đăng ký học thử phù hợp</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(item => `
+    <tr>
+      <td style="white-space:nowrap">${esc(logFmtTime(item.created_at))}</td>
+      <td><b style="color:var(--navy)">${esc(item.student_name || '—')}</b></td>
+      <td><button class="btn btn-outline btn-sm" type="button" data-copy-phone="${escAttr(item.phone || '')}">${esc(item.phone || '—')}</button></td>
+      <td>${esc(item.grade || '—')}</td>
+      <td>${esc(item.subject || '—')}</td>
+      <td>
+        <div style="font-weight:700;color:var(--navy)">${esc(item.teacher?.full_name || 'Không chọn')}</div>
+        <div style="font-size:.74rem;color:var(--ink-light)">${esc(item.teacher?.email || '')}</div>
+      </td>
+      <td>${item.source_url?`<a href="${escAttr(item.source_url)}" target="_blank" rel="noopener">${trialSourceLabel(item.source_url)}</a>`:trialSourceLabel(item.source_url)}</td>
+      <td>
+        <select class="trial-status-select" data-trial-status="${item.id}" style="min-width:126px;padding:7px 9px;border:1px solid var(--border);border-radius:9px;font-family:var(--font-body)">
+          ${['new','contacted','scheduled','cancelled','closed'].map(value => `<option value="${value}" ${item.status===value?'selected':''}>${trialStatusLabel(value)}</option>`).join('')}
+        </select>
+      </td>
+    </tr>
+  `).join('');
+  document.querySelectorAll('[data-trial-status]').forEach(el => {
+    el.onchange = () => updateTrialRequestStatus(el.dataset.trialStatus, el.value);
+  });
+  document.querySelectorAll('[data-copy-phone]').forEach(btn => {
+    btn.onclick = () => {
+      navigator.clipboard?.writeText(btn.dataset.copyPhone || '');
+      toast('Đã sao chép SĐT');
+    };
+  });
+}
+
+async function updateTrialRequestStatus(id,status){
+  const user = await window.AppAuth?.getUser?.();
+  const updates = {
+    status,
+    handled_by: user?.id || null,
+    handled_at: new Date().toISOString()
+  };
+  const { error } = await sb.from('trial_lesson_requests').update(updates).eq('id', id);
+  if(error){
+    alert('Không thể cập nhật đăng ký học thử: ' + error.message);
+    await loadTrialRequests();
+    return;
+  }
+  const row = _trialRequests.find(item => item.id === id);
+  if(row) Object.assign(row, updates);
+  toast('Đã cập nhật trạng thái học thử');
+}
+
+['trialRequestSearch'].forEach(id=>{
+  const el = document.getElementById(id);
+  if(!el) return;
+  let t;
+  el.addEventListener('input',()=>{ clearTimeout(t); t=setTimeout(renderTrialRequests,160); });
+});
+document.getElementById('trialRequestStatusFilter')?.addEventListener('change', renderTrialRequests);
 
 /* ──────────────────────────────
    NHẬT KÝ ADMIN

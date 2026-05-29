@@ -689,7 +689,7 @@ body {
             <section class="box">
               <div class="panel-head">
                 <div class="panel-title">Đăng ký học thử với giáo viên này</div>
-                <div class="panel-sub">Yêu cầu sẽ được gửi trực tiếp cho giáo viên</div>
+                <div class="panel-sub">Yêu cầu sẽ được lưu vào danh sách đăng ký học thử cho admin</div>
               </div>
               <div class="panel-body">
                 <form class="trial-form" id="teacherTrialForm" onsubmit="submitTeacherTrialRequest(event)">
@@ -1171,12 +1171,11 @@ window.submitTeacherTrialRequest = async function(event) {
   button.disabled = true;
   button.textContent = "Đang gửi...";
   try {
-    const { data: inserted, error } = await sb.from("trial_lesson_requests").insert(payload).select("id").single();
+    const { error } = await sb.from("trial_lesson_requests").insert(payload);
     if (error) throw error;
-    await notifyTeacherTrialRequest(inserted?.id, payload);
     form.reset();
     message.classList.add("success");
-    message.textContent = "Đã gửi đăng ký học thử trực tiếp cho giáo viên.";
+    message.textContent = "Đã gửi đăng ký học thử. Admin sẽ liên hệ lại sớm.";
   } catch (error) {
     console.warn("Teacher trial request failed", error);
     message.classList.add("error");
@@ -1186,23 +1185,6 @@ window.submitTeacherTrialRequest = async function(event) {
     button.textContent = "Gửi đăng ký học thử";
   }
 };
-
-async function notifyTeacherTrialRequest(requestId, payload) {
-  try {
-    await sb.from("notifications").insert({
-      user_id: viewedProfile.id,
-      actor_id: null,
-      type: "trial_lesson_request",
-      ref_id: requestId || null,
-      title: "Có đăng ký học thử mới",
-      message: `${payload.student_name} - ${payload.phone} - Khối ${payload.grade} - ${payload.subject}`,
-      target_url: `profile.html?id=${viewedProfile.id}`,
-      meta: payload
-    });
-  } catch (error) {
-    console.warn("Could not notify teacher", error);
-  }
-}
 
 async function setupFriendButton() {
   const btn = document.getElementById("friendBtn");
