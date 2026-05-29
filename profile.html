@@ -41,7 +41,9 @@ body {
   margin-bottom: 22px;
 }
 .cover {
-  height: 240px;
+  aspect-ratio: 2.5 / 1;
+  min-height: 180px;
+  max-height: 420px;
   background:
     linear-gradient(180deg, rgba(15,31,61,.08), rgba(15,31,61,.24)),
     url("profile-cover.jpg");
@@ -49,8 +51,7 @@ body {
   background-position: center;
 }
 .hero-body {
-  padding: 0 26px 26px;
-  margin-top: -56px;
+  padding: 22px 26px 26px;
 }
 .hero-top {
   display: flex;
@@ -580,8 +581,8 @@ body {
 .trial-message.error { color: var(--red); }
 @media (max-width: 860px) {
   .layout { grid-template-columns: 1fr; }
-  .cover { height: 210px; }
-  .hero-body { padding: 0 18px 20px; }
+  .cover { min-height: 150px; }
+  .hero-body { padding: 18px 18px 20px; }
   .teacher-top-grid { grid-template-columns: 1fr; }
   .teacher-course { grid-template-columns: 1fr; }
   .teacher-course-cover { min-height: 170px; }
