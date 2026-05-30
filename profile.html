@@ -1240,7 +1240,12 @@ window.submitTeacherTrialRequest = async function(event) {
   button.disabled = true;
   button.textContent = "Đang gửi...";
   try {
-    const { error } = await sb.from("trial_lesson_requests").insert(payload);
+    let { error } = await sb.from("trial_lesson_requests").insert(payload);
+    if (error && String(error.message || "").includes("teacher_id")) {
+      const fallbackPayload = { ...payload };
+      delete fallbackPayload.teacher_id;
+      ({ error } = await sb.from("trial_lesson_requests").insert(fallbackPayload));
+    }
     if (error) throw error;
     form.reset();
     message.classList.add("success");
