@@ -900,6 +900,11 @@ async function createNotification(userId, type, message, refId) {
   });
 }
 
+window.openProfileChatPopup = function(userId) {
+  if (!userId) return;
+  window.parent?.postMessage({ type: "dashboard:open-chat-popup", userId }, "*");
+};
+
 async function init() {
   const { data: { user } } = await sb.auth.getUser();
   currentUser = user || null;
@@ -1043,7 +1048,7 @@ function renderHeader() {
     actionBox.innerHTML = '<a class="btn btn-primary" href="account.html">Chỉnh sửa hồ sơ</a><a class="btn btn-outline" href="home.html">Về bảng tin</a>';
     document.getElementById("postSubBox").textContent = "Các bài viết bạn đã chia sẻ";
   } else {
-    actionBox.innerHTML = '<button class="btn btn-gold" id="friendBtn" type="button">Kết bạn</button><a class="btn btn-outline" href="messages.html?user=' + viewedProfile.id + '">Nhắn tin</a><a class="btn btn-outline" href="home.html">Về bảng tin</a>';
+    actionBox.innerHTML = '<button class="btn btn-gold" id="friendBtn" type="button">Kết bạn</button><button class="btn btn-outline" type="button" onclick="openProfileChatPopup(\'' + viewedProfile.id + '\')">Nhắn tin</button><a class="btn btn-outline" href="home.html">Về bảng tin</a>';
     document.getElementById("postSubBox").textContent = "Những bài viết có thể xem được";
     setupFriendButton();
   }
@@ -1321,7 +1326,7 @@ async function setupFriendButton() {
     actionBox.innerHTML = `
       <button class="btn btn-outline" type="button" disabled>Bạn bè</button>
       <button class="btn btn-outline" type="button" onclick="removeFriend()">Gỡ bạn</button>
-      <a class="btn btn-outline" href="messages.html?user=${viewedProfile.id}">Nhắn tin</a>
+      <button class="btn btn-outline" type="button" onclick="openProfileChatPopup('${viewedProfile.id}')">Nhắn tin</button>
       <a class="btn btn-outline" href="home.html">Về bảng tin</a>
     `;
     return;
@@ -1339,7 +1344,7 @@ async function setupFriendButton() {
     actionBox.innerHTML = `
       <button class="btn btn-outline" type="button" disabled>Đã gửi lời mời</button>
       <button class="btn btn-outline" type="button" onclick="cancelFriendRequest('${sent.id}')">Hủy lời mời</button>
-      <a class="btn btn-outline" href="messages.html?user=${viewedProfile.id}">Nhắn tin</a>
+      <button class="btn btn-outline" type="button" onclick="openProfileChatPopup('${viewedProfile.id}')">Nhắn tin</button>
       <a class="btn btn-outline" href="home.html">Về bảng tin</a>
     `;
     return;
@@ -1359,7 +1364,7 @@ async function setupFriendButton() {
         <button class="btn btn-gold" type="button" onclick="acceptFriendRequest('${received.id}')">Chấp nhận</button>
         <button class="btn btn-outline" type="button" onclick="rejectFriendRequest('${received.id}')">Từ chối</button>
       </div>
-      <a class="btn btn-outline" href="messages.html?user=${viewedProfile.id}">Nhắn tin</a>
+      <button class="btn btn-outline" type="button" onclick="openProfileChatPopup('${viewedProfile.id}')">Nhắn tin</button>
       <a class="btn btn-outline" href="home.html">Về bảng tin</a>
     `;
     return;
@@ -1407,7 +1412,7 @@ window.acceptFriendRequest = async function(requestId) {
   await createNotification(viewedProfile.id, "friend_accept", (currentUser.email || "Một người dùng") + " đã chấp nhận lời mời kết bạn của bạn.", null);
 
   const actionBox = document.getElementById("actionBox");
-  actionBox.innerHTML = '<button class="btn btn-outline" type="button" disabled>Bạn bè</button><a class="btn btn-outline" href="messages.html?user=' + viewedProfile.id + '">Nhắn tin</a><a class="btn btn-outline" href="home.html">Về bảng tin</a>';
+  actionBox.innerHTML = '<button class="btn btn-outline" type="button" disabled>Bạn bè</button><button class="btn btn-outline" type="button" onclick="openProfileChatPopup(\'' + viewedProfile.id + '\')">Nhắn tin</button><a class="btn btn-outline" href="home.html">Về bảng tin</a>';
 };
 
 window.rejectFriendRequest = async function(requestId) {

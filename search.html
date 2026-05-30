@@ -497,6 +497,16 @@ function openSearchTarget(url) {
   return false;
 }
 
+function openSearchChatPopup(userId) {
+  if (!userId) return false;
+  if (window.parent && window.parent !== window && typeof window.parent.openChatPopupForUser === "function") {
+    window.parent.openChatPopupForUser(userId);
+    return false;
+  }
+  window.parent?.postMessage({ type: "dashboard:open-chat-popup", userId }, "*");
+  return false;
+}
+
 function renderUserItem(user) {
   const meta = [];
   if (user.school) meta.push("<span>" + esc(user.school) + "</span>");
@@ -514,7 +524,7 @@ function renderUserItem(user) {
         ${user.bio ? `<div class="user-bio">${esc(user.bio)}</div>` : ""}
         <div class="user-actions">
           <a class="btn btn-outline" href="profile.html?id=${user.id}">Xem hồ sơ</a>
-          ${user.id !== currentUser.id ? `<a class="btn btn-outline" href="messages.html?user=${user.id}">Nhắn tin</a>` : ""}
+          ${user.id !== currentUser.id ? `<button class="btn btn-outline" type="button" onclick="openSearchChatPopup('${user.id}')">Nhắn tin</button>` : ""}
         </div>
       </div>
     </article>
@@ -623,7 +633,7 @@ function renderUserItemFullscreen(user) {
         ${user.bio ? `<div class="user-bio">${esc(user.bio)}</div>` : ""}
         <div class="user-actions">
           <button class="btn btn-outline" type="button" onclick="openSearchTarget('profile.html?id=${user.id}')">Xem hồ sơ</button>
-          ${user.id !== currentUser.id ? `<button class="btn btn-outline" type="button" onclick="openSearchTarget('messages.html?user=${user.id}')">Nhắn tin</button>` : ""}
+          ${user.id !== currentUser.id ? `<button class="btn btn-outline" type="button" onclick="openSearchChatPopup('${user.id}')">Nhắn tin</button>` : ""}
         </div>
       </div>
     </article>

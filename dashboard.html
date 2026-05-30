@@ -812,6 +812,7 @@ const contentFrame = document.getElementById("contentFrame");
 const mobileNavItems = [...document.querySelectorAll("#mobileNav .mobile-nav-item")];
 const mobileQuickActionItems = [...document.querySelectorAll("#mobileQuickActions .mobile-quick-action")];
 let dashboardMenuReady = false;
+let pendingChatPopupUserId = "";
 /* ── Sidebar toggle ── */
 const sidebar  = document.getElementById("sidebar");
 const tab      = document.getElementById("sidebarTab");
@@ -1085,6 +1086,13 @@ contentFrame.addEventListener("load", () => {
   const framePage = getFrameDashboardPage();
   if(!framePage) return;
   syncSidebarPin(framePage);
+  if(framePage.split("?")[0].split("#")[0] === "home.html" && pendingChatPopupUserId){
+    contentFrame.contentWindow?.postMessage({
+      type: "open-chat-popup",
+      payload: { userId: pendingChatPopupUserId }
+    }, "*");
+    pendingChatPopupUserId = "";
+  }
   const currentPage = getDashboardUrlPage();
   if(framePage !== currentPage) {
     syncDashboardUrl(framePage);
@@ -1093,6 +1101,20 @@ contentFrame.addEventListener("load", () => {
 
 window.addEventListener("message", (event) => {
   if(event.source !== contentFrame.contentWindow) return;
+  if(event.data?.type === "dashboard:open-chat-popup"){
+    pendingChatPopupUserId = String(event.data.userId || "").trim();
+    if(!pendingChatPopupUserId) return;
+    if(getFrameDashboardPage().split("?")[0].split("#")[0] === "home.html"){
+      contentFrame.contentWindow?.postMessage({
+        type: "open-chat-popup",
+        payload: { userId: pendingChatPopupUserId }
+      }, "*");
+      pendingChatPopupUserId = "";
+      return;
+    }
+    openDashboardPage("home.html");
+    return;
+  }
   if(event.data?.type !== "dashboard:navigate-frame") return;
   const page = normalizeDashboardPage(event.data.page || "");
   if(!page) return;
