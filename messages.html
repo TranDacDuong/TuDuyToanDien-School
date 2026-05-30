@@ -368,7 +368,11 @@ const CHAT_IMAGE_PREFIX = "__CHAT_IMAGE__";
 const ACTIVE_WINDOW_MS = 2 * 60 * 1000;
 
 function syncMobileConversationState(forceOpen = null) {
-  if (isTrayMode || isPopupMode) return;
+  if (isTrayMode) return;
+  if (isPopupMode) {
+    document.documentElement.classList.add("mobile-chat-open");
+    return;
+  }
   if (!window.matchMedia("(max-width: 860px)").matches) {
     document.documentElement.classList.remove("mobile-chat-open");
     return;
