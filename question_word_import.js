@@ -174,11 +174,16 @@
   function registerImageMarker(imgEl, images) {
     const src = String(imgEl?.getAttribute?.("src") || imgEl?.src || "").trim();
     if (!src) return "[HINH]";
+    if (!isSupportedWordImageSource(src)) return "[HINH]";
     const existingId = Object.keys(images).find((key) => images[key] === src);
     if (existingId) return `[HINH_${existingId}]`;
     const nextId = String(Object.keys(images).length + 1);
     images[nextId] = src;
     return `[HINH_${nextId}]`;
+  }
+
+  function isSupportedWordImageSource(src) {
+    return /^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(src) || /^https?:\/\//i.test(src);
   }
 
   function isBlockLikeTag(tag) {
