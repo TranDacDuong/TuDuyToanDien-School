@@ -151,7 +151,7 @@
       qPart.appendChild(qText);
     }
 
-    if (options.enableQuestionReport) {
+    if (options.enableQuestionReport !== false) {
       const reportButton = buildQuestionReportButton(q, options);
       if (reportButton) qPart.appendChild(reportButton);
     }
@@ -192,7 +192,7 @@
     if (!question?.id || !window.PublicExamSupport?.openQuestionReportModal) return null;
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = "Báo lỗi";
+    button.textContent = "Báo lỗi câu hỏi";
     button.style.cssText =
       "align-self:flex-start;margin-top:6px;border:1px solid rgba(245,158,11,.28);background:#fff7ed;" +
       "color:#b45309;padding:4px 8px;border-radius:999px;font-size:.68rem;font-weight:800;" +
@@ -254,12 +254,15 @@
     container.appendChild(title);
   }
 
-  function buildCorrectLine(container, text) {
+  function buildCorrectLine(container, text, isCorrect = true) {
     if (!String(text || "").trim()) return;
     const line = document.createElement("div");
     line.style.cssText =
-      "margin-top:4px;padding:9px 12px;border-radius:8px;background:#dcfce7;border:1px solid #86efac;" +
-      "color:#15803d;font-size:.84rem;font-weight:700;white-space:pre-line";
+      "margin-top:4px;padding:9px 12px;border-radius:8px;" +
+      (isCorrect
+        ? "background:#dcfce7;border:1px solid #86efac;color:#15803d;"
+        : "background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;") +
+      "font-size:.84rem;font-weight:700;white-space:pre-line";
     line.textContent = "Đáp án đúng: " + normalizeReviewText(text);
     container.appendChild(line);
   }
@@ -307,18 +310,48 @@
       const key = option.key || String.fromCharCode(97 + index);
       const studentValue = student[index] || "";
       const correctValue = correct[index] || "";
-      const picked = !!studentValue;
-      const isCorrect = picked && studentValue === correctValue;
-      container.appendChild(buildOptionRow({
+      container.appendChild(buildTrueFalseOptionRow({
         key: key + ")",
         text: normalizeReviewText(option.text),
-        picked,
-        isCorrect,
-        pickedLabel: picked ? labelTrueFalse(studentValue) : "",
+        studentValue,
+        isCorrect: !!studentValue && studentValue === correctValue,
       }));
     });
 
     if (!String(ans?.answer || "").trim()) buildSkippedLine(container);
+  }
+
+  function buildTrueFalseOptionRow({ key, text, studentValue, isCorrect }) {
+    const row = document.createElement("div");
+    row.style.cssText =
+      "display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:8px;margin-bottom:6px;" +
+      "border:1.5px solid var(--border);background:var(--white)";
+
+    const keyEl = document.createElement("span");
+    keyEl.style.cssText = "min-width:22px;color:var(--navy);font-weight:800";
+    keyEl.textContent = key;
+    row.appendChild(keyEl);
+
+    const textEl = document.createElement("span");
+    textEl.style.cssText = "flex:1;color:var(--ink);font-size:.94rem;line-height:1.55;white-space:pre-line";
+    textEl.textContent = text;
+    row.appendChild(textEl);
+
+    const actions = document.createElement("div");
+    actions.style.cssText = "display:flex;flex-shrink:0;gap:10px;margin-left:auto";
+    ["T", "F"].forEach((value) => {
+      const label = document.createElement("span");
+      const selected = studentValue === value;
+      const color = selected ? (isCorrect ? "#15803d" : "#b91c1c") : "var(--ink-light)";
+      label.style.cssText = `display:inline-flex;align-items:center;gap:4px;color:${color};font-size:.86rem;font-weight:700`;
+      label.innerHTML =
+        `<span style="display:inline-flex;width:16px;height:16px;align-items:center;justify-content:center;` +
+        `border:1.5px solid ${selected ? color : "var(--border)"};border-radius:50%;font-size:12px;line-height:1">` +
+        `${selected ? "✓" : ""}</span>${labelTrueFalse(value)}`;
+      actions.appendChild(label);
+    });
+    row.appendChild(actions);
+    return row;
   }
 
   function buildOptionRow({ key, text, picked, isCorrect, pickedLabel, highlightCorrect = false }) {
@@ -373,7 +406,10 @@
       box.textContent = "Không trả lời";
     }
     container.appendChild(box);
-    buildCorrectLine(container, q.answer || "");
+    const acceptedAnswers = String(q.answer || "").split(";").map((value) => value.trim().toLowerCase()).filter(Boolean);
+    const isCorrect = ans?.is_correct === true
+      || (ans?.is_correct == null && acceptedAnswers.includes(answer.trim().toLowerCase()));
+    buildCorrectLine(container, q.answer || "", isCorrect);
   }
 
   function buildEssayView(container, ans, eq) {
@@ -417,7 +453,7 @@
 
   function normalizeTrueFalse(value, count) {
     const source = String(value || "");
-    const explicitPairs = [...source.matchAll(/([a-z])\s*([TF])/gi)];
+    const explicitPairs = [...source.matchAll(/([a-z])\s*([TF])/g)];
     if (explicitPairs.length) {
       const pairMap = new Map(explicitPairs.map(([, label, answer]) => [label.toLowerCase(), answer.toUpperCase()]));
       return Array.from({ length: count }, (_, index) => pairMap.get(String.fromCharCode(97 + index)) || "");

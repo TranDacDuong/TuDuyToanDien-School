@@ -695,6 +695,8 @@
       reviewWrap.appendChild(window.buildReviewCards(eqs, ansMap, hasEssay, {
         essayInputPrefix: "pe_essay_",
         essayUpdateHandler: "peUpdateEssayTotal",
+        examResultId: resultId,
+        reportSourceMode: "public_teacher_review",
       }));
     } else if (reviewWrap) {
       reviewWrap.innerHTML = qHtml;
@@ -1376,7 +1378,7 @@
         scoreEarned=isCorrect?(eq.points||0):0;
         } else if (type==="true_false") {
           const lbls=[]; for(let i=0;i<n;i++) lbls.push(String.fromCharCode(97+i));
-          const explicitStudent = new Map([...ans.matchAll(/([a-z])\s*([TF])/gi)].map(([, label, value]) => [label.toLowerCase(), value.toUpperCase()]));
+          const explicitStudent = new Map([...ans.matchAll(/([a-z])\s*([TF])/g)].map(([, label, value]) => [label.toLowerCase(), value.toUpperCase()]));
           const normalizedStudent = window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(ans, n) || "";
           const normalizedCorrect = window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(correct, n) || "";
           let cnt=0;
@@ -1477,7 +1479,11 @@
       backHandler: "loadExamList",
       questions: eqs,
       answers: ansMap,
-      cardsOptions: { enableAiSolution: true },
+      cardsOptions: {
+        enableAiSolution: true,
+        examResultId: result?.id || null,
+        reportSourceMode: "public_review",
+      },
     })) return;
 
     const SECTION_ORDER  = ["multi_choice","true_false","short_answer","essay"];

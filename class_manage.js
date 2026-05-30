@@ -1868,7 +1868,10 @@
 
     /* Cards dÃ¹ng helper chung â€” canGradeEssay = true cho admin/teacher */
     if (window.buildReviewCards) {
-      tc.appendChild(window.buildReviewCards(sortedEqs, ansMap, hasEssay));
+      tc.appendChild(window.buildReviewCards(sortedEqs, ansMap, hasEssay, {
+        examResultId: resultId,
+        reportSourceMode: "class_teacher_review",
+      }));
     }
 
     window._cvEssayQIds      = essayQs.map(eq=>({qid:eq.question.id,pts:eq.points}));

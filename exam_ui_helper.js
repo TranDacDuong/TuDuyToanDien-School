@@ -100,7 +100,7 @@
   function isTrueFalseChecked(answer, label, index, value, count) {
     const source = String(answer || "");
     if (!source.trim()) return false;
-    const explicitPairs = [...source.matchAll(/([a-z])\s*([TF])/gi)];
+    const explicitPairs = [...source.matchAll(/([a-z])\s*([TF])/g)];
     if (explicitPairs.length) {
       return explicitPairs.some(([, pairLabel, pairValue]) => (
         pairLabel.toLowerCase() === label.toLowerCase() && pairValue.toUpperCase() === value

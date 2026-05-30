@@ -1065,7 +1065,7 @@
       } else if (type === "true_false") {
         const labels = []; for (let i=0;i<n;i++) labels.push(String.fromCharCode(97+i));
         let correctCount = 0;
-          const explicitStudent = new Map([...ans.matchAll(/([a-z])\s*([TF])/gi)].map(([, label, value]) => [label.toLowerCase(), value.toUpperCase()]));
+          const explicitStudent = new Map([...ans.matchAll(/([a-z])\s*([TF])/g)].map(([, label, value]) => [label.toLowerCase(), value.toUpperCase()]));
           const normalizedStudent = window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(ans, n) || "";
           const normalizedCorrect = window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(correct, n) || "";
           labels.forEach((lbl, index) => {
