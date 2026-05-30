@@ -112,6 +112,7 @@ p  { color: var(--ink-mid); }
 .btn-sm { padding: 5px 12px; font-size: .8rem; }
 .btn-lg { padding: 11px 24px; font-size: 1rem; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn:not(:disabled):active { transform: translateY(1px) scale(.98); }
 
 /* ── Cards ── */
 .card {
@@ -374,6 +375,13 @@ label {
 
 /* ── Loading skeleton ── */
 .loading-text { color: var(--ink-light); font-size: .875rem; padding: 20px; text-align: center; }
+.loading-text::after {
+  content: "";
+  display: inline-block;
+  width: 1.4em;
+  text-align: left;
+  animation: loadingDots 1.25s steps(4, end) infinite;
+}
 
 /* ── Class tag ── */
 .class-tag {
@@ -393,6 +401,78 @@ label {
 .att-btn.makeup  { background: var(--amber);  color: #fff; }
 
 /* ── Responsive ── */
+/* -- Motion layer -- */
+@keyframes pageArrive {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes heroDrift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@keyframes loadingDots {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75%, 100% { content: "..."; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  body {
+    animation: pageArrive .42s cubic-bezier(.2,.7,.2,1) both;
+  }
+  .page-wrap,
+  .page-shell,
+  body > .page {
+    animation: pageArrive .42s cubic-bezier(.2,.7,.2,1) both;
+  }
+  .page-hero,
+  .hero-card {
+    background-size: 180% 180%;
+    animation: heroDrift 14s ease-in-out infinite;
+  }
+  .btn:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(15,31,61,.12);
+  }
+  .card,
+  .surface-card,
+  .surface-toolbar,
+  .table-shell,
+  .hero-kpi,
+  .overview-card,
+  .feed-header,
+  .course-card,
+  .screen-panel,
+  .box {
+    transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+  }
+  .card:hover,
+  .surface-card:hover,
+  .surface-toolbar:hover,
+  .table-shell:hover,
+  .hero-kpi:hover,
+  .overview-card:hover,
+  .feed-header:hover,
+  .course-card:hover,
+  .screen-panel:hover,
+  .box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 16px 34px rgba(15,31,61,.10);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
 @media (max-width: 640px) {
   .page-wrap { padding: 14px; }
   h1 { font-size: 1.35rem; }
