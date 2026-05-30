@@ -345,6 +345,7 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
+<script src="image_upload.js"></script>
 <script>
 let currentUser = null;
 let currentProfile = null;
@@ -872,17 +873,20 @@ window.clearMessageImage = function() {
 };
 
 async function uploadChatImage(file, caption) {
-  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-  const path = currentUser.id + "/" + Date.now() + "-" + Math.random().toString(36).slice(2) + "." + ext;
-  const { error } = await sb.storage.from("chat-media").upload(path, file);
-  if (error) {
+  let imageUrl;
+  try {
+    const uploaded = await window.MindupImageUpload.uploadCompressedImage(file, {
+      kind: "post",
+      folder: "chat-media",
+    });
+    imageUrl = window.MindupImageUpload.getDisplayUrl(uploaded);
+  } catch (error) {
     alert("Không upload được ảnh chat: " + error.message);
     return null;
   }
 
-  const { data } = sb.storage.from("chat-media").getPublicUrl(path);
   return CHAT_IMAGE_PREFIX + JSON.stringify({
-    url: data.publicUrl,
+    url: imageUrl,
     caption: caption || ""
   });
 }

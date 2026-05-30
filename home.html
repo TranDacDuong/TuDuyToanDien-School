@@ -2181,6 +2181,7 @@ body {
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
+<script src="image_upload.js"></script>
 <script>
 let currentUser, role, currentProfile;
 let friendIds = new Set();
@@ -3043,21 +3044,19 @@ async function createPost() {
   if (error) { alert("Lỗi: " + error.message); return; }
 
   if (imageFile && insertedPost?.id) {
-    const mediaPath = `posts/${currentUser.id}/${insertedPost.id}-${Date.now()}-${imageFile.name}`.replace(/\s+/g, "-");
-    const { error: uploadError } = await sb.storage
-      .from("post-media")
-      .upload(mediaPath, imageFile);
-
-    if (uploadError) {
-      alert("Bài viết đã tạo nhưng upload ảnh lỗi. Hãy kiểm tra bucket 'post-media'. Lỗi: " + uploadError.message);
-    } else {
-      const { data: publicData } = sb.storage.from("post-media").getPublicUrl(mediaPath);
+    try {
+      const uploaded = await window.MindupImageUpload.uploadCompressedImage(imageFile, {
+        kind: "post",
+        folder: "post-media",
+      });
       await sb.from("post_media").insert({
         post_id: insertedPost.id,
-        file_url: publicData.publicUrl,
+        file_url: window.MindupImageUpload.getDisplayUrl(uploaded),
         file_type: "image",
         sort_order: 0
       });
+    } catch (uploadError) {
+      alert("Bài viết đã tạo nhưng upload ảnh lỗi: " + uploadError.message);
     }
   }
 
@@ -3675,18 +3674,19 @@ async function createPost() {
   }
 
   if (imageFile && insertedPost?.id) {
-    const mediaPath = `posts/${currentUser.id}/${insertedPost.id}-${Date.now()}-${imageFile.name}`.replace(/\s+/g, "-");
-    const { error: uploadError } = await sb.storage.from("post-media").upload(mediaPath, imageFile);
-    if (uploadError) {
-      alert("Bài viết đã tạo nhưng upload ảnh lỗi. Hãy kiểm tra bucket 'post-media'. Lỗi: " + uploadError.message);
-    } else {
-      const { data: publicData } = sb.storage.from("post-media").getPublicUrl(mediaPath);
+    try {
+      const uploaded = await window.MindupImageUpload.uploadCompressedImage(imageFile, {
+        kind: "post",
+        folder: "post-media",
+      });
       await sb.from("post_media").insert({
         post_id: insertedPost.id,
-        file_url: publicData.publicUrl,
+        file_url: window.MindupImageUpload.getDisplayUrl(uploaded),
         file_type: "image",
         sort_order: 0
       });
+    } catch (uploadError) {
+      alert("Bài viết đã tạo nhưng upload ảnh lỗi: " + uploadError.message);
     }
   }
 
