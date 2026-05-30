@@ -11,6 +11,24 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+async function requireAuthenticatedUser(req: Request) {
+  const authHeader = req.headers.get("Authorization") || "";
+  const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!accessToken || !supabaseUrl || !anonKey) throw new Error("Authentication required");
+
+  const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  const user = await res.json().catch(() => ({}));
+  if (!res.ok || !user?.id) throw new Error("Authentication required");
+  return user;
+}
+
 async function getGoogleAccessToken(clientId: string, clientSecret: string, refreshToken: string) {
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -90,6 +108,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
+    await requireAuthenticatedUser(req);
     const clientId = Deno.env.get("GOOGLE_DRIVE_CLIENT_ID");
     const clientSecret = Deno.env.get("GOOGLE_DRIVE_CLIENT_SECRET");
     const refreshToken = Deno.env.get("GOOGLE_DRIVE_REFRESH_TOKEN");
