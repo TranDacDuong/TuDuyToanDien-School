@@ -688,8 +688,8 @@ function switchTab(id, btn){
 async function loadRooms(){
   const { data } = await sb.from("rooms").select("*").order("room_name");
   document.getElementById("roomCount").textContent = data?.length || 0;
-  document.getElementById("roomTable").innerHTML = (data||[]).length
-    ? data.map(r => `<tr>
+  window.MindupLiveUI?.patchHTML(document.getElementById("roomTable"), (data||[]).length
+    ? data.map(r => `<tr data-live-key="room-${r.id}">
         <td><b>${esc(r.room_name)}</b></td>
         <td>${r.capacity ? r.capacity + " chỗ" : "—"}</td>
         <td style="color:var(--ink-mid)">${esc(r.note||"—")}</td>
@@ -698,7 +698,7 @@ async function loadRooms(){
           <button class="btn-del-sm"  onclick="deleteRoom('${r.id}')">🗑</button>
         </div></td>
       </tr>`).join("")
-    : `<tr class="empty-row"><td colspan="4">Chưa có phòng nào</td></tr>`;
+    : `<tr class="empty-row" data-live-key="room-empty"><td colspan="4">Chưa có phòng nào</td></tr>`);
 }
 
 async function saveRoom(){
@@ -759,15 +759,15 @@ async function loadGrades(){
   const { data } = await sb.from("grades").select("*");
   const sorted = (data||[]).sort((a,b) => parseInt(a.name)-parseInt(b.name));
   document.getElementById("gradeCount").textContent = sorted.length;
-  document.getElementById("gradeTable").innerHTML = sorted.length
-    ? sorted.map(g => `<tr>
+  window.MindupLiveUI?.patchHTML(document.getElementById("gradeTable"), sorted.length
+    ? sorted.map(g => `<tr data-live-key="grade-${g.id}">
         <td><span class="grade-badge">Khối ${esc(g.name)}</span></td>
         <td><div class="act-wrap">
           <button class="btn-edit-sm" onclick="editGrade('${g.id}','${esc(g.name)}')">✏</button>
           <button class="btn-del-sm"  onclick="deleteGrade('${g.id}')">🗑</button>
         </div></td>
       </tr>`).join("")
-    : `<tr class="empty-row"><td colspan="2">Chưa có khối nào</td></tr>`;
+    : `<tr class="empty-row" data-live-key="grade-empty"><td colspan="2">Chưa có khối nào</td></tr>`);
 }
 async function saveGrade(){
   const id   = document.getElementById("gradeId").value;
@@ -824,8 +824,8 @@ async function loadSubjects(){
     return g !== 0 ? g : a.name.localeCompare(b.name);
   });
   document.getElementById("subjectCount").textContent = sorted.length;
-  document.getElementById("subjectTable").innerHTML = sorted.length
-    ? sorted.map(s => `<tr>
+  window.MindupLiveUI?.patchHTML(document.getElementById("subjectTable"), sorted.length
+    ? sorted.map(s => `<tr data-live-key="subject-${s.id}">
         <td><span class="grade-badge">Khối ${esc(s.grades?.name||"?")}</span></td>
         <td><span class="subject-badge">${esc(s.name)}</span></td>
         <td><div class="act-wrap">
@@ -833,7 +833,7 @@ async function loadSubjects(){
           <button class="btn-del-sm"  onclick="deleteSubject('${s.id}')">🗑</button>
         </div></td>
       </tr>`).join("")
-    : `<tr class="empty-row"><td colspan="3">Chưa có môn nào</td></tr>`;
+    : `<tr class="empty-row" data-live-key="subject-empty"><td colspan="3">Chưa có môn nào</td></tr>`);
 }
 async function saveSubject(){
   const id       = document.getElementById("subjectId").value;
@@ -897,8 +897,8 @@ async function loadChapters(){
     return a.name.localeCompare(b.name);
   });
   document.getElementById("chapterCount").textContent = sorted.length;
-  document.getElementById("chapterTable").innerHTML = sorted.length
-    ? sorted.map(c => `<tr>
+  window.MindupLiveUI?.patchHTML(document.getElementById("chapterTable"), sorted.length
+    ? sorted.map(c => `<tr data-live-key="chapter-${c.id}">
         <td><span class="grade-badge">Khối ${esc(c.subjects?.grades?.name||"?")}</span></td>
         <td><span class="subject-badge">${esc(c.subjects?.name||"?")}</span></td>
         <td>${esc(c.name)}</td>
@@ -907,7 +907,7 @@ async function loadChapters(){
           <button class="btn-del-sm"  onclick="deleteChapter('${c.id}')">🗑</button>
         </div></td>
       </tr>`).join("")
-    : `<tr class="empty-row"><td colspan="4">Chưa có chương nào</td></tr>`;
+    : `<tr class="empty-row" data-live-key="chapter-empty"><td colspan="4">Chưa có chương nào</td></tr>`);
 }
 async function saveChapter(){
   const id         = document.getElementById("chapterId").value;
@@ -1001,6 +1001,11 @@ async function init(){
   await loadDropdowns();
   loadRooms(); loadGrades(); loadSubjects(); loadChapters();
   loadTeachers(); loadStudents(); loadTrialRequests(); loadAdminLogs();
+  window.MindupLiveUI?.watchTable?.('rooms', loadRooms);
+  window.MindupLiveUI?.watchTable?.('grades', loadGrades);
+  window.MindupLiveUI?.watchTable?.('subjects', loadSubjects);
+  window.MindupLiveUI?.watchTable?.('chapters', loadChapters);
+  window.MindupLiveUI?.watchTable?.('trial_lesson_requests', loadTrialRequests);
   const tab = new URLSearchParams(window.location.search).get('tab');
   if(tab){
     const targetBtn = document.querySelector(`.tab[onclick*="'${tab}'"]`);
@@ -1516,7 +1521,7 @@ function trialSourceLabel(url){
 
 async function loadTrialRequests(){
   const tbody = document.getElementById('trialRequestTable');
-  if(tbody) tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Đang tải...</td></tr>';
+  if(tbody && !_trialRequests.length) tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Đang tải...</td></tr>';
   const { data, error } = await sb
     .from('trial_lesson_requests')
     .select('*')
@@ -1546,11 +1551,11 @@ function renderTrialRequests(){
   document.getElementById('trialRequestCount').textContent = rows.length;
   const tbody = document.getElementById('trialRequestTable');
   if(!rows.length){
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Chưa có đăng ký học thử phù hợp</td></tr>';
+    window.MindupLiveUI?.patchHTML(tbody, '<tr class="empty-row" data-live-key="trial-empty"><td colspan="8">Chưa có đăng ký học thử phù hợp</td></tr>');
     return;
   }
-  tbody.innerHTML = rows.map(item => `
-    <tr>
+  window.MindupLiveUI?.patchHTML(tbody, rows.map(item => `
+    <tr data-live-key="trial-${item.id}">
       <td style="white-space:nowrap">${esc(logFmtTime(item.created_at))}</td>
       <td><b style="color:var(--navy)">${esc(item.student_name || '—')}</b></td>
       <td><button class="btn btn-outline btn-sm" type="button" data-copy-phone="${escAttr(item.phone || '')}">${esc(item.phone || '—')}</button></td>
@@ -1567,7 +1572,7 @@ function renderTrialRequests(){
         </select>
       </td>
     </tr>
-  `).join('');
+  `).join(''));
   document.querySelectorAll('[data-trial-status]').forEach(el => {
     el.onchange = () => updateTrialRequestStatus(el.dataset.trialStatus, el.value);
   });

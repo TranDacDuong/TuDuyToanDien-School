@@ -120,6 +120,7 @@ async function init(){
   S.role=profile?.role||'student';
   if(S.role==='admin'||S.role==='teacher') E.openCreateBtn.style.display='';
   await Promise.all([loadBase(),loadData()]);
+  window.MindupLiveUI?.watchTable?.('reference_materials',loadData);
 }
 
 async function loadBase(){
@@ -158,14 +159,14 @@ function renderMaterials(){
     return true;
   });
   E.empty.style.display=list.length?'none':'block';
-  E.grid.innerHTML=list.map(renderCard).join('');
+  window.MindupLiveUI?.patchHTML(E.grid,list.map(renderCard).join(''));
 }
 
 function renderCard(item){
   const grade=S.grades.find(x=>x.id===item.grade_id)?.name||'Tất cả khối';
   const subject=S.subjects.find(x=>x.id===item.subject_id)?.name||'Tất cả môn';
   const canManage=S.role==='admin'||S.role==='teacher';
-  return `<article class="card"><div class="chips"><span class="pill">${esc(grade)}</span><span class="pill">${esc(subject)}</span>${item.visible===false?'<span class="pill">Đang ẩn</span>':''}</div><div><h3 style="margin:0 0 8px;color:var(--navy)">${esc(item.title||'Tài liệu')}</h3><p style="margin:0;color:#607089;line-height:1.65">${esc(item.description||'Tài liệu tham khảo dành cho học sinh.')}</p></div><div class="actions"><a class="btn btn-primary" href="${esc(item.drive_url)}" target="_blank" rel="noopener">Mở Drive</a>${canManage?`<button class="btn btn-outline" type="button" onclick="openEditMaterialModal('${item.id}')">Sửa</button><button class="btn btn-danger" type="button" onclick="deleteMaterial('${item.id}')">Xóa</button>`:''}</div></article>`;
+  return `<article class="card" data-live-key="material-${item.id}"><div class="chips"><span class="pill">${esc(grade)}</span><span class="pill">${esc(subject)}</span>${item.visible===false?'<span class="pill">Đang ẩn</span>':''}</div><div><h3 style="margin:0 0 8px;color:var(--navy)">${esc(item.title||'Tài liệu')}</h3><p style="margin:0;color:#607089;line-height:1.65">${esc(item.description||'Tài liệu tham khảo dành cho học sinh.')}</p></div><div class="actions"><a class="btn btn-primary" href="${esc(item.drive_url)}" target="_blank" rel="noopener">Mở Drive</a>${canManage?`<button class="btn btn-outline" type="button" onclick="openEditMaterialModal('${item.id}')">Sửa</button><button class="btn btn-danger" type="button" onclick="deleteMaterial('${item.id}')">Xóa</button>`:''}</div></article>`;
 }
 
 function openCreateMaterialModal(){

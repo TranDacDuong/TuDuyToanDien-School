@@ -26,6 +26,88 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
   window.SUPABASE_URL = SUPABASE_URL;
   window.SUPABASE_KEY = SUPABASE_KEY;
   window.sb = sb;
+  window.MindupLiveUI = (function () {
+    let channelIndex = 0;
+
+    function ensureStyles() {
+      if (document.getElementById("mindupLiveUiStyles")) return;
+      const style = document.createElement("style");
+      style.id = "mindupLiveUiStyles";
+      style.textContent = `
+        @keyframes mindupLiveUiPulse {
+          from { background-color: rgba(245,158,11,.16); }
+          to { background-color: transparent; }
+        }
+        .mindup-live-ui-updated { animation: mindupLiveUiPulse .72s ease-out; }
+        @media (prefers-reduced-motion: reduce) {
+          .mindup-live-ui-updated { animation: none; }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    function patchHTML(container, html, keyAttribute = "data-live-key") {
+      if (!container) return;
+      ensureStyles();
+      const template = document.createElement("template");
+      template.innerHTML = String(html || "").trim();
+      const desired = Array.from(template.content.children);
+      const existing = new Map(
+        Array.from(container.children)
+          .map((node) => [node.getAttribute(keyAttribute), node])
+          .filter(([key]) => key)
+      );
+      const keep = new Set();
+
+      desired.forEach((candidate, index) => {
+        const key = candidate.getAttribute(keyAttribute);
+        const reference = container.children[index] || null;
+        let node = key ? existing.get(key) : reference;
+
+        if (!node || node.tagName !== candidate.tagName) {
+          node = candidate;
+          node.classList.add("mindup-live-ui-updated");
+        } else if (node.outerHTML !== candidate.outerHTML) {
+          candidate.classList.add("mindup-live-ui-updated");
+          node.replaceWith(candidate);
+          node = candidate;
+        }
+
+        const currentReference = container.children[index] || null;
+        if (node !== currentReference) container.insertBefore(node, currentReference);
+        keep.add(node);
+      });
+
+      Array.from(container.children).forEach((node) => {
+        if (!keep.has(node)) node.remove();
+      });
+    }
+
+    function watchTable(table, callback, options = {}) {
+      if (!table || typeof callback !== "function" || !sb?.channel) return null;
+      const debounceMs = Number(options.debounceMs ?? 120);
+      let timer = null;
+      const channel = sb
+        .channel(`mindup-live-${table}-${++channelIndex}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: options.schema || "public",
+            table,
+            ...(options.filter ? { filter: options.filter } : {}),
+          },
+          (payload) => {
+            clearTimeout(timer);
+            timer = setTimeout(() => callback(payload), debounceMs);
+          }
+        )
+        .subscribe();
+      return channel;
+    }
+
+    return { patchHTML, watchTable };
+  })();
   window.AppAuth = (function () {
     async function getUser() {
       try {

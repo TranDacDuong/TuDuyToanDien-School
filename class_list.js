@@ -23,8 +23,8 @@
     return capacities.length ? Math.min(...capacities) : 0;
   }
 
-  async function loadMyClasses(){
-    container.innerHTML = '<div style="color:var(--ink-light);padding:20px">Đang tải...</div>';
+  async function loadMyClasses(options = {}){
+    if(!options.silent) container.innerHTML = '<div style="color:var(--ink-light);padding:20px">Đang tải...</div>';
     try{
       const sb   = getSb();
       const role = window._currentRole;
@@ -252,11 +252,12 @@
       gradeMap[gName].push(cls);
     });
 
-    container.innerHTML = "";
+    const nextContainer = document.createElement("div");
 
     gradeOrder.forEach(grade => {
       const block = document.createElement("div");
       block.className = "grade-block";
+      block.dataset.liveKey = "class-grade-" + grade;
 
       const title = document.createElement("div");
       title.className = "grade-title";
@@ -269,6 +270,7 @@
       gradeMap[grade].forEach(cls => {
         const card = document.createElement("div");
         card.className = "class-card";
+        card.dataset.liveKey = "class-" + cls.id;
         if(cls.hidden) card.style.cssText = "opacity:.45;filter:grayscale(.4)";
 
         const schGrouped = renderScheduleSummary(_scheduleMap[cls.id] || []);
@@ -317,8 +319,9 @@
       });
 
       block.appendChild(grid);
-      container.appendChild(block);
+      nextContainer.appendChild(block);
     });
+    window.MindupLiveUI?.patchHTML(container, nextContainer.innerHTML);
   }
 
   window.deleteClass = async function(id, role){
@@ -338,7 +341,7 @@
         target_id: id,
       });
     }
-    loadMyClasses();
+    loadMyClasses({silent:true});
   };
 
   window.restoreClass = async function(id){
@@ -348,9 +351,12 @@
       target_type: "class",
       target_id: id,
     });
-    loadMyClasses();
+    loadMyClasses({silent:true});
   };
 
   window.loadMyClasses = loadMyClasses;
+  ["classes","class_schedules","class_teachers","class_students"].forEach(table => {
+    window.MindupLiveUI?.watchTable?.(table, () => loadMyClasses({silent:true}));
+  });
 
 })();

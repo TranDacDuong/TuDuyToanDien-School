@@ -565,7 +565,7 @@ function render() {
   const pageList = list.slice(startIndex, startIndex + PAGE_SIZE)
   pruneQuestionSelection()
 
-  questionTable.innerHTML = pageList.length
+  window.MindupLiveUI?.patchHTML(questionTable, pageList.length
     ? pageList
         .map((q, i) => {
           const faded = q.hidden ? "faded" : ""
@@ -581,7 +581,7 @@ function render() {
             : `<span class="status-badge status-ok">${q.question_type === "essay" ? "Không bắt buộc" : "Đã có đáp án"}</span>`
 
           return `
-      <tr class="q-row ${rowClass}" onclick="editQ('${q.id}')" title="Click để sửa câu hỏi" ${hidden}>
+      <tr class="q-row ${rowClass}" data-live-key="question-${q.id}" onclick="editQ('${q.id}')" title="Click để sửa câu hỏi" ${hidden}>
         ${isAdmin ? `<td class="selectCol ${faded}" onclick="event.stopPropagation()">
           <input type="checkbox" class="row-selector" ${checked} onchange="toggleQuestionSelection('${q.id}', this.checked)">
         </td>` : ""}
@@ -602,7 +602,7 @@ function render() {
       </tr>`
         })
         .join("")
-    : `<tr><td colspan="${isAdmin ? 12 : 11}" style="text-align:center;padding:28px;color:var(--ink-light)">Chưa có câu hỏi phù hợp với bộ lọc hiện tại.</td></tr>`
+    : `<tr data-live-key="question-empty"><td colspan="${isAdmin ? 12 : 11}" style="text-align:center;padding:28px;color:var(--ink-light)">Chưa có câu hỏi phù hợp với bộ lọc hiện tại.</td></tr>`)
 
   document.querySelectorAll(".q-row").forEach((r) => {
     r.style.cursor = "pointer"
@@ -1545,6 +1545,8 @@ async function init() {
   await loadCreatorFilter()
   await loadQuestions()
   await loadQuestionIssueReports(true)
+  window.MindupLiveUI?.watchTable?.("question_bank", loadQuestions)
+  window.MindupLiveUI?.watchTable?.("question_issue_reports", () => loadQuestionIssueReports(true))
   if (questionPageParams.get("focus") === "duplicates") {
     setTimeout(() => runDuplicateAudit(), 180)
   }
