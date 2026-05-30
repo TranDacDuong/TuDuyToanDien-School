@@ -553,7 +553,7 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .schedule-table td {
-  width: 14.285%;
+  width: 12.5%;
   min-height: 120px;
   vertical-align: top;
   padding: 10px;
@@ -562,6 +562,17 @@ body {
 }
 .schedule-table td:last-child {
   border-right: none;
+}
+.schedule-table th:first-child,
+.schedule-table td:first-child {
+  width: 120px;
+  min-width: 120px;
+}
+.schedule-row-time {
+  color: #1266b0;
+  font-size: .82rem;
+  font-weight: 800;
+  white-space: nowrap;
 }
 .schedule-cell-item {
   display: grid;
@@ -1170,18 +1181,20 @@ async function renderTeacherSchedules() {
     return;
   }
   const dayLabels = ["Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy", "Chủ nhật"];
-  const renderCell = weekday => {
-    const items = dayMap[weekday] || [];
+  const timeKey = item => `${String(item.start_time || "").slice(0, 5)}|${String(item.end_time || "").slice(0, 5)}`;
+  const timeSlots = [...new Set((schedules || []).map(timeKey))]
+    .filter(slot => slot !== "|")
+    .sort((a, b) => a.localeCompare(b));
+  const renderCell = (weekday, slot) => {
+    const items = (dayMap[weekday] || []).filter(item => timeKey(item) === slot);
     if (!items.length) return '<div class="bio-empty">Chưa có lịch</div>';
     return items.map(item => {
       const cls = item.cls;
-      const time = `${String(item.start_time || "").slice(0, 5)} - ${String(item.end_time || "").slice(0, 5)}`;
       const room = item.rooms?.room_name ? `<span>${esc(item.rooms.room_name)}</span>` : "";
       return `
         <div class="schedule-cell-item">
           <div class="schedule-subject">${esc(cls.subjects?.name || "Môn học")}</div>
           <div class="schedule-class">Buổi ${esc(item.session_no || 1)} • ${esc(cls.grades?.name || cls.class_name || "Lớp học")}</div>
-          <div class="schedule-time">${esc(time)}</div>
           ${room}
         </div>
       `;
@@ -1191,10 +1204,13 @@ async function renderTeacherSchedules() {
     <div class="schedule-table-wrap">
       <table class="schedule-table">
         <thead>
-          <tr>${dayLabels.map(day => `<th>${day}</th>`).join("")}</tr>
+          <tr><th>Khung giờ</th>${dayLabels.map(day => `<th>${day}</th>`).join("")}</tr>
         </thead>
         <tbody>
-          <tr>${[1, 2, 3, 4, 5, 6, 7].map(day => `<td>${renderCell(day)}</td>`).join("")}</tr>
+          ${timeSlots.map(slot => {
+            const [start, end] = slot.split("|");
+            return `<tr><td><div class="schedule-row-time">${esc(start)} - ${esc(end)}</div></td>${[1, 2, 3, 4, 5, 6, 7].map(day => `<td>${renderCell(day, slot)}</td>`).join("")}</tr>`;
+          }).join("")}
         </tbody>
       </table>
     </div>
