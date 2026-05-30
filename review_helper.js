@@ -279,7 +279,6 @@
       ? layout.options
       : Array.from({ length: count }, (_, i) => ({ key: String.fromCharCode(65 + i), text: "" }));
 
-    buildAnswerTitle(container);
     options.forEach((option, index) => {
       const key = option.key || String.fromCharCode(65 + index);
       const picked = selected.toUpperCase().includes(key.toUpperCase());
@@ -289,12 +288,11 @@
         text: normalizeReviewText(option.text),
         picked,
         isCorrect,
-        pickedLabel: "Bạn chọn",
+        highlightCorrect: isCorrect,
       }));
     });
 
     if (!selected.trim()) buildSkippedLine(container);
-    buildCorrectLine(container, correct);
   }
 
   function buildTrueFalseReview(container, q, ans, layout) {
@@ -305,7 +303,6 @@
       ? layout.options
       : Array.from({ length: count }, (_, i) => ({ key: String.fromCharCode(97 + i), text: "" }));
 
-    buildAnswerTitle(container);
     options.forEach((option, index) => {
       const key = option.key || String.fromCharCode(97 + index);
       const studentValue = student[index] || "";
@@ -317,30 +314,37 @@
         text: normalizeReviewText(option.text),
         picked,
         isCorrect,
-        pickedLabel: picked ? "Bạn chọn: " + labelTrueFalse(studentValue) : "",
+        pickedLabel: picked ? labelTrueFalse(studentValue) : "",
       }));
     });
 
     if (!String(ans?.answer || "").trim()) buildSkippedLine(container);
-    buildCorrectLine(container, formatTrueFalseAnswer(correct));
   }
 
-  function buildOptionRow({ key, text, picked, isCorrect, pickedLabel }) {
+  function buildOptionRow({ key, text, picked, isCorrect, pickedLabel, highlightCorrect = false }) {
+    const state = picked && !isCorrect ? "wrong" : (highlightCorrect || (picked && isCorrect)) ? "correct" : "default";
     const row = document.createElement("div");
     row.style.cssText =
       "display:flex;align-items:flex-start;gap:12px;padding:11px 12px;border-radius:8px;margin-bottom:6px;" +
-      "border:1.5px solid " + (picked ? (isCorrect ? "#86efac" : "#fca5a5") : "var(--border)") + ";" +
-      "background:" + (picked ? (isCorrect ? "#f0fdf4" : "#fef2f2") : "var(--white)");
+      "border:1.5px solid " + (state === "correct" ? "#86efac" : state === "wrong" ? "#fca5a5" : "var(--border)") + ";" +
+      "background:" + (state === "correct" ? "#f0fdf4" : state === "wrong" ? "#fef2f2" : "var(--white)");
 
     const body = document.createElement("div");
     body.style.cssText = "flex:1;min-width:0";
 
     const head = document.createElement("div");
-    head.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:" + (text ? "4px" : "0") + ";flex-wrap:wrap";
+    head.style.cssText = "display:flex;align-items:baseline;gap:8px;flex-wrap:wrap";
     const keyEl = document.createElement("span");
     keyEl.style.cssText = "font-weight:700;font-size:.92rem;color:var(--navy);min-width:22px;flex-shrink:0";
     keyEl.textContent = key;
     head.appendChild(keyEl);
+
+    if (text) {
+      const textEl = document.createElement("span");
+      textEl.style.cssText = "font-size:.94rem;line-height:1.55;color:var(--ink);white-space:pre-line";
+      textEl.textContent = normalizeReviewText(text);
+      head.appendChild(textEl);
+    }
 
     if (pickedLabel) {
       const pickedEl = document.createElement("span");
@@ -349,13 +353,6 @@
       head.appendChild(pickedEl);
     }
     body.appendChild(head);
-
-    if (text) {
-      const textEl = document.createElement("div");
-      textEl.style.cssText = "font-size:.94rem;line-height:1.55;color:var(--ink);white-space:pre-line";
-      textEl.textContent = normalizeReviewText(text);
-      body.appendChild(textEl);
-    }
 
     row.appendChild(body);
     return row;
@@ -419,6 +416,12 @@
   }
 
   function normalizeTrueFalse(value, count) {
+    const source = String(value || "");
+    const explicitPairs = [...source.matchAll(/([a-z])\s*([TF])/gi)];
+    if (explicitPairs.length) {
+      const pairMap = new Map(explicitPairs.map(([, label, answer]) => [label.toLowerCase(), answer.toUpperCase()]));
+      return Array.from({ length: count }, (_, index) => pairMap.get(String.fromCharCode(97 + index)) || "");
+    }
     if (window.QuestionAnswerFormat?.normalizeTrueFalseAnswer) {
       return window.QuestionAnswerFormat.normalizeTrueFalseAnswer(value, count) || "";
     }

@@ -189,6 +189,7 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
   }
 }
 </style>
+<link rel="stylesheet" href="academic_ui.css?v=20260531-academic1">
 <script>
   window.MathJax = {
     tex: { inlineMath: [["$","$"],["\\(","\\)"]], displayMath: [["$$","$$"],["\\[","\\]"]] },
@@ -198,7 +199,7 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
 <script src="visual-effects.js?v=20260530-themes3" defer></script>
 </head>
-<body>
+<body class="academic-page academic-page-public-exams">
 
 <div class="page-hd page-hero">
   <h1>Đề thi</h1>
@@ -251,6 +252,7 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
 <script src="supabaseClient.js"></script>
 <script src="ai_solution.js"></script>
 <script src="review_helper.js"></script>
+<script src="exam_ui_helper.js"></script>
 <script src="public_exam_support.js"></script>
 <script src="public_exam_report_support.js"></script>
 <script src="public_exam.js"></script>

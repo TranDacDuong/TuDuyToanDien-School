@@ -928,6 +928,40 @@
     const overlay = getOverlay();
     overlay.style.display = "flex";
     setPublicExamFocusMode(true);
+    if (window.ExamUIHelper?.renderStandardExam) {
+      window.ExamUIHelper.renderStandardExam({
+        mount: overlay,
+        title: examTitle,
+        questions: _examQuestions,
+        answers: _examAnswers,
+        seconds: _examSeconds,
+        clockId: "peClock",
+        navPanelId: "peNavPanel",
+        mainAreaId: "peMainArea",
+        handlers: {
+          exit: "peExitExam",
+          submit: "submitPublicExam",
+          toggleNav: "peToggleNav",
+          scroll: "peScrollToQ",
+          updateMC: "peMC",
+          updateTF: "peTF",
+          updateText: "_peAnswers",
+          refreshMC: "peRefreshMC",
+        },
+        reportButtonBuilder(question, body) {
+          if (_role !== "student" || !body) return;
+          const button = buildQuestionReportButton(question, {
+            sourceMode: "live_exam",
+            publicExamId: _peId,
+            examResultId: _examResultId,
+          });
+          if (button) body.appendChild(button);
+        },
+      });
+      updateClock();
+      setExamSyncState(_examSyncState === "offline" ? "offline" : "ready", _examDraftNotice || "Đã mở giao diện làm bài.");
+      return;
+    }
 
     const SECTION_ORDER  = ["multi_choice","true_false","short_answer","essay"];
     const SECTION_TITLES = {
@@ -1222,18 +1256,18 @@
   };
   window.peTF = function(qid) {
     const radios = document.querySelectorAll(`input[name^="tf_${qid}_"]`);
-    const states = [];
-    const seen=new Set();
+    let value = "";
+    const seen = new Set();
     radios.forEach(r=>{
       if (r.checked) {
         const lbl = r.name.split("_").pop();
         if (!seen.has(lbl)) {
           seen.add(lbl);
-          states.push(String(r.value || "F").toUpperCase() === "T" ? "T" : "F");
+          value += lbl + (String(r.value || "F").toUpperCase() === "T" ? "T" : "F");
         }
       }
     });
-    _examAnswers[qid] = window.QuestionAnswerFormat?.encodeTrueFalseSelections?.(states, states.length || 4) || states.join("");
+    _examAnswers[qid] = value;
     _examLocalDirty = true;
     persistExamDraft();
     setExamSyncState(navigator.onLine ? "saving" : "offline", navigator.onLine ? "Đã lưu cục bộ, chờ đồng bộ..." : "Mất mạng, đang giữ bản cục bộ");
@@ -1308,10 +1342,16 @@
   window.peExitExam = async function() {
     if (!confirm("Thoát? Tiến trình được lưu, thời gian bị trừ 5 phút khi vào lại.")) return;
     clearInterval(_examTimer);
-    if (_examResultId) { await saveProgress({ forceRemote: navigator.onLine, silent: false }); _examResultId=null; }
-    getOverlay().style.display="none";
-    setPublicExamFocusMode(false);
-    await loadExamList();
+    try {
+      if (_examResultId) await saveProgress({ forceRemote: navigator.onLine, silent: false });
+    } catch (error) {
+      console.error("[peExitExam] save failed:", error);
+    } finally {
+      _examResultId=null;
+      getOverlay().style.display="none";
+      setPublicExamFocusMode(false);
+      await loadExamList();
+    }
   };
 
   window.submitPublicExam = async function(auto=false) {
@@ -1336,15 +1376,16 @@
         scoreEarned=isCorrect?(eq.points||0):0;
         } else if (type==="true_false") {
           const lbls=[]; for(let i=0;i<n;i++) lbls.push(String.fromCharCode(97+i));
+          const explicitStudent = new Map([...ans.matchAll(/([a-z])\s*([TF])/gi)].map(([, label, value]) => [label.toLowerCase(), value.toUpperCase()]));
           const normalizedStudent = window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(ans, n) || "";
           const normalizedCorrect = window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(correct, n) || "";
           let cnt=0;
           lbls.forEach((lbl, index)=>{
-            const sc = normalizedStudent[index] || "";
+            const sc = explicitStudent.size ? (explicitStudent.get(lbl) || "") : (normalizedStudent[index] || "");
             const cc = normalizedCorrect[index] || "";
             if(sc===cc) cnt++;
           });
-        isCorrect=cnt===n;
+        isCorrect=(explicitStudent.size ? explicitStudent.size : normalizedStudent.length)===n&&cnt===n;
         scoreEarned=(partial&&partial[cnt]!==undefined)?partial[cnt]:(isCorrect?eq.points:0);
       } else if (type==="short_answer") {
         const corrects=correct.split(";").map(s=>s.trim().toLowerCase()).filter(Boolean);
@@ -1427,6 +1468,17 @@
     (answers||[]).forEach(a => { ansMap[a.question_id] = a; });
     const totalPts  = pe?.exam?.total_points || 10;
     const score     = result?.score_total ?? result?.score_auto;
+    if (window.ExamUIHelper?.renderStandardReview?.({
+      mount: grid,
+      title: examTitle,
+      subtitle: result?.submitted_at ? `Nộp lúc ${fmtDT(result.submitted_at)}` : "Kết quả bài làm",
+      score,
+      totalPoints: totalPts,
+      backHandler: "loadExamList",
+      questions: eqs,
+      answers: ansMap,
+      cardsOptions: { enableAiSolution: true },
+    })) return;
 
     const SECTION_ORDER  = ["multi_choice","true_false","short_answer","essay"];
     const SECTION_TITLES = {

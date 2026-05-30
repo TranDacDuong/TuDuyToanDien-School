@@ -100,22 +100,18 @@
 
     clearInterval(_examTimer);
 
-    if (_examResultId) {
-      await _saveProgressToDB();
+    try {
+      if (_examResultId) await _saveProgressToDB();
+    } catch (error) {
+      console.error("[exitExam] save failed:", error);
+    } finally {
       _examResultId = null;
-    }
-
-    // Quay vÃ¡Â»Â tab Ã„â€˜Ã¡Â»Â thi trong unified overlay
-    const sysTopbar = document.getElementById('topbar') || document.querySelector('header') || document.querySelector('nav');
-    if (sysTopbar) sysTopbar.style.display = '';
-
-    if (window.cvSwitchTab) {
-      // Rebuild shell trÃ†Â°Ã¡Â»â€ºc rÃ¡Â»â€œi chuyÃ¡Â»Æ’n sang tab exams
-      if (window._cachedClassForView) {
-        window.cvSwitchTab('exams');
-      } else if (window.openClassView && window._cvCurrentClassId) {
-        await window.openClassView(window._cvCurrentClassId, window._cvCurrentClassName || '');
+      const sysTopbar = document.getElementById('topbar') || document.querySelector('header') || document.querySelector('nav');
+      if (sysTopbar) sysTopbar.style.display = '';
+      if (window.openClassView && window._classId) {
+        await window.openClassView(window._classId, window._className || '');
       }
+      if (window.cvSwitchTab) await window.cvSwitchTab('exams');
     }
   };
 
@@ -561,6 +557,37 @@
   };
   /* Ã¢â€â‚¬Ã¢â€â‚¬ Render giao diÃ¡Â»â€¡n thi Ã¢â‚¬â€ giÃ¡Â»â€˜ng hÃ¡Â»â€¡t renderPublicExamUI Ã¢â€â‚¬Ã¢â€â‚¬ */
   function renderExamUI(overlay, examTitle, durationMin) {
+    if (window.ExamUIHelper?.renderStandardExam) {
+      window.ExamUIHelper.renderStandardExam({
+        mount: overlay,
+        title: examTitle,
+        questions: _examQuestions,
+        answers: _examAnswers,
+        seconds: _examSeconds,
+        clockId: "examClock",
+        navPanelId: "classExamNavPanel",
+        mainAreaId: "classExamMainArea",
+        exitButtonId: "examExitBtn",
+        handlers: {
+          exit: "exitExam",
+          submit: "submitExam",
+          toggleNav: "toggleClassExamNav",
+          scroll: "peScrollToQ",
+          updateMC: "peMC",
+          updateTF: "peTF",
+          updateText: "_peAnswers",
+          refreshMC: "peRefreshMC",
+        },
+        reportButtonBuilder(question, body) {
+          if (!body) return;
+          const button = buildClassQuestionReportButton(question);
+          if (button) body.appendChild(button);
+        },
+      });
+      updateClock();
+      return;
+    }
+
     const SECTION_ORDER  = ["multi_choice","true_false","short_answer","essay"];
     const SECTION_TITLES = {
       multi_choice: "Phần I. Trắc nghiệm",
@@ -1038,14 +1065,15 @@
       } else if (type === "true_false") {
         const labels = []; for (let i=0;i<n;i++) labels.push(String.fromCharCode(97+i));
         let correctCount = 0;
+          const explicitStudent = new Map([...ans.matchAll(/([a-z])\s*([TF])/gi)].map(([, label, value]) => [label.toLowerCase(), value.toUpperCase()]));
           const normalizedStudent = window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(ans, n) || "";
           const normalizedCorrect = window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(correct, n) || "";
           labels.forEach((lbl, index) => {
-            const studentChoice = normalizedStudent[index] || "";
+            const studentChoice = explicitStudent.size ? (explicitStudent.get(lbl) || "") : (normalizedStudent[index] || "");
             const correctChoice = normalizedCorrect[index] || "";
             if (studentChoice === correctChoice) correctCount++;
           });
-        isCorrect   = correctCount === n;
+        isCorrect   = (explicitStudent.size ? explicitStudent.size : normalizedStudent.length) === n && correctCount === n;
         scoreEarned = (partial && partial[correctCount] !== undefined) ? partial[correctCount] : (isCorrect ? eq.points : 0);
       } else if (type === "short_answer") {
         const corrects = correct.split(";").map(s=>s.trim().toLowerCase()).filter(Boolean);
@@ -1160,6 +1188,22 @@
       cvBody = document.getElementById("cvBody");
     }
     if (!cvBody) return;
+    if (window.ExamUIHelper?.renderStandardReview?.({
+      mount: cvBody,
+      title: "Xem lại bài thi",
+      subtitle: result.submitted_at ? `Nộp lúc ${new Date(result.submitted_at).toLocaleString("vi-VN")}` : "Kết quả bài làm",
+      score: result.score_total ?? result.score_auto,
+      totalPoints: _examTotal,
+      backHandler: "cvGoBackToExams",
+      questions: (eqs||[]).slice().sort((a,b)=>(a.order_no??0)-(b.order_no??0)).filter(eq=>eq.question),
+      answers: ansMap,
+      cardsOptions: {
+        enableAiSolution: true,
+        enableQuestionReport: true,
+        examResultId: result.id,
+        reportSourceMode: "class_review",
+      },
+    })) return;
 
     const wrap = document.createElement("div");
     const hdr  = document.createElement("div");

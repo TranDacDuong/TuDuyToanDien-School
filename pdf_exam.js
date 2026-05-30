@@ -842,10 +842,15 @@ async function closePdfAttempt() {
   }
   if (!confirm("Bạn muốn thoát? Tiến trình sẽ được lưu và khi vào lại sẽ bị trừ 5 phút.")) return;
   clearInterval(PDF_STATE.attemptTimer);
-  await savePdfAttemptProgress();
-  setPdfExamFocusMode(false);
-  if (returnFromPdfContext()) return;
-  PDF_EL.attemptShell.classList.remove("show");
+  try {
+    await savePdfAttemptProgress();
+  } catch (error) {
+    console.error("[closePdfAttempt] save failed:", error);
+  } finally {
+    setPdfExamFocusMode(false);
+    if (returnFromPdfContext()) return;
+    PDF_EL.attemptShell.classList.remove("show");
+  }
 }
 
 async function submitPdfAttempt(auto) {

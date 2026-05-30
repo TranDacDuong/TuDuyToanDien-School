@@ -2335,15 +2335,34 @@
     if (!tc) return;
     tc.innerHTML = '<p style="color:var(--ink-light)">Đang tải bài làm...</p>';
 
-    const [{ data: answers }, { data: eqs }, { data: result }] = await Promise.all([
+    const [{ data: answers }, { data: eqs }, { data: result }, { data: exam }] = await Promise.all([
       sb.from("exam_answers").select("question_id,answer,is_correct,score_earned").eq("result_id", resultId),
       sb.from("exam_questions").select("*, question:question_bank(*)").eq("exam_id", examId).order("order_no"),
       sb.from("exam_results").select("score_auto,score_total,score_essay,submitted_at").eq("id", resultId).single(),
+      sb.from("exams").select("title,total_points").eq("id", examId).single(),
     ]);
 
     const ansMap = {};
     (answers||[]).forEach(a => { ansMap[a.question_id] = a; });
     const score = result?.score_total ?? result?.score_auto ?? "?";
+    const sortedEqs = (eqs||[]).slice().sort((a,b)=>(a.order_no??0)-(b.order_no??0)).filter(eq=>eq.question);
+
+    if (window.ExamUIHelper?.renderStandardReview?.({
+      mount: tc,
+      title: exam?.title || examTitle || "Xem lại bài thi",
+      subtitle: result?.submitted_at ? `Nộp lúc ${fmtDT(result.submitted_at)}` : "Kết quả bài làm",
+      score,
+      totalPoints: exam?.total_points || 0,
+      backHandler: "cvSwitchTab.bind(null,'exams')",
+      questions: sortedEqs,
+      answers: ansMap,
+      cardsOptions: {
+        enableAiSolution: true,
+        enableQuestionReport: true,
+        examResultId: resultId,
+        reportSourceMode: "class_review",
+      },
+    })) return;
 
     /* Header */
     const wrap = document.createElement("div");
@@ -2357,7 +2376,6 @@
     wrap.appendChild(hdr);
 
     /* Cards â€” layout 15 pháº§n ngang giá»‘ng lÃºc thi, dÃ¹ng review_helper.js */
-    const sortedEqs = (eqs||[]).slice().sort((a,b)=>(a.order_no??0)-(b.order_no??0)).filter(eq=>eq.question);
     if (window.buildReviewCards) {
       wrap.appendChild(window.buildReviewCards(sortedEqs, ansMap, false, {
         enableAiSolution: true,

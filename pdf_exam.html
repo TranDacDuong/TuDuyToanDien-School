@@ -131,6 +131,7 @@ textarea{min-height:110px;resize:vertical}
 @media(max-width:1080px){.toolbar,.form-grid,.answer-card-bd,.detail-layout{grid-template-columns:1fr}.question-actions{align-items:flex-start;flex-direction:row;flex-wrap:wrap}.exam-body{grid-template-columns:1fr}.pdf-pane{min-height:360px}.detail-preview{min-height:360px}}
 @media(max-width:1080px){.draft-answer-topline,.draft-answer-bottomline{grid-template-columns:1fr}}
 </style>
+<link rel="stylesheet" href="academic_ui.css?v=20260531-academic1">
 <script>
 (() => {
   const params = new URLSearchParams(window.location.search);
@@ -141,7 +142,7 @@ textarea{min-height:110px;resize:vertical}
 </script>
 <script src="visual-effects.js?v=20260530-themes3" defer></script>
 </head>
-<body>
+<body class="academic-page academic-page-pdf-exams">
 <div class="page-hd">
   <h1>Đề PDF</h1>
   <div id="adminToolbar" style="display:none">
@@ -387,6 +388,7 @@ textarea{min-height:110px;resize:vertical}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
-  <script src="pdf_exam.js"></script>
+<script src="exam_ui_helper.js"></script>
+<script src="pdf_exam.js"></script>
 </body>
 </html>

@@ -24,14 +24,16 @@ body{margin:0;background:#eef3fb;color:var(--ink);font-family:var(--font-body)}
 .result-wrap{max-width:640px;margin:40px auto;text-align:center}
 @media(max-width:760px){.exam-body{flex-direction:column}.exam-nav{width:auto;border-right:none;border-bottom:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.nav-dot{margin-bottom:0}}
 </style>
+<link rel="stylesheet" href="academic_ui.css?v=20260531-academic1">
 <script src="visual-effects.js?v=20260530-themes3" defer></script>
 </head>
-<body>
+<body class="academic-page academic-page-practice">
 <div id="app"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
 <script src="ai_solution.js"></script>
 <script src="review_helper.js"></script>
+<script src="exam_ui_helper.js"></script>
 <script>
 (function(){
   const baseBuildReviewCards = window.buildReviewCards;
