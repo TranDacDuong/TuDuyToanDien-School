@@ -398,6 +398,8 @@ async function init() {
   }
   if (isPopupMode) {
     document.documentElement.classList.add("popup-mode");
+    document.getElementById("chatTitle").textContent = "Đang mở tin nhắn...";
+    document.getElementById("messageList").innerHTML = '<div class="empty"><strong>Đang mở cuộc trò chuyện</strong>Hệ thống đang kết nối với người nhận.</div>';
   }
   const { data: { user } } = await sb.auth.getUser();
   if (!user) {
@@ -414,6 +416,24 @@ async function init() {
 
   subscribePresence();
   subscribeNotificationChanges();
+  if (isPopupMode && selectedUserFromQuery) {
+    const friendId = selectedUserFromQuery;
+    const { data: targetUser } = await sb
+      .from("users")
+      .select("id, full_name, avatar_url, role")
+      .eq("id", friendId)
+      .maybeSingle();
+    if (targetUser?.id) {
+      selectedUserFromQuery = null;
+      await openConversation(
+        targetUser.id,
+        targetUser.full_name || "Người dùng",
+        targetUser.avatar_url || "default-avatar.png",
+        targetUser.role || ""
+      );
+      return;
+    }
+  }
   await loadFriends();
 }
 
@@ -479,6 +499,7 @@ async function loadFriends() {
 
     return {
       ...item,
+      conversationId: conversation?.id || null,
       preview,
       lastActivity: lastMessage?.created_at || null,
       unreadCount: unreadMap.get(item.friend_id) || 0
@@ -546,6 +567,13 @@ window.filterFriends = function() {
   }
 };
 
+function setComposerEnabled(enabled) {
+  document.getElementById("messageInput").disabled = !enabled;
+  document.getElementById("sendBtn").disabled = !enabled;
+  document.getElementById("attachBtn").disabled = !enabled;
+  document.getElementById("clearImageBtn").disabled = !enabled;
+}
+
 window.openConversation = async function(friendId, friendName, friendAvatar, friendRole) {
   if (isTrayMode) {
     window.parent?.postMessage({
@@ -566,20 +594,21 @@ window.openConversation = async function(friendId, friendName, friendAvatar, fri
   activeFriend = { id: friendId, name: friendName, avatar: friendAvatar, role: friendRole };
   document.getElementById("chatTitle").textContent = friendName;
   document.getElementById("chatSub").textContent = buildChatSub(friendId, friendRole);
-  document.getElementById("messageInput").disabled = false;
-  document.getElementById("sendBtn").disabled = false;
-  document.getElementById("attachBtn").disabled = false;
-  document.getElementById("clearImageBtn").disabled = false;
+  document.getElementById("messageList").innerHTML = '<div class="empty"><strong>Đang mở cuộc trò chuyện</strong>Tin nhắn sẽ hiện ngay sau khi kết nối hoàn tất.</div>';
+  setComposerEnabled(false);
   syncMobileConversationState(true);
 
   try {
-    currentConversationId = await ensureConversation(friendId);
-    await markMessageNotificationsRead(friendId);
+    currentConversationId = await ensureConversation(friendId, friendMap.get(friendId)?.conversationId);
+    setComposerEnabled(true);
     await loadMessages();
-    await loadFriends();
     subscribeConversationMessages(currentConversationId);
+    markMessageNotificationsRead(friendId)
+      .then(() => isPopupMode ? null : loadFriends())
+      .catch(console.warn);
   } catch (error) {
     currentConversationId = null;
+    setComposerEnabled(false);
     syncMobileConversationState(false);
     showConversationError(error);
   }
@@ -596,7 +625,11 @@ async function markMessageNotificationsRead(friendId) {
     .eq("is_read", false);
 }
 
-async function ensureConversation(friendId) {
+async function ensureConversation(friendId, knownConversationId = null) {
+  if (knownConversationId) {
+    ensureConversationMembership(knownConversationId).catch(console.warn);
+    return knownConversationId;
+  }
   const directKey = [currentUser.id, friendId].sort().join("_");
 
   const { data: existing } = await sb
@@ -606,7 +639,7 @@ async function ensureConversation(friendId) {
     .maybeSingle();
 
   if (existing?.id) {
-    await ensureConversationMembership(existing.id);
+    ensureConversationMembership(existing.id).catch(console.warn);
     return existing.id;
   }
 
@@ -626,7 +659,7 @@ async function ensureConversation(friendId) {
     throw error;
   }
 
-  await ensureConversationMembership(conversation.id);
+  ensureConversationMembership(conversation.id).catch(console.warn);
 
   return conversation.id;
 }
