@@ -731,7 +731,13 @@ async function openPdfAttempt(examId) {
   startPdfAttemptTimer();
 }
 
+function setPdfExamFocusMode(active) {
+  window.MindupEffects?.setExamMode?.(!!active);
+  window.parent?.postMessage({ type: "mindup:exam-mode", active: !!active }, "*");
+}
+
 function renderPdfAttemptUI(exam, questions) {
+  setPdfExamFocusMode(true);
   if (PDF_EL.attemptNav) {
     PDF_EL.attemptNav.innerHTML = questions.map((question, idx) => `<div class="nav-pill" id="pdfNav_${question.id}" onclick="scrollPdfQuestion('${question.id}')" title="${escAttr(question.label || `Câu ${idx + 1}`)}">${idx + 1}<span class="pill-dot" id="pdfNavDot_${question.id}"></span></div>`).join("");
   }
@@ -829,6 +835,7 @@ async function savePdfAttemptProgress() {
 
 async function closePdfAttempt() {
   if (!PDF_STATE.attemptResultId) {
+    setPdfExamFocusMode(false);
     if (returnFromPdfContext()) return;
     PDF_EL.attemptShell.classList.remove("show");
     return;
@@ -836,6 +843,7 @@ async function closePdfAttempt() {
   if (!confirm("Bạn muốn thoát? Tiến trình sẽ được lưu và khi vào lại sẽ bị trừ 5 phút.")) return;
   clearInterval(PDF_STATE.attemptTimer);
   await savePdfAttemptProgress();
+  setPdfExamFocusMode(false);
   if (returnFromPdfContext()) return;
   PDF_EL.attemptShell.classList.remove("show");
 }
@@ -878,6 +886,7 @@ async function submitPdfAttempt(auto) {
   await sb.from("pdf_exam_results").update({ submitted_at: new Date().toISOString(), score_auto: finalScore, score_total: hasEssay ? null : finalScore, seconds_left: null }).eq("id", PDF_STATE.attemptResultId);
 
   PDF_EL.attemptShell.classList.remove("show");
+  setPdfExamFocusMode(false);
   await loadPdfData(false);
   await openPdfReview(PDF_STATE.attemptResultId, exam?.title || "Đề PDF");
 }

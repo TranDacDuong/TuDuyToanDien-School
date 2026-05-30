@@ -809,6 +809,10 @@ CREATE TABLE IF NOT EXISTS public.home_teachers (
   CONSTRAINT home_teachers_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE CASCADE
 );
 
+INSERT INTO public.site_settings (setting_key, setting_value)
+VALUES ('ambient_theme', 'spring')
+ON CONFLICT (setting_key) DO NOTHING;
+
 CREATE INDEX IF NOT EXISTS home_teachers_sort_order_idx
   ON public.home_teachers (sort_order ASC);
 

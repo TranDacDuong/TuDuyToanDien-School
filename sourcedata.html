@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Quản lý hệ thống</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css?v=20260530-festival">
+<link rel="stylesheet" href="theme.css?v=20260530-themes3">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="supabaseClient.js"></script>
@@ -237,6 +237,18 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 #students.panel.active { display: block; }
 #trialRequests.panel.active { display: block; }
 #adminLogs.panel.active { display: block; }
+#appearance.panel.active { display: block; }
+.theme-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:12px; }
+.theme-card { border:2px solid transparent; border-radius:16px; background:#fff; box-shadow:0 10px 24px rgba(15,31,61,.07); padding:14px; cursor:pointer; text-align:left; transition:.18s; }
+.theme-card:hover { transform:translateY(-2px); box-shadow:0 14px 28px rgba(15,31,61,.11); }
+.theme-card.active { border-color:var(--gold); box-shadow:0 0 0 3px rgba(200,150,42,.14),0 14px 28px rgba(15,31,61,.1); }
+.theme-preview { height:72px; border-radius:12px; overflow:hidden; position:relative; background:linear-gradient(135deg,#fdf4dc,#e8f0fb); }
+.theme-preview::before,.theme-preview::after { content:""; position:absolute; border-radius:80% 20% 76% 24%; transform:rotate(25deg); }
+.theme-preview::before { width:16px; height:12px; top:16px; left:28%; background:var(--preview-a,#f4a4b7); box-shadow:54px 22px 0 var(--preview-b,#e4b84d),108px -2px 0 var(--preview-a,#f4a4b7); }
+.theme-preview::after { width:72%; height:8px; left:14%; bottom:14px; background:linear-gradient(90deg,transparent,var(--preview-b,#e4b84d),var(--preview-a,#f4a4b7),transparent); opacity:.52; }
+.theme-card-title { margin-top:11px; color:var(--navy); font-weight:800; font-size:.88rem; }
+.theme-card-copy { margin-top:3px; color:var(--ink-light); font-size:.75rem; line-height:1.45; }
+.theme-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:16px; }
 .s-toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
 .s-stats { display:flex; gap:8px; flex-wrap:wrap; }
 .s-chip { background:var(--white); border:1px solid var(--border); border-radius:20px; padding:4px 12px; font-size:.78rem; color:var(--ink-mid); font-weight:500; box-shadow:var(--shadow-sm); }
@@ -297,7 +309,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   .t-search-bar .sg { min-width: 100%; }
 }
 </style>
-<script src="visual-effects.js?v=20260530-festival" defer></script>
+<script src="visual-effects.js?v=20260530-themes3" defer></script>
 </head>
 <body>
 
@@ -319,6 +331,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   <button class="tab" data-testid="system-tab-students" onclick="switchTab('students',this)">👩‍🎓 Học sinh</button>
   <button class="tab" data-testid="system-tab-trials" onclick="switchTab('trialRequests',this)">Đăng ký học thử</button>
   <button class="tab" data-testid="system-tab-logs" onclick="switchTab('adminLogs',this)">Nhật ký vận hành</button>
+  <button class="tab" data-testid="system-tab-appearance" onclick="switchTab('appearance',this)">Giao diện</button>
 </div>
 
 <!-- ═══════ PHÒNG HỌC ═══════ -->
@@ -635,6 +648,22 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   </div>
 </div>
 
+<div id="appearance" class="panel">
+  <div class="table-card">
+    <div class="table-card-hd">
+      <span>Giao diện toàn hệ thống</span>
+    </div>
+    <div style="padding:18px">
+      <p style="margin:0 0 14px;color:var(--ink-mid);font-size:.84rem">Chọn hiệu ứng mặc định cho toàn bộ website. Người dùng vẫn có thể tắt hiệu ứng riêng trên thiết bị của mình.</p>
+      <div id="themeGrid" class="theme-grid"></div>
+      <div class="theme-actions">
+        <span id="themeSaveStatus" style="font-size:.8rem;color:var(--ink-light)"></span>
+        <button class="btn btn-primary" type="button" onclick="saveSystemTheme()">Áp dụng cho toàn hệ thống</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal sửa học sinh -->
 <div class="modal-s" id="sModal">
   <div class="modal-s-box">
@@ -681,6 +710,77 @@ function switchTab(id, btn){
   window.history.replaceState({}, '', url.toString());
   if(id === 'trialRequests') loadTrialRequests();
   if(id === 'adminLogs') loadAdminLogs();
+  if(id === 'appearance') loadSystemTheme();
+}
+
+const SYSTEM_THEMES = [
+  { id:'spring', name:'Mùa xuân', copy:'Cánh hoa hồng và lá vàng', a:'#f4a4b7', b:'#e4b84d' },
+  { id:'academy', name:'Học viện vàng', copy:'Ánh vàng trang trọng', a:'#e2b74a', b:'#a97018' },
+  { id:'sky', name:'Trời xanh', copy:'Sắc xanh trong và nhẹ', a:'#93c5fd', b:'#38bdf8' },
+  { id:'aurora', name:'Cực quang', copy:'Ánh tím xanh mềm mại', a:'#6ee7b7', b:'#a78bfa' },
+  { id:'summer', name:'Mùa hạ', copy:'Lá xanh và nắng ấm', a:'#4ade80', b:'#facc15' },
+  { id:'autumn', name:'Mùa thu', copy:'Lá vàng nâu xoay chậm', a:'#fb923c', b:'#b45309' },
+  { id:'winter', name:'Mùa đông', copy:'Bông tuyết trắng xanh', a:'#e0f2fe', b:'#93c5fd' },
+  { id:'lantern', name:'Đêm hội', copy:'Sắc đỏ vàng như lễ hội', a:'#f87171', b:'#facc15' },
+  { id:'ocean', name:'Gió biển', copy:'Sắc xanh biển thoáng mát', a:'#67e8f9', b:'#0ea5e9' },
+  { id:'minimal', name:'Tinh giản', copy:'Rất nhẹ, ưu tiên tập trung', a:'#cbd5e1', b:'#94a3b8' },
+];
+let _selectedSystemTheme = 'spring';
+
+function renderSystemThemes(){
+  const grid = document.getElementById('themeGrid');
+  if(!grid) return;
+  grid.innerHTML = SYSTEM_THEMES.map(theme => `
+    <button class="theme-card ${theme.id === _selectedSystemTheme ? 'active' : ''}" type="button" onclick="selectSystemTheme('${theme.id}')">
+      <div class="theme-preview" style="--preview-a:${theme.a};--preview-b:${theme.b}"></div>
+      <div class="theme-card-title">${theme.name}</div>
+      <div class="theme-card-copy">${theme.copy}</div>
+    </button>
+  `).join('');
+}
+
+function selectSystemTheme(themeId){
+  if(!SYSTEM_THEMES.some(theme => theme.id === themeId)) return;
+  _selectedSystemTheme = themeId;
+  renderSystemThemes();
+  window.parent?.postMessage({ type:'mindup:theme-changed', theme:themeId }, '*');
+}
+
+async function loadSystemTheme(){
+  const status = document.getElementById('themeSaveStatus');
+  renderSystemThemes();
+  if(status) status.textContent = 'Đang tải cấu hình...';
+  const { data, error } = await sb.from('site_settings').select('setting_value').eq('setting_key','ambient_theme').maybeSingle();
+  if(error){
+    if(status) status.textContent = 'Chưa tải được cấu hình: ' + error.message;
+    renderSystemThemes();
+    return;
+  }
+  _selectedSystemTheme = SYSTEM_THEMES.some(theme => theme.id === data?.setting_value) ? data.setting_value : 'spring';
+  renderSystemThemes();
+  if(status) status.textContent = 'Giao diện đang dùng: ' + (SYSTEM_THEMES.find(theme => theme.id === _selectedSystemTheme)?.name || '');
+}
+
+async function saveSystemTheme(){
+  const user = await window.AppAuth?.getUser?.();
+  if(!user) return alert('Vui lòng đăng nhập lại.');
+  const status = document.getElementById('themeSaveStatus');
+  if(status) status.textContent = 'Đang lưu...';
+  const { error } = await sb.from('site_settings').upsert({
+    setting_key:'ambient_theme',
+    setting_value:_selectedSystemTheme,
+    updated_by:user.id,
+    updated_at:new Date().toISOString(),
+  }, { onConflict:'setting_key' });
+  if(error){
+    if(status) status.textContent = 'Không thể lưu: ' + error.message;
+    return;
+  }
+  localStorage.setItem('mindup_system_theme', _selectedSystemTheme);
+  window.parent?.postMessage({ type:'mindup:theme-changed', theme:_selectedSystemTheme }, '*');
+  await window.AppAdminTools?.recordAudit?.('site_theme_updated', { target_type:'site_setting', theme:_selectedSystemTheme });
+  if(status) status.textContent = 'Đã áp dụng giao diện cho toàn hệ thống.';
+  toast('Đã cập nhật giao diện toàn hệ thống');
 }
 
 /* ══════════════════════════════

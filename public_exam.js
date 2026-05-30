@@ -835,6 +835,11 @@
     return button
   }
 
+  function setPublicExamFocusMode(active) {
+    window.MindupEffects?.setExamMode?.(!!active);
+    window.parent?.postMessage({ type: "mindup:exam-mode", active: !!active }, "*");
+  }
+
   window.startPublicExam = async function(peId, examId, examTitle, durationMin, totalPoints, examType) {
     const sb = getSb();
     _peId = peId; _peType = examType; _currentExamId = examId;
@@ -922,6 +927,7 @@
   function renderPublicExamUI(examTitle, durationMin) {
     const overlay = getOverlay();
     overlay.style.display = "flex";
+    setPublicExamFocusMode(true);
 
     const SECTION_ORDER  = ["multi_choice","true_false","short_answer","essay"];
     const SECTION_TITLES = {
@@ -1304,6 +1310,7 @@
     clearInterval(_examTimer);
     if (_examResultId) { await saveProgress({ forceRemote: navigator.onLine, silent: false }); _examResultId=null; }
     getOverlay().style.display="none";
+    setPublicExamFocusMode(false);
     await loadExamList();
   };
 
@@ -1368,6 +1375,7 @@
       await sb.from("exam_results").delete().in("id",ids);
     }
     window.PublicExamSupport?.clearDraft?.(_examResultId);
+    setPublicExamFocusMode(false);
     _examResultId=null;
     showPublicExamResult(scoreAuto, hasEssay);
   };
