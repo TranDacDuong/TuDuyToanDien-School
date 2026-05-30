@@ -347,7 +347,7 @@
       label.innerHTML =
         `<span style="display:inline-flex;width:16px;height:16px;align-items:center;justify-content:center;` +
         `border:1.5px solid ${selected ? color : "var(--border)"};border-radius:50%;font-size:12px;line-height:1">` +
-        `${selected ? "✓" : ""}</span>${labelTrueFalse(value)}`;
+        `${selected ? (isCorrect ? "✓" : "×") : ""}</span>${labelTrueFalse(value)}`;
       actions.appendChild(label);
     });
     row.appendChild(actions);
