@@ -416,6 +416,39 @@ label {
   50% { content: ".."; }
   75%, 100% { content: "..."; }
 }
+@keyframes petalFall {
+  0% {
+    transform: translate3d(0, -12vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  10% { opacity: var(--petal-opacity); }
+  88% { opacity: var(--petal-opacity); }
+  100% {
+    transform: translate3d(var(--petal-drift), 112vh, 0) rotate(var(--petal-turn));
+    opacity: 0;
+  }
+}
+
+.mindup-petal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  pointer-events: none;
+}
+.mindup-petal {
+  position: absolute;
+  top: -20px;
+  left: var(--petal-left);
+  width: var(--petal-size);
+  height: calc(var(--petal-size) * .72);
+  border-radius: 80% 20% 76% 24%;
+  background: linear-gradient(135deg, rgba(255,255,255,.9), rgba(244,164,183,.82) 52%, rgba(228,184,77,.7));
+  box-shadow: 0 2px 5px rgba(149,72,92,.12);
+  opacity: 0;
+  animation: petalFall var(--petal-duration) linear var(--petal-delay) infinite;
+  will-change: transform;
+}
 
 @media (prefers-reduced-motion: no-preference) {
   body {
