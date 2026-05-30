@@ -428,6 +428,30 @@ label {
     opacity: 0;
   }
 }
+@keyframes leafFall {
+  0% {
+    transform: translate3d(0, -14vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  12% { opacity: .58; }
+  88% { opacity: .58; }
+  100% {
+    transform: translate3d(var(--leaf-drift), 114vh, 0) rotate(var(--leaf-turn));
+    opacity: 0;
+  }
+}
+@keyframes ribbonGlide {
+  0% {
+    transform: translate3d(-26vw, 0, 0) rotate(-7deg) scale(var(--ribbon-scale));
+    opacity: 0;
+  }
+  14% { opacity: .26; }
+  78% { opacity: .26; }
+  100% {
+    transform: translate3d(126vw, -9vh, 0) rotate(7deg) scale(var(--ribbon-scale));
+    opacity: 0;
+  }
+}
 
 .mindup-petal-layer {
   position: fixed;
@@ -447,6 +471,32 @@ label {
   box-shadow: 0 2px 5px rgba(149,72,92,.12);
   opacity: 0;
   animation: petalFall var(--petal-duration) linear var(--petal-delay) infinite;
+  will-change: transform;
+}
+.mindup-leaf {
+  position: absolute;
+  top: -24px;
+  left: var(--leaf-left);
+  width: var(--leaf-size);
+  height: calc(var(--leaf-size) * .58);
+  border-radius: 95% 8% 95% 8%;
+  background: linear-gradient(135deg, rgba(255,235,157,.92), rgba(220,158,46,.82) 60%, rgba(154,96,21,.72));
+  box-shadow: 0 2px 5px rgba(130,84,20,.14);
+  opacity: 0;
+  animation: leafFall var(--leaf-duration) linear var(--leaf-delay) infinite;
+  will-change: transform;
+}
+.mindup-ribbon {
+  position: absolute;
+  top: var(--ribbon-top);
+  left: 0;
+  width: 110px;
+  height: 8px;
+  border-radius: 90% 12% 90% 12%;
+  background: linear-gradient(90deg, transparent, rgba(227,164,65,.32), rgba(236,123,145,.38), transparent);
+  filter: blur(.35px);
+  opacity: 0;
+  animation: ribbonGlide var(--ribbon-duration) ease-in-out var(--ribbon-delay) infinite;
   will-change: transform;
 }
 
