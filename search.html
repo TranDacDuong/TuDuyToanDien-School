@@ -48,6 +48,9 @@ body {
   border-color: var(--gold);
   box-shadow: 0 0 0 4px rgba(200,150,42,.1);
 }
+.tray-mode .tabs {
+  display: none;
+}
 .tabs {
   display: inline-flex;
   gap: 8px;
@@ -264,7 +267,7 @@ body {
   <section class="search-panel">
     <div class="search-row">
       <input id="keywordInput" class="search-input" placeholder="Nhập tên người dùng, trường học hoặc nội dung bài viết...">
-      <button class="btn btn-primary" onclick="performSearch()">Tìm kiếm</button>
+      <button class="btn btn-primary" onclick="submitSearch()">Tìm kiếm</button>
     </div>
     <div class="tabs">
       <button class="tab-btn active" data-tab="all" onclick="setTab('all')">Tất cả</button>
@@ -290,6 +293,11 @@ let activeTab = "all";
 let friendIds = new Set();
 let searchDebounceTimer = null;
 let searchCache = new Map();
+const isHomeSearchTray = new URLSearchParams(location.search).get("tray") === "1";
+document.body.classList.toggle("tray-mode", isHomeSearchTray);
+if (isHomeSearchTray) {
+  document.getElementById("keywordInput").placeholder = "Nhập tên người dùng, trường học hoặc tỉnh thành...";
+}
 
 async function init() {
   const { data: { user } } = await sb.auth.getUser();
@@ -340,11 +348,6 @@ window.performSearch = async function() {
     return;
   }
 
-  if (keyword.length < 2) {
-    resultList.innerHTML = '<div class="empty">Hãy nhập ít nhất 2 ký tự.</div>';
-    return;
-  }
-
   const cacheKey = activeTab + "::" + keyword.toLowerCase();
   if (searchCache.has(cacheKey)) {
     resultList.innerHTML = searchCache.get(cacheKey);
@@ -378,6 +381,43 @@ window.performSearch = async function() {
   const nextHtml = parts.join("");
   resultList.innerHTML = nextHtml;
   searchCache.set(cacheKey, nextHtml);
+};
+
+window.performRealtimeUserSearch = async function() {
+  const keyword = document.getElementById("keywordInput").value.trim();
+  const resultList = document.getElementById("resultList");
+
+  if (!keyword) {
+    resetSearch();
+    return;
+  }
+
+  const cacheKey = "tray-users::" + keyword.toLowerCase();
+  if (searchCache.has(cacheKey)) {
+    resultList.innerHTML = searchCache.get(cacheKey);
+    return;
+  }
+
+  resultList.innerHTML = '<div class="loading">Đang tìm người dùng...</div>';
+  const users = await searchUsers(keyword);
+  const nextHtml = users.length
+    ? users.map(renderUserItemFullscreen).join("")
+    : '<div class="empty">Không tìm thấy người dùng phù hợp.</div>';
+  resultList.innerHTML = nextHtml;
+  searchCache.set(cacheKey, nextHtml);
+};
+
+window.submitSearch = function() {
+  const keyword = document.getElementById("keywordInput").value.trim();
+  if (!isHomeSearchTray) {
+    performSearch();
+    return;
+  }
+  if (!keyword) {
+    document.getElementById("resultList").innerHTML = '<div class="empty">Hãy nhập từ khóa để tìm kiếm.</div>';
+    return;
+  }
+  openSearchTarget("search.html?q=" + encodeURIComponent(keyword));
 };
 
 async function searchUsers(keyword) {
@@ -520,7 +560,7 @@ function renderPostItem(post) {
 document.getElementById("keywordInput").addEventListener("keydown", function(event) {
   if (event.key === "Enter") {
     event.preventDefault();
-    performSearch();
+    submitSearch();
   }
 });
 
@@ -532,7 +572,8 @@ document.getElementById("keywordInput").addEventListener("input", function() {
     return;
   }
   searchDebounceTimer = setTimeout(() => {
-    performSearch();
+    if (isHomeSearchTray) performRealtimeUserSearch();
+    else performSearch();
   }, 320);
 });
 
