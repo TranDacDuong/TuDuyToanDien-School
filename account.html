@@ -639,6 +639,7 @@ async function changePassword(){
 
 async function uploadAvatar(){
   const file=document.getElementById("avatarInput").files[0];
+  const oldAvatarUrl=document.getElementById("avatarPreview").src;
 
   if(!file){
     alert("Chọn ảnh");
@@ -658,10 +659,20 @@ async function uploadAvatar(){
     return;
   }
 
-  await sb
+  const { error } = await sb
     .from("users")
     .update({avatar_url:avatarUrl})
     .eq("id",currentUser.id);
+
+  if(error){
+    await window.MindupImageUpload.deleteUploadedImage(avatarUrl).catch(console.warn);
+    alert("Không thể lưu avatar: " + error.message);
+    return;
+  }
+
+  if(oldAvatarUrl && oldAvatarUrl !== avatarUrl){
+    await window.MindupImageUpload.deleteUploadedImage(oldAvatarUrl).catch(console.warn);
+  }
 
   document.getElementById("avatarPreview").src=avatarUrl;
   showToast("Đổi avatar thành công");

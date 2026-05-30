@@ -3049,12 +3049,17 @@ async function createPost() {
         kind: "post",
         folder: "post-media",
       });
-      await sb.from("post_media").insert({
+      const fileUrl = window.MindupImageUpload.getDisplayUrl(uploaded);
+      const { error: mediaError } = await sb.from("post_media").insert({
         post_id: insertedPost.id,
-        file_url: window.MindupImageUpload.getDisplayUrl(uploaded),
+        file_url: fileUrl,
         file_type: "image",
         sort_order: 0
       });
+      if (mediaError) {
+        await window.MindupImageUpload.deleteUploadedImage(fileUrl).catch(console.warn);
+        throw mediaError;
+      }
     } catch (uploadError) {
       alert("Bài viết đã tạo nhưng upload ảnh lỗi: " + uploadError.message);
     }
@@ -3304,6 +3309,11 @@ window.savePostEdit = async function(pid) {
 
 window.removePostImage = async function(pid) {
   if (!confirm("Bạn có chắc muốn xóa ảnh đính kèm khỏi bài viết không?")) return;
+  const { data: mediaRows } = await sb
+    .from("post_media")
+    .select("file_url")
+    .eq("post_id", pid)
+    .eq("file_type", "image");
 
   const { error } = await sb
     .from("post_media")
@@ -3316,6 +3326,7 @@ window.removePostImage = async function(pid) {
     return;
   }
 
+  await window.MindupImageUpload?.deleteUploadedImages?.((mediaRows || []).map(item => item.file_url));
   loadPosts();
 };
 
@@ -3365,10 +3376,12 @@ window.moderatePost = async function(pid, status) {
 
 window.deletePost = async function(pid) {
   if (!confirm("Xóa bài này?")) return;
+  const { data: mediaRows } = await sb.from("post_media").select("file_url").eq("post_id", pid);
   await sb.from("comments").delete().eq("post_id", pid);
   await sb.from("likes").delete().eq("post_id", pid);
   const { error } = await sb.from("posts").delete().eq("id", pid);
   if (error) { alert("Lỗi: " + error.message); return; }
+  await window.MindupImageUpload?.deleteUploadedImages?.((mediaRows || []).map(item => item.file_url));
   document.getElementById("post_" + pid)?.remove();
 };
 
@@ -3679,12 +3692,17 @@ async function createPost() {
         kind: "post",
         folder: "post-media",
       });
-      await sb.from("post_media").insert({
+      const fileUrl = window.MindupImageUpload.getDisplayUrl(uploaded);
+      const { error: mediaError } = await sb.from("post_media").insert({
         post_id: insertedPost.id,
-        file_url: window.MindupImageUpload.getDisplayUrl(uploaded),
+        file_url: fileUrl,
         file_type: "image",
         sort_order: 0
       });
+      if (mediaError) {
+        await window.MindupImageUpload.deleteUploadedImage(fileUrl).catch(console.warn);
+        throw mediaError;
+      }
     } catch (uploadError) {
       alert("Bài viết đã tạo nhưng upload ảnh lỗi: " + uploadError.message);
     }

@@ -823,6 +823,10 @@ window.sendMessage = async function() {
   });
 
   if (error) {
+    const failedPayload = parseMessageContent(content);
+    if (failedPayload.type === "image") {
+      await window.MindupImageUpload?.deleteUploadedImage?.(failedPayload.url).catch(console.warn);
+    }
     alert("Không gửi được tin nhắn: " + error.message);
     return;
   }
