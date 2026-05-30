@@ -1,7 +1,7 @@
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "POST, DELETE, OPTIONS",
 };
 
 function jsonResponse(body: unknown, status = 200) {
@@ -103,9 +103,35 @@ async function uploadToDrive(file: File, accessToken: string, folderId: string, 
   return data;
 }
 
+async function deleteFromDrive(fileId: string, accessToken: string, folderId: string) {
+  const metadataRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,parents`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (metadataRes.status === 404) return { deleted: false, missing: true };
+
+  const metadata = await metadataRes.json().catch(() => ({}));
+  if (!metadataRes.ok) {
+    throw new Error(`Cannot inspect Google Drive image: ${metadata?.error?.message || metadataRes.statusText}`);
+  }
+  if (!Array.isArray(metadata.parents) || !metadata.parents.includes(folderId)) {
+    throw new Error("Google Drive image is outside the configured upload folder");
+  }
+
+  const deleteRes = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!deleteRes.ok && deleteRes.status !== 404) {
+    const data = await deleteRes.json().catch(() => ({}));
+    throw new Error(`Cannot delete Google Drive image: ${data?.error?.message || deleteRes.statusText}`);
+  }
+  return { deleted: deleteRes.ok, missing: deleteRes.status === 404 };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+  if (!["POST", "DELETE"].includes(req.method)) return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
     await requireAuthenticatedUser(req);
@@ -117,6 +143,15 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Missing Google Drive secrets" }, 500);
     }
 
+    const accessToken = await getGoogleAccessToken(clientId, clientSecret, refreshToken);
+    if (req.method === "DELETE") {
+      const body = await req.json().catch(() => ({}));
+      const fileId = String(body?.fileId || "").trim();
+      if (!/^[\w-]+$/.test(fileId)) return jsonResponse({ error: "Invalid Google Drive file ID" }, 400);
+      const outcome = await deleteFromDrive(fileId, accessToken, folderId);
+      return jsonResponse({ ok: true, provider: "google_drive", fileId, ...outcome });
+    }
+
     const form = await req.formData();
     const file = form.get("file");
     const folderName = safeFileName(String(form.get("folder") || ""));
@@ -124,7 +159,6 @@ Deno.serve(async (req) => {
     if (!file.type.startsWith("image/")) return jsonResponse({ error: "Only image uploads are allowed" }, 400);
     if (file.size > 2 * 1024 * 1024) return jsonResponse({ error: "Image is too large after compression" }, 400);
 
-    const accessToken = await getGoogleAccessToken(clientId, clientSecret, refreshToken);
     const uploaded = await uploadToDrive(file, accessToken, folderId, folderName);
     const fileId = uploaded.id;
 
@@ -141,7 +175,7 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error(error);
-    const message = error instanceof Error ? error.message : "Upload failed";
+    const message = error instanceof Error ? error.message : "Google Drive operation failed";
     return jsonResponse({ error: message }, 500);
   }
 });

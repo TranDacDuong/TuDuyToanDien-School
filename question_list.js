@@ -509,6 +509,7 @@ async function deleteSelectedQuestions() {
     alert("Không thể xóa câu hỏi: " + deleteRes.error.message)
     return
   }
+  await deleteQuestionImages(selected.filter((q) => deletableIds.includes(q.id)))
 
   await window.AppAdminTools?.recordAudit?.("question_bulk_delete", {
     target_type: "question",
@@ -530,6 +531,14 @@ async function deleteSelectedQuestions() {
 window.hideSelectedQuestions = hideSelectedQuestions
 window.restoreSelectedQuestions = restoreSelectedQuestions
 window.deleteSelectedQuestions = deleteSelectedQuestions
+
+async function deleteQuestionImages(items) {
+  const urls = (items || []).flatMap((q) => [q.question_img, q.answer_img]).filter(Boolean)
+  if (!urls.length || !window.MindupImageUpload?.deleteUploadedImages) return
+  const outcomes = await window.MindupImageUpload.deleteUploadedImages(urls)
+  const failures = outcomes.filter((item) => item.status === "rejected")
+  if (failures.length) console.warn("Could not delete some question images from Drive:", failures)
+}
 
 function getScopeKey(items) {
   return (items || []).map((item) => item.id).sort().join("|")
@@ -1448,6 +1457,7 @@ async function restoreQ(id) {
 }
 
 async function deleteQ(id) {
+  const question = questions.find((item) => item.id === id)
   if (!confirm("Xóa câu hỏi này?")) return
 
   if (isAdmin) {
@@ -1492,6 +1502,7 @@ async function deleteQ(id) {
         }
         const res = await sb.from("question_bank").delete().eq("id", id)
         if (res.error) throw res.error
+        await deleteQuestionImages(question ? [question] : [])
         return true
       },
     })

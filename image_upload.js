@@ -225,11 +225,54 @@
     return uploadResult?.lh3Url || uploadResult?.url || uploadResult?.downloadUrl || "";
   }
 
+  function getDriveFileId(url) {
+    const source = String(url || "").trim();
+    if (!source) return "";
+    const lh3Match = source.match(/^https:\/\/lh3\.googleusercontent\.com\/d\/([\w-]+)/i);
+    if (lh3Match) return lh3Match[1];
+    const driveMatch = source.match(/^https:\/\/drive\.google\.com\/(?:uc\?[^#]*\bid=|file\/d\/)([\w-]+)/i);
+    return driveMatch?.[1] || "";
+  }
+
+  async function deleteUploadedImage(urlOrFileId) {
+    const supabaseUrl = getSupabaseUrl();
+    const supabaseKey = getSupabaseKey();
+    if (!supabaseUrl || !supabaseKey) throw new Error("Missing Supabase config.");
+
+    const source = String(urlOrFileId || "").trim();
+    const fileId = getDriveFileId(source) || (/^[\w-]+$/.test(source) ? source : "");
+    if (!fileId) return { ok: true, skipped: true };
+
+    const token = await window.AppAuth?.getAccessToken?.();
+    const res = await fetch(`${supabaseUrl}/functions/v1/upload-drive-image`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: supabaseKey,
+        Authorization: `Bearer ${token || supabaseKey}`,
+      },
+      body: JSON.stringify({ fileId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.error) {
+      throw new Error(data?.error || "Cannot delete image from Drive.");
+    }
+    return data;
+  }
+
+  async function deleteUploadedImages(urls) {
+    const uniqueUrls = [...new Set((urls || []).filter(Boolean))];
+    return Promise.allSettled(uniqueUrls.map(deleteUploadedImage));
+  }
+
   window.MindupImageUpload = {
     presets: DEFAULT_PRESETS,
     compressImageFile,
     uploadCompressedImage,
     uploadDataUrl,
     getDisplayUrl,
+    getDriveFileId,
+    deleteUploadedImage,
+    deleteUploadedImages,
   };
 })();
