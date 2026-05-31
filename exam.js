@@ -76,7 +76,6 @@
     if (normalBtn) normalBtn.classList.toggle("active", currentExamMode === "normal");
     if (pdfBtn) pdfBtn.classList.toggle("active", currentExamMode === "pdf");
     if (createBtn) {
-      createBtn.style.display = currentRole === "admin" ? "" : "none";
       createBtn.textContent = currentExamMode === "pdf" ? "+ Tạo đề PDF" : "+ Tạo đề mới";
       createBtn.onclick = () => {
         if (currentExamMode === "pdf") openPdfExamModule("", "create");
@@ -116,6 +115,8 @@
 
       const { data: pdfRaw } = await pdfQuery;
       let data = pdfRaw || [];
+      if (currentRole === "teacher") data = data.filter(e => e.created_by === currentUser.id);
+
       const grid = document.getElementById("examGrid");
       if (!data.length) {
         grid.innerHTML = `<p style="color:var(--muted);font-size:13px">Chưa có đề PDF nào. Nhấn "+ Tạo đề PDF" để bắt đầu.</p>`;
@@ -124,7 +125,7 @@
 
       grid.innerHTML = "";
       data.forEach(e => {
-        const canEdit = currentRole === "admin";
+        const canEdit = currentRole === "admin" || e.created_by === currentUser.id;
         const card = document.createElement("div");
         card.className = "exam-card";
         card.innerHTML = `
@@ -152,6 +153,11 @@
     const { data: data_raw } = await query;
     let data = data_raw || [];
 
+    // Teacher chỉ thấy đề do mình tạo
+    if (currentRole === "teacher") {
+      data = data.filter(e => e.created_by === currentUser.id);
+    }
+
     const grid = document.getElementById("examGrid");
     if (!data.length) {
       grid.innerHTML = `<p style="color:var(--muted);font-size:13px">
@@ -161,7 +167,7 @@
 
     grid.innerHTML = "";
     data.forEach(e => {
-      const canEdit = currentRole === "admin";
+      const canEdit = currentRole === "admin" || e.created_by === currentUser.id;
       const card = document.createElement("div");
       card.className = "exam-card";
       card.innerHTML = `
@@ -188,7 +194,6 @@
   }
 
   window.deleteExam = async function (id) {
-    if (currentRole !== "admin") { alert("Chỉ admin mới có quyền xóa đề."); return; }
     if (!confirm("Xóa đề này? Các lớp đang dùng đề này sẽ mất liên kết.")) return;
     const sb = getSb();
     const { data: exam } = await sb.from("exams").select("created_by").eq("id", id).single();
@@ -207,7 +212,6 @@
   };
 
   window.cloneExam = async function (id) {
-    if (currentRole !== "admin") { alert("Chỉ admin mới có quyền nhân bản đề."); return; }
     const sb = getSb();
     const { data: exam, error: examErr } = await sb.from("exams").select("*").eq("id", id).single();
     if (examErr || !exam) {
@@ -271,12 +275,10 @@
   };
 
   window.editPdfExamFromExamPage = function (id) {
-    if (currentRole !== "admin") { alert("Chỉ admin mới có quyền sửa đề PDF."); return; }
     openPdfExamModule(id, "edit");
   };
 
   window.deletePdfExamFromExamPage = async function (id) {
-    if (currentRole !== "admin") { alert("Chỉ admin mới có quyền xóa đề PDF."); return; }
     if (!confirm("Xóa đề PDF này?")) return;
     const sb = getSb();
     const { data: exam } = await sb.from("pdf_exams").select("created_by").eq("id", id).single();
@@ -300,10 +302,6 @@
      EDITOR
   ══════════════════════════════════════════════ */
   window.openEditor = async function (examId, readOnly = false) {
-    if (currentRole !== "admin") {
-      if (!examId) { alert("Chỉ admin mới có quyền tạo đề."); return; }
-      readOnly = true;
-    }
     editingExamId = examId || null;
     examItems = [];
     bankPage  = 0;
@@ -873,7 +871,6 @@
      SAVE — đề standalone, không gắn lớp
   ══════════════════════════════════════════════ */
   window.saveExam = async function () {
-    if (currentRole !== "admin") { alert("Chỉ admin mới có quyền lưu đề."); return; }
     const title    = document.getElementById("fTitle").value.trim();
     const duration = parseInt(document.getElementById("fDuration").value) || 45;
     const total    = parseFloat(document.getElementById("fTotal").value) || 10;

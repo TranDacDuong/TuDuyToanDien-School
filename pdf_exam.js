@@ -129,7 +129,7 @@ async function initPdfExam() {
   fillPdfSubjects(PDF_EL.subjectFilter, "", "Tất cả môn");
   fillPdfSubjects(PDF_EL.examSubject, "", "Chọn môn");
 
-  if (PDF_STATE.role === "admin") {
+  if (PDF_STATE.role === "admin" || PDF_STATE.role === "teacher") {
     if (PDF_EL.adminToolbar) PDF_EL.adminToolbar.style.display = "";
   } else {
     if (PDF_EL.statusFilter) {
@@ -150,7 +150,7 @@ function handlePdfRouteParams() {
   const examId = params.get("exam");
   const action = params.get("action");
   const resultId = params.get("resultId");
-  if (!examId && action === "create" && PDF_STATE.role === "admin") {
+  if (!examId && action === "create" && (PDF_STATE.role === "admin" || PDF_STATE.role === "teacher")) {
     setPdfRouteLoading(false);
     openPdfExamModal();
     return;
@@ -159,7 +159,7 @@ function handlePdfRouteParams() {
     setPdfRouteLoading(false);
     return;
   }
-  if (action === "edit" && PDF_STATE.role === "admin") {
+  if (action === "edit" && (PDF_STATE.role === "admin" || PDF_STATE.role === "teacher")) {
     setPdfRouteLoading(false);
     openPdfExamModal(examId);
     return;
@@ -529,11 +529,11 @@ function renderPdfExamCard(exam) {
   const questions = getPdfQuestions(exam.id);
   const latest = getStudentLatestSubmitted(exam.id);
   const score = latest ? (latest.score_total ?? latest.score_auto ?? "?") : null;
-  return `<article class="card"><div class="card-cover"><div class="chips"><span class="pill light">${exam.status === "open" ? "Mở" : "Đóng"}</span><span class="pill light">${questions.length} câu</span>${latest ? `<span class="pill light">Đã làm ${score}/${exam.total_points || 0}đ</span>` : ""}</div><div><h3 style="margin:0;font-size:1.15rem;line-height:1.35">${esc(exam.title)}</h3><div style="margin-top:4px;font-size:.84rem;color:rgba(255,255,255,.82)">${esc(grade)} • ${esc(subject)}</div></div></div><div class="card-body"><div style="color:#607089;line-height:1.6">${linkify(esc(exam.description || "Đề PDF dùng Google Drive preview để hiển thị đề ở bên trái."))}</div><div class="meta"><div><span>Thời lượng</span><strong>${exam.duration_minutes || 0} phút</strong></div><div><span>Tổng điểm</span><strong>${exam.total_points || 0} điểm</strong></div></div><div class="actions"><button class="btn btn-outline" type="button" data-open-pdf-exam="${exam.id}">${PDF_STATE.role === "student" ? "Làm bài" : "Xem chi tiết"}</button>${PDF_STATE.role === "admin" ? `<button class="btn btn-outline" type="button" data-edit-pdf-exam="${exam.id}">Sửa</button><button class="btn btn-danger" type="button" data-delete-pdf-exam="${exam.id}">Xóa</button>` : ""}</div></div></article>`;
+  return `<article class="card"><div class="card-cover"><div class="chips"><span class="pill light">${exam.status === "open" ? "Mở" : "Đóng"}</span><span class="pill light">${questions.length} câu</span>${latest ? `<span class="pill light">Đã làm ${score}/${exam.total_points || 0}đ</span>` : ""}</div><div><h3 style="margin:0;font-size:1.15rem;line-height:1.35">${esc(exam.title)}</h3><div style="margin-top:4px;font-size:.84rem;color:rgba(255,255,255,.82)">${esc(grade)} • ${esc(subject)}</div></div></div><div class="card-body"><div style="color:#607089;line-height:1.6">${linkify(esc(exam.description || "Đề PDF dùng Google Drive preview để hiển thị đề ở bên trái."))}</div><div class="meta"><div><span>Thời lượng</span><strong>${exam.duration_minutes || 0} phút</strong></div><div><span>Tổng điểm</span><strong>${exam.total_points || 0} điểm</strong></div></div><div class="actions"><button class="btn btn-outline" type="button" data-open-pdf-exam="${exam.id}">${PDF_STATE.role === "student" ? "Làm bài" : "Xem chi tiết"}</button>${(PDF_STATE.role === "admin" || PDF_STATE.role === "teacher") ? `<button class="btn btn-outline" type="button" data-edit-pdf-exam="${exam.id}">Sửa</button><button class="btn btn-danger" type="button" data-delete-pdf-exam="${exam.id}">Xóa</button>` : ""}</div></div></article>`;
 }
 
 function openPdfExamModal(examId = null) {
-  if (PDF_STATE.role !== "admin") return;
+  if (!(PDF_STATE.role === "admin" || PDF_STATE.role === "teacher")) return;
   PDF_STATE.editingExamId = examId;
   PDF_EL.examForm.reset();
   PDF_STATE.draftQuestions = [];
@@ -569,7 +569,6 @@ function closePdfExamModal() {
 
 async function submitPdfExamForm(ev) {
   ev.preventDefault();
-  if (PDF_STATE.role !== "admin") return alert("Chỉ admin mới có quyền lưu đề PDF.");
   const parsed = parseDriveInput(PDF_EL.examDriveInput.value.trim());
   if (!parsed.fileId) return alert("Hãy nhập Google Drive file ID hoặc link chia sẻ hợp lệ.");
   if (!PDF_EL.examTitle.value.trim()) return alert("Tên đề không được để trống.");
@@ -639,7 +638,6 @@ function deletePdfQuestion(questionId) {
 }
 
 async function deletePdfExam(examId) {
-  if (PDF_STATE.role !== "admin") return alert("Chỉ admin mới có quyền xóa đề PDF.");
   if (!confirm("Bạn có chắc muốn xóa đề PDF này không?")) return;
   const { error } = await sb.from("pdf_exams").delete().eq("id", examId);
   if (error) return alert("Không thể xóa đề PDF: " + error.message);
@@ -666,11 +664,10 @@ function openPdfExamScreen(examId) {
   if (PDF_EL.detailPaneOpenLink) PDF_EL.detailPaneOpenLink.href = getPdfOpenUrl(exam);
   if (PDF_EL.detailPaneLabel) PDF_EL.detailPaneLabel.textContent = `Nội dung đề PDF • ${exam.title || ""}`;
 
-  const canManage = PDF_STATE.role === "admin";
-  const canReview = PDF_STATE.role === "admin" || PDF_STATE.role === "teacher";
+  const canManage = PDF_STATE.role === "admin" || PDF_STATE.role === "teacher";
   PDF_EL.editBtn.classList.toggle("hidden", !canManage);
   PDF_EL.addQuestionBtn.classList.toggle("hidden", !canManage);
-  PDF_EL.submissionBtn.classList.toggle("hidden", !canReview);
+  PDF_EL.submissionBtn.classList.toggle("hidden", !canManage);
   PDF_EL.takeBtn.classList.toggle("hidden", canManage || exam.status !== "open");
   PDF_EL.questionList.innerHTML = questions.length ? questions.map(renderPdfQuestionRow).join("") : `<div class="empty"><strong>Chưa có câu trả lời nào</strong><div>${canManage ? "Hãy thêm câu đầu tiên cho đề PDF này." : "Đề này chưa sẵn sàng để làm bài."}</div></div>`;
 }
