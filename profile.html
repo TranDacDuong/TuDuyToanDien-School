@@ -378,6 +378,9 @@ body {
   gap: 20px;
   align-items: start;
 }
+.teacher-top-grid > .box {
+  min-width: 0;
+}
 .teacher-section-title {
   color: #111827;
   font-size: 1rem;
@@ -632,6 +635,8 @@ body {
 .trial-message.success { color: #15803d; }
 .trial-message.error { color: var(--red); }
 section.box:has(#teacherTrialForm) {
+  min-width: 0;
+  overflow: hidden;
   border: 2px solid #f59e0b;
   box-shadow:
     0 0 0 1px rgba(249,115,22,.28),

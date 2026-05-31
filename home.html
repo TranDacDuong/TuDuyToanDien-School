@@ -1938,18 +1938,10 @@ body {
   </div>
 
   <div class="feed-header">
-    <div class="feed-title">Thông tin</div>
-    <div class="feed-tools">
-      <button class="feed-filter-toggle" id="feedFilterButton" type="button" onclick="cycleFeedFilter()">Chế độ: Tất cả</button>
-    </div>
+    <div class="feed-title">Bảng tin</div>
   </div>
 
-  <div class="home-tabs">
-    <button class="home-tab-btn active" id="homeTabOverview" type="button" onclick="setHomeTab('overview')">Thông tin</button>
-    <button class="home-tab-btn" id="homeTabDiscussion" type="button" onclick="setHomeTab('discussion')">Thảo luận</button>
-  </div>
-
-  <section class="overview-section active" id="overviewSection">
+  <section class="overview-section" id="overviewSection">
     <div class="overview-main" id="overviewMain">
       <div class="overview-card overview-admin" id="overviewAdminCard">
         <div class="overview-card-head">
@@ -2168,7 +2160,7 @@ body {
     </aside>
   </section>
 
-  <section class="discussion-section" id="discussionSection">
+  <section class="discussion-section active" id="discussionSection">
   <div class="feed-shortcuts">
     <div class="shortcut-card">
       <span class="shortcut-icon">🏠</span>
@@ -2240,8 +2232,8 @@ let feedRefreshTimer = null;
 let feedRefreshRunning = false;
 let homeBadgeChannel = null;
 let activeSocialPanel = "";
-let currentFeedFilter = "all";
-let currentHomeTab = "overview";
+let currentFeedFilter = "default";
+let currentHomeTab = "discussion";
 let cachedVisiblePosts = [];
 const HIDDEN_NOTIFICATION_TYPES = ["friend_request", "friend_accept", "message_new"];
 let examEvents = [];
@@ -2901,7 +2893,7 @@ function updateHomeTabs() {
   }
   const feedTitle = document.querySelector(".feed-title");
   if (feedTitle) {
-    feedTitle.textContent = currentHomeTab === "overview" ? "Thông tin" : "Thảo luận";
+    feedTitle.textContent = "Bảng tin";
   }
 }
 
@@ -3155,6 +3147,10 @@ async function loadPosts() {
 }
 
 function matchFeedFilter(post, filter) {
+  if (filter === "default") {
+    const postRole = post.users?.role;
+    return postRole === "admin" || postRole === "teacher" || (!!currentUser && (post.user_id === currentUser.id || friendIds.has(post.user_id)));
+  }
   if (!currentUser) return filter === "all";
   if (filter === "mine") return post.user_id === currentUser.id;
   if (filter === "friends") return friendIds.has(post.user_id);
