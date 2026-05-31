@@ -1234,9 +1234,10 @@ body {
   display: block;
 }
 .compose-preview img {
-  width: 100%;
-  max-height: 260px;
-  object-fit: cover;
+  display: block;
+  max-width: 100%;
+  width: auto;
+  height: auto;
   border-radius: 18px;
   border: 1px solid rgba(15,31,61,.08);
 }
@@ -1471,9 +1472,11 @@ body {
   padding: 0 18px 16px;
 }
 .post-media-img {
-  width: 100%;
-  max-height: 420px;
-  object-fit: cover;
+  display: block;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  margin: 0 auto;
   border-radius: 14px;
   border: 1px solid rgba(15,31,61,.08);
   background: var(--surface);
@@ -2162,29 +2165,6 @@ body {
   </section>
 
   <section class="discussion-section" id="discussionSection">
-  <div class="feed-shortcuts">
-    <div class="shortcut-card">
-      <span class="shortcut-icon">🏠</span>
-      <div class="shortcut-title">Bảng tin của bạn</div>
-      <div class="shortcut-sub">Xem nhanh bài mới, lượt thích và bình luận gần đây.</div>
-    </div>
-    <div class="shortcut-card">
-      <span class="shortcut-icon">👥</span>
-      <div class="shortcut-title">Bạn bè</div>
-      <div class="shortcut-sub">Theo dõi kết nối mới và các hoạt động từ bạn bè.</div>
-    </div>
-    <div class="shortcut-card">
-      <span class="shortcut-icon">🔔</span>
-      <div class="shortcut-title">Tương tác mới</div>
-      <div class="shortcut-sub">Thông báo, lời mời và nhắn tin được gom ngay tại đây.</div>
-    </div>
-    <div class="shortcut-card">
-      <span class="shortcut-icon">📝</span>
-      <div class="shortcut-title">Đăng bài nhanh</div>
-      <div class="shortcut-sub">Chia sẻ trạng thái, hình ảnh và cập nhật của bạn chỉ trong vài giây.</div>
-    </div>
-  </div>
-
   <div class="compose-card" id="composeCard">
     <div class="compose-header">
       <img class="compose-avatar" id="composeAvatar" src="default-avatar.png">
@@ -2369,7 +2349,7 @@ function enhanceComposerUI() {
       <div class="compose-inline-tools">
         <div class="compose-inline-left">
           <div style="position:relative;">
-            <button class="compose-icon-btn" type="button" title="Quyền riêng tư" onclick="toggleVisibilityMenu(event)">🌍</button>
+            <button class="compose-icon-btn" id="composeVisibilityButton" type="button" title="Công khai" aria-label="Công khai" onclick="toggleVisibilityMenu(event)">🌍</button>
             <div class="visibility-menu" id="visibilityMenu">
               <button class="visibility-option" type="button" onclick="setComposeVisibility('public')">🌍 Công khai</button>
               <button class="visibility-option" type="button" onclick="setComposeVisibility('friends')">👥 Bạn bè</button>
@@ -2377,7 +2357,6 @@ function enhanceComposerUI() {
             </div>
           </div>
           <button class="compose-icon-btn" type="button" title="Chọn ảnh" onclick="document.getElementById('postImage').click()">🖼️</button>
-          <span class="compose-status" id="composeStatus">🌍 Công khai</span>
         </div>
         <div class="compose-inline-right">
           <span class="compose-note" id="composeNote">⏳ Bài sẽ được duyệt trước khi hiển thị</span>
@@ -2491,15 +2470,20 @@ window.toggleVisibilityMenu = function(event) {
 
 window.setComposeVisibility = function(value) {
   const select = document.getElementById("postVisibility");
-  const status = document.getElementById("composeStatus");
+  const button = document.getElementById("composeVisibilityButton");
   const menu = document.getElementById("visibilityMenu");
-  const labelMap = {
-    public: "🌍 Công khai",
-    friends: "👥 Bạn bè",
-    private: "🔒 Riêng tư"
+  const configMap = {
+    public: { icon: "🌍", label: "Công khai" },
+    friends: { icon: "👥", label: "Bạn bè" },
+    private: { icon: "🔒", label: "Riêng tư" }
   };
+  const config = configMap[value] || configMap.public;
   if (select) select.value = value;
-  if (status) status.textContent = labelMap[value] || "🌍 Công khai";
+  if (button) {
+    button.textContent = config.icon;
+    button.title = config.label;
+    button.setAttribute("aria-label", config.label);
+  }
   if (menu) menu.classList.remove("open");
 };
 
@@ -3110,9 +3094,7 @@ async function createPost() {
   document.getElementById("postContent").value = "";
   document.getElementById("postVisibility").value = "public";
   document.getElementById("postImage").value = "";
-  const composeStatus = document.getElementById("composeStatus");
-  if (composeStatus) composeStatus.textContent = "🌍 Công khai";
-  document.getElementById("visibilityMenu")?.classList.remove("open");
+  setComposeVisibility("public");
   document.getElementById("composePreview").classList.remove("show");
   document.getElementById("composePreviewImg").src = "";
   loadPosts();
@@ -3759,9 +3741,7 @@ async function createPost() {
   document.getElementById("postImage").value = "";
   document.getElementById("composePreview").classList.remove("show");
   document.getElementById("composePreviewImg").src = "";
-  const composeStatus = document.getElementById("composeStatus");
-  if (composeStatus) composeStatus.textContent = "🌍 Công khai";
-  document.getElementById("visibilityMenu")?.classList.remove("open");
+  setComposeVisibility("public");
   await loadPosts();
 }
 
