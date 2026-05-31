@@ -48,6 +48,94 @@ function getSchedulesForEffectiveMonth(allSchedules, effectiveFrom){
   return eligible.filter(s => (s.effective_from || "2000-01-01") === latest);
 }
 
+function scheduleSortValue(schedule){
+  return [
+    Number(schedule?.session_no || 1),
+    Number(schedule?.weekday || 0),
+    String(schedule?.start_time || "").slice(0,5),
+    String(schedule?.end_time || "").slice(0,5),
+  ].join("|");
+}
+
+function schedulesMatch(a, b){
+  return Number(a?.session_no || 1) === Number(b?.session_no || 1) &&
+    Number(a?.weekday) === Number(b?.weekday) &&
+    String(a?.start_time || "").slice(0,5) === String(b?.start_time || "").slice(0,5) &&
+    String(a?.end_time || "").slice(0,5) === String(b?.end_time || "").slice(0,5);
+}
+
+function buildScheduleReplacementMap(oldSchedules, newSchedules){
+  const replacements = new Map();
+  const remainingNew = [...(newSchedules || [])];
+  const remainingOld = [];
+
+  [...(oldSchedules || [])].sort((a,b) => scheduleSortValue(a).localeCompare(scheduleSortValue(b))).forEach(old => {
+    const exactIndex = remainingNew.findIndex(next => schedulesMatch(old, next));
+    if(exactIndex >= 0){
+      replacements.set(Number(old.id), remainingNew[exactIndex]);
+      remainingNew.splice(exactIndex, 1);
+    } else {
+      remainingOld.push(old);
+    }
+  });
+
+  remainingOld
+    .sort((a,b) => scheduleSortValue(a).localeCompare(scheduleSortValue(b)))
+    .forEach(old => {
+      const sameSession = remainingNew
+        .map((next, index) => ({ next, index }))
+        .find(item => Number(item.next.session_no || 1) === Number(old.session_no || 1));
+      if(!sameSession) return;
+      replacements.set(Number(old.id), sameSession.next);
+      remainingNew.splice(sameSession.index, 1);
+    });
+
+  return replacements;
+}
+
+function moveDateToReplacementWeekday(dateValue, oldSchedule, newSchedule){
+  if(!dateValue || !oldSchedule || !newSchedule) return dateValue;
+  const date = new Date(dateValue+"T00:00:00");
+  const delta = Number(newSchedule.weekday || 0) - Number(oldSchedule.weekday || 0);
+  date.setDate(date.getDate() + delta);
+  return date.getFullYear()+"-"+String(date.getMonth()+1).padStart(2,"0")+"-"+String(date.getDate()).padStart(2,"0");
+}
+
+function isMissingRelationError(error){
+  const message = String(error?.message || "").toLowerCase();
+  return message.includes("does not exist") || message.includes("could not find") || message.includes("relation");
+}
+
+function limitScheduleQueryToVersion(query, nextEffectiveFrom){
+  return nextEffectiveFrom ? query.lt("date", nextEffectiveFrom) : query;
+}
+
+async function migrateClassSessionDates(sb, classId, effectiveFrom, nextEffectiveFrom, oldById, replacements){
+  const changedDays = [...replacements.entries()].map(([oldId, next]) => ({
+    old: oldById.get(Number(oldId)),
+    next,
+  })).filter(item => item.old && Number(item.old.weekday) !== Number(item.next.weekday));
+  if(!changedDays.length) return null;
+
+  let query = sb.from("class_sessions").select("id,session_date").eq("class_id", classId).gte("session_date", effectiveFrom);
+  if(nextEffectiveFrom) query = query.lt("session_date", nextEffectiveFrom);
+  const { data: sessions, error } = await query;
+  if(error) return isMissingRelationError(error) ? null : error;
+
+  for(const session of sessions || []){
+    const date = new Date(session.session_date+"T00:00:00");
+    const weekday = date.getDay() === 0 ? 7 : date.getDay();
+    const replacement = changedDays.find(item => Number(item.old.weekday) === weekday);
+    if(!replacement) continue;
+    const { error: updateError } = await sb
+      .from("class_sessions")
+      .update({ session_date: moveDateToReplacementWeekday(session.session_date, replacement.old, replacement.next) })
+      .eq("id", session.id);
+    if(updateError) return updateError;
+  }
+  return null;
+}
+
 function renderEditingMonthSchedules(){
   const activeSchedules = editingClassId
     ? getSchedulesForEffectiveMonth(editingSchedules, effectiveFromValue())
@@ -292,18 +380,11 @@ form.onsubmit = async (e) => {
     const sameMonthIds = (oldSchedules || [])
       .filter(s => (s.effective_from || "2000-01-01") === effectiveFrom)
       .map(s => s.id);
-
-    if(sameMonthIds.length){
-      const { data: existingAttendance } = await sb
-        .from("attendance")
-        .select("schedule_id")
-        .in("schedule_id", sameMonthIds)
-        .limit(1);
-      if(existingAttendance?.length){
-        alert("Tháng này đã có dữ liệu điểm danh. Vui lòng chọn một tháng mới để đổi lịch.");
-        return;
-      }
-    }
+    const nextEffectiveFrom = [...new Set((oldSchedules || [])
+      .map(s => s.effective_from || "2000-01-01")
+      .filter(value => value > effectiveFrom))]
+      .sort()[0] || null;
+    const activeOldSchedules = getSchedulesForEffectiveMonth(oldSchedules || [], effectiveFrom);
 
     const { data: newSchedules, error: insErr } = await sb.from("class_schedules").insert(inserts).select("id,session_no,weekday,start_time,end_time");
     if(insErr){
@@ -311,6 +392,7 @@ form.onsubmit = async (e) => {
       return;
     }
     const newScheduleIds = (newSchedules || []).map(s => s.id);
+    const scheduleReplacements = buildScheduleReplacementMap(activeOldSchedules, newSchedules || []);
     const { error: deleteChoiceError } = await sb.from("class_student_schedules").delete().eq("class_id", classId);
     if(deleteChoiceError){
       if(newScheduleIds.length) await sb.from("class_schedules").delete().in("id", newScheduleIds);
@@ -328,12 +410,13 @@ form.onsubmit = async (e) => {
       const old = oldById.get(Number(choice.schedule_id));
       const no = Number(old?.session_no || choice.session_no || 1);
       const candidates = newBySession[no] || [];
+      const mapped = scheduleReplacements.get(Number(choice.schedule_id));
       const exact = candidates.find(s =>
         Number(s.weekday) === Number(old?.weekday) &&
         String(s.start_time || "").slice(0,5) === String(old?.start_time || "").slice(0,5) &&
         String(s.end_time || "").slice(0,5) === String(old?.end_time || "").slice(0,5)
       );
-      const next = exact || candidates[0];
+      const next = mapped || exact || candidates[0];
       return next ? { class_id: classId, student_id: choice.student_id, session_no: no, schedule_id: next.id } : null;
     }).filter(Boolean);
     if(replacementChoices.length){
@@ -345,6 +428,69 @@ form.onsubmit = async (e) => {
         return;
       }
     }
+
+    const replacedOldIds = [...scheduleReplacements.keys()];
+    if(replacedOldIds.length){
+      let attendanceQuery = sb
+        .from("attendance")
+        .select("class_id,student_id,date,status,schedule_id,session_no")
+        .eq("class_id", classId)
+        .in("schedule_id", replacedOldIds)
+        .gte("date", effectiveFrom);
+      attendanceQuery = limitScheduleQueryToVersion(attendanceQuery, nextEffectiveFrom);
+      const { data: attendanceRows, error: attendanceLoadError } = await attendanceQuery;
+      if(attendanceLoadError){
+        alert("Lỗi tải dữ liệu điểm danh cũ: "+attendanceLoadError.message);
+        return;
+      }
+      const migratedAttendance = (attendanceRows || []).map(row => {
+        const old = oldById.get(Number(row.schedule_id));
+        const next = scheduleReplacements.get(Number(row.schedule_id));
+        return {
+          class_id: classId,
+          student_id: row.student_id,
+          date: moveDateToReplacementWeekday(row.date, old, next),
+          status: row.status,
+          schedule_id: next.id,
+          session_no: Number(next.session_no || row.session_no || 1),
+        };
+      });
+      if(migratedAttendance.length){
+        const { error: attendanceUpsertError } = await sb
+          .from("attendance")
+          .upsert(migratedAttendance, { onConflict: "class_id,student_id,date,schedule_id" });
+        if(attendanceUpsertError){
+          alert("Lỗi chuyển dữ liệu điểm danh sang lịch mới: "+attendanceUpsertError.message);
+          return;
+        }
+        let attendanceDeleteQuery = sb
+          .from("attendance")
+          .delete()
+          .eq("class_id", classId)
+          .in("schedule_id", replacedOldIds)
+          .gte("date", effectiveFrom);
+        attendanceDeleteQuery = limitScheduleQueryToVersion(attendanceDeleteQuery, nextEffectiveFrom);
+        const { error: attendanceDeleteError } = await attendanceDeleteQuery;
+        if(attendanceDeleteError){
+          alert("Lỗi dọn dữ liệu điểm danh cũ: "+attendanceDeleteError.message);
+          return;
+        }
+      }
+    }
+
+    const classSessionError = await migrateClassSessionDates(
+      sb,
+      classId,
+      effectiveFrom,
+      nextEffectiveFrom,
+      oldById,
+      scheduleReplacements
+    );
+    if(classSessionError){
+      alert("Lỗi chuyển ngày nội dung buổi học sang lịch mới: "+classSessionError.message);
+      return;
+    }
+
     if(sameMonthIds.length){
       const { error: delErr } = await sb.from("class_schedules").delete().in("id", sameMonthIds);
       if(delErr){
