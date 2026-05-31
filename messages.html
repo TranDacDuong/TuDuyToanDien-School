@@ -55,6 +55,9 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
 .popup-mode .chat-back,
 .popup-mode #attachBtn,
 .popup-mode #sendBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 30px;
   height: 30px;
   min-height: 30px;
@@ -78,6 +81,12 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
 }
 .popup-mode #sendBtn {
   width: 30px !important;
+}
+.composer-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 .popup-mode .composer-tools {
   display: none;
@@ -389,9 +398,9 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
           <img id="imagePreviewImg" alt="Xem trước ảnh">
         </div>
         <div class="composer-row">
-          <button class="btn" type="button" id="attachBtn" onclick="chooseMessageImage()" title="Chọn ảnh" aria-label="Chọn ảnh" disabled>🖼</button>
+          <button class="btn" type="button" id="attachBtn" onclick="chooseMessageImage()" title="Chọn ảnh" aria-label="Chọn ảnh" disabled><svg class="composer-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v13H4zM7 15l3.4-3.5 2.6 2.6 1.8-1.8L18 15.5M8 9h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           <textarea id="messageInput" placeholder="Nhập tin nhắn..." disabled></textarea>
-          <button class="btn btn-primary" id="sendBtn" onclick="sendMessage()" title="Gửi tin nhắn" aria-label="Gửi tin nhắn" disabled>➤</button>
+          <button class="btn btn-primary" id="sendBtn" onclick="sendMessage()" title="Gửi tin nhắn" aria-label="Gửi tin nhắn" disabled><svg class="composer-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 3-7.6 18-3.1-7.3L3 10.6 21 3Zm-10.7 10.7L21 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
         <div class="composer-tools">
           <div class="attach-wrap">
