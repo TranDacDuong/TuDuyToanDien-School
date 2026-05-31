@@ -589,7 +589,7 @@
         const d = item.date, scheduleId = item.schedule_id;
         const cellStyle = 'padding:4px;'+attendanceSessionStyle(item.session_no);
         if(!getStudentSchedules(me.student_id, schedulesThisMonth).some(s => Number(s.id) === scheduleId)){
-          myCells+='<td class="center" style="'+cellStyle+'color:var(--ink-light)">—</td>';
+          myCells+='<td class="center" style="'+cellStyle+'"></td>';
           return;
         }
         if(d>left){
@@ -597,9 +597,9 @@
           const sm=statusMap[status]||statusMap.absent;
           myCells+='<td class="center" style="'+cellStyle+'"><span class="att-btn '+sm.cls+'" style="cursor:default;font-weight:700">'+ sm.text+'</span></td>';
         } else {
-          const defaultStatus = "unmarked";
+          const defaultStatus = d < joined ? "absent" : "present";
           const status=_attendanceMap[me.student_id+"_"+d+"_"+scheduleId]||_attendanceMap[me.student_id+"_"+d+"_0"]||defaultStatus;
-          const sm=statusMap[status]||statusMap.unmarked;
+          const sm=statusMap[status]||statusMap.present;
           myCells+='<td class="center" style="'+cellStyle+'"><span class="att-btn '+sm.cls+'" style="cursor:default;font-weight:700">'+ sm.text+'</span></td>';
         }
       });
@@ -630,9 +630,9 @@
             const sm=statusMap[status]||statusMap.absent;
             cells+='<td class="center" style="padding:4px"><span class="att-btn '+sm.cls+'" style="cursor:default;'+(isMe?"font-weight:700":"")+'">'+ sm.text+'</span></td>';
           } else {
-            const defaultStatus = "unmarked";
+            const defaultStatus = d < joined ? "absent" : "present";
             const status=_attendanceMap[s.student_id+"_"+d]||defaultStatus;
-            const sm=statusMap[status]||statusMap.unmarked;
+            const sm=statusMap[status]||statusMap.present;
             cells+='<td class="center" style="padding:4px"><span class="att-btn '+sm.cls+'" style="cursor:default;'+(isMe?"font-weight:700":"")+'">'+ sm.text+'</span></td>';
           }
         });
@@ -663,7 +663,7 @@
         const d = item.date, scheduleId = item.schedule_id, sessionNo = item.session_no;
         const cellStyle = 'padding:4px;'+attendanceSessionStyle(sessionNo);
         if(!getStudentSchedules(s.student_id, schedulesThisMonth).some(sc => Number(sc.id) === scheduleId)){
-          cells+='<td class="center" style="'+cellStyle+'color:var(--ink-light)">—</td>';
+          cells+='<td class="center" style="'+cellStyle+'"></td>';
           return;
         }
         if(d>left){
@@ -675,10 +675,10 @@
             'onclick="cvToggleAtt(\''+_classId+'\',\''+s.student_id+'\',\''+d+'\',\''+status+'\',\''+scheduleId+'\',\''+sessionNo+'\')">'+
             sm.text+'</button></td>';
         } else {
-          const defaultStatus = "unmarked";
+          const defaultStatus = d < joined ? "absent" : "present";
           const status=_attendanceMap[s.student_id+"_"+d+"_"+scheduleId]||_attendanceMap[s.student_id+"_"+d+"_0"]||defaultStatus;
           const key="cvatt_"+s.student_id+"_"+d+"_"+scheduleId;
-          const sm=statusMap[status]||statusMap.unmarked;
+          const sm=statusMap[status]||statusMap.present;
           cells+='<td class="center" style="'+cellStyle+'">'+
             '<button id="'+key+'" class="att-btn '+sm.cls+'" '+
             'onclick="cvToggleAtt(\''+_classId+'\',\''+s.student_id+'\',\''+d+'\',\''+status+'\',\''+scheduleId+'\',\''+sessionNo+'\')">'+
@@ -764,7 +764,7 @@
     await sb.from("class_students").update({left_at:new Date().toISOString()}).eq("class_id",classId).eq("student_id",studentId);
     const sched=getSchedulesForMonth(_cachedClass.class_schedules||[],_currentMonth,_currentYear);
     const futureRows=generateStudentOccurrences(studentId,sched,_currentMonth,_currentYear)
-      .filter(item=>item.date>=today)
+      .filter(item=>item.date>today)
       .map(item=>({class_id:classId,student_id:studentId,date:item.date,status:"absent",schedule_id:item.schedule_id,session_no:item.session_no}));
     if(futureRows.length>0){
       await sb.from("attendance").upsert(
