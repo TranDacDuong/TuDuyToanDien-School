@@ -16,10 +16,10 @@
 
   const EXAM_PAGES = new Set(["course_practice.html"]);
   const THEMES = [
-    { id: "spring", name: "Mua xuan", copy: "Canh hoa hong va la vang", petals: 26, leaves: 9, ribbons: 3 },
-    { id: "summer", name: "Mua ha", copy: "La xanh va nang am", petals: 12, leaves: 20, ribbons: 3 },
-    { id: "autumn", name: "Mua thu", copy: "La vang nau xoay cham", petals: 8, leaves: 25, ribbons: 2 },
-    { id: "winter", name: "Mua dong", copy: "Bong tuyet trang xanh", petals: 30, leaves: 0, ribbons: 2 },
+    { id: "spring", name: "Mua xuan", copy: "Canh hoa hong bay nhe", petals: 34, leaves: 5, ribbons: 2 },
+    { id: "summer", name: "Mua ha", copy: "La xanh va diem nang", petals: 8, leaves: 24, ribbons: 4 },
+    { id: "autumn", name: "Mua thu", copy: "La vang nau xoay cham", petals: 6, leaves: 34, ribbons: 1 },
+    { id: "winter", name: "Mua dong", copy: "Tuyet trang xanh roi mem", petals: 44, leaves: 0, ribbons: 1 },
   ];
 
   let activeTheme = localStorage.getItem(STORAGE_THEME) || DEFAULT_THEME;

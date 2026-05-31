@@ -53,6 +53,8 @@ html[data-mindup-theme="spring"] {
   --cream:#fff7f2;--surface:#fff1f5;--border:#f2dce4;
   --season-page-bg:linear-gradient(145deg,#fff8f2 0%,#fff0f6 52%,#f5f7ff 100%);
   --season-hero-bg:radial-gradient(circle at top right,rgba(255,255,255,.28),transparent 34%),linear-gradient(135deg,#59456f 0%,#9e6f96 56%,#e495ad 100%);
+  --season-background-image:url("season-spring.png");
+  --season-background-overlay:linear-gradient(135deg,rgba(255,250,247,.76),rgba(255,239,246,.68));
 }
 html[data-mindup-theme="summer"] {
   --navy:#075b52;--navy-mid:#0d7668;--navy-light:#15967e;
@@ -60,6 +62,8 @@ html[data-mindup-theme="summer"] {
   --cream:#f4ffec;--surface:#ecfbe6;--border:#d4ebc9;
   --season-page-bg:linear-gradient(145deg,#f9ffe8 0%,#efffd9 46%,#dcf8e8 100%);
   --season-hero-bg:radial-gradient(circle at top right,rgba(255,248,174,.42),transparent 32%),linear-gradient(135deg,#08766a 0%,#18a37d 55%,#e5b32f 100%);
+  --season-background-image:url("season-summer.png");
+  --season-background-overlay:linear-gradient(135deg,rgba(250,255,238,.72),rgba(230,255,236,.64));
 }
 html[data-mindup-theme="autumn"] {
   --navy:#64331e;--navy-mid:#884421;--navy-light:#aa5726;
@@ -67,6 +71,8 @@ html[data-mindup-theme="autumn"] {
   --cream:#fff8ed;--surface:#fdf0de;--border:#ecd5b8;
   --season-page-bg:linear-gradient(145deg,#fff9ed 0%,#fcebd6 50%,#f7dac2 100%);
   --season-hero-bg:radial-gradient(circle at top right,rgba(255,224,154,.3),transparent 32%),linear-gradient(135deg,#70351d 0%,#a84f25 56%,#d78832 100%);
+  --season-background-image:url("season-autumn.png");
+  --season-background-overlay:linear-gradient(135deg,rgba(255,249,238,.74),rgba(255,232,209,.66));
 }
 html[data-mindup-theme="winter"] {
   --navy:#173c67;--navy-mid:#23598a;--navy-light:#3479ad;
@@ -74,12 +80,35 @@ html[data-mindup-theme="winter"] {
   --cream:#f2faff;--surface:#eaf5fb;--border:#d2e7f2;
   --season-page-bg:linear-gradient(145deg,#f8fdff 0%,#eaf7ff 50%,#e1effb 100%);
   --season-hero-bg:radial-gradient(circle at top right,rgba(255,255,255,.46),transparent 32%),linear-gradient(135deg,#214e7a 0%,#397daf 56%,#8bc8e5 100%);
+  --season-background-image:url("season-winter.png");
+  --season-background-overlay:linear-gradient(135deg,rgba(250,254,255,.74),rgba(229,244,255,.66));
+}
+html[data-mindup-theme="spring"],
+html[data-mindup-theme="summer"],
+html[data-mindup-theme="autumn"],
+html[data-mindup-theme="winter"] {
+  background:var(--season-page-bg);
 }
 html[data-mindup-theme="spring"] body,
 html[data-mindup-theme="summer"] body,
 html[data-mindup-theme="autumn"] body,
 html[data-mindup-theme="winter"] body {
-  background:var(--season-page-bg) !important;
+  position:relative;
+  isolation:isolate;
+  background:transparent !important;
+}
+html[data-mindup-theme="spring"] body::before,
+html[data-mindup-theme="summer"] body::before,
+html[data-mindup-theme="autumn"] body::before,
+html[data-mindup-theme="winter"] body::before {
+  content:"";
+  position:fixed;
+  inset:-18px;
+  z-index:-1;
+  pointer-events:none;
+  background:var(--season-background-overlay),var(--season-background-image) center/cover no-repeat;
+  filter:blur(7px) saturate(.88);
+  transform:scale(1.035);
 }
 html[data-mindup-theme="spring"] .page-hero,
 html[data-mindup-theme="summer"] .page-hero,

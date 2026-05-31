@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Quản lý hệ thống</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css?v=20260601-seasons2">
+<link rel="stylesheet" href="theme.css?v=20260601-seasons3">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="supabaseClient.js"></script>
@@ -242,7 +242,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 .theme-card { border:2px solid transparent; border-radius:16px; background:#fff; box-shadow:0 10px 24px rgba(15,31,61,.07); padding:14px; cursor:pointer; text-align:left; transition:.18s; }
 .theme-card:hover { transform:translateY(-2px); box-shadow:0 14px 28px rgba(15,31,61,.11); }
 .theme-card.active { border-color:var(--gold); box-shadow:0 0 0 3px rgba(200,150,42,.14),0 14px 28px rgba(15,31,61,.1); }
-.theme-preview { height:72px; border-radius:12px; overflow:hidden; position:relative; background:linear-gradient(135deg,#fdf4dc,#e8f0fb); }
+.theme-preview { height:96px; border-radius:12px; overflow:hidden; position:relative; background:linear-gradient(135deg,#fdf4dc,#e8f0fb); background-size:cover; background-position:center; }
 .theme-preview::before,.theme-preview::after { content:""; position:absolute; border-radius:80% 20% 76% 24%; transform:rotate(25deg); }
 .theme-preview::before { width:16px; height:12px; top:16px; left:28%; background:var(--preview-a,#f4a4b7); box-shadow:54px 22px 0 var(--preview-b,#e4b84d),108px -2px 0 var(--preview-a,#f4a4b7); }
 .theme-preview::after { width:72%; height:8px; left:14%; bottom:14px; background:linear-gradient(90deg,transparent,var(--preview-b,#e4b84d),var(--preview-a,#f4a4b7),transparent); opacity:.52; }
@@ -309,7 +309,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   .t-search-bar .sg { min-width: 100%; }
 }
 </style>
-<script src="visual-effects.js?v=20260601-seasons2" defer></script>
+<script src="visual-effects.js?v=20260601-seasons3" defer></script>
 </head>
 <body>
 
@@ -714,10 +714,10 @@ function switchTab(id, btn){
 }
 
 const SYSTEM_THEMES = [
-  { id:'spring', name:'Mùa xuân', copy:'Cánh hoa hồng và lá vàng', a:'#f4a4b7', b:'#e4b84d' },
-  { id:'summer', name:'Mùa hạ', copy:'Lá xanh và nắng ấm', a:'#4ade80', b:'#facc15' },
-  { id:'autumn', name:'Mùa thu', copy:'Lá vàng nâu xoay chậm', a:'#fb923c', b:'#b45309' },
-  { id:'winter', name:'Mùa đông', copy:'Bông tuyết trắng xanh', a:'#e0f2fe', b:'#93c5fd' },
+  { id:'spring', name:'Mùa xuân', copy:'Sân trường hoa đào, cánh hoa bay nhẹ', image:'season-spring.png', a:'#f4a4b7', b:'#e4b84d' },
+  { id:'summer', name:'Mùa hạ', copy:'Tán cây xanh, nắng vàng và lá bay', image:'season-summer.png', a:'#4ade80', b:'#facc15' },
+  { id:'autumn', name:'Mùa thu', copy:'Sân trường lá cam, lá vàng rơi chậm', image:'season-autumn.png', a:'#fb923c', b:'#b45309' },
+  { id:'winter', name:'Mùa đông', copy:'Sân trường phủ tuyết, hạt tuyết trắng xanh', image:'season-winter.png', a:'#e0f2fe', b:'#93c5fd' },
 ];
 let _selectedSystemTheme = 'spring';
 
@@ -726,7 +726,7 @@ function renderSystemThemes(){
   if(!grid) return;
   grid.innerHTML = SYSTEM_THEMES.map(theme => `
     <button class="theme-card ${theme.id === _selectedSystemTheme ? 'active' : ''}" type="button" onclick="selectSystemTheme('${theme.id}')">
-      <div class="theme-preview" style="--preview-a:${theme.a};--preview-b:${theme.b}"></div>
+      <div class="theme-preview" style="--preview-a:${theme.a};--preview-b:${theme.b};background-image:linear-gradient(135deg,rgba(255,255,255,.34),rgba(255,255,255,.12)),url('${theme.image}')"></div>
       <div class="theme-card-title">${theme.name}</div>
       <div class="theme-card-copy">${theme.copy}</div>
     </button>
