@@ -266,7 +266,7 @@ h1 { font-size:32px; margin-bottom:8px; font-family:var(--font-display); color:#
       <button id="modeNormalBtn" class="active" type="button" onclick="switchExamMode('normal')">Đề thường</button>
       <button id="modePdfBtn" type="button" onclick="switchExamMode('pdf')">Đề PDF</button>
     </div>
-    <button class="btn" data-testid="exam-create-button" onclick="openEditor(null)">+ Tạo đề mới</button>
+    <button class="btn" id="createExamBtn" data-testid="exam-create-button" onclick="openEditor(null)">+ Tạo đề mới</button>
   </div>
   <div class="exam-grid" id="examGrid">
     <p style="color:var(--muted);font-size:13px">Đang tải...</p>
@@ -281,7 +281,7 @@ h1 { font-size:32px; margin-bottom:8px; font-family:var(--font-display); color:#
       onclick="closeEditor()">← Quay lại</button>
     <h2 id="editorTitle">Tạo đề mới</h2>
     <span id="examStats" style="font-size:12px;color:#94a3b8;flex-shrink:0"></span>
-    <button class="btn" style="background:#16a34a;flex-shrink:0" onclick="saveExam()">💾 Lưu đề</button>
+    <button class="btn" id="saveExamBtn" style="background:#16a34a;flex-shrink:0" onclick="saveExam()">💾 Lưu đề</button>
   </div>
 
   <div class="editor-body">
