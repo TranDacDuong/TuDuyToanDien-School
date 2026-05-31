@@ -46,6 +46,56 @@
   --t: .18s ease;
 }
 
+/* Seasonal system palettes */
+html[data-mindup-theme="spring"] {
+  --navy:#3f365f;--navy-mid:#695382;--navy-light:#8e6ba0;
+  --gold:#d27b9c;--gold-light:#f0abc4;--gold-pale:#fff0f6;--gold-border:#efbfd0;
+  --cream:#fff7f2;--surface:#fff1f5;--border:#f2dce4;
+  --season-page-bg:linear-gradient(145deg,#fff8f2 0%,#fff0f6 52%,#f5f7ff 100%);
+  --season-hero-bg:radial-gradient(circle at top right,rgba(255,255,255,.28),transparent 34%),linear-gradient(135deg,#59456f 0%,#9e6f96 56%,#e495ad 100%);
+}
+html[data-mindup-theme="summer"] {
+  --navy:#075b52;--navy-mid:#0d7668;--navy-light:#15967e;
+  --gold:#e7a51d;--gold-light:#f7cd4b;--gold-pale:#fff8d7;--gold-border:#efd46c;
+  --cream:#f4ffec;--surface:#ecfbe6;--border:#d4ebc9;
+  --season-page-bg:linear-gradient(145deg,#f9ffe8 0%,#efffd9 46%,#dcf8e8 100%);
+  --season-hero-bg:radial-gradient(circle at top right,rgba(255,248,174,.42),transparent 32%),linear-gradient(135deg,#08766a 0%,#18a37d 55%,#e5b32f 100%);
+}
+html[data-mindup-theme="autumn"] {
+  --navy:#64331e;--navy-mid:#884421;--navy-light:#aa5726;
+  --gold:#c66a21;--gold-light:#eba446;--gold-pale:#fff0d7;--gold-border:#e7b46c;
+  --cream:#fff8ed;--surface:#fdf0de;--border:#ecd5b8;
+  --season-page-bg:linear-gradient(145deg,#fff9ed 0%,#fcebd6 50%,#f7dac2 100%);
+  --season-hero-bg:radial-gradient(circle at top right,rgba(255,224,154,.3),transparent 32%),linear-gradient(135deg,#70351d 0%,#a84f25 56%,#d78832 100%);
+}
+html[data-mindup-theme="winter"] {
+  --navy:#173c67;--navy-mid:#23598a;--navy-light:#3479ad;
+  --gold:#73a9d1;--gold-light:#b9e2f5;--gold-pale:#ebf8ff;--gold-border:#acd6eb;
+  --cream:#f2faff;--surface:#eaf5fb;--border:#d2e7f2;
+  --season-page-bg:linear-gradient(145deg,#f8fdff 0%,#eaf7ff 50%,#e1effb 100%);
+  --season-hero-bg:radial-gradient(circle at top right,rgba(255,255,255,.46),transparent 32%),linear-gradient(135deg,#214e7a 0%,#397daf 56%,#8bc8e5 100%);
+}
+html[data-mindup-theme="spring"] body,
+html[data-mindup-theme="summer"] body,
+html[data-mindup-theme="autumn"] body,
+html[data-mindup-theme="winter"] body {
+  background:var(--season-page-bg) !important;
+}
+html[data-mindup-theme="spring"] .page-hero,
+html[data-mindup-theme="summer"] .page-hero,
+html[data-mindup-theme="autumn"] .page-hero,
+html[data-mindup-theme="winter"] .page-hero,
+html[data-mindup-theme="spring"] .hero,
+html[data-mindup-theme="summer"] .hero,
+html[data-mindup-theme="autumn"] .hero,
+html[data-mindup-theme="winter"] .hero,
+html[data-mindup-theme="spring"] .ops-hero,
+html[data-mindup-theme="summer"] .ops-hero,
+html[data-mindup-theme="autumn"] .ops-hero,
+html[data-mindup-theme="winter"] .ops-hero {
+  background:var(--season-hero-bg) !important;
+}
+
 /* ── Reset & Base ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 .hidden { display: none !important; }
@@ -517,6 +567,12 @@ label {
   will-change: transform;
 }
 .mindup-petal-layer[data-theme="winter"] .mindup-petal { border-radius: 50%; }
+.mindup-petal-layer[data-theme="spring"] .mindup-petal { box-shadow:0 2px 7px rgba(210,123,156,.26); }
+.mindup-petal-layer[data-theme="summer"] .mindup-petal { border-radius:50%;box-shadow:0 0 12px rgba(250,204,21,.46); }
+.mindup-petal-layer[data-theme="summer"] .mindup-leaf { border-radius:95% 8% 95% 8%; }
+.mindup-petal-layer[data-theme="autumn"] .mindup-petal { border-radius:95% 8% 95% 8%; }
+.mindup-petal-layer[data-theme="autumn"] .mindup-leaf { box-shadow:0 3px 8px rgba(146,64,14,.24); }
+.mindup-petal-layer[data-theme="winter"] .mindup-petal { border:1px solid rgba(147,197,253,.62);box-shadow:0 0 10px rgba(186,230,253,.72); }
 .mindup-effect-settings {
   position: fixed;
   right: 16px;

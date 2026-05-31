@@ -1,9 +1,17 @@
 (function () {
-  if (window.top !== window) return;
-
   const STORAGE_ENABLED = "mindup_effects_enabled";
   const STORAGE_THEME = "mindup_system_theme";
   const DEFAULT_THEME = "spring";
+  document.documentElement.dataset.mindupTheme = localStorage.getItem(STORAGE_THEME) || DEFAULT_THEME;
+  if (window.top !== window) {
+    window.addEventListener("storage", (event) => {
+      if (event.key === STORAGE_THEME && event.newValue) {
+        document.documentElement.dataset.mindupTheme = event.newValue;
+      }
+    });
+    return;
+  }
+
   const EXAM_PAGES = new Set(["course_practice.html"]);
   const THEMES = [
     { id: "spring", name: "Mua xuan", copy: "Canh hoa hong va la vang", petals: 26, leaves: 9, ribbons: 3 },
