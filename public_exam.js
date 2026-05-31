@@ -74,6 +74,12 @@
   let _examDraftNotice = "";
   let _essayReviewQueue = [];
 
+  function requirePublicExamAdmin() {
+    if (_role === "admin") return true;
+    alert("Chỉ admin mới có quyền quản lý đề thi thử và đề thi thật.");
+    return false;
+  }
+
   /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      INIT
   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
@@ -328,6 +334,7 @@
   let _editingPeId = null;
 
   window.togglePin = async function(peId, pin) {
+    if (!requirePublicExamAdmin()) return;
     const sb = getSb();
     const { error } = await sb.from("public_exams").update({ is_pinned: pin }).eq("id", peId);
     if (error) { alert("Lỗi: " + error.message); return; }
@@ -335,6 +342,7 @@
   };
 
   window.openAddExamModal = async function() {
+    if (!requirePublicExamAdmin()) return;
     _editingPeId = null;
     document.querySelector("#addExamModal .modal-card h3").textContent = "Thêm đề thi công khai";
     document.getElementById("peExamId").value = "";
@@ -354,6 +362,7 @@
   };
 
   window.openEditExamModal = async function(peId) {
+    if (!requirePublicExamAdmin()) return;
     _editingPeId = peId;
     const pe = _allExams.find(p => p.id === peId);
     if (!pe) return;
@@ -371,6 +380,7 @@
   };
 
   window.savePublicExam = async function() {
+    if (!requirePublicExamAdmin()) return;
     const examId   = document.getElementById("peExamId").value;
     const examType = document.getElementById("peType").value;
     const startsAt = document.getElementById("peStartsAt").value || null;
@@ -403,6 +413,7 @@
   };
 
   window.deletePublicExam = async function(peId, title) {
+    if (!requirePublicExamAdmin()) return;
     if (!confirm(`Xóa đề thi "${title}"? Toàn bộ kết quả liên quan sẽ bị xóa.`)) return;
     const sb = getSb();
     const { data: results } = await sb.from("exam_results").select("id").eq("public_exam_id", peId);
