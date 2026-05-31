@@ -393,6 +393,10 @@ let presenceChannel = null;
 let presencePingInterval = null;
 let activePresenceIds = new Set();
 let friendsLoadToken = 0;
+let loadedMessages = [];
+let isLoadingOlderMessages = false;
+let hasOlderMessages = true;
+const MESSAGE_PAGE_SIZE = 10;
 const queryParams = new URLSearchParams(location.search);
 const isTrayMode = queryParams.get("tray") === "1";
 const isPopupMode = queryParams.get("popup") === "1";
@@ -629,6 +633,9 @@ window.openConversation = async function(friendId, friendName, friendAvatar, fri
   document.getElementById("friend_" + friendId)?.classList.add("active");
 
   activeFriend = { id: friendId, name: friendName, avatar: friendAvatar, role: friendRole };
+  loadedMessages = [];
+  isLoadingOlderMessages = false;
+  hasOlderMessages = true;
   document.getElementById("chatTitle").textContent = friendName;
   document.getElementById("chatSub").textContent = buildChatSub(friendId, friendRole);
   document.getElementById("messageList").innerHTML = '<div class="empty"><strong>Đang mở cuộc trò chuyện</strong>Tin nhắn sẽ hiện ngay sau khi kết nối hoàn tất.</div>';
@@ -638,7 +645,7 @@ window.openConversation = async function(friendId, friendName, friendAvatar, fri
   try {
     currentConversationId = await ensureConversation(friendId, friendMap.get(friendId)?.conversationId);
     setComposerEnabled(true);
-    await loadMessages();
+    await loadMessages({ reset: true, scrollToBottom: true });
     subscribeConversationMessages(currentConversationId);
     markMessageNotificationsRead(friendId)
       .then(() => isPopupMode ? null : loadFriends())
@@ -842,27 +849,9 @@ window.addEventListener("resize", () => {
   syncMobileConversationState(document.documentElement.classList.contains("mobile-chat-open"));
 });
 
-async function loadMessages() {
-  if (!currentConversationId) return;
-
-  const { data, error } = await sb
-    .from("messages")
-    .select("id, content, created_at, sender_id")
-    .eq("conversation_id", currentConversationId)
-    .order("created_at", { ascending: false })
-    .limit(10);
-
+function renderLoadedMessages() {
   const wrap = document.getElementById("messageList");
-  if (error) {
-    wrap.innerHTML = '<div class="empty"><strong>Không tải được tin nhắn</strong>Hãy thử lại sau ít phút.</div>';
-    return;
-  }
-  if (!data || !data.length) {
-    wrap.innerHTML = '<div class="empty"><strong>Chưa có tin nhắn nào</strong>Hãy gửi lời chào đầu tiên để bắt đầu cuộc trò chuyện.</div>';
-    return;
-  }
-
-  wrap.innerHTML = data.slice().reverse().map(item => `
+  wrap.innerHTML = loadedMessages.map(item => `
     <div class="message-row ${item.sender_id === currentUser.id ? "mine" : ""}">
       <div class="bubble">
         ${renderMessageBody(item.content)}
@@ -870,8 +859,89 @@ async function loadMessages() {
       </div>
     </div>
   `).join("");
-  wrap.scrollTop = wrap.scrollHeight;
 }
+
+async function loadMessages({ reset = false, scrollToBottom = false } = {}) {
+  if (!currentConversationId) return;
+
+  const wrap = document.getElementById("messageList");
+  const previousScrollTop = wrap.scrollTop;
+  const wasNearBottom = wrap.scrollHeight - wrap.clientHeight - wrap.scrollTop < 80;
+  const { data, error } = await sb
+    .from("messages")
+    .select("id, content, created_at, sender_id")
+    .eq("conversation_id", currentConversationId)
+    .order("created_at", { ascending: false })
+    .limit(MESSAGE_PAGE_SIZE);
+
+  if (error) {
+    wrap.innerHTML = '<div class="empty"><strong>Không tải được tin nhắn</strong>Hãy thử lại sau ít phút.</div>';
+    return;
+  }
+  if (!data || !data.length) {
+    if (reset) {
+      loadedMessages = [];
+      hasOlderMessages = false;
+      wrap.innerHTML = '<div class="empty"><strong>Chưa có tin nhắn nào</strong>Hãy gửi lời chào đầu tiên để bắt đầu cuộc trò chuyện.</div>';
+    }
+    return;
+  }
+
+  const latestMessages = data.slice().reverse();
+  if (reset) {
+    loadedMessages = latestMessages;
+    hasOlderMessages = data.length === MESSAGE_PAGE_SIZE;
+  } else {
+    const messagesById = new Map(loadedMessages.map(item => [item.id, item]));
+    latestMessages.forEach(item => messagesById.set(item.id, item));
+    loadedMessages = Array.from(messagesById.values()).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  }
+
+  renderLoadedMessages();
+  if (scrollToBottom || wasNearBottom) {
+    wrap.scrollTop = wrap.scrollHeight;
+  } else {
+    wrap.scrollTop = previousScrollTop;
+  }
+  if (reset && hasOlderMessages && wrap.scrollHeight <= wrap.clientHeight) loadOlderMessages();
+}
+
+async function loadOlderMessages() {
+  if (!currentConversationId || isLoadingOlderMessages || !hasOlderMessages || !loadedMessages.length) return;
+
+  const wrap = document.getElementById("messageList");
+  const previousScrollHeight = wrap.scrollHeight;
+  const previousScrollTop = wrap.scrollTop;
+  isLoadingOlderMessages = true;
+
+  const { data, error } = await sb
+    .from("messages")
+    .select("id, content, created_at, sender_id")
+    .eq("conversation_id", currentConversationId)
+    .lt("created_at", loadedMessages[0].created_at)
+    .order("created_at", { ascending: false })
+    .limit(MESSAGE_PAGE_SIZE);
+
+  isLoadingOlderMessages = false;
+  if (error) {
+    console.warn("Không tải được tin nhắn cũ:", error);
+    return;
+  }
+
+  const olderMessages = (data || []).slice().reverse();
+  hasOlderMessages = olderMessages.length === MESSAGE_PAGE_SIZE;
+  if (!olderMessages.length) return;
+
+  const loadedIds = new Set(loadedMessages.map(item => item.id));
+  loadedMessages = olderMessages.filter(item => !loadedIds.has(item.id)).concat(loadedMessages);
+  renderLoadedMessages();
+  wrap.scrollTop = previousScrollTop + wrap.scrollHeight - previousScrollHeight;
+  if (hasOlderMessages && wrap.scrollHeight <= wrap.clientHeight) loadOlderMessages();
+}
+
+document.getElementById("messageList").addEventListener("scroll", () => {
+  if (document.getElementById("messageList").scrollTop <= 24) loadOlderMessages();
+});
 
 window.sendMessage = async function() {
   const input = document.getElementById("messageInput");
@@ -914,7 +984,7 @@ window.sendMessage = async function() {
   input.value = "";
   clearMessageImage();
   await loadFriends();
-  await loadMessages();
+  await loadMessages({ scrollToBottom: true });
 };
 
 window.previewMessageImage = function() {
