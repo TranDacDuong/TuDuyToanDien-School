@@ -693,6 +693,23 @@ section.box:has(#teacherTrialForm) .panel-title {
   .teacher-course-stats { grid-template-columns: 1fr; }
   .editor-toolbar { gap: 5px; }
 }
+.profile-chat-popup {
+  position: fixed; right: 18px; bottom: 18px; z-index: 1500;
+  display: none; width: min(390px, calc(100vw - 24px)); overflow: hidden;
+  border: 1px solid rgba(15,31,61,.1); border-radius: 18px; background: #fff;
+  box-shadow: 0 20px 44px rgba(15,31,61,.2);
+}
+.profile-chat-popup.open { display: block; }
+.profile-chat-popup-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 12px; background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
+  color: #fff; font-size: .88rem; font-weight: 700;
+}
+.profile-chat-popup-head button {
+  border: 1px solid rgba(255,255,255,.24); border-radius: 8px;
+  background: rgba(255,255,255,.12); color: #fff; cursor: pointer;
+}
+.profile-chat-popup-frame { display: block; width: 100%; height: min(520px, 72vh); border: 0; background: #fff; }
 </style>
 <script src="visual-effects.js?v=20260530-themes3" defer></script>
 </head>
@@ -878,6 +895,14 @@ section.box:has(#teacherTrialForm) .panel-title {
   <div id="errorBox" class="box error hidden"></div>
 </div>
 
+<div class="profile-chat-popup" id="profileChatPopup">
+  <div class="profile-chat-popup-head">
+    <span>Nhắn tin</span>
+    <button type="button" onclick="closeProfileChatPopup()">Đóng</button>
+  </div>
+  <iframe class="profile-chat-popup-frame" id="profileChatPopupFrame" src="about:blank" loading="lazy"></iframe>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
 <script src="image_upload.js"></script>
@@ -902,7 +927,19 @@ async function createNotification(userId, type, message, refId) {
 
 window.openProfileChatPopup = function(userId) {
   if (!userId) return;
-  window.parent?.postMessage({ type: "dashboard:open-chat-popup", userId }, "*");
+  const popup = document.getElementById("profileChatPopup");
+  const frame = document.getElementById("profileChatPopupFrame");
+  if (!popup || !frame) return;
+  const src = "messages.html?popup=1&user=" + encodeURIComponent(userId);
+  if (frame.dataset.loaded !== src) {
+    frame.src = src;
+    frame.dataset.loaded = src;
+  }
+  popup.classList.add("open");
+};
+
+window.closeProfileChatPopup = function() {
+  document.getElementById("profileChatPopup")?.classList.remove("open");
 };
 
 async function init() {

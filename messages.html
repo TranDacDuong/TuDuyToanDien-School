@@ -52,6 +52,17 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
   padding: 10px 12px 12px;
 }
 .popup-mode .chat-back { display: inline-flex; align-items: center; justify-content: center; }
+.popup-mode .chat-back,
+.popup-mode #attachBtn,
+.popup-mode #sendBtn {
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  border-radius: 9px;
+  font-size: .8rem;
+  flex-shrink: 0;
+}
 .panel { background: var(--white); border: 1px solid rgba(15,31,61,.08); border-radius: 20px; box-shadow: 0 10px 24px rgba(15,31,61,.06); overflow: hidden; }
 .sidebar-head, .chat-head { padding: 18px 20px 14px; border-bottom: 1px solid rgba(15,31,61,.06); }
 .chat-head-bar { display: flex; align-items: center; gap: 10px; }
@@ -331,13 +342,13 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
           <img id="imagePreviewImg" alt="Xem trước ảnh">
         </div>
         <div class="composer-row">
+          <button class="btn" type="button" id="attachBtn" onclick="chooseMessageImage()" title="Chọn ảnh" aria-label="Chọn ảnh" disabled>🖼</button>
           <textarea id="messageInput" placeholder="Nhập tin nhắn..." disabled></textarea>
           <button class="btn btn-primary" id="sendBtn" onclick="sendMessage()" title="Gửi tin nhắn" aria-label="Gửi tin nhắn" disabled>➤</button>
         </div>
         <div class="composer-tools">
           <div class="attach-wrap">
             <input id="messageImage" class="hidden-input" type="file" accept="image/*" onchange="previewMessageImage()">
-            <button class="btn" type="button" id="attachBtn" onclick="chooseMessageImage()" title="Chọn ảnh" aria-label="Chọn ảnh" disabled>🖼</button>
             <span id="attachName" class="attach-name"></span>
           </div>
         </div>
@@ -819,7 +830,8 @@ async function loadMessages() {
     .from("messages")
     .select("id, content, created_at, sender_id")
     .eq("conversation_id", currentConversationId)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: false })
+    .limit(10);
 
   const wrap = document.getElementById("messageList");
   if (error) {
@@ -831,7 +843,7 @@ async function loadMessages() {
     return;
   }
 
-  wrap.innerHTML = data.map(item => `
+  wrap.innerHTML = data.slice().reverse().map(item => `
     <div class="message-row ${item.sender_id === currentUser.id ? "mine" : ""}">
       <div class="bubble">
         ${renderMessageBody(item.content)}
