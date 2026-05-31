@@ -443,10 +443,10 @@ form.onsubmit = async (e) => {
         alert("Lỗi tải dữ liệu điểm danh cũ: "+attendanceLoadError.message);
         return;
       }
-      const migratedAttendance = (attendanceRows || []).map(row => {
+      const migratedAttendance = [...new Map((attendanceRows || []).map(row => {
         const old = oldById.get(Number(row.schedule_id));
         const next = scheduleReplacements.get(Number(row.schedule_id));
-        return {
+        const migrated = {
           class_id: classId,
           student_id: row.student_id,
           date: moveDateToReplacementWeekday(row.date, old, next),
@@ -454,11 +454,12 @@ form.onsubmit = async (e) => {
           schedule_id: next.id,
           session_no: Number(next.session_no || row.session_no || 1),
         };
-      });
+        return [migrated.class_id+"_"+migrated.student_id+"_"+migrated.date, migrated];
+      })).values()];
       if(migratedAttendance.length){
         const { error: attendanceUpsertError } = await sb
           .from("attendance")
-          .upsert(migratedAttendance, { onConflict: "class_id,student_id,date,schedule_id" });
+          .upsert(migratedAttendance, { onConflict: "class_id,student_id,date" });
         if(attendanceUpsertError){
           alert("Lỗi chuyển dữ liệu điểm danh sang lịch mới: "+attendanceUpsertError.message);
           return;

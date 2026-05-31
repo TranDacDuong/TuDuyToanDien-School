@@ -25,6 +25,12 @@
   function fmtDT(iso){
     return new Date(iso).toLocaleString("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
   }
+  function uniqueAttendanceRows(rows){
+    return [...new Map((rows || []).map(row => [
+      row.class_id+"_"+row.student_id+"_"+row.date,
+      row
+    ])).values()];
+  }
   function esc(value){
     return String(value ?? "")
       .replace(/&/g, "&amp;")
@@ -740,7 +746,7 @@
     const sid = Number(scheduleId || 0) || null;
     const{error}=await sb.from("attendance").upsert(
       [{class_id:classId,student_id:studentId,date,status:next,schedule_id:sid,session_no:Number(sessionNo || 1)}],
-      {onConflict:"class_id,student_id,date,schedule_id"}
+      {onConflict:"class_id,student_id,date"}
     );
     if(error){alert("Lỗi: "+error.message);return;}
     _attendanceMap[studentId+"_"+date+"_"+(sid || 0)]=next;
@@ -762,8 +768,8 @@
       .map(item=>({class_id:classId,student_id:studentId,date:item.date,status:"absent",schedule_id:item.schedule_id,session_no:item.session_no}));
     if(futureRows.length>0){
       await sb.from("attendance").upsert(
-        futureRows,
-        {onConflict:"class_id,student_id,date,schedule_id"}
+        uniqueAttendanceRows(futureRows),
+        {onConflict:"class_id,student_id,date"}
       );
     }
     const st=_cachedClass.students.find(s=>s.student_id===studentId);
@@ -806,8 +812,8 @@
     });
     if(!rows.length) return;
     await sb.from("attendance").upsert(
-      rows,
-      {onConflict:"class_id,student_id,date,schedule_id"}
+      uniqueAttendanceRows(rows),
+      {onConflict:"class_id,student_id,date"}
     );
     rows.forEach(row=>{
       _attendanceMap[row.student_id+"_"+today+"_"+row.schedule_id]="absent";
@@ -948,8 +954,8 @@
       .map(item=>({class_id:classId,student_id:studentId,date:item.date,status:"absent",schedule_id:item.schedule_id,session_no:item.session_no}));
     if(pastRows.length>0){
       await sb.from("attendance").upsert(
-        pastRows,
-        {onConflict:"class_id,student_id,date,schedule_id"}
+        uniqueAttendanceRows(pastRows),
+        {onConflict:"class_id,student_id,date"}
       );
     }
     const{data:userData}=await sb.from("users").select("id,full_name").eq("id",studentId).single();
