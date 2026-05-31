@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Quản lý hệ thống</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css?v=20260601-seasons1">
+<link rel="stylesheet" href="theme.css?v=20260601-seasons2">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="supabaseClient.js"></script>
@@ -309,7 +309,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   .t-search-bar .sg { min-width: 100%; }
 }
 </style>
-<script src="visual-effects.js?v=20260601-seasons1" defer></script>
+<script src="visual-effects.js?v=20260601-seasons2" defer></script>
 </head>
 <body>
 
@@ -715,15 +715,9 @@ function switchTab(id, btn){
 
 const SYSTEM_THEMES = [
   { id:'spring', name:'Mùa xuân', copy:'Cánh hoa hồng và lá vàng', a:'#f4a4b7', b:'#e4b84d' },
-  { id:'academy', name:'Học viện vàng', copy:'Ánh vàng trang trọng', a:'#e2b74a', b:'#a97018' },
-  { id:'sky', name:'Trời xanh', copy:'Sắc xanh trong và nhẹ', a:'#93c5fd', b:'#38bdf8' },
-  { id:'aurora', name:'Cực quang', copy:'Ánh tím xanh mềm mại', a:'#6ee7b7', b:'#a78bfa' },
   { id:'summer', name:'Mùa hạ', copy:'Lá xanh và nắng ấm', a:'#4ade80', b:'#facc15' },
   { id:'autumn', name:'Mùa thu', copy:'Lá vàng nâu xoay chậm', a:'#fb923c', b:'#b45309' },
   { id:'winter', name:'Mùa đông', copy:'Bông tuyết trắng xanh', a:'#e0f2fe', b:'#93c5fd' },
-  { id:'lantern', name:'Đêm hội', copy:'Sắc đỏ vàng như lễ hội', a:'#f87171', b:'#facc15' },
-  { id:'ocean', name:'Gió biển', copy:'Sắc xanh biển thoáng mát', a:'#67e8f9', b:'#0ea5e9' },
-  { id:'minimal', name:'Tinh giản', copy:'Rất nhẹ, ưu tiên tập trung', a:'#cbd5e1', b:'#94a3b8' },
 ];
 let _selectedSystemTheme = 'spring';
 

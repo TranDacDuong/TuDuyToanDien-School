@@ -2,11 +2,13 @@
   const STORAGE_ENABLED = "mindup_effects_enabled";
   const STORAGE_THEME = "mindup_system_theme";
   const DEFAULT_THEME = "spring";
-  document.documentElement.dataset.mindupTheme = localStorage.getItem(STORAGE_THEME) || DEFAULT_THEME;
+  const SEASON_THEMES = new Set(["spring", "summer", "autumn", "winter"]);
+  const storedTheme = localStorage.getItem(STORAGE_THEME);
+  document.documentElement.dataset.mindupTheme = SEASON_THEMES.has(storedTheme) ? storedTheme : DEFAULT_THEME;
   if (window.top !== window) {
     window.addEventListener("storage", (event) => {
       if (event.key === STORAGE_THEME && event.newValue) {
-        document.documentElement.dataset.mindupTheme = event.newValue;
+        document.documentElement.dataset.mindupTheme = SEASON_THEMES.has(event.newValue) ? event.newValue : DEFAULT_THEME;
       }
     });
     return;
@@ -15,15 +17,9 @@
   const EXAM_PAGES = new Set(["course_practice.html"]);
   const THEMES = [
     { id: "spring", name: "Mua xuan", copy: "Canh hoa hong va la vang", petals: 26, leaves: 9, ribbons: 3 },
-    { id: "academy", name: "Hoc vien vang", copy: "Anh vang trang trong", petals: 16, leaves: 15, ribbons: 3 },
-    { id: "sky", name: "Troi xanh", copy: "Sac xanh trong va nhe", petals: 24, leaves: 5, ribbons: 4 },
-    { id: "aurora", name: "Cuc quang", copy: "Anh tim xanh mem mai", petals: 20, leaves: 4, ribbons: 5 },
     { id: "summer", name: "Mua ha", copy: "La xanh va nang am", petals: 12, leaves: 20, ribbons: 3 },
     { id: "autumn", name: "Mua thu", copy: "La vang nau xoay cham", petals: 8, leaves: 25, ribbons: 2 },
     { id: "winter", name: "Mua dong", copy: "Bong tuyet trang xanh", petals: 30, leaves: 0, ribbons: 2 },
-    { id: "lantern", name: "Dem hoi", copy: "Sac do vang nhu le hoi", petals: 18, leaves: 10, ribbons: 5 },
-    { id: "ocean", name: "Gio bien", copy: "Sac xanh bien thoang mat", petals: 22, leaves: 6, ribbons: 5 },
-    { id: "minimal", name: "Tinh gian", copy: "Rat nhe, uu tien tap trung", petals: 8, leaves: 3, ribbons: 1 },
   ];
 
   let activeTheme = localStorage.getItem(STORAGE_THEME) || DEFAULT_THEME;
