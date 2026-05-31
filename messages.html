@@ -63,6 +63,25 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
   font-size: .8rem;
   flex-shrink: 0;
 }
+.popup-mode .composer-row {
+  flex-direction: row !important;
+  gap: 6px;
+}
+.popup-mode .composer textarea {
+  width: auto;
+  min-width: 0;
+  min-height: 38px;
+  max-height: 84px;
+  padding: 9px 11px;
+  border-radius: 18px;
+  resize: none;
+}
+.popup-mode #sendBtn {
+  width: 30px !important;
+}
+.popup-mode .composer-tools {
+  display: none;
+}
 .panel { background: var(--white); border: 1px solid rgba(15,31,61,.08); border-radius: 20px; box-shadow: 0 10px 24px rgba(15,31,61,.06); overflow: hidden; }
 .sidebar-head, .chat-head { padding: 18px 20px 14px; border-bottom: 1px solid rgba(15,31,61,.06); }
 .chat-head-bar { display: flex; align-items: center; gap: 10px; }
