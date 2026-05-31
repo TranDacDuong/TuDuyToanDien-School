@@ -1937,11 +1937,12 @@ body {
     </a>
   </div>
 
-  <div class="feed-header">
-    <div class="feed-title">Bảng tin</div>
+  <div class="home-tabs">
+    <button class="home-tab-btn active" id="homeTabOverview" type="button" onclick="setHomeTab('overview')">Thông tin</button>
+    <button class="home-tab-btn" id="homeTabDiscussion" type="button" onclick="setHomeTab('discussion')">Thảo luận</button>
   </div>
 
-  <section class="overview-section" id="overviewSection">
+  <section class="overview-section active" id="overviewSection">
     <div class="overview-main" id="overviewMain">
       <div class="overview-card overview-admin" id="overviewAdminCard">
         <div class="overview-card-head">
@@ -2160,7 +2161,7 @@ body {
     </aside>
   </section>
 
-  <section class="discussion-section active" id="discussionSection">
+  <section class="discussion-section" id="discussionSection">
   <div class="feed-shortcuts">
     <div class="shortcut-card">
       <span class="shortcut-icon">🏠</span>
@@ -2233,7 +2234,7 @@ let feedRefreshRunning = false;
 let homeBadgeChannel = null;
 let activeSocialPanel = "";
 let currentFeedFilter = "default";
-let currentHomeTab = "discussion";
+let currentHomeTab = "overview";
 let cachedVisiblePosts = [];
 const HIDDEN_NOTIFICATION_TYPES = ["friend_request", "friend_accept", "message_new"];
 let examEvents = [];
