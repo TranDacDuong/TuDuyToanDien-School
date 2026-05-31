@@ -35,7 +35,7 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
 .popup-mode .shell { grid-template-columns: 1fr; gap: 0; height: 100vh; }
 .popup-mode .chat-panel { display: none; }
 .popup-mode.mobile-chat-open aside.panel { display: none; }
-.popup-mode.mobile-chat-open .chat-panel { display: block; }
+.popup-mode.mobile-chat-open .chat-panel { display: grid; }
 .popup-mode .panel {
   border-radius: 0;
   border: none;
@@ -178,6 +178,7 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
 .friend-badge.show { display: inline-flex; }
 .chat-panel { display: grid; grid-template-rows: auto 1fr auto; min-height: 0; }
 .message-list {
+  min-height: 0;
   padding: 18px;
   overflow: auto;
   scrollbar-color: #9b5aa5 transparent;
