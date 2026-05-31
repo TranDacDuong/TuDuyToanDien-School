@@ -212,6 +212,7 @@
   /* â”€â”€ Attendance status â”€â”€ */
   const statusCycle = ["present","absent","makeup"];
   const statusMap = {
+    unmarked:{ text:"—",      cls:""        },
     present:{ text:"Có",     cls:"present" },
     absent: { text:"Vắng",   cls:"absent"  },
     makeup: { text:"Học bù", cls:"makeup"  },
@@ -429,6 +430,7 @@
       return;
     }
     _cachedClass = data;
+    renderShell();
     const { data: chosenSchedules } = await sb
       .from("class_student_schedules")
       .select("student_id,schedule_id")
@@ -438,7 +440,6 @@
       if(!_studentScheduleMap[row.student_id]) _studentScheduleMap[row.student_id] = new Set();
       _studentScheduleMap[row.student_id].add(Number(row.schedule_id));
     });
-    renderShell();
     if(_activeTab === "attendance") await renderAttendanceTab();
     else await renderExamsTab();
   }
@@ -590,9 +591,9 @@
           const sm=statusMap[status]||statusMap.absent;
           myCells+='<td class="center" style="'+cellStyle+'"><span class="att-btn '+sm.cls+'" style="cursor:default;font-weight:700">'+ sm.text+'</span></td>';
         } else {
-          const defaultStatus = d < joined ? "absent" : "present";
+          const defaultStatus = "unmarked";
           const status=_attendanceMap[me.student_id+"_"+d+"_"+scheduleId]||_attendanceMap[me.student_id+"_"+d+"_0"]||defaultStatus;
-          const sm=statusMap[status]||statusMap.present;
+          const sm=statusMap[status]||statusMap.unmarked;
           myCells+='<td class="center" style="'+cellStyle+'"><span class="att-btn '+sm.cls+'" style="cursor:default;font-weight:700">'+ sm.text+'</span></td>';
         }
       });
@@ -623,9 +624,9 @@
             const sm=statusMap[status]||statusMap.absent;
             cells+='<td class="center" style="padding:4px"><span class="att-btn '+sm.cls+'" style="cursor:default;'+(isMe?"font-weight:700":"")+'">'+ sm.text+'</span></td>';
           } else {
-            const defaultStatus = d < joined ? "absent" : "present";
+            const defaultStatus = "unmarked";
             const status=_attendanceMap[s.student_id+"_"+d]||defaultStatus;
-            const sm=statusMap[status]||statusMap.present;
+            const sm=statusMap[status]||statusMap.unmarked;
             cells+='<td class="center" style="padding:4px"><span class="att-btn '+sm.cls+'" style="cursor:default;'+(isMe?"font-weight:700":"")+'">'+ sm.text+'</span></td>';
           }
         });
@@ -668,10 +669,10 @@
             'onclick="cvToggleAtt(\''+_classId+'\',\''+s.student_id+'\',\''+d+'\',\''+status+'\',\''+scheduleId+'\',\''+sessionNo+'\')">'+
             sm.text+'</button></td>';
         } else {
-          const defaultStatus = d < joined ? "absent" : "present";
+          const defaultStatus = "unmarked";
           const status=_attendanceMap[s.student_id+"_"+d+"_"+scheduleId]||_attendanceMap[s.student_id+"_"+d+"_0"]||defaultStatus;
           const key="cvatt_"+s.student_id+"_"+d+"_"+scheduleId;
-          const sm=statusMap[status]||statusMap.present;
+          const sm=statusMap[status]||statusMap.unmarked;
           cells+='<td class="center" style="'+cellStyle+'">'+
             '<button id="'+key+'" class="att-btn '+sm.cls+'" '+
             'onclick="cvToggleAtt(\''+_classId+'\',\''+s.student_id+'\',\''+d+'\',\''+status+'\',\''+scheduleId+'\',\''+sessionNo+'\')">'+
@@ -862,8 +863,7 @@
         'background:'+(alreadyIn?"var(--surface)":"var(--white)")+';border:1px solid var(--border)">'+
         "<div>"+
         '<div style="font-weight:600;font-size:.85rem;color:var(--navy)">'+(u.full_name||"—")+"</div>"+
-        '<div style="font-size:.75rem;color:var(--ink-mid)">'+(u.email||"")+
-          (_role === "admin" && u.phone ? " • "+u.phone : "")+"</div>"+
+        '<div style="font-size:.75rem;color:var(--ink-mid)">'+(u.email||"")+"</div>"+
         "</div>"+
         (alreadyIn
           ?'<span style="font-size:.75rem;color:var(--ink-light)">Đã trong lớp</span>'
@@ -1159,8 +1159,8 @@
       : "";
     const orderLabel = session.display_order || session.session_order || "—";
     return '<div style="background:var(--white);border:1px solid var(--border);border-radius:18px;padding:'+(isCompactMobile ? '16px' : '16px 18px')+'">'+
-      '<div style="display:grid;grid-template-columns:'+(isCompactMobile ? '1fr' : '94px minmax(0,1fr) auto')+';gap:16px;align-items:'+(isCompactMobile ? 'stretch' : 'center')+'">'+
-        '<div style="width:'+(isCompactMobile ? '100%' : '110px')+';min-height:58px;border-radius:16px;background:linear-gradient(135deg,#0f3c73 0%,#1d6bd1 100%);box-shadow:0 12px 28px rgba(15,60,115,.18);color:#fff;display:flex;flex-direction:'+(isCompactMobile ? 'row' : 'column')+';align-items:center;justify-content:center;gap:'+(isCompactMobile ? '10px' : '2px')+';padding:'+(isCompactMobile ? '12px 14px' : '10px 12px')+'">'+
+      '<div style="display:grid;grid-template-columns:'+(isCompactMobile ? '1fr' : '82px minmax(0,1fr) auto')+';gap:16px;align-items:'+(isCompactMobile ? 'stretch' : 'center')+'">'+
+        '<div style="width:'+(isCompactMobile ? '100%' : '82px')+';height:'+(isCompactMobile ? 'auto' : '82px')+';min-height:58px;border-radius:16px;background:linear-gradient(135deg,#0f3c73 0%,#1d6bd1 100%);box-shadow:0 12px 28px rgba(15,60,115,.18);color:#fff;display:flex;flex-direction:'+(isCompactMobile ? 'row' : 'column')+';align-items:center;justify-content:center;gap:'+(isCompactMobile ? '10px' : '2px')+';padding:'+(isCompactMobile ? '12px 14px' : '8px')+'">'+
           '<div style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.78)">Buổi học</div>'+
           '<div style="font-size:'+(isCompactMobile ? '1.18rem' : '1.4rem')+';font-weight:800;line-height:1.1">'+orderLabel+'</div>'+
         '</div>'+

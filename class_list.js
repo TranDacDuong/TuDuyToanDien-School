@@ -206,6 +206,18 @@
 
   const daysMap = {1:"T2",2:"T3",3:"T4",4:"T5",5:"T6",6:"T7",7:"CN"};
 
+  function getCurrentSchedules(schedules){
+    const month = new Date();
+    const monthStart = month.getFullYear()+"-"+String(month.getMonth()+1).padStart(2,"0")+"-01";
+    const eligible = (schedules || []).filter(s => (s.effective_from || "2000-01-01") <= monthStart);
+    if(!eligible.length) return [];
+    const latest = eligible.reduce((max, s) => {
+      const value = s.effective_from || "2000-01-01";
+      return value > max ? value : max;
+    }, "2000-01-01");
+    return eligible.filter(s => (s.effective_from || "2000-01-01") === latest);
+  }
+
   function renderScheduleSummary(schedules){
     if(!schedules || !schedules.length){
       return "<span style='color:var(--ink-light);font-size:.75rem'>Chưa có lịch</span>";
@@ -273,12 +285,13 @@
         card.dataset.liveKey = "class-" + cls.id;
         if(cls.hidden) card.style.cssText = "opacity:.45;filter:grayscale(.4)";
 
-        const schGrouped = renderScheduleSummary(_scheduleMap[cls.id] || []);
+        const currentSchedules = getCurrentSchedules(_scheduleMap[cls.id] || []);
+        const schGrouped = renderScheduleSummary(currentSchedules);
         const teacherList = (_teacherMap[cls.id]||[])
           .map(tid => _teacherNameMap[tid]||"").filter(Boolean);
         const stuCount    = _studentCount[cls.id] || 0;
         const subjectName = cls.subjects?.name || "";
-        const roomCapacity = getMinRoomCapacity(_scheduleMap[cls.id]);
+        const roomCapacity = getMinRoomCapacity(currentSchedules);
         const showCapacityWarning = (role === "admin" || role === "teacher") && roomCapacity > 0 && stuCount >= roomCapacity;
         const capacityWarningHtml = showCapacityWarning
           ? `<div class="class-info" style="margin-top:6px;padding:8px 10px;border-radius:10px;background:${stuCount > roomCapacity ? "rgba(239,68,68,.12)" : "rgba(245,158,11,.12)"};border:1px solid ${stuCount > roomCapacity ? "rgba(239,68,68,.28)" : "rgba(245,158,11,.28)"};color:${stuCount > roomCapacity ? "#b91c1c" : "#92400e"};font-weight:700">⚠ ${stuCount > roomCapacity ? "Số lượng học sinh đang vượt quá" : "Số lượng học sinh đã chạm tới"} sức chứa phòng học (${roomCapacity}).</div>`
@@ -311,9 +324,8 @@
           </div>
           ${actionHtml}`;
 
-        card.onclick = () => {
-          if(window.openClassView) window.openClassView(cls.id, cls.class_name);
-        };
+        card.dataset.openClassId = cls.id;
+        card.dataset.openClassName = cls.class_name || "";
 
         grid.appendChild(card);
       });
@@ -322,6 +334,11 @@
       nextContainer.appendChild(block);
     });
     window.MindupLiveUI?.patchHTML(container, nextContainer.innerHTML);
+    container.querySelectorAll("[data-open-class-id]").forEach(card => {
+      card.onclick = () => {
+        if(window.openClassView) window.openClassView(card.dataset.openClassId, card.dataset.openClassName);
+      };
+    });
   }
 
   window.deleteClass = async function(id, role){

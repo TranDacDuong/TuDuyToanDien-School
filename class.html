@@ -67,9 +67,6 @@ body { margin: 0; background: radial-gradient(circle at top left, rgba(200,150,4
   white-space: nowrap; padding-bottom: 8px;
 }
 
-/* ── Toolbar ── */
-.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
-
 /* ── Grade block ── */
 .grade-block { margin-bottom: 32px; }
 .grade-title {
@@ -224,13 +221,6 @@ input:focus, select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
     line-height: 1.6;
   }
 
-  .toolbar {
-    gap: 8px;
-    margin-bottom: 12px;
-  }
-
-  .toolbar .btn,
-  .toolbar button,
   #openCreateClass {
     width: 100%;
     min-height: 46px;
@@ -343,33 +333,31 @@ input:focus, select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
   <div id="userInfo" style="font-size:.82rem;color:var(--ink-light)">Đang tải...</div>
 </div>
 
-<!-- TOOLBAR -->
-<div class="toolbar">
-  <button class="btn btn-primary" id="openCreateClass" data-testid="class-create-button">+ Tạo lớp mới</button>
-</div>
-
 <!-- FILTER BAR -->
 <div class="filter-bar surface-toolbar" id="filterBar" style="display:none">
-  <div class="filter-group">
-    <label>🏫 Khối</label>
-    <select id="filterGrade">
-      <option value="">Tất cả khối</option>
-    </select>
+  <div id="classFilters" style="display:contents">
+    <div class="filter-group">
+      <label>🏫 Khối</label>
+      <select id="filterGrade">
+        <option value="">Tất cả khối</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>📚 Môn</label>
+      <select id="filterSubject">
+        <option value="">Tất cả môn</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>👨‍🏫 Giáo viên</label>
+      <select id="filterTeacher">
+        <option value="">Tất cả giáo viên</option>
+      </select>
+    </div>
+    <button class="filter-reset" onclick="resetFilters()">✕ Xóa lọc</button>
+    <span class="filter-count" id="filterCount"></span>
   </div>
-  <div class="filter-group">
-    <label>📚 Môn</label>
-    <select id="filterSubject">
-      <option value="">Tất cả môn</option>
-    </select>
-  </div>
-  <div class="filter-group">
-    <label>👨‍🏫 Giáo viên</label>
-    <select id="filterTeacher">
-      <option value="">Tất cả giáo viên</option>
-    </select>
-  </div>
-  <button class="filter-reset" onclick="resetFilters()">✕ Xóa lọc</button>
-  <span class="filter-count" id="filterCount"></span>
+  <button class="btn btn-primary" id="openCreateClass" data-testid="class-create-button">+ Tạo lớp mới</button>
 </div>
 
 <!-- CLASSES CONTAINER -->
@@ -420,6 +408,11 @@ input:focus, select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
       </div>
 
       <h3 style="margin-top:16px;font-family:var(--font-display);font-size:1rem;color:var(--navy)">Lịch học</h3>
+      <div id="scheduleEffectiveMonthWrap" style="display:none;margin:8px 0 10px">
+        <label>Áp dụng lịch từ tháng</label>
+        <input id="schedule_effective_month" type="month"/>
+        <div style="font-size:.76rem;color:var(--ink-light);margin-top:5px">Khi sửa lớp, lịch mới thay thế lịch cũ từ tháng đã chọn và tự động cập nhật lịch của học sinh.</div>
+      </div>
       <div class="schedules" id="schedules"></div>
       <div style="margin-top:8px;display:none">
         <button type="button" id="addSchedule" class="btn btn-outline btn-sm">+ Thêm buổi</button>

@@ -4,7 +4,7 @@
   const openBtn   = document.getElementById("openCreateClass");
   const closeBtn  = document.getElementById("closeCreatePopup");
   const filterBar = document.getElementById("filterBar");
-  const toolbar   = document.querySelector(".toolbar");
+  const filters   = document.getElementById("classFilters");
 
   function getSb(){ return window.sb || sb; }
 
@@ -35,17 +35,17 @@
       if(role === "admin"){
         /* Admin: hiện filter bar + nút tạo lớp */
         if(openBtn)   openBtn.style.display = "";
-        if(toolbar)   toolbar.style.display = "";
+        if(filters)   filters.style.display = "contents";
         if(filterBar) filterBar.style.display = "none"; /* class_list sẽ bật sau khi load */
       } else if(role === "teacher"){
-        /* Teacher: hiện nút tạo lớp, ẩn filter bar */
+        /* Teacher: hiện nút tạo lớp trong khối thao tác gọn */
         if(openBtn)   openBtn.style.display = "";
-        if(toolbar)   toolbar.style.display = "";
-        if(filterBar) filterBar.style.display = "none";
+        if(filters)   filters.style.display = "none";
+        if(filterBar) filterBar.style.display = "flex";
       } else {
-        /* Student: ẩn hết toolbar/create */
-        if(toolbar)   toolbar.style.display   = "none";
+        /* Student: ẩn khối tạo lớp và bộ lọc */
         if(openBtn)   openBtn.style.display   = "none";
+        if(filters)   filters.style.display   = "none";
         if(filterBar) filterBar.style.display = "none";
         if(popup)     popup.style.display     = "none";
       }

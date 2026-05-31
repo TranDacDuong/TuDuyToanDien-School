@@ -11,9 +11,12 @@ const makeupFee     = document.getElementById("makeup_fee");
 const sessionsPerWeek = document.getElementById("sessions_per_week");
 const schedulesEl   = document.getElementById("schedules");
 const addScheduleBtn= document.getElementById("addSchedule");
+const scheduleEffectiveMonth = document.getElementById("schedule_effective_month");
+const scheduleEffectiveMonthWrap = document.getElementById("scheduleEffectiveMonthWrap");
 
 let editingClassId = null;
 let selectedTeacherIds = new Set(); // giáo viên được chọn
+let editingSchedules = [];
 
 function getSb(){
   if(window.sb) return window.sb;
@@ -25,6 +28,39 @@ const WEEKDAYS = [
   {v:1,label:"Thứ 2"},{v:2,label:"Thứ 3"},{v:3,label:"Thứ 4"},
   {v:4,label:"Thứ 5"},{v:5,label:"Thứ 6"},{v:6,label:"Thứ 7"},{v:7,label:"Chủ nhật"}
 ];
+
+function currentMonthValue(){
+  const now = new Date();
+  return now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+}
+
+function effectiveFromValue(){
+  return (scheduleEffectiveMonth?.value || currentMonthValue())+"-01";
+}
+
+function getSchedulesForEffectiveMonth(allSchedules, effectiveFrom){
+  const eligible = (allSchedules || []).filter(s => (s.effective_from || "2000-01-01") <= effectiveFrom);
+  if(!eligible.length) return [];
+  const latest = eligible.reduce((max, s) => {
+    const value = s.effective_from || "2000-01-01";
+    return value > max ? value : max;
+  }, "2000-01-01");
+  return eligible.filter(s => (s.effective_from || "2000-01-01") === latest);
+}
+
+function renderEditingMonthSchedules(){
+  const activeSchedules = editingClassId
+    ? getSchedulesForEffectiveMonth(editingSchedules, effectiveFromValue())
+    : [];
+  renderScheduleGroups(activeSchedules.map(s => ({
+    weekday: s.weekday,
+    session_no: s.session_no || 1,
+    start_time: String(s.start_time || "").slice(0,5),
+    end_time: String(s.end_time || "").slice(0,5),
+    room_id: s.room_id,
+    class_id: editingClassId,
+  })));
+}
 
 /* ══════════════════════════════════════════════
    SCHEDULE ROW
@@ -69,8 +105,15 @@ function createScheduleRow(initial={}, sessionNo=1){
     const sb = getSb();
     try{
       const {data: rooms}     = await sb.from("rooms").select("id,room_name,capacity").order("room_name");
-      const {data: schedules} = await sb.from("class_schedules").select("room_id,start_time,end_time,class_id").eq("weekday",parseInt(weekday));
-      const filteredSchedules = (schedules||[]).filter(s => initial.class_id ? s.class_id !== initial.class_id : true);
+      const {data: schedules} = await sb.from("class_schedules").select("room_id,start_time,end_time,class_id,effective_from").eq("weekday",parseInt(weekday));
+      const byClass = {};
+      (schedules || []).forEach(s => {
+        if(!byClass[s.class_id]) byClass[s.class_id] = [];
+        byClass[s.class_id].push(s);
+      });
+      const filteredSchedules = Object.values(byClass)
+        .flatMap(items => getSchedulesForEffectiveMonth(items, effectiveFromValue()))
+        .filter(s => initial.class_id ? s.class_id !== initial.class_id : true);
       const occupied = new Set();
       filteredSchedules.forEach(s => {
         if(s.start_time.slice(0,5) < end && s.end_time.slice(0,5) > start) occupied.add(s.room_id);
@@ -133,6 +176,7 @@ function renderScheduleGroups(existingSchedules=[]){
 
 if(addScheduleBtn) addScheduleBtn.onclick = () => renderScheduleGroups();
 if(sessionsPerWeek) sessionsPerWeek.onchange = () => renderScheduleGroups();
+if(scheduleEffectiveMonth) scheduleEffectiveMonth.onchange = () => renderEditingMonthSchedules();
 
 /* ══════════════════════════════════════════════
    TEACHER PICKER
@@ -232,13 +276,86 @@ form.onsubmit = async (e) => {
     const end     = r.children[2].value;
     const room    = r.children[3].value || null;
     if(!weekday || !start || !end) return;
-    inserts.push({ class_id: classId, session_no: sessionNo, weekday: parseInt(weekday), start_time: start, end_time: end, room_id: room, effective_from: "2000-01-01" });
+    inserts.push({ class_id: classId, session_no: sessionNo, weekday: parseInt(weekday), start_time: start, end_time: end, room_id: room, effective_from: editingClassId ? effectiveFromValue() : "2000-01-01" });
   });
-  if(editingClassId){
-    const { error: delErr } = await sb.from("class_schedules").delete().eq("class_id", classId);
-    if(delErr){ alert("Lỗi xóa lịch cũ: "+delErr.message); return; }
+  if(!inserts.length){
+    alert("Vui lòng nhập ít nhất một lịch học hợp lệ.");
+    return;
   }
-  if(inserts.length){
+
+  if(editingClassId){
+    const effectiveFrom = effectiveFromValue();
+    const [{ data: oldSchedules }, { data: oldChoices }] = await Promise.all([
+      sb.from("class_schedules").select("id,session_no,weekday,start_time,end_time,effective_from").eq("class_id", classId),
+      sb.from("class_student_schedules").select("class_id,student_id,session_no,schedule_id").eq("class_id", classId),
+    ]);
+    const sameMonthIds = (oldSchedules || [])
+      .filter(s => (s.effective_from || "2000-01-01") === effectiveFrom)
+      .map(s => s.id);
+
+    if(sameMonthIds.length){
+      const { data: existingAttendance } = await sb
+        .from("attendance")
+        .select("schedule_id")
+        .in("schedule_id", sameMonthIds)
+        .limit(1);
+      if(existingAttendance?.length){
+        alert("Tháng này đã có dữ liệu điểm danh. Vui lòng chọn một tháng mới để đổi lịch.");
+        return;
+      }
+    }
+
+    const { data: newSchedules, error: insErr } = await sb.from("class_schedules").insert(inserts).select("id,session_no,weekday,start_time,end_time");
+    if(insErr){
+      alert("Lỗi lưu lịch: "+insErr.message);
+      return;
+    }
+    const newScheduleIds = (newSchedules || []).map(s => s.id);
+    const { error: deleteChoiceError } = await sb.from("class_student_schedules").delete().eq("class_id", classId);
+    if(deleteChoiceError){
+      if(newScheduleIds.length) await sb.from("class_schedules").delete().in("id", newScheduleIds);
+      alert("Lỗi cập nhật lịch học sinh: "+deleteChoiceError.message);
+      return;
+    }
+    const oldById = new Map((oldSchedules || []).map(s => [Number(s.id), s]));
+    const newBySession = {};
+    (newSchedules || []).forEach(s => {
+      const no = Number(s.session_no || 1);
+      if(!newBySession[no]) newBySession[no] = [];
+      newBySession[no].push(s);
+    });
+    const replacementChoices = (oldChoices || []).map(choice => {
+      const old = oldById.get(Number(choice.schedule_id));
+      const no = Number(old?.session_no || choice.session_no || 1);
+      const candidates = newBySession[no] || [];
+      const exact = candidates.find(s =>
+        Number(s.weekday) === Number(old?.weekday) &&
+        String(s.start_time || "").slice(0,5) === String(old?.start_time || "").slice(0,5) &&
+        String(s.end_time || "").slice(0,5) === String(old?.end_time || "").slice(0,5)
+      );
+      const next = exact || candidates[0];
+      return next ? { class_id: classId, student_id: choice.student_id, session_no: no, schedule_id: next.id } : null;
+    }).filter(Boolean);
+    if(replacementChoices.length){
+      const { error: choiceError } = await sb.from("class_student_schedules").upsert(replacementChoices, { onConflict: "class_id,student_id,session_no" });
+      if(choiceError){
+        if(oldChoices?.length) await sb.from("class_student_schedules").upsert(oldChoices, { onConflict: "class_id,student_id,session_no" });
+        if(newScheduleIds.length) await sb.from("class_schedules").delete().in("id", newScheduleIds);
+        alert("Lỗi cập nhật lịch học sinh: "+choiceError.message);
+        return;
+      }
+    }
+    if(sameMonthIds.length){
+      const { error: delErr } = await sb.from("class_schedules").delete().in("id", sameMonthIds);
+      if(delErr){
+        await sb.from("class_student_schedules").delete().eq("class_id", classId);
+        if(oldChoices?.length) await sb.from("class_student_schedules").upsert(oldChoices, { onConflict: "class_id,student_id,session_no" });
+        if(newScheduleIds.length) await sb.from("class_schedules").delete().in("id", newScheduleIds);
+        alert("Lỗi thay lịch trong tháng: "+delErr.message);
+        return;
+      }
+    }
+  } else {
     const { error: insErr } = await sb.from("class_schedules").insert(inserts);
     if(insErr){ alert("Lỗi lưu lịch: "+insErr.message); return; }
   }
@@ -273,8 +390,11 @@ form.onsubmit = async (e) => {
 ══════════════════════════════════════════════ */
 window.resetClassForm = function(){
   editingClassId = null;
+  editingSchedules = [];
   selectedTeacherIds = new Set();
   form.reset();
+  if(scheduleEffectiveMonth) scheduleEffectiveMonth.value = currentMonthValue();
+  if(scheduleEffectiveMonthWrap) scheduleEffectiveMonthWrap.style.display = "none";
   if(sessionsPerWeek) sessionsPerWeek.value = 1;
   renderScheduleGroups();
   renderTeacherPicker();
@@ -289,6 +409,9 @@ window.fillEditClass = async function(classId){
     sb.from("class_schedules").select("*").eq("class_id", classId).order("weekday"),
     sb.from("class_teachers").select("teacher_id").eq("class_id", classId),
   ]);
+  editingSchedules = schedules || [];
+  if(scheduleEffectiveMonth) scheduleEffectiveMonth.value = currentMonthValue();
+  if(scheduleEffectiveMonthWrap) scheduleEffectiveMonthWrap.style.display = "";
 
   /* Load form fields */
   form.class_name.value  = cls.class_name;
@@ -302,14 +425,7 @@ window.fillEditClass = async function(classId){
 
   /* Load schedules */
   if(schedules?.length){
-    renderScheduleGroups(schedules.map(s => ({
-      weekday:    s.weekday,
-      session_no: s.session_no || 1,
-      start_time: s.start_time.slice(0,5),
-      end_time:   s.end_time.slice(0,5),
-      room_id:    s.room_id,
-      class_id:   classId,
-    })));
+    renderEditingMonthSchedules();
   } else {
     renderScheduleGroups();
   }
@@ -324,6 +440,7 @@ window.fillEditClass = async function(classId){
 /* ── Init ── */
 loadGrades();
 loadTeacherPicker();
+if(scheduleEffectiveMonth) scheduleEffectiveMonth.value = currentMonthValue();
 renderScheduleGroups();
 
 })();
