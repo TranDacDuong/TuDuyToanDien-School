@@ -109,6 +109,11 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
     return { patchHTML, watchTable };
   })();
   window.AppAuth = (function () {
+    function normalizeLoginEmail(value) {
+      const email = String(value || "").trim();
+      return email && !email.includes("@") ? `${email}@gmail.com` : email;
+    }
+
     async function getUser() {
       try {
         const { data } = await sb.auth.getSession();
@@ -150,6 +155,7 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
     }
 
     return {
+      normalizeLoginEmail,
       getUser,
       getAccessToken,
       getEdgeFunctionHeaders,

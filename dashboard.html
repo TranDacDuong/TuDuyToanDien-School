@@ -779,7 +779,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     </div>
     <div class="auth-field">
       <label>Email</label>
-      <input id="authEmail" type="email" placeholder="example@email.com" autocomplete="email">
+      <input id="authEmail" type="text" placeholder="trandacduong" autocomplete="username">
     </div>
     <div class="auth-field">
       <label>Mật khẩu</label>
@@ -1140,6 +1140,10 @@ function toggleAuthMode(){
 
 function syncAuthModal(){
   const isLogin = authMode === "login";
+  const emailInput = document.getElementById("authEmail");
+  emailInput.type = isLogin ? "text" : "email";
+  emailInput.placeholder = isLogin ? "trandacduong" : "example@email.com";
+  emailInput.autocomplete = isLogin ? "username" : "email";
   document.getElementById("authTitle").textContent = isLogin ? "Đăng nhập" : "Tạo tài khoản";
   document.getElementById("authSub").textContent = isLogin
     ? "Đăng nhập để học tập, nhắn tin và theo dõi tiến độ cá nhân."
@@ -1152,7 +1156,8 @@ function syncAuthModal(){
 }
 
 async function submitAuthForm(){
-  const email = document.getElementById("authEmail").value.trim();
+  const emailInput = document.getElementById("authEmail").value.trim();
+  const email = authMode === "login" ? window.AppAuth.normalizeLoginEmail(emailInput) : emailInput;
   const password = document.getElementById("authPassword").value;
   const password2 = document.getElementById("authPassword2").value;
   const errorBox = document.getElementById("authError");

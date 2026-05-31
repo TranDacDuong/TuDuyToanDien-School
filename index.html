@@ -192,7 +192,7 @@ body::before{
 
     <div class="field">
       <label>Email</label>
-      <input id="email" type="email" placeholder="example@email.com" autocomplete="email">
+      <input id="email" type="text" placeholder="trandacduong" autocomplete="username">
     </div>
     <div class="field">
       <label>Mật khẩu</label>
@@ -222,6 +222,10 @@ let isLogin = true;
 function toggleMode() {
   isLogin = !isLogin;
   const pw2 = document.getElementById("pw2Wrap");
+  const emailInput = document.getElementById("email");
+  emailInput.type = isLogin ? "text" : "email";
+  emailInput.placeholder = isLogin ? "trandacduong" : "example@email.com";
+  emailInput.autocomplete = isLogin ? "username" : "email";
   if (isLogin) {
     document.getElementById("formTitle").textContent = "Đăng nhập";
     document.getElementById("formSub").textContent = "Chào mừng trở lại! Nhập thông tin để tiếp tục.";
@@ -240,7 +244,8 @@ function toggleMode() {
 }
 
 async function submitForm() {
-  const email = document.getElementById("email").value.trim();
+  const emailInput = document.getElementById("email").value.trim();
+  const email = isLogin ? window.AppAuth.normalizeLoginEmail(emailInput) : emailInput;
   const pw    = document.getElementById("password").value;
   const pw2   = document.getElementById("password2").value;
   if (!email || !pw) { toast("Vui lòng nhập email và mật khẩu"); return; }

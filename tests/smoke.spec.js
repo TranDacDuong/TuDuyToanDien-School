@@ -4,7 +4,7 @@ test.describe("TuDuyToanDien live smoke", () => {
   test("landing page loads and shows login form", async ({ page }) => {
     await page.goto("/index.html");
     await expect(page).toHaveTitle(/TuDuy|Tư Duy|School/i);
-    await expect(page.locator("input[type='email'], input[placeholder*='mail' i], input[name='email']").first()).toBeVisible();
+    await expect(page.locator("#email")).toBeVisible();
     await expect(page.locator("input[type='password'], input[name='password']").first()).toBeVisible();
   });
 
