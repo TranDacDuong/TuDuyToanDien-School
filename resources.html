@@ -13,10 +13,15 @@ body{margin:0;font-family:var(--font-body);background:radial-gradient(circle at 
 .page{max-width:1240px;margin:0 auto;padding:24px 24px 52px}
 .hero{margin-bottom:20px;padding:24px 26px;border-radius:24px;background:radial-gradient(circle at top right, rgba(255,255,255,.2), transparent 30%),linear-gradient(135deg, rgba(15,31,61,.98) 0%, rgba(31,65,128,.95) 55%, rgba(200,150,42,.86) 100%);border:1px solid rgba(35,56,92,.08);box-shadow:0 18px 42px rgba(15,23,42,.08);display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
 .hero h1{margin:0 0 8px;font-size:2rem;color:#fff;font-family:var(--font-display)}
-.hero p{margin:0;max-width:760px;color:rgba(255,255,255,.84);line-height:1.72}
 .toolbar{display:grid;grid-template-columns:repeat(3,minmax(180px,1fr)) auto;gap:14px;margin-bottom:20px;padding:14px;border-radius:24px;background:rgba(255,255,255,.9);border:1px solid rgba(15,31,61,.08);box-shadow:0 14px 30px rgba(15,31,61,.06)}
 .input,.select,textarea{width:100%;border:1px solid rgba(39,58,91,.14);border-radius:16px;padding:12px 14px;font:inherit;background:#fff}
 textarea{min-height:110px;resize:vertical}
+.library-list{display:grid;gap:22px}
+.library-section{display:grid;gap:14px}
+.library-head{display:flex;align-items:center;gap:10px;color:var(--navy)}
+.library-head::after{content:"";height:1px;flex:1;background:linear-gradient(90deg,rgba(15,60,115,.22),transparent)}
+.library-title{margin:0;font-size:1.12rem;font-family:var(--font-display)}
+.library-count{flex-shrink:0;border-radius:999px;padding:4px 9px;background:#edf4ff;color:#35507c;font-size:.74rem;font-weight:700}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px}
 .card{background:#fff;border:1px solid rgba(35,56,92,.08);border-radius:24px;box-shadow:0 18px 42px rgba(15,23,42,.08);padding:18px;display:grid;gap:14px}
 .card h3,.card p{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -41,7 +46,6 @@ textarea{min-height:110px;resize:vertical}
   .hero,.toolbar,.card,.empty,.modal-card{border-radius:20px}
   .hero{padding:18px}
   .hero h1{font-size:1.52rem}
-  .hero p{font-size:.86rem;line-height:1.6}
   .toolbar{padding:12px}
   .toolbar > *{width:100%}
   .toolbar .btn,#openCreateBtn{width:100%;min-height:46px}
@@ -61,7 +65,6 @@ textarea{min-height:110px;resize:vertical}
   <div class="hero">
     <div>
       <h1>Tài liệu tham khảo</h1>
-      <p>Tổng hợp tài liệu học tập dành cho học sinh bằng link Google Drive. Admin và giáo viên có thể cập nhật nhanh để học sinh truy cập theo khối và môn.</p>
     </div>
     <button id="openCreateBtn" class="btn btn-outline" type="button" style="display:none">Thêm tài liệu</button>
   </div>
@@ -73,7 +76,7 @@ textarea{min-height:110px;resize:vertical}
     <button class="btn btn-primary" type="button" onclick="loadData()">Tải lại</button>
   </div>
 
-  <div id="grid" class="grid"></div>
+  <div id="grid" class="library-list"></div>
   <div id="empty" class="empty" style="display:none"><strong>Chưa có tài liệu phù hợp</strong><div class="muted" style="margin-top:8px">Hãy đổi bộ lọc hoặc thêm tài liệu đầu tiên.</div></div>
 </div>
 
@@ -160,7 +163,27 @@ function renderMaterials(){
     return true;
   });
   E.empty.style.display=list.length?'none':'block';
-  window.MindupLiveUI?.patchHTML(E.grid,list.map(renderCard).join(''));
+  const groups=new Map();
+  list.forEach(item=>{
+    const key=item.grade_id||'common';
+    if(!groups.has(key)) groups.set(key,[]);
+    groups.get(key).push(item);
+  });
+  const gradeOrder=new Map(S.grades.map((grade,index)=>[grade.id,index]));
+  const sections=[...groups.entries()].sort(([a],[b])=>{
+    if(a==='common') return -1;
+    if(b==='common') return 1;
+    return (gradeOrder.get(a)??Number.MAX_SAFE_INTEGER)-(gradeOrder.get(b)??Number.MAX_SAFE_INTEGER);
+  }).map(([gradeId,items])=>{
+    const gradeName=gradeId==='common'?'Chung':S.grades.find(x=>x.id===gradeId)?.name||'Khác';
+    const sorted=[...items].sort((a,b)=>{
+      const subjectA=S.subjects.find(x=>x.id===a.subject_id)?.name||'';
+      const subjectB=S.subjects.find(x=>x.id===b.subject_id)?.name||'';
+      return subjectA.localeCompare(subjectB,'vi')||(a.title||'').localeCompare(b.title||'','vi');
+    });
+    return `<section class="library-section" data-live-key="library-${esc(gradeId)}"><div class="library-head"><h2 class="library-title">Kho tài liệu ${esc(gradeName)}</h2><span class="library-count">${items.length} tài liệu</span></div><div class="grid">${sorted.map(renderCard).join('')}</div></section>`;
+  }).join('');
+  window.MindupLiveUI?.patchHTML(E.grid,sections);
 }
 
 function renderCard(item){
