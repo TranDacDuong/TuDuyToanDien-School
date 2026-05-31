@@ -115,7 +115,6 @@
 
       const { data: pdfRaw } = await pdfQuery;
       let data = pdfRaw || [];
-      if (currentRole === "teacher") data = data.filter(e => e.created_by === currentUser.id);
 
       const grid = document.getElementById("examGrid");
       if (!data.length) {
@@ -152,11 +151,6 @@
 
     const { data: data_raw } = await query;
     let data = data_raw || [];
-
-    // Teacher chỉ thấy đề do mình tạo
-    if (currentRole === "teacher") {
-      data = data.filter(e => e.created_by === currentUser.id);
-    }
 
     const grid = document.getElementById("examGrid");
     if (!data.length) {
