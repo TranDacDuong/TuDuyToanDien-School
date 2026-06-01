@@ -2373,40 +2373,7 @@
       },
     })) return;
 
-    /* Header */
-    const wrap = document.createElement("div");
-    const hdr  = document.createElement("div");
-    hdr.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap";
-    hdr.innerHTML =
-      '<button onclick="cvSwitchTab(\'exams\')" class="btn btn-outline btn-sm">← Quay lại</button>' +
-      '<div style="flex:1"><div style="font-weight:700;font-size:.95rem;color:var(--navy)">' + examTitle + '</div>' +
-      '<div style="font-size:.75rem;color:var(--ink-mid)">Điểm: <b>' + score + '</b>' +
-      (result?.submitted_at ? ' &nbsp;•&nbsp; Nộp: ' + fmtDT(result.submitted_at) : '') + '</div></div>';
-    wrap.appendChild(hdr);
-
-    /* Cards â€” layout 15 pháº§n ngang giá»‘ng lÃºc thi, dÃ¹ng review_helper.js */
-    if (window.buildReviewCards) {
-      wrap.appendChild(window.buildReviewCards(sortedEqs, ansMap, false, {
-        enableAiSolution: true,
-        enableQuestionReport: true,
-        examResultId: resultId,
-        reportSourceMode: "class_review",
-      }));
-    }
-
-    tc.innerHTML = "";
-    tc.appendChild(wrap);
-  };
-
-  /* â”€â”€ Backward compat â”€â”€ */
-  window.openStudentClassView = function(classId, className){
-    window.openClassView(classId, className);
-  };
-
-  window.closeStudentClassView = function(){
-    clearInterval(window._examTimerRef);
-    const ov = document.getElementById("classViewOverlay");
-    if(ov) ov.style.display = "none";
+    tc.innerHTML = '<p style="color:var(--red)">Không tải được giao diện xem lại bài.</p>';
   };
 
 })();
