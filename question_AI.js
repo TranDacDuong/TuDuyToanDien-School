@@ -657,66 +657,6 @@ QUY TAC QUAN TRONG:
   /* ══════════════════════════════════════════════
      CONVERT WITH AI
   ══════════════════════════════════════════════ */
-  window.convertWithAI = async function () {
-    const text = document.getElementById("aiTextInput").value.trim();
-    if (!text && !_pastedImg) {
-      alert("Vui lòng nhập nội dung hoặc paste ảnh câu hỏi!"); return;
-    }
-
-    const btn = document.getElementById("convertBtn");
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spin">⟳</span> Đang phân tích...';
-    setProgress(20, "Đang gửi lên AI...");
-
-    try {
-      _lastSourceImg = _pastedImg; // lưu trước khi gọi AI để crop sau
-      setProgress(50, "AI đang phân tích...");
-      const result = await convertAiSourceToQuestions({ text, dataUrl: _pastedImg });
-      setProgress(90, "Đang xử lý...");
-      appendQuestions(result.questions, result.warnings);
-      setProgress(100, "Hoàn thành!");
-      setTimeout(() => hideProgress(), 800);
-
-      document.getElementById("aiTextInput").value = "";
-      _pastedImg = null;
-      document.getElementById("aiTextInput").placeholder = "Paste nội dung câu hỏi vào đây...";
-
-    } catch (err) {
-      hideProgress();
-      alert("Lỗi: " + err.message);
-    }
-
-    btn.disabled = false;
-    btn.innerHTML = "✨ Chuyển đổi với AI";
-  };
-
-  function cropFigure(srcDataUrl, bbox) {
-    return new Promise(resolve => {
-      const img = new Image();
-      img.onload = () => {
-        const W = img.naturalWidth;
-        const H = img.naturalHeight;
-
-        // bbox là pixel — thêm padding 20px mỗi phía
-        const PAD = 20;
-        const x  = Math.max(0, bbox.x - PAD);
-        const y  = Math.max(0, bbox.y - PAD);
-        const x2 = Math.min(W, bbox.x + bbox.w + PAD);
-        const y2 = Math.min(H, bbox.y + bbox.h + PAD);
-        const w  = x2 - x;
-        const h  = y2 - y;
-
-        const canvas = document.createElement("canvas");
-        canvas.width  = Math.round(w);
-        canvas.height = Math.round(h);
-        canvas.getContext("2d").drawImage(img, x, y, w, h, 0, 0, w, h);
-        resolve(canvas.toDataURL("image/jpeg", 0.9));
-      };
-      img.onerror = () => resolve(null);
-      img.src = srcDataUrl;
-    });
-  }
-
   async function callAI(messages) {
     const headers = window.AppAuth?.getAnonEdgeFunctionHeaders?.() || {
       "Content-Type":  "application/json",

@@ -53,28 +53,6 @@ async function loadSelectData() {
 }
 
 /* =========================
-   NÉN ẢNH
-========================= */
-async function compressImage(file) {
-  return new Promise((resolve) => {
-    const img    = new Image();
-    const reader = new FileReader();
-    reader.onload = e => { img.src = e.target.result; };
-    img.onload = () => {
-      const MAX = 1200;
-      let w = img.width, h = img.height;
-      if (w > MAX) { h = h * (MAX / w); w = MAX; }
-      if (h > MAX) { w = w * (MAX / h); h = MAX; }
-      const canvas = document.createElement("canvas");
-      canvas.width = w; canvas.height = h;
-      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-      canvas.toBlob(resolve, "image/jpeg", 0.7);
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-/* =========================
    LƯU CÂU HỎI
 ========================= */
 async function saveQuestion(shouldClose = true) {

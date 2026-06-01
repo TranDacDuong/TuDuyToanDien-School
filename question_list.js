@@ -544,10 +544,6 @@ function getScopeKey(items) {
   return (items || []).map((item) => item.id).sort().join("|")
 }
 
-function isFuzzyScopeFresh(items) {
-  return fuzzyAuditScopeKey && fuzzyAuditScopeKey === getScopeKey(items)
-}
-
 function invalidateFuzzyAudit() {
   fuzzySuggestionMap = new Map()
   fuzzyAuditScopeKey = ""

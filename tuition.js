@@ -75,22 +75,6 @@
     return `${y}-${String(m).padStart(2,"0")}-${String(last.getDate()).padStart(2,"0")}`;
   }
 
-  function generateDates(schedules, ym) {
-    const [year, month] = ym.split("-").map(Number);
-    const daysInMonth = new Date(year, month, 0).getDate();
-    const dates = [];
-    for (let d = 1; d <= daysInMonth; d++) {
-      const date = new Date(year, month - 1, d);
-      const weekday = date.getDay() === 0 ? 7 : date.getDay();
-      schedules.forEach(s => {
-        if (s.weekday === weekday) {
-          dates.push(`${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`);
-        }
-      });
-    }
-    return dates.sort();
-  }
-
   function generateOccurrences(schedules, ym) {
     const [year, month] = ym.split("-").map(Number);
     const daysInMonth = new Date(year, month, 0).getDate();
@@ -206,11 +190,6 @@
 
   function canManagePayments() {
     return currentRole === "admin";
-  }
-
-  function syncToolbarVisibility() {
-    const notifyBtn = document.getElementById("notifyTuitionBtn");
-    if (notifyBtn) notifyBtn.style.display = currentRole === "admin" ? "" : "none";
   }
 
   function fmtDate(iso) {
