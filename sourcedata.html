@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Quản lý hệ thống</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css?v=20260601-seasons3">
+<link rel="stylesheet" href="theme.css?v=20260602-mindup1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="supabaseClient.js"></script>
@@ -308,7 +308,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   .t-search-bar .sg { min-width: 100%; }
 }
 </style>
-<script src="visual-effects.js?v=20260601-seasons3" defer></script>
+<script src="visual-effects.js?v=20260602-mindup1" defer></script>
 </head>
 <body>
 
@@ -716,6 +716,7 @@ const SYSTEM_THEMES = [
   { id:'summer', name:'Mùa hạ', copy:'Tán cây xanh, nắng vàng và lá bay', image:'season-summer.png', a:'#4ade80', b:'#facc15' },
   { id:'autumn', name:'Mùa thu', copy:'Sân trường lá cam, lá vàng rơi chậm', image:'season-autumn.png', a:'#fb923c', b:'#b45309' },
   { id:'winter', name:'Mùa đông', copy:'Sân trường phủ tuyết, hạt tuyết trắng xanh', image:'season-winter.png', a:'#e0f2fe', b:'#93c5fd' },
+  { id:'mindup', name:'MindUp', copy:'Navy vững vàng, vàng cam khai mở và mạng lưới phát triển tư duy', preview:'radial-gradient(circle at 72% 28%,rgba(246,181,59,.92) 0 7px,transparent 8px),radial-gradient(circle at 30% 62%,rgba(255,255,255,.9) 0 5px,transparent 6px),linear-gradient(28deg,transparent 0 44%,rgba(246,181,59,.65) 44.5% 46%,transparent 46.5% 100%),linear-gradient(135deg,#10284c,#174779 62%,#ed8618 150%)', a:'#f6b53b', b:'#174779' },
 ];
 let _selectedSystemTheme = 'spring';
 
@@ -724,7 +725,7 @@ function renderSystemThemes(){
   if(!grid) return;
   grid.innerHTML = SYSTEM_THEMES.map(theme => `
     <button class="theme-card ${theme.id === _selectedSystemTheme ? 'active' : ''}" type="button" onclick="selectSystemTheme('${theme.id}')">
-      <div class="theme-preview" style="--preview-a:${theme.a};--preview-b:${theme.b};background-image:linear-gradient(135deg,rgba(255,255,255,.34),rgba(255,255,255,.12)),url('${theme.image}')"></div>
+      <div class="theme-preview" style="--preview-a:${theme.a};--preview-b:${theme.b};background-image:${theme.preview || `linear-gradient(135deg,rgba(255,255,255,.34),rgba(255,255,255,.12)),url('${theme.image}')`}"></div>
       <div class="theme-card-title">${theme.name}</div>
       <div class="theme-card-copy">${theme.copy}</div>
     </button>

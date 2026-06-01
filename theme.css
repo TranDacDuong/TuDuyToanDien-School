@@ -83,16 +83,25 @@ html[data-mindup-theme="winter"] {
   --season-background-image:url("season-winter.png");
   --season-background-overlay:linear-gradient(135deg,rgba(250,254,255,.74),rgba(229,244,255,.66));
 }
+html[data-mindup-theme="mindup"] {
+  --navy:#10284c;--navy-mid:#173f70;--navy-light:#225a98;
+  --gold:#ed8618;--gold-light:#f6b53b;--gold-pale:#fff3d6;--gold-border:#f0bd62;
+  --cream:#fffaf0;--surface:#f4f7fb;--border:#dce4ee;
+  --season-page-bg:linear-gradient(145deg,#fffaf0 0%,#f4f8ff 52%,#e9f1fb 100%);
+  --season-hero-bg:radial-gradient(circle at 84% 18%,rgba(255,193,69,.54),transparent 19%),radial-gradient(circle at 71% 72%,rgba(255,255,255,.18),transparent 25%),linear-gradient(135deg,#10284c 0%,#174779 58%,#ed8618 145%);
+}
 html[data-mindup-theme="spring"],
 html[data-mindup-theme="summer"],
 html[data-mindup-theme="autumn"],
-html[data-mindup-theme="winter"] {
+html[data-mindup-theme="winter"],
+html[data-mindup-theme="mindup"] {
   background:var(--season-page-bg);
 }
 html[data-mindup-theme="spring"] body,
 html[data-mindup-theme="summer"] body,
 html[data-mindup-theme="autumn"] body,
-html[data-mindup-theme="winter"] body {
+html[data-mindup-theme="winter"] body,
+html[data-mindup-theme="mindup"] body {
   position:relative;
   isolation:isolate;
   background:transparent !important;
@@ -121,8 +130,26 @@ html[data-mindup-theme="winter"] .hero,
 html[data-mindup-theme="spring"] .ops-hero,
 html[data-mindup-theme="summer"] .ops-hero,
 html[data-mindup-theme="autumn"] .ops-hero,
-html[data-mindup-theme="winter"] .ops-hero {
+html[data-mindup-theme="winter"] .ops-hero,
+html[data-mindup-theme="mindup"] .page-hero,
+html[data-mindup-theme="mindup"] .hero,
+html[data-mindup-theme="mindup"] .ops-hero {
   background:var(--season-hero-bg) !important;
+}
+html[data-mindup-theme="mindup"] body::before {
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:-1;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 16% 19%,rgba(246,181,59,.22) 0 4px,transparent 5px),
+    radial-gradient(circle at 82% 26%,rgba(23,63,112,.18) 0 5px,transparent 6px),
+    radial-gradient(circle at 69% 78%,rgba(237,134,24,.16) 0 4px,transparent 5px),
+    linear-gradient(118deg,transparent 0 23%,rgba(23,63,112,.07) 23.2% 23.45%,transparent 23.7% 100%),
+    linear-gradient(52deg,transparent 0 67%,rgba(237,134,24,.08) 67.2% 67.45%,transparent 67.7% 100%),
+    linear-gradient(145deg,rgba(255,250,240,.94),rgba(244,248,255,.9) 52%,rgba(233,241,251,.9));
+  background-size:auto,auto,auto,250px 250px,310px 310px,auto;
 }
 
 /* ── Reset & Base ── */
@@ -550,6 +577,7 @@ label {
 .mindup-petal-layer[data-theme="summer"] { --ambient-petal-a:rgba(254,249,195,.94);--ambient-petal-b:rgba(250,204,21,.76);--ambient-petal-c:rgba(74,222,128,.68);--ambient-leaf-a:rgba(187,247,208,.92);--ambient-leaf-b:rgba(34,197,94,.8);--ambient-leaf-c:rgba(21,128,61,.72);--ambient-ribbon-a:rgba(250,204,21,.34);--ambient-ribbon-b:rgba(74,222,128,.34); }
 .mindup-petal-layer[data-theme="autumn"] { --ambient-petal-a:rgba(254,215,170,.92);--ambient-petal-b:rgba(251,146,60,.82);--ambient-petal-c:rgba(185,28,28,.64);--ambient-leaf-a:rgba(253,230,138,.92);--ambient-leaf-b:rgba(234,88,12,.82);--ambient-leaf-c:rgba(146,64,14,.72);--ambient-ribbon-a:rgba(245,158,11,.34);--ambient-ribbon-b:rgba(234,88,12,.3); }
 .mindup-petal-layer[data-theme="winter"] { --ambient-petal-a:rgba(255,255,255,.98);--ambient-petal-b:rgba(224,242,254,.9);--ambient-petal-c:rgba(147,197,253,.64);--ambient-ribbon-a:rgba(186,230,253,.34);--ambient-ribbon-b:rgba(224,242,254,.4); }
+.mindup-petal-layer[data-theme="mindup"] { --ambient-petal-a:rgba(255,244,198,.96);--ambient-petal-b:rgba(246,181,59,.84);--ambient-petal-c:rgba(237,134,24,.72);--ambient-leaf-a:rgba(212,228,248,.9);--ambient-leaf-b:rgba(76,132,190,.7);--ambient-leaf-c:rgba(23,63,112,.7);--ambient-ribbon-a:rgba(246,181,59,.28);--ambient-ribbon-b:rgba(23,63,112,.3); }
 .mindup-petal {
   position: absolute;
   top: -20px;
@@ -596,6 +624,9 @@ label {
 .mindup-petal-layer[data-theme="autumn"] .mindup-petal { border-radius:95% 8% 95% 8%; }
 .mindup-petal-layer[data-theme="autumn"] .mindup-leaf { box-shadow:0 3px 8px rgba(146,64,14,.24); }
 .mindup-petal-layer[data-theme="winter"] .mindup-petal { border:1px solid rgba(147,197,253,.62);box-shadow:0 0 10px rgba(186,230,253,.72); }
+.mindup-petal-layer[data-theme="mindup"] .mindup-petal { border-radius:50%;box-shadow:0 0 13px rgba(237,134,24,.46); }
+.mindup-petal-layer[data-theme="mindup"] .mindup-leaf { border-radius:50%;box-shadow:0 0 12px rgba(23,63,112,.28); }
+.mindup-petal-layer[data-theme="mindup"] .mindup-ribbon { height:3px;border-radius:8px;filter:blur(.15px); }
 .mindup-effect-settings {
   position: fixed;
   right: 16px;

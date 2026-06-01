@@ -2,7 +2,7 @@
   const STORAGE_ENABLED = "mindup_effects_enabled";
   const STORAGE_THEME = "mindup_system_theme";
   const DEFAULT_THEME = "spring";
-  const SEASON_THEMES = new Set(["spring", "summer", "autumn", "winter"]);
+  const SEASON_THEMES = new Set(["spring", "summer", "autumn", "winter", "mindup"]);
   const storedTheme = localStorage.getItem(STORAGE_THEME);
   document.documentElement.dataset.mindupTheme = SEASON_THEMES.has(storedTheme) ? storedTheme : DEFAULT_THEME;
   if (window.top !== window) {
@@ -20,6 +20,7 @@
     { id: "summer", name: "Mua ha", copy: "La xanh va diem nang", petals: 8, leaves: 24, ribbons: 4 },
     { id: "autumn", name: "Mua thu", copy: "La vang nau xoay cham", petals: 6, leaves: 34, ribbons: 1 },
     { id: "winter", name: "Mua dong", copy: "Tuyet trang xanh roi mem", petals: 44, leaves: 0, ribbons: 1 },
+    { id: "mindup", name: "MindUp", copy: "Diem sang va ket noi tu duy", petals: 16, leaves: 12, ribbons: 3 },
   ];
 
   let activeTheme = localStorage.getItem(STORAGE_THEME) || DEFAULT_THEME;
