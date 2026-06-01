@@ -30,20 +30,6 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
   box-shadow: none;
 }
 
-/* Tabs */
-.tab-bar {
-  display: flex; gap: 4px; margin-bottom: 20px;
-  background: var(--surface); border-radius: 10px;
-  padding: 4px; width: fit-content;
-}
-.tab-btn {
-  padding: 8px 22px; border: none; border-radius: 7px;
-  font-size: .85rem; font-weight: 600; cursor: pointer;
-  font-family: var(--font-body); transition: .15s;
-  background: transparent; color: var(--ink-mid);
-}
-.tab-btn.active { background: var(--navy); color: var(--gold-light); }
-
 /* Grid đề thi */
 .exam-grid {
   display: grid;
@@ -146,19 +132,6 @@ body { margin: 0; background: var(--cream); font-family: var(--font-body); color
   .page-hd .btn {
     width: 100%;
     min-height: 46px;
-  }
-
-  .tab-bar {
-    width: 100%;
-    overflow-x: auto;
-    padding: 6px;
-    border-radius: 16px;
-  }
-
-  .tab-btn {
-    flex: 1 0 auto;
-    min-height: 42px;
-    padding: 8px 16px;
   }
 
   .exam-grid {
