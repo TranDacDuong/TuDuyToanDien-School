@@ -26,7 +26,7 @@
         { data: examAnswers },
       ] = await Promise.all([
         sb.from("users").select("id,full_name").eq("role", "student"),
-        sb.from("classes").select("id,name,hidden"),
+        sb.from("classes").select("id,class_name,hidden"),
         sb.from("question_bank").select("id,answer,question_text"),
         sb.from("exams").select("id"),
         sb.from("course_registration_requests").select("id").eq("status", "pending"),
@@ -99,7 +99,7 @@
 
       const classNameMap = {};
       (classes || []).forEach((item) => {
-        classNameMap[item.id] = item.name || item.id;
+        classNameMap[item.id] = item.class_name || item.id;
       });
 
       const classPerformance = Array.from(classStatsMap.values())

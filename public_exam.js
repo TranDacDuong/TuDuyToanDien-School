@@ -390,11 +390,11 @@
     const [{ data: pe }, { data: classes }] = await Promise.all([
       sb.from("public_exams")
         .select("exam:exams(total_points,exam_questions(*,question:question_bank(*)))").eq("id",peId).single(),
-      sb.from("classes").select("id,name"),
+      sb.from("classes").select("id,class_name"),
     ]);
     const totalPoints = pe?.exam?.total_points || 10;
     const classMap = {};
-    (classes || []).forEach((item) => { classMap[item.id] = item.name; });
+    (classes || []).forEach((item) => { classMap[item.id] = item.class_name; });
 
     const studentIds = [...new Set((results||[]).map(r => r.student_id))];
     let nameMap = {};
@@ -1137,4 +1137,3 @@
   window.loadExamList = loadExamList;
   init();
 })();
-
