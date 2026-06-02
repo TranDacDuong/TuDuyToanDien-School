@@ -33,6 +33,13 @@ textarea{min-height:110px;resize:vertical}
 .modal-card{width:min(760px,100%);max-height:calc(100vh - 48px);overflow:auto;background:#fff;border:1px solid rgba(35,56,92,.08);border-radius:24px;box-shadow:0 18px 42px rgba(15,23,42,.08)}
 .mh{display:flex;justify-content:space-between;align-items:center;padding:20px 24px 14px;border-bottom:1px solid rgba(39,58,91,.08);background:linear-gradient(180deg,#fff 0%,#fbfcff 100%)}
 .mb{padding:18px 24px 24px}
+.viewer-modal{padding:18px}
+.viewer-card{display:flex;width:min(1180px,100%);height:min(860px,calc(100vh - 36px));max-height:none;overflow:hidden;flex-direction:column}
+.viewer-head{gap:12px;padding:14px 18px}
+.viewer-title{min-width:0;overflow:hidden;color:var(--navy);font-size:1.08rem;text-overflow:ellipsis;white-space:nowrap}
+.viewer-actions{display:flex;flex-shrink:0;gap:8px;flex-wrap:wrap}
+.viewer-body{flex:1;min-height:0;background:#eef3fb}
+.viewer-frame{width:100%;height:100%;border:0;background:#fff}
 .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .field{display:grid;gap:8px}
 .full{grid-column:1/-1}
@@ -56,6 +63,12 @@ textarea{min-height:110px;resize:vertical}
   .modal-card{width:100%;max-height:calc(100dvh - 12px);border-radius:22px 22px 0 0}
   .mh{padding:16px 16px 12px;align-items:flex-start;gap:10px;flex-wrap:wrap}
   .mb{padding:14px 16px 18px}
+  .viewer-modal{padding:0}
+  .viewer-card{height:100dvh;max-height:none;border-radius:0}
+  .viewer-head{padding:12px;align-items:center}
+  .viewer-title{width:100%;font-size:.96rem}
+  .viewer-actions{width:100%}
+  .viewer-actions .btn{flex:1}
 }
 </style>
 <script src="visual-effects.js?v=20260602-mindup1" defer></script>
@@ -104,17 +117,34 @@ textarea{min-height:110px;resize:vertical}
   </div>
 </div>
 
+<div id="materialViewerModal" class="modal viewer-modal">
+  <div class="modal-card viewer-card">
+    <div class="mh viewer-head">
+      <h2 id="materialViewerTitle" class="viewer-title">Xem tài liệu</h2>
+      <div class="viewer-actions">
+        <a id="materialViewerExternal" class="btn btn-outline" href="#" target="_blank" rel="noopener">Mở tab mới</a>
+        <button class="btn btn-primary" type="button" onclick="closeMaterialViewer()">Đóng</button>
+      </div>
+    </div>
+    <div id="materialViewerBody" class="viewer-body"></div>
+  </div>
+</div>
+
 <script>
 const S={user:null,role:'student',materials:[],grades:[],subjects:[],editingId:null};
-const E={keyword:document.getElementById('keyword'),gradeFilter:document.getElementById('gradeFilter'),subjectFilter:document.getElementById('subjectFilter'),grid:document.getElementById('grid'),empty:document.getElementById('empty'),openCreateBtn:document.getElementById('openCreateBtn'),materialModal:document.getElementById('materialModal'),materialModalTitle:document.getElementById('materialModalTitle'),materialForm:document.getElementById('materialForm'),materialTitle:document.getElementById('materialTitle'),materialDriveUrl:document.getElementById('materialDriveUrl'),materialGrade:document.getElementById('materialGrade'),materialSubject:document.getElementById('materialSubject'),materialDescription:document.getElementById('materialDescription')};
+const E={keyword:document.getElementById('keyword'),gradeFilter:document.getElementById('gradeFilter'),subjectFilter:document.getElementById('subjectFilter'),grid:document.getElementById('grid'),empty:document.getElementById('empty'),openCreateBtn:document.getElementById('openCreateBtn'),materialModal:document.getElementById('materialModal'),materialModalTitle:document.getElementById('materialModalTitle'),materialForm:document.getElementById('materialForm'),materialTitle:document.getElementById('materialTitle'),materialDriveUrl:document.getElementById('materialDriveUrl'),materialGrade:document.getElementById('materialGrade'),materialSubject:document.getElementById('materialSubject'),materialDescription:document.getElementById('materialDescription'),materialViewerModal:document.getElementById('materialViewerModal'),materialViewerTitle:document.getElementById('materialViewerTitle'),materialViewerBody:document.getElementById('materialViewerBody'),materialViewerExternal:document.getElementById('materialViewerExternal')};
 E.openCreateBtn.addEventListener('click',openCreateMaterialModal);
 E.materialForm.addEventListener('submit',submitMaterialForm);
+E.materialViewerModal.addEventListener('click',event=>{if(event.target===E.materialViewerModal)closeMaterialViewer()});
 [E.keyword,E.gradeFilter,E.subjectFilter].forEach(el=>el.addEventListener('input',renderMaterials));
 
 function esc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function normalize(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase().trim()}
 function fillSelect(el,items,ph){el.innerHTML=`<option value="">${ph}</option>`+items.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}
 function isDriveUrl(url){return /^https?:\/\/(drive|docs)\.google\.com\//i.test(String(url||'').trim())}
+function getMaterialPreviewUrl(rawUrl){let url;try{url=new URL(rawUrl)}catch{return null}if(!['http:','https:'].includes(url.protocol))return null;const host=url.hostname.replace(/^www\./,'').toLowerCase();const driveMatch=url.pathname.match(/\/file\/d\/([^/]+)/);if(host==='drive.google.com'&&driveMatch)return `https://drive.google.com/file/d/${encodeURIComponent(driveMatch[1])}/preview`;const openId=host==='drive.google.com'&&url.searchParams.get('id');if(openId)return `https://drive.google.com/file/d/${encodeURIComponent(openId)}/preview`;if(host==='docs.google.com'){const parts=url.pathname.split('/').filter(Boolean),idIndex=parts.indexOf('d');if(idIndex>=0&&parts[idIndex+1])return `https://docs.google.com/${encodeURIComponent(parts[0])}/d/${encodeURIComponent(parts[idIndex+1])}/preview`}return url.href}
+function openMaterialViewer(rawUrl,title){const previewUrl=getMaterialPreviewUrl(rawUrl);if(!previewUrl)return alert('Không thể mở tài liệu này. Vui lòng kiểm tra lại đường dẫn.');E.materialViewerTitle.textContent=title||'Xem tài liệu';E.materialViewerExternal.href=rawUrl;E.materialViewerBody.innerHTML=`<iframe class="viewer-frame" src="${esc(previewUrl)}" title="${esc(E.materialViewerTitle.textContent)}" allow="autoplay" allowfullscreen></iframe>`;E.materialViewerModal.classList.add('show')}
+function closeMaterialViewer(){E.materialViewerModal.classList.remove('show');E.materialViewerBody.innerHTML=''}
 
 async function init(){
   const {data:{user}}=await sb.auth.getUser();
@@ -184,14 +214,17 @@ function renderMaterials(){
     return `<section class="library-section" data-live-key="library-${esc(gradeId)}"><div class="library-head"><h2 class="library-title">Kho tài liệu ${esc(gradeName)}</h2><span class="library-count">${items.length} tài liệu</span></div><div class="grid">${sorted.map(renderCard).join('')}</div></section>`;
   }).join('');
   window.MindupLiveUI?.patchHTML(E.grid,sections);
+  document.querySelectorAll('[data-material-viewer]').forEach(button=>button.onclick=()=>openMaterialViewerById(button.dataset.materialViewer));
 }
 
 function renderCard(item){
   const grade=S.grades.find(x=>x.id===item.grade_id)?.name||'Tất cả khối';
   const subject=S.subjects.find(x=>x.id===item.subject_id)?.name||'Tất cả môn';
   const canManage=S.role==='admin'||S.role==='teacher';
-  return `<article class="card" data-live-key="material-${item.id}"><div class="chips"><span class="pill">${esc(grade)}</span><span class="pill">${esc(subject)}</span>${item.visible===false?'<span class="pill">Đang ẩn</span>':''}</div><div><h3 style="margin:0 0 8px;color:var(--navy)">${esc(item.title||'Tài liệu')}</h3><p style="margin:0;color:#607089;line-height:1.65">${esc(item.description||'Tài liệu tham khảo dành cho học sinh.')}</p></div><div class="actions"><a class="btn btn-primary" href="${esc(item.drive_url)}" target="_blank" rel="noopener">Mở Drive</a>${canManage?`<button class="btn btn-outline" type="button" onclick="openEditMaterialModal('${item.id}')">Sửa</button><button class="btn btn-danger" type="button" onclick="deleteMaterial('${item.id}')">Xóa</button>`:''}</div></article>`;
+  return `<article class="card" data-live-key="material-${item.id}"><div class="chips"><span class="pill">${esc(grade)}</span><span class="pill">${esc(subject)}</span>${item.visible===false?'<span class="pill">Đang ẩn</span>':''}</div><div><h3 style="margin:0 0 8px;color:var(--navy)">${esc(item.title||'Tài liệu')}</h3><p style="margin:0;color:#607089;line-height:1.65">${esc(item.description||'Tài liệu tham khảo dành cho học sinh.')}</p></div><div class="actions"><button class="btn btn-primary" type="button" data-material-viewer="${item.id}">Xem tài liệu</button>${canManage?`<button class="btn btn-outline" type="button" onclick="openEditMaterialModal('${item.id}')">Sửa</button><button class="btn btn-danger" type="button" onclick="deleteMaterial('${item.id}')">Xóa</button>`:''}</div></article>`;
 }
+
+function openMaterialViewerById(id){const item=S.materials.find(material=>material.id===id);if(item)openMaterialViewer(item.drive_url,item.title)}
 
 function openCreateMaterialModal(){
   S.editingId=null;
@@ -240,6 +273,8 @@ async function deleteMaterial(id){
 }
 
 window.openEditMaterialModal=openEditMaterialModal;
+window.openMaterialViewer=openMaterialViewer;
+window.closeMaterialViewer=closeMaterialViewer;
 window.deleteMaterial=deleteMaterial;
 window.closeMaterialModal=closeMaterialModal;
 window.loadData=loadData;
