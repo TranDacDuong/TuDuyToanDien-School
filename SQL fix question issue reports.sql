@@ -36,3 +36,18 @@ CREATE POLICY question_issue_reports_authenticated_insert
       WHERE u.id = auth.uid()
     )
   );
+
+DROP POLICY IF EXISTS question_issue_reports_staff_delete
+  ON public.question_issue_reports;
+
+CREATE POLICY question_issue_reports_staff_delete
+  ON public.question_issue_reports
+  FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.users u
+      WHERE u.id = auth.uid()
+        AND u.role IN ('admin', 'teacher')
+    )
+  );

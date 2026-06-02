@@ -232,9 +232,6 @@ td { padding: 11px 12px; border-bottom: 1px solid #eef3f8; vertical-align: middl
 .report-meta { display:grid;gap:8px;font-size:.8rem;color:var(--ink-mid); }
 .report-actions { display:flex;gap:8px;flex-wrap:wrap;margin-top:10px; }
 .report-status-new { background:#eff6ff;color:#1d4ed8;border-color:#93c5fd; }
-.report-status-reviewing { background:#fff7ed;color:#c2410c;border-color:#fdba74; }
-.report-status-resolved { background:#ecfdf5;color:#15803d;border-color:#86efac; }
-.report-status-dismissed { background:#f8fafc;color:#475569;border-color:#cbd5e1; }
 
 .hidden-badge {
   margin-left: 6px; background: #fef3c7; color: #b45309;
@@ -551,13 +548,6 @@ button {
         <button class="btn btn-outline btn-sm" type="button" onclick="closeQuestionIssueReview()">Đóng</button>
       </div>
       <div class="report-review-toolbar">
-        <select id="questionIssueStatusFilter">
-          <option value="">Tất cả trạng thái</option>
-          <option value="new">Mới</option>
-          <option value="reviewing">Đang kiểm tra</option>
-          <option value="resolved">Đã sửa</option>
-          <option value="dismissed">Bỏ qua</option>
-        </select>
         <select id="questionIssueTypeFilter">
           <option value="">Tất cả loại lỗi</option>
           <option value="question_content">Nội dung câu hỏi sai</option>
@@ -1168,7 +1158,6 @@ function removeAnswer() {
 
 /* ── Reset form ── */
 function resetQuestionForm() {
-  window.clearQuestionIssueEditContext?.();
   if(typeof editingQuestionId !== "undefined") editingQuestionId = null;
   document.getElementById("questionText").value = "";
   document.getElementById("answerText").value   = "";
@@ -1195,7 +1184,7 @@ function resetQuestionForm() {
 }
 
 </script>
-<script src="question_list.js"></script>
+<script src="question_list.js?v=20260603-report-groups1"></script>
 <script src="image_upload.js"></script>
 <script src="question_create.js"></script>
 <script src="question_AI.js"></script>

@@ -30,7 +30,6 @@ let duplicateReviewGroups = []
 let selectedQuestionIds = new Set()
 let questionIssueReports = []
 let questionIssueTableMissing = false
-let activeQuestionIssueReportId = null
 const questionPageParams = new URLSearchParams(window.location.search)
 
 function resetToFirstPage() {
@@ -293,7 +292,7 @@ function updateQuickActionStats() {
   if (aiAnswerEl) aiAnswerEl.textContent = `${questions.filter(isAnswerMissing).length} chờ xử lý`
   if (reportEl) {
     if (questionIssueTableMissing) reportEl.textContent = "Cần SQL"
-    else reportEl.textContent = `${questionIssueReports.filter((item) => item.status === "new").length} mới`
+    else reportEl.textContent = `${new Set(questionIssueReports.map((item) => item.question_id)).size} câu`
   }
 }
 
@@ -766,14 +765,6 @@ function closeDuplicateReview() {
   if (wrap) wrap.style.display = "none"
 }
 
-function getQuestionIssueStatusMeta(status) {
-  const value = String(status || "new")
-  if (value === "resolved") return { label: "Đã sửa", className: "report-status-resolved" }
-  if (value === "dismissed") return { label: "Bỏ qua", className: "report-status-dismissed" }
-  if (value === "reviewing") return { label: "Đang kiểm tra", className: "report-status-reviewing" }
-  return { label: "Mới", className: "report-status-new" }
-}
-
 function getQuestionIssueTypeLabel(type) {
   const map = {
     question_content: "Nội dung câu hỏi sai",
@@ -784,10 +775,45 @@ function getQuestionIssueTypeLabel(type) {
   return map[type] || "Khác"
 }
 
+function normalizeQuestionIssueMathText(value) {
+  return String(value || "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\\\\([()[\]])/g, "\\$1")
+    .replace(/\\\\([a-zA-Z]+)/g, "\\$1")
+    .replace(/\\\$/g, "$")
+}
+
+function groupQuestionIssueReports(reports) {
+  const groups = new Map()
+  reports.forEach((item) => {
+    const group = groups.get(item.question_id) || {
+      questionId: item.question_id,
+      reports: [],
+      latestCreatedAt: item.created_at || "",
+    }
+    group.reports.push(item)
+    if (String(item.created_at || "") > String(group.latestCreatedAt || "")) {
+      group.latestCreatedAt = item.created_at
+    }
+    groups.set(item.question_id, group)
+  })
+  return [...groups.values()].sort((a, b) => String(b.latestCreatedAt).localeCompare(String(a.latestCreatedAt)))
+}
+
+function typesetQuestionIssueMath(listEl) {
+  if (!listEl || !window.MathJax?.typesetPromise) return
+  window.MathJax.typesetClear?.([listEl])
+  window.MathJax.typesetPromise([listEl]).catch(() => {})
+}
+
 function renderQuestionIssueReview() {
   const summaryEl = document.getElementById("questionIssueSummary")
   const listEl = document.getElementById("questionIssueList")
-  const statusFilter = document.getElementById("questionIssueStatusFilter")?.value || ""
   const typeFilter = document.getElementById("questionIssueTypeFilter")?.value || ""
   if (!summaryEl || !listEl) return
 
@@ -798,62 +824,64 @@ function renderQuestionIssueReview() {
   }
 
   const filtered = questionIssueReports.filter((item) => {
-    if (statusFilter && item.status !== statusFilter) return false
     if (typeFilter && item.report_type !== typeFilter) return false
     return true
   })
+  const groups = groupQuestionIssueReports(filtered)
+  const allGroups = groupQuestionIssueReports(questionIssueReports)
 
-  const pendingCount = questionIssueReports.filter((item) => item.status === "new").length
-  summaryEl.textContent = filtered.length
-    ? `Có ${filtered.length} báo lỗi hiển thị • ${pendingCount} báo lỗi mới cần rà.`
+  summaryEl.textContent = groups.length
+    ? `Có ${groups.length} câu hỏi cần rà • ${filtered.length} lượt báo lỗi đang hiển thị.`
     : "Không có báo lỗi nào phù hợp với bộ lọc hiện tại."
 
-  if (!filtered.length) {
+  if (!groups.length) {
     listEl.innerHTML = `<div class="empty-state"><strong>Không có báo lỗi nào</strong><p>Hệ thống chưa ghi nhận phản hồi phù hợp với bộ lọc hiện tại.</p></div>`
     return
   }
 
-  listEl.innerHTML = filtered
-    .map((item) => {
-      const question = questions.find((questionItem) => questionItem.id === item.question_id)
-      const statusMeta = getQuestionIssueStatusMeta(item.status)
-      const createdAt = item.created_at
-        ? new Date(item.created_at).toLocaleString("vi-VN", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-        : "—"
+  listEl.innerHTML = groups
+    .map((group) => {
+      const question = questions.find((questionItem) => questionItem.id === group.questionId)
+      const allReports = allGroups.find((item) => item.questionId === group.questionId)?.reports || group.reports
+      const issueTypes = [...new Set(allReports.map((item) => getQuestionIssueTypeLabel(item.report_type)))]
+      const notes = allReports.map((item) => {
+        const createdAt = item.created_at
+          ? new Date(item.created_at).toLocaleString("vi-VN", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "—"
+        return `<div style="padding:10px 12px;background:#fffaf0;border:1px solid #fde68a;border-radius:14px;font-size:.82rem;color:var(--ink)">
+          <div><b>${escapeHtml(item.reporter?.full_name || item.reporter?.email || "Không rõ")}</b> • ${createdAt} • ${escapeHtml(getQuestionIssueTypeLabel(item.report_type))}</div>
+          <div style="margin-top:6px;white-space:pre-line">${escapeHtml(item.note || "Không có ghi chú thêm.")}</div>
+        </div>`
+      }).join("")
       return `
         <div class="report-item">
           <div class="report-item-head">
             <div>
-              <div style="font-weight:800;color:var(--navy);font-size:.92rem">${escapeHtml(getQuestionIssueTypeLabel(item.report_type))}</div>
+              <div style="font-weight:800;color:var(--navy);font-size:.92rem">Câu hỏi có ${allReports.length} lượt báo lỗi</div>
               <div style="font-size:.78rem;color:var(--ink-light);margin-top:4px">
-                Học sinh: <b>${escapeHtml(item.reporter?.full_name || item.reporter?.email || "Không rõ")}</b>
-                • ${createdAt}
+                ${escapeHtml(issueTypes.join(" • "))}
               </div>
             </div>
-            <span class="status-badge ${statusMeta.className}">${statusMeta.label}</span>
+            <span class="status-badge report-status-new">${allReports.length} lượt báo</span>
           </div>
           <div class="report-item-body">
             <div>
-              <div class="report-item-stem">${escapeHtml(question?.question_text || "Không tìm thấy nội dung câu hỏi hiện tại.").replace(/\n/g, "<br>")}</div>
-              ${item.note ? `<div style="margin-top:10px;padding:10px 12px;background:#fffaf0;border:1px solid #fde68a;border-radius:14px;font-size:.82rem;color:var(--ink)"><b>Ghi chú học sinh:</b><div style="margin-top:6px;white-space:pre-line">${escapeHtml(item.note)}</div></div>` : ""}
+              <div class="report-item-stem">${escapeHtml(normalizeQuestionIssueMathText(question?.question_text || "Không tìm thấy nội dung câu hỏi hiện tại.")).replace(/\n/g, "<br>")}</div>
+              <div style="display:grid;gap:8px;margin-top:10px">${notes}</div>
             </div>
             <div class="report-meta">
               <div><b>Môn:</b> ${escapeHtml(question?.chapters?.subjects?.name || "—")}</div>
               <div><b>Chương:</b> ${escapeHtml(question?.chapters?.name || "—")}</div>
-              <div><b>Đề thi:</b> ${escapeHtml(item.public_exam_id || "—")}</div>
-              <div><b>Người xử lý:</b> ${escapeHtml(item.resolver?.full_name || "Chưa xử lý")}</div>
-              ${item.resolution_note ? `<div><b>Ghi chú xử lý:</b><div style="margin-top:4px;white-space:pre-line">${escapeHtml(item.resolution_note)}</div></div>` : ""}
+              <div><b>ID câu hỏi:</b> ${escapeHtml(group.questionId)}</div>
               <div class="report-actions">
-                <button class="btn btn-outline btn-sm" type="button" onclick="openQuestionIssueTarget('${item.question_id}','${item.id}')">Mở câu hỏi</button>
-                <button class="btn btn-outline btn-sm" type="button" onclick="updateQuestionIssueStatus('${item.id}','reviewing')">Đang kiểm tra</button>
-                <button class="btn btn-primary btn-sm" type="button" onclick="updateQuestionIssueStatus('${item.id}','resolved')">Đã sửa</button>
-                <button class="btn btn-outline btn-sm" type="button" onclick="updateQuestionIssueStatus('${item.id}','dismissed')">Bỏ qua</button>
+                <button class="btn btn-primary btn-sm" type="button" onclick="openQuestionIssueTarget('${group.questionId}')">Mở câu hỏi</button>
+                <button class="btn btn-outline btn-sm" type="button" onclick="dismissQuestionIssueTarget('${group.questionId}')">Bỏ qua</button>
               </div>
             </div>
           </div>
@@ -861,6 +889,7 @@ function renderQuestionIssueReview() {
       `
     })
     .join("")
+  typesetQuestionIssueMath(listEl)
 }
 
 function openQuestionIssueReview() {
@@ -878,60 +907,37 @@ function closeQuestionIssueReview() {
   if (wrap) wrap.style.display = "none"
 }
 
-async function updateQuestionIssueStatus(reportId, status) {
+async function deleteQuestionIssueReports(questionId) {
   if (questionIssueTableMissing) {
     alert("Chưa có bảng báo lỗi câu hỏi. Hãy chạy SQL mới trong file SQL Supabase.txt.")
-    return
+    return false
   }
-  const user = await window.AppAuth?.getUser?.()
-  const updates = {
-    status,
-    resolver_id: user?.id || null,
-  }
-  const { error } = await sb.from("question_issue_reports").update(updates).eq("id", reportId)
+  const { error } = await sb.from("question_issue_reports").delete().eq("question_id", questionId)
   if (error) {
     alert(error.message)
-    return
+    return false
   }
-  await loadQuestionIssueReports(true)
-}
-
-async function clearActiveQuestionIssueReport(questionId) {
-  if (questionIssueTableMissing || !activeQuestionIssueReportId) return
-  const reportId = activeQuestionIssueReportId
-  activeQuestionIssueReportId = null
-  const { error } = await sb
-    .from("question_issue_reports")
-    .delete()
-    .eq("id", reportId)
-    .eq("question_id", questionId)
-  if (error) {
-    console.error(error)
-    return
-  }
-  questionIssueReports = questionIssueReports.filter((item) => item.id !== reportId)
+  questionIssueReports = questionIssueReports.filter((item) => item.question_id !== questionId)
   renderQuestionIssueReview()
   updateQuickActionStats()
+  return true
 }
 
-function openQuestionIssueTarget(questionId, reportId) {
+async function openQuestionIssueTarget(questionId) {
+  if (!await deleteQuestionIssueReports(questionId)) return
   closeQuestionIssueReview()
-  activeQuestionIssueReportId = reportId || null
-  if (reportId) updateQuestionIssueStatus(reportId, "reviewing")
   editQ(questionId)
 }
 
-function clearQuestionIssueEditContext() {
-  activeQuestionIssueReportId = null
+async function dismissQuestionIssueTarget(questionId) {
+  await deleteQuestionIssueReports(questionId)
 }
 
 window.openQuestionIssueReview = openQuestionIssueReview
 window.closeQuestionIssueReview = closeQuestionIssueReview
 window.loadQuestionIssueReports = loadQuestionIssueReports
-window.updateQuestionIssueStatus = updateQuestionIssueStatus
 window.openQuestionIssueTarget = openQuestionIssueTarget
-window.clearActiveQuestionIssueReport = clearActiveQuestionIssueReport
-window.clearQuestionIssueEditContext = clearQuestionIssueEditContext
+window.dismissQuestionIssueTarget = dismissQuestionIssueTarget
 
 function renderPagination(totalItems, totalPages, visibleCount, startIndex) {
   const infoEl = document.getElementById("questionPagerInfo")
@@ -1578,7 +1584,6 @@ document.getElementById("questionIssueReview")?.addEventListener("click", (event
   if (event.target?.id === "questionIssueReview") closeQuestionIssueReview()
 })
 
-document.getElementById("questionIssueStatusFilter")?.addEventListener("change", renderQuestionIssueReview)
 document.getElementById("questionIssueTypeFilter")?.addEventListener("change", renderQuestionIssueReview)
 
 init()
