@@ -167,6 +167,23 @@
     return window.sb || sb;
   }
 
+  function isMissingQuestionIssueTable(error) {
+    const code = String(error?.code || "").toUpperCase();
+    const message = String(error?.message || "").toLowerCase();
+    return code === "42P01"
+      || code === "PGRST205"
+      || message.includes("could not find the table")
+      || message.includes("does not exist");
+  }
+
+  function isQuestionReportPermissionError(error) {
+    const code = String(error?.code || "").toUpperCase();
+    const message = String(error?.message || "").toLowerCase();
+    return code === "42501"
+      || message.includes("row-level security")
+      || message.includes("permission denied");
+  }
+
   function ensureQuestionReportModal() {
     let modal = document.getElementById("questionReportModal");
     if (modal) return modal;
@@ -259,8 +276,10 @@
         if (typeof payload.onSubmitted === "function") payload.onSubmitted();
       } catch (error) {
         const message = String(error?.message || "");
-        if (message.toLowerCase().includes("question_issue_reports")) {
+        if (isMissingQuestionIssueTable(error)) {
           toast("Thiếu bảng báo lỗi câu hỏi. Hãy chạy SQL mới.", "error");
+        } else if (isQuestionReportPermissionError(error)) {
+          toast("Chưa được cấp quyền gửi báo lỗi câu hỏi. Hãy chạy SQL hotfix mới.", "error");
         } else {
           toast(message || "Không gửi được báo lỗi.", "error");
         }

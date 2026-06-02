@@ -144,8 +144,12 @@ async function loadQuestions() {
 }
 
 function isMissingQuestionIssueTable(error) {
+  const code = String(error?.code || "").toUpperCase()
   const message = String(error?.message || "").toLowerCase()
-  return message.includes("question_issue_reports") || message.includes("does not exist")
+  return code === "42P01"
+    || code === "PGRST205"
+    || message.includes("could not find the table")
+    || message.includes("does not exist")
 }
 
 async function loadQuestionIssueReports(silent = false) {

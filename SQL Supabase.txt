@@ -2637,7 +2637,18 @@ CREATE TABLE IF NOT EXISTS public.question_issue_reports (
   public_exam_id uuid REFERENCES public.public_exams(id) ON DELETE SET NULL,
   exam_result_id uuid REFERENCES public.exam_results(id) ON DELETE SET NULL,
   report_type text NOT NULL DEFAULT 'question_content' CHECK (report_type IN ('question_content', 'wrong_answer', 'image_formula', 'other')),
-  source_mode text NOT NULL DEFAULT 'review' CHECK (source_mode IN ('live_exam', 'review', 'other')),
+  source_mode text NOT NULL DEFAULT 'review' CHECK (source_mode IN (
+    'live_exam',
+    'class_exam',
+    'review',
+    'other',
+    'course_review',
+    'course_teacher_review',
+    'class_review',
+    'class_teacher_review',
+    'public_review',
+    'public_teacher_review'
+  )),
   note text,
   status text NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'reviewing', 'resolved', 'dismissed')),
   resolver_id uuid REFERENCES public.users(id) ON DELETE SET NULL,
@@ -2659,7 +2670,8 @@ CREATE INDEX IF NOT EXISTS question_issue_reports_reporter_idx
 ALTER TABLE public.question_issue_reports ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS question_issue_reports_student_insert ON public.question_issue_reports;
-CREATE POLICY question_issue_reports_student_insert ON public.question_issue_reports
+DROP POLICY IF EXISTS question_issue_reports_authenticated_insert ON public.question_issue_reports;
+CREATE POLICY question_issue_reports_authenticated_insert ON public.question_issue_reports
 FOR INSERT
 WITH CHECK (
   reporter_id = auth.uid()
@@ -2667,7 +2679,6 @@ WITH CHECK (
     SELECT 1
     FROM public.users u
     WHERE u.id = auth.uid()
-      AND u.role = 'student'
   )
 );
 
