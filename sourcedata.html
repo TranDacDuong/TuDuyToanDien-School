@@ -625,8 +625,8 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
     <div class="trial-form-grid">
       <div class="fg"><label>Họ tên học sinh</label><input id="trialStudentName" placeholder="VD: Nguyễn Văn A"></div>
       <div class="fg"><label>SĐT</label><input id="trialPhone" placeholder="SĐT học sinh/phụ huynh"></div>
-      <div class="fg"><label>Khối</label><input id="trialGradeText" placeholder="VD: 10"></div>
-      <div class="fg"><label>Môn</label><input id="trialSubjectText" placeholder="VD: Toán"></div>
+      <div class="fg"><label>Khối</label><input id="trialGradeText" placeholder="VD: 10" oninput="populateTrialClassSelect();loadTrialClassSchedules()"></div>
+      <div class="fg"><label>Môn</label><input id="trialSubjectText" placeholder="VD: Toán" oninput="populateTrialClassSelect();loadTrialClassSchedules()"></div>
       <div class="fg full">
         <label>Link tài khoản học sinh hiện có</label>
         <div style="display:flex;gap:8px;align-items:center">
@@ -648,16 +648,16 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
         <select id="trialSchedule1Id" onchange="suggestTrialDateTime(1)"><option value="">-- Chọn lịch --</option></select>
       </div>
       <div class="fg">
-        <label>Thời gian học thử buổi 1</label>
-        <input id="trialSession1At" type="datetime-local">
+        <label>Ngày học thử buổi 1</label>
+        <select id="trialSession1At"><option value="">-- Chọn lịch trước --</option></select>
       </div>
       <div class="fg">
         <label>Lịch học thử buổi 2</label>
         <select id="trialSchedule2Id" onchange="suggestTrialDateTime(2)"><option value="">-- Chọn lịch --</option></select>
       </div>
       <div class="fg">
-        <label>Thời gian học thử buổi 2</label>
-        <input id="trialSession2At" type="datetime-local">
+        <label>Ngày học thử buổi 2</label>
+        <select id="trialSession2At"><option value="">-- Chọn lịch trước --</option></select>
       </div>
       <div class="fg full"><label>Ghi chú</label><textarea id="trialNote" placeholder="Nguồn thông tin, nhu cầu học, ghi chú khi gọi điện..." style="min-height:86px"></textarea></div>
     </div>
@@ -1745,13 +1745,27 @@ function trialToLocalInput(value){
   const d = new Date(value);
   if(Number.isNaN(d.getTime())) return '';
   const pad = n => String(n).padStart(2,'0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
 
-function trialFromLocalInput(value){
+function trialFromLocalInput(value, scheduleId){
   if(!value) return null;
-  const d = new Date(value);
+  const schedule = _trialScheduleMap[Number(scheduleId || 0)];
+  const time = String(schedule?.start_time || '08:00').slice(0,5);
+  const d = new Date(`${value}T${time}`);
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function trialDateWeekday(value){
+  const d = new Date(`${value}T00:00:00`);
+  if(Number.isNaN(d.getTime())) return null;
+  return d.getDay() === 0 ? 7 : d.getDay();
+}
+
+function trialDateMatchesSchedule(value, scheduleId){
+  if(!value || !scheduleId) return false;
+  const schedule = _trialScheduleMap[Number(scheduleId)];
+  return !!schedule && trialDateWeekday(value) === Number(schedule.weekday);
 }
 
 function trialActiveSchedulesForClass(classId){
@@ -1789,19 +1803,69 @@ function trialNextDateTimeForSchedule(schedule, afterValue){
   return '';
 }
 
+function trialDateOptionsForSchedule(scheduleId, afterValue, selectedDate){
+  const schedule = _trialScheduleMap[Number(scheduleId || 0)];
+  if(!schedule) return [];
+  const options = [];
+  const seen = new Set();
+  const base = afterValue ? new Date(afterValue) : new Date();
+  if(Number.isNaN(base.getTime())) return [];
+  const target = Number(schedule.weekday || 1);
+  const start = String(schedule.start_time || '08:00').slice(0,5);
+  const [hh, mm] = start.split(':').map(Number);
+  if(selectedDate){
+    options.push(selectedDate);
+    seen.add(selectedDate);
+  }
+  const d = new Date(base);
+  d.setSeconds(0,0);
+  for(let i=0; i<120 && options.length<16; i++){
+    const wd = d.getDay() === 0 ? 7 : d.getDay();
+    const candidate = new Date(d);
+    candidate.setHours(Number.isFinite(hh)?hh:8, Number.isFinite(mm)?mm:0, 0, 0);
+    const value = trialToLocalInput(candidate.toISOString());
+    if(wd === target && candidate > base && !seen.has(value)){
+      options.push(value);
+      seen.add(value);
+    }
+    d.setDate(d.getDate()+1);
+  }
+  return options;
+}
+
+function trialDateOptionLabel(value, scheduleId){
+  if(!value) return '';
+  const schedule = _trialScheduleMap[Number(scheduleId || 0)];
+  const d = new Date(`${value}T00:00:00`);
+  const dateText = Number.isNaN(d.getTime())
+    ? value
+    : d.toLocaleDateString('vi-VN', { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric' });
+  return `${dateText} • ${String(schedule?.start_time || '').slice(0,5)}-${String(schedule?.end_time || '').slice(0,5)}`;
+}
+
+function trialClassMatchesFilter(cls){
+  const gradeNeedle = rmVN(document.getElementById('trialGradeText')?.value || '');
+  const subjectNeedle = rmVN(document.getElementById('trialSubjectText')?.value || '');
+  const gradeText = rmVN(cls?.grades?.name || cls?.grade?.name || '');
+  const subjectText = rmVN(cls?.subjects?.name || cls?.subject?.name || '');
+  return (!gradeNeedle || gradeText.includes(gradeNeedle) || gradeNeedle.includes(gradeText)) &&
+    (!subjectNeedle || subjectText.includes(subjectNeedle) || subjectNeedle.includes(subjectText));
+}
+
 function populateTrialClassSelect(){
   const sel = document.getElementById('trialClassId');
   if(!sel) return;
   const prev = sel.value;
+  const classes = _trialClasses.filter(trialClassMatchesFilter);
   sel.innerHTML = '<option value="">-- Chọn lớp học thử --</option>' +
-    _trialClasses.map(c => `<option value="${c.id}">${esc(c.class_name || 'Lớp học')}</option>`).join('');
-  if(prev) sel.value = prev;
+    classes.map(c => `<option value="${c.id}">${esc(c.class_name || 'Lớp học')}${c.grades?.name || c.subjects?.name ? ` (${esc(c.grades?.name || '')}${c.subjects?.name ? ' - '+esc(c.subjects.name) : ''})` : ''}</option>`).join('');
+  if(prev && classes.some(c => c.id === prev)) sel.value = prev;
 }
 
 async function loadTrialClasses(){
   const { data, error } = await sb
     .from('classes')
-    .select('id,class_name,hidden,class_schedules(id,class_id,session_no,weekday,start_time,end_time,effective_from,rooms(room_name))')
+    .select('id,class_name,hidden,grades(name),subjects(name),class_schedules(id,class_id,session_no,weekday,start_time,end_time,effective_from,rooms(room_name))')
     .eq('hidden', false)
     .order('class_name');
   if(error){
@@ -2099,14 +2163,37 @@ function loadTrialClassSchedules(item){
     suggestTrialDateTime(1);
     suggestTrialDateTime(2);
   }
+  refreshTrialDateConstraints(1);
+  refreshTrialDateConstraints(2);
 }
 
 function suggestTrialDateTime(no){
   const scheduleId = Number(document.getElementById(`trialSchedule${no}Id`)?.value || 0);
   const target = document.getElementById(`trialSession${no}At`);
-  if(!scheduleId || !target || target.value) return;
-  const after = no === 2 ? trialFromLocalInput(document.getElementById('trialSession1At')?.value) : null;
+  if(!scheduleId || !target) return;
+  refreshTrialDateConstraints(no);
+  if(target.value && trialDateMatchesSchedule(target.value, scheduleId)) return;
+  target.value = '';
+  const after = no === 2 ? trialFromLocalInput(document.getElementById('trialSession1At')?.value, document.getElementById('trialSchedule1Id')?.value) : null;
   target.value = trialNextDateTimeForSchedule(_trialScheduleMap[scheduleId], after);
+  refreshTrialDateConstraints(2);
+}
+
+function refreshTrialDateConstraints(no){
+  const input = document.getElementById(`trialSession${no}At`);
+  const scheduleId = document.getElementById(`trialSchedule${no}Id`)?.value || '';
+  if(!input) return;
+  const selected = input.value;
+  const after = no === 2
+    ? trialFromLocalInput(document.getElementById('trialSession1At')?.value, document.getElementById('trialSchedule1Id')?.value)
+    : null;
+  const options = trialDateOptionsForSchedule(scheduleId, after, selected);
+  input.innerHTML = options.length
+    ? '<option value="">-- Chọn ngày học thử --</option>' + options.map(value => `<option value="${value}" ${value===selected?'selected':''}>${esc(trialDateOptionLabel(value, scheduleId))}</option>`).join('')
+    : '<option value="">-- Chọn lịch trước --</option>';
+  input.onchange = () => {
+    if(no === 1) refreshTrialDateConstraints(2);
+  };
 }
 
 async function saveTrialRequest(options = {}){
@@ -2114,8 +2201,10 @@ async function saveTrialRequest(options = {}){
   const classId = document.getElementById('trialClassId').value || null;
   const schedule1 = document.getElementById('trialSchedule1Id').value || null;
   const schedule2 = document.getElementById('trialSchedule2Id').value || null;
-  const session1 = trialFromLocalInput(document.getElementById('trialSession1At').value);
-  const session2 = trialFromLocalInput(document.getElementById('trialSession2At').value);
+  const session1Date = document.getElementById('trialSession1At').value;
+  const session2Date = document.getElementById('trialSession2At').value;
+  const session1 = trialFromLocalInput(session1Date, schedule1);
+  const session2 = trialFromLocalInput(session2Date, schedule2);
   const payload = {
     student_name: document.getElementById('trialStudentName').value.trim(),
     phone: document.getElementById('trialPhone').value.trim(),
@@ -2136,6 +2225,14 @@ async function saveTrialRequest(options = {}){
   }
   if((classId || schedule1 || schedule2 || session1 || session2) && !(classId && schedule1 && schedule2 && session1 && session2)){
     alert('Nếu chốt lịch học thử, vui lòng chọn đủ lớp, lịch và thời gian cho cả 2 buổi.');
+    return null;
+  }
+  if(schedule1 && session1Date && !trialDateMatchesSchedule(session1Date, schedule1)){
+    alert('Ngày học thử buổi 1 phải đúng thứ của lịch đã chọn.');
+    return null;
+  }
+  if(schedule2 && session2Date && !trialDateMatchesSchedule(session2Date, schedule2)){
+    alert('Ngày học thử buổi 2 phải đúng thứ của lịch đã chọn.');
     return null;
   }
   if(session1 && session2 && new Date(session2) <= new Date(session1)){
