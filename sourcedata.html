@@ -1826,20 +1826,26 @@ function trialDateOptionsForSchedule(scheduleId, afterValue, selectedDate){
     options.push(selectedDate);
     seen.add(selectedDate);
   }
-  const d = new Date(base);
+  const startDate = afterValue ? new Date(base) : new Date(base);
+  if(!afterValue) startDate.setDate(startDate.getDate() - 180);
+  startDate.setHours(0,0,0,0);
+  const endDate = new Date(base);
+  endDate.setDate(endDate.getDate() + 180);
+  endDate.setHours(23,59,59,999);
+  const d = new Date(startDate);
   d.setSeconds(0,0);
-  for(let i=0; i<120 && options.length<16; i++){
+  for(let i=0; i<370 && d <= endDate; i++){
     const wd = d.getDay() === 0 ? 7 : d.getDay();
     const candidate = new Date(d);
     candidate.setHours(Number.isFinite(hh)?hh:8, Number.isFinite(mm)?mm:0, 0, 0);
     const value = trialToLocalInput(candidate.toISOString());
-    if(wd === target && candidate > base && !seen.has(value)){
+    if(wd === target && (!afterValue || candidate > base) && !seen.has(value)){
       options.push(value);
       seen.add(value);
     }
     d.setDate(d.getDate()+1);
   }
-  return options;
+  return options.sort();
 }
 
 function trialDateOptionLabel(value, scheduleId){
