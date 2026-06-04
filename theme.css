@@ -143,13 +143,18 @@ html[data-mindup-theme="mindup"] body::before {
   z-index:-1;
   pointer-events:none;
   background:
-    radial-gradient(circle at 16% 19%,rgba(246,181,59,.22) 0 4px,transparent 5px),
-    radial-gradient(circle at 82% 26%,rgba(23,63,112,.18) 0 5px,transparent 6px),
-    radial-gradient(circle at 69% 78%,rgba(237,134,24,.16) 0 4px,transparent 5px),
+    radial-gradient(circle at 16% 19%,rgba(246,181,59,.2) 0 4px,transparent 5px),
+    radial-gradient(circle at 82% 26%,rgba(23,63,112,.16) 0 5px,transparent 6px),
+    radial-gradient(circle at 69% 78%,rgba(237,134,24,.14) 0 4px,transparent 5px),
     linear-gradient(118deg,transparent 0 23%,rgba(23,63,112,.07) 23.2% 23.45%,transparent 23.7% 100%),
     linear-gradient(52deg,transparent 0 67%,rgba(237,134,24,.08) 67.2% 67.45%,transparent 67.7% 100%),
-    linear-gradient(145deg,rgba(255,250,240,.94),rgba(244,248,255,.9) 52%,rgba(233,241,251,.9));
-  background-size:auto,auto,auto,250px 250px,310px 310px,auto;
+    linear-gradient(145deg,rgba(255,250,240,.78),rgba(244,248,255,.7) 52%,rgba(233,241,251,.78)),
+    url("Logo_ngang.png"),
+    linear-gradient(145deg,#fffaf0,#f4f8ff 52%,#e9f1fb);
+  background-size:auto,auto,auto,250px 250px,310px 310px,auto,min(92vw,980px) auto,auto;
+  background-position:center,center,center,center,center,center,center 48%,center;
+  background-repeat:no-repeat,no-repeat,no-repeat,repeat,repeat,no-repeat,no-repeat,no-repeat;
+  filter:saturate(.96);
 }
 
 /* ── Reset & Base ── */
