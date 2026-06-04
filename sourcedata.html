@@ -662,9 +662,9 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <div class="fg full"><label>Ghi chú</label><textarea id="trialNote" placeholder="Nguồn thông tin, nhu cầu học, ghi chú khi gọi điện..." style="min-height:86px"></textarea></div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap">
-      <button class="btn btn-outline btn-sm" type="button" onclick="closeTrialRequestModal()">Hủy</button>
       <button class="btn btn-outline btn-sm" type="button" onclick="createTrialStudentAccount()">Thêm tài khoản</button>
       <button class="btn btn-outline btn-sm" type="button" onclick="saveTrialRequest()">Thêm / lưu lịch học thử</button>
+      <button class="btn btn-outline btn-sm" type="button" onclick="deleteTrialRequestFromModal()">Xóa học sinh học thử</button>
       <button class="btn btn-primary btn-sm" type="button" onclick="addTrialStudentToClassFromModal()">Thêm vào lớp</button>
     </div>
   </div>
@@ -1888,7 +1888,7 @@ function renderTrialRequests(){
         <div class="trial-action-stack">
           <button class="btn btn-outline btn-sm" type="button" onclick="event.stopPropagation();openTrialRequestModal('${item.id}')">Mở</button>
           ${trialComputedStatus(item)==='trial_2_done' ? `<button class="btn btn-primary btn-sm" type="button" onclick="event.stopPropagation();addTrialStudentToClass('${item.id}')">Thêm vào lớp</button>` : ''}
-          ${trialComputedStatus(item)!=='enrolled' && trialComputedStatus(item)!=='cancelled' ? `<button class="btn btn-outline btn-sm" type="button" onclick="event.stopPropagation();cancelTrialRequest('${item.id}')">Hủy</button>` : ''}
+          ${trialComputedStatus(item)!=='enrolled' ? `<button class="btn btn-outline btn-sm" type="button" onclick="event.stopPropagation();deleteTrialRequest('${item.id}')">Xóa</button>` : ''}
         </div>
       </td>
     </tr>
@@ -2188,6 +2188,31 @@ async function cancelTrialRequest(id){
   if(!confirm('Hủy học thử này?')) return;
   await updateTrialRequestStatus(id, 'cancelled');
   await loadTrialRequests();
+}
+
+async function deleteTrialRequest(id){
+  if(!confirm('Xóa học sinh này khỏi danh sách học thử? Chỉ xóa khỏi danh sách học thử, không xóa tài khoản học sinh nếu đã tạo.')) return;
+  const { error } = await sb.from('trial_lesson_requests').delete().eq('id', id);
+  if(error){
+    alert('Không thể xóa học sinh học thử: ' + error.message);
+    return;
+  }
+  await window.AppAdminTools?.recordAudit?.('trial_lesson_deleted', {
+    target_type:'trial_lesson_request',
+    target_id:id,
+  });
+  closeTrialRequestModal();
+  toast('Đã xóa khỏi danh sách học thử');
+  await loadTrialRequests();
+}
+
+async function deleteTrialRequestFromModal(){
+  const id = document.getElementById('trialEditId')?.value || '';
+  if(!id){
+    closeTrialRequestModal();
+    return;
+  }
+  await deleteTrialRequest(id);
 }
 
 function trialGenerateOccurrences(schedules, month, year){
