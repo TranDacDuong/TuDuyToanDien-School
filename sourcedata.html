@@ -625,8 +625,8 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
     <div class="trial-form-grid">
       <div class="fg"><label>Họ tên học sinh</label><input id="trialStudentName" placeholder="VD: Nguyễn Văn A"></div>
       <div class="fg"><label>SĐT</label><input id="trialPhone" placeholder="SĐT học sinh/phụ huynh"></div>
-      <div class="fg"><label>Khối</label><input id="trialGradeText" placeholder="VD: 10" oninput="populateTrialClassSelect();loadTrialClassSchedules()"></div>
-      <div class="fg"><label>Môn</label><input id="trialSubjectText" placeholder="VD: Toán" oninput="populateTrialClassSelect();loadTrialClassSchedules()"></div>
+      <div class="fg"><label>Khối</label><select id="trialGradeText" onchange="renderTrialSubjectOptions();populateTrialClassSelect();loadTrialClassSchedules()"><option value="">-- Chọn khối --</option></select></div>
+      <div class="fg"><label>Môn</label><select id="trialSubjectText" onchange="populateTrialClassSelect();loadTrialClassSchedules()"><option value="">-- Chọn môn --</option></select></div>
       <div class="fg full">
         <label>Link tài khoản học sinh hiện có</label>
         <div style="display:flex;gap:8px;align-items:center">
@@ -1678,6 +1678,8 @@ let _trialClasses = [];
 let _trialClassMap = {};
 let _trialScheduleMap = {};
 let _trialStudentMap = {};
+let _trialGrades = [];
+let _trialSubjects = [];
 const TRIAL_DAYS = {1:'T2',2:'T3',3:'T4',4:'T5',5:'T6',6:'T7',7:'CN'};
 
 function trialStatusLabel(status){
@@ -1852,6 +1854,34 @@ function trialClassMatchesFilter(cls){
     (!subjectNeedle || subjectText.includes(subjectNeedle) || subjectNeedle.includes(subjectText));
 }
 
+function renderTrialGradeOptions(selectedValue = ''){
+  const sel = document.getElementById('trialGradeText');
+  if(!sel) return;
+  const prev = selectedValue || sel.value || '';
+  const sorted = (_trialGrades || []).slice().sort((a,b) => parseInt(a.name)-parseInt(b.name));
+  sel.innerHTML = '<option value="">-- Chọn khối --</option>' +
+    sorted.map(g => `<option value="${escAttr(g.name || '')}" ${String(g.name || '')===String(prev)?'selected':''}>Khối ${esc(g.name || '')}</option>`).join('');
+  if(prev && ![...sel.options].some(opt => opt.value === prev)){
+    sel.insertAdjacentHTML('beforeend', `<option value="${escAttr(prev)}" selected>${esc(prev)}</option>`);
+  }
+}
+
+function renderTrialSubjectOptions(selectedValue = ''){
+  const sel = document.getElementById('trialSubjectText');
+  if(!sel) return;
+  const prev = selectedValue || sel.value || '';
+  const gradeText = document.getElementById('trialGradeText')?.value || '';
+  const grade = (_trialGrades || []).find(g => String(g.name || '') === String(gradeText));
+  const subjects = (_trialSubjects || [])
+    .filter(s => !grade?.id || s.grade_id === grade.id)
+    .sort((a,b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'));
+  sel.innerHTML = '<option value="">-- Chọn môn --</option>' +
+    subjects.map(s => `<option value="${escAttr(s.name || '')}" ${String(s.name || '')===String(prev)?'selected':''}>${esc(s.name || '')}</option>`).join('');
+  if(prev && ![...sel.options].some(opt => opt.value === prev)){
+    sel.insertAdjacentHTML('beforeend', `<option value="${escAttr(prev)}" selected>${esc(prev)}</option>`);
+  }
+}
+
 function populateTrialClassSelect(){
   const sel = document.getElementById('trialClassId');
   if(!sel) return;
@@ -1863,11 +1893,18 @@ function populateTrialClassSelect(){
 }
 
 async function loadTrialClasses(){
-  const { data, error } = await sb
-    .from('classes')
-    .select('id,class_name,hidden,grades(name),subjects(name),class_schedules(id,class_id,session_no,weekday,start_time,end_time,effective_from,rooms(room_name))')
-    .eq('hidden', false)
-    .order('class_name');
+  const [
+    { data, error },
+    { data: grades },
+    { data: subjects }
+  ] = await Promise.all([
+    sb.from('classes')
+      .select('id,class_name,hidden,grades(name),subjects(name),class_schedules(id,class_id,session_no,weekday,start_time,end_time,effective_from,rooms(room_name))')
+      .eq('hidden', false)
+      .order('class_name'),
+    sb.from('grades').select('id,name'),
+    sb.from('subjects').select('id,name,grade_id')
+  ]);
   if(error){
     console.warn('Cannot load trial classes', error);
     _trialClasses = [];
@@ -1876,10 +1913,14 @@ async function loadTrialClasses(){
     populateTrialClassSelect();
     return;
   }
+  _trialGrades = grades || [];
+  _trialSubjects = subjects || [];
   _trialClasses = data || [];
   _trialClassMap = Object.fromEntries(_trialClasses.map(c => [c.id, c]));
   _trialScheduleMap = {};
   _trialClasses.forEach(c => (c.class_schedules || []).forEach(s => { _trialScheduleMap[Number(s.id)] = s; }));
+  renderTrialGradeOptions();
+  renderTrialSubjectOptions();
   populateTrialClassSelect();
 }
 
@@ -1989,8 +2030,8 @@ function openTrialRequestModal(id){
   document.getElementById('trialStudentId').value = item?.student_id || '';
   document.getElementById('trialStudentName').value = item?.student_name || '';
   document.getElementById('trialPhone').value = item?.phone || '';
-  document.getElementById('trialGradeText').value = item?.grade || '';
-  document.getElementById('trialSubjectText').value = item?.subject || '';
+  renderTrialGradeOptions(item?.grade || '');
+  renderTrialSubjectOptions(item?.subject || '');
   document.getElementById('trialNote').value = item?.note || '';
   document.getElementById('trialStudentSearch').value = '';
   document.getElementById('trialStudentResults').innerHTML = '';
