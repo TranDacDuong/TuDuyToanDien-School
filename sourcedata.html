@@ -1735,6 +1735,13 @@ function trialScheduleLabel(scheduleId){
   return `Buổi ${s.session_no || 1}: ${TRIAL_DAYS[s.weekday] || '?'} ${String(s.start_time || '').slice(0,5)}-${String(s.end_time || '').slice(0,5)}${room}`;
 }
 
+function trialScheduleOptionLabel(scheduleId){
+  const s = _trialScheduleMap[Number(scheduleId)];
+  if(!s) return 'Chưa chọn lịch';
+  const room = s.rooms?.room_name ? ' '+s.rooms.room_name : '';
+  return `${TRIAL_DAYS[s.weekday] || '?'} ${String(s.start_time || '').slice(0,5)} - ${String(s.end_time || '').slice(0,5)}${room}`;
+}
+
 function trialFormatDateTime(value){
   if(!value) return 'Chưa chọn thời gian';
   const d = new Date(value);
@@ -1837,12 +1844,10 @@ function trialDateOptionsForSchedule(scheduleId, afterValue, selectedDate){
 
 function trialDateOptionLabel(value, scheduleId){
   if(!value) return '';
-  const schedule = _trialScheduleMap[Number(scheduleId || 0)];
   const d = new Date(`${value}T00:00:00`);
-  const dateText = Number.isNaN(d.getTime())
+  return Number.isNaN(d.getTime())
     ? value
-    : d.toLocaleDateString('vi-VN', { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric' });
-  return `${dateText} • ${String(schedule?.start_time || '').slice(0,5)}-${String(schedule?.end_time || '').slice(0,5)}`;
+    : d.toLocaleDateString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric' });
 }
 
 function trialClassMatchesFilter(cls){
@@ -2190,7 +2195,7 @@ function loadTrialClassSchedules(item){
   const classId = document.getElementById('trialClassId')?.value || '';
   const schedules = trialActiveSchedulesForClass(classId);
   const makeOptions = selected => '<option value="">-- Chọn lịch --</option>' + schedules.map(s =>
-    `<option value="${s.id}" ${Number(selected)===Number(s.id)?'selected':''}>${esc(trialScheduleLabel(s.id))}</option>`
+    `<option value="${s.id}" ${Number(selected)===Number(s.id)?'selected':''}>${esc(trialScheduleOptionLabel(s.id))}</option>`
   ).join('');
   document.getElementById('trialSchedule1Id').innerHTML = makeOptions(item?.trial_schedule_1_id || '');
   document.getElementById('trialSchedule2Id').innerHTML = makeOptions(item?.trial_schedule_2_id || '');
