@@ -239,6 +239,26 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 #trialRequests.panel.active { display: block; }
 #adminLogs.panel.active { display: block; }
 #appearance.panel.active { display: block; }
+.trial-flow-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin:0 0 14px; }
+.trial-flow-card { background:#fff; border:1px solid rgba(15,31,61,.08); border-radius:14px; padding:12px; box-shadow:0 10px 22px rgba(15,31,61,.06); }
+.trial-flow-card b { display:block; color:var(--navy); font-size:.86rem; margin-bottom:4px; }
+.trial-flow-card span { color:var(--ink-light); font-size:.75rem; line-height:1.45; }
+.trial-status-pill { display:inline-flex; align-items:center; justify-content:center; min-width:126px; padding:6px 10px; border-radius:999px; font-size:.74rem; font-weight:800; border:1px solid transparent; white-space:nowrap; }
+.trial-status-pending_schedule { background:#fff7ed; color:#c2410c; border-color:#fed7aa; }
+.trial-status-scheduled { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+.trial-status-trial_1_done { background:#fefce8; color:#a16207; border-color:#fde68a; }
+.trial-status-trial_2_done { background:#ecfdf5; color:#047857; border-color:#bbf7d0; }
+.trial-status-enrolled { background:#eef2ff; color:#4338ca; border-color:#c7d2fe; }
+.trial-status-cancelled,.trial-status-closed { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
+.trial-modal-box { width:min(96vw,760px); max-height:90vh; overflow:auto; }
+.trial-form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.trial-form-grid .full { grid-column:1/-1; }
+.trial-selected-student { display:none; margin-top:8px; padding:8px 10px; border-radius:10px; background:#ecfdf5; color:#047857; font-size:.82rem; font-weight:700; }
+.trial-selected-student.show { display:block; }
+.trial-student-results { margin-top:8px; display:grid; gap:6px; }
+.trial-student-result { display:flex; justify-content:space-between; gap:10px; align-items:center; border:1px solid var(--border); border-radius:10px; padding:8px 10px; background:#fff; }
+.trial-action-stack { display:flex; gap:6px; flex-wrap:wrap; }
+@media (max-width: 720px) { .trial-form-grid { grid-template-columns:1fr; } .trial-modal-box { width:100%; border-radius:22px 22px 0 0; } }
 .theme-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:12px; }
 .theme-card { border:2px solid transparent; border-radius:16px; background:#fff; box-shadow:0 10px 24px rgba(15,31,61,.07); padding:14px; cursor:pointer; text-align:left; transition:.18s; }
 .theme-card:hover { transform:translateY(-2px); box-shadow:0 14px 28px rgba(15,31,61,.11); }
@@ -559,19 +579,27 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <span>Đăng ký học thử</span>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <span class="count-badge" id="trialRequestCount">0</span>
+        <button class="btn btn-primary btn-sm" type="button" onclick="openTrialRequestModal()">+ Thêm học sinh học thử</button>
         <button class="btn btn-outline btn-sm" type="button" onclick="loadTrialRequests()">↻ Làm mới</button>
       </div>
     </div>
+    <div class="trial-flow-grid" style="padding:0 16px">
+      <div class="trial-flow-card"><b>1. Chưa chốt lịch</b><span>Admin nhập thông tin học sinh học thử từ nguồn bên ngoài.</span></div>
+      <div class="trial-flow-card"><b>2. Đã chốt lịch</b><span>Chọn lớp học thử và 2 buổi học thử cụ thể.</span></div>
+      <div class="trial-flow-card"><b>3. Đã học buổi 1</b><span>Hệ thống tự nhận theo thời gian buổi học đầu tiên.</span></div>
+      <div class="trial-flow-card"><b>4. Xong 2 buổi</b><span>Sau buổi 2, admin có thể thêm học sinh vào lớp.</span></div>
+    </div>
     <div class="t-search-bar" style="grid-column:1/-1;margin-bottom:14px">
-      <div class="sg"><label>Tìm kiếm</label><input id="trialRequestSearch" placeholder="Tên, SĐT, môn, giáo viên..."></div>
+      <div class="sg"><label>Tìm kiếm</label><input id="trialRequestSearch" placeholder="Tên, SĐT, môn, lớp, giáo viên..."></div>
       <div class="sg"><label>Trạng thái</label>
         <select id="trialRequestStatusFilter">
           <option value="">Tất cả</option>
-          <option value="new">Mới</option>
-          <option value="contacted">Đã liên hệ</option>
-          <option value="scheduled">Đã xếp lớp</option>
+          <option value="pending_schedule">Chưa chốt lịch học thử</option>
+          <option value="scheduled">Đã chốt lịch học thử</option>
+          <option value="trial_1_done">Đã học thử buổi đầu tiên</option>
+          <option value="trial_2_done">Đã học thử xong 2 buổi</option>
+          <option value="enrolled">Đã thêm vào lớp</option>
           <option value="cancelled">Hủy</option>
-          <option value="closed">Đã đóng</option>
         </select>
       </div>
     </div>
@@ -580,17 +608,73 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
         <thead>
           <tr>
             <th style="min-width:150px">Thời gian</th>
-            <th style="min-width:180px">Học sinh</th>
+            <th style="min-width:210px">Học sinh</th>
             <th style="min-width:110px">SĐT</th>
             <th style="min-width:100px">Khối</th>
             <th style="min-width:110px">Môn</th>
+            <th style="min-width:230px">Lớp / lịch học thử</th>
             <th style="min-width:170px">Giáo viên</th>
             <th style="min-width:130px">Nguồn</th>
             <th style="min-width:140px">Trạng thái</th>
+            <th style="min-width:170px">Hành động</th>
           </tr>
         </thead>
-        <tbody id="trialRequestTable"><tr class="empty-row"><td colspan="8">Đang tải...</td></tr></tbody>
+        <tbody id="trialRequestTable"><tr class="empty-row"><td colspan="10">Đang tải...</td></tr></tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal-s" id="trialRequestModal">
+  <div class="modal-s-box trial-modal-box">
+    <div class="modal-s-hd">
+      <h3 id="trialModalTitle">Thêm học sinh học thử</h3>
+      <button class="modal-mclose" onclick="closeTrialRequestModal()">✕</button>
+    </div>
+    <input type="hidden" id="trialEditId">
+    <input type="hidden" id="trialStudentId">
+    <div class="trial-form-grid">
+      <div class="fg"><label>Họ tên học sinh</label><input id="trialStudentName" placeholder="VD: Nguyễn Văn A"></div>
+      <div class="fg"><label>SĐT</label><input id="trialPhone" placeholder="SĐT học sinh/phụ huynh"></div>
+      <div class="fg"><label>Khối</label><input id="trialGradeText" placeholder="VD: 10"></div>
+      <div class="fg"><label>Môn</label><input id="trialSubjectText" placeholder="VD: Toán"></div>
+      <div class="fg full">
+        <label>Link tài khoản học sinh hiện có</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="trialStudentSearch" placeholder="Tìm theo tên, email hoặc SĐT" style="flex:1">
+          <button class="btn btn-outline btn-sm" type="button" onclick="searchTrialStudents()">Tìm</button>
+          <button class="btn btn-outline btn-sm" type="button" onclick="clearTrialStudentLink()">Bỏ link</button>
+        </div>
+        <div id="trialSelectedStudent" class="trial-selected-student"></div>
+        <div id="trialStudentResults" class="trial-student-results"></div>
+      </div>
+      <div class="fg full">
+        <label>Lớp học thử</label>
+        <select id="trialClassId" onchange="loadTrialClassSchedules()">
+          <option value="">-- Chọn lớp học thử --</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Lịch học thử buổi 1</label>
+        <select id="trialSchedule1Id" onchange="suggestTrialDateTime(1)"><option value="">-- Chọn lịch --</option></select>
+      </div>
+      <div class="fg">
+        <label>Thời gian học thử buổi 1</label>
+        <input id="trialSession1At" type="datetime-local">
+      </div>
+      <div class="fg">
+        <label>Lịch học thử buổi 2</label>
+        <select id="trialSchedule2Id" onchange="suggestTrialDateTime(2)"><option value="">-- Chọn lịch --</option></select>
+      </div>
+      <div class="fg">
+        <label>Thời gian học thử buổi 2</label>
+        <input id="trialSession2At" type="datetime-local">
+      </div>
+      <div class="fg full"><label>Ghi chú</label><textarea id="trialNote" placeholder="Nguồn thông tin, nhu cầu học, ghi chú khi gọi điện..." style="min-height:86px"></textarea></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" type="button" onclick="closeTrialRequestModal()">Hủy</button>
+      <button class="btn btn-primary btn-sm" type="button" onclick="saveTrialRequest()">Lưu học thử</button>
     </div>
   </div>
 </div>
@@ -1599,41 +1683,169 @@ function sExportExcel(){
    ĐĂNG KÝ HỌC THỬ
 ────────────────────────────── */
 let _trialRequests = [];
+let _trialClasses = [];
+let _trialClassMap = {};
+let _trialScheduleMap = {};
+let _trialStudentMap = {};
+const TRIAL_DAYS = {1:'T2',2:'T3',3:'T4',4:'T5',5:'T6',6:'T7',7:'CN'};
 
 function trialStatusLabel(status){
-  if(status === 'contacted') return 'Đã liên hệ';
-  if(status === 'scheduled') return 'Đã xếp lớp';
+  if(status === 'pending_schedule' || status === 'new' || status === 'contacted') return 'Chưa chốt lịch học thử';
+  if(status === 'scheduled') return 'Đã chốt lịch học thử';
+  if(status === 'trial_1_done') return 'Đã học thử buổi đầu tiên';
+  if(status === 'trial_2_done') return 'Đã học thử xong 2 buổi';
+  if(status === 'enrolled') return 'Đã thêm vào lớp';
   if(status === 'cancelled') return 'Hủy';
   if(status === 'closed') return 'Đã đóng';
-  return 'Mới';
+  return 'Chưa chốt lịch học thử';
+}
+
+function trialStatusKey(status){
+  if(status === 'new' || status === 'contacted' || !status) return 'pending_schedule';
+  return status;
+}
+
+function trialComputedStatus(item){
+  const stored = trialStatusKey(item?.status);
+  if(['cancelled','enrolled','closed'].includes(stored)) return stored;
+  if(!item?.trial_class_id || !item?.trial_session_1_at || !item?.trial_session_2_at) return 'pending_schedule';
+  const now = Date.now();
+  const first = new Date(item.trial_session_1_at).getTime();
+  const second = new Date(item.trial_session_2_at).getTime();
+  if(Number.isFinite(second) && now >= second) return 'trial_2_done';
+  if(Number.isFinite(first) && now >= first) return 'trial_1_done';
+  return 'scheduled';
 }
 
 function trialSourceLabel(url){
   const text = String(url || '');
+  if(text === 'admin') return 'Admin nhập';
   if(text.includes('profile.html')) return 'Trang giáo viên';
   if(text.includes('home.html')) return 'Trang chủ';
-  return text ? 'Website' : 'Không rõ';
+  return text ? 'Website' : 'Admin nhập';
+}
+
+function trialClassLabel(classId){
+  return _trialClassMap[classId]?.class_name || 'Chưa chọn lớp';
+}
+
+function trialScheduleLabel(scheduleId){
+  const s = _trialScheduleMap[Number(scheduleId)];
+  if(!s) return 'Chưa chọn lịch';
+  const room = s.rooms?.room_name ? ' • '+s.rooms.room_name : '';
+  return `Buổi ${s.session_no || 1}: ${TRIAL_DAYS[s.weekday] || '?'} ${String(s.start_time || '').slice(0,5)}-${String(s.end_time || '').slice(0,5)}${room}`;
+}
+
+function trialFormatDateTime(value){
+  if(!value) return 'Chưa chọn thời gian';
+  const d = new Date(value);
+  if(Number.isNaN(d.getTime())) return 'Chưa chọn thời gian';
+  return d.toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+function trialToLocalInput(value){
+  if(!value) return '';
+  const d = new Date(value);
+  if(Number.isNaN(d.getTime())) return '';
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function trialFromLocalInput(value){
+  if(!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function trialActiveSchedulesForClass(classId){
+  const cls = _trialClassMap[classId];
+  const schedules = cls?.class_schedules || [];
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+  const eligible = schedules.filter(s => (s.effective_from || '2000-01-01') <= monthStart);
+  const source = eligible.length ? eligible : schedules;
+  const maxEffective = source.reduce((max,s) => {
+    const ef = s.effective_from || '2000-01-01';
+    return ef > max ? ef : max;
+  }, '2000-01-01');
+  return source
+    .filter(s => (s.effective_from || '2000-01-01') === maxEffective)
+    .sort((a,b) => Number(a.session_no || 1)-Number(b.session_no || 1) || Number(a.weekday || 0)-Number(b.weekday || 0) || String(a.start_time || '').localeCompare(String(b.start_time || '')));
+}
+
+function trialNextDateTimeForSchedule(schedule, afterValue){
+  if(!schedule) return '';
+  const base = afterValue ? new Date(afterValue) : new Date();
+  if(Number.isNaN(base.getTime())) return '';
+  const target = Number(schedule.weekday || 1);
+  const start = String(schedule.start_time || '08:00').slice(0,5);
+  const [hh, mm] = start.split(':').map(Number);
+  const d = new Date(base);
+  d.setSeconds(0,0);
+  for(let i=0;i<35;i++){
+    const wd = d.getDay() === 0 ? 7 : d.getDay();
+    const candidate = new Date(d);
+    candidate.setHours(Number.isFinite(hh)?hh:8, Number.isFinite(mm)?mm:0, 0, 0);
+    if(wd === target && candidate > base) return trialToLocalInput(candidate.toISOString());
+    d.setDate(d.getDate()+1);
+  }
+  return '';
+}
+
+function populateTrialClassSelect(){
+  const sel = document.getElementById('trialClassId');
+  if(!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">-- Chọn lớp học thử --</option>' +
+    _trialClasses.map(c => `<option value="${c.id}">${esc(c.class_name || 'Lớp học')}</option>`).join('');
+  if(prev) sel.value = prev;
+}
+
+async function loadTrialClasses(){
+  const { data, error } = await sb
+    .from('classes')
+    .select('id,class_name,hidden,class_schedules(id,class_id,session_no,weekday,start_time,end_time,effective_from,rooms(room_name))')
+    .eq('hidden', false)
+    .order('class_name');
+  if(error){
+    console.warn('Cannot load trial classes', error);
+    _trialClasses = [];
+    _trialClassMap = {};
+    _trialScheduleMap = {};
+    populateTrialClassSelect();
+    return;
+  }
+  _trialClasses = data || [];
+  _trialClassMap = Object.fromEntries(_trialClasses.map(c => [c.id, c]));
+  _trialScheduleMap = {};
+  _trialClasses.forEach(c => (c.class_schedules || []).forEach(s => { _trialScheduleMap[Number(s.id)] = s; }));
+  populateTrialClassSelect();
 }
 
 async function loadTrialRequests(){
   const tbody = document.getElementById('trialRequestTable');
-  if(tbody && !_trialRequests.length) tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Đang tải...</td></tr>';
-  const { data, error } = await sb
-    .from('trial_lesson_requests')
-    .select('*')
-    .order('created_at', { ascending: false });
+  if(tbody && !_trialRequests.length) tbody.innerHTML = '<tr class="empty-row"><td colspan="10">Đang tải...</td></tr>';
+  await loadTrialClasses();
+  const { data, error } = await sb.from('trial_lesson_requests').select('*').order('created_at', { ascending: false });
   if(error){
-    if(tbody) tbody.innerHTML = `<tr class="empty-row"><td colspan="8">${esc(error.message)}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr class="empty-row"><td colspan="10">${esc(error.message)}</td></tr>`;
     return;
   }
   const rows = data || [];
   const teacherIds = [...new Set(rows.map(item => item.teacher_id).filter(Boolean))];
+  const studentIds = [...new Set(rows.map(item => item.student_id).filter(Boolean))];
   let teacherMap = {};
+  _trialStudentMap = {};
   if(teacherIds.length){
     const { data: teachers } = await sb.from('users').select('id,full_name,email').in('id', teacherIds);
     teacherMap = Object.fromEntries((teachers || []).map(t => [t.id, t]));
   }
-  _trialRequests = rows.map(item => ({ ...item, teacher: teacherMap[item.teacher_id] || null }));
+  if(studentIds.length){
+    const { data: students } = await sb.from('users').select('id,full_name,email,phone').in('id', studentIds);
+    _trialStudentMap = Object.fromEntries((students || []).map(s => [s.id, s]));
+  }
+  _trialRequests = rows.map(item => ({ ...item, teacher: teacherMap[item.teacher_id] || null, linkedStudent: _trialStudentMap[item.student_id] || null }));
+  syncTrialComputedStatuses();
   renderTrialRequests();
 }
 
@@ -1641,43 +1853,244 @@ function renderTrialRequests(){
   const q = rmVN(document.getElementById('trialRequestSearch')?.value || '');
   const status = document.getElementById('trialRequestStatusFilter')?.value || '';
   const rows = _trialRequests.filter(item => {
-    const haystack = rmVN(`${item.student_name||''} ${item.phone||''} ${item.grade||''} ${item.subject||''} ${item.teacher?.full_name||''} ${item.teacher?.email||''}`);
-    return (!q || haystack.includes(q)) && (!status || item.status === status);
+    const effectiveStatus = trialComputedStatus(item);
+    const haystack = rmVN(`${item.student_name||''} ${item.phone||''} ${item.grade||''} ${item.subject||''} ${item.teacher?.full_name||''} ${item.teacher?.email||''} ${trialClassLabel(item.trial_class_id)} ${item.linkedStudent?.full_name||''} ${item.linkedStudent?.email||''}`);
+    return (!q || haystack.includes(q)) && (!status || effectiveStatus === status);
   });
   document.getElementById('trialRequestCount').textContent = rows.length;
   const tbody = document.getElementById('trialRequestTable');
   if(!rows.length){
-    window.MindupLiveUI?.patchHTML(tbody, '<tr class="empty-row" data-live-key="trial-empty"><td colspan="8">Chưa có đăng ký học thử phù hợp</td></tr>');
+    window.MindupLiveUI?.patchHTML(tbody, '<tr class="empty-row" data-live-key="trial-empty"><td colspan="10">Chưa có đăng ký học thử phù hợp</td></tr>');
     return;
   }
   window.MindupLiveUI?.patchHTML(tbody, rows.map(item => `
     <tr data-live-key="trial-${item.id}">
       <td style="white-space:nowrap">${esc(logFmtTime(item.created_at))}</td>
-      <td><b style="color:var(--navy)">${esc(item.student_name || '—')}</b></td>
+      <td>
+        <b style="color:var(--navy)">${esc(item.student_name || '—')}</b>
+        ${item.linkedStudent ? `<div style="font-size:.74rem;color:#047857;margin-top:3px">Đã link: ${esc(item.linkedStudent.full_name || item.linkedStudent.email || '')}</div>` : `<div style="font-size:.74rem;color:var(--ink-light);margin-top:3px">Chưa link tài khoản học sinh</div>`}
+        ${item.note ? `<div style="font-size:.72rem;color:var(--ink-light);margin-top:4px;max-width:240px">${esc(item.note)}</div>` : ''}
+      </td>
       <td><button class="btn btn-outline btn-sm" type="button" data-copy-phone="${escAttr(item.phone || '')}">${esc(item.phone || '—')}</button></td>
       <td>${esc(item.grade || '—')}</td>
       <td>${esc(item.subject || '—')}</td>
       <td>
+        <div style="font-weight:800;color:var(--navy)">${esc(trialClassLabel(item.trial_class_id))}</div>
+        <div style="font-size:.74rem;color:var(--ink-mid);line-height:1.55;margin-top:4px">
+          <div>1) ${esc(trialScheduleLabel(item.trial_schedule_1_id))}</div>
+          <div>${esc(trialFormatDateTime(item.trial_session_1_at))}</div>
+          <div style="margin-top:4px">2) ${esc(trialScheduleLabel(item.trial_schedule_2_id))}</div>
+          <div>${esc(trialFormatDateTime(item.trial_session_2_at))}</div>
+        </div>
+      </td>
+      <td>
         <div style="font-weight:700;color:var(--navy)">${esc(item.teacher?.full_name || 'Không chọn')}</div>
         <div style="font-size:.74rem;color:var(--ink-light)">${esc(item.teacher?.email || '')}</div>
       </td>
-      <td>${item.source_url?`<a href="${escAttr(item.source_url)}" target="_blank" rel="noopener">${trialSourceLabel(item.source_url)}</a>`:trialSourceLabel(item.source_url)}</td>
+      <td>${item.source_url && item.source_url !== 'admin' ? `<a href="${escAttr(item.source_url)}" target="_blank" rel="noopener">${trialSourceLabel(item.source_url)}</a>` : trialSourceLabel(item.source_url)}</td>
       <td>
-        <select class="trial-status-select" data-trial-status="${item.id}" style="min-width:126px;padding:7px 9px;border:1px solid var(--border);border-radius:9px;font-family:var(--font-body)">
-          ${['new','contacted','scheduled','cancelled','closed'].map(value => `<option value="${value}" ${item.status===value?'selected':''}>${trialStatusLabel(value)}</option>`).join('')}
-        </select>
+        <span class="trial-status-pill trial-status-${trialComputedStatus(item)}">${trialStatusLabel(trialComputedStatus(item))}</span>
+      </td>
+      <td>
+        <div class="trial-action-stack">
+          <button class="btn btn-outline btn-sm" type="button" onclick="openTrialRequestModal('${item.id}')">Sửa / chốt lịch</button>
+          ${trialComputedStatus(item)==='trial_2_done' ? `<button class="btn btn-primary btn-sm" type="button" onclick="addTrialStudentToClass('${item.id}')">Thêm vào lớp</button>` : ''}
+          ${trialComputedStatus(item)!=='enrolled' && trialComputedStatus(item)!=='cancelled' ? `<button class="btn btn-outline btn-sm" type="button" onclick="cancelTrialRequest('${item.id}')">Hủy</button>` : ''}
+        </div>
       </td>
     </tr>
   `).join(''));
-  document.querySelectorAll('[data-trial-status]').forEach(el => {
-    el.onchange = () => updateTrialRequestStatus(el.dataset.trialStatus, el.value);
-  });
   document.querySelectorAll('[data-copy-phone]').forEach(btn => {
     btn.onclick = () => {
       navigator.clipboard?.writeText(btn.dataset.copyPhone || '');
       toast('Đã sao chép SĐT');
     };
   });
+}
+
+async function syncTrialComputedStatuses(){
+  const updates = _trialRequests
+    .map(item => ({ item, next: trialComputedStatus(item) }))
+    .filter(({ item, next }) => next !== trialStatusKey(item.status) && ['pending_schedule','scheduled','trial_1_done'].includes(trialStatusKey(item.status)));
+  if(!updates.length) return;
+  const user = await window.AppAuth?.getUser?.();
+  await Promise.all(updates.map(({ item, next }) =>
+    sb.from('trial_lesson_requests').update({
+      status: next,
+      handled_by: user?.id || null,
+      handled_at: new Date().toISOString()
+    }).eq('id', item.id)
+  ));
+  updates.forEach(({ item, next }) => { item.status = next; });
+}
+
+function openTrialRequestModal(id){
+  const item = id ? _trialRequests.find(row => row.id === id) : null;
+  document.getElementById('trialModalTitle').textContent = item ? 'Sửa / chốt lịch học thử' : 'Thêm học sinh học thử';
+  document.getElementById('trialEditId').value = item?.id || '';
+  document.getElementById('trialStudentId').value = item?.student_id || '';
+  document.getElementById('trialStudentName').value = item?.student_name || '';
+  document.getElementById('trialPhone').value = item?.phone || '';
+  document.getElementById('trialGradeText').value = item?.grade || '';
+  document.getElementById('trialSubjectText').value = item?.subject || '';
+  document.getElementById('trialNote').value = item?.note || '';
+  document.getElementById('trialStudentSearch').value = '';
+  document.getElementById('trialStudentResults').innerHTML = '';
+  populateTrialClassSelect();
+  document.getElementById('trialClassId').value = item?.trial_class_id || '';
+  loadTrialClassSchedules(item);
+  renderTrialLinkedStudent(item?.linkedStudent || null);
+  document.getElementById('trialRequestModal').classList.add('open');
+}
+
+function closeTrialRequestModal(){
+  document.getElementById('trialRequestModal')?.classList.remove('open');
+}
+
+function renderTrialLinkedStudent(student){
+  const box = document.getElementById('trialSelectedStudent');
+  if(!box) return;
+  if(!student){
+    box.classList.remove('show');
+    box.textContent = '';
+    return;
+  }
+  box.classList.add('show');
+  box.textContent = `Đã link tài khoản: ${student.full_name || student.email || student.id} ${student.email ? '• '+student.email : ''}`;
+}
+
+function clearTrialStudentLink(){
+  document.getElementById('trialStudentId').value = '';
+  renderTrialLinkedStudent(null);
+}
+
+async function searchTrialStudents(){
+  const q = (document.getElementById('trialStudentSearch')?.value || '').trim();
+  const results = document.getElementById('trialStudentResults');
+  if(!q){
+    results.innerHTML = '<div style="font-size:.78rem;color:var(--ink-light)">Nhập tên, email hoặc SĐT để tìm học sinh.</div>';
+    return;
+  }
+  results.innerHTML = '<div style="font-size:.78rem;color:var(--ink-light)">Đang tìm...</div>';
+  const needle = q.replace(/[,%]/g, ' ');
+  const { data, error } = await sb.from('users')
+    .select('id,full_name,email,phone')
+    .eq('role','student')
+    .or(`full_name.ilike.%${needle}%,email.ilike.%${needle}%,phone.ilike.%${needle}%`)
+    .limit(8);
+  if(error){
+    results.innerHTML = `<div style="font-size:.78rem;color:var(--red)">${esc(error.message)}</div>`;
+    return;
+  }
+  if(!data?.length){
+    results.innerHTML = '<div style="font-size:.78rem;color:var(--ink-light)">Không tìm thấy học sinh phù hợp.</div>';
+    return;
+  }
+  results.innerHTML = data.map(s => `
+    <div class="trial-student-result">
+      <div>
+        <div style="font-weight:800;color:var(--navy)">${esc(s.full_name || 'Học sinh')}</div>
+        <div style="font-size:.74rem;color:var(--ink-light)">${esc(s.email || '')}${s.phone ? ' • '+esc(s.phone) : ''}</div>
+      </div>
+      <button class="btn btn-primary btn-sm" type="button" onclick="selectTrialStudent('${s.id}')">Link</button>
+    </div>
+  `).join('');
+  data.forEach(s => { _trialStudentMap[s.id] = s; });
+}
+
+function selectTrialStudent(id){
+  const student = _trialStudentMap[id];
+  document.getElementById('trialStudentId').value = id;
+  renderTrialLinkedStudent(student || { id });
+  document.getElementById('trialStudentResults').innerHTML = '';
+  if(student){
+    if(!document.getElementById('trialStudentName').value) document.getElementById('trialStudentName').value = student.full_name || '';
+    if(!document.getElementById('trialPhone').value) document.getElementById('trialPhone').value = student.phone || '';
+  }
+}
+
+function loadTrialClassSchedules(item){
+  const classId = document.getElementById('trialClassId')?.value || '';
+  const schedules = trialActiveSchedulesForClass(classId);
+  const makeOptions = selected => '<option value="">-- Chọn lịch --</option>' + schedules.map(s =>
+    `<option value="${s.id}" ${Number(selected)===Number(s.id)?'selected':''}>${esc(trialScheduleLabel(s.id))}</option>`
+  ).join('');
+  document.getElementById('trialSchedule1Id').innerHTML = makeOptions(item?.trial_schedule_1_id || '');
+  document.getElementById('trialSchedule2Id').innerHTML = makeOptions(item?.trial_schedule_2_id || '');
+  document.getElementById('trialSession1At').value = trialToLocalInput(item?.trial_session_1_at);
+  document.getElementById('trialSession2At').value = trialToLocalInput(item?.trial_session_2_at);
+  if(!item && schedules.length){
+    const first = schedules[0];
+    const second = schedules[1] || schedules[0];
+    document.getElementById('trialSchedule1Id').value = first.id;
+    document.getElementById('trialSchedule2Id').value = second.id;
+    suggestTrialDateTime(1);
+    suggestTrialDateTime(2);
+  }
+}
+
+function suggestTrialDateTime(no){
+  const scheduleId = Number(document.getElementById(`trialSchedule${no}Id`)?.value || 0);
+  const target = document.getElementById(`trialSession${no}At`);
+  if(!scheduleId || !target || target.value) return;
+  const after = no === 2 ? trialFromLocalInput(document.getElementById('trialSession1At')?.value) : null;
+  target.value = trialNextDateTimeForSchedule(_trialScheduleMap[scheduleId], after);
+}
+
+async function saveTrialRequest(){
+  const id = document.getElementById('trialEditId').value;
+  const classId = document.getElementById('trialClassId').value || null;
+  const schedule1 = document.getElementById('trialSchedule1Id').value || null;
+  const schedule2 = document.getElementById('trialSchedule2Id').value || null;
+  const session1 = trialFromLocalInput(document.getElementById('trialSession1At').value);
+  const session2 = trialFromLocalInput(document.getElementById('trialSession2At').value);
+  const payload = {
+    student_name: document.getElementById('trialStudentName').value.trim(),
+    phone: document.getElementById('trialPhone').value.trim(),
+    grade: document.getElementById('trialGradeText').value.trim(),
+    subject: document.getElementById('trialSubjectText').value.trim(),
+    student_id: document.getElementById('trialStudentId').value || null,
+    trial_class_id: classId,
+    trial_schedule_1_id: schedule1 ? Number(schedule1) : null,
+    trial_schedule_2_id: schedule2 ? Number(schedule2) : null,
+    trial_session_1_at: session1,
+    trial_session_2_at: session2,
+    note: document.getElementById('trialNote').value.trim() || null,
+    source_url: id ? undefined : 'admin',
+  };
+  if(!payload.student_name || !payload.phone || !payload.grade || !payload.subject){
+    alert('Vui lòng nhập đủ họ tên, SĐT, khối và môn.');
+    return;
+  }
+  if((classId || schedule1 || schedule2 || session1 || session2) && !(classId && schedule1 && schedule2 && session1 && session2)){
+    alert('Nếu chốt lịch học thử, vui lòng chọn đủ lớp, lịch và thời gian cho cả 2 buổi.');
+    return;
+  }
+  if(session1 && session2 && new Date(session2) <= new Date(session1)){
+    alert('Thời gian học thử buổi 2 phải sau buổi 1.');
+    return;
+  }
+  payload.status = trialComputedStatus({ ...payload, status: classId ? 'scheduled' : 'pending_schedule' });
+  const user = await window.AppAuth?.getUser?.();
+  payload.handled_by = user?.id || null;
+  payload.handled_at = new Date().toISOString();
+  Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+  const result = id
+    ? await sb.from('trial_lesson_requests').update(payload).eq('id', id)
+    : await sb.from('trial_lesson_requests').insert(payload);
+  if(result.error){
+    alert('Không thể lưu học thử: ' + result.error.message + '\n\nNếu lỗi báo thiếu cột hoặc sai trạng thái, hãy chạy SQL migration học thử mới.');
+    return;
+  }
+  await window.AppAdminTools?.recordAudit?.(id ? 'trial_lesson_updated' : 'trial_lesson_created', {
+    target_type:'trial_lesson_request',
+    target_id:id || null,
+    student_name:payload.student_name,
+    trial_class_id:classId
+  });
+  closeTrialRequestModal();
+  toast('Đã lưu học thử');
+  await loadTrialRequests();
 }
 
 async function updateTrialRequestStatus(id,status){
@@ -1696,6 +2109,98 @@ async function updateTrialRequestStatus(id,status){
   const row = _trialRequests.find(item => item.id === id);
   if(row) Object.assign(row, updates);
   toast('Đã cập nhật trạng thái học thử');
+}
+
+async function cancelTrialRequest(id){
+  if(!confirm('Hủy học thử này?')) return;
+  await updateTrialRequestStatus(id, 'cancelled');
+  await loadTrialRequests();
+}
+
+function trialGenerateOccurrences(schedules, month, year){
+  const items = [], days = new Date(year, month + 1, 0).getDate();
+  for(let d=1; d<=days; d++){
+    const date = new Date(year, month, d);
+    const wd = date.getDay() === 0 ? 7 : date.getDay();
+    schedules.forEach(s => {
+      if(Number(s.weekday) === wd){
+        const value = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        items.push({ date:value, schedule_id:Number(s.id), session_no:Number(s.session_no || 1) });
+      }
+    });
+  }
+  return items;
+}
+
+async function addTrialStudentToClass(id){
+  const item = _trialRequests.find(row => row.id === id);
+  if(!item) return;
+  if(!item.student_id){
+    alert('Học sinh này chưa được link với tài khoản học sinh. Hãy bấm Sửa / chốt lịch để link tài khoản trước.');
+    return;
+  }
+  if(!item.trial_class_id){
+    alert('Chưa chọn lớp học thử.');
+    return;
+  }
+  if(trialComputedStatus(item) !== 'trial_2_done' && !confirm('Học sinh chưa hoàn thành đủ 2 buổi học thử. Bạn vẫn muốn thêm vào lớp?')) return;
+  const classId = item.trial_class_id;
+  const studentId = item.student_id;
+  const { data: existing } = await sb.from('class_students')
+    .select('id,left_at')
+    .eq('class_id', classId)
+    .eq('student_id', studentId)
+    .is('left_at', null)
+    .maybeSingle();
+  if(existing){
+    await updateTrialRequestStatus(id, 'enrolled');
+    toast('Học sinh đã có trong lớp');
+    await loadTrialRequests();
+    return;
+  }
+  const joinedAt = new Date().toISOString();
+  const { error: insertError } = await sb.from('class_students').insert({ class_id:classId, student_id:studentId, joined_at:joinedAt });
+  if(insertError){
+    alert('Không thể thêm học sinh vào lớp: ' + insertError.message);
+    return;
+  }
+  const selectedSchedules = [item.trial_schedule_1_id, item.trial_schedule_2_id]
+    .map(id => _trialScheduleMap[Number(id)])
+    .filter(Boolean);
+  if(selectedSchedules.length){
+    const bySession = new Map();
+    selectedSchedules.forEach(s => bySession.set(Number(s.session_no || 1), s));
+    const scheduleRows = [...bySession.values()].map(s => ({
+      class_id:classId,
+      student_id:studentId,
+      session_no:Number(s.session_no || 1),
+      schedule_id:Number(s.id)
+    }));
+    const { error: scheduleError } = await sb.from('class_student_schedules').upsert(scheduleRows, { onConflict:'class_id,student_id,session_no' });
+    if(scheduleError) alert('Đã thêm vào lớp nhưng chưa lưu được lịch học sinh: ' + scheduleError.message);
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const pastRows = trialGenerateOccurrences(selectedSchedules, now.getMonth(), now.getFullYear())
+      .filter(row => row.date < today)
+      .map(row => ({ class_id:classId, student_id:studentId, date:row.date, status:'absent', schedule_id:row.schedule_id, session_no:row.session_no }));
+    if(pastRows.length){
+      const { error: attendanceError } = await sb.from('attendance').upsert(pastRows, { onConflict:'class_id,student_id,date,schedule_id' });
+      if(attendanceError) await sb.from('attendance').upsert(pastRows, { onConflict:'class_id,student_id,date' });
+    }
+  }
+  await sb.from('trial_lesson_requests').update({
+    status:'enrolled',
+    enrolled_at:joinedAt,
+    handled_at:joinedAt
+  }).eq('id', id);
+  await window.AppAdminTools?.recordAudit?.('trial_student_enrolled_to_class', {
+    target_type:'class_student',
+    target_id:classId,
+    trial_request_id:id,
+    student_id:studentId
+  });
+  toast('Đã thêm học sinh học thử vào lớp');
+  await loadTrialRequests();
 }
 
 ['trialRequestSearch'].forEach(id=>{
