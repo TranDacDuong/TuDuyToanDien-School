@@ -752,6 +752,16 @@ WITH CHECK (
   OR teacher_id = auth.uid()
 );
 
+DROP POLICY IF EXISTS trial_lesson_requests_delete_policy ON public.trial_lesson_requests;
+CREATE POLICY trial_lesson_requests_delete_policy ON public.trial_lesson_requests
+FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
+
 DROP POLICY IF EXISTS conversation_members_select_policy ON public.conversation_members;
 CREATE POLICY conversation_members_select_policy ON public.conversation_members
 FOR SELECT

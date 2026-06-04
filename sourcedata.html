@@ -2289,9 +2289,14 @@ async function cancelTrialRequest(id){
 
 async function deleteTrialRequest(id){
   if(!confirm('Xóa học sinh này khỏi danh sách học thử? Chỉ xóa khỏi danh sách học thử, không xóa tài khoản học sinh nếu đã tạo.')) return;
-  const { error } = await sb.from('trial_lesson_requests').delete().eq('id', id);
+  const { data, error } = await sb.from('trial_lesson_requests').delete().eq('id', id).select('id');
   if(error){
     alert('Không thể xóa học sinh học thử: ' + error.message);
+    return;
+  }
+  if(!data?.length){
+    alert('Supabase chưa xóa bản ghi nào. Khả năng cao database đang thiếu RLS policy DELETE cho bảng trial_lesson_requests. Hãy chạy SQL mới rồi thử lại.');
+    await loadTrialRequests();
     return;
   }
   await window.AppAdminTools?.recordAudit?.('trial_lesson_deleted', {
@@ -2348,7 +2353,8 @@ async function addTrialStudentToClass(id){
     .is('left_at', null)
     .maybeSingle();
   if(existing){
-    await sb.from('trial_lesson_requests').delete().eq('id', id);
+    const { data: deletedExisting } = await sb.from('trial_lesson_requests').delete().eq('id', id).select('id');
+    if(!deletedExisting?.length) alert('Học sinh đã có trong lớp nhưng chưa xóa được khỏi danh sách học thử. Hãy chạy SQL policy DELETE mới.');
     toast('Học sinh đã có trong lớp');
     closeTrialRequestModal();
     await loadTrialRequests();
@@ -2390,9 +2396,11 @@ async function addTrialStudentToClass(id){
     trial_request_id:id,
     student_id:studentId
   });
-  const { error: deleteTrialError } = await sb.from('trial_lesson_requests').delete().eq('id', id);
+  const { data: deletedTrialRows, error: deleteTrialError } = await sb.from('trial_lesson_requests').delete().eq('id', id).select('id');
   if(deleteTrialError){
     alert('Đã thêm vào lớp nhưng chưa xóa được khỏi danh sách học thử: ' + deleteTrialError.message);
+  } else if(!deletedTrialRows?.length){
+    alert('Đã thêm vào lớp nhưng Supabase chưa xóa bản ghi học thử nào. Hãy chạy SQL policy DELETE mới.');
   }
   toast('Đã thêm học sinh học thử vào lớp');
   closeTrialRequestModal();

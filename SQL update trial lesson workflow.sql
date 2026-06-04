@@ -89,3 +89,13 @@ CREATE INDEX IF NOT EXISTS trial_lesson_requests_trial_class_idx
 
 CREATE INDEX IF NOT EXISTS trial_lesson_requests_student_idx
   ON public.trial_lesson_requests (student_id, created_at DESC);
+
+DROP POLICY IF EXISTS trial_lesson_requests_delete_policy ON public.trial_lesson_requests;
+CREATE POLICY trial_lesson_requests_delete_policy ON public.trial_lesson_requests
+FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role = 'admin'
+  )
+);
