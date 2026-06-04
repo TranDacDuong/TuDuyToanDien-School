@@ -27,16 +27,22 @@ body {
 /* ── Sidebar ── */
 aside {
   position: fixed; top: 0; left: 0; height: 100vh;
-  width: 240px; background: var(--navy); color: #fff;
+  width: 240px;
+  background:
+    radial-gradient(circle at top left, rgba(200,150,42,.13), transparent 30%),
+    linear-gradient(180deg, rgba(255,255,255,.94) 0%, rgba(253,250,244,.9) 100%);
+  color: var(--ink);
   padding: 20px 14px; display: flex; flex-direction: column; flex-shrink: 0;
   transform: translateX(-100%);
   transition: transform .25s cubic-bezier(.4,0,.2,1), box-shadow .25s;
   z-index: 201;
   box-shadow: none;
+  border-right: 1px solid rgba(15,31,61,.08);
+  backdrop-filter: blur(18px);
 }
 aside.open {
   transform: translateX(0);
-  box-shadow: 4px 0 32px rgba(10,20,40,.22);
+  box-shadow: 18px 0 46px rgba(15,31,61,.12);
 }
 
 /* Tab kéo nhỏ luôn hiển thị ở cạnh trái */
@@ -44,17 +50,19 @@ aside.open {
   position: fixed; top: 50%; left: 0;
   transform: translateY(-50%);
   width: 18px; height: 56px;
-  background: var(--navy);
+  background: rgba(255,255,255,.9);
   border-radius: 0 8px 8px 0;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; z-index: 199;
   transition: width .2s, left .25s cubic-bezier(.4,0,.2,1);
-  box-shadow: 2px 0 8px rgba(10,20,40,.18);
+  box-shadow: 2px 0 12px rgba(15,31,61,.12);
+  border: 1px solid rgba(15,31,61,.08);
+  border-left: 0;
   overflow: hidden;
 }
 #sidebarTab::after {
   content: '›';
-  color: var(--gold-light);
+  color: var(--navy);
   font-size: 1rem; font-weight: 700;
   transition: transform .25s;
 }
@@ -80,9 +88,9 @@ aside.open ~ #sidebarTab,
     height: 54px;
     padding: 0 14px;
     border-radius: 999px;
-    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
-    box-shadow: 0 10px 28px rgba(10,20,40,.3);
-    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.92);
+    box-shadow: 0 10px 28px rgba(15,31,61,.16);
+    border: 1px solid rgba(15,31,61,.08);
     z-index: 1200;
   }
   #sidebarTab::after {
@@ -105,7 +113,7 @@ aside.open ~ #sidebarTab,
 
 .logo {
   font-family: var(--font-display); font-size: 1.1rem; font-weight: 700;
-  color: var(--gold-light); margin-bottom: 20px; padding: 0 6px;
+  color: var(--navy); margin-bottom: 20px; padding: 0 6px;
   display: flex; align-items: center; gap: 8px;
 }
 .logo::before {
@@ -117,18 +125,19 @@ aside.open ~ #sidebarTab,
 #userBox {
   display: flex; align-items: center; gap: 10px;
   margin-bottom: 20px; padding: 10px;
-  border-radius: 10px; background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 14px; background: rgba(255,255,255,.7);
+  border: 1px solid rgba(15,31,61,.08);
+  box-shadow: 0 8px 22px rgba(15,31,61,.06);
 }
 #userAvatar {
   width: 38px; height: 38px; border-radius: 50%;
   object-fit: cover; border: 2px solid var(--gold-border); flex-shrink: 0;
 }
-#userName { font-size: .85rem; font-weight: 600; color: #fff; }
+#userName { font-size: .85rem; font-weight: 700; color: var(--navy); }
 .logoutBtn {
-  font-size: .72rem; background: rgba(239,68,68,.15);
-  border: 1px solid rgba(239,68,68,.3); padding: 3px 9px;
-  border-radius: 5px; color: #fca5a5; cursor: pointer;
+  font-size: .72rem; background: rgba(239,68,68,.08);
+  border: 1px solid rgba(239,68,68,.16); padding: 3px 9px;
+  border-radius: 999px; color: #b91c1c; cursor: pointer;
   margin-top: 3px; font-family: var(--font-body); transition: .15s;
 }
 .logoutBtn:hover { background: #ef4444; color: #fff; border-color: #ef4444; }
@@ -139,19 +148,20 @@ aside.open ~ #sidebarTab,
   cursor: pointer; transition: .16s ease;
 }
 .authBtn.primary { background: var(--gold-light); color: var(--navy); }
-.authBtn.secondary { background: rgba(255,255,255,.08); color: rgba(255,255,255,.86); }
+.authBtn.secondary { background: rgba(255,255,255,.74); color: var(--navy); border-color: rgba(15,31,61,.1); }
 .authBtn:hover { transform: translateY(-1px); }
 
 aside ul { list-style: none; padding: 0; margin: 0; flex: 1; }
 aside li {
   padding: 10px 12px; cursor: pointer; border-radius: 8px;
   margin-bottom: 3px; font-size: .86rem; font-weight: 500;
-  transition: .15s; color: rgba(255,255,255,.7);
+  transition: .15s; color: var(--ink-mid);
   display: flex; align-items: center; gap: 8px;
 }
-aside li:hover { background: rgba(255,255,255,.08); color: #fff; }
+aside li:hover { background: rgba(15,31,61,.05); color: var(--navy); }
 aside li.active {
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
+  background: linear-gradient(135deg, rgba(255,185,46,.9) 0%, rgba(255,226,138,.86) 100%);
+  box-shadow: inset 0 0 0 1px rgba(200,150,42,.28), 0 8px 18px rgba(200,150,42,.12);
   color: var(--navy); font-weight: 700;
 }
 .menu-label { flex: 1; }
@@ -197,7 +207,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 @media (min-width: 769px) {
   body.home-sidebar-pinned aside {
     transform: translateX(0);
-    box-shadow: 4px 0 32px rgba(10,20,40,.18);
+    box-shadow: 10px 0 34px rgba(15,31,61,.08);
   }
   body.home-sidebar-pinned main {
     width: calc(100% - 240px);
