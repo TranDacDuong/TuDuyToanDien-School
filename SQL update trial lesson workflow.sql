@@ -7,6 +7,8 @@ ADD COLUMN IF NOT EXISTS trial_schedule_1_id integer,
 ADD COLUMN IF NOT EXISTS trial_schedule_2_id integer,
 ADD COLUMN IF NOT EXISTS trial_session_1_at timestamp with time zone,
 ADD COLUMN IF NOT EXISTS trial_session_2_at timestamp with time zone,
+ADD COLUMN IF NOT EXISTS parent_full_name text,
+ADD COLUMN IF NOT EXISTS parent_phone text,
 ADD COLUMN IF NOT EXISTS note text,
 ADD COLUMN IF NOT EXISTS enrolled_at timestamp with time zone;
 

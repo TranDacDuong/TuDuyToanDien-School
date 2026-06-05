@@ -601,7 +601,9 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
           <tr>
             <th style="min-width:150px">Thời gian</th>
             <th style="min-width:210px">Học sinh</th>
-            <th style="min-width:110px">SĐT</th>
+            <th style="min-width:110px">SĐT HS</th>
+            <th style="min-width:150px">Phụ huynh</th>
+            <th style="min-width:110px">SĐT PH</th>
             <th style="min-width:100px">Khối</th>
             <th style="min-width:110px">Môn</th>
             <th style="min-width:230px">Lớp / lịch học thử</th>
@@ -610,7 +612,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
             <th style="min-width:170px">Hành động</th>
           </tr>
         </thead>
-        <tbody id="trialRequestTable"><tr class="empty-row"><td colspan="9">Đang tải...</td></tr></tbody>
+        <tbody id="trialRequestTable"><tr class="empty-row"><td colspan="11">Đang tải...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -626,7 +628,9 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
     <input type="hidden" id="trialStudentId">
     <div class="trial-form-grid">
       <div class="fg"><label>Họ tên học sinh</label><input id="trialStudentName" placeholder="VD: Nguyễn Văn A"></div>
-      <div class="fg"><label>SĐT</label><input id="trialPhone" placeholder="SĐT học sinh/phụ huynh"></div>
+      <div class="fg"><label>SĐT học sinh</label><input id="trialPhone" placeholder="SĐT học sinh"></div>
+      <div class="fg"><label>Họ tên phụ huynh</label><input id="trialParentName" placeholder="VD: Nguyễn Thị B"></div>
+      <div class="fg"><label>SĐT phụ huynh</label><input id="trialParentPhone" placeholder="SĐT phụ huynh"></div>
       <div class="fg"><label>Khối</label><select id="trialGradeText" onchange="renderTrialSubjectOptions();populateTrialClassSelect();loadTrialClassSchedules()"><option value="">-- Chọn khối --</option></select></div>
       <div class="fg"><label>Môn</label><select id="trialSubjectText" onchange="populateTrialClassSelect();loadTrialClassSchedules()"><option value="">-- Chọn môn --</option></select></div>
       <div class="fg full">
@@ -1957,11 +1961,11 @@ async function loadTrialClasses(){
 
 async function loadTrialRequests(){
   const tbody = document.getElementById('trialRequestTable');
-  if(tbody && !_trialRequests.length) tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Đang tải...</td></tr>';
+  if(tbody && !_trialRequests.length) tbody.innerHTML = '<tr class="empty-row"><td colspan="11">Đang tải...</td></tr>';
   await loadTrialClasses();
   const { data, error } = await sb.from('trial_lesson_requests').select('*').order('created_at', { ascending: false });
   if(error){
-    if(tbody) tbody.innerHTML = `<tr class="empty-row"><td colspan="9">${esc(error.message)}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr class="empty-row"><td colspan="11">${esc(error.message)}</td></tr>`;
     return;
   }
   const rows = data || [];
@@ -1974,7 +1978,7 @@ async function loadTrialRequests(){
     teacherMap = Object.fromEntries((teachers || []).map(t => [t.id, t]));
   }
   if(studentIds.length){
-    const { data: students } = await sb.from('users').select('id,full_name,email,phone').in('id', studentIds);
+    const { data: students } = await sb.from('users').select('id,full_name,email,phone,parent_full_name,parent_phone').in('id', studentIds);
     _trialStudentMap = Object.fromEntries((students || []).map(s => [s.id, s]));
   }
   _trialRequests = rows.map(item => ({ ...item, teacher: teacherMap[item.teacher_id] || null, linkedStudent: _trialStudentMap[item.student_id] || null }));
@@ -1989,7 +1993,7 @@ function renderTrialRequests(){
   const subjectFilter = rmVN(document.getElementById('trialRequestSubjectFilter')?.value || '');
   const rows = _trialRequests.filter(item => {
     const effectiveStatus = trialComputedStatus(item);
-    const haystack = rmVN(`${item.student_name||''} ${item.phone||''} ${item.grade||''} ${item.subject||''} ${item.teacher?.full_name||''} ${item.teacher?.email||''} ${trialClassLabel(item.trial_class_id)} ${trialSourceDisplay(item)} ${item.linkedStudent?.full_name||''} ${item.linkedStudent?.email||''}`);
+    const haystack = rmVN(`${item.student_name||''} ${item.phone||''} ${item.parent_full_name||''} ${item.parent_phone||''} ${item.grade||''} ${item.subject||''} ${item.teacher?.full_name||''} ${item.teacher?.email||''} ${trialClassLabel(item.trial_class_id)} ${trialSourceDisplay(item)} ${item.linkedStudent?.full_name||''} ${item.linkedStudent?.email||''}`);
     const classInfo = _trialClassMap[item.trial_class_id] || {};
     const itemGrade = rmVN(item.grade || classInfo.grades?.name || classInfo.grade?.name || '');
     const itemSubject = rmVN(item.subject || classInfo.subjects?.name || classInfo.subject?.name || '');
@@ -2001,7 +2005,7 @@ function renderTrialRequests(){
   document.getElementById('trialRequestCount').textContent = rows.length;
   const tbody = document.getElementById('trialRequestTable');
   if(!rows.length){
-    window.MindupLiveUI?.patchHTML(tbody, '<tr class="empty-row" data-live-key="trial-empty"><td colspan="9">Chưa có đăng ký học thử phù hợp</td></tr>');
+    window.MindupLiveUI?.patchHTML(tbody, '<tr class="empty-row" data-live-key="trial-empty"><td colspan="11">Chưa có đăng ký học thử phù hợp</td></tr>');
     return;
   }
   window.MindupLiveUI?.patchHTML(tbody, rows.map(item => `
@@ -2013,6 +2017,8 @@ function renderTrialRequests(){
         ${item.note ? `<div style="font-size:.72rem;color:var(--ink-light);margin-top:4px;max-width:240px">${esc(item.note)}</div>` : ''}
       </td>
       <td><button class="btn btn-outline btn-sm" type="button" data-copy-phone="${escAttr(item.phone || '')}">${esc(item.phone || '—')}</button></td>
+      <td>${esc(item.parent_full_name || '—')}</td>
+      <td><button class="btn btn-outline btn-sm" type="button" data-copy-phone="${escAttr(item.parent_phone || '')}">${esc(item.parent_phone || '—')}</button></td>
       <td>${esc(item.grade || '—')}</td>
       <td>${esc(item.subject || '—')}</td>
       <td>
@@ -2069,6 +2075,8 @@ function openTrialRequestModal(id){
   document.getElementById('trialStudentId').value = item?.student_id || '';
   document.getElementById('trialStudentName').value = item?.student_name || '';
   document.getElementById('trialPhone').value = item?.phone || '';
+  document.getElementById('trialParentName').value = item?.parent_full_name || '';
+  document.getElementById('trialParentPhone').value = item?.parent_phone || '';
   renderTrialGradeOptions(item?.grade || '');
   renderTrialSubjectOptions(item?.subject || '');
   document.getElementById('trialNote').value = item?.note || '';
@@ -2112,7 +2120,7 @@ async function searchTrialStudents(){
   results.innerHTML = '<div style="font-size:.78rem;color:var(--ink-light)">Đang tìm...</div>';
   const needle = q.replace(/[,%]/g, ' ');
   const { data, error } = await sb.from('users')
-    .select('id,full_name,email,phone')
+    .select('id,full_name,email,phone,parent_full_name,parent_phone')
     .eq('role','student')
     .or(`full_name.ilike.%${needle}%,email.ilike.%${needle}%,phone.ilike.%${needle}%`)
     .limit(8);
@@ -2144,6 +2152,8 @@ function selectTrialStudent(id){
   if(student){
     if(!document.getElementById('trialStudentName').value) document.getElementById('trialStudentName').value = student.full_name || '';
     if(!document.getElementById('trialPhone').value) document.getElementById('trialPhone').value = student.phone || '';
+    if(!document.getElementById('trialParentName').value) document.getElementById('trialParentName').value = student.parent_full_name || '';
+    if(!document.getElementById('trialParentPhone').value) document.getElementById('trialParentPhone').value = student.parent_phone || '';
   }
 }
 
@@ -2171,6 +2181,8 @@ async function createTrialStudentAccount(){
   }
   const fullName = document.getElementById('trialStudentName').value.trim() || item.student_name || '';
   const phone = document.getElementById('trialPhone').value.trim() || item.phone || '';
+  const parentFullName = document.getElementById('trialParentName')?.value.trim() || item.parent_full_name || '';
+  const parentPhone = document.getElementById('trialParentPhone')?.value.trim() || item.parent_phone || '';
   if(!fullName || !phone){
     alert('Cần có họ tên và SĐT để tạo tài khoản học sinh.');
     return;
@@ -2183,6 +2195,8 @@ async function createTrialStudentAccount(){
       email,
       full_name: fullName,
       phone,
+      parent_full_name: parentFullName,
+      parent_phone: parentPhone,
       password,
       role: 'student'
     }]
@@ -2193,7 +2207,7 @@ async function createTrialStudentAccount(){
   }
   const { data: student, error: findError } = await sb
     .from('users')
-    .select('id,full_name,email,phone')
+    .select('id,full_name,email,phone,parent_full_name,parent_phone')
     .eq('email', email)
     .maybeSingle();
   if(findError || !student){
@@ -2288,6 +2302,8 @@ async function saveTrialRequest(options = {}){
   const payload = {
     student_name: document.getElementById('trialStudentName').value.trim(),
     phone: document.getElementById('trialPhone').value.trim(),
+    parent_full_name: document.getElementById('trialParentName').value.trim(),
+    parent_phone: document.getElementById('trialParentPhone').value.trim(),
     grade: document.getElementById('trialGradeText').value.trim(),
     subject: document.getElementById('trialSubjectText').value.trim(),
     student_id: document.getElementById('trialStudentId').value || null,
@@ -2299,8 +2315,8 @@ async function saveTrialRequest(options = {}){
     note: document.getElementById('trialNote').value.trim() || null,
     source_url: id ? undefined : 'admin',
   };
-  if(!payload.student_name || !payload.phone || !payload.grade || !payload.subject){
-    alert('Vui lòng nhập đủ họ tên, SĐT, khối và môn.');
+  if(!payload.student_name || !payload.phone || !payload.parent_full_name || !payload.parent_phone || !payload.grade || !payload.subject){
+    alert('Vui lòng nhập đủ họ tên học sinh, SĐT học sinh, họ tên phụ huynh, SĐT phụ huynh, khối và môn.');
     return null;
   }
   if((classId || schedule1 || schedule2 || session1 || session2) && !(classId && schedule1 && schedule2 && session1 && session2)){
