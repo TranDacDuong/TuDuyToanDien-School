@@ -682,6 +682,8 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <span>Nhật ký vận hành</span>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <span class="count-badge" id="adminLogCount">0</span>
+        <button class="btn btn-outline btn-sm" type="button" onclick="toggleAllVisibleAdminLogs()">Chọn</button>
+        <button class="btn btn-outline btn-sm" type="button" onclick="deleteSelectedAdminLogs()">Xóa đã chọn</button>
         <button class="btn btn-outline btn-sm" type="button" onclick="loadAdminLogs()">↻ Làm mới</button>
       </div>
     </div>
@@ -715,6 +717,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <table>
         <thead>
           <tr>
+            <th style="width:46px;text-align:center"><input type="checkbox" id="adminLogSelectAll" onchange="toggleAllVisibleAdminLogs(this.checked)"></th>
             <th style="min-width:170px">Thời gian</th>
             <th style="min-width:150px">Người thao tác</th>
             <th style="min-width:150px">Tác vụ</th>
@@ -723,7 +726,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
             <th>Chi tiết</th>
           </tr>
         </thead>
-        <tbody id="adminLogTable"><tr class="empty-row"><td colspan="6">Đang tải...</td></tr></tbody>
+        <tbody id="adminLogTable"><tr class="empty-row"><td colspan="7">Đang tải...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -2532,6 +2535,8 @@ document.getElementById('trialRequestSubjectFilter')?.addEventListener('change',
 ────────────────────────────── */
 let _adminLogs = [];
 let _activeLogQuickFilter = '';
+let _visibleAdminLogIds = [];
+let _selectedAdminLogIds = new Set();
 const LOG_QUICK_FILTERS = {
   home: { action: ['home', 'banner', 'pin', 'pinned'], target: ['home', 'homepage', 'hero', 'banner'] },
   course: { action: ['course'], target: ['course', 'course_session', 'course_registration_request', 'lesson'] },
@@ -2574,15 +2579,19 @@ function renderAdminLogs(){
     (!statusNeedle || log.status === statusNeedle) &&
     (!quickFilter || logMatchesQuickFilter(log, quickFilter))
   );
+  _visibleAdminLogIds = rows.map(log => log.id).filter(Boolean);
+  _selectedAdminLogIds = new Set([..._selectedAdminLogIds].filter(id => _visibleAdminLogIds.includes(id)));
   document.getElementById('adminLogCount').textContent = rows.length;
   updateLogQuickFilterButtons();
+  updateAdminLogSelectionUI();
   const tbody = document.getElementById('adminLogTable');
   if(!rows.length){
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Không có nhật ký nào phù hợp</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Không có nhật ký nào phù hợp</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map(log => `
     <tr>
+      <td style="text-align:center"><input type="checkbox" class="admin-log-check" value="${escAttr(log.id)}" ${_selectedAdminLogIds.has(log.id)?'checked':''} onchange="toggleAdminLogSelection('${escAttr(log.id)}', this.checked)"></td>
       <td style="white-space:nowrap">${esc(logFmtTime(log.created_at))}</td>
       <td>
         <div style="font-weight:700;color:var(--navy)">${esc(log.actor?.full_name || '—')}</div>
@@ -2602,6 +2611,61 @@ function renderAdminLogs(){
       <td>${logDetailHtml(log.details)}</td>
     </tr>
   `).join('');
+  updateAdminLogSelectionUI();
+}
+
+function updateAdminLogSelectionUI(){
+  const box = document.getElementById('adminLogSelectAll');
+  if(!box) return;
+  const total = _visibleAdminLogIds.length;
+  const selected = _visibleAdminLogIds.filter(id => _selectedAdminLogIds.has(id)).length;
+  box.checked = total > 0 && selected === total;
+  box.indeterminate = selected > 0 && selected < total;
+}
+
+function toggleAdminLogSelection(id, checked){
+  if(!id) return;
+  if(checked) _selectedAdminLogIds.add(id);
+  else _selectedAdminLogIds.delete(id);
+  updateAdminLogSelectionUI();
+}
+
+function toggleAllVisibleAdminLogs(force){
+  const shouldSelect = typeof force === 'boolean'
+    ? force
+    : _visibleAdminLogIds.some(id => !_selectedAdminLogIds.has(id));
+  _visibleAdminLogIds.forEach(id => {
+    if(shouldSelect) _selectedAdminLogIds.add(id);
+    else _selectedAdminLogIds.delete(id);
+  });
+  document.querySelectorAll('.admin-log-check').forEach(check => { check.checked = shouldSelect; });
+  updateAdminLogSelectionUI();
+}
+
+async function deleteSelectedAdminLogs(){
+  const ids = [..._selectedAdminLogIds];
+  if(!ids.length){
+    alert('Hãy chọn ít nhất một nhật ký cần xóa.');
+    return;
+  }
+  if(!confirm(`Xóa ${ids.length} nhật ký vận hành đã chọn? Thao tác này không thể hoàn tác.`)) return;
+  const { data, error } = await sb
+    .from('admin_action_logs')
+    .delete()
+    .in('id', ids)
+    .select('id');
+  if(error){
+    alert('Không thể xóa nhật ký vận hành: ' + error.message + '\n\nNếu lỗi quyền truy cập, hãy chạy SQL cấp quyền DELETE cho admin.');
+    return;
+  }
+  const deletedIds = new Set((data || []).map(row => row.id));
+  if(!deletedIds.size){
+    alert('Supabase chưa xóa bản ghi nào. Có thể database đang thiếu RLS policy DELETE cho bảng admin_action_logs.');
+    return;
+  }
+  _selectedAdminLogIds = new Set([..._selectedAdminLogIds].filter(id => !deletedIds.has(id)));
+  toast(`Đã xóa ${deletedIds.size} nhật ký vận hành`);
+  await loadAdminLogs();
 }
 
 function logMatchesQuickFilter(log, filter){
@@ -2621,14 +2685,14 @@ function updateLogQuickFilterButtons(){
 
 async function loadAdminLogs(){
   const tbody = document.getElementById('adminLogTable');
-  if(tbody) tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Đang tải...</td></tr>';
+  if(tbody) tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Đang tải...</td></tr>';
   const { data, error } = await sb
     .from('admin_action_logs')
     .select('id,actor_id,action,status,target_type,target_id,details,created_at')
     .order('created_at', { ascending: false })
     .limit(200);
   if(error){
-    if(tbody) tbody.innerHTML = `<tr class="empty-row"><td colspan="6">${esc(error.message)}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr class="empty-row"><td colspan="7">${esc(error.message)}</td></tr>`;
     return;
   }
   const rows = data || [];
