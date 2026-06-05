@@ -581,6 +581,8 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
     </div>
     <div class="t-search-bar" style="grid-column:1/-1;margin-bottom:14px">
       <div class="sg"><label>Tìm kiếm</label><input id="trialRequestSearch" placeholder="Tên, SĐT, môn, lớp, giáo viên..."></div>
+      <div class="sg"><label>Khối</label><select id="trialRequestGradeFilter"><option value="">Tất cả khối</option></select></div>
+      <div class="sg"><label>Môn</label><select id="trialRequestSubjectFilter"><option value="">Tất cả môn</option></select></div>
       <div class="sg"><label>Trạng thái</label>
         <select id="trialRequestStatusFilter">
           <option value="">Tất cả</option>
@@ -1893,6 +1895,23 @@ function renderTrialSubjectOptions(selectedValue = ''){
   }
 }
 
+function renderTrialRequestFilterOptions(){
+  const gradeSel = document.getElementById('trialRequestGradeFilter');
+  const subjectSel = document.getElementById('trialRequestSubjectFilter');
+  if(!gradeSel || !subjectSel) return;
+  const prevGrade = gradeSel.value || '';
+  const prevSubject = subjectSel.value || '';
+  const grades = (_trialGrades || []).slice().sort((a,b) => parseInt(a.name)-parseInt(b.name));
+  gradeSel.innerHTML = '<option value="">Tất cả khối</option>' +
+    grades.map(g => `<option value="${escAttr(g.name || '')}" ${String(g.name || '')===String(prevGrade)?'selected':''}>Khối ${esc(g.name || '')}</option>`).join('');
+  const selectedGrade = (_trialGrades || []).find(g => String(g.name || '') === String(gradeSel.value || ''));
+  const subjects = (_trialSubjects || [])
+    .filter(s => !selectedGrade?.id || s.grade_id === selectedGrade.id)
+    .sort((a,b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'));
+  subjectSel.innerHTML = '<option value="">Tất cả môn</option>' +
+    subjects.map(s => `<option value="${escAttr(s.name || '')}" ${String(s.name || '')===String(prevSubject)?'selected':''}>${esc(s.name || '')}</option>`).join('');
+}
+
 function populateTrialClassSelect(){
   const sel = document.getElementById('trialClassId');
   if(!sel) return;
@@ -1932,6 +1951,7 @@ async function loadTrialClasses(){
   _trialClasses.forEach(c => (c.class_schedules || []).forEach(s => { _trialScheduleMap[Number(s.id)] = s; }));
   renderTrialGradeOptions();
   renderTrialSubjectOptions();
+  renderTrialRequestFilterOptions();
   populateTrialClassSelect();
 }
 
@@ -1965,10 +1985,18 @@ async function loadTrialRequests(){
 function renderTrialRequests(){
   const q = rmVN(document.getElementById('trialRequestSearch')?.value || '');
   const status = document.getElementById('trialRequestStatusFilter')?.value || '';
+  const gradeFilter = rmVN(document.getElementById('trialRequestGradeFilter')?.value || '');
+  const subjectFilter = rmVN(document.getElementById('trialRequestSubjectFilter')?.value || '');
   const rows = _trialRequests.filter(item => {
     const effectiveStatus = trialComputedStatus(item);
     const haystack = rmVN(`${item.student_name||''} ${item.phone||''} ${item.grade||''} ${item.subject||''} ${item.teacher?.full_name||''} ${item.teacher?.email||''} ${trialClassLabel(item.trial_class_id)} ${trialSourceDisplay(item)} ${item.linkedStudent?.full_name||''} ${item.linkedStudent?.email||''}`);
-    return (!q || haystack.includes(q)) && (!status || effectiveStatus === status);
+    const classInfo = _trialClassMap[item.trial_class_id] || {};
+    const itemGrade = rmVN(item.grade || classInfo.grades?.name || classInfo.grade?.name || '');
+    const itemSubject = rmVN(item.subject || classInfo.subjects?.name || classInfo.subject?.name || '');
+    return (!q || haystack.includes(q)) &&
+      (!gradeFilter || itemGrade === gradeFilter) &&
+      (!subjectFilter || itemSubject === subjectFilter) &&
+      (!status || effectiveStatus === status);
   });
   document.getElementById('trialRequestCount').textContent = rows.length;
   const tbody = document.getElementById('trialRequestTable');
@@ -2477,6 +2505,11 @@ async function addTrialStudentToClassFromModal(){
   el.addEventListener('input',()=>{ clearTimeout(t); t=setTimeout(renderTrialRequests,160); });
 });
 document.getElementById('trialRequestStatusFilter')?.addEventListener('change', renderTrialRequests);
+document.getElementById('trialRequestGradeFilter')?.addEventListener('change', ()=>{
+  renderTrialRequestFilterOptions();
+  renderTrialRequests();
+});
+document.getElementById('trialRequestSubjectFilter')?.addEventListener('change', renderTrialRequests);
 
 /* ──────────────────────────────
    NHẬT KÝ ADMIN
