@@ -342,8 +342,8 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 
 <div class="page-hd page-hero">
   <div>
-    <h1>Quản lý hệ thống</h1>
-    <p>Thiết lập dữ liệu nền tảng, danh mục và các cấu hình vận hành để toàn bộ hệ thống học tập chạy đồng bộ hơn.</p>
+    <h1 id="systemPageTitle">Quản lý hệ thống</h1>
+    <p id="systemPageSubtitle">Thiết lập dữ liệu nền tảng, danh mục và các cấu hình vận hành để toàn bộ hệ thống học tập chạy đồng bộ hơn.</p>
   </div>
 </div>
 
@@ -792,6 +792,12 @@ function switchTab(id, btn){
   document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
   const activeBtn = btn || document.querySelector(`.tab[onclick*="'${id}'"]`);
   if(activeBtn) activeBtn.classList.add("active");
+  const titleEl = document.getElementById('systemPageTitle');
+  const subtitleEl = document.getElementById('systemPageSubtitle');
+  if(titleEl) titleEl.textContent = id === 'trialRequests' ? 'Đăng ký học thử' : 'Quản lý hệ thống';
+  if(subtitleEl) subtitleEl.textContent = id === 'trialRequests'
+    ? 'Quản lý học sinh đăng ký học thử, lịch học thử, tài khoản học sinh và thao tác thêm vào lớp.'
+    : 'Thiết lập dữ liệu nền tảng, danh mục và các cấu hình vận hành để toàn bộ hệ thống học tập chạy đồng bộ hơn.';
   const url = new URL(window.location.href);
   url.searchParams.set('tab', id);
   window.history.replaceState({}, '', url.toString());
