@@ -426,6 +426,13 @@ button:hover{
             <input type="number" id="birthYear">
           </div>
 
+          <div class="form-group" id="gradeGroup">
+            <label>Khối</label>
+            <select id="gradeId">
+              <option value="">Chọn khối</option>
+            </select>
+          </div>
+
           <div class="form-group">
             <label>Tỉnh / Thành phố</label>
             <select id="province">
@@ -540,6 +547,7 @@ button:hover{
 
 <script>
 let currentUser=null;
+let currentProfileRole="student";
 
 async function init(){
   const { data:{user} } = await sb.auth.getUser();
@@ -551,7 +559,19 @@ async function init(){
 
   currentUser=user;
   document.getElementById("email").value=user.email;
+  await loadGrades();
   loadProfile();
+}
+
+async function loadGrades(){
+  const select=document.getElementById("gradeId");
+  if(!select) return;
+  const { data, error } = await sb.from("grades").select("id,name").order("name");
+  if(error){
+    console.error(error);
+    return;
+  }
+  select.innerHTML='<option value="">Chọn khối</option>' + (data||[]).map(g=>`<option value="${g.id}">${g.name}</option>`).join("");
 }
 
 async function loadProfile(){
@@ -574,6 +594,9 @@ async function loadProfile(){
   document.getElementById("province").value=data.province ?? "";
   document.getElementById("school").value=data.school ?? "";
   document.getElementById("bio").value=data.bio ?? "";
+  currentProfileRole=data.role || "student";
+  const gradeSelect=document.getElementById("gradeId");
+  if(gradeSelect) gradeSelect.value=data.grade_id ?? "";
 
   if(data.avatar_url){
     document.getElementById("avatarPreview").src=data.avatar_url;
@@ -589,9 +612,15 @@ async function saveProfile(){
   const province=document.getElementById("province").value;
   const school=document.getElementById("school").value;
   const bio=document.getElementById("bio").value.trim();
+  const gradeId=document.getElementById("gradeId")?.value || null;
 
   if(!fullName || !phone || !birthYear){
     alert("Vui lòng nhập đầy đủ thông tin");
+    return;
+  }
+
+  if(currentProfileRole === "student" && !gradeId){
+    alert("Học sinh cần chọn Khối trước khi lưu thông tin.");
     return;
   }
 
@@ -603,6 +632,7 @@ async function saveProfile(){
       parent_full_name:parentFullName,
       parent_phone:parentPhone,
       birth_year:birthYear,
+      grade_id:gradeId,
       province:province,
       school:school,
       bio:bio

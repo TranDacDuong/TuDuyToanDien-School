@@ -279,7 +279,7 @@ font-family:var(--font-body);color:#ebf5ff;min-height:100vh}
   <div class="hero">
     <div class="hero-copy">
       <h1>Đấu trường tri thức</h1>
-      <p>Biến việc luyện đề thành một trận đấu thật sự. Học sinh có thể tạo phòng, mời bạn vào thi, trả lời câu hỏi nhanh để leo hạng và xem bảng xếp hạng ngay trong phòng.</p>
+      <p>Học sinh vào Game theo Khối trong hồ sơ, chọn Chơi đơn, Đấu nhanh hoặc Vòng MindUp khi admin đã bật bộ câu hỏi tương ứng.</p>
       <div id="gameHeroBadges" class="hero-badges"></div>
     </div>
     <div class="hero-actions">
@@ -299,11 +299,8 @@ font-family:var(--font-body);color:#ebf5ff;min-height:100vh}
     <select id="gameSubjectFilter" class="select"><option value="">Tất cả môn</option></select>
     <select id="gameModeFilter" class="select">
       <option value="">Mọi chế độ</option>
+      <option value="solo">Chơi đơn</option>
       <option value="quick">Đấu nhanh</option>
-      <option value="friends">Phòng bạn bè</option>
-      <option value="ranked">Leo hạng</option>
-      <option value="survival">Sinh tồn</option>
-      <option value="speed">Đua tốc độ</option>
     </select>
     <select id="gameVisibilityFilter" class="select">
       <option value="">Mọi kiểu phòng</option>
@@ -328,6 +325,120 @@ font-family:var(--font-body);color:#ebf5ff;min-height:100vh}
   <div id="gameRoomEmpty" class="empty hidden">
     <strong>Chưa có phòng nào phù hợp</strong>
     <div>Hãy đổi bộ lọc hoặc tạo một phòng mới để bắt đầu thi đấu.</div>
+  </div>
+</div>
+
+<div class="page hidden" id="gameAdminPage">
+  <div class="hero">
+    <div class="hero-copy">
+      <h1>Quản trị Game MindUp</h1>
+      <p>Admin tạo cấu hình Chơi đơn, Đấu nhanh và các Vòng MindUp. Học sinh chỉ nhìn thấy phần chơi khi cấu hình tương ứng đã được bật cho đúng Khối và Môn.</p>
+      <div class="hero-badges">
+        <div class="hero-badge">🎮 Chơi đơn</div>
+        <div class="hero-badge">⚡ Đấu nhanh</div>
+        <div class="hero-badge">🏔️ Vòng MindUp</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="insight-grid">
+    <div class="section-card">
+      <h3>Tạo phần Chơi đơn / Đấu nhanh</h3>
+      <form id="gameConfigForm" class="form-grid">
+        <div class="field">
+          <label>Chế độ</label>
+          <select id="adminGameConfigMode" class="select">
+            <option value="solo">Chơi đơn</option>
+            <option value="quick">Đấu nhanh</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Tên cấu hình</label>
+          <input id="adminGameConfigTitle" class="input" placeholder="Ví dụ: Toán 6 - Chơi đơn">
+        </div>
+        <div class="field">
+          <label>Khối</label>
+          <select id="adminGameConfigGrade" class="select"></select>
+        </div>
+        <div class="field">
+          <label>Môn</label>
+          <select id="adminGameConfigSubject" class="select"></select>
+        </div>
+        <div class="field">
+          <label>Số câu</label>
+          <input id="adminGameConfigQuestionCount" class="input" type="number" min="1" max="50" value="5">
+        </div>
+        <div class="field">
+          <label>Giây mỗi câu</label>
+          <input id="adminGameConfigTime" class="input" type="number" min="5" max="120" value="20">
+        </div>
+        <div class="field full">
+          <label>ID câu hỏi</label>
+          <textarea id="adminGameConfigQuestionIds" class="input" rows="4" placeholder="Dán ID câu hỏi, mỗi dòng một ID. Các câu này sẽ được dùng đúng theo thứ tự."></textarea>
+          <div class="hint">Có thể lấy ID từ Ngân hàng câu hỏi. Nếu bỏ trống, cấu hình vẫn tạo nhưng học sinh chưa thấy phần chơi này.</div>
+        </div>
+        <div class="field full">
+          <button class="btn btn-primary" type="submit">Lưu cấu hình chơi</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="section-card">
+      <h3>Tạo Vòng MindUp</h3>
+      <form id="gameRoundForm" class="form-grid">
+        <div class="field">
+          <label>Tên vòng</label>
+          <input id="adminGameRoundTitle" class="input" placeholder="Ví dụ: Vòng 1 - Khởi động tư duy">
+        </div>
+        <div class="field">
+          <label>Số vòng</label>
+          <input id="adminGameRoundNo" class="input" type="number" min="1" value="1">
+        </div>
+        <div class="field">
+          <label>Khối</label>
+          <select id="adminGameRoundGrade" class="select"></select>
+        </div>
+        <div class="field">
+          <label>Môn</label>
+          <select id="adminGameRoundSubject" class="select"></select>
+        </div>
+        <div class="field full">
+          <label>Mô tả</label>
+          <textarea id="adminGameRoundDescription" class="input" rows="2"></textarea>
+        </div>
+        <div class="field full">
+          <label>Khởi động - ID câu hỏi</label>
+          <textarea id="adminWarmupQuestionIds" class="input" rows="3" placeholder="Tối đa 20 câu, mỗi dòng một ID"></textarea>
+        </div>
+        <div class="field full">
+          <label>Vượt chướng ngại vật</label>
+          <input id="adminObstacleKeyword" class="input" placeholder="Từ khóa ẩn">
+          <textarea id="adminObstacleQuestionIds" class="input" rows="3" placeholder="4 câu gợi ý, mỗi dòng một ID" style="margin-top:8px"></textarea>
+        </div>
+        <div class="field full">
+          <label>Tăng tốc - ID câu hỏi</label>
+          <textarea id="adminAccelerationQuestionIds" class="input" rows="3" placeholder="4 câu, mỗi dòng một ID"></textarea>
+        </div>
+        <div class="field full">
+          <label>Về đích - ID câu hỏi</label>
+          <textarea id="adminFinishQuestionIds" class="input" rows="3" placeholder="Dán dạng: easy|question_id, medium|question_id, hard|question_id"></textarea>
+        </div>
+        <div class="field full">
+          <button class="btn btn-primary" type="submit">Lưu vòng MindUp</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="insight-grid">
+    <div class="section-card">
+      <h3>Cấu hình đang có</h3>
+      <div id="adminGameConfigList" class="history-list"></div>
+    </div>
+    <div class="section-card">
+      <h3>Vòng MindUp đang có</h3>
+      <div id="adminGameRoundList" class="history-list"></div>
+    </div>
   </div>
 </div>
 
@@ -373,10 +484,6 @@ font-family:var(--font-body);color:#ebf5ff;min-height:100vh}
             <label>Chế độ</label>
             <select id="gameRoomMode" class="select">
               <option value="quick">Đấu nhanh</option>
-              <option value="friends">Phòng bạn bè</option>
-              <option value="ranked">Leo hạng</option>
-              <option value="survival">Sinh tồn</option>
-              <option value="speed">Đua tốc độ</option>
             </select>
           </div>
           <div class="field">
@@ -496,7 +603,7 @@ font-family:var(--font-body);color:#ebf5ff;min-height:100vh}
           <h3>Bảng xếp hạng</h3>
           <div class="score-box" style="margin-bottom:12px">
             <div><span>Điểm của bạn</span><strong class="big" id="myGameScore">0</strong></div>
-            <div><span>Hạng hiện tại</span><strong class="big" id="myGameRank">#-</strong></div>
+            <div><span>Vị trí hiện tại</span><strong class="big" id="myGameRank">#-</strong></div>
           </div>
           <div class="score-box" style="margin-bottom:12px">
             <div class="combo-box"><span>Combo hiện tại</span><strong id="myGameCombo">0</strong></div>

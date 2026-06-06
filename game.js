@@ -1,6 +1,7 @@
 (function () {
   const GAME = {
     user: null,
+    profile: null,
     role: "student",
     initialClassId: "",
     initialAction: "",
@@ -32,6 +33,10 @@
     leavingRoom: false,
     selectedAutoMode: "",
     questionDifficultyMap: {},
+    configs: [],
+    configQuestions: [],
+    rounds: [],
+    roundChallenges: [],
     liveRenderKey: "",
     autoStartTimer: null,
   };
@@ -107,10 +112,32 @@
     finishedMeta: document.getElementById("gameFinishedMeta"),
     myStats: document.getElementById("gameMyStats"),
     resultsList: document.getElementById("gameResultsList"),
+    adminPage: document.getElementById("gameAdminPage"),
+    configForm: document.getElementById("gameConfigForm"),
+    roundForm: document.getElementById("gameRoundForm"),
+    adminConfigMode: document.getElementById("adminGameConfigMode"),
+    adminConfigTitle: document.getElementById("adminGameConfigTitle"),
+    adminConfigGrade: document.getElementById("adminGameConfigGrade"),
+    adminConfigSubject: document.getElementById("adminGameConfigSubject"),
+    adminConfigQuestionCount: document.getElementById("adminGameConfigQuestionCount"),
+    adminConfigTime: document.getElementById("adminGameConfigTime"),
+    adminConfigQuestionIds: document.getElementById("adminGameConfigQuestionIds"),
+    adminRoundTitle: document.getElementById("adminGameRoundTitle"),
+    adminRoundNo: document.getElementById("adminGameRoundNo"),
+    adminRoundGrade: document.getElementById("adminGameRoundGrade"),
+    adminRoundSubject: document.getElementById("adminGameRoundSubject"),
+    adminRoundDescription: document.getElementById("adminGameRoundDescription"),
+    adminWarmupQuestionIds: document.getElementById("adminWarmupQuestionIds"),
+    adminObstacleKeyword: document.getElementById("adminObstacleKeyword"),
+    adminObstacleQuestionIds: document.getElementById("adminObstacleQuestionIds"),
+    adminAccelerationQuestionIds: document.getElementById("adminAccelerationQuestionIds"),
+    adminFinishQuestionIds: document.getElementById("adminFinishQuestionIds"),
+    adminConfigList: document.getElementById("adminGameConfigList"),
+    adminRoundList: document.getElementById("adminGameRoundList"),
   };
 
   function supportsModeElo(mode) {
-    return ["solo", "quick", "friends", "ranked", "survival", "speed"].includes(mode);
+    return ["solo", "quick", "round"].includes(mode);
   }
 
   function roundToNearestTen(value) {
@@ -118,6 +145,9 @@
   }
 
   function getModeEloRule(mode) {
+    if (mode === "solo") return "Chơi đơn: đúng càng nhanh càng nhiều điểm, Elo đổi theo tổng điểm.";
+    if (mode === "quick") return "Đấu nhanh: Elo cộng/trừ theo hiệu số điểm giữa nửa trên và nửa dưới.";
+    if (mode === "round") return "Vòng MindUp: qua vòng thì điểm đạt được cộng thành Elo.";
     if (mode === "solo") {
       return "Chơi đơn: điểm trận càng cao, Elo cộng càng nhiều.";
     }
@@ -136,6 +166,26 @@
 
     if (mode === "solo") {
       return Object.fromEntries((orderedPlayers || []).map((player) => [player.user_id, getSoloEloDeltaFromScore(player.score)]));
+    }
+
+    if (mode === "quick") {
+      const winners = Math.floor(total / 2);
+      const losers = Math.floor(total / 2);
+      const map = Object.fromEntries((orderedPlayers || []).map((player) => [player.user_id, 0]));
+      if (!winners || !losers) return map;
+      let totalGain = 0;
+      for (let i = 0; i < winners; i += 1) {
+        const top = orderedPlayers[i];
+        const bottom = orderedPlayers[total - 1 - i];
+        const gain = Math.max(0, Number(top?.score || 0) - Number(bottom?.score || 0));
+        map[top.user_id] = gain;
+        totalGain += gain;
+      }
+      const lossEach = roundToNearestTen(totalGain / losers);
+      for (let i = total - losers; i < total; i += 1) {
+        map[orderedPlayers[i].user_id] = -lossEach;
+      }
+      return map;
     }
 
     const map = {};
@@ -277,6 +327,20 @@
   }
 
   function applyCleanModeOptions() {
+    if (EL.modeFilter) {
+      EL.modeFilter.innerHTML = `
+        <option value="">Mọi chế độ</option>
+        <option value="solo">Chơi đơn</option>
+        <option value="quick">Đấu nhanh</option>
+      `;
+    }
+    if (EL.roomMode) {
+      EL.roomMode.innerHTML = `
+        <option value="quick">Đấu nhanh</option>
+        <option value="friends">Phòng bạn bè</option>
+      `;
+    }
+    return;
     if (EL.modeFilter) {
       EL.modeFilter.innerHTML = `
         <option value="">Mọi chế độ</option>
@@ -517,7 +581,7 @@
     if (backBtn) backBtn.textContent = "← Quay lại";
     if (EL.leaveGameBtn) EL.leaveGameBtn.textContent = "Rời phòng";
     if (EL.myScore?.previousElementSibling) EL.myScore.previousElementSibling.textContent = "Điểm của bạn";
-    if (EL.myRank?.previousElementSibling) EL.myRank.previousElementSibling.textContent = "Hạng hiện tại";
+    if (EL.myRank?.previousElementSibling) EL.myRank.previousElementSibling.textContent = "Vị trí hiện tại";
     const historyModalTitle = document.querySelector("#gameHistoryModal .mh h2");
     if (historyModalTitle) historyModalTitle.textContent = "Chi tiết trận đấu";
     const historyClose = document.querySelector("#gameHistoryModal .mh .btn");
@@ -538,14 +602,14 @@
     if (EL.questionClock?.parentElement?.firstChild) EL.questionClock.parentElement.firstChild.textContent = "Còn lại";
     EL.progressText?.remove();
     if (EL.myScore?.previousElementSibling) EL.myScore.previousElementSibling.textContent = "Điểm của bạn";
-    if (EL.myRank?.previousElementSibling) EL.myRank.previousElementSibling.textContent = "Hạng hiện tại";
+    if (EL.myRank?.previousElementSibling) EL.myRank.previousElementSibling.textContent = "Vị trí hiện tại";
     document.querySelectorAll("#gameLiveView .panel h3")[0] && (document.querySelectorAll("#gameLiveView .panel h3")[0].textContent = "Đáp án của bạn");
     document.querySelectorAll("#gameLiveView .panel h3")[1] && (document.querySelectorAll("#gameLiveView .panel h3")[1].textContent = "Bảng xếp hạng");
     if (EL.finishedView?.querySelector("h3")) EL.finishedView.querySelector("h3").textContent = "Kết quả trận đấu";
   }
 
   if (EL.myScore?.previousElementSibling) EL.myScore.previousElementSibling.textContent = "Điểm của bạn";
-  if (EL.myRank?.previousElementSibling) EL.myRank.previousElementSibling.textContent = "Hạng hiện tại";
+  if (EL.myRank?.previousElementSibling) EL.myRank.previousElementSibling.textContent = "Vị trí hiện tại";
 
   function fmtDateTime(value) {
     if (!value) return "—";
@@ -665,6 +729,11 @@
 
   function getAutoMatchModeCards() {
     return [
+      { mode: "solo", title: "Chơi đơn", art: "🎯", desc: "Luyện nhanh như phần Tăng tốc, mỗi câu 5/10/15/20 điểm theo tốc độ.", elo: getModeEloRule("solo") },
+      { mode: "quick", title: "Đấu nhanh", art: "⚡", desc: "Từ 2 người trở lên, đúng càng nhanh điểm từng câu càng cao.", elo: getModeEloRule("quick") },
+      { mode: "round", title: "Vòng MindUp", art: "🏔️", desc: "4 thử thách kiểu Olympia: Khởi động, Chướng ngại, Tăng tốc, Về đích.", elo: "Qua vòng từ 300 điểm, điểm đạt được cộng vào Elo." },
+    ];
+    return [
       { mode: "solo", title: "Chơi đơn", art: "🎯", desc: "Vào trận ngay, luyện 5 câu để cày Elo.", elo: getModeEloRule("solo") },
       { mode: "quick", title: "Đấu nhanh", art: "⚡", desc: "Vào nhanh, ghép nhanh.", elo: getModeEloRule("quick") },
       { mode: "ranked", title: "Leo hạng", art: "🏆", desc: "Chế độ cạnh tranh Elo rõ ràng.", elo: getModeEloRule("ranked") },
@@ -723,6 +792,14 @@
     const grid = document.getElementById("gameGradeCardGrid");
     if (!grid) return;
     const modeReady = !!GAME.selectedAutoMode;
+    if (GAME.role === "student" && GAME.profile?.grade_id) {
+      const grade = GAME.grades.find((item) => item.id === GAME.profile.grade_id);
+      if (EL.gradeFilter) EL.gradeFilter.value = GAME.profile.grade_id;
+      grid.innerHTML = grade
+        ? `<button type="button" disabled style="${getGradeCardStyle(true)}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:rgba(250,204,21,.18);color:#fde68a;font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Khối trong hồ sơ</span><span style="font-size:1.1rem;font-weight:900;letter-spacing:.01em">${esc(grade.name)}</span></button>`
+        : `<div class="hint">Khối trong hồ sơ chưa hợp lệ.</div>`;
+      return;
+    }
     grid.innerHTML = (GAME.grades || []).map((grade) => {
       if (!modeReady) {
         return `<button type="button" disabled style="${getDisabledSelectionCardStyle()}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:rgba(148,163,184,.12);color:rgba(226,232,240,.58);font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Khối</span><span style="font-size:1.05rem;font-weight:900;letter-spacing:.01em">${esc(grade.name)}</span><span class="hint">Chọn chế độ trước</span></button>`;
@@ -755,7 +832,13 @@
       grid.innerHTML = `<div class="hint">Chọn khối trước để hiện môn tương ứng.</div>`;
       return;
     }
-    const subjects = gradeId ? GAME.subjects.filter((item) => item.grade_id === gradeId) : [];
+    let subjects = gradeId ? GAME.subjects.filter((item) => item.grade_id === gradeId) : [];
+    if (GAME.role === "student") {
+      subjects = subjects.filter((subject) => {
+        if (GAME.selectedAutoMode === "round") return hasRoundForSubject(gradeId, subject.id);
+        return !!getActiveGameConfig(GAME.selectedAutoMode, gradeId, subject.id);
+      });
+    }
     grid.innerHTML = subjects.length
       ? subjects.map((subject) => {
           const selected = EL.subjectFilter?.value === subject.id;
@@ -774,7 +857,7 @@
   function refreshLobbyActions() {
     if (EL.openRoomBtn) {
       EL.openRoomBtn.textContent = "Phòng bạn bè";
-      EL.openRoomBtn.classList.toggle("hidden", GAME.role !== "student");
+      EL.openRoomBtn.classList.add("hidden");
     }
     if (EL.quickMatchBtn) EL.quickMatchBtn.classList.add("hidden");
     if (EL.reloadRoomsBtn) EL.reloadRoomsBtn.classList.add("hidden");
@@ -789,7 +872,23 @@
     if (!GAME.selectedAutoMode) return;
     if (!EL.gradeFilter?.value) return;
     if (!EL.subjectFilter?.value) return;
+    if (GAME.selectedAutoMode === "round") {
+      renderRoundSelection(EL.gradeFilter.value, EL.subjectFilter.value);
+      return;
+    }
     autoMatchSelectedMode();
+  }
+
+  function renderRoundSelection(gradeId, subjectId) {
+    const rounds = (GAME.rounds || [])
+      .filter((round) => round.grade_id === gradeId && round.subject_id === subjectId && (round.status || "active") === "active")
+      .sort((a, b) => Number(a.round_no || 0) - Number(b.round_no || 0));
+    if (!EL.roomGrid) return;
+    EL.roomGrid.classList.remove("hidden");
+    EL.roomEmpty?.classList.add("hidden");
+    EL.roomGrid.innerHTML = rounds.length
+      ? rounds.map((round) => `<div class="room-card"><div class="room-top"><div><div class="room-title">Vòng ${round.round_no || 1}: ${esc(round.title)}</div><div class="hint">${esc(round.description || "4 thử thách: Khởi động, Vượt chướng ngại vật, Tăng tốc, Về đích.")}</div></div><span class="pill live">MindUp</span></div><div class="room-meta"><div><span>Qua vòng</span><strong>${round.pass_score || 300} điểm</strong></div><div><span>Thi lại</span><strong>-${round.retry_penalty || 30} điểm/lần</strong></div></div><div class="room-actions"><button class="btn btn-outline" type="button" disabled>Dữ liệu vòng đã sẵn sàng</button></div></div>`).join("")
+      : '<div class="empty"><strong>Chưa có vòng MindUp</strong><div>Admin chưa tạo vòng thi cho Khối/Môn này.</div></div>';
   }
 
   function clearAutoStartTimer() {
@@ -835,7 +934,7 @@
 
   function isPublicAutoMatchRoom(room) {
     const mode = roomModeValue(room);
-    return ["quick", "ranked", "survival", "speed"].includes(mode) && (room.visibility || "public") === "public";
+    return ["quick"].includes(mode) && (room.visibility || "public") === "public";
   }
 
   function queueAutoStart(room, delayMs = 1200) {
@@ -877,6 +976,254 @@
     EL.finishedView.classList.toggle("hidden", state !== "finished");
   }
 
+  async function loadGameCatalog() {
+    const [configsRes, configQuestionsRes, roundsRes, challengesRes] = await Promise.all([
+      sb.from("game_configs").select("*").order("created_at", { ascending: false }),
+      sb.from("game_config_questions").select("*").order("order_no", { ascending: true }),
+      sb.from("game_rounds").select("*").order("round_no", { ascending: true }).order("created_at", { ascending: false }),
+      sb.from("game_round_challenges").select("*").order("order_no", { ascending: true }),
+    ]);
+    GAME.configs = configsRes.data || [];
+    GAME.configQuestions = configQuestionsRes.data || [];
+    GAME.rounds = roundsRes.data || [];
+    GAME.roundChallenges = challengesRes.data || [];
+    if (configsRes.error || configQuestionsRes.error || roundsRes.error || challengesRes.error) {
+      console.warn("Game catalog warning", configsRes.error || configQuestionsRes.error || roundsRes.error || challengesRes.error);
+    }
+  }
+
+  function parseQuestionIds(raw) {
+    return String(raw || "")
+      .split(/[\n,;\s]+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  function parseFinishQuestionRows(raw) {
+    return String(raw || "")
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const parts = line.split("|").map((part) => part.trim()).filter(Boolean);
+        if (parts.length >= 2 && ["easy", "medium", "hard"].includes(parts[0])) {
+          return { level: parts[0], questionId: parts[1] };
+        }
+        return { level: null, questionId: line };
+      })
+      .filter((item) => item.questionId);
+  }
+
+  function fillAdminSubjects(gradeEl, subjectEl) {
+    fillSubjects(subjectEl, gradeEl?.value || "", "Chọn môn");
+  }
+
+  function renderAdminGamePage() {
+    document.getElementById("gameListPage")?.classList.add("hidden");
+    document.querySelectorAll(".page").forEach((page) => {
+      if (page.id !== "gameAdminPage" && page.id !== "gameListPage") page.classList.add("hidden");
+    });
+    EL.adminPage?.classList.remove("hidden");
+    fillGrades(EL.adminConfigGrade, "Chọn khối");
+    fillGrades(EL.adminRoundGrade, "Chọn khối");
+    fillAdminSubjects(EL.adminConfigGrade, EL.adminConfigSubject);
+    fillAdminSubjects(EL.adminRoundGrade, EL.adminRoundSubject);
+    renderAdminGameLists();
+  }
+
+  function renderAdminGameLists() {
+    if (EL.adminConfigList) {
+      EL.adminConfigList.innerHTML = GAME.configs.length
+        ? GAME.configs.map((cfg) => {
+          const grade = GAME.grades.find((item) => item.id === cfg.grade_id)?.name || "Khối";
+          const subject = GAME.subjects.find((item) => item.id === cfg.subject_id)?.name || "Môn";
+          const qCount = GAME.configQuestions.filter((item) => item.config_id === cfg.id).length;
+          return `<div class="history-item"><div class="history-main"><strong>${esc(cfg.title || roomModeLabel(cfg.mode))}</strong><div class="hint">${esc(roomModeLabel(cfg.mode))} • ${esc(grade)} • ${esc(subject)} • ${qCount} câu hỏi • ${esc(cfg.status || "active")}</div></div><button class="btn btn-outline btn-sm" type="button" onclick="deleteGameConfig('${cfg.id}')">Xóa</button></div>`;
+        }).join("")
+        : '<div class="empty">Chưa có cấu hình Chơi đơn hoặc Đấu nhanh.</div>';
+    }
+    if (EL.adminRoundList) {
+      EL.adminRoundList.innerHTML = GAME.rounds.length
+        ? GAME.rounds.map((round) => {
+          const grade = GAME.grades.find((item) => item.id === round.grade_id)?.name || "Khối";
+          const subject = GAME.subjects.find((item) => item.id === round.subject_id)?.name || "Môn";
+          const challengeCount = GAME.roundChallenges.filter((item) => item.round_id === round.id).length;
+          return `<div class="history-item"><div class="history-main"><strong>Vòng ${round.round_no || 1}: ${esc(round.title)}</strong><div class="hint">${esc(grade)} • ${esc(subject)} • ${challengeCount}/4 thử thách • qua vòng ${round.pass_score || 300} điểm • thi lại trừ ${round.retry_penalty || 30}</div></div><button class="btn btn-outline btn-sm" type="button" onclick="deleteGameRound('${round.id}')">Xóa</button></div>`;
+        }).join("")
+        : '<div class="empty">Chưa có Vòng MindUp nào.</div>';
+    }
+  }
+
+  async function replaceConfigQuestions(configId, questionIds) {
+    await sb.from("game_config_questions").delete().eq("config_id", configId);
+    const rows = questionIds.map((questionId, index) => ({
+      config_id: configId,
+      question_id: questionId,
+      order_no: index + 1,
+    }));
+    if (rows.length) {
+      const { error } = await sb.from("game_config_questions").insert(rows);
+      if (error) throw error;
+    }
+  }
+
+  async function submitGameConfig(event) {
+    event.preventDefault();
+    if (GAME.role !== "admin") return;
+    const mode = EL.adminConfigMode?.value || "solo";
+    const gradeId = EL.adminConfigGrade?.value || "";
+    const subjectId = EL.adminConfigSubject?.value || "";
+    const title = String(EL.adminConfigTitle?.value || "").trim() || roomModeLabel(mode);
+    const questionIds = parseQuestionIds(EL.adminConfigQuestionIds?.value || "");
+    if (!gradeId || !subjectId) {
+      alert("Hãy chọn Khối và Môn cho cấu hình Game.");
+      return;
+    }
+    const { data: config, error } = await sb.from("game_configs").insert({
+      mode,
+      title,
+      grade_id: gradeId,
+      subject_id: subjectId,
+      question_count: Number(EL.adminConfigQuestionCount?.value || questionIds.length || 5),
+      time_per_question: Number(EL.adminConfigTime?.value || 20),
+      status: questionIds.length ? "active" : "inactive",
+      created_by: GAME.user.id,
+    }).select("*").single();
+    if (error) {
+      alert("Không lưu được cấu hình Game: " + error.message);
+      return;
+    }
+    try {
+      await replaceConfigQuestions(config.id, questionIds);
+    } catch (questionError) {
+      alert("Đã tạo cấu hình nhưng lỗi khi thêm câu hỏi: " + questionError.message);
+    }
+    EL.configForm?.reset();
+    await loadGameCatalog();
+    renderAdminGamePage();
+  }
+
+  async function insertChallengeQuestions(challengeId, items) {
+    if (!challengeId) return;
+    const rows = items.map((item, index) => ({
+      challenge_id: challengeId,
+      question_id: item.questionId || item,
+      order_no: index + 1,
+      finish_level: item.level || null,
+      obstacle_key: item.obstacleKey || null,
+    }));
+    if (rows.length) {
+      const { error } = await sb.from("game_round_challenge_questions").insert(rows);
+      if (error) throw error;
+    }
+  }
+
+  async function submitGameRound(event) {
+    event.preventDefault();
+    if (GAME.role !== "admin") return;
+    const gradeId = EL.adminRoundGrade?.value || "";
+    const subjectId = EL.adminRoundSubject?.value || "";
+    const title = String(EL.adminRoundTitle?.value || "").trim();
+    if (!title || !gradeId || !subjectId) {
+      alert("Hãy nhập tên vòng, chọn Khối và Môn.");
+      return;
+    }
+    const { data: round, error } = await sb.from("game_rounds").insert({
+      title,
+      description: String(EL.adminRoundDescription?.value || "").trim(),
+      grade_id: gradeId,
+      subject_id: subjectId,
+      round_no: Number(EL.adminRoundNo?.value || 1),
+      pass_score: 300,
+      retry_penalty: 30,
+      status: "active",
+      created_by: GAME.user.id,
+    }).select("*").single();
+    if (error) {
+      alert("Không lưu được vòng MindUp: " + error.message);
+      return;
+    }
+
+    const challengeRows = [
+      { round_id: round.id, challenge_type: "warmup", title: "Khởi động", order_no: 1, time_limit_seconds: 120, question_limit: 20 },
+      { round_id: round.id, challenge_type: "obstacle", title: "Vượt chướng ngại vật", order_no: 2, question_limit: 4, keyword_answer: String(EL.adminObstacleKeyword?.value || "").trim() },
+      { round_id: round.id, challenge_type: "acceleration", title: "Tăng tốc", order_no: 3, question_limit: 4 },
+      { round_id: round.id, challenge_type: "finish", title: "Về đích", order_no: 4 },
+    ];
+    const { data: challenges, error: challengeError } = await sb.from("game_round_challenges").insert(challengeRows).select("*");
+    if (challengeError) {
+      alert("Đã tạo vòng nhưng lỗi khi tạo thử thách: " + challengeError.message);
+      return;
+    }
+    const challengeByType = Object.fromEntries((challenges || []).map((item) => [item.challenge_type, item]));
+    try {
+      await insertChallengeQuestions(challengeByType.warmup?.id, parseQuestionIds(EL.adminWarmupQuestionIds?.value).map((questionId) => ({ questionId })));
+      await insertChallengeQuestions(challengeByType.obstacle?.id, parseQuestionIds(EL.adminObstacleQuestionIds?.value).map((questionId, idx) => ({ questionId, obstacleKey: String.fromCharCode(65 + idx) })));
+      await insertChallengeQuestions(challengeByType.acceleration?.id, parseQuestionIds(EL.adminAccelerationQuestionIds?.value).map((questionId) => ({ questionId })));
+      await insertChallengeQuestions(challengeByType.finish?.id, parseFinishQuestionRows(EL.adminFinishQuestionIds?.value));
+    } catch (questionError) {
+      alert("Đã tạo vòng nhưng lỗi khi thêm câu hỏi: " + questionError.message);
+    }
+    EL.roundForm?.reset();
+    await loadGameCatalog();
+    renderAdminGamePage();
+  }
+
+  window.deleteGameConfig = async function(configId) {
+    if (GAME.role !== "admin" || !confirm("Xóa cấu hình Game này?")) return;
+    const { error } = await sb.from("game_configs").delete().eq("id", configId);
+    if (error) return alert("Không xóa được cấu hình: " + error.message);
+    await loadGameCatalog();
+    renderAdminGamePage();
+  };
+
+  window.deleteGameRound = async function(roundId) {
+    if (GAME.role !== "admin" || !confirm("Xóa vòng MindUp này?")) return;
+    const { error } = await sb.from("game_rounds").delete().eq("id", roundId);
+    if (error) return alert("Không xóa được vòng: " + error.message);
+    await loadGameCatalog();
+    renderAdminGamePage();
+  };
+
+  function applyStudentGradeLock() {
+    const gradeId = GAME.profile?.grade_id || "";
+    if (!gradeId) {
+      if (EL.roomGrid) {
+        EL.roomGrid.classList.remove("hidden");
+        EL.roomGrid.innerHTML = '<div class="empty"><strong>Chưa chọn Khối</strong><div>Học sinh cần vào Trang cá nhân / Tài khoản để chọn Khối trước khi chơi Game.</div><div style="margin-top:12px"><a class="btn btn-primary" href="account.html">Cập nhật hồ sơ</a></div></div>';
+      }
+      EL.roomEmpty?.classList.add("hidden");
+      document.getElementById("gameModeDeck")?.classList.add("hidden");
+      return;
+    }
+    if (EL.gradeFilter) {
+      EL.gradeFilter.value = gradeId;
+      EL.gradeFilter.disabled = true;
+      EL.gradeFilter.title = "Khối được lấy từ hồ sơ cá nhân.";
+      fillSubjects(EL.subjectFilter, gradeId, "Tất cả môn");
+    }
+    renderGradeCards();
+    renderSubjectCards();
+  }
+
+  function getActiveGameConfig(mode, gradeId, subjectId) {
+    return (GAME.configs || []).find((cfg) =>
+      cfg.mode === mode &&
+      cfg.grade_id === gradeId &&
+      cfg.subject_id === subjectId &&
+      (cfg.status || "active") === "active" &&
+      (GAME.configQuestions || []).some((row) => row.config_id === cfg.id)
+    ) || null;
+  }
+
+  function hasRoundForSubject(gradeId, subjectId) {
+    return (GAME.rounds || []).some((round) =>
+      round.grade_id === gradeId &&
+      round.subject_id === subjectId &&
+      (round.status || "active") === "active"
+    );
+  }
+
   async function init() {
     const params = new URLSearchParams(location.search);
     GAME.initialClassId = params.get("classId") || "";
@@ -892,14 +1239,16 @@
     GAME.accessToken = session?.access_token || "";
 
     const [{ data: profile }, { data: grades }, { data: subjects }] = await Promise.all([
-      sb.from("users").select("role").eq("id", user.id).single(),
+      sb.from("users").select("id,role,grade_id").eq("id", user.id).single(),
       sb.from("grades").select("id,name").order("name"),
       sb.from("subjects").select("id,name,grade_id").order("name"),
     ]);
 
+    GAME.profile = profile || null;
     GAME.role = profile?.role || "student";
     GAME.grades = grades || [];
     GAME.subjects = subjects || [];
+    await loadGameCatalog();
     configureCreateRoomForm();
     injectAutoModeLobby();
     refreshLobbyActions();
@@ -913,6 +1262,12 @@
     renderSubjectCards();
 
     bindEvents();
+    if (GAME.role === "admin") {
+      renderAdminGamePage();
+      return;
+    }
+    applyStudentGradeLock();
+    if (GAME.role === "student" && !GAME.profile?.grade_id) return;
     setupListRealtime();
     await Promise.all([loadRooms(), loadFriends(), loadAccessibleClasses()]);
     if (GAME.initialAction === "create_room") {
@@ -937,6 +1292,10 @@
       }
     });
     EL.roomForm?.addEventListener("submit", submitCreateRoom);
+    EL.configForm?.addEventListener("submit", submitGameConfig);
+    EL.roundForm?.addEventListener("submit", submitGameRound);
+    EL.adminConfigGrade?.addEventListener("change", () => fillAdminSubjects(EL.adminConfigGrade, EL.adminConfigSubject));
+    EL.adminRoundGrade?.addEventListener("change", () => fillAdminSubjects(EL.adminRoundGrade, EL.adminRoundSubject));
     EL.roomClass?.addEventListener("change", () => {
       if (EL.roomClass.value) syncRoomFiltersFromClass(EL.roomClass.value);
     });
@@ -1075,6 +1434,7 @@
   }
 
   function roomModeLabel(mode) {
+    if (mode === "round") return "Vòng MindUp";
     if (mode === "solo") return "Chơi đơn";
     if (mode === "ranked") return "Leo hạng";
     if (mode === "survival") return "Sinh tồn";
@@ -1460,13 +1820,10 @@
       if (Number(player.score || 0) === best) streak += 1;
       else break;
     }
-    const tier = getArenaTier(eloProfile.points);
-    const tierProgress = getArenaTierProgress(eloProfile.points);
-
     if (EL.heroBadges) {
       EL.heroBadges.innerHTML = [
         `<div class="hero-badge">Elo ${eloProfile.points} • ${eloProfile.matches} trận tính Elo</div>`,
-        `<div class="hero-badge">${tier.icon} Hạng ${tier.name}</div>`,
+        `<div class="hero-badge">Thành tích ${totalMatches} trận</div>`,
         `<div class="hero-badge">Tỉ lệ thắng ${winRate}%</div>`,
         `<div class="hero-badge">Chuỗi thắng ${streak}</div>`,
       ].join("");
@@ -1475,14 +1832,12 @@
     if (EL.statsGrid) {
       EL.statsGrid.innerHTML = `
         <div class="stat-card"><span>Elo hiện tại</span><strong>${eloProfile.points}</strong><small>${eloProfile.matches} trận Elo • ${eloProfile.wins} trận PvP đứng đầu</small></div>
-        <div class="stat-card"><span>Tiến độ thăng hạng</span><strong>${tier.icon} ${tier.name}</strong><small>${tierProgress.text}</small><div class="progress-bar" style="margin-top:10px"><div class="progress-fill" style="width:${tierProgress.percent}%"></div></div></div>
+        <div class="stat-card"><span>Thành tích</span><strong>${totalMatches}</strong><small>Tổng điểm ${totalScore} • Điểm TB ${avgScore}</small></div>
         <div class="stat-card"><span>Trận đã chơi</span><strong>${totalMatches}</strong></div>
         <div class="stat-card"><span>Thắng PvP</span><strong>${wins}</strong><small>Tỉ lệ thắng ${winRate}%</small></div>
         <div class="stat-card"><span>Điểm cao nhất</span><strong>${myBest}</strong><small>${soloProfile.matches} trận chơi đơn • Tổng điểm ${totalScore}</small></div>
         <div class="stat-card"><span>Điểm trung bình</span><strong>${avgScore}</strong><small>Chuỗi thắng ${streak}</small></div>
       `;
-      const rankProgressLabel = EL.statsGrid.querySelector(".stat-card:nth-child(2) span");
-      if (rankProgressLabel) rankProgressLabel.textContent = "Tiến độ thăng hạng";
     }
 
     const history = [...myFinished]
@@ -1687,15 +2042,21 @@
   async function createAutoRoomForMode(mode, gradeId, subjectId) {
     const joinCode = randomCode();
     const defaults = getModeDefaults(mode);
+    const config = getActiveGameConfig(mode, gradeId, subjectId);
+    if (!config) {
+      alert("Admin chưa thêm danh sách câu hỏi cho phần chơi này.");
+      return null;
+    }
     const payload = {
       title: `${roomModeLabel(mode)} • ${joinCode}`,
       join_code: joinCode,
       mode,
       grade_id: gradeId,
       subject_id: subjectId,
-      question_count: 5,
-      time_per_question: 20,
+      question_count: Number(config.question_count || defaults.questionCount || 5),
+      time_per_question: Number(config.time_per_question || defaults.timePerQuestion || 20),
       max_players: Number(defaults.maxPlayers || 8),
+      game_config_id: config.id,
       class_id: null,
       description: `Phòng tự ghép cho chế độ ${roomModeLabel(mode)}.`,
       visibility: mode === "solo" ? "private" : "public",
@@ -1726,6 +2087,11 @@
       }
       if (EL.roomMode) EL.roomMode.value = "friends";
       openGameRoomModal();
+      return;
+    }
+    const config = getActiveGameConfig(mode, EL.gradeFilter.value, EL.subjectFilter.value);
+    if (!config) {
+      alert("Admin chưa thêm danh sách câu hỏi cho phần chơi này.");
       return;
     }
     if (mode === "solo") {
@@ -2188,6 +2554,33 @@
   }
 
   async function buildGameQuestions(room) {
+    const configId = room.game_config_id || getActiveGameConfig(roomModeValue(room), room.grade_id, room.subject_id)?.id || "";
+    if (configId) {
+      const links = (GAME.configQuestions || [])
+        .filter((item) => item.config_id === configId)
+        .sort((a, b) => Number(a.order_no || 0) - Number(b.order_no || 0));
+      const ids = links.map((item) => item.question_id).filter(Boolean).slice(0, Number(room.question_count || links.length || 5));
+      if (ids.length) {
+        const { data: configuredBank, error: configuredError } = await sb.from("question_bank")
+          .select("id,question_type,question_text,question_img,answer,answer_count,hidden,difficulty")
+          .in("id", ids);
+        if (!configuredError) {
+          const byId = Object.fromEntries((configuredBank || []).map((question) => [question.id, question]));
+          return ids.map((id, index) => byId[id]).filter((question) => question && !question.hidden && question.answer).map((question, index) => ({
+            room_id: room.id,
+            order_no: index + 1,
+            question_id: question.id,
+            question_type: question.question_type,
+            question_text: question.question_text,
+            question_img: question.question_img,
+            answer: question.answer,
+            answer_count: question.answer_count || (question.question_type === "short_answer" ? 1 : 4),
+            points: defaultQuestionPoints(question.question_type),
+            difficulty: question.difficulty || 2,
+          }));
+        }
+      }
+    }
     const { data: chapters } = await sb.from("chapters").select("id").eq("subject_id", room.subject_id);
     const chapterIds = (chapters || []).map((item) => item.id);
     let bank = [];
@@ -2536,8 +2929,12 @@
       return;
     }
 
-    const nextScore = await recalcPlayerScore(player.id);
-    await sb.from("game_room_players").update({ score: nextScore }).eq("id", player.id);
+    if (roomModeValue(room) === "quick") {
+      await recalcQuickRoomScores(room.id, questionId);
+    } else {
+      const nextScore = await recalcPlayerScore(player.id);
+      await sb.from("game_room_players").update({ score: nextScore }).eq("id", player.id);
+    }
     await refreshActiveRoom(room.id, true);
   }
 
@@ -2545,11 +2942,6 @@
     const mode = roomModeValue(GAME.activeRoom);
     const difficulty = Number(question.difficulty || GAME.questionDifficultyMap?.[question.question_id] || 2);
     if (mode === "solo") {
-      const baseByDifficulty = { 1: 8, 2: 12, 3: 16 };
-      const penaltyByDifficulty = { 1: 4, 2: 5, 3: 6 };
-      const base = baseByDifficulty[Math.max(1, Math.min(3, difficulty))] || 12;
-      const timeBonus = Math.round((Math.max(0, remaining) / Math.max(10, totalTime)) * base * 0.6);
-      const penalty = penaltyByDifficulty[Math.max(1, Math.min(3, difficulty))] || 5;
       let ok = false;
       if (question.question_type === "multi_choice") {
         ok = normalizeAnswer(question.answer) === normalizeAnswer(answerValue);
@@ -2559,7 +2951,10 @@
         const accepted = shortAnswerAccepted(question.answer);
         ok = accepted.includes(String(answerValue || "").trim().toLowerCase());
       }
-      return { isCorrect: ok, score: ok ? base + timeBonus : -penalty, comboBonus: 0 };
+      if (!ok) return { isCorrect: false, score: 0, comboBonus: 0 };
+      const ratio = Math.max(0, remaining) / Math.max(1, totalTime);
+      const score = ratio >= 0.75 ? 20 : ratio >= 0.5 ? 15 : ratio >= 0.25 ? 10 : 5;
+      return { isCorrect: true, score, comboBonus: 0 };
     }
     const speedBonus = Math.round((remaining / totalTime) * (mode === "speed" ? 70 : 35));
     const base = Number(question.points || 0);
@@ -2588,6 +2983,29 @@
   async function recalcPlayerScore(playerId) {
     const { data } = await sb.from("game_room_answers").select("score_earned").eq("player_id", playerId);
     return (data || []).reduce((sum, item) => sum + Number(item.score_earned || 0), 0);
+  }
+
+  async function recalcQuickRoomScores(roomId, questionId) {
+    const players = GAME.roomPlayers.length
+      ? GAME.roomPlayers
+      : ((await sb.from("game_room_players").select("id,room_id,user_id,score,joined_at").eq("room_id", roomId)).data || []);
+    const { data: answers } = await sb.from("game_room_answers")
+      .select("id,player_id,is_correct,answered_at")
+      .eq("room_id", roomId)
+      .eq("game_question_id", questionId);
+    const correct = (answers || [])
+      .filter((item) => item.is_correct)
+      .sort((a, b) => new Date(a.answered_at || 0) - new Date(b.answered_at || 0));
+    const playerCount = Math.max(1, players.length);
+    await Promise.all((answers || []).map((answer) => {
+      const rank = correct.findIndex((item) => item.id === answer.id) + 1;
+      const score = rank > 0 ? Math.max(5, (playerCount - rank + 1) * 5) : 0;
+      return sb.from("game_room_answers").update({ score_earned: score }).eq("id", answer.id);
+    }));
+    await Promise.all(players.map(async (player) => {
+      const nextScore = await recalcPlayerScore(player.id);
+      return sb.from("game_room_players").update({ score: nextScore }).eq("id", player.id);
+    }));
   }
 
   window.toggleGameChoice = function (questionId, option) {
