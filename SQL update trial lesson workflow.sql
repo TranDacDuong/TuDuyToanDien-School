@@ -98,6 +98,6 @@ FOR DELETE
 USING (
   EXISTS (
     SELECT 1 FROM public.users u
-    WHERE u.id = auth.uid() AND u.role = 'admin'
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
   )
 );
