@@ -921,6 +921,41 @@ let profileChannels = [];
 let profileRefreshTimer = null;
 let likedProfilePostIds = new Set();
 
+function setProfileBlockLoading() {
+  const statsBox = document.getElementById("statsBox");
+  const postList = document.getElementById("postList");
+  const friendListBox = document.getElementById("friendListBox");
+  const teacherCoursesBox = document.getElementById("teacherCoursesBox");
+  const teacherSchedulesBox = document.getElementById("teacherSchedulesBox");
+  if (statsBox) statsBox.innerHTML = '<div class="empty">Đang tải thống kê...</div>';
+  if (postList) postList.innerHTML = '<div class="empty">Đang tải bài viết...</div>';
+  if (friendListBox) friendListBox.innerHTML = '<div class="friend-empty">Đang tải bạn bè...</div>';
+  if (teacherCoursesBox) teacherCoursesBox.innerHTML = '<div class="empty">Đang tải khóa học...</div>';
+  if (teacherSchedulesBox) teacherSchedulesBox.innerHTML = '<div class="empty">Đang tải lịch học...</div>';
+}
+
+function runProfileBlock(task, fallback) {
+  Promise.resolve()
+    .then(task)
+    .catch(error => {
+      console.error(error);
+      if (!fallback) return;
+      const box = document.getElementById(fallback.id);
+      if (box) box.innerHTML = fallback.html;
+    });
+}
+
+function loadProfileBlocks() {
+  runProfileBlock(renderTeacherProfile, { id: "teacherCoursesBox", html: '<div class="empty">Không tải được thông tin giáo viên.</div>' });
+  runProfileBlock(renderPostsAndStats, { id: "postList", html: '<div class="empty">Không tải được bài viết.</div>' });
+  if (currentUser) {
+    runProfileBlock(renderFriendList, { id: "friendListBox", html: '<div class="friend-empty">Không tải được danh sách bạn bè.</div>' });
+    subscribeProfileRealtime();
+  } else {
+    document.getElementById("friendListBox").innerHTML = '<div class="friend-empty">Đăng nhập để xem kết nối.</div>';
+  }
+}
+
 async function createNotification(userId, type, message, refId) {
   if (!userId || !currentUser || userId === currentUser.id) return;
   await sb.from("notifications").insert({
@@ -965,17 +1000,10 @@ async function init() {
   document.getElementById("profileComposer").classList.toggle("show", currentUser?.id === viewedProfile.id);
 
   renderHeader();
-  await renderTeacherProfile();
-  await renderPostsAndStats();
-  if (currentUser) {
-    await renderFriendList();
-    subscribeProfileRealtime();
-  } else {
-    document.getElementById("friendListBox").innerHTML = '<div class="friend-empty">Đăng nhập để xem kết nối.</div>';
-  }
-
+  setProfileBlockLoading();
   document.getElementById("loadingBox").classList.add("hidden");
   document.getElementById("profileView").classList.remove("hidden");
+  loadProfileBlocks();
 }
 
 function subscribeProfileRealtime() {
@@ -1530,7 +1558,8 @@ async function renderPostsAndStats() {
       post_media(file_url, file_type, sort_order)
     `)
     .eq("user_id", viewedProfile.id)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(20);
 
   if (error) throw new Error("Không tải được bài viết trên trang cá nhân.");
 
@@ -1576,7 +1605,7 @@ async function renderPostsAndStats() {
       .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
       .map(item => item.file_type === "video"
         ? '<video class="media-item" src="' + safeUrl(item.file_url) + '" controls></video>'
-        : '<img class="media-item" src="' + safeUrl(item.file_url) + '" alt="Ảnh bài viết">')
+        : '<img class="media-item" src="' + safeUrl(item.file_url) + '" alt="Ảnh bài viết" loading="lazy">')
       .join("");
 
     const badges = [];
