@@ -131,6 +131,15 @@ body {
 .quickOp-title strong { display:block; color: var(--navy); font-size: .88rem; }
 .quickOp .quickOp-icon { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; flex:0 0 26px; border-radius:9px; background:#edf4ff; color:#1d4ed8; font-size:.9rem; line-height:1; }
 .quickOp span { display:block; color: var(--ink-mid); font-size: .78rem; line-height: 1.55; }
+.quickOp-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.quickOp-mini {
+  display:inline-flex; align-items:center; justify-content:center;
+  min-height:30px; padding:6px 10px; border-radius:10px;
+  border:1px solid rgba(15,31,61,.1); background:#fff; color:var(--navy);
+  font-family:var(--font-body); font-size:.76rem; font-weight:800;
+  text-decoration:none; cursor:pointer;
+}
+.quickOp-mini.primary { background:var(--navy); color:#fff; border-color:var(--navy); }
 .quickStat {
   display:inline-flex;
   margin-top: 10px;
@@ -469,11 +478,14 @@ button {
       <span>Chạy kiểm tra và mở popup nhóm câu trùng để đối chiếu ngay trong một lượt.</span>
       <span class="quickStat" id="quickDuplicateCount">0 câu</span>
     </button>
-    <button class="quickOp" data-testid="question-quick-import-word" type="button" onclick="document.getElementById('wordImportInput').click()">
+    <div class="quickOp" data-testid="question-quick-import-word">
       <div class="quickOp-title"><span class="quickOp-icon" aria-hidden="true">W</span><strong>Nhập Từ Word</strong></div>
       <span>Đưa file `.docx` vào popup tạo câu hỏi để giáo viên duyệt và lưu từng câu.</span>
-      <span class="quickStat">DOCX</span>
-    </button>
+      <div class="quickOp-actions">
+        <button class="quickOp-mini primary" type="button" onclick="document.getElementById('wordImportInput').click()">Chọn file Word</button>
+        <a class="quickOp-mini" href="question-word-template.docx" download>Tải file mẫu</a>
+      </div>
+    </div>
     <button class="quickOp" data-testid="question-quick-create" type="button" onclick="openModal()">
       <div class="quickOp-title"><span class="quickOp-icon" aria-hidden="true">+</span><strong>Tạo Nhanh Câu Hỏi</strong></div>
       <span>Mở form tạo câu hỏi ngay để thêm câu mới mà không cần cuộn xuống bảng.</span>
