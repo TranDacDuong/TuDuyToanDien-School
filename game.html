@@ -442,7 +442,7 @@ font-family:var(--font-body);color:#ebf5ff;min-height:100vh}
   </div>
 </div>
 
-<div class="page" style="padding-top:0">
+<div class="page" id="gameStudentInsightPage" style="padding-top:0">
   <div class="insight-grid">
     <div style="display:grid;gap:18px">
       <div id="gameStatsGrid" class="stats-grid"></div>
@@ -452,13 +452,10 @@ font-family:var(--font-body);color:#ebf5ff;min-height:100vh}
       </div>
     </div>
     <div class="section-card">
-      <h3>Bảng xếp hạng</h3>
-      <div class="rank-tabs">
-        <button class="rank-tab active" type="button" data-rank-period="day">Hôm nay</button>
-        <button class="rank-tab" type="button" data-rank-period="week">Tuần</button>
-        <button class="rank-tab" type="button" data-rank-period="month">Tháng</button>
-      </div>
+      <h3>Bảng xếp hạng Elo</h3>
       <div id="gameGlobalLeaderboard" class="player-list leaderboard"></div>
+      <div class="hint" id="gameMountainLeaderboardTitle" style="margin:14px 0 8px;color:#fef3c7;font-weight:800">Bảng xếp hạng Leo núi theo Khối/Môn</div>
+      <div id="gameMountainLeaderboard" class="player-list leaderboard" style="margin-top:10px"></div>
     </div>
   </div>
 </div>

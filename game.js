@@ -29,7 +29,6 @@
     roomPresenceIds: [],
     accessToken: "",
     unloadingLeaveSent: false,
-    leaderboardPeriod: "day",
     leavingRoom: false,
     selectedAutoMode: "",
     questionDifficultyMap: {},
@@ -57,6 +56,8 @@
     historyModal: document.getElementById("gameHistoryModal"),
     historyModalBody: document.getElementById("gameHistoryModalBody"),
     globalLeaderboard: document.getElementById("gameGlobalLeaderboard"),
+    mountainLeaderboard: document.getElementById("gameMountainLeaderboard"),
+    mountainLeaderboardTitle: document.getElementById("gameMountainLeaderboardTitle"),
     openRoomBtn: document.getElementById("openGameRoomBtn"),
     quickMatchBtn: document.getElementById("quickMatchBtn"),
     reloadRoomsBtn: document.getElementById("reloadGameRoomsBtn"),
@@ -532,12 +533,9 @@
     const emptyDesc = document.querySelector("#gameRoomEmpty div");
     if (emptyDesc) emptyDesc.textContent = "Hãy đổi bộ lọc hoặc tạo một phòng mới để bắt đầu thi đấu.";
 
-    document.querySelectorAll(".section-card h3")[0] && (document.querySelectorAll(".section-card h3")[0].textContent = "Lịch sử thi đấu gần đây");
-    document.querySelectorAll(".section-card h3")[1] && (document.querySelectorAll(".section-card h3")[1].textContent = "Bảng xếp hạng");
-    document.querySelectorAll("[data-rank-period='day']").forEach((el) => el.textContent = "Hôm nay");
-    document.querySelectorAll("[data-rank-period='week']").forEach((el) => el.textContent = "Tuần");
-    document.querySelectorAll("[data-rank-period='month']").forEach((el) => el.textContent = "Tháng");
-
+    const studentSectionTitles = document.querySelectorAll("#gameStudentInsightPage .section-card h3");
+    if (studentSectionTitles[0]) studentSectionTitles[0].textContent = "Lịch sử thi đấu gần đây";
+    if (studentSectionTitles[1]) studentSectionTitles[1].textContent = "Bảng xếp hạng Elo";
     const modalTitle = document.querySelector("#gameRoomModal .mh h2");
     if (modalTitle) modalTitle.textContent = "Tạo phòng thi đấu";
     const modalClose = document.querySelector("#gameRoomModal .mh .btn");
@@ -750,17 +748,11 @@
     deck.id = "gameModeDeck";
     deck.style.cssText = "display:grid;gap:14px;margin:18px 0 10px";
     deck.innerHTML = `
-      <div style="display:grid;gap:10px">
-        <div style="font-weight:800;font-size:1.05rem;color:#fef3c7">Chọn chế độ rồi vào trận theo thứ tự Chế độ → Khối → Môn</div>
-        <div style="color:rgba(235,245,255,.78)">Chế độ nhiều người sẽ tự ghép phòng phù hợp. Riêng Chơi đơn sẽ tạo trận riêng để bạn vào làm ngay và vẫn cộng Elo chung.</div>
-      </div>
       <div id="gameModeCardGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px"></div>
       <div style="display:grid;gap:10px;margin-top:8px">
-        <div style="font-weight:800;font-size:1rem;color:#fef3c7">Chọn khối</div>
         <div id="gameGradeCardGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px"></div>
       </div>
       <div style="display:grid;gap:10px;margin-top:8px">
-        <div style="font-weight:800;font-size:1rem;color:#fef3c7">Chọn môn</div>
         <div id="gameSubjectCardGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px"></div>
       </div>
     `;
@@ -793,11 +785,8 @@
     if (!grid) return;
     const modeReady = !!GAME.selectedAutoMode;
     if (GAME.role === "student" && GAME.profile?.grade_id) {
-      const grade = GAME.grades.find((item) => item.id === GAME.profile.grade_id);
       if (EL.gradeFilter) EL.gradeFilter.value = GAME.profile.grade_id;
-      grid.innerHTML = grade
-        ? `<button type="button" disabled style="${getGradeCardStyle(true)}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:rgba(250,204,21,.18);color:#fde68a;font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Khối trong hồ sơ</span><span style="font-size:1.1rem;font-weight:900;letter-spacing:.01em">${esc(grade.name)}</span></button>`
-        : `<div class="hint">Khối trong hồ sơ chưa hợp lệ.</div>`;
+      grid.innerHTML = "";
       return;
     }
     grid.innerHTML = (GAME.grades || []).map((grade) => {
@@ -824,12 +813,12 @@
     const grid = document.getElementById("gameSubjectCardGrid");
     if (!grid) return;
     if (!GAME.selectedAutoMode) {
-      grid.innerHTML = `<div class="hint">Chọn chế độ trước để mở danh sách môn phù hợp.</div>`;
+      grid.innerHTML = "";
       return;
     }
     const gradeId = EL.gradeFilter?.value || "";
     if (!gradeId) {
-      grid.innerHTML = `<div class="hint">Chọn khối trước để hiện môn tương ứng.</div>`;
+      grid.innerHTML = "";
       return;
     }
     let subjects = gradeId ? GAME.subjects.filter((item) => item.grade_id === gradeId) : [];
@@ -844,11 +833,12 @@
           const selected = EL.subjectFilter?.value === subject.id;
           return `<button type="button" data-subject-card="${subject.id}" style="${getSubjectCardStyle(selected)}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:${selected ? "rgba(34,211,238,.18)" : "rgba(148,163,184,.12)"};color:${selected ? "#a5f3fc" : "rgba(226,232,240,.78)"};font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">${selected ? "Đang chọn" : "Môn"}</span><span style="font-size:1.02rem;font-weight:900;letter-spacing:.01em">${esc(subject.name)}</span></button>`;
         }).join("")
-      : `<div class="hint">Chọn khối trước để hiện môn tương ứng.</div>`;
+      : `<div class="hint">Chưa có phần chơi phù hợp với Khối/Môn này.</div>`;
     document.querySelectorAll("[data-subject-card]").forEach((button) => {
       button.addEventListener("click", () => {
         if (EL.subjectFilter) EL.subjectFilter.value = button.dataset.subjectCard || "";
         renderSubjectCards();
+        renderArenaInsightsUnified();
         tryAutoJoinReadySelection();
       });
     });
@@ -1021,7 +1011,7 @@
   function renderAdminGamePage() {
     document.getElementById("gameListPage")?.classList.add("hidden");
     document.querySelectorAll(".page").forEach((page) => {
-      if (page.id !== "gameAdminPage" && page.id !== "gameListPage") page.classList.add("hidden");
+      if (page.id !== "gameAdminPage") page.classList.add("hidden");
     });
     EL.adminPage?.classList.remove("hidden");
     fillGrades(EL.adminConfigGrade, "Chọn khối");
@@ -1202,8 +1192,20 @@
       EL.gradeFilter.title = "Khối được lấy từ hồ sơ cá nhân.";
       fillSubjects(EL.subjectFilter, gradeId, "Tất cả môn");
     }
+    renderStudentGradeBadge();
     renderGradeCards();
     renderSubjectCards();
+  }
+
+  function renderStudentGradeBadge() {
+    const joinBox = document.querySelector(".join-code-box");
+    if (!joinBox || document.getElementById("gameStudentGradeBadge")) return;
+    const grade = GAME.grades.find((item) => item.id === GAME.profile?.grade_id);
+    const badge = document.createElement("div");
+    badge.id = "gameStudentGradeBadge";
+    badge.style.cssText = "width:100%;margin-top:8px;color:#fef3c7;font-weight:800";
+    badge.textContent = grade ? `Khối ${grade.name.replace(/^Khối\s*/i, "")}` : "Chưa chọn Khối";
+    joinBox.appendChild(badge);
   }
 
   function getActiveGameConfig(mode, gradeId, subjectId) {
@@ -1304,10 +1306,12 @@
     EL.gradeFilter?.addEventListener("change", () => {
       fillSubjects(EL.subjectFilter, EL.gradeFilter.value, "Tất cả môn");
       renderRooms();
+      renderArenaInsightsUnified();
       if (!EL.gradeFilter.value) GAME.selectedAutoMode = "";
       tryAutoJoinReadySelection();
     });
     EL.subjectFilter?.addEventListener("change", () => {
+      renderArenaInsightsUnified();
       tryAutoJoinReadySelection();
     });
     [EL.keyword, EL.subjectFilter, EL.modeFilter, EL.visibilityFilter, EL.sortFilter, EL.statusFilter].forEach((el) => {
@@ -1319,13 +1323,6 @@
     EL.leaveGameBtn?.addEventListener("click", leaveRoom);
     EL.copyGameCodeBtn?.addEventListener("click", copyRoomCode);
     EL.shareGameCodeBtn?.addEventListener("click", copyRoomInvite);
-    document.querySelectorAll("[data-rank-period]").forEach((button) => {
-      button.addEventListener("click", () => {
-        GAME.leaderboardPeriod = button.dataset.rankPeriod || "day";
-        document.querySelectorAll("[data-rank-period]").forEach((item) => item.classList.toggle("active", item === button));
-        renderArenaInsightsUnified();
-      });
-    });
     document.querySelectorAll("[data-auto-mode]").forEach((button) => {
       button.addEventListener("click", () => {
         GAME.selectedAutoMode = button.dataset.autoMode || "";
@@ -1721,22 +1718,6 @@
     </div>`;
   }
 
-  function getPeriodStart(period) {
-    const now = new Date();
-    const start = new Date(now);
-    start.setHours(0, 0, 0, 0);
-    if (period === "week") {
-      const day = start.getDay() || 7;
-      start.setDate(start.getDate() - day + 1);
-      return start;
-    }
-    if (period === "month") {
-      start.setDate(1);
-      return start;
-    }
-    return start;
-  }
-
   function getOrderedPlayersForRoom(roomId, players) {
     return [...(players || [])]
       .filter((player) => player.room_id === roomId)
@@ -1800,8 +1781,6 @@
     const myFinished = finishedPlayers.filter((player) => player.user_id === GAME.user.id);
     const myCompetitiveFinished = myFinished.filter((player) => roomModeValue(getRoomById(player.room_id)) !== "solo");
     const eloProfile = getUnifiedEloProfile(finishedRooms, finishedPlayers, GAME.user.id);
-    const soloProfile = getSoloProfile(finishedRooms, finishedPlayers, GAME.user.id);
-    const myBest = myFinished.reduce((max, item) => Math.max(max, Number(item.score || 0)), 0);
     const totalMatches = myFinished.length;
     const totalScore = myFinished.reduce((sum, item) => sum + Number(item.score || 0), 0);
     const wins = myCompetitiveFinished.filter((player) => {
@@ -1832,10 +1811,8 @@
     if (EL.statsGrid) {
       EL.statsGrid.innerHTML = `
         <div class="stat-card"><span>Elo hiện tại</span><strong>${eloProfile.points}</strong><small>${eloProfile.matches} trận Elo • ${eloProfile.wins} trận PvP đứng đầu</small></div>
-        <div class="stat-card"><span>Thành tích</span><strong>${totalMatches}</strong><small>Tổng điểm ${totalScore} • Điểm TB ${avgScore}</small></div>
         <div class="stat-card"><span>Trận đã chơi</span><strong>${totalMatches}</strong></div>
         <div class="stat-card"><span>Thắng PvP</span><strong>${wins}</strong><small>Tỉ lệ thắng ${winRate}%</small></div>
-        <div class="stat-card"><span>Điểm cao nhất</span><strong>${myBest}</strong><small>${soloProfile.matches} trận chơi đơn • Tổng điểm ${totalScore}</small></div>
         <div class="stat-card"><span>Điểm trung bình</span><strong>${avgScore}</strong><small>Chuỗi thắng ${streak}</small></div>
       `;
     }
@@ -1863,14 +1840,45 @@
         : `<div class="empty">Bạn chưa có trận nào hoàn thành.</div>`;
     }
 
-    const periodStart = getPeriodStart(GAME.leaderboardPeriod);
-    const scopedRooms = finishedRooms.filter((room) => new Date(room.ended_at || room.created_at) >= periodStart);
-    const leaderboard = getLeaderboardByElo(scopedRooms, finishedPlayers);
+    const leaderboard = getLeaderboardByElo(finishedRooms, finishedPlayers);
 
     if (EL.globalLeaderboard) {
       EL.globalLeaderboard.innerHTML = leaderboard.length
         ? leaderboard.map((item, idx) => `<div class="player-row"><div class="player-main"><img class="avatar" src="${escAttr(getPlayerAvatar(item.userId))}" alt="avatar"><div><div style="font-weight:700;color:var(--navy)">${idx + 1}. ${esc(getPlayerName(item.userId))}</div><div class="hint">${item.matches} trận Elo • ${item.wins} trận đứng đầu</div></div></div><strong style="color:var(--navy)">${item.elo}</strong></div>`).join("")
-        : `<div class="empty">Chưa có dữ liệu Elo cho mốc thời gian này.</div>`;
+        : `<div class="empty">Chưa có dữ liệu Elo.</div>`;
+    }
+
+    const gradeId = GAME.profile?.grade_id || EL.gradeFilter?.value || "";
+    const subjectId = EL.subjectFilter?.value || "";
+    const grade = GAME.grades.find((item) => item.id === gradeId);
+    const subject = GAME.subjects.find((item) => item.id === subjectId);
+    const gradeLabel = grade ? grade.name : "Tất cả khối";
+    const subjectLabel = subject ? subject.name : "Tất cả môn";
+    if (EL.mountainLeaderboardTitle) {
+      EL.mountainLeaderboardTitle.textContent = `Bảng xếp hạng Leo núi - ${gradeLabel} • ${subjectLabel}`;
+    }
+    if (EL.mountainLeaderboard) {
+      const mountainRooms = finishedRooms.filter((room) =>
+        roomModeValue(room) === "round" &&
+        (!gradeId || room.grade_id === gradeId) &&
+        (!subjectId || room.subject_id === subjectId)
+      );
+      const mountainIds = new Set(mountainRooms.map((room) => room.id));
+      const mountainTotals = new Map();
+      finishedPlayers.filter((player) => mountainIds.has(player.room_id)).forEach((player) => {
+        const current = mountainTotals.get(player.user_id) || { userId: player.user_id, score: 0, best: 0, attempts: 0 };
+        const score = Number(player.score || 0);
+        current.score += score;
+        current.best = Math.max(current.best, score);
+        current.attempts += 1;
+        mountainTotals.set(player.user_id, current);
+      });
+      const mountainLeaderboard = [...mountainTotals.values()]
+        .sort((a, b) => b.score - a.score || b.best - a.best || a.attempts - b.attempts)
+        .slice(0, 10);
+      EL.mountainLeaderboard.innerHTML = mountainLeaderboard.length
+        ? mountainLeaderboard.map((item, idx) => `<div class="player-row"><div class="player-main"><img class="avatar" src="${escAttr(getPlayerAvatar(item.userId))}" alt="avatar"><div><div style="font-weight:700;color:var(--navy)">${idx + 1}. ${esc(getPlayerName(item.userId))}</div><div class="hint">${item.attempts} lượt Leo núi • cao nhất ${item.best}</div></div></div><strong style="color:var(--navy)">${item.score}</strong></div>`).join("")
+        : `<div class="empty">Chưa có dữ liệu Leo núi cho ${esc(gradeLabel)} • ${esc(subjectLabel)}.</div>`;
     }
   }
 
