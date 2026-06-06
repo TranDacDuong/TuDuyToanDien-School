@@ -1951,11 +1951,18 @@ function renderTrialRequestFilterOptions(){
   gradeSel.innerHTML = '<option value="">Tất cả khối</option>' +
     grades.map(g => `<option value="${escAttr(g.name || '')}" ${String(g.name || '')===String(prevGrade)?'selected':''}>Khối ${esc(g.name || '')}</option>`).join('');
   const selectedGrade = (_trialGrades || []).find(g => String(g.name || '') === String(gradeSel.value || ''));
-  const subjects = (_trialSubjects || [])
+  const subjectMap = new Map();
+  (_trialSubjects || [])
     .filter(s => !selectedGrade?.id || s.grade_id === selectedGrade.id)
-    .sort((a,b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'));
+    .forEach(s => {
+      const name = String(s.name || '').trim();
+      const key = rmVN(name);
+      if(name && key && !subjectMap.has(key)) subjectMap.set(key, name);
+    });
+  const subjects = [...subjectMap.values()]
+    .sort((a,b) => String(a || '').localeCompare(String(b || ''), 'vi'));
   subjectSel.innerHTML = '<option value="">Tất cả môn</option>' +
-    subjects.map(s => `<option value="${escAttr(s.name || '')}" ${String(s.name || '')===String(prevSubject)?'selected':''}>${esc(s.name || '')}</option>`).join('');
+    subjects.map(name => `<option value="${escAttr(name || '')}" ${rmVN(name || '')===rmVN(prevSubject)?'selected':''}>${esc(name || '')}</option>`).join('');
 }
 
 function populateTrialClassSelect(){
