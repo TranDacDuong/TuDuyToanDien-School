@@ -246,6 +246,16 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 .trial-status-trial_2_done { background:#ecfdf5; color:#047857; border-color:#bbf7d0; }
 .trial-status-enrolled { background:#eef2ff; color:#4338ca; border-color:#c7d2fe; }
 .trial-status-cancelled,.trial-status-closed { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
+@keyframes trialUrgentPulse {
+  0%,100% { box-shadow: inset 0 0 0 1px rgba(245,158,11,.32); background:rgba(255,251,235,.92); }
+  50% { box-shadow: inset 0 0 0 2px rgba(234,88,12,.58), 0 0 18px rgba(245,158,11,.28); background:rgba(254,243,199,.98); }
+}
+.trial-urgent-row td { animation: trialUrgentPulse 1.25s ease-in-out infinite; }
+.trial-urgent-today td { border-top:2px solid rgba(234,88,12,.5); border-bottom:2px solid rgba(234,88,12,.18); }
+.trial-urgent-tomorrow td { border-top:2px solid rgba(37,99,235,.28); border-bottom:2px solid rgba(37,99,235,.14); }
+.trial-urgent-label { display:inline-flex; align-items:center; padding:4px 8px; border-radius:999px; font-size:.72rem; font-weight:800; margin-top:6px; }
+.trial-urgent-label.today { background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; }
+.trial-urgent-label.tomorrow { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
 .trial-modal-box { width:min(96vw,760px); max-height:90vh; overflow:auto; }
 .trial-form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .trial-form-grid .full { grid-column:1/-1; }
@@ -1752,6 +1762,41 @@ function trialFormatDateTime(value){
   return d.toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
 }
 
+function trialDayKey(value){
+  if(!value) return '';
+  const d = new Date(value);
+  if(Number.isNaN(d.getTime())) return '';
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
+function trialSoonInfo(item){
+  const status = trialComputedStatus(item);
+  if(['cancelled','enrolled','closed'].includes(status)) return null;
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate()+1);
+  const todayKey = trialDayKey(today);
+  const tomorrowKey = trialDayKey(tomorrow);
+  const sessions = [
+    { no:1, value:item?.trial_session_1_at },
+    { no:2, value:item?.trial_session_2_at },
+  ]
+    .map(session => ({ ...session, key: trialDayKey(session.value), time: new Date(session.value).getTime() }))
+    .filter(session => session.key && Number.isFinite(session.time));
+  const hit = sessions.find(session => session.key === todayKey)
+    || sessions.find(session => session.key === tomorrowKey);
+  if(!hit) return null;
+  return {
+    day: hit.key === todayKey ? 'today' : 'tomorrow',
+    rank: hit.key === todayKey ? 0 : 1,
+    sessionNo: hit.no,
+    time: hit.time,
+    label: hit.key === todayKey ? `Hôm nay - buổi ${hit.no}` : `Ngày mai - buổi ${hit.no}`,
+  };
+}
+
 function trialToLocalInput(value){
   if(!value) return '';
   const d = new Date(value);
@@ -1998,6 +2043,13 @@ function renderTrialRequests(){
       (!gradeFilter || itemGrade === gradeFilter) &&
       (!subjectFilter || itemSubject === subjectFilter) &&
       (!status || effectiveStatus === status);
+  }).sort((a,b) => {
+    const aSoon = trialSoonInfo(a);
+    const bSoon = trialSoonInfo(b);
+    if(aSoon && bSoon) return aSoon.rank - bSoon.rank || aSoon.time - bSoon.time;
+    if(aSoon) return -1;
+    if(bSoon) return 1;
+    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
   });
   document.getElementById('trialRequestCount').textContent = rows.length;
   const tbody = document.getElementById('trialRequestTable');
@@ -2005,11 +2057,14 @@ function renderTrialRequests(){
     window.MindupLiveUI?.patchHTML(tbody, '<tr class="empty-row" data-live-key="trial-empty"><td colspan="5">Chưa có đăng ký học thử phù hợp</td></tr>');
     return;
   }
-  window.MindupLiveUI?.patchHTML(tbody, rows.map(item => `
-    <tr data-live-key="trial-${item.id}" onclick="openTrialRequestModal('${item.id}')" style="cursor:pointer">
+  window.MindupLiveUI?.patchHTML(tbody, rows.map(item => {
+    const soon = trialSoonInfo(item);
+    return `
+    <tr class="${soon ? `trial-urgent-row trial-urgent-${soon.day}` : ''}" data-live-key="trial-${item.id}" onclick="openTrialRequestModal('${item.id}')" style="cursor:pointer">
       <td>
         <div style="white-space:nowrap;font-weight:700;color:var(--navy)">${esc(logFmtTime(item.created_at))}</div>
         <div style="font-size:.76rem;color:var(--ink-light);margin-top:4px">${esc(trialSourceDisplay(item))}</div>
+        ${soon ? `<div class="trial-urgent-label ${soon.day}">${esc(soon.label)}</div>` : ''}
       </td>
       <td>
         <b style="color:var(--navy)">${esc(item.student_name || '—')}</b>
@@ -2036,7 +2091,7 @@ function renderTrialRequests(){
         </div>
       </td>
     </tr>
-  `).join(''));
+  `}).join(''));
   document.querySelectorAll('[data-copy-phone]').forEach(btn => {
     btn.onclick = (event) => {
       event.stopPropagation();
