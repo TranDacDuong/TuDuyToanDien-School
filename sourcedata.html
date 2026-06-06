@@ -236,7 +236,6 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 
 /* ── Students tab ── */
 #students.panel.active { display: block; }
-#trialRequests.panel.active { display: block; }
 #adminLogs.panel.active { display: block; }
 #appearance.panel.active { display: block; }
 .trial-status-pill { display:inline-flex; align-items:center; justify-content:center; min-width:126px; padding:6px 10px; border-radius:999px; font-size:.74rem; font-weight:800; border:1px solid transparent; white-space:nowrap; }
@@ -794,14 +793,11 @@ function switchTab(id, btn){
   if(activeBtn) activeBtn.classList.add("active");
   const titleEl = document.getElementById('systemPageTitle');
   const subtitleEl = document.getElementById('systemPageSubtitle');
-  if(titleEl) titleEl.textContent = id === 'trialRequests' ? 'Đăng ký học thử' : 'Quản lý hệ thống';
-  if(subtitleEl) subtitleEl.textContent = id === 'trialRequests'
-    ? 'Quản lý học sinh đăng ký học thử, lịch học thử, tài khoản học sinh và thao tác thêm vào lớp.'
-    : 'Thiết lập dữ liệu nền tảng, danh mục và các cấu hình vận hành để toàn bộ hệ thống học tập chạy đồng bộ hơn.';
+  if(titleEl) titleEl.textContent = 'Quản lý hệ thống';
+  if(subtitleEl) subtitleEl.textContent = 'Thiết lập dữ liệu nền tảng, danh mục và các cấu hình vận hành để toàn bộ hệ thống học tập chạy đồng bộ hơn.';
   const url = new URL(window.location.href);
   url.searchParams.set('tab', id);
   window.history.replaceState({}, '', url.toString());
-  if(id === 'trialRequests') loadTrialRequests();
   if(id === 'adminLogs') loadAdminLogs();
   if(id === 'appearance') loadSystemTheme();
 }
@@ -1189,17 +1185,16 @@ async function init(){
   }
   await loadDropdowns();
   loadRooms(); loadGrades(); loadSubjects(); loadChapters();
-  loadTeachers(); loadStudents(); loadTrialRequests(); loadAdminLogs();
+  loadTeachers(); loadStudents(); loadAdminLogs();
   window.MindupLiveUI?.watchTable?.('rooms', loadRooms);
   window.MindupLiveUI?.watchTable?.('grades', loadGrades);
   window.MindupLiveUI?.watchTable?.('subjects', loadSubjects);
   window.MindupLiveUI?.watchTable?.('chapters', loadChapters);
-  window.MindupLiveUI?.watchTable?.('trial_lesson_requests', loadTrialRequests);
   const tab = new URLSearchParams(window.location.search).get('tab');
   if(tab){
     const targetBtn = document.querySelector(`.tab[onclick*="'${tab}'"]`);
     const targetPanel = document.getElementById(tab);
-    if(targetPanel) switchTab(tab, targetBtn);
+    if(targetBtn && targetPanel) switchTab(tab, targetBtn);
   }
 }
 init();

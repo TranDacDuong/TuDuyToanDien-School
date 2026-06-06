@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Đăng ký học thử</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css?v=20260604-mindup-navy1">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script src="visual-effects.js?v=20260602-mindup1" defer></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font-body);background:radial-gradient(circle at top left,rgba(200,150,42,.12),transparent 22%),linear-gradient(180deg,#f4efe4 0%,#f8f5ef 24%,#f7faff 100%);color:var(--ink)}
+.page{max-width:1280px;margin:0 auto;padding:24px 22px 48px}
+.hero{margin-bottom:18px;padding:24px 26px;border-radius:24px;background:radial-gradient(circle at top right,rgba(255,255,255,.2),transparent 30%),linear-gradient(135deg,rgba(15,31,61,.98) 0%,rgba(31,65,128,.95) 55%,rgba(200,150,42,.86) 100%);border:1px solid rgba(35,56,92,.08);box-shadow:0 18px 42px rgba(15,23,42,.08);display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.hero h1{margin:0 0 8px;color:#fff;font-family:var(--font-display);font-size:2rem}
+.hero p{margin:0;color:rgba(255,255,255,.82);line-height:1.65}
+.toolbar{display:grid;grid-template-columns:minmax(220px,1.4fr) minmax(120px,.7fr) minmax(140px,.8fr) minmax(190px,1fr) auto;gap:12px;margin-bottom:18px;padding:14px;border-radius:22px;background:rgba(255,255,255,.9);border:1px solid rgba(15,31,61,.08);box-shadow:0 14px 28px rgba(15,31,61,.07)}
+.input,.select,textarea{width:100%;border:1px solid rgba(39,58,91,.14);border-radius:14px;padding:11px 13px;font:inherit;background:#fff;color:var(--navy)}
+textarea{min-height:86px;resize:vertical}
+.card{background:#fff;border:1px solid rgba(35,56,92,.08);border-radius:24px;box-shadow:0 18px 42px rgba(15,23,42,.08);overflow:hidden}
+.card-hd{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid rgba(39,58,91,.08);background:linear-gradient(180deg,#fff 0%,#fbfcff 100%);flex-wrap:wrap}
+.card-hd h2{margin:0;font-family:var(--font-display);font-size:1.08rem;color:var(--navy)}
+.count{border-radius:999px;padding:5px 10px;background:#edf4ff;color:#35507c;font-size:.76rem;font-weight:800}
+.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:.83rem;min-width:940px}
+th{background:var(--navy);color:var(--gold-light);padding:10px 12px;text-align:left;white-space:nowrap}
+td{padding:11px 12px;border-bottom:1px solid rgba(39,58,91,.08);vertical-align:top}
+tbody tr{cursor:pointer}
+tbody tr:nth-child(even) td{background:#fbfdff}
+tbody tr:hover td{background:#fff7ed}
+.phone-btn{display:inline-flex;border:1px solid rgba(15,31,61,.12);background:#fff;border-radius:10px;padding:6px 10px;font:inherit;font-size:.78rem;font-weight:800;color:var(--navy);cursor:pointer}
+.status-pill{display:inline-flex;align-items:center;justify-content:center;min-width:126px;padding:6px 10px;border-radius:999px;font-size:.74rem;font-weight:800;border:1px solid transparent;white-space:nowrap}
+.status-pending_schedule{background:#fff7ed;color:#c2410c;border-color:#fed7aa}
+.status-scheduled{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
+.status-trial_1_done{background:#fefce8;color:#a16207;border-color:#fde68a}
+.status-trial_2_done{background:#ecfdf5;color:#047857;border-color:#bbf7d0}
+.status-enrolled{background:#eef2ff;color:#4338ca;border-color:#c7d2fe}
+.status-cancelled,.status-closed{background:#fef2f2;color:#b91c1c;border-color:#fecaca}
+@keyframes urgentPulse{0%,100%{box-shadow:inset 0 0 0 1px rgba(245,158,11,.32);background:rgba(255,251,235,.92)}50%{box-shadow:inset 0 0 0 2px rgba(234,88,12,.58),0 0 18px rgba(245,158,11,.28);background:rgba(254,243,199,.98)}}
+.urgent-row td{animation:urgentPulse 1.25s ease-in-out infinite}
+.urgent-label{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:.72rem;font-weight:800;margin-top:6px}
+.urgent-label.today{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}
+.urgent-label.tomorrow{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.modal{position:fixed;inset:0;background:rgba(10,20,40,.45);display:none;align-items:center;justify-content:center;padding:18px;z-index:2000}.modal.show{display:flex}
+.modal-card{width:min(860px,100%);max-height:calc(100vh - 36px);overflow:auto;background:#fff;border:1px solid rgba(35,56,92,.08);border-radius:24px;box-shadow:0 18px 42px rgba(15,23,42,.18)}
+.modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:18px 22px;border-bottom:1px solid rgba(39,58,91,.08)}
+.modal-head h3{margin:0;color:var(--navy);font-family:var(--font-display)}
+.modal-body{padding:18px 22px 22px}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.field{display:grid;gap:7px}.full{grid-column:1/-1}
+.actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px}
+.selected-student{display:none;margin-top:8px;padding:8px 10px;border-radius:10px;background:#ecfdf5;color:#047857;font-size:.82rem;font-weight:700}
+.selected-student.show{display:block}
+.student-results{margin-top:8px;display:grid;gap:6px}
+.student-result{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid rgba(39,58,91,.12);border-radius:12px;padding:8px 10px;background:#fff}
+.empty{padding:28px;text-align:center;color:var(--ink-light)}
+@media(max-width:900px){.page{padding:16px 12px 32px}.toolbar,.form-grid{grid-template-columns:1fr}.hero,.toolbar,.card,.modal-card{border-radius:20px}.modal{padding:10px;align-items:flex-end}.modal-card{border-radius:22px 22px 0 0}}
+</style>
+</head>
+<body>
+<div class="page">
+  <section class="hero">
+    <div>
+      <h1>Đăng ký học thử</h1>
+      <p>Quản lý học sinh đăng ký học thử, lịch học thử, tài khoản học sinh và thao tác thêm vào lớp.</p>
+    </div>
+    <button class="btn btn-outline" type="button" onclick="openTrialModal()">+ Thêm học sinh học thử</button>
+  </section>
+
+  <section class="toolbar">
+    <input id="requestSearch" class="input" placeholder="Tên, SĐT, môn, lớp, giáo viên...">
+    <select id="gradeFilter" class="select"><option value="">Tất cả khối</option></select>
+    <select id="subjectFilter" class="select"><option value="">Tất cả môn</option></select>
+    <select id="statusFilter" class="select">
+      <option value="">Tất cả trạng thái</option>
+      <option value="pending_schedule">Chưa chốt lịch học thử</option>
+      <option value="scheduled">Đã chốt lịch học thử</option>
+      <option value="trial_1_done">Đã học thử buổi đầu tiên</option>
+      <option value="trial_2_done">Đã học thử xong 2 buổi</option>
+      <option value="enrolled">Đã thêm vào lớp</option>
+      <option value="cancelled">Hủy</option>
+    </select>
+    <button class="btn btn-primary" type="button" onclick="loadTrialRequests()">Tải lại</button>
+  </section>
+
+  <section class="card">
+    <div class="card-hd">
+      <h2>Danh sách học sinh học thử</h2>
+      <span class="count" id="requestCount">0</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width:180px">Thời gian / nguồn</th>
+            <th style="min-width:240px">Học sinh</th>
+            <th style="min-width:190px">Phụ huynh</th>
+            <th style="min-width:130px">Khối / môn</th>
+            <th style="min-width:270px">Lớp / lịch học thử</th>
+          </tr>
+        </thead>
+        <tbody id="requestTable"><tr class="empty"><td colspan="5">Đang tải...</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<div class="modal" id="trialModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="modalTitle">Thêm học sinh học thử</h3>
+      <button class="btn btn-outline" type="button" onclick="closeTrialModal()">Đóng</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editId">
+      <input type="hidden" id="studentId">
+      <div class="form-grid">
+        <div class="field"><label>Họ tên học sinh</label><input id="studentName" class="input" placeholder="VD: Nguyễn Văn A"></div>
+        <div class="field"><label>SĐT học sinh</label><input id="studentPhone" class="input" placeholder="SĐT học sinh"></div>
+        <div class="field"><label>Họ tên phụ huynh</label><input id="parentName" class="input" placeholder="VD: Nguyễn Thị B"></div>
+        <div class="field"><label>SĐT phụ huynh</label><input id="parentPhone" class="input" placeholder="SĐT phụ huynh"></div>
+        <div class="field"><label>Khối</label><select id="gradeText" class="select" onchange="renderSubjectOptions();populateClassSelect();loadClassSchedules()"></select></div>
+        <div class="field"><label>Môn</label><select id="subjectText" class="select" onchange="populateClassSelect();loadClassSchedules()"></select></div>
+        <div class="field full">
+          <label>Link tài khoản học sinh hiện có</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="studentSearch" class="input" placeholder="Tìm theo tên, email hoặc SĐT">
+            <button class="btn btn-outline" type="button" onclick="searchStudents()">Tìm</button>
+            <button class="btn btn-outline" type="button" onclick="clearStudentLink()">Bỏ link</button>
+          </div>
+          <div id="selectedStudent" class="selected-student"></div>
+          <div id="studentResults" class="student-results"></div>
+        </div>
+        <div class="field full"><label>Lớp học thử</label><select id="classId" class="select" onchange="loadClassSchedules()"></select></div>
+        <div class="field"><label>Lịch học thử buổi 1</label><select id="schedule1Id" class="select" onchange="suggestDate(1)"></select></div>
+        <div class="field"><label>Ngày học thử buổi 1</label><select id="session1At" class="select"></select></div>
+        <div class="field"><label>Lịch học thử buổi 2</label><select id="schedule2Id" class="select" onchange="suggestDate(2)"></select></div>
+        <div class="field"><label>Ngày học thử buổi 2</label><select id="session2At" class="select"></select></div>
+        <div class="field full"><label>Ghi chú</label><textarea id="note" class="input" placeholder="Nguồn thông tin, nhu cầu học, ghi chú khi gọi điện..."></textarea></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-outline" type="button" onclick="createStudentAccount()">Thêm tài khoản</button>
+        <button class="btn btn-outline" type="button" onclick="saveTrialRequest()">Lưu học thử</button>
+        <button class="btn btn-outline" type="button" onclick="deleteTrialFromModal()">Xóa học sinh học thử</button>
+        <button class="btn btn-primary" type="button" onclick="addTrialToClassFromModal()">Thêm vào lớp</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const DAYS = {1:"T2",2:"T3",3:"T4",4:"T5",5:"T6",6:"T7",7:"CN"};
+let S = { requests:[], classes:[], grades:[], subjects:[], classMap:{}, scheduleMap:{}, studentMap:{} };
+
+function esc(s){ return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function escAttr(s){ return esc(s).replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
+function rmVN(s){ return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim(); }
+function toast(msg,dur=2000){ const el=document.getElementById("toast"); if(!el) return; el.textContent=msg; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),dur); }
+function slugName(name){ return rmVN(name).replace(/[^a-z0-9]+/g,"").slice(0,28) || "hocsinh"; }
+function fmtTime(value){ if(!value) return "—"; const d=new Date(value); return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("vi-VN"); }
+function localDate(value){ if(!value) return ""; const d=new Date(value); if(Number.isNaN(d.getTime())) return ""; const pad=n=>String(n).padStart(2,"0"); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function dayKey(value){ if(!value) return ""; const d=new Date(value); if(Number.isNaN(d.getTime())) return ""; const pad=n=>String(n).padStart(2,"0"); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+
+function statusKey(status){ return status === "new" || status === "contacted" || !status ? "pending_schedule" : status; }
+function statusLabel(status){
+  status = statusKey(status);
+  if(status === "scheduled") return "Đã chốt lịch học thử";
+  if(status === "trial_1_done") return "Đã học thử buổi đầu tiên";
+  if(status === "trial_2_done") return "Đã học thử xong 2 buổi";
+  if(status === "enrolled") return "Đã thêm vào lớp";
+  if(status === "cancelled") return "Hủy";
+  if(status === "closed") return "Đã đóng";
+  return "Chưa chốt lịch học thử";
+}
+function computedStatus(item){
+  const stored = statusKey(item?.status);
+  if(["cancelled","enrolled","closed"].includes(stored)) return stored;
+  if(!item?.trial_class_id || !item?.trial_session_1_at || !item?.trial_session_2_at) return "pending_schedule";
+  const now = Date.now();
+  const first = new Date(item.trial_session_1_at).getTime();
+  const second = new Date(item.trial_session_2_at).getTime();
+  if(Number.isFinite(second) && now >= second) return "trial_2_done";
+  if(Number.isFinite(first) && now >= first) return "trial_1_done";
+  return "scheduled";
+}
+function soonInfo(item){
+  const status = computedStatus(item);
+  if(["cancelled","enrolled","closed"].includes(status)) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+  const todayKey = dayKey(today), tomorrowKey = dayKey(tomorrow);
+  const sessions = [{no:1,value:item?.trial_session_1_at},{no:2,value:item?.trial_session_2_at}]
+    .map(x=>({...x,key:dayKey(x.value),time:new Date(x.value).getTime()}))
+    .filter(x=>x.key && Number.isFinite(x.time));
+  const hit = sessions.find(x=>x.key===todayKey) || sessions.find(x=>x.key===tomorrowKey);
+  if(!hit) return null;
+  return { day: hit.key===todayKey ? "today" : "tomorrow", rank: hit.key===todayKey ? 0 : 1, time: hit.time, label: hit.key===todayKey ? `Hôm nay - buổi ${hit.no}` : `Ngày mai - buổi ${hit.no}` };
+}
+function sourceDisplay(item){
+  const text = String(item?.source_url || "");
+  if(text.includes("profile.html")) return item?.teacher?.full_name || "Trang giáo viên";
+  if(text.includes("home.html")) return "Trang chủ";
+  if(text === "admin" || !text) return "Admin nhập";
+  return "Website";
+}
+function classLabel(classId){ return S.classMap[classId]?.class_name || "Chưa chọn lớp"; }
+function scheduleLabel(id){
+  const s = S.scheduleMap[Number(id)];
+  if(!s) return "Chưa chọn lịch";
+  const room = s.rooms?.room_name ? " "+s.rooms.room_name : "";
+  return `${DAYS[s.weekday] || "?"} ${String(s.start_time || "").slice(0,5)} - ${String(s.end_time || "").slice(0,5)}${room}`;
+}
+function scheduleDateLabel(value){ const d=new Date(`${value}T00:00:00`); return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric"}); }
+function fromLocalDate(value, scheduleId){ if(!value) return null; const s=S.scheduleMap[Number(scheduleId||0)]; const time=String(s?.start_time || "08:00").slice(0,5); const d=new Date(`${value}T${time}`); return Number.isNaN(d.getTime()) ? null : d.toISOString(); }
+function dateWeekday(value){ const d=new Date(`${value}T00:00:00`); if(Number.isNaN(d.getTime())) return null; return d.getDay()===0 ? 7 : d.getDay(); }
+function dateMatchesSchedule(value, scheduleId){ const s=S.scheduleMap[Number(scheduleId)]; return !!s && dateWeekday(value) === Number(s.weekday); }
+
+function activeSchedulesForClass(classId){
+  const cls = S.classMap[classId];
+  const schedules = cls?.class_schedules || [];
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-01`;
+  const eligible = schedules.filter(s => (s.effective_from || "2000-01-01") <= monthStart);
+  const source = eligible.length ? eligible : schedules;
+  const maxEffective = source.reduce((max,s) => (s.effective_from || "2000-01-01") > max ? (s.effective_from || "2000-01-01") : max, "2000-01-01");
+  return source.filter(s => (s.effective_from || "2000-01-01") === maxEffective)
+    .sort((a,b)=>Number(a.session_no||1)-Number(b.session_no||1)||Number(a.weekday||0)-Number(b.weekday||0)||String(a.start_time||"").localeCompare(String(b.start_time||"")));
+}
+function nextDateForSchedule(schedule, afterValue){
+  if(!schedule) return "";
+  const base = afterValue ? new Date(afterValue) : new Date();
+  if(Number.isNaN(base.getTime())) return "";
+  const target = Number(schedule.weekday || 1);
+  const [hh,mm] = String(schedule.start_time || "08:00").slice(0,5).split(":").map(Number);
+  const d = new Date(base); d.setSeconds(0,0);
+  for(let i=0;i<35;i++){
+    const wd = d.getDay()===0 ? 7 : d.getDay();
+    const c = new Date(d); c.setHours(Number.isFinite(hh)?hh:8, Number.isFinite(mm)?mm:0, 0, 0);
+    if(wd === target && c > base) return localDate(c.toISOString());
+    d.setDate(d.getDate()+1);
+  }
+  return "";
+}
+function dateOptions(scheduleId, afterValue, selectedDate){
+  const schedule = S.scheduleMap[Number(scheduleId || 0)];
+  if(!schedule) return [];
+  const options = [], seen = new Set();
+  const base = afterValue ? new Date(afterValue) : new Date();
+  if(Number.isNaN(base.getTime())) return [];
+  if(selectedDate){ options.push(selectedDate); seen.add(selectedDate); }
+  const startDate = new Date(base);
+  if(!afterValue) startDate.setDate(startDate.getDate()-180);
+  startDate.setHours(0,0,0,0);
+  const endDate = new Date(base); endDate.setDate(endDate.getDate()+180); endDate.setHours(23,59,59,999);
+  const target = Number(schedule.weekday || 1);
+  const [hh,mm] = String(schedule.start_time || "08:00").slice(0,5).split(":").map(Number);
+  const d = new Date(startDate);
+  for(let i=0;i<370 && d<=endDate;i++){
+    const wd = d.getDay()===0 ? 7 : d.getDay();
+    const c = new Date(d); c.setHours(Number.isFinite(hh)?hh:8, Number.isFinite(mm)?mm:0, 0, 0);
+    const value = localDate(c.toISOString());
+    if(wd === target && (!afterValue || c > base) && !seen.has(value)){ options.push(value); seen.add(value); }
+    d.setDate(d.getDate()+1);
+  }
+  return options.sort();
+}
+
+function renderGradeOptions(selected=""){
+  const grade = document.getElementById("gradeText");
+  const filter = document.getElementById("gradeFilter");
+  const grades = [...S.grades].sort((a,b)=>parseInt(a.name)-parseInt(b.name));
+  const html = '<option value="">-- Chọn khối --</option>' + grades.map(g=>`<option value="${escAttr(g.name||"")}" ${String(g.name||"")===String(selected)?"selected":""}>Khối ${esc(g.name||"")}</option>`).join("");
+  grade.innerHTML = html;
+  const prev = filter.value || "";
+  filter.innerHTML = '<option value="">Tất cả khối</option>' + grades.map(g=>`<option value="${escAttr(g.name||"")}" ${String(g.name||"")===String(prev)?"selected":""}>Khối ${esc(g.name||"")}</option>`).join("");
+}
+function renderSubjectOptions(selected=""){
+  const sel = document.getElementById("subjectText");
+  const gradeText = document.getElementById("gradeText")?.value || "";
+  const grade = S.grades.find(g=>String(g.name||"")===String(gradeText));
+  const subjects = S.subjects.filter(s=>!grade?.id || s.grade_id===grade.id).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi"));
+  sel.innerHTML = '<option value="">-- Chọn môn --</option>' + subjects.map(s=>`<option value="${escAttr(s.name||"")}" ${String(s.name||"")===String(selected)?"selected":""}>${esc(s.name||"")}</option>`).join("");
+}
+function renderSubjectFilter(){
+  const sel = document.getElementById("subjectFilter");
+  const prev = sel.value || "";
+  const gradeText = document.getElementById("gradeFilter")?.value || "";
+  const grade = S.grades.find(g=>String(g.name||"")===String(gradeText));
+  const map = new Map();
+  S.subjects.filter(s=>!grade?.id || s.grade_id===grade.id).forEach(s=>{
+    const name = String(s.name || "").trim(), key = rmVN(name);
+    if(name && key && !map.has(key)) map.set(key,name);
+  });
+  const subjects = [...map.values()].sort((a,b)=>String(a).localeCompare(String(b),"vi"));
+  sel.innerHTML = '<option value="">Tất cả môn</option>' + subjects.map(name=>`<option value="${escAttr(name)}" ${rmVN(name)===rmVN(prev)?"selected":""}>${esc(name)}</option>`).join("");
+}
+function classMatchesFilter(cls){
+  const gradeNeedle = rmVN(document.getElementById("gradeText")?.value || "");
+  const subjectNeedle = rmVN(document.getElementById("subjectText")?.value || "");
+  const gradeText = rmVN(cls?.grades?.name || cls?.grade?.name || "");
+  const subjectText = rmVN(cls?.subjects?.name || cls?.subject?.name || "");
+  return (!gradeNeedle || gradeText.includes(gradeNeedle) || gradeNeedle.includes(gradeText)) &&
+    (!subjectNeedle || subjectText.includes(subjectNeedle) || subjectNeedle.includes(subjectText));
+}
+function populateClassSelect(){
+  const sel = document.getElementById("classId");
+  const prev = sel.value;
+  const classes = S.classes.filter(classMatchesFilter);
+  sel.innerHTML = '<option value="">-- Chọn lớp học thử --</option>' + classes.map(c=>`<option value="${c.id}">${esc(c.class_name||"Lớp học")}${c.grades?.name || c.subjects?.name ? ` (${esc(c.grades?.name || "")}${c.subjects?.name ? " - "+esc(c.subjects.name) : ""})` : ""}</option>`).join("");
+  if(prev && classes.some(c=>c.id===prev)) sel.value = prev;
+}
+function loadClassSchedules(item){
+  const classId = document.getElementById("classId")?.value || "";
+  const schedules = activeSchedulesForClass(classId);
+  const makeOptions = selected => '<option value="">-- Chọn lịch --</option>' + schedules.map(s=>`<option value="${s.id}" ${Number(selected)===Number(s.id)?"selected":""}>${esc(scheduleLabel(s.id))}</option>`).join("");
+  document.getElementById("schedule1Id").innerHTML = makeOptions(item?.trial_schedule_1_id || "");
+  document.getElementById("schedule2Id").innerHTML = makeOptions(item?.trial_schedule_2_id || "");
+  document.getElementById("session1At").value = localDate(item?.trial_session_1_at);
+  document.getElementById("session2At").value = localDate(item?.trial_session_2_at);
+  if(!item && schedules.length){
+    document.getElementById("schedule1Id").value = schedules[0].id;
+    document.getElementById("schedule2Id").value = (schedules[1] || schedules[0]).id;
+    suggestDate(1); suggestDate(2);
+  }
+  refreshDateOptions(1); refreshDateOptions(2);
+}
+function suggestDate(no){
+  const scheduleId = Number(document.getElementById(`schedule${no}Id`)?.value || 0);
+  const target = document.getElementById(`session${no}At`);
+  if(!scheduleId || !target) return;
+  refreshDateOptions(no);
+  if(target.value && dateMatchesSchedule(target.value, scheduleId)) return;
+  target.value = "";
+  const after = no===2 ? fromLocalDate(document.getElementById("session1At")?.value, document.getElementById("schedule1Id")?.value) : null;
+  target.value = nextDateForSchedule(S.scheduleMap[scheduleId], after);
+  refreshDateOptions(2);
+}
+function refreshDateOptions(no){
+  const input = document.getElementById(`session${no}At`);
+  const scheduleId = document.getElementById(`schedule${no}Id`)?.value || "";
+  if(!input) return;
+  const selected = input.value;
+  const after = no===2 ? fromLocalDate(document.getElementById("session1At")?.value, document.getElementById("schedule1Id")?.value) : null;
+  const options = dateOptions(scheduleId, after, selected);
+  input.innerHTML = options.length ? '<option value="">-- Chọn ngày học thử --</option>' + options.map(v=>`<option value="${v}" ${v===selected?"selected":""}>${esc(scheduleDateLabel(v))}</option>`).join("") : '<option value="">-- Chọn lịch trước --</option>';
+  input.onchange = () => { if(no===1) refreshDateOptions(2); };
+}
+
+async function loadClasses(){
+  const [{data,error},{data:grades},{data:subjects}] = await Promise.all([
+    sb.from("classes").select("id,class_name,hidden,grades(name),subjects(name),class_schedules(id,class_id,session_no,weekday,start_time,end_time,effective_from,room_id,rooms(room_name))").eq("hidden",false).order("class_name"),
+    sb.from("grades").select("id,name"),
+    sb.from("subjects").select("id,name,grade_id")
+  ]);
+  if(error) throw error;
+  S.grades = grades || [];
+  S.subjects = subjects || [];
+  S.classes = data || [];
+  S.classMap = Object.fromEntries(S.classes.map(c=>[c.id,c]));
+  S.scheduleMap = {};
+  S.classes.forEach(c=>(c.class_schedules||[]).forEach(s=>{ S.scheduleMap[Number(s.id)] = s; }));
+  renderGradeOptions();
+  renderSubjectOptions();
+  renderSubjectFilter();
+  populateClassSelect();
+}
+async function loadTrialRequests(){
+  const tbody = document.getElementById("requestTable");
+  tbody.innerHTML = '<tr class="empty"><td colspan="5">Đang tải...</td></tr>';
+  try{
+    await loadClasses();
+    const {data,error} = await sb.from("trial_lesson_requests").select("*").order("created_at",{ascending:false});
+    if(error) throw error;
+    const rows = data || [];
+    const teacherIds = [...new Set(rows.map(x=>x.teacher_id).filter(Boolean))];
+    const studentIds = [...new Set(rows.map(x=>x.student_id).filter(Boolean))];
+    let teacherMap = {};
+    S.studentMap = {};
+    if(teacherIds.length){
+      const {data:teachers} = await sb.from("users").select("id,full_name,email").in("id",teacherIds);
+      teacherMap = Object.fromEntries((teachers||[]).map(t=>[t.id,t]));
+    }
+    if(studentIds.length){
+      const {data:students} = await sb.from("users").select("id,full_name,email,phone,parent_full_name,parent_phone").in("id",studentIds);
+      S.studentMap = Object.fromEntries((students||[]).map(s=>[s.id,s]));
+    }
+    S.requests = rows.map(item=>({...item, teacher: teacherMap[item.teacher_id] || null, linkedStudent: S.studentMap[item.student_id] || null}));
+    await syncStatuses();
+    renderRequests();
+  }catch(error){
+    tbody.innerHTML = `<tr class="empty"><td colspan="5">${esc(error.message || "Không tải được dữ liệu.")}</td></tr>`;
+  }
+}
+function renderRequests(){
+  const q = rmVN(document.getElementById("requestSearch")?.value || "");
+  const status = document.getElementById("statusFilter")?.value || "";
+  const gradeFilter = rmVN(document.getElementById("gradeFilter")?.value || "");
+  const subjectFilter = rmVN(document.getElementById("subjectFilter")?.value || "");
+  const rows = S.requests.filter(item=>{
+    const effective = computedStatus(item);
+    const haystack = rmVN(`${item.student_name||""} ${item.phone||""} ${item.parent_full_name||""} ${item.parent_phone||""} ${item.grade||""} ${item.subject||""} ${item.teacher?.full_name||""} ${classLabel(item.trial_class_id)} ${sourceDisplay(item)} ${item.linkedStudent?.full_name||""} ${item.linkedStudent?.email||""}`);
+    const cls = S.classMap[item.trial_class_id] || {};
+    const itemGrade = rmVN(item.grade || cls.grades?.name || cls.grade?.name || "");
+    const itemSubject = rmVN(item.subject || cls.subjects?.name || cls.subject?.name || "");
+    return (!q || haystack.includes(q)) && (!gradeFilter || itemGrade===gradeFilter) && (!subjectFilter || itemSubject===subjectFilter) && (!status || effective===status);
+  }).sort((a,b)=>{
+    const as=soonInfo(a), bs=soonInfo(b);
+    if(as && bs) return as.rank-bs.rank || as.time-bs.time;
+    if(as) return -1;
+    if(bs) return 1;
+    return new Date(b.created_at||0).getTime()-new Date(a.created_at||0).getTime();
+  });
+  document.getElementById("requestCount").textContent = rows.length;
+  const tbody = document.getElementById("requestTable");
+  if(!rows.length){ tbody.innerHTML = '<tr class="empty"><td colspan="5">Chưa có đăng ký học thử phù hợp</td></tr>'; return; }
+  tbody.innerHTML = rows.map(item=>{
+    const soon = soonInfo(item), st = computedStatus(item);
+    return `
+    <tr class="${soon ? "urgent-row" : ""}" onclick="openTrialModal('${item.id}')">
+      <td><div style="white-space:nowrap;font-weight:800;color:var(--navy)">${esc(fmtTime(item.created_at))}</div><div style="font-size:.76rem;color:var(--ink-light);margin-top:4px">${esc(sourceDisplay(item))}</div>${soon?`<div class="urgent-label ${soon.day}">${esc(soon.label)}</div>`:""}</td>
+      <td><b style="color:var(--navy)">${esc(item.student_name || "—")}</b><div style="margin-top:6px"><button class="phone-btn" type="button" onclick="event.stopPropagation();copyPhone('${escAttr(item.phone || "")}')">${esc(item.phone || "—")}</button></div><div style="margin-top:6px"><span class="status-pill status-${st}">${statusLabel(st)}</span></div>${item.linkedStudent?`<div style="font-size:.74rem;color:#047857;margin-top:4px">Đã link: ${esc(item.linkedStudent.full_name || item.linkedStudent.email || "")}</div>`:`<div style="font-size:.74rem;color:var(--ink-light);margin-top:4px">Chưa link tài khoản học sinh</div>`}${item.note?`<div style="font-size:.72rem;color:var(--ink-light);margin-top:4px;max-width:240px">${esc(item.note)}</div>`:""}</td>
+      <td><div style="font-weight:800;color:var(--navy)">${esc(item.parent_full_name || "—")}</div><div style="margin-top:6px"><button class="phone-btn" type="button" onclick="event.stopPropagation();copyPhone('${escAttr(item.parent_phone || "")}')">${esc(item.parent_phone || "—")}</button></div></td>
+      <td><div style="font-weight:800;color:var(--navy)">${esc(item.grade || "—")}</div><div style="font-size:.78rem;color:var(--ink-mid);margin-top:4px">${esc(item.subject || "—")}</div></td>
+      <td><div style="font-weight:900;color:var(--navy)">${esc(classLabel(item.trial_class_id))}</div><div style="font-size:.74rem;color:var(--ink-mid);line-height:1.55;margin-top:4px"><div>1) ${esc(scheduleLabel(item.trial_schedule_1_id))}</div><div>${esc(fmtTime(item.trial_session_1_at))}</div><div style="margin-top:4px">2) ${esc(scheduleLabel(item.trial_schedule_2_id))}</div><div>${esc(fmtTime(item.trial_session_2_at))}</div></div></td>
+    </tr>`;
+  }).join("");
+}
+async function syncStatuses(){
+  const updates = S.requests.map(item=>({item,next:computedStatus(item)})).filter(({item,next})=>next!==statusKey(item.status) && ["pending_schedule","scheduled","trial_1_done"].includes(statusKey(item.status)));
+  if(!updates.length) return;
+  await Promise.all(updates.map(({item,next})=>sb.from("trial_lesson_requests").update({status:next, handled_at:new Date().toISOString()}).eq("id",item.id)));
+  updates.forEach(({item,next})=>item.status=next);
+}
+function copyPhone(phone){ if(!phone) return; navigator.clipboard?.writeText(phone); toast("Đã sao chép SĐT"); }
+
+function openTrialModal(id){
+  const item = id ? S.requests.find(row=>row.id===id) : null;
+  document.getElementById("modalTitle").textContent = item ? "Chi tiết học sinh học thử" : "Thêm học sinh học thử";
+  document.getElementById("editId").value = item?.id || "";
+  document.getElementById("studentId").value = item?.student_id || "";
+  document.getElementById("studentName").value = item?.student_name || "";
+  document.getElementById("studentPhone").value = item?.phone || "";
+  document.getElementById("parentName").value = item?.parent_full_name || "";
+  document.getElementById("parentPhone").value = item?.parent_phone || "";
+  renderGradeOptions(item?.grade || "");
+  renderSubjectOptions(item?.subject || "");
+  document.getElementById("note").value = item?.note || "";
+  document.getElementById("studentSearch").value = "";
+  document.getElementById("studentResults").innerHTML = "";
+  populateClassSelect();
+  document.getElementById("classId").value = item?.trial_class_id || "";
+  loadClassSchedules(item);
+  renderLinkedStudent(item?.linkedStudent || null);
+  document.getElementById("trialModal").classList.add("show");
+}
+function closeTrialModal(){ document.getElementById("trialModal").classList.remove("show"); }
+function renderLinkedStudent(student){
+  const box = document.getElementById("selectedStudent");
+  if(!student){ box.classList.remove("show"); box.textContent=""; return; }
+  box.classList.add("show");
+  box.textContent = `Đã link tài khoản: ${student.full_name || student.email || student.id}${student.email ? " • "+student.email : ""}`;
+}
+function clearStudentLink(){ document.getElementById("studentId").value=""; renderLinkedStudent(null); }
+async function searchStudents(){
+  const q = document.getElementById("studentSearch").value.trim();
+  const box = document.getElementById("studentResults");
+  if(!q){ box.innerHTML='<div style="font-size:.78rem;color:var(--ink-light)">Nhập tên, email hoặc SĐT để tìm học sinh.</div>'; return; }
+  box.innerHTML='<div style="font-size:.78rem;color:var(--ink-light)">Đang tìm...</div>';
+  const needle = q.replace(/[,%]/g," ");
+  const {data,error} = await sb.from("users").select("id,full_name,email,phone,parent_full_name,parent_phone").eq("role","student").or(`full_name.ilike.%${needle}%,email.ilike.%${needle}%,phone.ilike.%${needle}%`).limit(8);
+  if(error){ box.innerHTML=`<div style="font-size:.78rem;color:var(--red)">${esc(error.message)}</div>`; return; }
+  if(!data?.length){ box.innerHTML='<div style="font-size:.78rem;color:var(--ink-light)">Không tìm thấy học sinh phù hợp.</div>'; return; }
+  data.forEach(s=>{ S.studentMap[s.id]=s; });
+  box.innerHTML = data.map(s=>`<div class="student-result"><div><div style="font-weight:800;color:var(--navy)">${esc(s.full_name || "Học sinh")}</div><div style="font-size:.74rem;color:var(--ink-light)">${esc(s.email || "")}${s.phone ? " • "+esc(s.phone) : ""}</div></div><button class="btn btn-primary" type="button" onclick="selectStudent('${s.id}')">Link</button></div>`).join("");
+}
+function selectStudent(id){
+  const s = S.studentMap[id];
+  document.getElementById("studentId").value = id;
+  renderLinkedStudent(s || {id});
+  document.getElementById("studentResults").innerHTML = "";
+  if(s){
+    if(!document.getElementById("studentName").value) document.getElementById("studentName").value = s.full_name || "";
+    if(!document.getElementById("studentPhone").value) document.getElementById("studentPhone").value = s.phone || "";
+    if(!document.getElementById("parentName").value) document.getElementById("parentName").value = s.parent_full_name || "";
+    if(!document.getElementById("parentPhone").value) document.getElementById("parentPhone").value = s.parent_phone || "";
+  }
+}
+function payloadFromForm(){
+  const schedule1 = document.getElementById("schedule1Id").value || null;
+  const schedule2 = document.getElementById("schedule2Id").value || null;
+  const date1 = document.getElementById("session1At").value;
+  const date2 = document.getElementById("session2At").value;
+  return {
+    student_name: document.getElementById("studentName").value.trim(),
+    phone: document.getElementById("studentPhone").value.trim(),
+    parent_full_name: document.getElementById("parentName").value.trim(),
+    parent_phone: document.getElementById("parentPhone").value.trim(),
+    grade: document.getElementById("gradeText").value.trim(),
+    subject: document.getElementById("subjectText").value.trim(),
+    student_id: document.getElementById("studentId").value || null,
+    trial_class_id: document.getElementById("classId").value || null,
+    trial_schedule_1_id: schedule1 ? Number(schedule1) : null,
+    trial_schedule_2_id: schedule2 ? Number(schedule2) : null,
+    trial_session_1_at: fromLocalDate(date1, schedule1),
+    trial_session_2_at: fromLocalDate(date2, schedule2),
+    note: document.getElementById("note").value.trim() || null,
+    _date1: date1, _date2: date2, _schedule1: schedule1, _schedule2: schedule2,
+  };
+}
+async function saveTrialRequest(options={}){
+  const id = document.getElementById("editId").value;
+  const payload = payloadFromForm();
+  if(!payload.student_name || !payload.phone || !payload.parent_full_name || !payload.parent_phone || !payload.grade || !payload.subject){
+    alert("Vui lòng nhập đủ họ tên học sinh, SĐT học sinh, họ tên phụ huynh, SĐT phụ huynh, khối và môn.");
+    return null;
+  }
+  if((payload.trial_class_id || payload.trial_schedule_1_id || payload.trial_schedule_2_id || payload.trial_session_1_at || payload.trial_session_2_at) && !(payload.trial_class_id && payload.trial_schedule_1_id && payload.trial_schedule_2_id && payload.trial_session_1_at && payload.trial_session_2_at)){
+    alert("Nếu chốt lịch học thử, vui lòng chọn đủ lớp, lịch và thời gian cho cả 2 buổi.");
+    return null;
+  }
+  if(payload._schedule1 && payload._date1 && !dateMatchesSchedule(payload._date1, payload._schedule1)){ alert("Ngày học thử buổi 1 phải đúng thứ của lịch đã chọn."); return null; }
+  if(payload._schedule2 && payload._date2 && !dateMatchesSchedule(payload._date2, payload._schedule2)){ alert("Ngày học thử buổi 2 phải đúng thứ của lịch đã chọn."); return null; }
+  if(payload.trial_session_1_at && payload.trial_session_2_at && new Date(payload.trial_session_2_at) <= new Date(payload.trial_session_1_at)){ alert("Thời gian học thử buổi 2 phải sau buổi 1."); return null; }
+  delete payload._date1; delete payload._date2; delete payload._schedule1; delete payload._schedule2;
+  payload.status = computedStatus({...payload, status: payload.trial_class_id ? "scheduled" : "pending_schedule"});
+  if(!id) payload.source_url = "admin";
+  const result = id ? await sb.from("trial_lesson_requests").update(payload).eq("id",id) : await sb.from("trial_lesson_requests").insert(payload);
+  if(result.error){ alert("Không thể lưu học thử: "+result.error.message); return null; }
+  if(!options.keepOpen) closeTrialModal();
+  if(!options.silent) toast("Đã lưu học thử");
+  await loadTrialRequests();
+  return true;
+}
+async function createStudentAccount(){
+  const id = document.getElementById("editId").value;
+  if(!id){ alert("Hãy lưu học sinh học thử trước, sau đó mở lại dòng đó để tạo tài khoản."); return; }
+  const item = S.requests.find(row=>row.id===id);
+  if(!item || item.student_id){ alert(item?.student_id ? "Học sinh này đã được link tài khoản." : "Không tìm thấy học sinh học thử này."); return; }
+  const fullName = document.getElementById("studentName").value.trim() || item.student_name || "";
+  const phone = document.getElementById("studentPhone").value.trim() || item.phone || "";
+  if(!fullName || !phone){ alert("Cần có họ tên và SĐT để tạo tài khoản học sinh."); return; }
+  const digits = phone.replace(/\D+/g,"");
+  const email = `${slugName(fullName)}${digits ? digits.slice(-4) : String(Date.now()).slice(-5)}@gmail.com`;
+  const password = digits.length >= 6 ? digits : "123456";
+  const {error} = await sb.rpc("admin_import_students_batch",{p_rows:[{email,full_name:fullName,phone,parent_full_name:document.getElementById("parentName").value.trim(),parent_phone:document.getElementById("parentPhone").value.trim(),password,role:"student"}]});
+  if(error){ alert("Không thể tạo tài khoản học sinh: "+error.message); return; }
+  const {data:student,error:findError} = await sb.from("users").select("id,full_name,email,phone,parent_full_name,parent_phone").eq("email",email).maybeSingle();
+  if(findError || !student){ alert("Đã gọi tạo tài khoản nhưng chưa tìm thấy tài khoản vừa tạo. Hãy tải lại rồi thử link thủ công."); return; }
+  const {error:updateError} = await sb.from("trial_lesson_requests").update({student_id:student.id,handled_at:new Date().toISOString()}).eq("id",id);
+  if(updateError){ alert("Tạo tài khoản xong nhưng chưa link được vào học thử: "+updateError.message); return; }
+  alert(`Đã tạo tài khoản học sinh.\nEmail: ${email}\nMật khẩu: ${password}`);
+  await loadTrialRequests();
+  openTrialModal(id);
+}
+async function deleteTrial(id){
+  if(!id) return;
+  if(!confirm("Xóa học sinh này khỏi danh sách học thử? Chỉ xóa khỏi danh sách học thử, không xóa tài khoản học sinh nếu đã tạo.")) return;
+  const {data,error} = await sb.from("trial_lesson_requests").delete().eq("id",id).select("id");
+  if(error){ alert("Không thể xóa học sinh học thử: "+error.message); return; }
+  if(!data?.length){ alert("Supabase chưa xóa bản ghi nào. Hãy kiểm tra RLS DELETE cho bảng trial_lesson_requests."); return; }
+  closeTrialModal();
+  toast("Đã xóa khỏi danh sách học thử");
+  await loadTrialRequests();
+}
+function deleteTrialFromModal(){ const id=document.getElementById("editId").value; if(!id){ closeTrialModal(); return; } deleteTrial(id); }
+async function addTrialToClass(id){
+  const item = S.requests.find(row=>row.id===id);
+  if(!item){ alert("Không tìm thấy học sinh học thử này."); return; }
+  if(!item.student_id){ alert("Hãy tạo hoặc link tài khoản học sinh trước khi thêm vào lớp."); return; }
+  if(!item.trial_class_id){ alert("Chưa chọn lớp học thử."); return; }
+  if(computedStatus(item)!=="trial_2_done" && !confirm("Học sinh chưa hoàn thành đủ 2 buổi học thử. Bạn vẫn muốn thêm vào lớp?")) return;
+  const existing = await sb.from("class_students").select("id").eq("class_id",item.trial_class_id).eq("student_id",item.student_id).maybeSingle();
+  if(!existing.data){
+    const {error} = await sb.from("class_students").insert({class_id:item.trial_class_id,student_id:item.student_id,joined_at:new Date().toISOString()});
+    if(error){ alert("Không thể thêm học sinh vào lớp: "+error.message); return; }
+  }
+  const selectedSchedules = [item.trial_schedule_1_id,item.trial_schedule_2_id].filter(Boolean);
+  if(selectedSchedules.length){
+    await sb.from("class_student_schedules").delete().eq("class_id",item.trial_class_id).eq("student_id",item.student_id);
+    await sb.from("class_student_schedules").insert(selectedSchedules.map(schedule_id=>({class_id:item.trial_class_id,student_id:item.student_id,schedule_id:Number(schedule_id)})));
+  }
+  const {error:deleteError} = await sb.from("trial_lesson_requests").delete().eq("id",id);
+  if(deleteError) alert("Đã thêm vào lớp nhưng chưa xóa được khỏi danh sách học thử: "+deleteError.message);
+  toast("Đã thêm học sinh học thử vào lớp");
+  closeTrialModal();
+  await loadTrialRequests();
+}
+async function addTrialToClassFromModal(){
+  const id = document.getElementById("editId").value;
+  if(!id){ alert("Hãy lưu học sinh học thử trước khi thêm vào lớp."); return; }
+  const saved = await saveTrialRequest({keepOpen:true,silent:true});
+  if(!saved) return;
+  await addTrialToClass(id);
+}
+
+["requestSearch"].forEach(id=>{
+  const el = document.getElementById(id);
+  let t;
+  el.addEventListener("input",()=>{ clearTimeout(t); t=setTimeout(renderRequests,160); });
+});
+document.getElementById("statusFilter").addEventListener("change",renderRequests);
+document.getElementById("gradeFilter").addEventListener("change",()=>{ renderSubjectFilter(); renderRequests(); });
+document.getElementById("subjectFilter").addEventListener("change",renderRequests);
+window.MindupLiveUI?.watchTable?.("trial_lesson_requests", loadTrialRequests);
+loadTrialRequests();
+</script>
+</body>
+</html>
