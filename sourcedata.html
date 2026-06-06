@@ -599,20 +599,14 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <table>
         <thead>
           <tr>
-            <th style="min-width:150px">Thời gian</th>
-            <th style="min-width:210px">Học sinh</th>
-            <th style="min-width:110px">SĐT HS</th>
-            <th style="min-width:150px">Phụ huynh</th>
-            <th style="min-width:110px">SĐT PH</th>
-            <th style="min-width:100px">Khối</th>
-            <th style="min-width:110px">Môn</th>
-            <th style="min-width:230px">Lớp / lịch học thử</th>
-            <th style="min-width:130px">Nguồn</th>
-            <th style="min-width:140px">Trạng thái</th>
-            <th style="min-width:170px">Hành động</th>
+            <th style="min-width:180px">Thời gian / nguồn</th>
+            <th style="min-width:240px">Học sinh</th>
+            <th style="min-width:190px">Phụ huynh</th>
+            <th style="min-width:130px">Khối / môn</th>
+            <th style="min-width:260px">Lớp / lịch học thử</th>
           </tr>
         </thead>
-        <tbody id="trialRequestTable"><tr class="empty-row"><td colspan="11">Đang tải...</td></tr></tbody>
+        <tbody id="trialRequestTable"><tr class="empty-row"><td colspan="5">Đang tải...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1964,11 +1958,11 @@ async function loadTrialClasses(){
 
 async function loadTrialRequests(){
   const tbody = document.getElementById('trialRequestTable');
-  if(tbody && !_trialRequests.length) tbody.innerHTML = '<tr class="empty-row"><td colspan="11">Đang tải...</td></tr>';
+  if(tbody && !_trialRequests.length) tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Đang tải...</td></tr>';
   await loadTrialClasses();
   const { data, error } = await sb.from('trial_lesson_requests').select('*').order('created_at', { ascending: false });
   if(error){
-    if(tbody) tbody.innerHTML = `<tr class="empty-row"><td colspan="11">${esc(error.message)}</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr class="empty-row"><td colspan="5">${esc(error.message)}</td></tr>`;
     return;
   }
   const rows = data || [];
@@ -2008,22 +2002,30 @@ function renderTrialRequests(){
   document.getElementById('trialRequestCount').textContent = rows.length;
   const tbody = document.getElementById('trialRequestTable');
   if(!rows.length){
-    window.MindupLiveUI?.patchHTML(tbody, '<tr class="empty-row" data-live-key="trial-empty"><td colspan="11">Chưa có đăng ký học thử phù hợp</td></tr>');
+    window.MindupLiveUI?.patchHTML(tbody, '<tr class="empty-row" data-live-key="trial-empty"><td colspan="5">Chưa có đăng ký học thử phù hợp</td></tr>');
     return;
   }
   window.MindupLiveUI?.patchHTML(tbody, rows.map(item => `
     <tr data-live-key="trial-${item.id}" onclick="openTrialRequestModal('${item.id}')" style="cursor:pointer">
-      <td style="white-space:nowrap">${esc(logFmtTime(item.created_at))}</td>
+      <td>
+        <div style="white-space:nowrap;font-weight:700;color:var(--navy)">${esc(logFmtTime(item.created_at))}</div>
+        <div style="font-size:.76rem;color:var(--ink-light);margin-top:4px">${esc(trialSourceDisplay(item))}</div>
+      </td>
       <td>
         <b style="color:var(--navy)">${esc(item.student_name || '—')}</b>
+        <div style="margin-top:6px"><button class="btn btn-outline btn-sm" type="button" onclick="event.stopPropagation()" data-copy-phone="${escAttr(item.phone || '')}">${esc(item.phone || '—')}</button></div>
+        <div style="margin-top:6px"><span class="trial-status-pill trial-status-${trialComputedStatus(item)}">${trialStatusLabel(trialComputedStatus(item))}</span></div>
         ${item.linkedStudent ? `<div style="font-size:.74rem;color:#047857;margin-top:3px">Đã link: ${esc(item.linkedStudent.full_name || item.linkedStudent.email || '')}</div>` : `<div style="font-size:.74rem;color:var(--ink-light);margin-top:3px">Chưa link tài khoản học sinh</div>`}
         ${item.note ? `<div style="font-size:.72rem;color:var(--ink-light);margin-top:4px;max-width:240px">${esc(item.note)}</div>` : ''}
       </td>
-      <td><button class="btn btn-outline btn-sm" type="button" data-copy-phone="${escAttr(item.phone || '')}">${esc(item.phone || '—')}</button></td>
-      <td>${esc(item.parent_full_name || '—')}</td>
-      <td><button class="btn btn-outline btn-sm" type="button" data-copy-phone="${escAttr(item.parent_phone || '')}">${esc(item.parent_phone || '—')}</button></td>
-      <td>${esc(item.grade || '—')}</td>
-      <td>${esc(item.subject || '—')}</td>
+      <td>
+        <div style="font-weight:700;color:var(--navy)">${esc(item.parent_full_name || '—')}</div>
+        <div style="margin-top:6px"><button class="btn btn-outline btn-sm" type="button" onclick="event.stopPropagation()" data-copy-phone="${escAttr(item.parent_phone || '')}">${esc(item.parent_phone || '—')}</button></div>
+      </td>
+      <td>
+        <div style="font-weight:700;color:var(--navy)">${esc(item.grade || '—')}</div>
+        <div style="font-size:.78rem;color:var(--ink-mid);margin-top:4px">${esc(item.subject || '—')}</div>
+      </td>
       <td>
         <div style="font-weight:800;color:var(--navy)">${esc(trialClassLabel(item.trial_class_id))}</div>
         <div style="font-size:.74rem;color:var(--ink-mid);line-height:1.55;margin-top:4px">
@@ -2031,17 +2033,6 @@ function renderTrialRequests(){
           <div>${esc(trialFormatDateTime(item.trial_session_1_at))}</div>
           <div style="margin-top:4px">2) ${esc(trialScheduleLabel(item.trial_schedule_2_id))}</div>
           <div>${esc(trialFormatDateTime(item.trial_session_2_at))}</div>
-        </div>
-      </td>
-      <td>${esc(trialSourceDisplay(item))}</td>
-      <td>
-        <span class="trial-status-pill trial-status-${trialComputedStatus(item)}">${trialStatusLabel(trialComputedStatus(item))}</span>
-      </td>
-      <td>
-        <div class="trial-action-stack">
-          <button class="btn btn-outline btn-sm" type="button" onclick="event.stopPropagation();openTrialRequestModal('${item.id}')">Mở</button>
-          ${trialComputedStatus(item)==='trial_2_done' ? `<button class="btn btn-primary btn-sm" type="button" onclick="event.stopPropagation();addTrialStudentToClass('${item.id}')">Thêm vào lớp</button>` : ''}
-          ${trialComputedStatus(item)!=='enrolled' ? `<button class="btn btn-outline btn-sm" type="button" onclick="event.stopPropagation();deleteTrialRequest('${item.id}')">Xóa</button>` : ''}
         </div>
       </td>
     </tr>
