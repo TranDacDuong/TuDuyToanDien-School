@@ -207,9 +207,20 @@ font-family:var(--font-body);color:#ebf5ff;min-height:100vh}
 .question-breakdown-item.good{background:rgba(16,185,129,.15);border-color:rgba(134,239,172,.56)}
 .question-breakdown-item.bad{background:rgba(239,68,68,.14);border-color:rgba(252,165,165,.56)}
 .question-breakdown-item.pending{background:rgba(59,130,246,.15);border-color:rgba(191,219,254,.52)}
+.game-question-picker-toolbar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.game-question-picker-body{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(260px,.8fr);gap:14px}
+.game-question-picker-list,.game-question-picker-selected{display:grid;gap:10px;max-height:460px;overflow:auto;padding-right:4px}
+.game-question-picker-item{display:grid;gap:8px;padding:12px 14px;border-radius:16px;background:rgba(255,255,255,.08);border:1px solid rgba(186,230,253,.18)}
+.game-question-picker-item strong{color:#fef3c7}
+.game-question-picker-meta{display:flex;gap:8px;flex-wrap:wrap;color:#cbd5e1;font-size:.78rem}
+.game-question-picker-text{white-space:pre-line;line-height:1.5;color:#f8fafc;font-size:.86rem;max-height:120px;overflow:hidden}
+.game-question-picker-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.game-question-picker-selected .game-question-picker-item{background:rgba(250,204,21,.12);border-color:rgba(250,204,21,.28)}
+.game-question-picker-field-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 @media(max-width:1024px){
   .toolbar,.form-grid,.room-shell,.game-stage,.insight-grid,.stats-grid{grid-template-columns:1fr}
   .history-detail-grid{grid-template-columns:1fr}
+  .game-question-picker-toolbar,.game-question-picker-body{grid-template-columns:1fr}
 }
 @media(max-width:640px){
   .page{padding:14px 10px 24px}
@@ -375,7 +386,10 @@ font-family:var(--font-body);color:#ebf5ff;min-height:100vh}
         <div class="field full">
           <label>ID câu hỏi</label>
           <textarea id="adminGameConfigQuestionIds" class="input" rows="4" placeholder="Dán ID câu hỏi, mỗi dòng một ID. Các câu này sẽ được dùng đúng theo thứ tự."></textarea>
-          <div class="hint">Có thể lấy ID từ Ngân hàng câu hỏi. Nếu bỏ trống, cấu hình vẫn tạo nhưng học sinh chưa thấy phần chơi này.</div>
+          <div class="game-question-picker-field-actions">
+            <button class="btn btn-outline btn-sm" type="button" data-game-question-picker-target="adminGameConfigQuestionIds" data-game-question-picker-title="Chọn câu hỏi cho phần chơi" data-game-question-picker-grade="adminGameConfigGrade" data-game-question-picker-subject="adminGameConfigSubject">Chọn danh sách câu hỏi</button>
+          </div>
+          <div class="hint">Game chỉ dùng câu trắc nghiệm và trả lời ngắn. Câu đúng/sai và tự luận sẽ không được chọn vào phần chơi.</div>
         </div>
         <div class="field full">
           <button class="btn btn-primary" type="submit">Lưu cấu hình chơi</button>
@@ -409,19 +423,31 @@ font-family:var(--font-body);color:#ebf5ff;min-height:100vh}
         <div class="field full">
           <label>Khởi động - ID câu hỏi</label>
           <textarea id="adminWarmupQuestionIds" class="input" rows="3" placeholder="Tối đa 20 câu, mỗi dòng một ID"></textarea>
+          <div class="game-question-picker-field-actions">
+            <button class="btn btn-outline btn-sm" type="button" data-game-question-picker-target="adminWarmupQuestionIds" data-game-question-picker-title="Chọn câu Khởi động" data-game-question-picker-grade="adminGameRoundGrade" data-game-question-picker-subject="adminGameRoundSubject">Chọn danh sách câu hỏi</button>
+          </div>
         </div>
         <div class="field full">
           <label>Vượt chướng ngại vật</label>
           <input id="adminObstacleKeyword" class="input" placeholder="Từ khóa ẩn">
           <textarea id="adminObstacleQuestionIds" class="input" rows="3" placeholder="4 câu gợi ý, mỗi dòng một ID" style="margin-top:8px"></textarea>
+          <div class="game-question-picker-field-actions">
+            <button class="btn btn-outline btn-sm" type="button" data-game-question-picker-target="adminObstacleQuestionIds" data-game-question-picker-title="Chọn câu Vượt chướng ngại vật" data-game-question-picker-grade="adminGameRoundGrade" data-game-question-picker-subject="adminGameRoundSubject">Chọn danh sách câu hỏi</button>
+          </div>
         </div>
         <div class="field full">
           <label>Tăng tốc - ID câu hỏi</label>
           <textarea id="adminAccelerationQuestionIds" class="input" rows="3" placeholder="4 câu, mỗi dòng một ID"></textarea>
+          <div class="game-question-picker-field-actions">
+            <button class="btn btn-outline btn-sm" type="button" data-game-question-picker-target="adminAccelerationQuestionIds" data-game-question-picker-title="Chọn câu Tăng tốc" data-game-question-picker-grade="adminGameRoundGrade" data-game-question-picker-subject="adminGameRoundSubject">Chọn danh sách câu hỏi</button>
+          </div>
         </div>
         <div class="field full">
           <label>Về đích - ID câu hỏi</label>
           <textarea id="adminFinishQuestionIds" class="input" rows="3" placeholder="Dán dạng: easy|question_id, medium|question_id, hard|question_id"></textarea>
+          <div class="game-question-picker-field-actions">
+            <button class="btn btn-outline btn-sm" type="button" data-game-question-picker-target="adminFinishQuestionIds" data-game-question-picker-title="Chọn câu Về đích" data-game-question-picker-grade="adminGameRoundGrade" data-game-question-picker-subject="adminGameRoundSubject" data-game-question-picker-format="finish">Chọn danh sách câu hỏi</button>
+          </div>
         </div>
         <div class="field full">
           <button class="btn btn-primary" type="submit">Lưu vòng MindUp</button>
@@ -456,6 +482,38 @@ font-family:var(--font-body);color:#ebf5ff;min-height:100vh}
       <div id="gameGlobalLeaderboard" class="player-list leaderboard"></div>
       <div class="hint" id="gameMountainLeaderboardTitle" style="margin:14px 0 8px;color:#fef3c7;font-weight:800">Bảng xếp hạng Leo núi theo Khối/Môn</div>
       <div id="gameMountainLeaderboard" class="player-list leaderboard" style="margin-top:10px"></div>
+    </div>
+  </div>
+</div>
+
+<div id="gameQuestionPickerModal" class="modal">
+  <div class="modal-card" style="width:min(1120px,100%)">
+    <div class="mh">
+      <h2 id="gameQuestionPickerTitle">Chọn danh sách câu hỏi</h2>
+      <button class="btn btn-outline" type="button" onclick="closeGameQuestionPicker()">Đóng</button>
+    </div>
+    <div class="mb">
+      <div class="game-question-picker-toolbar">
+        <select id="gameQuestionPickerGrade" class="select"></select>
+        <select id="gameQuestionPickerSubject" class="select"></select>
+        <select id="gameQuestionPickerChapter" class="select"></select>
+        <input id="gameQuestionPickerSearch" class="input" placeholder="Tìm nội dung câu hỏi">
+      </div>
+      <div class="hint" style="margin-bottom:12px">Chỉ hiển thị câu trắc nghiệm và trả lời ngắn có đáp án. Câu đúng/sai và tự luận không được dùng trong Game.</div>
+      <div class="game-question-picker-body">
+        <div>
+          <h3 style="margin-top:0">Danh sách câu hỏi</h3>
+          <div id="gameQuestionPickerList" class="game-question-picker-list"></div>
+        </div>
+        <div>
+          <h3 style="margin-top:0">Đã chọn</h3>
+          <div id="gameQuestionPickerSelected" class="game-question-picker-selected"></div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+        <button class="btn btn-outline" type="button" onclick="closeGameQuestionPicker()">Hủy</button>
+        <button class="btn btn-primary" id="applyGameQuestionPickerBtn" type="button">Áp dụng danh sách</button>
+      </div>
     </div>
   </div>
 </div>

@@ -8,6 +8,7 @@
     initialRoomId: "",
     grades: [],
     subjects: [],
+    chapters: [],
     classes: [],
     classIds: [],
     friends: [],
@@ -36,6 +37,12 @@
     configQuestions: [],
     rounds: [],
     roundChallenges: [],
+    questionPicker: {
+      target: null,
+      format: "plain",
+      selected: new Map(),
+      rows: [],
+    },
     liveRenderKey: "",
     autoStartTimer: null,
   };
@@ -135,6 +142,21 @@
     adminFinishQuestionIds: document.getElementById("adminFinishQuestionIds"),
     adminConfigList: document.getElementById("adminGameConfigList"),
     adminRoundList: document.getElementById("adminGameRoundList"),
+    pickerModal: document.getElementById("gameQuestionPickerModal"),
+    pickerTitle: document.getElementById("gameQuestionPickerTitle"),
+    pickerGrade: document.getElementById("gameQuestionPickerGrade"),
+    pickerSubject: document.getElementById("gameQuestionPickerSubject"),
+    pickerChapter: document.getElementById("gameQuestionPickerChapter"),
+    pickerSearch: document.getElementById("gameQuestionPickerSearch"),
+    pickerList: document.getElementById("gameQuestionPickerList"),
+    pickerSelected: document.getElementById("gameQuestionPickerSelected"),
+    pickerApplyBtn: document.getElementById("applyGameQuestionPickerBtn"),
+  };
+
+  const GAME_ALLOWED_QUESTION_TYPES = ["multi_choice", "short_answer"];
+  const GAME_QUESTION_TYPE_LABELS = {
+    multi_choice: "Trắc nghiệm",
+    short_answer: "Trả lời ngắn",
   };
 
   function supportsModeElo(mode) {
@@ -1044,6 +1066,179 @@
     }
   }
 
+  function getQuestionPickerTypeLabel(type) {
+    return GAME_QUESTION_TYPE_LABELS[type] || type || "Câu hỏi";
+  }
+
+  function getFinishLevelForQuestion(question) {
+    const difficulty = Number(question?.difficulty || 5);
+    if (difficulty <= 3) return "easy";
+    if (difficulty >= 8) return "hard";
+    return "medium";
+  }
+
+  function parsePickerSelectionFromTextarea(target, format) {
+    const raw = String(target?.value || "").trim();
+    if (!raw) return new Map();
+    const rows = format === "finish"
+      ? parseFinishQuestionRows(raw).map((item) => ({ id: item.questionId, level: item.level || null }))
+      : parseQuestionIds(raw).map((id) => ({ id }));
+    return new Map(rows.filter((item) => item.id).map((item) => [item.id, item]));
+  }
+
+  function syncPickerChapters() {
+    fillChapters(EL.pickerChapter, EL.pickerSubject?.value || "", "Tất cả chương");
+  }
+
+  function renderQuestionPickerSelected() {
+    if (!EL.pickerSelected) return;
+    const selected = [...GAME.questionPicker.selected.values()];
+    EL.pickerSelected.innerHTML = selected.length
+      ? selected.map((item, index) => `<div class="game-question-picker-item">
+          <strong>${index + 1}. ${esc(getPlayerQuestionTitle(item))}</strong>
+          <div class="game-question-picker-meta"><span>${esc(getQuestionPickerTypeLabel(item.question_type))}</span><span>Độ khó ${Number(item.difficulty || 5)}</span>${item.level ? `<span>Về đích: ${esc(item.level)}</span>` : ""}</div>
+          <div class="game-question-picker-actions"><button class="btn btn-outline btn-sm" type="button" data-picker-remove="${escAttr(item.id)}">Bỏ chọn</button></div>
+        </div>`).join("")
+      : '<div class="empty">Chưa chọn câu hỏi nào.</div>';
+    EL.pickerSelected.querySelectorAll("[data-picker-remove]").forEach((button) => {
+      button.addEventListener("click", () => {
+        GAME.questionPicker.selected.delete(button.dataset.pickerRemove || "");
+        renderQuestionPickerSelected();
+        renderQuestionPickerList();
+      });
+    });
+  }
+
+  function getPlayerQuestionTitle(question) {
+    const text = String(question?.question_text || question?.id || "").replace(/\s+/g, " ").trim();
+    return text.length > 88 ? `${text.slice(0, 88)}...` : text;
+  }
+
+  function renderQuestionPickerList() {
+    if (!EL.pickerList) return;
+    const selectedIds = GAME.questionPicker.selected;
+    const rows = GAME.questionPicker.rows || [];
+    EL.pickerList.innerHTML = rows.length
+      ? rows.map((question) => {
+        const selected = selectedIds.has(question.id);
+        const chapterName = question.chapters?.name || GAME.chapters.find((item) => item.id === question.chapter_id)?.name || "Chưa có chương";
+        return `<div class="game-question-picker-item">
+          <div class="game-question-picker-meta"><span>${esc(getQuestionPickerTypeLabel(question.question_type))}</span><span>${esc(chapterName)}</span><span>Độ khó ${Number(question.difficulty || 5)}</span><span>${esc(question.id)}</span></div>
+          <div class="game-question-picker-text">${esc(getPlayerQuestionTitle(question))}</div>
+          <div class="game-question-picker-actions">
+            <button class="btn ${selected ? "btn-outline" : "btn-primary"} btn-sm" type="button" data-picker-toggle="${escAttr(question.id)}">${selected ? "Bỏ chọn" : "Chọn câu hỏi"}</button>
+          </div>
+        </div>`;
+      }).join("")
+      : '<div class="empty">Không có câu trắc nghiệm/trả lời ngắn phù hợp với bộ lọc này.</div>';
+    EL.pickerList.querySelectorAll("[data-picker-toggle]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const id = button.dataset.pickerToggle || "";
+        if (GAME.questionPicker.selected.has(id)) {
+          GAME.questionPicker.selected.delete(id);
+        } else {
+          const question = (GAME.questionPicker.rows || []).find((item) => item.id === id);
+          if (question) {
+            GAME.questionPicker.selected.set(id, {
+              id,
+              question_type: question.question_type,
+              question_text: question.question_text,
+              difficulty: question.difficulty || 5,
+              level: GAME.questionPicker.format === "finish" ? getFinishLevelForQuestion(question) : null,
+            });
+          }
+        }
+        renderQuestionPickerSelected();
+        renderQuestionPickerList();
+      });
+    });
+  }
+
+  async function loadQuestionPickerRows() {
+    if (!EL.pickerList) return;
+    EL.pickerList.innerHTML = '<div class="empty">Đang tải danh sách câu hỏi...</div>';
+    const gradeId = EL.pickerGrade?.value || "";
+    const subjectId = EL.pickerSubject?.value || "";
+    const chapterId = EL.pickerChapter?.value || "";
+    const search = String(EL.pickerSearch?.value || "").trim();
+
+    let chapterIds = [];
+    if (chapterId) {
+      chapterIds = [chapterId];
+    } else if (subjectId) {
+      chapterIds = GAME.chapters.filter((chapter) => chapter.subject_id === subjectId).map((chapter) => chapter.id);
+    } else if (gradeId) {
+      const subjectIds = GAME.subjects.filter((subject) => subject.grade_id === gradeId).map((subject) => subject.id);
+      chapterIds = GAME.chapters.filter((chapter) => subjectIds.includes(chapter.subject_id)).map((chapter) => chapter.id);
+    }
+
+    let query = sb.from("question_bank")
+      .select("id,question_text,question_type,difficulty,answer,hidden,chapter_id,chapters(id,name,subject_id)")
+      .eq("hidden", false)
+      .in("question_type", GAME_ALLOWED_QUESTION_TYPES)
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    if (chapterIds.length) query = query.in("chapter_id", chapterIds);
+    else if (gradeId || subjectId || chapterId) query = query.eq("chapter_id", "00000000-0000-0000-0000-000000000000");
+    if (search) query = query.ilike("question_text", `%${search}%`);
+
+    const { data, error } = await query;
+    if (error) {
+      EL.pickerList.innerHTML = `<div class="empty">Không tải được câu hỏi: ${esc(error.message)}</div>`;
+      return;
+    }
+    GAME.questionPicker.rows = (data || []).filter((question) =>
+      GAME_ALLOWED_QUESTION_TYPES.includes(question.question_type) &&
+      !question.hidden &&
+      String(question.answer || "").trim()
+    );
+    renderQuestionPickerList();
+  }
+
+  async function openGameQuestionPicker(button) {
+    const targetId = button?.dataset?.gameQuestionPickerTarget || "";
+    const target = document.getElementById(targetId);
+    if (!target) return;
+    const gradeSource = document.getElementById(button.dataset.gameQuestionPickerGrade || "");
+    const subjectSource = document.getElementById(button.dataset.gameQuestionPickerSubject || "");
+    const format = button.dataset.gameQuestionPickerFormat || "plain";
+    GAME.questionPicker = {
+      target,
+      format,
+      selected: parsePickerSelectionFromTextarea(target, format),
+      rows: [],
+    };
+    if (EL.pickerTitle) EL.pickerTitle.textContent = button.dataset.gameQuestionPickerTitle || "Chọn danh sách câu hỏi";
+    fillGrades(EL.pickerGrade, "Tất cả khối");
+    if (EL.pickerGrade) EL.pickerGrade.value = gradeSource?.value || "";
+    fillSubjects(EL.pickerSubject, EL.pickerGrade?.value || "", "Tất cả môn");
+    if (EL.pickerSubject) EL.pickerSubject.value = subjectSource?.value || "";
+    syncPickerChapters();
+    if (EL.pickerSearch) EL.pickerSearch.value = "";
+    EL.pickerModal?.classList.add("show");
+    renderQuestionPickerSelected();
+    await loadQuestionPickerRows();
+  }
+
+  function applyQuestionPickerSelection() {
+    const target = GAME.questionPicker.target;
+    if (!target) return;
+    const selected = [...GAME.questionPicker.selected.values()];
+    target.value = selected.map((item) => {
+      if (GAME.questionPicker.format === "finish") return `${item.level || "medium"}|${item.id}`;
+      return item.id;
+    }).join("\n");
+    if (target === EL.adminConfigQuestionIds && EL.adminConfigQuestionCount && selected.length) {
+      EL.adminConfigQuestionCount.value = selected.length;
+    }
+    closeGameQuestionPicker();
+  }
+
+  window.closeGameQuestionPicker = function() {
+    EL.pickerModal?.classList.remove("show");
+  };
+
   async function replaceConfigQuestions(configId, questionIds) {
     await sb.from("game_config_questions").delete().eq("config_id", configId);
     const rows = questionIds.map((questionId, index) => ({
@@ -1057,6 +1252,29 @@
     }
   }
 
+  async function filterAllowedGameQuestionIds(questionIds) {
+    const ids = [...new Set((questionIds || []).filter(Boolean))];
+    if (!ids.length) return [];
+    const { data, error } = await sb.from("question_bank")
+      .select("id,question_type,answer,hidden")
+      .in("id", ids);
+    if (error) throw error;
+    const allowed = new Set((data || [])
+      .filter((question) =>
+        GAME_ALLOWED_QUESTION_TYPES.includes(question.question_type) &&
+        !question.hidden &&
+        String(question.answer || "").trim()
+      )
+      .map((question) => question.id));
+    return (questionIds || []).filter((id) => allowed.has(id));
+  }
+
+  async function filterAllowedFinishQuestionRows(rows) {
+    const ids = rows.map((item) => item.questionId).filter(Boolean);
+    const allowedIds = new Set(await filterAllowedGameQuestionIds(ids));
+    return rows.filter((item) => allowedIds.has(item.questionId));
+  }
+
   async function submitGameConfig(event) {
     event.preventDefault();
     if (GAME.role !== "admin") return;
@@ -1064,9 +1282,21 @@
     const gradeId = EL.adminConfigGrade?.value || "";
     const subjectId = EL.adminConfigSubject?.value || "";
     const title = String(EL.adminConfigTitle?.value || "").trim() || roomModeLabel(mode);
-    const questionIds = parseQuestionIds(EL.adminConfigQuestionIds?.value || "");
+    const rawQuestionIds = parseQuestionIds(EL.adminConfigQuestionIds?.value || "");
     if (!gradeId || !subjectId) {
       alert("Hãy chọn Khối và Môn cho cấu hình Game.");
+      return;
+    }
+    let questionIds = [];
+    try {
+      questionIds = await filterAllowedGameQuestionIds(rawQuestionIds);
+    } catch (filterError) {
+      alert("Không kiểm tra được danh sách câu hỏi: " + filterError.message);
+      return;
+    }
+    if (rawQuestionIds.length && questionIds.length !== rawQuestionIds.length) {
+      alert("Một số câu đã bị loại vì không phải trắc nghiệm/trả lời ngắn, bị ẩn hoặc chưa có đáp án. Hãy kiểm tra lại danh sách câu hỏi.");
+      if (EL.adminConfigQuestionIds) EL.adminConfigQuestionIds.value = questionIds.join("\n");
       return;
     }
     const { data: config, error } = await sb.from("game_configs").insert({
@@ -1118,6 +1348,36 @@
       alert("Hãy nhập tên vòng, chọn Khối và Môn.");
       return;
     }
+    const rawWarmupIds = parseQuestionIds(EL.adminWarmupQuestionIds?.value);
+    const rawObstacleIds = parseQuestionIds(EL.adminObstacleQuestionIds?.value);
+    const rawAccelerationIds = parseQuestionIds(EL.adminAccelerationQuestionIds?.value);
+    const rawFinishRows = parseFinishQuestionRows(EL.adminFinishQuestionIds?.value);
+    let warmupIds = [];
+    let obstacleIds = [];
+    let accelerationIds = [];
+    let finishRows = [];
+    try {
+      warmupIds = await filterAllowedGameQuestionIds(rawWarmupIds);
+      obstacleIds = await filterAllowedGameQuestionIds(rawObstacleIds);
+      accelerationIds = await filterAllowedGameQuestionIds(rawAccelerationIds);
+      finishRows = await filterAllowedFinishQuestionRows(rawFinishRows);
+    } catch (filterError) {
+      alert("Không kiểm tra được danh sách câu hỏi của vòng: " + filterError.message);
+      return;
+    }
+    if (
+      warmupIds.length !== rawWarmupIds.length ||
+      obstacleIds.length !== rawObstacleIds.length ||
+      accelerationIds.length !== rawAccelerationIds.length ||
+      finishRows.length !== rawFinishRows.length
+    ) {
+      alert("Một số câu trong vòng MindUp đã bị loại vì không phải trắc nghiệm/trả lời ngắn, bị ẩn hoặc chưa có đáp án. Hãy kiểm tra lại danh sách câu hỏi.");
+      if (EL.adminWarmupQuestionIds) EL.adminWarmupQuestionIds.value = warmupIds.join("\n");
+      if (EL.adminObstacleQuestionIds) EL.adminObstacleQuestionIds.value = obstacleIds.join("\n");
+      if (EL.adminAccelerationQuestionIds) EL.adminAccelerationQuestionIds.value = accelerationIds.join("\n");
+      if (EL.adminFinishQuestionIds) EL.adminFinishQuestionIds.value = finishRows.map((item) => `${item.level || "medium"}|${item.questionId}`).join("\n");
+      return;
+    }
     const { data: round, error } = await sb.from("game_rounds").insert({
       title,
       description: String(EL.adminRoundDescription?.value || "").trim(),
@@ -1147,10 +1407,10 @@
     }
     const challengeByType = Object.fromEntries((challenges || []).map((item) => [item.challenge_type, item]));
     try {
-      await insertChallengeQuestions(challengeByType.warmup?.id, parseQuestionIds(EL.adminWarmupQuestionIds?.value).map((questionId) => ({ questionId })));
-      await insertChallengeQuestions(challengeByType.obstacle?.id, parseQuestionIds(EL.adminObstacleQuestionIds?.value).map((questionId, idx) => ({ questionId, obstacleKey: String.fromCharCode(65 + idx) })));
-      await insertChallengeQuestions(challengeByType.acceleration?.id, parseQuestionIds(EL.adminAccelerationQuestionIds?.value).map((questionId) => ({ questionId })));
-      await insertChallengeQuestions(challengeByType.finish?.id, parseFinishQuestionRows(EL.adminFinishQuestionIds?.value));
+      await insertChallengeQuestions(challengeByType.warmup?.id, warmupIds.map((questionId) => ({ questionId })));
+      await insertChallengeQuestions(challengeByType.obstacle?.id, obstacleIds.map((questionId, idx) => ({ questionId, obstacleKey: String.fromCharCode(65 + idx) })));
+      await insertChallengeQuestions(challengeByType.acceleration?.id, accelerationIds.map((questionId) => ({ questionId })));
+      await insertChallengeQuestions(challengeByType.finish?.id, finishRows);
     } catch (questionError) {
       alert("Đã tạo vòng nhưng lỗi khi thêm câu hỏi: " + questionError.message);
     }
@@ -1240,16 +1500,18 @@
     GAME.user = user;
     GAME.accessToken = session?.access_token || "";
 
-    const [{ data: profile }, { data: grades }, { data: subjects }] = await Promise.all([
+    const [{ data: profile }, { data: grades }, { data: subjects }, { data: chapters }] = await Promise.all([
       sb.from("users").select("id,role,grade_id").eq("id", user.id).single(),
       sb.from("grades").select("id,name").order("name"),
       sb.from("subjects").select("id,name,grade_id").order("name"),
+      sb.from("chapters").select("id,name,subject_id").order("name"),
     ]);
 
     GAME.profile = profile || null;
     GAME.role = profile?.role || "student";
     GAME.grades = grades || [];
     GAME.subjects = subjects || [];
+    GAME.chapters = chapters || [];
     await loadGameCatalog();
     configureCreateRoomForm();
     injectAutoModeLobby();
@@ -1298,6 +1560,21 @@
     EL.roundForm?.addEventListener("submit", submitGameRound);
     EL.adminConfigGrade?.addEventListener("change", () => fillAdminSubjects(EL.adminConfigGrade, EL.adminConfigSubject));
     EL.adminRoundGrade?.addEventListener("change", () => fillAdminSubjects(EL.adminRoundGrade, EL.adminRoundSubject));
+    document.querySelectorAll("[data-game-question-picker-target]").forEach((button) => {
+      button.addEventListener("click", () => openGameQuestionPicker(button));
+    });
+    EL.pickerGrade?.addEventListener("change", () => {
+      fillSubjects(EL.pickerSubject, EL.pickerGrade.value, "Tất cả môn");
+      syncPickerChapters();
+      loadQuestionPickerRows();
+    });
+    EL.pickerSubject?.addEventListener("change", () => {
+      syncPickerChapters();
+      loadQuestionPickerRows();
+    });
+    EL.pickerChapter?.addEventListener("change", loadQuestionPickerRows);
+    EL.pickerSearch?.addEventListener("input", loadQuestionPickerRows);
+    EL.pickerApplyBtn?.addEventListener("click", applyQuestionPickerSelection);
     EL.roomClass?.addEventListener("change", () => {
       if (EL.roomClass.value) syncRoomFiltersFromClass(EL.roomClass.value);
     });
@@ -1401,6 +1678,12 @@
     const list = gradeId ? GAME.subjects.filter((subject) => subject.grade_id === gradeId) : GAME.subjects;
     el.innerHTML = `<option value="">${placeholder}</option>` + list.map((subject) => `<option value="${subject.id}">${esc(subject.name)}</option>`).join("");
     if (el === EL.subjectFilter) renderSubjectCards();
+  }
+
+  function fillChapters(el, subjectId, placeholder) {
+    if (!el) return;
+    const list = subjectId ? GAME.chapters.filter((chapter) => chapter.subject_id === subjectId) : [];
+    el.innerHTML = `<option value="">${placeholder}</option>` + list.map((chapter) => `<option value="${chapter.id}">${esc(chapter.name)}</option>`).join("");
   }
 
   function fillClasses(el, placeholder) {
@@ -2574,7 +2857,12 @@
           .in("id", ids);
         if (!configuredError) {
           const byId = Object.fromEntries((configuredBank || []).map((question) => [question.id, question]));
-          return ids.map((id, index) => byId[id]).filter((question) => question && !question.hidden && question.answer).map((question, index) => ({
+          return ids.map((id, index) => byId[id]).filter((question) =>
+            question &&
+            !question.hidden &&
+            question.answer &&
+            GAME_ALLOWED_QUESTION_TYPES.includes(question.question_type)
+          ).map((question, index) => ({
             room_id: room.id,
             order_no: index + 1,
             question_id: question.id,
@@ -2608,7 +2896,7 @@
       bank = merged;
     }
     const usable = (bank || []).filter((item) => !item.hidden && ["multi_choice", "short_answer"].includes(item.question_type) && item.answer);
-    const picked = shuffle(usable).slice(0, 5);
+    const picked = shuffle(usable).slice(0, Number(room.question_count || 5));
     return picked.map((question, index) => ({
       room_id: room.id,
       order_no: index + 1,
