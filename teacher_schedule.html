@@ -43,8 +43,7 @@ tbody tr:nth-child(even) td{background:#fbfdff}
 .lesson-list{display:grid;gap:8px;min-height:34px}
 .lesson{border:1px solid rgba(29,107,209,.12);border-radius:14px;padding:9px 10px;background:linear-gradient(180deg,#fff 0%,#f8fbff 100%)}
 .lesson-class{font-weight:800;color:var(--navy);line-height:1.35}
-.lesson-meta{margin-top:4px;color:var(--ink-mid);font-size:.75rem;line-height:1.45}
-.teacher-chip{display:inline-flex;margin:5px 5px 0 0;padding:3px 7px;border-radius:999px;background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;font-size:.7rem;font-weight:800}
+.lesson-meta{margin-top:4px;color:var(--ink-mid);font-size:.75rem;line-height:1.45;font-weight:700}
 .empty{padding:28px;text-align:center;color:var(--ink-light)}
 @media(max-width:920px){
   .page{padding:16px 12px 32px}
@@ -85,7 +84,7 @@ tbody tr:nth-child(even) td{background:#fbfdff}
 
 <script>
 const DAYS = {1:"Thứ hai",2:"Thứ ba",3:"Thứ tư",4:"Thứ năm",5:"Thứ sáu",6:"Thứ bảy",7:"Chủ nhật"};
-let STATE = { teachers:[], rooms:[], classes:[], schedules:[], classTeachers:[], teacherById:{}, classById:{}, teacherNamesByClass:{} };
+let STATE = { teachers:[], rooms:[], classes:[], schedules:[], classTeachers:[], classStudents:[], teacherById:{}, classById:{}, teacherNamesByClass:{}, rosterCountByClass:{} };
 
 function esc(s){ return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function escAttr(s){ return esc(s).replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
@@ -208,12 +207,11 @@ function renderLessonCell(schedules, weekday, slot){
   if(!items.length) return '<div class="lesson-list"></div>';
   return `<div class="lesson-list">${items.map(item => {
     const cls = STATE.classById[item.class_id] || {};
-    const teachers = STATE.teacherNamesByClass[item.class_id] || [];
+    const rosterCount = STATE.rosterCountByClass[item.class_id] || 0;
     return `
       <div class="lesson">
         <div class="lesson-class">${esc(cls.class_name || "Lớp học")}</div>
-        <div class="lesson-meta">Buổi ${esc(item.session_no || 1)} • ${esc(cls.grades?.name || "Khối")} • ${esc(cls.subjects?.name || "Môn học")}</div>
-        <div>${teachers.map(name => `<span class="teacher-chip">${esc(name)}</span>`).join("")}</div>
+        <div class="lesson-meta">Buổi ${esc(item.session_no || 1)} • Sĩ số ${esc(rosterCount)}</div>
       </div>
     `;
   }).join("")}</div>`;
@@ -236,14 +234,15 @@ async function loadPageData(){
   const roomSchedules = document.getElementById("roomSchedules");
   teacherList.innerHTML = '<div class="empty">Đang tải giáo viên...</div>';
   roomSchedules.innerHTML = '<div class="empty card">Đang tải thời khóa biểu...</div>';
-  const [{ data: teachers, error: teacherError }, { data: rooms, error: roomError }, { data: classes, error: classError }, { data: schedules, error: scheduleError }, { data: classTeachers, error: classTeacherError }] = await Promise.all([
+  const [{ data: teachers, error: teacherError }, { data: rooms, error: roomError }, { data: classes, error: classError }, { data: schedules, error: scheduleError }, { data: classTeachers, error: classTeacherError }, { data: classStudents, error: classStudentError }] = await Promise.all([
     sb.from("users").select("id,full_name,email,phone,subject,avatar_url").eq("role","teacher").order("full_name"),
     sb.from("rooms").select("id,room_name,capacity").order("room_name"),
     sb.from("classes").select("id,class_name,hidden,grades(name),subjects(name)").eq("hidden",false).order("class_name"),
     sb.from("class_schedules").select("id,class_id,session_no,weekday,start_time,end_time,effective_from,room_id,rooms(id,room_name)").order("weekday").order("start_time"),
     sb.from("class_teachers").select("class_id,teacher_id"),
+    sb.from("class_students").select("class_id,student_id,left_at").is("left_at", null),
   ]);
-  const firstError = teacherError || roomError || classError || scheduleError || classTeacherError;
+  const firstError = teacherError || roomError || classError || scheduleError || classTeacherError || classStudentError;
   if(firstError){
     teacherList.innerHTML = `<div class="empty">${esc(firstError.message || "Không tải được dữ liệu.")}</div>`;
     roomSchedules.innerHTML = `<div class="empty card">${esc(firstError.message || "Không tải được dữ liệu.")}</div>`;
@@ -254,6 +253,7 @@ async function loadPageData(){
   STATE.classes = classes || [];
   STATE.schedules = schedules || [];
   STATE.classTeachers = classTeachers || [];
+  STATE.classStudents = classStudents || [];
   STATE.teacherById = Object.fromEntries(STATE.teachers.map(t => [t.id, t]));
   STATE.classById = Object.fromEntries(STATE.classes.map(cls => [cls.id, cls]));
   STATE.teacherNamesByClass = {};
@@ -262,6 +262,11 @@ async function loadPageData(){
     if(!name) return;
     if(!STATE.teacherNamesByClass[row.class_id]) STATE.teacherNamesByClass[row.class_id] = [];
     STATE.teacherNamesByClass[row.class_id].push(name);
+  });
+  STATE.rosterCountByClass = {};
+  STATE.classStudents.forEach(row => {
+    if(!row.class_id || !row.student_id) return;
+    STATE.rosterCountByClass[row.class_id] = (STATE.rosterCountByClass[row.class_id] || 0) + 1;
   });
   renderAll();
 }
