@@ -659,6 +659,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     <li data-role="admin,teacher,student" data-page="resources.html"><span class="menu-label">📚 Tài liệu tham khảo</span></li>
     <li data-role="admin,teacher"         data-page="question.html"><span class="menu-label">📝 Ngân hàng câu hỏi</span></li>
     <li data-role="admin,teacher"         data-page="exam.html"><span class="menu-label">📄 Đề kiểm tra</span></li>
+    <li data-role="admin"                 data-page="sourcedata.html?tab=trialRequests"><span class="menu-label">📝 Đăng ký học thử</span></li>
     <li data-role="admin"                 data-page="sourcedata.html"><span class="menu-label">⚙️ Hệ thống</span></li>
   </ul>
 </aside>
@@ -938,15 +939,18 @@ function applyRoleMenu(role){
 
 function setActiveMenuItem(page){
   const basePage = String(page || "").split("?")[0].split("#")[0];
-  document.querySelectorAll("#menu li").forEach(item => {
-    item.classList.toggle("active", item.dataset.page === page || item.dataset.page === basePage);
+  const items = [...document.querySelectorAll("#menu li")];
+  const hasExact = items.some(item => item.dataset.page === page);
+  items.forEach(item => {
+    item.classList.toggle("active", hasExact ? item.dataset.page === page : item.dataset.page === basePage);
   });
 }
 
 function setActiveMobileNav(page){
   const basePage = String(page || "").split("?")[0].split("#")[0];
+  const hasExact = mobileNavItems.some(item => item.dataset.page === page);
   mobileNavItems.forEach(item => {
-    item.classList.toggle("active", item.dataset.page === page || item.dataset.page === basePage);
+    item.classList.toggle("active", hasExact ? item.dataset.page === page : item.dataset.page === basePage);
   });
 }
 

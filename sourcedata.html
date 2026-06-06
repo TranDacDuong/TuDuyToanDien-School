@@ -355,7 +355,6 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   <button class="tab" data-testid="system-tab-chapters" onclick="switchTab('chapters',this)">📖 Chương</button>
   <button class="tab" data-testid="system-tab-teachers" onclick="switchTab('teachers',this)">👨‍🏫 Giáo viên</button>
   <button class="tab" data-testid="system-tab-students" onclick="switchTab('students',this)">👩‍🎓 Học sinh</button>
-  <button class="tab" data-testid="system-tab-trials" onclick="switchTab('trialRequests',this)">📝 Đăng ký học thử</button>
   <button class="tab" data-testid="system-tab-logs" onclick="switchTab('adminLogs',this)">📋 Nhật ký vận hành</button>
   <button class="tab" data-testid="system-tab-appearance" onclick="switchTab('appearance',this)">🎨 Giao diện</button>
 </div>
@@ -1194,7 +1193,7 @@ async function init(){
   if(tab){
     const targetBtn = document.querySelector(`.tab[onclick*="'${tab}'"]`);
     const targetPanel = document.getElementById(tab);
-    if(targetBtn && targetPanel) switchTab(tab, targetBtn);
+    if(targetPanel) switchTab(tab, targetBtn);
   }
 }
 init();
