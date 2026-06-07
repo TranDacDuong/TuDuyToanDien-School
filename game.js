@@ -3580,14 +3580,13 @@
       const answer = answersByQuestion.get(question.id);
       const opened = !!answer?.is_correct;
       const locked = !!answer && !answer.is_correct;
-      const imageBg = opened && question.question_img ? `linear-gradient(135deg,rgba(8,15,30,.18),rgba(8,15,30,.06)),url('${escAttr(question.question_img)}')` : "";
-      const bg = imageBg || (opened
-        ? "linear-gradient(135deg,rgba(16,185,129,.28),rgba(34,197,94,.14))"
-        : locked
-          ? "linear-gradient(135deg,rgba(239,68,68,.24),rgba(127,29,29,.18))"
-          : "linear-gradient(135deg,rgba(250,204,21,.24),rgba(59,130,246,.16))");
-      const label = opened ? "Đã mở" : locked ? "Đã chìm" : "Chọn";
-      return `<button class="btn btn-outline" type="button" ${answer ? "disabled" : ""} onclick="selectRoundObstacleQuestion('${question.id}')" style="min-height:120px;border-radius:22px;background:${bg}!important;background-size:cover!important;background-position:center!important;color:#fff!important;display:grid;place-items:center;font-size:1.08rem;font-weight:900;text-shadow:0 2px 10px rgba(2,8,23,.72)"><span>${opened ? "" : `Chướng ngại vật số ${index + 1}`}</span><span style="font-size:.78rem;opacity:.88">${label}</span></button>`;
+      if (opened) {
+        return `<button aria-label="Chướng ngại vật số ${index + 1} đã mở" type="button" disabled style="min-height:150px;border:0;background:transparent!important;opacity:0;pointer-events:none"></button>`;
+      }
+      const bg = locked
+        ? "linear-gradient(135deg,rgba(148,163,184,.96),rgba(51,65,85,.98)),repeating-linear-gradient(45deg,rgba(255,255,255,.12) 0 10px,rgba(15,23,42,.1) 10px 20px)"
+        : "linear-gradient(135deg,rgba(250,204,21,.96),rgba(245,158,11,.94) 48%,rgba(30,64,175,.92))";
+      return `<button class="btn btn-outline" type="button" ${answer ? "disabled" : ""} onclick="selectRoundObstacleQuestion('${question.id}')" style="min-height:150px;border-radius:0;background:${bg}!important;color:#fff!important;display:grid;place-items:center;font-size:1.08rem;font-weight:900;text-shadow:0 2px 10px rgba(2,8,23,.72);border:1px solid rgba(255,255,255,.18)!important"><span>${locked ? "" : `Chướng ngại vật số ${index + 1}`}</span></button>`;
     }).join("");
     const openedCount = questions.filter((question) => answersByQuestion.get(question.id)?.is_correct).length;
     const keywordLength = String(challenge?.keyword_answer || "").trim().length;
@@ -3606,8 +3605,7 @@
     renderMathText(EL.questionBody, "");
     EL.questionBody.innerHTML = `
       <div style="position:relative;display:grid;gap:14px;padding:18px;border-radius:24px;overflow:hidden;background:radial-gradient(circle at center,rgba(250,204,21,.2),rgba(15,23,42,.18));border:1px solid rgba(186,230,253,.16)">
-        <div style="position:absolute;inset:0;display:grid;place-items:center;font-size:3rem;font-weight:1000;letter-spacing:.08em;color:rgba(250,204,21,.2);pointer-events:none">MindUp</div>
-        <div style="position:relative;display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:12px">${tiles}</div>
+        <div style="position:relative;display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:0;overflow:hidden;border-radius:20px;aspect-ratio:16/9;background:linear-gradient(135deg,rgba(255,255,255,.9),rgba(226,232,240,.84)),url('mindup-zbs-logo.png');background-repeat:no-repeat;background-position:center;background-size:min(72%,520px) auto;box-shadow:inset 0 0 0 1px rgba(186,230,253,.18)">${tiles}</div>
         ${keywordBox}
       </div>
     `;
@@ -3628,6 +3626,26 @@
     }
   }
 
+  function isRoundObstacleTypingActive(room) {
+    const active = document.activeElement;
+    if (!room || !active) return false;
+    if (active.id === "roundObstacleKeywordInput") {
+      GAME.roundObstacleKeywordDraft[room.id] = active.value || "";
+      return true;
+    }
+    if (active.id === "gameShortAnswerInput") {
+      const player = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
+      const questionId = GAME.roundObstacleSelection?.[room.id] || "";
+      if (player && questionId) {
+        window.__gameShortDraft = window.__gameShortDraft || {};
+        window.__gameShortDraft[player.id] = window.__gameShortDraft[player.id] || {};
+        window.__gameShortDraft[player.id][questionId] = active.value || "";
+      }
+      return true;
+    }
+    return false;
+  }
+
   function renderLiveRoom() {
       const room = GAME.activeRoom;
       const questions = GAME.roomQuestions;
@@ -3643,6 +3661,17 @@
 
       const timeline = getQuestionTimeline(room, questions);
       if (timeline.obstacleBoard) {
+        if (isRoundObstacleTypingActive(room)) {
+          const selectedId = GAME.roundObstacleSelection?.[room.id] || "";
+          const selectedQuestion = selectedId ? (GAME.roomQuestions || []).find((item) => item.id === selectedId) : null;
+          if (selectedQuestion && EL.questionClock) {
+            const startedAt = Number(GAME.roundObstacleStartedAt?.[room.id] || Date.now());
+            const secondsLeft = Math.max(0, getQuestionDuration(selectedQuestion, room) - Math.floor((Date.now() - startedAt) / 1000));
+            EL.questionClock.textContent = String(secondsLeft).padStart(2, "0");
+          }
+          renderLeaderboard();
+          return;
+        }
         renderRoundObstacleBoard(timeline);
         renderLeaderboard();
         clearInterval(GAME.questionTick);
@@ -3660,8 +3689,7 @@
             renderLeaderboard();
             return;
           }
-          if (document.activeElement?.id === "roundObstacleKeywordInput") {
-            GAME.roundObstacleKeywordDraft[room.id] = document.activeElement.value || "";
+          if (isRoundObstacleTypingActive(room)) {
             renderLeaderboard();
             return;
           }
