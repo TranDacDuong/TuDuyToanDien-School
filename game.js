@@ -1112,10 +1112,23 @@
 
   async function renderRoundChallengeLobby(roundId) {
     const round = (GAME.rounds || []).find((item) => item.id === roundId);
-    if (!round || !EL.roomGrid) return;
+    const view = ensureRoundLobbyView();
+    if (!round || !view || !EL.roomScreen) return;
     GAME.selectedRoundId = roundId;
-    EL.roomGrid.classList.remove("hidden");
-    EL.roomEmpty?.classList.add("hidden");
+    clearIntervals();
+    showRoomNotice("");
+    teardownRoomRealtime();
+    GAME.activeRoom = null;
+    GAME.roomPlayers = [];
+    GAME.roomQuestions = [];
+    GAME.roomAnswers = [];
+    GAME.myAnswers = [];
+    EL.roomScreen.classList.add("show");
+    EL.roomScreenTitle.textContent = `Vòng ${round.round_no || 1}: ${round.title}`;
+    EL.toggleReadyBtn?.classList.add("hidden");
+    EL.startGameBtn?.classList.add("hidden");
+    EL.leaveGameBtn?.classList.add("hidden");
+    setScreenState("roundLobby");
     const attemptMap = await loadRoundAttemptMap(roundId);
     const nextType = getNextRoundChallengeType(attemptMap);
     const challengeCards = getRoundChallengeOrder().map((type, index) => {
@@ -1138,14 +1151,17 @@
         : `<button class="btn ${enabled ? "btn-primary" : "btn-outline"} btn-sm" type="button" ${enabled ? "" : "disabled"} data-start-round="${escAttr(round.id)}" data-round-challenge="${type}">${enabled ? "Bắt đầu" : status}</button>`;
       return `<div class="room-card" style="${locked ? "opacity:.62" : ""}"><div class="room-top"><div><div class="room-title">${index + 1}. ${esc(label)}</div><div class="hint">${esc(detail)}</div></div><span class="pill ${done ? "done" : enabled ? "live" : "waiting"}">${status}</span></div>${action}</div>`;
     }).join("");
-    EL.roomGrid.innerHTML = `
-      <div class="room-card" style="grid-column:1/-1">
-        <div class="room-top"><div><div class="room-title">Vòng ${round.round_no || 1}: ${esc(round.title)}</div><div class="hint">Thí sinh chọn lần lượt 4 thử thách trong vòng thi cá nhân.</div></div><button class="btn btn-outline btn-sm" type="button" data-back-round-list>Chọn vòng khác</button></div>
+    view.innerHTML = `
+      <div class="panel">
+        <div class="room-top"><div><div class="room-title">Vòng ${round.round_no || 1}: ${esc(round.title)}</div><div class="hint">${esc(round.description || "Thí sinh chọn lần lượt 4 thử thách trong vòng thi cá nhân.")}</div></div><button class="btn btn-outline btn-sm" type="button" data-back-round-list>Chọn vòng khác</button></div>
       </div>
-      ${challengeCards}
+      <div class="room-grid">${challengeCards}</div>
     `;
-    EL.roomGrid.querySelector("[data-back-round-list]")?.addEventListener("click", () => renderRoundSelection(round.grade_id, round.subject_id));
-    EL.roomGrid.querySelectorAll("[data-start-round]").forEach((button) => {
+    view.querySelector("[data-back-round-list]")?.addEventListener("click", () => {
+      hideGameScreen();
+      renderRoundSelection(round.grade_id, round.subject_id);
+    });
+    view.querySelectorAll("[data-start-round]").forEach((button) => {
       button.addEventListener("click", () => startMindUpRound(button.dataset.startRound || "", button.dataset.roundChallenge || "", button.dataset.finishLevel || ""));
     });
   }
@@ -1242,9 +1258,22 @@
   }
 
   function setScreenState(state) {
+    const roundLobbyView = document.getElementById("gameRoundLobbyView");
     EL.waitingView.classList.toggle("hidden", state !== "waiting");
     EL.liveView.classList.toggle("hidden", state !== "live");
     EL.finishedView.classList.toggle("hidden", state !== "finished");
+    roundLobbyView?.classList.toggle("hidden", state !== "roundLobby");
+  }
+
+  function ensureRoundLobbyView() {
+    let view = document.getElementById("gameRoundLobbyView");
+    if (view) return view;
+    view = document.createElement("div");
+    view.id = "gameRoundLobbyView";
+    view.className = "hidden";
+    view.style.cssText = "display:grid;gap:18px;max-width:1180px;margin:0 auto";
+    EL.roomScreen?.querySelector(".screen-body")?.appendChild(view);
+    return view;
   }
 
   async function loadGameCatalog() {
@@ -3140,6 +3169,8 @@
     showRoomNotice("");
     teardownRoomRealtime();
     GAME.activeRoom = null;
+    document.getElementById("gameRoundLobbyView")?.classList.add("hidden");
+    EL.leaveGameBtn?.classList.remove("hidden");
     EL.roomScreen.classList.remove("show");
   }
 
@@ -3250,6 +3281,7 @@
     }
 
     EL.roomScreenTitle.textContent = getRoomDisplayTitle(room);
+    EL.leaveGameBtn?.classList.remove("hidden");
     EL.startGameBtn.classList.add("hidden");
     EL.startGameBtn.disabled = true;
     EL.toggleReadyBtn?.classList.add("hidden");
