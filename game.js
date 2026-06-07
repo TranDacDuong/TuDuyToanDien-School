@@ -2467,7 +2467,7 @@
     const status = EL.statusFilter?.value || "";
     const playerMap = buildRoomPlayerMap();
 
-    let list = [...GAME.rooms].filter((room) => roomModeValue(room) !== "solo");
+    let list = [...GAME.rooms].filter((room) => !["solo", "round"].includes(roomModeValue(room)));
     if (keyword) {
       list = list.filter((room) => String(room.title || "").toLowerCase().includes(keyword) || String(room.join_code || "").toLowerCase().includes(keyword));
     }
