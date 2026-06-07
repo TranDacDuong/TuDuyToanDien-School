@@ -184,7 +184,7 @@
   function getModeEloRule(mode) {
     if (mode === "solo") return "Chơi đơn: điểm trận bao nhiêu thì cộng bấy nhiêu Elo.";
     if (mode === "quick") return "Đấu nhanh: điểm trận bao nhiêu thì cộng bấy nhiêu Elo.";
-    if (mode === "round") return "Vòng MindUp: qua vòng thì điểm đạt được cộng thành Elo.";
+    if (mode === "round") return "Vòng MindUp: đạt từ 100 điểm mới qua vòng và được cộng Elo; mỗi lần thi lại trừ 20 điểm.";
     if (mode === "solo") {
       return "Chơi đơn: điểm trận càng cao, Elo cộng càng nhiều.";
     }
@@ -206,8 +206,10 @@
     }
 
     if (mode === "round") {
-      const factor = room?.round_retry ? 0.2 : 1;
-      return Object.fromEntries((orderedPlayers || []).map((player) => [player.user_id, Math.round(Number(player.score || 0) * factor)]));
+      return Object.fromEntries((orderedPlayers || []).map((player) => {
+        const score = Number(player.score || 0);
+        return [player.user_id, score >= 100 ? Math.max(0, score) : 0];
+      }));
     }
 
     const map = {};
@@ -765,7 +767,7 @@
     return [
       { mode: "solo", title: "Chơi đơn", art: "🎯", desc: "Luyện nhanh như phần Tăng tốc, mỗi câu 5/10/15/20 điểm theo tốc độ.", elo: getModeEloRule("solo") },
       { mode: "quick", title: "Đấu nhanh", art: "⚡", desc: "Từ 2 người trở lên, đúng càng nhanh điểm từng câu càng cao.", elo: getModeEloRule("quick") },
-      { mode: "round", title: "Vòng MindUp", art: "🏔️", desc: "4 thử thách kiểu Olympia: Khởi động, Chướng ngại, Tăng tốc, Về đích.", elo: "Qua vòng từ 300 điểm, điểm đạt được cộng vào Elo." },
+      { mode: "round", title: "Vòng MindUp", art: "🏔️", desc: "4 thử thách kiểu Olympia: Khởi động, Chướng ngại, Tăng tốc, Về đích.", elo: "Từ 100 điểm mới qua vòng và được cộng Elo; thi lại trừ 20 điểm." },
     ];
     return [
       { mode: "solo", title: "Chơi đơn", art: "🎯", desc: "Vào trận ngay, luyện 5 câu để cày Elo.", elo: getModeEloRule("solo") },
@@ -1420,7 +1422,7 @@
           const grade = GAME.grades.find((item) => item.id === round.grade_id)?.name || "Khối";
           const subject = GAME.subjects.find((item) => item.id === round.subject_id)?.name || "Môn";
           const challengeCount = GAME.roundChallenges.filter((item) => item.round_id === round.id).length;
-          return `<div class="history-item"><div class="history-main"><strong>Vòng ${round.round_no || 1}: ${esc(round.title)}</strong><div class="hint">${esc(grade)} • ${esc(subject)} • ${challengeCount}/4 thử thách • qua vòng ${round.pass_score || 300} điểm • thi lại trừ ${round.retry_penalty || 30}</div></div><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="btn btn-outline btn-sm" type="button" onclick="editGameRound('${round.id}')">Sửa</button><button class="btn btn-outline btn-sm" type="button" onclick="deleteGameRound('${round.id}')">Xóa</button></div></div>`;
+          return `<div class="history-item"><div class="history-main"><strong>Vòng ${round.round_no || 1}: ${esc(round.title)}</strong><div class="hint">${esc(grade)} • ${esc(subject)} • ${challengeCount}/4 thử thách • qua vòng từ 100 điểm • thi lại trừ 20 điểm</div></div><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="btn btn-outline btn-sm" type="button" onclick="editGameRound('${round.id}')">Sửa</button><button class="btn btn-outline btn-sm" type="button" onclick="deleteGameRound('${round.id}')">Xóa</button></div></div>`;
         }).join("")
         : '<div class="empty">Chưa có Vòng MindUp nào.</div>';
     }
@@ -2951,7 +2953,8 @@
   async function createRoundRoom(round, challengeType = "", finishLevel = "") {
     const joinCode = randomCode();
     const isRetry = await hasFinishedRoundAttempt(round.id, challengeType, finishLevel);
-    const carriedScore = isRetry ? 0 : await getRoundCarriedScore(round.id);
+    const retryPenalty = isRetry ? 20 : 0;
+    const carriedScore = Math.max(0, await getRoundCarriedScore(round.id) - retryPenalty);
     const challengeName = getRoundChallengeDisplayName(challengeType, finishLevel);
     const payload = {
       title: `Vòng ${round.round_no || 1}: ${round.title} • ${challengeName}`,
@@ -4154,6 +4157,12 @@
           : `Phòng ${GAME.activeRoom?.title || ""} đã kết thúc. Người có điểm cao hơn sẽ xếp trên, nếu bằng điểm thì ai vào phòng sớm hơn sẽ xếp trên.`;
     if (supportsModeElo(roomMode)) {
       EL.finishedMeta.textContent += ` ${getModeEloRule(roomMode)}`;
+    }
+    if (roomMode === "round") {
+      const myPlayer = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
+      EL.finishedMeta.textContent += Number(myPlayer?.score || 0) >= 100
+        ? " Bạn đã qua vòng và điểm vòng được cộng vào Elo."
+        : " Bạn chưa đạt 100 điểm nên chưa qua vòng và chưa được cộng Elo.";
     }
     if (EL.myStats) {
       const myPlayer = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
