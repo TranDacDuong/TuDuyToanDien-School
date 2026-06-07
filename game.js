@@ -1129,6 +1129,7 @@
     EL.roomScreenTitle.textContent = `Vòng ${round.round_no || 1}: ${round.title}`;
     EL.toggleReadyBtn?.classList.add("hidden");
     EL.startGameBtn?.classList.add("hidden");
+    updateRoundTopbarScore("", 0);
     EL.leaveGameBtn?.classList.add("hidden");
     setScreenState("roundLobby");
     const attemptMap = await loadRoundAttemptMap(roundId);
@@ -1276,6 +1277,27 @@
     view.style.cssText = "display:grid;gap:18px;max-width:1180px;margin:0 auto";
     EL.roomScreen?.querySelector(".screen-body")?.appendChild(view);
     return view;
+  }
+
+  function ensureRoundTopbarScore() {
+    let badge = document.getElementById("roundTopbarScore");
+    if (badge) return badge;
+    badge = document.createElement("div");
+    badge.id = "roundTopbarScore";
+    badge.className = "hidden";
+    badge.style.cssText = "display:inline-flex;align-items:center;min-height:36px;padding:8px 14px;border-radius:14px;background:linear-gradient(135deg,rgba(250,204,21,.22),rgba(34,211,238,.14));border:1px solid rgba(250,204,21,.42);color:#fef3c7;font-weight:900;white-space:nowrap";
+    EL.leaveGameBtn?.parentElement?.insertBefore(badge, EL.leaveGameBtn);
+    return badge;
+  }
+
+  function updateRoundTopbarScore(mode, score = 0) {
+    const badge = ensureRoundTopbarScore();
+    const isRound = mode === "round";
+    if (badge) {
+      badge.textContent = `Điểm của bạn: ${Number(score || 0)}`;
+      badge.classList.toggle("hidden", !isRound);
+    }
+    EL.leaveGameBtn?.classList.toggle("hidden", isRound);
   }
 
   async function loadGameCatalog() {
@@ -3172,7 +3194,7 @@
     teardownRoomRealtime();
     GAME.activeRoom = null;
     document.getElementById("gameRoundLobbyView")?.classList.add("hidden");
-    EL.leaveGameBtn?.classList.remove("hidden");
+    updateRoundTopbarScore("", 0);
     EL.roomScreen.classList.remove("show");
   }
 
@@ -3283,7 +3305,7 @@
     }
 
     EL.roomScreenTitle.textContent = getRoomDisplayTitle(room);
-    EL.leaveGameBtn?.classList.remove("hidden");
+    updateRoundTopbarScore(mode, me?.score || 0);
     EL.startGameBtn.classList.add("hidden");
     EL.startGameBtn.disabled = true;
     EL.toggleReadyBtn?.classList.add("hidden");
@@ -3543,7 +3565,7 @@
     const leaderboardPanel = EL.leaderboard?.closest(".panel") || livePanels[1];
     const scoreBoxes = leaderboardPanel?.querySelectorAll(".score-box") || [];
     const leaderboardTitle = leaderboardPanel?.querySelector("h3");
-    if (leaderboardPanel) leaderboardPanel.classList.remove("hidden");
+    if (leaderboardPanel) leaderboardPanel.classList.toggle("hidden", mode === "round");
     if (leaderboardTitle) leaderboardTitle.textContent = (mode === "solo" || mode === "round") ? "Điểm hiện tại" : "Bảng xếp hạng";
     if (scoreBoxes[0]?.children?.[1]) scoreBoxes[0].children[1].classList.toggle("hidden", mode === "solo" || mode === "round");
     if (scoreBoxes[1]) scoreBoxes[1].classList.toggle("hidden", mode === "quick" || mode === "solo" || mode === "round");
@@ -3613,12 +3635,11 @@
       GAME.roundObstacleKeywordDraft[room.id] = event.target.value || "";
     });
     if (selectedQuestion && !answersByQuestion.has(selectedQuestion.id)) {
-      const questionHtml = `<div style="display:grid;gap:12px;margin-top:14px;padding:16px;border-radius:18px;background:rgba(255,255,255,.08);border:1px solid rgba(186,230,253,.18)"><strong style="color:#fef3c7">Câu hỏi chướng ngại vật</strong><div id="roundObstacleQuestionText"></div></div>`;
-      EL.questionBody.insertAdjacentHTML("beforeend", questionHtml);
-      renderMathText(document.getElementById("roundObstacleQuestionText"), selectedQuestion.question_text || "Xem nội dung câu hỏi.");
-      EL.questionImg.classList.toggle("hidden", !selectedQuestion.question_img);
-      if (selectedQuestion.question_img) EL.questionImg.src = selectedQuestion.question_img;
+      EL.questionImg.classList.add("hidden");
       renderAnswerArea(selectedQuestion);
+      const questionHtml = `<div style="display:grid;gap:12px;margin-bottom:14px;padding:16px;border-radius:18px;background:rgba(255,255,255,.08);border:1px solid rgba(186,230,253,.18)"><strong style="color:#fef3c7">Câu hỏi chướng ngại vật</strong><div id="roundObstacleQuestionText"></div>${selectedQuestion.question_img ? `<img src="${escAttr(selectedQuestion.question_img)}" alt="question" style="max-width:100%;border-radius:14px;border:1px solid rgba(186,230,253,.18)">` : ""}</div>`;
+      EL.answerArea.insertAdjacentHTML("afterbegin", questionHtml);
+      renderMathText(document.getElementById("roundObstacleQuestionText"), selectedQuestion.question_text || "Xem nội dung câu hỏi.");
     } else {
       EL.questionImg.classList.add("hidden");
       EL.answerArea.innerHTML = '<div class="empty">Hãy chọn một ô để mở câu hỏi.</div>';
@@ -3999,6 +4020,7 @@
   function renderLeaderboard() {
     if (roomModeValue(GAME.activeRoom) === "round") {
       const myRow = (GAME.roomPlayers || []).find((item) => item.user_id === GAME.user.id);
+      updateRoundTopbarScore("round", myRow?.score || 0);
       if (EL.myScore) EL.myScore.textContent = myRow?.score || 0;
       if (EL.myRank) EL.myRank.textContent = "";
       if (EL.myCombo) EL.myCombo.textContent = "";
