@@ -523,6 +523,10 @@
     });
     const heroTitle = document.querySelector(".hero-copy h1");
     const heroDesc = document.querySelector(".hero-copy p");
+    if (heroDesc) {
+      heroDesc.classList.add("hidden");
+      heroDesc.style.display = "none";
+    }
     if (EL.gradeFilter?.options[0]) EL.gradeFilter.options[0].text = "Tất cả khối";
     if (EL.subjectFilter?.options[0]) EL.subjectFilter.options[0].text = "Tất cả môn";
     if (EL.visibilityFilter) {
@@ -557,6 +561,7 @@
     if (emptyDesc) emptyDesc.textContent = "Hãy đổi bộ lọc hoặc tạo một phòng mới để bắt đầu thi đấu.";
 
     const studentSectionTitles = document.querySelectorAll("#gameStudentInsightPage .section-card h3");
+    EL.historyList?.closest(".section-card")?.classList.add("hidden");
     if (studentSectionTitles[0]) studentSectionTitles[0].textContent = "Lịch sử thi đấu gần đây";
     if (studentSectionTitles[1]) studentSectionTitles[1].textContent = "Bảng xếp hạng Elo";
     const modalTitle = document.querySelector("#gameRoomModal .mh h2");
@@ -790,7 +795,7 @@
       <div style="display:grid;gap:10px;margin-top:8px">
         <div id="gameGradeCardGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px"></div>
       </div>
-      <div style="display:grid;gap:10px;margin-top:8px">
+      <div style="display:none;gap:10px;margin-top:8px">
         <div id="gameSubjectCardGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px"></div>
       </div>
     `;
@@ -1006,6 +1011,38 @@
     return `position:relative;display:grid;gap:8px;min-height:116px;padding:16px 18px;border-radius:22px;border:${selected ? "2px solid rgba(103,232,249,.95)" : "1px solid rgba(125,211,252,.18)"};background:${selected ? "radial-gradient(circle at top left,rgba(34,211,238,.24),transparent 42%),linear-gradient(135deg,rgba(8,145,178,.28) 0%,rgba(30,64,175,.2) 45%,rgba(10,20,40,.98) 100%)" : "radial-gradient(circle at top left,rgba(56,189,248,.12),transparent 38%),linear-gradient(135deg,rgba(8,15,30,.98) 0%,rgba(13,27,52,.98) 55%,rgba(10,20,40,.98) 100%)"};box-shadow:${selected ? "0 18px 36px rgba(34,211,238,.16), inset 0 1px 0 rgba(255,255,255,.08)" : "0 14px 30px rgba(2,8,23,.24), inset 0 1px 0 rgba(255,255,255,.04)"};color:#eff6ff;text-align:left;cursor:pointer;overflow:hidden;transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease`;
   }
 
+  function ensureSubjectSelectModal() {
+    let modal = document.getElementById("gameSubjectSelectModal");
+    if (modal) return modal;
+    modal = document.createElement("div");
+    modal.id = "gameSubjectSelectModal";
+    modal.className = "modal";
+    modal.innerHTML = `
+      <div class="modal-card" style="width:min(720px,100%)">
+        <div class="mh">
+          <h2>Chọn môn</h2>
+          <button class="btn btn-outline" type="button" onclick="closeGameSubjectSelectModal()">Đóng</button>
+        </div>
+        <div class="mb" style="display:grid;gap:14px">
+          <div id="gameSubjectSelectModalList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function openSubjectSelectModal() {
+    if (!GAME.selectedAutoMode || !EL.gradeFilter?.value) return;
+    const modal = ensureSubjectSelectModal();
+    renderSubjectCards();
+    modal.classList.add("show");
+  }
+
+  function closeSubjectSelectModal() {
+    document.getElementById("gameSubjectSelectModal")?.classList.remove("show");
+  }
+
   function getDisabledSelectionCardStyle() {
     return "position:relative;display:grid;gap:8px;min-height:108px;padding:16px 18px;border-radius:22px;border:1px dashed rgba(148,163,184,.22);background:linear-gradient(135deg,rgba(8,15,30,.72) 0%,rgba(13,27,52,.7) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.02);color:rgba(226,232,240,.54);text-align:left;cursor:not-allowed;overflow:hidden;opacity:.72";
   }
@@ -1034,13 +1071,16 @@
         fillSubjects(EL.subjectFilter, EL.gradeFilter?.value || "", "Tất cả môn");
         renderGradeCards();
         renderSubjectCards();
+        openSubjectSelectModal();
         tryAutoJoinReadySelection();
       });
     });
   }
 
   function renderSubjectCards() {
-    const grid = document.getElementById("gameSubjectCardGrid");
+    const inlineGrid = document.getElementById("gameSubjectCardGrid");
+    if (inlineGrid) inlineGrid.innerHTML = "";
+    const grid = document.getElementById("gameSubjectSelectModalList") || inlineGrid;
     if (!grid) return;
     if (!GAME.selectedAutoMode) {
       grid.innerHTML = "";
@@ -1067,6 +1107,7 @@
     document.querySelectorAll("[data-subject-card]").forEach((button) => {
       button.addEventListener("click", () => {
         if (EL.subjectFilter) EL.subjectFilter.value = button.dataset.subjectCard || "";
+        closeSubjectSelectModal();
         renderSubjectCards();
         renderArenaInsightsUnified();
         tryAutoJoinReadySelection();
@@ -2153,6 +2194,7 @@
         fillSubjects(EL.subjectFilter, "", "Chọn khối trước");
         renderGradeCards();
         renderSubjectCards();
+        if (EL.gradeFilter?.value) openSubjectSelectModal();
         document.querySelectorAll("[data-auto-mode]").forEach((item) => {
           item.style.outline = item === button ? "2px solid #facc15" : "none";
           item.style.transform = item === button ? "translateY(-2px)" : "none";
@@ -2602,6 +2644,24 @@
     return GAME.roomsRaw.find((room) => room.id === roomId) || null;
   }
 
+  function getMyFinishedHistory(limit = 20) {
+    const finishedRooms = GAME.rooms.filter((room) => room.status === "finished");
+    const finishedIds = new Set(finishedRooms.map((room) => room.id));
+    const finishedPlayers = GAME.players.filter((player) => finishedIds.has(player.room_id));
+    return finishedPlayers
+      .filter((player) => player.user_id === GAME.user.id)
+      .sort((a, b) => new Date(getRoomById(b.room_id)?.ended_at || 0) - new Date(getRoomById(a.room_id)?.ended_at || 0))
+      .slice(0, limit)
+      .map((player) => {
+        const room = getRoomById(player.room_id);
+        const sameRoom = finishedPlayers
+          .filter((row) => row.room_id === player.room_id)
+          .sort((a, b) => (b.score || 0) - (a.score || 0));
+        const rank = sameRoom.findIndex((row) => row.user_id === GAME.user.id) + 1;
+        return { player, room, rank: Math.max(rank, 1), players: sameRoom };
+      });
+  }
+
   function renderArenaInsightsUnified() {
     const finishedRooms = GAME.rooms.filter((room) => room.status === "finished");
     const finishedIds = new Set(finishedRooms.map((room) => room.id));
@@ -2636,12 +2696,27 @@
       ].join("");
     }
 
+    if (EL.heroBadges) {
+      EL.heroBadges.innerHTML = "";
+      EL.heroBadges.classList.add("hidden");
+    }
+
     if (EL.statsGrid) {
       EL.statsGrid.innerHTML = `
         <div class="stat-card"><span>Elo hiện tại</span><strong>${eloProfile.points}</strong><small>${eloProfile.matches} trận Elo • ${eloProfile.wins} trận PvP đứng đầu</small></div>
         <div class="stat-card"><span>Trận đã chơi</span><strong>${totalMatches}</strong></div>
         <div class="stat-card"><span>Thắng PvP</span><strong>${wins}</strong><small>Tỉ lệ thắng ${winRate}%</small></div>
         <div class="stat-card"><span>Điểm trung bình</span><strong>${avgScore}</strong><small>Chuỗi thắng ${streak}</small></div>
+      `;
+    }
+
+    if (EL.statsGrid) {
+      EL.statsGrid.innerHTML = `
+        <div class="stat-card"><span>Elo hiện tại</span><strong>${eloProfile.points}</strong></div>
+        <button class="stat-card" type="button" onclick="openGameHistoryListModal()" style="text-align:left;cursor:pointer;border:0">
+          <span>Lịch sử đấu</span><strong>Mở</strong>
+        </button>
+        <div class="stat-card"><span>Điểm trung bình</span><strong>${avgScore}</strong></div>
       `;
     }
 
@@ -2666,6 +2741,11 @@
           </div>`;
         }).join("")
         : `<div class="empty">Bạn chưa có trận nào hoàn thành.</div>`;
+    }
+
+    if (EL.historyList) {
+      EL.historyList.innerHTML = "";
+      EL.historyList.closest(".section-card")?.classList.add("hidden");
     }
 
     const leaderboard = getLeaderboardByElo(finishedRooms, finishedPlayers);
@@ -2710,9 +2790,35 @@
     }
   }
 
+  function openHistoryListModal() {
+    if (!EL.historyModal || !EL.historyModalBody) return;
+    const title = document.querySelector("#gameHistoryModal .mh h2");
+    if (title) title.textContent = "Lịch sử đấu";
+    const history = getMyFinishedHistory(20);
+    EL.historyModal.classList.add("show");
+    EL.historyModalBody.innerHTML = history.length
+      ? `<div class="panel" style="grid-column:1/-1">
+          <div class="history-list">
+            ${history.map(({ player, room, rank }) => `<div class="history-item">
+              <div class="history-main">
+                <strong>${esc(getRoomDisplayTitle(room || {}))}</strong>
+                <div class="hint">${fmtDateTime(room?.ended_at || room?.created_at)}</div>
+              </div>
+              <div class="history-actions">
+                <div style="text-align:right"><strong>${player.score || 0} điểm</strong><div class="hint">Hạng #${rank}</div></div>
+                <button class="btn btn-outline btn-sm" type="button" onclick="openGameHistoryDetail('${player.room_id}')">Xem chi tiết</button>
+              </div>
+            </div>`).join("")}
+          </div>
+        </div>`
+      : `<div class="empty" style="grid-column:1/-1">Bạn chưa có trận nào hoàn thành.</div>`;
+  }
+
   async function openHistoryDetail(roomId) {
     const room = getRoomById(roomId);
     if (!room || !EL.historyModalBody) return;
+    const title = document.querySelector("#gameHistoryModal .mh h2");
+    if (title) title.textContent = "Chi tiết trận đấu";
     EL.historyModal.classList.add("show");
     EL.historyModalBody.innerHTML = `<div class="empty" style="grid-column:1/-1">Đang tải chi tiết trận đấu...</div>`;
     const [{ data: players }, { data: answers }] = await Promise.all([
@@ -4504,8 +4610,10 @@
   };
 
   window.inviteGameFriend = inviteFriend;
+  window.openGameHistoryListModal = openHistoryListModal;
   window.openGameHistoryDetail = openHistoryDetail;
   window.closeGameHistoryModal = closeGameHistoryModal;
+  window.closeGameSubjectSelectModal = closeSubjectSelectModal;
   window.closeGameRoomModal = closeGameRoomModal;
   window.closeGameScreen = closeGameScreen;
 })();
