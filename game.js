@@ -37,6 +37,8 @@
     configQuestions: [],
     rounds: [],
     roundChallenges: [],
+    roundChallengeQuestions: [],
+    roundFinishChoices: {},
     questionPicker: {
       target: null,
       format: "plain",
@@ -139,7 +141,9 @@
     adminObstacleKeyword: document.getElementById("adminObstacleKeyword"),
     adminObstacleQuestionIds: document.getElementById("adminObstacleQuestionIds"),
     adminAccelerationQuestionIds: document.getElementById("adminAccelerationQuestionIds"),
-    adminFinishQuestionIds: document.getElementById("adminFinishQuestionIds"),
+    adminFinishEasyQuestionIds: document.getElementById("adminFinishEasyQuestionIds"),
+    adminFinishMediumQuestionIds: document.getElementById("adminFinishMediumQuestionIds"),
+    adminFinishHardQuestionIds: document.getElementById("adminFinishHardQuestionIds"),
     adminConfigList: document.getElementById("adminGameConfigList"),
     adminRoundList: document.getElementById("adminGameRoundList"),
     pickerModal: document.getElementById("gameQuestionPickerModal"),
@@ -183,12 +187,17 @@
     return "Chế độ này không tính Elo.";
   }
 
-  function getModeEloDeltaMap(mode, orderedPlayers) {
+  function getModeEloDeltaMap(mode, orderedPlayers, room = null) {
     const total = orderedPlayers.length;
     if (!total || !supportsModeElo(mode)) return {};
 
     if (mode === "solo") {
       return Object.fromEntries((orderedPlayers || []).map((player) => [player.user_id, getSoloEloDeltaFromScore(player.score)]));
+    }
+
+    if (mode === "round") {
+      const factor = room?.round_retry ? 0.2 : 1;
+      return Object.fromEntries((orderedPlayers || []).map((player) => [player.user_id, Math.round(Number(player.score || 0) * factor)]));
     }
 
     if (mode === "quick") {
@@ -282,7 +291,7 @@
     eloRooms.forEach((room) => {
       const ordered = getOrderedPlayersForRoom(room.id, finishedPlayers);
       if (!ordered.some((player) => player.user_id === userId)) return;
-      const deltas = getModeEloDeltaMap(roomModeValue(room), ordered);
+      const deltas = getModeEloDeltaMap(roomModeValue(room), ordered, room);
       points += Number(deltas[userId] || 0);
       matches += 1;
       if (ordered[0]?.user_id === userId && roomModeValue(room) !== "solo") wins += 1;
@@ -720,11 +729,22 @@
   }
 
   function getQuestionDuration(question, room) {
+    if (roomModeValue(room) === "round") {
+      if (question?.challenge_type === "warmup") return 6;
+      if (question?.challenge_type === "finish") {
+        if (question.finish_level === "easy") return 20;
+        if (question.finish_level === "hard") return 60;
+        return 40;
+      }
+      if (question?.challenge_type === "acceleration") return Math.max(10, Number(question?.difficulty || 2) * 10);
+      return Math.max(10, Number(room?.time_per_question || 20));
+    }
     const difficulty = Number(GAME.questionDifficultyMap?.[question?.question_id] || 2);
     return Math.max(10, difficulty * 10 || Number(room?.time_per_question || 20));
   }
 
   function getQuestionTimeline(room, questions) {
+    if (roomModeValue(room) === "round") return getRoundQuestionTimeline(room, questions);
     let elapsed = Math.max(0, Math.floor((Date.now() - new Date(room.started_at).getTime()) / 1000));
     for (let index = 0; index < questions.length; index += 1) {
       const duration = getQuestionDuration(questions[index], room);
@@ -792,6 +812,76 @@
 
   function getGradeCardStyle(selected) {
     return `position:relative;display:grid;gap:8px;min-height:108px;padding:16px 18px;border-radius:22px;border:${selected ? "2px solid rgba(250,204,21,.95)" : "1px solid rgba(125,211,252,.18)"};background:${selected ? "radial-gradient(circle at top left,rgba(250,204,21,.28),transparent 42%),linear-gradient(135deg,rgba(59,130,246,.34) 0%,rgba(15,23,42,.98) 58%,rgba(10,20,40,.98) 100%)" : "radial-gradient(circle at top left,rgba(125,211,252,.14),transparent 38%),linear-gradient(135deg,rgba(8,15,30,.98) 0%,rgba(13,27,52,.98) 55%,rgba(10,20,40,.98) 100%)"};box-shadow:${selected ? "0 18px 36px rgba(250,204,21,.18), inset 0 1px 0 rgba(255,255,255,.08)" : "0 14px 30px rgba(2,8,23,.24), inset 0 1px 0 rgba(255,255,255,.04)"};color:#eff6ff;text-align:left;cursor:pointer;overflow:hidden;transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease`;
+  }
+
+  function getRoundBaseQuestions(questions) {
+    return (questions || []).filter((question) => question.challenge_type !== "finish");
+  }
+
+  function getRoundFinishQuestions(questions, level) {
+    return (questions || []).filter((question) => question.challenge_type === "finish" && question.finish_level === level);
+  }
+
+  function getRoundFinishChoice(roomId) {
+    return GAME.roundFinishChoices?.[roomId] || null;
+  }
+
+  function setRoundFinishChoice(roomId, level) {
+    if (!roomId) return;
+    GAME.roundFinishChoices[roomId] = {
+      level: ["easy", "medium", "hard"].includes(level) ? level : "medium",
+      selectedAt: Date.now(),
+    };
+  }
+
+  function walkQuestionTimeline(room, questions, elapsed) {
+    let remainingElapsed = Math.max(0, elapsed);
+    for (let index = 0; index < questions.length; index += 1) {
+      const duration = getQuestionDuration(questions[index], room);
+      if (remainingElapsed < duration) {
+        return {
+          index,
+          question: questions[index],
+          secondsLeft: Math.max(0, duration - remainingElapsed),
+          duration,
+          questions,
+        };
+      }
+      remainingElapsed -= duration;
+    }
+    return { index: questions.length, question: null, secondsLeft: 0, duration: 0, questions };
+  }
+
+  function getRoundQuestionTimeline(room, questions) {
+    const elapsed = Math.max(0, Math.floor((Date.now() - new Date(room.started_at).getTime()) / 1000));
+    const baseQuestions = getRoundBaseQuestions(questions);
+    const baseTotal = baseQuestions.reduce((sum, question) => sum + getQuestionDuration(question, room), 0);
+    if (elapsed < baseTotal) return walkQuestionTimeline(room, baseQuestions, elapsed);
+
+    let choice = getRoundFinishChoice(room.id);
+    if (!choice && elapsed < baseTotal + 30) {
+      return {
+        selectFinishLevel: true,
+        index: baseQuestions.length,
+        question: null,
+        secondsLeft: Math.max(0, baseTotal + 30 - elapsed),
+        duration: 30,
+        questions: baseQuestions,
+      };
+    }
+    if (!choice) {
+      setRoundFinishChoice(room.id, "medium");
+      choice = getRoundFinishChoice(room.id);
+    }
+    const finishQuestions = getRoundFinishQuestions(questions, choice.level || "medium");
+    const finishElapsed = choice?.selectedAt ? Math.max(0, Math.floor((Date.now() - choice.selectedAt) / 1000)) : Math.max(0, elapsed - baseTotal - 30);
+    const finishTimeline = walkQuestionTimeline(room, finishQuestions, finishElapsed);
+    return {
+      ...finishTimeline,
+      index: baseQuestions.length + finishTimeline.index,
+      questions: [...baseQuestions, ...finishQuestions],
+      finishLevel: choice.level || "medium",
+    };
   }
 
   function getSubjectCardStyle(selected) {
@@ -899,8 +989,11 @@
     EL.roomGrid.classList.remove("hidden");
     EL.roomEmpty?.classList.add("hidden");
     EL.roomGrid.innerHTML = rounds.length
-      ? rounds.map((round) => `<div class="room-card"><div class="room-top"><div><div class="room-title">Vòng ${round.round_no || 1}: ${esc(round.title)}</div><div class="hint">${esc(round.description || "4 thử thách: Khởi động, Vượt chướng ngại vật, Tăng tốc, Về đích.")}</div></div><span class="pill live">MindUp</span></div><div class="room-meta"><div><span>Qua vòng</span><strong>${round.pass_score || 300} điểm</strong></div><div><span>Thi lại</span><strong>-${round.retry_penalty || 30} điểm/lần</strong></div></div><div class="room-actions"><button class="btn btn-outline" type="button" disabled>Dữ liệu vòng đã sẵn sàng</button></div></div>`).join("")
+      ? rounds.map((round) => `<div class="room-card"><div class="room-top"><div><div class="room-title">Vòng ${round.round_no || 1}: ${esc(round.title)}</div><div class="hint">${esc(round.description || "4 thử thách: Khởi động, Vượt chướng ngại vật, Tăng tốc, Về đích.")}</div></div><span class="pill live">MindUp</span></div><div class="room-meta"><div><span>Qua vòng</span><strong>${round.pass_score || 300} điểm</strong></div><div><span>Thi lại</span><strong>Elo = 20% điểm</strong></div></div><div class="room-actions"><button class="btn btn-primary" type="button" data-start-round="${escAttr(round.id)}">Vào vòng</button></div></div>`).join("")
       : '<div class="empty"><strong>Chưa có vòng MindUp</strong><div>Admin chưa tạo vòng thi cho Khối/Môn này.</div></div>';
+    document.querySelectorAll("[data-start-round]").forEach((button) => {
+      button.addEventListener("click", () => startMindUpRound(button.dataset.startRound || ""));
+    });
   }
 
   function clearAutoStartTimer() {
@@ -989,18 +1082,20 @@
   }
 
   async function loadGameCatalog() {
-    const [configsRes, configQuestionsRes, roundsRes, challengesRes] = await Promise.all([
+    const [configsRes, configQuestionsRes, roundsRes, challengesRes, challengeQuestionsRes] = await Promise.all([
       sb.from("game_configs").select("*").order("created_at", { ascending: false }),
       sb.from("game_config_questions").select("*").order("order_no", { ascending: true }),
       sb.from("game_rounds").select("*").order("round_no", { ascending: true }).order("created_at", { ascending: false }),
       sb.from("game_round_challenges").select("*").order("order_no", { ascending: true }),
+      sb.from("game_round_challenge_questions").select("*").order("order_no", { ascending: true }),
     ]);
     GAME.configs = configsRes.data || [];
     GAME.configQuestions = configQuestionsRes.data || [];
     GAME.rounds = roundsRes.data || [];
     GAME.roundChallenges = challengesRes.data || [];
-    if (configsRes.error || configQuestionsRes.error || roundsRes.error || challengesRes.error) {
-      console.warn("Game catalog warning", configsRes.error || configQuestionsRes.error || roundsRes.error || challengesRes.error);
+    GAME.roundChallengeQuestions = challengeQuestionsRes.data || [];
+    if (configsRes.error || configQuestionsRes.error || roundsRes.error || challengesRes.error || challengeQuestionsRes.error) {
+      console.warn("Game catalog warning", configsRes.error || configQuestionsRes.error || roundsRes.error || challengesRes.error || challengeQuestionsRes.error);
     }
   }
 
@@ -1351,16 +1446,22 @@
     const rawWarmupIds = parseQuestionIds(EL.adminWarmupQuestionIds?.value);
     const rawObstacleIds = parseQuestionIds(EL.adminObstacleQuestionIds?.value);
     const rawAccelerationIds = parseQuestionIds(EL.adminAccelerationQuestionIds?.value);
-    const rawFinishRows = parseFinishQuestionRows(EL.adminFinishQuestionIds?.value);
+    const rawFinishEasyIds = parseQuestionIds(EL.adminFinishEasyQuestionIds?.value);
+    const rawFinishMediumIds = parseQuestionIds(EL.adminFinishMediumQuestionIds?.value);
+    const rawFinishHardIds = parseQuestionIds(EL.adminFinishHardQuestionIds?.value);
     let warmupIds = [];
     let obstacleIds = [];
     let accelerationIds = [];
-    let finishRows = [];
+    let finishEasyIds = [];
+    let finishMediumIds = [];
+    let finishHardIds = [];
     try {
       warmupIds = await filterAllowedGameQuestionIds(rawWarmupIds);
       obstacleIds = await filterAllowedGameQuestionIds(rawObstacleIds);
       accelerationIds = await filterAllowedGameQuestionIds(rawAccelerationIds);
-      finishRows = await filterAllowedFinishQuestionRows(rawFinishRows);
+      finishEasyIds = await filterAllowedGameQuestionIds(rawFinishEasyIds);
+      finishMediumIds = await filterAllowedGameQuestionIds(rawFinishMediumIds);
+      finishHardIds = await filterAllowedGameQuestionIds(rawFinishHardIds);
     } catch (filterError) {
       alert("Không kiểm tra được danh sách câu hỏi của vòng: " + filterError.message);
       return;
@@ -1369,13 +1470,30 @@
       warmupIds.length !== rawWarmupIds.length ||
       obstacleIds.length !== rawObstacleIds.length ||
       accelerationIds.length !== rawAccelerationIds.length ||
-      finishRows.length !== rawFinishRows.length
+      finishEasyIds.length !== rawFinishEasyIds.length ||
+      finishMediumIds.length !== rawFinishMediumIds.length ||
+      finishHardIds.length !== rawFinishHardIds.length
     ) {
       alert("Một số câu trong vòng MindUp đã bị loại vì không phải trắc nghiệm/trả lời ngắn, bị ẩn hoặc chưa có đáp án. Hãy kiểm tra lại danh sách câu hỏi.");
       if (EL.adminWarmupQuestionIds) EL.adminWarmupQuestionIds.value = warmupIds.join("\n");
       if (EL.adminObstacleQuestionIds) EL.adminObstacleQuestionIds.value = obstacleIds.join("\n");
       if (EL.adminAccelerationQuestionIds) EL.adminAccelerationQuestionIds.value = accelerationIds.join("\n");
-      if (EL.adminFinishQuestionIds) EL.adminFinishQuestionIds.value = finishRows.map((item) => `${item.level || "medium"}|${item.questionId}`).join("\n");
+      if (EL.adminFinishEasyQuestionIds) EL.adminFinishEasyQuestionIds.value = finishEasyIds.join("\n");
+      if (EL.adminFinishMediumQuestionIds) EL.adminFinishMediumQuestionIds.value = finishMediumIds.join("\n");
+      if (EL.adminFinishHardQuestionIds) EL.adminFinishHardQuestionIds.value = finishHardIds.join("\n");
+      return;
+    }
+    const countChecks = [
+      ["Khởi động", warmupIds.length, 20],
+      ["Vượt chướng ngại vật", obstacleIds.length, 4],
+      ["Tăng tốc", accelerationIds.length, 4],
+      ["Về đích - Dễ", finishEasyIds.length, 3],
+      ["Về đích - Trung bình", finishMediumIds.length, 3],
+      ["Về đích - Khó", finishHardIds.length, 3],
+    ];
+    const invalidCount = countChecks.find(([, actual, expected]) => actual !== expected);
+    if (invalidCount) {
+      alert(`${invalidCount[0]} phải chọn đúng ${invalidCount[2]} câu hỏi. Hiện tại đang có ${invalidCount[1]} câu.`);
       return;
     }
     const { data: round, error } = await sb.from("game_rounds").insert({
@@ -1410,7 +1528,11 @@
       await insertChallengeQuestions(challengeByType.warmup?.id, warmupIds.map((questionId) => ({ questionId })));
       await insertChallengeQuestions(challengeByType.obstacle?.id, obstacleIds.map((questionId, idx) => ({ questionId, obstacleKey: String.fromCharCode(65 + idx) })));
       await insertChallengeQuestions(challengeByType.acceleration?.id, accelerationIds.map((questionId) => ({ questionId })));
-      await insertChallengeQuestions(challengeByType.finish?.id, finishRows);
+      await insertChallengeQuestions(challengeByType.finish?.id, [
+        ...finishEasyIds.map((questionId) => ({ questionId, level: "easy" })),
+        ...finishMediumIds.map((questionId) => ({ questionId, level: "medium" })),
+        ...finishHardIds.map((questionId) => ({ questionId, level: "hard" })),
+      ]);
     } catch (questionError) {
       alert("Đã tạo vòng nhưng lỗi khi thêm câu hỏi: " + questionError.message);
     }
@@ -2038,7 +2160,7 @@
     const totals = {};
     rankedRooms.forEach((room) => {
       const ordered = getOrderedPlayersForRoom(room.id, finishedPlayers);
-      const deltas = getModeEloDeltaMap(roomModeValue(room), ordered);
+      const deltas = getModeEloDeltaMap(roomModeValue(room), ordered, room);
       Object.keys(deltas).forEach((userId) => {
         if (!totals[userId]) totals[userId] = { elo: 1000, matches: 0, wins: 0 };
         totals[userId].elo += Number(deltas[userId] || 0);
@@ -2364,6 +2486,61 @@
     return room;
   }
 
+  async function hasFinishedRoundAttempt(roundId) {
+    if (!roundId || !GAME.user?.id) return false;
+    const { data } = await sb.from("game_rooms")
+      .select("id,game_room_players!inner(user_id)")
+      .eq("mode", "round")
+      .eq("round_id", roundId)
+      .eq("status", "finished")
+      .eq("game_room_players.user_id", GAME.user.id)
+      .limit(1);
+    return (data || []).length > 0;
+  }
+
+  async function createRoundRoom(round) {
+    const joinCode = randomCode();
+    const isRetry = await hasFinishedRoundAttempt(round.id);
+    const payload = {
+      title: `Vòng ${round.round_no || 1}: ${round.title}`,
+      join_code: joinCode,
+      mode: "round",
+      round_id: round.id,
+      round_retry: isRetry,
+      grade_id: round.grade_id,
+      subject_id: round.subject_id,
+      question_count: 31,
+      time_per_question: 20,
+      max_players: 1,
+      visibility: "private",
+      status: "waiting",
+      host_id: GAME.user.id,
+      created_by: GAME.user.id,
+      description: round.description || "Vòng MindUp cá nhân.",
+    };
+    const { data: room, error } = await sb.from("game_rooms").insert(payload).select("*").single();
+    if (error) {
+      alert("Không tạo được phòng Vòng MindUp. Nếu lỗi thiếu cột round_id hoặc round_retry, hãy chạy SQL mới.");
+      return null;
+    }
+    const { error: playerError } = await sb.from("game_room_players").insert({ room_id: room.id, user_id: GAME.user.id, score: 0, ready: true });
+    if (playerError && !String(playerError.message || "").includes("duplicate")) {
+      alert("Không vào được Vòng MindUp: " + playerError.message);
+      return null;
+    }
+    return room;
+  }
+
+  async function startMindUpRound(roundId) {
+    const round = (GAME.rounds || []).find((item) => item.id === roundId);
+    if (!round) return alert("Không tìm thấy vòng MindUp này.");
+    const room = await createRoundRoom(round);
+    if (!room) return;
+    await loadRooms();
+    await joinRoom(room.id);
+    await startGameMatch();
+  }
+
   async function autoMatchSelectedMode() {
     const mode = GAME.selectedAutoMode || EL.modeFilter?.value || "";
     if (!mode) return;
@@ -2641,7 +2818,7 @@
     const autoManagedRoom = isPublicAutoMatchRoom(room);
     const isCoordinator = getRoomCoordinatorUserId(room, GAME.roomPlayers) === GAME.user.id;
     const me = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
-    const minimumPlayers = mode === "solo" ? 1 : 2;
+    const minimumPlayers = (mode === "solo" || mode === "round") ? 1 : 2;
     const canStart = room.status === "waiting" && isCoordinator && GAME.roomPlayers.length >= minimumPlayers;
     const countdownActive = mode !== "solo" && room.status === "waiting" && GAME.roomPlayers.length >= 2;
     if (countdownActive && !room.started_at && !GAME.localCountdownStartedAt) {
@@ -2698,8 +2875,8 @@
           EL.roomDescriptionView.textContent = "Chế độ Chơi đơn tạo một trận riêng để bạn luyện 5 câu và cộng Elo chung ngay sau khi kết thúc.";
         }
         if (EL.roomStartHint) {
-          if (mode === "solo") {
-            EL.roomStartHint.textContent = "Bạn là người chơi duy nhất của trận này. Hệ thống sẽ vào câu hỏi ngay.";
+    if (mode === "solo" || mode === "round") {
+      EL.roomStartHint.textContent = "Bạn là người chơi duy nhất của trận này. Hệ thống sẽ vào câu hỏi ngay.";
           } else if (autoManagedRoom) {
             EL.roomStartHint.textContent = countdownActive
               ? "Phòng đã đủ người. Hệ thống đang đếm ngược để vào trận."
@@ -2810,7 +2987,7 @@
   async function startGameMatch() {
     const room = GAME.activeRoom;
     if (!room || getRoomCoordinatorUserId(room, GAME.roomPlayers) !== GAME.user.id) return;
-    const minPlayers = roomModeValue(room) === "solo" ? 1 : 2;
+    const minPlayers = ["solo", "round"].includes(roomModeValue(room)) ? 1 : 2;
     if (GAME.roomPlayers.length < minPlayers) {
       alert(minPlayers === 1 ? "Cần ít nhất 1 người chơi để bắt đầu trận." : "Cần ít nhất 2 người chơi để bắt đầu trận.");
       return;
@@ -2845,6 +3022,9 @@
   }
 
   async function buildGameQuestions(room) {
+    if (roomModeValue(room) === "round") {
+      return buildRoundGameQuestions(room);
+    }
     const configId = room.game_config_id || getActiveGameConfig(roomModeValue(room), room.grade_id, room.subject_id)?.id || "";
     if (configId) {
       const links = (GAME.configQuestions || [])
@@ -2924,26 +3104,45 @@
       }
 
       const timeline = getQuestionTimeline(room, questions);
+      if (timeline.selectFinishLevel) {
+        renderRoundFinishLevelChooser(timeline);
+        renderLeaderboard();
+        clearInterval(GAME.questionTick);
+        GAME.questionTick = setInterval(() => {
+          const nextTimeline = getQuestionTimeline(room, GAME.roomQuestions);
+          if (!nextTimeline.selectFinishLevel) {
+            clearInterval(GAME.questionTick);
+            GAME.liveRenderKey = "";
+            refreshActiveRoom(room.id, true);
+            return;
+          }
+          EL.questionClock.textContent = String(nextTimeline.secondsLeft).padStart(2, "0");
+        }, 1000);
+        return;
+      }
+      const visibleQuestions = timeline.questions || questions;
       const currentIndex = timeline.index;
-      if (!timeline.question || currentIndex >= questions.length) {
+      if (!timeline.question || currentIndex >= visibleQuestions.length) {
         finishRoomIfNeeded();
         return;
       }
 
       const question = timeline.question;
       const secondsLeft = timeline.secondsLeft;
-      EL.questionTitle.textContent = `Câu ${currentIndex + 1} / ${questions.length}`;
+      EL.questionTitle.textContent = `Câu ${currentIndex + 1} / ${visibleQuestions.length}`;
       EL.questionClock.textContent = String(secondsLeft).padStart(2, "0");
       if (EL.progressText) {
         EL.progressText.textContent = mode === "survival"
           ? `Sinh tồn • ${currentIndex + 1}/${questions.length}${myLives !== null ? ` • ${myLives} mạng` : ""}`
           : mode === "solo"
-            ? `Chơi đơn • ${currentIndex + 1}/${questions.length}`
+            ? `Chơi đơn • ${currentIndex + 1}/${visibleQuestions.length}`
+          : mode === "round"
+            ? `Vòng MindUp • ${getRoundChallengeLabel(question)} • ${currentIndex + 1}/${visibleQuestions.length}`
           : mode === "speed"
-            ? `Đua tốc độ • ${currentIndex + 1}/${questions.length}`
-            : `Tiến độ ${currentIndex + 1}/${questions.length}`;
+            ? `Đua tốc độ • ${currentIndex + 1}/${visibleQuestions.length}`
+            : `Tiến độ ${currentIndex + 1}/${visibleQuestions.length}`;
       }
-      if (EL.progressFill) EL.progressFill.style.width = `${((currentIndex + 1) / questions.length) * 100}%`;
+      if (EL.progressFill) EL.progressFill.style.width = `${((currentIndex + 1) / visibleQuestions.length) * 100}%`;
       renderMathText(EL.questionBody, question.question_text || "Xem nội dung câu hỏi.");
       EL.questionImg.classList.toggle("hidden", !question.question_img);
       if (question.question_img) EL.questionImg.src = question.question_img;
@@ -2961,7 +3160,7 @@
       GAME.questionTick = setInterval(() => {
         const nextTimeline = getQuestionTimeline(room, questions);
         EL.questionClock.textContent = String(nextTimeline.secondsLeft).padStart(2, "0");
-        if (nextTimeline.index !== currentIndex) {
+        if (nextTimeline.index !== currentIndex || nextTimeline.selectFinishLevel) {
           clearInterval(GAME.questionTick);
           GAME.liveRenderKey = "";
           refreshActiveRoom(room.id, true);
@@ -2969,8 +3168,91 @@
       }, 1000);
   }
 
+  async function buildRoundGameQuestions(room) {
+    const roundId = room.round_id || "";
+    const challenges = (GAME.roundChallenges || [])
+      .filter((challenge) => challenge.round_id === roundId)
+      .sort((a, b) => Number(a.order_no || 0) - Number(b.order_no || 0));
+    const questionLinks = [];
+    challenges.forEach((challenge) => {
+      (GAME.roundChallengeQuestions || [])
+        .filter((link) => link.challenge_id === challenge.id)
+        .sort((a, b) => Number(a.order_no || 0) - Number(b.order_no || 0))
+        .forEach((link) => questionLinks.push({ ...link, challenge_type: challenge.challenge_type }));
+    });
+    const ids = questionLinks.map((item) => item.question_id).filter(Boolean);
+    if (!ids.length) return [];
+    const { data: bank, error } = await sb.from("question_bank")
+      .select("id,question_type,question_text,question_img,answer,answer_count,hidden,difficulty")
+      .in("id", ids);
+    if (error) {
+      alert("Không tải được câu hỏi của Vòng MindUp: " + error.message);
+      return [];
+    }
+    const byId = Object.fromEntries((bank || []).map((question) => [question.id, question]));
+    return questionLinks.map((link, index) => {
+      const question = byId[link.question_id];
+      if (!question || question.hidden || !question.answer || !GAME_ALLOWED_QUESTION_TYPES.includes(question.question_type)) return null;
+      return {
+        room_id: room.id,
+        order_no: index + 1,
+        question_id: question.id,
+        question_type: question.question_type,
+        question_text: question.question_text,
+        question_img: question.question_img,
+        answer: question.answer,
+        answer_count: question.answer_count || (question.question_type === "short_answer" ? 1 : 4),
+        points: getRoundQuestionPoints(link.challenge_type, link.finish_level),
+        challenge_type: link.challenge_type,
+        finish_level: link.finish_level || null,
+        difficulty: question.difficulty || 2,
+      };
+    }).filter(Boolean);
+  }
+
+  function getRoundQuestionPoints(challengeType, finishLevel) {
+    if (challengeType === "finish") {
+      if (finishLevel === "easy") return 20;
+      if (finishLevel === "hard") return 60;
+      return 40;
+    }
+    if (challengeType === "warmup") return 10;
+    if (challengeType === "obstacle") return 30;
+    if (challengeType === "acceleration") return 40;
+    return 20;
+  }
+
   function totalTimeValue(room, question) {
     return Math.max(10, getQuestionDuration(question, room));
+  }
+
+  function getRoundChallengeLabel(question) {
+    if (question?.challenge_type === "warmup") return "Khởi động";
+    if (question?.challenge_type === "obstacle") return "Vượt chướng ngại vật";
+    if (question?.challenge_type === "acceleration") return "Tăng tốc";
+    if (question?.challenge_type === "finish") {
+      if (question.finish_level === "easy") return "Về đích - Dễ";
+      if (question.finish_level === "hard") return "Về đích - Khó";
+      return "Về đích - Trung bình";
+    }
+    return "Vòng MindUp";
+  }
+
+  function renderRoundFinishLevelChooser(timeline) {
+    EL.questionTitle.textContent = "Về đích";
+    EL.questionClock.textContent = String(timeline.secondsLeft).padStart(2, "0");
+    if (EL.progressText) EL.progressText.textContent = "Chọn mức câu hỏi Về đích";
+    if (EL.progressFill) EL.progressFill.style.width = "90%";
+    renderMathText(EL.questionBody, "Bạn có 30 giây để chọn mức câu hỏi. Nếu không chọn, hệ thống mặc định chọn mức Trung bình.");
+    EL.questionImg.classList.add("hidden");
+    EL.answerArea.innerHTML = `
+      <div style="display:grid;gap:10px">
+        <button class="btn btn-primary" type="button" onclick="chooseRoundFinishLevel('easy')">Dễ • 3 câu • 20 giây/câu</button>
+        <button class="btn btn-primary" type="button" onclick="chooseRoundFinishLevel('medium')">Trung bình • 3 câu • 40 giây/câu</button>
+        <button class="btn btn-primary" type="button" onclick="chooseRoundFinishLevel('hard')">Khó • 3 câu • 60 giây/câu</button>
+      </div>
+    `;
+    EL.answerFeedback.innerHTML = "";
   }
 
   function getQuestionAnsweredPlayerIds(questionId) {
@@ -2987,6 +3269,7 @@
   function maybeAdvanceQuestion(question, currentIndex, totalTime) {
     const room = GAME.activeRoom;
     if (!room || room.status !== "live" || !question) return;
+    if (roomModeValue(room) === "round") return;
     if (getRoomCoordinatorUserId(room, GAME.roomPlayers) !== GAME.user.id) return;
     const requiredPlayers = getRequiredAnswerPlayers(room);
     if (!requiredPlayers.length) return;
@@ -3126,8 +3409,10 @@
     if (!room) return;
     if (roomModeValue(room) === "survival") {
       const alivePlayers = getAlivePlayers(room, GAME.roomPlayers, GAME.roomAnswers || []);
-      const currentIndex = getQuestionTimeline(room, GAME.roomQuestions).index;
-      if (alivePlayers.length > 1 && currentIndex < GAME.roomQuestions.length) {
+      const timeline = getQuestionTimeline(room, GAME.roomQuestions);
+      const currentIndex = timeline.index;
+      const activeCount = (timeline.questions || GAME.roomQuestions).length;
+      if (alivePlayers.length > 1 && currentIndex < activeCount) {
         return;
       }
     }
@@ -3148,7 +3433,7 @@
     });
     const winner = ordered[0];
     const roomMode = roomModeValue(GAME.activeRoom);
-    const eloDeltaMap = getModeEloDeltaMap(roomMode, ordered);
+    const eloDeltaMap = getModeEloDeltaMap(roomMode, ordered, GAME.activeRoom);
     EL.finishedMeta.textContent = roomMode === "survival"
       ? `Phòng ${GAME.activeRoom?.title || ""} đã kết thúc. Ở chế độ sinh tồn, người còn nhiều mạng hơn sẽ xếp trên, nếu bằng mạng thì so điểm.`
       : roomMode === "solo"
@@ -3165,9 +3450,12 @@
       const correctCount = myRows.filter((item) => item.is_correct).length;
       const totalCount = myRows.length;
       const accuracy = totalCount ? Math.round((correctCount / totalCount) * 100) : 0;
+      const displayedQuestionTotal = roomMode === "round"
+        ? getRoundBaseQuestions(GAME.roomQuestions).length + 3
+        : (GAME.roomQuestions.length || 0);
       EL.myStats.innerHTML = `
         <div><span>Điểm của bạn</span><strong>${myPlayer?.score || 0}</strong></div>
-        <div><span>Câu đúng</span><strong>${correctCount}/${GAME.roomQuestions.length || 0}</strong></div>
+        <div><span>Câu đúng</span><strong>${correctCount}/${displayedQuestionTotal}</strong></div>
         <div><span>Độ chính xác</span><strong>${accuracy}%</strong></div>
         ${supportsModeElo(roomMode) ? `<div><span>Elo</span><strong>${Number(eloDeltaMap[GAME.user.id] || 0) >= 0 ? "+" : ""}${Number(eloDeltaMap[GAME.user.id] || 0)}</strong></div>` : ""}
         ${getPlayerLives(myPlayer?.id, GAME.activeRoom, GAME.roomAnswers || []) !== null ? `<div><span>Mạng còn lại</span><strong>${getPlayerLives(myPlayer?.id, GAME.activeRoom, GAME.roomAnswers || [])}</strong></div>` : ""}
@@ -3201,7 +3489,7 @@
 
     const timeline = getQuestionTimeline(room, GAME.roomQuestions);
     const questionIndex = timeline.index;
-    if (GAME.roomQuestions[questionIndex]?.id !== questionId) return;
+    if (timeline.selectFinishLevel || timeline.question?.id !== questionId) return;
 
     const remaining = Math.max(0, timeline.secondsLeft);
     const totalTime = Math.max(10, timeline.duration || getQuestionDuration(question, room));
@@ -3362,6 +3650,13 @@
       window.__gameShortDraft[player.id][questionId] = value.trim();
     }
     submitAnswer(questionId, value.trim());
+  };
+
+  window.chooseRoundFinishLevel = function(level) {
+    if (!GAME.activeRoom?.id) return;
+    setRoundFinishChoice(GAME.activeRoom.id, level);
+    GAME.liveRenderKey = "";
+    renderLiveRoom();
   };
 
   window.inviteGameFriend = inviteFriend;

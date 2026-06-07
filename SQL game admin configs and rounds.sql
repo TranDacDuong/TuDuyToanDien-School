@@ -9,6 +9,27 @@ CREATE INDEX IF NOT EXISTS users_grade_id_idx ON public.users(grade_id);
 ALTER TABLE public.game_rooms
 ADD COLUMN IF NOT EXISTS game_config_id uuid;
 
+ALTER TABLE public.game_rooms
+ADD COLUMN IF NOT EXISTS mode text NOT NULL DEFAULT 'quick';
+
+ALTER TABLE public.game_rooms
+ADD COLUMN IF NOT EXISTS round_retry boolean NOT NULL DEFAULT false;
+
+ALTER TABLE public.game_rooms
+DROP CONSTRAINT IF EXISTS game_rooms_mode_check;
+
+ALTER TABLE public.game_rooms
+ADD CONSTRAINT game_rooms_mode_check
+CHECK (mode IN ('quick', 'friends', 'ranked', 'survival', 'speed', 'solo', 'round'));
+
+ALTER TABLE public.game_room_questions
+ADD COLUMN IF NOT EXISTS challenge_type text
+  CHECK (challenge_type IS NULL OR challenge_type IN ('warmup', 'obstacle', 'acceleration', 'finish'));
+
+ALTER TABLE public.game_room_questions
+ADD COLUMN IF NOT EXISTS finish_level text
+  CHECK (finish_level IS NULL OR finish_level IN ('easy', 'medium', 'hard'));
+
 CREATE TABLE IF NOT EXISTS public.game_configs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   mode text NOT NULL CHECK (mode IN ('solo', 'quick')),
@@ -53,6 +74,9 @@ CREATE TABLE IF NOT EXISTS public.game_rounds (
 
 CREATE INDEX IF NOT EXISTS game_rounds_lookup_idx
   ON public.game_rounds(grade_id, subject_id, status, round_no);
+
+ALTER TABLE public.game_rooms
+ADD COLUMN IF NOT EXISTS round_id uuid REFERENCES public.game_rounds(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS public.game_round_challenges (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

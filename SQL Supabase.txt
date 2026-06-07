@@ -1966,6 +1966,9 @@ CREATE TABLE IF NOT EXISTS public.game_rooms (
     CHECK (status IN ('waiting', 'live', 'finished')),
   host_id uuid NOT NULL,
   created_by uuid NOT NULL,
+  game_config_id uuid,
+  round_id uuid,
+  round_retry boolean NOT NULL DEFAULT false,
   started_at timestamp with time zone,
   ended_at timestamp with time zone,
   created_at timestamp with time zone DEFAULT now(),
@@ -2004,6 +2007,8 @@ CREATE TABLE IF NOT EXISTS public.game_room_questions (
   answer text NOT NULL,
   answer_count integer NOT NULL DEFAULT 4,
   points integer NOT NULL DEFAULT 100,
+  challenge_type text CHECK (challenge_type IS NULL OR challenge_type IN ('warmup', 'obstacle', 'acceleration', 'finish')),
+  finish_level text CHECK (finish_level IS NULL OR finish_level IN ('easy', 'medium', 'hard')),
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT game_room_questions_pkey PRIMARY KEY (id),
   CONSTRAINT game_room_questions_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.game_rooms(id) ON DELETE CASCADE,
@@ -2240,7 +2245,7 @@ ALTER TABLE public.game_rooms
 
 ALTER TABLE public.game_rooms
   ADD CONSTRAINT game_rooms_mode_check
-  CHECK (mode IN ('quick', 'friends', 'ranked', 'survival', 'speed', 'solo'));
+  CHECK (mode IN ('quick', 'friends', 'ranked', 'survival', 'speed', 'solo', 'round'));
 
 CREATE INDEX IF NOT EXISTS game_rooms_mode_idx
   ON public.game_rooms (mode, status, created_at DESC);

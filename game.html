@@ -443,10 +443,24 @@ font-family:var(--font-body);color:#ebf5ff;min-height:100vh}
           </div>
         </div>
         <div class="field full">
-          <label>Về đích - ID câu hỏi</label>
-          <textarea id="adminFinishQuestionIds" class="input" rows="3" placeholder="Dán dạng: easy|question_id, medium|question_id, hard|question_id"></textarea>
+          <label>Về đích - Câu dễ</label>
+          <textarea id="adminFinishEasyQuestionIds" class="input" rows="3" placeholder="Chọn đúng 3 câu dễ, mỗi dòng một ID"></textarea>
           <div class="game-question-picker-field-actions">
-            <button class="btn btn-outline btn-sm" type="button" data-game-question-picker-target="adminFinishQuestionIds" data-game-question-picker-title="Chọn câu Về đích" data-game-question-picker-grade="adminGameRoundGrade" data-game-question-picker-subject="adminGameRoundSubject" data-game-question-picker-format="finish">Chọn danh sách câu hỏi</button>
+            <button class="btn btn-outline btn-sm" type="button" data-game-question-picker-target="adminFinishEasyQuestionIds" data-game-question-picker-title="Chọn 3 câu Về đích - Dễ" data-game-question-picker-grade="adminGameRoundGrade" data-game-question-picker-subject="adminGameRoundSubject">Chọn danh sách câu hỏi</button>
+          </div>
+        </div>
+        <div class="field full">
+          <label>Về đích - Câu trung bình</label>
+          <textarea id="adminFinishMediumQuestionIds" class="input" rows="3" placeholder="Chọn đúng 3 câu trung bình, mỗi dòng một ID"></textarea>
+          <div class="game-question-picker-field-actions">
+            <button class="btn btn-outline btn-sm" type="button" data-game-question-picker-target="adminFinishMediumQuestionIds" data-game-question-picker-title="Chọn 3 câu Về đích - Trung bình" data-game-question-picker-grade="adminGameRoundGrade" data-game-question-picker-subject="adminGameRoundSubject">Chọn danh sách câu hỏi</button>
+          </div>
+        </div>
+        <div class="field full">
+          <label>Về đích - Câu khó</label>
+          <textarea id="adminFinishHardQuestionIds" class="input" rows="3" placeholder="Chọn đúng 3 câu khó, mỗi dòng một ID"></textarea>
+          <div class="game-question-picker-field-actions">
+            <button class="btn btn-outline btn-sm" type="button" data-game-question-picker-target="adminFinishHardQuestionIds" data-game-question-picker-title="Chọn 3 câu Về đích - Khó" data-game-question-picker-grade="adminGameRoundGrade" data-game-question-picker-subject="adminGameRoundSubject">Chọn danh sách câu hỏi</button>
           </div>
         </div>
         <div class="field full">
