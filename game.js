@@ -45,6 +45,7 @@
       selected: new Map(),
       rows: [],
     },
+    editingConfigIds: [],
     liveRenderKey: "",
     autoStartTimer: null,
   };
@@ -172,8 +173,8 @@
   }
 
   function getModeEloRule(mode) {
-    if (mode === "solo") return "Chơi đơn: đúng càng nhanh càng nhiều điểm, Elo đổi theo tổng điểm.";
-    if (mode === "quick") return "Đấu nhanh: Elo cộng/trừ theo hiệu số điểm giữa nửa trên và nửa dưới.";
+    if (mode === "solo") return "Chơi đơn: điểm trận bao nhiêu thì cộng bấy nhiêu Elo.";
+    if (mode === "quick") return "Đấu nhanh: điểm trận bao nhiêu thì cộng bấy nhiêu Elo.";
     if (mode === "round") return "Vòng MindUp: qua vòng thì điểm đạt được cộng thành Elo.";
     if (mode === "solo") {
       return "Chơi đơn: điểm trận càng cao, Elo cộng càng nhiều.";
@@ -191,33 +192,13 @@
     const total = orderedPlayers.length;
     if (!total || !supportsModeElo(mode)) return {};
 
-    if (mode === "solo") {
-      return Object.fromEntries((orderedPlayers || []).map((player) => [player.user_id, getSoloEloDeltaFromScore(player.score)]));
+    if (mode === "solo" || mode === "quick") {
+      return Object.fromEntries((orderedPlayers || []).map((player) => [player.user_id, Math.max(0, Number(player.score || 0))]));
     }
 
     if (mode === "round") {
       const factor = room?.round_retry ? 0.2 : 1;
       return Object.fromEntries((orderedPlayers || []).map((player) => [player.user_id, Math.round(Number(player.score || 0) * factor)]));
-    }
-
-    if (mode === "quick") {
-      const winners = Math.floor(total / 2);
-      const losers = Math.floor(total / 2);
-      const map = Object.fromEntries((orderedPlayers || []).map((player) => [player.user_id, 0]));
-      if (!winners || !losers) return map;
-      let totalGain = 0;
-      for (let i = 0; i < winners; i += 1) {
-        const top = orderedPlayers[i];
-        const bottom = orderedPlayers[total - 1 - i];
-        const gain = Math.max(0, Number(top?.score || 0) - Number(bottom?.score || 0));
-        map[top.user_id] = gain;
-        totalGain += gain;
-      }
-      const lossEach = roundToNearestTen(totalGain / losers);
-      for (let i = total - losers; i < total; i += 1) {
-        map[orderedPlayers[i].user_id] = -lossEach;
-      }
-      return map;
     }
 
     const map = {};
@@ -267,7 +248,7 @@
       const player = (finishedPlayers || []).find((item) => item.room_id === room.id && item.user_id === userId);
       if (!player) return;
       const score = Number(player.score || 0);
-      points += getSoloEloDeltaFromScore(score);
+      points += score;
       matches += 1;
       totalScore += score;
       bestScore = Math.max(bestScore, score);
@@ -729,6 +710,9 @@
   }
 
   function getQuestionDuration(question, room) {
+    if (["solo", "quick"].includes(roomModeValue(room))) {
+      return Math.max(10, Number(room?.time_per_question || 60));
+    }
     if (roomModeValue(room) === "round") {
       if (question?.challenge_type === "warmup") return 6;
       if (question?.challenge_type === "finish") {
@@ -1012,7 +996,7 @@
     if (!room?.started_at) return null;
     const elapsedMs = Date.now() - new Date(room.started_at).getTime();
     if (!Number.isFinite(elapsedMs)) return null;
-    return Math.max(0, 10 - Math.floor(elapsedMs / 1000));
+    return Math.max(0, 15 - Math.floor(elapsedMs / 1000));
   }
 
   function renderWaitingCountdown(room) {
@@ -1042,10 +1026,22 @@
     return ["quick"].includes(mode) && (room.visibility || "public") === "public";
   }
 
+  function areRoomPlayersReadyForStart(room, players = GAME.roomPlayers) {
+    const mode = roomModeValue(room);
+    const list = players || [];
+    if (mode === "solo") return list.length >= 1 && list.every((player) => player.ready);
+    if (mode === "round") return list.length >= 1;
+    if (mode === "quick") {
+      const coordinatorId = getRoomCoordinatorUserId(room, list);
+      return list.length >= 2 && list.every((player) => player.user_id === coordinatorId || player.ready);
+    }
+    return list.length >= 2;
+  }
+
   function queueAutoStart(room, delayMs = 1200) {
     clearAutoStartTimer();
     GAME.autoStartTimer = setTimeout(() => {
-      if (GAME.activeRoom?.id === room.id && GAME.activeRoom?.status === "waiting" && GAME.roomPlayers.length >= 2) {
+      if (GAME.activeRoom?.id === room.id && GAME.activeRoom?.status === "waiting" && areRoomPlayersReadyForStart(GAME.activeRoom, GAME.roomPlayers)) {
         startGameMatch();
       }
     }, Math.max(0, Number(delayMs || 0)));
@@ -1138,14 +1134,59 @@
     renderAdminGameLists();
   }
 
+  function getConfigGroupKey(cfg) {
+    return [cfg.title || "Game", cfg.grade_id || "", cfg.subject_id || ""].join("|");
+  }
+
+  function getGameConfigGroups() {
+    const groups = new Map();
+    (GAME.configs || [])
+      .filter((cfg) => ["solo", "quick"].includes(cfg.mode))
+      .forEach((cfg) => {
+        const key = getConfigGroupKey(cfg);
+        if (!groups.has(key)) {
+          groups.set(key, {
+            key,
+            title: cfg.title || "Bộ luyện tập Game",
+            grade_id: cfg.grade_id,
+            subject_id: cfg.subject_id,
+            configs: [],
+          });
+        }
+        groups.get(key).configs.push(cfg);
+      });
+    return [...groups.values()].sort((a, b) => {
+      const aActive = a.configs.some((cfg) => (cfg.status || "active") === "active") ? 1 : 0;
+      const bActive = b.configs.some((cfg) => (cfg.status || "active") === "active") ? 1 : 0;
+      return bActive - aActive || String(a.title || "").localeCompare(String(b.title || ""));
+    });
+  }
+
+  function encodeConfigGroupIds(group) {
+    return encodeURIComponent(JSON.stringify((group?.configs || []).map((cfg) => cfg.id)));
+  }
+
+  function getConfigQuestionIds(configId) {
+    return (GAME.configQuestions || [])
+      .filter((item) => item.config_id === configId)
+      .sort((a, b) => Number(a.order_no || 0) - Number(b.order_no || 0))
+      .map((item) => item.question_id)
+      .filter(Boolean);
+  }
+
   function renderAdminGameLists() {
     if (EL.adminConfigList) {
-      EL.adminConfigList.innerHTML = GAME.configs.length
-        ? GAME.configs.map((cfg) => {
-          const grade = GAME.grades.find((item) => item.id === cfg.grade_id)?.name || "Khối";
-          const subject = GAME.subjects.find((item) => item.id === cfg.subject_id)?.name || "Môn";
-          const qCount = GAME.configQuestions.filter((item) => item.config_id === cfg.id).length;
-          return `<div class="history-item"><div class="history-main"><strong>${esc(cfg.title || roomModeLabel(cfg.mode))}</strong><div class="hint">${esc(roomModeLabel(cfg.mode))} • ${esc(grade)} • ${esc(subject)} • ${qCount} câu hỏi • ${esc(cfg.status || "active")}</div></div><button class="btn btn-outline btn-sm" type="button" onclick="deleteGameConfig('${cfg.id}')">Xóa</button></div>`;
+      const groups = getGameConfigGroups();
+      EL.adminConfigList.innerHTML = groups.length
+        ? groups.map((group) => {
+          const grade = GAME.grades.find((item) => item.id === group.grade_id)?.name || "Khối";
+          const subject = GAME.subjects.find((item) => item.id === group.subject_id)?.name || "Môn";
+          const ids = new Set(group.configs.flatMap((cfg) => getConfigQuestionIds(cfg.id)));
+          const active = group.configs.some((cfg) => (cfg.status || "active") === "active");
+          const hasSolo = group.configs.some((cfg) => cfg.mode === "solo");
+          const hasQuick = group.configs.some((cfg) => cfg.mode === "quick");
+          const encodedIds = encodeConfigGroupIds(group);
+          return `<div class="history-item"><div class="history-main"><strong>${esc(group.title)}</strong><div class="hint">${esc(grade)} • ${esc(subject)} • ${ids.size} câu hỏi • 5 câu/trận • 60s/câu • ${active ? "Đang áp dụng" : "Chưa áp dụng"} • ${hasSolo ? "Chơi đơn" : "Thiếu Chơi đơn"} / ${hasQuick ? "Đấu nhanh" : "Thiếu Đấu nhanh"}</div></div><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="btn btn-primary btn-sm" type="button" onclick="applyGameConfigGroup('${encodedIds}')">Áp dụng</button><button class="btn btn-outline btn-sm" type="button" onclick="editGameConfigGroup('${encodedIds}')">Sửa</button><button class="btn btn-outline btn-sm" type="button" onclick="deleteGameConfigGroup('${encodedIds}')">Xóa</button></div></div>`;
         }).join("")
         : '<div class="empty">Chưa có cấu hình Chơi đơn hoặc Đấu nhanh.</div>';
     }
@@ -1324,9 +1365,6 @@
       if (GAME.questionPicker.format === "finish") return `${item.level || "medium"}|${item.id}`;
       return item.id;
     }).join("\n");
-    if (target === EL.adminConfigQuestionIds && EL.adminConfigQuestionCount && selected.length) {
-      EL.adminConfigQuestionCount.value = selected.length;
-    }
     closeGameQuestionPicker();
   }
 
@@ -1373,10 +1411,9 @@
   async function submitGameConfig(event) {
     event.preventDefault();
     if (GAME.role !== "admin") return;
-    const mode = EL.adminConfigMode?.value || "solo";
     const gradeId = EL.adminConfigGrade?.value || "";
     const subjectId = EL.adminConfigSubject?.value || "";
-    const title = String(EL.adminConfigTitle?.value || "").trim() || roomModeLabel(mode);
+    const title = String(EL.adminConfigTitle?.value || "").trim() || "Bộ luyện tập Game";
     const rawQuestionIds = parseQuestionIds(EL.adminConfigQuestionIds?.value || "");
     if (!gradeId || !subjectId) {
       alert("Hãy chọn Khối và Môn cho cấu hình Game.");
@@ -1394,25 +1431,44 @@
       if (EL.adminConfigQuestionIds) EL.adminConfigQuestionIds.value = questionIds.join("\n");
       return;
     }
-    const { data: config, error } = await sb.from("game_configs").insert({
+    if (questionIds.length < 5) {
+      alert("Cần chọn ít nhất 5 câu hỏi để tạo phần Chơi đơn / Đấu nhanh.");
+      return;
+    }
+
+    const editingIds = GAME.editingConfigIds || [];
+    const wasActive = editingIds.some((id) => (GAME.configs || []).some((cfg) => cfg.id === id && (cfg.status || "active") === "active"));
+    if (editingIds.length) {
+      const { error: deleteError } = await sb.from("game_configs").delete().in("id", editingIds);
+      if (deleteError) {
+        alert("Không cập nhật được cấu hình Game: " + deleteError.message);
+        return;
+      }
+    }
+
+    const configRows = ["solo", "quick"].map((mode) => ({
       mode,
       title,
       grade_id: gradeId,
       subject_id: subjectId,
-      question_count: Number(EL.adminConfigQuestionCount?.value || questionIds.length || 5),
-      time_per_question: Number(EL.adminConfigTime?.value || 20),
-      status: questionIds.length ? "active" : "inactive",
+      question_count: 5,
+      time_per_question: 60,
+      status: wasActive ? "active" : "inactive",
       created_by: GAME.user.id,
-    }).select("*").single();
+    }));
+    const { data: configs, error } = await sb.from("game_configs").insert(configRows).select("*");
     if (error) {
       alert("Không lưu được cấu hình Game: " + error.message);
       return;
     }
     try {
-      await replaceConfigQuestions(config.id, questionIds);
+      for (const config of configs || []) {
+        await replaceConfigQuestions(config.id, questionIds);
+      }
     } catch (questionError) {
       alert("Đã tạo cấu hình nhưng lỗi khi thêm câu hỏi: " + questionError.message);
     }
+    GAME.editingConfigIds = [];
     EL.configForm?.reset();
     await loadGameCatalog();
     renderAdminGamePage();
@@ -1540,6 +1596,62 @@
     await loadGameCatalog();
     renderAdminGamePage();
   }
+
+  function decodeConfigGroupIds(encodedIds) {
+    try {
+      const ids = JSON.parse(decodeURIComponent(encodedIds || "[]"));
+      return Array.isArray(ids) ? ids.filter(Boolean) : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  window.applyGameConfigGroup = async function(encodedIds) {
+    if (GAME.role !== "admin") return;
+    const ids = decodeConfigGroupIds(encodedIds);
+    const groupConfigs = (GAME.configs || []).filter((cfg) => ids.includes(cfg.id));
+    const base = groupConfigs[0];
+    if (!base) return alert("Không tìm thấy cấu hình cần áp dụng.");
+    const { error: offError } = await sb.from("game_configs")
+      .update({ status: "inactive" })
+      .eq("grade_id", base.grade_id)
+      .eq("subject_id", base.subject_id)
+      .in("mode", ["solo", "quick"]);
+    if (offError) return alert("Không tắt được cấu hình cũ: " + offError.message);
+    const { error } = await sb.from("game_configs").update({ status: "active" }).in("id", ids);
+    if (error) return alert("Không áp dụng được cấu hình: " + error.message);
+    await loadGameCatalog();
+    renderAdminGamePage();
+  };
+
+  window.editGameConfigGroup = function(encodedIds) {
+    if (GAME.role !== "admin") return;
+    const ids = decodeConfigGroupIds(encodedIds);
+    const groupConfigs = (GAME.configs || []).filter((cfg) => ids.includes(cfg.id));
+    const base = groupConfigs[0];
+    if (!base) return alert("Không tìm thấy cấu hình cần sửa.");
+    GAME.editingConfigIds = ids;
+    if (EL.adminConfigTitle) EL.adminConfigTitle.value = base.title || "";
+    if (EL.adminConfigGrade) {
+      EL.adminConfigGrade.value = base.grade_id || "";
+      fillAdminSubjects(EL.adminConfigGrade, EL.adminConfigSubject);
+    }
+    if (EL.adminConfigSubject) EL.adminConfigSubject.value = base.subject_id || "";
+    const sourceConfig = groupConfigs.find((cfg) => cfg.mode === "solo") || base;
+    if (EL.adminConfigQuestionIds) EL.adminConfigQuestionIds.value = getConfigQuestionIds(sourceConfig.id).join("\n");
+    EL.adminConfigTitle?.focus();
+  };
+
+  window.deleteGameConfigGroup = async function(encodedIds) {
+    if (GAME.role !== "admin") return;
+    const ids = decodeConfigGroupIds(encodedIds);
+    if (!ids.length || !confirm("Xóa cấu hình Chơi đơn / Đấu nhanh này?")) return;
+    const { error } = await sb.from("game_configs").delete().in("id", ids);
+    if (error) return alert("Không xóa được cấu hình: " + error.message);
+    GAME.editingConfigIds = (GAME.editingConfigIds || []).filter((id) => !ids.includes(id));
+    await loadGameCatalog();
+    renderAdminGamePage();
+  };
 
   window.deleteGameConfig = async function(configId) {
     if (GAME.role !== "admin" || !confirm("Xóa cấu hình Game này?")) return;
@@ -1847,21 +1959,21 @@
 
   function getModeDefaults(mode) {
     if (mode === "solo") {
-      return { visibility: "private", maxPlayers: 1, questionCount: 5, timePerQuestion: 20 };
+      return { visibility: "private", maxPlayers: 1, questionCount: 5, timePerQuestion: 60 };
     }
     if (mode === "friends") {
-      return { visibility: "private", maxPlayers: 6, questionCount: 5, timePerQuestion: 20 };
+      return { visibility: "private", maxPlayers: 6, questionCount: 5, timePerQuestion: 60 };
     }
     if (mode === "survival") {
-      return { visibility: "private", maxPlayers: 8, questionCount: 5, timePerQuestion: 20 };
+      return { visibility: "private", maxPlayers: 8, questionCount: 5, timePerQuestion: 60 };
     }
     if (mode === "speed") {
-      return { visibility: "private", maxPlayers: 10, questionCount: 5, timePerQuestion: 20 };
+      return { visibility: "private", maxPlayers: 10, questionCount: 5, timePerQuestion: 60 };
     }
     if (mode === "ranked") {
-      return { visibility: GAME.role === "admin" ? "public" : "private", maxPlayers: 4, questionCount: 5, timePerQuestion: 20 };
+      return { visibility: GAME.role === "admin" ? "public" : "private", maxPlayers: 4, questionCount: 5, timePerQuestion: 60 };
     }
-    return { visibility: GAME.role === "admin" ? "public" : "private", maxPlayers: 8, questionCount: 5, timePerQuestion: 20 };
+    return { visibility: GAME.role === "admin" ? "public" : "private", maxPlayers: 8, questionCount: 5, timePerQuestion: 60 };
   }
 
   function applyModeDefaults(mode, force) {
@@ -2371,7 +2483,7 @@
       grade_id: EL.roomGrade.value,
       subject_id: EL.roomSubject.value,
       question_count: 5,
-      time_per_question: 20,
+      time_per_question: 60,
       max_players: maxPlayers,
       class_id: classId,
       description: String(EL.roomDescription.value || "").trim(),
@@ -2385,7 +2497,7 @@
       alert(`Lỗi tạo phòng: ${error.message}`);
       return;
     }
-    await sb.from("game_room_players").insert({ room_id: room.id, user_id: GAME.user.id, score: 0, ready: true });
+    await sb.from("game_room_players").insert({ room_id: room.id, user_id: GAME.user.id, score: 0, ready: mode === "quick" });
     closeGameRoomModal();
     await loadRooms();
     openRoomScreen(room.id);
@@ -2415,7 +2527,7 @@
     }
     const exists = GAME.players.find((player) => player.room_id === roomId && player.user_id === GAME.user.id);
     if (!exists) {
-      const autoReady = isPublicAutoMatchRoom(room);
+      const autoReady = false;
       const { error } = await sb.from("game_room_players").insert({ room_id: roomId, user_id: GAME.user.id, score: 0, ready: autoReady });
       if (error && !String(error.message || "").includes("duplicate")) {
         alert(`Không thể tham gia phòng: ${error.message}`);
@@ -2466,8 +2578,8 @@
       mode,
       grade_id: gradeId,
       subject_id: subjectId,
-      question_count: Number(config.question_count || defaults.questionCount || 5),
-      time_per_question: Number(config.time_per_question || defaults.timePerQuestion || 20),
+      question_count: 5,
+      time_per_question: 60,
       max_players: Number(defaults.maxPlayers || 8),
       game_config_id: config.id,
       class_id: null,
@@ -2482,7 +2594,7 @@
       alert(`Không thể tạo phòng tự động: ${error.message}`);
       return null;
     }
-    await sb.from("game_room_players").insert({ room_id: room.id, user_id: GAME.user.id, score: 0, ready: true });
+    await sb.from("game_room_players").insert({ room_id: room.id, user_id: GAME.user.id, score: 0, ready: mode === "quick" });
     return room;
   }
 
@@ -2567,7 +2679,6 @@
       if (!room) return;
       await loadRooms();
       await joinRoom(room.id);
-      await startGameMatch();
       return;
     }
     await loadRooms();
@@ -2664,15 +2775,36 @@
   }
 
   async function toggleReadyState() {
+    const room = GAME.activeRoom;
     const player = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
-    if (!player) return;
-    const { error } = await sb.from("game_room_players").update({ ready: !player.ready }).eq("id", player.id);
+    if (!room || !player) return;
+    const mode = roomModeValue(room);
+    const nextReady = mode === "solo" ? true : !player.ready;
+    const { error } = await sb.from("game_room_players").update({ ready: nextReady }).eq("id", player.id);
     if (error) {
       alert(`Không thể cập nhật trạng thái: ${error.message}`);
       return;
     }
-    await refreshActiveRoom(GAME.activeRoom.id, true);
+    await refreshActiveRoom(room.id, true);
+    if (mode === "solo" && getRoomCoordinatorUserId(room, GAME.roomPlayers) === GAME.user.id) {
+      await startGameMatch();
+    }
   }
+
+  window.kickGamePlayer = async function(playerId) {
+    const room = GAME.activeRoom;
+    const player = (GAME.roomPlayers || []).find((item) => item.id === playerId);
+    if (!room || !player) return;
+    if (roomModeValue(room) !== "quick" || getRoomCoordinatorUserId(room, GAME.roomPlayers) !== GAME.user?.id) return;
+    if (player.ready) return alert("Chỉ có thể kick người chơi chưa sẵn sàng.");
+    try {
+      await removePlayerFromRoom(room, player);
+      await refreshActiveRoom(room.id, true);
+      await loadRooms();
+    } catch (error) {
+      alert("Không kick được người chơi: " + error.message);
+    }
+  };
 
   async function leaveRoom() {
     const room = GAME.activeRoom;
@@ -2811,16 +2943,17 @@
     if (!room) return;
     const grade = GAME.grades.find((item) => item.id === room.grade_id)?.name || "—";
     const subject = GAME.subjects.find((item) => item.id === room.subject_id)?.name || "—";
-    const className = room.class_id ? getClassName(room.class_id) : "";
-    const visibility = roomVisibilityLabel(room.visibility || "public");
     const mode = roomModeValue(room);
     const modeLabel = roomModeLabel(mode);
-    const autoManagedRoom = isPublicAutoMatchRoom(room);
     const isCoordinator = getRoomCoordinatorUserId(room, GAME.roomPlayers) === GAME.user.id;
     const me = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
-    const minimumPlayers = (mode === "solo" || mode === "round") ? 1 : 2;
-    const canStart = room.status === "waiting" && isCoordinator && GAME.roomPlayers.length >= minimumPlayers;
-    const countdownActive = mode !== "solo" && room.status === "waiting" && GAME.roomPlayers.length >= 2;
+    const readyForStart = areRoomPlayersReadyForStart(room, GAME.roomPlayers);
+    const countdownActive = mode === "quick" && room.status === "waiting" && readyForStart;
+
+    if (mode === "quick" && isCoordinator && me && !me.ready && room.status === "waiting") {
+      sb.from("game_room_players").update({ ready: true }).eq("id", me.id).then(() => refreshActiveRoom(room.id, true)).catch(() => {});
+    }
+
     if (countdownActive && !room.started_at && !GAME.localCountdownStartedAt) {
       GAME.localCountdownStartedAt = new Date().toISOString();
     }
@@ -2828,7 +2961,7 @@
       GAME.localCountdownStartedAt = room.started_at;
       renderWaitingCountdown(room);
       if (isCoordinator) {
-        const delayMs = Math.max(0, new Date(room.started_at).getTime() + 10000 - Date.now());
+        const delayMs = Math.max(0, new Date(room.started_at).getTime() + 15000 - Date.now());
         queueAutoStart(room, delayMs);
       }
     } else if (countdownActive && GAME.localCountdownStartedAt) {
@@ -2836,6 +2969,7 @@
     } else {
       clearAutoStartTimer();
       clearWaitingCountdown();
+      GAME.localCountdownStartedAt = null;
       if (isCoordinator && room.status === "waiting" && room.started_at) {
         sb.from("game_rooms").update({ started_at: null }).eq("id", room.id).then(() => refreshActiveRoom(room.id, true)).catch(() => {});
       }
@@ -2847,61 +2981,65 @@
 
     EL.roomScreenTitle.textContent = getRoomDisplayTitle(room);
     EL.startGameBtn.classList.add("hidden");
-    EL.startGameBtn.disabled = !canStart;
+    EL.startGameBtn.disabled = true;
     EL.toggleReadyBtn?.classList.add("hidden");
-    if (EL.toggleReadyBtn && me && !isCoordinator) EL.toggleReadyBtn.textContent = me.ready ? "Hủy sẵn sàng" : "Sẵn sàng";
+    if (EL.toggleReadyBtn && me && room.status === "waiting") {
+      const canToggle = mode === "solo" || (mode === "quick" && !isCoordinator);
+      if (canToggle) {
+        EL.toggleReadyBtn.classList.remove("hidden");
+        EL.toggleReadyBtn.textContent = me.ready ? "Hủy sẵn sàng" : "Sẵn sàng";
+      }
+    }
     ensurePlayerCache().then(() => {
       if (room.status === "waiting") {
         setScreenState("waiting");
-        EL.roomSummary.innerHTML = `
-          <div><span>Mã phòng</span><strong>${esc(room.join_code || "—")}</strong></div>
-          <div><span>Hiển thị</span><strong>${esc(visibility)}</strong></div>
-          <div><span>Chế độ</span><strong>${esc(modeLabel)}</strong></div>
-          <div><span>Lớp</span><strong>${esc(className || "Không gắn lớp")}</strong></div>
-          <div><span>Khối</span><strong>${esc(grade)}</strong></div>
-          <div><span>Môn</span><strong>${esc(subject)}</strong></div>
-          <div><span>Số câu</span><strong>${room.question_count} câu</strong></div>
-          <div><span>Số người</span><strong>${GAME.roomPlayers.length}/${room.max_players || 8}</strong></div>
-          <div><span>Giây mỗi câu</span><strong>${room.time_per_question}s</strong></div>
-          <div><span>Luật Elo</span><strong>${supportsModeElo(roomModeValue(room)) ? getModeEloRule(roomModeValue(room)) : "Không tính Elo"}</strong></div>
-          <div><span>Tạo lúc</span><strong>${fmtDateTime(room.created_at)}</strong></div>
-        `;
+        const panels = EL.waitingView?.querySelectorAll(".panel") || [];
+        panels[1]?.classList.toggle("hidden", mode === "solo");
+        panels[2]?.classList.toggle("hidden", mode === "solo");
+        const summaryItems = mode === "solo"
+          ? [
+            ["Chế độ", modeLabel],
+            ["Khối", grade],
+            ["Môn", subject],
+            ["Số câu", "5 câu"],
+            ["Giây mỗi câu", "60s"],
+            ["Luật Elo", getModeEloRule(mode)],
+          ]
+          : [
+            ["Mã phòng", room.join_code || "—"],
+            ["Chế độ", modeLabel],
+            ["Khối", grade],
+            ["Môn", subject],
+            ["Số câu", "5 câu"],
+            ["Số người", `${GAME.roomPlayers.length}/${room.max_players || 8}`],
+            ["Giây mỗi câu", "60s"],
+            ["Luật Elo", getModeEloRule(mode)],
+          ];
+        EL.roomSummary.innerHTML = summaryItems.map(([label, value]) => `<div><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join("");
         if (EL.inviteCode) EL.inviteCode.textContent = room.join_code || "—";
-        if (EL.inviteVisibility) EL.inviteVisibility.textContent = visibility;
-        EL.roomDescriptionView.textContent = room.description || "Mời bạn bè cùng vào phòng, khi đủ người hệ thống sẽ tự động bắt đầu trận.";
-        if (autoManagedRoom) {
-          EL.roomDescriptionView.textContent = "Hệ thống đang ghép người chơi. Khi đủ người, trận đấu sẽ tự động bắt đầu.";
-        } else if (mode === "solo") {
-          EL.roomDescriptionView.textContent = "Chế độ Chơi đơn tạo một trận riêng để bạn luyện 5 câu và cộng Elo chung ngay sau khi kết thúc.";
-        }
+        if (EL.inviteVisibility) EL.inviteVisibility.textContent = roomVisibilityLabel(room.visibility || "public");
+        EL.roomDescriptionView.textContent = mode === "solo"
+          ? "Bấm Sẵn sàng để bắt đầu 5 câu luyện tập."
+          : "Chủ phòng ở vị trí số 1. Khi tất cả người chơi đã sẵn sàng, hệ thống đếm ngược 15 giây rồi vào Game.";
         if (EL.roomStartHint) {
-    if (mode === "solo" || mode === "round") {
-      EL.roomStartHint.textContent = "Bạn là người chơi duy nhất của trận này. Hệ thống sẽ vào câu hỏi ngay.";
-          } else if (autoManagedRoom) {
-            EL.roomStartHint.textContent = countdownActive
-              ? "Phòng đã đủ người. Hệ thống đang đếm ngược để vào trận."
-              : "Chọn xong là vào phòng ngay. Hãy chờ thêm người chơi để hệ thống tự bắt đầu trận.";
-          } else
-          if (isCoordinator) {
-            EL.roomStartHint.textContent = countdownActive
-              ? "Phòng đã đủ điều kiện để bắt đầu trận."
-              : "Cần ít nhất 2 người chơi để bắt đầu trận.";
-          } else {
-            EL.roomStartHint.textContent = "Hãy chờ thêm người chơi vào phòng để bắt đầu.";
-          }
-        }
-        if (EL.roomStartHint && countdownActive && !autoManagedRoom) {
-          EL.roomStartHint.textContent = isCoordinator
-            ? "Phòng đã có từ 2 người trở lên. Hệ thống đang đếm ngược 10 giây."
-            : "Phòng đang đếm ngược. Hãy sẵn sàng vào trận.";
+          EL.roomStartHint.textContent = mode === "solo"
+            ? (me?.ready ? "Đang vào trận..." : "Chơi một mình nên không cần mã phòng hay mời bạn.")
+            : (countdownActive ? "Tất cả đã sẵn sàng. Đang đếm ngược 15 giây." : "Cần ít nhất 2 người chơi và tất cả người chơi phải sẵn sàng.");
         }
         EL.playerList.innerHTML = GAME.roomPlayers.length
           ? GAME.roomPlayers.map((player, idx) => renderPlayerRow(player, idx + 1, false)).join("")
           : `<div class="empty">Chưa có người chơi nào trong phòng.</div>`;
-        renderFriendInviteList(room);
+        if (mode === "solo") {
+          if (EL.friendInviteList) EL.friendInviteList.innerHTML = "";
+        } else {
+          renderFriendInviteList(room);
+        }
         return;
       }
 
+      const panels = EL.waitingView?.querySelectorAll(".panel") || [];
+      panels[1]?.classList.remove("hidden");
+      panels[2]?.classList.remove("hidden");
       if (room.status === "live") {
         setScreenState("live");
         renderLiveRoom();
@@ -2917,9 +3055,14 @@
     const rankClass = showScore ? (index === 1 ? "top-1" : index === 2 ? "top-2" : index === 3 ? "top-3" : "") : "";
     const meClass = player.user_id === GAME.user?.id ? "me" : "";
     const lives = getPlayerLives(player.id, GAME.activeRoom, GAME.roomAnswers || []);
+    const mode = roomModeValue(GAME.activeRoom);
+    const coordinatorId = getRoomCoordinatorUserId(GAME.activeRoom, GAME.roomPlayers);
+    const isHost = player.user_id === coordinatorId;
+    const canKick = !showScore && mode === "quick" && GAME.activeRoom?.status === "waiting" && coordinatorId === GAME.user?.id && !isHost && !player.ready;
     const readyTag = GAME.activeRoom?.status === "waiting"
-      ? `<span class="status-tag ${player.ready ? "ready" : "waiting"}">${player.ready ? "Sẵn sàng" : "Chưa sẵn sàng"}</span>`
+      ? `<span class="status-tag ${player.ready || isHost ? "ready" : "waiting"}">${isHost ? "Chủ phòng" : player.ready ? "Sẵn sàng" : "Chưa sẵn sàng"}</span>`
       : "";
+    const waitingActions = `<div style="display:grid;justify-items:end;gap:4px">${readyTag}${canKick ? `<button class="btn btn-outline btn-sm" type="button" onclick="kickGamePlayer('${player.id}')">Kick</button>` : ""}<span class="hint">${fmtDateTime(player.joined_at)}</span></div>`;
     return `<div class="player-row ${rankClass} ${meClass}">
       <div class="player-main">
         <img class="avatar" src="${escAttr(getPlayerAvatar(player.user_id))}" alt="avatar">
@@ -2928,7 +3071,7 @@
           <div class="hint">Người chơi${lives !== null ? ` • ${lives} mạng` : ""}</div>
         </div>
       </div>
-      ${showScore ? `<strong style="color:#fde68a">${player.score || 0}</strong>` : `<div style="display:grid;justify-items:end;gap:4px">${readyTag}<span class="hint">${fmtDateTime(player.joined_at)}</span></div>`}
+      ${showScore ? `<strong style="color:#fde68a">${player.score || 0}</strong>` : waitingActions}
     </div>`;
   }
 
@@ -3030,7 +3173,7 @@
       const links = (GAME.configQuestions || [])
         .filter((item) => item.config_id === configId)
         .sort((a, b) => Number(a.order_no || 0) - Number(b.order_no || 0));
-      const ids = links.map((item) => item.question_id).filter(Boolean).slice(0, Number(room.question_count || links.length || 5));
+      const ids = shuffle(links.map((item) => item.question_id).filter(Boolean)).slice(0, 5);
       if (ids.length) {
         const { data: configuredBank, error: configuredError } = await sb.from("question_bank")
           .select("id,question_type,question_text,question_img,answer,answer_count,hidden,difficulty")
@@ -3076,7 +3219,7 @@
       bank = merged;
     }
     const usable = (bank || []).filter((item) => !item.hidden && ["multi_choice", "short_answer"].includes(item.question_type) && item.answer);
-    const picked = shuffle(usable).slice(0, Number(room.question_count || 5));
+    const picked = shuffle(usable).slice(0, 5);
     return picked.map((question, index) => ({
       room_id: room.id,
       order_no: index + 1,
@@ -3091,10 +3234,23 @@
     }));
   }
 
+  function applyLiveModeLayout(mode) {
+    const livePanels = EL.liveView?.querySelectorAll(".panel") || [];
+    const leaderboardPanel = EL.leaderboard?.closest(".panel") || livePanels[1];
+    const scoreBoxes = leaderboardPanel?.querySelectorAll(".score-box") || [];
+    const leaderboardTitle = leaderboardPanel?.querySelector("h3");
+    if (leaderboardPanel) leaderboardPanel.classList.remove("hidden");
+    if (leaderboardTitle) leaderboardTitle.textContent = mode === "solo" ? "Điểm của bạn" : "Bảng xếp hạng";
+    if (scoreBoxes[0]?.children?.[1]) scoreBoxes[0].children[1].classList.toggle("hidden", mode === "solo");
+    if (scoreBoxes[1]) scoreBoxes[1].classList.toggle("hidden", mode === "quick" || mode === "solo");
+    if (EL.leaderboard) EL.leaderboard.classList.toggle("hidden", mode === "solo");
+  }
+
   function renderLiveRoom() {
       const room = GAME.activeRoom;
       const questions = GAME.roomQuestions;
       const mode = roomModeValue(room);
+      applyLiveModeLayout(mode);
       const me = GAME.roomPlayers.find((player) => player.user_id === GAME.user.id);
       const myLives = me ? getPlayerLives(me.id, room, GAME.roomAnswers || []) : null;
       if (!room || !questions.length) {
@@ -3385,6 +3541,12 @@
   }
 
   function renderLeaderboard() {
+    if (roomModeValue(GAME.activeRoom) === "solo") {
+      const myRow = (GAME.roomPlayers || []).find((item) => item.user_id === GAME.user.id);
+      if (EL.myScore) EL.myScore.textContent = myRow?.score || 0;
+      if (EL.myRank) EL.myRank.textContent = "#1";
+      return;
+    }
     const ordered = [...GAME.roomPlayers].sort((a, b) => {
       const livesA = getPlayerLives(a.id, GAME.activeRoom, GAME.roomAnswers || []);
       const livesB = getPlayerLives(b.id, GAME.activeRoom, GAME.roomAnswers || []);

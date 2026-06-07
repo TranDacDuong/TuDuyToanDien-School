@@ -357,15 +357,8 @@ font-family:var(--font-body);color:#ebf5ff;min-height:100vh}
       <h3>Tạo phần Chơi đơn / Đấu nhanh</h3>
       <form id="gameConfigForm" class="form-grid">
         <div class="field">
-          <label>Chế độ</label>
-          <select id="adminGameConfigMode" class="select">
-            <option value="solo">Chơi đơn</option>
-            <option value="quick">Đấu nhanh</option>
-          </select>
-        </div>
-        <div class="field">
           <label>Tên cấu hình</label>
-          <input id="adminGameConfigTitle" class="input" placeholder="Ví dụ: Toán 6 - Chơi đơn">
+          <input id="adminGameConfigTitle" class="input" placeholder="Ví dụ: Toán 6 - Hàm số">
         </div>
         <div class="field">
           <label>Khối</label>
@@ -375,21 +368,13 @@ font-family:var(--font-body);color:#ebf5ff;min-height:100vh}
           <label>Môn</label>
           <select id="adminGameConfigSubject" class="select"></select>
         </div>
-        <div class="field">
-          <label>Số câu</label>
-          <input id="adminGameConfigQuestionCount" class="input" type="number" min="1" max="50" value="5">
-        </div>
-        <div class="field">
-          <label>Giây mỗi câu</label>
-          <input id="adminGameConfigTime" class="input" type="number" min="5" max="120" value="20">
-        </div>
         <div class="field full">
           <label>ID câu hỏi</label>
           <textarea id="adminGameConfigQuestionIds" class="input" rows="4" placeholder="Dán ID câu hỏi, mỗi dòng một ID. Các câu này sẽ được dùng đúng theo thứ tự."></textarea>
           <div class="game-question-picker-field-actions">
             <button class="btn btn-outline btn-sm" type="button" data-game-question-picker-target="adminGameConfigQuestionIds" data-game-question-picker-title="Chọn câu hỏi cho phần chơi" data-game-question-picker-grade="adminGameConfigGrade" data-game-question-picker-subject="adminGameConfigSubject">Chọn danh sách câu hỏi</button>
           </div>
-          <div class="hint">Game chỉ dùng câu trắc nghiệm và trả lời ngắn. Câu đúng/sai và tự luận sẽ không được chọn vào phần chơi.</div>
+          <div class="hint">Chơi đơn và Đấu nhanh dùng chung danh sách này. Mỗi trận lấy ngẫu nhiên 5 câu, mỗi câu 60 giây. Cần chọn ít nhất 5 câu trắc nghiệm hoặc trả lời ngắn có đáp án.</div>
         </div>
         <div class="field full">
           <button class="btn btn-primary" type="submit">Lưu cấu hình chơi</button>
