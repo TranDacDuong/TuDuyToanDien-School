@@ -2922,9 +2922,36 @@
     });
   }
 
+  async function getRoundCarriedScore(roundId, excludeRoomId = "") {
+    if (!roundId || !GAME.user?.id) return 0;
+    const { data } = await sb.from("game_rooms")
+      .select("id,description,created_at,ended_at,game_room_players!inner(user_id,score)")
+      .eq("mode", "round")
+      .eq("round_id", roundId)
+      .eq("status", "finished")
+      .eq("game_room_players.user_id", GAME.user.id)
+      .limit(80);
+    const orderIndex = Object.fromEntries(getRoundChallengeOrder().map((type, index) => [type, index]));
+    const rows = (data || [])
+      .filter((room) => room.id !== excludeRoomId)
+      .map((room) => {
+        const meta = parseRoundRoomMeta(room);
+        const player = Array.isArray(room.game_room_players) ? room.game_room_players[0] : room.game_room_players;
+        return {
+          score: Number(player?.score || 0),
+          order: Number(orderIndex[meta.challengeType] ?? -1),
+          time: new Date(room.ended_at || room.created_at || 0).getTime() || 0,
+        };
+      })
+      .filter((row) => row.order >= 0)
+      .sort((a, b) => b.order - a.order || b.time - a.time);
+    return rows[0]?.score || 0;
+  }
+
   async function createRoundRoom(round, challengeType = "", finishLevel = "") {
     const joinCode = randomCode();
     const isRetry = await hasFinishedRoundAttempt(round.id, challengeType, finishLevel);
+    const carriedScore = isRetry ? 0 : await getRoundCarriedScore(round.id);
     const challengeName = getRoundChallengeDisplayName(challengeType, finishLevel);
     const payload = {
       title: `Vòng ${round.round_no || 1}: ${round.title} • ${challengeName}`,
@@ -2948,7 +2975,7 @@
       alert(`Không tạo được phòng Vòng MindUp: ${error.message}. Nếu lỗi liên quan đến round_id, round_retry, mode, challenge_type hoặc finish_level, hãy chạy file SQL fix MindUp round room columns.sql.`);
       return null;
     }
-    const { error: playerError } = await sb.from("game_room_players").insert({ room_id: room.id, user_id: GAME.user.id, score: 0, ready: true });
+    const { error: playerError } = await sb.from("game_room_players").insert({ room_id: room.id, user_id: GAME.user.id, score: carriedScore, ready: true });
     if (playerError && !String(playerError.message || "").includes("duplicate")) {
       alert("Không vào được Vòng MindUp: " + playerError.message);
       return null;
@@ -3772,6 +3799,7 @@
       const waitingForHopeStar = mode === "round"
         && question.challenge_type === "finish"
         && !answered
+        && !hasUsedFinishHopeStar(room.id)
         && !hasFinishHopeStarDecision(room.id, question.id);
       if (waitingForHopeStar) {
         renderMathText(EL.questionBody, "");
@@ -3950,7 +3978,7 @@
       }
     }
 
-    if (roomModeValue(room) === "round" && getRoomRoundChallengeType(room) === "finish" && !answered && !hasFinishHopeStarDecision(room.id, question.id)) {
+    if (roomModeValue(room) === "round" && getRoomRoundChallengeType(room) === "finish" && !answered && !hasUsedFinishHopeStar(room.id) && !hasFinishHopeStarDecision(room.id, question.id)) {
       EL.answerArea.innerHTML = `
         <div class="empty" style="padding:18px">
           <strong>Bạn có muốn sử dụng Ngôi sao hy vọng cho câu này không?</strong>
@@ -4205,6 +4233,9 @@
 
     if (roomModeValue(room) === "quick") {
       await recalcQuickRoomScores(room.id, questionId);
+    } else if (roomModeValue(room) === "round") {
+      const nextScore = await recalcRoundPlayerScore(player.id, room);
+      await sb.from("game_room_players").update({ score: nextScore }).eq("id", player.id);
     } else {
       const nextScore = await recalcPlayerScore(player.id);
       await sb.from("game_room_players").update({ score: nextScore }).eq("id", player.id);
@@ -4229,6 +4260,11 @@
 
   function isFinishHopeStarActive(roomId, questionId) {
     return !!GAME.finishHopeStars[getFinishHopeKey(roomId, questionId)];
+  }
+
+  function hasUsedFinishHopeStar(roomId) {
+    const prefix = `${roomId || ""}:`;
+    return Object.entries(GAME.finishHopeStars || {}).some(([key, value]) => key.startsWith(prefix) && value === true);
   }
 
   function getElapsedThroughQuestion(questions, questionIndex, room) {
@@ -4320,6 +4356,12 @@
   async function recalcPlayerScore(playerId) {
     const { data } = await sb.from("game_room_answers").select("score_earned").eq("player_id", playerId);
     return (data || []).reduce((sum, item) => sum + Number(item.score_earned || 0), 0);
+  }
+
+  async function recalcRoundPlayerScore(playerId, room) {
+    const baseScore = await getRoundCarriedScore(room?.round_id || "", room?.id || "");
+    const currentScore = await recalcPlayerScore(playerId);
+    return baseScore + currentScore;
   }
 
   async function recalcQuickRoomScores(roomId, questionId) {
@@ -4414,6 +4456,10 @@
 
   window.chooseRoundHopeStar = function(questionId, enabled) {
     if (!GAME.activeRoom?.id) return;
+    if (enabled && hasUsedFinishHopeStar(GAME.activeRoom.id)) {
+      alert("Bạn chỉ được dùng 1 Ngôi sao hy vọng trong phần Về đích.");
+      return;
+    }
     GAME.finishHopeStars[getFinishHopeKey(GAME.activeRoom.id, questionId)] = !!enabled;
     GAME.liveRenderKey = "";
     renderLiveRoom();
