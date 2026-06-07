@@ -42,6 +42,7 @@
     questionPicker: {
       target: null,
       format: "plain",
+      requiredCount: 0,
       selected: new Map(),
       rows: [],
     },
@@ -1240,6 +1241,18 @@
     fillChapters(EL.pickerChapter, EL.pickerSubject?.value || "", "Tất cả chương");
   }
 
+  function updateQuestionPickerApplyState() {
+    if (!EL.pickerApplyBtn) return;
+    const required = Number(GAME.questionPicker.requiredCount || 0);
+    const selectedCount = GAME.questionPicker.selected?.size || 0;
+    const valid = !required || selectedCount === required;
+    EL.pickerApplyBtn.disabled = !valid;
+    EL.pickerApplyBtn.textContent = required
+      ? (valid ? `Áp dụng danh sách (${selectedCount}/${required})` : `Cần chọn đúng ${required} câu (${selectedCount}/${required})`)
+      : "Áp dụng danh sách";
+    EL.pickerApplyBtn.title = required && !valid ? `Phải chọn đúng ${required} câu hỏi mới áp dụng được.` : "";
+  }
+
   function renderQuestionPickerSelected() {
     if (!EL.pickerSelected) return;
     const selected = [...GAME.questionPicker.selected.values()];
@@ -1257,6 +1270,7 @@
         renderQuestionPickerList();
       });
     });
+    updateQuestionPickerApplyState();
   }
 
   function getPlayerQuestionTitle(question) {
@@ -1302,6 +1316,7 @@
         renderQuestionPickerList();
       });
     });
+    updateQuestionPickerApplyState();
   }
 
   async function loadQuestionPickerRows() {
@@ -1356,6 +1371,7 @@
     GAME.questionPicker = {
       target,
       format,
+      requiredCount: Number(button.dataset.gameQuestionPickerRequiredCount || 0),
       selected: parsePickerSelectionFromTextarea(target, format),
       rows: [],
     };
@@ -1375,6 +1391,12 @@
     const target = GAME.questionPicker.target;
     if (!target) return;
     const selected = [...GAME.questionPicker.selected.values()];
+    const required = Number(GAME.questionPicker.requiredCount || 0);
+    if (required && selected.length !== required) {
+      alert(`Phải chọn đúng ${required} câu hỏi. Hiện tại đang chọn ${selected.length} câu.`);
+      updateQuestionPickerApplyState();
+      return;
+    }
     target.value = selected.map((item) => {
       if (GAME.questionPicker.format === "finish") return `${item.level || "medium"}|${item.id}`;
       return item.id;
@@ -2697,7 +2719,7 @@
     };
     const { data: room, error } = await sb.from("game_rooms").insert(payload).select("*").single();
     if (error) {
-      alert("Không tạo được phòng Vòng MindUp. Nếu lỗi thiếu cột round_id hoặc round_retry, hãy chạy SQL mới.");
+      alert(`Không tạo được phòng Vòng MindUp: ${error.message}. Nếu lỗi liên quan đến round_id, round_retry, mode, challenge_type hoặc finish_level, hãy chạy file SQL fix MindUp round room columns.sql.`);
       return null;
     }
     const { error: playerError } = await sb.from("game_room_players").insert({ room_id: room.id, user_id: GAME.user.id, score: 0, ready: true });
