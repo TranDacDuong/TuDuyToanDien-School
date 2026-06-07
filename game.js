@@ -40,6 +40,8 @@
     roundChallengeQuestions: [],
     roundFinishChoices: {},
     roundObstacleSelection: {},
+    roundObstacleStartedAt: {},
+    roundObstacleKeywordDraft: {},
     selectedRoundId: "",
     roundAttemptCache: {},
     finishHopeStars: {},
@@ -3542,10 +3544,10 @@
     const scoreBoxes = leaderboardPanel?.querySelectorAll(".score-box") || [];
     const leaderboardTitle = leaderboardPanel?.querySelector("h3");
     if (leaderboardPanel) leaderboardPanel.classList.remove("hidden");
-    if (leaderboardTitle) leaderboardTitle.textContent = mode === "solo" ? "Điểm của bạn" : "Bảng xếp hạng";
-    if (scoreBoxes[0]?.children?.[1]) scoreBoxes[0].children[1].classList.toggle("hidden", mode === "solo");
-    if (scoreBoxes[1]) scoreBoxes[1].classList.toggle("hidden", mode === "quick" || mode === "solo");
-    if (EL.leaderboard) EL.leaderboard.classList.toggle("hidden", mode === "solo");
+    if (leaderboardTitle) leaderboardTitle.textContent = (mode === "solo" || mode === "round") ? "Điểm hiện tại" : "Bảng xếp hạng";
+    if (scoreBoxes[0]?.children?.[1]) scoreBoxes[0].children[1].classList.toggle("hidden", mode === "solo" || mode === "round");
+    if (scoreBoxes[1]) scoreBoxes[1].classList.toggle("hidden", mode === "quick" || mode === "solo" || mode === "round");
+    if (EL.leaderboard) EL.leaderboard.classList.toggle("hidden", mode === "solo" || mode === "round");
   }
 
   function renderRoundObstacleBoard(timeline) {
@@ -3555,14 +3557,20 @@
     const selectedId = GAME.roundObstacleSelection?.[room.id] || "";
     const selectedQuestion = questions.find((question) => question.id === selectedId);
     const challenge = (GAME.roundChallenges || []).find((item) => item.round_id === room.round_id && item.challenge_type === "obstacle");
+    const selectedStartedAt = Number(GAME.roundObstacleStartedAt?.[room.id] || 0);
+    const selectedDuration = selectedQuestion ? getQuestionDuration(selectedQuestion, room) : 0;
+    const selectedElapsed = selectedStartedAt ? Math.floor((Date.now() - selectedStartedAt) / 1000) : 0;
+    const selectedSecondsLeft = selectedQuestion ? Math.max(0, selectedDuration - selectedElapsed) : 0;
     const allDone = questions.length && questions.every((question) => answersByQuestion.has(question.id));
     if (allDone && !challenge?.keyword_answer) {
       finishRoomIfNeeded();
       return;
     }
     EL.questionTitle.textContent = "Vượt chướng ngại vật";
-    EL.questionClock.textContent = "--";
-    if (EL.progressText) EL.progressText.textContent = "Chọn ô số để mở câu hỏi. Trả lời đúng mở ô, trả lời sai khóa ô.";
+    EL.questionClock.textContent = selectedQuestion ? String(selectedSecondsLeft).padStart(2, "0") : "--";
+    if (EL.progressText) EL.progressText.textContent = selectedQuestion
+      ? `Đang trả lời Chướng ngại vật số ${questions.findIndex((item) => item.id === selectedQuestion.id) + 1}.`
+      : "Chọn ô số để mở câu hỏi. Trả lời đúng mở ô, trả lời sai khóa ô.";
     if (EL.progressFill) {
       const opened = questions.filter((question) => answersByQuestion.get(question.id)?.is_correct).length;
       EL.progressFill.style.width = `${Math.round((opened / Math.max(1, questions.length)) * 100)}%`;
@@ -3583,12 +3591,13 @@
     }).join("");
     const openedCount = questions.filter((question) => answersByQuestion.get(question.id)?.is_correct).length;
     const keywordLength = String(challenge?.keyword_answer || "").trim().length;
+    const keywordDraft = GAME.roundObstacleKeywordDraft?.[room.id] || "";
     const keywordBox = challenge?.keyword_answer ? `
       <div style="position:relative;display:grid;gap:10px;padding:14px;border-radius:18px;background:rgba(255,255,255,.08);border:1px solid rgba(186,230,253,.18)">
         <strong style="color:#fef3c7">Từ khóa</strong>
         <div class="hint">${keywordLength ? `Gợi ý: từ khóa có ${keywordLength} ký tự.` : "Từ khóa liên quan đến cả 4 câu hỏi."} Trả lời càng sớm càng nhiều điểm.</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <input id="roundObstacleKeywordInput" class="input" style="flex:1;min-width:180px" placeholder="Nhập từ khóa">
+          <input id="roundObstacleKeywordInput" class="input" style="flex:1;min-width:180px" placeholder="Nhập từ khóa" value="${escAttr(keywordDraft)}">
           <button class="btn btn-primary" type="button" onclick="submitRoundObstacleKeyword()">Trả lời từ khóa</button>
         </div>
         <div class="hint">Nếu đúng: ${[100, 80, 60, 40, 20][Math.min(4, openedCount)]} điểm. Nếu sai: dừng thử thách.</div>
@@ -3602,9 +3611,18 @@
         ${keywordBox}
       </div>
     `;
+    document.getElementById("roundObstacleKeywordInput")?.addEventListener("input", (event) => {
+      GAME.roundObstacleKeywordDraft[room.id] = event.target.value || "";
+    });
     if (selectedQuestion && !answersByQuestion.has(selectedQuestion.id)) {
+      const questionHtml = `<div style="display:grid;gap:12px;margin-top:14px;padding:16px;border-radius:18px;background:rgba(255,255,255,.08);border:1px solid rgba(186,230,253,.18)"><strong style="color:#fef3c7">Câu hỏi chướng ngại vật</strong><div id="roundObstacleQuestionText"></div></div>`;
+      EL.questionBody.insertAdjacentHTML("beforeend", questionHtml);
+      renderMathText(document.getElementById("roundObstacleQuestionText"), selectedQuestion.question_text || "Xem nội dung câu hỏi.");
+      EL.questionImg.classList.toggle("hidden", !selectedQuestion.question_img);
+      if (selectedQuestion.question_img) EL.questionImg.src = selectedQuestion.question_img;
       renderAnswerArea(selectedQuestion);
     } else {
+      EL.questionImg.classList.add("hidden");
       EL.answerArea.innerHTML = '<div class="empty">Hãy chọn một ô để mở câu hỏi.</div>';
       EL.answerFeedback.innerHTML = "";
     }
@@ -3628,7 +3646,27 @@
         renderRoundObstacleBoard(timeline);
         renderLeaderboard();
         clearInterval(GAME.questionTick);
-        GAME.questionTick = setInterval(() => refreshActiveRoom(room.id, true), 1500);
+        GAME.questionTick = setInterval(() => {
+          const selectedId = GAME.roundObstacleSelection?.[room.id] || "";
+          const selectedQuestion = selectedId ? (GAME.roomQuestions || []).find((item) => item.id === selectedId) : null;
+          if (selectedQuestion && !GAME.myAnswers.some((item) => item.game_question_id === selectedQuestion.id)) {
+            const startedAt = Number(GAME.roundObstacleStartedAt?.[room.id] || Date.now());
+            const secondsLeft = Math.max(0, getQuestionDuration(selectedQuestion, room) - Math.floor((Date.now() - startedAt) / 1000));
+            if (secondsLeft <= 0) {
+              submitAnswer(selectedQuestion.id, "");
+              return;
+            }
+            if (EL.questionClock) EL.questionClock.textContent = String(secondsLeft).padStart(2, "0");
+            renderLeaderboard();
+            return;
+          }
+          if (document.activeElement?.id === "roundObstacleKeywordInput") {
+            GAME.roundObstacleKeywordDraft[room.id] = document.activeElement.value || "";
+            renderLeaderboard();
+            return;
+          }
+          refreshActiveRoom(room.id, true);
+        }, 1000);
         return;
       }
       if (timeline.selectFinishLevel) {
@@ -3931,6 +3969,15 @@
   }
 
   function renderLeaderboard() {
+    if (roomModeValue(GAME.activeRoom) === "round") {
+      const myRow = (GAME.roomPlayers || []).find((item) => item.user_id === GAME.user.id);
+      if (EL.myScore) EL.myScore.textContent = myRow?.score || 0;
+      if (EL.myRank) EL.myRank.textContent = "";
+      if (EL.myCombo) EL.myCombo.textContent = "";
+      if (EL.myBestCombo) EL.myBestCombo.textContent = "";
+      if (EL.leaderboard) EL.leaderboard.innerHTML = "";
+      return;
+    }
     if (roomModeValue(GAME.activeRoom) === "solo") {
       const myRow = (GAME.roomPlayers || []).find((item) => item.user_id === GAME.user.id);
       if (EL.myScore) EL.myScore.textContent = myRow?.score || 0;
@@ -4053,11 +4100,20 @@
     if (existing) return;
 
     const timeline = getQuestionTimeline(room, GAME.roomQuestions);
-    const questionIndex = timeline.index;
-    if (timeline.selectFinishLevel || timeline.question?.id !== questionId) return;
+    const challengeType = roomModeValue(room) === "round" ? getRoomRoundChallengeType(room) : "";
+    let questionIndex = timeline.index;
+    let remaining = Math.max(0, timeline.secondsLeft);
+    let totalTime = Math.max(10, timeline.duration || getQuestionDuration(question, room));
+    if (challengeType === "obstacle") {
+      if (GAME.roundObstacleSelection?.[room.id] !== questionId) return;
+      questionIndex = GAME.roomQuestions.findIndex((item) => item.id === questionId);
+      const startedAt = Number(GAME.roundObstacleStartedAt?.[room.id] || Date.now());
+      totalTime = Math.max(10, getQuestionDuration(question, room));
+      remaining = Math.max(0, totalTime - Math.floor((Date.now() - startedAt) / 1000));
+    } else if (timeline.selectFinishLevel || timeline.question?.id !== questionId) {
+      return;
+    }
 
-    const remaining = Math.max(0, timeline.secondsLeft);
-    const totalTime = Math.max(10, timeline.duration || getQuestionDuration(question, room));
     const currentCombo = getCurrentComboValue();
     const scored = evaluateAnswer(question, answerValue, remaining, totalTime, currentCombo);
 
@@ -4086,6 +4142,7 @@
     }
     if (roomModeValue(room) === "round" && getRoomRoundChallengeType(room) === "obstacle") {
       delete GAME.roundObstacleSelection[room.id];
+      delete GAME.roundObstacleStartedAt[room.id];
     }
     if (roomModeValue(room) === "round") {
       await advanceRoundQuestionAfterAnswer(room, question, questionIndex, totalTime);
@@ -4296,6 +4353,7 @@
   window.selectRoundObstacleQuestion = function(questionId) {
     if (!GAME.activeRoom?.id) return;
     GAME.roundObstacleSelection[GAME.activeRoom.id] = questionId;
+    GAME.roundObstacleStartedAt[GAME.activeRoom.id] = Date.now();
     GAME.liveRenderKey = "";
     renderLiveRoom();
   };
@@ -4307,6 +4365,7 @@
     const challenge = (GAME.roundChallenges || []).find((item) => item.round_id === room.round_id && item.challenge_type === "obstacle");
     const keyword = String(challenge?.keyword_answer || "").trim();
     const value = String(document.getElementById("roundObstacleKeywordInput")?.value || "").trim();
+    GAME.roundObstacleKeywordDraft[room.id] = value;
     if (!keyword) return alert("Thử thách này chưa có từ khóa.");
     if (!value) return alert("Hãy nhập từ khóa trước khi trả lời.");
     const correct = shortAnswerAccepted(keyword).includes(value.toLowerCase());
