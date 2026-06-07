@@ -46,6 +46,7 @@
       rows: [],
     },
     editingConfigIds: [],
+    editingRoundId: "",
     liveRenderKey: "",
     autoStartTimer: null,
   };
@@ -1196,7 +1197,7 @@
           const grade = GAME.grades.find((item) => item.id === round.grade_id)?.name || "Khối";
           const subject = GAME.subjects.find((item) => item.id === round.subject_id)?.name || "Môn";
           const challengeCount = GAME.roundChallenges.filter((item) => item.round_id === round.id).length;
-          return `<div class="history-item"><div class="history-main"><strong>Vòng ${round.round_no || 1}: ${esc(round.title)}</strong><div class="hint">${esc(grade)} • ${esc(subject)} • ${challengeCount}/4 thử thách • qua vòng ${round.pass_score || 300} điểm • thi lại trừ ${round.retry_penalty || 30}</div></div><button class="btn btn-outline btn-sm" type="button" onclick="deleteGameRound('${round.id}')">Xóa</button></div>`;
+          return `<div class="history-item"><div class="history-main"><strong>Vòng ${round.round_no || 1}: ${esc(round.title)}</strong><div class="hint">${esc(grade)} • ${esc(subject)} • ${challengeCount}/4 thử thách • qua vòng ${round.pass_score || 300} điểm • thi lại trừ ${round.retry_penalty || 30}</div></div><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="btn btn-outline btn-sm" type="button" onclick="editGameRound('${round.id}')">Sửa</button><button class="btn btn-outline btn-sm" type="button" onclick="deleteGameRound('${round.id}')">Xóa</button></div></div>`;
         }).join("")
         : '<div class="empty">Chưa có Vòng MindUp nào.</div>';
     }
@@ -1211,6 +1212,19 @@
     if (difficulty <= 3) return "easy";
     if (difficulty >= 8) return "hard";
     return "medium";
+  }
+
+  function getRoundChallengeByType(roundId, type) {
+    return (GAME.roundChallenges || []).find((challenge) => challenge.round_id === roundId && challenge.challenge_type === type) || null;
+  }
+
+  function getRoundChallengeQuestionIds(challengeId, finishLevel = null) {
+    return (GAME.roundChallengeQuestions || [])
+      .filter((item) => item.challenge_id === challengeId)
+      .filter((item) => !finishLevel || item.finish_level === finishLevel)
+      .sort((a, b) => Number(a.order_no || 0) - Number(b.order_no || 0))
+      .map((item) => item.question_id)
+      .filter(Boolean);
   }
 
   function parsePickerSelectionFromTextarea(target, format) {
@@ -1552,7 +1566,7 @@
       alert(`${invalidCount[0]} phải chọn đúng ${invalidCount[2]} câu hỏi. Hiện tại đang có ${invalidCount[1]} câu.`);
       return;
     }
-    const { data: round, error } = await sb.from("game_rounds").insert({
+    const roundPayload = {
       title,
       description: String(EL.adminRoundDescription?.value || "").trim(),
       grade_id: gradeId,
@@ -1561,8 +1575,30 @@
       pass_score: 300,
       retry_penalty: 30,
       status: "active",
-      created_by: GAME.user.id,
-    }).select("*").single();
+    };
+    const editingRoundId = GAME.editingRoundId || "";
+    let round = null;
+    let error = null;
+    if (editingRoundId) {
+      const result = await sb.from("game_rounds").update(roundPayload).eq("id", editingRoundId).select("*").single();
+      round = result.data;
+      error = result.error;
+      if (!error) {
+        const oldChallenges = (GAME.roundChallenges || []).filter((challenge) => challenge.round_id === editingRoundId);
+        const oldChallengeIds = oldChallenges.map((challenge) => challenge.id);
+        if (oldChallengeIds.length) {
+          await sb.from("game_round_challenge_questions").delete().in("challenge_id", oldChallengeIds);
+          await sb.from("game_round_challenges").delete().in("id", oldChallengeIds);
+        }
+      }
+    } else {
+      const result = await sb.from("game_rounds").insert({
+        ...roundPayload,
+        created_by: GAME.user.id,
+      }).select("*").single();
+      round = result.data;
+      error = result.error;
+    }
     if (error) {
       alert("Không lưu được vòng MindUp: " + error.message);
       return;
@@ -1592,6 +1628,7 @@
     } catch (questionError) {
       alert("Đã tạo vòng nhưng lỗi khi thêm câu hỏi: " + questionError.message);
     }
+    GAME.editingRoundId = "";
     EL.roundForm?.reset();
     await loadGameCatalog();
     renderAdminGamePage();
@@ -1659,6 +1696,34 @@
     if (error) return alert("Không xóa được cấu hình: " + error.message);
     await loadGameCatalog();
     renderAdminGamePage();
+  };
+
+  window.editGameRound = function(roundId) {
+    if (GAME.role !== "admin") return;
+    const round = (GAME.rounds || []).find((item) => item.id === roundId);
+    if (!round) return alert("Không tìm thấy vòng MindUp cần sửa.");
+    GAME.editingRoundId = roundId;
+    if (EL.adminRoundTitle) EL.adminRoundTitle.value = round.title || "";
+    if (EL.adminRoundNo) EL.adminRoundNo.value = round.round_no || 1;
+    if (EL.adminRoundGrade) {
+      EL.adminRoundGrade.value = round.grade_id || "";
+      fillAdminSubjects(EL.adminRoundGrade, EL.adminRoundSubject);
+    }
+    if (EL.adminRoundSubject) EL.adminRoundSubject.value = round.subject_id || "";
+    if (EL.adminRoundDescription) EL.adminRoundDescription.value = round.description || "";
+
+    const warmup = getRoundChallengeByType(roundId, "warmup");
+    const obstacle = getRoundChallengeByType(roundId, "obstacle");
+    const acceleration = getRoundChallengeByType(roundId, "acceleration");
+    const finish = getRoundChallengeByType(roundId, "finish");
+    if (EL.adminWarmupQuestionIds) EL.adminWarmupQuestionIds.value = getRoundChallengeQuestionIds(warmup?.id).join("\n");
+    if (EL.adminObstacleKeyword) EL.adminObstacleKeyword.value = obstacle?.keyword_answer || "";
+    if (EL.adminObstacleQuestionIds) EL.adminObstacleQuestionIds.value = getRoundChallengeQuestionIds(obstacle?.id).join("\n");
+    if (EL.adminAccelerationQuestionIds) EL.adminAccelerationQuestionIds.value = getRoundChallengeQuestionIds(acceleration?.id).join("\n");
+    if (EL.adminFinishEasyQuestionIds) EL.adminFinishEasyQuestionIds.value = getRoundChallengeQuestionIds(finish?.id, "easy").join("\n");
+    if (EL.adminFinishMediumQuestionIds) EL.adminFinishMediumQuestionIds.value = getRoundChallengeQuestionIds(finish?.id, "medium").join("\n");
+    if (EL.adminFinishHardQuestionIds) EL.adminFinishHardQuestionIds.value = getRoundChallengeQuestionIds(finish?.id, "hard").join("\n");
+    EL.adminRoundTitle?.focus();
   };
 
   window.deleteGameRound = async function(roundId) {
