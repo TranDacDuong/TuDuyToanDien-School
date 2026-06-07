@@ -27,3 +27,13 @@ ADD COLUMN IF NOT EXISTS finish_level text
 
 CREATE INDEX IF NOT EXISTS game_rooms_round_id_idx
   ON public.game_rooms(round_id);
+
+ALTER TABLE public.game_rooms
+DROP CONSTRAINT IF EXISTS game_rooms_max_players_check;
+
+ALTER TABLE public.game_rooms
+ADD CONSTRAINT game_rooms_max_players_check
+CHECK (
+  (mode IN ('solo', 'round') AND max_players = 1)
+  OR (mode NOT IN ('solo', 'round') AND max_players BETWEEN 2 AND 20)
+);
