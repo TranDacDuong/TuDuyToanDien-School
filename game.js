@@ -3768,11 +3768,19 @@
             : `Tiến độ ${currentIndex + 1}/${visibleQuestions.length}`;
       }
       if (EL.progressFill) EL.progressFill.style.width = `${((currentIndex + 1) / visibleQuestions.length) * 100}%`;
-      renderMathText(EL.questionBody, question.question_text || "Xem nội dung câu hỏi.");
-      EL.questionImg.classList.toggle("hidden", !question.question_img);
-      if (question.question_img) EL.questionImg.src = question.question_img;
-
       const answered = GAME.myAnswers.find((item) => item.game_question_id === question.id);
+      const waitingForHopeStar = mode === "round"
+        && question.challenge_type === "finish"
+        && !answered
+        && !hasFinishHopeStarDecision(room.id, question.id);
+      if (waitingForHopeStar) {
+        renderMathText(EL.questionBody, "");
+        EL.questionImg.classList.add("hidden");
+      } else {
+        renderMathText(EL.questionBody, question.question_text || "Xem nội dung câu hỏi.");
+        EL.questionImg.classList.toggle("hidden", !question.question_img);
+        if (question.question_img) EL.questionImg.src = question.question_img;
+      }
       const renderKey = `${question.id}:${answered?.id || "pending"}:${myLives ?? "na"}`;
       if (GAME.liveRenderKey !== renderKey) {
         GAME.liveRenderKey = renderKey;
@@ -4408,7 +4416,7 @@
     if (!GAME.activeRoom?.id) return;
     GAME.finishHopeStars[getFinishHopeKey(GAME.activeRoom.id, questionId)] = !!enabled;
     GAME.liveRenderKey = "";
-    renderAnswerArea(GAME.roomQuestions.find((item) => item.id === questionId));
+    renderLiveRoom();
   };
 
   window.selectRoundObstacleQuestion = function(questionId) {
