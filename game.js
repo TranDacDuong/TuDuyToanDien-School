@@ -3608,10 +3608,11 @@
       if (opened) {
         return `<button aria-label="Chướng ngại vật số ${index + 1} đã mở" type="button" disabled style="min-height:150px;border:0;background:transparent!important;opacity:0;pointer-events:none"></button>`;
       }
-      const bg = locked
-        ? "linear-gradient(135deg,#94a3b8 0%,#64748b 42%,#334155 100%)"
-        : "linear-gradient(135deg,#facc15,#f59e0b 48%,#1d4ed8)";
-      return `<button class="btn btn-outline" type="button" ${answer ? "disabled" : ""} onclick="selectRoundObstacleQuestion('${question.id}')" style="min-height:150px;border-radius:0!important;background:${bg}!important;color:#fff!important;display:grid;place-items:center;font-size:1.08rem;font-weight:900;text-shadow:0 2px 10px rgba(2,8,23,.72);border:1px solid #fff!important;box-shadow:${locked ? "inset 0 0 0 999px rgba(51,65,85,.08),inset 0 18px 36px rgba(255,255,255,.12),inset 0 -18px 36px rgba(15,23,42,.28)" : "none"}"><span>${locked ? "" : `Chướng ngại vật số ${index + 1}`}</span></button>`;
+      if (locked) {
+        return `<div aria-label="Chướng ngại vật số ${index + 1} đã chìm" style="min-height:150px;border-radius:0;background:#64748b;background-image:linear-gradient(135deg,#94a3b8 0%,#64748b 42%,#334155 100%);display:grid;place-items:center;border:1px solid #fff;box-shadow:inset 0 18px 36px rgba(255,255,255,.12),inset 0 -18px 36px rgba(15,23,42,.28);opacity:1"></div>`;
+      }
+      const bg = "linear-gradient(135deg,#facc15,#f59e0b 48%,#1d4ed8)";
+      return `<button class="btn btn-outline" type="button" onclick="selectRoundObstacleQuestion('${question.id}')" style="min-height:150px;border-radius:0!important;background:${bg}!important;color:#fff!important;display:grid;place-items:center;font-size:1.08rem;font-weight:900;text-shadow:0 2px 10px rgba(2,8,23,.72);border:1px solid #fff!important;opacity:1!important"><span>Chướng ngại vật số ${index + 1}</span></button>`;
     }).join("");
     const openedCount = questions.filter((question) => answersByQuestion.get(question.id)?.is_correct).length;
     const keywordLength = String(challenge?.keyword_answer || "").trim().length;
@@ -3634,6 +3635,9 @@
       </div>
     `;
     if (selectedQuestion && !answersByQuestion.has(selectedQuestion.id)) {
+      if (selectedSecondsLeft <= 0) {
+        setTimeout(() => submitAnswer(selectedQuestion.id, ""), 0);
+      }
       EL.questionImg.classList.add("hidden");
       renderAnswerArea(selectedQuestion);
       const questionHtml = `<div style="display:grid;gap:12px;margin-bottom:14px;padding:16px;border-radius:18px;background:rgba(255,255,255,.08);border:1px solid rgba(186,230,253,.18)"><strong style="color:#fef3c7">Câu hỏi chướng ngại vật</strong><div id="roundObstacleQuestionText"></div>${selectedQuestion.question_img ? `<img src="${escAttr(selectedQuestion.question_img)}" alt="question" style="max-width:100%;border-radius:14px;border:1px solid rgba(186,230,253,.18)">` : ""}</div>`;
@@ -3691,6 +3695,10 @@
           if (selectedQuestion && EL.questionClock) {
             const startedAt = Number(GAME.roundObstacleStartedAt?.[room.id] || Date.now());
             const secondsLeft = Math.max(0, getQuestionDuration(selectedQuestion, room) - Math.floor((Date.now() - startedAt) / 1000));
+            if (secondsLeft <= 0) {
+              submitAnswer(selectedQuestion.id, "");
+              return;
+            }
             EL.questionClock.textContent = String(secondsLeft).padStart(2, "0");
           }
           renderLeaderboard();
