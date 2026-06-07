@@ -3563,8 +3563,10 @@
   function applyLiveModeLayout(mode) {
     const livePanels = EL.liveView?.querySelectorAll(".panel") || [];
     const leaderboardPanel = EL.leaderboard?.closest(".panel") || livePanels[1];
+    const answerTitle = livePanels[0]?.querySelector("h3");
     const scoreBoxes = leaderboardPanel?.querySelectorAll(".score-box") || [];
     const leaderboardTitle = leaderboardPanel?.querySelector("h3");
+    if (answerTitle) answerTitle.classList.toggle("hidden", mode === "round");
     if (leaderboardPanel) leaderboardPanel.classList.toggle("hidden", mode === "round");
     if (leaderboardTitle) leaderboardTitle.textContent = (mode === "solo" || mode === "round") ? "Điểm hiện tại" : "Bảng xếp hạng";
     if (scoreBoxes[0]?.children?.[1]) scoreBoxes[0].children[1].classList.toggle("hidden", mode === "solo" || mode === "round");
@@ -3606,9 +3608,9 @@
         return `<button aria-label="Chướng ngại vật số ${index + 1} đã mở" type="button" disabled style="min-height:150px;border:0;background:transparent!important;opacity:0;pointer-events:none"></button>`;
       }
       const bg = locked
-        ? "linear-gradient(135deg,rgba(148,163,184,.96),rgba(51,65,85,.98)),repeating-linear-gradient(45deg,rgba(255,255,255,.12) 0 10px,rgba(15,23,42,.1) 10px 20px)"
-        : "linear-gradient(135deg,rgba(250,204,21,.96),rgba(245,158,11,.94) 48%,rgba(30,64,175,.92))";
-      return `<button class="btn btn-outline" type="button" ${answer ? "disabled" : ""} onclick="selectRoundObstacleQuestion('${question.id}')" style="min-height:150px;border-radius:0;background:${bg}!important;color:#fff!important;display:grid;place-items:center;font-size:1.08rem;font-weight:900;text-shadow:0 2px 10px rgba(2,8,23,.72);border:1px solid rgba(255,255,255,.18)!important"><span>${locked ? "" : `Chướng ngại vật số ${index + 1}`}</span></button>`;
+        ? "repeating-linear-gradient(45deg,#64748b 0 14px,#475569 14px 28px)"
+        : "linear-gradient(135deg,#facc15,#f59e0b 48%,#1d4ed8)";
+      return `<button class="btn btn-outline" type="button" ${answer ? "disabled" : ""} onclick="selectRoundObstacleQuestion('${question.id}')" style="min-height:150px;border-radius:0!important;background:${bg}!important;color:#fff!important;display:grid;place-items:center;font-size:1.08rem;font-weight:900;text-shadow:0 2px 10px rgba(2,8,23,.72);border:1px solid #fff!important"><span>${locked ? "" : `Chướng ngại vật số ${index + 1}`}</span></button>`;
     }).join("");
     const openedCount = questions.filter((question) => answersByQuestion.get(question.id)?.is_correct).length;
     const keywordLength = String(challenge?.keyword_answer || "").trim().length;
@@ -3626,25 +3628,25 @@
     ` : "";
     renderMathText(EL.questionBody, "");
     EL.questionBody.innerHTML = `
-      <div style="position:relative;display:grid;gap:14px;padding:18px;border-radius:24px;overflow:hidden;background:radial-gradient(circle at center,rgba(250,204,21,.2),rgba(15,23,42,.18));border:1px solid rgba(186,230,253,.16)">
-        <div style="position:relative;display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:0;overflow:hidden;border-radius:20px;aspect-ratio:16/9;background:linear-gradient(135deg,rgba(255,255,255,.9),rgba(226,232,240,.84)),url('mindup-zbs-logo.png');background-repeat:no-repeat;background-position:center;background-size:min(72%,520px) auto;box-shadow:inset 0 0 0 1px rgba(186,230,253,.18)">${tiles}</div>
-        ${keywordBox}
+      <div style="position:relative;display:grid;gap:14px;padding:18px;border-radius:0;overflow:hidden;background:radial-gradient(circle at center,rgba(250,204,21,.2),rgba(15,23,42,.18));border:1px solid rgba(186,230,253,.16)">
+        <div style="position:relative;display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:0;overflow:hidden;border-radius:0;aspect-ratio:16/9;background:linear-gradient(135deg,rgba(255,255,255,.9),rgba(226,232,240,.84)),url('mindup-zbs-logo.png');background-repeat:no-repeat;background-position:center;background-size:min(72%,520px) auto;box-shadow:inset 0 0 0 1px rgba(186,230,253,.18)">${tiles}</div>
       </div>
     `;
-    document.getElementById("roundObstacleKeywordInput")?.addEventListener("input", (event) => {
-      GAME.roundObstacleKeywordDraft[room.id] = event.target.value || "";
-    });
     if (selectedQuestion && !answersByQuestion.has(selectedQuestion.id)) {
       EL.questionImg.classList.add("hidden");
       renderAnswerArea(selectedQuestion);
       const questionHtml = `<div style="display:grid;gap:12px;margin-bottom:14px;padding:16px;border-radius:18px;background:rgba(255,255,255,.08);border:1px solid rgba(186,230,253,.18)"><strong style="color:#fef3c7">Câu hỏi chướng ngại vật</strong><div id="roundObstacleQuestionText"></div>${selectedQuestion.question_img ? `<img src="${escAttr(selectedQuestion.question_img)}" alt="question" style="max-width:100%;border-radius:14px;border:1px solid rgba(186,230,253,.18)">` : ""}</div>`;
       EL.answerArea.insertAdjacentHTML("afterbegin", questionHtml);
+      if (keywordBox) EL.answerArea.insertAdjacentHTML("afterbegin", keywordBox);
       renderMathText(document.getElementById("roundObstacleQuestionText"), selectedQuestion.question_text || "Xem nội dung câu hỏi.");
     } else {
       EL.questionImg.classList.add("hidden");
-      EL.answerArea.innerHTML = '<div class="empty">Hãy chọn một ô để mở câu hỏi.</div>';
+      EL.answerArea.innerHTML = `${keywordBox}<div class="empty">Hãy chọn một ô để mở câu hỏi.</div>`;
       EL.answerFeedback.innerHTML = "";
     }
+    document.getElementById("roundObstacleKeywordInput")?.addEventListener("input", (event) => {
+      GAME.roundObstacleKeywordDraft[room.id] = event.target.value || "";
+    });
   }
 
   function isRoundObstacleTypingActive(room) {
