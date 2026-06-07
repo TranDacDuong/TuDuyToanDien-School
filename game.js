@@ -730,6 +730,7 @@
         return 40;
       }
       if (question?.challenge_type === "acceleration") return Math.max(10, Number(question?.difficulty || 2) * 10);
+      if (question?.challenge_type === "obstacle") return 60;
       return Math.max(10, Number(room?.time_per_question || 20));
     }
     const difficulty = Number(GAME.questionDifficultyMap?.[question?.question_id] || 2);
@@ -3608,9 +3609,9 @@
         return `<button aria-label="Chướng ngại vật số ${index + 1} đã mở" type="button" disabled style="min-height:150px;border:0;background:transparent!important;opacity:0;pointer-events:none"></button>`;
       }
       const bg = locked
-        ? "repeating-linear-gradient(45deg,#64748b 0 14px,#475569 14px 28px)"
+        ? "linear-gradient(135deg,#94a3b8 0%,#64748b 42%,#334155 100%)"
         : "linear-gradient(135deg,#facc15,#f59e0b 48%,#1d4ed8)";
-      return `<button class="btn btn-outline" type="button" ${answer ? "disabled" : ""} onclick="selectRoundObstacleQuestion('${question.id}')" style="min-height:150px;border-radius:0!important;background:${bg}!important;color:#fff!important;display:grid;place-items:center;font-size:1.08rem;font-weight:900;text-shadow:0 2px 10px rgba(2,8,23,.72);border:1px solid #fff!important"><span>${locked ? "" : `Chướng ngại vật số ${index + 1}`}</span></button>`;
+      return `<button class="btn btn-outline" type="button" ${answer ? "disabled" : ""} onclick="selectRoundObstacleQuestion('${question.id}')" style="min-height:150px;border-radius:0!important;background:${bg}!important;color:#fff!important;display:grid;place-items:center;font-size:1.08rem;font-weight:900;text-shadow:0 2px 10px rgba(2,8,23,.72);border:1px solid #fff!important;box-shadow:${locked ? "inset 0 0 0 999px rgba(51,65,85,.08),inset 0 18px 36px rgba(255,255,255,.12),inset 0 -18px 36px rgba(15,23,42,.28)" : "none"}"><span>${locked ? "" : `Chướng ngại vật số ${index + 1}`}</span></button>`;
     }).join("");
     const openedCount = questions.filter((question) => answersByQuestion.get(question.id)?.is_correct).length;
     const keywordLength = String(challenge?.keyword_answer || "").trim().length;
@@ -3929,7 +3930,7 @@
       } else if (answered) {
         EL.answerFeedback.innerHTML = `<div class="feedback-box ${answered.is_correct ? "good" : "bad"}">${answered.is_correct ? "Bạn ghi điểm ở câu này." : "Bạn đã gửi đáp án."} +${answered.score_earned || 0} điểm</div>`;
       } else {
-        EL.answerFeedback.innerHTML = `<div class="feedback-box pending">Mỗi câu chỉ được trả lời một lần. Hãy chọn thật chắc trước khi xác nhận.</div>`;
+        EL.answerFeedback.innerHTML = "";
       }
     }
 
