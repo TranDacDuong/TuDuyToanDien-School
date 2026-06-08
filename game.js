@@ -2361,6 +2361,21 @@
     return (GAME.players || []).filter((player) => player.room_id === roomId).length;
   }
 
+  function getLobbyRoomPlayers(roomId) {
+    return sortPlayersByJoin((GAME.players || []).filter((player) => player.room_id === roomId));
+  }
+
+  function hasActiveStartController(room, players = getLobbyRoomPlayers(room?.id)) {
+    const controllerId = getRoomStartControllerUserId(room);
+    return !!controllerId && (players || []).some((player) => player.user_id === controllerId);
+  }
+
+  function isJoinableQuickRoom(room, players = getLobbyRoomPlayers(room?.id)) {
+    if (roomModeValue(room) !== "quick" || room?.status !== "waiting") return true;
+    if (!(players || []).length) return false;
+    return hasActiveStartController(room, players);
+  }
+
   function roomHasCapacity(room) {
     return roomPlayerCount(room.id) < Number(room.max_players || 8);
   }
@@ -2427,6 +2442,7 @@
   function filterVisibleRooms(rooms) {
     const playerMap = buildRoomPlayerMap();
     return (rooms || []).filter((room) => {
+      if (!isJoinableQuickRoom(room, playerMap[room.id] || [])) return false;
       if (!canAccessClassRoom(room)) return false;
       if ((room.visibility || "public") !== "private") return true;
       if (room.created_by === GAME.user?.id) return true;
@@ -2953,6 +2969,12 @@
       alert("Không tìm thấy phòng này.");
       return;
     }
+    const lobbyPlayers = getLobbyRoomPlayers(roomId);
+    if (!isJoinableQuickRoom(room, lobbyPlayers)) {
+      alert("Phòng đấu nhanh này đã mất chủ phòng. Hãy bấm Đấu nhanh để tạo hoặc ghép vào phòng mới.");
+      await loadRooms();
+      return;
+    }
     if (!canAccessClassRoom(room) && !GAME.players.some((player) => player.room_id === roomId && player.user_id === GAME.user.id)) {
       alert("Phòng này chỉ dành cho học sinh hoặc giáo viên của lớp được liên kết.");
       return;
@@ -2985,6 +3007,7 @@
     const bestRoom = [...(GAME.rooms || [])]
       .filter((room) => room.status === "waiting" && (room.visibility || "public") === "public")
       .filter((room) => roomModeValue(room) === "quick")
+      .filter((room) => isJoinableQuickRoom(room))
       .filter((room) => !gradeId || room.grade_id === gradeId)
       .filter((room) => !subjectId || room.subject_id === subjectId)
       .filter((room) => !keyword || String(room.title || "").toLowerCase().includes(keyword) || String(room.join_code || "").toLowerCase().includes(keyword))
@@ -3165,6 +3188,7 @@
       .filter((room) => room.grade_id === EL.gradeFilter.value)
       .filter((room) => room.subject_id === EL.subjectFilter.value)
       .filter((room) => (room.visibility || "public") === "public")
+      .filter((room) => mode !== "quick" || isJoinableQuickRoom(room))
       .sort((a, b) => roomPlayerCount(b.id) - roomPlayerCount(a.id) || new Date(a.created_at) - new Date(b.created_at))
       .find((room) => roomHasCapacity(room) || GAME.players.some((player) => player.room_id === room.id && player.user_id === GAME.user.id));
 
@@ -3430,7 +3454,8 @@
     const isStartController = getRoomStartControllerUserId(room) === GAME.user.id;
     const me = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
     const readyForStart = areRoomPlayersReadyForStart(room, GAME.roomPlayers);
-    const countdownActive = mode === "quick" && room.status === "waiting" && readyForStart;
+    const hasStartController = mode !== "quick" || room.status !== "waiting" || hasActiveStartController(room, GAME.roomPlayers);
+    const countdownActive = mode === "quick" && room.status === "waiting" && readyForStart && hasStartController;
 
     if (mode === "quick" && isCoordinator && me && !me.ready && room.status === "waiting") {
       sb.from("game_room_players").update({ ready: true }).eq("id", me.id).then(() => refreshActiveRoom(room.id, true)).catch(() => {});
@@ -3511,6 +3536,9 @@
           EL.roomStartHint.textContent = mode === "solo"
             ? (me?.ready ? "Đang vào trận..." : "Chơi một mình nên không cần mã phòng hay mời bạn.")
             : (countdownActive ? "Tất cả đã sẵn sàng. Đang đếm ngược 15 giây." : "Cần ít nhất 2 người chơi và tất cả người chơi phải sẵn sàng.");
+        }
+        if (EL.roomStartHint && mode === "quick" && !hasStartController) {
+          EL.roomStartHint.textContent = "Phòng này đã mất chủ phòng. Hãy quay lại và bấm Đấu nhanh để vào phòng mới.";
         }
         EL.playerList.innerHTML = GAME.roomPlayers.length
           ? GAME.roomPlayers.map((player, idx) => renderPlayerRow(player, idx + 1, false)).join("")
