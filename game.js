@@ -4148,16 +4148,22 @@
         : `<button class="btn btn-primary" style="margin-top:12px" type="button" onclick="submitGameShortAnswer('${question.id}')">Gửi đáp án</button>`}
     `;
     if (!disabled) {
-      document.getElementById("gameShortAnswerInput")?.addEventListener("input", (event) => {
+      const shortInput = document.getElementById("gameShortAnswerInput");
+      shortInput?.addEventListener("input", (event) => {
         if (!me) return;
         window.__gameShortDraft = window.__gameShortDraft || {};
         window.__gameShortDraft[me.id] = window.__gameShortDraft[me.id] || {};
         window.__gameShortDraft[me.id][question.id] = event.target.value || "";
       });
-      document.getElementById("gameShortAnswerInput")?.addEventListener("keydown", (event) => {
+      shortInput?.addEventListener("keydown", (event) => {
         if (event.key !== "Enter" || event.isComposing) return;
         event.preventDefault();
         submitGameShortAnswer(question.id);
+      });
+      requestAnimationFrame(() => {
+        shortInput?.focus({ preventScroll: true });
+        const end = shortInput?.value?.length || 0;
+        shortInput?.setSelectionRange?.(end, end);
       });
     }
 
