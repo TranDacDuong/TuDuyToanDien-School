@@ -322,6 +322,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   min-height:520px;
   padding:26px 42px 46px;
   border-radius:26px;
+  align-content:start;
 }
 #gameLiveView .question-head{
   align-items:center;
@@ -355,6 +356,11 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
 }
 #gameLiveView.mode-solo .progress-wrap{
   display:none;
+}
+#gameLiveView.mode-solo .question-card{
+  min-height:0;
+  gap:14px;
+  align-self:start;
 }
 #gameLiveView.mode-solo .question-text{
   margin-top:0;
