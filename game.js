@@ -498,7 +498,7 @@
       });
       return;
     }
-    if (getRoomCoordinatorUserId(room, GAME.roomPlayers) === GAME.user?.id) {
+    if (getRoomCoordinatorUserId(room, GAME.roomPlayers) === GAME.user?.id || getRoomStartControllerUserId(room) === GAME.user?.id) {
       sendKeepaliveRequest(`${baseUrl}/game_rooms?id=eq.${encodeURIComponent(room.id)}`, {
         method: "PATCH",
         headers: { ...getRestHeaders(), "Content-Type": "application/json" },
@@ -723,10 +723,12 @@
   }
 
   function getRoomCoordinatorUserId(room, players) {
-    if (room?.host_id) return room.host_id;
-    if (room?.created_by) return room.created_by;
     const ordered = sortPlayersByJoin(players);
-    return ordered[0]?.user_id || "";
+    return ordered[0]?.user_id || room?.host_id || room?.created_by || "";
+  }
+
+  function getRoomStartControllerUserId(room) {
+    return room?.host_id || room?.created_by || "";
   }
 
   function getQuestionDuration(question, room) {
@@ -1286,7 +1288,7 @@
   function maybeStartQuickMatchAfterCountdown(room) {
     if (!room?.id || GAME.activeRoom?.id !== room.id) return;
     if (GAME.activeRoom?.status !== "waiting") return;
-    if (getRoomCoordinatorUserId(GAME.activeRoom, GAME.roomPlayers) !== GAME.user.id) return;
+    if (getRoomStartControllerUserId(GAME.activeRoom) !== GAME.user.id) return;
     if (!areRoomPlayersReadyForStart(GAME.activeRoom, GAME.roomPlayers)) return;
     if (GAME.autoStartingRoomId === room.id) return;
     GAME.autoStartingRoomId = room.id;
@@ -3196,7 +3198,7 @@
       await cleanupRoomCompletely(room.id);
       return;
     }
-    if (getRoomCoordinatorUserId(room, GAME.roomPlayers) === player.user_id) {
+    if (getRoomCoordinatorUserId(room, GAME.roomPlayers) === player.user_id || getRoomStartControllerUserId(room) === player.user_id) {
       await sb.from("game_rooms").update({ host_id: remain[0].user_id, started_at: remain.length >= 2 ? room.started_at : null }).eq("id", room.id);
     } else if (remain.length < 2) {
       await sb.from("game_rooms").update({ started_at: null }).eq("id", room.id);
@@ -3261,7 +3263,7 @@
       return;
     }
     await refreshActiveRoom(room.id, true);
-    if (mode === "solo" && getRoomCoordinatorUserId(room, GAME.roomPlayers) === GAME.user.id) {
+    if (mode === "solo" && getRoomStartControllerUserId(room) === GAME.user.id) {
       await startGameMatch();
     }
   }
@@ -3425,6 +3427,7 @@
     const mode = roomModeValue(room);
     const modeLabel = roomModeLabel(mode);
     const isCoordinator = getRoomCoordinatorUserId(room, GAME.roomPlayers) === GAME.user.id;
+    const isStartController = getRoomStartControllerUserId(room) === GAME.user.id;
     const me = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
     const readyForStart = areRoomPlayersReadyForStart(room, GAME.roomPlayers);
     const countdownActive = mode === "quick" && room.status === "waiting" && readyForStart;
@@ -3435,12 +3438,12 @@
 
     if (countdownActive && !room.started_at && !GAME.localCountdownStartedAt) {
       GAME.localCountdownStartedAt = new Date().toISOString();
-      if (isCoordinator) queueAutoStart({ ...room, started_at: GAME.localCountdownStartedAt }, 15000);
+      if (isStartController) queueAutoStart({ ...room, started_at: GAME.localCountdownStartedAt }, 15000);
     }
     if (countdownActive && room.started_at) {
       GAME.localCountdownStartedAt = room.started_at;
       renderWaitingCountdown(room);
-      if (isCoordinator) {
+      if (isStartController) {
         const delayMs = Math.max(0, new Date(room.started_at).getTime() + 15000 - Date.now());
         queueAutoStart(room, delayMs);
       }
@@ -3450,11 +3453,11 @@
       clearAutoStartTimer();
       clearWaitingCountdown();
       GAME.localCountdownStartedAt = null;
-      if (isCoordinator && room.status === "waiting" && room.started_at) {
+      if (isStartController && room.status === "waiting" && room.started_at) {
         sb.from("game_rooms").update({ started_at: null }).eq("id", room.id).then(() => refreshActiveRoom(room.id, true)).catch(() => {});
       }
     }
-    if (isCoordinator && room.status === "waiting" && countdownActive && !room.started_at) {
+    if (isStartController && room.status === "waiting" && countdownActive && !room.started_at) {
       clearAutoStartTimer();
       const nextStartedAt = new Date().toISOString();
       queueAutoStart({ ...room, started_at: nextStartedAt }, 15000);
@@ -3612,25 +3615,34 @@
 
   async function startGameMatch() {
     const room = GAME.activeRoom;
-    if (!room || getRoomCoordinatorUserId(room, GAME.roomPlayers) !== GAME.user.id) return;
+    if (!room || getRoomStartControllerUserId(room) !== GAME.user.id) return;
     clearWaitingCountdown();
+    const abortStart = async (message) => {
+      clearAutoStartTimer();
+      GAME.autoStartingRoomId = null;
+      if (room.status === "waiting") {
+        await sb.from("game_rooms").update({ started_at: null }).eq("id", room.id);
+      }
+      if (message) alert(message);
+      await refreshActiveRoom(room.id, true);
+    };
     const minPlayers = ["solo", "round"].includes(roomModeValue(room)) ? 1 : 2;
     if (GAME.roomPlayers.length < minPlayers) {
-      alert(minPlayers === 1 ? "Cần ít nhất 1 người chơi để bắt đầu trận." : "Cần ít nhất 2 người chơi để bắt đầu trận.");
+      await abortStart(minPlayers === 1 ? "Cần ít nhất 1 người chơi để bắt đầu trận." : "Cần ít nhất 2 người chơi để bắt đầu trận.");
       return;
     }
     const questions = await buildGameQuestions(room);
     GAME.questionDifficultyMap = Object.fromEntries(questions.map((item) => [item.question_id, Number(item.difficulty || 2)]));
     const dbQuestions = questions.map(({ difficulty, ...rest }) => rest);
     if (questions.length < room.question_count) {
-      alert("Chưa đủ câu hỏi phù hợp trong Ngân hàng câu hỏi để bắt đầu trận.");
+      await abortStart("Chưa đủ câu hỏi phù hợp trong Ngân hàng câu hỏi để bắt đầu trận.");
       return;
     }
 
     await sb.from("game_room_questions").delete().eq("room_id", room.id);
     const { error: insertErr } = await sb.from("game_room_questions").insert(dbQuestions);
     if (insertErr) {
-      alert(`Không thể chuẩn bị câu hỏi: ${insertErr.message}`);
+      await abortStart(`Không thể chuẩn bị câu hỏi: ${insertErr.message}`);
       return;
     }
 
@@ -3641,7 +3653,7 @@
     }).eq("id", room.id);
 
     if (updateErr) {
-      alert(`Không thể bắt đầu trận: ${updateErr.message}`);
+      await abortStart(`Không thể bắt đầu trận: ${updateErr.message}`);
       return;
     }
 
@@ -4068,7 +4080,7 @@
     const room = GAME.activeRoom;
     if (!room || room.status !== "live" || !question) return;
     if (roomModeValue(room) === "round") return;
-    if (getRoomCoordinatorUserId(room, GAME.roomPlayers) !== GAME.user.id) return;
+    if (getRoomStartControllerUserId(room) !== GAME.user.id) return;
     const requiredPlayers = getRequiredAnswerPlayers(room);
     if (!requiredPlayers.length) return;
     const answeredPlayerIds = getQuestionAnsweredPlayerIds(question.id);
@@ -4257,7 +4269,7 @@
         return;
       }
     }
-    if (room.status !== "finished" && getRoomCoordinatorUserId(room, GAME.roomPlayers) === GAME.user.id) {
+    if (room.status !== "finished" && getRoomStartControllerUserId(room) === GAME.user.id) {
       await sb.from("game_rooms").update({ status: "finished", ended_at: new Date().toISOString() }).eq("id", room.id);
     }
     await refreshActiveRoom(room.id, true);
