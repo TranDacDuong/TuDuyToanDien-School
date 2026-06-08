@@ -1330,7 +1330,7 @@
     badge.id = "roundTopbarScore";
     badge.className = "hidden";
     badge.style.cssText = "display:inline-flex;align-items:center;min-height:36px;padding:8px 14px;border-radius:14px;background:var(--gold-pale);border:1px solid var(--gold-border);color:var(--navy);font-weight:900;white-space:nowrap";
-    EL.leaveGameBtn?.parentElement?.insertBefore(badge, EL.leaveGameBtn);
+    document.querySelector("#gameRoomScreen .topbar-actions")?.appendChild(badge);
     return badge;
   }
 
@@ -1343,7 +1343,7 @@
       badge.textContent = isSoloLive ? `Điểm: ${Number(score || 0)}` : `Điểm của bạn: ${Number(score || 0)}`;
       badge.classList.toggle("hidden", !isPinnedScore);
     }
-    EL.leaveGameBtn?.classList.toggle("hidden", isPinnedScore);
+    EL.leaveGameBtn?.classList.add("hidden");
   }
 
   async function loadGameCatalog() {
