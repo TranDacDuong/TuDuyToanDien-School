@@ -1250,6 +1250,7 @@
       EL.roomCountdownLabel.textContent = secondsLeft > 0
         ? "Trận đấu sắp bắt đầu"
         : "Đang vào trận";
+      if (secondsLeft <= 0) maybeStartQuickMatchAfterCountdown(room);
     };
     clearInterval(GAME.waitingTick);
     tick();
@@ -1276,10 +1277,20 @@
   function queueAutoStart(room, delayMs = 1200) {
     clearAutoStartTimer();
     GAME.autoStartTimer = setTimeout(() => {
-      if (GAME.activeRoom?.id === room.id && GAME.activeRoom?.status === "waiting" && areRoomPlayersReadyForStart(GAME.activeRoom, GAME.roomPlayers)) {
-        startGameMatch();
-      }
+      maybeStartQuickMatchAfterCountdown(room);
     }, Math.max(0, Number(delayMs || 0)));
+  }
+
+  function maybeStartQuickMatchAfterCountdown(room) {
+    if (!room?.id || GAME.activeRoom?.id !== room.id) return;
+    if (GAME.activeRoom?.status !== "waiting") return;
+    if (getRoomCoordinatorUserId(GAME.activeRoom, GAME.roomPlayers) !== GAME.user.id) return;
+    if (!areRoomPlayersReadyForStart(GAME.activeRoom, GAME.roomPlayers)) return;
+    if (GAME.autoStartingRoomId === room.id) return;
+    GAME.autoStartingRoomId = room.id;
+    Promise.resolve(startGameMatch()).finally(() => {
+      if (GAME.activeRoom?.status !== "live") GAME.autoStartingRoomId = null;
+    });
   }
 
   function shuffle(list) {
@@ -3422,6 +3433,7 @@
 
     if (countdownActive && !room.started_at && !GAME.localCountdownStartedAt) {
       GAME.localCountdownStartedAt = new Date().toISOString();
+      if (isCoordinator) queueAutoStart({ ...room, started_at: GAME.localCountdownStartedAt }, 15000);
     }
     if (countdownActive && room.started_at) {
       GAME.localCountdownStartedAt = room.started_at;
@@ -3442,7 +3454,9 @@
     }
     if (isCoordinator && room.status === "waiting" && countdownActive && !room.started_at) {
       clearAutoStartTimer();
-      sb.from("game_rooms").update({ started_at: new Date().toISOString() }).eq("id", room.id).then(() => refreshActiveRoom(room.id, true)).catch(() => {});
+      const nextStartedAt = new Date().toISOString();
+      queueAutoStart({ ...room, started_at: nextStartedAt }, 15000);
+      sb.from("game_rooms").update({ started_at: nextStartedAt }).eq("id", room.id).then(() => refreshActiveRoom(room.id, true)).catch(() => {});
     }
 
     EL.roomScreenTitle.innerHTML = `Phòng chờ: <span>${esc(room.join_code || "----")}</span>`;
