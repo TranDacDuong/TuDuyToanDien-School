@@ -527,6 +527,8 @@
       heroDesc.classList.add("hidden");
       heroDesc.style.display = "none";
     }
+    EL.leaveGameBtn?.remove();
+    EL.leaveGameBtn = null;
     if (EL.gradeFilter?.options[0]) EL.gradeFilter.options[0].text = "Tất cả khối";
     if (EL.subjectFilter?.options[0]) EL.subjectFilter.options[0].text = "Tất cả môn";
     if (EL.visibilityFilter) {
