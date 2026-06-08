@@ -519,7 +519,7 @@
   function normalizeStaticGameText() {
     document.title = "Game thi đấu";
     document.querySelectorAll("[style*='color:var(--navy)']").forEach((node) => {
-      node.style.color = "#f8fafc";
+      node.style.color = "var(--navy)";
     });
     const heroTitle = document.querySelector(".hero-copy h1");
     const heroDesc = document.querySelector(".hero-copy p");
@@ -802,17 +802,17 @@
     hero.parentElement.insertBefore(deck, hero.nextSibling);
     const grid = deck.querySelector("#gameModeCardGrid");
     grid.innerHTML = getAutoMatchModeCards().map((item) => `
-      <button type="button" class="game-mode-card" data-auto-mode="${item.mode}" style="display:grid;gap:10px;text-align:left;padding:18px;border-radius:22px;border:1px solid rgba(125,211,252,.18);background:linear-gradient(135deg,rgba(10,20,40,.96) 0%,rgba(16,32,61,.96) 100%);color:#eff6ff;cursor:pointer;box-shadow:0 16px 36px rgba(2,8,23,.24)">
+      <button type="button" class="game-mode-card" data-auto-mode="${item.mode}" style="display:grid;gap:10px;text-align:left;padding:18px;border-radius:18px;border:1px solid rgba(15,31,61,.08);background:#fff;color:var(--ink);cursor:pointer;box-shadow:var(--shadow-sm)">
         <div style="font-size:2rem;line-height:1">${item.art}</div>
-        <div style="font-size:1.05rem;font-weight:800;color:#fef3c7">${item.title}</div>
-        <div style="font-size:.85rem;color:rgba(235,245,255,.88)">${item.desc}</div>
-        <div style="font-size:.78rem;color:#fde68a;line-height:1.5">${item.elo}</div>
+        <div style="font-size:1.05rem;font-weight:800;color:var(--navy)">${item.title}</div>
+        <div style="font-size:.85rem;color:var(--ink-mid)">${item.desc}</div>
+        <div style="font-size:.78rem;color:var(--amber);line-height:1.5">${item.elo}</div>
       </button>
     `).join("");
   }
 
   function getGradeCardStyle(selected) {
-    return `position:relative;display:grid;gap:8px;min-height:108px;padding:16px 18px;border-radius:22px;border:${selected ? "2px solid rgba(250,204,21,.95)" : "1px solid rgba(125,211,252,.18)"};background:${selected ? "radial-gradient(circle at top left,rgba(250,204,21,.28),transparent 42%),linear-gradient(135deg,rgba(59,130,246,.34) 0%,rgba(15,23,42,.98) 58%,rgba(10,20,40,.98) 100%)" : "radial-gradient(circle at top left,rgba(125,211,252,.14),transparent 38%),linear-gradient(135deg,rgba(8,15,30,.98) 0%,rgba(13,27,52,.98) 55%,rgba(10,20,40,.98) 100%)"};box-shadow:${selected ? "0 18px 36px rgba(250,204,21,.18), inset 0 1px 0 rgba(255,255,255,.08)" : "0 14px 30px rgba(2,8,23,.24), inset 0 1px 0 rgba(255,255,255,.04)"};color:#eff6ff;text-align:left;cursor:pointer;overflow:hidden;transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease`;
+    return `position:relative;display:grid;gap:8px;min-height:108px;padding:16px 18px;border-radius:18px;border:${selected ? "2px solid var(--gold)" : "1px solid rgba(15,31,61,.08)"};background:${selected ? "linear-gradient(135deg,var(--gold-pale) 0%,#fff 100%)" : "#fff"};box-shadow:${selected ? "0 10px 28px rgba(200,150,42,.16)" : "var(--shadow-sm)"};color:var(--ink);text-align:left;cursor:pointer;overflow:hidden;transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease`;
   }
 
   function getRoundBaseQuestions(questions) {
@@ -1008,7 +1008,7 @@
   }
 
   function getSubjectCardStyle(selected) {
-    return `position:relative;display:grid;gap:8px;min-height:116px;padding:16px 18px;border-radius:22px;border:${selected ? "2px solid rgba(103,232,249,.95)" : "1px solid rgba(125,211,252,.18)"};background:${selected ? "radial-gradient(circle at top left,rgba(34,211,238,.24),transparent 42%),linear-gradient(135deg,rgba(8,145,178,.28) 0%,rgba(30,64,175,.2) 45%,rgba(10,20,40,.98) 100%)" : "radial-gradient(circle at top left,rgba(56,189,248,.12),transparent 38%),linear-gradient(135deg,rgba(8,15,30,.98) 0%,rgba(13,27,52,.98) 55%,rgba(10,20,40,.98) 100%)"};box-shadow:${selected ? "0 18px 36px rgba(34,211,238,.16), inset 0 1px 0 rgba(255,255,255,.08)" : "0 14px 30px rgba(2,8,23,.24), inset 0 1px 0 rgba(255,255,255,.04)"};color:#eff6ff;text-align:left;cursor:pointer;overflow:hidden;transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease`;
+    return `position:relative;display:grid;gap:8px;min-height:116px;padding:16px 18px;border-radius:18px;border:${selected ? "2px solid var(--gold)" : "1px solid rgba(15,31,61,.08)"};background:${selected ? "linear-gradient(135deg,var(--gold-pale) 0%,#fff 100%)" : "#fff"};box-shadow:${selected ? "0 10px 28px rgba(200,150,42,.16)" : "var(--shadow-sm)"};color:var(--ink);text-align:left;cursor:pointer;overflow:hidden;transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease`;
   }
 
   function ensureSubjectSelectModal() {
@@ -1044,7 +1044,7 @@
   }
 
   function getDisabledSelectionCardStyle() {
-    return "position:relative;display:grid;gap:8px;min-height:108px;padding:16px 18px;border-radius:22px;border:1px dashed rgba(148,163,184,.22);background:linear-gradient(135deg,rgba(8,15,30,.72) 0%,rgba(13,27,52,.7) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.02);color:rgba(226,232,240,.54);text-align:left;cursor:not-allowed;overflow:hidden;opacity:.72";
+    return "position:relative;display:grid;gap:8px;min-height:108px;padding:16px 18px;border-radius:18px;border:1px dashed var(--border);background:#f8fafc;box-shadow:none;color:var(--ink-light);text-align:left;cursor:not-allowed;overflow:hidden;opacity:.82";
   }
 
   function renderGradeCards() {
@@ -1058,10 +1058,10 @@
     }
     grid.innerHTML = (GAME.grades || []).map((grade) => {
       if (!modeReady) {
-        return `<button type="button" disabled style="${getDisabledSelectionCardStyle()}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:rgba(148,163,184,.12);color:rgba(226,232,240,.58);font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Khối</span><span style="font-size:1.05rem;font-weight:900;letter-spacing:.01em">${esc(grade.name)}</span><span class="hint">Chọn chế độ trước</span></button>`;
+        return `<button type="button" disabled style="${getDisabledSelectionCardStyle()}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:#eef2f7;color:var(--ink-light);font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Khối</span><span style="font-size:1.05rem;font-weight:900;letter-spacing:.01em">${esc(grade.name)}</span><span class="hint">Chọn chế độ trước</span></button>`;
       }
       const selected = EL.gradeFilter?.value === grade.id;
-      return `<button type="button" data-grade-card="${grade.id}" style="${getGradeCardStyle(selected)}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:${selected ? "rgba(250,204,21,.18)" : "rgba(148,163,184,.12)"};color:${selected ? "#fde68a" : "rgba(226,232,240,.78)"};font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">${selected ? "Đang chọn" : "Khối"}</span><span style="font-size:1.1rem;font-weight:900;letter-spacing:.01em">${esc(grade.name)}</span></button>`;
+      return `<button type="button" data-grade-card="${grade.id}" style="${getGradeCardStyle(selected)}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:${selected ? "var(--gold-pale)" : "#eef2f7"};color:${selected ? "var(--amber)" : "var(--ink-mid)"};font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">${selected ? "Đang chọn" : "Khối"}</span><span style="font-size:1.1rem;font-weight:900;letter-spacing:.01em;color:var(--navy)">${esc(grade.name)}</span></button>`;
     }).join("");
     if (!modeReady) return;
     document.querySelectorAll("[data-grade-card]").forEach((button) => {
@@ -1101,7 +1101,7 @@
     grid.innerHTML = subjects.length
       ? subjects.map((subject) => {
           const selected = EL.subjectFilter?.value === subject.id;
-          return `<button type="button" data-subject-card="${subject.id}" style="${getSubjectCardStyle(selected)}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:${selected ? "rgba(34,211,238,.18)" : "rgba(148,163,184,.12)"};color:${selected ? "#a5f3fc" : "rgba(226,232,240,.78)"};font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">${selected ? "Đang chọn" : "Môn"}</span><span style="font-size:1.02rem;font-weight:900;letter-spacing:.01em">${esc(subject.name)}</span></button>`;
+          return `<button type="button" data-subject-card="${subject.id}" style="${getSubjectCardStyle(selected)}"><span style="display:inline-flex;align-items:center;width:max-content;padding:4px 10px;border-radius:999px;background:${selected ? "var(--gold-pale)" : "#eef2f7"};color:${selected ? "var(--amber)" : "var(--ink-mid)"};font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase">${selected ? "Đang chọn" : "Môn"}</span><span style="font-size:1.02rem;font-weight:900;letter-spacing:.01em;color:var(--navy)">${esc(subject.name)}</span></button>`;
         }).join("")
       : `<div class="hint">Chưa có phần chơi phù hợp với Khối/Môn này.</div>`;
     document.querySelectorAll("[data-subject-card]").forEach((button) => {
@@ -1329,7 +1329,7 @@
     badge = document.createElement("div");
     badge.id = "roundTopbarScore";
     badge.className = "hidden";
-    badge.style.cssText = "display:inline-flex;align-items:center;min-height:36px;padding:8px 14px;border-radius:14px;background:linear-gradient(135deg,rgba(250,204,21,.22),rgba(34,211,238,.14));border:1px solid rgba(250,204,21,.42);color:#fef3c7;font-weight:900;white-space:nowrap";
+    badge.style.cssText = "display:inline-flex;align-items:center;min-height:36px;padding:8px 14px;border-radius:14px;background:var(--gold-pale);border:1px solid var(--gold-border);color:var(--navy);font-weight:900;white-space:nowrap";
     EL.leaveGameBtn?.parentElement?.insertBefore(badge, EL.leaveGameBtn);
     return badge;
   }
@@ -2049,7 +2049,7 @@
     const grade = GAME.grades.find((item) => item.id === GAME.profile?.grade_id);
     const badge = document.createElement("div");
     badge.id = "gameStudentGradeBadge";
-    badge.style.cssText = "width:100%;margin-top:8px;color:#fef3c7;font-weight:800";
+    badge.style.cssText = "width:100%;margin-top:8px;color:var(--navy);font-weight:800";
     badge.textContent = grade ? `Khối ${grade.name.replace(/^Khối\s*/i, "")}` : "Chưa chọn Khối";
     joinBox.appendChild(badge);
   }
@@ -3530,7 +3530,7 @@
       <div class="player-main">
         <img class="avatar" src="${escAttr(getPlayerAvatar(player.user_id))}" alt="avatar">
         <div>
-          <div style="font-weight:700;color:#f8fafc">${index}. ${esc(getPlayerName(player.user_id))}</div>
+          <div style="font-weight:700;color:var(--navy)">${index}. ${esc(getPlayerName(player.user_id))}</div>
           <div class="hint">Người chơi${lives !== null ? ` • ${lives} mạng` : ""}</div>
         </div>
       </div>
@@ -3547,7 +3547,7 @@
           <div class="player-main">
             <img class="avatar" src="${escAttr(friend.avatar_url || "default-avatar.png")}" alt="avatar">
             <div>
-              <div style="font-weight:700;color:#f8fafc">${esc(friend.full_name || "Bạn bè")}</div>
+              <div style="font-weight:700;color:var(--navy)">${esc(friend.full_name || "Bạn bè")}</div>
               <div class="hint">${room.visibility === "private" ? "Phòng riêng tư" : "Có thể vào bằng mã"}</div>
             </div>
           </div>
@@ -3754,8 +3754,8 @@
     const keywordLength = String(challenge?.keyword_answer || "").trim().length;
     const keywordDraft = GAME.roundObstacleKeywordDraft?.[room.id] || "";
     const keywordBox = challenge?.keyword_answer ? `
-      <div style="position:relative;display:grid;gap:10px;padding:14px;border-radius:18px;background:rgba(255,255,255,.08);border:1px solid rgba(186,230,253,.18)">
-        <strong style="color:#fef3c7">Từ khóa</strong>
+      <div style="position:relative;display:grid;gap:10px;padding:14px;border-radius:18px;background:#fff;border:1px solid rgba(39,58,91,.08)">
+        <strong style="color:var(--navy)">Từ khóa</strong>
         <div class="hint">${keywordLength ? `Gợi ý: từ khóa có ${keywordLength} ký tự.` : "Từ khóa liên quan đến cả 4 câu hỏi."} Trả lời càng sớm càng nhiều điểm.</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <input id="roundObstacleKeywordInput" class="input" style="flex:1;min-width:180px" placeholder="Nhập từ khóa" value="${escAttr(keywordDraft)}">
@@ -3766,8 +3766,8 @@
     ` : "";
     renderMathText(EL.questionBody, "");
     EL.questionBody.innerHTML = `
-      <div style="position:relative;display:grid;gap:14px;padding:18px;border-radius:0;overflow:hidden;background:radial-gradient(circle at center,rgba(250,204,21,.2),rgba(15,23,42,.18));border:1px solid rgba(186,230,253,.16)">
-        <div style="position:relative;display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:0;overflow:hidden;border-radius:0;aspect-ratio:16/9;background:linear-gradient(135deg,rgba(255,255,255,.9),rgba(226,232,240,.84)),url('mindup-zbs-logo.png');background-repeat:no-repeat;background-position:center;background-size:min(72%,520px) auto;box-shadow:inset 0 0 0 1px rgba(186,230,253,.18)">${tiles}</div>
+      <div style="position:relative;display:grid;gap:14px;padding:18px;border-radius:0;overflow:hidden;background:#fff;border:1px solid rgba(39,58,91,.08)">
+        <div style="position:relative;display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:0;overflow:hidden;border-radius:0;aspect-ratio:16/9;background:linear-gradient(135deg,rgba(255,255,255,.9),rgba(226,232,240,.84)),url('mindup-zbs-logo.png');background-repeat:no-repeat;background-position:center;background-size:min(72%,520px) auto;box-shadow:inset 0 0 0 1px rgba(39,58,91,.08)">${tiles}</div>
       </div>
     `;
     if (selectedQuestion && !answersByQuestion.has(selectedQuestion.id)) {
@@ -3776,7 +3776,7 @@
       }
       EL.questionImg.classList.add("hidden");
       renderAnswerArea(selectedQuestion);
-      const questionHtml = `<div style="display:grid;gap:12px;margin-bottom:14px;padding:16px;border-radius:18px;background:rgba(255,255,255,.08);border:1px solid rgba(186,230,253,.18)"><strong style="color:#fef3c7">Câu hỏi chướng ngại vật</strong><div id="roundObstacleQuestionText"></div>${selectedQuestion.question_img ? `<img src="${escAttr(selectedQuestion.question_img)}" alt="question" style="max-width:100%;border-radius:14px;border:1px solid rgba(186,230,253,.18)">` : ""}</div>`;
+      const questionHtml = `<div style="display:grid;gap:12px;margin-bottom:14px;padding:16px;border-radius:18px;background:#fff;border:1px solid rgba(39,58,91,.08)"><strong style="color:var(--navy)">Câu hỏi chướng ngại vật</strong><div id="roundObstacleQuestionText"></div>${selectedQuestion.question_img ? `<img src="${escAttr(selectedQuestion.question_img)}" alt="question" style="max-width:100%;border-radius:14px;border:1px solid rgba(39,58,91,.08)">` : ""}</div>`;
       EL.answerArea.insertAdjacentHTML("afterbegin", questionHtml);
       if (keywordBox) EL.answerArea.insertAdjacentHTML("afterbegin", keywordBox);
       renderMathText(document.getElementById("roundObstacleQuestionText"), selectedQuestion.question_text || "Xem nội dung câu hỏi.");
@@ -4292,7 +4292,7 @@
         <div style="display:flex;align-items:center;gap:12px">
           <div class="medal ${medalClass}">${idx + 1}</div>
           <div>
-            <div style="font-weight:800;color:#f8fafc">${esc(getPlayerName(player.user_id))}</div>
+            <div style="font-weight:800;color:var(--navy)">${esc(getPlayerName(player.user_id))}</div>
             ${supportsModeElo(roomMode) ? `<div class="hint">${Number(eloDeltaMap[player.user_id] || 0) >= 0 ? "+" : ""}${Number(eloDeltaMap[player.user_id] || 0)} Elo</div>` : ""}
             <div class="hint">${player.user_id === GAME.user.id ? "Bạn" : "Người chơi"}</div>
           </div>
