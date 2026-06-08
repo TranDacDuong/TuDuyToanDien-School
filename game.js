@@ -600,7 +600,7 @@
     if (EL.copyGameCodeBtn) EL.copyGameCodeBtn.textContent = "Sao chép mã";
     if (EL.shareGameCodeBtn) EL.shareGameCodeBtn.textContent = "Sao chép lời mời";
     if (EL.questionTitle) EL.questionTitle.textContent = "Câu hỏi";
-    if (EL.questionClock?.parentElement?.firstChild) EL.questionClock.parentElement.firstChild.textContent = "Còn lại";
+    if (EL.questionClock?.parentElement?.firstChild) EL.questionClock.parentElement.firstChild.textContent = "⏱";
     document.querySelectorAll("#gameLiveView .panel h3")[0] && (document.querySelectorAll("#gameLiveView .panel h3")[0].textContent = "Đáp án của bạn");
     document.querySelectorAll("#gameLiveView .panel h3")[1] && (document.querySelectorAll("#gameLiveView .panel h3")[1].textContent = "Bảng xếp hạng");
     if (EL.finishedView?.querySelector("h3")) EL.finishedView.querySelector("h3").textContent = "Kết quả trận đấu";
@@ -625,7 +625,7 @@
     if (EL.leaveGameBtn) EL.leaveGameBtn.textContent = "Rời phòng";
     if (EL.startGameBtn) EL.startGameBtn.textContent = "Bắt đầu trận";
     if (EL.questionTitle) EL.questionTitle.textContent = "Câu hỏi";
-    if (EL.questionClock?.parentElement?.firstChild) EL.questionClock.parentElement.firstChild.textContent = "Còn lại";
+    if (EL.questionClock?.parentElement?.firstChild) EL.questionClock.parentElement.firstChild.textContent = "⏱";
     EL.progressText?.remove();
     if (EL.myScore?.previousElementSibling) EL.myScore.previousElementSibling.textContent = "Điểm của bạn";
     if (EL.myRank?.previousElementSibling) EL.myRank.previousElementSibling.textContent = "Vị trí hiện tại";
@@ -1337,11 +1337,13 @@
   function updateRoundTopbarScore(mode, score = 0) {
     const badge = ensureRoundTopbarScore();
     const isRound = mode === "round";
+    const isSoloLive = mode === "solo" && GAME.activeRoom?.status === "live";
+    const isPinnedScore = isRound || isSoloLive;
     if (badge) {
-      badge.textContent = `Điểm của bạn: ${Number(score || 0)}`;
-      badge.classList.toggle("hidden", !isRound);
+      badge.textContent = isSoloLive ? `Điểm: ${Number(score || 0)}` : `Điểm của bạn: ${Number(score || 0)}`;
+      badge.classList.toggle("hidden", !isPinnedScore);
     }
-    EL.leaveGameBtn?.classList.toggle("hidden", isRound);
+    EL.leaveGameBtn?.classList.toggle("hidden", isPinnedScore);
   }
 
   async function loadGameCatalog() {
@@ -3698,13 +3700,16 @@
   }
 
   function applyLiveModeLayout(mode) {
+    EL.liveView?.classList.toggle("mode-solo", mode === "solo");
+    EL.liveView?.classList.toggle("mode-round", mode === "round");
+    EL.liveView?.classList.toggle("mode-quick", mode === "quick");
     const livePanels = EL.liveView?.querySelectorAll(".panel") || [];
     const leaderboardPanel = EL.leaderboard?.closest(".panel") || livePanels[1];
     const answerTitle = livePanels[0]?.querySelector("h3");
     const scoreBoxes = leaderboardPanel?.querySelectorAll(".score-box") || [];
     const leaderboardTitle = leaderboardPanel?.querySelector("h3");
     if (answerTitle) answerTitle.classList.toggle("hidden", mode === "round");
-    if (leaderboardPanel) leaderboardPanel.classList.toggle("hidden", mode === "round");
+    if (leaderboardPanel) leaderboardPanel.classList.toggle("hidden", mode === "round" || mode === "solo");
     if (leaderboardTitle) leaderboardTitle.textContent = (mode === "solo" || mode === "round") ? "Điểm hiện tại" : "Bảng xếp hạng";
     if (scoreBoxes[0]?.children?.[1]) scoreBoxes[0].children[1].classList.toggle("hidden", mode === "solo" || mode === "round");
     if (scoreBoxes[1]) scoreBoxes[1].classList.toggle("hidden", mode === "quick" || mode === "solo" || mode === "round");
@@ -4186,6 +4191,7 @@
     }
     if (roomModeValue(GAME.activeRoom) === "solo") {
       const myRow = (GAME.roomPlayers || []).find((item) => item.user_id === GAME.user.id);
+      updateRoundTopbarScore("solo", myRow?.score || 0);
       if (EL.myScore) EL.myScore.textContent = myRow?.score || 0;
       if (EL.myRank) EL.myRank.textContent = "#1";
       return;

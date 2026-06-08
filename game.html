@@ -254,6 +254,19 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   border:1.5px solid rgba(204,214,255,.78)!important;
   font-size:1rem;
 }
+#gameRoomScreen #roundTopbarScore{
+  min-width:136px;
+  min-height:50px;
+  justify-content:center;
+  padding:10px 18px;
+  border-radius:16px;
+  background:linear-gradient(180deg,#ffd86b,#f5a92f)!important;
+  border:0!important;
+  color:#061746!important;
+  font-size:1.04rem;
+  font-weight:900;
+  box-shadow:0 10px 20px rgba(245,169,47,.24);
+}
 .game-show-brand{
   position:absolute;
   left:50%;
@@ -319,7 +332,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
 }
 #gameLiveView .question-card{
   min-height:520px;
-  padding:46px 42px;
+  padding:34px 42px 46px;
   border-radius:26px;
 }
 #gameLiveView .question-head{
@@ -344,9 +357,19 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   font-size:1rem;
   font-weight:800;
 }
+#gameLiveView .countdown span{
+  font-size:1.16rem;
+  line-height:1;
+}
 #gameLiveView .countdown strong{
   color:#061746;
   font-size:1.2rem;
+}
+#gameLiveView.mode-solo .progress-wrap{
+  display:none;
+}
+#gameLiveView.mode-solo .question-text{
+  margin-top:66px;
 }
 #gameLiveView .progress-wrap{
   margin:28px 0 50px;
@@ -907,7 +930,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
       <div class="question-card">
         <div class="question-head">
           <strong id="gameQuestionTitle">Câu hỏi</strong>
-          <div class="countdown"><span>Còn lại</span><strong id="gameQuestionClock">00</strong></div>
+          <div class="countdown"><span aria-hidden="true">⏱</span><strong id="gameQuestionClock">00</strong></div>
         </div>
         <div class="progress-wrap">
           <div class="hint" id="gameProgressText">Tiến độ trận đấu</div>
