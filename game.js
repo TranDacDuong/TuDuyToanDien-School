@@ -3441,7 +3441,7 @@
       sb.from("game_rooms").update({ started_at: new Date().toISOString() }).eq("id", room.id).then(() => refreshActiveRoom(room.id, true)).catch(() => {});
     }
 
-    EL.roomScreenTitle.textContent = getRoomDisplayTitle(room);
+    EL.roomScreenTitle.innerHTML = `Phòng chờ: <span>${esc(room.join_code || "----")}</span>`;
     updateRoundTopbarScore(mode, me?.score || 0);
     EL.startGameBtn.classList.add("hidden");
     EL.startGameBtn.disabled = true;
@@ -3890,7 +3890,7 @@
 
       const question = timeline.question;
       const secondsLeft = timeline.secondsLeft;
-      EL.questionTitle.textContent = `Câu ${currentIndex + 1} / ${visibleQuestions.length}`;
+      EL.questionTitle.innerHTML = `Câu <span>${currentIndex + 1}</span> / ${visibleQuestions.length}`;
       EL.questionClock.textContent = String(secondsLeft).padStart(2, "0");
       if (EL.progressText) {
         EL.progressText.textContent = mode === "survival"
