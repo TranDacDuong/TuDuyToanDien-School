@@ -4154,6 +4154,11 @@
         window.__gameShortDraft[me.id] = window.__gameShortDraft[me.id] || {};
         window.__gameShortDraft[me.id][question.id] = event.target.value || "";
       });
+      document.getElementById("gameShortAnswerInput")?.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" || event.isComposing) return;
+        event.preventDefault();
+        submitGameShortAnswer(question.id);
+      });
     }
 
     window.__gameTfDraft = window.__gameTfDraft || {};
