@@ -723,8 +723,10 @@
   }
 
   function getRoomCoordinatorUserId(room, players) {
+    if (room?.host_id) return room.host_id;
+    if (room?.created_by) return room.created_by;
     const ordered = sortPlayersByJoin(players);
-    return ordered[0]?.user_id || room?.host_id || room?.created_by || "";
+    return ordered[0]?.user_id || "";
   }
 
   function getQuestionDuration(question, room) {
@@ -3611,6 +3613,7 @@
   async function startGameMatch() {
     const room = GAME.activeRoom;
     if (!room || getRoomCoordinatorUserId(room, GAME.roomPlayers) !== GAME.user.id) return;
+    clearWaitingCountdown();
     const minPlayers = ["solo", "round"].includes(roomModeValue(room)) ? 1 : 2;
     if (GAME.roomPlayers.length < minPlayers) {
       alert(minPlayers === 1 ? "Cần ít nhất 1 người chơi để bắt đầu trận." : "Cần ít nhất 2 người chơi để bắt đầu trận.");
