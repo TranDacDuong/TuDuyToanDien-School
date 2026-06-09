@@ -174,7 +174,7 @@
 
   function getModeEloRule(mode) {
     if (mode === "solo") return "Chơi đơn: điểm trận bao nhiêu thì cộng bấy nhiêu Elo.";
-    if (mode === "quick") return "Đấu nhanh: điểm trận bao nhiêu thì cộng bấy nhiêu Elo.";
+    if (mode === "quick") return "Đấu nhanh: nửa trên được cộng Elo bằng hiệu điểm với người đối xứng ở nửa dưới; nửa dưới bị trừ đều tổng Elo đã cộng.";
     if (mode === "round") return "Vòng MindUp: đạt từ 100 điểm mới qua vòng và được cộng Elo; mỗi lần thi lại trừ 20 điểm.";
     if (mode === "solo") {
       return "Chơi đơn: điểm trận càng cao, Elo cộng càng nhiều.";
@@ -192,8 +192,12 @@
     const total = orderedPlayers.length;
     if (!total || !supportsModeElo(mode)) return {};
 
-    if (mode === "solo" || mode === "quick") {
+    if (mode === "solo") {
       return Object.fromEntries((orderedPlayers || []).map((player) => [player.user_id, Math.max(0, Number(player.score || 0))]));
+    }
+
+    if (mode === "quick") {
+      return getMirroredRankEloDeltaMap(orderedPlayers);
     }
 
     if (mode === "round") {
@@ -227,6 +231,30 @@
       else if (index < topCount + secondCount) map[player.user_id] = 10;
       else map[player.user_id] = 0;
     });
+    return map;
+  }
+
+  function getMirroredRankEloDeltaMap(orderedPlayers) {
+    const players = orderedPlayers || [];
+    const total = players.length;
+    const topCount = Math.floor(total / 2);
+    const bottomCount = topCount;
+    const map = Object.fromEntries(players.map((player) => [player.user_id, 0]));
+    if (!topCount || !bottomCount) return map;
+
+    let totalPositive = 0;
+    for (let index = 0; index < topCount; index += 1) {
+      const topPlayer = players[index];
+      const mirroredPlayer = players[total - 1 - index];
+      const delta = Math.max(0, Math.round(Number(topPlayer?.score || 0) - Number(mirroredPlayer?.score || 0)));
+      map[topPlayer.user_id] = delta;
+      totalPositive += delta;
+    }
+
+    const bottomPenalty = Math.round(totalPositive / bottomCount);
+    for (let index = total - bottomCount; index < total; index += 1) {
+      map[players[index].user_id] = -bottomPenalty;
+    }
     return map;
   }
 
