@@ -2641,10 +2641,10 @@
     if (EL.statsGrid) {
       EL.statsGrid.innerHTML = `
         <div class="stat-card"><span>Elo hiện tại</span><strong>${eloProfile.points}</strong></div>
-        <button class="stat-card" type="button" onclick="openGameHistoryListModal()" style="text-align:left;cursor:pointer;border:0">
-          <span>Lịch sử đấu</span><strong>Mở</strong>
-        </button>
         <div class="stat-card"><span>Điểm trung bình</span><strong>${avgScore}</strong></div>
+        <button class="stat-card history-stat-button" type="button" onclick="openGameHistoryListModal()" aria-label="Xem lịch sử đấu">
+          <span>Lịch sử đấu</span><strong>${totalMatches}</strong><small>Xem chi tiết các trận đã chơi</small>
+        </button>
       `;
     }
 

@@ -175,6 +175,10 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
 .hero .stat-card span{font-size:.68rem;margin-bottom:3px}
 .hero .stat-card strong{font-size:1.05rem}
 .hero .stat-card small{font-size:.68rem;margin-top:2px}
+.hero .history-stat-button{position:relative;text-align:left;cursor:pointer;border:1px solid rgba(212,163,82,.55);background:linear-gradient(135deg,#fff7ed,#fff);box-shadow:0 10px 22px rgba(212,163,82,.18);transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
+.hero .history-stat-button:hover{transform:translateY(-1px);border-color:var(--amber);box-shadow:0 14px 28px rgba(212,163,82,.24)}
+.hero .history-stat-button strong{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hero .history-stat-button strong::after{content:"›";display:grid;place-items:center;width:24px;height:24px;border-radius:999px;background:var(--amber);color:#fff;font-size:1.35rem;line-height:1}
 .room-card{border-radius:18px;box-shadow:var(--shadow);padding:18px;overflow:hidden}
 .room-title,.section-card h3,.panel h3,.question-head strong,.topbar h2,.mh h3{color:var(--navy)}
 .modal-card .field label{color:var(--ink-mid)}
