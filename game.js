@@ -4160,7 +4160,14 @@
     }
 
     const currentCombo = getCurrentComboValue();
-    const scored = evaluateAnswer(question, answerValue, remaining, totalTime, currentCombo);
+    let scored = evaluateAnswer(question, answerValue, remaining, totalTime, currentCombo);
+    if (roomModeValue(room) === "quick") {
+      scored = {
+        ...scored,
+        score: await getQuickAnswerScore(room, questionId, scored.isCorrect),
+        comboBonus: 0,
+      };
+    }
 
     const { error: insertErr } = await sb.from("game_room_answers").insert({
       room_id: room.id,
@@ -4180,7 +4187,8 @@
     }
 
     if (roomModeValue(room) === "quick") {
-      await recalcQuickRoomScores(room.id, questionId);
+      const nextScore = await recalcPlayerScore(player.id);
+      await sb.from("game_room_players").update({ score: nextScore }).eq("id", player.id);
     } else if (roomModeValue(room) === "round") {
       const nextScore = await recalcRoundPlayerScore(player.id, room);
       await sb.from("game_room_players").update({ score: nextScore }).eq("id", player.id);
@@ -4324,27 +4332,23 @@
     return baseScore + currentScore;
   }
 
-  async function recalcQuickRoomScores(roomId, questionId) {
+  async function getQuickAnswerScore(room, questionId, isCorrect) {
+    if (!isCorrect) return 0;
     const players = GAME.roomPlayers.length
       ? GAME.roomPlayers
-      : ((await sb.from("game_room_players").select("id,room_id,user_id,score,joined_at").eq("room_id", roomId)).data || []);
-    const { data: answers } = await sb.from("game_room_answers")
-      .select("id,player_id,is_correct,answered_at")
-      .eq("room_id", roomId)
-      .eq("game_question_id", questionId);
-    const correct = (answers || [])
-      .filter((item) => item.is_correct)
-      .sort((a, b) => new Date(a.answered_at || 0) - new Date(b.answered_at || 0));
+      : ((await sb.from("game_room_players").select("id").eq("room_id", room.id)).data || []);
     const playerCount = Math.max(1, players.length);
-    await Promise.all((answers || []).map((answer) => {
-      const rank = correct.findIndex((item) => item.id === answer.id) + 1;
-      const score = rank > 0 ? Math.max(0, (playerCount - rank + 1) * 5) : 0;
-      return sb.from("game_room_answers").update({ score_earned: score }).eq("id", answer.id);
-    }));
-    await Promise.all(players.map(async (player) => {
-      const nextScore = await recalcPlayerScore(player.id);
-      return sb.from("game_room_players").update({ score: nextScore }).eq("id", player.id);
-    }));
+    const { count, error } = await sb
+      .from("game_room_answers")
+      .select("id", { count: "exact", head: true })
+      .eq("room_id", room.id)
+      .eq("game_question_id", questionId)
+      .eq("is_correct", true);
+    const correctBefore = error
+      ? (GAME.roomAnswers || []).filter((item) => item.game_question_id === questionId && item.is_correct).length
+      : Number(count || 0);
+    const rank = correctBefore + 1;
+    return Math.max(0, (playerCount - rank + 1) * 5);
   }
 
   window.toggleGameChoice = function (questionId, option) {
