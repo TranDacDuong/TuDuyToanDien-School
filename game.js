@@ -2473,10 +2473,14 @@
       const ordered = getOrderedPlayersForRoom(room.id, finishedPlayers);
       const deltas = getModeEloDeltaMap(roomModeValue(room), ordered, room);
       Object.keys(deltas).forEach((userId) => {
-        if (!totals[userId]) totals[userId] = { elo: 1000, matches: 0, wins: 0 };
+        if (!totals[userId]) totals[userId] = { elo: 1000, matches: 0, wins: 0, quickMatches: 0, quickWins: 0 };
         totals[userId].elo += Number(deltas[userId] || 0);
         totals[userId].matches += 1;
         if (ordered[0]?.user_id === userId && roomModeValue(room) !== "solo") totals[userId].wins += 1;
+        if (roomModeValue(room) === "quick") {
+          totals[userId].quickMatches += 1;
+          if (ordered[0]?.user_id === userId) totals[userId].quickWins += 1;
+        }
       });
     });
     return Object.entries(totals)
@@ -2490,22 +2494,99 @@
     return GAME.roomsRaw.find((room) => room.id === roomId) || null;
   }
 
+  function getRoundHistoryTitle(roundId, fallbackRoom = null) {
+    const round = (GAME.rounds || []).find((item) => item.id === roundId);
+    if (round) return `Vòng ${round.round_no || 1}: ${round.title || "MindUp"}`;
+    return getRoomDisplayTitle(fallbackRoom || {});
+  }
+
+  function getHistoryEntryTitle(entry) {
+    if (entry?.kind === "round") return entry.title || getRoundHistoryTitle(entry.roundId, entry.room);
+    return getRoomDisplayTitle(entry?.room || {});
+  }
+
+  function getHistoryEntryDetailId(entry) {
+    return entry?.kind === "round" ? `round:${entry.roundId}` : entry?.player?.room_id;
+  }
+
+  function getRoundChallengeSortIndex(room) {
+    const index = getRoundChallengeOrder().indexOf(getRoomRoundChallengeType(room));
+    return index === -1 ? 99 : index;
+  }
+
+  function getRoundChallengeHistoryKey(room) {
+    const type = getRoomRoundChallengeType(room) || "unknown";
+    return type === "finish" ? "finish" : type;
+  }
+
+  function getBestRoundChallengeAttempts(rooms, players) {
+    const bestByChallenge = new Map();
+    (rooms || []).forEach((room) => {
+      const player = (players || []).find((item) => item.room_id === room.id);
+      if (!player) return;
+      const key = getRoundChallengeHistoryKey(room);
+      const score = Number(player.score || 0);
+      const time = new Date(room.ended_at || room.created_at || 0).getTime() || 0;
+      const current = bestByChallenge.get(key);
+      if (!current || score > current.score || (score === current.score && time > current.time)) {
+        bestByChallenge.set(key, { room, player, score, time });
+      }
+    });
+    return [...bestByChallenge.values()].sort((a, b) =>
+      getRoundChallengeSortIndex(a.room) - getRoundChallengeSortIndex(b.room)
+      || a.time - b.time
+    );
+  }
+
   function getMyFinishedHistory(limit = 20) {
     const finishedRooms = GAME.rooms.filter((room) => room.status === "finished");
     const finishedIds = new Set(finishedRooms.map((room) => room.id));
     const finishedPlayers = GAME.players.filter((player) => finishedIds.has(player.room_id));
-    return finishedPlayers
+    const entries = [];
+    const roundGroups = new Map();
+    finishedPlayers
       .filter((player) => player.user_id === GAME.user.id)
-      .sort((a, b) => new Date(getRoomById(b.room_id)?.ended_at || 0) - new Date(getRoomById(a.room_id)?.ended_at || 0))
-      .slice(0, limit)
-      .map((player) => {
+      .forEach((player) => {
         const room = getRoomById(player.room_id);
+        if (roomModeValue(room) === "round" && room?.round_id) {
+          const current = roundGroups.get(room.round_id) || [];
+          current.push({ player, room });
+          roundGroups.set(room.round_id, current);
+          return;
+        }
         const sameRoom = finishedPlayers
           .filter((row) => row.room_id === player.room_id)
           .sort((a, b) => (b.score || 0) - (a.score || 0));
         const rank = sameRoom.findIndex((row) => row.user_id === GAME.user.id) + 1;
-        return { player, room, rank: Math.max(rank, 1), players: sameRoom };
+        entries.push({
+          kind: "room",
+          player,
+          room,
+          rank: Math.max(rank, 1),
+          players: sameRoom,
+          sortAt: new Date(room?.ended_at || room?.created_at || 0).getTime(),
+        });
       });
+
+    roundGroups.forEach((items, roundId) => {
+      const sorted = [...items].sort((a, b) => new Date(b.room?.ended_at || b.room?.created_at || 0) - new Date(a.room?.ended_at || a.room?.created_at || 0));
+      const latest = sorted[0];
+      const totalScore = sorted.reduce((max, item) => Math.max(max, Number(item.player?.score || 0)), 0);
+      entries.push({
+        kind: "round",
+        roundId,
+        title: getRoundHistoryTitle(roundId, latest?.room),
+        player: { ...(latest?.player || {}), room_id: `round:${roundId}`, score: totalScore },
+        room: latest?.room,
+        rank: 1,
+        rooms: sorted.map((item) => item.room),
+        sortAt: new Date(latest?.room?.ended_at || latest?.room?.created_at || 0).getTime(),
+      });
+    });
+
+    return entries
+      .sort((a, b) => (b.sortAt || 0) - (a.sortAt || 0))
+      .slice(0, limit);
   }
 
   function renderArenaInsightsUnified() {
@@ -2514,9 +2595,10 @@
     const finishedPlayers = GAME.players.filter((player) => finishedIds.has(player.room_id));
     const myFinished = finishedPlayers.filter((player) => player.user_id === GAME.user.id);
     const myCompetitiveFinished = myFinished.filter((player) => roomModeValue(getRoomById(player.room_id)) !== "solo");
+    const myHistoryEntries = getMyFinishedHistory(9999);
     const eloProfile = getUnifiedEloProfile(finishedRooms, finishedPlayers, GAME.user.id);
-    const totalMatches = myFinished.length;
-    const totalScore = myFinished.reduce((sum, item) => sum + Number(item.score || 0), 0);
+    const totalMatches = myHistoryEntries.length;
+    const totalScore = myHistoryEntries.reduce((sum, item) => sum + Number(item.player?.score || 0), 0);
     const wins = myCompetitiveFinished.filter((player) => {
       const sameRoom = finishedPlayers.filter((row) => row.room_id === player.room_id);
       const best = sameRoom.reduce((max, row) => Math.max(max, Number(row.score || 0)), 0);
@@ -2598,7 +2680,10 @@
 
     if (EL.globalLeaderboard) {
       EL.globalLeaderboard.innerHTML = leaderboard.length
-        ? leaderboard.map((item, idx) => `<div class="player-row"><div class="player-main"><img class="avatar" src="${escAttr(getPlayerAvatar(item.userId))}" alt="avatar"><div><div style="font-weight:700;color:var(--navy)">${idx + 1}. ${esc(getPlayerName(item.userId))}</div><div class="hint">${item.matches} trận Elo • ${item.wins} trận đứng đầu</div></div></div><strong style="color:var(--navy)">${item.elo}</strong></div>`).join("")
+        ? leaderboard.map((item, idx) => {
+          const quickRate = item.quickMatches ? Math.round((Number(item.quickWins || 0) / Number(item.quickMatches || 1)) * 100) : 0;
+          return `<div class="player-row"><div class="player-main"><img class="avatar" src="${escAttr(getPlayerAvatar(item.userId))}" alt="avatar"><div><div style="font-weight:700;color:var(--navy)">${idx + 1}. ${esc(getPlayerName(item.userId))}</div><div class="hint">${item.matches} trận Elo • Thắng Đấu nhanh ${quickRate}%</div></div></div><strong style="color:var(--navy)">${item.elo}</strong></div>`;
+        }).join("")
         : `<div class="empty">Chưa có dữ liệu Elo.</div>`;
     }
 
@@ -2610,7 +2695,7 @@
     const subjectLabel = subject ? subject.name : "";
     const mountainScopeLabel = [gradeLabel, subjectLabel].filter(Boolean).join(" • ") || "Khối của bạn";
     if (EL.mountainLeaderboardTitle) {
-      EL.mountainLeaderboardTitle.textContent = `Bảng xếp hạng Leo núi - ${mountainScopeLabel}`;
+      EL.mountainLeaderboardTitle.textContent = "Bảng xếp hạng Leo núi";
     }
     if (EL.mountainLeaderboard) {
       const mountainRooms = finishedRooms.filter((room) =>
@@ -2618,15 +2703,24 @@
         (!gradeId || room.grade_id === gradeId) &&
         (!subjectId || room.subject_id === subjectId)
       );
-      const mountainIds = new Set(mountainRooms.map((room) => room.id));
-      const mountainTotals = new Map();
+      const mountainRoomMap = new Map(mountainRooms.map((room) => [room.id, room]));
+      const mountainIds = new Set(mountainRoomMap.keys());
+      const userRoundScores = new Map();
       finishedPlayers.filter((player) => mountainIds.has(player.room_id)).forEach((player) => {
-        const current = mountainTotals.get(player.user_id) || { userId: player.user_id, score: 0, best: 0, attempts: 0 };
-        const score = Number(player.score || 0);
+        const room = mountainRoomMap.get(player.room_id);
+        const key = `${player.user_id}:${room?.round_id || room?.id || player.room_id}`;
+        const current = userRoundScores.get(key) || { userId: player.user_id, score: 0 };
+        current.score = Math.max(current.score, Number(player.score || 0));
+        userRoundScores.set(key, current);
+      });
+      const mountainTotals = new Map();
+      userRoundScores.forEach((roundScore) => {
+        const current = mountainTotals.get(roundScore.userId) || { userId: roundScore.userId, score: 0, best: 0, attempts: 0 };
+        const score = Number(roundScore.score || 0);
         current.score += score;
         current.best = Math.max(current.best, score);
         current.attempts += 1;
-        mountainTotals.set(player.user_id, current);
+        mountainTotals.set(roundScore.userId, current);
       });
       const mountainLeaderboard = [...mountainTotals.values()]
         .sort((a, b) => b.score - a.score || b.best - a.best || a.attempts - b.attempts)
@@ -2646,14 +2740,14 @@
     EL.historyModalBody.innerHTML = history.length
       ? `<div class="panel" style="grid-column:1/-1">
           <div class="history-list">
-            ${history.map(({ player, room, rank }) => `<div class="history-item">
+            ${history.map((entry) => `<div class="history-item">
               <div class="history-main">
-                <strong>${esc(getRoomDisplayTitle(room || {}))}</strong>
-                <div class="hint">${fmtDateTime(room?.ended_at || room?.created_at)}</div>
+                <strong>${esc(getHistoryEntryTitle(entry))}</strong>
+                <div class="hint">${fmtDateTime(entry.room?.ended_at || entry.room?.created_at)}</div>
               </div>
               <div class="history-actions">
-                <div style="text-align:right"><strong>${player.score || 0} điểm</strong><div class="hint">Hạng #${rank}</div></div>
-                <button class="btn btn-outline btn-sm" type="button" onclick="openGameHistoryDetail('${player.room_id}')">Xem chi tiết</button>
+                <div style="text-align:right"><strong>${entry.player?.score || 0} điểm</strong>${entry.kind === "round" ? `<div class="hint">Tổng Vòng MindUp</div>` : `<div class="hint">Hạng #${entry.rank}</div>`}</div>
+                <button class="btn btn-outline btn-sm" type="button" onclick="openGameHistoryDetail('${escAttr(getHistoryEntryDetailId(entry) || "")}')">Xem chi tiết</button>
               </div>
             </div>`).join("")}
           </div>
@@ -2662,6 +2756,10 @@
   }
 
   async function openHistoryDetail(roomId) {
+    if (String(roomId || "").startsWith("round:")) {
+      await openRoundHistoryDetail(String(roomId || "").slice("round:".length));
+      return;
+    }
     const room = getRoomById(roomId);
     if (!room || !EL.historyModalBody) return;
     const title = document.querySelector("#gameHistoryModal .mh h2");
@@ -2705,6 +2803,87 @@
       </div>
     `;
     return;
+  }
+
+  async function openRoundHistoryDetail(roundId) {
+    if (!roundId || !EL.historyModalBody) return;
+    const title = document.querySelector("#gameHistoryModal .mh h2");
+    if (title) title.textContent = "Chi tiết Vòng MindUp";
+    EL.historyModal.classList.add("show");
+    EL.historyModalBody.innerHTML = `<div class="empty" style="grid-column:1/-1">Đang tải chi tiết Vòng MindUp...</div>`;
+    const roundRooms = (GAME.roomsRaw || [])
+      .filter((room) => room.status === "finished" && roomModeValue(room) === "round" && room.round_id === roundId)
+      .sort((a, b) => {
+        const orderA = getRoundChallengeOrder().indexOf(getRoomRoundChallengeType(a));
+        const orderB = getRoundChallengeOrder().indexOf(getRoomRoundChallengeType(b));
+        return (orderA === -1 ? 99 : orderA) - (orderB === -1 ? 99 : orderB)
+          || new Date(a.ended_at || a.created_at || 0) - new Date(b.ended_at || b.created_at || 0);
+      });
+    const roomIds = roundRooms.map((room) => room.id);
+    if (!roomIds.length) {
+      EL.historyModalBody.innerHTML = `<div class="empty" style="grid-column:1/-1">Không tìm thấy dữ liệu Vòng MindUp.</div>`;
+      return;
+    }
+    const [{ data: players }, { data: answers }] = await Promise.all([
+      sb.from("game_room_players").select("id,room_id,user_id,score,joined_at").in("room_id", roomIds),
+      sb.from("game_room_answers").select("player_id,room_id,is_correct,score_earned,answered_at").in("room_id", roomIds),
+    ]);
+    const myPlayers = (players || []).filter((player) => player.user_id === GAME.user.id);
+    const myRoomIds = new Set(myPlayers.map((player) => player.room_id));
+    const myRoundRooms = roundRooms.filter((room) => myRoomIds.has(room.id));
+    if (!myRoundRooms.length) {
+      EL.historyModalBody.innerHTML = `<div class="empty" style="grid-column:1/-1">Không tìm thấy dữ liệu Vòng MindUp của bạn.</div>`;
+      return;
+    }
+    const selectedAttempts = getBestRoundChallengeAttempts(myRoundRooms, myPlayers);
+    let carriedScore = 0;
+    const challengeRows = selectedAttempts.map(({ room, player: myPlayer }) => {
+      const finalScore = Number(myPlayer?.score || 0);
+      const challengeScore = Math.max(0, finalScore - carriedScore);
+      carriedScore = Math.max(carriedScore, finalScore);
+      const myAnswers = (answers || []).filter((answer) => answer.player_id === myPlayer?.id);
+      const correctCount = myAnswers.filter((answer) => answer.is_correct).length;
+      return {
+        room,
+        label: getRoundChallengeDisplayName(getRoomRoundChallengeType(room), getRoomRoundFinishLevel(room)),
+        finalScore,
+        challengeScore,
+        correctCount,
+        answerCount: myAnswers.length,
+      };
+    });
+    const totalScore = challengeRows.reduce((max, row) => Math.max(max, row.finalScore), 0);
+    const totalCorrect = challengeRows.reduce((sum, row) => sum + row.correctCount, 0);
+    const totalAnswered = challengeRows.reduce((sum, row) => sum + row.answerCount, 0);
+    EL.historyModalBody.innerHTML = `
+      <div class="panel">
+        <h3>${esc(getRoundHistoryTitle(roundId, myRoundRooms[0]))}</h3>
+        <div class="hint" style="margin-bottom:12px">${fmtDateTime(myRoundRooms[myRoundRooms.length - 1]?.ended_at || myRoundRooms[0]?.created_at)}</div>
+        <div class="history-stat-grid">
+          <div class="history-stat"><span>Tổng điểm</span><strong>${totalScore}</strong></div>
+          <div class="history-stat"><span>Trạng thái</span><strong>${totalScore >= 100 ? "Đã qua" : "Chưa qua"}</strong></div>
+          <div class="history-stat"><span>Thử thách</span><strong>${challengeRows.length}/4</strong></div>
+          <div class="history-stat"><span>Câu đúng</span><strong>${totalCorrect}/${totalAnswered}</strong></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Điểm từng thử thách</h3>
+        <div class="question-breakdown">
+          ${challengeRows.map((row) => `<div class="question-breakdown-item">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
+              <div>
+                <strong style="color:var(--navy)">${esc(row.label)}</strong>
+                <div class="hint">${row.correctCount}/${row.answerCount} câu đúng</div>
+              </div>
+              <div style="text-align:right">
+                <strong style="color:var(--navy);font-size:1.1rem">${row.challengeScore}</strong>
+                <div class="hint">Tổng đến đây ${row.finalScore}</div>
+              </div>
+            </div>
+          </div>`).join("")}
+        </div>
+      </div>
+    `;
   }
 
   function closeGameHistoryModal() {

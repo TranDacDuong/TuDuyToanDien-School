@@ -53,6 +53,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
 .stat-card small{display:block;margin-top:6px;color:var(--ink-light);font-size:.76rem}
 .section-card{background:#fff;border:1px solid rgba(39,58,91,.08);border-radius:20px;box-shadow:0 14px 32px rgba(15,23,42,.06);padding:18px}
 .section-card h3{margin:0 0 12px;color:var(--navy)}
+.student-leaderboard-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:24px}
 .invite-tools{display:grid;gap:10px}
 .friend-invite-list{display:grid;gap:8px}
 .friend-invite-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:14px;background:#f8fafc;border:1px solid rgba(39,58,91,.06)}
@@ -169,6 +170,11 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
 .stat-card span{color:var(--ink-light);font-weight:700;letter-spacing:.02em}
 .stat-card strong{color:var(--navy);font-size:1.55rem;line-height:1.1;text-shadow:none}
 .stat-card small{color:var(--ink-light);font-size:.8rem;line-height:1.45}
+.hero .stats-grid{grid-template-columns:repeat(3,minmax(120px,180px));gap:10px;margin-top:4px}
+.hero .stat-card{padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.92);box-shadow:0 8px 18px rgba(15,31,61,.08)}
+.hero .stat-card span{font-size:.68rem;margin-bottom:3px}
+.hero .stat-card strong{font-size:1.05rem}
+.hero .stat-card small{font-size:.68rem;margin-top:2px}
 .room-card{border-radius:18px;box-shadow:var(--shadow);padding:18px;overflow:hidden}
 .room-title,.section-card h3,.panel h3,.question-head strong,.topbar h2,.mh h3{color:var(--navy)}
 .modal-card .field label{color:var(--ink-mid)}
@@ -483,7 +489,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   line-height:1;
 }
 @media(max-width:1024px){
-  .toolbar,.form-grid,.room-shell,.game-stage,.insight-grid,.stats-grid{grid-template-columns:1fr}
+  .toolbar,.form-grid,.room-shell,.game-stage,.insight-grid,.stats-grid,.student-leaderboard-grid{grid-template-columns:1fr}
   .history-detail-grid{grid-template-columns:1fr}
   .game-question-picker-toolbar,.game-question-picker-body{grid-template-columns:1fr}
   #gameRoomScreen .topbar{height:auto;min-height:110px;align-items:flex-start}
@@ -573,6 +579,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
     <div class="hero-copy">
       <h1>Đấu trường tri thức</h1>
       <p>Học sinh vào Game theo Khối trong hồ sơ, chọn Chơi đơn, Đấu nhanh hoặc Vòng MindUp khi admin đã bật bộ câu hỏi tương ứng.</p>
+      <div id="gameStatsGrid" class="stats-grid"></div>
       <div id="gameHeroBadges" class="hero-badges"></div>
     </div>
     <div class="hero-actions">
@@ -720,19 +727,20 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
 </div>
 
 <div class="page" id="gameStudentInsightPage" style="padding-top:0">
-  <div class="insight-grid">
-    <div style="display:grid;gap:18px">
-      <div id="gameStatsGrid" class="stats-grid"></div>
-      <div class="section-card">
-        <h3>Lịch sử thi đấu gần đây</h3>
-        <div id="gameHistoryList" class="history-list"></div>
-      </div>
+  <div class="hidden">
+    <div class="section-card">
+      <h3>Lịch sử thi đấu gần đây</h3>
+      <div id="gameHistoryList" class="history-list"></div>
     </div>
+  </div>
+  <div class="student-leaderboard-grid">
     <div class="section-card">
       <h3>Bảng xếp hạng Elo</h3>
       <div id="gameGlobalLeaderboard" class="player-list leaderboard"></div>
-      <div class="hint" id="gameMountainLeaderboardTitle" style="margin:14px 0 8px;color:var(--navy);font-weight:800">Bảng xếp hạng Leo núi theo Khối/Môn</div>
-      <div id="gameMountainLeaderboard" class="player-list leaderboard" style="margin-top:10px"></div>
+    </div>
+    <div class="section-card">
+      <h3 id="gameMountainLeaderboardTitle">Bảng xếp hạng Leo núi</h3>
+      <div id="gameMountainLeaderboard" class="player-list leaderboard"></div>
     </div>
   </div>
 </div>
