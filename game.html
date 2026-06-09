@@ -368,12 +368,23 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
 #gameLiveView.mode-solo .progress-wrap{
   display:none;
 }
+#gameLiveView.mode-quick .progress-wrap{
+  display:none;
+}
 #gameLiveView.mode-solo .question-card{
   min-height:0;
   gap:14px;
   align-self:start;
 }
+#gameLiveView.mode-quick .question-card{
+  min-height:0;
+  gap:14px;
+  align-self:start;
+}
 #gameLiveView.mode-solo .question-text{
+  margin-top:0;
+}
+#gameLiveView.mode-quick .question-text{
   margin-top:0;
 }
 #gameLiveView .progress-wrap{
@@ -476,9 +487,18 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   filter:drop-shadow(0 8px 14px rgba(0,0,0,.28));
 }
 #gameLiveView .score-box:first-of-type div:nth-child(2),
-#gameLiveView .score-box:nth-of-type(2),
-#gameLiveView #gameLeaderboard{
+#gameLiveView .score-box:nth-of-type(2){
   display:none!important;
+}
+#gameLiveView.mode-solo #gameLeaderboard,
+#gameLiveView.mode-round #gameLeaderboard{
+  display:none!important;
+}
+#gameLiveView.mode-quick .score-box{
+  display:none!important;
+}
+#gameLiveView.mode-quick #gameLeaderboard{
+  display:grid!important;
 }
 #gameLiveView .score-box span{
   color:#fff;

@@ -1319,9 +1319,10 @@
     const badge = ensureRoundTopbarScore();
     const isRound = mode === "round";
     const isSoloLive = mode === "solo" && GAME.activeRoom?.status === "live";
-    const isPinnedScore = isRound || isSoloLive;
+    const isQuickLive = mode === "quick" && GAME.activeRoom?.status === "live";
+    const isPinnedScore = isRound || isSoloLive || isQuickLive;
     if (badge) {
-      badge.textContent = isSoloLive ? `Điểm: ${Number(score || 0)}` : `Điểm của bạn: ${Number(score || 0)}`;
+      badge.textContent = (isSoloLive || isQuickLive) ? `Điểm: ${Number(score || 0)}` : `Điểm của bạn: ${Number(score || 0)}`;
       badge.classList.toggle("hidden", !isPinnedScore);
     }
     EL.leaveGameBtn?.classList.add("hidden");
@@ -4282,6 +4283,7 @@
     EL.leaderboard.innerHTML = ordered.map((player, idx) => renderPlayerRow(player, idx + 1, true)).join("");
     const myIndex = ordered.findIndex((item) => item.user_id === GAME.user.id);
     const myRow = ordered[myIndex];
+    updateRoundTopbarScore(roomModeValue(GAME.activeRoom), myRow?.score || 0);
     EL.myScore.textContent = myRow?.score || 0;
     EL.myRank.textContent = myIndex >= 0 ? `#${myIndex + 1}` : "#-";
     if (EL.myCombo) EL.myCombo.textContent = comboStats.combo;
