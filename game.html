@@ -602,6 +602,17 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   <div id="gameRoundGrid" class="room-grid hidden"></div>
 </div>
 
+<div id="gameRoundSelectionScreen" class="screen">
+  <div class="topbar">
+    <button class="btn btn-outline btn-sm" type="button" onclick="closeGameRoundSelectionScreen()">← Quay lại</button>
+    <h2 id="gameRoundSelectionTitle">Vòng MindUp</h2>
+    <div class="topbar-actions"></div>
+  </div>
+  <div class="screen-body">
+    <div id="gameRoundSelectionGrid" class="room-grid" style="max-width:1180px;margin:0 auto"></div>
+  </div>
+</div>
+
 <div class="page hidden" id="gameAdminPage">
   <div class="hero">
     <div class="hero-copy">

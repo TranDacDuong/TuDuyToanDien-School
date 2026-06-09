@@ -63,6 +63,9 @@
     gradeFilter: document.getElementById("gameGradeFilter"),
     subjectFilter: document.getElementById("gameSubjectFilter"),
     roundGrid: document.getElementById("gameRoundGrid"),
+    roundSelectionScreen: document.getElementById("gameRoundSelectionScreen"),
+    roundSelectionTitle: document.getElementById("gameRoundSelectionTitle"),
+    roundSelectionGrid: document.getElementById("gameRoundSelectionGrid"),
     heroBadges: document.getElementById("gameHeroBadges"),
     statsGrid: document.getElementById("gameStatsGrid"),
     historyList: document.getElementById("gameHistoryList"),
@@ -1072,18 +1075,52 @@
     autoMatchSelectedMode();
   }
 
+  function getMyRoundSummaryByRoundId(roundId) {
+    const roomIds = new Set((GAME.roomsRaw || [])
+      .filter((room) => room.status === "finished" && roomModeValue(room) === "round" && room.round_id === roundId)
+      .map((room) => room.id));
+    const myRows = (GAME.players || [])
+      .filter((player) => player.user_id === GAME.user?.id && roomIds.has(player.room_id))
+      .map((player) => ({ player, room: getRoomById(player.room_id) }))
+      .filter((item) => item.room);
+    const challengeCounts = new Map();
+    myRows.forEach(({ room }) => {
+      const key = getRoundChallengeHistoryKey(room);
+      challengeCounts.set(key, Number(challengeCounts.get(key) || 0) + 1);
+    });
+    const scores = myRows.map(({ player }) => Number(player.score || 0));
+    return {
+      attempts: challengeCounts.size ? Math.max(...challengeCounts.values()) : 0,
+      bestScore: scores.length ? Math.max(...scores) : 0,
+    };
+  }
+
+  function closeRoundSelectionScreen() {
+    EL.roundSelectionScreen?.classList.remove("show");
+    if (GAME.selectedAutoMode === "round" && EL.gradeFilter?.value) openSubjectSelectModal();
+  }
+
   function renderRoundSelection(gradeId, subjectId) {
     const rounds = (GAME.rounds || [])
       .filter((round) => round.grade_id === gradeId && round.subject_id === subjectId && (round.status || "active") === "active")
       .sort((a, b) => Number(a.round_no || 0) - Number(b.round_no || 0));
-    if (!EL.roundGrid) return;
-    EL.roundGrid.classList.remove("hidden");
+    const grid = EL.roundSelectionGrid || EL.roundGrid;
+    if (!grid) return;
+    EL.roundGrid?.classList.add("hidden");
+    EL.roundSelectionScreen?.classList.add("show");
+    const subject = (GAME.subjects || []).find((item) => item.id === subjectId);
+    if (EL.roundSelectionTitle) {
+      EL.roundSelectionTitle.textContent = subject ? `Vòng MindUp - ${subject.name}` : "Vòng MindUp";
+    }
 
     GAME.selectedRoundId = "";
-    EL.roundGrid.innerHTML = rounds.length
-      ? rounds.map((round) => `<div class="room-card"><div class="room-top"><div><div class="room-title">Vòng ${round.round_no || 1}: ${esc(round.title)}</div><div class="hint">${esc(round.description || "Chọn Khối, Môn, Vòng rồi vào giao diện 4 thử thách MindUp.")}</div></div><span class="pill live">MindUp</span></div><div class="room-meta"><div><span>Khởi động</span><strong>120 giây, đúng +10</strong></div><div><span>Vượt chướng ngại vật</span><strong>4 ô, từ khóa bonus</strong></div><div><span>Tăng tốc</span><strong>40/30/20/10 theo tốc độ</strong></div><div><span>Về đích</span><strong>Dễ / TB / Khó</strong></div></div><div class="room-actions" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" type="button" data-open-round="${escAttr(round.id)}">Vào vòng</button></div></div>`).join("")
+    grid.innerHTML = rounds.length
+      ? rounds.map((round) => {
+        const summary = getMyRoundSummaryByRoundId(round.id);
+        return `<div class="room-card"><div class="room-top"><div><div class="room-title">Vòng ${round.round_no || 1}: ${esc(round.title)}</div><div class="hint">${esc(round.description || "Chọn vòng để vào giao diện thi MindUp.")}</div></div><span class="pill live">MindUp</span></div><div class="room-meta"><div><span>Số lần đã thi</span><strong>${summary.attempts}</strong></div><div><span>Điểm cao nhất</span><strong>${summary.bestScore}</strong></div></div><div class="room-actions" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" type="button" data-open-round="${escAttr(round.id)}">Vào vòng</button></div></div>`;
+      }).join("")
       : '<div class="empty"><strong>Chưa có vòng MindUp</strong><div>Admin chưa tạo vòng thi cho Khối/Môn này.</div></div>';
-    document.querySelectorAll("[data-open-round]").forEach((button) => {
+    grid.querySelectorAll("[data-open-round]").forEach((button) => {
       button.addEventListener("click", () => renderRoundChallengeLobby(button.dataset.openRound || ""));
     });
   }
@@ -1092,6 +1129,7 @@
     const round = (GAME.rounds || []).find((item) => item.id === roundId);
     const view = ensureRoundLobbyView();
     if (!round || !view || !EL.roomScreen) return;
+    EL.roundSelectionScreen?.classList.remove("show");
     GAME.selectedRoundId = roundId;
     clearIntervals();
     showRoomNotice("");
@@ -2109,6 +2147,7 @@
     EL.roomMode?.addEventListener("change", () => applyModeDefaults(EL.roomMode.value, true));
     EL.roomGrade?.addEventListener("change", () => fillSubjects(EL.roomSubject, EL.roomGrade.value, "Chọn môn"));
     EL.gradeFilter?.addEventListener("change", () => {
+      EL.roundSelectionScreen?.classList.remove("show");
       fillSubjects(EL.subjectFilter, EL.gradeFilter.value, "Tất cả môn");
       renderArenaInsightsUnified();
       if (!EL.gradeFilter.value) GAME.selectedAutoMode = "";
@@ -2125,6 +2164,7 @@
     EL.shareGameCodeBtn?.addEventListener("click", copyRoomInvite);
     document.querySelectorAll("[data-auto-mode]").forEach((button) => {
       button.addEventListener("click", () => {
+        EL.roundSelectionScreen?.classList.remove("show");
         GAME.selectedAutoMode = button.dataset.autoMode || "";
         if (EL.gradeFilter) EL.gradeFilter.value = "";
         if (EL.subjectFilter) EL.subjectFilter.value = "";
@@ -4670,6 +4710,7 @@
   window.openGameHistoryDetail = openHistoryDetail;
   window.closeGameHistoryModal = closeGameHistoryModal;
   window.closeGameSubjectSelectModal = closeSubjectSelectModal;
+  window.closeGameRoundSelectionScreen = closeRoundSelectionScreen;
   window.closeGameRoomModal = closeGameRoomModal;
   window.closeGameScreen = closeGameScreen;
 })();
