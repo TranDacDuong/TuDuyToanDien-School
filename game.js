@@ -4277,6 +4277,18 @@
       const score = ratio >= 0.75 ? 20 : ratio >= 0.5 ? 15 : ratio >= 0.25 ? 10 : 5;
       return { isCorrect: true, score, comboBonus: 0 };
     }
+    if (mode === "quick") {
+      let ok = false;
+      if (question.question_type === "multi_choice") {
+        ok = normalizeAnswer(question.answer) === normalizeAnswer(answerValue);
+      } else if (question.question_type === "true_false") {
+        ok = normalizeAnswer(question.answer) === normalizeAnswer(answerValue);
+      } else {
+        const accepted = shortAnswerAccepted(question.answer);
+        ok = accepted.includes(String(answerValue || "").trim().toLowerCase());
+      }
+      return { isCorrect: ok, score: 0, comboBonus: 0 };
+    }
     const speedBonus = Math.round((remaining / totalTime) * (mode === "speed" ? 70 : 35));
     const base = Number(question.points || 0);
     const comboBonus = mode === "speed"
@@ -4326,7 +4338,7 @@
     const playerCount = Math.max(1, players.length);
     await Promise.all((answers || []).map((answer) => {
       const rank = correct.findIndex((item) => item.id === answer.id) + 1;
-      const score = rank > 0 ? Math.max(5, (playerCount - rank + 1) * 5) : 0;
+      const score = rank > 0 ? Math.max(0, (playerCount - rank + 1) * 5) : 0;
       return sb.from("game_room_answers").update({ score_earned: score }).eq("id", answer.id);
     }));
     await Promise.all(players.map(async (player) => {
