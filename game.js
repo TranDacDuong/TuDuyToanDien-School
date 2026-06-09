@@ -60,15 +60,9 @@
   };
 
   const EL = {
-    keyword: document.getElementById("gameKeyword"),
     gradeFilter: document.getElementById("gameGradeFilter"),
     subjectFilter: document.getElementById("gameSubjectFilter"),
-    modeFilter: document.getElementById("gameModeFilter"),
-    visibilityFilter: document.getElementById("gameVisibilityFilter"),
-    sortFilter: document.getElementById("gameSortFilter"),
-    statusFilter: document.getElementById("gameStatusFilter"),
-    roomGrid: document.getElementById("gameRoomGrid"),
-    roomEmpty: document.getElementById("gameRoomEmpty"),
+    roundGrid: document.getElementById("gameRoundGrid"),
     heroBadges: document.getElementById("gameHeroBadges"),
     statsGrid: document.getElementById("gameStatsGrid"),
     historyList: document.getElementById("gameHistoryList"),
@@ -77,9 +71,6 @@
     globalLeaderboard: document.getElementById("gameGlobalLeaderboard"),
     mountainLeaderboard: document.getElementById("gameMountainLeaderboard"),
     mountainLeaderboardTitle: document.getElementById("gameMountainLeaderboardTitle"),
-    openRoomBtn: document.getElementById("openGameRoomBtn"),
-    quickMatchBtn: document.getElementById("quickMatchBtn"),
-    reloadRoomsBtn: document.getElementById("reloadGameRoomsBtn"),
     joinCode: document.getElementById("gameJoinCode"),
     joinByCodeBtn: document.getElementById("joinByCodeBtn"),
     roomModal: document.getElementById("gameRoomModal"),
@@ -329,17 +320,6 @@
     const visibilityLabel = EL.roomVisibility.closest(".field").querySelector("label");
     if (visibilityLabel) visibilityLabel.textContent = "Hiển thị phòng";
   }
-  if (EL.modeFilter) {
-    EL.modeFilter.innerHTML = `
-      <option value="">Mọi chế độ</option>
-      <option value="solo">Chơi đơn</option>
-      <option value="quick">Đấu nhanh</option>
-      <option value="friends">Phòng bạn bè</option>
-      <option value="ranked">Leo hạng</option>
-      <option value="survival">Sinh tồn</option>
-      <option value="speed">Đua tốc độ</option>
-    `;
-  }
   if (EL.roomMode) {
     EL.roomMode.innerHTML = `
       <option value="quick">Đấu nhanh</option>
@@ -351,39 +331,8 @@
   }
 
   function applyCleanModeOptions() {
-    if (EL.modeFilter) {
-      EL.modeFilter.innerHTML = `
-        <option value="">Mọi chế độ</option>
-        <option value="solo">Chơi đơn</option>
-        <option value="quick">Đấu nhanh</option>
-      `;
-    }
     if (EL.roomMode) {
-      EL.roomMode.innerHTML = `
-        <option value="quick">Đấu nhanh</option>
-        <option value="friends">Phòng bạn bè</option>
-      `;
-    }
-    return;
-    if (EL.modeFilter) {
-      EL.modeFilter.innerHTML = `
-        <option value="">Mọi chế độ</option>
-        <option value="solo">Chơi đơn</option>
-        <option value="quick">Đấu nhanh</option>
-        <option value="friends">Phòng bạn bè</option>
-        <option value="ranked">Leo hạng</option>
-        <option value="survival">Sinh tồn</option>
-        <option value="speed">Đua tốc độ</option>
-      `;
-    }
-    if (EL.roomMode) {
-      EL.roomMode.innerHTML = `
-        <option value="quick">Đấu nhanh</option>
-        <option value="friends">Phòng bạn bè</option>
-        <option value="ranked">Leo hạng</option>
-        <option value="survival">Sinh tồn</option>
-        <option value="speed">Đua tốc độ</option>
-      `;
+      EL.roomMode.innerHTML = `<option value="quick">Đấu nhanh</option><option value="friends">Phòng bạn bè</option>`;
     }
   }
 
@@ -531,36 +480,6 @@
     EL.leaveGameBtn = null;
     if (EL.gradeFilter?.options[0]) EL.gradeFilter.options[0].text = "Tất cả khối";
     if (EL.subjectFilter?.options[0]) EL.subjectFilter.options[0].text = "Tất cả môn";
-    if (EL.visibilityFilter) {
-      EL.visibilityFilter.innerHTML = `
-        <option value="">Mọi kiểu phòng</option>
-        <option value="public">Công khai</option>
-        <option value="private">Riêng tư</option>
-      `;
-    }
-    if (EL.sortFilter) {
-      EL.sortFilter.innerHTML = `
-        <option value="players">Đông người nhất</option>
-        <option value="recommended">Phù hợp nhất</option>
-        <option value="hot">Đang sôi động</option>
-        <option value="new">Mới nhất</option>
-        <option value="spots">Còn nhiều chỗ</option>
-      `;
-      EL.sortFilter.value = "players";
-    }
-    if (EL.statusFilter) {
-      EL.statusFilter.innerHTML = `
-        <option value="">Tất cả trạng thái</option>
-        <option value="waiting">Đang chờ</option>
-        <option value="live">Đang đấu</option>
-        <option value="finished">Đã kết thúc</option>
-      `;
-    }
-
-    const emptyTitle = document.querySelector("#gameRoomEmpty strong");
-    if (emptyTitle) emptyTitle.textContent = "Chưa có phòng nào phù hợp";
-    const emptyDesc = document.querySelector("#gameRoomEmpty div");
-    if (emptyDesc) emptyDesc.textContent = "Hãy đổi bộ lọc hoặc tạo một phòng mới để bắt đầu thi đấu.";
 
     const studentSectionTitles = document.querySelectorAll("#gameStudentInsightPage .section-card h3");
     EL.historyList?.closest(".section-card")?.classList.add("hidden");
@@ -616,12 +535,6 @@
     if (historyClose) historyClose.textContent = "Đóng";
     if (heroTitle) heroTitle.textContent = "Đấu trường tri thức";
     if (heroDesc) heroDesc.textContent = "Chọn chế độ, vào phòng và trả lời thật nhanh. Luật cộng/trừ Elo của từng chế độ được hiển thị rõ để người chơi dễ theo dõi.";
-    if (EL.openRoomBtn) EL.openRoomBtn.textContent = "+ Tạo phòng mới";
-    if (EL.quickMatchBtn) EL.quickMatchBtn.textContent = "Ghép nhanh";
-    if (EL.reloadRoomsBtn) EL.reloadRoomsBtn.textContent = "Tải lại";
-    if (EL.joinCode) EL.joinCode.placeholder = "Nhập mã phòng";
-    if (EL.joinByCodeBtn) EL.joinByCodeBtn.textContent = "Vào phòng";
-    if (EL.keyword) EL.keyword.placeholder = "Tìm theo tên phòng hoặc mã phòng";
     if (EL.roomScreenTitle) EL.roomScreenTitle.textContent = "Phòng thi đấu";
     if (EL.toggleReadyBtn) EL.toggleReadyBtn.textContent = "Sẵn sàng";
     if (EL.leaveGameBtn) EL.leaveGameBtn.textContent = "Rời phòng";
@@ -712,11 +625,6 @@
     }
   }
 
-  function getRoomRoleMeta(room) {
-    if (room?.class_id) return { label: "Phòng lớp học", accent: "Lớp riêng" };
-    if ((room?.visibility || "public") === "public") return { label: "Phòng công khai", accent: "Mở toàn sảnh" };
-    return { label: "Phòng riêng", accent: "Vào bằng mã" };
-  }
 
   function sortPlayersByJoin(players) {
     return [...(players || [])].sort((a, b) => new Date(a.joined_at || 0) - new Date(b.joined_at || 0) || String(a.user_id || "").localeCompare(String(b.user_id || "")));
@@ -1122,17 +1030,7 @@
   }
 
   function refreshLobbyActions() {
-    if (EL.openRoomBtn) {
-      EL.openRoomBtn.textContent = "Phòng bạn bè";
-      EL.openRoomBtn.classList.add("hidden");
-    }
-    if (EL.quickMatchBtn) EL.quickMatchBtn.classList.add("hidden");
-    if (EL.reloadRoomsBtn) EL.reloadRoomsBtn.classList.add("hidden");
-    if (EL.keyword) EL.keyword.classList.add("hidden");
-    [EL.visibilityFilter, EL.sortFilter, EL.statusFilter, EL.modeFilter].forEach((el) => el?.classList.add("hidden"));
-    if (EL.roomGrid) EL.roomGrid.classList.add("hidden");
-    if (EL.roomEmpty) EL.roomEmpty.classList.add("hidden");
-    document.querySelector(".toolbar")?.classList.add("hidden");
+    EL.roundGrid?.classList.add("hidden");
   }
 
   function tryAutoJoinReadySelection() {
@@ -1150,11 +1048,11 @@
     const rounds = (GAME.rounds || [])
       .filter((round) => round.grade_id === gradeId && round.subject_id === subjectId && (round.status || "active") === "active")
       .sort((a, b) => Number(a.round_no || 0) - Number(b.round_no || 0));
-    if (!EL.roomGrid) return;
-    EL.roomGrid.classList.remove("hidden");
-    EL.roomEmpty?.classList.add("hidden");
+    if (!EL.roundGrid) return;
+    EL.roundGrid.classList.remove("hidden");
+
     GAME.selectedRoundId = "";
-    EL.roomGrid.innerHTML = rounds.length
+    EL.roundGrid.innerHTML = rounds.length
       ? rounds.map((round) => `<div class="room-card"><div class="room-top"><div><div class="room-title">Vòng ${round.round_no || 1}: ${esc(round.title)}</div><div class="hint">${esc(round.description || "Chọn Khối, Môn, Vòng rồi vào giao diện 4 thử thách MindUp.")}</div></div><span class="pill live">MindUp</span></div><div class="room-meta"><div><span>Khởi động</span><strong>120 giây, đúng +10</strong></div><div><span>Vượt chướng ngại vật</span><strong>4 ô, từ khóa bonus</strong></div><div><span>Tăng tốc</span><strong>40/30/20/10 theo tốc độ</strong></div><div><span>Về đích</span><strong>Dễ / TB / Khó</strong></div></div><div class="room-actions" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" type="button" data-open-round="${escAttr(round.id)}">Vào vòng</button></div></div>`).join("")
       : '<div class="empty"><strong>Chưa có vòng MindUp</strong><div>Admin chưa tạo vòng thi cho Khối/Môn này.</div></div>';
     document.querySelectorAll("[data-open-round]").forEach((button) => {
@@ -2043,11 +1941,11 @@
   function applyStudentGradeLock() {
     const gradeId = GAME.profile?.grade_id || "";
     if (!gradeId) {
-      if (EL.roomGrid) {
-        EL.roomGrid.classList.remove("hidden");
-        EL.roomGrid.innerHTML = '<div class="empty"><strong>Chưa chọn Khối</strong><div>Học sinh cần vào Trang cá nhân / Tài khoản để chọn Khối trước khi chơi Game.</div><div style="margin-top:12px"><a class="btn btn-primary" href="account.html">Cập nhật hồ sơ</a></div></div>';
+      if (EL.roundGrid) {
+        EL.roundGrid.classList.remove("hidden");
+        EL.roundGrid.innerHTML = '<div class="empty"><strong>Chưa chọn Khối</strong><div>Học sinh cần vào Trang cá nhân / Tài khoản để chọn Khối trước khi chơi Game.</div><div style="margin-top:12px"><a class="btn btn-primary" href="account.html">Cập nhật hồ sơ</a></div></div>';
       }
-      EL.roomEmpty?.classList.add("hidden");
+
       document.getElementById("gameModeDeck")?.classList.add("hidden");
       return;
     }
@@ -2150,9 +2048,6 @@
   function bindEvents() {
     window.addEventListener("pagehide", leaveRoomOnUnload);
     window.addEventListener("beforeunload", leaveRoomOnUnload);
-    EL.openRoomBtn?.addEventListener("click", () => openGameRoomModal());
-    EL.quickMatchBtn?.addEventListener("click", quickMatch);
-    EL.reloadRoomsBtn?.addEventListener("click", () => loadRooms());
     EL.joinByCodeBtn?.addEventListener("click", joinRoomByCode);
     EL.joinCode?.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
@@ -2187,7 +2082,6 @@
     EL.roomGrade?.addEventListener("change", () => fillSubjects(EL.roomSubject, EL.roomGrade.value, "Chọn môn"));
     EL.gradeFilter?.addEventListener("change", () => {
       fillSubjects(EL.subjectFilter, EL.gradeFilter.value, "Tất cả môn");
-      renderRooms();
       renderArenaInsightsUnified();
       if (!EL.gradeFilter.value) GAME.selectedAutoMode = "";
       tryAutoJoinReadySelection();
@@ -2195,10 +2089,6 @@
     EL.subjectFilter?.addEventListener("change", () => {
       renderArenaInsightsUnified();
       tryAutoJoinReadySelection();
-    });
-    [EL.keyword, EL.subjectFilter, EL.modeFilter, EL.visibilityFilter, EL.sortFilter, EL.statusFilter].forEach((el) => {
-      el?.addEventListener("input", renderRooms);
-      el?.addEventListener("change", renderRooms);
     });
     EL.startGameBtn?.addEventListener("click", startGameMatch);
     EL.toggleReadyBtn?.addEventListener("click", toggleReadyState);
@@ -2386,32 +2276,7 @@
     return (GAME.classIds || []).includes(room.class_id);
   }
 
-  function getClassName(classId) {
-    return GAME.classes.find((item) => item.id === classId)?.class_name || "Lớp liên kết";
-  }
 
-  function getRoomSortValue(room, mode) {
-    const playerCount = roomPlayerCount(room.id);
-    const maxPlayers = Number(room.max_players || 8);
-    const waiting = room.status === "waiting" ? 500 : room.status === "live" ? 250 : 0;
-    const joined = (GAME.players || []).some((player) => player.room_id === room.id && player.user_id === GAME.user?.id) ? 1000 : 0;
-    if (mode === "players") return [joined + waiting, playerCount, -new Date(room.created_at).getTime()];
-    if (mode === "hot") return [playerCount, -new Date(room.created_at).getTime()];
-    if (mode === "new") return [new Date(room.created_at).getTime(), playerCount];
-    if (mode === "spots") return [maxPlayers - playerCount, -playerCount];
-    const publicBonus = (room.visibility || "public") === "public" ? 50 : 0;
-    return [joined + waiting + publicBonus, playerCount, -new Date(room.created_at).getTime()];
-  }
-
-  function compareTupleDesc(a, b) {
-    const len = Math.max(a.length, b.length);
-    for (let i = 0; i < len; i += 1) {
-      const av = Number(a[i] || 0);
-      const bv = Number(b[i] || 0);
-      if (av !== bv) return bv - av;
-    }
-    return 0;
-  }
 
   function getMyComboStats() {
     const ordered = [...(GAME.myAnswers || [])].sort((a, b) => new Date(a.answered_at || 0) - new Date(b.answered_at || 0));
@@ -2518,8 +2383,7 @@
     ]);
 
     if (roomErr || playerErr) {
-      EL.roomGrid.innerHTML = `<div class="empty"><strong>Không tải được phòng thi đấu</strong><div>${esc(roomErr?.message || playerErr?.message || "Đã có lỗi xảy ra.")}</div></div>`;
-      EL.roomEmpty.classList.add("hidden");
+      EL.roundGrid.innerHTML = `<div class="empty"><strong>Không tải được phòng thi đấu</strong><div>${esc(roomErr?.message || playerErr?.message || "Đã có lỗi xảy ra.")}</div></div>`;
       return;
     }
 
@@ -2529,46 +2393,8 @@
     }));
     GAME.players = players || [];
     GAME.rooms = filterVisibleRooms(GAME.roomsRaw);
-    renderRooms();
     await ensureArenaUserCache();
     renderArenaInsightsUnified();
-  }
-
-  function renderRooms() {
-    const keyword = String(EL.keyword?.value || "").trim().toLowerCase();
-    const gradeId = EL.gradeFilter?.value || "";
-    const subjectId = EL.subjectFilter?.value || "";
-    const modeFilter = EL.modeFilter?.value || "";
-    const visibility = EL.visibilityFilter?.value || "";
-    const sortMode = EL.sortFilter?.value || "players";
-    const status = EL.statusFilter?.value || "";
-    const playerMap = buildRoomPlayerMap();
-
-    let list = [...GAME.rooms].filter((room) => !["solo", "round"].includes(roomModeValue(room)));
-    if (keyword) {
-      list = list.filter((room) => String(room.title || "").toLowerCase().includes(keyword) || String(room.join_code || "").toLowerCase().includes(keyword));
-    }
-    if (gradeId) list = list.filter((room) => room.grade_id === gradeId);
-    if (subjectId) list = list.filter((room) => room.subject_id === subjectId);
-    if (modeFilter) list = list.filter((room) => roomModeValue(room) === modeFilter);
-    if (visibility) list = list.filter((room) => (room.visibility || "public") === visibility);
-    if (status) list = list.filter((room) => room.status === status);
-    list.sort((a, b) => compareTupleDesc(getRoomSortValue(a, sortMode), getRoomSortValue(b, sortMode)));
-
-    EL.roomGrid.innerHTML = list.map((room) => renderRoomCard(room, playerMap[room.id] || [])).join("");
-    EL.roomEmpty.classList.toggle("hidden", list.length > 0);
-
-    document.querySelectorAll("[data-join-room]").forEach((button) => {
-      button.onclick = () => joinRoom(button.dataset.joinRoom);
-    });
-    document.querySelectorAll("[data-enter-room]").forEach((button) => {
-      if ((button.textContent || "").toLowerCase().includes("xem")) {
-        button.textContent = "Đã kết thúc";
-        button.disabled = true;
-        return;
-      }
-      button.onclick = () => openRoomScreen(button.dataset.enterRoom);
-    });
   }
 
   function buildRoomPlayerMap() {
@@ -2578,49 +2404,6 @@
       out[player.room_id].push(player);
     });
     return out;
-  }
-
-  function renderRoomCard(room, players) {
-    const joined = players.some((player) => player.user_id === GAME.user.id);
-    const grade = GAME.grades.find((item) => item.id === room.grade_id)?.name || "—";
-    const subject = GAME.subjects.find((item) => item.id === room.subject_id)?.name || "—";
-    const className = room.class_id ? getClassName(room.class_id) : "";
-    const visibility = roomVisibilityLabel(room.visibility || "public");
-    const roleMeta = getRoomRoleMeta(room);
-    const mode = roomModeValue(room);
-    const modeLabel = roomModeLabel(mode);
-    const statusLabel = room.status === "waiting" ? "Đang chờ" : room.status === "live" ? "Đang đấu" : "Đã kết thúc";
-    const statusClass = room.status === "waiting" ? "waiting" : room.status === "live" ? "live" : "done";
-    const hasCapacity = roomHasCapacity(room);
-    const fillPercent = Math.max(0, Math.min(100, Math.round((players.length / Number(room.max_players || 8)) * 100)));
-    const canEnter = joined || (room.status === "waiting" && hasCapacity);
-    return `<div class="room-card">
-      <div class="room-top">
-        <div>
-          <div class="room-title">${esc(room.title || "Phòng thi đấu")}</div>
-          <div class="hint">Mã phòng: <b>${esc(room.join_code || "—")}</b></div>
-          ${className ? `<div class="hint">Lớp: <b>${esc(className)}</b></div>` : ""}
-          <div class="hint">Chế độ: <b>${esc(modeLabel)}</b></div>
-        </div>
-        <span class="pill ${statusClass}">${statusLabel}</span>
-      </div>
-      <div class="room-meta">
-        <div><span>Khối</span><strong>${esc(grade)}</strong></div>
-        <div><span>Môn</span><strong>${esc(subject)}</strong></div>
-        <div><span>Phòng</span><strong>${esc(visibility)}</strong></div>
-        <div><span>Số câu</span><strong>${room.question_count || 0} câu</strong></div>
-        <div><span>Người chơi</span><strong>${players.length}/${room.max_players || 8}</strong></div>
-      </div>
-      <div class="room-fill"><div class="room-fill-bar" style="width:${fillPercent}%"></div></div>
-      <div class="hint">${esc(room.description || "Phòng thi đấu không có mô tả.")}</div>
-      <div class="room-actions">
-        ${joined
-          ? `<button class="btn btn-primary" type="button" data-enter-room="${room.id}">${room.status === "finished" ? "Xem kết quả" : "Vào phòng"}</button>`
-          : canEnter
-            ? `<button class="btn btn-primary" type="button" data-join-room="${room.id}">Tham gia</button>`
-            : `<button class="btn btn-outline" type="button" disabled>${room.status !== "waiting" ? "Đã khóa" : "Đã đầy"}</button>`}
-      </div>
-    </div>`;
   }
 
   function getOrderedPlayersForRoom(roomId, players) {
@@ -2795,10 +2578,11 @@
     const subjectId = EL.subjectFilter?.value || "";
     const grade = GAME.grades.find((item) => item.id === gradeId);
     const subject = GAME.subjects.find((item) => item.id === subjectId);
-    const gradeLabel = grade ? grade.name : "Tất cả khối";
-    const subjectLabel = subject ? subject.name : "Tất cả môn";
+    const gradeLabel = grade ? grade.name : "";
+    const subjectLabel = subject ? subject.name : "";
+    const mountainScopeLabel = [gradeLabel, subjectLabel].filter(Boolean).join(" • ") || "Khối của bạn";
     if (EL.mountainLeaderboardTitle) {
-      EL.mountainLeaderboardTitle.textContent = `Bảng xếp hạng Leo núi - ${gradeLabel} • ${subjectLabel}`;
+      EL.mountainLeaderboardTitle.textContent = `Bảng xếp hạng Leo núi - ${mountainScopeLabel}`;
     }
     if (EL.mountainLeaderboard) {
       const mountainRooms = finishedRooms.filter((room) =>
@@ -2821,7 +2605,7 @@
         .slice(0, 10);
       EL.mountainLeaderboard.innerHTML = mountainLeaderboard.length
         ? mountainLeaderboard.map((item, idx) => `<div class="player-row"><div class="player-main"><img class="avatar" src="${escAttr(getPlayerAvatar(item.userId))}" alt="avatar"><div><div style="font-weight:700;color:var(--navy)">${idx + 1}. ${esc(getPlayerName(item.userId))}</div><div class="hint">${item.attempts} lượt Leo núi • cao nhất ${item.best}</div></div></div><strong style="color:var(--navy)">${item.score}</strong></div>`).join("")
-        : `<div class="empty">Chưa có dữ liệu Leo núi cho ${esc(gradeLabel)} • ${esc(subjectLabel)}.</div>`;
+        : `<div class="empty">Chưa có dữ liệu Leo núi cho ${esc(mountainScopeLabel)}.</div>`;
     }
   }
 
@@ -2996,33 +2780,6 @@
     await openRoomScreen(roomId);
   }
 
-  async function quickMatch() {
-    if (GAME.selectedAutoMode) {
-      await autoMatchSelectedMode();
-      return;
-    }
-    const gradeId = EL.gradeFilter?.value || "";
-    const subjectId = EL.subjectFilter?.value || "";
-    const keyword = String(EL.keyword?.value || "").trim().toLowerCase();
-    const bestRoom = [...(GAME.rooms || [])]
-      .filter((room) => room.status === "waiting" && (room.visibility || "public") === "public")
-      .filter((room) => roomModeValue(room) === "quick")
-      .filter((room) => isJoinableQuickRoom(room))
-      .filter((room) => !gradeId || room.grade_id === gradeId)
-      .filter((room) => !subjectId || room.subject_id === subjectId)
-      .filter((room) => !keyword || String(room.title || "").toLowerCase().includes(keyword) || String(room.join_code || "").toLowerCase().includes(keyword))
-      .filter((room) => roomHasCapacity(room) || GAME.players.some((player) => player.room_id === room.id && player.user_id === GAME.user.id))
-      .sort((a, b) => roomPlayerCount(b.id) - roomPlayerCount(a.id) || new Date(b.created_at) - new Date(a.created_at))[0];
-    if (!bestRoom) {
-      if (EL.roomMode) EL.roomMode.value = "quick";
-      applyModeDefaults("quick", true);
-      openGameRoomModal();
-      alert("Chưa có phòng đấu nhanh phù hợp. Mình đã mở sẵn form tạo phòng đấu nhanh cho bạn.");
-      return;
-    }
-    await joinRoom(bestRoom.id);
-  }
-
   async function createAutoRoomForMode(mode, gradeId, subjectId) {
     const joinCode = randomCode();
     const defaults = getModeDefaults(mode);
@@ -3154,7 +2911,7 @@
   }
 
   async function autoMatchSelectedMode() {
-    const mode = GAME.selectedAutoMode || EL.modeFilter?.value || "";
+    const mode = GAME.selectedAutoMode || "";
     if (!mode) return;
     if (!EL.gradeFilter?.value || !EL.subjectFilter?.value) {
       alert("Hãy chọn Khối và Môn trước khi vào trận.");

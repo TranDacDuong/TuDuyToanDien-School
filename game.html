@@ -576,9 +576,6 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
       <div id="gameHeroBadges" class="hero-badges"></div>
     </div>
     <div class="hero-actions">
-      <button class="btn btn-primary" type="button" id="openGameRoomBtn">+ Tạo phòng mới</button>
-      <button class="btn btn-outline" type="button" id="quickMatchBtn">Ghép nhanh</button>
-      <button class="btn btn-outline" type="button" id="reloadGameRoomsBtn">Tải lại</button>
       <div class="join-code-box">
         <input id="gameJoinCode" class="input" placeholder="Nhập mã phòng">
         <button class="btn btn-outline" type="button" id="joinByCodeBtn">Vào phòng</button>
@@ -586,39 +583,12 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
     </div>
   </div>
 
-  <div class="toolbar">
-    <input id="gameKeyword" class="input" placeholder="Tìm theo tên phòng hoặc mã phòng">
-    <select id="gameGradeFilter" class="select"><option value="">Tất cả khối</option></select>
-    <select id="gameSubjectFilter" class="select"><option value="">Tất cả môn</option></select>
-    <select id="gameModeFilter" class="select">
-      <option value="">Mọi chế độ</option>
-      <option value="solo">Chơi đơn</option>
-      <option value="quick">Đấu nhanh</option>
-    </select>
-    <select id="gameVisibilityFilter" class="select">
-      <option value="">Mọi kiểu phòng</option>
-      <option value="public">Công khai</option>
-      <option value="private">Riêng tư</option>
-    </select>
-    <select id="gameSortFilter" class="select">
-      <option value="recommended">Phù hợp nhất</option>
-      <option value="hot">Đang đông</option>
-      <option value="new">Mới nhất</option>
-      <option value="spots">Còn nhiều chỗ</option>
-    </select>
-    <select id="gameStatusFilter" class="select">
-      <option value="">Tất cả trạng thái</option>
-      <option value="waiting">Đang chờ</option>
-      <option value="live">Đang đấu</option>
-      <option value="finished">Đã kết thúc</option>
-    </select>
+  <div class="hidden" aria-hidden="true">
+    <select id="gameGradeFilter"><option value=""></option></select>
+    <select id="gameSubjectFilter"><option value=""></option></select>
   </div>
 
-  <div id="gameRoomGrid" class="room-grid"></div>
-  <div id="gameRoomEmpty" class="empty hidden">
-    <strong>Chưa có phòng nào phù hợp</strong>
-    <div>Hãy đổi bộ lọc hoặc tạo một phòng mới để bắt đầu thi đấu.</div>
-  </div>
+  <div id="gameRoundGrid" class="room-grid hidden"></div>
 </div>
 
 <div class="page hidden" id="gameAdminPage">
