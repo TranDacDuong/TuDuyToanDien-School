@@ -224,12 +224,22 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   background:#020b24 url("background_game.png") center/cover no-repeat;
   color:#fff;
 }
+#gameRoomScreen.round-bg-warmup{background-image:url("Background_Khoi_Dong.png")}
+#gameRoomScreen.round-bg-obstacle{background-image:url("Background_Vuot_Chuong_Ngai_Vat.png")}
+#gameRoomScreen.round-bg-acceleration{background-image:url("Background_Tang_Toc.png")}
+#gameRoomScreen.round-bg-finish{background-image:url("Background_Ve_Dich.png")}
 #gameRoomScreen::before{
   content:"";
   position:absolute;
   inset:0;
   pointer-events:none;
   background:linear-gradient(180deg,rgba(2,8,28,.18),rgba(2,8,28,.08) 45%,rgba(2,8,28,.24));
+}
+#gameRoomScreen.round-bg-warmup::before,
+#gameRoomScreen.round-bg-obstacle::before,
+#gameRoomScreen.round-bg-acceleration::before,
+#gameRoomScreen.round-bg-finish::before{
+  background:linear-gradient(90deg,rgba(2,8,28,.06) 0%,rgba(2,8,28,.12) 42%,rgba(2,8,28,.52) 64%,rgba(2,8,28,.76) 100%);
 }
 #gameRoomScreen .topbar{
   position:relative;
@@ -322,6 +332,13 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   gap:20px;
   align-items:start;
 }
+#gameLiveView.mode-round{
+  width:min(760px,58vw);
+  margin-left:auto;
+  margin-right:2vw;
+  grid-template-columns:1fr;
+  gap:16px;
+}
 #gameLiveView .question-card,
 #gameLiveView .panel{
   background:linear-gradient(145deg,rgba(2,18,70,.84),rgba(4,21,86,.72));
@@ -334,6 +351,19 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   padding:26px 42px 46px;
   border-radius:26px;
   align-content:start;
+}
+#gameLiveView.mode-round .question-card,
+#gameLiveView.mode-round .panel{
+  background:linear-gradient(145deg,rgba(2,18,70,.78),rgba(4,21,86,.64));
+  backdrop-filter:blur(3px);
+}
+#gameLiveView.mode-round .question-card{
+  min-height:0;
+  padding:22px 28px 28px;
+  gap:14px;
+}
+#gameLiveView.mode-round .panel{
+  padding:22px 24px;
 }
 #gameLiveView .question-head{
   align-items:center;
@@ -521,6 +551,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   #gameRoomScreen .topbar h2{position:static;transform:none;order:3;max-width:none;width:100%;text-align:center}
   #gameRoomScreen .topbar-actions{order:4}
   #gameLiveView.game-stage{grid-template-columns:1fr}
+  #gameLiveView.mode-round{width:100%;margin-left:0;margin-right:0}
   #gameLiveView .question-card{min-height:420px}
 }
 @media(max-width:640px){

@@ -1328,6 +1328,18 @@
     EL.leaveGameBtn?.classList.add("hidden");
   }
 
+  function setRoundChallengeBackground(challengeType = "") {
+    const classMap = {
+      warmup: "round-bg-warmup",
+      obstacle: "round-bg-obstacle",
+      acceleration: "round-bg-acceleration",
+      finish: "round-bg-finish",
+    };
+    const classes = Object.values(classMap);
+    EL.roomScreen?.classList.remove(...classes);
+    if (classMap[challengeType]) EL.roomScreen?.classList.add(classMap[challengeType]);
+  }
+
   async function loadGameCatalog() {
     const [configsRes, configQuestionsRes, roundsRes, challengesRes, challengeQuestionsRes] = await Promise.all([
       sb.from("game_configs").select("*").order("created_at", { ascending: false }),
@@ -3380,6 +3392,7 @@
     GAME.activeRoom = null;
     document.getElementById("gameRoundLobbyView")?.classList.add("hidden");
     updateRoundTopbarScore("", 0);
+    setRoundChallengeBackground("");
     EL.roomScreen.classList.remove("show");
   }
 
@@ -3767,6 +3780,7 @@
     EL.liveView?.classList.toggle("mode-solo", mode === "solo");
     EL.liveView?.classList.toggle("mode-round", mode === "round");
     EL.liveView?.classList.toggle("mode-quick", mode === "quick");
+    setRoundChallengeBackground(mode === "round" ? getRoomRoundChallengeType(GAME.activeRoom) : "");
     const livePanels = EL.liveView?.querySelectorAll(".panel") || [];
     const leaderboardPanel = EL.leaderboard?.closest(".panel") || livePanels[1];
     const answerTitle = livePanels[0]?.querySelector("h3");
