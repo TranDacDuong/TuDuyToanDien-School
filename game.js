@@ -3395,6 +3395,7 @@
     document.getElementById("gameRoundLobbyView")?.classList.add("hidden");
     updateRoundTopbarScore("", 0);
     setRoundChallengeBackground("");
+    EL.roomScreen?.classList.remove("mode-round-screen");
     EL.roomScreen.classList.remove("show");
   }
 
@@ -3476,6 +3477,7 @@
     const readyForStart = areRoomPlayersReadyForStart(room, GAME.roomPlayers);
     const hasStartController = mode !== "quick" || room.status !== "waiting" || hasActiveStartController(room, GAME.roomPlayers);
     const countdownActive = mode === "quick" && room.status === "waiting" && readyForStart && hasStartController;
+    EL.roomScreen?.classList.toggle("mode-round-screen", mode === "round");
 
     if (mode === "quick" && isCoordinator && me && !me.ready && room.status === "waiting") {
       sb.from("game_room_players").update({ ready: true }).eq("id", me.id).then(() => refreshActiveRoom(room.id, true)).catch(() => {});
