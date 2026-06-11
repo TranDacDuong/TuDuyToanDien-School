@@ -4063,7 +4063,6 @@
       const question = byId[link.question_id];
       if (!question || question.hidden || !question.answer || !GAME_ALLOWED_QUESTION_TYPES.includes(question.question_type)) return null;
       return {
-        id: question.id,
         room_id: room.id,
         order_no: index + 1,
         question_id: question.id,
