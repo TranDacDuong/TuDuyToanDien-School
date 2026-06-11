@@ -335,8 +335,8 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
 #gameLiveView.mode-round{
   width:100%;
   margin:0;
-  grid-template-columns:minmax(260px,34vw) minmax(360px,1fr) minmax(300px,.78fr);
-  gap:16px;
+  grid-template-columns:clamp(320px,20vw,400px) minmax(520px,1.15fr) minmax(360px,.85fr);
+  gap:18px;
   align-items:start;
 }
 #gameLiveView.mode-round .question-card{
