@@ -1337,7 +1337,9 @@
     };
     const classes = Object.values(classMap);
     EL.roomScreen?.classList.remove(...classes);
+    EL.liveView?.classList.remove("round-challenge-warmup", "round-challenge-obstacle", "round-challenge-acceleration", "round-challenge-finish");
     if (classMap[challengeType]) EL.roomScreen?.classList.add(classMap[challengeType]);
+    if (classMap[challengeType]) EL.liveView?.classList.add(`round-challenge-${challengeType}`);
   }
 
   async function loadGameCatalog() {
@@ -3797,6 +3799,20 @@
     if (EL.leaderboard) EL.leaderboard.classList.toggle("hidden", mode === "solo" || mode === "round");
   }
 
+  function getRoundObstacleSecondsLeft(room, question) {
+    if (!room?.id || !question) return 0;
+    const startedAt = Number(GAME.roundObstacleStartedAt?.[room.id] || 0);
+    if (!startedAt) return getQuestionDuration(question, room);
+    const durationMs = getQuestionDuration(question, room) * 1000;
+    return Math.max(0, Math.ceil((startedAt + durationMs - Date.now()) / 1000));
+  }
+
+  function isRoundObstacleQuestionExpired(room, question) {
+    if (!room?.id || !question) return false;
+    const startedAt = Number(GAME.roundObstacleStartedAt?.[room.id] || 0);
+    return !!startedAt && Date.now() >= startedAt + getQuestionDuration(question, room) * 1000;
+  }
+
   function renderRoundObstacleBoard(timeline) {
     const room = GAME.activeRoom;
     const questions = timeline.questions || [];
@@ -3806,8 +3822,7 @@
     const challenge = (GAME.roundChallenges || []).find((item) => item.round_id === room.round_id && item.challenge_type === "obstacle");
     const selectedStartedAt = Number(GAME.roundObstacleStartedAt?.[room.id] || 0);
     const selectedDuration = selectedQuestion ? getQuestionDuration(selectedQuestion, room) : 0;
-    const selectedElapsed = selectedStartedAt ? Math.floor((Date.now() - selectedStartedAt) / 1000) : 0;
-    const selectedSecondsLeft = selectedQuestion ? Math.max(0, selectedDuration - selectedElapsed) : 0;
+    const selectedSecondsLeft = selectedQuestion ? getRoundObstacleSecondsLeft(room, selectedQuestion) : 0;
     const allDone = questions.length && questions.every((question) => answersByQuestion.has(question.id));
     if (allDone && !challenge?.keyword_answer) {
       finishRoomIfNeeded();
@@ -3815,32 +3830,26 @@
     }
     EL.questionTitle.textContent = "Vượt chướng ngại vật";
     EL.questionClock.textContent = selectedQuestion ? String(selectedSecondsLeft).padStart(2, "0") : "--";
-    if (EL.progressText) EL.progressText.textContent = selectedQuestion
-      ? `Đang trả lời Chướng ngại vật số ${questions.findIndex((item) => item.id === selectedQuestion.id) + 1}.`
-      : "Chọn ô số để mở câu hỏi. Trả lời đúng mở ô, trả lời sai khóa ô.";
-    if (EL.progressFill) {
-      const opened = questions.filter((question) => answersByQuestion.get(question.id)?.is_correct).length;
-      EL.progressFill.style.width = `${Math.round((opened / Math.max(1, questions.length)) * 100)}%`;
-    }
+    if (EL.progressText) EL.progressText.textContent = "";
+    if (EL.progressFill) EL.progressFill.style.width = "0%";
     EL.questionImg.classList.add("hidden");
     const tiles = questions.map((question, index) => {
       const answer = answersByQuestion.get(question.id);
       const opened = !!answer?.is_correct;
       const locked = !!answer && !answer.is_correct;
       if (opened) {
-        return `<button aria-label="Chướng ngại vật số ${index + 1} đã mở" type="button" disabled style="min-height:150px;border:0;background:transparent!important;opacity:0;pointer-events:none"></button>`;
+        return `<button aria-label="Chướng ngại vật số ${index + 1} đã mở" type="button" disabled class="round-obstacle-tile opened"></button>`;
       }
       if (locked) {
-        return `<div aria-label="Chướng ngại vật số ${index + 1} đã chìm" style="min-height:150px;border-radius:0;background:#64748b;background-image:linear-gradient(135deg,#94a3b8 0%,#64748b 42%,#334155 100%);display:grid;place-items:center;border:1px solid #fff;box-shadow:inset 0 18px 36px rgba(255,255,255,.12),inset 0 -18px 36px rgba(15,23,42,.28);opacity:1"></div>`;
+        return `<div aria-label="Chướng ngại vật số ${index + 1} đã chìm" class="round-obstacle-tile locked"></div>`;
       }
-      const bg = "linear-gradient(135deg,#facc15,#f59e0b 48%,#1d4ed8)";
-      return `<button class="btn btn-outline" type="button" onclick="selectRoundObstacleQuestion('${question.id}')" style="min-height:150px;border-radius:0!important;background:${bg}!important;color:#fff!important;display:grid;place-items:center;font-size:1.08rem;font-weight:900;text-shadow:0 2px 10px rgba(2,8,23,.72);border:1px solid #fff!important;opacity:1!important"><span>Chướng ngại vật số ${index + 1}</span></button>`;
+      return `<button class="round-obstacle-tile" type="button" onclick="selectRoundObstacleQuestion('${question.id}')"><span>Chướng ngại vật số ${index + 1}</span></button>`;
     }).join("");
     const openedCount = questions.filter((question) => answersByQuestion.get(question.id)?.is_correct).length;
     const keywordLength = String(challenge?.keyword_answer || "").trim().length;
     const keywordDraft = GAME.roundObstacleKeywordDraft?.[room.id] || "";
     const keywordBox = challenge?.keyword_answer ? `
-      <div style="position:relative;display:grid;gap:10px;padding:14px;border-radius:18px;background:#fff;border:1px solid rgba(39,58,91,.08)">
+      <div class="round-obstacle-keyword-card" style="position:relative;display:grid;gap:10px;padding:14px;border-radius:18px;background:#fff;border:1px solid rgba(39,58,91,.08)">
         <strong style="color:var(--navy)">Từ khóa</strong>
         <div class="hint">${keywordLength ? `Gợi ý: từ khóa có ${keywordLength} ký tự.` : "Từ khóa liên quan đến cả 4 câu hỏi."} Trả lời càng sớm càng nhiều điểm.</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -3852,8 +3861,8 @@
     ` : "";
     renderMathText(EL.questionBody, "");
     EL.questionBody.innerHTML = `
-      <div style="position:relative;display:grid;gap:14px;padding:18px;border-radius:0;overflow:hidden;background:#fff;border:1px solid rgba(39,58,91,.08)">
-        <div style="position:relative;display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:0;overflow:hidden;border-radius:0;aspect-ratio:16/9;background:linear-gradient(135deg,rgba(255,255,255,.9),rgba(226,232,240,.84)),url('mindup-zbs-logo.png');background-repeat:no-repeat;background-position:center;background-size:min(72%,520px) auto;box-shadow:inset 0 0 0 1px rgba(39,58,91,.08)">${tiles}</div>
+      <div class="round-obstacle-board-shell">
+        <div class="round-obstacle-board">${tiles}</div>
       </div>
     `;
     if (selectedQuestion && !answersByQuestion.has(selectedQuestion.id)) {
@@ -3862,7 +3871,7 @@
       }
       EL.questionImg.classList.add("hidden");
       renderAnswerArea(selectedQuestion);
-      const questionHtml = `<div style="display:grid;gap:12px;margin-bottom:14px;padding:16px;border-radius:18px;background:#fff;border:1px solid rgba(39,58,91,.08)"><strong style="color:var(--navy)">Câu hỏi chướng ngại vật</strong><div id="roundObstacleQuestionText"></div>${selectedQuestion.question_img ? `<img src="${escAttr(selectedQuestion.question_img)}" alt="question" style="max-width:100%;border-radius:14px;border:1px solid rgba(39,58,91,.08)">` : ""}</div>`;
+      const questionHtml = `<div class="round-obstacle-question-card"><strong style="color:var(--navy)">Câu hỏi chướng ngại vật</strong><div id="roundObstacleQuestionText"></div>${selectedQuestion.question_img ? `<img src="${escAttr(selectedQuestion.question_img)}" alt="question" style="max-width:100%;border-radius:14px;border:1px solid rgba(39,58,91,.08)">` : ""}</div>`;
       EL.answerArea.insertAdjacentHTML("afterbegin", questionHtml);
       if (keywordBox) EL.answerArea.insertAdjacentHTML("afterbegin", keywordBox);
       renderMathText(document.getElementById("roundObstacleQuestionText"), selectedQuestion.question_text || "Xem nội dung câu hỏi.");
@@ -3915,9 +3924,8 @@
           const selectedId = GAME.roundObstacleSelection?.[room.id] || "";
           const selectedQuestion = selectedId ? (GAME.roomQuestions || []).find((item) => item.id === selectedId) : null;
           if (selectedQuestion && EL.questionClock) {
-            const startedAt = Number(GAME.roundObstacleStartedAt?.[room.id] || Date.now());
-            const secondsLeft = Math.max(0, getQuestionDuration(selectedQuestion, room) - Math.floor((Date.now() - startedAt) / 1000));
-            if (secondsLeft <= 0) {
+            const secondsLeft = getRoundObstacleSecondsLeft(room, selectedQuestion);
+            if (isRoundObstacleQuestionExpired(room, selectedQuestion)) {
               submitAnswer(selectedQuestion.id, "");
               return;
             }
@@ -3933,9 +3941,8 @@
           const selectedId = GAME.roundObstacleSelection?.[room.id] || "";
           const selectedQuestion = selectedId ? (GAME.roomQuestions || []).find((item) => item.id === selectedId) : null;
           if (selectedQuestion && !GAME.myAnswers.some((item) => item.game_question_id === selectedQuestion.id)) {
-            const startedAt = Number(GAME.roundObstacleStartedAt?.[room.id] || Date.now());
-            const secondsLeft = Math.max(0, getQuestionDuration(selectedQuestion, room) - Math.floor((Date.now() - startedAt) / 1000));
-            if (secondsLeft <= 0) {
+            const secondsLeft = getRoundObstacleSecondsLeft(room, selectedQuestion);
+            if (isRoundObstacleQuestionExpired(room, selectedQuestion)) {
               submitAnswer(selectedQuestion.id, "");
               return;
             }
@@ -4054,6 +4061,7 @@
       const question = byId[link.question_id];
       if (!question || question.hidden || !question.answer || !GAME_ALLOWED_QUESTION_TYPES.includes(question.question_type)) return null;
       return {
+        id: question.id,
         room_id: room.id,
         order_no: index + 1,
         question_id: question.id,
@@ -4426,7 +4434,8 @@
     }
 
     const currentCombo = getCurrentComboValue();
-    let scored = evaluateAnswer(question, answerValue, remaining, totalTime, currentCombo);
+    const finalAnswerValue = challengeType === "obstacle" && isRoundObstacleQuestionExpired(room, question) ? "" : answerValue;
+    let scored = evaluateAnswer(question, finalAnswerValue, remaining, totalTime, currentCombo);
     if (roomModeValue(room) === "quick") {
       scored = {
         ...scored,
@@ -4439,7 +4448,7 @@
       room_id: room.id,
       player_id: player.id,
       game_question_id: questionId,
-      answer: answerValue,
+      answer: finalAnswerValue,
       is_correct: scored.isCorrect,
       score_earned: scored.score,
       response_ms: (totalTime - remaining) * 1000,

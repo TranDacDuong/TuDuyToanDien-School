@@ -371,6 +371,77 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
 #gameLiveView.mode-round .panel{
   padding:22px 24px;
 }
+#gameLiveView.round-challenge-obstacle .progress-wrap{
+  display:none;
+}
+#gameLiveView.round-challenge-obstacle .question-card{
+  gap:10px;
+}
+#gameLiveView.round-challenge-obstacle .question-text{
+  margin-top:0;
+}
+.round-obstacle-board-shell{
+  position:relative;
+  display:grid;
+  gap:10px;
+  padding:12px;
+  border-radius:14px;
+  overflow:hidden;
+  background:rgba(255,255,255,.94);
+  border:1px solid rgba(39,58,91,.08);
+}
+.round-obstacle-board{
+  position:relative;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(100px,1fr));
+  gap:0;
+  overflow:hidden;
+  border-radius:0;
+  background:linear-gradient(135deg,rgba(255,255,255,.9),rgba(226,232,240,.84)),url('mindup-zbs-logo.png');
+  background-repeat:no-repeat;
+  background-position:center;
+  background-size:min(66%,420px) auto;
+  box-shadow:inset 0 0 0 1px rgba(39,58,91,.08);
+}
+.round-obstacle-tile{
+  min-height:96px;
+  border-radius:0!important;
+  border:1px solid #fff!important;
+  background:linear-gradient(135deg,#facc15,#f59e0b 48%,#1d4ed8)!important;
+  color:#fff!important;
+  display:grid;
+  place-items:center;
+  padding:10px;
+  font-size:.9rem;
+  font-weight:900;
+  text-align:center;
+  text-shadow:0 2px 10px rgba(2,8,23,.72);
+  cursor:pointer;
+}
+.round-obstacle-tile.opened{
+  border:0!important;
+  background:transparent!important;
+  opacity:0;
+  pointer-events:none;
+}
+.round-obstacle-tile.locked{
+  background:#64748b!important;
+  background-image:linear-gradient(135deg,#94a3b8 0%,#64748b 42%,#334155 100%)!important;
+  box-shadow:inset 0 14px 28px rgba(255,255,255,.12),inset 0 -14px 28px rgba(15,23,42,.28);
+  cursor:default;
+}
+.round-obstacle-keyword-card{
+  margin-bottom:18px;
+}
+.round-obstacle-question-card{
+  display:grid;
+  gap:12px;
+  margin-top:2px;
+  padding:16px;
+  border-radius:18px;
+  background:#fff;
+  border:1px solid rgba(39,58,91,.08);
+}
 #gameLiveView .question-head{
   align-items:center;
 }
