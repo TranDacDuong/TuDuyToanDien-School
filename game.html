@@ -333,11 +333,17 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   align-items:start;
 }
 #gameLiveView.mode-round{
-  width:min(760px,58vw);
-  margin-left:auto;
-  margin-right:2vw;
-  grid-template-columns:1fr;
+  width:100%;
+  margin:0;
+  grid-template-columns:minmax(260px,34vw) minmax(360px,1fr) minmax(300px,.78fr);
   gap:16px;
+  align-items:start;
+}
+#gameLiveView.mode-round .question-card{
+  grid-column:2;
+}
+#gameLiveView.mode-round > div:last-child{
+  grid-column:3;
 }
 #gameLiveView .question-card,
 #gameLiveView .panel{
@@ -551,7 +557,9 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   #gameRoomScreen .topbar h2{position:static;transform:none;order:3;max-width:none;width:100%;text-align:center}
   #gameRoomScreen .topbar-actions{order:4}
   #gameLiveView.game-stage{grid-template-columns:1fr}
-  #gameLiveView.mode-round{width:100%;margin-left:0;margin-right:0}
+  #gameLiveView.mode-round{width:100%;margin-left:0;margin-right:0;grid-template-columns:1fr}
+  #gameLiveView.mode-round .question-card,
+  #gameLiveView.mode-round > div:last-child{grid-column:auto}
   #gameLiveView .question-card{min-height:420px}
 }
 @media(max-width:640px){

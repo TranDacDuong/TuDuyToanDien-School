@@ -3786,7 +3786,10 @@
     const answerTitle = livePanels[0]?.querySelector("h3");
     const scoreBoxes = leaderboardPanel?.querySelectorAll(".score-box") || [];
     const leaderboardTitle = leaderboardPanel?.querySelector("h3");
-    if (answerTitle) answerTitle.classList.toggle("hidden", mode === "round");
+    if (answerTitle) {
+      answerTitle.classList.remove("hidden");
+      answerTitle.textContent = mode === "round" ? "Câu trả lời" : "Đáp án của bạn";
+    }
     if (leaderboardPanel) leaderboardPanel.classList.toggle("hidden", mode === "round" || mode === "solo");
     if (leaderboardTitle) leaderboardTitle.textContent = (mode === "solo" || mode === "round") ? "Điểm hiện tại" : "Bảng xếp hạng";
     if (scoreBoxes[0]?.children?.[1]) scoreBoxes[0].children[1].classList.toggle("hidden", mode === "solo" || mode === "round");
