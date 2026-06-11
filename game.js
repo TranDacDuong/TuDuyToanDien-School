@@ -4463,19 +4463,39 @@
       return;
     }
 
+    const localAnswer = {
+      id: `local-${room.id}-${questionId}-${Date.now()}`,
+      room_id: room.id,
+      player_id: player.id,
+      game_question_id: questionId,
+      answer: finalAnswerValue,
+      is_correct: scored.isCorrect,
+      score_earned: scored.score,
+      answered_at: new Date().toISOString(),
+    };
+    GAME.myAnswers = [...(GAME.myAnswers || []).filter((item) => item.game_question_id !== questionId), localAnswer];
+    GAME.roomAnswers = [...(GAME.roomAnswers || []).filter((item) => !(item.player_id === player.id && item.game_question_id === questionId)), localAnswer];
+    document.activeElement?.blur?.();
+
+    let nextScore = null;
     if (roomModeValue(room) === "quick") {
-      const nextScore = await recalcPlayerScore(player.id);
+      nextScore = await recalcPlayerScore(player.id);
       await sb.from("game_room_players").update({ score: nextScore }).eq("id", player.id);
     } else if (roomModeValue(room) === "round") {
-      const nextScore = await recalcRoundPlayerScore(player.id, room);
+      nextScore = await recalcRoundPlayerScore(player.id, room);
       await sb.from("game_room_players").update({ score: nextScore }).eq("id", player.id);
     } else {
-      const nextScore = await recalcPlayerScore(player.id);
+      nextScore = await recalcPlayerScore(player.id);
       await sb.from("game_room_players").update({ score: nextScore }).eq("id", player.id);
+    }
+    if (Number.isFinite(Number(nextScore))) {
+      player.score = Number(nextScore);
     }
     if (roomModeValue(room) === "round" && getRoomRoundChallengeType(room) === "obstacle") {
       delete GAME.roundObstacleSelection[room.id];
       delete GAME.roundObstacleStartedAt[room.id];
+      GAME.liveRenderKey = "";
+      renderLiveRoom();
     }
     if (roomModeValue(room) === "round") {
       await advanceRoundQuestionAfterAnswer(room, question, questionIndex, totalTime);
