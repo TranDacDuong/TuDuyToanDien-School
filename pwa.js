@@ -97,6 +97,29 @@
     return output;
   }
 
+  function delay(ms) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
+  }
+
+  function isPushServiceError(error) {
+    const text = [error?.name, error?.message].filter(Boolean).join(" ");
+    return /AbortError|push service|Registration failed/i.test(text);
+  }
+
+  function getFriendlyPushError(error) {
+    if (isPushServiceError(error) && isAndroidDevice()) {
+      return "Chrome/Android chưa đăng ký được với dịch vụ thông báo. Vui lòng cập nhật Chrome, bật Google Play Services, mở MindUp lại rồi bấm Bật thông báo thêm một lần.";
+    }
+    return error?.message || "Chưa bật được thông báo. Vui lòng thử lại sau.";
+  }
+
+  async function subscribeBrowserPush(registration) {
+    return registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+  }
+
   function subscriptionToRow(userId, subscription) {
     const json = subscription.toJSON();
     if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
@@ -173,18 +196,26 @@
     }
 
     if (!subscription) {
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-      });
+      try {
+        subscription = await subscribeBrowserPush(registration);
+      } catch (error) {
+        if (!isPushServiceError(error)) throw error;
+        await registration.update().catch(() => null);
+        await delay(600);
+        subscription = await subscribeBrowserPush(registration);
+      }
     } else if (options.repairRevoked) {
       const saved = await getSavedSubscription(subscription.endpoint);
       if (saved?.revoked_at) {
         await subscription.unsubscribe().catch(() => false);
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-        });
+        try {
+          subscription = await subscribeBrowserPush(registration);
+        } catch (error) {
+          if (!isPushServiceError(error)) throw error;
+          await registration.update().catch(() => null);
+          await delay(600);
+          subscription = await subscribeBrowserPush(registration);
+        }
       }
     }
 
@@ -403,9 +434,10 @@
       } catch (error) {
         console.warn("MindUp push subscription failed:", error);
         const detail = [error?.name, error?.message].filter(Boolean).join(": ");
-        status.textContent = detail
-          ? `Chưa bật được thông báo: ${detail}`
-          : "Chưa bật được thông báo. Vui lòng thử lại sau.";
+        const friendly = getFriendlyPushError(error);
+        status.textContent = isPushServiceError(error)
+          ? friendly
+          : (detail ? `Chưa bật được thông báo: ${detail}` : friendly);
         status.hidden = false;
       }
     });
