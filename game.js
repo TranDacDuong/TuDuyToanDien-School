@@ -4336,10 +4336,11 @@
     if (me) window.__gameShortDraft[me.id] = window.__gameShortDraft[me.id] || {};
     const shortDraft = answered?.answer || window.__gameShortDraft?.[me?.id || "guest"]?.[question.id] || "";
     EL.answerArea.innerHTML = `
-      <input id="gameShortAnswerInput" class="input short-input" placeholder="Nhập đáp án ngắn" ${disabled ? "disabled" : ""} value="${escAttr(shortDraft)}">
-      ${disabled
-        ? renderAnsweredHint(answered)
-        : `<button class="btn btn-primary" style="margin-top:12px" type="button" onclick="submitGameShortAnswer('${question.id}')">Gửi đáp án</button>`}
+      <div class="short-answer-row">
+        <input id="gameShortAnswerInput" class="input short-input" placeholder="Nh&#7853;p &#273;&#225;p &#225;n ng&#7855;n" ${disabled ? "disabled" : ""} value="${escAttr(shortDraft)}">
+        ${disabled ? "" : `<button class="btn btn-primary short-submit-btn" type="button" onclick="submitGameShortAnswer('${question.id}')" title="G&#7917;i &#273;&#225;p &#225;n" aria-label="G&#7917;i &#273;&#225;p &#225;n">&#10148;</button>`}
+      </div>
+      ${disabled ? renderAnsweredHint(answered) : ""}
     `;
     if (!disabled) {
       const shortInput = document.getElementById("gameShortAnswerInput");

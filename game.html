@@ -498,6 +498,18 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   font-size:1rem;
   font-weight:800;
 }
+#gameLiveView .short-answer-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+#gameLiveView .short-answer-row .short-input{
+  flex:1 1 auto;
+  min-width:0;
+}
+#gameLiveView .short-submit-btn{
+  flex:0 0 auto;
+}
 #gameLiveView .countdown span{
   font-size:1.16rem;
   line-height:1;
@@ -568,6 +580,9 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   font-size:1.18rem;
   font-weight:900;
   text-transform:uppercase;
+}
+#gameLiveView .panel:first-child h3{
+  display:none!important;
 }
 #gameLiveView .panel h3::before,
 #gameLiveView .panel h3::after{
@@ -684,7 +699,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   .toolbar{grid-template-columns:1fr;padding:12px}
   .toolbar > *{width:100%}
   .room-meta,.score-box,.history-stat-grid{grid-template-columns:1fr}
-  .room-top,.question-head,.player-row,.result-card,.history-item,.friend-invite-row{flex-direction:column;align-items:flex-start}
+  .room-top,.player-row,.result-card,.history-item,.friend-invite-row{flex-direction:column;align-items:flex-start}
   .modal{padding:10px;align-items:flex-end}
   #gameSubjectSelectModal.modal.show{align-items:center}
   #gameSubjectSelectModal .modal-card{
@@ -705,8 +720,49 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   #gameRoomScreen .topbar-actions .btn{width:100%;min-width:0}
   #gameRoomScreen .screen-body{padding:14px 10px 20px}
   #gameLiveView .question-card{min-height:360px;padding:24px 18px}
-  #gameLiveView .question-head strong{font-size:1.45rem}
+  #gameLiveView .question-head{
+    flex-direction:row;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    width:100%;
+  }
+  #gameLiveView .question-head strong{
+    font-size:1.05rem;
+    line-height:1.1;
+    min-width:0;
+  }
+  #gameLiveView .countdown{
+    min-width:42px;
+    height:34px;
+    padding:0 9px;
+    border-radius:999px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:4px;
+    font-size:.75rem;
+  }
+  #gameLiveView .countdown span{font-size:.8rem}
+  #gameLiveView .countdown strong{font-size:.92rem}
+  #gameLiveView .panel:first-child h3{display:none}
   #gameLiveView .question-text{font-size:1rem}
+  #gameLiveView .short-input,
+  #gameLiveView .input{
+    min-height:42px;
+    border-radius:12px;
+    font-size:.92rem;
+  }
+  #gameLiveView #gameAnswerArea .short-submit-btn{
+    width:42px;
+    min-width:42px;
+    height:42px;
+    min-height:42px;
+    padding:0;
+    margin-top:0!important;
+    border-radius:12px!important;
+    font-size:1rem;
+  }
   #gameLiveView .score-box:first-of-type div{padding-right:100px}
   #gameLiveView .score-box:first-of-type div:first-child::after{right:20px;font-size:3.5rem}
   .screen-countdown-value{font-size:4rem}
@@ -727,7 +783,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
     background:#fff;
     padding:8px;
   }
-  .countdown {
+  .countdown:not(.game-question-countdown) {
     width:100%;
     justify-content:center;
   }
@@ -1099,7 +1155,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
       <div class="question-card">
         <div class="question-head">
           <strong id="gameQuestionTitle">Câu hỏi</strong>
-          <div class="countdown"><span aria-hidden="true">⏱</span><strong id="gameQuestionClock">00</strong></div>
+          <div class="countdown game-question-countdown"><span aria-hidden="true">⏱</span><strong id="gameQuestionClock">00</strong></div>
         </div>
         <div class="progress-wrap">
           <div class="hint" id="gameProgressText">Tiến độ trận đấu</div>
