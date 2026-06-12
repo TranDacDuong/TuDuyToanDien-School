@@ -321,6 +321,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 .ops-link.secondary { background: rgba(15,31,61,.08); color: var(--navy); }
 .ops-empty { color: var(--ink-light); font-size: .84rem; line-height: 1.7; }
 #mobileQuickActions { display: none; }
+#mobileQuickActions .mobile-tools-toggle { display: none; }
 #mobileQuickActions .mobile-quick-actions-shell {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -575,29 +576,102 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 
   body {
     display: block;
-    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+    height: 100dvh;
+    min-height: 100dvh;
+    padding: 0;
+    overflow: hidden;
   }
 
   main {
-    min-height: 100dvh;
+    height: 100dvh;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: calc(82px + env(safe-area-inset-bottom));
+    overflow: hidden;
   }
 
   #mobileQuickActions {
-    display: block;
-    position: sticky;
-    top: 0;
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    align-items: center;
+    position: relative;
     z-index: 50;
-    padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+    padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
     background: linear-gradient(180deg, rgba(253,250,244,.98) 0%, rgba(253,250,244,.94) 72%, rgba(253,250,244,0) 100%);
     backdrop-filter: blur(10px);
   }
 
+  body.dashboard-home-page #mobileQuickActions,
+  body.mobile-tools-open #mobileQuickActions {
+    display: block;
+  }
+
+  body.dashboard-home-page #mobileQuickActions {
+    padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
+  }
+
+  #mobileQuickActions .mobile-tools-toggle {
+    appearance: none;
+    border: 1px solid rgba(15,31,61,.12);
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,.94);
+    color: var(--navy);
+    box-shadow: 0 10px 24px rgba(15,31,61,.12);
+    font-size: 1.08rem;
+    font-weight: 800;
+  }
+
+  body.dashboard-home-page #mobileQuickActions .mobile-tools-toggle {
+    display: none;
+  }
+
+  body:not(.dashboard-home-page):not(.mobile-tools-open) #mobileQuickActions .mobile-quick-actions-shell {
+    display: none;
+  }
+
+  body.mobile-tools-open:not(.dashboard-home-page) #mobileQuickActions .mobile-tools-toggle {
+    margin-bottom: 8px;
+  }
+
+  #mobileQuickActions .mobile-quick-actions-shell {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    padding: 8px;
+    border-radius: 18px;
+  }
+
+  #mobileQuickActions .mobile-quick-action {
+    min-height: 48px;
+    padding: 8px 6px;
+    border-radius: 14px;
+    gap: 0;
+  }
+
+  #mobileQuickActions .mobile-quick-action span:first-child {
+    font-size: 1.18rem;
+  }
+
+  #mobileQuickActions .mobile-quick-action span:not(.mobile-quick-action-badge):not(:first-child) {
+    display: none;
+  }
+
   .content {
+    flex: 1 1 auto;
     min-height: 0;
+    overflow: hidden;
   }
 
   iframe {
-    height: calc(100dvh - 180px);
+    width: 100%;
+    height: 100%;
+    display: block;
   }
 
   #sidebarTab {
@@ -693,6 +767,9 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     <button class="authBtn secondary" type="button" onclick="openAuthModal('register')">Đăng ký</button>
   </div>
   <section id="mobileQuickActions" aria-label="Loi tat mobile">
+    <button id="mobileToolsToggle" class="mobile-tools-toggle" type="button" aria-expanded="false" aria-label="Mở công cụ nhanh">
+      <span>☰</span>
+    </button>
     <div class="mobile-quick-actions-shell">
       <button class="mobile-quick-action" type="button" data-page="search.html">
         <span>🔎</span>
@@ -844,6 +921,8 @@ const PUBLIC_DASHBOARD_PAGES = new Set(["home.html", "courses.html"]);
 const contentFrame = document.getElementById("contentFrame");
 const mobileNavItems = [...document.querySelectorAll("#mobileNav .mobile-nav-item")];
 const mobileQuickActionItems = [...document.querySelectorAll("#mobileQuickActions .mobile-quick-action")];
+const mobileToolsToggle = document.getElementById("mobileToolsToggle");
+let mobileToolsManualOpen = false;
 let dashboardMenuReady = false;
 let pendingChatPopupUserId = "";
 /* ── Sidebar toggle ── */
@@ -981,6 +1060,19 @@ function setActiveMobileQuickActions(page){
   });
 }
 
+function setMobileToolsState(page, options = {}){
+  const basePage = String(page || "").split("?")[0].split("#")[0];
+  const isHomePage = basePage === "home.html";
+  if(options.reset) {
+    mobileToolsManualOpen = false;
+  }
+  const isOpen = isHomePage || mobileToolsManualOpen;
+  document.body.classList.toggle("dashboard-home-page", isHomePage);
+  document.body.classList.toggle("mobile-tools-open", isOpen);
+  mobileToolsToggle?.setAttribute("aria-expanded", String(isOpen));
+  mobileToolsToggle?.setAttribute("aria-label", isOpen ? "Thu gọn công cụ nhanh" : "Mở công cụ nhanh");
+}
+
 function normalizeDashboardPage(page){
   const raw = String(page || "").trim();
   if(!raw) return "";
@@ -1053,6 +1145,7 @@ function openDashboardPage(page, options = {}){
   if(syncMobile) setActiveMobileNav(page);
   else setActiveMobileNav("");
   setActiveMobileQuickActions(page);
+  setMobileToolsState(page, { reset: true });
   if(page === "ops-center"){
     opsHub?.classList.add("show");
     contentWrap?.classList.add("hidden");
@@ -1086,8 +1179,13 @@ function setupMenu(){
         openAuthModal("login");
         return;
       }
+      mobileToolsManualOpen = false;
       openDashboardPage(item.dataset.page, { syncMenu: false });
     });
+  });
+  mobileToolsToggle?.addEventListener("click", () => {
+    mobileToolsManualOpen = !mobileToolsManualOpen;
+    setMobileToolsState(getDashboardUrlPage() || getFrameDashboardPage());
   });
   const requestedPage = getDashboardUrlPage();
   if(requestedPage){
@@ -1316,6 +1414,3 @@ initDashboard();
 </script>
 </body>
 </html>
-
-
-
