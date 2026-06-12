@@ -1,7 +1,5 @@
 (function registerMindUpPwa(){
   const VAPID_PUBLIC_KEY = "BFeo1qo3R-OG_92Fh36HtY12Gae0G27neKtmXn2KS9KoG_gbOS3BRPKUH7uWij7544kuU0a4VL4x3EP4iwYsu2o";
-  const DISMISSED_KEY = "mindup_push_prompt_dismissed_at";
-  const INSTALL_DISMISSED_KEY = "mindup_install_prompt_dismissed_at";
   const INSTALL_ACCEPTED_KEY = "mindup_install_prompt_accepted";
   const PROMPT_DELAY_MS = 1400;
 
@@ -57,6 +55,10 @@
 
   function isIosDevice() {
     return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  }
+
+  function isAndroidDevice() {
+    return /Android/i.test(navigator.userAgent);
   }
 
   function waitForSupabase(timeoutMs = 8000) {
@@ -197,9 +199,7 @@
       return false;
     }
     if (!user?.id || !isPushSupported() || !isPushConfigured()) return false;
-    if (Notification.permission !== "default") return false;
-    const dismissedAt = Number(localStorage.getItem(DISMISSED_KEY) || 0);
-    return !dismissedAt || Date.now() - dismissedAt > 7 * 24 * 60 * 60 * 1000;
+    return Notification.permission !== "granted";
   }
 
   function shouldShowInstallPrompt(user) {
@@ -208,11 +208,7 @@
     } catch (error) {
       return false;
     }
-    if (!user?.id || isStandaloneApp() || !isMobileDevice()) return false;
-    if (localStorage.getItem(INSTALL_ACCEPTED_KEY) === "1") return false;
-    if (!deferredInstallPrompt && !isIosDevice()) return false;
-    const dismissedAt = Number(localStorage.getItem(INSTALL_DISMISSED_KEY) || 0);
-    return !dismissedAt || Date.now() - dismissedAt > 3 * 24 * 60 * 60 * 1000;
+    return Boolean(user?.id && isMobileDevice() && !isStandaloneApp());
   }
 
   function ensurePromptStyles() {
@@ -312,48 +308,51 @@
     prompt.id = "mindupInstallPrompt";
     prompt.className = "mindup-push-prompt mindup-install-prompt";
     const isIos = isIosDevice();
+    const canUseNativeInstall = Boolean(deferredInstallPrompt);
     prompt.innerHTML = isIos ? `
-      <strong>Cai MindUp ve man hinh chinh</strong>
-      <p>Mo MindUp nhu mot ung dung rieng tren dien thoai de hoc va nhan thong bao nhanh hon.</p>
+      <strong>Cài MindUp về màn hình chính</strong>
+      <p>Mở MindUp như một ứng dụng riêng trên điện thoại để học, xem lịch học và nhận thông báo thuận tiện hơn.</p>
       <ol class="mindup-install-steps">
-        <li>Cham nut Chia se trong Safari.</li>
-        <li>Chon Them vao man hinh chinh.</li>
-        <li>Mo MindUp tu icon moi tao.</li>
+        <li>Chạm nút Chia sẻ trong Safari.</li>
+        <li>Chọn Thêm vào màn hình chính.</li>
+        <li>Mở MindUp từ biểu tượng mới tạo.</li>
       </ol>
       <div class="mindup-push-actions">
-        <button class="mindup-push-later" type="button">De sau</button>
-        <button class="mindup-push-enable" type="button">Da hieu</button>
+        <button class="mindup-push-later" type="button">Để sau</button>
+        <button class="mindup-push-enable" type="button">Đã hiểu</button>
       </div>
     ` : `
-      <strong>Cai app MindUp?</strong>
-      <p>Them MindUp vao dien thoai de mo nhanh nhu app va tiep tuc su dung thuan tien hon sau khi dang nhap.</p>
+      <strong>Cài app MindUp trên điện thoại</strong>
+      <p>Thêm MindUp vào màn hình chính để mở nhanh như app, học thuận tiện hơn và nhận thông tin học tập kịp thời.</p>
+      ${canUseNativeInstall ? "" : `
+        <ol class="mindup-install-steps">
+          <li>Chạm menu ba chấm của Chrome.</li>
+          <li>Chọn Cài đặt ứng dụng hoặc Thêm vào màn hình chính.</li>
+          <li>Mở MindUp từ biểu tượng mới tạo.</li>
+        </ol>
+      `}
       <div class="mindup-push-actions">
-        <button class="mindup-push-later" type="button">De sau</button>
-        <button class="mindup-push-enable" type="button">Cai app</button>
+        <button class="mindup-push-later" type="button">Để sau</button>
+        <button class="mindup-push-enable" type="button">${canUseNativeInstall ? "Cài app" : "Đã hiểu"}</button>
       </div>
     `;
 
     prompt.querySelector(".mindup-push-later").addEventListener("click", () => {
-      localStorage.setItem(INSTALL_DISMISSED_KEY, String(Date.now()));
       removeInstallPrompt();
       window.setTimeout(initPushPrompt, 500);
     });
     prompt.querySelector(".mindup-push-enable").addEventListener("click", async () => {
-      if (isIos) {
-        localStorage.setItem(INSTALL_DISMISSED_KEY, String(Date.now()));
+      if (isIos || !deferredInstallPrompt) {
         removeInstallPrompt();
         window.setTimeout(initPushPrompt, 500);
         return;
       }
-      if (!deferredInstallPrompt) return;
       const installEvent = deferredInstallPrompt;
       deferredInstallPrompt = null;
       installEvent.prompt();
       const outcome = await installEvent.userChoice.catch(() => null);
       if (outcome?.outcome === "accepted") {
         localStorage.setItem(INSTALL_ACCEPTED_KEY, "1");
-      } else {
-        localStorage.setItem(INSTALL_DISMISSED_KEY, String(Date.now()));
       }
       removeInstallPrompt();
       window.setTimeout(initPushPrompt, 500);
@@ -369,9 +368,14 @@
     const prompt = document.createElement("div");
     prompt.id = "mindupPushPrompt";
     prompt.className = "mindup-push-prompt";
+    const blocked = Notification.permission === "denied";
+    const androidHint = isAndroidDevice()
+      ? " Nếu đang dùng Android, hãy kiểm tra thêm quyền thông báo của Chrome và app MindUp trong Cài đặt điện thoại."
+      : "";
     prompt.innerHTML = `
-      <strong>Bật thông báo MindUp?</strong>
-      <p>Nhận nhắc học phí, lịch học và trạng thái mới ngay cả khi bạn không mở trang.</p>
+      <strong>Bật thông báo MindUp</strong>
+      <p>Cho phép thông báo để nhận thông tin học tập, lịch học, học phí và trạng thái mới kịp thời.</p>
+      ${blocked ? `<p>Thông báo đang bị chặn trên trình duyệt hoặc hệ điều hành.${androidHint}</p>` : ""}
       <div class="mindup-push-actions">
         <button class="mindup-push-later" type="button">Để sau</button>
         <button class="mindup-push-enable" type="button">Bật thông báo</button>
@@ -381,15 +385,19 @@
 
     const status = prompt.querySelector(".mindup-push-status");
     prompt.querySelector(".mindup-push-later").addEventListener("click", () => {
-      localStorage.setItem(DISMISSED_KEY, String(Date.now()));
       removePrompt();
     });
     prompt.querySelector(".mindup-push-enable").addEventListener("click", async () => {
       status.hidden = true;
+      if (Notification.permission === "denied") {
+        status.textContent = "Thông báo đang bị chặn. Vui lòng mở Cài đặt của Chrome hoặc app MindUp, sau đó bật quyền Thông báo.";
+        status.hidden = false;
+        return;
+      }
       try {
         const result = await enablePushNotifications();
         if (!result.ok) {
-          status.textContent = "Bạn có thể bật lại thông báo trong cài đặt trình duyệt.";
+          status.textContent = "Bạn có thể bật lại thông báo trong cài đặt trình duyệt hoặc cài đặt app MindUp.";
           status.hidden = false;
         }
       } catch (error) {
@@ -407,10 +415,13 @@
 
   async function initPushPrompt() {
     const user = await getCurrentUser();
-    if (user?.id && Notification.permission === "granted") {
-      await ensurePushSubscription(user.id, { repairRevoked: true }).catch((error) => {
+    if (!user?.id || !isPushSupported()) return;
+    if (Notification.permission === "granted") {
+      const subscription = await ensurePushSubscription(user.id, { repairRevoked: true }).catch((error) => {
         console.warn("MindUp push auto repair failed:", error);
+        return null;
       });
+      if (!subscription) showPrompt();
       return;
     }
     if (document.getElementById("mindupInstallPrompt")) return;
