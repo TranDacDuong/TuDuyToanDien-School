@@ -677,6 +677,12 @@ label {
 .mindup-effect-toggle input:checked + span::after { transform: translateX(16px); }
 .mindup-effect-toggle b { color: var(--ink-mid); font-size: .76rem; text-transform: none; }
 
+@media (max-width: 640px) {
+  .mindup-effect-settings {
+    display: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .page-wrap,
   .page-shell,
