@@ -581,14 +581,14 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   }
 
   #mobileQuickActions {
-    display: flex;
-    flex: 0 0 auto;
-    justify-content: flex-end;
-    align-items: center;
-    position: relative;
+    display: block;
+    position: fixed;
+    top: calc(8px + env(safe-area-inset-top));
+    right: 12px;
     z-index: 1185;
-    padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
+    padding: 0;
     background: transparent;
+    pointer-events: none;
   }
 
   #mobileQuickActions .mobile-tools-toggle {
@@ -605,6 +605,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     box-shadow: 0 10px 24px rgba(15,31,61,.12);
     font-size: 1.08rem;
     font-weight: 800;
+    pointer-events: auto;
   }
 
   body:not(.mobile-tools-open) #mobileQuickActions .mobile-quick-actions-shell {
@@ -613,17 +614,19 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 
   #mobileQuickActions .mobile-quick-actions-shell {
     position: absolute;
-    left: 12px;
-    right: 64px;
-    top: calc(8px + env(safe-area-inset-top));
+    top: 52px;
+    right: 0;
     display: flex;
+    flex-direction: column;
     gap: 8px;
-    padding: 0 2px 4px;
-    overflow-x: auto;
+    max-height: min(260px, calc(100dvh - 150px));
+    padding: 0 0 4px;
+    overflow-y: auto;
     scrollbar-width: none;
     background: transparent;
     border: 0;
     box-shadow: none;
+    pointer-events: auto;
   }
   #mobileQuickActions .mobile-quick-actions-shell::-webkit-scrollbar { display: none; }
 
@@ -830,6 +833,10 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 </main>
 
 <nav id="mobileNav" aria-label="Điều hướng nhanh">
+  <button class="mobile-nav-item" type="button" data-page="home.html">
+    <span>🏠</span>
+    <span>Trang chủ</span>
+  </button>
   <button class="mobile-nav-item" type="button" data-page="courses.html">
     <span>🎓</span>
     <span>Khóa học</span>
@@ -837,10 +844,6 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   <button class="mobile-nav-item" type="button" data-page="class.html">
     <span>📘</span>
     <span>Lớp học</span>
-  </button>
-  <button class="mobile-nav-item" type="button" data-page="home.html">
-    <span>🏠</span>
-    <span>Trang chủ</span>
   </button>
   <button class="mobile-nav-item" type="button" data-page="tuition.html">
     <span>💰</span>
