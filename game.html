@@ -671,6 +671,11 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   .page{padding:14px 10px 24px}
   .hero,.toolbar,.room-card,.section-card,.panel,.question-card,.modal-card,.stat-card,.empty{border-radius:20px}
   .hero{padding:18px}
+  .hero-copy{min-width:0;width:100%}
+  .hero .stats-grid{grid-template-columns:1fr;width:100%;max-width:100%}
+  .hero .stat-card{width:100%;min-width:0}
+  .hero .history-stat-button strong{min-width:0}
+  .hero .history-stat-button strong::after{flex:0 0 24px}
   .hero-copy h1{font-size:1.55rem}
   .hero-copy p{font-size:.88rem;line-height:1.6}
   .hero-actions,.join-code-box,.room-actions,.history-actions,.topbar-actions{width:100%}
@@ -681,6 +686,12 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   .room-meta,.score-box,.history-stat-grid{grid-template-columns:1fr}
   .room-top,.question-head,.player-row,.result-card,.history-item,.friend-invite-row{flex-direction:column;align-items:flex-start}
   .modal{padding:10px;align-items:flex-end}
+  #gameSubjectSelectModal.modal.show{align-items:center}
+  #gameSubjectSelectModal .modal-card{
+    width:min(720px,calc(100vw - 28px))!important;
+    max-height:calc(100dvh - 28px);
+    border-radius:22px;
+  }
   .modal-card{width:100%;max-height:calc(100dvh - 12px);border-radius:22px 22px 0 0}
   .mh{padding:16px 16px 12px;align-items:flex-start;gap:10px;flex-wrap:wrap}
   .mb{padding:14px 16px 18px}
