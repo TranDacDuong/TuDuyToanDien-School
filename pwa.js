@@ -1,9 +1,24 @@
 (function registerMindUpPwa(){
   const VAPID_PUBLIC_KEY = "BFeo1qo3R-OG_92Fh36HtY12Gae0G27neKtmXn2KS9KoG_gbOS3BRPKUH7uWij7544kuU0a4VL4x3EP4iwYsu2o";
   const DISMISSED_KEY = "mindup_push_prompt_dismissed_at";
+  const INSTALL_DISMISSED_KEY = "mindup_install_prompt_dismissed_at";
+  const INSTALL_ACCEPTED_KEY = "mindup_install_prompt_accepted";
   const PROMPT_DELAY_MS = 1400;
 
   let serviceWorkerRegistrationPromise = null;
+  let deferredInstallPrompt = null;
+
+  window.addEventListener("beforeinstallprompt", function(event){
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    window.setTimeout(initInstallPrompt, 400);
+  });
+
+  window.addEventListener("appinstalled", function(){
+    localStorage.setItem(INSTALL_ACCEPTED_KEY, "1");
+    removeInstallPrompt();
+    deferredInstallPrompt = null;
+  });
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function(){
@@ -27,6 +42,21 @@
       "Notification" in window &&
       window.isSecureContext
     );
+  }
+
+  function isStandaloneApp() {
+    return Boolean(
+      window.matchMedia?.("(display-mode: standalone)")?.matches ||
+      window.navigator.standalone
+    );
+  }
+
+  function isMobileDevice() {
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 820;
+  }
+
+  function isIosDevice() {
+    return /iPhone|iPad|iPod/i.test(navigator.userAgent);
   }
 
   function waitForSupabase(timeoutMs = 8000) {
@@ -136,6 +166,19 @@
     return !dismissedAt || Date.now() - dismissedAt > 7 * 24 * 60 * 60 * 1000;
   }
 
+  function shouldShowInstallPrompt(user) {
+    try {
+      if (window.top !== window) return false;
+    } catch (error) {
+      return false;
+    }
+    if (!user?.id || isStandaloneApp() || !isMobileDevice()) return false;
+    if (localStorage.getItem(INSTALL_ACCEPTED_KEY) === "1") return false;
+    if (!deferredInstallPrompt && !isIosDevice()) return false;
+    const dismissedAt = Number(localStorage.getItem(INSTALL_DISMISSED_KEY) || 0);
+    return !dismissedAt || Date.now() - dismissedAt > 3 * 24 * 60 * 60 * 1000;
+  }
+
   function ensurePromptStyles() {
     if (document.getElementById("mindupPushPromptStyles")) return;
     const style = document.createElement("style");
@@ -196,6 +239,14 @@
         color: #b45309;
         font-size: .78rem;
       }
+      .mindup-install-steps {
+        margin: 0 0 12px;
+        padding-left: 18px;
+        color: #4a5578;
+        font-size: .84rem;
+        line-height: 1.5;
+      }
+      .mindup-install-steps li { margin: 2px 0; }
       @media (max-width: 640px) {
         .mindup-push-prompt {
           left: 14px;
@@ -211,6 +262,68 @@
 
   function removePrompt() {
     document.getElementById("mindupPushPrompt")?.remove();
+  }
+
+  function removeInstallPrompt() {
+    document.getElementById("mindupInstallPrompt")?.remove();
+  }
+
+  function showInstallPrompt() {
+    if (document.getElementById("mindupInstallPrompt") || isStandaloneApp()) return;
+    ensurePromptStyles();
+
+    const prompt = document.createElement("div");
+    prompt.id = "mindupInstallPrompt";
+    prompt.className = "mindup-push-prompt mindup-install-prompt";
+    const isIos = isIosDevice();
+    prompt.innerHTML = isIos ? `
+      <strong>Cai MindUp ve man hinh chinh</strong>
+      <p>Mo MindUp nhu mot ung dung rieng tren dien thoai de hoc va nhan thong bao nhanh hon.</p>
+      <ol class="mindup-install-steps">
+        <li>Cham nut Chia se trong Safari.</li>
+        <li>Chon Them vao man hinh chinh.</li>
+        <li>Mo MindUp tu icon moi tao.</li>
+      </ol>
+      <div class="mindup-push-actions">
+        <button class="mindup-push-later" type="button">De sau</button>
+        <button class="mindup-push-enable" type="button">Da hieu</button>
+      </div>
+    ` : `
+      <strong>Cai app MindUp?</strong>
+      <p>Them MindUp vao dien thoai de mo nhanh nhu app va tiep tuc su dung thuan tien hon sau khi dang nhap.</p>
+      <div class="mindup-push-actions">
+        <button class="mindup-push-later" type="button">De sau</button>
+        <button class="mindup-push-enable" type="button">Cai app</button>
+      </div>
+    `;
+
+    prompt.querySelector(".mindup-push-later").addEventListener("click", () => {
+      localStorage.setItem(INSTALL_DISMISSED_KEY, String(Date.now()));
+      removeInstallPrompt();
+      window.setTimeout(initPushPrompt, 500);
+    });
+    prompt.querySelector(".mindup-push-enable").addEventListener("click", async () => {
+      if (isIos) {
+        localStorage.setItem(INSTALL_DISMISSED_KEY, String(Date.now()));
+        removeInstallPrompt();
+        window.setTimeout(initPushPrompt, 500);
+        return;
+      }
+      if (!deferredInstallPrompt) return;
+      const installEvent = deferredInstallPrompt;
+      deferredInstallPrompt = null;
+      installEvent.prompt();
+      const outcome = await installEvent.userChoice.catch(() => null);
+      if (outcome?.outcome === "accepted") {
+        localStorage.setItem(INSTALL_ACCEPTED_KEY, "1");
+      } else {
+        localStorage.setItem(INSTALL_DISMISSED_KEY, String(Date.now()));
+      }
+      removeInstallPrompt();
+      window.setTimeout(initPushPrompt, 500);
+    });
+
+    document.body.appendChild(prompt);
   }
 
   function showPrompt() {
@@ -255,7 +368,23 @@
 
   async function initPushPrompt() {
     const user = await getCurrentUser();
+    if (document.getElementById("mindupInstallPrompt")) return;
     if (shouldShowPrompt(user)) showPrompt();
+  }
+
+  async function initInstallPrompt() {
+    const user = await getCurrentUser();
+    if (shouldShowInstallPrompt(user)) showInstallPrompt();
+  }
+
+  async function watchAuthForPrompts() {
+    const client = await waitForSupabase();
+    if (!client?.auth?.onAuthStateChange) return;
+    client.auth.onAuthStateChange((event, session) => {
+      if (event !== "SIGNED_IN" || !session?.user) return;
+      window.setTimeout(initInstallPrompt, 500);
+      window.setTimeout(initPushPrompt, 1800);
+    });
   }
 
   window.MindUpPush = {
@@ -265,6 +394,8 @@
   };
 
   window.addEventListener("load", function(){
-    window.setTimeout(initPushPrompt, PROMPT_DELAY_MS);
+    window.setTimeout(initInstallPrompt, PROMPT_DELAY_MS);
+    window.setTimeout(initPushPrompt, PROMPT_DELAY_MS + 1600);
+    watchAuthForPrompts();
   });
 })();
