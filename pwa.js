@@ -1,10 +1,14 @@
 (function registerMindUpPwa(){
   const VAPID_PUBLIC_KEY = "BFeo1qo3R-OG_92Fh36HtY12Gae0G27neKtmXn2KS9KoG_gbOS3BRPKUH7uWij7544kuU0a4VL4x3EP4iwYsu2o";
   const INSTALL_ACCEPTED_KEY = "mindup_install_prompt_accepted";
+  const LOCAL_NOTIFY_ENABLED_KEY = "mindup_local_notifications_enabled";
+  const LOCAL_NOTIFY_LAST_SEEN_KEY = "mindup_local_notifications_last_seen_at";
+  const LOCAL_NOTIFY_POLL_MS = 30000;
   const PROMPT_DELAY_MS = 1400;
 
   let serviceWorkerRegistrationPromise = null;
   let deferredInstallPrompt = null;
+  let localNotificationPollTimer = null;
 
   window.addEventListener("beforeinstallprompt", function(event){
     event.preventDefault();
@@ -148,6 +152,73 @@
     if (error) throw error;
   }
 
+  function normalizeLocalNotificationUrl(value) {
+    try {
+      const url = new URL(value || "notifications.html", window.location.origin);
+      if (url.origin !== window.location.origin) return "notifications.html";
+      return `${url.pathname}${url.search}${url.hash}`.replace(/^\//, "") || "notifications.html";
+    } catch (error) {
+      return "notifications.html";
+    }
+  }
+
+  function showLocalNotification(item) {
+    if (!item || Notification.permission !== "granted") return;
+    const notification = new Notification(item.title || "MindUp", {
+      body: item.message || "Bạn có thông báo mới.",
+      icon: "pwa-icon-192.png",
+      badge: "pwa-icon-192.png",
+      tag: item.id || `mindup-local-${Date.now()}`
+    });
+    notification.onclick = function(){
+      window.focus();
+      window.location.href = normalizeLocalNotificationUrl(item.target_url);
+      notification.close();
+    };
+  }
+
+  async function pollLocalNotifications(userId) {
+    if (!userId || Notification.permission !== "granted" || localStorage.getItem(LOCAL_NOTIFY_ENABLED_KEY) !== "1") return;
+    const client = await waitForSupabase();
+    if (!client) return;
+
+    const lastSeenAt = localStorage.getItem(LOCAL_NOTIFY_LAST_SEEN_KEY);
+    if (!lastSeenAt) {
+      localStorage.setItem(LOCAL_NOTIFY_LAST_SEEN_KEY, new Date().toISOString());
+      return;
+    }
+
+    const { data, error } = await client
+      .from("notifications")
+      .select("id,title,message,target_url,created_at,is_read")
+      .eq("user_id", userId)
+      .eq("is_read", false)
+      .gt("created_at", lastSeenAt)
+      .order("created_at", { ascending: true })
+      .limit(8);
+    if (error) return;
+
+    (data || []).forEach(showLocalNotification);
+    const newest = (data || []).at(-1)?.created_at;
+    if (newest) localStorage.setItem(LOCAL_NOTIFY_LAST_SEEN_KEY, newest);
+  }
+
+  function startLocalNotificationPolling(userId) {
+    if (!userId || localNotificationPollTimer) return;
+    pollLocalNotifications(userId).catch(() => {});
+    localNotificationPollTimer = window.setInterval(() => {
+      pollLocalNotifications(userId).catch(() => {});
+    }, LOCAL_NOTIFY_POLL_MS);
+  }
+
+  function enableLocalNotifications(userId, resetSeen = false) {
+    localStorage.setItem(LOCAL_NOTIFY_ENABLED_KEY, "1");
+    if (resetSeen || !localStorage.getItem(LOCAL_NOTIFY_LAST_SEEN_KEY)) {
+      localStorage.setItem(LOCAL_NOTIFY_LAST_SEEN_KEY, new Date().toISOString());
+    }
+    startLocalNotificationPolling(userId);
+  }
+
   async function getSavedSubscription(endpoint) {
     const client = await waitForSupabase();
     if (!client || !endpoint) return null;
@@ -180,7 +251,16 @@
       : await Notification.requestPermission();
     if (permission !== "granted") return { ok: false, permission };
 
-    const subscription = await ensurePushSubscription(user.id, { forceNew: true, repairRevoked: true });
+    let subscription = null;
+    try {
+      subscription = await ensurePushSubscription(user.id, { forceNew: true, repairRevoked: true });
+    } catch (error) {
+      if (!isPushServiceError(error)) throw error;
+      enableLocalNotifications(user.id, true);
+      removePrompt();
+      return { ok: true, permission, localOnly: true };
+    }
+    enableLocalNotifications(user.id);
     removePrompt();
     return { ok: Boolean(subscription), permission };
   }
@@ -451,9 +531,11 @@
     if (Notification.permission === "granted") {
       const subscription = await ensurePushSubscription(user.id, { repairRevoked: true }).catch((error) => {
         console.warn("MindUp push auto repair failed:", error);
+        if (isPushServiceError(error)) enableLocalNotifications(user.id);
         return null;
       });
-      if (!subscription) showPrompt();
+      if (subscription) enableLocalNotifications(user.id);
+      if (!subscription && localStorage.getItem(LOCAL_NOTIFY_ENABLED_KEY) !== "1") showPrompt();
       return;
     }
     if (document.getElementById("mindupInstallPrompt")) return;
