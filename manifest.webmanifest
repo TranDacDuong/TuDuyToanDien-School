@@ -1,0 +1,34 @@
+{
+  "name": "MindUp - Tu Duy Toan Dien",
+  "short_name": "MindUp",
+  "description": "Nen tang hoc tap, luyen de va quan ly lop hoc MindUp.",
+  "id": "/",
+  "start_url": "/dashboard.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#fdfaf4",
+  "theme_color": "#0f1f3d",
+  "categories": ["education", "productivity"],
+  "lang": "vi",
+  "icons": [
+    {
+      "src": "pwa-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "pwa-icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
