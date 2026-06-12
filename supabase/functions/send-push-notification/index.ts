@@ -150,6 +150,10 @@ async function sendToSubscription(subscription: PushSubscriptionRow, payload: st
         },
       },
       payload,
+      {
+        TTL: 60 * 60 * 24 * 7,
+        urgency: "high",
+      },
     );
     return { ok: true };
   } catch (error) {

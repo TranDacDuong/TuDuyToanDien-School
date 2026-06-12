@@ -1,4 +1,4 @@
-const CACHE_VERSION = "mindup-pwa-v1";
+const CACHE_VERSION = "mindup-pwa-v2";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -54,6 +54,11 @@ self.addEventListener("fetch", event => {
 
   if (request.mode === "navigate") {
     event.respondWith(networkFirstNavigation(request));
+    return;
+  }
+
+  if (url.pathname.endsWith("/pwa.js") || url.pathname.endsWith("/service-worker.js")) {
+    event.respondWith(networkFirstAsset(request));
     return;
   }
 
@@ -121,6 +126,17 @@ async function staleWhileRevalidate(request) {
     .catch(() => cached);
 
   return cached || fresh;
+}
+
+async function networkFirstAsset(request) {
+  const cache = await caches.open(RUNTIME_CACHE);
+  try {
+    const response = await fetch(request, { cache: "no-store" });
+    if (response && response.ok) cache.put(request, response.clone());
+    return response;
+  } catch (error) {
+    return cache.match(request);
+  }
 }
 
 function readPushPayload(event) {

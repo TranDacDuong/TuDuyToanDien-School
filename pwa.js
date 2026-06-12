@@ -120,6 +120,18 @@
     if (error) throw error;
   }
 
+  async function getSavedSubscription(endpoint) {
+    const client = await waitForSupabase();
+    if (!client || !endpoint) return null;
+    const { data, error } = await client
+      .from("push_subscriptions")
+      .select("id, revoked_at")
+      .eq("endpoint", endpoint)
+      .maybeSingle();
+    if (error) return null;
+    return data || null;
+  }
+
   async function getServiceWorkerRegistration() {
     if (serviceWorkerRegistrationPromise) {
       const registered = await serviceWorkerRegistrationPromise;
@@ -140,6 +152,14 @@
       : await Notification.requestPermission();
     if (permission !== "granted") return { ok: false, permission };
 
+    const subscription = await ensurePushSubscription(user.id, { repairRevoked: true });
+    removePrompt();
+    return { ok: Boolean(subscription), permission };
+  }
+
+  async function ensurePushSubscription(userId, options = {}) {
+    if (!isPushSupported() || !isPushConfigured() || Notification.permission !== "granted") return null;
+
     const registration = await getServiceWorkerRegistration();
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
@@ -147,11 +167,19 @@
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
       });
+    } else if (options.repairRevoked) {
+      const saved = await getSavedSubscription(subscription.endpoint);
+      if (saved?.revoked_at) {
+        await subscription.unsubscribe().catch(() => false);
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        });
+      }
     }
 
-    await saveSubscription(user.id, subscription);
-    removePrompt();
-    return { ok: true, permission };
+    await saveSubscription(userId, subscription);
+    return subscription;
   }
 
   function shouldShowPrompt(user) {
@@ -368,6 +396,12 @@
 
   async function initPushPrompt() {
     const user = await getCurrentUser();
+    if (user?.id && Notification.permission === "granted") {
+      await ensurePushSubscription(user.id, { repairRevoked: true }).catch((error) => {
+        console.warn("MindUp push auto repair failed:", error);
+      });
+      return;
+    }
     if (document.getElementById("mindupInstallPrompt")) return;
     if (shouldShowPrompt(user)) showPrompt();
   }
