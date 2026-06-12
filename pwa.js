@@ -1,5 +1,5 @@
 (function registerMindUpPwa(){
-  const VAPID_PUBLIC_KEY = "REPLACE_WITH_YOUR_VAPID_PUBLIC_KEY";
+  const VAPID_PUBLIC_KEY = "BFeo1qo3R-OG_92Fh36HtY12Gae0G27neKtmXn2KS9KoG_gbOS3BRPKUH7uWij7544kuU0a4VL4x3EP4iwYsu2o";
   const DISMISSED_KEY = "mindup_push_prompt_dismissed_at";
   const PROMPT_DELAY_MS = 1400;
 
