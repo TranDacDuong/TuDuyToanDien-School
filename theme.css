@@ -46,6 +46,22 @@
   --t: .18s ease;
 }
 
+.icon-btn {
+  width: 34px !important;
+  min-width: 34px !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 10px !important;
+  line-height: 1 !important;
+  font-size: 1.05rem !important;
+  font-weight: 800 !important;
+  flex: 0 0 auto !important;
+}
+
 /* Seasonal system palettes */
 html[data-mindup-theme="spring"] {
   --navy:#3f365f;--navy-mid:#695382;--navy-light:#8e6ba0;
