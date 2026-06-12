@@ -80,18 +80,7 @@ aside.open ~ #sidebarTab,
     pointer-events: none;
   }
   #sidebarTab {
-    top: auto;
-    bottom: 18px;
-    left: 14px;
-    transform: none;
-    width: 92px;
-    height: 54px;
-    padding: 0 14px;
-    border-radius: 999px;
-    background: rgba(255,255,255,.92);
-    box-shadow: 0 10px 28px rgba(15,31,61,.16);
-    border: 1px solid rgba(15,31,61,.08);
-    z-index: 1200;
+    display: none;
   }
   #sidebarTab::after {
     content: '☰';
@@ -597,19 +586,9 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     justify-content: flex-end;
     align-items: center;
     position: relative;
-    z-index: 50;
+    z-index: 1185;
     padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
-    background: linear-gradient(180deg, rgba(253,250,244,.98) 0%, rgba(253,250,244,.94) 72%, rgba(253,250,244,0) 100%);
-    backdrop-filter: blur(10px);
-  }
-
-  body.dashboard-home-page #mobileQuickActions,
-  body.mobile-tools-open #mobileQuickActions {
-    display: block;
-  }
-
-  body.dashboard-home-page #mobileQuickActions {
-    padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
+    background: transparent;
   }
 
   #mobileQuickActions .mobile-tools-toggle {
@@ -628,30 +607,36 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     font-weight: 800;
   }
 
-  body.dashboard-home-page #mobileQuickActions .mobile-tools-toggle {
+  body:not(.mobile-tools-open) #mobileQuickActions .mobile-quick-actions-shell {
     display: none;
-  }
-
-  body:not(.dashboard-home-page):not(.mobile-tools-open) #mobileQuickActions .mobile-quick-actions-shell {
-    display: none;
-  }
-
-  body.mobile-tools-open:not(.dashboard-home-page) #mobileQuickActions .mobile-tools-toggle {
-    margin-bottom: 8px;
   }
 
   #mobileQuickActions .mobile-quick-actions-shell {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    position: absolute;
+    left: 12px;
+    right: 64px;
+    top: calc(8px + env(safe-area-inset-top));
+    display: flex;
     gap: 8px;
-    padding: 8px;
-    border-radius: 18px;
+    padding: 0 2px 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
   }
+  #mobileQuickActions .mobile-quick-actions-shell::-webkit-scrollbar { display: none; }
 
   #mobileQuickActions .mobile-quick-action {
-    min-height: 48px;
-    padding: 8px 6px;
-    border-radius: 14px;
+    flex: 0 0 46px;
+    width: 46px;
+    height: 46px;
+    min-height: 46px;
+    padding: 0;
+    border-radius: 999px;
     gap: 0;
+    background: rgba(8,15,30,.9);
+    box-shadow: 0 10px 24px rgba(15,31,61,.18);
   }
 
   #mobileQuickActions .mobile-quick-action span:first-child {
@@ -674,32 +659,30 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     display: block;
   }
 
-  #sidebarTab {
-    bottom: calc(92px + env(safe-area-inset-bottom));
-    width: 52px;
-    height: 52px;
-    background: linear-gradient(135deg, rgba(15,31,61,.96) 0%, rgba(29,107,209,.88) 100%);
-  }
-
-  #sidebarTab::after {
-    font-size: 1.18rem !important;
-  }
-
   #mobileNav {
     position: fixed;
     left: 10px;
     right: 10px;
     bottom: calc(10px + env(safe-area-inset-bottom));
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 8px;
-    padding: 10px;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+    padding: 8px;
     border-radius: 24px;
     background: rgba(8,15,30,.92);
     border: 1px solid rgba(186,230,253,.16);
     box-shadow: 0 20px 40px rgba(2,8,23,.34);
     backdrop-filter: blur(14px);
     z-index: 1190;
+  }
+  #mobileNav .mobile-nav-item {
+    gap: 3px;
+    padding: 7px 3px;
+    border-radius: 14px;
+    font-size: .62rem;
+  }
+  #mobileNav .mobile-nav-item span:first-child {
+    font-size: 1.05rem;
   }
   #opsHub { padding: 12px 12px 0; }
   .ops-shell { margin-bottom: 10px; }
@@ -859,6 +842,10 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     <span>🏠</span>
     <span>Trang chủ</span>
   </button>
+  <button class="mobile-nav-item" type="button" data-page="tuition.html">
+    <span>💰</span>
+    <span>Học phí</span>
+  </button>
   <button class="mobile-nav-item" type="button" data-page="public_exam.html">
     <span>🎯</span>
     <span>Đề thi</span>
@@ -866,6 +853,10 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   <button class="mobile-nav-item" type="button" data-page="game.html">
     <span>🎮</span>
     <span>Game</span>
+  </button>
+  <button class="mobile-nav-item mobile-nav-more" type="button" data-action="menu">
+    <span>⋯</span>
+    <span>Thêm</span>
   </button>
 </nav>
 
@@ -1066,7 +1057,7 @@ function setMobileToolsState(page, options = {}){
   if(options.reset) {
     mobileToolsManualOpen = false;
   }
-  const isOpen = isHomePage || mobileToolsManualOpen;
+  const isOpen = mobileToolsManualOpen;
   document.body.classList.toggle("dashboard-home-page", isHomePage);
   document.body.classList.toggle("mobile-tools-open", isOpen);
   mobileToolsToggle?.setAttribute("aria-expanded", String(isOpen));
@@ -1168,6 +1159,10 @@ function setupMenu(){
   });
   mobileNavItems.forEach(item => {
     item.addEventListener("click", () => {
+      if(item.dataset.action === "menu"){
+        openSidebar();
+        return;
+      }
       const hasMenuItem = !!document.querySelector(`#menu li[data-page="${item.dataset.page}"]`);
       openDashboardPage(item.dataset.page, { syncMenu: hasMenuItem });
     });
