@@ -779,6 +779,10 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
         <span>Nhắn tin</span>
         <span class="mobile-quick-action-badge" id="messageBadgeTop">0</span>
       </button>
+      <button class="mobile-quick-action" type="button" data-page="profile.html">
+        <span>👤</span>
+        <span>Trang cá nhân</span>
+      </button>
     </div>
   </section>
   <section id="opsHub">
@@ -1181,7 +1185,10 @@ function setupMenu(){
         return;
       }
       mobileToolsManualOpen = false;
-      openDashboardPage(item.dataset.page, { syncMenu: false });
+      const targetPage = item.dataset.page === "profile.html"
+        ? "profile.html?id=" + encodeURIComponent(currentDashboardProfile?.id || currentDashboardUser.id)
+        : item.dataset.page;
+      openDashboardPage(targetPage, { syncMenu: false });
     });
   });
   mobileToolsToggle?.addEventListener("click", () => {
