@@ -97,11 +97,14 @@
 
   function subscriptionToRow(userId, subscription) {
     const json = subscription.toJSON();
+    if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
+      throw new Error("Push subscription is missing browser keys");
+    }
     return {
       user_id: userId,
       endpoint: json.endpoint,
-      p256dh: json.keys?.p256dh || null,
-      auth: json.keys?.auth || null,
+      p256dh: json.keys.p256dh,
+      auth: json.keys.auth,
       expiration_time: json.expirationTime ? new Date(json.expirationTime).toISOString() : null,
       user_agent: navigator.userAgent || null,
       revoked_at: null,
@@ -152,7 +155,7 @@
       : await Notification.requestPermission();
     if (permission !== "granted") return { ok: false, permission };
 
-    const subscription = await ensurePushSubscription(user.id, { repairRevoked: true });
+    const subscription = await ensurePushSubscription(user.id, { forceNew: true, repairRevoked: true });
     removePrompt();
     return { ok: Boolean(subscription), permission };
   }
@@ -162,6 +165,11 @@
 
     const registration = await getServiceWorkerRegistration();
     let subscription = await registration.pushManager.getSubscription();
+    if (subscription && options.forceNew) {
+      await subscription.unsubscribe().catch(() => false);
+      subscription = null;
+    }
+
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -386,7 +394,10 @@
         }
       } catch (error) {
         console.warn("MindUp push subscription failed:", error);
-        status.textContent = "Chưa bật được thông báo. Vui lòng thử lại sau.";
+        const detail = [error?.name, error?.message].filter(Boolean).join(": ");
+        status.textContent = detail
+          ? `Chưa bật được thông báo: ${detail}`
+          : "Chưa bật được thông báo. Vui lòng thử lại sau.";
         status.hidden = false;
       }
     });
