@@ -384,7 +384,7 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
         <div class="sidebar-sub">Chọn một người bạn để bắt đầu trò chuyện</div>
       </div>
       <div class="search-wrap">
-        <input id="friendSearch" class="search-input" placeholder="Tìm bạn bè..." oninput="filterFriends()">
+        <input id="friendSearch" class="search-input" placeholder="Tìm người dùng hoặc cuộc trò chuyện..." oninput="filterFriends()">
       </div>
       <div id="friendList" class="friend-list">
         <div class="empty"><strong>Đang tải</strong>Danh sách bạn bè đang được chuẩn bị...</div>
@@ -432,6 +432,9 @@ let currentConversationId = null;
 let activeFriend = null;
 let friendMap = new Map();
 let allFriends = [];
+let userSearchResults = [];
+let userSearchTimer = null;
+let userSearchToken = 0;
 let selectedUserFromQuery = null;
 let messageChannel = null;
 let notificationChannel = null;
@@ -525,27 +528,56 @@ async function init() {
   await loadFriends();
 }
 
+function getDirectPartnerId(directKey) {
+  const parts = String(directKey || "").split("_").filter(Boolean);
+  return parts.find(part => part !== currentUser?.id) || "";
+}
+
+function makeConversationListItem(user, options = {}) {
+  return {
+    friend_id: user?.id || options.friend_id || "",
+    users: {
+      full_name: user?.full_name || options.full_name || "Người dùng",
+      avatar_url: user?.avatar_url || options.avatar_url || "default-avatar.png",
+      role: user?.role || options.role || ""
+    },
+    conversationId: options.conversationId || null,
+    preview: options.preview || "",
+    lastActivity: options.lastActivity || null,
+    unreadCount: options.unreadCount || 0,
+    isFriend: Boolean(options.isFriend),
+    isSearchResult: Boolean(options.isSearchResult)
+  };
+}
+
+async function fetchUsersByIds(userIds) {
+  const ids = [...new Set((userIds || []).filter(Boolean))];
+  if (!ids.length) return new Map();
+
+  const { data, error } = await sb
+    .from("users")
+    .select("id, full_name, avatar_url, role")
+    .in("id", ids);
+
+  if (error) throw error;
+  return new Map((data || []).map(user => [user.id, user]));
+}
+
 async function loadFriends() {
   const requestToken = ++friendsLoadToken;
-  const { data, error } = await sb
-    .from("friendships")
-    .select("friend_id, users!friendships_friend_id_fkey(full_name, avatar_url, role)")
-    .eq("user_id", currentUser.id)
-    .order("created_at", { ascending: false });
-
   const wrap = document.getElementById("friendList");
-  if (error) {
-    wrap.innerHTML = '<div class="empty"><strong>Không thể tải danh sách</strong>Hãy thử lại sau ít phút.</div>';
-    return;
-  }
-  if (!data || !data.length) {
-    wrap.innerHTML = '<div class="empty"><strong>Chưa có bạn bè</strong>Hãy kết bạn trước để bắt đầu nhắn tin.</div>';
-    return;
-  }
 
-  const directKeys = (data || []).map(item => [currentUser.id, item.friend_id].sort().join("_"));
-  const [{ data: conversations }, { data: unreadNotifications }] = await Promise.all([
-    sb.from("conversations").select("id, direct_key").in("direct_key", directKeys),
+  const [{ data: friendships, error: friendshipError }, { data: conversations, error: conversationError }, { data: unreadNotifications }] = await Promise.all([
+    sb
+      .from("friendships")
+      .select("friend_id, users!friendships_friend_id_fkey(id, full_name, avatar_url, role)")
+      .eq("user_id", currentUser.id)
+      .order("created_at", { ascending: false }),
+    sb
+      .from("conversations")
+      .select("id, direct_key, created_at")
+      .eq("kind", "direct")
+      .not("direct_key", "is", null),
     sb
       .from("notifications")
       .select("actor_id")
@@ -554,14 +586,36 @@ async function loadFriends() {
       .eq("is_read", false)
   ]);
 
-  const conversationMap = new Map((conversations || []).map(item => [item.direct_key, item]));
+  if (friendshipError || conversationError) {
+    wrap.innerHTML = '<div class="empty"><strong>Không thể tải tin nhắn</strong>Hãy thử lại sau ít phút.</div>';
+    return;
+  }
+
+  const friendRows = friendships || [];
+  const friendById = new Map(friendRows.map(item => [item.friend_id, item]));
+  const directConversations = (conversations || [])
+    .map(item => ({ ...item, partnerId: getDirectPartnerId(item.direct_key) }))
+    .filter(item => item.partnerId && item.partnerId !== currentUser.id);
+  const conversationByUserId = new Map(directConversations.map(item => [item.partnerId, item]));
+  const participantIds = [...new Set([
+    ...friendRows.map(item => item.friend_id),
+    ...directConversations.map(item => item.partnerId)
+  ].filter(Boolean))];
+
+  let userById = new Map();
+  try {
+    userById = await fetchUsersByIds(participantIds);
+  } catch (error) {
+    console.warn("Could not load message users", error);
+  }
+
   const unreadMap = new Map();
   (unreadNotifications || []).forEach(item => {
     if (!item.actor_id) return;
     unreadMap.set(item.actor_id, (unreadMap.get(item.actor_id) || 0) + 1);
   });
 
-  const conversationIds = (conversations || []).map(item => item.id);
+  const conversationIds = directConversations.map(item => item.id);
   const lastMessageMap = new Map();
   if (conversationIds.length) {
     const { data: messages } = await sb
@@ -577,21 +631,22 @@ async function loadFriends() {
     });
   }
 
-  const enriched = (data || []).map(item => {
-    const directKey = [currentUser.id, item.friend_id].sort().join("_");
-    const conversation = conversationMap.get(directKey);
+  const enriched = participantIds.map(userId => {
+    const friendRow = friendById.get(userId);
+    const conversation = conversationByUserId.get(userId);
+    const user = userById.get(userId) || friendRow?.users || { id: userId };
     const lastMessage = conversation ? lastMessageMap.get(conversation.id) : null;
     const preview = lastMessage?.content
       ? (lastMessage.sender_id === currentUser.id ? "Bạn: " : "") + getMessagePreview(lastMessage.content)
       : "";
 
-    return {
-      ...item,
+    return makeConversationListItem({ ...user, id: userId }, {
       conversationId: conversation?.id || null,
       preview,
-      lastActivity: lastMessage?.created_at || null,
-      unreadCount: unreadMap.get(item.friend_id) || 0
-    };
+      lastActivity: lastMessage?.created_at || conversation?.created_at || null,
+      unreadCount: unreadMap.get(userId) || 0,
+      isFriend: friendById.has(userId)
+    });
   });
 
   if (requestToken !== friendsLoadToken) return;
@@ -605,55 +660,155 @@ async function loadFriends() {
 
   allFriends = enriched;
   friendMap = new Map(enriched.map(item => [item.friend_id, item]));
-  renderFriendList(getFilteredFriendList());
+
+  if (!enriched.length && !document.getElementById("friendSearch")?.value?.trim()) {
+    wrap.innerHTML = '<div class="empty"><strong>Chưa có cuộc trò chuyện</strong>Tìm người dùng để bắt đầu nhắn tin.</div>';
+  } else {
+    renderFriendList(getFilteredFriendList());
+  }
 
   if (activeFriend?.id) {
     document.getElementById("friend_" + activeFriend.id)?.classList.add("active");
   }
 
   const selectedUserId = !currentConversationId ? selectedUserFromQuery : null;
-  if (selectedUserId && friendMap.has(selectedUserId)) {
+  if (selectedUserId) {
     const item = friendMap.get(selectedUserId);
     selectedUserFromQuery = null;
-    openConversation(
-      selectedUserId,
-      item.users?.full_name || "Người dùng",
-      item.users?.avatar_url || "default-avatar.png",
-      item.users?.role || ""
-    );
+    if (item) {
+      openConversation(
+        selectedUserId,
+        item.users?.full_name || "Người dùng",
+        item.users?.avatar_url || "default-avatar.png",
+        item.users?.role || ""
+      );
+    } else {
+      const { data: targetUser } = await sb
+        .from("users")
+        .select("id, full_name, avatar_url, role")
+        .eq("id", selectedUserId)
+        .maybeSingle();
+      if (targetUser?.id) {
+        openConversation(
+          targetUser.id,
+          targetUser.full_name || "Người dùng",
+          targetUser.avatar_url || "default-avatar.png",
+          targetUser.role || ""
+        );
+      }
+    }
   }
 }
 
 function renderFriendList(list) {
   const wrap = document.getElementById("friendList");
   if (!list.length) {
-    wrap.innerHTML = '<div class="empty"><strong>Không tìm thấy kết quả</strong>Hãy thử một từ khóa khác.</div>';
+    wrap.innerHTML = '<div class="empty"><strong>Không tìm thấy kết quả</strong>Hãy thử tên người dùng khác.</div>';
     return;
   }
 
-  wrap.innerHTML = list.map(item => `
-    <div class="friend-card" id="friend_${item.friend_id}" onclick="openConversation('${item.friend_id}', '${escapeJs(item.users?.full_name || "Người dùng")}', '${escapeJs(item.users?.avatar_url || "default-avatar.png")}', '${escapeJs(item.users?.role || "")}')">
-      <img class="avatar" src="${item.users?.avatar_url || "default-avatar.png"}" alt="Avatar" onerror="this.src='default-avatar.png'">
-      <div class="friend-main">
-        <div class="friend-top">
-          <span class="status-dot ${activePresenceIds.has(item.friend_id) ? "online" : ""}"></span>
-          <div class="name">${esc(item.users?.full_name || "Người dùng")}</div>
-          <div class="friend-time">${item.lastActivity ? esc(formatListTime(item.lastActivity)) : ""}</div>
+  wrap.innerHTML = list.map(item => {
+    const relationLabel = item.isFriend ? "Bạn bè" : (item.conversationId ? "Đã nhắn tin" : "Người dùng");
+    const preview = item.preview || (item.isSearchResult ? "Bắt đầu trò chuyện" : "Chưa có tin nhắn nào");
+    return `
+      <div class="friend-card" id="friend_${item.friend_id}" onclick="openConversation('${item.friend_id}', '${escapeJs(item.users?.full_name || "Người dùng")}', '${escapeJs(item.users?.avatar_url || "default-avatar.png")}', '${escapeJs(item.users?.role || "")}')">
+        <img class="avatar" src="${item.users?.avatar_url || "default-avatar.png"}" alt="Avatar" onerror="this.src='default-avatar.png'">
+        <div class="friend-main">
+          <div class="friend-top">
+            <span class="status-dot ${activePresenceIds.has(item.friend_id) ? "online" : ""}"></span>
+            <div class="name">${esc(item.users?.full_name || "Người dùng")}</div>
+            <div class="friend-time">${item.lastActivity ? esc(formatListTime(item.lastActivity)) : ""}</div>
+          </div>
+          <div class="meta">${esc(formatRole(item.users?.role || ""))} • ${esc(relationLabel)}</div>
+          <div class="preview">${esc(preview)}</div>
         </div>
-        <div class="meta">${esc(formatRole(item.users?.role || ""))}</div>
-        <div class="preview">${esc(item.preview || "Chưa có tin nhắn nào")}</div>
+        <div class="friend-badge ${item.unreadCount ? "show" : ""}">${item.unreadCount > 99 ? "99+" : item.unreadCount || ""}</div>
       </div>
-      <div class="friend-badge ${item.unreadCount ? "show" : ""}">${item.unreadCount > 99 ? "99+" : item.unreadCount || ""}</div>
-    </div>
-  `).join("");
+    `;
+  }).join("");
 }
 
 window.filterFriends = function() {
+  const keyword = document.getElementById("friendSearch")?.value?.trim() || "";
+  clearTimeout(userSearchTimer);
+
+  if (keyword.length < 2) {
+    userSearchResults = [];
+    userSearchToken += 1;
+  } else {
+    userSearchTimer = setTimeout(() => searchUsersForConversation(keyword), 250);
+  }
+
   renderFriendList(getFilteredFriendList());
   if (activeFriend?.id) {
     document.getElementById("friend_" + activeFriend.id)?.classList.add("active");
   }
 };
+
+async function searchUsersForConversation(keyword) {
+  const token = ++userSearchToken;
+  const searchText = String(keyword || "").trim();
+  if (searchText.length < 2) return;
+
+  const { data, error } = await sb
+    .from("users")
+    .select("id, full_name, avatar_url, role")
+    .ilike("full_name", `%${searchText}%`)
+    .neq("id", currentUser.id)
+    .limit(12);
+
+  if (token !== userSearchToken) return;
+  if (error) {
+    console.warn("Could not search users", error);
+    userSearchResults = [];
+    renderFriendList(getFilteredFriendList());
+    return;
+  }
+
+  const knownIds = new Set(allFriends.map(item => item.friend_id));
+  userSearchResults = (data || [])
+    .filter(user => user?.id && !knownIds.has(user.id))
+    .map(user => makeConversationListItem(user, {
+      isSearchResult: true,
+      preview: "Bắt đầu trò chuyện"
+    }));
+
+  renderFriendList(getFilteredFriendList());
+  if (activeFriend?.id) {
+    document.getElementById("friend_" + activeFriend.id)?.classList.add("active");
+  }
+}
+
+function rememberConversationUser(friendId, friendName, friendAvatar, friendRole) {
+  if (!friendId) {
+    return;
+  }
+
+  if (friendMap.has(friendId)) {
+    const existing = friendMap.get(friendId);
+    existing.conversationId = currentConversationId || existing.conversationId;
+    friendMap.set(friendId, existing);
+    allFriends = allFriends.map(entry => entry.friend_id === friendId ? existing : entry);
+    return;
+  }
+
+  const item = makeConversationListItem({
+    id: friendId,
+    full_name: friendName,
+    avatar_url: friendAvatar,
+    role: friendRole
+  }, {
+    conversationId: currentConversationId,
+    preview: "",
+    lastActivity: new Date().toISOString()
+  });
+
+  allFriends = [item, ...allFriends.filter(entry => entry.friend_id !== friendId)];
+  friendMap.set(friendId, item);
+  userSearchResults = userSearchResults.filter(entry => entry.friend_id !== friendId);
+  renderFriendList(getFilteredFriendList());
+  document.getElementById("friend_" + friendId)?.classList.add("active");
+}
 
 function setComposerEnabled(enabled) {
   document.getElementById("messageInput").disabled = !enabled;
@@ -690,6 +845,7 @@ window.openConversation = async function(friendId, friendName, friendAvatar, fri
 
   try {
     currentConversationId = await ensureConversation(friendId, friendMap.get(friendId)?.conversationId);
+    rememberConversationUser(friendId, friendName, friendAvatar, friendRole);
     setComposerEnabled(true);
     await loadMessages({ reset: true, scrollToBottom: true });
     subscribeConversationMessages(currentConversationId);
@@ -1134,11 +1290,25 @@ function buildChatSub(friendId, friendRole) {
 
 function getFilteredFriendList() {
   const keyword = document.getElementById("friendSearch")?.value?.trim().toLowerCase() || "";
-  if (!keyword) return allFriends;
-  return allFriends.filter(item =>
-    String(item.users?.full_name || "").toLowerCase().includes(keyword) ||
-    String(formatRole(item.users?.role || "")).toLowerCase().includes(keyword)
-  );
+  const localMatches = !keyword
+    ? allFriends
+    : allFriends.filter(item =>
+        String(item.users?.full_name || "").toLowerCase().includes(keyword) ||
+        String(formatRole(item.users?.role || "")).toLowerCase().includes(keyword) ||
+        String(item.preview || "").toLowerCase().includes(keyword)
+      );
+
+  if (!userSearchResults.length) return localMatches;
+
+  const seen = new Set(localMatches.map(item => item.friend_id));
+  const merged = [...localMatches];
+  userSearchResults.forEach(item => {
+    if (!seen.has(item.friend_id)) {
+      seen.add(item.friend_id);
+      merged.push(item);
+    }
+  });
+  return merged;
 }
 
 function parseMessageContent(value) {
