@@ -162,14 +162,28 @@
     }
   }
 
-  function showLocalNotification(item) {
+  async function showLocalNotification(item) {
     if (!item || Notification.permission !== "granted") return;
-    const notification = new Notification(item.title || "MindUp", {
+    const options = {
       body: item.message || "Bạn có thông báo mới.",
       icon: "pwa-icon-192.png",
       badge: "pwa-icon-192.png",
-      tag: item.id || `mindup-local-${Date.now()}`
-    });
+      tag: item.id || `mindup-local-${Date.now()}`,
+      data: {
+        url: normalizeLocalNotificationUrl(item.target_url),
+        notificationId: item.id || null
+      }
+    };
+
+    if ("serviceWorker" in navigator) {
+      const registration = await getServiceWorkerRegistration().catch(() => null);
+      if (registration?.showNotification) {
+        await registration.showNotification(item.title || "MindUp", options);
+        return;
+      }
+    }
+
+    const notification = new Notification(item.title || "MindUp", options);
     notification.onclick = function(){
       window.focus();
       window.location.href = normalizeLocalNotificationUrl(item.target_url);
@@ -198,7 +212,7 @@
       .limit(8);
     if (error) return;
 
-    (data || []).forEach(showLocalNotification);
+    await Promise.all((data || []).map((item) => showLocalNotification(item).catch(() => null)));
     const newest = (data || []).at(-1)?.created_at;
     if (newest) localStorage.setItem(LOCAL_NOTIFY_LAST_SEEN_KEY, newest);
   }
