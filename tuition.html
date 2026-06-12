@@ -572,11 +572,35 @@ tr:hover td { background: #f8fbff; }
     align-items: stretch;
   }
   .toolbar-group.filters select,
-  .toolbar-group.filters input[type=month],
   .toolbar button,
   .toolbar .badge {
     width: 100%;
     min-height: 46px;
+  }
+  .toolbar-group.filters input[type=month] {
+    width: fit-content;
+    max-width: 100%;
+    min-height: 0;
+    height: 34px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: .82rem;
+    line-height: 1;
+    align-self: flex-start;
+    flex: 0 0 auto;
+  }
+  .toolbar-group.filters input[type=month]::-webkit-datetime-edit,
+  .toolbar-group.filters input[type=month]::-webkit-datetime-edit-fields-wrapper,
+  .toolbar-group.filters input[type=month]::-webkit-datetime-edit-text,
+  .toolbar-group.filters input[type=month]::-webkit-datetime-edit-month-field,
+  .toolbar-group.filters input[type=month]::-webkit-datetime-edit-year-field {
+    font-size: .82rem;
+    line-height: 1;
+  }
+  .toolbar-group.filters input[type=month]::-webkit-calendar-picker-indicator {
+    width: 16px;
+    height: 16px;
+    padding: 0;
   }
   .summary-row { grid-template-columns: 1fr; }
   .summary-card { padding: 14px; }
