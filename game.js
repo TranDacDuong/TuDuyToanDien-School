@@ -38,6 +38,9 @@
     rounds: [],
     roundChallenges: [],
     roundChallengeQuestions: [],
+    eloProfiles: [],
+    eloTransactions: [],
+    eloTablesReady: false,
     roundFinishChoices: {},
     roundObstacleSelection: {},
     roundObstacleStartedAt: {},
@@ -168,7 +171,7 @@
   };
 
   function supportsModeElo(mode) {
-    return ["solo", "quick", "round"].includes(mode);
+    return ["solo", "quick", "round", "ranked"].includes(mode);
   }
 
   function roundToNearestTen(value) {
@@ -176,7 +179,7 @@
   }
 
   function getModeEloRule(mode) {
-    if (mode === "solo") return "Chơi đơn: điểm trận bao nhiêu thì cộng bấy nhiêu Elo.";
+    if (mode === "solo") return "Chơi đơn: Elo thay đổi theo mức điểm của trận, tối đa +30 Elo.";
     if (mode === "quick") return "Đấu nhanh: nửa trên được cộng Elo bằng hiệu điểm với người đối xứng ở nửa dưới; nửa dưới bị trừ đều tổng Elo đã cộng.";
     if (mode === "round") return "Vòng MindUp: đạt từ 100 điểm mới qua vòng và được cộng Elo; mỗi lần thi lại trừ 20 điểm.";
     if (mode === "solo") {
@@ -196,7 +199,7 @@
     if (!total || !supportsModeElo(mode)) return {};
 
     if (mode === "solo") {
-      return Object.fromEntries((orderedPlayers || []).map((player) => [player.user_id, Math.max(0, Number(player.score || 0))]));
+      return Object.fromEntries((orderedPlayers || []).map((player) => [player.user_id, getSoloEloDeltaFromScore(player.score)]));
     }
 
     if (mode === "quick") {
@@ -302,15 +305,101 @@
     let points = 1000;
     let matches = 0;
     let wins = 0;
+    let quickMatches = 0;
+    let quickWins = 0;
     eloRooms.forEach((room) => {
+      const mode = roomModeValue(room);
       const ordered = getOrderedPlayersForRoom(room.id, finishedPlayers);
       if (!ordered.some((player) => player.user_id === userId)) return;
-      const deltas = getModeEloDeltaMap(roomModeValue(room), ordered, room);
+      const deltas = getModeEloDeltaMap(mode, ordered, room);
       points += Number(deltas[userId] || 0);
       matches += 1;
-      if (ordered[0]?.user_id === userId && roomModeValue(room) !== "solo") wins += 1;
+      if (ordered[0]?.user_id === userId && mode !== "solo") wins += 1;
+      if (mode === "quick") {
+        quickMatches += 1;
+        if (ordered[0]?.user_id === userId) quickWins += 1;
+      }
     });
-    return { points, matches, wins };
+    return { points, matches, wins, quickMatches, quickWins };
+  }
+
+  function getStoredEloProfile(userId) {
+    const profile = (GAME.eloProfiles || []).find((item) => item.user_id === userId);
+    if (!profile) return null;
+    return {
+      points: Number(profile.elo || 1000),
+      matches: Number(profile.matches || 0),
+      wins: Number(profile.wins || 0),
+      quickMatches: Number(profile.quick_matches || 0),
+      quickWins: Number(profile.quick_wins || 0),
+    };
+  }
+
+  function getCurrentEloProfile(finishedRooms, finishedPlayers, userId) {
+    return getStoredEloProfile(userId) || getUnifiedEloProfile(finishedRooms, finishedPlayers, userId);
+  }
+
+  function getRoomEloTransaction(roomId, userId) {
+    return (GAME.eloTransactions || []).find((item) => item.room_id === roomId && item.user_id === userId) || null;
+  }
+
+  async function loadGameEloState() {
+    try {
+      const [{ data: profiles, error: profileErr }, { data: transactions, error: txErr }] = await Promise.all([
+        sb.from("game_elo_profiles").select("user_id,elo,matches,wins,quick_matches,quick_wins,updated_at"),
+        sb.from("game_elo_transactions").select("room_id,user_id,mode,score,rank_no,elo_before,elo_delta,elo_after,created_at"),
+      ]);
+      if (profileErr || txErr) throw profileErr || txErr;
+      GAME.eloProfiles = profiles || [];
+      GAME.eloTransactions = transactions || [];
+      GAME.eloTablesReady = true;
+    } catch (error) {
+      GAME.eloProfiles = [];
+      GAME.eloTransactions = [];
+      GAME.eloTablesReady = false;
+      console.warn("MindUp game Elo tables are not ready; using legacy calculation.", error);
+    }
+  }
+
+  async function finalizeRoomElo(room, orderedPlayers) {
+    if (!room?.id || !GAME.eloTablesReady || !supportsModeElo(roomModeValue(room))) return;
+    if ((GAME.eloTransactions || []).some((item) => item.room_id === room.id)) return;
+
+    const mode = roomModeValue(room);
+    const deltaMap = getModeEloDeltaMap(mode, orderedPlayers, room);
+    const legacyRooms = (GAME.roomsRaw || []).filter((item) => item.status === "finished" && item.id !== room.id);
+    const rows = (orderedPlayers || [])
+      .filter((player) => player?.user_id)
+      .map((player, index) => {
+        const legacy = getUnifiedEloProfile(legacyRooms, GAME.players || [], player.user_id);
+        return {
+          user_id: player.user_id,
+          mode,
+          score: Math.round(Number(player.score || 0)),
+          rank_no: index + 1,
+          elo_delta: Math.round(Number(deltaMap[player.user_id] || 0)),
+          initial_elo: legacy.points,
+          initial_matches: legacy.matches,
+          initial_wins: legacy.wins,
+          initial_quick_matches: legacy.quickMatches,
+          initial_quick_wins: legacy.quickWins,
+        };
+      });
+    if (!rows.length) return;
+
+    const { data, error } = await sb.rpc("apply_game_elo_transactions", {
+      p_room_id: room.id,
+      p_rows: rows,
+    });
+    if (error) {
+      console.warn("MindUp game Elo finalize failed:", error);
+      return;
+    }
+
+    const result = Array.isArray(data) ? data[0] : data;
+    if (Number(result?.applied || 0) > 0) {
+      await loadGameEloState();
+    }
   }
 
   function getArenaTierProgress(elo) {
@@ -2476,6 +2565,7 @@
     }));
     GAME.players = players || [];
     GAME.rooms = filterVisibleRooms(GAME.roomsRaw);
+    await loadGameEloState();
     await ensureArenaUserCache();
     renderArenaInsightsUnified();
   }
@@ -2520,6 +2610,20 @@
   }
 
   function getLeaderboardByElo(scopedRooms, finishedPlayers) {
+    if (GAME.eloTablesReady && (GAME.eloProfiles || []).length) {
+      return [...GAME.eloProfiles]
+        .map((profile) => ({
+          userId: profile.user_id,
+          elo: Number(profile.elo || 1000),
+          matches: Number(profile.matches || 0),
+          wins: Number(profile.wins || 0),
+          quickMatches: Number(profile.quick_matches || 0),
+          quickWins: Number(profile.quick_wins || 0),
+        }))
+        .sort((a, b) => b.elo - a.elo || b.wins - a.wins || b.matches - a.matches)
+        .slice(0, 10);
+    }
+
     const rankedRooms = [...(scopedRooms || [])]
       .filter((room) => supportsModeElo(roomModeValue(room)))
       .sort((a, b) => new Date(a.ended_at || a.created_at) - new Date(b.ended_at || b.created_at));
@@ -2651,7 +2755,7 @@
     const myFinished = finishedPlayers.filter((player) => player.user_id === GAME.user.id);
     const myCompetitiveFinished = myFinished.filter((player) => roomModeValue(getRoomById(player.room_id)) !== "solo");
     const myHistoryEntries = getMyFinishedHistory(9999);
-    const eloProfile = getUnifiedEloProfile(finishedRooms, finishedPlayers, GAME.user.id);
+    const eloProfile = getCurrentEloProfile(finishedRooms, finishedPlayers, GAME.user.id);
     const totalMatches = myHistoryEntries.length;
     const totalScore = myHistoryEntries.reduce((sum, item) => sum + Number(item.player?.score || 0), 0);
     const wins = myCompetitiveFinished.filter((player) => {
@@ -4335,7 +4439,7 @@
     await refreshActiveRoom(room.id, true);
   }
 
-  function renderFinishedRoomUnified() {
+  async function renderFinishedRoomUnified() {
     const finishedRoom = GAME.activeRoom;
     const ordered = [...GAME.roomPlayers].sort((a, b) => {
       const livesA = getPlayerLives(a.id, GAME.activeRoom, GAME.roomAnswers || []);
@@ -4347,7 +4451,12 @@
     });
     const winner = ordered[0];
     const roomMode = roomModeValue(GAME.activeRoom);
-    const eloDeltaMap = getModeEloDeltaMap(roomMode, ordered, GAME.activeRoom);
+    await finalizeRoomElo(GAME.activeRoom, ordered);
+    const calculatedDeltaMap = getModeEloDeltaMap(roomMode, ordered, GAME.activeRoom);
+    const eloDeltaMap = Object.fromEntries(ordered.map((player) => {
+      const transaction = getRoomEloTransaction(GAME.activeRoom?.id, player.user_id);
+      return [player.user_id, transaction ? Number(transaction.elo_delta || 0) : Number(calculatedDeltaMap[player.user_id] || 0)];
+    }));
     if (roomMode === "round" && !GAME.roundReturnTimer) {
       GAME.roundReturnTimer = setTimeout(async () => {
         const gradeId = finishedRoom?.grade_id || "";
