@@ -372,7 +372,7 @@
       'box-shadow:0 2px 8px rgba(0,0,0,.25)">'+
         '<button onclick="closeClassView()" style="background:rgba(255,255,255,.12);'+
         'border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 14px;border-radius:7px;'+
-        'font-size:.82rem;font-weight:600;cursor:pointer;font-family:var(--font-body)">← Quay lại</button>'+
+        'font-size:.82rem;font-weight:600;cursor:pointer;font-family:var(--font-body)" title="Quay lại" aria-label="Quay lại">←</button>'+
         '<span style="font-family:var(--font-display);font-size:1.1rem;flex:1;white-space:nowrap;'+
         'overflow:hidden;text-overflow:ellipsis">'+title+"</span>"+
         '<div style="display:flex;gap:8px;align-items:center">'+
@@ -1781,7 +1781,7 @@
 
     tc.innerHTML=
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'+
-        '<button onclick="cvSwitchTab(\'exams\')" class="btn btn-outline btn-sm">← Quay lại</button>'+
+        '<button onclick="cvSwitchTab(\'exams\')" class="btn btn-outline btn-sm" title="Quay lại" aria-label="Quay lại">←</button>'+
         '<div>'+
           '<div style="font-weight:700;font-size:.95rem;color:var(--navy)">'+exam?.title+'</div>'+
           '<div style="font-size:.75rem;color:var(--ink-mid)">'+(results?.length||0)+' bài đã nộp / '+students.length+' học sinh &nbsp;•&nbsp; Tổng điểm: '+exam?.total_points+'</div>'+
@@ -1845,7 +1845,7 @@
     /* Header */
     tc.innerHTML=
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">'+
-        '<button class="btn btn-outline btn-sm" id="cvDetailBackBtn">← Quay lại</button>'+
+        '<button class="btn btn-outline btn-sm" id="cvDetailBackBtn" title="Quay l?i" aria-label="Quay l?i">?</button>'+
         '<div style="flex:1">'+
           '<div style="font-weight:700;font-size:.95rem;color:var(--navy)">'+studentName+'</div>'+
           '<div style="font-size:.75rem;color:var(--ink-mid)">'+exam?.title+' &nbsp;•&nbsp; Nộp: '+(result?.submitted_at?fmtDT(result.submitted_at):"—")+'</div>'+

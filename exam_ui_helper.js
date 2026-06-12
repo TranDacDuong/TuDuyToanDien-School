@@ -197,7 +197,7 @@
     mount.innerHTML = `<div class="standard-exam-shell exam-shell">
       <div class="standard-exam-topbar topbar">
         <div class="standard-exam-title-row">
-          <button id="${options.exitButtonId || "standardExamExit"}" type="button" onclick="${handlers.exit}()">← Thoát</button>
+          <button id="${options.exitButtonId || "standardExamExit"}" type="button" onclick="${handlers.exit}()" title="Thoát" aria-label="Thoát">⏻</button>
           <h1>${esc(options.title || "Làm bài")}</h1>
         </div>
         <div class="standard-exam-actions">
@@ -232,7 +232,7 @@
     if (!mount || !window.buildReviewCards) return false;
     mount.innerHTML = `<div class="standard-review-shell">
       <div class="standard-review-topbar academic-topbar">
-        <button type="button" onclick="${options.backHandler}()">← Quay lại</button>
+        <button type="button" onclick="${options.backHandler}()" title="Quay lại" aria-label="Quay lại">←</button>
         <div>
           <h1>${esc(options.title || "Xem lại bài thi")}</h1>
           <p>${esc(options.subtitle || "Kết quả bài làm")}</p>

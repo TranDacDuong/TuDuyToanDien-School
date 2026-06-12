@@ -553,7 +553,7 @@ button {
           <div style="font-family:var(--font-display);font-size:1rem;color:var(--navy)">Kiểm tra câu trùng</div>
           <div id="duplicateReviewSummary" style="font-size:.82rem;color:var(--ink-light)">Chưa chạy kiểm tra câu trùng.</div>
         </div>
-        <button class="btn btn-outline btn-sm" type="button" onclick="closeDuplicateReview()">Đóng</button>
+        <button class="btn btn-outline btn-sm" type="button" onclick="closeDuplicateReview()" title="??ng" aria-label="??ng">?</button>
       </div>
       <div class="dup-review-groups" id="duplicateReviewGroups"></div>
     </div>
@@ -566,7 +566,7 @@ button {
           <div style="font-family:var(--font-display);font-size:1rem;color:var(--navy)">Báo lỗi câu hỏi</div>
           <div id="questionIssueSummary" style="font-size:.82rem;color:var(--ink-light)">Chưa tải danh sách báo lỗi.</div>
         </div>
-        <button class="btn btn-outline btn-sm" type="button" onclick="closeQuestionIssueReview()">Đóng</button>
+        <button class="btn btn-outline btn-sm" type="button" onclick="closeQuestionIssueReview()" title="??ng" aria-label="??ng">?</button>
       </div>
       <div class="report-review-toolbar">
         <select id="questionIssueTypeFilter">
@@ -734,7 +734,7 @@ button {
     <div class="modal-footer modal-footer-sticky">
       <div id="qProgress" style="display:none;font-size:.8rem;font-weight:700;color:var(--navy);padding:6px 12px;background:var(--surface);border-radius:8px;border:1px solid var(--border)"></div>
       <button id="saveBtn" onclick="saveQuestion()">Lưu câu hỏi</button>
-      <button class="btn-close" onclick="closeModal()">Đóng</button>
+      <button class="btn-close" onclick="closeModal()" title="??ng" aria-label="??ng">?</button>
       <div id="modalActionBtns" style="display:flex;gap:8px;margin-left:auto"></div>
     </div>
   </div>

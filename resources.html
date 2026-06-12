@@ -106,7 +106,7 @@ textarea{min-height:110px;resize:vertical}
   <div class="modal-card">
     <div class="mh">
       <h2 id="materialModalTitle" style="margin:0">Thêm tài liệu</h2>
-      <button class="btn btn-outline" type="button" onclick="closeMaterialModal()">Đóng</button>
+      <button class="btn btn-outline" type="button" onclick="closeMaterialModal()" title="??ng" aria-label="??ng">?</button>
     </div>
     <div class="mb">
       <form id="materialForm">
@@ -118,7 +118,7 @@ textarea{min-height:110px;resize:vertical}
           <div class="field full"><label>Mô tả ngắn</label><textarea id="materialDescription" class="input"></textarea></div>
         </div>
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px">
-          <button class="btn btn-outline" type="button" onclick="closeMaterialModal()">Hủy</button>
+          <button class="btn btn-outline" type="button" onclick="closeMaterialModal()" title="??ng" aria-label="??ng">?</button>
           <button class="btn btn-primary" type="submit">Lưu tài liệu</button>
         </div>
       </form>
@@ -132,7 +132,7 @@ textarea{min-height:110px;resize:vertical}
       <h2 id="materialViewerTitle" class="viewer-title">Xem tài liệu</h2>
       <div class="viewer-actions">
         <a id="materialViewerExternal" class="btn btn-outline" href="#" target="_blank" rel="noopener">Mở tab mới</a>
-        <button class="btn btn-primary" type="button" onclick="closeMaterialViewer()">Đóng</button>
+        <button class="btn btn-primary" type="button" onclick="closeMaterialViewer()" title="??ng" aria-label="??ng">?</button>
       </div>
     </div>
     <div id="materialViewerBody" class="viewer-body"></div>

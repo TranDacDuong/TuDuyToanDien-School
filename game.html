@@ -786,7 +786,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
 
 <div id="gameRoundSelectionScreen" class="screen">
   <div class="topbar">
-    <button class="btn btn-outline btn-sm" type="button" onclick="closeGameRoundSelectionScreen()">← Quay lại</button>
+    <button class="btn btn-outline btn-sm" type="button" onclick="closeGameRoundSelectionScreen()" title="Quay l?i" aria-label="Quay l?i">?</button>
     <h2 id="gameRoundSelectionTitle">Vòng MindUp</h2>
     <div class="topbar-actions"></div>
   </div>
@@ -946,7 +946,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   <div class="modal-card" style="width:min(1120px,100%)">
     <div class="mh">
       <h2 id="gameQuestionPickerTitle">Chọn danh sách câu hỏi</h2>
-      <button class="btn btn-outline" type="button" onclick="closeGameQuestionPicker()">Đóng</button>
+      <button class="btn btn-outline" type="button" onclick="closeGameQuestionPicker()" title="??ng" aria-label="??ng">?</button>
     </div>
     <div class="mb">
       <div class="game-question-picker-toolbar">
@@ -967,7 +967,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
         </div>
       </div>
       <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
-        <button class="btn btn-outline" type="button" onclick="closeGameQuestionPicker()">Hủy</button>
+        <button class="btn btn-outline" type="button" onclick="closeGameQuestionPicker()" title="??ng" aria-label="??ng">?</button>
         <button class="btn btn-primary" id="applyGameQuestionPickerBtn" type="button">Áp dụng danh sách</button>
       </div>
     </div>
@@ -978,7 +978,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   <div class="modal-card">
     <div class="mh">
       <h2>Tạo phòng thi đấu</h2>
-      <button class="btn btn-outline" type="button" onclick="closeGameRoomModal()">Đóng</button>
+      <button class="btn btn-outline" type="button" onclick="closeGameRoomModal()" title="??ng" aria-label="??ng">?</button>
     </div>
     <div class="mb">
       <form id="gameRoomForm">
@@ -1039,7 +1039,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
           </div>
         </div>
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
-          <button class="btn btn-outline" type="button" onclick="closeGameRoomModal()">Hủy</button>
+          <button class="btn btn-outline" type="button" onclick="closeGameRoomModal()" title="??ng" aria-label="??ng">?</button>
           <button class="btn btn-primary" type="submit">Tạo phòng</button>
         </div>
       </form>
@@ -1056,7 +1056,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
     </div>
   </div>
   <div class="topbar">
-    <button class="btn btn-outline btn-sm" type="button" onclick="closeGameScreen()">← Quay lại</button>
+    <button class="btn btn-outline btn-sm" type="button" onclick="closeGameScreen()" title="Quay l?i" aria-label="Quay l?i">?</button>
     <h2 id="gameRoomScreenTitle">Phòng thi đấu</h2>
     <div class="game-show-brand" aria-hidden="true">
       <span class="game-show-leaf">‹</span>
@@ -1144,7 +1144,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   <div class="modal-card">
     <div class="mh">
       <h2>Chi tiết trận đấu</h2>
-      <button class="btn btn-outline" type="button" onclick="closeGameHistoryModal()">Đóng</button>
+      <button class="btn btn-outline" type="button" onclick="closeGameHistoryModal()" title="??ng" aria-label="??ng">?</button>
     </div>
     <div class="mb">
       <div id="gameHistoryModalBody" class="history-detail-grid"></div>

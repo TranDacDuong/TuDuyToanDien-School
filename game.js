@@ -630,7 +630,7 @@
 
     if (EL.roomScreenTitle) EL.roomScreenTitle.textContent = "Phòng thi đấu";
     const backBtn = document.querySelector("#gameRoomScreen .topbar .btn");
-    if (backBtn) backBtn.textContent = "← Quay lại";
+    if (backBtn) { backBtn.textContent = "←"; backBtn.title = "Quay lại"; backBtn.setAttribute("aria-label", "Quay lại"); }
     if (EL.toggleReadyBtn) EL.toggleReadyBtn.textContent = "Sẵn sàng";
     if (EL.leaveGameBtn) EL.leaveGameBtn.textContent = "Rời phòng";
     if (EL.startGameBtn) EL.startGameBtn.textContent = "Bắt đầu trận";
@@ -645,7 +645,7 @@
     document.querySelectorAll("#gameLiveView .panel h3")[0] && (document.querySelectorAll("#gameLiveView .panel h3")[0].textContent = "Đáp án của bạn");
     document.querySelectorAll("#gameLiveView .panel h3")[1] && (document.querySelectorAll("#gameLiveView .panel h3")[1].textContent = "Bảng xếp hạng");
     if (EL.finishedView?.querySelector("h3")) EL.finishedView.querySelector("h3").textContent = "Kết quả trận đấu";
-    if (backBtn) backBtn.textContent = "← Quay lại";
+    if (backBtn) { backBtn.textContent = "←"; backBtn.title = "Quay lại"; backBtn.setAttribute("aria-label", "Quay lại"); }
     if (EL.leaveGameBtn) EL.leaveGameBtn.textContent = "Rời phòng";
     if (EL.myScore?.previousElementSibling) EL.myScore.previousElementSibling.textContent = "Điểm của bạn";
     if (EL.myRank?.previousElementSibling) EL.myRank.previousElementSibling.textContent = "Vị trí hiện tại";
@@ -1055,7 +1055,7 @@
       <div class="modal-card" style="width:min(720px,100%)">
         <div class="mh">
           <h2>Chọn môn</h2>
-          <button class="btn btn-outline" type="button" onclick="closeGameSubjectSelectModal()">Đóng</button>
+          <button class="btn btn-outline" type="button" onclick="closeGameSubjectSelectModal()" title="??ng" aria-label="??ng">?</button>
         </div>
         <div class="mb" style="display:grid;gap:14px">
           <div id="gameSubjectSelectModalList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px"></div>

@@ -177,7 +177,7 @@ textarea{min-height:110px;resize:vertical}
   <div class="modal-card">
     <div class="mh">
       <h2 id="pdfExamModalTitle">Tạo đề PDF</h2>
-      <button class="btn btn-outline" type="button" onclick="closePdfExamModal()">Đóng</button>
+      <button class="btn btn-outline" type="button" onclick="closePdfExamModal()" title="??ng" aria-label="??ng">?</button>
     </div>
     <div class="mb">
       <form id="pdfExamForm">
@@ -230,7 +230,7 @@ textarea{min-height:110px;resize:vertical}
           </div>
         </div>
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
-          <button class="btn btn-outline" type="button" onclick="closePdfExamModal()">Hủy</button>
+          <button class="btn btn-outline" type="button" onclick="closePdfExamModal()" title="??ng" aria-label="??ng">?</button>
           <button class="btn btn-primary" type="submit">Lưu đề PDF</button>
         </div>
       </form>
@@ -242,7 +242,7 @@ textarea{min-height:110px;resize:vertical}
   <div class="modal-card">
     <div class="mh">
       <h2 id="pdfQuestionModalTitle">Thêm câu trả lời</h2>
-      <button class="btn btn-outline" type="button" onclick="closePdfQuestionModal()">Đóng</button>
+      <button class="btn btn-outline" type="button" onclick="closePdfQuestionModal()" title="??ng" aria-label="??ng">?</button>
     </div>
     <div class="mb">
       <form id="pdfQuestionForm">
@@ -285,7 +285,7 @@ textarea{min-height:110px;resize:vertical}
           Trắc nghiệm: nhập đáp án dạng <b>A</b> hoặc <b>AB</b>. Đúng/Sai: nhập dạng <b>aTbFcT...</b>. Trả lời ngắn: nhiều đáp án cách nhau bằng dấu <b>;</b>.
         </div>
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
-          <button class="btn btn-outline" type="button" onclick="closePdfQuestionModal()">Hủy</button>
+          <button class="btn btn-outline" type="button" onclick="closePdfQuestionModal()" title="??ng" aria-label="??ng">?</button>
           <button class="btn btn-primary" type="submit">Lưu câu</button>
         </div>
       </form>
@@ -297,7 +297,7 @@ textarea{min-height:110px;resize:vertical}
   <div class="modal-card review-modal-card">
     <div class="mh">
       <h2 id="pdfSubmissionTitle">Bài đã nộp</h2>
-      <button class="btn btn-outline" type="button" onclick="closePdfSubmissionModal()">Đóng</button>
+      <button class="btn btn-outline" type="button" onclick="closePdfSubmissionModal()" title="??ng" aria-label="??ng">?</button>
     </div>
     <div class="mb" id="pdfSubmissionBody"></div>
   </div>
@@ -305,7 +305,7 @@ textarea{min-height:110px;resize:vertical}
 
 <div id="pdfExamScreen" class="screen">
   <div class="stop">
-    <button class="btn btn-outline btn-sm" type="button" onclick="closePdfExamScreen()">← Quay lại</button>
+    <button class="btn btn-outline btn-sm" type="button" onclick="closePdfExamScreen()" title="Quay l?i" aria-label="Quay l?i">?</button>
     <h2 id="pdfExamScreenTitle">Chi tiết đề PDF</h2>
     <button class="btn btn-primary hidden" id="pdfExamTakeBtn" type="button">Làm bài</button>
     <button class="btn btn-outline btn-sm hidden" id="pdfExamEditBtn" type="button">Sửa đề</button>
@@ -350,7 +350,7 @@ textarea{min-height:110px;resize:vertical}
 
 <div id="pdfAttemptShell" class="exam-shell">
   <div class="exam-topbar">
-    <button class="btn btn-outline btn-sm" type="button" onclick="closePdfAttempt()">← Thoát</button>
+    <button class="btn btn-outline btn-sm" type="button" onclick="closePdfAttempt()" title="Tho?t" aria-label="Tho?t">?</button>
     <h2 id="pdfAttemptTitle">Làm đề PDF</h2>
     <div class="exam-clock">
       <span style="font-size:.8rem;color:rgba(255,255,255,.72)">Thời gian</span>
@@ -374,7 +374,7 @@ textarea{min-height:110px;resize:vertical}
 
 <div id="pdfReviewShell" class="exam-shell">
   <div class="exam-topbar">
-    <button class="btn btn-outline btn-sm" type="button" onclick="closePdfReview()">← Thoát</button>
+    <button class="btn btn-outline btn-sm" type="button" onclick="closePdfReview()" title="Tho?t" aria-label="Tho?t">?</button>
     <h2 id="pdfReviewTitle">Xem lại bài</h2>
     <div class="review-score">
       <span>Điểm</span>

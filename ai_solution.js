@@ -178,7 +178,9 @@
           '🤖 Lời giải từ AI</div>' + renderMd(reply);
         resultBox.style.display = "block";
         triggerMathJax(resultBox);
-        btn.innerHTML = "✕ Đóng lời giải";
+        btn.innerHTML = "✕";
+        btn.title = "Đóng lời giải";
+        btn.setAttribute("aria-label", "Đóng lời giải");
       } catch (err) {
         resultBox.innerHTML = '<div style="color:var(--red)">Lỗi: ' + err.message + '</div>';
         resultBox.style.display = "block";

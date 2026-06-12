@@ -80,7 +80,7 @@
       'box-shadow:0 2px 8px rgba(0,0,0,.2)">' +
         '<button onclick="closeStudentClassView()" style="background:rgba(255,255,255,.12);' +
         'border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 14px;border-radius:7px;' +
-        'font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)">← Quay lại</button>' +
+        'font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body)" title="Quay lại" aria-label="Quay lại">←</button>' +
         '<span style="font-family:var(--font-display);font-size:1.1rem;flex:1">' + className + "</span>" +
         '<span id="scv-date" style="font-size:.8rem;color:rgba(255,255,255,.6)">' + todayStr() + "</span>" +
       "</div>" +
@@ -859,7 +859,7 @@
           '<div style="font-size:.9rem;color:var(--ink-mid);margin-top:4px">Điểm tự động</div>' +
           (hasEssay ? '<div style="margin-top:14px;padding:10px 14px;background:#fef3c7;border-radius:8px;font-size:.82rem;color:#b45309">⏳ Phần tự luận sẽ được giáo viên chấm sau</div>' : "") +
         "</div>" +
-        '<button onclick="cvGoBackToExams()" style="background:var(--navy);color:var(--gold-light);border:none;padding:12px 32px;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);margin-right:10px">← Quay lại danh sách đề thi</button>' +
+        '<button onclick="cvGoBackToExams()" style="background:var(--navy);color:var(--gold-light);border:none;padding:12px 32px;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);margin-right:10px" title="Quay l?i" aria-label="Quay l?i">?</button>' +
         '<button onclick="cvReviewExamDetail()" style="background:var(--surface);color:var(--navy);border:1.5px solid var(--border);padding:12px 24px;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">📋 Xem lại từng câu</button>' +
       "</div>";
 

@@ -1816,7 +1816,7 @@ function ensureHomeOverlayShell() {
     panel.innerHTML = `
       <div class="social-panel-head">
         <div class="social-panel-title" id="socialPanelTitle">Tiện ích</div>
-        <button class="btn btn-outline btn-sm" type="button" onclick="closeSocialPanel()">Đóng</button>
+        <button class="btn btn-outline btn-sm" type="button" onclick="closeSocialPanel()" title="??ng" aria-label="??ng">?</button>
       </div>
       <iframe class="social-panel-frame" id="socialPanelFrame" src="about:blank" loading="lazy"></iframe>
     `;
@@ -1834,7 +1834,7 @@ function ensureHomeOverlayShell() {
     popup.innerHTML = `
       <div class="chat-popup-head">
         <div class="chat-popup-title">Nhắn tin</div>
-        <button class="btn btn-outline btn-sm" type="button" onclick="closeChatPopup()">Đóng</button>
+        <button class="btn btn-outline btn-sm" type="button" onclick="closeChatPopup()" title="??ng" aria-label="??ng">?</button>
       </div>
       <iframe class="chat-popup-frame" id="chatPopupFrame" src="about:blank" loading="lazy"></iframe>
     `;
