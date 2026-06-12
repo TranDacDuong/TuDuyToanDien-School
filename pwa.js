@@ -229,7 +229,7 @@
     } catch (error) {
       return false;
     }
-    if (!user?.id || !isPushSupported() || !isPushConfigured()) return false;
+    if (!user?.id || !isMobileDevice() || !isPushSupported() || !isPushConfigured()) return false;
     return Notification.permission !== "granted";
   }
 
