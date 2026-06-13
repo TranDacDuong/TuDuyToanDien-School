@@ -236,6 +236,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 
 /* ── Students tab ── */
 #students.panel.active { display: block; }
+#parentLinks.panel.active { display: block; }
 #adminLogs.panel.active { display: block; }
 #appearance.panel.active { display: block; }
 .trial-status-pill { display:inline-flex; align-items:center; justify-content:center; min-width:126px; padding:6px 10px; border-radius:999px; font-size:.74rem; font-weight:800; border:1px solid transparent; white-space:nowrap; }
@@ -307,6 +308,19 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 .s-pg-btn:disabled { opacity:.4; cursor:not-allowed; }
 .s-ini { width:32px; height:32px; border-radius:50%; background:var(--navy); color:var(--gold-light); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.75rem; flex-shrink:0; }
 .s-av  { width:32px; height:32px; border-radius:50%; object-fit:cover; border:2px solid var(--gold-border); flex-shrink:0; }
+.pl-layout { display:grid; grid-template-columns:340px 1fr; gap:18px; align-items:start; }
+.pl-results { display:grid; gap:6px; margin-top:8px; }
+.pl-result { width:100%; border:1px solid var(--border); border-radius:10px; background:#fff; padding:9px 10px; text-align:left; cursor:pointer; font-family:var(--font-body); transition:.15s; }
+.pl-result:hover { border-color:var(--blue); box-shadow:0 8px 18px rgba(15,31,61,.08); }
+.pl-result-title { color:var(--navy); font-weight:800; font-size:.84rem; }
+.pl-result-meta { color:var(--ink-light); font-size:.72rem; margin-top:2px; line-height:1.4; }
+.pl-selected { display:none; margin:8px 0 12px; padding:9px 10px; border-radius:10px; background:#ecfdf5; color:#047857; font-size:.8rem; font-weight:800; line-height:1.45; border:1px solid rgba(4,120,87,.16); }
+.pl-selected.show { display:block; }
+.pl-note { color:var(--ink-light); font-size:.74rem; line-height:1.5; margin-top:4px; }
+.pl-status { display:inline-flex; align-items:center; justify-content:center; min-width:78px; padding:4px 8px; border-radius:999px; font-size:.72rem; font-weight:800; white-space:nowrap; }
+.pl-status.active { background:#ecfdf5; color:#047857; border:1px solid #bbf7d0; }
+.pl-status.revoked { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; }
+@media (max-width: 860px) { .pl-layout { grid-template-columns:1fr; } }
 
 /* Modal sửa học sinh */
 .modal-s { position:fixed; inset:0; background:rgba(10,20,40,.5); backdrop-filter:blur(3px); display:none; align-items:center; justify-content:center; z-index:1000; }
@@ -361,6 +375,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   <button class="tab" data-testid="system-tab-chapters" onclick="switchTab('chapters',this)">📖 Chương</button>
   <button class="tab" data-testid="system-tab-teachers" onclick="switchTab('teachers',this)">👨‍🏫 Giáo viên</button>
   <button class="tab" data-testid="system-tab-students" onclick="switchTab('students',this)">👩‍🎓 Học sinh</button>
+  <button class="tab" data-testid="system-tab-parent-links" onclick="switchTab('parentLinks',this)">👪 Phụ huynh</button>
   <button class="tab" data-testid="system-tab-logs" onclick="switchTab('adminLogs',this)">📋 Nhật ký vận hành</button>
   <button class="tab" data-testid="system-tab-appearance" onclick="switchTab('appearance',this)">🎨 Giao diện</button>
 </div>
@@ -579,6 +594,68 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <div class="s-pg">
         <span class="s-pg-info" id="sPgInfo"></span>
         <div class="s-pg-btns" id="sPgBtns"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="parentLinks" class="panel">
+  <div class="pl-layout" style="grid-column:1/-1">
+    <div class="form-card">
+      <div class="form-card-hd"><h3>👪 Liên kết phụ huynh</h3></div>
+      <div class="form-card-body">
+        <input type="hidden" id="plParentId">
+        <input type="hidden" id="plStudentId">
+        <div class="fg">
+          <label>Email phụ huynh</label>
+          <input id="plParentEmail" placeholder="phuhuynh@example.com" autocomplete="off">
+          <div class="pl-note">Nếu email chưa có tài khoản, hệ thống sẽ tạo tài khoản phụ huynh mới.</div>
+        </div>
+        <div class="fg"><label>Họ tên phụ huynh</label><input id="plParentName" placeholder="Họ và tên"></div>
+        <div class="fg"><label>SĐT phụ huynh</label><input id="plParentPhone" placeholder="Số điện thoại"></div>
+        <div class="fg">
+          <label>Mật khẩu ban đầu</label>
+          <input id="plParentPassword" type="password" placeholder="Để trống: dùng SĐT hoặc 123456">
+        </div>
+        <div id="plSelectedParent" class="pl-selected"></div>
+        <div class="pl-results" id="plParentResults"></div>
+        <div class="fg" style="margin-top:12px">
+          <label>Tìm học sinh</label>
+          <input id="plStudentSearch" placeholder="Nhập tên, email hoặc SĐT học sinh" autocomplete="off">
+        </div>
+        <div id="plSelectedStudent" class="pl-selected"></div>
+        <div class="pl-results" id="plStudentResults"></div>
+        <div class="fg" style="margin-top:12px"><label>Quan hệ</label><input id="plRelationship" placeholder="VD: Bố, mẹ, người giám hộ"></div>
+        <div class="fg"><label>Ghi chú</label><input id="plNote" placeholder="Ghi chú nội bộ nếu cần"></div>
+        <div class="form-btns">
+          <button class="btn btn-primary btn-sm" onclick="plLinkParentStudent()">💾 Liên kết</button>
+          <button class="btn btn-outline btn-sm" onclick="plClearForm()">↺ Làm mới</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card-hd">
+        <span>Danh sách liên kết phụ huynh - học sinh</span>
+        <span class="count-badge" id="plCount">0</span>
+      </div>
+      <div class="t-search-bar" style="margin:0;border-radius:0;box-shadow:none;border-left:0;border-right:0">
+        <div class="sg"><label>Tìm kiếm</label><input id="plSearch" placeholder="Tên, email, SĐT phụ huynh hoặc học sinh"></div>
+        <div class="sg">
+          <label>Trạng thái</label>
+          <select id="plStatusFilter">
+            <option value="active">Đang liên kết</option>
+            <option value="all">Tất cả</option>
+            <option value="revoked">Đã hủy</option>
+          </select>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="loadParentLinks()" style="align-self:flex-end">↻ Làm mới</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Phụ huynh</th><th>Học sinh</th><th>Quan hệ</th><th>Trạng thái</th><th>Ghi chú</th><th>Hành động</th></tr></thead>
+          <tbody id="plTable"><tr class="empty-row"><td colspan="6">Đang tải...</td></tr></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -807,6 +884,7 @@ function switchTab(id, btn){
   window.history.replaceState({}, '', url.toString());
   if(id === 'adminLogs') loadAdminLogs();
   if(id === 'appearance') loadSystemTheme();
+  if(id === 'parentLinks') loadParentLinks();
 }
 
 const SYSTEM_THEMES = [
@@ -1192,11 +1270,12 @@ async function init(){
   }
   await loadDropdowns();
   loadRooms(); loadGrades(); loadSubjects(); loadChapters();
-  loadTeachers(); loadStudents(); loadAdminLogs();
+  loadTeachers(); loadStudents(); loadParentLinks(); loadAdminLogs();
   window.MindupLiveUI?.watchTable?.('rooms', loadRooms);
   window.MindupLiveUI?.watchTable?.('grades', loadGrades);
   window.MindupLiveUI?.watchTable?.('subjects', loadSubjects);
   window.MindupLiveUI?.watchTable?.('chapters', loadChapters);
+  window.MindupLiveUI?.watchTable?.('parent_students', loadParentLinks);
   const tab = new URLSearchParams(window.location.search).get('tab');
   if(tab){
     const targetBtn = document.querySelector(`.tab[onclick*="'${tab}'"]`);
@@ -1689,6 +1768,224 @@ function sExportExcel(){
 
 // Bind search
 ['sSName','sSPhone','sSBirth','sSProv','sSSchool'].forEach(id=>{let t;document.getElementById(id).addEventListener('input',()=>{clearTimeout(t);t=setTimeout(()=>{_sPage=1;sApplyFilter();},200);});});
+
+/* ──────────────────────────────
+   PHỤ HUYNH - HỌC SINH
+────────────────────────────── */
+let _plLinks = [];
+let _plParents = [];
+let _plStudents = [];
+let _plSelectedParent = null;
+let _plSelectedStudent = null;
+
+function plUserLine(user){
+  return `${user?.full_name || 'Chưa có tên'}${user?.email ? ' · '+user.email : ''}${user?.phone ? ' · '+user.phone : ''}`;
+}
+
+function plSearchSafe(value){
+  return String(value || '').replace(/[%,()]/g, '').trim();
+}
+
+function plSetSelectedParent(user){
+  _plSelectedParent = user || null;
+  document.getElementById('plParentId').value = user?.id || '';
+  if(user){
+    document.getElementById('plParentEmail').value = user.email || '';
+    document.getElementById('plParentName').value = user.full_name || '';
+    document.getElementById('plParentPhone').value = user.phone || '';
+  }
+  const box = document.getElementById('plSelectedParent');
+  box.classList.toggle('show', !!user);
+  box.innerHTML = user ? `Đã chọn phụ huynh: ${esc(plUserLine(user))}` : '';
+  document.getElementById('plParentResults').innerHTML = '';
+}
+
+function plSetSelectedStudent(user){
+  _plSelectedStudent = user || null;
+  document.getElementById('plStudentId').value = user?.id || '';
+  const box = document.getElementById('plSelectedStudent');
+  box.classList.toggle('show', !!user);
+  box.innerHTML = user ? `Đã chọn học sinh: ${esc(plUserLine(user))}` : '';
+  if(user) document.getElementById('plStudentSearch').value = user.full_name || user.email || '';
+  document.getElementById('plStudentResults').innerHTML = '';
+}
+
+function plRenderPickResults(targetId, rows, onClickName){
+  const box = document.getElementById(targetId);
+  box.innerHTML = (rows || []).slice(0, 8).map((user, index) => `
+    <button class="pl-result" type="button" onclick="${onClickName}(${index})">
+      <div class="pl-result-title">${esc(user.full_name || 'Chưa có tên')}</div>
+      <div class="pl-result-meta">${esc([user.email, user.phone].filter(Boolean).join(' · ') || 'Chưa có email/SĐT')}</div>
+    </button>
+  `).join('');
+}
+
+async function plSearchParents(){
+  const q = document.getElementById('plParentEmail').value.trim();
+  if(q.length < 2){ document.getElementById('plParentResults').innerHTML = ''; return; }
+  const safe = plSearchSafe(q);
+  const { data, error } = await sb.from('users')
+    .select('id,full_name,email,phone,role')
+    .eq('role', 'parent')
+    .or(`full_name.ilike.%${safe}%,email.ilike.%${safe}%,phone.ilike.%${safe}%`)
+    .order('full_name')
+    .limit(8);
+  if(error){ console.warn(error); return; }
+  _plParents = data || [];
+  plRenderPickResults('plParentResults', _plParents, 'plPickParent');
+}
+
+function plPickParent(index){ plSetSelectedParent(_plParents[index]); }
+
+async function plSearchStudents(){
+  const q = document.getElementById('plStudentSearch').value.trim();
+  if(q.length < 2){ document.getElementById('plStudentResults').innerHTML = ''; return; }
+  const safe = plSearchSafe(q);
+  const { data, error } = await sb.from('users')
+    .select('id,full_name,email,phone,parent_full_name,parent_phone,role')
+    .eq('role', 'student')
+    .or(`full_name.ilike.%${safe}%,email.ilike.%${safe}%,phone.ilike.%${safe}%,parent_full_name.ilike.%${safe}%,parent_phone.ilike.%${safe}%`)
+    .order('full_name')
+    .limit(8);
+  if(error){ console.warn(error); return; }
+  _plStudents = data || [];
+  plRenderPickResults('plStudentResults', _plStudents, 'plPickStudent');
+}
+
+function plPickStudent(index){ plSetSelectedStudent(_plStudents[index]); }
+
+async function loadParentLinks(){
+  const tbody = document.getElementById('plTable');
+  if(!tbody) return;
+  if(!_plLinks.length) tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Đang tải...</td></tr>';
+  const { data, error } = await sb.from('parent_students')
+    .select('id,parent_id,student_id,relationship,note,created_at,revoked_at')
+    .order('created_at', { ascending:false });
+  if(error){
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">${esc(error.message || 'Không tải được danh sách liên kết')}</td></tr>`;
+    return;
+  }
+  const links = data || [];
+  const userIds = [...new Set(links.flatMap(item => [item.parent_id, item.student_id]).filter(Boolean))];
+  let userMap = {};
+  if(userIds.length){
+    const { data: users } = await sb.from('users').select('id,full_name,email,phone,role').in('id', userIds);
+    userMap = Object.fromEntries((users || []).map(user => [user.id, user]));
+  }
+  _plLinks = links.map(item => ({ ...item, parent:userMap[item.parent_id] || null, student:userMap[item.student_id] || null }));
+  plRenderLinks();
+}
+
+function plRenderLinks(){
+  const tbody = document.getElementById('plTable');
+  if(!tbody) return;
+  const q = rmVN(document.getElementById('plSearch')?.value || '');
+  const status = document.getElementById('plStatusFilter')?.value || 'active';
+  const rows = _plLinks.filter(item => {
+    const active = !item.revoked_at;
+    if(status === 'active' && !active) return false;
+    if(status === 'revoked' && active) return false;
+    const haystack = rmVN(`${plUserLine(item.parent)} ${plUserLine(item.student)} ${item.relationship || ''} ${item.note || ''}`);
+    return !q || haystack.includes(q);
+  });
+  document.getElementById('plCount').textContent = rows.length;
+  if(!rows.length){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Chưa có liên kết phù hợp</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(item => {
+    const active = !item.revoked_at;
+    return `<tr>
+      <td><b style="color:var(--navy)">${esc(item.parent?.full_name || 'Phụ huynh')}</b><div style="font-size:.72rem;color:var(--ink-light)">${esc([item.parent?.email, item.parent?.phone].filter(Boolean).join(' · ') || '—')}</div></td>
+      <td><b style="color:var(--navy)">${esc(item.student?.full_name || 'Học sinh')}</b><div style="font-size:.72rem;color:var(--ink-light)">${esc([item.student?.email, item.student?.phone].filter(Boolean).join(' · ') || '—')}</div></td>
+      <td>${esc(item.relationship || 'parent')}</td>
+      <td><span class="pl-status ${active ? 'active' : 'revoked'}">${active ? 'Đang liên kết' : 'Đã hủy'}</span></td>
+      <td>${esc(item.note || '—')}</td>
+      <td><div class="act-wrap">${active ? `<button class="btn-del-sm" onclick="plUnlink('${item.id}')">Hủy</button>` : `<button class="btn-edit-sm" onclick="plRelink('${item.id}')">Liên kết lại</button>`}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+async function plLinkParentStudent(){
+  const email = document.getElementById('plParentEmail').value.trim().toLowerCase();
+  const full_name = document.getElementById('plParentName').value.trim();
+  const phone = document.getElementById('plParentPhone').value.trim();
+  const password = document.getElementById('plParentPassword').value.trim();
+  const student_id = document.getElementById('plStudentId').value;
+  const relationship = document.getElementById('plRelationship').value.trim() || 'parent';
+  const note = document.getElementById('plNote').value.trim();
+  if(!email || !email.includes('@')) return alert('Vui lòng nhập email phụ huynh hợp lệ.');
+  if(!full_name) return alert('Vui lòng nhập họ tên phụ huynh.');
+  if(!student_id) return alert('Vui lòng chọn học sinh cần liên kết.');
+  const outcome = await window.AppAdminTools?.runAdminAction?.({
+    action: 'parent_student_linked',
+    details: { target_type:'parent_student', student_id, parent_email:email, relationship },
+    errorPrefix: 'Không thể liên kết phụ huynh',
+    operation: async () => {
+      const { data, error } = await sb.rpc('admin_import_parents_batch', { p_rows: [{ email, full_name, phone, password, student_id, relationship }] });
+      if(error) throw error;
+      if(note){
+        const { data: parent } = await sb.from('users').select('id').eq('email', email).maybeSingle();
+        if(parent?.id){
+          const { error: noteError } = await sb.from('parent_students')
+            .update({ note })
+            .eq('parent_id', parent.id)
+            .eq('student_id', student_id);
+          if(noteError) throw noteError;
+        }
+      }
+      return { data };
+    }
+  });
+  if(!outcome?.ok) return;
+  toast('✅ Đã liên kết phụ huynh với học sinh');
+  plClearForm();
+  await loadParentLinks();
+}
+
+async function plUnlink(id){
+  if(!confirm('Hủy liên kết phụ huynh với học sinh này?')) return;
+  const item = _plLinks.find(row => row.id === id);
+  const outcome = await window.AppAdminTools?.runAdminAction?.({
+    action: 'parent_student_unlinked',
+    details: { target_type:'parent_student', target_id:id, parent_id:item?.parent_id, student_id:item?.student_id },
+    errorPrefix: 'Không thể hủy liên kết phụ huynh',
+    operation: async () => sb.from('parent_students').update({ revoked_at:new Date().toISOString() }).eq('id', id)
+  });
+  if(!outcome?.ok) return;
+  toast('Đã hủy liên kết');
+  await loadParentLinks();
+}
+
+async function plRelink(id){
+  const item = _plLinks.find(row => row.id === id);
+  if(!item) return;
+  const outcome = await window.AppAdminTools?.runAdminAction?.({
+    action: 'parent_student_relinked',
+    details: { target_type:'parent_student', target_id:id, parent_id:item.parent_id, student_id:item.student_id },
+    errorPrefix: 'Không thể liên kết lại',
+    operation: async () => sb.from('parent_students').update({ revoked_at:null }).eq('id', id)
+  });
+  if(!outcome?.ok) return;
+  toast('Đã liên kết lại');
+  await loadParentLinks();
+}
+
+function plClearForm(){
+  ['plParentId','plStudentId','plParentEmail','plParentName','plParentPhone','plParentPassword','plStudentSearch','plRelationship','plNote'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.value = '';
+  });
+  plSetSelectedParent(null);
+  plSetSelectedStudent(null);
+  document.getElementById('plParentResults').innerHTML = '';
+  document.getElementById('plStudentResults').innerHTML = '';
+}
+
+['plParentEmail'].forEach(id=>{let t;document.getElementById(id)?.addEventListener('input',()=>{clearTimeout(t);plSetSelectedParent(null);t=setTimeout(plSearchParents,220);});});
+['plStudentSearch'].forEach(id=>{let t;document.getElementById(id)?.addEventListener('input',()=>{clearTimeout(t);plSetSelectedStudent(null);t=setTimeout(plSearchStudents,220);});});
+['plSearch','plStatusFilter'].forEach(id=>document.getElementById(id)?.addEventListener('input', plRenderLinks));
+document.getElementById('plStatusFilter')?.addEventListener('change', plRenderLinks);
 
 /* ──────────────────────────────
    ĐĂNG KÝ HỌC THỬ
