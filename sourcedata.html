@@ -530,6 +530,13 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <button class="modal-mclose" onclick="closeTModal()">✕</button>
     </div>
     <input type="hidden" id="tEditId">
+    <div class="fg">
+      <label>Vai trò</label>
+      <select id="tRole">
+        <option value="teacher">Giáo viên</option>
+        <option value="assistant">Trợ giảng/Tư vấn viên</option>
+      </select>
+    </div>
     <div id="tAddSection">
       <div class="fg"><label>Email tài khoản học sinh</label><input id="tEmail" placeholder="Nhập email để tìm..."></div>
       <div class="found-user" id="tFoundUser"></div>
@@ -1303,7 +1310,7 @@ function tPhone(p){ navigator.clipboard.writeText(p).then(()=>toast('📋 Đã s
 
 async function loadTeachers(){
   const [{ data: teachers }, { data: ct }, { data: cls }] = await Promise.all([
-    sb.from('users').select('id,full_name,email,phone,birth_year,subject,avatar_url').eq('role','teacher').order('full_name'),
+    sb.from('users').select('id,full_name,email,phone,birth_year,subject,avatar_url,role').in('role',['teacher','assistant']).order('full_name'),
     sb.from('class_teachers').select('teacher_id,class_id'),
     sb.from('classes').select('id,class_name').eq('hidden',false),
   ]);
@@ -1350,6 +1357,7 @@ function renderTeacherGrid(){
     return `<div class="tc-card">
       <div class="tc-top">${av}<div class="tc-hd-info"><div class="tc-name">${esc(t.full_name||'—')}</div><div class="tc-email">${esc(t.email||'')}</div></div></div>
       <div class="tc-body">
+        <div class="tc-row">👤 <span class="tc-subject">${t.role === 'assistant' ? 'Trợ giảng/Tư vấn viên' : 'Giáo viên'}</span></div>
         <div class="tc-row">📚 ${t.subject ? `<span class="tc-subject">${esc(t.subject)}</span>` : '<span style="color:var(--ink-light)">Chưa có môn</span>'}</div>
         <div class="tc-row">📞 ${t.phone ? `<button style="background:none;border:none;color:var(--blue);font-size:.8rem;cursor:pointer;padding:0;font-family:var(--font-body);font-weight:500" onclick="tPhone('${t.phone}')">📞 ${esc(t.phone)}</button>` : '<span style="color:var(--ink-light)">Chưa có SĐT</span>'}</div>
         <div class="tc-row">🎂 <span style="font-weight:500;color:var(--ink)">${t.birth_year||'—'}</span></div>
@@ -1369,6 +1377,7 @@ function openAddTeacher(){
   document.getElementById('tAddSection').style.display = 'block';
   document.getElementById('tFoundUser').style.display  = 'none';
   ['tEditId','tEmail','tSubject','tBirth','tPhone'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('tRole').value = 'teacher';
   document.getElementById('tModal').classList.add('open');
 }
 
@@ -1378,6 +1387,7 @@ function openEditTeacher(id){
   document.getElementById('tModalTitle').textContent = 'Sửa thông tin giáo viên';
   document.getElementById('tAddSection').style.display = 'none';
   document.getElementById('tEditId').value   = id;
+  document.getElementById('tRole').value     = t.role || 'teacher';
   document.getElementById('tSubject').value  = t.subject    || '';
   document.getElementById('tBirth').value    = t.birth_year || '';
   document.getElementById('tPhone').value    = t.phone      || '';
@@ -1388,46 +1398,49 @@ function closeTModal(){ document.getElementById('tModal').classList.remove('open
 
 async function submitTeacher(){
   const subject    = document.getElementById('tSubject').value;
+  const staffRole  = document.getElementById('tRole').value === 'assistant' ? 'assistant' : 'teacher';
   const birth_year = parseInt(document.getElementById('tBirth').value)||null;
   const phone      = document.getElementById('tPhone').value.trim()||null;
   if(_tEditId){
     const outcome = await window.AppAdminTools?.runAdminAction?.({
       action: 'teacher_updated',
       details: {
-        target_type: 'teacher',
+        target_type: staffRole,
         target_id: _tEditId,
+        role: staffRole,
         subject,
         birth_year,
         has_phone: !!phone,
       },
       errorPrefix: 'Không thể cập nhật giáo viên',
-      operation: async () => sb.from('users').update({subject,birth_year,phone}).eq('id',_tEditId),
+      operation: async () => sb.from('users').update({role:staffRole,subject,birth_year,phone}).eq('id',_tEditId),
     });
     if(outcome && !outcome.ok) return;
-    toast('✅ Đã cập nhật giáo viên');
+    toast('✅ Đã cập nhật nhân sự');
   } else {
     const email = document.getElementById('tEmail').value.trim();
     if(!email){ alert('Vui lòng nhập email'); return; }
     const {data:u, error:ue} = await sb.from('users').select('*').eq('email',email).maybeSingle();
     if(ue){ alert(ue.message); return; }
     if(!u){ alert('Không tìm thấy tài khoản'); return; }
-    if(u.role==='teacher'){ alert('Tài khoản này đã là giáo viên'); return; }
+    if(u.role==='teacher' || u.role==='assistant'){ alert('Tài khoản này đã là nhân sự giảng dạy/hỗ trợ'); return; }
     if(u.role==='admin')  { alert('Không thể chuyển tài khoản admin'); return; }
     const outcome = await window.AppAdminTools?.runAdminAction?.({
       action: 'teacher_created',
       details: {
-        target_type: 'teacher',
+        target_type: staffRole,
         target_id: u.id,
+        role: staffRole,
         teacher_email: email,
         subject,
         birth_year,
         has_phone: !!phone,
       },
       errorPrefix: 'Không thể thêm giáo viên',
-      operation: async () => sb.from('users').update({role:'teacher',subject,birth_year,phone}).eq('id',u.id),
+      operation: async () => sb.from('users').update({role:staffRole,subject,birth_year,phone}).eq('id',u.id),
     });
     if(outcome && !outcome.ok) return;
-    toast('✅ Đã thêm giáo viên mới');
+    toast(staffRole === 'assistant' ? '✅ Đã thêm trợ giảng/tư vấn viên mới' : '✅ Đã thêm giáo viên mới');
   }
   closeTModal(); loadTeachers();
 }

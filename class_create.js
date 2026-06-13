@@ -273,7 +273,7 @@ let _allTeachers = [];
 
 async function loadTeacherPicker(){
   const sb = getSb();
-  const { data } = await sb.from("users").select("id,full_name").eq("role","teacher").order("full_name");
+  const { data } = await sb.from("users").select("id,full_name,role").in("role",["teacher","assistant"]).order("full_name");
   _allTeachers = data || [];
   renderTeacherPicker();
 }
@@ -293,7 +293,7 @@ function renderTeacherPicker(){
         <input type="checkbox" value="${t.id}" ${checked}
           style="width:16px;height:16px;accent-color:var(--navy)"
           onchange="window._onTeacherToggle('${t.id}',this)">
-        <span style="font-weight:500;color:var(--navy)">${t.full_name}</span>
+        <span style="font-weight:500;color:var(--navy)">${t.full_name}${t.role === "assistant" ? " · Trợ giảng/Tư vấn" : ""}</span>
       </label>`;
   }).join("");
 }

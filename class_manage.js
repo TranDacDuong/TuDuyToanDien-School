@@ -289,6 +289,14 @@
     ].some(value => value && value.includes(compactKeyword));
   }
 
+  function canTakeAttendance(role = _role){
+    return role === "admin" || role === "teacher" || role === "assistant";
+  }
+
+  function canManageClassContent(role = _role){
+    return role === "admin" || role === "teacher";
+  }
+
   async function getStudentSearchPool(){
     if(_studentSearchPool) return _studentSearchPool;
     const sb = getSb();
@@ -364,13 +372,13 @@
   function buildTopbar(title){
     const role = window._currentRole || "student";
     let actionBtns = "";
-    if(role === "admin" || role === "teacher"){
+    if(canManageClassContent(role)){
       actionBtns =
         '<button onclick="cvEditClass()" style="'+
         'background:var(--gold);color:var(--navy);border:none;padding:6px 14px;'+
         'border-radius:7px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">'+
         '✏ Sửa</button>'+
-        (role === "admin" || role === "teacher"
+        (canManageClassContent(role)
           ? '<button onclick="cvDeleteClass()" style="'+
             'background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.3);'+
             'padding:6px 14px;border-radius:7px;font-size:.82rem;font-weight:700;'+
@@ -469,7 +477,7 @@
 
     const schThisMonth = getSchedulesForMonth(data.class_schedules||[], _currentMonth, _currentYear);
     const roomCapacity = getMinRoomCapacity(schThisMonth);
-    const shouldWarnCapacity = (role === "admin" || role === "teacher") && roomCapacity > 0 && activeCount >= roomCapacity;
+    const shouldWarnCapacity = (role === "admin" || role === "teacher" || role === "assistant") && roomCapacity > 0 && activeCount >= roomCapacity;
     const scheduleHtml = renderScheduleSummary(schThisMonth);
     const capacityWarningHtml = shouldWarnCapacity
       ? '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;'+
@@ -683,7 +691,7 @@
           const key="cvatt_"+s.student_id+"_"+d+"_"+scheduleId;
           const sm=statusMap[status]||statusMap.absent;
           cells+='<td class="center" style="'+cellStyle+'">'+
-            (role === "admin" || role === "teacher"
+            (canTakeAttendance(role)
               ? '<button id="'+key+'" class="att-btn '+sm.cls+'" '+
                 'onclick="cvToggleAtt(\''+_classId+'\',\''+s.student_id+'\',\''+d+'\',\''+status+'\',\''+scheduleId+'\',\''+sessionNo+'\')">'+
                 sm.text+'</button>'
@@ -695,7 +703,7 @@
           const key="cvatt_"+s.student_id+"_"+d+"_"+scheduleId;
           const sm=statusMap[status]||statusMap.present;
           cells+='<td class="center" style="'+cellStyle+'">'+
-            (role === "admin" || role === "teacher"
+            (canTakeAttendance(role)
               ? '<button id="'+key+'" class="att-btn '+sm.cls+'" '+
                 'onclick="cvToggleAtt(\''+_classId+'\',\''+s.student_id+'\',\''+d+'\',\''+status+'\',\''+scheduleId+'\',\''+sessionNo+'\')">'+
                 sm.text+'</button>'

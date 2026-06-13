@@ -37,7 +37,7 @@
 
       let classIds = null;
 
-      if(role === "teacher"){
+      if(role === "teacher" || role === "assistant"){
         const { data: myRows } = await getSb()
           .from("class_teachers").select("class_id").eq("teacher_id", uid);
         classIds = (myRows||[]).map(r => r.class_id);
@@ -142,7 +142,7 @@
 
   async function loadFilterOptions(sb, role){
     const { data: teachers } = await sb
-      .from("users").select("id,full_name").eq("role","teacher").order("full_name");
+      .from("users").select("id,full_name,role").in("role",["teacher","assistant"]).order("full_name");
     _teacherNameMap = {};
     (teachers||[]).forEach(t => { _teacherNameMap[t.id] = t.full_name; });
 
@@ -315,7 +315,7 @@
         const stuCount    = _studentCount[cls.id] || 0;
         const subjectName = cls.subjects?.name || "";
         const roomCapacity = getMinRoomCapacity(currentSchedules);
-        const showCapacityWarning = (role === "admin" || role === "teacher") && roomCapacity > 0 && stuCount >= roomCapacity;
+        const showCapacityWarning = (role === "admin" || role === "teacher" || role === "assistant") && roomCapacity > 0 && stuCount >= roomCapacity;
         const capacityWarningHtml = showCapacityWarning
           ? `<div class="class-info" style="margin-top:6px;padding:8px 10px;border-radius:10px;background:${stuCount > roomCapacity ? "rgba(239,68,68,.12)" : "rgba(245,158,11,.12)"};border:1px solid ${stuCount > roomCapacity ? "rgba(239,68,68,.28)" : "rgba(245,158,11,.28)"};color:${stuCount > roomCapacity ? "#b91c1c" : "#92400e"};font-weight:700">⚠ ${stuCount > roomCapacity ? "Số lượng học sinh đang vượt quá" : "Số lượng học sinh đã chạm tới"} sức chứa phòng học (${roomCapacity}).</div>`
           : "";

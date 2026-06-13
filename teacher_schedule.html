@@ -242,7 +242,7 @@ async function loadPageData(){
   teacherList.innerHTML = '<div class="empty">Đang tải giáo viên...</div>';
   roomSchedules.innerHTML = '<div class="empty card">Đang tải thời khóa biểu...</div>';
   const [{ data: teachers, error: teacherError }, { data: rooms, error: roomError }, { data: classes, error: classError }, { data: schedules, error: scheduleError }, { data: classTeachers, error: classTeacherError }, { data: classStudents, error: classStudentError }] = await Promise.all([
-    sb.from("users").select("id,full_name,email,phone,subject,avatar_url").eq("role","teacher").order("full_name"),
+    sb.from("users").select("id,full_name,email,phone,subject,avatar_url,role").in("role",["teacher","assistant"]).order("full_name"),
     sb.from("rooms").select("id,room_name,capacity").order("room_name"),
     sb.from("classes").select("id,class_name,hidden,grades(name),subjects(name)").eq("hidden",false).order("class_name"),
     sb.from("class_schedules").select("id,class_id,session_no,weekday,start_time,end_time,effective_from,room_id,rooms(id,room_name)").order("weekday").order("start_time"),

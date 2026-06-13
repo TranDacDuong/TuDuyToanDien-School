@@ -184,9 +184,10 @@
   let currentRole = "admin";
   let currentUserId = null;
   let parentStudentIds = new Set();
+  let assistantClassIds = new Set();
 
   function canViewStudentPhone() {
-    return currentRole === "admin";
+    return currentRole === "admin" || currentRole === "assistant";
   }
 
   function canManagePayments() {
@@ -437,9 +438,17 @@ Nhập số tiền hoàn lại (>0):`,
       .single();
     currentRole = profile?.role || "student";
     parentStudentIds = new Set();
+    assistantClassIds = new Set();
     if (currentRole === "teacher") {
       location.href = "dashboard.html";
       return false;
+    } else if (currentRole === "assistant") {
+      const { data: rows, error: classError } = await sb
+        .from("class_teachers")
+        .select("class_id")
+        .eq("teacher_id", currentUserId);
+      if (classError) throw classError;
+      assistantClassIds = new Set((rows || []).map(row => row.class_id).filter(Boolean));
     }
 
     const titleEl = document.querySelector("h1");
@@ -599,6 +608,7 @@ Nhập số tiền hoàn lại (>0):`,
       (classStudents || []).forEach(cs => {
         if (currentRole === "student" && cs.student_id !== currentUserId) return;
         if (currentRole === "parent" && !parentStudentIds.has(cs.student_id)) return;
+        if (currentRole === "assistant" && !assistantClassIds.has(cs.class_id)) return;
         const cls = classMap[cs.class_id];
         if (!cls) return;
 

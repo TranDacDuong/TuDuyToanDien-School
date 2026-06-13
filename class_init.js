@@ -26,7 +26,7 @@
 
       const userInfo = document.getElementById("userInfo");
       if(userInfo){
-        const roleLabel = { admin:"Quản trị viên", teacher:"Giáo viên", student:"Học sinh", parent:"Phụ huynh" };
+        const roleLabel = { admin:"Quản trị viên", teacher:"Giáo viên", assistant:"Trợ giảng/Tư vấn viên", student:"Học sinh", parent:"Phụ huynh" };
         userInfo.textContent = (profile?.full_name||"") + " · " + (roleLabel[profile?.role]||"");
       }
 
