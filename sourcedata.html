@@ -325,9 +325,10 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 /* Modal sửa học sinh */
 .modal-s { position:fixed; inset:0; background:rgba(10,20,40,.5); backdrop-filter:blur(3px); display:none; align-items:center; justify-content:center; z-index:1000; }
 .modal-s.open { display:flex; }
-.modal-s-box { background:var(--white); border-radius:22px; padding:22px; width:min(95vw,520px); box-shadow:0 26px 54px rgba(15,23,42,.18); border:1px solid rgba(15,31,61,.08); }
-.modal-s-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+.modal-s-box { background:var(--white); border-radius:22px; padding:22px; width:min(95vw,520px); max-height:calc(92vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow:auto; box-shadow:0 26px 54px rgba(15,23,42,.18); border:1px solid rgba(15,31,61,.08); }
+.modal-s-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; position:sticky; top:-22px; z-index:2; background:var(--white); padding-top:2px; padding-bottom:10px; }
 .modal-s-hd h3 { font-family:var(--font-display); font-size:1rem; color:var(--navy); margin:0; }
+.modal-s-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; position:sticky; bottom:-22px; z-index:2; background:var(--white); padding-top:10px; padding-bottom:2px; }
 .se-parent-status { display:none; margin:-4px 0 10px; padding:8px 10px; border-radius:10px; font-size:.78rem; font-weight:700; line-height:1.45; }
 .se-parent-status.show { display:block; }
 .se-parent-status.ok { background:#ecfdf5; color:#047857; border:1px solid #bbf7d0; }
@@ -349,7 +350,9 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   .modal-ov,
   .modal-s { padding: 10px; align-items: flex-end; }
   .modal-box,
-  .modal-s-box { width: 100%; border-radius: 22px 22px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); }
+  .modal-s-box { width: 100%; max-height:88vh; border-radius: 22px 22px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); }
+  .modal-s-hd { top:-18px; }
+  .modal-s-actions { bottom:calc(-18px - env(safe-area-inset-bottom)); padding-bottom:calc(2px + env(safe-area-inset-bottom)); }
   .s-search .sg,
   .t-search-bar .sg { min-width: 100%; }
 }
@@ -855,7 +858,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
     <div class="fg"><label>Năm sinh</label><input id="seB" type="number" placeholder="Năm sinh"></div>
     <div class="fg"><label>Tỉnh</label><input id="sePv"   placeholder="Tỉnh/thành"></div>
     <div class="fg"><label>Trường</label><input id="seSc" placeholder="Tên trường"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+    <div class="modal-s-actions">
       <button class="btn btn-outline btn-sm" onclick="sCloseModal()">Hủy</button>
       <button class="btn btn-primary btn-sm" onclick="sSaveStudent()">💾 Lưu</button>
     </div>
