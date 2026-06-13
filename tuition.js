@@ -183,6 +183,7 @@
   let currentRows = [];
   let currentRole = "admin";
   let currentUserId = null;
+  let parentStudentIds = new Set();
 
   function canViewStudentPhone() {
     return currentRole === "admin";
@@ -435,6 +436,7 @@ Nhập số tiền hoàn lại (>0):`,
       .eq("id", user.id)
       .single();
     currentRole = profile?.role || "student";
+    parentStudentIds = new Set();
     if (currentRole === "teacher") {
       location.href = "dashboard.html";
       return false;
@@ -443,6 +445,15 @@ Nhập số tiền hoàn lại (>0):`,
     const titleEl = document.querySelector("h1");
     if (currentRole === "student") {
       if (titleEl) titleEl.textContent = "Học phí của tôi";
+    } else if (currentRole === "parent") {
+      if (titleEl) titleEl.textContent = "Học phí của học sinh";
+      const { data: links, error: linkError } = await sb
+        .from("parent_students")
+        .select("student_id")
+        .eq("parent_id", currentUserId)
+        .is("revoked_at", null);
+      if (linkError) throw linkError;
+      parentStudentIds = new Set((links || []).map(row => row.student_id).filter(Boolean));
     }
     return true;
   }
@@ -459,7 +470,7 @@ Nhập số tiền hoàn lại (>0):`,
     const reloadBtn = toolbarButtons.find(btn => btn.textContent.includes("Tải lại"));
     const printBtn = toolbarButtons.find(btn => btn.textContent.includes("In"));
 
-    if (currentRole === "student") {
+    if (currentRole === "student" || currentRole === "parent") {
       if (classFilter) classFilter.style.display = "none";
       if (paidFilter) paidFilter.style.display = "none";
       if (notifyBtn) notifyBtn.style.display = "none";
@@ -587,6 +598,7 @@ Nhập số tiền hoàn lại (>0):`,
       allRows = [];
       (classStudents || []).forEach(cs => {
         if (currentRole === "student" && cs.student_id !== currentUserId) return;
+        if (currentRole === "parent" && !parentStudentIds.has(cs.student_id)) return;
         const cls = classMap[cs.class_id];
         if (!cls) return;
 
@@ -752,13 +764,13 @@ Nhập số tiền hoàn lại (>0):`,
 
     currentRows = rows;
 
-    if (currentRole === "student") {
+    if (currentRole === "student" || currentRole === "parent") {
       const detailWrap = document.getElementById("studentDetailView");
       const detailBody = document.getElementById("studentDetailBody");
       if (detailWrap && detailBody) {
-        if (rows[0]) {
+        if (rows.length) {
           detailWrap.classList.add("show");
-          detailBody.innerHTML = buildTuitionDetailHtml(rows[0]);
+          detailBody.innerHTML = rows.map(row => buildTuitionDetailHtml(row)).join("");
         } else {
           detailWrap.classList.add("show");
           detailBody.innerHTML = '<div class="empty" style="padding:24px 0">Không có dữ liệu học phí trong tháng này.</div>';

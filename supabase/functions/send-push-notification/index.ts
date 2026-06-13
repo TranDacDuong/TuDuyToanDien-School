@@ -155,15 +155,36 @@ async function sendToSubscription(subscription: PushSubscriptionRow, payload: st
         urgency: "high",
       },
     );
-    return { ok: true };
+    return { ok: true, subscriptionId: subscription.id, endpointHost: safeEndpointHost(subscription.endpoint) };
   } catch (error) {
     const statusCode = (error as { statusCode?: number })?.statusCode;
     if (statusCode === 404 || statusCode === 410) {
       await revokeSubscription(subscription.id);
-      return { ok: false, revoked: true };
+      return {
+        ok: false,
+        revoked: true,
+        subscriptionId: subscription.id,
+        endpointHost: safeEndpointHost(subscription.endpoint),
+        statusCode,
+        message: error instanceof Error ? error.message : "Subscription is gone",
+      };
     }
     console.error("Push send failed", error);
-    return { ok: false };
+    return {
+      ok: false,
+      subscriptionId: subscription.id,
+      endpointHost: safeEndpointHost(subscription.endpoint),
+      statusCode: statusCode || null,
+      message: error instanceof Error ? error.message : String(error || "Push send failed"),
+    };
+  }
+}
+
+function safeEndpointHost(endpoint: string) {
+  try {
+    return new URL(endpoint).host;
+  } catch (_) {
+    return "";
   }
 }
 
@@ -182,11 +203,13 @@ Deno.serve(async (req) => {
       ...(Array.isArray(body.notificationIds) ? body.notificationIds : []),
     ]);
     const directUserIds = normalizeIds(body.userIds);
+    const debug = body.debug === true;
 
     const subscriptions = await getActiveSubscriptions();
     let sent = 0;
     let attempted = 0;
     let revoked = 0;
+    const details: Array<Record<string, unknown>> = [];
 
     if (notificationIds.length) {
       const notifications = await getNotifications(notificationIds);
@@ -209,9 +232,10 @@ Deno.serve(async (req) => {
           const result = await sendToSubscription(subscription, payload);
           if (result.ok) sent += 1;
           if (result.revoked) revoked += 1;
+          if (debug) details.push({ userId: notification.user_id, ...result });
         }
       }
-      return jsonResponse({ ok: true, attempted, sent, revoked });
+      return jsonResponse({ ok: true, attempted, sent, revoked, ...(debug ? { details } : {}) });
     }
 
     if (!isPrivileged(role)) {
@@ -233,9 +257,10 @@ Deno.serve(async (req) => {
       const result = await sendToSubscription(subscription, payload);
       if (result.ok) sent += 1;
       if (result.revoked) revoked += 1;
+      if (debug) details.push({ userId: subscription.user_id, ...result });
     }
 
-    return jsonResponse({ ok: true, attempted, sent, revoked });
+    return jsonResponse({ ok: true, attempted, sent, revoked, ...(debug ? { details } : {}) });
   } catch (error) {
     console.error(error);
     const message = error instanceof Error ? error.message : "Cannot send push notification";

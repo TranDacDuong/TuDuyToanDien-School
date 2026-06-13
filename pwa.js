@@ -265,18 +265,78 @@
       : await Notification.requestPermission();
     if (permission !== "granted") return { ok: false, permission };
 
-    let subscription = null;
-    try {
-      subscription = await ensurePushSubscription(user.id, { forceNew: true, repairRevoked: true });
-    } catch (error) {
-      if (!isPushServiceError(error)) throw error;
-      enableLocalNotifications(user.id, true);
-      removePrompt();
-      return { ok: true, permission, localOnly: true };
-    }
+    const subscription = await ensurePushSubscription(user.id, { forceNew: true, repairRevoked: true });
     enableLocalNotifications(user.id);
     removePrompt();
-    return { ok: Boolean(subscription), permission };
+    return { ok: Boolean(subscription), permission, endpoint: subscription?.endpoint || "" };
+  }
+
+  async function getPushDiagnostics() {
+    const user = await getCurrentUser();
+    const diagnostics = {
+      userId: user?.id || null,
+      supported: isPushSupported(),
+      configured: isPushConfigured(),
+      secureContext: window.isSecureContext,
+      permission: "Notification" in window ? Notification.permission : "unsupported",
+      hasServiceWorker: "serviceWorker" in navigator,
+      hasPushManager: "PushManager" in window,
+      hasNotificationApi: "Notification" in window,
+      standalone: isStandaloneApp(),
+      mobile: isMobileDevice(),
+      android: isAndroidDevice(),
+      localFallbackEnabled: localStorage.getItem(LOCAL_NOTIFY_ENABLED_KEY) === "1",
+      subscription: null,
+      savedSubscription: null,
+      error: null
+    };
+
+    try {
+      if (!diagnostics.supported || diagnostics.permission !== "granted") return diagnostics;
+      const registration = await getServiceWorkerRegistration();
+      const subscription = await registration.pushManager.getSubscription();
+      if (!subscription) return diagnostics;
+      const json = subscription.toJSON();
+      diagnostics.subscription = {
+        endpoint: json.endpoint || "",
+        hasP256dh: Boolean(json.keys?.p256dh),
+        hasAuth: Boolean(json.keys?.auth),
+        expirationTime: json.expirationTime || null
+      };
+      diagnostics.savedSubscription = await getSavedSubscription(json.endpoint);
+    } catch (error) {
+      diagnostics.error = [error?.name, error?.message].filter(Boolean).join(": ") || String(error || "");
+    }
+    return diagnostics;
+  }
+
+  async function sendTestPushToCurrentUser(options = {}) {
+    const user = await getCurrentUser();
+    if (!user?.id) throw new Error("User is not signed in");
+    const client = await waitForSupabase();
+    if (!client) throw new Error("Supabase is not ready");
+    const { data: { session } } = await client.auth.getSession();
+    if (!session?.access_token) throw new Error("Missing session token");
+
+    const response = await fetch(`${window.SUPABASE_URL || ""}/functions/v1/send-push-notification`, {
+      method: "POST",
+      headers: {
+        "apikey": window.SUPABASE_KEY || "",
+        "Authorization": `Bearer ${session.access_token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        userIds: [user.id],
+        title: options.title || "MindUp test",
+        message: options.message || "Thong bao day thu nghiem tu MindUp.",
+        targetUrl: options.targetUrl || "notifications.html",
+        type: options.type || "system",
+        debug: true
+      })
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body?.error || "Push notification failed");
+    return body;
   }
 
   async function ensurePushSubscription(userId, options = {}) {
@@ -545,7 +605,6 @@
     if (Notification.permission === "granted") {
       const subscription = await ensurePushSubscription(user.id, { repairRevoked: true }).catch((error) => {
         console.warn("MindUp push auto repair failed:", error);
-        if (isPushServiceError(error)) enableLocalNotifications(user.id);
         return null;
       });
       if (subscription) enableLocalNotifications(user.id);
@@ -573,6 +632,8 @@
 
   window.MindUpPush = {
     enable: enablePushNotifications,
+    diagnostics: getPushDiagnostics,
+    sendTestToCurrentUser: sendTestPushToCurrentUser,
     isConfigured: isPushConfigured,
     isSupported: isPushSupported
   };

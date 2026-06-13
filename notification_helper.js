@@ -21,6 +21,70 @@
     return "";
   }
 
+  const PARENT_VISIBLE_TYPES = new Set([
+    "course_enrolled",
+    "course_request_approved",
+    "course_request_rejected",
+    "course_session_added",
+    "course_session_updated",
+    "class_session_added",
+    "class_session_updated",
+    "class_exam_added",
+    "tuition_due",
+    "tuition_reminder",
+    "trial_lesson_request"
+  ]);
+
+  async function getLinkedParentsForStudents(studentIds) {
+    const ids = [...new Set((studentIds || []).filter(Boolean))];
+    if (!ids.length) return [];
+    try {
+      const { data, error } = await getSb()
+        .from("parent_students")
+        .select("parent_id,student_id")
+        .in("student_id", ids)
+        .is("revoked_at", null);
+      if (error) return [];
+      return data || [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  async function expandParentNotifications(payloads) {
+    const rows = Array.isArray(payloads) ? payloads : [];
+    const studentIds = rows
+      .filter(item => PARENT_VISIBLE_TYPES.has(item.type))
+      .map(item => item.user_id)
+      .filter(Boolean);
+    const parentLinks = await getLinkedParentsForStudents(studentIds);
+    if (!parentLinks.length) return rows;
+
+    const linksByStudent = parentLinks.reduce((acc, link) => {
+      if (!acc[link.student_id]) acc[link.student_id] = [];
+      acc[link.student_id].push(link.parent_id);
+      return acc;
+    }, {});
+
+    const expanded = [...rows];
+    rows.forEach(item => {
+      if (!PARENT_VISIBLE_TYPES.has(item.type)) return;
+      (linksByStudent[item.user_id] || []).forEach(parentId => {
+        if (!parentId || parentId === item.actor_id || parentId === item.user_id) return;
+        expanded.push({
+          ...item,
+          user_id: parentId,
+          meta: {
+            ...(item.meta || {}),
+            student_id: item.user_id,
+            parent_copy: true
+          }
+        });
+      });
+    });
+    return expanded;
+  }
+
   async function invokePushFunction(payload) {
     try {
       const { data: { session } } = await getSb().auth.getSession();
@@ -99,15 +163,16 @@
       meta: normalizeMeta(meta)
     };
 
+    const expandedPayload = await expandParentNotifications([payload]);
     const { data, error } = await getSb()
       .from("notifications")
-      .insert(payload)
-      .select("id")
-      .single();
+      .insert(expandedPayload)
+      .select("id");
 
     if (error) throw error;
-    if (push !== false) sendPushForNotification(data.id);
-    return data;
+    const ids = (data || []).map(item => item.id).filter(Boolean);
+    if (push !== false && ids.length) sendPushForNotifications(ids);
+    return data?.[0] || null;
   }
 
   async function createBulkNotifications(items, { allowSelf = false, push = true } = {}) {
@@ -133,17 +198,19 @@
 
     if (!payloads.length) return { count: 0 };
 
+    const expandedPayloads = await expandParentNotifications(payloads);
+
     const chunkSize = 100;
     const insertedIds = [];
-    for (let i = 0; i < payloads.length; i += chunkSize) {
-      const chunk = payloads.slice(i, i + chunkSize);
+    for (let i = 0; i < expandedPayloads.length; i += chunkSize) {
+      const chunk = expandedPayloads.slice(i, i + chunkSize);
       const { data, error } = await getSb().from("notifications").insert(chunk).select("id");
       if (error) throw error;
       insertedIds.push(...((data || []).map(item => item.id).filter(Boolean)));
     }
 
     if (push !== false && insertedIds.length) sendPushForNotifications(insertedIds);
-    return { count: payloads.length };
+    return { count: payloads.length, expandedCount: expandedPayloads.length };
   }
 
   async function getCourseStudentIds(courseId) {

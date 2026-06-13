@@ -710,7 +710,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="MindUp">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<script src="pwa.js?v=20260612-swnotify1" defer></script>
+<script src="pwa.js?v=20260613-push-debug1" defer></script>
 </head>
 <body>
 
@@ -732,17 +732,18 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   </div>
 
   <ul id="menu">
-    <li data-role="admin,teacher,student" data-page="home.html"><span class="menu-label">🏠 Trang chủ</span></li>
-    <li data-role="admin,teacher,student" data-page="courses.html"><span class="menu-label">🎓 Khóa học</span></li>
-    <li data-role="admin,teacher,student" data-page="class.html"><span class="menu-label">📘 Lớp học</span></li>
-    <li data-role="admin,teacher,student" data-page="teacher_schedule.html"><span class="menu-label">👨‍🏫 Giáo viên & TKB</span></li>
+    <li data-role="admin,teacher,student,parent" data-page="home.html"><span class="menu-label">🏠 Trang chủ</span></li>
+    <li data-role="admin,teacher,student,parent" data-page="courses.html"><span class="menu-label">🎓 Khóa học</span></li>
+    <li data-role="admin,teacher,student,parent" data-page="class.html"><span class="menu-label">📘 Lớp học</span></li>
+    <li data-role="admin,teacher,student,parent" data-page="teacher_schedule.html"><span class="menu-label">👨‍🏫 Giáo viên & TKB</span></li>
     <li data-role="admin,teacher,student" data-page="public_exam.html"><span class="menu-label">🎯 Đề thi</span></li>
     <li data-role="admin,teacher,student" data-page="game.html"><span class="menu-label">🎮 Game</span></li>
-    <li data-role="admin,student"         data-page="tuition.html"><span class="menu-label">💰 Học phí</span></li>
-    <li data-role="admin,teacher,student" data-page="resources.html"><span class="menu-label">📚 Tài liệu tham khảo</span></li>
+    <li data-role="admin,student,parent"  data-page="tuition.html"><span class="menu-label">💰 Học phí</span></li>
+    <li data-role="admin,teacher,student,parent" data-page="resources.html"><span class="menu-label">📚 Tài liệu tham khảo</span></li>
     <li data-role="admin,teacher"         data-page="question.html"><span class="menu-label">🧠 Ngân hàng câu hỏi</span></li>
     <li data-role="admin,teacher"         data-page="exam.html"><span class="menu-label">✅ Đề kiểm tra</span></li>
     <li data-role="admin,teacher"         data-page="trial_requests.html"><span class="menu-label">🌱 Đăng ký học thử</span></li>
+    <li data-role="admin"                 data-page="push_debug.html"><span class="menu-label">🔔 Test thông báo</span></li>
     <li data-role="admin"                 data-page="sourcedata.html"><span class="menu-label">⚙️ Hệ thống</span></li>
   </ul>
 </aside>
@@ -840,31 +841,31 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 </main>
 
 <nav id="mobileNav" aria-label="Điều hướng nhanh">
-  <button class="mobile-nav-item" type="button" data-page="home.html">
+  <button class="mobile-nav-item" type="button" data-role="admin,teacher,student,parent" data-page="home.html">
     <span>🏠</span>
     <span>Trang chủ</span>
   </button>
-  <button class="mobile-nav-item" type="button" data-page="courses.html">
+  <button class="mobile-nav-item" type="button" data-role="admin,teacher,student,parent" data-page="courses.html">
     <span>🎓</span>
     <span>Khóa học</span>
   </button>
-  <button class="mobile-nav-item" type="button" data-page="class.html">
+  <button class="mobile-nav-item" type="button" data-role="admin,teacher,student,parent" data-page="class.html">
     <span>📘</span>
     <span>Lớp học</span>
   </button>
-  <button class="mobile-nav-item" type="button" data-page="tuition.html">
+  <button class="mobile-nav-item" type="button" data-role="admin,student,parent" data-page="tuition.html">
     <span>💰</span>
     <span>Học phí</span>
   </button>
-  <button class="mobile-nav-item" type="button" data-page="public_exam.html">
+  <button class="mobile-nav-item" type="button" data-role="admin,teacher,student" data-page="public_exam.html">
     <span>🎯</span>
     <span>Đề thi</span>
   </button>
-  <button class="mobile-nav-item" type="button" data-page="game.html">
+  <button class="mobile-nav-item" type="button" data-role="admin,teacher,student" data-page="game.html">
     <span>🎮</span>
     <span>Game</span>
   </button>
-  <button class="mobile-nav-item mobile-nav-more" type="button" data-action="menu">
+  <button class="mobile-nav-item mobile-nav-more" type="button" data-role="admin,teacher,student,parent" data-action="menu">
     <span>⋯</span>
     <span>Thêm</span>
   </button>
@@ -1035,6 +1036,10 @@ function applyRoleMenu(role){
     const roles = item.dataset.role.split(",");
     item.style.display = roles.includes(role) ? "flex" : "none";
   });
+  mobileNavItems.forEach(item => {
+    const roles = (item.dataset.role || "").split(",").filter(Boolean);
+    item.style.display = !roles.length || roles.includes(role) ? "flex" : "none";
+  });
 }
 
 function setActiveMenuItem(page){
@@ -1084,6 +1089,16 @@ function normalizeDashboardPage(page){
   const cleanPath = pathPart.replace(/^\/+/, "").replace(/^\.\/+/, "");
   if(!cleanPath || cleanPath.includes("://") || cleanPath.startsWith("..")) return "";
   return cleanPath + (queryPart ? "?" + queryPart : "") + hash;
+}
+
+function canOpenDashboardPage(page){
+  if(!currentDashboardProfile?.role) return true;
+  const basePage = String(page || "").split("?")[0].split("#")[0];
+  const menuItem = document.querySelector(`#menu li[data-page="${basePage}"]`);
+  const mobileItem = document.querySelector(`#mobileNav .mobile-nav-item[data-page="${basePage}"]`);
+  const role = currentDashboardProfile.role;
+  const roleList = (menuItem?.dataset.role || mobileItem?.dataset.role || "").split(",").filter(Boolean);
+  return !roleList.length || roleList.includes(role);
 }
 
 function getDashboardUrlPage(){
@@ -1136,6 +1151,9 @@ function openDashboardPage(page, options = {}){
   if(!currentDashboardUser && !PUBLIC_DASHBOARD_PAGES.has(basePage)){
     openAuthModal("login");
     return;
+  }
+  if(currentDashboardUser && currentDashboardProfile && !canOpenDashboardPage(page)){
+    page = "home.html";
   }
   if(updateUrl) syncDashboardUrl(page, replaceUrl);
   const opsHub = document.getElementById("opsHub");

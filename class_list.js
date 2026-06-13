@@ -53,6 +53,29 @@
           container.innerHTML = '<div style="color:var(--ink-light);padding:20px">Bạn chưa tham gia lớp nào.</div>';
           return;
         }
+      } else if(role === "parent"){
+        const { data: links, error: linkError } = await getSb()
+          .from("parent_students")
+          .select("student_id")
+          .eq("parent_id", uid)
+          .is("revoked_at", null);
+        if(linkError) throw linkError;
+        const studentIds = [...new Set((links || []).map(row => row.student_id).filter(Boolean))];
+        if(!studentIds.length){
+          container.innerHTML = '<div style="color:var(--ink-light);padding:20px">Tài khoản phụ huynh chưa liên kết với học sinh nào.</div>';
+          return;
+        }
+        const { data: myRows, error: classLinkError } = await getSb()
+          .from("class_students")
+          .select("class_id")
+          .in("student_id", studentIds)
+          .is("left_at", null);
+        if(classLinkError) throw classLinkError;
+        classIds = [...new Set((myRows||[]).map(r => r.class_id).filter(Boolean))];
+        if(!classIds.length){
+          container.innerHTML = '<div style="color:var(--ink-light);padding:20px">Chưa có lớp học nào của học sinh được liên kết.</div>';
+          return;
+        }
       }
 
       let classQuery = sb

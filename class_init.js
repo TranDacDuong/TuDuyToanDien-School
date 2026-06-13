@@ -26,7 +26,7 @@
 
       const userInfo = document.getElementById("userInfo");
       if(userInfo){
-        const roleLabel = { admin:"Quản trị viên", teacher:"Giáo viên", student:"Học sinh" };
+        const roleLabel = { admin:"Quản trị viên", teacher:"Giáo viên", student:"Học sinh", parent:"Phụ huynh" };
         userInfo.textContent = (profile?.full_name||"") + " · " + (roleLabel[profile?.role]||"");
       }
 
@@ -43,7 +43,7 @@
         if(filters)   filters.style.display = "none";
         if(filterBar) filterBar.style.display = "flex";
       } else {
-        /* Student: ẩn khối tạo lớp và bộ lọc */
+        /* Student/parent: ẩn khối tạo lớp và bộ lọc */
         if(openBtn)   openBtn.style.display   = "none";
         if(filters)   filters.style.display   = "none";
         if(filterBar) filterBar.style.display = "none";

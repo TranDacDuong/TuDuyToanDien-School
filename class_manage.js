@@ -252,6 +252,7 @@
   let _studentSearchPool = null;
   let _classSessionExamCatalog = { exam: [], pdf: [] };
   let _studentScheduleMap = {};
+  let _parentStudentIds = new Set();
 
   function normalizeSearchText(value){
     return String(value || "")
@@ -330,6 +331,16 @@
     _activeTab    = "attendance";
     _currentMonth = new Date().getMonth();
     _currentYear  = new Date().getFullYear();
+    _parentStudentIds = new Set();
+
+    if(_role === "parent" && window._currentUserId){
+      const { data: parentLinks } = await getSb()
+        .from("parent_students")
+        .select("student_id")
+        .eq("parent_id", window._currentUserId)
+        .is("revoked_at", null);
+      _parentStudentIds = new Set((parentLinks || []).map(row => row.student_id).filter(Boolean));
+    }
 
     window._classId   = classId;
     window._className = className;
@@ -558,6 +569,7 @@
     const visibleStudents = (data.students||[]).filter(s=>{
       const j = s.joined_at?s.joined_at.slice(0,10):"0000-00-00";
       const l = s.left_at  ?s.left_at.slice(0,10)  :"9999-99-99";
+      if(role === "parent" && !_parentStudentIds.has(s.student_id)) return false;
       return j<=mEnd && l>=mStart;
     });
     const dates = role === "student"
@@ -671,21 +683,27 @@
           const key="cvatt_"+s.student_id+"_"+d+"_"+scheduleId;
           const sm=statusMap[status]||statusMap.absent;
           cells+='<td class="center" style="'+cellStyle+'">'+
-            '<button id="'+key+'" class="att-btn '+sm.cls+'" '+
-            'onclick="cvToggleAtt(\''+_classId+'\',\''+s.student_id+'\',\''+d+'\',\''+status+'\',\''+scheduleId+'\',\''+sessionNo+'\')">'+
-            sm.text+'</button></td>';
+            (role === "admin" || role === "teacher"
+              ? '<button id="'+key+'" class="att-btn '+sm.cls+'" '+
+                'onclick="cvToggleAtt(\''+_classId+'\',\''+s.student_id+'\',\''+d+'\',\''+status+'\',\''+scheduleId+'\',\''+sessionNo+'\')">'+
+                sm.text+'</button>'
+              : '<span class="att-btn '+sm.cls+'" style="cursor:default;font-weight:700">'+sm.text+'</span>')+
+            '</td>';
         } else {
           const defaultStatus = d < joined ? "absent" : "present";
           const status=_attendanceMap[s.student_id+"_"+d+"_"+scheduleId]||_attendanceMap[s.student_id+"_"+d+"_0"]||defaultStatus;
           const key="cvatt_"+s.student_id+"_"+d+"_"+scheduleId;
           const sm=statusMap[status]||statusMap.present;
           cells+='<td class="center" style="'+cellStyle+'">'+
-            '<button id="'+key+'" class="att-btn '+sm.cls+'" '+
-            'onclick="cvToggleAtt(\''+_classId+'\',\''+s.student_id+'\',\''+d+'\',\''+status+'\',\''+scheduleId+'\',\''+sessionNo+'\')">'+
-            sm.text+'</button></td>';
+            (role === "admin" || role === "teacher"
+              ? '<button id="'+key+'" class="att-btn '+sm.cls+'" '+
+                'onclick="cvToggleAtt(\''+_classId+'\',\''+s.student_id+'\',\''+d+'\',\''+status+'\',\''+scheduleId+'\',\''+sessionNo+'\')">'+
+                sm.text+'</button>'
+              : '<span class="att-btn '+sm.cls+'" style="cursor:default;font-weight:700">'+sm.text+'</span>')+
+            '</td>';
         }
       });
-      const stopBtn = isActive
+      const stopBtn = (isActive && (role === "admin" || role === "teacher"))
         ? '<button onclick="cvStopStudent(\''+_classId+'\',\''+s.student_id+'\')" '+
           'class="btn btn-outline btn-sm" style="font-size:.72rem;padding:3px 9px">Ngừng</button>'
         : '<span style="font-size:.72rem;color:var(--ink-light)">—</span>';

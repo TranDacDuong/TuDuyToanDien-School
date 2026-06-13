@@ -1,4 +1,4 @@
-const CACHE_VERSION = "mindup-pwa-v4";
+const CACHE_VERSION = "mindup-pwa-v5";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -8,6 +8,7 @@ const APP_SHELL = [
   "theme.css?v=20260604-mindup-navy1",
   "supabaseClient.js",
   "pwa.js",
+  "push_debug.html",
   "manifest.webmanifest",
   "favicon.png",
   "apple-touch-icon.png",

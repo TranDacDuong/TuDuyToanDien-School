@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Kiểm tra thông báo đẩy</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css?v=20260604-mindup-navy1">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script src="pwa.js?v=20260613-push-debug1" defer></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:24px;font-family:var(--font-body);color:var(--ink);background:linear-gradient(180deg,#f8fbff 0%,#fffaf0 100%)}
+.page{max-width:980px;margin:0 auto;display:grid;gap:16px}
+.hero{padding:22px 24px;border-radius:18px;background:linear-gradient(135deg,#0f1f3d 0%,#174779 72%,#d8a645 140%);color:#fff;box-shadow:0 18px 42px rgba(15,31,61,.1)}
+.hero h1{margin:0 0 8px;font-family:var(--font-display);font-size:1.55rem}
+.hero p{margin:0;color:rgba(255,255,255,.82);line-height:1.6}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.card{background:#fff;border:1px solid rgba(15,31,61,.08);border-radius:12px;box-shadow:0 14px 32px rgba(15,31,61,.07);padding:16px}
+.card h2{margin:0 0 12px;font-family:var(--font-display);font-size:1.05rem;color:var(--navy)}
+.row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid rgba(15,31,61,.07);font-size:.88rem}
+.row:last-child{border-bottom:0}
+.key{color:var(--ink-mid);font-weight:700}
+.val{font-weight:700;color:var(--navy);text-align:right;word-break:break-word}
+.ok{color:#047857}.bad{color:#b91c1c}.warn{color:#b45309}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+button{border:1px solid rgba(15,31,61,.14);border-radius:8px;background:#fff;color:var(--navy);font:inherit;font-weight:800;padding:10px 13px;cursor:pointer}
+button.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+button:disabled{opacity:.55;cursor:not-allowed}
+input{width:100%;border:1.5px solid var(--border);border-radius:8px;background:#fff;padding:10px 12px;font:inherit}
+label{display:block;margin:0 0 6px;font-size:.78rem;font-weight:800;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em}
+pre{margin:12px 0 0;padding:12px;border-radius:10px;background:#0f172a;color:#e5e7eb;white-space:pre-wrap;word-break:break-word;font-size:.78rem;line-height:1.55;max-height:360px;overflow:auto}
+.full{grid-column:1/-1}
+@media(max-width:760px){body{padding:14px}.grid{grid-template-columns:1fr}.hero{padding:18px}.hero h1{font-size:1.32rem}}
+</style>
+</head>
+<body>
+<main class="page">
+  <section class="hero">
+    <h1>Kiểm tra thông báo đẩy MindUp</h1>
+    <p>Màn hình này kiểm tra Web Push thật qua service worker. Nếu chỉ có polling trong app thì sẽ không được tính là bật thông báo đẩy.</p>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Trạng thái thiết bị</h2>
+      <div id="diagnosticRows"><div class="row"><span class="key">Đang tải</span><span class="val warn">...</span></div></div>
+      <div class="actions" style="margin-top:14px">
+        <button class="primary" type="button" onclick="enablePush()">Bật thông báo đẩy</button>
+        <button type="button" onclick="loadDiagnostics()">Kiểm tra lại</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Gửi test</h2>
+      <div style="margin-bottom:12px">
+        <label>Tài khoản nhận</label>
+        <input id="targetUser" placeholder="VD: student10 hoặc student10@gmail.com">
+      </div>
+      <div class="actions">
+        <button class="primary" type="button" onclick="sendTargetTest()">Gửi test tới tài khoản</button>
+        <button type="button" onclick="sendSelfTest()">Gửi test cho tôi</button>
+      </div>
+      <pre id="testResult">Chưa gửi test.</pre>
+    </div>
+
+    <div class="card full">
+      <h2>Chi tiết kỹ thuật</h2>
+      <pre id="rawDiagnostics">Đang tải...</pre>
+    </div>
+  </section>
+</main>
+
+<script>
+let currentUser = null;
+let currentProfile = null;
+
+function cls(value){
+  if(value === true || value === "granted" || value === "ok") return "ok";
+  if(value === false || value === "denied" || value === "missing") return "bad";
+  return "warn";
+}
+
+function yesNo(value){
+  if(value === true) return "Có";
+  if(value === false) return "Không";
+  return value ?? "—";
+}
+
+function renderRows(diag){
+  const rows = [
+    ["Người dùng", currentProfile?.full_name || currentProfile?.email || diag.userId || "—"],
+    ["Quyền trình duyệt", diag.permission],
+    ["Hỗ trợ Push API", diag.supported],
+    ["Service worker", diag.hasServiceWorker],
+    ["PushManager", diag.hasPushManager],
+    ["Có subscription", Boolean(diag.subscription?.endpoint)],
+    ["Đã lưu Supabase", Boolean(diag.savedSubscription && !diag.savedSubscription.revoked_at)],
+    ["Đang chạy dạng app", diag.standalone],
+    ["Android", diag.android],
+    ["Fallback khi mở app", diag.localFallbackEnabled],
+  ];
+  document.getElementById("diagnosticRows").innerHTML = rows.map(([key, value]) =>
+    `<div class="row"><span class="key">${key}</span><span class="val ${cls(value)}">${yesNo(value)}</span></div>`
+  ).join("");
+}
+
+async function waitForMindUpPush(){
+  for(let i=0;i<80;i++){
+    if(window.MindUpPush?.diagnostics) return window.MindUpPush;
+    await new Promise(resolve => setTimeout(resolve,100));
+  }
+  throw new Error("MindUpPush chưa sẵn sàng");
+}
+
+async function loadCurrentUser(){
+  currentUser = await window.AppAuth?.getUser?.();
+  if(!currentUser) {
+    location.href = "dashboard.html";
+    return;
+  }
+  const { data } = await sb.from("users").select("id,email,full_name,role").eq("id", currentUser.id).maybeSingle();
+  currentProfile = data || null;
+}
+
+async function loadDiagnostics(){
+  const api = await waitForMindUpPush();
+  const diag = await api.diagnostics();
+  renderRows(diag);
+  document.getElementById("rawDiagnostics").textContent = JSON.stringify(diag, null, 2);
+  return diag;
+}
+
+async function enablePush(){
+  const box = document.getElementById("testResult");
+  box.textContent = "Đang bật thông báo đẩy...";
+  try{
+    const api = await waitForMindUpPush();
+    const result = await api.enable();
+    box.textContent = JSON.stringify(result, null, 2);
+  }catch(error){
+    box.textContent = "Không bật được Web Push thật:\n" + ([error?.name, error?.message].filter(Boolean).join(": ") || String(error));
+  }
+  await loadDiagnostics();
+}
+
+async function invokePush(payload){
+  const headers = await window.AppAuth.getEdgeFunctionHeaders();
+  const res = await fetch(`${window.SUPABASE_URL}/functions/v1/send-push-notification`, {
+    method:"POST",
+    headers,
+    body: JSON.stringify({ ...payload, debug:true })
+  });
+  const body = await res.json().catch(() => ({}));
+  if(!res.ok) throw new Error(body?.error || "Push notification failed");
+  return body;
+}
+
+async function findTargetUser(input){
+  const raw = String(input || "").trim();
+  if(!raw) throw new Error("Nhập tài khoản cần gửi test");
+  const email = raw.includes("@") ? raw : `${raw}@gmail.com`;
+  const { data, error } = await sb
+    .from("users")
+    .select("id,email,full_name,role")
+    .or(`email.eq.${email},email.ilike.%${raw}%,full_name.ilike.%${raw}%`)
+    .limit(5);
+  if(error) throw error;
+  if(!data?.length) throw new Error("Không tìm thấy tài khoản nhận");
+  return data[0];
+}
+
+async function sendTargetTest(){
+  const out = document.getElementById("testResult");
+  out.textContent = "Đang gửi test...";
+  try{
+    const target = await findTargetUser(document.getElementById("targetUser").value);
+    const body = await invokePush({
+      userIds:[target.id],
+      title:"MindUp kiểm tra thông báo",
+      message:`Thông báo test cho ${target.full_name || target.email}.`,
+      targetUrl:"notifications.html",
+      type:"push_test"
+    });
+    out.textContent = JSON.stringify({ target, result: body }, null, 2);
+  }catch(error){
+    out.textContent = "Gửi test thất bại:\n" + (error?.message || String(error));
+  }
+}
+
+async function sendSelfTest(){
+  const out = document.getElementById("testResult");
+  out.textContent = "Đang gửi test cho tài khoản hiện tại...";
+  try{
+    const { data: row, error } = await sb.from("notifications").insert({
+      user_id: currentUser.id,
+      actor_id: currentUser.id,
+      type: "tuition_reminder",
+      title: "MindUp kiểm tra thông báo",
+      message: "Đây là thông báo test cho thiết bị hiện tại.",
+      target_url: "notifications.html",
+      meta: { push_debug: true }
+    }).select("id").single();
+    if(error) throw error;
+    const body = await invokePush({
+      notificationId: row.id
+    });
+    out.textContent = JSON.stringify(body, null, 2);
+  }catch(error){
+    out.textContent = "Gửi test thất bại:\n" + (error?.message || String(error));
+  }
+}
+
+window.addEventListener("load", async () => {
+  await loadCurrentUser();
+  await loadDiagnostics();
+});
+</script>
+</body>
+</html>
