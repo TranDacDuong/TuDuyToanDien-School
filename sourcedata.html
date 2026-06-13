@@ -325,9 +325,14 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 /* Modal sửa học sinh */
 .modal-s { position:fixed; inset:0; background:rgba(10,20,40,.5); backdrop-filter:blur(3px); display:none; align-items:center; justify-content:center; z-index:1000; }
 .modal-s.open { display:flex; }
-.modal-s-box { background:var(--white); border-radius:22px; padding:22px; width:min(95vw,400px); box-shadow:0 26px 54px rgba(15,23,42,.18); border:1px solid rgba(15,31,61,.08); }
+.modal-s-box { background:var(--white); border-radius:22px; padding:22px; width:min(95vw,520px); box-shadow:0 26px 54px rgba(15,23,42,.18); border:1px solid rgba(15,31,61,.08); }
 .modal-s-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
 .modal-s-hd h3 { font-family:var(--font-display); font-size:1rem; color:var(--navy); margin:0; }
+.se-parent-status { display:none; margin:-4px 0 10px; padding:8px 10px; border-radius:10px; font-size:.78rem; font-weight:700; line-height:1.45; }
+.se-parent-status.show { display:block; }
+.se-parent-status.ok { background:#ecfdf5; color:#047857; border:1px solid #bbf7d0; }
+.se-parent-status.warn { background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; }
+.se-parent-password.hidden { display:none; }
 @media (max-width: 860px) {
   body { padding: 14px 10px 24px; }
   .page-hd,.tabs,.form-card,.table-card,.t-search-bar,.tc-card,.s-table-card { border-radius: 20px; }
@@ -375,7 +380,6 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   <button class="tab" data-testid="system-tab-chapters" onclick="switchTab('chapters',this)">📖 Chương</button>
   <button class="tab" data-testid="system-tab-teachers" onclick="switchTab('teachers',this)">👨‍🏫 Giáo viên</button>
   <button class="tab" data-testid="system-tab-students" onclick="switchTab('students',this)">👩‍🎓 Học sinh</button>
-  <button class="tab" data-testid="system-tab-parent-links" onclick="switchTab('parentLinks',this)">👪 Phụ huynh</button>
   <button class="tab" data-testid="system-tab-logs" onclick="switchTab('adminLogs',this)">📋 Nhật ký vận hành</button>
   <button class="tab" data-testid="system-tab-appearance" onclick="switchTab('appearance',this)">🎨 Giao diện</button>
 </div>
@@ -845,6 +849,9 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
     <div class="fg"><label>SĐT</label><input id="seP"     placeholder="SĐT"></div>
     <div class="fg"><label>Họ tên phụ huynh</label><input id="seParentN" placeholder="Họ và tên phụ huynh"></div>
     <div class="fg"><label>SĐT phụ huynh</label><input id="seParentP" placeholder="SĐT phụ huynh"></div>
+    <div class="fg"><label>Gmail phụ huynh</label><input id="seParentEmail" placeholder="gmail phụ huynh"></div>
+    <div id="seParentEmailStatus" class="se-parent-status"></div>
+    <div class="fg se-parent-password" id="seParentPasswordWrap"><label>Mật khẩu phụ huynh</label><input id="seParentPassword" placeholder="Mặc định là SĐT phụ huynh"></div>
     <div class="fg"><label>Năm sinh</label><input id="seB" type="number" placeholder="Năm sinh"></div>
     <div class="fg"><label>Tỉnh</label><input id="sePv"   placeholder="Tỉnh/thành"></div>
     <div class="fg"><label>Trường</label><input id="seSc" placeholder="Tên trường"></div>
@@ -884,7 +891,6 @@ function switchTab(id, btn){
   window.history.replaceState({}, '', url.toString());
   if(id === 'adminLogs') loadAdminLogs();
   if(id === 'appearance') loadSystemTheme();
-  if(id === 'parentLinks') loadParentLinks();
 }
 
 const SYSTEM_THEMES = [
@@ -1270,12 +1276,11 @@ async function init(){
   }
   await loadDropdowns();
   loadRooms(); loadGrades(); loadSubjects(); loadChapters();
-  loadTeachers(); loadStudents(); loadParentLinks(); loadAdminLogs();
+  loadTeachers(); loadStudents(); loadAdminLogs();
   window.MindupLiveUI?.watchTable?.('rooms', loadRooms);
   window.MindupLiveUI?.watchTable?.('grades', loadGrades);
   window.MindupLiveUI?.watchTable?.('subjects', loadSubjects);
   window.MindupLiveUI?.watchTable?.('chapters', loadChapters);
-  window.MindupLiveUI?.watchTable?.('parent_students', loadParentLinks);
   const tab = new URLSearchParams(window.location.search).get('tab');
   if(tab){
     const targetBtn = document.querySelector(`.tab[onclick*="'${tab}'"]`);
@@ -1690,17 +1695,159 @@ function sPgRender(){
 
 function sCopyPhone(p){ navigator.clipboard.writeText(p).then(()=>toast('📋 Đã sao chép: '+p)); }
 
-function sEditStudent(id){
+let _sParentEmailTouched = false;
+let _sParentEmailExisting = null;
+let _sParentEmailTimer = null;
+let _sParentPasswordTouched = false;
+
+function sParentDefaultPassword(phone){
+  const digits = String(phone || '').replace(/\D+/g, '');
+  return digits.length >= 6 ? digits : '123456';
+}
+
+function sSetParentEmailStatus(message = '', type = 'ok'){
+  const el = document.getElementById('seParentEmailStatus');
+  if(!el) return;
+  el.className = `se-parent-status ${message ? 'show ' + type : ''}`;
+  el.textContent = message;
+}
+
+function sSetParentPasswordVisible(visible){
+  document.getElementById('seParentPasswordWrap')?.classList.toggle('hidden', !visible);
+}
+
+function sParentEmailCandidate(base, index){
+  return `${base}${index}@gmail.com`;
+}
+
+async function sSuggestParentEmail(force = false){
+  const emailEl = document.getElementById('seParentEmail');
+  if(!emailEl) return '';
+  if(_sParentEmailTouched && !force) return emailEl.value.trim().toLowerCase();
+  const parentName = document.getElementById('seParentN')?.value.trim() || '';
+  if(!parentName){
+    emailEl.value = '';
+    sSetParentPasswordVisible(true);
+    sSetParentEmailStatus('');
+    return '';
+  }
+  const base = sSlugName(parentName) || 'phuhuynh';
+  const candidates = Array.from({ length: 40 }, (_, index) => sParentEmailCandidate(base, index + 1));
+  const { data } = await sb.from('users').select('email').in('email', candidates);
+  const used = new Set((data || []).map(item => String(item.email || '').toLowerCase()));
+  const email = candidates.find(candidate => !used.has(candidate)) || `${base}${Date.now()}@gmail.com`;
+  emailEl.value = email;
+  _sParentEmailExisting = null;
+  sSetParentPasswordVisible(true);
+  sSetParentEmailStatus('Email phụ huynh mới. Mật khẩu mặc định đang lấy theo SĐT phụ huynh.', 'ok');
+  return email;
+}
+
+async function sCheckParentEmail(){
+  const email = document.getElementById('seParentEmail')?.value.trim().toLowerCase() || '';
+  _sParentEmailExisting = null;
+  if(!email){
+    sSetParentPasswordVisible(true);
+    sSetParentEmailStatus('');
+    return null;
+  }
+  if(!email.includes('@')){
+    sSetParentPasswordVisible(true);
+    sSetParentEmailStatus('Email phụ huynh chưa hợp lệ.', 'warn');
+    return null;
+  }
+  const { data, error } = await sb.from('users').select('id,full_name,email,phone,role').eq('email', email).maybeSingle();
+  if(error){
+    sSetParentPasswordVisible(true);
+    sSetParentEmailStatus(error.message || 'Chưa kiểm tra được email phụ huynh.', 'warn');
+    return null;
+  }
+  if(data?.role === 'parent'){
+    _sParentEmailExisting = data;
+    sSetParentPasswordVisible(false);
+    sSetParentEmailStatus(`Email này đã là tài khoản phụ huynh: ${data.full_name || data.email}. Không cần nhập mật khẩu.`, 'ok');
+    return data;
+  }
+  if(data){
+    _sParentEmailExisting = data;
+    sSetParentPasswordVisible(true);
+    sSetParentEmailStatus(`Email này đang thuộc tài khoản ${data.role || 'khác'}, không dùng để liên kết phụ huynh.`, 'warn');
+    return data;
+  }
+  sSetParentPasswordVisible(true);
+  sSetParentEmailStatus('Email phụ huynh mới. Mật khẩu mặc định đang lấy theo SĐT phụ huynh.', 'ok');
+  return null;
+}
+
+async function sLoadLinkedParentForStudent(studentId){
+  const { data: link } = await sb.from('parent_students')
+    .select('parent_id')
+    .eq('student_id', studentId)
+    .is('revoked_at', null)
+    .limit(1)
+    .maybeSingle();
+  if(!link?.parent_id) return null;
+  const { data: parent } = await sb.from('users')
+    .select('id,full_name,email,phone,role')
+    .eq('id', link.parent_id)
+    .maybeSingle();
+  return parent?.role === 'parent' ? parent : null;
+}
+
+async function sSyncParentAccountForStudent(studentId, payload){
+  const parentEmail = document.getElementById('seParentEmail')?.value.trim().toLowerCase() || '';
+  const parentName = payload.parent_full_name || '';
+  const parentPhone = payload.parent_phone || '';
+  if(!parentName && !parentEmail && !parentPhone) return;
+  const email = parentEmail || await sSuggestParentEmail(true);
+  if(!email || !email.includes('@')) throw new Error('Email phụ huynh chưa hợp lệ.');
+  const existing = await sCheckParentEmail();
+  if(existing && existing.role !== 'parent') throw new Error('Email phụ huynh đang thuộc tài khoản không phải phụ huynh.');
+  const password = existing?.role === 'parent'
+    ? ''
+    : (document.getElementById('seParentPassword')?.value.trim() || sParentDefaultPassword(parentPhone));
+  const { error } = await sb.rpc('admin_import_parents_batch', {
+    p_rows: [{
+      email,
+      full_name: parentName || existing?.full_name || 'Phụ huynh',
+      phone: parentPhone || existing?.phone || '',
+      password,
+      student_id: studentId,
+      relationship: 'parent'
+    }]
+  });
+  if(error) throw error;
+}
+
+async function sEditStudent(id){
   const s=_sAll.find(x=>x.id===id); if(!s) return;
   _sEditId=id;
+  _sParentEmailTouched = false;
+  _sParentEmailExisting = null;
+  _sParentPasswordTouched = false;
   document.getElementById('seN').value  = s.full_name  ||'';
   document.getElementById('seP').value  = s.phone      ||'';
   document.getElementById('seParentN').value = s.parent_full_name || '';
   document.getElementById('seParentP').value = s.parent_phone || '';
+  document.getElementById('seParentEmail').value = '';
+  document.getElementById('seParentPassword').value = sParentDefaultPassword(s.parent_phone || '');
+  sSetParentPasswordVisible(true);
+  sSetParentEmailStatus('');
   document.getElementById('seB').value  = s.birth_year ||'';
   document.getElementById('sePv').value = s.province   ||'';
   document.getElementById('seSc').value = s.school     ||'';
   document.getElementById('sModal').classList.add('open');
+  const parent = await sLoadLinkedParentForStudent(id);
+  if(parent){
+    document.getElementById('seParentEmail').value = parent.email || '';
+    if(!document.getElementById('seParentN').value) document.getElementById('seParentN').value = parent.full_name || '';
+    if(!document.getElementById('seParentP').value) document.getElementById('seParentP').value = parent.phone || '';
+    _sParentEmailExisting = parent;
+    sSetParentPasswordVisible(false);
+    sSetParentEmailStatus(`Đang liên kết với tài khoản phụ huynh: ${parent.full_name || parent.email}.`, 'ok');
+  } else if(s.parent_full_name){
+    await sSuggestParentEmail(true);
+  }
 }
 function sCloseModal(){ document.getElementById('sModal').classList.remove('open'); }
 
@@ -1725,9 +1872,12 @@ async function sSaveStudent(){
       has_parent_phone: !!payload.parent_phone,
     },
     errorPrefix: 'Không thể cập nhật học sinh',
-    operation: async () => sb.from('users').update({
-      ...payload,
-    }).eq('id',_sEditId),
+    operation: async () => {
+      const updateResult = await sb.from('users').update({ ...payload }).eq('id',_sEditId);
+      if(updateResult?.error) throw updateResult.error;
+      await sSyncParentAccountForStudent(_sEditId, payload);
+      return updateResult;
+    },
   });
   if(outcome && !outcome.ok) return;
   sCloseModal(); toast('✅ Đã cập nhật học sinh'); loadStudents();
@@ -1768,6 +1918,21 @@ function sExportExcel(){
 
 // Bind search
 ['sSName','sSPhone','sSBirth','sSProv','sSSchool'].forEach(id=>{let t;document.getElementById(id).addEventListener('input',()=>{clearTimeout(t);t=setTimeout(()=>{_sPage=1;sApplyFilter();},200);});});
+document.getElementById('seParentN')?.addEventListener('input',()=>{
+  clearTimeout(_sParentEmailTimer);
+  if(!_sParentEmailTouched) _sParentEmailTimer = setTimeout(()=>sSuggestParentEmail(true), 250);
+});
+document.getElementById('seParentP')?.addEventListener('input',()=>{
+  if(!_sParentPasswordTouched && !document.getElementById('seParentPasswordWrap')?.classList.contains('hidden')){
+    document.getElementById('seParentPassword').value = sParentDefaultPassword(document.getElementById('seParentP').value);
+  }
+});
+document.getElementById('seParentEmail')?.addEventListener('input',()=>{
+  _sParentEmailTouched = true;
+  clearTimeout(_sParentEmailTimer);
+  _sParentEmailTimer = setTimeout(sCheckParentEmail, 300);
+});
+document.getElementById('seParentPassword')?.addEventListener('input',()=>{ _sParentPasswordTouched = true; });
 
 /* ──────────────────────────────
    PHỤ HUYNH - HỌC SINH
