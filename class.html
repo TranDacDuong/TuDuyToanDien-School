@@ -2,12 +2,12 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
 <title>Quản lý Lớp học</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css?v=20260604-mindup-navy1">
+<link rel="stylesheet" href="theme.css?v=20260615-ios1">
 <style>
 * { box-sizing: border-box; }
 body { margin: 0; background: radial-gradient(circle at top left, rgba(200,150,42,.1), transparent 22%), linear-gradient(180deg, #f4efe4 0%, #f8f5ef 24%, #f7faff 100%); font-family: var(--font-body); color: var(--ink); padding: 24px; }
@@ -317,7 +317,7 @@ input:focus, select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="MindUp">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<script src="pwa.js?v=20260612-swnotify1" defer></script>
+<script src="pwa.js?v=20260615-ios-guide1" defer></script>
 </head>
 <body class="academic-page academic-page-classes">
 
@@ -400,6 +400,13 @@ input:focus, select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
         <span style="color:var(--ink-light);font-size:.82rem">Đang tải...</span>
       </div>
 
+      <!-- Trợ giảng / tư vấn viên phụ trách -->
+      <h3 style="margin-top:16px;font-family:var(--font-display);font-size:1rem;color:var(--navy)">Trợ giảng/Tư vấn viên phụ trách</h3>
+      <div id="assistantPickerWrap" style="margin-top:8px;max-height:180px;overflow-y:auto;
+        border:1.5px solid var(--border);border-radius:10px;padding:8px;background:var(--surface)">
+        <span style="color:var(--ink-light);font-size:.82rem">Đang tải...</span>
+      </div>
+
       <h3 style="margin-top:16px;font-family:var(--font-display);font-size:1rem;color:var(--navy)">Lịch học</h3>
       <div id="scheduleEffectiveMonthWrap" style="display:none;margin:8px 0 10px">
         <label>Áp dụng lịch từ tháng</label>
@@ -435,13 +442,14 @@ input:focus, select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
 <script src="./supabaseClient.js"></script>
 <script src="./notification_helper.js"></script>
 <script src="./class_init.js"></script>
-<script src="./class_create.js"></script>
-<script src="./class_list.js"></script>
+<script src="./class_create.js?v=20260615-staff-pickers1"></script>
+<script src="./class_list.js?v=20260615-teacher-card1"></script>
 <script src="./ai_solution.js"></script>
 <script src="./review_helper.js"></script>
 <script src="./exam_ui_helper.js"></script>
 <script src="./public_exam_support.js"></script>
-<script src="./class_manage.js"></script>
+<script src="./class_manage.js?v=20260615-session-evaluation3"></script>
+<script src="./class_evaluations.js?v=20260615-session-evaluation2"></script>
 <script src="./class_student.js"></script>
 </body>
 </html>

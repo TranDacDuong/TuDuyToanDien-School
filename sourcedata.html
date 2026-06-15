@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css?v=20260604-mindup-navy1">
+<link rel="stylesheet" href="theme.css?v=20260615-ios1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="supabaseClient.js"></script>
@@ -364,7 +364,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="MindUp">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<script src="pwa.js?v=20260612-swnotify1" defer></script>
+<script src="pwa.js?v=20260615-ios-guide1" defer></script>
 </head>
 <body>
 
@@ -383,6 +383,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   <button class="tab" data-testid="system-tab-chapters" onclick="switchTab('chapters',this)">📖 Chương</button>
   <button class="tab" data-testid="system-tab-teachers" onclick="switchTab('teachers',this)">👨‍🏫 Giáo viên</button>
   <button class="tab" data-testid="system-tab-students" onclick="switchTab('students',this)">👩‍🎓 Học sinh</button>
+  <button class="tab" data-testid="system-tab-evaluation-templates" onclick="switchTab('evaluationTemplates',this)">Mẫu nhận xét</button>
   <button class="tab" data-testid="system-tab-logs" onclick="switchTab('adminLogs',this)">📋 Nhật ký vận hành</button>
   <button class="tab" data-testid="system-tab-appearance" onclick="switchTab('appearance',this)">🎨 Giao diện</button>
 </div>
@@ -776,6 +777,38 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   </div>
 </div>
 
+<div id="evaluationTemplates" class="panel">
+  <div class="form-card">
+    <div class="form-card-hd"><h3>Thêm mẫu nhận xét</h3></div>
+    <div class="form-card-body">
+      <div class="fg"><label>Phần nội dung</label>
+        <select id="evaluationTemplateSection" onchange="changeEvaluationTemplateSection()">
+          <option value="opening">Mở đầu</option><option value="status">Trạng thái</option>
+          <option value="expectation">Kỳ vọng</option><option value="closing">Kết thúc</option>
+        </select>
+      </div>
+      <div class="fg" id="evaluationTemplateStatusWrap" style="display:none"><label>Trạng thái</label><select id="evaluationTemplateStatus"></select></div>
+      <div class="fg"><label>Nội dung</label>
+        <textarea id="evaluationTemplateContent" style="min-height:96px" placeholder="Dùng được {ten_hoc_sinh}, {ten_phu_huynh}, {ngay_hoc}, {mon_hoc}, {ten_lop}, {ten_giao_vien}"></textarea>
+      </div>
+      <div class="form-btns"><button class="btn btn-primary btn-sm" type="button" onclick="addEvaluationTemplate()">Thêm mẫu</button></div>
+    </div>
+  </div>
+  <div class="table-card">
+    <div class="table-card-hd"><span>Thư viện mẫu nhận xét</span><span class="count-badge" id="evaluationTemplateCount">0</span></div>
+    <div class="t-search-bar" style="padding:14px;margin:0">
+      <div class="sg"><label>Phần nội dung</label>
+        <select id="evaluationTemplateSectionFilter" onchange="filterEvaluationTemplates()">
+          <option value="">Tất cả</option><option value="opening">Mở đầu</option><option value="status">Trạng thái</option>
+          <option value="expectation">Kỳ vọng</option><option value="closing">Kết thúc</option>
+        </select>
+      </div>
+      <div class="sg"><label>Trạng thái</label><select id="evaluationTemplateStatusFilter" onchange="filterEvaluationTemplates()"></select></div>
+    </div>
+    <div id="evaluationTemplateList"></div>
+  </div>
+</div>
+
 <div id="adminLogs" class="panel">
   <div class="table-card">
     <div class="table-card-hd">
@@ -875,6 +908,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 
 <div class="toast" id="toast"></div>
 
+<script src="./evaluation_templates_admin.js?v=20260615-session-evaluation1"></script>
 <script>
 /* ── Helpers ── */
 function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
@@ -901,6 +935,7 @@ function switchTab(id, btn){
   window.history.replaceState({}, '', url.toString());
   if(id === 'adminLogs') loadAdminLogs();
   if(id === 'appearance') loadSystemTheme();
+  if(id === 'evaluationTemplates') loadEvaluationTemplatesAdmin();
 }
 
 const SYSTEM_THEMES = [

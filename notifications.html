@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css?v=20260604-mindup-navy1">
+<link rel="stylesheet" href="theme.css?v=20260615-ios1">
 <style>
 * { box-sizing: border-box; }
 body { margin: 0; font-family: var(--font-body); background: linear-gradient(180deg, #f6f0e4 0%, var(--cream) 55%, #f8fbff 100%); color: var(--ink); }
@@ -45,7 +45,7 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="MindUp">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<script src="pwa.js?v=20260612-swnotify1" defer></script>
+<script src="pwa.js?v=20260615-ios-guide1" defer></script>
 </head>
 <body>
 <div class="page">
@@ -102,9 +102,9 @@ async function loadNotifications() {
   wrap.innerHTML = visibleItems.map(item => `
     <div class="card ${item.is_read ? "" : "unread"}">
       <div class="row">
-        <img class="avatar" src="${item.users?.avatar_url || "default-avatar.png"}" alt="Avatar" onerror="this.src='default-avatar.png'">
+        <img class="avatar" src="${escAttr(getNotificationAvatar(item))}" alt="Avatar" onerror="this.src='default-avatar.png'">
         <div style="flex:1">
-          <div class="title">${esc(item.title || item.users?.full_name || "Hệ thống")}</div>
+          <div class="title">${esc(getNotificationSenderName(item))}</div>
           <div class="message">${esc(item.message || formatType(item.type))}</div>
           <div class="meta">${formatTime(item.created_at)}</div>
           <div class="actions">
@@ -125,8 +125,23 @@ function buildLink(item) {
   return "";
 }
 
+function getNotificationSenderName(item) {
+  if (item?.meta?.branded_sender || item?.type === "session_evaluation") {
+    return item?.meta?.sender_name || "MindUp - Tư duy Toàn Diện";
+  }
+  return item?.title || item?.users?.full_name || "Hệ thống";
+}
+
+function getNotificationAvatar(item) {
+  if (item?.meta?.branded_sender || item?.type === "session_evaluation") {
+    return item?.meta?.sender_avatar || "pwa-icon-192.png";
+  }
+  return item?.users?.avatar_url || "default-avatar.png";
+}
+
 function getNotificationFallbackTarget(item) {
   if (!item) return "";
+  if (item.meta?.branded_sender || item.type === "session_evaluation") return "";
   if (item.type === "post_like" || item.type === "post_comment" || item.type === "post_approved" || item.type === "post_rejected") {
     return item.ref_id ? `post.html?id=${encodeURIComponent(item.ref_id)}` : "";
   }
@@ -237,6 +252,11 @@ function formatType(type) {
   if (type === "class_session_added") return "đã thêm buổi học mới trong lớp học của bạn.";
   if (type === "class_session_updated") return "đã cập nhật buổi học trong lớp của bạn.";
   if (type === "class_exam_added") return "đã thêm đề kiểm tra mới trong lớp học của bạn.";
+  if (type === "session_evaluation") return "đã gửi nhận xét sau buổi học.";
+  if (type === "task_assigned") return "đã giao cho bạn một công việc mới.";
+  if (type === "task_daily_digest") return "đã tổng hợp công việc hôm nay của bạn.";
+  if (type === "task_due_reminder") return "nhắc bạn một công việc sắp đến hạn.";
+  if (type === "task_overdue") return "nhắc bạn một công việc đã quá hạn.";
   if (type === "tuition_due") return "có học phí mới cần thanh toán.";
   if (type === "tuition_reminder") return "nhắc bạn hoàn tất học phí còn thiếu.";
   return "Bạn có một thông báo mới.";

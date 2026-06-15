@@ -14,6 +14,7 @@
   let _teacherMap    = {};
   let _studentCount  = {};
   let _teacherNameMap = {};
+  let _teacherRoleMap = {};
   let _allSubjects   = [];
 
   function getMinRoomCapacity(schedules){
@@ -141,10 +142,14 @@
   }
 
   async function loadFilterOptions(sb, role){
-    const { data: teachers } = await sb
+    const { data: staff } = await sb
       .from("users").select("id,full_name,role").in("role",["teacher","assistant"]).order("full_name");
     _teacherNameMap = {};
-    (teachers||[]).forEach(t => { _teacherNameMap[t.id] = t.full_name; });
+    _teacherRoleMap = {};
+    (staff||[]).forEach(t => {
+      _teacherNameMap[t.id] = t.full_name;
+      _teacherRoleMap[t.id] = t.role;
+    });
 
     if(role !== "admin") return;
 
@@ -167,7 +172,9 @@
     const teachEl = document.getElementById("filterTeacher");
     if(teachEl){
       teachEl.innerHTML = '<option value="">Tất cả giáo viên</option>';
-      (teachers||[]).forEach(t => teachEl.appendChild(new Option(t.full_name, t.id)));
+      (staff||[])
+        .filter(t => t.role === "teacher")
+        .forEach(t => teachEl.appendChild(new Option(t.full_name, t.id)));
     }
   }
 
@@ -311,7 +318,9 @@
         const currentSchedules = getCurrentSchedules(_scheduleMap[cls.id] || []);
         const schGrouped = renderScheduleSummary(currentSchedules);
         const teacherList = (_teacherMap[cls.id]||[])
-          .map(tid => _teacherNameMap[tid]||"").filter(Boolean);
+          .filter(tid => _teacherRoleMap[tid] === "teacher")
+          .map(tid => _teacherNameMap[tid]||"")
+          .filter(Boolean);
         const stuCount    = _studentCount[cls.id] || 0;
         const subjectName = cls.subjects?.name || "";
         const roomCapacity = getMinRoomCapacity(currentSchedules);

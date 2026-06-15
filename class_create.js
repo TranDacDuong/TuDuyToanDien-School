@@ -279,10 +279,22 @@ async function loadTeacherPicker(){
 }
 
 function renderTeacherPicker(){
-  const wrap = document.getElementById("teacherPickerWrap");
-  if(!wrap) return;
+  renderStaffPicker("teacherPickerWrap", "teacher");
+  renderStaffPicker("assistantPickerWrap", "assistant");
+}
 
-  wrap.innerHTML = _allTeachers.map(t => {
+function renderStaffPicker(wrapId, role){
+  const wrap = document.getElementById(wrapId);
+  if(!wrap) return;
+  const staff = _allTeachers.filter(item => item.role === role);
+  if(!staff.length){
+    wrap.innerHTML = `<span style="color:var(--ink-light);font-size:.82rem">${
+      role === "teacher" ? "Chưa có giáo viên." : "Chưa có trợ giảng/tư vấn viên."
+    }</span>`;
+    return;
+  }
+
+  wrap.innerHTML = staff.map(t => {
     const checked = selectedTeacherIds.has(t.id) ? "checked" : "";
     return `
       <label style="display:flex;align-items:center;gap:8px;padding:7px 10px;
@@ -293,7 +305,7 @@ function renderTeacherPicker(){
         <input type="checkbox" value="${t.id}" ${checked}
           style="width:16px;height:16px;accent-color:var(--navy)"
           onchange="window._onTeacherToggle('${t.id}',this)">
-        <span style="font-weight:500;color:var(--navy)">${t.full_name}${t.role === "assistant" ? " · Trợ giảng/Tư vấn" : ""}</span>
+        <span style="font-weight:500;color:var(--navy)">${t.full_name}</span>
       </label>`;
   }).join("");
 }
@@ -507,23 +519,28 @@ form.onsubmit = async (e) => {
     if(insErr){ alert("Lỗi lưu lịch: "+insErr.message); return; }
   }
 
-  /* Lưu giáo viên — xóa cũ rồi insert lại */
+  /* Lưu giáo viên và trợ giảng — xóa cũ rồi insert lại */
   await sb.from("class_teachers").delete().eq("class_id", classId);
   if(selectedTeacherIds.size > 0){
     const teacherRows = [...selectedTeacherIds].map(tid => ({
       class_id:   classId,
       teacher_id: tid,
-      role:       "main",
+      role:       _allTeachers.find(item => item.id === tid)?.role === "assistant" ? "assistant" : "main",
     }));
     const {error} = await sb.from("class_teachers").insert(teacherRows);
-    if(error) console.error("Lỗi lưu giáo viên:", error.message);
+    if(error) console.error("Lỗi lưu nhân sự phụ trách:", error.message);
   }
 
+  const selectedTeacherCount = [...selectedTeacherIds]
+    .filter(id => _allTeachers.find(item => item.id === id)?.role === "teacher").length;
+  const selectedAssistantCount = [...selectedTeacherIds]
+    .filter(id => _allTeachers.find(item => item.id === id)?.role === "assistant").length;
   await window.AppAdminTools?.recordAudit?.(editingClassId ? "class_updated" : "class_created", {
     target_type: "class",
     target_id: classId,
     class_name,
-    teacher_count: selectedTeacherIds.size,
+    teacher_count: selectedTeacherCount,
+    assistant_count: selectedAssistantCount,
     schedule_count: inserts.length,
     sessions_per_week,
   });

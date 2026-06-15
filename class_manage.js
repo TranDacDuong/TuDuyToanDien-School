@@ -297,6 +297,39 @@
     return role === "admin" || role === "teacher";
   }
 
+  function canEvaluateClassSession(role = _role){
+    return role === "admin" || role === "teacher" || role === "assistant";
+  }
+
+  function renderSessionEvaluationToolbar(sessions){
+    if(!canEvaluateClassSession() || !Array.isArray(sessions)) return "";
+    const today = todayStr();
+    const firstDay = monthStart(_currentMonth, _currentYear);
+    const lastDay = monthEnd(_currentMonth, _currentYear);
+    const available = sessions
+      .filter(item => {
+        const date = String(item?.session_date || "").slice(0,10);
+        return item?.id && date >= firstDay && date <= lastDay && date <= today;
+      })
+      .sort((a,b) => String(b.session_date).localeCompare(String(a.session_date)));
+    if(!available.length){
+      return '<div style="margin-bottom:14px;padding:12px 14px;border:1px dashed #cbd5e1;border-radius:10px;background:#fff;color:var(--ink-mid);font-size:.82rem">'+
+        '<strong style="display:block;color:var(--navy);margin-bottom:4px">Nhận xét buổi học</strong>'+
+        'Chưa có buổi học đã diễn ra trong tháng này.'+
+      '</div>';
+    }
+    return '<div style="margin-bottom:14px;padding:13px 14px;border:1px solid #bfdbfe;border-radius:10px;background:#f8fbff">'+
+      '<div style="font-weight:800;color:var(--navy);margin-bottom:8px">Nhận xét buổi học</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+        available.map(item =>
+          '<button type="button" class="btn btn-primary btn-sm" onclick="openSessionEvaluation(\''+item.id+'\')">'+
+            'Nhận xét '+fmtSessionDate(item.session_date)+
+          '</button>'
+        ).join("")+
+      '</div>'+
+    '</div>';
+  }
+
   async function getStudentSearchPool(){
     if(_studentSearchPool) return _studentSearchPool;
     const sb = getSb();
@@ -583,6 +616,18 @@
     const dates = role === "student"
       ? generateStudentOccurrences(window._currentUserId, schedulesThisMonth, _currentMonth, _currentYear)
       : collectDatesForStudents(visibleStudents, schedulesThisMonth, _currentMonth, _currentYear);
+    let evaluationSessions = [];
+    if(canEvaluateClassSession(role)){
+      const { data: storedSessions, error: sessionLoadError } = await sb
+        .from("class_sessions")
+        .select("id,lesson_id,session_order,session_date,exam_id,pdf_exam_id,starts_at,ends_at,created_at")
+        .eq("class_id",_classId)
+        .order("session_date",{ascending:true});
+      if(!sessionLoadError){
+        const synced = await syncClassSessionsForCurrentMonth(sb, storedSessions || []);
+        evaluationSessions = synced.sessions || storedSessions || [];
+      }
+    }
 
     const {data:attData} = await sb.from("attendance").select("student_id,date,status,schedule_id")
       .eq("class_id",_classId).gte("date",mStart).lte("date",mEnd);
@@ -753,6 +798,7 @@
       "</div></div></div>";
 
     tc.innerHTML=
+      renderSessionEvaluationToolbar(evaluationSessions)+
       '<div style="margin-bottom:14px">'+
       '<button onclick="cvOpenAddStudent()" class="btn btn-primary btn-sm">+ Thêm học sinh</button>'+
       '</div>'+
@@ -1183,10 +1229,13 @@
     const practiceHtml = role === "student"
       ? renderStudentPracticeBlock(examInfo, examState)
       : renderAdminPracticeBlock(examInfo, examState);
-    const actionHtml = (role === "admin" || role === "teacher")
+    const canEvaluate = role === "admin" || role === "teacher" || role === "assistant";
+    const actionHtml = canEvaluate
       ? '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+          '<button onclick="openSessionEvaluation(\''+session.id+'\')" class="btn btn-primary btn-sm">Đánh giá buổi học</button>'+
+          ((role === "admin" || role === "teacher") ?
           '<button onclick="cvOpenAddClassSession(\''+session.id+'\')" class="btn btn-outline btn-sm">Sửa buổi</button>'+
-          '<button onclick="cvDeleteClassSession(\''+session.id+'\')" class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5">Xóa buổi</button>'+
+          '<button onclick="cvDeleteClassSession(\''+session.id+'\')" class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5">Xóa buổi</button>' : '')+
         '</div>'
       : "";
     const orderLabel = session.display_order || session.session_order || "—";
@@ -1340,6 +1389,10 @@
     }
 
     let sessions = sessionTableMissing ? [] : (classSessions || []);
+    if(!sessionTableMissing){
+      const synced = await syncClassSessionsForCurrentMonth(sb, sessions);
+      sessions = synced.sessions || sessions;
+    }
     const lessonIds = [...new Set(sessions.map(s=>s.lesson_id).filter(Boolean))];
     const regularIds = [...new Set([
       ...sessions.map(s=>s.exam_id).filter(Boolean),

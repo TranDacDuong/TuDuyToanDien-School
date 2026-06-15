@@ -30,6 +30,11 @@
     "class_session_added",
     "class_session_updated",
     "class_exam_added",
+    "session_evaluation",
+    "task_assigned",
+    "task_daily_digest",
+    "task_due_reminder",
+    "task_overdue",
     "tuition_due",
     "tuition_reminder",
     "trial_lesson_request"

@@ -62,6 +62,44 @@ EXECUTE FUNCTION public.set_parent_students_updated_at();
 
 ALTER TABLE public.parent_students ENABLE ROW LEVEL SECURITY;
 
+CREATE OR REPLACE FUNCTION public.is_parent_of_student(p_student_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.parent_students ps
+    WHERE ps.parent_id = auth.uid()
+      AND ps.student_id = p_student_id
+      AND ps.revoked_at IS NULL
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_class_staff_for_student(p_student_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.class_students cs
+    JOIN public.class_teachers ct ON ct.class_id = cs.class_id
+    WHERE cs.student_id = p_student_id
+      AND ct.teacher_id = auth.uid()
+      AND (cs.left_at IS NULL OR cs.left_at >= now())
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.is_parent_of_student(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.is_class_staff_for_student(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_parent_of_student(uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.is_class_staff_for_student(uuid) TO authenticated, service_role;
+
 DROP POLICY IF EXISTS parent_students_select_policy ON public.parent_students;
 CREATE POLICY parent_students_select_policy ON public.parent_students
 FOR SELECT
@@ -113,14 +151,9 @@ USING (
 -- Parent read access to child learning data.
 DROP POLICY IF EXISTS class_students_parent_select ON public.class_students;
 CREATE POLICY class_students_parent_select ON public.class_students
-FOR SELECT
+FOR SELECT TO authenticated
 USING (
-  EXISTS (
-    SELECT 1 FROM public.parent_students ps
-    WHERE ps.parent_id = auth.uid()
-      AND ps.student_id = class_students.student_id
-      AND ps.revoked_at IS NULL
-  )
+  public.is_parent_of_student(class_students.student_id)
 );
 
 DROP POLICY IF EXISTS class_student_schedules_parent_select ON public.class_student_schedules;
