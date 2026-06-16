@@ -330,6 +330,31 @@
     '</div>';
   }
 
+  function buildSessionMapByDate(sessions){
+    const map = {};
+    (sessions || []).forEach(session => {
+      const date = String(session?.session_date || "").slice(0,10);
+      if(date && session?.id && !map[date]) map[date] = session;
+    });
+    return map;
+  }
+
+  function renderAttendanceDateHeader(item, sessionMap, role, minWidth){
+    const d = item.date;
+    const session = sessionMap?.[d];
+    const baseStyle = "min-width:"+minWidth+"px;white-space:nowrap;"+attendanceSessionStyle(item.session_no, "header");
+    const label = d.slice(8,10)+"/"+d.slice(5,7);
+    if(canEvaluateClassSession(role) && session?.id && d <= todayStr()){
+      return '<th class="center" style="'+baseStyle+'">'+
+        '<button type="button" onclick="openSessionEvaluation(\''+session.id+'\')" title="Nhận xét buổi học" aria-label="Nhận xét buổi học ngày '+label+'" '+
+          'style="border:0;background:rgba(255,255,255,.16);color:inherit;border-radius:8px;padding:5px 7px;font:inherit;font-weight:800;cursor:pointer;line-height:1;display:inline-flex;align-items:center;gap:4px">'+
+          label+'<span aria-hidden="true" style="font-size:.78em;opacity:.9">✎</span>'+
+        '</button>'+
+      '</th>';
+    }
+    return '<th class="center" style="'+baseStyle+'">'+label+'</th>';
+  }
+
   async function getStudentSearchPool(){
     if(_studentSearchPool) return _studentSearchPool;
     const sb = getSb();
@@ -633,14 +658,13 @@
       .eq("class_id",_classId).gte("date",mStart).lte("date",mEnd);
     _attendanceMap = {};
     (attData||[]).forEach(a=>{ _attendanceMap[a.student_id+"_"+a.date+"_"+(a.schedule_id || 0)]=a.status; });
+    const evaluationSessionMap = buildSessionMapByDate(evaluationSessions);
 
     if(role === "student"){
       const uid = window._currentUserId;
       let dateHeaders="";
       dates.forEach(item=>{
-        const d = item.date;
-        dateHeaders+='<th class="center" style="min-width:58px;white-space:nowrap;'+attendanceSessionStyle(item.session_no, "header")+'">'+
-          d.slice(8,10)+"/"+d.slice(5,7)+"</th>";
+        dateHeaders += renderAttendanceDateHeader(item, evaluationSessionMap, role, 58);
       });
       const me = visibleStudents.find(s => s.student_id === uid);
       if(!me){
@@ -779,9 +803,7 @@
 
     let dateHeaders="";
       dates.forEach(item=>{
-        const d = item.date;
-        dateHeaders+='<th class="center" style="min-width:62px;white-space:nowrap;'+attendanceSessionStyle(item.session_no, "header")+'">'+
-        d.slice(8,10)+"/"+d.slice(5,7)+"</th>";
+        dateHeaders += renderAttendanceDateHeader(item, evaluationSessionMap, role, 62);
       });
 
     const searchModal=
@@ -798,7 +820,6 @@
       "</div></div></div>";
 
     tc.innerHTML=
-      renderSessionEvaluationToolbar(evaluationSessions)+
       '<div style="margin-bottom:14px">'+
       '<button onclick="cvOpenAddStudent()" class="btn btn-primary btn-sm">+ Thêm học sinh</button>'+
       '</div>'+
