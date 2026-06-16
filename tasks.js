@@ -146,8 +146,8 @@
           </div>
         </div>
         <div class="task-actions">
-          ${task.action_url ? `<button class="task-btn primary" type="button" data-action-url="${esc(task.action_url)}">Mở</button>` : ""}
           <span class="task-status ${state.className}"><span>${state.icon}</span><span>${state.label}</span></span>
+          ${task.action_url ? `<button class="task-btn primary" type="button" data-action-url="${esc(task.action_url)}">Mở</button>` : ""}
         </div>
       </article>`;
   }
