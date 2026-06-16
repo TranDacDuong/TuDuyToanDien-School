@@ -7,12 +7,13 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css?v=20260604-mindup-navy1">
+<link rel="stylesheet" href="theme.css?v=20260615-ios1">
 <style>
 * { box-sizing: border-box; }
 body {
   margin: 0; font-family: var(--font-body);
   display: flex; height: 100vh;
+  height: 100dvh;
   background: var(--cream); visibility: hidden; color: var(--ink);
   min-height: 100dvh;
 }
@@ -20,13 +21,13 @@ body {
 /* ── Trigger zone (invisible strip on the left edge) ── */
 #sidebarTrigger {
   position: fixed; top: 0; left: 0;
-  width: 16px; height: 100vh;
+  width: 16px; height: 100vh; height: 100dvh;
   z-index: 200;
 }
 
 /* ── Sidebar ── */
 aside {
-  position: fixed; top: 0; left: 0; height: 100vh;
+  position: fixed; top: 0; left: 0; height: 100vh; height: 100dvh;
   width: 240px;
   background:
     radial-gradient(circle at top left, rgba(200,150,42,.13), transparent 30%),
@@ -546,12 +547,21 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   }
 
   .modal {
-    padding: 12px;
+    padding:
+      max(12px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
     align-items: flex-end;
+    overflow-y: auto;
   }
 
   .modal-box {
     width: min(100%, 520px);
+    max-height: calc(100dvh - max(24px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     padding: 22px 18px;
     border-radius: 22px 22px 0 0;
   }
@@ -673,7 +683,11 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 3px;
     padding: 6px;
-    margin: 0 6px calc(4px + env(safe-area-inset-bottom));
+    margin:
+      0
+      max(6px, env(safe-area-inset-right))
+      max(4px, env(safe-area-inset-bottom))
+      max(6px, env(safe-area-inset-left));
     border-radius: 20px;
     background: rgba(8,15,30,.92);
     border: 1px solid rgba(186,230,253,.16);
@@ -710,7 +724,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="MindUp">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<script src="pwa.js?v=20260613-push-debug1" defer></script>
+<script src="pwa.js?v=20260615-ios-guide1" defer></script>
 </head>
 <body>
 
@@ -735,10 +749,11 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     <li data-role="admin,teacher,assistant,student,parent" data-page="home.html"><span class="menu-label">🏠 Trang chủ</span></li>
     <li data-role="admin,teacher,assistant,student,parent" data-page="courses.html"><span class="menu-label">🎓 Khóa học</span></li>
     <li data-role="admin,teacher,assistant,student,parent" data-page="class.html"><span class="menu-label">📘 Lớp học</span></li>
+    <li data-role="admin,teacher,assistant,student,parent" data-page="tasks.html"><span class="menu-label">📋 Công việc</span></li>
     <li data-role="admin,teacher,assistant,student,parent" data-page="teacher_schedule.html"><span class="menu-label">👨‍🏫 Giáo viên & TKB</span></li>
     <li data-role="admin,teacher,student" data-page="public_exam.html"><span class="menu-label">🎯 Đề thi</span></li>
     <li data-role="admin,teacher,student" data-page="game.html"><span class="menu-label">🎮 Game</span></li>
-    <li data-role="admin,assistant,student,parent"  data-page="tuition.html"><span class="menu-label">💰 Học phí</span></li>
+    <li data-role="admin,teacher,assistant,student,parent"  data-page="tuition.html"><span class="menu-label">💰 Học phí</span></li>
     <li data-role="admin,teacher,assistant,student,parent" data-page="resources.html"><span class="menu-label">📚 Tài liệu tham khảo</span></li>
     <li data-role="admin,teacher"         data-page="question.html"><span class="menu-label">🧠 Ngân hàng câu hỏi</span></li>
     <li data-role="admin,teacher"         data-page="exam.html"><span class="menu-label">✅ Đề kiểm tra</span></li>
@@ -853,7 +868,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     <span>📘</span>
     <span>Lớp học</span>
   </button>
-  <button class="mobile-nav-item" type="button" data-role="admin,assistant,student,parent" data-page="tuition.html">
+  <button class="mobile-nav-item" type="button" data-role="admin,teacher,assistant,student,parent" data-page="tuition.html">
     <span>💰</span>
     <span>Học phí</span>
   </button>
