@@ -209,13 +209,28 @@
   }
 
   function openAction(url) {
-    if (!url) return;
+    const page = String(url || "").trim();
+    if (!page) return;
     try {
-      window.parent.postMessage({ type: "dashboard:navigate-frame", page: url }, "*");
-      if (window.parent === window) location.href = url;
+      if (window.parent && window.parent !== window && typeof window.parent.openDashboardPage === "function") {
+        window.parent.openDashboardPage(page);
+        return;
+      }
     } catch (_) {
-      location.href = url;
+      // Fall through to the iframe/local navigation fallback.
     }
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: "dashboard:navigate-frame", page }, "*");
+        setTimeout(() => {
+          if (location.pathname.split("/").pop() === "tasks.html") location.href = page;
+        }, 250);
+        return;
+      }
+    } catch (_) {
+      // Fall through to normal navigation.
+    }
+    location.href = page;
   }
 
   function openModal(id) {
