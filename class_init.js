@@ -55,9 +55,14 @@
 
       if(openClassId && window.openClassView){
         setTimeout(async () => {
-          await window.openClassView(openClassId, qs.get("className") || "Chi tiết lớp");
-          if(openTab === "exams" && window.cvSwitchTab){
-            setTimeout(() => window.cvSwitchTab("exams"), 250);
+          window._openingClassFromUrl = true;
+          try {
+            await window.openClassView(openClassId, qs.get("className") || "Chi tiết lớp");
+            if(openTab === "exams" && window.cvSwitchTab){
+              setTimeout(() => window.cvSwitchTab("exams"), 250);
+            }
+          } finally {
+            window._openingClassFromUrl = false;
           }
         }, 400);
       }
