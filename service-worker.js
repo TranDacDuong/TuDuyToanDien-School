@@ -1,13 +1,15 @@
-const CACHE_VERSION = "mindup-pwa-v5";
+const CACHE_VERSION = "mindup-pwa-v11";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
 const APP_SHELL = [
   "dashboard.html",
+  "tasks.html",
+  "tasks.js",
   "offline.html",
-  "theme.css?v=20260604-mindup-navy1",
+  "theme.css?v=20260615-ios1",
   "supabaseClient.js",
-  "pwa.js",
+  "pwa.js?v=20260615-ios-guide1",
   "push_debug.html",
   "manifest.webmanifest",
   "favicon.png",
