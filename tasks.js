@@ -4,9 +4,7 @@
     profile: null,
     assignments: [],
     users: [],
-    view: "today",
-    search: "",
-    priority: "",
+    selectedDate: "",
     preferences: null,
   };
 
@@ -23,6 +21,19 @@
     }).formatToParts(value);
     const map = Object.fromEntries(parts.map(part => [part.type, part.value]));
     return `${map.year}-${map.month}-${map.day}`;
+  }
+
+  function addDays(dateText, amount) {
+    const date = dateText ? new Date(`${dateText}T00:00:00+07:00`) : new Date();
+    date.setDate(date.getDate() + amount);
+    return localDate(date);
+  }
+
+  function formatShortDate(value) {
+    const date = value ? new Date(`${value}T00:00:00+07:00`) : new Date();
+    return new Intl.DateTimeFormat("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric",
+    }).format(date);
   }
 
   function toast(message) {
@@ -72,25 +83,13 @@
   }
 
   function visibleAssignments() {
-    const today = localDate();
+    const selected = S.selectedDate || localDate();
     return S.assignments.filter(item => {
       const task = item.task || {};
-      const completed = item.status === "completed" || item.status === "cancelled";
       const day = taskDay(item);
-      if (S.view === "today" && day !== today) return false;
-      if (S.view === "upcoming" && (completed || day <= today)) return false;
-      if (S.view === "overdue" && !isOverdue(item)) return false;
-      if (S.view === "completed" && !completed) return false;
-      if (S.priority && task.priority !== S.priority) return false;
-      if (S.search) {
-        const haystack = `${task.title || ""} ${task.description || ""}`.toLowerCase();
-        if (!haystack.includes(S.search)) return false;
-      }
-      return true;
+      return day === selected;
     }).sort((a, b) => {
       const priority = { urgent: 0, important: 1, normal: 2 };
-      const dayDiff = taskDay(a).localeCompare(taskDay(b));
-      if (dayDiff) return dayDiff;
       const status = Number(a.status === "completed") - Number(b.status === "completed");
       if (status) return status;
       const priorityDiff = (priority[a.task?.priority] ?? 3) - (priority[b.task?.priority] ?? 3);
@@ -169,10 +168,15 @@
 
   function render() {
     renderSummary();
+    syncDatebar();
     const rows = visibleAssignments();
     E.list.innerHTML = rows.length
       ? renderGrouped(rows)
-      : '<div class="task-empty">Không có công việc phù hợp trong mục này.</div>';
+      : `<div class="task-empty">Không có công việc trong ngày ${esc(formatShortDate(S.selectedDate || localDate()))}.</div>`;
+  }
+
+  function syncDatebar() {
+    if (E.currentDay) E.currentDay.textContent = formatShortDate(S.selectedDate || localDate());
   }
 
   async function loadTasks({ refresh = false } = {}) {
@@ -323,13 +327,14 @@
   }
 
   function bindEvents() {
-    document.querySelectorAll(".task-tab").forEach(button => button.addEventListener("click", () => {
-      S.view = button.dataset.view;
-      document.querySelectorAll(".task-tab").forEach(item => item.classList.toggle("active", item === button));
+    E.prevDay.addEventListener("click", () => {
+      S.selectedDate = addDays(S.selectedDate || localDate(), -1);
       render();
-    }));
-    E.search.addEventListener("input", () => { S.search = E.search.value.trim().toLowerCase(); render(); });
-    E.priority.addEventListener("change", () => { S.priority = E.priority.value; render(); });
+    });
+    E.nextDay.addEventListener("click", () => {
+      S.selectedDate = addDays(S.selectedDate || localDate(), 1);
+      render();
+    });
     E.list.addEventListener("click", event => {
       const target = event.target.closest("button");
       if (!target) return;
@@ -346,7 +351,7 @@
 
   async function init() {
     Object.assign(E, {
-      list: byId("taskList"), search: byId("taskSearch"), priority: byId("taskPriorityFilter"),
+      list: byId("taskList"), prevDay: byId("taskPrevDay"), currentDay: byId("taskCurrentDay"), nextDay: byId("taskNextDay"),
       todayCount: byId("taskTodayCount"), importantCount: byId("taskImportantCount"),
       overdueCount: byId("taskOverdueCount"), completedCount: byId("taskCompletedCount"),
       toast: byId("taskToast"),
@@ -357,6 +362,7 @@
     const { data: profile, error } = await sb.from("users").select("id,full_name,role").eq("id", user.id).single();
     if (error) return E.list.innerHTML = `<div class="task-empty">${esc(error.message)}</div>`;
     S.profile = profile;
+    S.selectedDate = localDate();
     byId("taskGreeting").textContent = `${profile.full_name || "Bạn"}, đây là các việc cần chú ý hôm nay.`;
     byId("taskCreateButton").style.display = profile.role === "admin" ? "grid" : "none";
     bindEvents();

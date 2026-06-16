@@ -14,9 +14,8 @@
     .task-head-actions{display:flex;gap:8px;flex-wrap:wrap}.icon-command{width:38px;height:38px;border-radius:7px;border:1px solid var(--border);background:#fff;display:grid;place-items:center;cursor:pointer;font-size:1rem}
     .task-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}.task-stat{background:#fff;border:1px solid var(--border);border-radius:8px;padding:13px 14px}
     .task-stat span{display:block;color:var(--ink-light);font-size:.73rem;font-weight:800;text-transform:uppercase}.task-stat strong{display:block;color:var(--navy);font-size:1.45rem;margin-top:4px}
-    .task-toolbar{background:#fff;border:1px solid var(--border);padding:10px;border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
-    .task-tabs{display:flex;gap:6px;overflow:auto}.task-tab{border:1px solid transparent;background:transparent;padding:8px 11px;border-radius:7px;font:inherit;font-size:.82rem;font-weight:800;color:var(--ink-mid);white-space:nowrap;cursor:pointer}
-    .task-tab.active{background:var(--navy);color:#fff}.task-filters{display:flex;gap:7px}.task-filters input,.task-filters select{height:36px;border:1px solid var(--border);border-radius:7px;background:#fff;padding:0 9px;font:inherit;font-size:.8rem}
+    .task-toolbar{background:#fff;border:1px solid var(--border);padding:10px;border-radius:8px;display:grid;gap:8px;margin-bottom:12px}
+    .task-datebar{display:grid;grid-template-columns:1fr minmax(150px,1.1fr) 1fr;gap:8px}.task-date-btn{border:1px solid var(--border);background:#fff;color:var(--navy);height:40px;border-radius:7px;font:inherit;font-size:.82rem;font-weight:900;cursor:pointer}.task-date-btn.current{background:var(--navy);border-color:var(--navy);color:#fff;cursor:default}
     .task-list{display:grid;gap:14px}.task-day{display:grid;gap:8px}.task-day-title{display:flex;align-items:center;gap:8px;margin:2px 0;color:var(--navy);font-size:.92rem;font-weight:900}.task-day-title:after{content:"";height:1px;background:var(--border);flex:1}.task-card{background:#fff;border:1px solid var(--border);border-left:4px solid #94a3b8;border-radius:8px;padding:14px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}
     .task-card.urgent{border-left-color:#dc2626}.task-card.important{border-left-color:#f59e0b}.task-card.completed{opacity:.68;border-left-color:#16a34a}
     .task-card-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.task-card h3{font-size:.96rem;color:var(--navy);margin:0}.task-badge{padding:3px 7px;border-radius:999px;background:#f1f5f9;color:#475569;font-size:.68rem;font-weight:800}
@@ -31,7 +30,7 @@
     .task-field input,.task-field select,.task-field textarea{width:100%;border:1px solid var(--border);border-radius:7px;padding:9px 10px;font:inherit}.task-field textarea{min-height:86px;resize:vertical}
     .assignee-list{max-height:190px;overflow:auto;border:1px solid var(--border);border-radius:7px;padding:7px;display:grid;gap:4px}.assignee-row{display:flex;align-items:center;gap:8px;padding:6px;border-radius:6px}.assignee-row:hover{background:#f8fafc}
     .task-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.task-toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:#0f1f3d;color:#fff;padding:10px 14px;border-radius:7px;font-size:.82rem;transition:.2s;z-index:1000}.task-toast.show{opacity:1;transform:translate(-50%,0)}
-    @media(max-width:760px){body{padding:12px 10px calc(18px + env(safe-area-inset-bottom))}.task-summary{grid-template-columns:repeat(2,1fr)}.task-toolbar{align-items:stretch;flex-direction:column}.task-filters input{min-width:0;flex:1}.task-card{grid-template-columns:1fr}.task-actions{justify-content:flex-start}.task-actions .task-btn{flex:1}.task-form{grid-template-columns:1fr}.task-field.full{grid-column:auto}.task-head h1{font-size:1.3rem}}
+    @media(max-width:760px){body{padding:12px 10px calc(18px + env(safe-area-inset-bottom))}.task-summary{grid-template-columns:repeat(2,1fr)}.task-datebar{grid-template-columns:1fr 1.15fr 1fr}.task-date-btn{height:38px;font-size:.76rem}.task-card{grid-template-columns:1fr}.task-actions{justify-content:flex-start}.task-actions .task-btn{flex:1}.task-form{grid-template-columns:1fr}.task-field.full{grid-column:auto}.task-head h1{font-size:1.3rem}}
   </style>
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0f1f3d">
@@ -56,19 +55,10 @@
     </section>
 
     <section class="task-toolbar">
-      <div class="task-tabs">
-        <button class="task-tab active" data-view="today">Hôm nay</button>
-        <button class="task-tab" data-view="upcoming">Sắp tới</button>
-        <button class="task-tab" data-view="overdue">Quá hạn</button>
-        <button class="task-tab" data-view="completed">Đã xong</button>
-        <button class="task-tab" data-view="all">Tất cả</button>
-      </div>
-      <div class="task-filters">
-        <input id="taskSearch" placeholder="Tìm công việc">
-        <select id="taskPriorityFilter">
-          <option value="">Mọi mức độ</option><option value="urgent">Khẩn cấp</option>
-          <option value="important">Quan trọng</option><option value="normal">Thông thường</option>
-        </select>
+      <div class="task-datebar" aria-label="Chọn ngày công việc">
+        <button class="task-date-btn" type="button" id="taskPrevDay">Trước đó</button>
+        <button class="task-date-btn current" type="button" id="taskCurrentDay" aria-current="date">17/06/2026</button>
+        <button class="task-date-btn" type="button" id="taskNextDay">Sau đó</button>
       </div>
     </section>
     <section id="taskList" class="task-list"><div class="task-empty">Đang tổng hợp công việc...</div></section>
@@ -107,6 +97,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js"></script>
   <script src="notification_helper.js"></script>
-  <script src="tasks.js?v=20260616-task-days3"></script>
+  <script src="tasks.js?v=20260617-datebar1"></script>
 </body>
 </html>
