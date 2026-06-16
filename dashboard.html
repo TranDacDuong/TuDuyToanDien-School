@@ -1143,6 +1143,19 @@ function getFrameDashboardPage(){
   }
 }
 
+function isSameOpenClassPage(currentPage, nextPage){
+  const current = normalizeDashboardPage(currentPage);
+  const next = normalizeDashboardPage(nextPage);
+  const currentBase = current.split("?")[0].split("#")[0];
+  const nextBase = next.split("?")[0].split("#")[0];
+  if(currentBase !== "class.html" || nextBase !== "class.html") return false;
+  const currentParams = new URLSearchParams((current.split("?")[1] || "").split("#")[0]);
+  const nextParams = new URLSearchParams((next.split("?")[1] || "").split("#")[0]);
+  const currentClassId = currentParams.get("openClassId") || "";
+  const nextClassId = nextParams.get("openClassId") || "";
+  return !!currentClassId && currentClassId === nextClassId;
+}
+
 function updateBadgeElements(ids, count){
   ids
     .map(id => document.getElementById(id))
@@ -1188,6 +1201,10 @@ function openDashboardPage(page, options = {}){
   }
   opsHub?.classList.remove("show");
   contentWrap?.classList.remove("hidden");
+  if(getFrameDashboardPage() === page){
+    closeSidebar();
+    return;
+  }
   contentFrame.src = page;
   closeSidebar();
 }
@@ -1293,6 +1310,10 @@ window.addEventListener("message", (event) => {
   if(event.data?.type !== "dashboard:navigate-frame") return;
   const page = normalizeDashboardPage(event.data.page || "");
   if(!page) return;
+  if(isSameOpenClassPage(getFrameDashboardPage(), page)){
+    syncDashboardUrl(page);
+    return;
+  }
   openDashboardPage(page);
 });
 
