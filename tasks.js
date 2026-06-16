@@ -12,6 +12,7 @@
 
   const E = {};
   const byId = id => document.getElementById(id);
+  const REMINDER_TYPES = new Set(["class_schedule", "child_schedule", "attendance"]);
   const esc = value => String(value || "")
     .replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -39,6 +40,32 @@
     }).format(new Date(value));
   }
 
+  function formatDay(value) {
+    const today = localDate();
+    const tomorrow = localDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
+    if (value === today) return "Hôm nay";
+    if (value === tomorrow) return "Ngày mai";
+    const date = value ? new Date(`${value}T00:00:00+07:00`) : new Date();
+    const label = new Intl.DateTimeFormat("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh", weekday: "long", day: "2-digit", month: "2-digit", year: "numeric",
+    }).format(date);
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+
+  function taskDay(item) {
+    const task = item.task || {};
+    if (task.due_at) return localDate(new Date(task.due_at));
+    if (task.available_on) return task.available_on;
+    return localDate();
+  }
+
+  function statusInfo(item) {
+    const task = item.task || {};
+    if (REMINDER_TYPES.has(task.task_type)) return { className: "reminder", icon: "•", label: "Lời nhắc nhở" };
+    if (item.status === "completed") return { className: "done", icon: "✓", label: "Đã hoàn thành" };
+    return { className: "todo", icon: "✕", label: "Chưa hoàn thành" };
+  }
+
   function isOverdue(item) {
     return item.status !== "completed" && item.status !== "cancelled"
       && item.task?.due_at && new Date(item.task.due_at) < new Date();
@@ -49,8 +76,9 @@
     return S.assignments.filter(item => {
       const task = item.task || {};
       const completed = item.status === "completed" || item.status === "cancelled";
-      if (S.view === "today" && (completed || task.available_on > today || (task.due_at && localDate(new Date(task.due_at)) > today))) return false;
-      if (S.view === "upcoming" && (completed || (!task.due_at || localDate(new Date(task.due_at)) <= today))) return false;
+      const day = taskDay(item);
+      if (S.view === "today" && day !== today) return false;
+      if (S.view === "upcoming" && (completed || day <= today)) return false;
       if (S.view === "overdue" && !isOverdue(item)) return false;
       if (S.view === "completed" && !completed) return false;
       if (S.priority && task.priority !== S.priority) return false;
@@ -61,6 +89,8 @@
       return true;
     }).sort((a, b) => {
       const priority = { urgent: 0, important: 1, normal: 2 };
+      const dayDiff = taskDay(a).localeCompare(taskDay(b));
+      if (dayDiff) return dayDiff;
       const status = Number(a.status === "completed") - Number(b.status === "completed");
       if (status) return status;
       const priorityDiff = (priority[a.task?.priority] ?? 3) - (priority[b.task?.priority] ?? 3);
@@ -97,7 +127,7 @@
     const task = item.task || {};
     const completed = item.status === "completed";
     const overdue = isOverdue(item);
-    const canComplete = task.verification_mode === "manual" || S.profile?.role === "admin";
+    const state = statusInfo(item);
     return `
       <article class="task-card ${esc(task.priority)} ${completed ? "completed" : ""}" data-task="${item.id}">
         <div>
@@ -116,19 +146,32 @@
           </div>
         </div>
         <div class="task-actions">
-          ${task.action_url ? `<button class="task-btn primary" type="button" data-action-url="${esc(task.action_url)}">Mở xử lý</button>` : ""}
-          ${!completed && item.status === "open" ? `<button class="task-btn" type="button" data-start="${item.id}">Bắt đầu</button>` : ""}
-          ${!completed && canComplete ? `<button class="task-btn success" type="button" data-complete="${item.id}">Hoàn thành</button>` : ""}
-          ${completed && canComplete ? `<button class="task-btn" type="button" data-reopen="${item.id}">Mở lại</button>` : ""}
+          ${task.action_url ? `<button class="task-btn primary" type="button" data-action-url="${esc(task.action_url)}">Mở</button>` : ""}
+          <span class="task-status ${state.className}"><span>${state.icon}</span><span>${state.label}</span></span>
         </div>
       </article>`;
+  }
+
+  function renderGrouped(rows) {
+    const groups = new Map();
+    rows.forEach(item => {
+      const key = taskDay(item);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(item);
+    });
+    return [...groups.entries()].map(([day, items]) => `
+      <section class="task-day">
+        <h2 class="task-day-title">${esc(formatDay(day))}</h2>
+        ${items.map(taskCard).join("")}
+      </section>
+    `).join("");
   }
 
   function render() {
     renderSummary();
     const rows = visibleAssignments();
     E.list.innerHTML = rows.length
-      ? rows.map(taskCard).join("")
+      ? renderGrouped(rows)
       : '<div class="task-empty">Không có công việc phù hợp trong mục này.</div>';
   }
 
@@ -276,9 +319,6 @@
       const target = event.target.closest("button");
       if (!target) return;
       if (target.dataset.actionUrl) openAction(target.dataset.actionUrl);
-      if (target.dataset.start) setStatus(target.dataset.start, "in_progress");
-      if (target.dataset.complete) setStatus(target.dataset.complete, "completed");
-      if (target.dataset.reopen) setStatus(target.dataset.reopen, "open");
     });
     byId("taskRefreshButton").addEventListener("click", () => loadTasks({ refresh: true }));
     byId("taskCreateButton").addEventListener("click", openCreateModal);
