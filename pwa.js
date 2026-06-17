@@ -304,8 +304,8 @@
       : await Notification.requestPermission();
     if (permission !== "granted") return { ok: false, permission };
 
+    enableLocalNotifications(user.id, true);
     const subscription = await ensurePushSubscription(user.id, { forceNew: true, repairRevoked: true });
-    enableLocalNotifications(user.id);
     removePrompt();
     return { ok: Boolean(subscription), permission, endpoint: subscription?.endpoint || "" };
   }
@@ -1085,12 +1085,12 @@
     const user = await getCurrentUser();
     if (!user?.id || !isPushSupported()) return;
     if (Notification.permission === "granted") {
+      enableLocalNotifications(user.id);
       const subscription = await ensurePushSubscription(user.id, { repairRevoked: true }).catch((error) => {
         console.warn("MindUp push auto repair failed:", error);
         return null;
       });
-      if (subscription) enableLocalNotifications(user.id);
-      if (!subscription && localStorage.getItem(LOCAL_NOTIFY_ENABLED_KEY) !== "1") showPrompt();
+      if (!subscription) showPrompt();
       return;
     }
     if (document.getElementById("mindupInstallPrompt")) return;

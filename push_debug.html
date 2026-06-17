@@ -216,6 +216,47 @@ async function sendTargetTest(){
   }
 }
 
+window.sendTargetTest = async function(){
+  const out = document.getElementById("testResult");
+  out.textContent = "Dang gui test...";
+  try{
+    const target = await findTargetUser(document.getElementById("targetUser").value);
+    const title = "MindUp kiem tra thong bao";
+    const message = `Thong bao test cho ${target.full_name || target.email}. Neu app dang mo, thong bao nay se xuat hien trong app; neu app dong, Web Push se hien tren thanh thong bao.`;
+    const { error: insertError } = await sb.from("notifications").insert({
+      user_id: target.id,
+      actor_id: currentUser.id,
+      type: "tuition_reminder",
+      title,
+      message,
+      target_url: "notifications.html",
+      meta: {
+        push_debug: true,
+        direct_target_test: true,
+        target_email: target.email || null
+      }
+    });
+    if(insertError) throw insertError;
+    const body = await invokePush({
+      userIds:[target.id],
+      title,
+      message,
+      targetUrl:"notifications.html",
+      type:"tuition_reminder"
+    });
+    out.textContent = JSON.stringify({
+      target,
+      notificationCreated: true,
+      result: body,
+      nextStep: body.sent > 0
+        ? "Da tao notification trong app va server da gui toi push service. Neu dien thoai khong hien khi app dong, mo lai tab nay va xem dong 'Lan cuoi SW nhan push'."
+        : "Da tao notification trong app nhung chua co subscription hop le cho tai khoan nay. Hay mo app tren dien thoai va bam Bat thong bao day."
+    }, null, 2);
+  }catch(error){
+    out.textContent = "Gui test that bai:\n" + (error?.message || String(error));
+  }
+};
+
 async function sendSelfTest(){
   const out = document.getElementById("testResult");
   out.textContent = "Đang gửi test cho tài khoản hiện tại...";
