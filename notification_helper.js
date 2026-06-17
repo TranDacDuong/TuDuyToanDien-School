@@ -138,6 +138,29 @@
     return invokePushFunction({ userIds, title, message, targetUrl, type });
   }
 
+  function isRowLevelSecurityError(error) {
+    const message = String(error?.message || error || "");
+    return error?.code === "42501" || /row-level security|violates row-level security/i.test(message);
+  }
+
+  function canFallbackToDirectPush(rows) {
+    return rows.length && rows.every(item => item.type === "session_evaluation" && item.user_id);
+  }
+
+  async function sendDirectPushFallback(rows) {
+    if (!canFallbackToDirectPush(rows)) return false;
+    for (const row of rows) {
+      await sendPushToUsers({
+        userIds: [row.user_id],
+        title: row.title || "MindUp",
+        message: row.message || "",
+        targetUrl: row.target_url || "notifications.html",
+        type: row.type
+      });
+    }
+    return true;
+  }
+
   async function createNotification(options) {
     const {
       userId,
@@ -169,12 +192,34 @@
     };
 
     const expandedPayload = await expandParentNotifications([payload]);
+    if (canFallbackToDirectPush(expandedPayload)) {
+      const { error } = await getSb()
+        .from("notifications")
+        .insert(expandedPayload);
+
+      if (error) {
+        if (push !== false && isRowLevelSecurityError(error) && await sendDirectPushFallback(expandedPayload)) {
+          console.warn("MindUp notification insert blocked by RLS; sent session evaluation push directly.", error);
+          return { directPushOnly: true };
+        }
+        throw error;
+      }
+      if (push !== false) sendDirectPushFallback(expandedPayload);
+      return { inserted: true };
+    }
+
     const { data, error } = await getSb()
       .from("notifications")
       .insert(expandedPayload)
       .select("id");
 
-    if (error) throw error;
+    if (error) {
+      if (push !== false && isRowLevelSecurityError(error) && await sendDirectPushFallback(expandedPayload)) {
+        console.warn("MindUp notification insert blocked by RLS; sent session evaluation push directly.", error);
+        return { directPushOnly: true };
+      }
+      throw error;
+    }
     const ids = (data || []).map(item => item.id).filter(Boolean);
     if (push !== false && ids.length) sendPushForNotifications(ids);
     return data?.[0] || null;
@@ -209,13 +254,32 @@
     const insertedIds = [];
     for (let i = 0; i < expandedPayloads.length; i += chunkSize) {
       const chunk = expandedPayloads.slice(i, i + chunkSize);
+      if (canFallbackToDirectPush(chunk)) {
+        const { error } = await getSb().from("notifications").insert(chunk);
+        if (error) {
+          if (push !== false && isRowLevelSecurityError(error) && await sendDirectPushFallback(chunk)) {
+            console.warn("MindUp notification insert blocked by RLS; sent session evaluation push directly.", error);
+            continue;
+          }
+          throw error;
+        }
+        if (push !== false) sendDirectPushFallback(chunk);
+        continue;
+      }
+
       const { data, error } = await getSb().from("notifications").insert(chunk).select("id");
-      if (error) throw error;
+      if (error) {
+        if (push !== false && isRowLevelSecurityError(error) && await sendDirectPushFallback(chunk)) {
+          console.warn("MindUp notification insert blocked by RLS; sent session evaluation push directly.", error);
+          continue;
+        }
+        throw error;
+      }
       insertedIds.push(...((data || []).map(item => item.id).filter(Boolean)));
     }
 
     if (push !== false && insertedIds.length) sendPushForNotifications(insertedIds);
-    return { count: payloads.length, expandedCount: expandedPayloads.length };
+    return { count: payloads.length, expandedCount: expandedPayloads.length, insertedCount: insertedIds.length };
   }
 
   async function getCourseStudentIds(courseId) {
