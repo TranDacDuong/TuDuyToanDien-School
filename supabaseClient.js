@@ -126,21 +126,52 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
       return data?.user || null;
     }
 
+    function getStoredSession() {
+      try {
+        const projectRef = new URL(SUPABASE_URL).hostname.split(".")[0];
+        const keys = [
+          `sb-${projectRef}-auth-token`,
+          "supabase.auth.token"
+        ];
+        for (const key of keys) {
+          const raw = localStorage.getItem(key);
+          if (!raw) continue;
+          const parsed = JSON.parse(raw);
+          const session = parsed?.currentSession || parsed;
+          if (session?.access_token) return session;
+        }
+      } catch (_) {
+        return null;
+      }
+      return null;
+    }
+
     async function getAccessToken() {
       try {
         const { data } = await sb.auth.getSession();
-        return data?.session?.access_token || "";
+        if (data?.session?.access_token) return data.session.access_token;
       } catch (_) {
-        return "";
+        // Try refresh/local storage fallbacks below.
       }
+
+      try {
+        const { data } = await sb.auth.refreshSession();
+        if (data?.session?.access_token) return data.session.access_token;
+      } catch (_) {
+        // Try local storage fallback below.
+      }
+
+      const stored = getStoredSession();
+      return stored?.access_token || "";
     }
 
     async function getEdgeFunctionHeaders(extraHeaders = {}) {
       const token = await getAccessToken();
+      if (!token) throw new Error("Authentication required. Vui lòng đăng nhập lại rồi thử gửi thông báo.");
       return {
         "Content-Type": "application/json",
         apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${token || SUPABASE_KEY}`,
+        Authorization: `Bearer ${token}`,
         ...extraHeaders,
       };
     }

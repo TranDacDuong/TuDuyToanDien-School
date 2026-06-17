@@ -92,18 +92,16 @@
 
   async function invokePushFunction(payload) {
     try {
-      const { data: { session } } = await getSb().auth.getSession();
-      if (!session?.access_token) return { skipped: true };
+      const headers = window.AppAuth?.getEdgeFunctionHeaders
+        ? await window.AppAuth.getEdgeFunctionHeaders()
+        : null;
+      if (!headers) return { skipped: true };
 
       const supabaseUrl = window.SUPABASE_URL || "";
       const functionUrl = `${supabaseUrl}/functions/v1/send-push-notification`;
       const response = await fetch(functionUrl, {
         method: "POST",
-        headers: {
-          "apikey": window.SUPABASE_KEY || "",
-          "Authorization": `Bearer ${session.access_token}`,
-          "Content-Type": "application/json"
-        },
+        headers,
         body: JSON.stringify(payload)
       });
 

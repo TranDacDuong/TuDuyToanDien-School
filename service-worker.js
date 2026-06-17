@@ -1,4 +1,4 @@
-const CACHE_VERSION = "mindup-pwa-v12";
+const CACHE_VERSION = "mindup-pwa-v13";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const PUSH_RECEIPT_CACHE = `${CACHE_VERSION}-push-receipts`;
@@ -62,7 +62,11 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  if (url.pathname.endsWith("/pwa.js") || url.pathname.endsWith("/service-worker.js")) {
+  if (
+    url.pathname.endsWith("/pwa.js") ||
+    url.pathname.endsWith("/supabaseClient.js") ||
+    url.pathname.endsWith("/service-worker.js")
+  ) {
     event.respondWith(networkFirstAsset(request));
     return;
   }

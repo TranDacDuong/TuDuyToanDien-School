@@ -363,16 +363,14 @@
     if (!user?.id) throw new Error("User is not signed in");
     const client = await waitForSupabase();
     if (!client) throw new Error("Supabase is not ready");
-    const { data: { session } } = await client.auth.getSession();
-    if (!session?.access_token) throw new Error("Missing session token");
+    const headers = window.AppAuth?.getEdgeFunctionHeaders
+      ? await window.AppAuth.getEdgeFunctionHeaders()
+      : null;
+    if (!headers) throw new Error("Missing session token");
 
     const response = await fetch(`${window.SUPABASE_URL || ""}/functions/v1/send-push-notification`, {
       method: "POST",
-      headers: {
-        "apikey": window.SUPABASE_KEY || "",
-        "Authorization": `Bearer ${session.access_token}`,
-        "Content-Type": "application/json"
-      },
+      headers,
       body: JSON.stringify({
         userIds: [user.id],
         title: options.title || "MindUp test",
