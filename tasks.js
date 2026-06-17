@@ -10,6 +10,7 @@
 
   const E = {};
   const byId = id => document.getElementById(id);
+  const INTERNAL_ROLES = new Set(["admin", "teacher", "assistant"]);
   const REMINDER_TYPES = new Set(["class_schedule", "child_schedule", "attendance"]);
   const esc = value => String(value || "")
     .replace(/&/g, "&amp;").replace(/</g, "&lt;")
@@ -199,7 +200,7 @@
       E.list.innerHTML = `<div class="task-empty">Chưa tải được công việc: ${esc(error.message)}</div>`;
       return;
     }
-    S.assignments = data || [];
+    S.assignments = (data || []).filter(item => INTERNAL_ROLES.has(item.assignee?.role || S.profile?.role));
     render();
   }
 
@@ -258,7 +259,7 @@
 
   async function openCreateModal() {
     if (!S.users.length) {
-      const { data, error } = await sb.from("users").select("id,full_name,email,role").order("full_name");
+      const { data, error } = await sb.from("users").select("id,full_name,email,role").in("role", [...INTERNAL_ROLES]).order("full_name");
       if (error) return alert(error.message);
       S.users = data || [];
     }
@@ -362,6 +363,14 @@
     const { data: profile, error } = await sb.from("users").select("id,full_name,role").eq("id", user.id).single();
     if (error) return E.list.innerHTML = `<div class="task-empty">${esc(error.message)}</div>`;
     S.profile = profile;
+    if (!INTERNAL_ROLES.has(profile.role)) {
+      if (window.parent && window.parent !== window && typeof window.parent.openDashboardPage === "function") {
+        window.parent.openDashboardPage("notifications.html", { syncMenu: false, syncMobile: false, replaceUrl: true });
+        return;
+      }
+      location.href = "notifications.html";
+      return;
+    }
     S.selectedDate = localDate();
     byId("taskGreeting").textContent = `${profile.full_name || "Bạn"}, đây là các việc cần chú ý hôm nay.`;
     byId("taskCreateButton").style.display = profile.role === "admin" ? "grid" : "none";

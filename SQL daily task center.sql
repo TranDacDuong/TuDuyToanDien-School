@@ -269,6 +269,7 @@ BEGIN
       AND cs.session_date BETWEEN v_today AND v_today + 7
     LEFT JOIN public.lessons l ON l.id = cs.lesson_id
     WHERE u.role::text = 'student'
+      AND false
       AND (p_user_id IS NULL OR u.id = p_user_id)
   LOOP
     v_due := COALESCE(r.starts_at, ((r.session_date::text || ' 07:00:00+07')::timestamptz));
@@ -296,6 +297,7 @@ BEGIN
     JOIN public.class_sessions cs ON cs.class_id = c.id
       AND cs.session_date BETWEEN v_today AND v_today + 7
     WHERE p.role::text = 'parent'
+      AND false
       AND (p_user_id IS NULL OR p.id = p_user_id)
   LOOP
     v_due := COALESCE(r.starts_at, ((r.session_date::text || ' 07:00:00+07')::timestamptz));
@@ -352,6 +354,7 @@ BEGIN
       AND cs.session_date BETWEEN v_today - 3 AND v_today + 14
       AND (cs.exam_id IS NOT NULL OR cs.pdf_exam_id IS NOT NULL)
     WHERE (st.left_at IS NULL OR st.left_at::date >= v_today)
+      AND false
       AND (p_user_id IS NULL OR st.student_id = p_user_id)
   LOOP
     v_due := COALESCE(r.ends_at, ((r.session_date::text || ' 23:00:00+07')::timestamptz));
@@ -379,6 +382,7 @@ BEGIN
     LEFT JOIN public.lessons l ON l.id = cs.lesson_id
     WHERE (COALESCE(c.start_date, c.created_at::date) + (GREATEST(COALESCE(cs.open_day, 1), 1) - 1))::date
       BETWEEN v_today - 3 AND v_today + 14
+      AND false
       AND (p_user_id IS NULL OR ce.student_id = p_user_id)
   LOOP
     PERFORM public.upsert_generated_task(
@@ -418,6 +422,7 @@ BEGIN
       WHERE ps.student_id = tp.student_id AND ps.revoked_at IS NULL
     ) target
     WHERE tp.amount_paid < tp.amount_due
+      AND false
       AND tp.month >= date_trunc('month', v_today - interval '1 month')::date
       AND tp.month <= date_trunc('month', v_today + interval '1 month')::date
       AND (p_user_id IS NULL OR target.user_id = p_user_id)

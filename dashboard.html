@@ -749,7 +749,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     <li data-role="admin,teacher,assistant,student,parent" data-page="home.html"><span class="menu-label">🏠 Trang chủ</span></li>
     <li data-role="admin,teacher,assistant,student,parent" data-page="courses.html"><span class="menu-label">🎓 Khóa học</span></li>
     <li data-role="admin,teacher,assistant,student,parent" data-page="class.html"><span class="menu-label">📘 Lớp học</span></li>
-    <li data-role="admin,teacher,assistant,student,parent" data-page="tasks.html"><span class="menu-label">📋 Công việc</span></li>
+    <li data-role="admin,teacher,assistant" data-page="tasks.html"><span class="menu-label">📋 Công việc</span></li>
     <li data-role="admin,teacher,assistant,student,parent" data-page="teacher_schedule.html"><span class="menu-label">👨‍🏫 Giáo viên & TKB</span></li>
     <li data-role="admin,teacher,student" data-page="public_exam.html"><span class="menu-label">🎯 Đề thi</span></li>
     <li data-role="admin,teacher,student" data-page="game.html"><span class="menu-label">🎮 Game</span></li>
@@ -1181,7 +1181,9 @@ function openDashboardPage(page, options = {}){
     return;
   }
   if(currentDashboardUser && currentDashboardProfile && !canOpenDashboardPage(page)){
-    page = "home.html";
+    page = basePage === "tasks.html" && ["student", "parent"].includes(currentDashboardProfile.role)
+      ? "notifications.html"
+      : "home.html";
   }
   if(updateUrl) syncDashboardUrl(page, replaceUrl);
   const opsHub = document.getElementById("opsHub");
