@@ -1,6 +1,8 @@
-const CACHE_VERSION = "mindup-pwa-v11";
+const CACHE_VERSION = "mindup-pwa-v12";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
+const PUSH_RECEIPT_CACHE = `${CACHE_VERSION}-push-receipts`;
+const PUSH_RECEIPT_KEY = "/__mindup_last_push_receipt__";
 
 const APP_SHELL = [
   "dashboard.html",
@@ -9,7 +11,7 @@ const APP_SHELL = [
   "offline.html",
   "theme.css?v=20260615-ios1",
   "supabaseClient.js",
-  "pwa.js?v=20260615-ios-guide1",
+  "pwa.js?v=20260617-push-receipt1",
   "push_debug.html",
   "manifest.webmanifest",
   "favicon.png",
@@ -77,15 +79,21 @@ self.addEventListener("push", event => {
     body: payload.body || payload.message || "Bạn có thông báo mới.",
     icon: payload.icon || "pwa-icon-192.png",
     badge: payload.badge || "pwa-icon-192.png",
-    tag: payload.tag || payload.notificationId || payload.type || "mindup-notification",
-    renotify: Boolean(payload.renotify),
+    tag: payload.tag || payload.notificationId || `mindup-${Date.now()}`,
+    renotify: payload.renotify !== false,
+    timestamp: Date.now(),
+    vibrate: payload.vibrate || [160, 80, 160],
     data: {
       url: payload.url || payload.target_url || "notifications.html",
-      notificationId: payload.notificationId || payload.id || null
+      notificationId: payload.notificationId || payload.id || null,
+      receivedAt: new Date().toISOString()
     }
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil((async () => {
+    await rememberPushReceipt(payload, options).catch(() => null);
+    await self.registration.showNotification(title, options);
+  })());
 });
 
 self.addEventListener("notificationclick", event => {
@@ -159,4 +167,21 @@ function normalizeClientUrl(value) {
   } catch (error) {
     return "notifications.html";
   }
+}
+
+async function rememberPushReceipt(payload, options) {
+  const cache = await caches.open(PUSH_RECEIPT_CACHE);
+  const receipt = {
+    receivedAt: options.data.receivedAt,
+    title: payload.title || "MindUp",
+    body: payload.body || payload.message || "",
+    notificationId: payload.notificationId || payload.id || null,
+    type: payload.type || null,
+    tag: options.tag,
+    url: options.data.url,
+    swVersion: CACHE_VERSION
+  };
+  await cache.put(PUSH_RECEIPT_KEY, new Response(JSON.stringify(receipt), {
+    headers: { "Content-Type": "application/json" }
+  }));
 }

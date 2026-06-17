@@ -7,10 +7,10 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css?v=20260604-mindup-navy1">
+<link rel="stylesheet" href="theme.css?v=20260615-ios1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
-<script src="pwa.js?v=20260613-push-debug1" defer></script>
+<script src="pwa.js?v=20260617-push-receipt1" defer></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;padding:24px;font-family:var(--font-body);color:var(--ink);background:linear-gradient(180deg,#f8fbff 0%,#fffaf0 100%)}
@@ -50,6 +50,7 @@ pre{margin:12px 0 0;padding:12px;border-radius:10px;background:#0f172a;color:#e5
       <div id="diagnosticRows"><div class="row"><span class="key">Đang tải</span><span class="val warn">...</span></div></div>
       <div class="actions" style="margin-top:14px">
         <button class="primary" type="button" onclick="enablePush()">Bật thông báo đẩy</button>
+        <button type="button" onclick="showLocalDisplayTest()">Test hiển thị máy này</button>
         <button type="button" onclick="loadDiagnostics()">Kiểm tra lại</button>
       </div>
     </div>
@@ -97,8 +98,10 @@ function renderRows(diag){
     ["Hỗ trợ Push API", diag.supported],
     ["Service worker", diag.hasServiceWorker],
     ["PushManager", diag.hasPushManager],
+    ["SW đang điều khiển trang", diag.hasController],
     ["Có subscription", Boolean(diag.subscription?.endpoint)],
     ["Đã lưu Supabase", Boolean(diag.savedSubscription && !diag.savedSubscription.revoked_at)],
+    ["Lần cuối SW nhận push", diag.lastPushReceipt?.receivedAt || "Chưa ghi nhận"],
     ["Đang chạy dạng app", diag.standalone],
     ["Android", diag.android],
     ["Fallback khi mở app", diag.localFallbackEnabled],
@@ -147,6 +150,22 @@ async function enablePush(){
   await loadDiagnostics();
 }
 
+async function showLocalDisplayTest(){
+  const box = document.getElementById("testResult");
+  box.textContent = "Đang thử hiển thị thông báo ngay trên thiết bị này...";
+  try{
+    const api = await waitForMindUpPush();
+    const result = await api.showServiceWorkerTest();
+    box.textContent = JSON.stringify({
+      note: "Đây chỉ kiểm tra quyền hiển thị thông báo của Android/Chrome. Nút Gửi test mới kiểm tra Web Push từ server.",
+      result
+    }, null, 2);
+  }catch(error){
+    box.textContent = "Không hiển thị được thông báo local:\n" + ([error?.name, error?.message].filter(Boolean).join(": ") || String(error));
+  }
+  await loadDiagnostics();
+}
+
 async function invokePush(payload){
   const headers = await window.AppAuth.getEdgeFunctionHeaders();
   const res = await fetch(`${window.SUPABASE_URL}/functions/v1/send-push-notification`, {
@@ -181,11 +200,17 @@ async function sendTargetTest(){
     const body = await invokePush({
       userIds:[target.id],
       title:"MindUp kiểm tra thông báo",
-      message:`Thông báo test cho ${target.full_name || target.email}.`,
+      message:`Thông báo Web Push thật cho ${target.full_name || target.email}. Hãy tắt app rồi kiểm tra thanh thông báo.`,
       targetUrl:"notifications.html",
       type:"push_test"
     });
-    out.textContent = JSON.stringify({ target, result: body }, null, 2);
+    out.textContent = JSON.stringify({
+      target,
+      result: body,
+      nextStep: body.sent > 0
+        ? "Server đã gửi tới push service. Nếu điện thoại không hiện khi app đóng, mở lại tab này và xem dòng 'Lần cuối SW nhận push'."
+        : "Chưa có subscription hợp lệ cho tài khoản này, hãy mở app trên điện thoại và bấm Bật thông báo đẩy."
+    }, null, 2);
   }catch(error){
     out.textContent = "Gửi test thất bại:\n" + (error?.message || String(error));
   }
@@ -208,7 +233,12 @@ async function sendSelfTest(){
     const body = await invokePush({
       notificationId: row.id
     });
-    out.textContent = JSON.stringify(body, null, 2);
+    out.textContent = JSON.stringify({
+      result: body,
+      nextStep: body.sent > 0
+        ? "Server đã gửi Web Push thật tới thiết bị hiện tại. Hãy tắt app để thử, sau đó mở lại tab này kiểm tra 'Lần cuối SW nhận push'."
+        : "Chưa gửi được tới subscription nào. Hãy bấm Bật thông báo đẩy rồi thử lại."
+    }, null, 2);
   }catch(error){
     out.textContent = "Gửi test thất bại:\n" + (error?.message || String(error));
   }
