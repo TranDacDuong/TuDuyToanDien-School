@@ -751,7 +751,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     <li data-role="admin,teacher,assistant,student,parent" data-page="class.html"><span class="menu-label">📘 Lớp học</span></li>
     <li data-role="admin,teacher,assistant" data-page="tasks.html"><span class="menu-label">📋 Công việc</span></li>
     <li data-role="admin,teacher,assistant,student,parent" data-page="teacher_schedule.html"><span class="menu-label">👨‍🏫 Giáo viên & TKB</span></li>
-    <li data-role="admin,teacher,student" data-page="public_exam.html"><span class="menu-label">🎯 Đề thi</span></li>
+    <li data-role="admin,teacher,student,parent" data-page="public_exam.html"><span class="menu-label">🎯 Đề thi</span></li>
     <li data-role="admin,teacher,student" data-page="game.html"><span class="menu-label">🎮 Game</span></li>
     <li data-role="admin,teacher,assistant,student,parent"  data-page="tuition.html"><span class="menu-label">💰 Học phí</span></li>
     <li data-role="admin,teacher,assistant,student,parent" data-page="resources.html"><span class="menu-label">📚 Tài liệu tham khảo</span></li>
@@ -868,11 +868,15 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     <span>📘</span>
     <span>Lớp học</span>
   </button>
+  <button class="mobile-nav-item" type="button" data-role="parent" data-page="teacher_schedule.html">
+    <span>👨‍🏫</span>
+    <span>GV &amp; TKB</span>
+  </button>
   <button class="mobile-nav-item" type="button" data-role="admin,teacher,assistant,student,parent" data-page="tuition.html">
     <span>💰</span>
     <span>Học phí</span>
   </button>
-  <button class="mobile-nav-item" type="button" data-role="admin,teacher,student" data-page="public_exam.html">
+  <button class="mobile-nav-item" type="button" data-role="admin,teacher,student,parent" data-page="public_exam.html">
     <span>🎯</span>
     <span>Đề thi</span>
   </button>
