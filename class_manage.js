@@ -649,8 +649,7 @@
         .eq("class_id",_classId)
         .order("session_date",{ascending:true});
       if(!sessionLoadError){
-        const synced = await syncClassSessionsForCurrentMonth(sb, storedSessions || []);
-        evaluationSessions = synced.sessions || storedSessions || [];
+        evaluationSessions = storedSessions || [];
       }
     }
 
@@ -1297,88 +1296,6 @@
     return '<div style="background:var(--white);border:1px dashed #cbd5e1;border-radius:14px;padding:16px 18px">'+header+body+actionRow+'</div>';
   }
 
-  async function syncClassSessionsForCurrentMonth(sb, sessions){
-    const role = _role;
-    const schedulesThisMonth = getSchedulesForMonth(_cachedClass?.class_schedules || [], _currentMonth, _currentYear);
-    const monthDates = generateDates(schedulesThisMonth, _currentMonth, _currentYear);
-    if(!monthDates.length) return { sessions, createdLessons: [] };
-    if(role !== "admin" && role !== "teacher") return { sessions, createdLessons: [] };
-
-    const existingDates = new Set(
-      (sessions || [])
-        .map(item => (item.session_date || "").slice(0, 10))
-        .filter(Boolean)
-    );
-    const missingDates = monthDates.filter(date => !existingDates.has(date));
-    if(!missingDates.length) return { sessions, createdLessons: [] };
-
-    const baseOrder = (sessions || []).reduce((maxValue, item) => {
-      const nextValue = Number(item?.session_order || 0);
-      return nextValue > maxValue ? nextValue : maxValue;
-    }, 0);
-
-    const lessonPayloads = missingDates.map(date => ({
-      name: "Chưa cập nhật nội dung buổi học",
-      summary: "",
-      lecture_video_url: null,
-      solution_video_url: null,
-      document_link: null,
-      created_by: window._currentUserId
-    }));
-    const { data: newLessons, error: lessonError } = await sb
-      .from("lessons")
-      .insert(lessonPayloads)
-      .select("id,name,summary,lecture_video_url,solution_video_url,document_link");
-    if(lessonError){
-      alert("Không thể tự tạo bài học theo lịch tháng này: " + lessonError.message);
-      return { sessions, createdLessons: [] };
-    }
-
-    const sessionPayloads = (newLessons || []).map((lesson, index) => ({
-      class_id: _classId,
-      lesson_id: lesson.id,
-      session_order: baseOrder + index + 1,
-      session_date: missingDates[index],
-      exam_id: null,
-      pdf_exam_id: null,
-      starts_at: null,
-      ends_at: null,
-      created_by: window._currentUserId
-    }));
-    const { data: insertedSessions, error: sessionError } = await sb
-      .from("class_sessions")
-      .insert(sessionPayloads)
-      .select("id,lesson_id,session_order,session_date,exam_id,pdf_exam_id,starts_at,ends_at,created_at");
-    if(sessionError){
-      const lessonIds = (newLessons || []).map(item => item.id).filter(Boolean);
-      if(lessonIds.length){
-        await sb.from("lessons").delete().in("id", lessonIds);
-      }
-      const msg = String(sessionError.message || "").toLowerCase();
-      if(msg.includes("duplicate") || msg.includes("unique")){
-        const { data: refreshedSessions } = await sb
-          .from("class_sessions")
-          .select("id,lesson_id,session_order,session_date,exam_id,pdf_exam_id,starts_at,ends_at,created_at")
-          .eq("class_id", _classId)
-          .order("session_order", { ascending: true });
-        return { sessions: refreshedSessions || sessions, createdLessons: [] };
-      }
-      alert("Không thể tự tạo buổi học theo lịch tháng này: " + sessionError.message);
-      return { sessions, createdLessons: [] };
-    }
-
-    const mergedSessions = [...(sessions || []), ...(insertedSessions || [])]
-      .sort((a, b) => {
-        const dateCompare = String(a.session_date || "").localeCompare(String(b.session_date || ""));
-        if(dateCompare !== 0) return dateCompare;
-        return Number(a.session_order || 0) - Number(b.session_order || 0);
-      });
-    return {
-      sessions: mergedSessions,
-      createdLessons: newLessons || []
-    };
-  }
-
   async function renderExamsTab(){
     const tc=document.getElementById("cvTabContent"); if(!tc) return;
     tc.innerHTML='<p style="color:var(--ink-light);font-size:.85rem">Đang tải buổi học và đề luyện tập...</p>';
@@ -1409,11 +1326,7 @@
       return;
     }
 
-    let sessions = sessionTableMissing ? [] : (classSessions || []);
-    if(!sessionTableMissing){
-      const synced = await syncClassSessionsForCurrentMonth(sb, sessions);
-      sessions = synced.sessions || sessions;
-    }
+    const sessions = sessionTableMissing ? [] : (classSessions || []);
     const lessonIds = [...new Set(sessions.map(s=>s.lesson_id).filter(Boolean))];
     const regularIds = [...new Set([
       ...sessions.map(s=>s.exam_id).filter(Boolean),
