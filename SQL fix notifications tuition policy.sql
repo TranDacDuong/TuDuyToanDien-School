@@ -3,6 +3,8 @@
 -- Run this in your Supabase SQL Editor.
 -- ============================================
 
+BEGIN;
+
 -- 1. Dynamically drop all existing policies on the notifications table to avoid name mismatches
 DO $$
 DECLARE
@@ -20,10 +22,11 @@ END $$;
 -- 2. Re-enable RLS on the table
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
--- 3. Create SELECT policy (users can read their own notifications)
+-- 3. Recipients can read their notifications; senders can read rows they just created
+--    so PostgREST INSERT ... RETURNING id can complete under RLS.
 CREATE POLICY notifications_select_policy ON public.notifications
   FOR SELECT TO authenticated
-  USING (auth.uid() = user_id);
+  USING (auth.uid() = user_id OR auth.uid() = actor_id);
 
 -- 4. Create UPDATE policy (users can update/mark read their own notifications)
 CREATE POLICY notifications_update_policy ON public.notifications
@@ -65,3 +68,4 @@ CREATE POLICY notifications_insert_trial_policy ON public.notifications
     AND actor_id IS NULL
   );
 
+COMMIT;

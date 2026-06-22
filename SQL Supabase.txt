@@ -694,29 +694,49 @@ USING (
 
 DROP POLICY IF EXISTS notifications_select_policy ON public.notifications;
 CREATE POLICY notifications_select_policy ON public.notifications
-FOR SELECT
-USING (auth.uid() = user_id);
+FOR SELECT TO authenticated
+USING (auth.uid() = user_id OR auth.uid() = actor_id);
 
 DROP POLICY IF EXISTS notifications_insert_policy ON public.notifications;
-CREATE POLICY notifications_insert_policy ON public.notifications
-FOR INSERT
+DROP POLICY IF EXISTS notifications_insert_actor_policy ON public.notifications;
+CREATE POLICY notifications_insert_actor_policy ON public.notifications
+FOR INSERT TO authenticated
+WITH CHECK (auth.uid() = actor_id);
+
+DROP POLICY IF EXISTS notifications_insert_staff_policy ON public.notifications;
+CREATE POLICY notifications_insert_staff_policy ON public.notifications
+FOR INSERT TO authenticated
 WITH CHECK (
-  auth.uid() = actor_id
-  OR (
-    type = 'trial_lesson_request'
-    AND actor_id IS NULL
-    AND EXISTS (
-      SELECT 1 FROM public.users u
-      WHERE u.id = notifications.user_id AND u.role IN ('admin', 'teacher')
-    )
+  EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role::text IN ('admin', 'teacher', 'assistant')
   )
+);
+
+DROP POLICY IF EXISTS notifications_insert_trial_policy ON public.notifications;
+CREATE POLICY notifications_insert_trial_policy ON public.notifications
+FOR INSERT TO anon, authenticated
+WITH CHECK (
+  type = 'trial_lesson_request'
+  AND actor_id IS NULL
 );
 
 DROP POLICY IF EXISTS notifications_update_policy ON public.notifications;
 CREATE POLICY notifications_update_policy ON public.notifications
-FOR UPDATE
+FOR UPDATE TO authenticated
 USING (auth.uid() = user_id)
 WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS notifications_delete_policy ON public.notifications;
+CREATE POLICY notifications_delete_policy ON public.notifications
+FOR DELETE TO authenticated
+USING (
+  auth.uid() = user_id
+  OR EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.role::text = 'admin'
+  )
+);
 
 DROP POLICY IF EXISTS trial_lesson_requests_insert_policy ON public.trial_lesson_requests;
 CREATE POLICY trial_lesson_requests_insert_policy ON public.trial_lesson_requests
