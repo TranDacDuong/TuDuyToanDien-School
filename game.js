@@ -446,7 +446,7 @@
     if (GAME.unloadingLeaveSent) return;
     const room = GAME.activeRoom;
     const player = (GAME.roomPlayers || []).find((item) => item.user_id === GAME.user?.id);
-    if (!room || !player || room.status === "finished") return;
+    if (!room || !player || room.status === "finished" || room.status === "live") return;
     GAME.unloadingLeaveSent = true;
     const baseUrl = getRestBaseUrl();
     if (!baseUrl) return;
@@ -2094,6 +2094,17 @@
     if (GAME.role === "student" && !GAME.profile?.grade_id) return;
     setupListRealtime();
     await Promise.all([loadRooms(), loadFriends(), loadAccessibleClasses()]);
+    // Auto rejoin active room if user is already a player in a waiting or live room
+    if (!GAME.initialRoomId) {
+      const myActivePlayer = GAME.players.find((p) => p.user_id === GAME.user.id);
+      if (myActivePlayer) {
+        const myRoom = GAME.roomsRaw.find((r) => r.id === myActivePlayer.room_id);
+        if (myRoom && (myRoom.status === "waiting" || myRoom.status === "live")) {
+          await openRoomScreen(myRoom.id);
+          return;
+        }
+      }
+    }
     if (GAME.initialAction === "create_room") {
       openGameRoomModal();
     } else if (GAME.initialRoomId) {
@@ -3462,8 +3473,13 @@
 
     EL.roomScreenTitle.innerHTML = `Phòng chờ: <span>${esc(room.join_code || "----")}</span>`;
     updateRoundTopbarScore(mode, me?.score || 0);
-    EL.startGameBtn.classList.add("hidden");
-    EL.startGameBtn.disabled = true;
+    if (isStartController && room.status === "waiting" && mode === "quick") {
+      EL.startGameBtn.classList.remove("hidden");
+      EL.startGameBtn.disabled = !readyForStart;
+    } else {
+      EL.startGameBtn.classList.add("hidden");
+      EL.startGameBtn.disabled = true;
+    }
     EL.toggleReadyBtn?.classList.add("hidden");
     if (EL.toggleReadyBtn && me && room.status === "waiting") {
       const canToggle = mode === "solo" || (mode === "quick" && !isCoordinator);
@@ -3614,6 +3630,10 @@
   async function startGameMatch() {
     const room = GAME.activeRoom;
     if (!room || getRoomStartControllerUserId(room) !== GAME.user.id) return;
+    if (!areRoomPlayersReadyForStart(room, GAME.roomPlayers)) {
+      alert("Tất cả người chơi trong phòng phải sẵn sàng mới có thể bắt đầu.");
+      return;
+    }
     clearWaitingCountdown();
     const abortStart = async (message) => {
       clearAutoStartTimer();
@@ -4244,7 +4264,7 @@
     clearInterval(GAME.questionTick);
     const room = GAME.activeRoom;
     if (!room) return;
-    if (room.status !== "finished" && getRoomStartControllerUserId(room) === GAME.user.id) {
+    if (room.status !== "finished") {
       await sb.from("game_rooms").update({ status: "finished", ended_at: new Date().toISOString() }).eq("id", room.id);
     }
     await refreshActiveRoom(room.id, true);

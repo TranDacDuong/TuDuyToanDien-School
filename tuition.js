@@ -128,14 +128,14 @@
       }
 
     } else if (tuition_type === "per_month") {
-      // fee - (absent × fee/tổng) + (makeup × makeup_fee)
+      // fee + (makeup × makeup_fee) (không trừ tiền vắng mặt)
       const perSession = totalSessions > 0 ? fee / totalSessions : 0;
       const mFee       = mkFee !== null ? mkFee : perSession;
       feePerSession    = perSession;
-      amount           = fee - (absent * perSession) + (makeup * mFee);
+      amount           = fee + (makeup * mFee);
       amount           = Math.max(0, amount);
-      billableSessions = totalSessions - absent + makeup;
-      noteCalc = `${fmt(perSession)}đ/buổi`;
+      billableSessions = totalSessions + makeup;
+      noteCalc = `Cố định tháng`;
       if (mkFee !== null && mkFee !== perSession) {
         noteCalc += ` • Học bù: ${fmt(mFee)}đ/buổi`;
       }
@@ -439,16 +439,9 @@ Nhập số tiền hoàn lại (>0):`,
     currentRole = profile?.role || "student";
     parentStudentIds = new Set();
     assistantClassIds = new Set();
-    if (currentRole === "teacher") {
+    if (currentRole === "teacher" || currentRole === "assistant") {
       location.href = "dashboard.html";
       return false;
-    } else if (currentRole === "assistant") {
-      const { data: rows, error: classError } = await sb
-        .from("class_teachers")
-        .select("class_id")
-        .eq("teacher_id", currentUserId);
-      if (classError) throw classError;
-      assistantClassIds = new Set((rows || []).map(row => row.class_id).filter(Boolean));
     }
 
     const titleEl = document.querySelector("h1");
