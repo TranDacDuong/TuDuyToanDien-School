@@ -2993,7 +2993,7 @@
     const policy = getCreateRoomPolicy();
     const joinCode = String(EL.roomCode.value || "").trim().toUpperCase() || randomCode();
     const classId = policy.allowClass ? (EL.roomClass?.value || null) : null;
-    const maxPlayers = mode === "ranked" ? 4 : Number(EL.roomMaxPlayers?.value || 8);
+    const maxPlayers = Number(EL.roomMaxPlayers?.value || 8);
     if (policy.classRequired && !classId) {
       alert("Giáo viên cần chọn lớp học trước khi tạo phòng.");
       return;
@@ -3605,7 +3605,6 @@
   function renderPlayerRow(player, index, showScore) {
     const rankClass = showScore ? (index === 1 ? "top-1" : index === 2 ? "top-2" : index === 3 ? "top-3" : "") : "";
     const meClass = player.user_id === GAME.user?.id ? "me" : "";
-    const lives = getPlayerLives(player.id, GAME.activeRoom, GAME.roomAnswers || []);
     const mode = roomModeValue(GAME.activeRoom);
     const coordinatorId = getRoomCoordinatorUserId(GAME.activeRoom, GAME.roomPlayers);
     const isHost = player.user_id === coordinatorId;
@@ -3619,7 +3618,7 @@
         <img class="avatar" src="${escAttr(getPlayerAvatar(player.user_id))}" alt="avatar">
         <div>
           <div style="font-weight:700;color:var(--navy)">${index}. ${esc(getPlayerName(player.user_id))}</div>
-          <div class="hint">Người chơi${lives !== null ? ` • ${lives} mạng` : ""}</div>
+          <div class="hint">Người chơi</div>
         </div>
       </div>
       ${showScore ? `<strong style="color:#fde68a">${player.score || 0}</strong>` : waitingActions}
@@ -4138,9 +4137,6 @@
   }
 
   function getRequiredAnswerPlayers(room) {
-    if (roomModeValue(room) === "survival") {
-      return getAlivePlayers(room, GAME.roomPlayers, GAME.roomAnswers || []);
-    }
     return GAME.roomPlayers || [];
   }
 
