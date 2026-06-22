@@ -171,7 +171,7 @@
   };
 
   function supportsModeElo(mode) {
-    return ["solo", "quick", "round", "ranked"].includes(mode);
+    return ["solo", "quick", "round"].includes(mode);
   }
 
   function roundToNearestTen(value) {
@@ -182,15 +182,6 @@
     if (mode === "solo") return "Chơi đơn: Elo thay đổi theo mức điểm của trận, tối đa +30 Elo.";
     if (mode === "quick") return "Đấu nhanh: nửa trên được cộng Elo bằng hiệu điểm với người đối xứng ở nửa dưới; nửa dưới bị trừ đều tổng Elo đã cộng.";
     if (mode === "round") return "Vòng MindUp: đạt từ 100 điểm mới qua vòng và được cộng Elo; mỗi lần thi lại trừ 20 điểm.";
-    if (mode === "solo") {
-      return "Chơi đơn: điểm trận càng cao, Elo cộng càng nhiều.";
-    }
-    if (mode === "ranked") {
-      return "Top 1 +100 Elo, top 2 +50 Elo, các vị trí còn lại bị trừ đều tổng 150 Elo.";
-    }
-    if (mode === "quick" || mode === "friends" || mode === "survival" || mode === "speed") {
-      return "Top 25% +20 Elo, 25% tiếp theo +10 Elo, còn lại không đổi Elo.";
-    }
     return "Chế độ này không tính Elo.";
   }
 
@@ -213,31 +204,7 @@
       }));
     }
 
-    const map = {};
-    if (mode === "ranked") {
-      orderedPlayers.forEach((player, index) => {
-        if (index === 0) {
-          map[player.user_id] = 100;
-          return;
-        }
-        if (index === 1) {
-          map[player.user_id] = 50;
-          return;
-        }
-        const losers = Math.max(1, total - 2);
-        map[player.user_id] = -roundToNearestTen(150 / losers);
-      });
-      return map;
-    }
-
-    const topCount = Math.max(1, Math.ceil(total * 0.25));
-    const secondCount = Math.max(1, Math.ceil(total * 0.25));
-    orderedPlayers.forEach((player, index) => {
-      if (index < topCount) map[player.user_id] = 20;
-      else if (index < topCount + secondCount) map[player.user_id] = 10;
-      else map[player.user_id] = 0;
-    });
-    return map;
+    return {};
   }
 
   function getMirroredRankEloDeltaMap(orderedPlayers) {
@@ -429,8 +396,6 @@
 
   init();
   normalizeStaticGameText();
-  applyCleanModeOptions();
-
   if (EL.roomMode?.closest(".field")) {
     const modeLabels = EL.roomMode.closest(".field").querySelectorAll("label");
     if (modeLabels[0]) modeLabels[0].textContent = "Chế độ";
@@ -443,20 +408,8 @@
   if (EL.roomMode) {
     EL.roomMode.innerHTML = `
       <option value="quick">Đấu nhanh</option>
-      <option value="friends">Phòng bạn bè</option>
-      <option value="ranked">Leo hạng</option>
-      <option value="survival">Sinh tồn</option>
-      <option value="speed">Đua tốc độ</option>
     `;
   }
-
-  function applyCleanModeOptions() {
-    if (EL.roomMode) {
-      EL.roomMode.innerHTML = `<option value="quick">Đấu nhanh</option><option value="friends">Phòng bạn bè</option>`;
-    }
-  }
-
-  applyCleanModeOptions();
 
   function esc(value) {
     return String(value ?? "")
@@ -807,13 +760,6 @@
       { mode: "solo", title: "Chơi đơn", art: "🎯", desc: "Luyện nhanh như phần Tăng tốc, mỗi câu 5/10/15/20 điểm theo tốc độ.", elo: getModeEloRule("solo") },
       { mode: "quick", title: "Đấu nhanh", art: "⚡", desc: "Từ 2 người trở lên, đúng càng nhanh điểm từng câu càng cao.", elo: getModeEloRule("quick") },
       { mode: "round", title: "Vòng MindUp", art: "🏔️", desc: "4 thử thách kiểu Olympia: Khởi động, Chướng ngại, Tăng tốc, Về đích.", elo: "Từ 100 điểm mới qua vòng và được cộng Elo; thi lại trừ 20 điểm." },
-    ];
-    return [
-      { mode: "solo", title: "Chơi đơn", art: "🎯", desc: "Vào trận ngay, luyện 5 câu để cày Elo.", elo: getModeEloRule("solo") },
-      { mode: "quick", title: "Đấu nhanh", art: "⚡", desc: "Vào nhanh, ghép nhanh.", elo: getModeEloRule("quick") },
-      { mode: "ranked", title: "Leo hạng", art: "🏆", desc: "Chế độ cạnh tranh Elo rõ ràng.", elo: getModeEloRule("ranked") },
-      { mode: "survival", title: "Sinh tồn", art: "🛡️", desc: "Sai là mất mạng, càng về cuối càng căng.", elo: getModeEloRule("survival") },
-      { mode: "speed", title: "Đua tốc độ", art: "🚀", desc: "Đúng nhanh để bứt lên.", elo: getModeEloRule("speed") },
     ];
   }
 
@@ -2378,34 +2324,18 @@
 
   function roomModeValue(room) {
     if (room?.mode) return room.mode;
-    return (room?.visibility || "public") === "private" ? "friends" : "quick";
+    return "quick";
   }
 
   function roomModeLabel(mode) {
     if (mode === "round") return "Vòng MindUp";
     if (mode === "solo") return "Chơi đơn";
-    if (mode === "ranked") return "Leo hạng";
-    if (mode === "survival") return "Sinh tồn";
-    if (mode === "speed") return "Đua tốc độ";
-    if (mode === "friends") return "Phòng bạn bè";
     return "Đấu nhanh";
   }
 
   function getModeDefaults(mode) {
     if (mode === "solo") {
       return { visibility: "private", maxPlayers: 1, questionCount: 5, timePerQuestion: 60 };
-    }
-    if (mode === "friends") {
-      return { visibility: "private", maxPlayers: 6, questionCount: 5, timePerQuestion: 60 };
-    }
-    if (mode === "survival") {
-      return { visibility: "private", maxPlayers: 8, questionCount: 5, timePerQuestion: 60 };
-    }
-    if (mode === "speed") {
-      return { visibility: "private", maxPlayers: 10, questionCount: 5, timePerQuestion: 60 };
-    }
-    if (mode === "ranked") {
-      return { visibility: GAME.role === "admin" ? "public" : "private", maxPlayers: 4, questionCount: 5, timePerQuestion: 60 };
     }
     return { visibility: GAME.role === "admin" ? "public" : "private", maxPlayers: 8, questionCount: 5, timePerQuestion: 60 };
   }
@@ -2585,21 +2515,7 @@
       .sort((a, b) => (b.score || 0) - (a.score || 0) || new Date(a.joined_at) - new Date(b.joined_at));
   }
 
-  function getPlayerLives(playerId, room, answers) {
-    if (roomModeValue(room) !== "survival") return null;
-    const wrongCount = (answers || []).filter((item) => item.player_id === playerId && item.is_correct === false).length;
-    return Math.max(0, 3 - wrongCount);
-  }
 
-  function isPlayerEliminated(playerId, room, answers) {
-    const lives = getPlayerLives(playerId, room, answers);
-    return lives !== null && lives <= 0;
-  }
-
-  function getAlivePlayers(room, players, answers) {
-    if (roomModeValue(room) !== "survival") return players || [];
-    return (players || []).filter((player) => !isPlayerEliminated(player.id, room, answers));
-  }
 
   function getArenaTier(elo) {
     if (elo >= 1800) return { name: "Kim cương", icon: "◆" };
@@ -3050,14 +2966,18 @@
   }
 
   function openGameRoomModal() {
+    if (GAME.role === "student") {
+      alert("Học sinh không thể tự tạo phòng thi đấu.");
+      return;
+    }
     EL.roomForm?.reset();
     EL.roomCode.value = randomCode();
     if (EL.roomTitle) EL.roomTitle.value = `Game ${EL.roomCode.value}`;
-    if (EL.roomMode) EL.roomMode.value = GAME.role === "student" ? "friends" : (GAME.initialAction === "create_room_ranked" ? "ranked" : "quick");
+    if (EL.roomMode) EL.roomMode.value = "quick";
     configureCreateRoomForm();
     if (EL.roomMaxPlayers) EL.roomMaxPlayers.value = "8";
     if (EL.roomClass) EL.roomClass.value = GAME.initialClassId && GAME.classIds.includes(GAME.initialClassId) ? GAME.initialClassId : "";
-    applyModeDefaults(EL.roomMode?.value || "quick", true);
+    applyModeDefaults("quick", true);
     if (EL.roomClass?.value) syncRoomFiltersFromClass(EL.roomClass.value);
     if (!EL.roomClass?.value) fillSubjects(EL.roomSubject, EL.roomGrade.value, "Chọn môn");
     EL.roomModal.classList.add("show");
@@ -3281,15 +3201,6 @@
     if (!mode) return;
     if (!EL.gradeFilter?.value || !EL.subjectFilter?.value) {
       alert("Hãy chọn Khối và Môn trước khi vào trận.");
-      return;
-    }
-    if (mode === "friends") {
-      if (GAME.role !== "student") {
-        alert("Phòng bạn bè chỉ dành cho học sinh tạo và vào bằng mã phòng.");
-        return;
-      }
-      if (EL.roomMode) EL.roomMode.value = "friends";
-      openGameRoomModal();
       return;
     }
     const config = getActiveGameConfig(mode, EL.gradeFilter.value, EL.subjectFilter.value);
@@ -4016,8 +3927,6 @@
       const questions = GAME.roomQuestions;
       const mode = roomModeValue(room);
       applyLiveModeLayout(mode);
-      const me = GAME.roomPlayers.find((player) => player.user_id === GAME.user.id);
-      const myLives = me ? getPlayerLives(me.id, room, GAME.roomAnswers || []) : null;
       if (!room || !questions.length) {
         renderMathText(EL.questionBody, "Đang chuẩn bị câu hỏi...");
         EL.answerArea.innerHTML = "";
@@ -4092,15 +4001,11 @@
       EL.questionTitle.innerHTML = `Câu <span>${currentIndex + 1}</span> / ${visibleQuestions.length}`;
       EL.questionClock.textContent = String(secondsLeft).padStart(2, "0");
       if (EL.progressText) {
-        EL.progressText.textContent = mode === "survival"
-          ? `Sinh tồn • ${currentIndex + 1}/${questions.length}${myLives !== null ? ` • ${myLives} mạng` : ""}`
-          : mode === "solo"
+        EL.progressText.textContent = mode === "solo"
             ? `Chơi đơn • ${currentIndex + 1}/${visibleQuestions.length}`
           : mode === "round"
             ? `Vòng MindUp • ${getRoundChallengeLabel(question)} • ${currentIndex + 1}/${visibleQuestions.length}`
-          : mode === "speed"
-            ? `Đua tốc độ • ${currentIndex + 1}/${visibleQuestions.length}`
-            : `Tiến độ ${currentIndex + 1}/${visibleQuestions.length}`;
+            : `Đấu nhanh • Tiến độ ${currentIndex + 1}/${visibleQuestions.length}`;
       }
       if (EL.progressFill) EL.progressFill.style.width = `${((currentIndex + 1) / visibleQuestions.length) * 100}%`;
       const answered = GAME.myAnswers.find((item) => item.game_question_id === question.id);
@@ -4117,7 +4022,7 @@
         EL.questionImg.classList.toggle("hidden", !question.question_img);
         if (question.question_img) EL.questionImg.src = question.question_img;
       }
-      const renderKey = `${question.id}:${answered?.id || "pending"}:${myLives ?? "na"}`;
+      const renderKey = `${question.id}:${answered?.id || "pending"}`;
       if (GAME.liveRenderKey !== renderKey) {
         GAME.liveRenderKey = renderKey;
         renderAnswerArea(question);
@@ -4274,12 +4179,9 @@
     const room = GAME.activeRoom;
     const me = GAME.roomPlayers.find((player) => player.user_id === GAME.user.id);
     const answered = GAME.myAnswers.find((item) => item.game_question_id === question.id);
-    const isEliminated = me ? isPlayerEliminated(me.id, GAME.activeRoom, GAME.roomAnswers || []) : false;
-    const disabled = !!answered || isEliminated;
+    const disabled = !!answered;
     if (EL.answerFeedback) {
-      if (isEliminated) {
-        EL.answerFeedback.innerHTML = `<div class="feedback-box bad">Bạn đã hết mạng trong trận sinh tồn này.</div>`;
-      } else if (answered) {
+      if (answered) {
         EL.answerFeedback.innerHTML = `<div class="feedback-box ${answered.is_correct ? "good" : "bad"}">${answered.is_correct ? "Bạn ghi điểm ở câu này." : "Bạn đã gửi đáp án."} +${answered.score_earned || 0} điểm</div>`;
       } else {
         EL.answerFeedback.innerHTML = "";
@@ -4300,14 +4202,6 @@
       if (EL.answerFeedback) EL.answerFeedback.innerHTML = "";
       return;
     }
-
-      if (roomModeValue(room) === "survival") {
-        const alivePlayers = getAlivePlayers(room, GAME.roomPlayers, GAME.roomAnswers || []);
-        if (alivePlayers.length <= 1) {
-          finishRoomIfNeeded();
-          return;
-        }
-      }
 
       if (question.question_type === "multi_choice") {
       const player = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
@@ -4403,11 +4297,6 @@
       return;
     }
     const ordered = [...GAME.roomPlayers].sort((a, b) => {
-      const livesA = getPlayerLives(a.id, GAME.activeRoom, GAME.roomAnswers || []);
-      const livesB = getPlayerLives(b.id, GAME.activeRoom, GAME.roomAnswers || []);
-      if (livesA !== null || livesB !== null) {
-        if ((livesB ?? -1) !== (livesA ?? -1)) return (livesB ?? -1) - (livesA ?? -1);
-      }
       return (b.score || 0) - (a.score || 0) || new Date(a.joined_at) - new Date(b.joined_at);
     });
     const comboStats = getMyComboStats();
@@ -4425,15 +4314,6 @@
     clearInterval(GAME.questionTick);
     const room = GAME.activeRoom;
     if (!room) return;
-    if (roomModeValue(room) === "survival") {
-      const alivePlayers = getAlivePlayers(room, GAME.roomPlayers, GAME.roomAnswers || []);
-      const timeline = getQuestionTimeline(room, GAME.roomQuestions);
-      const currentIndex = timeline.index;
-      const activeCount = (timeline.questions || GAME.roomQuestions).length;
-      if (alivePlayers.length > 1 && currentIndex < activeCount) {
-        return;
-      }
-    }
     if (room.status !== "finished" && getRoomStartControllerUserId(room) === GAME.user.id) {
       await sb.from("game_rooms").update({ status: "finished", ended_at: new Date().toISOString() }).eq("id", room.id);
     }
@@ -4443,11 +4323,6 @@
   async function renderFinishedRoomUnified() {
     const finishedRoom = GAME.activeRoom;
     const ordered = [...GAME.roomPlayers].sort((a, b) => {
-      const livesA = getPlayerLives(a.id, GAME.activeRoom, GAME.roomAnswers || []);
-      const livesB = getPlayerLives(b.id, GAME.activeRoom, GAME.roomAnswers || []);
-      if (livesA !== null || livesB !== null) {
-        if ((livesB ?? -1) !== (livesA ?? -1)) return (livesB ?? -1) - (livesA ?? -1);
-      }
       return (b.score || 0) - (a.score || 0) || new Date(a.joined_at) - new Date(b.joined_at);
     });
     const winner = ordered[0];
@@ -4472,13 +4347,9 @@
         GAME.roundReturnTimer = null;
       }, 1800);
     }
-    EL.finishedMeta.textContent = roomMode === "survival"
-      ? `Phòng ${GAME.activeRoom?.title || ""} đã kết thúc. Ở chế độ sinh tồn, người còn nhiều mạng hơn sẽ xếp trên, nếu bằng mạng thì so điểm.`
-      : roomMode === "solo"
+    EL.finishedMeta.textContent = roomMode === "solo"
         ? `Trận Chơi đơn đã kết thúc. Elo của bạn thay đổi theo tổng điểm, độ chính xác và tốc độ hoàn thành 5 câu hỏi.`
-        : roomMode === "speed"
-          ? `Phòng ${GAME.activeRoom?.title || ""} đã kết thúc. Ở chế độ đua tốc độ, đúng nhanh sẽ nhận nhiều điểm hơn.`
-          : `Phòng ${GAME.activeRoom?.title || ""} đã kết thúc. Người có điểm cao hơn sẽ xếp trên, nếu bằng điểm thì ai vào phòng sớm hơn sẽ xếp trên.`;
+        : `Phòng ${GAME.activeRoom?.title || ""} đã kết thúc. Người có điểm cao hơn sẽ xếp trên, nếu bằng điểm thì ai vào phòng sớm hơn sẽ xếp trên.`;
     if (supportsModeElo(roomMode)) {
       EL.finishedMeta.textContent += ` ${getModeEloRule(roomMode)}`;
     }
@@ -4500,7 +4371,6 @@
         <div><span>Câu đúng</span><strong>${correctCount}/${displayedQuestionTotal}</strong></div>
         <div><span>Độ chính xác</span><strong>${accuracy}%</strong></div>
         ${supportsModeElo(roomMode) ? `<div><span>Elo</span><strong>${Number(eloDeltaMap[GAME.user.id] || 0) >= 0 ? "+" : ""}${Number(eloDeltaMap[GAME.user.id] || 0)}</strong></div>` : ""}
-        ${getPlayerLives(myPlayer?.id, GAME.activeRoom, GAME.roomAnswers || []) !== null ? `<div><span>Mạng còn lại</span><strong>${getPlayerLives(myPlayer?.id, GAME.activeRoom, GAME.roomAnswers || [])}</strong></div>` : ""}
         <div><span>Xếp hạng</span><strong>#${Math.max(1, ordered.findIndex((item) => item.user_id === GAME.user.id) + 1)}</strong></div>
       `;
     }
@@ -4703,13 +4573,9 @@
       }
       return { isCorrect: ok, score: 0, comboBonus: 0 };
     }
-    const speedBonus = Math.round((remaining / totalTime) * (mode === "speed" ? 70 : 35));
+    const speedBonus = Math.round((remaining / totalTime) * 35);
     const base = Number(question.points || 0);
-    const comboBonus = mode === "speed"
-      ? (currentCombo >= 1 ? Math.min(90, (currentCombo + 1) * 12) : 0)
-      : currentCombo >= 2
-        ? Math.min(60, currentCombo * 10)
-        : 0;
+    const comboBonus = currentCombo >= 2 ? Math.min(60, currentCombo * 10) : 0;
     if (question.question_type === "multi_choice") {
       const correct = normalizeAnswer(question.answer);
       const mine = normalizeAnswer(answerValue);
