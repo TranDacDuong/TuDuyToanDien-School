@@ -33,7 +33,7 @@
 
   const STATIC_BANK_INFO = {
     bank: "MB",
-    account: "YOUR_MB_ACCOUNT_NUMBER", // Bạn hãy thay đổi số tài khoản MB tĩnh của bạn ở đây để in hoá đơn
+    account: "YOUR_MB_ACCOUNT_NUMBER", // Bạn hãy thay đổi số tài khoản MB của bạn ở đây để hiển thị mã QR
   };
 
   function buildPaymentQrUrl(studentName, ym, amount) {
@@ -49,103 +49,24 @@
       return `<div class="qr-payment-card"><div class="qr-payment-text"><div class="qr-payment-title">Mã QR thanh toán</div><div class="qr-payment-note">Học phí đã được thanh toán đủ nên không cần tạo mã QR.</div></div></div>`;
     }
 
-    // Nếu đang in hoá đơn (hoặc không có studentId), hiển thị mã QR tĩnh
-    if (document.body.classList.contains("printing-invoices") || !studentId) {
-      const qrUrl = buildPaymentQrUrl(studentName, ym, finalAmount);
-      const transferContent = buildTransferContent(studentName, ym);
-      return `
-        <div class="qr-payment-card">
-          <div class="qr-payment-media">
-            <img class="qr-payment-image" src="${qrUrl}" alt="QR thanh toán học phí" referrerpolicy="no-referrer">
-          </div>
-          <div class="qr-payment-text">
-            <div class="qr-payment-title">Quét mã để thanh toán học phí</div>
-            <div class="qr-payment-line"><span>Ngân hàng:</span><b>${STATIC_BANK_INFO.bank}</b></div>
-            <div class="qr-payment-line"><span>Số tài khoản:</span><b>${STATIC_BANK_INFO.account}</b></div>
-            <div class="qr-payment-line"><span>Số tiền:</span><b>${fmt(finalAmount)}đ</b></div>
-            <div class="qr-payment-line"><span>Nội dung CK:</span><b>${transferContent}</b></div>
-            <div class="qr-payment-note">Khi quét QR, ứng dụng ngân hàng sẽ tự điền sẵn số tiền và nội dung chuyển khoản.</div>
-          </div>
-        </div>
-      `;
-    }
-
-    const containerId = `payos-container-${studentId}-${ym}`.replace(/[^a-zA-Z0-9-]/g, "");
-
+    const qrUrl = buildPaymentQrUrl(studentName, ym, finalAmount);
+    const transferContent = buildTransferContent(studentName, ym);
     return `
-      <div class="qr-payment-card" id="${containerId}">
-        <div class="qr-payment-text" style="width: 100%; text-align: center; padding: 12px 0;">
-          <div class="qr-payment-title">Thanh toán học phí trực tuyến (VietQR PayOS)</div>
-          <button class="action-btn collect" style="padding: 10px 20px; font-size: 13px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;" 
-            onclick="window.generatePayosQr('${studentId}', '${ym}', ${finalAmount}, '${containerId}')">
-            ⚡ Tạo mã QR chuyển khoản tự động
-          </button>
-          <div class="qr-payment-note" style="margin-top: 10px; font-size: 12px;">Mã QR động kết nối trực tiếp với tài khoản MB Bank của bạn qua cổng PayOS để tự động gạch nợ.</div>
+      <div class="qr-payment-card">
+        <div class="qr-payment-media">
+          <img class="qr-payment-image" src="${qrUrl}" alt="QR thanh toán học phí" referrerpolicy="no-referrer">
+        </div>
+        <div class="qr-payment-text">
+          <div class="qr-payment-title">Quét mã để thanh toán học phí</div>
+          <div class="qr-payment-line"><span>Ngân hàng:</span><b>${STATIC_BANK_INFO.bank}</b></div>
+          <div class="qr-payment-line"><span>Số tài khoản:</span><b>${STATIC_BANK_INFO.account}</b></div>
+          <div class="qr-payment-line"><span>Số tiền:</span><b>${fmt(finalAmount)}đ</b></div>
+          <div class="qr-payment-line"><span>Nội dung CK:</span><b>${transferContent}</b></div>
+          <div class="qr-payment-note">Khi quét QR, ứng dụng ngân hàng sẽ tự điền sẵn số tiền và nội dung chuyển khoản.</div>
         </div>
       </div>
     `;
   }
-
-  window.generatePayosQr = async function (studentId, ym, amount, containerId) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    
-    container.innerHTML = `
-      <div class="qr-payment-text" style="width: 100%; text-align: center; padding: 12px 0;">
-        <span style="font-size: 13px; color: var(--muted);">⏳ Đang tạo mã QR thanh toán...</span>
-      </div>
-    `;
-    
-    try {
-      const sb = getSb();
-      const session = await sb.auth.getSession();
-      const token = session.data.session?.access_token;
-      
-      const res = await fetch(`${window.SUPABASE_URL}/functions/v1/payos-payment/create-link`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ studentId, month: ym, amount })
-      });
-      
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Không thể tạo link thanh toán");
-      }
-      
-      const data = await res.json();
-      
-      container.innerHTML = `
-        <div class="qr-payment-media">
-          <img class="qr-payment-image" src="${data.qrCode}" alt="QR thanh toán học phí" referrerpolicy="no-referrer">
-        </div>
-        <div class="qr-payment-text">
-          <div class="qr-payment-title" style="color:var(--green)">Mã VietQR PayOS đã sẵn sàng</div>
-          <div class="qr-payment-line"><span>Ngân hàng:</span><b>MB Bank (Cổng PayOS)</b></div>
-          <div class="qr-payment-line"><span>Số tiền:</span><b>${fmt(data.amount)}đ</b></div>
-          <div class="qr-payment-line"><span>Nội dung CK:</span><b style="color:var(--red); font-size:14px; letter-spacing:0.5px;">${data.description}</b></div>
-          <div class="qr-payment-note" style="color:var(--red); font-weight:600;">Chú ý: Quét mã hoặc copy chính xác Nội dung chuyển khoản để hệ thống tự động gạch nợ.</div>
-          <div style="margin-top: 10px;">
-            <a class="action-btn collect" style="text-decoration: none; display: inline-block; padding: 6px 12px; font-size:12px;" href="${data.checkoutUrl}" target="_blank">
-              🔗 Mở link thanh toán trực tiếp
-            </a>
-          </div>
-        </div>
-      `;
-    } catch (error) {
-      container.innerHTML = `
-        <div class="qr-payment-text" style="width: 100%; text-align: center; padding: 12px 0;">
-          <span style="font-size: 13px; color: var(--red); font-weight:600;">❌ Lỗi: ${error.message}</span>
-          <br>
-          <button class="action-btn note" style="margin-top:8px; padding: 4px 8px; font-size:11px;" onclick="window.generatePayosQr('${studentId}', '${ym}', ${amount}, '${containerId}')">
-            Thử lại
-          </button>
-        </div>
-      `;
-    }
-  };
 
   function todayYM() {
     const n = new Date();
