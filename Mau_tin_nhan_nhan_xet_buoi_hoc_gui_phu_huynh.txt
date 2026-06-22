@@ -1,0 +1,99 @@
+Kính gửi anh/chị {ten_phu_huynh},
+
+Trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} {cum_mau_trang_thai_tot}.
+
+//Nếu có trạng thái xấu thì thêm đoạn sau.
+Tuy nhiên, con {cum_mau_trang_thai_xau}.
+
+{cau_ket_thuc}.
+
+TIẾP THU KIẾN THỨC TỐT
+1. tiếp thu kiến thức khá tốt và nắm bắt được các nội dung trọng tâm của bài học
+2. hiểu bài nhanh và vận dụng được kiến thức vào các bài tập trên lớp
+3. nắm vững nội dung được hướng dẫn trong buổi học
+4. tiếp nhận kiến thức hiệu quả và hoàn thành tốt các yêu cầu học tập
+5. thể hiện khả năng tiếp thu bài học tích cực trong suốt buổi học
+
+TẬP TRUNG VÀO BÀI GIẢNG
+1. duy trì sự tập trung tốt trong quá trình học tập
+2. theo sát nội dung bài giảng và thực hiện đầy đủ các yêu cầu của giáo viên
+3. có thái độ học tập nghiêm túc trong giờ học
+4. chú ý lắng nghe và tham gia đầy đủ các hoạt động trên lớp
+5. giữ được sự tập trung trong phần lớn thời gian học tập
+
+SÔI NỔI
+1. tích cực tham gia phát biểu xây dựng bài
+2. chủ động trao đổi với giáo viên trong quá trình học
+3. mạnh dạn chia sẻ ý kiến và cách làm bài của mình
+4. tham gia thảo luận khá sôi nổi trong giờ học
+5. có tinh thần tương tác tích cực với giáo viên và các bạn
+
+TIẾP THU KIẾN THỨC CÒN CHẬM
+1. vẫn cần thêm thời gian để nắm vững kiến thức của bài học
+2. còn gặp một số khó khăn trong việc tiếp nhận kiến thức mới
+3. cần được luyện tập thêm để hiểu sâu hơn nội dung bài học
+4. tiếp thu bài học còn chậm ở một số nội dung trọng tâm
+5. cần cố gắng hơn trong việc ghi nhớ và vận dụng kiến thức
+
+MẤT TẬP TRUNG
+1. đôi lúc còn mất tập trung trong giờ học
+2. vẫn còn một số thời điểm chưa chú ý vào nội dung bài giảng
+3. cần cải thiện khả năng tập trung khi tham gia học tập
+4. đôi khi còn sao nhãng trong quá trình học
+5. chưa duy trì được sự tập trung xuyên suốt buổi học
+
+ÍT TƯƠNG TÁC
+1. còn khá dè dặt khi tham gia trao đổi với giáo viên
+2. chưa thực sự chủ động phát biểu xây dựng bài
+3. còn hạn chế trong việc tương tác và chia sẻ ý kiến
+4. cần mạnh dạn hơn khi tham gia các hoạt động trên lớp
+5. chưa tích cực trao đổi trong quá trình học tập
+
+NÓI CHUYỆN RIÊNG
+1. đôi lúc còn nói chuyện riêng trong giờ học
+2. vẫn còn trao đổi ngoài nội dung bài học khi đang học
+3. cần chú ý hạn chế nói chuyện riêng để tập trung hơn
+4. có thời điểm chưa giữ được sự nghiêm túc trong giờ học
+5. còn bị phân tán bởi các cuộc trao đổi ngoài bài học
+
+SỬ DỤNG ĐIỆN THOẠI
+1. còn sử dụng điện thoại vào những thời điểm không cần thiết trong giờ học
+2. cần hạn chế việc sử dụng điện thoại để tập trung hơn vào bài học
+3. đôi lúc còn bị ảnh hưởng bởi điện thoại trong quá trình học
+4. chưa thực sự kiểm soát tốt việc sử dụng điện thoại trong giờ học
+5. cần chú ý sử dụng điện thoại đúng mục đích học tập
+
+CHƯA LÀM BÀI TẬP
+1. chưa hoàn thành đầy đủ bài tập được giao trước buổi học
+2. còn thiếu một phần bài tập cần chuẩn bị
+3. chưa thực hiện đầy đủ nhiệm vụ học tập được giao
+4. cần chú ý hoàn thành bài tập trước khi đến lớp
+5. chưa chuẩn bị đầy đủ bài tập theo yêu cầu của giáo viên
+
+ĐI HỌC MUỘN
+1. đến lớp muộn so với thời gian quy định, phần nào ảnh hưởng đến việc tiếp nhận đầy đủ nội dung đầu buổi học
+2. đi học chưa đúng giờ, cần chú ý sắp xếp thời gian hợp lý để tham gia lớp học đầy đủ và hiệu quả hơn
+3. vào lớp muộn trong buổi học hôm nay, dẫn đến bỏ lỡ một phần nội dung được giáo viên hướng dẫn ở đầu giờ
+4. chưa có mặt đúng giờ khi buổi học bắt đầu, làm ảnh hưởng đến quá trình theo dõi nội dung đầu buổi học
+5. đến lớp muộn hơn thời gian quy định, vì vậy chưa tham gia đầy đủ các hoạt động học tập ở đầu giờ
+
+LỖI KHÁC
+1. vẫn còn một số hạn chế cần tiếp tục khắc phục trong quá trình học tập
+2. cần điều chỉnh thêm một số thói quen học tập để đạt hiệu quả tốt hơn
+3. còn một vài điểm cần cải thiện để nâng cao kết quả học tập
+4. cần cố gắng hơn trong việc thực hiện các nội quy của lớp học
+5. vẫn còn những hạn chế nhỏ cần được nhắc nhở và điều chỉnh
+
+MẪU CÂU KẾT THÚC KHI KHÔNG CÓ LỖI
+1. Cảm ơn anh/chị đã luôn đồng hành cùng giáo viên trong quá trình học tập của em. Mong em tiếp tục duy trì tinh thần học tập tích cực và phát huy những điểm mạnh hiện có.
+2. Thầy/cô rất vui khi ghi nhận những biểu hiện tích cực của em trong buổi học hôm nay. Hy vọng với sự quan tâm của gia đình, em sẽ tiếp tục tiến bộ trong thời gian tới.
+3. Cảm ơn anh/chị đã luôn quan tâm và tạo điều kiện cho em trong quá trình học tập. Thầy/cô mong em sẽ tiếp tục phát huy tốt những kết quả đã đạt được.
+4. Với những biểu hiện tích cực trong buổi học hôm nay, thầy/cô tin rằng em sẽ tiếp tục có thêm nhiều tiến bộ nếu nhận được sự đồng hành thường xuyên từ gia đình.
+5. Thầy/cô ghi nhận sự cố gắng của em trong buổi học hôm nay và mong anh/chị tiếp tục động viên để em duy trì phong độ học tập tích cực này.
+
+MẪU CÂU KẾT THÚC KHI CÓ LỖI CẦN KHẮC PHỤC
+1. Mong anh/chị tiếp tục đồng hành cùng giáo viên trong việc nhắc nhở và động viên em để em từng bước khắc phục những hạn chế hiện tại.
+2. Hy vọng với sự quan tâm của gia đình và sự hỗ trợ từ giáo viên, em sẽ sớm cải thiện những điểm còn hạn chế và đạt kết quả học tập tốt hơn.
+3. Mong anh/chị cùng phối hợp nhắc nhở và động viên em để xây dựng thói quen học tập tích cực hơn trong thời gian tới.
+4. Thầy/cô tin rằng với sự đồng hành của gia đình, em sẽ có thêm động lực để điều chỉnh những điểm còn hạn chế và tiếp tục tiến bộ.
+5. Cảm ơn anh/chị đã luôn phối hợp cùng giáo viên trong quá trình giáo dục và đồng hành cùng em. Hy vọng em sẽ sớm khắc phục những hạn chế hiện tại để đạt hiệu quả học tập tốt hơn.

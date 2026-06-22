@@ -779,12 +779,12 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 
 <div id="evaluationTemplates" class="panel">
   <div class="form-card">
-    <div class="form-card-hd"><h3>Thêm mẫu nhận xét</h3></div>
+    <div class="form-card-hd"><h3>Thêm mẫu nhận xét</h3><button id="syncDefaultEvaluationTemplatesBtn" class="btn btn-outline btn-sm" type="button" onclick="syncDefaultEvaluationTemplates()">Đồng bộ mẫu mặc định</button></div>
     <div class="form-card-body">
       <div class="fg"><label>Phần nội dung</label>
         <select id="evaluationTemplateSection" onchange="changeEvaluationTemplateSection()">
-          <option value="opening">Mở đầu</option><option value="status">Trạng thái</option>
-          <option value="expectation">Kỳ vọng</option><option value="closing">Kết thúc</option>
+          <option value="status">Cụm trạng thái</option>
+          <option value="opening">Kết thúc – không có lỗi</option><option value="closing">Kết thúc – có lỗi cần khắc phục</option>
         </select>
       </div>
       <div class="fg" id="evaluationTemplateStatusWrap" style="display:none"><label>Trạng thái</label><select id="evaluationTemplateStatus"></select></div>
@@ -799,8 +799,8 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
     <div class="t-search-bar" style="padding:14px;margin:0">
       <div class="sg"><label>Phần nội dung</label>
         <select id="evaluationTemplateSectionFilter" onchange="filterEvaluationTemplates()">
-          <option value="">Tất cả</option><option value="opening">Mở đầu</option><option value="status">Trạng thái</option>
-          <option value="expectation">Kỳ vọng</option><option value="closing">Kết thúc</option>
+          <option value="">Tất cả</option><option value="status">Cụm trạng thái</option>
+          <option value="opening">Kết thúc – không có lỗi</option><option value="closing">Kết thúc – có lỗi cần khắc phục</option>
         </select>
       </div>
       <div class="sg"><label>Trạng thái</label><select id="evaluationTemplateStatusFilter" onchange="filterEvaluationTemplates()"></select></div>
@@ -908,7 +908,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 
 <div class="toast" id="toast"></div>
 
-<script src="./evaluation_templates_admin.js?v=20260615-session-evaluation1"></script>
+<script src="./evaluation_templates_admin.js?v=20260622-session-evaluation3"></script>
 <script>
 /* ── Helpers ── */
 function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }

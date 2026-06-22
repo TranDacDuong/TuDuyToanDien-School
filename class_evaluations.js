@@ -44,6 +44,7 @@
       .se-state.sent{background:#dcfce7;color:#166534}.se-state.failed{background:#fee2e2;color:#b91c1c}
       .se-statuses{display:flex;gap:7px;flex-wrap:wrap}.se-chip{border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:999px;padding:7px 10px;font:inherit;font-size:.78rem;font-weight:700;cursor:pointer}
       .se-chip.active{border-color:#1d6bd1;background:#eaf3ff;color:#174779}.se-chip.attention.active{border-color:#f59e0b;background:#fff7ed;color:#9a3412}
+      .se-status-groups{display:grid;gap:12px}.se-status-group{display:grid;gap:7px}.se-status-label{font-size:.72rem;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:#64748b}
       .se-editor{margin-top:12px;display:none}.se-editor.open{display:block}.se-editor textarea{width:100%;min-height:150px;resize:vertical;border:1px solid #cbd5e1;border-radius:7px;padding:11px 12px;line-height:1.55;font:inherit;color:#1e293b;background:#fff}
       .se-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.se-btn{border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:7px;padding:8px 11px;font:inherit;font-size:.8rem;font-weight:800;cursor:pointer}
       .se-btn.primary{background:#174779;border-color:#174779;color:#fff}.se-btn.send{background:#15803d;border-color:#15803d;color:#fff}.se-btn:disabled{opacity:.5;cursor:not-allowed}
@@ -280,14 +281,9 @@
           <div class="se-name">${esc(student.full_name || student.email)}</div>
           <span class="se-state ${esc(evaluation.state)}" id="se-state-${student.id}">${stateLabel}</span>
         </div>
-        <div class="se-statuses">
-          ${state.statuses.map(status => `
-            <button type="button"
-              class="se-chip ${status.category === "needs_attention" ? "attention" : ""} ${evaluation.statusIds.has(status.id) ? "active" : ""}"
-              data-student="${student.id}" data-status="${status.id}"
-              onclick="toggleSessionEvaluationStatus('${student.id}','${status.id}')"
-              ${sent ? "disabled" : ""}>${esc(status.name)}</button>
-          `).join("")}
+        <div class="se-status-groups">
+          ${statusGroup("Điểm tích cực", state.statuses.filter(status => status.category !== "needs_attention"), evaluation, student, sent)}
+          ${statusGroup("Điểm cần khắc phục", state.statuses.filter(status => status.category === "needs_attention"), evaluation, student, sent)}
         </div>
         <div class="se-editor ${hasMessage ? "open" : ""}" id="se-editor-${student.id}">
           <textarea id="se-message-${student.id}" ${sent ? "readonly" : ""} oninput="updateSessionEvaluationMessage('${student.id}',this.value)">${esc(evaluation.message)}</textarea>
@@ -298,6 +294,20 @@
           <button type="button" class="se-btn send" onclick="sendSessionEvaluation('${student.id}')" ${sent ? "disabled" : ""}>Gửi phụ huynh</button>
         </div>
       </article>`;
+  }
+
+  function statusGroup(label, statuses, evaluation, student, sent) {
+    if (!statuses.length) return "";
+    return `<div class="se-status-group">
+      <div class="se-status-label">${esc(label)}</div>
+      <div class="se-statuses">${statuses.map(status => `
+        <button type="button"
+          class="se-chip ${status.category === "needs_attention" ? "attention" : ""} ${evaluation.statusIds.has(status.id) ? "active" : ""}"
+          data-student="${student.id}" data-status="${status.id}"
+          onclick="toggleSessionEvaluationStatus('${student.id}','${status.id}')"
+          ${sent ? "disabled" : ""}>${esc(status.name)}</button>
+      `).join("")}</div>
+    </div>`;
   }
 
   function updateProgress() {
@@ -329,6 +339,39 @@
     return result.trim();
   }
 
+  function trimSentencePunctuation(value) {
+    return String(value || "").trim().replace(/[.!?;,\s]+$/g, "");
+  }
+
+  function joinVietnamesePhrases(values) {
+    const phrases = values.map(trimSentencePunctuation).filter(Boolean);
+    if (phrases.length < 2) return phrases[0] || "";
+    if (phrases.length === 2) return `${phrases[0]} và ${phrases[1]}`;
+    return `${phrases.slice(0, -1).join(", ")} và ${phrases.at(-1)}`;
+  }
+
+  function buildSessionEvaluationMessage({
+    parentName, subject, date, studentName, positivePhrases, attentionPhrases, closing,
+  }) {
+    const positivePhrase = joinVietnamesePhrases(positivePhrases || []);
+    const attentionPhrase = joinVietnamesePhrases(attentionPhrases || []);
+    const greeting = String(parentName || "").trim()
+      ? `Kính gửi anh/chị ${String(parentName).trim()},`
+      : "Kính gửi Quý phụ huynh,";
+    const intro = positivePhrase
+      ? `Trong buổi học môn ${subject || "buổi học"} ngày ${date || ""}, em ${studentName || "học sinh"} ${positivePhrase}.`
+      : `Trong buổi học môn ${subject || "buổi học"} ngày ${date || ""}, giáo viên đã theo dõi và ghi nhận quá trình học tập của em ${studentName || "học sinh"}.`;
+    const paragraphs = [greeting, intro];
+    if (attentionPhrase) paragraphs.push(`Tuy nhiên, con ${attentionPhrase}.`);
+    paragraphs.push(trimSentencePunctuation(closing) + ".");
+    return paragraphs.join("\n\n");
+  }
+
+  window.SessionEvaluationMessage = Object.freeze({
+    build: buildSessionEvaluationMessage,
+    joinPhrases: joinVietnamesePhrases,
+  });
+
   window.toggleSessionEvaluationStatus = function (studentId, statusId) {
     const evaluation = state.evaluations.get(studentId);
     if (!evaluation || evaluation.state === "sent") return;
@@ -337,13 +380,6 @@
     if (evaluation.statusIds.has(statusId)) {
       evaluation.statusIds.delete(statusId);
     } else {
-      if (status.category === "positive" || status.category === "neutral") {
-        evaluation.statusIds.clear();
-      } else {
-        state.statuses
-          .filter(item => item.category === "positive" || item.category === "neutral")
-          .forEach(item => evaluation.statusIds.delete(item.id));
-      }
       evaluation.statusIds.add(statusId);
     }
     evaluation.message = "";
@@ -365,26 +401,41 @@
       alert("Hãy chọn ít nhất một trạng thái cho học sinh.");
       return;
     }
-    const previous = evaluation.template_selection || {};
-    const opening = choose(state.templates.filter(item => item.section_type === "opening"), [previous.opening]);
-    const closing = choose(state.templates.filter(item => item.section_type === "closing"), [previous.closing]);
-    const descriptions = selected.map(status => choose(
+    const previous = evaluation.template_selection?.format_version === 2 ? evaluation.template_selection : {};
+    const positiveStatuses = selected.filter(status => status.category !== "needs_attention");
+    const attentionStatuses = selected.filter(status => status.category === "needs_attention");
+    const positiveDescriptions = positiveStatuses.map(status => choose(
       state.templates.filter(item => item.section_type === "status" && item.status_id === status.id),
-      previous.descriptions || [],
+      previous.positive_descriptions || [],
     )).filter(Boolean);
-    const expectationStatuses = [...selected]
-      .sort((a, b) => (a.category === "needs_attention" ? 0 : 1) - (b.category === "needs_attention" ? 0 : 1))
-      .slice(0, 2);
-    const expectations = expectationStatuses.map(status => choose(
-      state.templates.filter(item => item.section_type === "expectation" && item.status_id === status.id),
-      previous.expectations || [],
+    const attentionDescriptions = attentionStatuses.map(status => choose(
+      state.templates.filter(item => item.section_type === "status" && item.status_id === status.id),
+      previous.attention_descriptions || [],
     )).filter(Boolean);
-    const selectedTemplates = [opening, ...descriptions, ...expectations, closing].filter(Boolean);
-    evaluation.message = selectedTemplates.map(item => applyVariables(item.content, student)).join("\n\n");
+    if (positiveDescriptions.length !== positiveStatuses.length || attentionDescriptions.length !== attentionStatuses.length) {
+      alert("Một trạng thái đang thiếu mẫu câu. Vui lòng báo quản trị viên bổ sung thư viện nhận xét.");
+      return;
+    }
+    const closingSection = attentionStatuses.length ? "closing" : "opening";
+    const closing = choose(state.templates.filter(item => item.section_type === closingSection), [previous.closing]);
+    if (!closing) {
+      alert("Thư viện đang thiếu câu kết thúc phù hợp.");
+      return;
+    }
+
+    evaluation.message = buildSessionEvaluationMessage({
+      parentName: state.parents.get(student.id),
+      subject: state.classInfo?.subjects?.name || state.session?.lesson?.name || "buổi học",
+      date: formatDate(state.session?.session_date),
+      studentName: student.full_name,
+      positivePhrases: positiveDescriptions.map(item => applyVariables(item.content, student)),
+      attentionPhrases: attentionDescriptions.map(item => applyVariables(item.content, student)),
+      closing: applyVariables(closing.content, student),
+    });
     evaluation.template_selection = {
-      opening: opening?.id || null,
-      descriptions: descriptions.map(item => item.id),
-      expectations: expectations.map(item => item.id),
+      format_version: 2,
+      positive_descriptions: positiveDescriptions.map(item => item.id),
+      attention_descriptions: attentionDescriptions.map(item => item.id),
       closing: closing?.id || null,
     };
     const editor = document.getElementById(`se-editor-${studentId}`);
