@@ -39,19 +39,7 @@
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
   }
-  function generateDates(schedules, month, year){
-    const dates=new Set(), days=new Date(year,month+1,0).getDate();
-    for(let d=1;d<=days;d++){
-      const date=new Date(year,month,d);
-      const wd=date.getDay()===0?7:date.getDay();
-      schedules.forEach(s=>{
-        if(s.weekday===wd){
-          dates.add(date.getFullYear()+"-"+String(date.getMonth()+1).padStart(2,"0")+"-"+String(d).padStart(2,"0"));
-        }
-      });
-    }
-    return [...dates].sort();
-  }
+  
   function generateOccurrences(schedules, month, year){
     const items=[], days=new Date(year,month+1,0).getDate();
     for(let d=1;d<=days;d++){
@@ -74,10 +62,7 @@
     return eligible.filter(s=>(s.effective_from||"2000-01-01")===maxEf);
   }
 
-  function scheduleLabel(s){
-    if(!s) return "Chưa chọn lịch";
-    return "Buổi "+(s.session_no || 1)+": "+(daysMap[s.weekday] || "?")+" "+String(s.start_time || "").slice(0,5)+"–"+String(s.end_time || "").slice(0,5)+(s.rooms?.room_name ? " • "+s.rooms.room_name : "");
-  }
+  
 
   function renderScheduleSummary(schedules){
     if(!schedules || !schedules.length){
@@ -122,9 +107,7 @@
     return getStudentSchedules(studentId, schedules).some(s => s.weekday === wd);
   }
 
-  function generateStudentDates(studentId, schedules, month, year){
-    return generateDates(getStudentSchedules(studentId, schedules), month, year);
-  }
+  
 
   function generateStudentOccurrences(studentId, schedules, month, year){
     return generateOccurrences(getStudentSchedules(studentId, schedules), month, year);
@@ -196,24 +179,9 @@
     return msg.includes("does not exist") || msg.includes("could not find") || msg.includes("relation");
   }
 
-  function isCurrentMonthDate(value){
-    if(!value) return false;
-    const d = new Date(value);
-    if(Number.isNaN(d.getTime())) return false;
-    return d.getMonth() === _currentMonth && d.getFullYear() === _currentYear;
-  }
+  
 
-  function fmtSessionDate(value){
-    if(!value) return "Chưa chọn ngày học";
-    const d = new Date(value);
-    if(Number.isNaN(d.getTime())) return "Chưa chọn ngày học";
-    return d.toLocaleDateString("vi-VN", {
-      weekday: "short",
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric"
-    });
-  }
+  
 
   /* â”€â”€ Attendance status â”€â”€ */
   const statusCycle = ["present","absent","makeup"];
@@ -301,34 +269,7 @@
     return role === "admin" || role === "teacher" || role === "assistant";
   }
 
-  function renderSessionEvaluationToolbar(sessions){
-    if(!canEvaluateClassSession() || !Array.isArray(sessions)) return "";
-    const today = todayStr();
-    const firstDay = monthStart(_currentMonth, _currentYear);
-    const lastDay = monthEnd(_currentMonth, _currentYear);
-    const available = sessions
-      .filter(item => {
-        const date = String(item?.session_date || "").slice(0,10);
-        return item?.id && date >= firstDay && date <= lastDay && date <= today;
-      })
-      .sort((a,b) => String(b.session_date).localeCompare(String(a.session_date)));
-    if(!available.length){
-      return '<div style="margin-bottom:14px;padding:12px 14px;border:1px dashed #cbd5e1;border-radius:10px;background:#fff;color:var(--ink-mid);font-size:.82rem">'+
-        '<strong style="display:block;color:var(--navy);margin-bottom:4px">Nhận xét buổi học</strong>'+
-        'Chưa có buổi học đã diễn ra trong tháng này.'+
-      '</div>';
-    }
-    return '<div style="margin-bottom:14px;padding:13px 14px;border:1px solid #bfdbfe;border-radius:10px;background:#f8fbff">'+
-      '<div style="font-weight:800;color:var(--navy);margin-bottom:8px">Nhận xét buổi học</div>'+
-      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-        available.map(item =>
-          '<button type="button" class="btn btn-primary btn-sm" onclick="openSessionEvaluation(\''+item.id+'\')">'+
-            'Nhận xét '+fmtSessionDate(item.session_date)+
-          '</button>'
-        ).join("")+
-      '</div>'+
-    '</div>';
-  }
+  
 
   function buildSessionMapByDate(sessions){
     const map = {};
@@ -1066,235 +1007,17 @@
   /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      TAB Äá»€ THI
   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-  function getExamAccessMeta(startsAt, endsAt){
-    const now = new Date();
-    let canDo = true;
-    let note = "";
-    if(startsAt && endsAt){
-      const startDt = new Date(startsAt);
-      const endDt = new Date(endsAt);
-      if(now < startDt){ canDo = false; note = "Chưa đến giờ làm bài"; }
-      else if(now > endDt){ canDo = false; note = "Đã hết giờ làm bài"; }
-      else note = "Đang trong thời gian làm bài";
-    }
-    return {
-      canDo,
-      note,
-      scheduleLabel: startsAt && endsAt
-        ? "🕐 " + fmtDT(startsAt) + " → " + fmtDT(endsAt)
-        : "🗓 Không giới hạn"
-    };
-  }
+  
 
-  function buildSessionExamInfo(source){
-    if(!source) return null;
-    if(source.type === "pdf"){
-      return {
-        type: "pdf",
-        id: source.id,
-        title: source.title,
-        duration_minutes: source.duration_minutes,
-        total_points: source.total_points,
-        question_types: source.question_types || [],
-        starts_at: source.starts_at || null,
-        ends_at: source.ends_at || null
-      };
-    }
-    return {
-      type: "exam",
-      id: source.id,
-      title: source.title,
-      duration_minutes: source.duration_minutes,
-      total_points: source.total_points,
-      exam_questions: source.exam_questions || [],
-      starts_at: source.starts_at || null,
-      ends_at: source.ends_at || null
-    };
-  }
+  
 
-  function renderStudentPracticeBlock(examInfo, resultState){
-    if(!examInfo) return "";
-    const isCompactMobile = window.matchMedia("(max-width: 768px)").matches;
-    const access = getExamAccessMeta(examInfo.starts_at, examInfo.ends_at);
+  
 
-    if(examInfo.type === "pdf"){
-      const results = resultState.pdfResultsMap[examInfo.id] || [];
-      const submitted = results.filter(r=>r.submitted_at);
-      const lastResult = submitted[0] || null;
-      const inProgress = submitted.length === 0
-        ? (results.find(r=>!r.submitted_at && (r.seconds_left||0) > 0) || null)
-        : null;
-      const hasEssay = (examInfo.question_types || []).includes("essay");
-      let actionsHtml = "";
-      if(lastResult){
-        const score = lastResult.score_total ?? lastResult.score_auto ?? "?";
-        const waiting = hasEssay && lastResult.score_total === null;
-        actionsHtml += '<span style="background:#dcfce7;color:#15803d;font-size:.78rem;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap">✓ '+score+' / '+(examInfo.total_points||0)+' đ</span>';
-        if(waiting){
-          actionsHtml += ' <span style="background:#fef3c7;color:#b45309;font-size:.72rem;padding:2px 8px;border-radius:20px">⏳ Chờ chấm tự luận</span>';
-        }
-        actionsHtml += ' <button onclick="location.href=\'pdf_exam.html?exam='+encodeURIComponent(examInfo.id)+'&classId='+encodeURIComponent(_classId)+'&action=review&resultId='+encodeURIComponent(lastResult.id)+'\'" class="btn btn-outline btn-sm" style="font-size:.75rem">Xem lại</button>';
-      } else if(!access.canDo && (examInfo.starts_at || examInfo.ends_at)){
-        actionsHtml = '<div style="font-size:.75rem;color:var(--ink-mid);padding:6px 10px;background:var(--surface);border-radius:8px;white-space:nowrap">'+access.note+'</div>';
-      } else if(inProgress){
-        const secsLeft = Math.max(0,(inProgress.seconds_left||0)-300);
-        const minLeft = Math.floor(secsLeft/60);
-        const secLeft = secsLeft%60;
-        actionsHtml = '<button onclick="location.href=\'pdf_exam.html?exam='+encodeURIComponent(examInfo.id)+'&classId='+encodeURIComponent(_classId)+'\'" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;white-space:nowrap;font-family:var(--font-body)">Làm bài tiếp ('+minLeft+':'+String(secLeft).padStart(2,"0")+')</button>';
-      } else {
-        actionsHtml = '<button onclick="location.href=\'pdf_exam.html?exam='+encodeURIComponent(examInfo.id)+'&classId='+encodeURIComponent(_classId)+'\'" style="background:linear-gradient(135deg,var(--navy),var(--navy-mid));color:var(--gold-light);border:none;padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;white-space:nowrap;font-family:var(--font-body)">Làm bài</button>';
-      }
+  
 
-      return '<div style="margin-top:12px;padding:'+(isCompactMobile ? '14px' : '12px 14px')+';border-radius:14px;border:1px solid #bfdbfe;background:linear-gradient(180deg,#f8fbff 0%,#eef6ff 100%);box-shadow:0 10px 24px rgba(29,107,209,.08)">'+
-        '<div style="font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#1d4ed8;margin-bottom:10px">Đề luyện tập</div>'+
-        '<div style="display:flex;justify-content:space-between;align-items:'+(isCompactMobile ? 'stretch' : 'center')+';gap:12px;flex-wrap:wrap;flex-direction:'+(isCompactMobile ? 'column' : 'row')+'">'+
-          '<div style="flex:1;min-width:0">'+
-            '<div style="font-weight:700;color:var(--navy)">'+esc(examInfo.title)+'</div>'+
-            '<div style="font-size:'+(isCompactMobile ? '.82rem' : '.75rem')+';color:var(--ink-mid);line-height:1.6">📄 PDF • ⏱ '+(examInfo.duration_minutes||0)+' phút • 🏆 '+(examInfo.total_points||0)+' điểm • '+access.scheduleLabel+'</div>'+
-            (access.note && access.canDo ? '<div style="font-size:.72rem;color:#16a34a;margin-top:2px">'+access.note+'</div>' : '')+
-          '</div>'+
-          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:'+(isCompactMobile ? '100%' : 'auto')+';justify-content:'+(isCompactMobile ? 'flex-start' : 'flex-end')+'">'+actionsHtml+'</div>'+
-        '</div>'+
-      '</div>';
-    }
+  
 
-    const results = resultState.resultsMap[examInfo.id] || [];
-    const submitted = results.filter(r=>r.submitted_at);
-    const lastResult = submitted[0] || null;
-    const inProgress = submitted.length === 0
-      ? (results.find(r=>!r.submitted_at && (r.seconds_left||0) > 0) || null)
-      : null;
-    const hasEssay = (examInfo.exam_questions || []).some(eq=>eq.question?.question_type === "essay");
-    let actionsHtml = "";
-    if(lastResult){
-      const score = lastResult.score_total ?? lastResult.score_auto ?? "?";
-      const waiting = hasEssay && lastResult.score_essay === null && lastResult.score_total === null;
-      actionsHtml += '<span style="background:#dcfce7;color:#15803d;font-size:.78rem;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap">✓ '+score+' / '+(examInfo.total_points||0)+' đ</span>';
-      if(waiting){
-        actionsHtml += ' <span style="background:#fef3c7;color:#b45309;font-size:.72rem;padding:2px 8px;border-radius:20px">⏳ Chờ chấm tự luận</span>';
-      }
-      actionsHtml += ' <button onclick="cvOpenStudentReview(\''+lastResult.id+'\',\''+examInfo.id+'\',\''+examInfo.title.replace(/'/g,"\\'")+'\')" class="btn btn-outline btn-sm" style="font-size:.75rem">Xem lại</button>';
-    } else if(!access.canDo && (examInfo.starts_at || examInfo.ends_at)){
-      actionsHtml = '<div style="font-size:.75rem;color:var(--ink-mid);padding:6px 10px;background:var(--surface);border-radius:8px;white-space:nowrap">'+access.note+'</div>';
-    } else if(inProgress){
-      const secsLeft = Math.max(0,(inProgress.seconds_left||0)-300);
-      const minLeft = Math.floor(secsLeft/60);
-      const secLeft = secsLeft%60;
-      actionsHtml = '<button onclick="resumeExam(\''+examInfo.id+'\',\''+examInfo.title.replace(/'/g,"\\'")+'\','+(examInfo.total_points||0)+',\''+inProgress.id+'\','+secsLeft+')" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;white-space:nowrap;font-family:var(--font-body)">Làm bài tiếp ('+minLeft+':'+String(secLeft).padStart(2,"0")+')</button>';
-    } else {
-      actionsHtml = '<button onclick="startExam(\''+examInfo.id+'\',\''+examInfo.title.replace(/'/g,"\\'")+'\','+(examInfo.duration_minutes||0)+','+(examInfo.total_points||0)+',\''+_classId+'\')" style="background:linear-gradient(135deg,var(--navy),var(--navy-mid));color:var(--gold-light);border:none;padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;white-space:nowrap;font-family:var(--font-body)">Làm bài</button>';
-    }
-
-    return '<div style="margin-top:12px;padding:'+(isCompactMobile ? '14px' : '12px 14px')+';border-radius:14px;border:1px solid #bfdbfe;background:linear-gradient(180deg,#f8fbff 0%,#eef6ff 100%);box-shadow:0 10px 24px rgba(29,107,209,.08)">'+
-      '<div style="font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#1d4ed8;margin-bottom:10px">Đề luyện tập</div>'+
-      '<div style="display:flex;justify-content:space-between;align-items:'+(isCompactMobile ? 'stretch' : 'center')+';gap:12px;flex-wrap:wrap;flex-direction:'+(isCompactMobile ? 'column' : 'row')+'">'+
-        '<div style="flex:1;min-width:0">'+
-          '<div style="font-weight:700;color:var(--navy)">'+esc(examInfo.title)+'</div>'+
-          '<div style="font-size:'+(isCompactMobile ? '.82rem' : '.75rem')+';color:var(--ink-mid);line-height:1.6">⏱ '+(examInfo.duration_minutes||0)+' phút • 🏆 '+(examInfo.total_points||0)+' điểm • '+access.scheduleLabel+'</div>'+
-          (access.note && access.canDo ? '<div style="font-size:.72rem;color:#16a34a;margin-top:2px">'+access.note+'</div>' : '')+
-        '</div>'+
-        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:'+(isCompactMobile ? '100%' : 'auto')+';justify-content:'+(isCompactMobile ? 'flex-start' : 'flex-end')+'">'+actionsHtml+'</div>'+
-      '</div>'+
-    '</div>';
-  }
-
-  function renderAdminPracticeBlock(examInfo, submitState){
-    if(!examInfo) return "";
-    const isCompactMobile = window.matchMedia("(max-width: 768px)").matches;
-    const access = getExamAccessMeta(examInfo.starts_at, examInfo.ends_at);
-    if(examInfo.type === "pdf"){
-      const count = submitState.pdfSubmitCount[examInfo.id] || 0;
-      return '<div style="margin-top:12px;padding:'+(isCompactMobile ? '14px' : '12px 14px')+';border-radius:14px;border:1px solid #bfdbfe;background:linear-gradient(180deg,#f8fbff 0%,#eef6ff 100%);box-shadow:0 10px 24px rgba(29,107,209,.08)">'+
-        '<div style="font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#1d4ed8;margin-bottom:10px">Đề luyện tập</div>'+
-        '<div style="display:flex;justify-content:space-between;align-items:'+(isCompactMobile ? 'stretch' : 'center')+';gap:12px;flex-wrap:wrap;flex-direction:'+(isCompactMobile ? 'column' : 'row')+'">'+
-          '<div style="flex:1;min-width:0">'+
-            '<div style="font-weight:700;color:var(--navy)">'+esc(examInfo.title)+'</div>'+
-            '<div style="font-size:'+(isCompactMobile ? '.82rem' : '.75rem')+';color:var(--ink-mid);line-height:1.6">📄 PDF • ⏱ '+(examInfo.duration_minutes||0)+' phút • 🏆 '+(examInfo.total_points||0)+' điểm • '+access.scheduleLabel+'</div>'+
-          '</div>'+
-          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:'+(isCompactMobile ? '100%' : 'auto')+';justify-content:'+(isCompactMobile ? 'flex-start' : 'flex-end')+'">'+
-            '<span style="background:var(--navy);color:var(--gold-light);padding:3px 12px;border-radius:20px;font-size:.78rem;font-weight:700">'+count+' bài đã nộp</span>'+
-            '<button onclick="location.href=\'pdf_exam.html?exam='+encodeURIComponent(examInfo.id)+'&classId='+encodeURIComponent(_classId)+'\'" class="btn btn-outline btn-sm">Mở đề PDF</button>'+
-          '</div>'+
-        '</div>'+
-      '</div>';
-    }
-
-    const count = submitState.submitCount[examInfo.id] || 0;
-    return '<div style="margin-top:12px;padding:'+(isCompactMobile ? '14px' : '12px 14px')+';border-radius:14px;border:1px solid #bfdbfe;background:linear-gradient(180deg,#f8fbff 0%,#eef6ff 100%);box-shadow:0 10px 24px rgba(29,107,209,.08)">'+
-      '<div style="font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#1d4ed8;margin-bottom:10px">Đề luyện tập</div>'+
-      '<div style="display:flex;justify-content:space-between;align-items:'+(isCompactMobile ? 'stretch' : 'center')+';gap:12px;flex-wrap:wrap;flex-direction:'+(isCompactMobile ? 'column' : 'row')+'">'+
-        '<div onclick="cvOpenExamResult(\''+examInfo.id+'\',\''+examInfo.title.replace(/'/g,"\\'")+'\',\''+_classId+'\')" style="flex:1;min-width:0;cursor:pointer">'+
-          '<div style="font-weight:700;color:var(--navy)">'+esc(examInfo.title)+'</div>'+
-          '<div style="font-size:'+(isCompactMobile ? '.82rem' : '.75rem')+';color:var(--ink-mid);line-height:1.6">⏱ '+(examInfo.duration_minutes||0)+' phút • 🏆 '+(examInfo.total_points||0)+' điểm • '+access.scheduleLabel+'</div>'+
-        '</div>'+
-        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:'+(isCompactMobile ? '100%' : 'auto')+';justify-content:'+(isCompactMobile ? 'flex-start' : 'flex-end')+'">'+
-          '<span style="background:var(--navy);color:var(--gold-light);padding:3px 12px;border-radius:20px;font-size:.78rem;font-weight:700">'+count+' bài đã nộp</span>'+
-          '<button onclick="cvOpenExamResult(\''+examInfo.id+'\',\''+examInfo.title.replace(/'/g,"\\'")+'\',\''+_classId+'\')" class="btn btn-outline btn-sm">Xem kết quả</button>'+
-        '</div>'+
-      '</div>'+
-    '</div>';
-  }
-
-  function renderClassSessionCard(session, lesson, examInfo, role, examState){
-    const isCompactMobile = window.matchMedia("(max-width: 768px)").matches;
-    const summary = lesson?.summary
-      ? '<div style="font-size:.84rem;line-height:1.65;color:var(--ink-mid);margin-top:6px">'+esc(lesson.summary)+'</div>'
-      : '';
-    const mediaHtml =
-      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+
-        (lesson?.lecture_video_url ? '<a class="btn btn-outline btn-sm" href="'+esc(lesson.lecture_video_url)+'" target="_blank" rel="noopener">Video bài giảng</a>' : '')+
-        (lesson?.solution_video_url ? '<a class="btn btn-outline btn-sm" href="'+esc(lesson.solution_video_url)+'" target="_blank" rel="noopener">Video chữa bài</a>' : '')+
-        (lesson?.document_link ? '<a class="btn btn-outline btn-sm" href="'+esc(lesson.document_link)+'" target="_blank" rel="noopener">Tài liệu</a>' : '')+
-      '</div>';
-    const practiceHtml = role === "student"
-      ? renderStudentPracticeBlock(examInfo, examState)
-      : renderAdminPracticeBlock(examInfo, examState);
-    const canEvaluate = role === "admin" || role === "teacher" || role === "assistant";
-    const actionHtml = canEvaluate
-      ? '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-          '<button onclick="openSessionEvaluation(\''+session.id+'\')" class="btn btn-primary btn-sm">Đánh giá buổi học</button>'+
-          ((role === "admin" || role === "teacher") ?
-          '<button onclick="cvOpenAddClassSession(\''+session.id+'\')" class="btn btn-outline btn-sm">Sửa buổi</button>'+
-          '<button onclick="cvDeleteClassSession(\''+session.id+'\')" class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5">Xóa buổi</button>' : '')+
-        '</div>'
-      : "";
-    const orderLabel = session.display_order || session.session_order || "—";
-    return '<div style="background:var(--white);border:1px solid var(--border);border-radius:18px;padding:'+(isCompactMobile ? '16px' : '16px 18px')+'">'+
-      '<div style="display:grid;grid-template-columns:'+(isCompactMobile ? '1fr' : '82px minmax(0,1fr) auto')+';gap:16px;align-items:'+(isCompactMobile ? 'stretch' : 'center')+'">'+
-        '<div style="width:'+(isCompactMobile ? '100%' : '82px')+';height:'+(isCompactMobile ? 'auto' : '82px')+';min-height:58px;border-radius:16px;background:linear-gradient(135deg,#0f3c73 0%,#1d6bd1 100%);box-shadow:0 12px 28px rgba(15,60,115,.18);color:#fff;display:flex;flex-direction:'+(isCompactMobile ? 'row' : 'column')+';align-items:center;justify-content:center;gap:'+(isCompactMobile ? '10px' : '2px')+';padding:'+(isCompactMobile ? '12px 14px' : '8px')+'">'+
-          '<div style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.78)">Buổi học</div>'+
-          '<div style="font-size:'+(isCompactMobile ? '1.18rem' : '1.4rem')+';font-weight:800;line-height:1.1">'+orderLabel+'</div>'+
-        '</div>'+
-        '<div style="min-width:0">'+
-          '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">'+
-            '<span style="font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8">'+esc(fmtSessionDate(session.session_date))+'</span>'+
-            (examInfo ? '<span style="font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#fff7ed;color:#c2410c">Có đề luyện tập</span>' : '<span style="font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#f5f5f4;color:#57534e">Chưa gắn đề luyện tập</span>')+
-          '</div>'+
-          '<div style="font-weight:700;font-size:1rem;color:var(--navy);margin-top:'+(isCompactMobile ? '8px' : '4px')+'">'+esc(lesson?.name || "Chưa có tên bài học")+'</div>'+
-          summary+
-          mediaHtml+
-          practiceHtml+
-        '</div>'+
-        '<div style="display:flex;justify-content:'+(isCompactMobile ? 'stretch' : 'flex-end')+';width:'+(isCompactMobile ? '100%' : 'auto')+'">'+actionHtml+'</div>'+
-      '</div>'+
-    '</div>';
-  }
-
-  function renderLegacyExamCard(examInfo, role, examState){
-    const header = '<div style="font-size:.76rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-light);margin-bottom:8px">Đề kiểm tra riêng</div>';
-    const body = role === "student"
-      ? renderStudentPracticeBlock(examInfo, examState)
-      : renderAdminPracticeBlock(examInfo, examState);
-    const actionRow = (role === "admin" || role === "teacher")
-      ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'+
-          (examInfo.type === "exam"
-            ? '<button onclick="cvEditClassExam(\''+examInfo.class_exam_id+'\',\''+examInfo.title.replace(/'/g,"\\'")+'\',\''+examInfo.id+'\')" class="btn btn-outline btn-sm">Đặt giờ</button>'
-            : '<button onclick="cvEditClassExam(\''+examInfo.class_exam_id+'\',\''+examInfo.title.replace(/'/g,"\\'")+'\',\'\')" class="btn btn-outline btn-sm">Đặt giờ</button>')+
-          '<button onclick="cvRemoveExamFromClass(\''+examInfo.class_exam_id+'\',\''+examInfo.title.replace(/'/g,"\\'")+'\','+((examInfo.type==="pdf"? (examState.pdfSubmitCount[examInfo.id]||0) : (examState.submitCount[examInfo.id]||0)))+')" class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5">Gỡ đề</button>'+
-        '</div>'
-      : "";
-    return '<div style="background:var(--white);border:1px dashed #cbd5e1;border-radius:14px;padding:16px 18px">'+header+body+actionRow+'</div>';
-  }
+  
 
   async function renderExamsTab(){
     const tc=document.getElementById("cvTabContent"); if(!tc) return;
@@ -1546,226 +1269,9 @@
     '</div>';
   }
 
-  async function renderExamsForStudent(tc, exams, addExamBtn=""){
-    const sb=getSb();
-    const uid=window._currentUserId;
-    const examIds=exams.filter(e=>e.type==="exam").map(e=>e.id);
-    const pdfIds=exams.filter(e=>e.type==="pdf").map(e=>e.id);
-    const {data:myResults,error:myResultsError}=examIds.length
-      ? await sb.from("exam_results")
-          .select("id,exam_id,attempt_no,submitted_at,score_auto,score_essay,score_total,seconds_left")
-          .eq("student_id",uid).eq("class_id",_classId).in("exam_id",examIds)
-          .order("attempt_no",{ascending:false})
-      : {data:[],error:null};
-    const {data:myPdfResults,error:myPdfResultsError}=pdfIds.length
-      ? await sb.from("pdf_exam_results")
-          .select("id,pdf_exam_id,attempt_no,submitted_at,score_auto,score_total,seconds_left")
-          .eq("student_id",uid).eq("class_id",_classId).in("pdf_exam_id",pdfIds)
-          .order("attempt_no",{ascending:false})
-      : {data:[],error:null};
+  
 
-    if(myResultsError || myPdfResultsError){
-      const msg = myResultsError?.message || myPdfResultsError?.message || "Không thể tải bài làm.";
-      tc.innerHTML = addExamBtn + '<p style="color:var(--red);font-size:.85rem;padding:12px">Lỗi tải bài làm: '+esc(msg)+'</p>';
-      return;
-    }
-
-    const resultsMap={};
-    (myResults||[]).forEach(r=>{
-      if(!resultsMap[r.exam_id]) resultsMap[r.exam_id]=[];
-      resultsMap[r.exam_id].push(r);
-    });
-    const pdfResultsMap={};
-    (myPdfResults||[]).forEach(r=>{
-      if(!pdfResultsMap[r.pdf_exam_id]) pdfResultsMap[r.pdf_exam_id]=[];
-      pdfResultsMap[r.pdf_exam_id].push(r);
-    });
-
-    const now=new Date();
-    const examsHtml=exams.map(ex=>{
-      if(ex.type==="pdf"){
-        const results = pdfResultsMap[ex.id]||[];
-        const submitted = results.filter(r=>r.submitted_at);
-        const lastResult = submitted[0]||null;
-        const inProgress = (submitted.length===0)
-          ? (results.find(r=>!r.submitted_at&&r.seconds_left>0)||null)
-          : null;
-        const pdfHasEssay=(ex.question_types||[]).includes("essay");
-        let canDo=true, scheduleNote="";
-        if(ex.starts_at&&ex.ends_at){
-          const startDt=new Date(ex.starts_at), endDt=new Date(ex.ends_at);
-          if(now<startDt){canDo=false;scheduleNote="Chưa đến giờ thi";}
-          else if(now>endDt){canDo=false;scheduleNote="Đã hết giờ thi";}
-          else scheduleNote="Đang trong giờ thi";
-        }
-        const schStr=ex.starts_at&&ex.ends_at
-          ?"🕐 "+fmtDT(ex.starts_at)+" → "+fmtDT(ex.ends_at)
-          :"🗓 Không giới hạn";
-        let scoreBadge="";
-        if(lastResult){
-          const score=lastResult.score_total??lastResult.score_auto??"?";
-          const pendingEssay=pdfHasEssay&&lastResult.score_total===null;
-          scoreBadge='<span style="background:#dcfce7;color:#15803d;font-size:.78rem;font-weight:700;'+
-            'padding:3px 10px;border-radius:20px;white-space:nowrap">✓ '+score+" / "+ex.total_points+" đ</span>"+
-            (pendingEssay?' <span style="background:#fef3c7;color:#b45309;font-size:.72rem;padding:2px 8px;border-radius:20px">⏳ Chờ chấm tự luận</span>':"");
-          scoreBadge+=' <button onclick="location.href=\'pdf_exam.html?exam='+encodeURIComponent(ex.id)+'&classId='+encodeURIComponent(_classId)+'&action=review&resultId='+encodeURIComponent(lastResult.id)+'\'" '+
-            'class="btn btn-outline btn-sm" style="font-size:.75rem">Xem lại</button>';
-        }
-        let actionBtn="";
-        if(!canDo&&(ex.starts_at||ex.ends_at)){
-          actionBtn='<div style="font-size:.75rem;color:var(--ink-mid);padding:6px 10px;'+
-            'background:var(--surface);border-radius:8px;white-space:nowrap">'+scheduleNote+"</div>";
-        } else if(inProgress){
-          const secsLeft=Math.max(0,(inProgress.seconds_left||0)-300);
-          const minLeft=Math.floor(secsLeft/60), secLeft2=secsLeft%60;
-          const timeStr=minLeft+":"+String(secLeft2).padStart(2,"0");
-          actionBtn='<button onclick="location.href=\'pdf_exam.html?exam='+encodeURIComponent(ex.id)+'&classId='+encodeURIComponent(_classId)+'\'" '+
-            'style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;'+
-            'padding:8px 14px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;'+
-            'white-space:nowrap;font-family:var(--font-body);flex-shrink:0">Làm bài tiếp ('+timeStr+")</button>";
-        } else if(lastResult&&!pdfHasEssay){
-          actionBtn='<div style="font-size:.78rem;font-weight:600;color:var(--green);padding:6px 12px;'+
-            'background:#dcfce7;border-radius:8px;white-space:nowrap">Đã hoàn thành</div>'+
-            '<button onclick="location.href=\'pdf_exam.html?exam='+encodeURIComponent(ex.id)+'&classId='+encodeURIComponent(_classId)+'&action=review&resultId='+encodeURIComponent(lastResult.id)+'\'" '+
-            'class="btn btn-outline btn-sm" style="font-size:.78rem">Xem lại</button>';
-        } else if(submitted.length>0){
-          actionBtn="";
-        } else {
-          actionBtn='<button onclick="location.href=\'pdf_exam.html?exam='+encodeURIComponent(ex.id)+'&classId='+encodeURIComponent(_classId)+'\'" '+
-            'style="background:linear-gradient(135deg,var(--navy),var(--navy-mid));color:var(--gold-light);'+
-            'border:none;padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;'+
-            'white-space:nowrap;font-family:var(--font-body);flex-shrink:0">Làm bài</button>';
-        }
-        return `<div style="border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-          <div style="flex:1;min-width:0">
-            <div style="font-weight:700;color:var(--navy);font-size:.95rem">${esc(ex.title)}</div>
-            <div style="font-size:.75rem;color:var(--ink-mid)">📄 PDF • ⏱ ${ex.duration_minutes||0} phút • 🏆 ${ex.total_points||0} điểm • ${schStr}</div>
-            ${(scheduleNote&&canDo)?'<div style="font-size:.72rem;color:#16a34a;margin-top:2px">'+scheduleNote+'</div>':""}
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            ${scoreBadge}${actionBtn}
-          </div>
-        </div>`;
-      }
-      const results   =resultsMap[ex.id]||[];
-      const submitted =results.filter(r=>r.submitted_at);
-      const lastResult=submitted[0]||null;
-      const inProgress=(submitted.length===0)
-        ?(results.find(r=>!r.submitted_at&&r.seconds_left>0)||null)
-        :null;
-
-      let canDo=true, scheduleNote="";
-      if(ex.starts_at&&ex.ends_at){
-        const startDt=new Date(ex.starts_at), endDt=new Date(ex.ends_at);
-        if(now<startDt){canDo=false;scheduleNote="Chưa đến giờ thi";}
-        else if(now>endDt){canDo=false;scheduleNote="Đã hết giờ thi";}
-        else scheduleNote="Đang trong giờ thi";
-      }
-      const schStr=ex.starts_at&&ex.ends_at
-        ?"🕐 "+fmtDT(ex.starts_at)+" → "+fmtDT(ex.ends_at)
-        :"🗓 Không giới hạn";
-
-      const examHasEssay=(ex.exam_questions||[]).some(eq=>eq.question?.question_type==="essay");
-      let scoreBadge="";
-      if(lastResult){
-        const score=lastResult.score_total??lastResult.score_auto??"?";
-        const pendingEssay=examHasEssay&&lastResult.score_essay===null&&lastResult.score_total===null;
-        scoreBadge='<span style="background:#dcfce7;color:#15803d;font-size:.78rem;font-weight:700;'+
-          'padding:3px 10px;border-radius:20px;white-space:nowrap">✓ '+score+" / "+ex.total_points+" đ</span>"+
-          (pendingEssay?' <span style="background:#fef3c7;color:#b45309;font-size:.72rem;padding:2px 8px;border-radius:20px">⏳ Chờ chấm tự luận</span>':"");
-        scoreBadge+=' <button onclick="cvOpenStudentReview(\''+lastResult.id+'\',\''+ex.id+'\',\''+ex.title.replace(/'/g,"\\'")+'\')\" '+
-          'class="btn btn-outline btn-sm" style="font-size:.75rem">Xem lại</button>';
-      }
-
-      let actionBtn="";
-      if(!canDo&&(ex.starts_at||ex.ends_at)){
-        actionBtn='<div style="font-size:.75rem;color:var(--ink-mid);padding:6px 10px;'+
-          'background:var(--surface);border-radius:8px;white-space:nowrap">'+scheduleNote+"</div>";
-      } else if(inProgress){
-        const secsLeft=Math.max(0,(inProgress.seconds_left||0)-300);
-        const minLeft=Math.floor(secsLeft/60), secLeft2=secsLeft%60;
-        const timeStr=minLeft+":"+String(secLeft2).padStart(2,"0");
-        actionBtn='<button onclick="resumeExam(\''+ex.id+'\',\''+ex.title.replace(/'/g,"\\'")+'\','+ex.total_points+',\''+inProgress.id+'\','+secsLeft+')" '+
-          'style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;'+
-          'padding:8px 14px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;'+
-          'white-space:nowrap;font-family:var(--font-body);flex-shrink:0">Làm bài tiếp ('+timeStr+")</button>";
-      } else if(lastResult&&!examHasEssay){
-        actionBtn='<div style="font-size:.78rem;font-weight:600;color:var(--green);padding:6px 12px;'+
-          'background:#dcfce7;border-radius:8px;white-space:nowrap">Đã hoàn thành</div>'+
-          '<button onclick="cvOpenStudentReview(\''+lastResult.id+'\',\''+ex.id+'\',\''+ex.title.replace(/'/g,"\\'")+'\')" '+
-          'class="btn btn-outline btn-sm" style="font-size:.78rem">Xem lại</button>';
-      } else if(submitted.length>0){
-        actionBtn="";
-      } else {
-        actionBtn='<button onclick="startExam(\''+ex.id+'\',\''+ex.title.replace(/'/g,"\\'")+'\','+ex.duration_minutes+','+ex.total_points+',\''+_classId+'\')" '+
-          'style="background:linear-gradient(135deg,var(--navy),var(--navy-mid));color:var(--gold-light);'+
-          'border:none;padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;'+
-          'white-space:nowrap;font-family:var(--font-body);flex-shrink:0">Làm bài</button>';
-      }
-
-      return '<div style="padding:14px 16px;background:var(--white);border:1px solid var(--border);'+
-        'border-radius:10px;'+(lastResult?"border-left:3px solid var(--green)":"")+'">' +
-        '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">'+
-          '<div style="flex:1;min-width:0">'+
-            '<div style="font-weight:600;font-size:.9rem;color:var(--navy);margin-bottom:3px">'+ex.title+"</div>"+
-            '<div style="font-size:.75rem;color:var(--ink-mid)">⏱ '+ex.duration_minutes+" phút &nbsp;•&nbsp; 🏆 "+ex.total_points+"đ &nbsp;•&nbsp; "+schStr+"</div>"+
-            (scheduleNote&&canDo?'<div style="font-size:.72rem;color:#16a34a;margin-top:2px">'+scheduleNote+"</div>":"")+
-          "</div>"+
-          '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap">'+
-            scoreBadge+actionBtn+
-          "</div>"+
-        "</div></div>";
-    }).join("");
-
-    tc.innerHTML=addExamBtn+'<div style="display:flex;flex-direction:column;gap:8px">'+examsHtml+"</div>";
-  }
-
-  async function renderExamsForAdmin(tc, exams, addExamBtn=""){
-    const sb=getSb();
-    const examIds=exams.filter(e=>e.type==="exam").map(e=>e.id);
-    const{data:submits}=examIds.length
-      ? await sb.from("exam_results").select("exam_id").not("submitted_at","is",null).eq("class_id",_classId).in("exam_id",examIds)
-      : {data:[]};
-    const submitCount={};
-    (submits||[]).forEach(r=>{submitCount[r.exam_id]=(submitCount[r.exam_id]||0)+1;});
-
-    tc.innerHTML=addExamBtn+'<div style="display:flex;flex-direction:column;gap:8px">'+
-      exams.map(ex=>{
-        const schStr=ex.starts_at&&ex.ends_at
-          ?"🕐 "+fmtDT(ex.starts_at)+" → "+fmtDT(ex.ends_at)
-          :"🗓 Không giới hạn";
-        if(ex.type==="pdf"){
-          return '<div style="padding:14px 16px;background:var(--white);border:1px solid var(--border);'+
-            'border-radius:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+
-            '<div style="flex:1;min-width:0">'+
-              '<div style="font-weight:600;font-size:.9rem;color:var(--navy);margin-bottom:3px">'+ex.title+'</div>'+
-              '<div style="font-size:.75rem;color:var(--ink-mid)">📄 PDF &nbsp;•&nbsp; ⏱ '+ex.duration_minutes+' phút &nbsp;•&nbsp; 🏆 '+ex.total_points+' điểm &nbsp;•&nbsp; '+schStr+'</div>'+
-            '</div>'+
-            '<button onclick="location.href=\'pdf_exam.html?exam='+ex.id+'&classId='+_classId+'\'" class="btn btn-outline btn-sm" style="font-size:.75rem;flex-shrink:0">Mở đề PDF</button>'+
-            '<button onclick="cvRemoveExamFromClass(\''+ex.class_exam_id+'\',\''+ex.title.replace(/'/g,"\\'")+'\',0)" class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5;font-size:.75rem;flex-shrink:0">Gỡ</button>'+
-            '</div>';
-        }
-        const cnt=submitCount[ex.id]||0;
-        return '<div style="padding:14px 16px;background:var(--white);border:1px solid var(--border);'+
-          'border-radius:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+
-          '<div onclick="cvOpenExamResult(\''+ex.id+'\',\''+ex.title.replace(/'/g,"\\'")+'\',\''+_classId+'\')" style="flex:1;cursor:pointer;min-width:0">'+
-            '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">'+
-              '<div style="flex:1">'+
-                '<div style="font-weight:600;font-size:.9rem;color:var(--navy);margin-bottom:3px">'+ex.title+'</div>'+
-                '<div style="font-size:.75rem;color:var(--ink-mid)">⏱ '+ex.duration_minutes+' phút &nbsp;•&nbsp; 🏆 '+ex.total_points+' điểm &nbsp;•&nbsp; '+schStr+'</div>'+
-              '</div>'+
-              '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'+
-                '<span style="background:var(--navy);color:var(--gold-light);padding:3px 12px;border-radius:20px;font-size:.78rem;font-weight:700">'+cnt+' bài đã nộp</span>'+
-                '<span style="color:var(--ink-light);font-size:1.2rem">›</span>'+
-              '</div>'+
-            '</div>'+
-          '</div>'+
-          '<button onclick="cvEditClassExam(\''+ex.class_exam_id+'\',\''+ex.title.replace(/'/g,"\\'")+'\',\''+ex.id+'\')" class="btn btn-outline btn-sm" style="font-size:.75rem;flex-shrink:0">Đặt giờ</button>'+
-          '<button onclick="cvRemoveExamFromClass(\''+ex.class_exam_id+'\',\''+ex.title.replace(/'/g,"\\'")+'\','+cnt+')" class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5;font-size:.75rem;flex-shrink:0">Gỡ</button>'+
-          '</div>';
-      }).join("")+
-      '</div>';
-  }
+  
 
   window.cvOpenExamResult = async function(examId, examTitle, classId){
     const tc=document.getElementById("cvTabContent"); if(!tc) return;

@@ -174,9 +174,6 @@
     return ["solo", "quick", "round"].includes(mode);
   }
 
-  function roundToNearestTen(value) {
-    return Math.round(Number(value || 0) / 10) * 10;
-  }
 
   function getModeEloRule(mode) {
     if (mode === "solo") return "Chơi đơn: Elo thay đổi theo mức điểm của trận, tối đa +30 Elo.";
@@ -241,29 +238,6 @@
     return 30;
   }
 
-  function getSoloProfile(finishedRooms, finishedPlayers, userId) {
-    const soloRooms = (finishedRooms || []).filter((room) => roomModeValue(room) === "solo");
-    let points = 1000;
-    let matches = 0;
-    let totalScore = 0;
-    let bestScore = 0;
-    soloRooms.forEach((room) => {
-      const player = (finishedPlayers || []).find((item) => item.room_id === room.id && item.user_id === userId);
-      if (!player) return;
-      const score = Number(player.score || 0);
-      points += score;
-      matches += 1;
-      totalScore += score;
-      bestScore = Math.max(bestScore, score);
-    });
-    return {
-      points,
-      matches,
-      totalScore,
-      bestScore,
-      avgScore: matches ? Math.round(totalScore / matches) : 0,
-    };
-  }
 
   function getUnifiedEloProfile(finishedRooms, finishedPlayers, userId) {
     const eloRooms = [...(finishedRooms || [])]
@@ -369,30 +343,6 @@
     }
   }
 
-  function getArenaTierProgress(elo) {
-    const tiers = [
-      { name: "Đồng", icon: "•", min: 1000, max: 1099 },
-      { name: "Bạc", icon: "✦", min: 1100, max: 1299 },
-      { name: "Vàng", icon: "★", min: 1300, max: 1549 },
-      { name: "Bạch kim", icon: "⬡", min: 1550, max: 1799 },
-      { name: "Kim cương", icon: "◆", min: 1800, max: Infinity },
-    ];
-    const value = Math.max(1000, Number(elo || 1000));
-    const current = tiers.find((tier) => value >= tier.min && value <= tier.max) || tiers[0];
-    const next = tiers[tiers.indexOf(current) + 1] || null;
-    if (!next) {
-      return { current, next, percent: 100, text: "Bạn đã ở bậc cao nhất." };
-    }
-    const span = Math.max(1, next.min - current.min);
-    const percent = Math.max(0, Math.min(100, Math.round(((value - current.min) / span) * 100)));
-    const remain = Math.max(0, next.min - value);
-    return {
-      current,
-      next,
-      percent,
-      text: `Còn ${remain} Elo để lên ${next.name}.`,
-    };
-  }
 
   init();
   normalizeStaticGameText();
@@ -1260,10 +1210,6 @@
     GAME.waitingTick = setInterval(tick, 250);
   }
 
-  function isPublicAutoMatchRoom(room) {
-    const mode = roomModeValue(room);
-    return ["quick"].includes(mode) && (room.visibility || "public") === "public";
-  }
 
   function areRoomPlayersReadyForStart(room, players = GAME.roomPlayers) {
     const mode = roomModeValue(room);
@@ -1736,11 +1682,6 @@
     return (questionIds || []).filter((id) => allowed.has(id));
   }
 
-  async function filterAllowedFinishQuestionRows(rows) {
-    const ids = rows.map((item) => item.questionId).filter(Boolean);
-    const allowedIds = new Set(await filterAllowedGameQuestionIds(ids));
-    return rows.filter((item) => allowedIds.has(item.questionId));
-  }
 
   async function submitGameConfig(event) {
     event.preventDefault();
@@ -2517,13 +2458,6 @@
 
 
 
-  function getArenaTier(elo) {
-    if (elo >= 1800) return { name: "Kim cương", icon: "◆" };
-    if (elo >= 1550) return { name: "Bạch kim", icon: "⬡" };
-    if (elo >= 1300) return { name: "Vàng", icon: "★" };
-    if (elo >= 1100) return { name: "Bạc", icon: "✦" };
-    return { name: "Đồng", icon: "●" };
-  }
 
   function getLeaderboardByElo(scopedRooms, finishedPlayers) {
     if (GAME.eloTablesReady && (GAME.eloProfiles || []).length) {
