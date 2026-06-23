@@ -142,7 +142,7 @@
   }
 
   function canFallbackToDirectPush(rows) {
-    return rows.length && rows.every(item => item.type === "session_evaluation" && item.user_id);
+    return rows.length && rows.every(item => item.user_id);
   }
 
   async function sendDirectPushFallback(rows) {

@@ -256,7 +256,11 @@
   }
 
   async function pollLocalNotifications(userId) {
-    if (!userId || Notification.permission !== "granted" || localStorage.getItem(LOCAL_NOTIFY_ENABLED_KEY) !== "1") return;
+    if (!userId || Notification.permission !== "granted") return;
+    // Auto-enable nếu đã có quyền nhưng chưa bấm "Bật thông báo" trong app
+    if (localStorage.getItem(LOCAL_NOTIFY_ENABLED_KEY) !== "1") {
+      localStorage.setItem(LOCAL_NOTIFY_ENABLED_KEY, "1");
+    }
     const client = await waitForSupabase();
     if (!client) return;
 
