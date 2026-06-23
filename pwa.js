@@ -13,6 +13,14 @@
   let deferredInstallPrompt = null;
   let localNotificationPollTimer = null;
 
+  function isTopLevelWindow() {
+    try {
+      return window.top === window;
+    } catch (error) {
+      return false;
+    }
+  }
+
   window.addEventListener("beforeinstallprompt", function(event){
     event.preventDefault();
     deferredInstallPrompt = event;
@@ -43,7 +51,7 @@
     return serviceWorkerRegistrationPromise;
   }
 
-  if ("serviceWorker" in navigator) {
+  if ("serviceWorker" in navigator && isTopLevelWindow()) {
     window.addEventListener("load", registerServiceWorker);
   }
 
@@ -471,7 +479,10 @@
 
   async function ensurePushSubscription(userId, options = {}) {
     if (pushSubscriptionPromise) return pushSubscriptionPromise;
-    pushSubscriptionPromise = ensurePushSubscriptionNow(userId, options);
+    const subscribe = () => ensurePushSubscriptionNow(userId, options);
+    pushSubscriptionPromise = navigator.locks?.request
+      ? navigator.locks.request("mindup-push-subscription", { mode: "exclusive" }, subscribe)
+      : subscribe();
     try {
       return await pushSubscriptionPromise;
     } finally {
@@ -1155,6 +1166,7 @@
   }
 
   async function initPushPrompt() {
+    if (!isTopLevelWindow()) return;
     const user = await getCurrentUser();
     if (!user?.id || !isPushSupported()) return;
     if (Notification.permission === "granted") {
@@ -1175,11 +1187,13 @@
   }
 
   async function initInstallPrompt() {
+    if (!isTopLevelWindow()) return;
     const user = await getCurrentUser();
     if (shouldShowInstallPrompt(user)) showInstallPrompt();
   }
 
   async function watchAuthForPrompts() {
+    if (!isTopLevelWindow()) return;
     const client = await waitForSupabase();
     if (!client?.auth?.onAuthStateChange) return;
     client.auth.onAuthStateChange((event, session) => {
@@ -1205,6 +1219,7 @@
   });
 
   window.addEventListener("online", async function(){
+    if (!isTopLevelWindow()) return;
     if (Notification.permission !== "granted") return;
     const user = await getCurrentUser();
     if (user?.id) schedulePushRetry(user.id);
