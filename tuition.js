@@ -869,11 +869,25 @@ Nhập số tiền hoàn lại (>0):`,
             </div>`
         : '<span style="color:var(--muted);font-size:12px">—</span>';
 
-      const lockCell = isLocked
-        ? needRecalc
+      let lockCell = "";
+      if (isLocked) {
+        const snap = payment?.locked_snapshot || {};
+        const lockedPaid = snap.amount_paid !== undefined ? snap.amount_paid : (payment?.amount_paid || 0);
+        const lockedDue  = snap.amount !== undefined ? snap.amount : (payment?.amount_due || 0);
+
+        const badge = needRecalc
           ? `<span class="lock-badge warn">⚠️ Đã đổi</span>`
-          : `<span class="lock-badge">🔒 Đã chốt</span>`
-        : `<span style="color:var(--muted);font-size:12px">—</span>`;
+          : `<span class="lock-badge">🔒 Đã chốt</span>`;
+
+        lockCell = `
+          ${badge}
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;white-space:nowrap">
+            Đã nộp: ${fmt(lockedPaid)}đ / ${fmt(lockedDue)}đ
+          </div>
+        `;
+      } else {
+        lockCell = `<span style="color:var(--muted);font-size:12px">—</span>`;
+      }
 
       const tr = document.createElement("tr");
       tr.className = "tuition-row-clickable" + (needRecalc ? " recalc-needed" : "");
@@ -1128,6 +1142,7 @@ Nhập số tiền hoàn lại (>0):`,
       for (const g of currentRows) {
         const snapshot = {
           amount: g.amount,
+          amount_paid: paymentMap[g.studentId]?.amount_paid || 0,
           classes: g.classes.map(c => ({
             classId: c.classId,
             present: c.present,
@@ -1192,6 +1207,7 @@ Nhập số tiền hoàn lại (>0):`,
     if (!confirm(`Tính lại học phí cho ${g.studentName} theo điểm danh hiện tại?`)) return;
     const snapshot = {
       amount: g.amount,
+      amount_paid: paymentMap[studentId]?.amount_paid || 0,
       classes: g.classes.map(c => ({
         classId: c.classId,
         present: c.present,
