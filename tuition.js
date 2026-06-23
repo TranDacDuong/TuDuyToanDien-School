@@ -872,7 +872,6 @@ Nhập số tiền hoàn lại (>0):`,
       let lockCell = "";
       if (isLocked) {
         const snap = payment?.locked_snapshot || {};
-        const lockedPaid = snap.amount_paid !== undefined ? snap.amount_paid : (payment?.amount_paid || 0);
         const lockedDue  = snap.amount !== undefined ? snap.amount : (payment?.amount_due || 0);
 
         const badge = needRecalc
@@ -882,7 +881,7 @@ Nhập số tiền hoàn lại (>0):`,
         lockCell = `
           ${badge}
           <div style="font-size:11px;color:var(--muted);margin-top:4px;white-space:nowrap">
-            Đã nộp: ${fmt(lockedPaid)}đ / ${fmt(lockedDue)}đ
+            Tiền chốt: ${fmt(lockedDue)}đ
           </div>
         `;
       } else {
