@@ -1169,7 +1169,11 @@ function syncDashboardUrl(page, replace = false){
   const next = url.pathname + url.search + url.hash;
   if(next === window.location.pathname + window.location.search + window.location.hash) return;
   const method = replace ? "replaceState" : "pushState";
-  history[method]({ dashboardPage: normalized }, "", next);
+  try {
+    history[method]({ dashboardPage: normalized }, "", next);
+  } catch (e) {
+    console.warn("Could not sync dashboard URL:", e);
+  }
 }
 
 function getFrameDashboardPage(){

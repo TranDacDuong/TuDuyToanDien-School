@@ -982,9 +982,13 @@ function switchTab(id, btn){
   const subtitleEl = document.getElementById('systemPageSubtitle');
   if(titleEl) titleEl.textContent = 'Quản lý hệ thống';
   if(subtitleEl) subtitleEl.textContent = 'Thiết lập dữ liệu nền tảng, danh mục và các cấu hình vận hành để toàn bộ hệ thống học tập chạy đồng bộ hơn.';
-  const url = new URL(window.location.href);
-  url.searchParams.set('tab', id);
-  window.history.replaceState({}, '', url.toString());
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', id);
+    window.history.replaceState({}, '', url.toString());
+  } catch (e) {
+    console.warn("Could not update history state:", e);
+  }
   if(id === 'adminLogs') loadAdminLogs();
   if(id === 'appearance') loadSystemTheme();
   if(id === 'evaluationTemplates') loadEvaluationTemplatesAdmin();
