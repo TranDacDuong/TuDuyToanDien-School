@@ -881,9 +881,15 @@
       if (activeExam && !activeExam.is_review_generated && activeExam.total_points > 0) {
         const scorePct = finalScore / activeExam.total_points;
         if (scorePct < 0.5) {
-          const incorrectQIds = answerRows.filter(r => r.is_correct === false).map(r => r.question_id);
-          const correctQIds = answerRows.filter(r => r.is_correct === true).map(r => r.question_id);
-          if (incorrectQIds.length > 0) {
+          const incorrectEqs = _examQuestions.filter(eq => {
+            const r = answerRows.find(row => row.question_id === eq.question.id);
+            return r && r.is_correct === false;
+          });
+          const correctEqs = _examQuestions.filter(eq => {
+            const r = answerRows.find(row => row.question_id === eq.question.id);
+            return !r || r.is_correct !== false;
+          });
+          if (incorrectEqs.length > 0) {
             let altQIds = [];
             if (activeExam.topic_id) {
               const { data: qBank } = await sb.from("question_bank").select("id").eq("topic_id", activeExam.topic_id);
@@ -893,14 +899,21 @@
               }
             }
             altQIds.sort(() => Math.random() - 0.5);
-            const neededCount = correctQIds.length;
+            const neededCount = correctEqs.length;
             let selectedAlts = altQIds.slice(0, neededCount);
+            let shuffledCorrect = [];
             if (selectedAlts.length < neededCount) {
               const shortage = neededCount - selectedAlts.length;
-              const shuffledCorrect = [...correctQIds].sort(() => Math.random() - 0.5);
-              selectedAlts = [...selectedAlts, ...shuffledCorrect.slice(0, shortage)];
+              shuffledCorrect = correctEqs.map(eq => eq.question.id).sort(() => Math.random() - 0.5);
             }
-            const finalQIds = [...incorrectQIds, ...selectedAlts];
+            const finalQList = [];
+            incorrectEqs.forEach(eq => {
+              finalQList.push({ question_id: eq.question.id, points: eq.points });
+            });
+            for (let i = 0; i < correctEqs.length; i++) {
+              const qid = i < selectedAlts.length ? selectedAlts[i] : shuffledCorrect[i - selectedAlts.length];
+              finalQList.push({ question_id: qid, points: correctEqs[i].points });
+            }
             const currentClassId = window._classId || document.getElementById("classViewOverlay")?.dataset.classId || null;
             const { data: newExam, error: newExamErr } = await sb.from("exams").insert({
               title: `Ôn tập lỗi sai: ${activeExam.title}`,
@@ -914,10 +927,10 @@
             }).select("id").single();
 
             if (newExam) {
-              const newEqs = finalQIds.map((qid, idx) => ({
+              const newEqs = finalQList.map((item, idx) => ({
                 exam_id: newExam.id,
-                question_id: qid,
-                points: _examQuestions[idx]?.points || 1,
+                question_id: item.question_id,
+                points: item.points,
                 order_no: idx + 1
               }));
               await sb.from("exam_questions").insert(newEqs);
