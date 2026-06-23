@@ -508,6 +508,30 @@ tr:hover td { background: #f8fbff; }
   line-height: 1.6;
 }
 
+/* ── Chốt học phí ── */
+@keyframes blink-warn {
+  0%, 100% { background: #fff1f2; }
+  50%       { background: #ffe4e6; }
+}
+tr.recalc-needed td { animation: blink-warn 1.4s ease-in-out infinite; }
+tr.recalc-needed td:first-child { border-left: 3px solid #ef4444; }
+.lock-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+  white-space: nowrap;
+}
+.lock-badge.warn {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+
 /* print */
 @media print {
   @page {
@@ -651,7 +675,7 @@ tr:hover td { background: #f8fbff; }
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="MindUp">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<script src="pwa.js?v=20260615-ios-guide1" defer></script>
+<script src="pwa.js?v=20260623-push-legacy5" defer></script>
 </head>
 <body>
 <div class="page">
@@ -675,6 +699,7 @@ tr:hover td { background: #f8fbff; }
     </div>
     <div class="toolbar-group actions">
       <button onclick="loadTuition()">Tải lại</button>
+      <button class="secondary" id="lockTuitionBtn" onclick="lockAllTuition()" style="display:none">🔒 Chốt học phí</button>
       <button class="secondary" id="notifyTuitionBtn" onclick="notifyPendingTuition()" style="display:none">Thông báo học phí</button>
       <button class="secondary" onclick="printInvoices()">In hóa đơn</button>
       <span class="badge" id="rowCount">0 học sinh</span>
@@ -715,6 +740,7 @@ tr:hover td { background: #f8fbff; }
           <th class="right">Đã nộp</th>
           <th class="right">Còn thiếu</th>
           <th class="center">Trạng thái</th>
+          <th class="center">Chốt</th>
           <th class="center">Thao tác</th>
         </tr>
       </thead>

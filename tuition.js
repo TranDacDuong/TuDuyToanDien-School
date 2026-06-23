@@ -177,6 +177,21 @@
     overpaid: "Nộp thừa",
   };
 
+  /* Kiểm tra liệu điểm danh đã thay đổi sau khi chốt */
+  function isRecalcNeeded(group) {
+    const payment = paymentMap[group.studentId];
+    if (!payment || !payment.locked_snapshot) return false;
+    const snap = payment.locked_snapshot;
+    if (Math.abs((snap.amount || 0) - group.amount) > 1) return true;
+    const snapClasses = snap.classes || [];
+    for (const sc of snapClasses) {
+      const cur = (group.classes || []).find(c => c.classId === sc.classId);
+      if (!cur) return true;
+      if (cur.present !== sc.present || cur.absent !== sc.absent || cur.makeup !== sc.makeup) return true;
+    }
+    return false;
+  }
+
   /* ─────────────────────────────────────────────
      STATE
      allRows  : mảng chi tiết từng học sinh × lớp (dùng để tính)
@@ -300,13 +315,16 @@
     const { data, error } = await sb
       .from("tuition_payments")
       .upsert({
-        student_id:  studentId,
-        class_id:    null,
-        month:       ymToDate(ym),
-        amount_due:  fields.amount_due  ?? existing.amount_due  ?? 0,
-        amount_paid: fields.amount_paid ?? existing.amount_paid ?? 0,
-        paid_at:     fields.paid_at     !== undefined ? fields.paid_at : (existing.paid_at || null),
-        note:        fields.note        !== undefined ? fields.note    : (existing.note    || null),
+        student_id:      studentId,
+        class_id:        null,
+        month:           ymToDate(ym),
+        amount_due:      fields.amount_due       ?? existing.amount_due       ?? 0,
+        amount_paid:     fields.amount_paid      ?? existing.amount_paid      ?? 0,
+        paid_at:         fields.paid_at          !== undefined ? fields.paid_at         : (existing.paid_at         || null),
+        note:            fields.note             !== undefined ? fields.note            : (existing.note            || null),
+        locked_at:       fields.locked_at        !== undefined ? fields.locked_at       : (existing.locked_at       || null),
+        locked_by:       fields.locked_by        !== undefined ? fields.locked_by       : (existing.locked_by       || null),
+        locked_snapshot: fields.locked_snapshot  !== undefined ? fields.locked_snapshot : (existing.locked_snapshot || null),
       }, { onConflict: "student_id,month" })
       .select().single();
     if (error) throw error;
@@ -476,6 +494,7 @@ Nhập số tiền hoàn lại (>0):`,
     const classFilter = document.getElementById("classFilter");
     const paidFilter = document.getElementById("paidFilter");
     const notifyBtn = document.getElementById("notifyTuitionBtn");
+    const lockBtn = document.getElementById("lockTuitionBtn");
     const rowCount = document.getElementById("rowCount");
     const summary = document.querySelector(".summary-row");
     const tableWrap = document.querySelector(".table-wrap");
@@ -488,6 +507,7 @@ Nhập số tiền hoàn lại (>0):`,
       if (classFilter) classFilter.style.display = "none";
       if (paidFilter) paidFilter.style.display = "none";
       if (notifyBtn) notifyBtn.style.display = "none";
+      if (lockBtn) lockBtn.style.display = "none";
       if (reloadBtn) reloadBtn.style.display = "none";
       if (printBtn) printBtn.style.display = "none";
       if (rowCount) rowCount.style.display = "none";
@@ -504,6 +524,7 @@ Nhập số tiền hoàn lại (>0):`,
     if (reloadBtn) reloadBtn.style.display = "";
     if (printBtn) printBtn.style.display = "";
     if (notifyBtn) notifyBtn.style.display = canManagePayments() ? "" : "none";
+    if (lockBtn) lockBtn.style.display = canManagePayments() ? "" : "none";
     if (studentDetailView) studentDetailView.classList.remove("show");
     if (paidFilter) paidFilter.style.display = canManagePayments() ? "" : "none";
   }
@@ -548,7 +569,7 @@ Nhập số tiền hoàn lại (>0):`,
     if (!ym) return;
 
     const tbody = document.getElementById("tuitionBody");
-    tbody.innerHTML = `<tr><td colspan="9" class="loading">⏳ Đang tính học phí...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="loading">⏳ Đang tính học phí...</td></tr>`;
 
     const sb     = getSb();
     const mStart = ymToDate(ym);
@@ -674,7 +695,7 @@ Nhập số tiền hoàn lại (>0):`,
 
     } catch (err) {
       console.error(err);
-      tbody.innerHTML = `<tr><td colspan="9" class="empty">❌ Lỗi: ${err.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="empty">❌ Lỗi: ${err.message}</td></tr>`;
     }
   };
 
@@ -699,6 +720,7 @@ Nhập số tiền hoàn lại (>0):`,
       }
       const g = map[r.studentId];
       g.classes.push({
+        classId:          r.classId,
         className:        r.className,
         tuitionType:      r.tuitionType,
         tuitionFee:       r.tuitionFee,
@@ -751,13 +773,14 @@ Nhập số tiền hoàn lại (>0):`,
       }
       const g = map[r.studentId];
       g.classes.push({
-        className: r.className, tuitionType: r.tuitionType,
-        tuitionFee: r.tuitionFee, makeupFee: r.makeupFee,
+        classId:       r.classId,
+        className:     r.className, tuitionType:      r.tuitionType,
+        tuitionFee:    r.tuitionFee, makeupFee:        r.makeupFee,
         scheduleLabel: r.scheduleLabel,
         totalSessions: r.totalSessions,
-        present: r.present, absent: r.absent, makeup: r.makeup,
-        billableSessions: r.billableSessions, feePerSession: r.feePerSession,
-        amount: r.amount, noteCalc: r.noteCalc,
+        present:       r.present, absent:            r.absent, makeup: r.makeup,
+        billableSessions: r.billableSessions, feePerSession:    r.feePerSession,
+        amount:        r.amount, noteCalc:           r.noteCalc,
       });
       g.totalSessions    += r.totalSessions;
       g.present          += r.present;
@@ -767,7 +790,12 @@ Nhập số tiền hoàn lại (>0):`,
       g.amount           += r.amount;
     });
 
-    let rows = Object.values(map).sort((a, b) => a.studentName.localeCompare(b.studentName));
+    let rows = Object.values(map).sort((a, b) => {
+      const aWarn = isRecalcNeeded(a) ? 0 : 1;
+      const bWarn = isRecalcNeeded(b) ? 0 : 1;
+      if (aWarn !== bWarn) return aWarn - bWarn;
+      return a.studentName.localeCompare(b.studentName);
+    });
 
     // Filter theo trạng thái thanh toán
     if (paidFilter) {
@@ -797,7 +825,7 @@ Nhập số tiền hoàn lại (>0):`,
     const tbody = document.getElementById("tuitionBody");
 
     if (rows.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="9" class="empty">Không có dữ liệu</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="empty">Không có dữ liệu</td></tr>`;
       updateSummary([], ym);
       document.getElementById("rowCount").textContent = "0 học sinh";
       return;
@@ -806,8 +834,10 @@ Nhập số tiền hoàn lại (>0):`,
     const frag = document.createDocumentFragment();
 
     rows.forEach((g, i) => {
-      const payment = paymentMap[g.studentId];
-      const note    = payment?.note || "";
+      const payment    = paymentMap[g.studentId];
+      const note       = payment?.note || "";
+      const isLocked   = Boolean(payment?.locked_at);
+      const needRecalc = isRecalcNeeded(g);
 
       const amountPaid  = payment?.amount_paid || 0;
       const status      = getStatus(g.amount, amountPaid);
@@ -832,11 +862,21 @@ Nhập số tiền hoàn lại (>0):`,
                onclick="event.stopPropagation();editNote('${g.studentId}','${ym}',${g.amount})">
                 📝 ${note ? "Sửa ghi chú" : "Ghi chú"}
               </button>
+              ${needRecalc ? `<button class="action-btn" style="background:#ef4444;color:#fff;margin-top:2px"
+               onclick="event.stopPropagation();recalcOneTuition('${g.studentId}','${ym}')">
+                🔄 Tính lại
+              </button>` : ""}
             </div>`
         : '<span style="color:var(--muted);font-size:12px">—</span>';
 
+      const lockCell = isLocked
+        ? needRecalc
+          ? `<span class="lock-badge warn">⚠️ Đã đổi</span>`
+          : `<span class="lock-badge">🔒 Đã chốt</span>`
+        : `<span style="color:var(--muted);font-size:12px">—</span>`;
+
       const tr = document.createElement("tr");
-      tr.className = "tuition-row-clickable";
+      tr.className = "tuition-row-clickable" + (needRecalc ? " recalc-needed" : "");
       tr.setAttribute("onclick", `openTuitionDetail('${g.studentId}')`);
       tr.innerHTML = `
         <td style="color:var(--muted);vertical-align:top;padding-top:12px">${i + 1}</td>
@@ -872,6 +912,10 @@ Nhập số tiền hoàn lại (>0):`,
 
         <td class="center" style="vertical-align:top;padding-top:10px">
           <span class="status-badge ${status}">${statusLabel[status]}</span>
+        </td>
+
+        <td class="center" style="vertical-align:top;padding-top:10px">
+          ${lockCell}
         </td>
 
         <td style="vertical-align:top;padding-top:8px">
@@ -1056,6 +1100,73 @@ Nhập số tiền hoàn lại (>0):`,
       alert(`Đã gửi thông báo học phí cho ${pendingRows.length} học sinh.`);
     } catch (error) {
       alert("Không thể gửi thông báo học phí: " + error.message);
+    }
+  };
+
+  /* ─────────────────────────────────────────────
+     CHỐT HỌC PHÍ
+  ───────────────────────────────────────────── */
+  window.lockAllTuition = async function () {
+    if (!canManagePayments()) { alert("Bạn không có quyền chốt học phí."); return; }
+    const ym = monthPicker.value;
+    if (!currentRows.length) { alert("Không có học sinh nào để chốt."); return; }
+    if (!confirm(`Chốt học phí tháng ${ym} cho ${currentRows.length} học sinh?\n\nSau khi chốt, nếu điểm danh thay đổi sẽ hiện cảnh báo ⚠️.`)) return;
+
+    const lockBtn = document.getElementById("lockTuitionBtn");
+    if (lockBtn) { lockBtn.disabled = true; lockBtn.textContent = "⏳ Đang chốt..."; }
+
+    try {
+      for (const g of currentRows) {
+        const snapshot = {
+          amount: g.amount,
+          classes: g.classes.map(c => ({
+            classId: c.classId,
+            present: c.present,
+            absent:  c.absent,
+            makeup:  c.makeup,
+            amount:  c.amount,
+          }))
+        };
+        await upsertPayment(g.studentId, ym, {
+          amount_due:      g.amount,
+          locked_at:       new Date().toISOString(),
+          locked_by:       currentUserId,
+          locked_snapshot: snapshot,
+        });
+      }
+      await loadTuition();
+      alert(`✅ Đã chốt học phí tháng ${ym} cho ${currentRows.length} học sinh.`);
+    } catch (err) {
+      alert("❌ Lỗi khi chốt học phí: " + err.message);
+    } finally {
+      if (lockBtn) { lockBtn.disabled = false; lockBtn.textContent = "🔒 Chốt học phí"; }
+    }
+  };
+
+  window.recalcOneTuition = async function (studentId, ym) {
+    const g = getStudentGroup(studentId);
+    if (!g) return;
+    if (!confirm(`Tính lại học phí cho ${g.studentName} theo điểm danh hiện tại?`)) return;
+    const snapshot = {
+      amount: g.amount,
+      classes: g.classes.map(c => ({
+        classId: c.classId,
+        present: c.present,
+        absent:  c.absent,
+        makeup:  c.makeup,
+        amount:  c.amount,
+      }))
+    };
+    try {
+      await upsertPayment(studentId, ym, {
+        amount_due:      g.amount,
+        locked_at:       new Date().toISOString(),
+        locked_by:       currentUserId,
+        locked_snapshot: snapshot,
+      });
+      await loadTuition();
+    } catch (err) {
+      alert("Lỗi: " + err.message);
     }
   };
 
