@@ -385,6 +385,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   <button class="tab" data-testid="system-tab-teachers" onclick="switchTab('teachers',this)">👨‍🏫 Giáo viên</button>
   <button class="tab" data-testid="system-tab-students" onclick="switchTab('students',this)">👩‍🎓 Học sinh</button>
   <button class="tab" data-testid="system-tab-evaluation-templates" onclick="switchTab('evaluationTemplates',this)">Mẫu nhận xét</button>
+  <button class="tab" data-testid="system-tab-msg-templates" onclick="switchTab('msgTemplates',this)">💬 Tin nhắn tự động</button>
   <button class="tab" data-testid="system-tab-logs" onclick="switchTab('adminLogs',this)">📋 Nhật ký vận hành</button>
   <button class="tab" data-testid="system-tab-appearance" onclick="switchTab('appearance',this)">🎨 Giao diện</button>
 </div>
@@ -897,6 +898,25 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   </div>
 </div>
 
+<!-- ═══════ MẪU TIN NHẮN TỰ ĐỘNG ═══════ -->
+<div id="msgTemplates" class="panel">
+  <div class="table-card" style="grid-column:1/-1">
+    <div class="table-card-hd">
+      <span>💬 Mẫu tin nhắn tự động MindUp Bot</span>
+      <button class="btn btn-outline btn-sm" onclick="loadMessageTemplatesAdmin()">🔄 Tải lại</button>
+    </div>
+    <div style="padding:14px 18px 8px;color:var(--ink-mid);font-size:.82rem">
+      Các tin nhắn dưới đây được hệ thống gửi tự động dưới tên <strong>MindUp - Tư Duy Toàn Diện</strong>. Dùng <code>{{tên_biến}}</code> làm chỗ thay thế.
+    </div>
+    <div class="table-scroll">
+      <table id="msgTemplateTable">
+        <thead><tr><th>ID</th><th>Tên mẫu</th><th style="min-width:360px">Nội dung (có thể sửa)</th><th>Bật/Tắt</th><th>Lưu</th></tr></thead>
+        <tbody id="msgTemplateTbody"><tr><td colspan="5" class="empty">Đang tải…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <div id="appearance" class="panel">
   <div class="table-card">
     <div class="table-card-hd">
@@ -969,6 +989,7 @@ function switchTab(id, btn){
   if(id === 'appearance') loadSystemTheme();
   if(id === 'evaluationTemplates') loadEvaluationTemplatesAdmin();
   if(id === 'topics') loadTopics();
+  if(id === 'msgTemplates') loadMessageTemplatesAdmin();
 }
 
 const SYSTEM_THEMES = [
@@ -3384,6 +3405,73 @@ function applyAdminLogQueryFilters(){
   el.addEventListener('input',()=>{ _activeLogQuickFilter=''; clearTimeout(t); t=setTimeout(renderAdminLogs,160); });
 });
 document.getElementById('logStatusFilter')?.addEventListener('change',()=>{ _activeLogQuickFilter=''; renderAdminLogs(); });
+
+/* ═══════ MẪU TIN NHẮN TỰ ĐỘNG ═══════ */
+const DEFAULT_MSG_TEMPLATES = [
+  { id:'exam_result',         name:'Báo cáo kết quả bài làm',           content:'📊 Chúc mừng em đã hoàn thành đề *{{exam_title}}* với kết quả **{{score}}/{{total_points}}** điểm!\n\nHãy xem lại chi tiết bài làm để rút kinh nghiệm cho các câu chưa đúng nhé! 💪\n\n__ACTION__{"type":"view_result","label":"👁 Xem lại bài làm","url":"{{review_url}}"}' },
+  { id:'low_score_review',    name:'Cảnh báo điểm thấp & đề ôn tập',   content:'⚠️ Kết quả đề luyện tập *{{exam_title}}* của em chưa đạt yêu cầu (**{{score}}/{{total_points}}** điểm).\n\nThầy cô đã tạo riêng cho em một **Đề ôn tập lỗi sai** cùng chủ đề. Hãy làm ngay để sửa các lỗi sai nhé!\n\n__ACTION__{"type":"open_exam","label":"✏️ Làm đề ôn tập","url":"{{review_exam_url}}"}' },
+  { id:'review_exam_reminder',name:'Nhắc làm đề ôn tập lỗi sai',       content:'⏰ Nhắc nhở: Đề ôn tập lỗi sai **"{{exam_title}}"** của em vẫn chưa được hoàn thành.\n\nHãy dành ra 15 phút làm bài để sửa các câu đã làm sai nhé! 📚\n\n__ACTION__{"type":"open_exam","label":"✏️ Làm đề ôn tập","url":"{{review_exam_url}}"}' },
+  { id:'absent_notification', name:'Thông báo vắng học (1 buổi)',       content:'😔 Hôm nay em **{{student_name}}** đã vắng mặt trong buổi học lớp **{{class_name}}** ngày **{{session_date}}**.\n\nThầy cô rất nhớ em, không biết em có gặp khó khăn gì không? Hãy nhắn lại cho thầy cô nhé!\n\n__ACTION__{"type":"reply","label":"📞 Liên hệ thầy cô","url":""}' },
+  { id:'consecutive_absent_warning', name:'Cảnh báo vắng liên tiếp',  content:'🚨 Thầy cô nhận thấy em **{{student_name}}** đã nghỉ học **{{absent_count}} buổi liên tiếp** tại lớp **{{class_name}}**.\n\nViệc nghỉ nhiều có thể khiến em bị hổng kiến thức. Trợ giảng đã sẵn sàng hỗ trợ em học bù, hãy nhắn lại ngay nhé!\n\n__ACTION__{"type":"reply","label":"💬 Nhắn trợ giảng học bù","url":""}' },
+  { id:'session_reminder_1h', name:'Nhắc lịch học (1 giờ trước)',      content:'⏰ Nhắc nhở: Lớp học **{{class_name}}** của em sẽ bắt đầu lúc **{{start_time}}** hôm nay. Đừng quên chuẩn bị bài và tài liệu nhé! 📚' },
+  { id:'session_reminder_7h', name:'Nhắc lịch học (7 giờ sáng)',       content:'🌅 Chào buổi sáng! Hôm nay em có buổi học lớp **{{class_name}}** lúc **{{start_time}}**. Chuẩn bị tinh thần tốt nhé! ☀️' },
+  { id:'new_exam_notification',name:'Thông báo đề luyện tập mới',      content:'📝 Thầy cô vừa mở đề luyện tập mới **"{{exam_title}}"** cho lớp **{{class_name}}**. Em hãy vào làm để củng cố bài học nhé!\n\n__ACTION__{"type":"open_exam","label":"📝 Làm bài ngay","url":"{{exam_url}}"}' },
+  { id:'session_evaluation_widget', name:'Đánh giá buổi học (khảo sát)', content:'⭐ Buổi học lớp **{{class_name}}** hôm nay thế nào em nhỉ? Hãy cho thầy cô biết mức độ hiểu bài của em nhé!\n\n__EVALUATION__{"sessionId":"{{session_id}}","options":[{"value":"understood","label":"😊 Hiểu bài"},{"value":"partial","label":"😐 Mơ hồ"},{"value":"confused","label":"🙁 Khó hiểu"}]}' },
+  { id:'praise_high_score',   name:'Khen ngợi điểm xuất sắc (≥9đ)',    content:'🌟 Xuất sắc! Em đã đạt thành tích **{{score}}/{{total_points}}** điểm trong đề luyện tập *{{exam_title}}*.\n\nThầy cô rất tự hào về sự cố gắng của em! Tiếp tục phát huy nhé! 🏆' },
+  { id:'praise_improvement',  name:'Khen ngợi tiến bộ thông thường',   content:'📈 Khen ngợi em đã có sự tiến bộ! Điểm số của em trong đề luyện tập *{{exam_title}}* đã tăng **+{{improvement}}** điểm so với lần trước cùng môn.\n\nSự nỗ lực không ngừng nghỉ của em đang đơm hoa kết trái! 🌸' },
+  { id:'praise_big_improvement', name:'Ghi nhận tiến bộ vượt bậc (≥3đ)', content:'🎉 Tuyệt vời! Thầy cô ghi nhận sự tiến bộ vượt bậc của em!\n\nĐiểm số đề *{{exam_title}}* của em đã tăng **+{{improvement}} điểm** so với đề trước cùng môn, đạt **{{score}}/{{total_points}}** điểm.\n\nSự cố gắng không ngừng nghỉ của em đang mang lại quả ngọt đó! 🍀' },
+  { id:'late_study_warning',  name:'Cảnh báo học muộn (sau 23:30)',     content:'🌙 Thầy cô thấy em vừa hoàn thành đề luyện tập *{{exam_title}}* vào lúc đêm muộn.\n\nRất khen tinh thần tự giác của em, nhưng hãy cố gắng sắp xếp học sớm hơn để bảo vệ sức khỏe và đầu óc minh mẫn nhé! 💤' },
+  { id:'tuition_reminder_1',  name:'Nhắc học phí (ngày 1 tháng)',       content:'💰 Thông báo học phí: Tháng **{{month_label}}** đã bắt đầu. Học phí lớp **{{class_name}}** cho học sinh **{{student_name}}** cần được nộp trước ngày 10/{{month}}. Cảm ơn quý phụ huynh đã đồng hành cùng MindUp! 🙏' },
+  { id:'tuition_reminder_3',  name:'Nhắc học phí (ngày 8 - còn 2 ngày)', content:'⚠️ Nhắc nhở: Còn 2 ngày nữa là đến hạn nộp học phí tháng **{{month_label}}** cho học sinh **{{student_name}}**. Vui lòng hoàn thành trước ngày 10/{{month}} để tránh gián đoạn học tập!' },
+  { id:'tuition_overdue',     name:'Thông báo học phí quá hạn',          content:'🚨 Học phí tháng **{{month_label}}** của học sinh **{{student_name}}** lớp **{{class_name}}** đã quá hạn nộp. Vui lòng liên hệ nhà trường ngay để sắp xếp việc nộp học phí. Trân trọng!' },
+  { id:'tuition_confirmed',   name:'Xác nhận học phí đã nộp thành công', content:'✅ MindUp xác nhận đã nhận đủ học phí **tháng {{month_label}}** của học sinh **{{student_name}}** lớp **{{class_name}}** (số tiền: **{{amount}}đ**).\n\nCảm ơn quý phụ huynh đã luôn đồng hành cùng MindUp! 🙏\n\n__ACTION__{"type":"url","label":"🧾 Xem lịch sử học phí","url":"tuition.html"}' },
+  { id:'birthday_wish',       name:'Chúc mừng sinh nhật',               content:'🎉🎂 Chúc mừng sinh nhật em **{{student_name}}**!\n\nMindUp - Tư Duy Toàn Diện chúc em tuổi mới luôn tràn đầy niềm vui, sức khỏe dồi dào, học tập thật tốt và đạt được nhiều kết quả cao trong năm học này nhé! 🌟' },
+  { id:'welcome_new_student', name:'Chào mừng học viên mới',            content:'🚀 Chào mừng em **{{student_name}}** đã chính thức gia nhập gia đình MindUp - Tư Duy Toàn Diện!\n\nĐây là kênh liên hệ trực tiếp 24/7 giữa em và thầy cô. Bất cứ khi nào có câu hỏi hoặc cần hỗ trợ, em cứ nhắn tin ở đây nhé. Cùng nhau chinh phục các điểm số cao! 🏆\n\n__ACTION__{"type":"url","label":"📖 Hướng dẫn học tập","url":"courses.html"}' },
+];
+
+async function loadMessageTemplatesAdmin(){
+  const tbody = document.getElementById('msgTemplateTbody');
+  if(!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="5" class="empty">Đang tải...</td></tr>';
+  const sb = getSb();
+  const { data: saved } = await sb.from('message_templates').select('id,name,content,is_enabled');
+  const savedMap = new Map((saved||[]).map(t => [t.id, t]));
+  tbody.innerHTML = DEFAULT_MSG_TEMPLATES.map(tpl => {
+    const existing = savedMap.get(tpl.id);
+    const content = existing?.content || tpl.content;
+    const isEnabled = existing ? existing.is_enabled !== false : true;
+    return `<tr>
+      <td style="font-size:.7rem;color:var(--ink-mid);max-width:110px;word-break:break-all">${esc(tpl.id)}</td>
+      <td style="font-weight:600;min-width:160px">${esc(tpl.name)}</td>
+      <td><textarea id="tplcontent_${esc(tpl.id)}" style="width:100%;min-height:80px;font-family:var(--font-body);font-size:.78rem;border:1.5px solid var(--border);border-radius:8px;padding:8px;resize:vertical">${esc(content)}</textarea></td>
+      <td style="text-align:center">
+        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="tplenabled_${esc(tpl.id)}" ${isEnabled ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--navy)">
+          Bật
+        </label>
+      </td>
+      <td><button class="btn btn-primary btn-sm" onclick="saveMsgTemplate('${esc(tpl.id)}','${esc(tpl.name).replace(/'/g,'\\\\\\'')}')">💾 Lưu</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function saveMsgTemplate(id, name) {
+  const contentEl = document.getElementById('tplcontent_' + id);
+  const enabledEl = document.getElementById('tplenabled_' + id);
+  if(!contentEl) return;
+  const sb = getSb();
+  const { error } = await sb.from('message_templates').upsert({
+    id,
+    name,
+    content: contentEl.value,
+    is_enabled: enabledEl ? enabledEl.checked : true,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'id' });
+  if(error) { toast('❌ Lỗi lưu mẫu: ' + error.message, 3500); return; }
+  toast('✅ Đã lưu mẫu "' + name + '"');
+}
+
+
 
 </script>
 </body>

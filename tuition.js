@@ -371,6 +371,25 @@ Nhập số tiền thu thêm lần này:`,
         added_amount: addAmount,
         amount_paid: newPaid,
       });
+      // === MINDUP BOT: Xác nhận học phí (gửi khi đã đóng đủ) ===
+      try {
+        if(window.MindUpBot && newPaid >= amountDue) {
+          const sb = getSb();
+          // Lấy thông tin học sinh + phụ huynh
+          const { data: studentInfo } = await sb.from('users').select('full_name,parent_id').eq('id', studentId).maybeSingle();
+          const parentId = studentInfo?.parent_id || null;
+          if(parentId) {
+            const studentName = studentInfo?.full_name || 'học sinh';
+            const row = (allRows||[]).find(r=>r.studentId===studentId);
+            const className = row?.className || '';
+            // Format tháng
+            const [year, month] = ym.split('-');
+            const monthLabel = `${parseInt(month)}/${year}`;
+            await window.MindUpBot.sendTuitionConfirmMessage(parentId, { studentName, className, monthLabel, amount: newPaid });
+          }
+        }
+      } catch(botErr){ console.warn('[MindUpBot] Lỗi gửi tin nhắn xác nhận học phí:', botErr); }
+      // === END MINDUP BOT ===
       renderRows();
     } catch (err) { alert("Lỗi: " + err.message); }
   };

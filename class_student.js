@@ -871,6 +871,40 @@
     }).eq("id", _examResultId);
 
     const userObj = (await sb.auth.getUser()).data.user;
+    const currentClassId = window._classId || document.getElementById("classViewOverlay")?.dataset.classId || null;
+
+    // === MINDUP BOT: Tin nhắn sau khi nộp bài (lớp học) ===
+    try {
+      if (window.MindUpBot && userObj && !hasEssay) {
+        const bot = window.MindUpBot;
+        const now = new Date();
+        const activeExamForBot = (await sb.from('exams').select('id,title,total_points,topic_id,is_review_generated').eq('id', _currentExamId).single())?.data;
+        if (activeExamForBot) {
+          // Tin nhắn 7: Báo cáo kết quả bài làm
+          await bot.sendExamResultMessage(userObj.id, { examTitle: activeExamForBot.title, score: finalScore, totalPoints: activeExamForBot.total_points, resultId: _examResultId, examId: _currentExamId, classId: currentClassId });
+          // Tin nhắn 12: Cảnh báo học muộn (sau 23:30)
+          if (now.getHours() >= 23 || (now.getHours() === 23 && now.getMinutes() >= 30)) {
+            await bot.sendLateStudyWarningMessage(userObj.id, { examTitle: activeExamForBot.title });
+          }
+          if (activeExamForBot.total_points > 0 && !activeExamForBot.is_review_generated) {
+            // Tin nhắn 10: Khen ngợi điểm xuất sắc (>=9)
+            if (finalScore >= 9) {
+              await bot.sendPraiseMessage(userObj.id, { examTitle: activeExamForBot.title, score: finalScore, totalPoints: activeExamForBot.total_points, isHighScore: true });
+            }
+            // Kiểm tra tiến bộ so với lần trước
+            try {
+              const { data: prevResults } = await sb.from('exam_results').select('score_auto').eq('student_id', userObj.id).not('id', 'eq', _examResultId).not('submitted_at', 'is', null).order('submitted_at', { ascending: false }).limit(1);
+              if (prevResults && prevResults.length > 0) {
+                const improvement = finalScore - (prevResults[0].score_auto || 0);
+                if (improvement >= 3) { await bot.sendBigImprovementMessage(userObj.id, { examTitle: activeExamForBot.title, score: finalScore, totalPoints: activeExamForBot.total_points, improvement: Math.round(improvement * 100) / 100 }); }
+                else if (improvement > 0 && finalScore < 9) { await bot.sendPraiseMessage(userObj.id, { examTitle: activeExamForBot.title, score: finalScore, totalPoints: activeExamForBot.total_points, isHighScore: false, improvement: Math.round(improvement * 100) / 100 }); }
+              }
+            } catch (e) { console.warn('[MindUpBot] Không lấy được điểm trước:', e); }
+          }
+        }
+      }
+    } catch (botErr) { console.warn('[MindUpBot] Lỗi gửi tin nhắn sau nộp bài lớp học:', botErr); }
+    // === END MINDUP BOT ===
 
     try {
       const { data: activeExam } = await sb.from("exams")
@@ -914,7 +948,7 @@
               const qid = i < selectedAlts.length ? selectedAlts[i] : shuffledCorrect[i - selectedAlts.length];
               finalQList.push({ question_id: qid, points: correctEqs[i].points });
             }
-            const currentClassId = window._classId || document.getElementById("classViewOverlay")?.dataset.classId || null;
+            const currentClassId = window._classId || document.getElementById("classViewOverlay")?.dataset.classId || null; // already set above
             const { data: newExam, error: newExamErr } = await sb.from("exams").insert({
               title: `Ôn tập lỗi sai: ${activeExam.title}`,
               duration_minutes: activeExam.duration_minutes || 45,
@@ -934,7 +968,18 @@
                 order_no: idx + 1
               }));
               await sb.from("exam_questions").insert(newEqs);
-              alert(`⚠️ Cảnh báo: Kết quả luyện tập của bạn dưới 50% (${finalScore}/${activeExam.total_points}).\nHệ thống đã tự động tạo một Đề ôn tập lỗi sai chứa các câu bạn làm sai và câu hỏi thay thế cùng chủ đề!`);
+              // Tin nhắn 8: Cảnh báo điểm thấp & link đề ôn tập (thay thế alert)
+              try {
+                if (window.MindUpBot) {
+                  await window.MindUpBot.sendLowScoreAndReviewExamMessage(userObj.id, {
+                    examTitle: activeExam.title,
+                    score: finalScore,
+                    totalPoints: activeExam.total_points,
+                    reviewExamId: newExam.id,
+                    classId: currentClassId
+                  });
+                }
+              } catch (botMsgErr) { console.warn('[MindUpBot] Lỗi gửi tin nhắn điểm thấp:', botMsgErr); }
 
               if (window.NotificationHelper?.createNotification) {
                 try {

@@ -365,6 +365,92 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
   .friend-top { flex-wrap: wrap; }
   .friend-time { margin-left: 0; width: 100%; }
 }
+/* === MindUp Bot Special Styles === */
+.mindup-pinned {
+  border: 2px solid rgba(200,150,42,.45) !important;
+  background: linear-gradient(135deg, #fffbf0 0%, #fff8e8 100%) !important;
+  position: relative;
+}
+.mindup-pinned::before {
+  content: '📌 Kênh chính thức';
+  position: absolute;
+  top: -9px;
+  left: 12px;
+  font-size: .64rem;
+  font-weight: 700;
+  color: #b08020;
+  background: #fff8e8;
+  padding: 0 6px;
+  border-radius: 4px;
+  letter-spacing: .04em;
+}
+.mindup-pinned .name { color: #0f3c73; }
+.bot-msg-label {
+  font-size: .68rem;
+  font-weight: 700;
+  color: #b08020;
+  letter-spacing: .04em;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.real-sender-label {
+  font-size: .66rem;
+  color: rgba(255,255,255,.62);
+  margin-top: 4px;
+  font-style: italic;
+}
+.bot-bubble {
+  background: linear-gradient(135deg, #fffbf0 0%, #fff5d6 100%) !important;
+  border-color: rgba(200,150,42,.3) !important;
+}
+.bubble-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 2px solid var(--navy);
+  background: var(--navy);
+  color: #fff;
+  font-size: .82rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  transition: .15s;
+}
+.bot-bubble .bubble-action-btn {
+  border-color: #b08020;
+  background: #b08020;
+}
+.bubble-action-btn:hover { opacity: .85; }
+.eval-widget {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.eval-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(200,150,42,.3);
+  background: rgba(255,255,255,.7);
+  cursor: pointer;
+  font-size: .84rem;
+  font-weight: 600;
+  color: #0f3c73;
+  transition: .15s;
+}
+.eval-option:hover { background: #fef3c7; border-color: #b08020; }
+.eval-option.selected { background: #0f3c73; color: #fff; border-color: #0f3c73; }
+.eval-option.disabled { opacity: .7; cursor: default; }
+.eval-submitted { font-size: .82rem; color: #16a34a; font-weight: 600; margin-top: 6px; }
 </style>
 <script src="visual-effects.js?v=20260602-mindup1" defer></script>
 <link rel="manifest" href="manifest.webmanifest">
@@ -418,6 +504,38 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
           </div>
         </div>
       </div>
+      <div id="friendList" class="friend-list">
+        <div class="empty"><strong>Đang tải</strong>Danh sách bạn bè đang được chuẩn bị...</div>
+      </div>
+    </aside>
+
+    <section class="panel chat-panel">
+      <div class="chat-head">
+        <div class="chat-head-bar">
+          <button class="chat-back" type="button" onclick="closeMobileConversation()">←</button>
+        </div>
+        <div id="chatTitle" class="chat-title">Chưa chọn cuộc trò chuyện</div>
+        <div id="chatSub" class="chat-sub">Hãy chọn một người ở cột bên trái</div>
+      </div>
+      <div id="messageList" class="message-list">
+        <div class="empty"><strong>Chưa chọn cuộc trò chuyện</strong>Hãy chọn một người ở cột bên trái để bắt đầu nhắn tin.</div>
+      </div>
+      <div class="composer">
+        <div id="imagePreview" class="image-preview">
+          <img id="imagePreviewImg" alt="Xem trước ảnh">
+        </div>
+        <div class="composer-row">
+          <button class="btn" type="button" id="attachBtn" onclick="chooseMessageImage()" title="Chọn ảnh" aria-label="Chọn ảnh" disabled><svg class="composer-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v13H4zM7 15l3.4-3.5 2.6 2.6 1.8-1.8L18 15.5M8 9h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <textarea id="messageInput" placeholder="Nhập tin nhắn..." disabled></textarea>
+          <button class="btn btn-primary" id="sendBtn" onclick="sendMessage()" title="Gửi tin nhắn" aria-label="Gửi tin nhắn" disabled><svg class="composer-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 3-7.6 18-3.1-7.3L3 10.6 21 3Zm-10.7 10.7L21 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+        <div class="composer-tools">
+          <div class="attach-wrap">
+            <input id="messageImage" class="hidden-input" type="file" accept="image/*" onchange="previewMessageImage()">
+            <span id="attachName" class="attach-name"></span>
+          </div>
+        </div>
+      </div>
     </section>
   </div>
 </div>
@@ -425,6 +543,7 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
 <script src="image_upload.js"></script>
+<script src="mindup_bot.js"></script>
 <script>
 let currentUser = null;
 let currentProfile = null;
@@ -530,6 +649,10 @@ async function init() {
 
 function getDirectPartnerId(directKey) {
   const parts = String(directKey || "").split("_").filter(Boolean);
+  const BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
+  if (parts.includes(BOT_ID)) {
+    return parts.find(part => part !== BOT_ID) || "";
+  }
   return parts.find(part => part !== currentUser?.id) || "";
 }
 
@@ -636,8 +759,17 @@ async function loadFriends() {
     const conversation = conversationByUserId.get(userId);
     const user = userById.get(userId) || friendRow?.users || { id: userId };
     const lastMessage = conversation ? lastMessageMap.get(conversation.id) : null;
+    let prefix = "";
+    if (lastMessage) {
+      const BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
+      if (lastMessage.sender_id === currentUser.id || lastMessage.real_sender_id === currentUser.id) {
+        prefix = "Bạn: ";
+      } else if (lastMessage.sender_id === BOT_ID) {
+        prefix = "MindUp: ";
+      }
+    }
     const preview = lastMessage?.content
-      ? (lastMessage.sender_id === currentUser.id ? "Bạn: " : "") + getMessagePreview(lastMessage.content)
+      ? prefix + getMessagePreview(lastMessage.content)
       : "";
 
     return makeConversationListItem({ ...user, id: userId }, {
@@ -697,6 +829,11 @@ async function loadFriends() {
         );
       }
     }
+  }
+  // === MindUp Bot: Ghim kênh MindUp lên đầu cho học sinh/phụ huynh ===
+  await ensureMindupInFriendList();
+  if (activeFriend?.id) {
+    document.getElementById("friend_" + activeFriend.id)?.classList.add("active");
   }
 }
 
@@ -844,7 +981,7 @@ window.openConversation = async function(friendId, friendName, friendAvatar, fri
   syncMobileConversationState(true);
 
   try {
-    currentConversationId = await ensureConversation(friendId, friendMap.get(friendId)?.conversationId);
+    currentConversationId = await ensureConversation(friendId, friendRole, friendMap.get(friendId)?.conversationId);
     rememberConversationUser(friendId, friendName, friendAvatar, friendRole);
     setComposerEnabled(true);
     await loadMessages({ reset: true, scrollToBottom: true });
@@ -871,12 +1008,21 @@ async function markMessageNotificationsRead(friendId) {
     .eq("is_read", false);
 }
 
-async function ensureConversation(friendId, knownConversationId = null) {
+async function ensureConversation(friendId, friendRole, knownConversationId = null) {
   if (knownConversationId) {
     ensureConversationMembership(knownConversationId).catch(console.warn);
     return knownConversationId;
   }
-  const directKey = [currentUser.id, friendId].sort().join("_");
+  const BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
+  const isTargetStudentOrParent = ['student', 'parent'].includes(friendRole || '');
+  const isCurrentStaff = ['admin', 'teacher', 'assistant'].includes(currentProfile?.role || '');
+
+  let directKey;
+  if (isTargetStudentOrParent && (isCurrentStaff || friendId === BOT_ID)) {
+    directKey = [friendId, BOT_ID].sort().join("_");
+  } else {
+    directKey = [currentUser.id, friendId].sort().join("_");
+  }
 
   const { data: existing } = await sb
     .from("conversations")
@@ -1053,14 +1199,31 @@ window.addEventListener("resize", () => {
 
 function renderLoadedMessages() {
   const wrap = document.getElementById("messageList");
-  wrap.innerHTML = loadedMessages.map(item => `
-    <div class="message-row ${item.sender_id === currentUser.id ? "mine" : ""}">
-      <div class="bubble">
-        ${renderMessageBody(item.content)}
-        <div class="bubble-time">${formatTime(item.created_at)}</div>
+  const BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
+  const isStaff = ['admin','teacher','assistant'].includes(currentProfile?.role || '');
+  wrap.innerHTML = loadedMessages.map(item => {
+    const isMine = item.sender_id === currentUser.id || item.real_sender_id === currentUser.id;
+    const isBot = item.sender_id === BOT_ID;
+    const realSenderId = item.real_sender_id;
+    // Lấy tên người gửi thực nếu là staff
+    let realSenderNote = '';
+    if (isBot && isStaff && realSenderId) {
+      realSenderNote = `<div class="real-sender-label">Gửi bởi: ${esc(_realSenderNames.get(realSenderId) || realSenderId.slice(0,8)+'...')}</div>`;
+    }
+    const botLabel = isBot ? '<div class="bot-msg-label">🤖 MindUp - Tư Duy Toàn Diện</div>' : '';
+    return `
+      <div class="message-row ${isMine ? 'mine' : ''}">
+        <div class="bubble ${isBot ? 'bot-bubble' : ''}">
+          ${botLabel}
+          ${renderMessageBody(item.content)}
+          ${realSenderNote}
+          <div class="bubble-time">${formatTime(item.created_at)}</div>
+        </div>
       </div>
-    </div>
-  `).join("");
+    `;
+  }).join('');
+  // Prefetch real sender names if needed
+  if (isStaff) prefetchRealSenderNames();
 }
 
 async function loadMessages({ reset = false, scrollToBottom = false } = {}) {
@@ -1071,7 +1234,7 @@ async function loadMessages({ reset = false, scrollToBottom = false } = {}) {
   const wasNearBottom = wrap.scrollHeight - wrap.clientHeight - wrap.scrollTop < 80;
   const { data, error } = await sb
     .from("messages")
-    .select("id, content, created_at, sender_id")
+    .select("id, content, created_at, sender_id, real_sender_id")
     .eq("conversation_id", currentConversationId)
     .order("created_at", { ascending: false })
     .limit(MESSAGE_PAGE_SIZE);
@@ -1118,7 +1281,7 @@ async function loadOlderMessages() {
 
   const { data, error } = await sb
     .from("messages")
-    .select("id, content, created_at, sender_id")
+    .select("id, content, created_at, sender_id, real_sender_id")
     .eq("conversation_id", currentConversationId)
     .lt("created_at", loadedMessages[0].created_at)
     .order("created_at", { ascending: false })
@@ -1159,11 +1322,29 @@ window.sendMessage = async function() {
     if (!content) return;
   }
 
-  const { error } = await sb.from("messages").insert({
-    conversation_id: currentConversationId,
-    sender_id: currentUser.id,
-    content
-  });
+  const BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
+  const activeFriendInfo = friendMap.get(activeFriend?.id);
+  const isTargetStudentOrParent = ['student', 'parent'].includes(activeFriendInfo?.users?.role || activeFriend?.role || '');
+  const isCurrentStaff = ['admin', 'teacher', 'assistant'].includes(currentProfile?.role || '');
+
+  let error;
+  if (isTargetStudentOrParent && isCurrentStaff) {
+    // Send as Bot via send_bot_message RPC
+    const { error: rpcError } = await sb.rpc('send_bot_message', {
+      p_conversation_id: currentConversationId,
+      p_content: content,
+      p_real_sender_id: currentUser.id
+    });
+    error = rpcError;
+  } else {
+    // Normal direct insert
+    const { error: insertError } = await sb.from("messages").insert({
+      conversation_id: currentConversationId,
+      sender_id: currentUser.id,
+      content
+    });
+    error = insertError;
+  }
 
   if (error) {
     const failedPayload = parseMessageContent(content);
@@ -1174,7 +1355,9 @@ window.sendMessage = async function() {
     return;
   }
 
-  if (activeFriend?.id) {
+  // Gửi thông báo qua notification table
+  // Chỉ gọi cho tin nhắn cá nhân thông thường. Đối với tin nhắn Bot, trigger DB sẽ tự động xử lý
+  if (activeFriend?.id && activeFriend.id !== BOT_ID && !isTargetStudentOrParent) {
     await createNotification(
       activeFriend.id,
       "message_new",
@@ -1327,20 +1510,42 @@ function parseMessageContent(value) {
 
 function renderMessageBody(value) {
   const payload = parseMessageContent(value);
-  if (payload.type !== "image") {
-    return `<div class="bubble-caption">${esc(payload.text)}</div>`;
+  if (payload.type === "image") {
+    const caption = payload.caption ? `<div class="bubble-caption">${renderMarkdown(payload.caption)}</div>` : "";
+    return `<img class="bubble-image" src="${safeUrl(payload.url)}" alt="Ảnh chat">${caption}`;
   }
-
-  const caption = payload.caption ? `<div class="bubble-caption">${esc(payload.caption)}</div>` : "";
-  return `
-    <img class="bubble-image" src="${safeUrl(payload.url)}" alt="Ảnh chat">
-    ${caption}
-  `;
+  // Tách __ACTION__ và __EVALUATION__ ra
+  let text = payload.text;
+  let actionHtml = '';
+  // __ACTION__
+  const actionMatch = text.match(/__ACTION__(\{.*?\})/);
+  if (actionMatch) {
+    text = text.replace(/__ACTION__\{.*?\}/, '').trim();
+    try {
+      const act = JSON.parse(actionMatch[1]);
+      const href = act.url ? `href="${safeUrl(act.url)}" target="_blank"` : 'href="#"';
+      actionHtml += `<a class="bubble-action-btn" ${href}>${esc(act.label || 'Xem')}</a>`;
+    } catch {}
+  }
+  // __EVALUATION__
+  const evalMatch = text.match(/__EVALUATION__(\{.*?\})/);
+  if (evalMatch) {
+    text = text.replace(/__EVALUATION__\{.*?\}/, '').trim();
+    try {
+      const evalData = JSON.parse(evalMatch[1]);
+      const sessionId = evalData.sessionId || '';
+      const opts = (evalData.options || []).map((opt, i) =>
+        `<div class="eval-option" id="evopt_${sessionId}_${i}" onclick="handleEvalOption('${esc(sessionId)}', '${esc(opt.value)}', ${i}, ${(evalData.options||[]).length})">${esc(opt.label)}</div>`
+      ).join('');
+      actionHtml += `<div class="eval-widget" id="evalWidget_${sessionId}">${opts}</div>`;
+    } catch {}
+  }
+  return `<div class="bubble-caption">${renderMarkdown(text)}</div>${actionHtml}`;
 }
 
 function getMessagePreview(value) {
   const payload = parseMessageContent(value);
-  if (payload.type !== "image") return payload.text;
+  if (payload.type !== "image") return payload.text.replace(/__ACTION__|__EVALUATION__.*/g, '').trim();
   return payload.caption ? "[Ảnh] " + payload.caption : "[Ảnh]";
 }
 
@@ -1361,6 +1566,121 @@ function escapeJs(value) {
     .replace(/\\/g, "\\\\")
     .replace(/'/g, "\\'");
 }
+
+// === MindUp Bot Helpers ===
+const MINDUP_BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
+const _realSenderNames = new Map();
+
+async function prefetchRealSenderNames() {
+  const ids = [...new Set(loadedMessages.filter(m => m.real_sender_id).map(m => m.real_sender_id))];
+  const missing = ids.filter(id => !_realSenderNames.has(id));
+  if (!missing.length) return;
+  try {
+    const { data } = await sb.from('users').select('id,full_name').in('id', missing);
+    (data || []).forEach(u => _realSenderNames.set(u.id, u.full_name || u.id));
+    renderLoadedMessages();
+  } catch {}
+}
+
+// Render markdown **bold** and *italic*
+function renderMarkdown(text) {
+  if (!text) return '';
+  const escaped = esc(text);
+  return escaped
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+}
+
+// Handle evaluation widget click
+window.handleEvalOption = async function(sessionId, value, optIdx, totalOpts) {
+  // Disable all options
+  for(let i=0;i<totalOpts;i++) {
+    const el = document.getElementById(`evopt_${sessionId}_${i}`);
+    if(el) { el.classList.add('disabled'); el.onclick = null; }
+  }
+  const selected = document.getElementById(`evopt_${sessionId}_${optIdx}`);
+  if(selected) selected.classList.add('selected');
+  // Save response
+  try {
+    await sb.from('session_evaluations').insert({
+      session_id: sessionId,
+      student_id: currentUser.id,
+      response: value,
+      responded_at: new Date().toISOString()
+    });
+  } catch(e) { console.warn('[MindUp Eval]', e); }
+  const widget = document.getElementById(`evalWidget_${sessionId}`);
+  if(widget) {
+    const done = document.createElement('div');
+    done.className = 'eval-submitted';
+    done.textContent = '✅ Cảm ơn em đã phản hồi!';
+    widget.appendChild(done);
+  }
+};
+
+// == Friend list: Pin MindUp at top for student/parent ==
+async function ensureMindupInFriendList() {
+  const isStudentOrParent = ['student','parent'].includes(currentProfile?.role || '');
+  if (!isStudentOrParent) return;
+  // Check if MindUp bot is already in allFriends
+  if (allFriends.some(f => f.friend_id === MINDUP_BOT_ID)) return;
+  // Look up bot conversation
+  const directKey = [currentUser.id, MINDUP_BOT_ID].sort().join('_');
+  const { data: conv } = await sb.from('conversations').select('id').eq('direct_key', directKey).maybeSingle();
+  let previewText = 'Kênh liên hệ thầy cô 📩';
+  let lastActivity = null;
+  if(conv?.id) {
+    const { data: lastMsg } = await sb.from('messages').select('content,created_at').eq('conversation_id', conv.id).order('created_at',{ascending:false}).limit(1).maybeSingle();
+    if(lastMsg) { previewText = getMessagePreview(lastMsg.content); lastActivity = lastMsg.created_at; }
+  }
+  const botEntry = makeConversationListItem({ id: MINDUP_BOT_ID, full_name: 'MindUp - Tư Duy Toàn Diện', avatar_url: 'favicon.png', role: 'bot' }, {
+    conversationId: conv?.id || null,
+    preview: previewText,
+    lastActivity: lastActivity,
+    isFriend: false
+  });
+  allFriends = [botEntry, ...allFriends.filter(f => f.friend_id !== MINDUP_BOT_ID)];
+  friendMap.set(MINDUP_BOT_ID, botEntry);
+}
+
+// == Override renderFriendList to handle MindUp pinned card ==
+const _renderFriendListCore = (list) => {
+  const wrap = document.getElementById("friendList");
+  if (!list.length) {
+    wrap.innerHTML = '<div class="empty"><strong>Không tìm thấy kết quả</strong>Hãy thử tên người dùng khác.</div>';
+    return;
+  }
+  const BOT_ID = MINDUP_BOT_ID;
+  wrap.innerHTML = list.map(item => {
+    const isMindUp = item.friend_id === BOT_ID;
+    const displayName = isMindUp ? 'MindUp - Tư Duy Toàn Diện' : esc(item.users?.full_name || 'Người dùng');
+    const avatar = isMindUp ? 'favicon.png' : (item.users?.avatar_url || 'default-avatar.png');
+    const relationLabel = isMindUp ? 'Kênh chính thức' : (item.isFriend ? 'Bạn bè' : (item.conversationId ? 'Đã nhắn tin' : 'Người dùng'));
+    const preview = item.preview || (item.isSearchResult ? 'Bắt đầu trò chuyện' : 'Chưa có tin nhắn nào');
+    return `
+      <div class="friend-card ${isMindUp ? 'mindup-pinned' : ''}" id="friend_${item.friend_id}" onclick="openConversation('${item.friend_id}', '${escapeJs(isMindUp ? 'MindUp - Tư Duy Toàn Diện' : (item.users?.full_name || 'Người dùng'))}', '${escapeJs(avatar)}', '${escapeJs(item.users?.role || '')}')">
+        <img class="avatar" src="${avatar}" alt="Avatar" onerror="this.src='default-avatar.png'">
+        <div class="friend-main">
+          <div class="friend-top">
+            ${!isMindUp ? `<span class="status-dot ${activePresenceIds.has(item.friend_id) ? 'online' : ''}"></span>` : ''}
+            <div class="name">${displayName}</div>
+            <div class="friend-time">${item.lastActivity ? esc(formatListTime(item.lastActivity)) : ''}</div>
+          </div>
+          <div class="meta">${esc(isMindUp ? '🤖 Bot tự động' : formatRole(item.users?.role || ''))} • ${esc(relationLabel)}</div>
+          <div class="preview">${esc(preview)}</div>
+        </div>
+        <div class="friend-badge ${item.unreadCount ? 'show' : ''}">${item.unreadCount > 99 ? '99+' : item.unreadCount || ''}</div>
+      </div>
+    `;
+  }).join('');
+};
+
+// Hook renderFriendList to use MindUp-aware version
+const _origRFL = renderFriendList;
+function renderFriendList(list) { _renderFriendListCore(list); }
+
+
 
 init();
 </script>

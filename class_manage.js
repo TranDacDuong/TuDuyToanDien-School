@@ -814,7 +814,48 @@
       btn.className="att-btn "+s.cls; btn.textContent=s.text;
       btn.setAttribute("onclick","cvToggleAtt('"+classId+"','"+studentId+"','"+date+"','"+next+"','"+sid+"','"+Number(sessionNo || 1)+"')");
     }
+    // === MINDUP BOT: Gửi tin nhắn tự động sau điểm danh ===
+    try {
+      if(window.MindUpBot && date === new Date().toISOString().slice(0,10)) {
+        const now = new Date();
+        const isAfterSession = now.getHours() >= 17; // Chỉ gửi sau 17h
+        if(isAfterSession) {
+          const className = _cachedClass?.name || _cachedClass?.class_name || 'lớp học';
+          const sessionDate = new Date(date).toLocaleDateString('vi-VN');
+          // Lấy thông tin học sinh
+          const st = (_cachedClass?.students||[]).find(s=>s.student_id===studentId);
+          const studentName = st?.user?.full_name || 'học sinh';
+          if(next === 'absent') {
+            // Tin nhắn 3: Thông báo vắng học (1 buổi)
+            await window.MindUpBot.sendAbsentMessage(studentId, { studentName, className, sessionDate });
+            // Kiểm tra vắng liên tiếp
+            const {data:recentAtt} = await sb.from('attendance')
+              .select('date,status').eq('class_id',classId).eq('student_id',studentId)
+              .eq('status','absent').order('date',{ascending:false}).limit(5);
+            if(recentAtt && recentAtt.length >= 2) {
+              // Tính số buổi vắng liên tiếp (chỉ đếm những ngày giáp nhau)
+              let consecutiveCount = 1;
+              for(let i=1;i<recentAtt.length;i++){
+                const d1=new Date(recentAtt[i-1].date), d2=new Date(recentAtt[i].date);
+                const diff=Math.round((d1-d2)/(86400000));
+                if(diff<=7) consecutiveCount++; else break; // Kế tiếp trong vòng 7 ngày
+              }
+              if(consecutiveCount >= 2) {
+                // Tin nhắn 4: Cảnh báo vắng liên tiếp
+                await window.MindUpBot.sendConsecutiveAbsentMessage(studentId, { studentName, className, absentCount: consecutiveCount });
+              }
+            }
+          } else if(next === 'present') {
+            // Tin nhắn 13: Yêu cầu đánh giá buổi học
+            const sessionId = `${classId}_${date}_${sessionNo||1}`;
+            await window.MindUpBot.sendSessionEvaluationWidget(studentId, { className, sessionId });
+          }
+        }
+      }
+    } catch(botErr){ console.warn('[MindUpBot] Lỗi gửi tin nhắn điểm danh:',botErr); }
+    // === END MINDUP BOT ===
   };
+
 
   window.cvStopStudent = async function(classId,studentId){
     if(!confirm("Xác nhận ngừng học cho học sinh này?")) return;
