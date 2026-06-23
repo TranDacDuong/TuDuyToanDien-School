@@ -1200,7 +1200,7 @@ async function loadSubjects(){
   const { data } = await sb.from("subjects").select("id,name,grade_id,grades(name)");
   const sorted = (data||[]).sort((a,b) => {
     const g = parseInt(a.grades?.name||0) - parseInt(b.grades?.name||0);
-    return g !== 0 ? g : a.name.localeCompare(b.name);
+    return g !== 0 ? g : (a.name||"").localeCompare(b.name||"");
   });
   document.getElementById("subjectCount").textContent = sorted.length;
   window.MindupLiveUI?.patchHTML(document.getElementById("subjectTable"), sorted.length
@@ -1265,6 +1265,88 @@ async function deleteSubject(id){
 
 /* ══════════════════════════════
    CHƯƠNG
+*/
+async function loadChapters(){
+  const { data } = await sb.from("chapters").select("id,name,subject_id,subjects(id,name,grade_id,grades(id,name))");
+  const sorted = (data||[]).sort((a,b) => {
+    const g = parseInt(a.subjects?.grades?.name||0) - parseInt(b.subjects?.grades?.name||0);
+    if(g !== 0) return g;
+    const s = (a.subjects?.name||"").localeCompare(b.subjects?.name||"");
+    if(s !== 0) return s;
+    return (a.name||"").localeCompare(b.name||"");
+  });
+  document.getElementById("chapterCount").textContent = sorted.length;
+  window.MindupLiveUI?.patchHTML(document.getElementById("chapterTable"), sorted.length
+    ? sorted.map(c => `<tr data-live-key="chapter-${c.id}">
+        <td><span class="grade-badge">Khối ${esc(c.subjects?.grades?.name||"?")}</span></td>
+        <td><span class="subject-badge">${esc(c.subjects?.name||"?")}</span></td>
+        <td>${esc(c.name)}</td>
+        <td><div class="act-wrap">
+          <button class="btn-edit-sm" onclick="editChapter('${c.id}','${esc(c.name)}','${c.subject_id}','${c.subjects?.grade_id}')">✏</button>
+          <button class="btn-del-sm"  onclick="deleteChapter('${c.id}')">🗑</button>
+        </div></td>
+      </tr>`).join("")
+    : `<tr class="empty-row" data-live-key="chapter-empty"><td colspan="4">Chưa có chương nào</td></tr>`);
+}
+
+async function saveChapter(){
+  const id         = document.getElementById("chapterId").value;
+  const name       = document.getElementById("chapterName").value.trim();
+  const subject_id = document.getElementById("chapterSubject").value;
+  const grade_id   = document.getElementById("chapterGrade").value;
+  if(!name || !subject_id){ alert("Vui lòng điền đầy đủ"); return; }
+  const outcome = await window.AppAdminTools?.runAdminAction?.({
+    action: id ? 'chapter_updated' : 'chapter_created',
+    details: {
+      target_type: 'chapter',
+      target_id: id || null,
+      chapter_name: name,
+      subject_id,
+      grade_id,
+    },
+    errorPrefix: 'Không thể lưu chương',
+    operation: async () => {
+      if(id) return sb.from("chapters").update({name,subject_id}).eq("id",id);
+      return sb.from("chapters").insert({name,subject_id});
+    }
+  });
+  if(outcome && !outcome.ok) return;
+  resetChapter(); loadChapters(); loadDropdowns(); toast("✅ Đã lưu chương");
+}
+
+function resetChapter(){
+  document.getElementById("chapterId").value      = "";
+  document.getElementById("chapterName").value    = "";
+  document.getElementById("chapterGrade").value   = "";
+  document.getElementById("chapterSubject").value = "";
+}
+
+async function editChapter(id, name, subjectId, gradeId){
+  document.getElementById("chapterId").value      = id;
+  document.getElementById("chapterName").value    = name;
+  document.getElementById("chapterGrade").value   = gradeId;
+  await loadSubjectsByGrade();
+  document.getElementById("chapterSubject").value = subjectId;
+}
+
+async function deleteChapter(id){
+  if(!confirm("Xóa chương này?")) return;
+  const chapterName = document.getElementById("chapterName").value.trim() || null;
+  const outcome = await window.AppAdminTools?.runAdminAction?.({
+    action: 'chapter_deleted',
+    details: {
+      target_type: 'chapter',
+      target_id: id,
+      chapter_name: chapterName,
+    },
+    errorPrefix: 'Không thể xóa chương',
+    operation: async () => sb.from("chapters").delete().eq("id",id),
+  });
+  if(outcome && !outcome.ok) return;
+  loadChapters(); loadDropdowns(); toast("🗑 Đã xóa chương");
+}
+
+/*
 ══════════════════════════════ */
 /* ══════════════════════════════
    CHỦ ĐỀ
@@ -1278,7 +1360,7 @@ async function loadTopics(){
     if(s!==0) return s;
     const c = (a.chapters?.name||"").localeCompare(b.chapters?.name||"");
     if(c!==0) return c;
-    return a.name.localeCompare(b.name);
+    return (a.name||"").localeCompare(b.name||"");
   });
   document.getElementById("topicCount").textContent = sorted.length;
   window.MindupLiveUI?.patchHTML(document.getElementById("topicTable"), sorted.length
@@ -1408,14 +1490,32 @@ async function init(){
     location.href = "dashboard.html";
     return;
   }
-  await loadDropdowns();
-  loadRooms(); loadGrades(); loadSubjects(); loadChapters(); loadTopics();
-  loadTeachers(); loadStudents(); loadAdminLogs();
+  try { await loadDropdowns(); } catch (e) { console.error("loadDropdowns error:", e); }
+  
+  const loaders = [
+    { name: "loadRooms", fn: loadRooms },
+    { name: "loadGrades", fn: loadGrades },
+    { name: "loadSubjects", fn: loadSubjects },
+    { name: "loadChapters", fn: loadChapters },
+    { name: "loadTopics", fn: loadTopics },
+    { name: "loadTeachers", fn: loadTeachers },
+    { name: "loadStudents", fn: loadStudents },
+    { name: "loadAdminLogs", fn: loadAdminLogs }
+  ];
+  for (const l of loaders) {
+    try {
+      await l.fn();
+    } catch (e) {
+      console.error(`${l.name} error:`, e);
+    }
+  }
+
   window.MindupLiveUI?.watchTable?.('rooms', loadRooms);
   window.MindupLiveUI?.watchTable?.('grades', loadGrades);
   window.MindupLiveUI?.watchTable?.('subjects', loadSubjects);
   window.MindupLiveUI?.watchTable?.('chapters', loadChapters);
   window.MindupLiveUI?.watchTable?.('topics', loadTopics);
+  
   const tab = new URLSearchParams(window.location.search).get('tab');
   if(tab){
     const targetBtn = document.querySelector(`.tab[onclick*="'${tab}'"]`);
