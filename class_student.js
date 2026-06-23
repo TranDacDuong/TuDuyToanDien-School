@@ -1,4 +1,4 @@
-﻿/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
    CLASS_STUDENT.JS
    Full-screen view cho student khi nhÃ¡ÂºÂ¥n vÃƒÂ o lÃ¡Â»â€ºp hÃ¡Â»Âc
    HiÃ¡Â»Æ’n thÃ¡Â»â€¹: thÃƒÂ´ng tin lÃ¡Â»â€ºp, Ã„â€˜iÃ¡Â»Æ’m danh cÃƒÂ¡ nhÃƒÂ¢n, danh sÃƒÂ¡ch
@@ -229,8 +229,9 @@
         .eq("class_id", classId)
         .order("joined_at"),
       sb.from("exams")
-        .select("id, title, duration_minutes, starts_at, ends_at, total_points, exam_questions(question_id, question:question_bank(question_type))")
+        .select("id, title, duration_minutes, starts_at, ends_at, total_points, topic_id, is_review_generated, parent_exam_id, student_id, exam_questions(question_id, question:question_bank(question_type))")
         .eq("class_id", classId)
+        .or(`student_id.is.null,student_id.eq.${user.id}`)
         .order("starts_at", { ascending: true }),
     ]);
 
@@ -276,9 +277,9 @@
     });
   }
 
-  /* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+  /* ══════════════════════════════════════════════ 
      RENDER
-  Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
+  ══════════════════════════════════════════════ */
   function renderStudentView(body, { cls, monthSchedules, attData, classStudents, exams, resultsMap, userId, classId }) {
     const now = new Date();
 
@@ -293,7 +294,7 @@
     });
     const totalSessions = presentCount + absentCount + makeupCount;
 
-    /* Ã¢â€â‚¬Ã¢â€â‚¬ Schedule pills Ã¢â€â‚¬Ã¢â€â‚¬ */
+    /* ── Schedule pills ── */
     const schHtml = monthSchedules.length
       ? monthSchedules.map(s =>
           '<span style="background:var(--blue-bg);color:var(--blue);padding:3px 11px;' +
@@ -303,7 +304,7 @@
         ).join("")
       : '<span style="color:var(--ink-light);font-size:.82rem">Chưa có lịch</span>';
 
-    /* Ã¢â€â‚¬Ã¢â€â‚¬ Attendance Ã¢â€â‚¬Ã¢â€â‚¬ */
+    /* ── Attendance ── */
     const attColor = { present:"var(--green)", absent:"var(--red)", makeup:"var(--amber)" };
     const attLabel = { present:"Có mặt", absent:"Vắng", makeup:"Học bù" };
 
@@ -320,7 +321,7 @@
         "</div>"
       : '<p style="color:var(--ink-light);font-size:.85rem">Chưa có dữ liệu điểm danh tháng này.</p>';
 
-    /* Ã¢â€â‚¬Ã¢â€â‚¬ Danh sÃƒÂ¡ch hÃ¡Â»Âc sinh Ã¢â€â‚¬Ã¢â€â‚¬ */
+    /* ── Danh sách học sinh ── */
     const studentsHtml = classStudents.length
       ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">' +
         classStudents.map((cs, i) => {
@@ -339,10 +340,13 @@
         "</div>"
       : '<p style="color:var(--ink-light);font-size:.85rem">Không có học sinh.</p>';
 
-    /* Ã¢â€â‚¬Ã¢â€â‚¬ Danh sÃƒÂ¡ch Ã„â€˜Ã¡Â»Â thi Ã¢â€â‚¬Ã¢â€â‚¬ */
-    const examsHtml = exams.length
+    /* ── Danh sách đề thi ── */
+    const mainExams = exams.filter(ex => !ex.is_review_generated);
+    const reviewExams = exams.filter(ex => ex.is_review_generated);
+
+    const examsHtml = mainExams.length
       ? '<div style="display:flex;flex-direction:column;gap:10px">' +
-        exams.map(ex => {
+        mainExams.map(ex => {
           const results      = resultsMap[ex.id] || [];
           const submitted    = results.filter(r => r.submitted_at);
           const lastResult   = submitted[0];
@@ -413,6 +417,46 @@
               'cursor:pointer;white-space:nowrap;font-family:var(--font-body);flex-shrink:0">' +
               (attemptCount > 0 ? "🔄 Làm lại" : "📝 Làm bài") + "</button>";
           }
+
+          const matchedReviews = reviewExams.filter(re => re.parent_exam_id === ex.id);
+          const reviewHtml = matchedReviews.map(re => {
+            const rResults = resultsMap[re.id] || [];
+            const rSubmitted = rResults.filter(r => r.submitted_at);
+            const rLastResult = rSubmitted[0];
+            const rInProgress = (rSubmitted.length === 0) ? (rResults.find(r => !r.submitted_at && r.seconds_left > 0) || null) : null;
+            const rAttemptCount = rSubmitted.length;
+
+            let rScoreBadge = "";
+            if (rLastResult) {
+              const rScore = rLastResult.score_total ?? rLastResult.score_auto ?? "?";
+              rScoreBadge = '<span style="background:#fef3c7;color:#d97706;border:1.5px solid #f59e0b;font-size:.78rem;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap">✓ ' + rScore + ' / ' + re.total_points + ' đ</span>';
+            }
+
+            let rActionBtn = "";
+            if (rInProgress) {
+              const rSecsLeft = Math.max(0, (rInProgress.seconds_left || 0) - 300);
+              const rMinLeft = Math.floor(rSecsLeft / 60);
+              const rSecLeft2 = rSecsLeft % 60;
+              const rTimeStr = rMinLeft + ":" + String(rSecLeft2).padStart(2,"0");
+              rActionBtn = '<button onclick="resumeExam(\'' + re.id + '\',\'' + re.title.replace(/'/g,"\\'") + '\',' + re.total_points + ',\'' + rInProgress.id + '\',' + rSecsLeft + ')" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;white-space:nowrap;font-family:var(--font-body);flex-shrink:0">▶ Làm tiếp (' + rTimeStr + ')</button>';
+            } else if (rLastResult) {
+              rActionBtn = '<div style="font-size:.78rem;font-weight:600;color:#d97706;padding:6px 12px;background:#fef3c7;border-radius:8px;white-space:nowrap">✔ Đã hoàn thành</div>';
+            } else {
+              rActionBtn = '<button onclick="startExam(\'' + re.id + '\',\'' + re.title.replace(/'/g,"\\'") + '\',' + re.duration_minutes + ',' + re.total_points + ')" style="background:linear-gradient(135deg,#d97706,#b45309);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;white-space:nowrap;font-family:var(--font-body);flex-shrink:0">' + (rAttemptCount > 0 ? "🔄 Làm lại" : "📝 Làm bài") + '</button>';
+            }
+
+            return '<div style="margin-top:8px;margin-left:20px;padding:12px 14px;background:#fffbeb;border:1px solid #fde047;border-radius:10px;border-left:3px solid #f59e0b">' +
+              '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
+                '<div style="flex:1;min-width:0">' +
+                  '<div style="font-weight:700;font-size:.85rem;color:#92400e;margin-bottom:3px">⚠️ ' + re.title + "</div>" +
+                  '<div style="font-size:.75rem;color:#b45309">⏱ ' + re.duration_minutes + " phút &nbsp;•&nbsp; 🏆 " + re.total_points + "đ</div>" +
+                '</div>' +
+                '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap">' +
+                  rScoreBadge + rActionBtn +
+                '</div>' +
+              '</div>' +
+            '</div>';
+          }).join("");
 
           return '<div style="padding:14px 16px;background:var(--white);border:1px solid var(--border);' +
             'border-radius:10px;' + (lastResult ? "border-left:3px solid var(--green)" : "") + '">' +
@@ -818,17 +862,83 @@
     }
 
     const hasEssay = _examQuestions.some(eq => eq.question.question_type === "essay");
+    const finalScore = Math.round(scoreAuto * 100) / 100;
     await sb.from("exam_results").update({
       submitted_at: new Date().toISOString(),
-      score_auto:   Math.round(scoreAuto * 100) / 100,
-      score_total:  hasEssay ? null : Math.round(scoreAuto * 100) / 100,
+      score_auto:   finalScore,
+      score_total:  hasEssay ? null : finalScore,
       seconds_left: null,
     }).eq("id", _examResultId);
+
+    const userObj = (await sb.auth.getUser()).data.user;
+
+    try {
+      const { data: activeExam } = await sb.from("exams")
+        .select("id, title, total_points, topic_id, is_review_generated")
+        .eq("id", _currentExamId)
+        .single();
+      
+      if (activeExam && !activeExam.is_review_generated && activeExam.total_points > 0) {
+        const scorePct = finalScore / activeExam.total_points;
+        if (scorePct < 0.5) {
+          const incorrectQIds = answerRows.filter(r => r.is_correct === false).map(r => r.question_id);
+          if (incorrectQIds.length > 0) {
+            const reviewPoints = _examQuestions
+              .filter(eq => incorrectQIds.includes(eq.question.id))
+              .reduce((acc, eq) => acc + (eq.points || 0), 0);
+            
+            const currentClassId = window._classId || document.getElementById("classViewOverlay")?.dataset.classId || null;
+            const { data: newExam, error: newExamErr } = await sb.from("exams").insert({
+              title: `Ôn tập lỗi sai: ${activeExam.title}`,
+              duration_minutes: Math.max(15, Math.ceil(incorrectQIds.length * 2.5)),
+              total_points: reviewPoints,
+              topic_id: activeExam.topic_id || null,
+              is_review_generated: true,
+              parent_exam_id: activeExam.id,
+              student_id: userObj.id,
+              class_id: currentClassId
+            }).select("id").single();
+
+            if (newExam) {
+              const newEqs = _examQuestions
+                .filter(eq => incorrectQIds.includes(eq.question.id))
+                .map((eq, idx) => ({
+                  exam_id: newExam.id,
+                  question_id: eq.question.id,
+                  points: eq.points || 0,
+                  order_no: idx + 1
+                }));
+              await sb.from("exam_questions").insert(newEqs);
+              alert(`⚠️ Cảnh báo: Kết quả luyện tập của bạn dưới 50% (${finalScore}/${activeExam.total_points}).\nHệ thống đã tự động tạo một Đề ôn tập lỗi sai chứa các câu bạn làm chưa đúng để bạn ôn tập lại!`);
+
+              if (window.NotificationHelper?.createNotification) {
+                try {
+                  await window.NotificationHelper.createNotification({
+                    userId: userObj.id,
+                    type: 'class_exam_added',
+                    title: 'Đề ôn tập lỗi sai mới',
+                    message: `Bạn được tạo Đề ôn tập lỗi sai cho đề "${activeExam.title}"`,
+                    refId: newExam.id,
+                    targetUrl: `class.html?classId=${currentClassId || ''}`,
+                    allowSelf: true,
+                    push: true
+                  });
+                } catch (notifErr) {
+                  console.error("Lỗi gửi thông báo:", notifErr);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Lỗi khi tạo đề ôn tập tự động:", err);
+    }
 
     const { data: staleAfter } = await sb
       .from("exam_results").select("id")
       .eq("exam_id", _currentExamId)
-      .eq("student_id", (await sb.auth.getUser()).data.user.id)
+      .eq("student_id", userObj.id)
       .is("submitted_at", null);
     if (staleAfter?.length) {
       const ids = staleAfter.map(r => r.id);

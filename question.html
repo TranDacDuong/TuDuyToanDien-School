@@ -515,6 +515,7 @@ button {
       <select id="f_grade"><option value="">Khối</option></select>
       <select id="f_subject"><option value="">Môn</option></select>
       <select id="f_chapter"><option value="">Chương</option></select>
+      <select id="f_topic"><option value="">Chủ đề</option></select>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:nowrap;align-items:center">
       <select id="f_type">
@@ -623,6 +624,7 @@ button {
         <select id="aiGrade"><option value="">Chọn khối</option></select>
         <select id="aiSubject"><option value="">Chọn môn</option></select>
         <select id="aiChapter"><option value="">Chọn chương</option></select>
+        <select id="aiTopic"><option value="">Chọn chủ đề</option></select>
         <select id="aiDifficulty"><option value="">Độ khó (tự động)</option></select>
       </div>
       <div class="input-zone">
@@ -664,11 +666,12 @@ button {
   <div class="modal-box" style="width:min(98vw,920px)">
     <h3 id="formTitle" style="font-family:var(--font-display);font-size:1.1rem;color:var(--navy);margin:0 0 14px">Tạo câu hỏi</h3>
 
-    <!-- Hàng 1: Khối / Môn / Chương -->
+    <!-- Hàng 1: Khối / Môn / Chương / Chủ đề -->
     <div style="display:flex;gap:8px;flex-wrap:nowrap;margin-bottom:12px">
       <select id="grade" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:.85rem;outline:none"><option value="">Chọn khối</option></select>
       <select id="subject" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:.85rem;outline:none"><option value="">Chọn môn</option></select>
       <select id="chapter" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:.85rem;outline:none"><option value="">Chọn chương</option></select>
+      <select id="topic" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:.85rem;outline:none"><option value="">Chọn chủ đề</option></select>
     </div>
 
     <!-- Hàng 2: Nội dung (3) + Hình vẽ (1) -->

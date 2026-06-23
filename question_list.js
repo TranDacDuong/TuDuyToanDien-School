@@ -58,6 +58,7 @@ f_grade.onchange = async () => {
   resetToFirstPage()
   f_subject.innerHTML = "<option value=''>Môn</option>"
   f_chapter.innerHTML = "<option value=''>Chương</option>"
+  f_topic.innerHTML = "<option value=''>Chủ đề</option>"
   if (!f_grade.value) {
     render()
     return
@@ -73,6 +74,7 @@ f_grade.onchange = async () => {
 f_subject.onchange = async () => {
   resetToFirstPage()
   f_chapter.innerHTML = "<option value=''>Chương</option>"
+  f_topic.innerHTML = "<option value=''>Chủ đề</option>"
   if (!f_subject.value) {
     render()
     return
@@ -85,7 +87,22 @@ f_subject.onchange = async () => {
   render()
 }
 
-f_chapter.onchange = () => {
+f_chapter.onchange = async () => {
+  resetToFirstPage()
+  f_topic.innerHTML = "<option value=''>Chủ đề</option>"
+  if (!f_chapter.value) {
+    render()
+    return
+  }
+
+  const { data } = await sb.from("topics").select("*").eq("chapter_id", f_chapter.value).order("id")
+  ;(data || []).forEach((t) => {
+    f_topic.innerHTML += `<option value="${t.id}">${t.name}</option>`
+  })
+  render()
+}
+
+f_topic.onchange = () => {
   resetToFirstPage()
   render()
 }
@@ -303,6 +320,7 @@ function getBaseFilteredQuestions() {
   if (f_grade.value) list = list.filter((q) => q.chapters?.subjects?.grades?.id == f_grade.value)
   if (f_subject.value) list = list.filter((q) => q.chapters?.subjects?.id == f_subject.value)
   if (f_chapter.value) list = list.filter((q) => q.chapter_id == f_chapter.value)
+  if (f_topic.value) list = list.filter((q) => q.topic_id == f_topic.value)
   if (f_type.value) list = list.filter((q) => q.question_type === f_type.value)
   if (f_difficulty.value) list = list.filter((q) => q.difficulty == f_difficulty.value)
 
@@ -1373,6 +1391,21 @@ async function editQ(id) {
     chapter.innerHTML += `<option value="${c.id}">${c.name}</option>`
   })
   chapter.value = chapterId || ""
+
+  const topic = document.getElementById("topic");
+  if (topic) {
+    if (chapterId) {
+      const { data: topics } = await sb.from("topics").select("*").eq("chapter_id", chapterId)
+      topic.innerHTML = "<option value=''>Chủ đề</option>"
+      ;(topics || []).forEach((t) => {
+        topic.innerHTML += `<option value="${t.id}">${t.name}</option>`
+      })
+      topic.value = q.topic_id || ""
+    } else {
+      topic.innerHTML = "<option value=''>Chủ đề</option>"
+      topic.value = ""
+    }
+  }
 
   question_type.value = q.question_type
   difficulty.value = q.difficulty

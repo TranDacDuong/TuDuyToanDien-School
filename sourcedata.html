@@ -381,6 +381,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   <button class="tab" data-testid="system-tab-grades" onclick="switchTab('grades',this)">🏛 Khối</button>
   <button class="tab" data-testid="system-tab-subjects" onclick="switchTab('subjects',this)">📚 Môn học</button>
   <button class="tab" data-testid="system-tab-chapters" onclick="switchTab('chapters',this)">📖 Chương</button>
+  <button class="tab" data-testid="system-tab-topics" onclick="switchTab('topics',this)">🏷️ Chủ đề</button>
   <button class="tab" data-testid="system-tab-teachers" onclick="switchTab('teachers',this)">👨‍🏫 Giáo viên</button>
   <button class="tab" data-testid="system-tab-students" onclick="switchTab('students',this)">👩‍🎓 Học sinh</button>
   <button class="tab" data-testid="system-tab-evaluation-templates" onclick="switchTab('evaluationTemplates',this)">Mẫu nhận xét</button>
@@ -496,6 +497,36 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <table>
         <thead><tr><th>Khối</th><th>Môn</th><th>Chương</th><th>Hành động</th></tr></thead>
         <tbody id="chapterTable"><tr class="empty-row"><td colspan="4">Đang tải...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ CHỦ ĐỀ ═══════ -->
+<div id="topics" class="panel">
+  <div class="form-card">
+    <div class="form-card-hd"><h3>🏷️ Thêm / Sửa chủ đề</h3></div>
+    <div class="form-card-body">
+      <input type="hidden" id="topicId">
+      <div class="fg"><label>Khối</label><select id="topicGrade"><option value="">-- Chọn khối --</option></select></div>
+      <div class="fg"><label>Môn học</label><select id="topicSubject"><option value="">-- Chọn môn trước --</option></select></div>
+      <div class="fg"><label>Chương</label><select id="topicChapter"><option value="">-- Chọn chương trước --</option></select></div>
+      <div class="fg"><label>Tên chủ đề</label><input id="topicName" placeholder="VD: Chủ đề 1: Đồng biến nghịch biến..."></div>
+      <div class="form-btns">
+        <button class="btn btn-primary btn-sm" onclick="saveTopic()">💾 Lưu</button>
+        <button class="btn btn-outline btn-sm" onclick="resetTopic()">↺ Làm mới</button>
+      </div>
+    </div>
+  </div>
+  <div class="table-card">
+    <div class="table-card-hd">
+      <span>Danh sách chủ đề</span>
+      <span class="count-badge" id="topicCount">0</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Khối</th><th>Môn</th><th>Chương</th><th>Chủ đề</th><th>Hành động</th></tr></thead>
+        <tbody id="topicTable"><tr class="empty-row"><td colspan="5">Đang tải...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -937,6 +968,7 @@ function switchTab(id, btn){
   if(id === 'adminLogs') loadAdminLogs();
   if(id === 'appearance') loadSystemTheme();
   if(id === 'evaluationTemplates') loadEvaluationTemplatesAdmin();
+  if(id === 'topics') loadTopics();
 }
 
 const SYSTEM_THEMES = [
@@ -1209,76 +1241,84 @@ async function deleteSubject(id){
 /* ══════════════════════════════
    CHƯƠNG
 ══════════════════════════════ */
-async function loadChapters(){
-  const { data } = await sb.from("chapters").select("id,name,subjects(id,name,grades(id,name))");
+/* ══════════════════════════════
+   CHỦ ĐỀ
+══════════════════════════════ */
+async function loadTopics(){
+  const { data } = await sb.from("topics").select("id,name,chapter_id,chapters(id,name,subjects(id,name,grades(id,name)))");
   const sorted = (data||[]).sort((a,b) => {
-    const g = parseInt(a.subjects?.grades?.name||0) - parseInt(b.subjects?.grades?.name||0);
+    const g = parseInt(a.chapters?.subjects?.grades?.name||0) - parseInt(b.chapters?.subjects?.grades?.name||0);
     if(g!==0) return g;
-    const s = (a.subjects?.name||"").localeCompare(b.subjects?.name||"");
+    const s = (a.chapters?.subjects?.name||"").localeCompare(b.chapters?.subjects?.name||"");
     if(s!==0) return s;
+    const c = (a.chapters?.name||"").localeCompare(b.chapters?.name||"");
+    if(c!==0) return c;
     return a.name.localeCompare(b.name);
   });
-  document.getElementById("chapterCount").textContent = sorted.length;
-  window.MindupLiveUI?.patchHTML(document.getElementById("chapterTable"), sorted.length
-    ? sorted.map(c => `<tr data-live-key="chapter-${c.id}">
-        <td><span class="grade-badge">Khối ${esc(c.subjects?.grades?.name||"?")}</span></td>
-        <td><span class="subject-badge">${esc(c.subjects?.name||"?")}</span></td>
-        <td>${esc(c.name)}</td>
+  document.getElementById("topicCount").textContent = sorted.length;
+  window.MindupLiveUI?.patchHTML(document.getElementById("topicTable"), sorted.length
+    ? sorted.map(t => `<tr data-live-key="topic-${t.id}">
+        <td><span class="grade-badge">Khối ${esc(t.chapters?.subjects?.grades?.name||"?")}</span></td>
+        <td><span class="subject-badge">${esc(t.chapters?.subjects?.name||"?")}</span></td>
+        <td>${esc(t.chapters?.name||"?")}</td>
+        <td><b>${esc(t.name)}</b></td>
         <td><div class="act-wrap">
-          <button class="btn-edit-sm" onclick="editChapter('${c.id}','${esc(c.name)}','${c.subjects?.id}','${c.subjects?.grades?.id}')">✏</button>
-          <button class="btn-del-sm"  onclick="deleteChapter('${c.id}')">🗑</button>
+          <button class="btn-edit-sm" onclick="editTopic('${t.id}','${esc(t.name)}','${t.chapters?.id}','${t.chapters?.subjects?.id}','${t.chapters?.subjects?.grades?.id}')">✏</button>
+          <button class="btn-del-sm"  onclick="deleteTopic('${t.id}')">🗑</button>
         </div></td>
       </tr>`).join("")
-    : `<tr class="empty-row" data-live-key="chapter-empty"><td colspan="4">Chưa có chương nào</td></tr>`);
+    : `<tr class="empty-row" data-live-key="topic-empty"><td colspan="5">Chưa có chủ đề nào</td></tr>`);
 }
-async function saveChapter(){
-  const id         = document.getElementById("chapterId").value;
-  const name       = document.getElementById("chapterName").value.trim();
-  const subject_id = document.getElementById("chapterSubject").value;
-  if(!name || !subject_id){ alert("Vui lòng điền đầy đủ"); return; }
+async function saveTopic(){
+  const id         = document.getElementById("topicId").value;
+  const name       = document.getElementById("topicName").value.trim();
+  const chapter_id = document.getElementById("topicChapter").value;
+  if(!name || !chapter_id){ alert("Vui lòng điền đầy đủ"); return; }
   const outcome = await window.AppAdminTools?.runAdminAction?.({
-    action: id ? 'chapter_updated' : 'chapter_created',
+    action: id ? 'topic_updated' : 'topic_created',
     details: {
-      target_type: 'chapter',
+      target_type: 'topic',
       target_id: id || null,
-      chapter_name: name,
-      subject_id,
+      topic_name: name,
+      chapter_id,
     },
-    errorPrefix: 'Không thể lưu chương',
+    errorPrefix: 'Không thể lưu chủ đề',
     operation: async () => {
-      if(id) return sb.from("chapters").update({name,subject_id}).eq("id",id);
-      return sb.from("chapters").insert({name,subject_id});
+      if(id) return sb.from("topics").update({name,chapter_id}).eq("id",id);
+      return sb.from("topics").insert({name,chapter_id});
     }
   });
   if(outcome && !outcome.ok) return;
-  resetChapter(); loadChapters(); toast("✅ Đã lưu chương");
+  resetTopic(); loadTopics(); toast("✅ Đã lưu chủ đề");
 }
-async function editChapter(id,name,subjectId,gradeId){
-  document.getElementById("chapterId").value    = id;
-  document.getElementById("chapterName").value  = name;
-  document.getElementById("chapterGrade").value = gradeId;
-  await loadSubjectsByGrade();
-  document.getElementById("chapterSubject").value = subjectId;
+async function editTopic(id,name,chapterId,subjectId,gradeId){
+  document.getElementById("topicId").value    = id;
+  document.getElementById("topicName").value  = name;
+  document.getElementById("topicGrade").value = gradeId;
+  await loadSubjectsByGradeForTopic();
+  document.getElementById("topicSubject").value = subjectId;
+  await loadChaptersBySubjectForTopic();
+  document.getElementById("topicChapter").value = chapterId;
 }
-function resetChapter(){
-  document.getElementById("chapterId").value    = "";
-  document.getElementById("chapterName").value  = "";
+function resetTopic(){
+  document.getElementById("topicId").value    = "";
+  document.getElementById("topicName").value  = "";
 }
-async function deleteChapter(id){
-  if(!confirm("Xóa chương này?")) return;
-  const chapterName = document.getElementById("chapterName").value.trim() || null;
+async function deleteTopic(id){
+  if(!confirm("Xóa chủ đề này?")) return;
+  const topicName = document.getElementById("topicName").value.trim() || null;
   const outcome = await window.AppAdminTools?.runAdminAction?.({
-    action: 'chapter_deleted',
+    action: 'topic_deleted',
     details: {
-      target_type: 'chapter',
+      target_type: 'topic',
       target_id: id,
-      chapter_name: chapterName,
+      topic_name: topicName,
     },
-    errorPrefix: 'Không thể xóa chương',
-    operation: async () => sb.from("chapters").delete().eq("id",id),
+    errorPrefix: 'Không thể xóa chủ đề',
+    operation: async () => sb.from("topics").delete().eq("id",id),
   });
   if(outcome && !outcome.ok) return;
-  loadChapters(); toast("🗑 Đã xóa chương");
+  loadTopics(); toast("🗑 Đã xóa chủ đề");
 }
 
 /* ══════════════════════════════
@@ -1288,16 +1328,19 @@ async function loadDropdowns(){
   const { data: grades } = await sb.from("grades").select("*");
   const sorted = (grades||[]).sort((a,b) => parseInt(a.name)-parseInt(b.name));
   const opts = sorted.map(g => `<option value="${g.id}">Khối ${esc(g.name)}</option>`).join("");
-  ["subjectGrade","chapterGrade"].forEach(id => {
+  ["subjectGrade","chapterGrade","topicGrade"].forEach(id => {
     const el = document.getElementById(id);
     const prev = el.value;
     el.innerHTML = `<option value="">-- Chọn khối --</option>` + opts;
     if(prev) el.value = prev;
   });
   loadSubjectsByGrade();
+  loadSubjectsByGradeForTopic();
 }
 
 document.getElementById("chapterGrade").addEventListener("change", loadSubjectsByGrade);
+document.getElementById("topicGrade").addEventListener("change", loadSubjectsByGradeForTopic);
+document.getElementById("topicSubject").addEventListener("change", loadChaptersBySubjectForTopic);
 
 async function loadSubjectsByGrade(){
   const gradeId = document.getElementById("chapterGrade").value;
@@ -1306,6 +1349,26 @@ async function loadSubjectsByGrade(){
   const { data } = await sb.from("subjects").select("*").eq("grade_id",gradeId).order("name");
   sel.innerHTML = `<option value="">-- Chọn môn --</option>` +
     (data||[]).map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join("");
+}
+
+async function loadSubjectsByGradeForTopic(){
+  const gradeId = document.getElementById("topicGrade").value;
+  const sel     = document.getElementById("topicSubject");
+  const chapSel = document.getElementById("topicChapter");
+  chapSel.innerHTML = `<option value="">-- Chọn môn trước --</option>`;
+  if(!gradeId){ sel.innerHTML = `<option value="">-- Chọn khối trước --</option>`; return; }
+  const { data } = await sb.from("subjects").select("*").eq("grade_id",gradeId).order("name");
+  sel.innerHTML = `<option value="">-- Chọn môn --</option>` +
+    (data||[]).map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join("");
+}
+
+async function loadChaptersBySubjectForTopic(){
+  const subjectId = document.getElementById("topicSubject").value;
+  const sel       = document.getElementById("topicChapter");
+  if(!subjectId){ sel.innerHTML = `<option value="">-- Chọn môn trước --</option>`; return; }
+  const { data } = await sb.from("chapters").select("*").eq("subject_id",subjectId).order("name");
+  sel.innerHTML = `<option value="">-- Chọn chương --</option>` +
+    (data||[]).map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
 }
 
 /* ── Init ── */
@@ -1321,12 +1384,13 @@ async function init(){
     return;
   }
   await loadDropdowns();
-  loadRooms(); loadGrades(); loadSubjects(); loadChapters();
+  loadRooms(); loadGrades(); loadSubjects(); loadChapters(); loadTopics();
   loadTeachers(); loadStudents(); loadAdminLogs();
   window.MindupLiveUI?.watchTable?.('rooms', loadRooms);
   window.MindupLiveUI?.watchTable?.('grades', loadGrades);
   window.MindupLiveUI?.watchTable?.('subjects', loadSubjects);
   window.MindupLiveUI?.watchTable?.('chapters', loadChapters);
+  window.MindupLiveUI?.watchTable?.('topics', loadTopics);
   const tab = new URLSearchParams(window.location.search).get('tab');
   if(tab){
     const targetBtn = document.querySelector(`.tab[onclick*="'${tab}'"]`);
