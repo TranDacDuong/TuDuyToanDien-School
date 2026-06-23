@@ -928,7 +928,7 @@ Nhập số tiền hoàn lại (>0):`,
     tbody.innerHTML = "";
     tbody.appendChild(frag);
     updateSummary(rows, ym);
-    document.getElementById("rowCount").textContent = rows.length + " học sinh";
+    updateLockButton();
   }
 
   window.openTuitionDetail = function(studentId) {
@@ -1103,9 +1103,18 @@ Nhập số tiền hoàn lại (>0):`,
     }
   };
 
-  /* ─────────────────────────────────────────────
-     CHỐT HỌC PHÍ
-  ───────────────────────────────────────────── */
+  /* Cập nhật tiêu đề nút chốt dựa vào trạng thái hiện tại */
+  function updateLockButton() {
+    const lockBtn = document.getElementById("lockTuitionBtn");
+    if (!lockBtn || !canManagePayments()) return;
+    const allLocked = currentRows.length > 0 && currentRows.every(g => paymentMap[g.studentId]?.locked_at);
+    if (allLocked) {
+      lockBtn.textContent = "🔓 Mở chốt";
+    } else {
+      lockBtn.textContent = "🔒 Chốt học phí";
+    }
+  }
+
   window.lockAllTuition = async function () {
     if (!canManagePayments()) { alert("Bạn không có quyền chốt học phí."); return; }
     const ym = monthPicker.value;
@@ -1139,7 +1148,41 @@ Nhập số tiền hoàn lại (>0):`,
     } catch (err) {
       alert("❌ Lỗi khi chốt học phí: " + err.message);
     } finally {
-      if (lockBtn) { lockBtn.disabled = false; lockBtn.textContent = "🔒 Chốt học phí"; }
+      if (lockBtn) lockBtn.disabled = false;
+    }
+  };
+
+  window.unlockAllTuition = async function () {
+    if (!canManagePayments()) { alert("Bạn không có quyền mở chốt."); return; }
+    const ym = monthPicker.value;
+    if (!confirm(`Mở chốt học phí tháng ${ym}?\n\nHọc phí sẽ trở về tính động theo điểm danh thực tế.`)) return;
+
+    const lockBtn = document.getElementById("lockTuitionBtn");
+    if (lockBtn) { lockBtn.disabled = true; lockBtn.textContent = "⏳ Đang mở chốt..."; }
+
+    try {
+      for (const g of currentRows) {
+        await upsertPayment(g.studentId, ym, {
+          locked_at:       null,
+          locked_by:       null,
+          locked_snapshot: null,
+        });
+      }
+      await loadTuition();
+      alert(`✅ Đã mở chốt học phí tháng ${ym}.`);
+    } catch (err) {
+      alert("❌ Lỗi khi mở chốt: " + err.message);
+    } finally {
+      if (lockBtn) lockBtn.disabled = false;
+    }
+  };
+
+  window.toggleTuitionLock = function () {
+    const allLocked = currentRows.length > 0 && currentRows.every(g => paymentMap[g.studentId]?.locked_at);
+    if (allLocked) {
+      window.unlockAllTuition();
+    } else {
+      window.lockAllTuition();
     }
   };
 
