@@ -5,7 +5,9 @@
 
 -- ──────────────────────────────────────────────────────────────────
 -- 1. Thêm 'bot' vào enum user_role và tạo tài khoản Bot MindUp
---    (Nếu chưa tồn tại)
+--    LƯU Ý: Do giới hạn của PostgreSQL, bạn phải bôi đen dòng lệnh:
+--    ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'bot';
+--    và bấm RUN riêng trước, sau đó mới chạy phần code bên dưới!
 -- ──────────────────────────────────────────────────────────────────
 ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'bot';
 
