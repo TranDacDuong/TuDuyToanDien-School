@@ -1,4 +1,4 @@
-﻿/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    CLASS_MANAGE.JS  â€”  Unified fullscreen view cho má»i role
    - Admin / Teacher : Ä‘iá»ƒm danh (cÃ³ thá»ƒ báº¥m) + Ä‘á» thi + nÃºt Sá»­a/XÃ³a
    - Student         : Ä‘iá»ƒm danh (chá»‰ xem) + Ä‘á» thi (lÃ m bÃ i)
@@ -1246,21 +1246,7 @@
     '</div>';
   }
 
-  function renderLegacyExamCard(examInfo, role, examState){
-    const header = '<div style="font-size:.76rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-light);margin-bottom:8px">Đề kiểm tra riêng</div>';
-    const body = role === "student"
-      ? renderStudentPracticeBlock(examInfo, examState)
-      : renderAdminPracticeBlock(examInfo, examState);
-    const actionRow = (role === "admin" || role === "teacher")
-      ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'+
-          (examInfo.type === "exam"
-            ? '<button onclick="cvEditClassExam(\''+examInfo.class_exam_id+'\',\''+examInfo.title.replace(/'/g,"\\'")+'\',\''+examInfo.id+'\')" class="btn btn-outline btn-sm">Đặt giờ</button>'
-            : '<button onclick="cvEditClassExam(\''+examInfo.class_exam_id+'\',\''+examInfo.title.replace(/'/g,"\\'")+'\',\'\')" class="btn btn-outline btn-sm">Đặt giờ</button>')+
-          '<button onclick="cvRemoveExamFromClass(\''+examInfo.class_exam_id+'\',\''+examInfo.title.replace(/'/g,"\\'")+'\','+((examInfo.type==="pdf"? (examState.pdfSubmitCount[examInfo.id]||0) : (examState.submitCount[examInfo.id]||0)))+')" class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5">Gỡ đề</button>'+
-        '</div>'
-      : "";
-    return '<div style="background:var(--white);border:1px dashed #cbd5e1;border-radius:14px;padding:16px 18px">'+header+body+actionRow+'</div>';
-  }
+
 
   async function renderExamsTab(){
     const tc=document.getElementById("cvTabContent"); if(!tc) return;
@@ -1269,7 +1255,6 @@
 
     const [
       {data:classSessions,error:classSessionsError},
-      {data:classExams,error:classExamsError},
       {data:gameRooms,error:gameRoomsError},
       {data:gamePlayers,error:gamePlayersError}
     ] = await Promise.all([
@@ -1277,17 +1262,13 @@
         .select("id,lesson_id,session_order,session_date,exam_id,pdf_exam_id,starts_at,ends_at,created_at")
         .eq("class_id",_classId)
         .order("session_order",{ascending:true}),
-      sb.from("class_exams")
-        .select("id,starts_at,ends_at,exam_id,pdf_exam_id")
-        .eq("class_id",_classId)
-        .order("created_at",{ascending:false}),
       sb.from("game_rooms").select("id,title,join_code,status,question_count,time_per_question,max_players,visibility,class_id,created_at").eq("class_id",_classId).order("created_at",{ascending:false}),
       sb.from("game_room_players").select("id,room_id,user_id,score,ready,joined_at")
     ]);
 
     const sessionTableMissing = !!classSessionsError && isMissingRelationError(classSessionsError);
-    if((classSessionsError && !sessionTableMissing) || classExamsError || gameRoomsError || gamePlayersError){
-      const msg = classSessionsError?.message || classExamsError?.message || gameRoomsError?.message || gamePlayersError?.message || "Không thể tải dữ liệu lớp học.";
+    if((classSessionsError && !sessionTableMissing) || gameRoomsError || gamePlayersError){
+      const msg = classSessionsError?.message || gameRoomsError?.message || gamePlayersError?.message || "Không thể tải dữ liệu lớp học.";
       tc.innerHTML = '<p style="color:var(--red);font-size:.85rem;padding:12px">Lỗi tải dữ liệu: '+esc(msg)+'</p>';
       return;
     }
@@ -1295,12 +1276,10 @@
     const sessions = sessionTableMissing ? [] : (classSessions || []);
     const lessonIds = [...new Set(sessions.map(s=>s.lesson_id).filter(Boolean))];
     const regularIds = [...new Set([
-      ...sessions.map(s=>s.exam_id).filter(Boolean),
-      ...(classExams||[]).map(ce=>ce.exam_id).filter(Boolean)
+      ...sessions.map(s=>s.exam_id).filter(Boolean)
     ])];
     const pdfIds = [...new Set([
-      ...sessions.map(s=>s.pdf_exam_id).filter(Boolean),
-      ...(classExams||[]).map(ce=>ce.pdf_exam_id).filter(Boolean)
+      ...sessions.map(s=>s.pdf_exam_id).filter(Boolean)
     ])];
 
     const queryList = [
@@ -1408,46 +1387,16 @@
         }, lesson, examInfo, role, examState);
       });
 
-    const legacyCards = (classExams || []).map(row => {
-      if(row.exam_id && regularMap[row.exam_id]){
-        return renderLegacyExamCard({
-          type: "exam",
-          class_exam_id: row.id,
-          starts_at: row.starts_at,
-          ends_at: row.ends_at,
-          ...regularMap[row.exam_id]
-        }, role, examState);
-      }
-      if(row.pdf_exam_id && pdfMap[row.pdf_exam_id]){
-        return renderLegacyExamCard({
-          type: "pdf",
-          class_exam_id: row.id,
-          title: pdfMap[row.pdf_exam_id].title + " (PDF)",
-          duration_minutes: pdfMap[row.pdf_exam_id].duration_minutes,
-          total_points: pdfMap[row.pdf_exam_id].total_points,
-          question_types: pdfQuestionTypeMap[row.pdf_exam_id] || [],
-          id: row.pdf_exam_id,
-          starts_at: row.starts_at,
-          ends_at: row.ends_at
-        }, role, examState);
-      }
-      return "";
-    }).filter(Boolean);
-
     const gameSectionHtml = buildClassGamesSection(role, gameRooms||[], gamePlayers||[]);
     const actionsHtml = (role==="admin"||role==="teacher")
       ? '<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">'+
           '<button onclick="cvOpenAddClassSession()" class="btn btn-primary btn-sm">+ Thêm buổi học</button>'+
-          '<button onclick="cvOpenAddExam()" class="btn btn-outline btn-sm">+ Thêm đề kiểm tra</button>'+
         '</div>'
       : "";
     const sessionHint = sessionTableMissing
       ? '<div style="margin-bottom:14px;padding:12px 14px;border-radius:12px;background:#fff7ed;border:1px solid rgba(245,158,11,.28);color:#9a3412;font-size:.82rem">Tab này đã sẵn sàng cho kiểu "Buổi 1, Buổi 2..." nhưng database của bạn chưa có bảng <b>class_sessions</b>. Hãy chạy SQL mới rồi reload lại.</div>'
       : "";
     const sessionEmpty = '<div style="padding:18px;border:1px dashed #cbd5e1;border-radius:14px;background:#fff"><strong style="display:block;color:var(--navy);margin-bottom:6px">Chưa có buổi học nào</strong><div style="font-size:.84rem;color:var(--ink-mid)">Giáo viên bấm Thêm buổi học để tạo buổi học thủ công cho lớp.</div></div>';
-    const legacySection = legacyCards.length
-      ? '<div style="margin-top:18px"><div style="font-weight:700;color:var(--navy);margin-bottom:10px">Đề kiểm tra riêng đã tạo trước đây</div><div style="display:flex;flex-direction:column;gap:10px">'+legacyCards.join("")+'</div></div>'
-      : "";
 
     tc.innerHTML = gameSectionHtml +
       '<div style="background:var(--white);border:1px solid var(--border);border-radius:14px;padding:16px 18px">'+
@@ -1458,7 +1407,6 @@
         actionsHtml+
         sessionHint+
         '<div style="display:flex;flex-direction:column;gap:12px">'+(sessionCards.length ? sessionCards.join("") : sessionEmpty)+'</div>'+
-        legacySection+
       '</div>';
   }
 
@@ -1790,7 +1738,7 @@
         '</div>'+
         '<div style="margin-top:14px"><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Link tài liệu tham khảo (Drive)</label><input id="cvSessionDocumentLink" type="url" value="'+esc(lesson?.document_link || "")+'" placeholder="https://drive.google.com/..." style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"></div>'+
         '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:14px">'+
-          '<div><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Loại đề luyện tập</label><select id="cvSessionPracticeType" onchange="cvUpdateSessionPracticeOptions(this.value)" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"><option value="">Chưa gắn đề luyện tập</option><option value="exam" '+(practiceType==="exam"?"selected":"")+'>Đề kiểm tra</option><option value="pdf" '+(practiceType==="pdf"?"selected":"")+'>Đề PDF</option></select></div>'+
+          '<div><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Loại đề luyện tập</label><select id="cvSessionPracticeType" onchange="cvUpdateSessionPracticeOptions(this.value)" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"><option value="">Chưa gắn đề luyện tập</option><option value="exam" '+(practiceType==="exam"?"selected":"")+'>Đề luyện tập online</option><option value="pdf" '+(practiceType==="pdf"?"selected":"")+'>Đề PDF</option></select></div>'+
           '<div><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Chọn đề luyện tập</label><select id="cvSessionPracticeId" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"></select></div>'+
         '</div>'+
         '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:14px">'+
@@ -1946,158 +1894,7 @@
     await cvSwitchTab("exams");
   };
 
-  /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-     THÃŠM / Gá»  / Äáº¶T GIá»œ Äá»€ THI TRONG Lá»šP
-  â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-  window.cvOpenAddExam = async function(){
-    const tc=document.getElementById("cvTabContent"); if(!tc) return;
-    const sb=getSb();
-    const [{data:existing},{data:allExams},{data:allPdfExams}] = await Promise.all([
-      sb.from("class_exams").select("exam_id,pdf_exam_id").eq("class_id",_classId),
-      sb.from("exams").select("id,title,duration_minutes,total_points").order("created_at",{ascending:false}),
-      sb.from("pdf_exams").select("id,title,duration_minutes,total_points,status").order("created_at",{ascending:false})
-    ]);
-    const existingKeys = new Set((existing||[]).map(e=>e.exam_id?`exam:${e.exam_id}`:`pdf:${e.pdf_exam_id}`));
-    const allItems = [
-      ...(allExams||[]).map(ex=>({kind:"exam",id:ex.id,title:ex.title,duration_minutes:ex.duration_minutes,total_points:ex.total_points,status:"open"})),
-      ...(allPdfExams||[]).map(ex=>({kind:"pdf",id:ex.id,title:`${ex.title} (PDF)`,duration_minutes:ex.duration_minutes,total_points:ex.total_points,status:ex.status||"open"}))
-    ];
 
-    const modal=document.createElement("div");
-    modal.id="cvAddExamModal";
-    modal.style.cssText="position:fixed;inset:0;background:rgba(10,20,40,.5);backdrop-filter:blur(3px);"+
-      "display:flex;align-items:center;justify-content:center;z-index:300";
-    modal.innerHTML=
-      '<div style="background:var(--white);border-radius:14px;padding:20px;width:min(95vw,620px);'+
-      'max-height:80vh;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);border-top:4px solid var(--gold)">'+
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
-          '<h3 style="font-family:var(--font-display);font-size:1rem;color:var(--navy);margin:0">Thêm đề kiểm tra vào lớp</h3>'+
-          '<button onclick="document.getElementById(\'cvAddExamModal\').remove()" style="background:var(--surface);border:none;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px;color:var(--ink-mid)">✕</button>'+
-        '</div>'+
-        '<input id="cvExamSearchInput" type="text" placeholder="Tìm đề theo tên..." oninput="cvFilterExamList()" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:.85rem;margin-bottom:12px;width:100%;box-sizing:border-box;outline:none">'+
-        '<div id="cvExamList" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px">'+
-        allItems.map(ex=>{
-          const key = `${ex.kind}:${ex.id}`;
-          const added=existingKeys.has(key);
-          return '<div class="cv-exam-pick-item" data-title="'+ex.title.toLowerCase()+'" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:'+(added?"var(--surface)":"var(--white)")+'">'+
-            '<div>'+
-              '<div style="font-weight:600;font-size:.85rem;color:var(--navy)">'+ex.title+'</div>'+
-              '<div style="font-size:.72rem;color:var(--ink-mid)">'+(ex.kind==="pdf"?"PDF &nbsp;•&nbsp; ":"")+'⏱ '+(ex.duration_minutes||0)+' phút &nbsp;•&nbsp; 🏆 '+(ex.total_points||0)+' điểm'+(ex.kind==="pdf"&&ex.status!=="open"?' &nbsp;•&nbsp; Đóng':'')+'</div>'+
-            '</div>'+
-            (added
-              ?'<span style="font-size:.75rem;color:var(--ink-light)">Đã thêm</span>'
-              :'<button onclick="cvConfirmAddExam(\''+ex.kind+'\',\''+ex.id+'\',\''+ex.title.replace(/'/g,"\\'")+'\')" class="btn btn-primary btn-sm" style="flex-shrink:0">+ Thêm</button>')+
-            '</div>';
-        }).join("")+
-        '</div>'+
-      '</div>';
-    document.body.appendChild(modal);
-  };
-
-  window.cvFilterExamList = function(){
-    const q=(document.getElementById("cvExamSearchInput")?.value||"").toLowerCase();
-    document.querySelectorAll(".cv-exam-pick-item").forEach(el=>{
-      el.style.display=el.dataset.title.includes(q)?"":"none";
-    });
-  };
-
-  window.cvConfirmAddExam = async function(kind, examId, examTitle){
-    const sb=getSb();
-    const payload = kind === "pdf"
-      ? {class_id:_classId,pdf_exam_id:examId}
-      : {class_id:_classId,exam_id:examId};
-    const {error}=await sb.from("class_exams").insert(payload);
-    if(error){alert("Lỗi: "+error.message);return;}
-
-    if(window.NotificationHelper){
-      try {
-        await window.NotificationHelper.notifyClassStudents(_classId, () => ({
-          type: "class_exam_added",
-          title: `${_className || "Lớp học"} có đề kiểm tra mới`,
-          message: `Đề "${examTitle}" vừa được thêm vào lớp của bạn.`,
-          targetUrl: `class.html?openClassId=${encodeURIComponent(_classId)}&tab=exams&className=${encodeURIComponent(_className || "Lớp học")}`,
-          meta: {
-            class_id: _classId,
-            class_name: _className || "",
-            exam_id: examId,
-            exam_kind: kind
-          }
-        }));
-      } catch (notifyError) {
-        console.warn("Không gửi được thông báo đề kiểm tra lớp:", notifyError);
-      }
-    }
-
-    document.getElementById("cvAddExamModal")?.remove();
-    await cvSwitchTab("exams");
-  };
-
-  window.cvRemoveExamFromClass = async function(classExamId, examTitle, submittedCount){
-    const msg = submittedCount>0
-      ? `Gỡ đề "${examTitle}" khỏi lớp?\n⚠ Đã có ${submittedCount} bài nộp — kết quả vẫn được giữ lại.`
-      : `Gỡ đề "${examTitle}" khỏi lớp?`;
-    if(!confirm(msg)) return;
-    const sb=getSb();
-    const {error}=await sb.from("class_exams").delete().eq("id",classExamId);
-    if(error){alert("Lỗi: "+error.message);return;}
-    await cvSwitchTab("exams");
-  };
-
-  window.cvEditClassExam = function(classExamId, examTitle, examId){
-    const modal=document.createElement("div");
-    modal.id="cvEditExamModal";
-    modal.style.cssText="position:fixed;inset:0;background:rgba(10,20,40,.5);backdrop-filter:blur(3px);"+
-      "display:flex;align-items:center;justify-content:center;z-index:300";
-    modal.innerHTML=
-      '<div style="background:var(--white);border-radius:14px;padding:20px;width:min(95vw,440px);'+
-      'box-shadow:var(--shadow-lg);border-top:4px solid var(--gold)">'+
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'+
-          '<h3 style="font-family:var(--font-display);font-size:1rem;color:var(--navy);margin:0">Đặt giờ thi</h3>'+
-          '<button onclick="document.getElementById(\'cvEditExamModal\').remove()" '+
-          'style="background:var(--surface);border:none;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px">✕</button>'+
-        '</div>'+
-        '<div style="font-size:.82rem;color:var(--ink-mid);margin-bottom:14px">'+examTitle+'</div>'+
-        '<div style="margin-bottom:12px">'+
-          '<label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Thời gian bắt đầu</label>'+
-          '<input type="datetime-local" id="cvExamStartsAt" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:.875rem;box-sizing:border-box;outline:none">'+
-        '</div>'+
-        '<div style="margin-bottom:18px">'+
-          '<label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Thời gian kết thúc</label>'+
-          '<input type="datetime-local" id="cvExamEndsAt" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:.875rem;box-sizing:border-box;outline:none">'+
-        '</div>'+
-        '<div style="display:flex;gap:8px;justify-content:flex-end">'+
-          '<button onclick="cvSaveClassExamTime(\''+classExamId+'\')" class="btn btn-primary">💾 Lưu</button>'+
-          '<button onclick="cvClearClassExamTime(\''+classExamId+'\')" class="btn btn-outline">✕ Xóa giờ</button>'+
-        '</div>'+
-      '</div>';
-    document.body.appendChild(modal);
-    getSb().from("class_exams").select("starts_at,ends_at").eq("id",classExamId).single()
-      .then(({data})=>{
-        if(data?.starts_at) document.getElementById("cvExamStartsAt").value=data.starts_at.slice(0,16);
-        if(data?.ends_at)   document.getElementById("cvExamEndsAt").value=data.ends_at.slice(0,16);
-      });
-  };
-
-  window.cvSaveClassExamTime = async function(classExamId){
-    const startsAt=document.getElementById("cvExamStartsAt")?.value||null;
-    const endsAt  =document.getElementById("cvExamEndsAt")?.value||null;
-    if(startsAt&&endsAt&&startsAt>=endsAt){alert("Thời gian kết thúc phải sau bắt đầu!");return;}
-    const sb=getSb();
-    const {error}=await sb.from("class_exams").update({
-      starts_at: startsAt?new Date(startsAt).toISOString():null,
-      ends_at:   endsAt  ?new Date(endsAt).toISOString()  :null,
-    }).eq("id",classExamId);
-    if(error){alert("Lỗi: "+error.message);return;}
-    document.getElementById("cvEditExamModal")?.remove();
-    await cvSwitchTab("exams");
-  };
-
-  window.cvClearClassExamTime = async function(classExamId){
-    const sb=getSb();
-    await sb.from("class_exams").update({starts_at:null,ends_at:null}).eq("id",classExamId);
-    document.getElementById("cvEditExamModal")?.remove();
-    await cvSwitchTab("exams");
-  };
 
   /* â”€â”€ Há»c sinh xem láº¡i bÃ i thi tá»« tab Äá» thi â€” layout 15 pháº§n ngang â”€â”€ */
   window.cvOpenStudentReview = async function(resultId, examId, examTitle) {

@@ -509,7 +509,7 @@
       '<div style="background:var(--white);border-radius:12px;padding:18px 20px;' +
       'box-shadow:var(--shadow-sm);margin-bottom:18px">' +
         '<h3 style="font-family:var(--font-display);font-size:1rem;color:var(--navy);margin-bottom:12px">' +
-        "📝 Đề kiểm tra (" + exams.length + ")</h3>" +
+        "📝 Đề luyện tập (" + exams.length + ")</h3>" +
         examsHtml +
       "</div>";
   }
