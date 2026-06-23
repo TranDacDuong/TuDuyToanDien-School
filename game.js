@@ -177,14 +177,6 @@
     return ["solo", "quick", "round"].includes(mode);
   }
 
-
-  function getModeEloRule(mode) {
-    if (mode === "solo") return "Chơi đơn: Elo thay đổi theo mức điểm của trận, tối đa +30 Elo.";
-    if (mode === "quick") return "Đấu nhanh: nửa trên được cộng Elo bằng hiệu điểm với người đối xứng ở nửa dưới; nửa dưới bị trừ đều tổng Elo đã cộng.";
-    if (mode === "round") return "Đấu đỉnh cao: đạt từ 100 điểm mới qua vòng và được cộng Elo; mỗi lần thi lại trừ 20 điểm.";
-    return "Chế độ này không tính Elo.";
-  }
-
   function getModeEloDeltaMap(mode, orderedPlayers, room = null) {
     const total = orderedPlayers.length;
     if (!total || !supportsModeElo(mode)) return {};
@@ -198,9 +190,13 @@
     }
 
     if (mode === "round") {
+      if (getRoomRoundChallengeType(room) !== "finish") {
+        return Object.fromEntries((orderedPlayers || []).map((player) => [player.user_id, 0]));
+      }
       return Object.fromEntries((orderedPlayers || []).map((player) => {
         const score = Number(player.score || 0);
-        return [player.user_id, score >= 100 ? Math.max(0, score) : 0];
+        const delta = score >= 100 ? Math.min(30, 10 + Math.floor((score - 100) / 20)) : 0;
+        return [player.user_id, delta];
       }));
     }
 
@@ -215,20 +211,23 @@
     const map = Object.fromEntries(players.map((player) => [player.user_id, 0]));
     if (!topCount || !bottomCount) return map;
 
-    let totalPositive = 0;
     for (let index = 0; index < topCount; index += 1) {
       const topPlayer = players[index];
       const mirroredPlayer = players[total - 1 - index];
-      const delta = Math.max(0, Math.round(Number(topPlayer?.score || 0) - Number(mirroredPlayer?.score || 0)));
+      const scoreGap = Math.round(Number(topPlayer?.score || 0) - Number(mirroredPlayer?.score || 0));
+      const delta = Math.min(30, Math.max(0, scoreGap));
       map[topPlayer.user_id] = delta;
-      totalPositive += delta;
-    }
-
-    const bottomPenalty = Math.round(totalPositive / bottomCount);
-    for (let index = total - bottomCount; index < total; index += 1) {
-      map[players[index].user_id] = -bottomPenalty;
+      map[mirroredPlayer.user_id] = -delta;
     }
     return map;
+  }
+
+  function isEloEligibleRoom(room, orderedPlayers) {
+    const mode = roomModeValue(room);
+    if (!supportsModeElo(mode)) return false;
+    if (mode === "quick") return (orderedPlayers || []).length >= 2;
+    if (mode === "round") return getRoomRoundChallengeType(room) === "finish";
+    return true;
   }
 
   function getSoloEloDeltaFromScore(score) {
@@ -254,6 +253,7 @@
     eloRooms.forEach((room) => {
       const mode = roomModeValue(room);
       const ordered = getOrderedPlayersForRoom(room.id, finishedPlayers);
+      if (!isEloEligibleRoom(room, ordered)) return;
       if (!ordered.some((player) => player.user_id === userId)) return;
       const deltas = getModeEloDeltaMap(mode, ordered, room);
       points += Number(deltas[userId] || 0);
@@ -271,7 +271,7 @@
     const profile = (GAME.eloProfiles || []).find((item) => item.user_id === userId);
     if (!profile) return null;
     return {
-      points: Number(profile.elo || 1000),
+      points: Number(profile.elo ?? 1000),
       matches: Number(profile.matches || 0),
       wins: Number(profile.wins || 0),
       quickMatches: Number(profile.quick_matches || 0),
@@ -307,6 +307,7 @@
 
   async function finalizeRoomElo(room, orderedPlayers) {
     if (!room?.id || !GAME.eloTablesReady || !supportsModeElo(roomModeValue(room))) return;
+    if (!isEloEligibleRoom(room, orderedPlayers)) return;
     if ((GAME.eloTransactions || []).some((item) => item.room_id === room.id)) return;
 
     const mode = roomModeValue(room);
@@ -560,7 +561,7 @@
     const historyClose = document.querySelector("#gameHistoryModal .mh .btn");
     if (historyClose) historyClose.textContent = "Đóng";
     if (heroTitle) heroTitle.textContent = "Đấu trường tri thức";
-    if (heroDesc) heroDesc.textContent = "Chọn chế độ, vào phòng và trả lời thật nhanh. Luật cộng/trừ Elo của từng chế độ được hiển thị rõ để người chơi dễ theo dõi.";
+    if (heroDesc) heroDesc.textContent = "Chọn chế độ, vào phòng và chinh phục các thử thách của Game.";
     if (EL.roomScreenTitle) EL.roomScreenTitle.textContent = "Phòng thi đấu";
     if (EL.toggleReadyBtn) EL.toggleReadyBtn.textContent = "Sẵn sàng";
     if (EL.leaveGameBtn) EL.leaveGameBtn.textContent = "Rời phòng";
@@ -710,9 +711,9 @@
 
   function getAutoMatchModeCards() {
     return [
-      { mode: "solo", title: "Chơi đơn", art: "🎯", desc: "Luyện nhanh như phần Tăng tốc, mỗi câu 5/10/15/20 điểm theo tốc độ.", elo: getModeEloRule("solo") },
-      { mode: "quick", title: "Đấu nhanh", art: "⚡", desc: "Từ 2 người trở lên, đúng càng nhanh điểm từng câu càng cao.", elo: getModeEloRule("quick") },
-      { mode: "round", title: "Đấu đỉnh cao", art: "🏔️", desc: "4 thử thách kiểu Olympia: Khởi động, Chướng ngại, Tăng tốc, Về đích.", elo: "Từ 100 điểm mới qua vòng và được cộng Elo; thi lại trừ 20 điểm." },
+      { mode: "solo", title: "Chơi đơn", art: "🎯" },
+      { mode: "quick", title: "Đấu nhanh", art: "⚡" },
+      { mode: "round", title: "Đấu đỉnh cao", art: "🏔️" },
     ];
   }
 
@@ -738,8 +739,6 @@
       <button type="button" class="game-mode-card" data-auto-mode="${item.mode}" style="display:grid;gap:10px;text-align:left;padding:18px;border-radius:18px;border:1px solid rgba(15,31,61,.08);background:#fff;color:var(--ink);cursor:pointer;box-shadow:var(--shadow-sm)">
         <div style="font-size:2rem;line-height:1">${item.art}</div>
         <div style="font-size:1.05rem;font-weight:800;color:var(--navy)">${item.title}</div>
-        <div style="font-size:.85rem;color:var(--ink-mid)">${item.desc}</div>
-        <div style="font-size:.78rem;color:var(--amber);line-height:1.5">${item.elo}</div>
       </button>
     `).join("");
   }
@@ -2529,7 +2528,7 @@
       return [...GAME.eloProfiles]
         .map((profile) => ({
           userId: profile.user_id,
-          elo: Number(profile.elo || 1000),
+          elo: Number(profile.elo ?? 1000),
           matches: Number(profile.matches || 0),
           wins: Number(profile.wins || 0),
           quickMatches: Number(profile.quick_matches || 0),
@@ -2545,6 +2544,7 @@
     const totals = {};
     rankedRooms.forEach((room) => {
       const ordered = getOrderedPlayersForRoom(room.id, finishedPlayers);
+      if (!isEloEligibleRoom(room, ordered)) return;
       const deltas = getModeEloDeltaMap(roomModeValue(room), ordered, room);
       Object.keys(deltas).forEach((userId) => {
         if (!totals[userId]) totals[userId] = { elo: 1000, matches: 0, wins: 0, quickMatches: 0, quickWins: 0 };
@@ -3555,7 +3555,6 @@
             ["Môn", subject],
             ["Số câu", "5 câu"],
             ["Giây mỗi câu", "60s"],
-            ["Luật Elo", getModeEloRule(mode)],
           ]
           : [
             ["Mã phòng", room.join_code || "—"],
@@ -3565,7 +3564,6 @@
             ["Số câu", "5 câu"],
             ["Số người", `${GAME.roomPlayers.length}/${room.max_players || 8}`],
             ["Giây mỗi câu", "60s"],
-            ["Luật Elo", getModeEloRule(mode)],
           ];
         EL.roomSummary.innerHTML = summaryItems.map(([label, value]) => `<div><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join("");
         if (EL.inviteCode) EL.inviteCode.textContent = room.join_code || "—";
@@ -4358,9 +4356,6 @@
     EL.finishedMeta.textContent = roomMode === "solo"
         ? `Trận Chơi đơn đã kết thúc. Elo của bạn thay đổi theo tổng điểm, độ chính xác và tốc độ hoàn thành 5 câu hỏi.`
         : `Phòng ${GAME.activeRoom?.title || ""} đã kết thúc. Người có điểm cao hơn sẽ xếp trên, nếu bằng điểm thì ai vào phòng sớm hơn sẽ xếp trên.`;
-    if (supportsModeElo(roomMode)) {
-      EL.finishedMeta.textContent += ` ${getModeEloRule(roomMode)}`;
-    }
     if (roomMode === "round") {
       const myPlayer = GAME.roomPlayers.find((item) => item.user_id === GAME.user.id);
       EL.finishedMeta.textContent += Number(myPlayer?.score || 0) >= 100
