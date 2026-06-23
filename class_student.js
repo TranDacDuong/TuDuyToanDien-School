@@ -874,7 +874,7 @@
 
     try {
       const { data: activeExam } = await sb.from("exams")
-        .select("id, title, total_points, topic_id, is_review_generated")
+        .select("id, title, total_points, duration_minutes, topic_id, is_review_generated")
         .eq("id", _currentExamId)
         .single();
       
@@ -882,16 +882,30 @@
         const scorePct = finalScore / activeExam.total_points;
         if (scorePct < 0.5) {
           const incorrectQIds = answerRows.filter(r => r.is_correct === false).map(r => r.question_id);
+          const correctQIds = answerRows.filter(r => r.is_correct === true).map(r => r.question_id);
           if (incorrectQIds.length > 0) {
-            const reviewPoints = _examQuestions
-              .filter(eq => incorrectQIds.includes(eq.question.id))
-              .reduce((acc, eq) => acc + (eq.points || 0), 0);
-            
+            let altQIds = [];
+            if (activeExam.topic_id) {
+              const { data: qBank } = await sb.from("question_bank").select("id").eq("topic_id", activeExam.topic_id);
+              if (qBank && qBank.length > 0) {
+                const originalQIds = _examQuestions.map(eq => eq.question.id);
+                altQIds = qBank.map(q => q.id).filter(id => !originalQIds.includes(id));
+              }
+            }
+            altQIds.sort(() => Math.random() - 0.5);
+            const neededCount = correctQIds.length;
+            let selectedAlts = altQIds.slice(0, neededCount);
+            if (selectedAlts.length < neededCount) {
+              const shortage = neededCount - selectedAlts.length;
+              const shuffledCorrect = [...correctQIds].sort(() => Math.random() - 0.5);
+              selectedAlts = [...selectedAlts, ...shuffledCorrect.slice(0, shortage)];
+            }
+            const finalQIds = [...incorrectQIds, ...selectedAlts];
             const currentClassId = window._classId || document.getElementById("classViewOverlay")?.dataset.classId || null;
             const { data: newExam, error: newExamErr } = await sb.from("exams").insert({
               title: `Ôn tập lỗi sai: ${activeExam.title}`,
-              duration_minutes: Math.max(15, Math.ceil(incorrectQIds.length * 2.5)),
-              total_points: reviewPoints,
+              duration_minutes: activeExam.duration_minutes || 45,
+              total_points: activeExam.total_points || 10,
               topic_id: activeExam.topic_id || null,
               is_review_generated: true,
               parent_exam_id: activeExam.id,
@@ -900,16 +914,14 @@
             }).select("id").single();
 
             if (newExam) {
-              const newEqs = _examQuestions
-                .filter(eq => incorrectQIds.includes(eq.question.id))
-                .map((eq, idx) => ({
-                  exam_id: newExam.id,
-                  question_id: eq.question.id,
-                  points: eq.points || 0,
-                  order_no: idx + 1
-                }));
+              const newEqs = finalQIds.map((qid, idx) => ({
+                exam_id: newExam.id,
+                question_id: qid,
+                points: _examQuestions[idx]?.points || 1,
+                order_no: idx + 1
+              }));
               await sb.from("exam_questions").insert(newEqs);
-              alert(`⚠️ Cảnh báo: Kết quả luyện tập của bạn dưới 50% (${finalScore}/${activeExam.total_points}).\nHệ thống đã tự động tạo một Đề ôn tập lỗi sai chứa các câu bạn làm chưa đúng để bạn ôn tập lại!`);
+              alert(`⚠️ Cảnh báo: Kết quả luyện tập của bạn dưới 50% (${finalScore}/${activeExam.total_points}).\nHệ thống đã tự động tạo một Đề ôn tập lỗi sai chứa các câu bạn làm sai và câu hỏi thay thế cùng chủ đề!`);
 
               if (window.NotificationHelper?.createNotification) {
                 try {
