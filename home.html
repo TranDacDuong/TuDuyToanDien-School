@@ -1569,6 +1569,58 @@ body {
 
   <section class="overview-section active" id="overviewSection">
     <div class="overview-main" id="overviewMain">
+      <!-- Báo cáo học tập cá nhân của Học sinh/Phụ huynh -->
+      <div class="overview-card" id="studentReportCard" style="display:none; border: 1.5px solid rgba(29,107,209,0.18); box-shadow: 0 14px 36px rgba(29,107,209,0.06); margin-bottom: 22px;">
+        <div class="overview-card-head" style="background: radial-gradient(circle at top right, rgba(29,107,209,0.08), transparent 38%), linear-gradient(180deg, #f7faff 0%, #ffffff 100%); position: relative; padding-left: 36px;">
+          <div style="position: absolute; left: 20px; top: 16px; width: 5px; height: 28px; border-radius: 999px; background: linear-gradient(180deg, #10b981, #1d6bd1);"></div>
+          <div class="overview-card-title">📈 Báo cáo học tập cá nhân</div>
+          <div class="overview-card-sub" id="studentReportSub">Biểu đồ tiến trình điểm số, chuyên cần và nhận xét của con.</div>
+        </div>
+        <div class="overview-card-body" style="display:flex; flex-direction:column; gap:20px; padding: 20px;">
+          <!-- Parent student selector dropdown -->
+          <div id="parentStudentSelectorRow" style="display:none; align-items:center; gap:10px; flex-wrap:wrap; border-bottom:1px solid rgba(15,31,61,0.06); padding-bottom:12px;">
+            <span style="font-size:13px; font-weight:700; color:var(--navy);">Chọn học sinh:</span>
+            <select class="admin-select" id="parentStudentSelect" style="width:200px; padding:6px 10px;" onchange="onReportStudentChange()"></select>
+          </div>
+
+          <!-- Score chart wrapper -->
+          <div>
+            <h4 style="margin:0 0 10px; color:var(--navy); font-size:14px; display:flex; align-items:center; gap:6px;">
+              <span>📊 Biểu đồ tiến trình điểm số</span>
+            </h4>
+            <div style="position:relative; height:240px; width:100%; background:#fff; border-radius:14px; border:1px solid rgba(15,31,61,0.06); padding:10px;">
+              <canvas id="studentScoreChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Stats & evaluations grid -->
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
+            <!-- Attendance KPI card -->
+            <div style="background:linear-gradient(180deg,#fcfdfe 0%,#f8fbff 100%); border:1px solid rgba(15,31,61,0.06); border-radius:16px; padding:14px;">
+              <h4 style="margin:0 0 10px; color:var(--navy); font-size:13px;">📅 Chuyên cần tháng này</h4>
+              <div style="display:flex; align-items:center; gap:16px;">
+                <div style="position:relative; width:64px; height:64px; display:flex; align-items:center; justify-content:center; border-radius: 50%; background: #eef4ff; border: 4px solid #1d6bd1;">
+                  <div id="attendancePercent" style="font-size:16px; font-weight:800; color:#1d6bd1;">0%</div>
+                </div>
+                <div style="flex:1; display:grid; gap:4px; font-size:12px; color:var(--ink-mid);">
+                  <div style="display:flex; justify-content:space-between;"><span>Có mặt:</span><b id="attPresent" style="color:var(--green)">0 buổi</b></div>
+                  <div style="display:flex; justify-content:space-between;"><span>Vắng học:</span><b id="attAbsent" style="color:var(--red)">0 buổi</b></div>
+                  <div style="display:flex; justify-content:space-between;"><span>Học bù:</span><b id="attMakeup" style="color:#d97706">0 buổi</b></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recent Comments card -->
+            <div style="background:linear-gradient(180deg,#fcfdfe 0%,#f8fbff 100%); border:1px solid rgba(15,31,61,0.06); border-radius:16px; padding:14px;">
+              <h4 style="margin:0 0 10px; color:var(--navy); font-size:13px;">💬 Nhận xét gần đây của giáo viên</h4>
+              <div id="studentCommentsList" style="display:flex; flex-direction:column; gap:8px;">
+                <div style="font-size:12px; color:var(--ink-light); font-style:italic;">Chưa có nhận xét nào trong tháng này.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="overview-card overview-admin" id="overviewAdminCard">
         <div class="overview-card-head">
           <div class="overview-card-title">Tin tức Trang chủ</div>
@@ -1745,6 +1797,7 @@ body {
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="supabaseClient.js"></script>
 <script src="image_upload.js"></script>
 <script>
@@ -2069,7 +2122,258 @@ async function init() {
   setInterval(renderCountdown, 60000);
   loadHomeHubBadges();
   subscribeHomeHubBadges();
+  if (role === "student" || role === "parent") {
+    await initStudentReport();
+  }
   loadPosts();
+}
+
+let myScoreChart = null;
+
+async function initStudentReport() {
+  const card = document.getElementById("studentReportCard");
+  if (!card) return;
+  card.style.display = "block";
+
+  if (role === "student") {
+    document.getElementById("parentStudentSelectorRow").style.display = "none";
+    await loadStudentReportData(currentUser.id);
+  } else if (role === "parent") {
+    const { data: links, error: lErr } = await sb
+      .from("parent_students")
+      .select("student_id, student:users!student_id(id, full_name)")
+      .eq("parent_id", currentUser.id)
+      .is("revoked_at", null);
+
+    if (lErr) {
+      console.error("Lỗi tải danh sách con:", lErr);
+      return;
+    }
+
+    const students = (links || []).map(l => l.student).filter(Boolean);
+    if (!students.length) {
+      document.getElementById("studentReportSub").textContent = "Không tìm thấy tài khoản học sinh liên kết với phụ huynh.";
+      return;
+    }
+
+    const select = document.getElementById("parentStudentSelect");
+    select.innerHTML = students.map(s => `<option value="${s.id}">${esc(s.full_name)}</option>`).join("");
+    document.getElementById("parentStudentSelectorRow").style.display = "flex";
+
+    await loadStudentReportData(students[0].id);
+  }
+}
+
+window.onReportStudentChange = async function() {
+  const select = document.getElementById("parentStudentSelect");
+  if (select?.value) {
+    await loadStudentReportData(select.value);
+  }
+};
+
+async function loadStudentReportData(studentId) {
+  // 1. Chuyên cần
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = today.getMonth() + 1;
+  const ymStr = `${y}-${String(m).padStart(2, "0")}`;
+  const mStart = ymStr + "-01";
+  const lastDay = new Date(y, m, 0).getDate();
+  const mEnd = `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+
+  const { data: att } = await sb
+    .from("attendance")
+    .select("status, date")
+    .eq("student_id", studentId)
+    .gte("date", mStart)
+    .lte("date", mEnd);
+
+  let present = 0, absent = 0, makeup = 0;
+  (att || []).forEach(a => {
+    if (a.status === "present") present++;
+    else if (a.status === "absent") absent++;
+    else if (a.status === "makeup") makeup++;
+  });
+  const total = present + absent + makeup;
+  const pct = total > 0 ? Math.round(((present + makeup) / total) * 100) : 0;
+
+  document.getElementById("attendancePercent").textContent = pct + "%";
+  document.getElementById("attPresent").textContent = present + " buổi";
+  document.getElementById("attAbsent").textContent = absent + " buổi";
+  document.getElementById("attMakeup").textContent = makeup + " buổi";
+
+  // 2. Nhận xét giáo viên
+  const { data: evals } = await sb
+    .from("session_student_evaluations")
+    .select(`
+      id,
+      final_message,
+      generated_message,
+      created_at,
+      classes(class_name)
+    `)
+    .eq("student_id", studentId)
+    .eq("state", "sent")
+    .order("created_at", { ascending: false })
+    .limit(3);
+
+  const cmtList = document.getElementById("studentCommentsList");
+  if (evals && evals.length) {
+    cmtList.innerHTML = evals.map(e => {
+      const text = e.final_message || e.generated_message || "Chưa có nội dung";
+      const className = e.classes?.class_name || "Lớp học";
+      const dateStr = new Date(e.created_at).toLocaleDateString("vi-VN");
+      return `
+        <div style="padding:10px; background:#fff; border-radius:10px; border:1px solid rgba(15,31,61,0.05); font-size:12px; line-height:1.5;">
+          <div style="font-weight:700; color:var(--navy); margin-bottom:4px;">${esc(className)} <span style="font-weight:400; color:var(--ink-light); float:right;">${dateStr}</span></div>
+          <div style="color:var(--ink-mid); white-space:pre-wrap; word-break:break-word;">${esc(text)}</div>
+        </div>
+      `;
+    }).join("");
+  } else {
+    cmtList.innerHTML = `<div style="font-size:12px; color:var(--ink-light); font-style:italic;">Chưa có nhận xét nào được gửi trong tháng này.</div>`;
+  }
+
+  // 3. Biểu đồ điểm số Chart.js
+  const { data: results } = await sb
+    .from("exam_results")
+    .select(`
+      score_total,
+      submitted_at,
+      exams(title, total_points, classes(class_name, subject_id, subjects(name)))
+    `)
+    .eq("student_id", studentId)
+    .not("submitted_at", "is", null)
+    .order("submitted_at", { ascending: true });
+
+  const subjectMap = {};
+  (results || []).forEach(r => {
+    const subName = r.exams?.classes?.subjects?.name || "Khác";
+    if (!subjectMap[subName]) subjectMap[subName] = [];
+    subjectMap[subName].push(r);
+  });
+
+  const labels = (results || []).map(r => {
+    const d = new Date(r.submitted_at);
+    const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
+    return `${dateStr} - ${r.exams?.title || "Bài KT"}`;
+  });
+
+  const datasets = Object.keys(subjectMap).map((subName, idx) => {
+    const colors = [
+      '#1d6bd1', // Blue
+      '#10b981', // Green
+      '#f59e0b', // Orange
+      '#ef4444', // Red
+      '#8b5cf6', // Purple
+      '#ec4899'  // Pink
+    ];
+    const color = colors[idx % colors.length];
+
+    const data = (results || []).map(r => {
+      const currentSubName = r.exams?.classes?.subjects?.name || "Khác";
+      if (currentSubName === subName) {
+        const maxPts = Number(r.exams?.total_points) || 10;
+        const score = Number(r.score_total) || 0;
+        return maxPts === 10 ? score : Math.round((score / maxPts) * 10 * 10) / 10;
+      }
+      return null;
+    });
+
+    return {
+      label: subName,
+      data: data,
+      borderColor: color,
+      backgroundColor: color + '22',
+      tension: 0.3,
+      spanGaps: true,
+      borderWidth: 2,
+      pointRadius: 4,
+      pointHoverRadius: 6
+    };
+  });
+
+  const canvas = document.getElementById("studentScoreChart");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  if (myScoreChart) {
+    myScoreChart.destroy();
+    myScoreChart = null;
+  }
+
+  if (!results || !results.length) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.font = "14px 'DM Sans', sans-serif";
+    ctx.fillStyle = "#94a3b8";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("Chưa có kết quả bài kiểm tra nào.", canvas.width / 2, canvas.height / 2);
+    return;
+  }
+
+  myScoreChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: datasets
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            font: { family: "'DM Sans', sans-serif", size: 11, weight: 'bold' },
+            color: '#1e293b'
+          }
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label: function(context) {
+              let label = context.dataset.label || '';
+              if (label) {
+                label += ': ';
+              }
+              if (context.parsed.y !== null) {
+                label += context.parsed.y + '/10 điểm';
+              }
+              return label;
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          min: 0,
+          max: 10,
+          ticks: {
+            stepSize: 1,
+            font: { family: "'DM Sans', sans-serif", size: 10 },
+            color: '#64748b'
+          },
+          grid: {
+            color: 'rgba(148, 163, 184, 0.1)'
+          }
+        },
+        x: {
+          ticks: {
+            font: { family: "'DM Sans', sans-serif", size: 9 },
+            color: '#64748b',
+            maxRotation: 30,
+            minRotation: 0
+          },
+          grid: {
+            display: false
+          }
+        }
+      }
+    }
+  });
 }
 
 async function loadFriendIds() {
