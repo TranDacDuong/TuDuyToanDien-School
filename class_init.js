@@ -16,8 +16,14 @@
       const { data:{ user } } = await getSb().auth.getUser();
       if(!user) return;
 
-      const { data: profile } = await getSb()
+      const { data: storedProfile } = await getSb()
         .from("users").select("role,full_name").eq("id", user.id).maybeSingle();
+      let profile = storedProfile;
+      if(profile?.role === "student"){
+        const { data: parentLink } = await getSb().from("parent_students")
+          .select("id").eq("parent_id", user.id).is("revoked_at", null).limit(1).maybeSingle();
+        if(parentLink) profile = { ...profile, role:"parent" };
+      }
 
       /* Set global — class_list.js đọc từ đây */
       window._currentRole     = profile?.role || "student";
@@ -26,7 +32,7 @@
 
       const userInfo = document.getElementById("userInfo");
       if(userInfo){
-        const roleLabel = { admin:"Quản trị viên", teacher:"Giáo viên", assistant:"Trợ giảng/Tư vấn viên", student:"Học sinh", parent:"Phụ huynh" };
+        const roleLabel = { admin:"Quản trị viên", teacher:"Giáo viên", assistant:"Trợ giảng/Tư vấn viên", student:"Học sinh", parent:"Phụ huynh", accountant:"Kế toán" };
         userInfo.textContent = (profile?.full_name||"") + " · " + (roleLabel[profile?.role]||"");
       }
 
@@ -42,6 +48,10 @@
         if(openBtn)   openBtn.style.display = "";
         if(filters)   filters.style.display = "none";
         if(filterBar) filterBar.style.display = "flex";
+      } else if(role === "accountant"){
+        if(openBtn)   openBtn.style.display = "none";
+        if(filters)   filters.style.display = "contents";
+        if(filterBar) filterBar.style.display = "none";
       } else {
         /* Student/parent: ẩn khối tạo lớp và bộ lọc */
         if(openBtn)   openBtn.style.display   = "none";

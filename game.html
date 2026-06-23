@@ -424,13 +424,20 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   gap:0;
   overflow:hidden;
   border-radius:0;
-  background:linear-gradient(135deg,rgba(255,255,255,.9),rgba(226,232,240,.84)),url('mindup-zbs-logo.png');
-  background-repeat:no-repeat;
-  background-position:center;
-  background-size:min(66%,420px) auto;
+  background:#e2e8f0;
   box-shadow:inset 0 0 0 1px rgba(39,58,91,.08);
 }
+.round-obstacle-image{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  z-index:0;
+}
 .round-obstacle-tile{
+  position:relative;
+  z-index:1;
   min-height:96px;
   border-radius:0!important;
   border:1px solid #fff!important;
@@ -445,6 +452,22 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   text-shadow:0 2px 10px rgba(2,8,23,.72);
   cursor:pointer;
 }
+.admin-obstacle-image-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 180px;
+  gap:12px;
+  align-items:start;
+  margin-top:10px;
+}
+.admin-obstacle-image-preview{
+  width:100%;
+  aspect-ratio:16/10;
+  object-fit:cover;
+  border-radius:12px;
+  border:1px solid rgba(39,58,91,.12);
+  background:#f1f5f9;
+}
+.admin-obstacle-image-preview.hidden{display:none}
 .round-obstacle-tile.opened{
   border:0!important;
   background:transparent!important;
@@ -682,7 +705,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   line-height:1;
 }
 @media(max-width:1024px){
-  .toolbar,.form-grid,.room-shell,.game-stage,.insight-grid,.stats-grid,.student-leaderboard-grid{grid-template-columns:1fr}
+  .toolbar,.form-grid,.room-shell,.game-stage,.insight-grid,.stats-grid,.student-leaderboard-grid,.admin-obstacle-image-row{grid-template-columns:1fr}
   .history-detail-grid{grid-template-columns:1fr}
   .game-question-picker-toolbar,.game-question-picker-body{grid-template-columns:1fr}
   #gameRoomScreen .topbar{height:auto;min-height:110px;align-items:flex-start}
@@ -833,7 +856,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   <div class="hero">
     <div class="hero-copy">
       <h1>Đấu trường tri thức</h1>
-      <p>Học sinh vào Game theo Khối trong hồ sơ, chọn Chơi đơn, Đấu nhanh hoặc Vòng MindUp khi admin đã bật bộ câu hỏi tương ứng.</p>
+      <p>Học sinh vào Game theo Khối trong hồ sơ, chọn Chơi đơn, Đấu nhanh hoặc Đấu đỉnh cao khi admin đã bật bộ câu hỏi tương ứng.</p>
       <div id="gameStatsGrid" class="stats-grid"></div>
       <div id="gameHeroBadges" class="hero-badges"></div>
     </div>
@@ -856,7 +879,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
 <div id="gameRoundSelectionScreen" class="screen">
   <div class="topbar">
     <button class="btn btn-outline btn-sm icon-btn" type="button" onclick="closeGameRoundSelectionScreen()" title="Quay l&#7841;i" aria-label="Quay l&#7841;i">&larr;</button>
-    <h2 id="gameRoundSelectionTitle">Vòng MindUp</h2>
+    <h2 id="gameRoundSelectionTitle">Đấu đỉnh cao</h2>
     <div class="topbar-actions"></div>
   </div>
   <div class="screen-body">
@@ -868,11 +891,11 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
   <div class="hero">
     <div class="hero-copy">
       <h1>Quản trị Game MindUp</h1>
-      <p>Admin tạo cấu hình Chơi đơn, Đấu nhanh và các Vòng MindUp. Học sinh chỉ nhìn thấy phần chơi khi cấu hình tương ứng đã được bật cho đúng Khối và Môn.</p>
+      <p>Admin tạo cấu hình Chơi đơn, Đấu nhanh và các vòng Đấu đỉnh cao. Học sinh chỉ nhìn thấy phần chơi khi cấu hình tương ứng đã được bật cho đúng Khối và Môn.</p>
       <div class="hero-badges">
         <div class="hero-badge">🎮 Chơi đơn</div>
         <div class="hero-badge">⚡ Đấu nhanh</div>
-        <div class="hero-badge">🏔️ Vòng MindUp</div>
+        <div class="hero-badge">🏔️ Đấu đỉnh cao</div>
       </div>
     </div>
   </div>
@@ -908,7 +931,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
     </div>
 
     <div class="section-card">
-      <h3>Tạo Vòng MindUp</h3>
+      <h3>Tạo Đấu đỉnh cao</h3>
       <form id="gameRoundForm" class="form-grid">
         <div class="field">
           <label>Tên vòng</label>
@@ -940,6 +963,14 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
         <div class="field full">
           <label>Vượt chướng ngại vật</label>
           <input id="adminObstacleKeyword" class="input" placeholder="Từ khóa ẩn">
+          <div class="admin-obstacle-image-row">
+            <div>
+              <label for="adminObstacleImage" style="display:block;margin-bottom:6px">Hình ảnh từ khóa</label>
+              <input id="adminObstacleImage" class="input" type="file" accept="image/*">
+              <div class="hint" style="margin-top:6px">Ảnh sẽ nằm phía sau 4 ô chướng ngại vật và dần lộ ra khi trả lời đúng.</div>
+            </div>
+            <img id="adminObstacleImagePreview" class="admin-obstacle-image-preview hidden" alt="Ảnh chướng ngại vật">
+          </div>
           <textarea id="adminObstacleQuestionIds" class="input" rows="3" placeholder="4 câu gợi ý, mỗi dòng một ID" style="margin-top:8px"></textarea>
           <div class="game-question-picker-field-actions">
             <button class="btn btn-outline btn-sm" type="button" data-game-question-picker-target="adminObstacleQuestionIds" data-game-question-picker-title="Chọn câu Vượt chướng ngại vật" data-game-question-picker-grade="adminGameRoundGrade" data-game-question-picker-subject="adminGameRoundSubject" data-game-question-picker-required-count="4">Chọn danh sách câu hỏi</button>
@@ -974,7 +1005,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
           </div>
         </div>
         <div class="field full">
-          <button class="btn btn-primary" type="submit">Lưu vòng MindUp</button>
+          <button class="btn btn-primary" type="submit">Lưu Đấu đỉnh cao</button>
         </div>
       </form>
     </div>
@@ -986,7 +1017,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
       <div id="adminGameConfigList" class="history-list"></div>
     </div>
     <div class="section-card">
-      <h3>Vòng MindUp đang có</h3>
+      <h3>Đấu đỉnh cao đang có</h3>
       <div id="adminGameRoundList" class="history-list"></div>
     </div>
   </div>
@@ -1223,6 +1254,7 @@ body{margin:0;background:var(--cream);font-family:var(--font-body);color:var(--i
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
+<script src="image_upload.js"></script>
 <script src="game.js"></script>
 </body>
 </html>

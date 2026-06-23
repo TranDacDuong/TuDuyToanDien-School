@@ -1779,6 +1779,9 @@ function formatMoney(value) {
 function formatRole(role) {
   if (role === "admin") return "Quản trị viên";
   if (role === "teacher") return "Giáo viên";
+  if (role === "assistant") return "Trợ giảng/Tư vấn viên";
+  if (role === "accountant") return "Kế toán";
+  if (role === "parent") return "Phụ huynh";
   if (role === "student") return "Học sinh";
   return "Thành viên";
 }

@@ -193,11 +193,11 @@
   let assistantClassIds = new Set();
 
   function canViewStudentPhone() {
-    return currentRole === "admin" || currentRole === "assistant";
+    return currentRole === "admin" || currentRole === "assistant" || currentRole === "accountant";
   }
 
   function canManagePayments() {
-    return currentRole === "admin";
+    return currentRole === "admin" || currentRole === "accountant";
   }
 
   function fmtDate(iso) {
@@ -437,11 +437,17 @@ Nhập số tiền hoàn lại (>0):`,
     }
     currentUserId = user.id;
 
-    const { data: profile } = await sb
+    const { data: storedProfile } = await sb
       .from("users")
       .select("role, full_name")
       .eq("id", user.id)
       .single();
+    let profile = storedProfile;
+    if (profile?.role === "student") {
+      const { data: parentLink } = await sb.from("parent_students")
+        .select("id").eq("parent_id", user.id).is("revoked_at", null).limit(1).maybeSingle();
+      if (parentLink) profile = { ...profile, role: "parent" };
+    }
     currentRole = profile?.role || "student";
     parentStudentIds = new Set();
     assistantClassIds = new Set();
@@ -497,7 +503,7 @@ Nhập số tiền hoàn lại (>0):`,
     if (tableWrap) tableWrap.style.display = "";
     if (reloadBtn) reloadBtn.style.display = "";
     if (printBtn) printBtn.style.display = "";
-    if (notifyBtn) notifyBtn.style.display = currentRole === "admin" ? "" : "none";
+    if (notifyBtn) notifyBtn.style.display = canManagePayments() ? "" : "none";
     if (studentDetailView) studentDetailView.classList.remove("show");
     if (paidFilter) paidFilter.style.display = canManagePayments() ? "" : "none";
   }
@@ -1005,8 +1011,8 @@ Nhập số tiền hoàn lại (>0):`,
      INIT
   ───────────────────────────────────────────── */
   window.notifyPendingTuition = async function () {
-    if (currentRole !== "admin") {
-      alert("Chỉ admin mới có thể gửi thông báo học phí.");
+    if (!canManagePayments()) {
+      alert("Bạn không có quyền gửi thông báo học phí.");
       return;
     }
     if (!window.NotificationHelper) {

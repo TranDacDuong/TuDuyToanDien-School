@@ -85,7 +85,7 @@
         .order("class_name", { ascending: true });
       if(classIds !== null) classQuery = classQuery.in("id", classIds);
       // Teacher và student chỉ thấy lớp không bị ẩn
-      if(role !== "admin") classQuery = classQuery.eq("hidden", false);
+      if(role !== "admin" && role !== "accountant") classQuery = classQuery.eq("hidden", false);
 
       const [
         { data: classes,  error: e1 },
@@ -127,7 +127,7 @@
 
       await loadFilterOptions(sb, role);
 
-      if(role === "admin"){
+      if(role === "admin" || role === "accountant"){
         const filterBar = document.getElementById("filterBar");
         if(filterBar) filterBar.style.display = "flex";
         bindFilters();
@@ -151,7 +151,7 @@
       _teacherRoleMap[t.id] = t.role;
     });
 
-    if(role !== "admin") return;
+    if(role !== "admin" && role !== "accountant") return;
 
     const [{ data: grades }, { data: subjects }] = await Promise.all([
       sb.from("grades").select("id,name").order("name"),

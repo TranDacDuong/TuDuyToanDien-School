@@ -536,6 +536,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <select id="tRole">
         <option value="teacher">Giáo viên</option>
         <option value="assistant">Trợ giảng/Tư vấn viên</option>
+        <option value="accountant">Kế toán</option>
       </select>
     </div>
     <div id="tAddSection">
@@ -1345,7 +1346,7 @@ function tPhone(p){ navigator.clipboard.writeText(p).then(()=>toast('📋 Đã s
 
 async function loadTeachers(){
   const [{ data: teachers }, { data: ct }, { data: cls }] = await Promise.all([
-    sb.from('users').select('id,full_name,email,phone,birth_year,subject,avatar_url,role').in('role',['teacher','assistant']).order('full_name'),
+    sb.from('users').select('id,full_name,email,phone,birth_year,subject,avatar_url,role').in('role',['teacher','assistant','accountant']).order('full_name'),
     sb.from('class_teachers').select('teacher_id,class_id'),
     sb.from('classes').select('id,class_name').eq('hidden',false),
   ]);
@@ -1392,7 +1393,7 @@ function renderTeacherGrid(){
     return `<div class="tc-card">
       <div class="tc-top">${av}<div class="tc-hd-info"><div class="tc-name">${esc(t.full_name||'—')}</div><div class="tc-email">${esc(t.email||'')}</div></div></div>
       <div class="tc-body">
-        <div class="tc-row">👤 <span class="tc-subject">${t.role === 'assistant' ? 'Trợ giảng/Tư vấn viên' : 'Giáo viên'}</span></div>
+        <div class="tc-row">👤 <span class="tc-subject">${t.role === 'assistant' ? 'Trợ giảng/Tư vấn viên' : t.role === 'accountant' ? 'Kế toán' : 'Giáo viên'}</span></div>
         <div class="tc-row">📚 ${t.subject ? `<span class="tc-subject">${esc(t.subject)}</span>` : '<span style="color:var(--ink-light)">Chưa có môn</span>'}</div>
         <div class="tc-row">📞 ${t.phone ? `<button style="background:none;border:none;color:var(--blue);font-size:.8rem;cursor:pointer;padding:0;font-family:var(--font-body);font-weight:500" onclick="tPhone('${t.phone}')">📞 ${esc(t.phone)}</button>` : '<span style="color:var(--ink-light)">Chưa có SĐT</span>'}</div>
         <div class="tc-row">🎂 <span style="font-weight:500;color:var(--ink)">${t.birth_year||'—'}</span></div>
@@ -1433,7 +1434,8 @@ function closeTModal(){ document.getElementById('tModal').classList.remove('open
 
 async function submitTeacher(){
   const subject    = document.getElementById('tSubject').value;
-  const staffRole  = document.getElementById('tRole').value === 'assistant' ? 'assistant' : 'teacher';
+  const selectedRole = document.getElementById('tRole').value;
+  const staffRole  = ['teacher','assistant','accountant'].includes(selectedRole) ? selectedRole : 'teacher';
   const birth_year = parseInt(document.getElementById('tBirth').value)||null;
   const phone      = document.getElementById('tPhone').value.trim()||null;
   if(_tEditId){
@@ -1458,7 +1460,7 @@ async function submitTeacher(){
     const {data:u, error:ue} = await sb.from('users').select('*').eq('email',email).maybeSingle();
     if(ue){ alert(ue.message); return; }
     if(!u){ alert('Không tìm thấy tài khoản'); return; }
-    if(u.role==='teacher' || u.role==='assistant'){ alert('Tài khoản này đã là nhân sự giảng dạy/hỗ trợ'); return; }
+    if(['teacher','assistant','accountant'].includes(u.role)){ alert('Tài khoản này đã là nhân sự của hệ thống'); return; }
     if(u.role==='admin')  { alert('Không thể chuyển tài khoản admin'); return; }
     const outcome = await window.AppAdminTools?.runAdminAction?.({
       action: 'teacher_created',
@@ -1475,7 +1477,7 @@ async function submitTeacher(){
       operation: async () => sb.from('users').update({role:staffRole,subject,birth_year,phone}).eq('id',u.id),
     });
     if(outcome && !outcome.ok) return;
-    toast(staffRole === 'assistant' ? '✅ Đã thêm trợ giảng/tư vấn viên mới' : '✅ Đã thêm giáo viên mới');
+    toast(staffRole === 'assistant' ? '✅ Đã thêm trợ giảng/tư vấn viên mới' : staffRole === 'accountant' ? '✅ Đã thêm kế toán mới' : '✅ Đã thêm giáo viên mới');
   }
   closeTModal(); loadTeachers();
 }

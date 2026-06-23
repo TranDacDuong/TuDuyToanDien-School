@@ -58,6 +58,7 @@
     },
     editingConfigIds: [],
     editingRoundId: "",
+    editingObstacleImageUrl: "",
     liveRenderKey: "",
     autoStartTimer: null,
   };
@@ -146,6 +147,8 @@
     adminRoundDescription: document.getElementById("adminGameRoundDescription"),
     adminWarmupQuestionIds: document.getElementById("adminWarmupQuestionIds"),
     adminObstacleKeyword: document.getElementById("adminObstacleKeyword"),
+    adminObstacleImage: document.getElementById("adminObstacleImage"),
+    adminObstacleImagePreview: document.getElementById("adminObstacleImagePreview"),
     adminObstacleQuestionIds: document.getElementById("adminObstacleQuestionIds"),
     adminAccelerationQuestionIds: document.getElementById("adminAccelerationQuestionIds"),
     adminFinishEasyQuestionIds: document.getElementById("adminFinishEasyQuestionIds"),
@@ -178,7 +181,7 @@
   function getModeEloRule(mode) {
     if (mode === "solo") return "Chơi đơn: Elo thay đổi theo mức điểm của trận, tối đa +30 Elo.";
     if (mode === "quick") return "Đấu nhanh: nửa trên được cộng Elo bằng hiệu điểm với người đối xứng ở nửa dưới; nửa dưới bị trừ đều tổng Elo đã cộng.";
-    if (mode === "round") return "Vòng MindUp: đạt từ 100 điểm mới qua vòng và được cộng Elo; mỗi lần thi lại trừ 20 điểm.";
+    if (mode === "round") return "Đấu đỉnh cao: đạt từ 100 điểm mới qua vòng và được cộng Elo; mỗi lần thi lại trừ 20 điểm.";
     return "Chế độ này không tính Elo.";
   }
 
@@ -709,7 +712,7 @@
     return [
       { mode: "solo", title: "Chơi đơn", art: "🎯", desc: "Luyện nhanh như phần Tăng tốc, mỗi câu 5/10/15/20 điểm theo tốc độ.", elo: getModeEloRule("solo") },
       { mode: "quick", title: "Đấu nhanh", art: "⚡", desc: "Từ 2 người trở lên, đúng càng nhanh điểm từng câu càng cao.", elo: getModeEloRule("quick") },
-      { mode: "round", title: "Vòng MindUp", art: "🏔️", desc: "4 thử thách kiểu Olympia: Khởi động, Chướng ngại, Tăng tốc, Về đích.", elo: "Từ 100 điểm mới qua vòng và được cộng Elo; thi lại trừ 20 điểm." },
+      { mode: "round", title: "Đấu đỉnh cao", art: "🏔️", desc: "4 thử thách kiểu Olympia: Khởi động, Chướng ngại, Tăng tốc, Về đích.", elo: "Từ 100 điểm mới qua vòng và được cộng Elo; thi lại trừ 20 điểm." },
     ];
   }
 
@@ -821,7 +824,7 @@
       if (finishLevel === "hard") return "Về đích - Khó";
       return "Về đích - Trung bình";
     }
-    return "Vòng MindUp";
+    return "Đấu đỉnh cao";
   }
 
   function getRoundChallengeQuestionCount(type) {
@@ -1095,16 +1098,16 @@
     EL.roundSelectionScreen?.classList.add("show");
     const subject = (GAME.subjects || []).find((item) => item.id === subjectId);
     if (EL.roundSelectionTitle) {
-      EL.roundSelectionTitle.textContent = subject ? `Vòng MindUp - ${subject.name}` : "Vòng MindUp";
+      EL.roundSelectionTitle.textContent = subject ? `Đấu đỉnh cao - ${subject.name}` : "Đấu đỉnh cao";
     }
 
     GAME.selectedRoundId = "";
     grid.innerHTML = rounds.length
       ? rounds.map((round) => {
         const summary = getMyRoundSummaryByRoundId(round.id);
-        return `<div class="room-card"><div class="room-top"><div><div class="room-title">Vòng ${round.round_no || 1}: ${esc(round.title)}</div><div class="hint">${esc(round.description || "Chọn vòng để vào giao diện thi MindUp.")}</div></div><span class="pill live">MindUp</span></div><div class="room-meta"><div><span>Số lần đã thi</span><strong>${summary.attempts}</strong></div><div><span>Điểm cao nhất</span><strong>${summary.bestScore}</strong></div></div><div class="room-actions" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" type="button" data-open-round="${escAttr(round.id)}">Vào vòng</button></div></div>`;
+        return `<div class="room-card"><div class="room-top"><div><div class="room-title">Vòng ${round.round_no || 1}: ${esc(round.title)}</div><div class="hint">${esc(round.description || "Chọn vòng để vào giao diện Đấu đỉnh cao.")}</div></div><span class="pill live">Đỉnh cao</span></div><div class="room-meta"><div><span>Số lần đã thi</span><strong>${summary.attempts}</strong></div><div><span>Điểm cao nhất</span><strong>${summary.bestScore}</strong></div></div><div class="room-actions" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" type="button" data-open-round="${escAttr(round.id)}">Vào vòng</button></div></div>`;
       }).join("")
-      : '<div class="empty"><strong>Chưa có vòng MindUp</strong><div>Admin chưa tạo vòng thi cho Khối/Môn này.</div></div>';
+      : '<div class="empty"><strong>Chưa có Đấu đỉnh cao</strong><div>Admin chưa tạo vòng thi cho Khối/Môn này.</div></div>';
     grid.querySelectorAll("[data-open-round]").forEach((button) => {
       button.addEventListener("click", () => renderRoundChallengeLobby(button.dataset.openRound || ""));
     });
@@ -1444,7 +1447,7 @@
           const challengeCount = GAME.roundChallenges.filter((item) => item.round_id === round.id).length;
           return `<div class="history-item"><div class="history-main"><strong>Vòng ${round.round_no || 1}: ${esc(round.title)}</strong><div class="hint">${esc(grade)} • ${esc(subject)} • ${challengeCount}/4 thử thách • qua vòng từ 100 điểm • thi lại trừ 20 điểm</div></div><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="btn btn-outline btn-sm" type="button" onclick="editGameRound('${round.id}')">Sửa</button><button class="btn btn-outline btn-sm" type="button" onclick="deleteGameRound('${round.id}')">Xóa</button></div></div>`;
         }).join("")
-        : '<div class="empty">Chưa có Vòng MindUp nào.</div>';
+        : '<div class="empty">Chưa có Đấu đỉnh cao nào.</div>';
     }
   }
 
@@ -1764,6 +1767,29 @@
     }
   }
 
+  function setAdminObstacleImagePreview(url) {
+    const preview = EL.adminObstacleImagePreview;
+    if (!preview) return;
+    const source = String(url || "").trim();
+    preview.src = source;
+    preview.classList.toggle("hidden", !source);
+  }
+
+  async function resolveObstacleImageUrl() {
+    const file = EL.adminObstacleImage?.files?.[0] || null;
+    if (!file) return GAME.editingObstacleImageUrl || "";
+    if (!window.MindupImageUpload?.uploadCompressedImage) {
+      throw new Error("Chức năng tải ảnh chưa sẵn sàng.");
+    }
+    const uploaded = await window.MindupImageUpload.uploadCompressedImage(file, {
+      kind: "question",
+      folder: "game-obstacles",
+    });
+    const url = window.MindupImageUpload.getDisplayUrl(uploaded);
+    if (!url) throw new Error("Không nhận được đường dẫn ảnh sau khi tải lên.");
+    return url;
+  }
+
   async function submitGameRound(event) {
     event.preventDefault();
     if (GAME.role !== "admin") return;
@@ -1805,7 +1831,7 @@
       finishMediumIds.length !== rawFinishMediumIds.length ||
       finishHardIds.length !== rawFinishHardIds.length
     ) {
-      alert("Một số câu trong vòng MindUp đã bị loại vì không phải trắc nghiệm/trả lời ngắn, bị ẩn hoặc chưa có đáp án. Hãy kiểm tra lại danh sách câu hỏi.");
+      alert("Một số câu trong Đấu đỉnh cao đã bị loại vì không phải trắc nghiệm/trả lời ngắn, bị ẩn hoặc chưa có đáp án. Hãy kiểm tra lại danh sách câu hỏi.");
       if (EL.adminWarmupQuestionIds) EL.adminWarmupQuestionIds.value = warmupIds.join("\n");
       if (EL.adminObstacleQuestionIds) EL.adminObstacleQuestionIds.value = obstacleIds.join("\n");
       if (EL.adminAccelerationQuestionIds) EL.adminAccelerationQuestionIds.value = accelerationIds.join("\n");
@@ -1825,6 +1851,21 @@
     const invalidCount = countChecks.find(([, actual, expected]) => actual !== expected);
     if (invalidCount) {
       alert(`${invalidCount[0]} phải chọn đúng ${invalidCount[2]} câu hỏi. Hiện tại đang có ${invalidCount[1]} câu.`);
+      return;
+    }
+    if (!String(EL.adminObstacleKeyword?.value || "").trim()) {
+      alert("Hãy nhập từ khóa cho phần Vượt chướng ngại vật.");
+      return;
+    }
+    let obstacleImageUrl = "";
+    try {
+      obstacleImageUrl = await resolveObstacleImageUrl();
+    } catch (imageError) {
+      alert("Không tải được hình ảnh chướng ngại vật: " + imageError.message);
+      return;
+    }
+    if (!obstacleImageUrl) {
+      alert("Hãy chọn hình ảnh mô tả từ khóa cho phần Vượt chướng ngại vật.");
       return;
     }
     const roundPayload = {
@@ -1861,13 +1902,13 @@
       error = result.error;
     }
     if (error) {
-      alert("Không lưu được vòng MindUp: " + error.message);
+      alert("Không lưu được Đấu đỉnh cao: " + error.message);
       return;
     }
 
     const challengeRows = [
       { round_id: round.id, challenge_type: "warmup", title: "Khởi động", order_no: 1, time_limit_seconds: 120, question_limit: 20 },
-      { round_id: round.id, challenge_type: "obstacle", title: "Vượt chướng ngại vật", order_no: 2, question_limit: 4, keyword_answer: String(EL.adminObstacleKeyword?.value || "").trim() },
+      { round_id: round.id, challenge_type: "obstacle", title: "Vượt chướng ngại vật", order_no: 2, question_limit: 4, keyword_answer: String(EL.adminObstacleKeyword?.value || "").trim(), keyword_image_url: obstacleImageUrl },
       { round_id: round.id, challenge_type: "acceleration", title: "Tăng tốc", order_no: 3, question_limit: 4 },
       { round_id: round.id, challenge_type: "finish", title: "Về đích", order_no: 4 },
     ];
@@ -1890,7 +1931,9 @@
       alert("Đã tạo vòng nhưng lỗi khi thêm câu hỏi: " + questionError.message);
     }
     GAME.editingRoundId = "";
+    GAME.editingObstacleImageUrl = "";
     EL.roundForm?.reset();
+    setAdminObstacleImagePreview("");
     await loadGameCatalog();
     renderAdminGamePage();
   }
@@ -1962,7 +2005,7 @@
   window.editGameRound = function(roundId) {
     if (GAME.role !== "admin") return;
     const round = (GAME.rounds || []).find((item) => item.id === roundId);
-    if (!round) return alert("Không tìm thấy vòng MindUp cần sửa.");
+    if (!round) return alert("Không tìm thấy Đấu đỉnh cao cần sửa.");
     GAME.editingRoundId = roundId;
     if (EL.adminRoundTitle) EL.adminRoundTitle.value = round.title || "";
     if (EL.adminRoundNo) EL.adminRoundNo.value = round.round_no || 1;
@@ -1979,6 +2022,9 @@
     const finish = getRoundChallengeByType(roundId, "finish");
     if (EL.adminWarmupQuestionIds) EL.adminWarmupQuestionIds.value = getRoundChallengeQuestionIds(warmup?.id).join("\n");
     if (EL.adminObstacleKeyword) EL.adminObstacleKeyword.value = obstacle?.keyword_answer || "";
+    GAME.editingObstacleImageUrl = obstacle?.keyword_image_url || "";
+    if (EL.adminObstacleImage) EL.adminObstacleImage.value = "";
+    setAdminObstacleImagePreview(GAME.editingObstacleImageUrl);
     if (EL.adminObstacleQuestionIds) EL.adminObstacleQuestionIds.value = getRoundChallengeQuestionIds(obstacle?.id).join("\n");
     if (EL.adminAccelerationQuestionIds) EL.adminAccelerationQuestionIds.value = getRoundChallengeQuestionIds(acceleration?.id).join("\n");
     if (EL.adminFinishEasyQuestionIds) EL.adminFinishEasyQuestionIds.value = getRoundChallengeQuestionIds(finish?.id, "easy").join("\n");
@@ -1988,7 +2034,7 @@
   };
 
   window.deleteGameRound = async function(roundId) {
-    if (GAME.role !== "admin" || !confirm("Xóa vòng MindUp này?")) return;
+    if (GAME.role !== "admin" || !confirm("Xóa Đấu đỉnh cao này?")) return;
     const { error } = await sb.from("game_rounds").delete().eq("id", roundId);
     if (error) return alert("Không xóa được vòng: " + error.message);
     await loadGameCatalog();
@@ -2126,6 +2172,14 @@
     EL.roomForm?.addEventListener("submit", submitCreateRoom);
     EL.configForm?.addEventListener("submit", submitGameConfig);
     EL.roundForm?.addEventListener("submit", submitGameRound);
+    EL.adminObstacleImage?.addEventListener("change", () => {
+      const file = EL.adminObstacleImage.files?.[0];
+      if (!file) {
+        setAdminObstacleImagePreview(GAME.editingObstacleImageUrl);
+        return;
+      }
+      setAdminObstacleImagePreview(URL.createObjectURL(file));
+    });
     EL.adminConfigGrade?.addEventListener("change", () => fillAdminSubjects(EL.adminConfigGrade, EL.adminConfigSubject));
     EL.adminRoundGrade?.addEventListener("change", () => fillAdminSubjects(EL.adminRoundGrade, EL.adminRoundSubject));
     document.querySelectorAll("[data-game-question-picker-target]").forEach((button) => {
@@ -2280,7 +2334,7 @@
   }
 
   function roomModeLabel(mode) {
-    if (mode === "round") return "Vòng MindUp";
+    if (mode === "round") return "Đấu đỉnh cao";
     if (mode === "solo") return "Chơi đơn";
     return "Đấu nhanh";
   }
@@ -2766,7 +2820,7 @@
                 <div class="hint">${fmtDateTime(entry.room?.ended_at || entry.room?.created_at)}</div>
               </div>
               <div class="history-actions">
-                <div style="text-align:right"><strong>${entry.player?.score || 0} điểm</strong>${entry.kind === "round" ? `<div class="hint">Tổng Vòng MindUp</div>` : `<div class="hint">Hạng #${entry.rank}</div>`}</div>
+                <div style="text-align:right"><strong>${entry.player?.score || 0} điểm</strong>${entry.kind === "round" ? `<div class="hint">Tổng Đấu đỉnh cao</div>` : `<div class="hint">Hạng #${entry.rank}</div>`}</div>
                 <button class="btn btn-outline btn-sm" type="button" onclick="openGameHistoryDetail('${escAttr(getHistoryEntryDetailId(entry) || "")}')">Xem chi tiết</button>
               </div>
             </div>`).join("")}
@@ -2828,9 +2882,9 @@
   async function openRoundHistoryDetail(roundId) {
     if (!roundId || !EL.historyModalBody) return;
     const title = document.querySelector("#gameHistoryModal .mh h2");
-    if (title) title.textContent = "Chi tiết Vòng MindUp";
+    if (title) title.textContent = "Chi tiết Đấu đỉnh cao";
     EL.historyModal.classList.add("show");
-    EL.historyModalBody.innerHTML = `<div class="empty" style="grid-column:1/-1">Đang tải chi tiết Vòng MindUp...</div>`;
+    EL.historyModalBody.innerHTML = `<div class="empty" style="grid-column:1/-1">Đang tải chi tiết Đấu đỉnh cao...</div>`;
     const roundRooms = (GAME.roomsRaw || [])
       .filter((room) => room.status === "finished" && roomModeValue(room) === "round" && room.round_id === roundId)
       .sort((a, b) => {
@@ -2841,7 +2895,7 @@
       });
     const roomIds = roundRooms.map((room) => room.id);
     if (!roomIds.length) {
-      EL.historyModalBody.innerHTML = `<div class="empty" style="grid-column:1/-1">Không tìm thấy dữ liệu Vòng MindUp.</div>`;
+      EL.historyModalBody.innerHTML = `<div class="empty" style="grid-column:1/-1">Không tìm thấy dữ liệu Đấu đỉnh cao.</div>`;
       return;
     }
     const [{ data: players }, { data: answers }] = await Promise.all([
@@ -2852,7 +2906,7 @@
     const myRoomIds = new Set(myPlayers.map((player) => player.room_id));
     const myRoundRooms = roundRooms.filter((room) => myRoomIds.has(room.id));
     if (!myRoundRooms.length) {
-      EL.historyModalBody.innerHTML = `<div class="empty" style="grid-column:1/-1">Không tìm thấy dữ liệu Vòng MindUp của bạn.</div>`;
+      EL.historyModalBody.innerHTML = `<div class="empty" style="grid-column:1/-1">Không tìm thấy dữ liệu Đấu đỉnh cao của bạn.</div>`;
       return;
     }
     const selectedAttempts = getBestRoundChallengeAttempts(myRoundRooms, myPlayers);
@@ -3111,12 +3165,12 @@
     };
     const { data: room, error } = await sb.from("game_rooms").insert(payload).select("*").single();
     if (error) {
-      alert(`Không tạo được phòng Vòng MindUp: ${error.message}. Nếu lỗi liên quan đến round_id, round_retry, mode, challenge_type hoặc finish_level, hãy chạy file SQL fix MindUp round room columns.sql.`);
+      alert(`Không tạo được phòng Đấu đỉnh cao: ${error.message}. Nếu lỗi liên quan đến round_id, round_retry, mode, challenge_type hoặc finish_level, hãy chạy file SQL fix MindUp round room columns.sql.`);
       return null;
     }
     const { error: playerError } = await sb.from("game_room_players").insert({ room_id: room.id, user_id: GAME.user.id, score: carriedScore, ready: true });
     if (playerError && !String(playerError.message || "").includes("duplicate")) {
-      alert("Không vào được Vòng MindUp: " + playerError.message);
+      alert("Không vào được Đấu đỉnh cao: " + playerError.message);
       return null;
     }
     return room;
@@ -3124,8 +3178,8 @@
 
   async function startMindUpRound(roundId, challengeType = "", finishLevel = "") {
     const round = (GAME.rounds || []).find((item) => item.id === roundId);
-    if (!round) return alert("Không tìm thấy vòng MindUp này.");
-    if (!challengeType) return alert("Hãy chọn thử thách của Vòng MindUp trước.");
+    if (!round) return alert("Không tìm thấy Đấu đỉnh cao này.");
+    if (!challengeType) return alert("Hãy chọn thử thách của Đấu đỉnh cao trước.");
     if (challengeType === "finish" && !["easy", "medium", "hard"].includes(finishLevel)) {
       return alert("Hãy chọn bộ câu hỏi Về đích: Dễ, Trung bình hoặc Khó.");
     }
@@ -3830,9 +3884,13 @@
       </div>
     ` : "";
     renderMathText(EL.questionBody, "");
+    const obstacleImageUrl = challenge?.keyword_image_url || "mindup-zbs-logo.png";
     EL.questionBody.innerHTML = `
       <div class="round-obstacle-board-shell">
-        <div class="round-obstacle-board">${tiles}</div>
+        <div class="round-obstacle-board">
+          <img class="round-obstacle-image" src="${escAttr(obstacleImageUrl)}" alt="Hình ảnh chướng ngại vật">
+          ${tiles}
+        </div>
       </div>
     `;
     if (selectedQuestion && !answersByQuestion.has(selectedQuestion.id)) {
@@ -3957,7 +4015,7 @@
         EL.progressText.textContent = mode === "solo"
             ? `Chơi đơn • ${currentIndex + 1}/${visibleQuestions.length}`
           : mode === "round"
-            ? `Vòng MindUp • ${getRoundChallengeLabel(question)} • ${currentIndex + 1}/${visibleQuestions.length}`
+            ? `Đấu đỉnh cao • ${getRoundChallengeLabel(question)} • ${currentIndex + 1}/${visibleQuestions.length}`
             : `Đấu nhanh • Tiến độ ${currentIndex + 1}/${visibleQuestions.length}`;
       }
       if (EL.progressFill) EL.progressFill.style.width = `${((currentIndex + 1) / visibleQuestions.length) * 100}%`;
@@ -4017,7 +4075,7 @@
       .select("id,question_type,question_text,question_img,answer,answer_count,hidden,difficulty")
       .in("id", ids);
     if (error) {
-      alert("Không tải được câu hỏi của Vòng MindUp: " + error.message);
+      alert("Không tải được câu hỏi của Đấu đỉnh cao: " + error.message);
       return [];
     }
     const byId = Object.fromEntries((bank || []).map((question) => [question.id, question]));
@@ -4066,7 +4124,7 @@
       if (question.finish_level === "hard") return "Về đích - Khó";
       return "Về đích - Trung bình";
     }
-    return "Vòng MindUp";
+    return "Đấu đỉnh cao";
   }
 
   function renderRoundFinishLevelChooser(timeline) {

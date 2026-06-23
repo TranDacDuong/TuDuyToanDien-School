@@ -8,6 +8,8 @@
   const PUSH_RECEIPT_KEY = "/__mindup_last_push_receipt__";
 
   let serviceWorkerRegistrationPromise = null;
+  let pushSubscriptionPromise = null;
+  let pushRetryTimer = null;
   let deferredInstallPrompt = null;
   let localNotificationPollTimer = null;
 
@@ -23,8 +25,9 @@
     deferredInstallPrompt = null;
   });
 
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", function(){
+  function registerServiceWorker() {
+    if (!("serviceWorker" in navigator)) return Promise.resolve(null);
+    if (!serviceWorkerRegistrationPromise) {
       serviceWorkerRegistrationPromise = navigator.serviceWorker
         .register("service-worker.js")
         .then(function(registration){
@@ -33,9 +36,15 @@
         })
         .catch(function(error){
           console.warn("MindUp PWA service worker registration failed:", error);
+          serviceWorkerRegistrationPromise = null;
           return null;
         });
-    });
+    }
+    return serviceWorkerRegistrationPromise;
+  }
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", registerServiceWorker);
   }
 
   function isPushConfigured() {
@@ -121,7 +130,7 @@
 
   function getFriendlyPushError(error) {
     if (isPushServiceError(error) && isAndroidDevice()) {
-      return "Chrome/Android chưa đăng ký được với dịch vụ thông báo. Vui lòng cập nhật Chrome, bật Google Play Services, mở MindUp lại rồi bấm Bật thông báo thêm một lần.";
+      return "Quyền thông báo đã được bật nhưng Chrome chưa tạo được kênh Web Push. MindUp sẽ tự thử lại; bạn vẫn có thể bấm Thử lại mà không cần cài lại app.";
     }
     return error?.message || "Chưa bật được thông báo. Vui lòng thử lại sau.";
   }
@@ -131,6 +140,42 @@
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
     });
+  }
+
+  async function resetServiceWorkerRegistration(registration) {
+    await registration?.unregister?.().catch(() => false);
+    serviceWorkerRegistrationPromise = null;
+    await delay(500);
+    const nextRegistration = await registerServiceWorker();
+    if (!nextRegistration) throw new Error("Service worker registration is not ready");
+    await Promise.race([navigator.serviceWorker.ready, delay(8000)]);
+    return nextRegistration;
+  }
+
+  async function subscribeBrowserPushWithRecovery(initialRegistration) {
+    let registration = initialRegistration;
+    let lastError = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await subscribeBrowserPush(registration);
+      } catch (error) {
+        if (!isPushServiceError(error)) throw error;
+        lastError = error;
+        if (attempt === 0) {
+          await registration.update().catch(() => null);
+          await delay(1200);
+        } else if (attempt === 1) {
+          try {
+            registration = await resetServiceWorkerRegistration(registration);
+          } catch (resetError) {
+            console.warn("MindUp service worker reset failed:", resetError);
+            throw lastError;
+          }
+          await delay(1800);
+        }
+      }
+    }
+    throw lastError || new Error("Chrome push service registration failed");
   }
 
   function subscriptionToRow(userId, subscription) {
@@ -260,10 +305,8 @@
   }
 
   async function getServiceWorkerRegistration() {
-    if (serviceWorkerRegistrationPromise) {
-      const registered = await serviceWorkerRegistrationPromise;
-      if (registered) return registered;
-    }
+    const registered = await registerServiceWorker();
+    if (registered) return registered;
     return navigator.serviceWorker.ready;
   }
 
@@ -310,9 +353,21 @@
     if (permission !== "granted") return { ok: false, permission };
 
     enableLocalNotifications(user.id, true);
-    const subscription = await ensurePushSubscription(user.id, { repairRevoked: true });
-    removePrompt();
-    return { ok: Boolean(subscription), permission, endpoint: subscription?.endpoint || "" };
+    try {
+      const subscription = await ensurePushSubscription(user.id, { repairRevoked: true });
+      removePrompt();
+      return { ok: Boolean(subscription), permission, push: true, endpoint: subscription?.endpoint || "" };
+    } catch (error) {
+      if (!isPushServiceError(error)) throw error;
+      schedulePushRetry(user.id);
+      return {
+        ok: true,
+        permission,
+        push: false,
+        localOnly: true,
+        error: [error?.name, error?.message].filter(Boolean).join(": ")
+      };
+    }
   }
 
   async function getPushDiagnostics() {
@@ -390,7 +445,7 @@
     return body;
   }
 
-  async function ensurePushSubscription(userId, options = {}) {
+  async function ensurePushSubscriptionNow(userId, options = {}) {
     if (!isPushSupported() || !isPushConfigured() || Notification.permission !== "granted") return null;
 
     const registration = await getServiceWorkerRegistration();
@@ -401,31 +456,40 @@
     }
 
     if (!subscription) {
-      try {
-        subscription = await subscribeBrowserPush(registration);
-      } catch (error) {
-        if (!isPushServiceError(error)) throw error;
-        await registration.update().catch(() => null);
-        await delay(600);
-        subscription = await subscribeBrowserPush(registration);
-      }
+      subscription = await subscribeBrowserPushWithRecovery(registration);
     } else if (options.repairRevoked) {
       const saved = await getSavedSubscription(subscription.endpoint);
       if (saved?.revoked_at) {
         await subscription.unsubscribe().catch(() => false);
-        try {
-          subscription = await subscribeBrowserPush(registration);
-        } catch (error) {
-          if (!isPushServiceError(error)) throw error;
-          await registration.update().catch(() => null);
-          await delay(600);
-          subscription = await subscribeBrowserPush(registration);
-        }
+        subscription = await subscribeBrowserPushWithRecovery(registration);
       }
     }
 
     await saveSubscription(userId, subscription);
     return subscription;
+  }
+
+  async function ensurePushSubscription(userId, options = {}) {
+    if (pushSubscriptionPromise) return pushSubscriptionPromise;
+    pushSubscriptionPromise = ensurePushSubscriptionNow(userId, options);
+    try {
+      return await pushSubscriptionPromise;
+    } finally {
+      pushSubscriptionPromise = null;
+    }
+  }
+
+  function schedulePushRetry(userId) {
+    if (!userId || pushRetryTimer || Notification.permission !== "granted") return;
+    pushRetryTimer = window.setTimeout(async () => {
+      pushRetryTimer = null;
+      try {
+        const subscription = await ensurePushSubscription(userId, { repairRevoked: true });
+        if (subscription) removePrompt();
+      } catch (error) {
+        console.warn("MindUp push delayed retry failed:", error);
+      }
+    }, 15000);
   }
 
   function shouldShowPrompt(user) {
@@ -1068,7 +1132,11 @@
       }
       try {
         const result = await enablePushNotifications();
-        if (!result.ok) {
+        if (result.localOnly) {
+          status.textContent = getFriendlyPushError({ name: "AbortError", message: result.error || "Push service registration failed" });
+          status.hidden = false;
+          prompt.querySelector(".mindup-push-enable").textContent = "Thử lại";
+        } else if (!result.ok) {
           status.textContent = "Bạn có thể bật lại thông báo trong cài đặt trình duyệt hoặc cài đặt app MindUp.";
           status.hidden = false;
         }
@@ -1093,6 +1161,10 @@
       enableLocalNotifications(user.id);
       const subscription = await ensurePushSubscription(user.id, { repairRevoked: true }).catch((error) => {
         console.warn("MindUp push auto repair failed:", error);
+        if (isPushServiceError(error)) {
+          enableLocalNotifications(user.id);
+          schedulePushRetry(user.id);
+        }
         return null;
       });
       if (!subscription) showPrompt();
@@ -1130,5 +1202,11 @@
     window.setTimeout(initInstallPrompt, PROMPT_DELAY_MS);
     window.setTimeout(initPushPrompt, PROMPT_DELAY_MS + 1600);
     watchAuthForPrompts();
+  });
+
+  window.addEventListener("online", async function(){
+    if (Notification.permission !== "granted") return;
+    const user = await getCurrentUser();
+    if (user?.id) schedulePushRetry(user.id);
   });
 })();
