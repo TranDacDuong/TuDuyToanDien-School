@@ -1151,6 +1151,46 @@
       actionsHtml = '<button onclick="startExam(\''+examInfo.id+'\',\''+examInfo.title.replace(/'/g,"\\'")+'\','+(examInfo.duration_minutes||0)+','+(examInfo.total_points||0)+',\''+_classId+'\')" style="background:linear-gradient(135deg,var(--navy),var(--navy-mid));color:var(--gold-light);border:none;padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;white-space:nowrap;font-family:var(--font-body)">Làm bài</button>';
     }
 
+    const matchedReviews = (resultState.reviewExams || []).filter(re => re.parent_exam_id === examInfo.id);
+    const reviewHtml = matchedReviews.map(re => {
+      const rResults = resultState.resultsMap[re.id] || [];
+      const rSubmitted = rResults.filter(r => r.submitted_at);
+      const rLastResult = rSubmitted[0] || null;
+      const rInProgress = (rSubmitted.length === 0) ? (rResults.find(r => !r.submitted_at && r.seconds_left > 0) || null) : null;
+      const rAttemptCount = rSubmitted.length;
+
+      let rScoreBadge = "";
+      if (rLastResult) {
+        const rScore = rLastResult.score_total ?? rLastResult.score_auto ?? "?";
+        rScoreBadge = '<span style="background:#fef3c7;color:#d97706;border:1.5px solid #f59e0b;font-size:.78rem;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap">✓ ' + rScore + ' / ' + re.total_points + ' đ</span>';
+      }
+
+      let rActionBtn = "";
+      if (rInProgress) {
+        const rSecsLeft = Math.max(0, (rInProgress.seconds_left || 0) - 300);
+        const rMinLeft = Math.floor(rSecsLeft / 60);
+        const rSecLeft2 = rSecsLeft % 60;
+        const rTimeStr = rMinLeft + ":" + String(rSecLeft2).padStart(2,"0");
+        rActionBtn = '<button onclick="resumeExam(\'' + re.id + '\',\'' + re.title.replace(/'/g,"\\'") + '\',' + re.total_points + ',\'' + rInProgress.id + '\',' + rSecsLeft + ')" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;white-space:nowrap;font-family:var(--font-body);flex-shrink:0">▶ Làm tiếp (' + rTimeStr + ')</button>';
+      } else if (rLastResult) {
+        rActionBtn = '<div style="font-size:.78rem;font-weight:600;color:#d97706;padding:6px 12px;background:#fef3c7;border-radius:8px;white-space:nowrap">✔ Đã hoàn thành</div>';
+      } else {
+        rActionBtn = '<button onclick="startExam(\'' + re.id + '\',\'' + re.title.replace(/'/g,"\\'") + '\',' + re.duration_minutes + ',' + re.total_points + ',\'' + _classId + '\')" style="background:linear-gradient(135deg,#d97706,#b45309);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;white-space:nowrap;font-family:var(--font-body);flex-shrink:0">' + (rAttemptCount > 0 ? "🔄 Làm lại" : "📝 Làm bài") + '</button>';
+      }
+
+      return '<div style="margin-top:8px;margin-left:20px;padding:12px 14px;background:#fffbeb;border:1px solid #fde047;border-radius:10px;border-left:3px solid #f59e0b">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-weight:700;font-size:.85rem;color:#92400e;margin-bottom:3px">⚠️ ' + esc(re.title) + "</div>" +
+            '<div style="font-size:.75rem;color:#b45309">⏱ ' + re.duration_minutes + " phút &nbsp;•&nbsp; 🏆 " + re.total_points + "đ</div>" +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap">' +
+            rScoreBadge + rActionBtn +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join("");
+
     return '<div style="margin-top:12px;padding:'+(isCompactMobile ? '14px' : '12px 14px')+';border-radius:14px;border:1px solid #bfdbfe;background:linear-gradient(180deg,#f8fbff 0%,#eef6ff 100%);box-shadow:0 10px 24px rgba(29,107,209,.08)">'+
       '<div style="font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#1d4ed8;margin-bottom:10px">Đề luyện tập</div>'+
       '<div style="display:flex;justify-content:space-between;align-items:'+(isCompactMobile ? 'stretch' : 'center')+';gap:12px;flex-wrap:wrap;flex-direction:'+(isCompactMobile ? 'column' : 'row')+'">'+
@@ -1161,7 +1201,7 @@
         '</div>'+
         '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:'+(isCompactMobile ? '100%' : 'auto')+';justify-content:'+(isCompactMobile ? 'flex-start' : 'flex-end')+'">'+actionsHtml+'</div>'+
       '</div>'+
-    '</div>';
+    '</div>' + reviewHtml;
   }
 
   function renderAdminPracticeBlock(examInfo, submitState){
@@ -1252,19 +1292,39 @@
     const tc=document.getElementById("cvTabContent"); if(!tc) return;
     tc.innerHTML='<p style="color:var(--ink-light);font-size:.85rem">Đang tải buổi học và đề luyện tập...</p>';
     const sb=getSb(), role=_role;
+    const isStudent = role === "student";
+    const isParent = role === "parent";
+    let reviewExamsQuery = null;
+    if (isStudent && window._currentUserId) {
+      reviewExamsQuery = sb.from("exams")
+        .select("id,title,duration_minutes,total_points,is_review_generated,parent_exam_id,student_id,exam_questions(question:question_bank(question_type))")
+        .eq("class_id", _classId)
+        .eq("is_review_generated", true)
+        .eq("student_id", window._currentUserId);
+    } else if (isParent && window._currentUserId && _parentStudentIds && _parentStudentIds.size > 0) {
+      reviewExamsQuery = sb.from("exams")
+        .select("id,title,duration_minutes,total_points,is_review_generated,parent_exam_id,student_id,exam_questions(question:question_bank(question_type))")
+        .eq("class_id", _classId)
+        .eq("is_review_generated", true)
+        .in("student_id", Array.from(_parentStudentIds));
+    }
 
     const [
       {data:classSessions,error:classSessionsError},
       {data:gameRooms,error:gameRoomsError},
-      {data:gamePlayers,error:gamePlayersError}
+      {data:gamePlayers,error:gamePlayersError},
+      reviewExamsResult
     ] = await Promise.all([
       sb.from("class_sessions")
         .select("id,lesson_id,session_order,session_date,exam_id,pdf_exam_id,starts_at,ends_at,created_at")
         .eq("class_id",_classId)
         .order("session_order",{ascending:true}),
       sb.from("game_rooms").select("id,title,join_code,status,question_count,time_per_question,max_players,visibility,class_id,created_at").eq("class_id",_classId).order("created_at",{ascending:false}),
-      sb.from("game_room_players").select("id,room_id,user_id,score,ready,joined_at")
+      sb.from("game_room_players").select("id,room_id,user_id,score,ready,joined_at"),
+      reviewExamsQuery ? reviewExamsQuery : Promise.resolve({data:[],error:null})
     ]);
+
+    const reviewExams = reviewExamsResult?.data || [];
 
     const sessionTableMissing = !!classSessionsError && isMissingRelationError(classSessionsError);
     if((classSessionsError && !sessionTableMissing) || gameRoomsError || gamePlayersError){
@@ -1275,8 +1335,10 @@
 
     const sessions = sessionTableMissing ? [] : (classSessions || []);
     const lessonIds = [...new Set(sessions.map(s=>s.lesson_id).filter(Boolean))];
+    const reviewExamIds = reviewExams.map(re => re.id);
     const regularIds = [...new Set([
-      ...sessions.map(s=>s.exam_id).filter(Boolean)
+      ...sessions.map(s=>s.exam_id).filter(Boolean),
+      ...reviewExamIds
     ])];
     const pdfIds = [...new Set([
       ...sessions.map(s=>s.pdf_exam_id).filter(Boolean)
@@ -1344,13 +1406,15 @@
           resultsMap: (results[4].data||[]).reduce((acc,row)=>{ if(!acc[row.exam_id]) acc[row.exam_id]=[]; acc[row.exam_id].push(row); return acc; }, {}),
           pdfResultsMap: (results[5].data||[]).reduce((acc,row)=>{ if(!acc[row.pdf_exam_id]) acc[row.pdf_exam_id]=[]; acc[row.pdf_exam_id].push(row); return acc; }, {}),
           submitCount: {},
-          pdfSubmitCount: {}
+          pdfSubmitCount: {},
+          reviewExams: reviewExams
         }
       : {
           resultsMap: {},
           pdfResultsMap: {},
           submitCount: (results[4].data||[]).reduce((acc,row)=>{ acc[row.exam_id]=(acc[row.exam_id]||0)+1; return acc; }, {}),
-          pdfSubmitCount: (results[5].data||[]).reduce((acc,row)=>{ acc[row.pdf_exam_id]=(acc[row.pdf_exam_id]||0)+1; return acc; }, {})
+          pdfSubmitCount: (results[5].data||[]).reduce((acc,row)=>{ acc[row.pdf_exam_id]=(acc[row.pdf_exam_id]||0)+1; return acc; }, {}),
+          reviewExams: reviewExams
         };
 
     const manualSessions = sessions
