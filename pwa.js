@@ -150,6 +150,10 @@
     });
   }
 
+  async function subscribeBrowserPushLegacy(registration) {
+    return registration.pushManager.subscribe({ userVisibleOnly: true });
+  }
+
   async function subscribeBrowserPushWithRecovery(initialRegistration) {
     const registration = initialRegistration;
     let lastError = null;
@@ -167,7 +171,16 @@
         }
       }
     }
-    throw lastError || new Error("Chrome push service registration failed");
+    try {
+      return await subscribeBrowserPushLegacy(registration);
+    } catch (legacyError) {
+      const error = new Error([
+        lastError?.message,
+        legacyError?.message && `Legacy: ${legacyError.message}`
+      ].filter(Boolean).join(" | ") || "Chrome push service registration failed");
+      error.name = lastError?.name || legacyError?.name || "AbortError";
+      throw error;
+    }
   }
 
   function subscriptionToRow(userId, subscription) {

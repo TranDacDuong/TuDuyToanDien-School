@@ -1,4 +1,4 @@
-const CACHE_VERSION = "mindup-pwa-v18";
+const CACHE_VERSION = "mindup-pwa-v19";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const PUSH_RECEIPT_CACHE = `${CACHE_VERSION}-push-receipts`;
@@ -11,7 +11,7 @@ const APP_SHELL = [
   "offline.html",
   "theme.css?v=20260615-ios1",
   "supabaseClient.js",
-  "pwa.js?v=20260623-push-ready4",
+  "pwa.js?v=20260623-push-legacy5",
   "push_debug.html",
   "manifest.webmanifest",
   "favicon.png",
