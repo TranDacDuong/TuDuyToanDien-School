@@ -190,13 +190,9 @@
     }
 
     if (mode === "round") {
-      if (getRoomRoundChallengeType(room) !== "finish") {
-        return Object.fromEntries((orderedPlayers || []).map((player) => [player.user_id, 0]));
-      }
       return Object.fromEntries((orderedPlayers || []).map((player) => {
         const score = Number(player.score || 0);
-        const delta = score >= 100 ? Math.min(30, 10 + Math.floor((score - 100) / 20)) : 0;
-        return [player.user_id, delta];
+        return [player.user_id, score >= 100 ? Math.max(0, score) : 0];
       }));
     }
 
@@ -211,23 +207,20 @@
     const map = Object.fromEntries(players.map((player) => [player.user_id, 0]));
     if (!topCount || !bottomCount) return map;
 
+    let totalPositive = 0;
     for (let index = 0; index < topCount; index += 1) {
       const topPlayer = players[index];
       const mirroredPlayer = players[total - 1 - index];
-      const scoreGap = Math.round(Number(topPlayer?.score || 0) - Number(mirroredPlayer?.score || 0));
-      const delta = Math.min(30, Math.max(0, scoreGap));
+      const delta = Math.max(0, Math.round(Number(topPlayer?.score || 0) - Number(mirroredPlayer?.score || 0)));
       map[topPlayer.user_id] = delta;
-      map[mirroredPlayer.user_id] = -delta;
+      totalPositive += delta;
+    }
+
+    const bottomPenalty = Math.round(totalPositive / bottomCount);
+    for (let index = total - bottomCount; index < total; index += 1) {
+      map[players[index].user_id] = -bottomPenalty;
     }
     return map;
-  }
-
-  function isEloEligibleRoom(room, orderedPlayers) {
-    const mode = roomModeValue(room);
-    if (!supportsModeElo(mode)) return false;
-    if (mode === "quick") return (orderedPlayers || []).length >= 2;
-    if (mode === "round") return getRoomRoundChallengeType(room) === "finish";
-    return true;
   }
 
   function getSoloEloDeltaFromScore(score) {
@@ -253,7 +246,6 @@
     eloRooms.forEach((room) => {
       const mode = roomModeValue(room);
       const ordered = getOrderedPlayersForRoom(room.id, finishedPlayers);
-      if (!isEloEligibleRoom(room, ordered)) return;
       if (!ordered.some((player) => player.user_id === userId)) return;
       const deltas = getModeEloDeltaMap(mode, ordered, room);
       points += Number(deltas[userId] || 0);
@@ -271,7 +263,7 @@
     const profile = (GAME.eloProfiles || []).find((item) => item.user_id === userId);
     if (!profile) return null;
     return {
-      points: Number(profile.elo ?? 1000),
+      points: Number(profile.elo || 1000),
       matches: Number(profile.matches || 0),
       wins: Number(profile.wins || 0),
       quickMatches: Number(profile.quick_matches || 0),
@@ -307,7 +299,6 @@
 
   async function finalizeRoomElo(room, orderedPlayers) {
     if (!room?.id || !GAME.eloTablesReady || !supportsModeElo(roomModeValue(room))) return;
-    if (!isEloEligibleRoom(room, orderedPlayers)) return;
     if ((GAME.eloTransactions || []).some((item) => item.room_id === room.id)) return;
 
     const mode = roomModeValue(room);
@@ -2528,7 +2519,7 @@
       return [...GAME.eloProfiles]
         .map((profile) => ({
           userId: profile.user_id,
-          elo: Number(profile.elo ?? 1000),
+          elo: Number(profile.elo || 1000),
           matches: Number(profile.matches || 0),
           wins: Number(profile.wins || 0),
           quickMatches: Number(profile.quick_matches || 0),
@@ -2544,7 +2535,6 @@
     const totals = {};
     rankedRooms.forEach((room) => {
       const ordered = getOrderedPlayersForRoom(room.id, finishedPlayers);
-      if (!isEloEligibleRoom(room, ordered)) return;
       const deltas = getModeEloDeltaMap(roomModeValue(room), ordered, room);
       Object.keys(deltas).forEach((userId) => {
         if (!totals[userId]) totals[userId] = { elo: 1000, matches: 0, wins: 0, quickMatches: 0, quickWins: 0 };
