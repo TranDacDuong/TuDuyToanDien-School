@@ -154,9 +154,14 @@
     const client = await waitForSupabase();
     if (!client) throw new Error("Supabase is not ready");
 
-    const { error } = await client
-      .from("push_subscriptions")
-      .upsert(subscriptionToRow(userId, subscription), { onConflict: "endpoint" });
+    const row = subscriptionToRow(userId, subscription);
+    const { error } = await client.rpc("upsert_my_push_subscription", {
+      p_endpoint: row.endpoint,
+      p_p256dh: row.p256dh,
+      p_auth: row.auth,
+      p_expiration_time: row.expiration_time,
+      p_user_agent: row.user_agent
+    });
 
     if (error) throw error;
   }
@@ -305,7 +310,7 @@
     if (permission !== "granted") return { ok: false, permission };
 
     enableLocalNotifications(user.id, true);
-    const subscription = await ensurePushSubscription(user.id, { forceNew: true, repairRevoked: true });
+    const subscription = await ensurePushSubscription(user.id, { repairRevoked: true });
     removePrompt();
     return { ok: Boolean(subscription), permission, endpoint: subscription?.endpoint || "" };
   }

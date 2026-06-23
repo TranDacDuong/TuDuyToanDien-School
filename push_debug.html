@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="theme.css?v=20260615-ios1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
-<script src="pwa.js?v=20260617-push-receipt1" defer></script>
+<script src="pwa.js?v=20260623-push-fix1" defer></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;padding:24px;font-family:var(--font-body);color:var(--ink);background:linear-gradient(180deg,#f8fbff 0%,#fffaf0 100%)}
@@ -139,6 +139,10 @@ async function loadDiagnostics(){
 
 async function enablePush(){
   const box = document.getElementById("testResult");
+  if ("Notification" in window && Notification.permission === "denied") {
+    box.textContent = "Trình duyệt đang chặn quyền thông báo. Website không thể tự bật lại quyền này.\n\nHãy mở biểu tượng ổ khóa/cài đặt bên cạnh thanh địa chỉ → Thông báo → Cho phép, sau đó tải lại trang và bấm Bật thông báo đẩy.";
+    return;
+  }
   box.textContent = "Đang bật thông báo đẩy...";
   try{
     const api = await waitForMindUpPush();
@@ -215,47 +219,6 @@ async function sendTargetTest(){
     out.textContent = "Gửi test thất bại:\n" + (error?.message || String(error));
   }
 }
-
-window.sendTargetTest = async function(){
-  const out = document.getElementById("testResult");
-  out.textContent = "Dang gui test...";
-  try{
-    const target = await findTargetUser(document.getElementById("targetUser").value);
-    const title = "MindUp kiem tra thong bao";
-    const message = `Thong bao test cho ${target.full_name || target.email}. Neu app dang mo, thong bao nay se xuat hien trong app; neu app dong, Web Push se hien tren thanh thong bao.`;
-    const { error: insertError } = await sb.from("notifications").insert({
-      user_id: target.id,
-      actor_id: currentUser.id,
-      type: "tuition_reminder",
-      title,
-      message,
-      target_url: "notifications.html",
-      meta: {
-        push_debug: true,
-        direct_target_test: true,
-        target_email: target.email || null
-      }
-    });
-    if(insertError) throw insertError;
-    const body = await invokePush({
-      userIds:[target.id],
-      title,
-      message,
-      targetUrl:"notifications.html",
-      type:"tuition_reminder"
-    });
-    out.textContent = JSON.stringify({
-      target,
-      notificationCreated: true,
-      result: body,
-      nextStep: body.sent > 0
-        ? "Da tao notification trong app va server da gui toi push service. Neu dien thoai khong hien khi app dong, mo lai tab nay va xem dong 'Lan cuoi SW nhan push'."
-        : "Da tao notification trong app nhung chua co subscription hop le cho tai khoan nay. Hay mo app tren dien thoai va bam Bat thong bao day."
-    }, null, 2);
-  }catch(error){
-    out.textContent = "Gui test that bai:\n" + (error?.message || String(error));
-  }
-};
 
 async function sendSelfTest(){
   const out = document.getElementById("testResult");
