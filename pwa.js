@@ -150,18 +150,8 @@
     });
   }
 
-  async function resetServiceWorkerRegistration(registration) {
-    await registration?.unregister?.().catch(() => false);
-    serviceWorkerRegistrationPromise = null;
-    await delay(500);
-    const nextRegistration = await registerServiceWorker();
-    if (!nextRegistration) throw new Error("Service worker registration is not ready");
-    await Promise.race([navigator.serviceWorker.ready, delay(8000)]);
-    return nextRegistration;
-  }
-
   async function subscribeBrowserPushWithRecovery(initialRegistration) {
-    let registration = initialRegistration;
+    const registration = initialRegistration;
     let lastError = null;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
@@ -173,13 +163,7 @@
           await registration.update().catch(() => null);
           await delay(1200);
         } else if (attempt === 1) {
-          try {
-            registration = await resetServiceWorkerRegistration(registration);
-          } catch (resetError) {
-            console.warn("MindUp service worker reset failed:", resetError);
-            throw lastError;
-          }
-          await delay(1800);
+          await delay(2500);
         }
       }
     }
@@ -314,8 +298,12 @@
 
   async function getServiceWorkerRegistration() {
     const registered = await registerServiceWorker();
-    if (registered) return registered;
-    return navigator.serviceWorker.ready;
+    if (!registered) throw new Error("Service worker registration failed");
+    const readyRegistration = await navigator.serviceWorker.ready;
+    if (!readyRegistration?.active || readyRegistration.active.state !== "activated") {
+      throw new Error("Service worker is not active");
+    }
+    return readyRegistration;
   }
 
   async function getLastPushReceipt() {
