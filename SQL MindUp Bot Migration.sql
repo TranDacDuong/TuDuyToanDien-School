@@ -4,9 +4,12 @@
 -- ====================================================================
 
 -- ──────────────────────────────────────────────────────────────────
--- 1. Tạo tài khoản Bot MindUp trong bảng users
+-- 1. Thêm 'bot' vào enum user_role và tạo tài khoản Bot MindUp
 --    (Nếu chưa tồn tại)
 -- ──────────────────────────────────────────────────────────────────
+ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'bot';
+
+
 INSERT INTO public.users (
   id,
   full_name,
