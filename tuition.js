@@ -871,19 +871,18 @@ Nhập số tiền hoàn lại (>0):`,
 
       let lockCell = "";
       if (isLocked) {
-        const snap = payment?.locked_snapshot || {};
-        const lockedDue  = snap.amount !== undefined ? snap.amount : (payment?.amount_due || 0);
-
-        const badge = needRecalc
-          ? `<span class="lock-badge warn">⚠️ Đã đổi</span>`
-          : `<span class="lock-badge">🔒 Đã chốt</span>`;
-
-        lockCell = `
-          ${badge}
-          <div style="font-size:11px;color:var(--muted);margin-top:4px;white-space:nowrap">
-            Tiền chốt: ${fmt(lockedDue)}đ
-          </div>
-        `;
+        if (needRecalc) {
+          const snap = payment?.locked_snapshot || {};
+          const lockedDue  = snap.amount !== undefined ? snap.amount : (payment?.amount_due || 0);
+          lockCell = `
+            <span class="lock-badge warn">⚠️ Đã đổi</span>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;white-space:nowrap">
+              Tiền chốt: ${fmt(lockedDue)}đ
+            </div>
+          `;
+        } else {
+          lockCell = `<span class="lock-badge">🔒 Đã chốt</span>`;
+        }
       } else {
         lockCell = `<span style="color:var(--muted);font-size:12px">—</span>`;
       }
