@@ -3578,7 +3578,7 @@ async function loadMessageTemplatesAdmin(){
           Bật
         </label>
       </td>
-      <td><button class="btn btn-primary btn-sm" onclick="saveMsgTemplate('${esc(tpl.id)}','${esc(tpl.name).replace(/'/g,'\\\\\\'')}')">💾 Lưu</button></td>
+      <td><button class="btn btn-primary btn-sm" onclick="saveMsgTemplate('${esc(tpl.id)}','${esc(tpl.name).replace(/'/g, "\\'")}')">💾 Lưu</button></td>
     </tr>`;
   }).join('');
 }
