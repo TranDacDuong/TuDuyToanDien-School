@@ -926,6 +926,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
     <div style="padding:14px 18px 8px;color:var(--ink-mid);font-size:.82rem">
       Các tin nhắn dưới đây được hệ thống gửi tự động dưới tên <strong>MindUp - Tư Duy Toàn Diện</strong>. Dùng <code>{{tên_biến}}</code> làm chỗ thay thế.
     </div>
+    <div id="msgTemplatesWarning" style="padding:0 18px 8px;min-height:0"></div>
     <div class="table-scroll">
       <table id="msgTemplateTable">
         <thead><tr><th>ID</th><th>Tên mẫu</th><th style="min-width:360px">Nội dung (có thể sửa)</th><th>Bật/Tắt</th><th>Lưu</th></tr></thead>
@@ -981,6 +982,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 <script src="./evaluation_templates_admin.js?v=20260622-session-evaluation3"></script>
 <script>
 /* ── Helpers ── */
+function getSb(){ return window.sb; }
 function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function escAttr(s){ return esc(s).replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
 function toast(msg, dur=2000){
@@ -3558,29 +3560,70 @@ const DEFAULT_MSG_TEMPLATES = [
 ];
 
 async function loadMessageTemplatesAdmin(){
+  console.log('[loadMessageTemplatesAdmin] Started');
   const tbody = document.getElementById('msgTemplateTbody');
-  if(!tbody) return;
+  if(!tbody) {
+    console.log('[loadMessageTemplatesAdmin] No tbody found');
+    return;
+  }
   tbody.innerHTML = '<tr><td colspan="5" class="empty">Đang tải...</td></tr>';
-  const sb = getSb();
-  const { data: saved } = await sb.from('message_templates').select('id,name,content,is_enabled');
-  const savedMap = new Map((saved||[]).map(t => [t.id, t]));
-  tbody.innerHTML = DEFAULT_MSG_TEMPLATES.map(tpl => {
-    const existing = savedMap.get(tpl.id);
-    const content = existing?.content || tpl.content;
-    const isEnabled = existing ? existing.is_enabled !== false : true;
-    return `<tr>
-      <td style="font-size:.7rem;color:var(--ink-mid);max-width:110px;word-break:break-all">${esc(tpl.id)}</td>
-      <td style="font-weight:600;min-width:160px">${esc(tpl.name)}</td>
-      <td><textarea id="tplcontent_${esc(tpl.id)}" style="width:100%;min-height:80px;font-family:var(--font-body);font-size:.78rem;border:1.5px solid var(--border);border-radius:8px;padding:8px;resize:vertical">${esc(content)}</textarea></td>
-      <td style="text-align:center">
-        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
-          <input type="checkbox" id="tplenabled_${esc(tpl.id)}" ${isEnabled ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--navy)">
-          Bật
-        </label>
-      </td>
-      <td><button class="btn btn-primary btn-sm" onclick="saveMsgTemplate('${esc(tpl.id)}','${esc(tpl.name).replace(/'/g, "\\'")}')">💾 Lưu</button></td>
-    </tr>`;
-  }).join('');
+
+  // Hàm render bảng (dùng chung cho cả có DB lẫn fallback)
+  function renderTemplateRows(savedMap) {
+    console.log('[loadMessageTemplatesAdmin] renderTemplateRows called');
+    tbody.innerHTML = DEFAULT_MSG_TEMPLATES.map(tpl => {
+      const existing = savedMap ? savedMap.get(tpl.id) : null;
+      const content = existing?.content || tpl.content;
+      const isEnabled = existing ? existing.is_enabled !== false : true;
+      return `<tr>
+        <td style="font-size:.7rem;color:var(--ink-mid);max-width:110px;word-break:break-all">${esc(tpl.id)}</td>
+        <td style="font-weight:600;min-width:160px">${esc(tpl.name)}</td>
+        <td><textarea id="tplcontent_${esc(tpl.id)}" style="width:100%;min-height:80px;font-family:var(--font-body);font-size:.78rem;border:1.5px solid var(--border);border-radius:8px;padding:8px;resize:vertical">${esc(content)}</textarea></td>
+        <td style="text-align:center">
+          <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="tplenabled_${esc(tpl.id)}" ${isEnabled ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--navy)">
+            Bật
+          </label>
+        </td>
+        <td><button class="btn btn-primary btn-sm" onclick="saveMsgTemplate('${esc(tpl.id)}','${esc(tpl.name).replace(/'/g, "\\'")}')">💾 Lưu</button></td>
+      </tr>`;
+    }).join('');
+    console.log('[loadMessageTemplatesAdmin] renderTemplateRows completed');
+  }
+
+  try {
+    console.log('[loadMessageTemplatesAdmin] Getting sb client...');
+    const sb = getSb();
+    if (!sb) {
+      console.log('[loadMessageTemplatesAdmin] No sb client, fallback to renderTemplateRows(null)');
+      renderTemplateRows(null);
+      return;
+    }
+    console.log('[loadMessageTemplatesAdmin] Querying message_templates from Supabase...');
+    const { data: saved, error } = await sb.from('message_templates').select('id,name,content,is_enabled');
+    console.log('[loadMessageTemplatesAdmin] Query completed', { dataLength: saved?.length, error });
+    if (error) {
+      console.warn('[MsgTemplates] Không đọc được DB, dùng nội dung mặc định:', error.message);
+      renderTemplateRows(null);
+      // Hiển thị cảnh báo nhỏ phía trên bảng
+      const warningEl = document.getElementById('msgTemplatesWarning');
+      if(warningEl) warningEl.innerHTML = `<span style="color:#b45309;font-size:.78rem">⚠️ Chưa đồng bộ được DB (${esc(error.message)}). Đang hiển thị nội dung mặc định — bảng <code>message_templates</code> có thể chưa được tạo trong Supabase.</span>`;
+      return;
+    }
+    console.log('[loadMessageTemplatesAdmin] Creating savedMap...');
+    const savedMap = new Map((saved||[]).map(t => [t.id, t]));
+    console.log('[loadMessageTemplatesAdmin] Calling renderTemplateRows with savedMap...');
+    renderTemplateRows(savedMap);
+    const warningEl = document.getElementById('msgTemplatesWarning');
+    if(warningEl) warningEl.innerHTML = '';
+    console.log('[loadMessageTemplatesAdmin] Done');
+  } catch (err) {
+    console.error('Error loading message templates:', err);
+    // Fallback: vẫn hiển thị danh sách mặc định thay vì trang trắng
+    renderTemplateRows(null);
+    const warningEl = document.getElementById('msgTemplatesWarning');
+    if(warningEl) warningEl.innerHTML = `<span style="color:#b45309;font-size:.78rem">⚠️ Lỗi kết nối DB: ${esc(err.message)}. Đang hiển thị nội dung mặc định.</span>`;
+  }
 }
 
 async function saveMsgTemplate(id, name) {
@@ -3588,6 +3631,7 @@ async function saveMsgTemplate(id, name) {
   const enabledEl = document.getElementById('tplenabled_' + id);
   if(!contentEl) return;
   const sb = getSb();
+  if (!sb) { toast('❌ Supabase chưa sẵn sàng', 3000); return; }
   const { error } = await sb.from('message_templates').upsert({
     id,
     name,
@@ -3595,7 +3639,14 @@ async function saveMsgTemplate(id, name) {
     is_enabled: enabledEl ? enabledEl.checked : true,
     updated_at: new Date().toISOString()
   }, { onConflict: 'id' });
-  if(error) { toast('❌ Lỗi lưu mẫu: ' + error.message, 3500); return; }
+  if(error) {
+    if(error.code === '42P01' || error.message?.includes('does not exist')) {
+      toast('⚠️ Bảng message_templates chưa được tạo. Hãy chạy SQL Migration trước!', 5000);
+    } else {
+      toast('❌ Lỗi lưu mẫu: ' + error.message, 3500);
+    }
+    return;
+  }
   toast('✅ Đã lưu mẫu "' + name + '"');
 }
 
