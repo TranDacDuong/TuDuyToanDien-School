@@ -989,6 +989,12 @@ function switchTab(id, btn){
   } catch (e) {
     console.warn("Could not update history state:", e);
   }
+  if(id === 'rooms') loadRooms();
+  if(id === 'grades') loadGrades();
+  if(id === 'subjects') loadSubjects();
+  if(id === 'chapters') loadChapters();
+  if(id === 'teachers') loadTeachers();
+  if(id === 'students') loadStudents();
   if(id === 'adminLogs') loadAdminLogs();
   if(id === 'appearance') loadSystemTheme();
   if(id === 'evaluationTemplates') loadEvaluationTemplatesAdmin();
