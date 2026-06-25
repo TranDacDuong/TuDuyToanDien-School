@@ -1016,7 +1016,11 @@ async function initDashboard(userOverride = null){
 
   const { data: storedProfile, error } = await sb.from("users").select("*").eq("id", user.id).maybeSingle();
   let profile = storedProfile;
-  if(error || !profile){ alert("Không tìm thấy thông tin người dùng"); return; }
+  if(error || !profile){
+    alert("Không tìm thấy thông tin người dùng. Hệ thống sẽ đăng xuất.");
+    logout();
+    return;
+  }
   if(profile.role === "student"){
     const { data: parentLink } = await sb.from("parent_students")
       .select("id")
