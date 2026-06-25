@@ -26,6 +26,19 @@ body {
   position: relative;
 }
 
+.home-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.home-header-row .home-tabs,
+.home-header-row .social-hub {
+  margin-bottom: 0;
+}
+
 .home-tabs {
   display: inline-flex;
   gap: 8px;
@@ -1562,9 +1575,12 @@ body {
 <body>
 <div class="feed-wrap">
 
-  <div class="home-tabs">
-    <button class="home-tab-btn active" id="homeTabOverview" type="button" onclick="setHomeTab('overview')">Thông tin</button>
-    <button class="home-tab-btn" id="homeTabDiscussion" type="button" onclick="setHomeTab('discussion')">Thảo luận</button>
+  <div class="home-header-row">
+    <div class="home-tabs">
+      <button class="home-tab-btn active" id="homeTabOverview" type="button" onclick="setHomeTab('overview')">Thông tin</button>
+      <button class="home-tab-btn" id="homeTabDiscussion" type="button" onclick="setHomeTab('discussion')">Thảo luận</button>
+    </div>
+    <div class="social-hub"></div>
   </div>
 
   <section class="overview-section active" id="overviewSection">
@@ -1896,7 +1912,36 @@ function ensureHomeOverlayShell() {
 }
 
 function enhanceHomeHub() {
-  // Quick links live in the dashboard floating mobile menu now.
+  const hub = document.querySelector(".social-hub");
+  if (!hub) return;
+  if (!currentUser) {
+    hub.innerHTML = `
+      <button class="hub-button" type="button" title="Đăng nhập" onclick="parent?.openAuthModal ? parent.openAuthModal('login') : location.href='dashboard.html'">
+        <span class="hub-icon">${uiIcons.search}</span>
+      </button>
+    `;
+    return;
+  }
+  hub.innerHTML = `
+    <button class="hub-button" type="button" title="Tìm kiếm" onclick="toggleSocialPanel('search')">
+      <span class="hub-icon">${uiIcons.search}</span>
+    </button>
+    <button class="hub-button" type="button" title="Thông báo" onclick="toggleSocialPanel('notifications')">
+      <span class="hub-icon">${uiIcons.bell}</span>
+      <span class="hub-badge" id="homeNotificationBadge">0</span>
+    </button>
+    <button class="hub-button" type="button" title="Lời mời kết bạn" onclick="toggleSocialPanel('friend_requests')">
+      <span class="hub-icon">${uiIcons.friends}</span>
+      <span class="hub-badge" id="homeFriendRequestBadge">0</span>
+    </button>
+    <button class="hub-button" type="button" title="Nhắn tin" onclick="toggleSocialPanel('messages')">
+      <span class="hub-icon">${uiIcons.message}</span>
+      <span class="hub-badge" id="homeMessageBadge">0</span>
+    </button>
+    <a class="hub-link" id="homeProfileLink" href="profile.html" title="Trang cá nhân">
+      <img class="hub-icon" id="homeProfileAvatar" src="default-avatar.png" alt="Avatar" onerror="this.src='default-avatar.png'">
+    </a>
+  `;
 }
 
 
