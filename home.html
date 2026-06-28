@@ -1890,9 +1890,16 @@ function ensureHomeOverlayShell() {
       <iframe class="social-panel-frame" id="socialPanelFrame" src="about:blank" loading="lazy"></iframe>
     `;
     const feedWrap = document.querySelector(".feed-wrap");
+    const headerRow = document.querySelector(".home-header-row");
     const socialHub = document.querySelector(".social-hub");
-    if (feedWrap && socialHub) {
-      feedWrap.insertBefore(panel, socialHub.nextSibling);
+    if (feedWrap) {
+      if (headerRow) {
+        feedWrap.insertBefore(panel, headerRow.nextSibling);
+      } else if (socialHub) {
+        feedWrap.insertBefore(panel, socialHub.nextSibling);
+      } else {
+        feedWrap.appendChild(panel);
+      }
     }
   }
 
