@@ -127,6 +127,34 @@
     return output;
   }
 
+  function getConfiguredApplicationServerKey() {
+    return urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+  }
+
+  function asUint8Array(value) {
+    if (!value) return null;
+    if (value instanceof Uint8Array) return value;
+    try {
+      return new Uint8Array(value);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function bytesEqual(left, right) {
+    if (!left || !right || left.length !== right.length) return false;
+    for (let i = 0; i < left.length; i += 1) {
+      if (left[i] !== right[i]) return false;
+    }
+    return true;
+  }
+
+  function subscriptionUsesConfiguredVapidKey(subscription) {
+    const currentKey = asUint8Array(subscription?.options?.applicationServerKey);
+    if (!currentKey) return false;
+    return bytesEqual(currentKey, getConfiguredApplicationServerKey());
+  }
+
   function delay(ms) {
     return new Promise((resolve) => window.setTimeout(resolve, ms));
   }
@@ -146,12 +174,8 @@
   async function subscribeBrowserPush(registration) {
     return registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      applicationServerKey: getConfiguredApplicationServerKey()
     });
-  }
-
-  async function subscribeBrowserPushLegacy(registration) {
-    return registration.pushManager.subscribe({ userVisibleOnly: true });
   }
 
   async function subscribeBrowserPushWithRecovery(initialRegistration) {
@@ -171,16 +195,7 @@
         }
       }
     }
-    try {
-      return await subscribeBrowserPushLegacy(registration);
-    } catch (legacyError) {
-      const error = new Error([
-        lastError?.message,
-        legacyError?.message && `Legacy: ${legacyError.message}`
-      ].filter(Boolean).join(" | ") || "Chrome push service registration failed");
-      error.name = lastError?.name || legacyError?.name || "AbortError";
-      throw error;
-    }
+    throw lastError || new Error("Chrome push service registration failed");
   }
 
   function subscriptionToRow(userId, subscription) {
@@ -422,6 +437,7 @@
         endpoint: json.endpoint || "",
         hasP256dh: Boolean(json.keys?.p256dh),
         hasAuth: Boolean(json.keys?.auth),
+        vapidKeyMatches: subscriptionUsesConfiguredVapidKey(subscription),
         expirationTime: json.expirationTime || null
       };
       diagnostics.savedSubscription = await getSavedSubscription(json.endpoint);
@@ -463,7 +479,7 @@
 
     const registration = await getServiceWorkerRegistration();
     let subscription = await registration.pushManager.getSubscription();
-    if (subscription && options.forceNew) {
+    if (subscription && (options.forceNew || !subscriptionUsesConfiguredVapidKey(subscription))) {
       await subscription.unsubscribe().catch(() => false);
       subscription = null;
     }
@@ -744,6 +760,15 @@
         background: #dbeafe;
         box-shadow: 0 0 0 3px rgba(37,99,235,.2);
       }
+      .mindup-ios-share-icon {
+        width: 17px;
+        height: 17px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
       .mindup-ios-site {
         position: absolute;
         inset: 0 0 42px;
@@ -1006,7 +1031,13 @@
             <div class="mindup-ios-safari-bar">
               <span class="mindup-ios-icon-button">‹</span>
               <span class="mindup-ios-address">mindup.edu.vn</span>
-              <span class="mindup-ios-icon-button is-highlighted">⇧</span>
+              <span class="mindup-ios-icon-button is-highlighted" aria-label="Nut Chia se">
+                <svg class="mindup-ios-share-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M12 15V3"></path>
+                  <path d="M7 8l5-5 5 5"></path>
+                  <path d="M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8"></path>
+                </svg>
+              </span>
             </div>
           </div>
         </article>

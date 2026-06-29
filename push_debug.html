@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="theme.css?v=20260615-ios1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
-<script src="pwa.js?v=20260623-push-legacy5" defer></script>
+<script src="pwa.js?v=20260630-push-vapid7" defer></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;padding:24px;font-family:var(--font-body);color:var(--ink);background:linear-gradient(180deg,#f8fbff 0%,#fffaf0 100%)}
@@ -100,6 +100,7 @@ function renderRows(diag){
     ["PushManager", diag.hasPushManager],
     ["SW đang điều khiển trang", diag.hasController],
     ["Có subscription", Boolean(diag.subscription?.endpoint)],
+    ["Subscription khớp VAPID", diag.subscription?.vapidKeyMatches ?? "Chưa có"],
     ["Đã lưu Supabase", Boolean(diag.savedSubscription && !diag.savedSubscription.revoked_at)],
     ["Lần cuối SW nhận push", diag.lastPushReceipt?.receivedAt || "Chưa ghi nhận"],
     ["Đang chạy dạng app", diag.standalone],
