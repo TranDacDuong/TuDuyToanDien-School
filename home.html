@@ -1450,13 +1450,7 @@ body {
   }
 
   .social-hub {
-    position: sticky;
-    top: 10px;
-    z-index: 40;
-    margin-bottom: 14px;
-    justify-content: center;
-    gap: 10px;
-    flex-wrap: wrap;
+    display: none;
   }
 
   #socialPanel {
@@ -1490,7 +1484,7 @@ body {
 
 @media (max-width: 640px) {
   .feed-wrap {
-    padding: 12px 10px calc(108px + env(safe-area-inset-bottom));
+    padding: 12px 10px 18px;
   }
 
   .overview-section.active {
@@ -1501,23 +1495,6 @@ body {
   .overview-card-body {
     padding-left: 16px;
     padding-right: 16px;
-  }
-
-  .social-hub {
-    position: fixed;
-    left: 10px;
-    right: 10px;
-    bottom: calc(10px + env(safe-area-inset-bottom));
-    top: auto;
-    z-index: 1200;
-    margin: 0;
-    padding: 10px;
-    border-radius: 24px;
-    background: rgba(255,255,255,.94);
-    border: 1px solid rgba(15,31,61,.08);
-    box-shadow: 0 20px 40px rgba(15,31,61,.16);
-    backdrop-filter: blur(14px);
-    justify-content: space-between;
   }
 
   .hub-link,
