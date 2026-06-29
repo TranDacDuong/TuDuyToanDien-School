@@ -575,6 +575,21 @@ async function deleteTrial(id){
   await loadTrialRequests();
 }
 function deleteTrialFromModal(){ const id=document.getElementById("editId").value; if(!id){ closeTrialModal(); return; } deleteTrial(id); }
+function buildTrialStudentScheduleRows(item){
+  const selectedIds = [item?.trial_schedule_1_id, item?.trial_schedule_2_id].filter(Boolean);
+  const rowsBySession = new Map();
+  selectedIds.forEach((scheduleId, index) => {
+    const schedule = S.scheduleMap[Number(scheduleId)] || {};
+    const sessionNo = Number(schedule.session_no || index + 1);
+    rowsBySession.set(sessionNo, {
+      class_id: item.trial_class_id,
+      student_id: item.student_id,
+      session_no: sessionNo,
+      schedule_id: Number(scheduleId),
+    });
+  });
+  return [...rowsBySession.values()].sort((a,b)=>a.session_no-b.session_no);
+}
 async function addTrialToClass(id){
   const item = S.requests.find(row=>row.id===id);
   if(!item){ alert("Không tìm thấy học sinh học thử này."); return; }
@@ -586,10 +601,12 @@ async function addTrialToClass(id){
     const {error} = await sb.from("class_students").insert({class_id:item.trial_class_id,student_id:item.student_id,joined_at:new Date().toISOString()});
     if(error){ alert("Không thể thêm học sinh vào lớp: "+error.message); return; }
   }
-  const selectedSchedules = [item.trial_schedule_1_id,item.trial_schedule_2_id].filter(Boolean);
-  if(selectedSchedules.length){
-    await sb.from("class_student_schedules").delete().eq("class_id",item.trial_class_id).eq("student_id",item.student_id);
-    await sb.from("class_student_schedules").insert(selectedSchedules.map(schedule_id=>({class_id:item.trial_class_id,student_id:item.student_id,schedule_id:Number(schedule_id)})));
+  const selectedScheduleRows = buildTrialStudentScheduleRows(item);
+  if(selectedScheduleRows.length){
+    const {error:deleteScheduleError} = await sb.from("class_student_schedules").delete().eq("class_id",item.trial_class_id).eq("student_id",item.student_id);
+    if(deleteScheduleError){ alert("Đã thêm học sinh vào lớp nhưng chưa xóa được lịch cũ: "+deleteScheduleError.message); return; }
+    const {error:scheduleError} = await sb.from("class_student_schedules").upsert(selectedScheduleRows, { onConflict:"class_id,student_id,session_no" });
+    if(scheduleError){ alert("Đã thêm học sinh vào lớp nhưng chưa lưu được đúng lịch học thử: "+scheduleError.message); return; }
   }
   const {error:deleteError} = await sb.from("trial_lesson_requests").delete().eq("id",id);
   if(deleteError) alert("Đã thêm vào lớp nhưng chưa xóa được khỏi danh sách học thử: "+deleteError.message);
