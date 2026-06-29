@@ -39,6 +39,12 @@
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
   }
+  function jsArg(value){
+    return String(value ?? "")
+      .replace(/\\/g, "\\\\")
+      .replace(/'/g, "\\'")
+      .replace(/\r?\n/g, " ");
+  }
   function generateDates(schedules, month, year){
     const dates=new Set(), days=new Date(year,month+1,0).getDate();
     for(let d=1;d<=days;d++){
@@ -157,16 +163,17 @@
     return picks;
   }
 
-  function buildSchedulePickerHtml(schedules){
+  function buildSchedulePickerHtml(schedules, selectedScheduleIds = new Set()){
     const grouped = groupSchedulesBySession(schedules);
     const sessionNos = Object.keys(grouped).map(Number).sort((a,b)=>a-b);
     if(!sessionNos.length) {
       return '<p style="font-size:13px;color:var(--ink-light)">Lớp chưa có lịch học để chọn.</p>';
     }
     const rows = sessionNos.map(no => {
+      const checkedIndex = Math.max(0, grouped[no].findIndex(s => selectedScheduleIds.has(Number(s.id))));
       const options = grouped[no].map((s, idx) => `
         <label style="display:block;margin:4px 0;cursor:pointer">
-          <input type="radio" name="cv_schedule_session_${no}" value="${s.id}" ${idx === 0 ? "checked" : ""} style="width:15px;height:15px;accent-color:var(--navy);vertical-align:middle;margin-right:6px">
+          <input type="radio" name="cv_schedule_session_${no}" value="${s.id}" ${idx === checkedIndex ? "checked" : ""} style="width:15px;height:15px;accent-color:var(--navy);vertical-align:middle;margin-right:6px">
           <span>${esc((daysMap[s.weekday] || "?")+" "+String(s.start_time || "").slice(0,5)+"–"+String(s.end_time || "").slice(0,5)+(s.rooms?.room_name ? " • "+s.rooms.room_name : ""))}</span>
         </label>
       `).join("");
@@ -749,10 +756,17 @@
         ? '<button onclick="cvStopStudent(\''+_classId+'\',\''+s.student_id+'\')" '+
           'class="btn btn-outline btn-sm" style="font-size:.72rem;padding:3px 9px">Ngừng</button>'
         : '<span style="font-size:.72rem;color:var(--ink-light)">—</span>';
+      const studentName = s.user?.full_name || "—";
+      const studentNameHtml = canTakeAttendance(role)
+        ? '<button type="button" onclick="cvOpenEditStudentSchedule(\''+s.student_id+'\',\''+jsArg(studentName)+'\')" '+
+          'title="Sửa lịch học của học sinh này" '+
+          'style="appearance:none;border:0;background:transparent;padding:0;margin:0;color:var(--navy);font:inherit;font-weight:700;text-align:left;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px">'+
+          esc(studentName)+'</button>'
+        : esc(studentName);
       rowsHtml+="<tr>"+
         '<td style="text-align:left;font-weight:600;position:sticky;left:0;background:#fff;z-index:1;'+
         'border-right:1px solid var(--border);padding:6px 10px">'+
-        s.user.full_name+
+        studentNameHtml+
         (!isActive?'<br><span style="font-size:.7rem;color:var(--ink-light);font-weight:400">nghỉ '+left+"</span>":"")+
         "</td>"+cells+
         '<td class="center">'+stopBtn+"</td>"+
@@ -927,9 +941,14 @@
   window.cvOpenAddStudent = function(){
     const modal=document.getElementById("cvAddStudentModal");
     if(!modal) return;
+    const title=modal.querySelector(".popup-header h3");
+    const label=modal.querySelector('label[for="cvStudentSearch"]');
+    const inp=document.getElementById("cvStudentSearch");
+    if(title) title.textContent="Thêm học sinh";
+    if(label) label.style.display="";
+    if(inp){ inp.style.display=""; inp.disabled=false; inp.value=""; }
     modal.classList.remove("hidden");
     modal.style.display="flex";
-    const inp=document.getElementById("cvStudentSearch");
     if(inp){inp.value="";inp.focus();}
     const res=document.getElementById("cvSearchResults");
     if(res) res.innerHTML="";
@@ -940,6 +959,85 @@
     if(!modal) return;
     modal.classList.add("hidden");
     modal.style.display="none";
+  };
+
+  window.cvOpenEditStudentSchedule = function(studentId, studentName){
+    if(!canTakeAttendance(_role)) return;
+    const modal=document.getElementById("cvAddStudentModal");
+    const resultsDiv=document.getElementById("cvSearchResults");
+    if(!modal || !resultsDiv) return;
+    const title=modal.querySelector(".popup-header h3");
+    const label=modal.querySelector('label[for="cvStudentSearch"]');
+    const inp=document.getElementById("cvStudentSearch");
+    if(title) title.textContent="Sửa lịch học";
+    if(label) label.style.display="none";
+    if(inp){ inp.style.display="none"; inp.disabled=true; }
+
+    const sched=getSchedulesForMonth(_cachedClass.class_schedules||[],_currentMonth,_currentYear);
+    const selectedIds=_studentScheduleMap[studentId] || new Set();
+    resultsDiv.innerHTML =
+      '<div style="padding:10px;border-radius:10px;background:#fff;border:1px solid var(--border)">'+
+        '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center">'+
+          '<div>'+
+            '<div style="font-weight:800;color:var(--navy)">Sửa lịch học của học sinh</div>'+
+            '<div style="font-size:.82rem;color:var(--ink-mid);margin-top:2px">'+esc(studentName)+'</div>'+
+          '</div>'+
+          '<button onclick="cvCloseAddStudent()" class="btn btn-outline btn-sm">Đóng</button>'+
+        '</div>'+
+        '<p style="font-size:.82rem;color:var(--ink-mid);margin:10px 0 0">Chọn lịch học áp dụng cho học sinh này trong lớp hiện tại. Mỗi buổi chọn một khung lịch.</p>'+
+        buildSchedulePickerHtml(sched, selectedIds)+
+        '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">'+
+          '<button onclick="cvConfirmEditStudentSchedule(\''+studentId+'\',\''+jsArg(studentName)+'\')" class="btn btn-primary btn-sm">Lưu lịch học</button>'+
+        '</div>'+
+      '</div>';
+    modal.classList.remove("hidden");
+    modal.style.display="flex";
+  };
+
+  window.cvConfirmEditStudentSchedule = async function(studentId, studentName){
+    if(!canTakeAttendance(_role)) return;
+    const sb=getSb();
+    const sched=getSchedulesForMonth(_cachedClass.class_schedules||[],_currentMonth,_currentYear);
+    const selectedSchedules = chooseSchedulesForStudent(studentName, sched);
+    if(selectedSchedules === null) return;
+    if(!selectedSchedules.length && sched.length){
+      alert("Lớp chưa có lịch học hợp lệ.");
+      return;
+    }
+
+    const { error: deleteError } = await sb
+      .from("class_student_schedules")
+      .delete()
+      .eq("class_id", _classId)
+      .eq("student_id", studentId);
+    if(deleteError){ alert("Lỗi xóa lịch học cũ: "+deleteError.message); return; }
+
+    if(selectedSchedules.length){
+      const rows = selectedSchedules.map(s => ({
+        class_id: _classId,
+        student_id: studentId,
+        session_no: Number(s.session_no || 1),
+        schedule_id: s.id
+      }));
+      const { error: scheduleError } = await sb
+        .from("class_student_schedules")
+        .upsert(rows, { onConflict: "class_id,student_id,session_no" });
+      if(scheduleError){ alert("Lỗi lưu lịch học sinh: "+scheduleError.message); return; }
+      _studentScheduleMap[studentId] = new Set(selectedSchedules.map(s => Number(s.id)));
+    } else {
+      delete _studentScheduleMap[studentId];
+    }
+
+    await window.AppAdminTools?.recordAudit?.("class_student_schedule_updated", {
+      target_type: "class_student_schedule",
+      target_id: _classId,
+      class_id: _classId,
+      student_id: studentId,
+      student_name: studentName || null,
+      schedule_ids: selectedSchedules.map(s => s.id),
+    });
+    cvCloseAddStudent();
+    await renderAttendanceTab();
   };
 
   window.cvSearchStudents = async function(){
