@@ -165,8 +165,9 @@
   }
 
   function getFriendlyPushError(error) {
+    const detail = [error?.name, error?.message].filter(Boolean).join(": ");
     if (isPushServiceError(error) && isAndroidDevice()) {
-      return "Quyền thông báo đã được bật nhưng Chrome chưa tạo được kênh Web Push. MindUp sẽ tự thử lại; bạn vẫn có thể bấm Thử lại mà không cần cài lại app.";
+      return `Quyền thông báo đã được bật nhưng Chrome chưa tạo được kênh Web Push. MindUp sẽ tự thử lại; bạn vẫn có thể bấm Thử lại mà không cần cài lại app.${detail ? ` (Chi tiết: ${detail})` : ""}`;
     }
     return error?.message || "Chưa bật được thông báo. Vui lòng thử lại sau.";
   }

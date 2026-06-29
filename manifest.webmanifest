@@ -9,7 +9,6 @@
   "orientation": "portrait-primary",
   "background_color": "#fdfaf4",
   "theme_color": "#0f1f3d",
-  "gcm_sender_id": "103953800507",
   "categories": ["education", "productivity"],
   "lang": "vi",
   "icons": [
