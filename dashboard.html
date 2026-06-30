@@ -276,6 +276,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 .ops-grid.two-up { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .ops-grid.three-up { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .ops-grid.four-up { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ops-stack { display: grid; grid-template-columns: 1fr; gap: 14px; }
 .ops-card {
   padding: 18px; border-radius: 22px; background: rgba(255,255,255,.94);
   border: 1px solid rgba(15,31,61,.08); box-shadow: 0 14px 30px rgba(15,31,61,.06);
@@ -882,7 +883,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
           <div class="ops-kpi-sub" id="opsActiveClassSub">Tổng lớp đang hoạt động</div>
         </div>
       </div>
-      <div class="ops-grid two-up">
+      <div class="ops-stack">
         <div class="ops-card">
           <h3>Tổng doanh thu các tháng</h3>
           <p class="ops-card-sub">Theo dõi tổng doanh thu học phí phát sinh từng tháng.</p>
@@ -893,8 +894,6 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
           <p class="ops-card-sub">So sánh lượng học sinh mới với số học sinh rời lớp trong từng tháng.</p>
           <div class="ops-chart" id="opsStudentFlowChart"><div class="ops-empty">Đang tải tăng trưởng học sinh...</div></div>
         </div>
-      </div>
-      <div class="ops-grid two-up">
         <div class="ops-card">
           <h3>Tổng số ca nghỉ của học sinh</h3>
           <p class="ops-card-sub">Tổng lượt vắng mặt/vắng có phép theo tháng.</p>
