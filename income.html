@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thu nhập giáo viên</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css?v=20260615-ios1">
+<style>
+  body {
+    margin: 0;
+    padding: 20px;
+    font-family: var(--font-body);
+    background: radial-gradient(circle at top left, rgba(200,150,42,.08), transparent 24%),
+                linear-gradient(180deg, #f4efe4 0%, #f8f5ef 26%, #f7faff 100%);
+    color: var(--ink);
+  }
+
+  .income-container {
+    max-width: 1060px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding-bottom: 50px;
+  }
+
+  .header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    border-bottom: 1px solid rgba(15,31,61,.08);
+    padding-bottom: 16px;
+  }
+
+  .header-title {
+    font-family: var(--font-display);
+    color: var(--navy);
+    font-size: 1.8rem;
+    margin: 0;
+  }
+
+  .controls-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .control-select, .control-input {
+    padding: 10px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(15,31,61,.12);
+    background: #fff;
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    color: var(--navy);
+    outline: none;
+    transition: var(--t);
+  }
+
+  .control-select:focus, .control-input:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(200,150,42,.12);
+  }
+
+  /* Admin Configuration Form */
+  .config-card {
+    background: var(--white);
+    border: 1px solid rgba(15,31,61,.08);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    padding: 20px;
+  }
+
+  .config-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    align-items: flex-end;
+  }
+
+  .config-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .config-field label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--ink-mid);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .btn-save {
+    background: linear-gradient(135deg, #0f3c73 0%, #1d6bd1 100%);
+    color: #fff;
+    border: none;
+    padding: 11px 22px;
+    border-radius: 12px;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: var(--t);
+    box-shadow: 0 8px 16px rgba(29,107,209,.15);
+  }
+
+  .btn-save:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 20px rgba(29,107,209,.25);
+  }
+
+  /* KPIs Display */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+  }
+
+  .kpi-card {
+    background: var(--white);
+    border: 1px solid rgba(15,31,61,.07);
+    border-radius: 22px;
+    padding: 22px;
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 125px;
+    transition: transform 0.2s;
+  }
+
+  .kpi-card:hover {
+    transform: translateY(-2px);
+  }
+
+  .kpi-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 5px;
+    background: linear-gradient(180deg, var(--gold), #1877f2);
+  }
+
+  .kpi-card.revenue::before { background: linear-gradient(180deg, #10b981, #059669); }
+  .kpi-card.salary::before { background: linear-gradient(180deg, #3b82f6, #2563eb); }
+  .kpi-card.bonus::before { background: linear-gradient(180deg, #f59e0b, #d97706); }
+  .kpi-card.income::before { background: linear-gradient(180deg, #8b5cf6, #7c3aed); }
+
+  .kpi-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--ink-mid);
+  }
+
+  .kpi-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--navy);
+    margin: 8px 0;
+  }
+
+  .kpi-sub {
+    font-size: 0.74rem;
+    color: var(--ink-light);
+  }
+
+  /* Progress/Milestone Visualizer */
+  .milestone-card {
+    background: linear-gradient(145deg, #ffffff 0%, #fbfcff 100%);
+    border: 1px solid rgba(15,31,61,.08);
+    border-radius: 24px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+  }
+
+  .milestone-title {
+    font-family: var(--font-display);
+    color: var(--navy);
+    font-size: 1.2rem;
+    margin: 0 0 16px 0;
+  }
+
+  .progress-track {
+    height: 10px;
+    background: rgba(15,31,61,.05);
+    border-radius: 999px;
+    position: relative;
+    margin: 25px 0 15px 0;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6 0%, #f59e0b 50%, #10b981 100%);
+    border-radius: 999px;
+    width: 0%;
+    transition: width 1s ease-out;
+  }
+
+  .milestone-nodes {
+    display: flex;
+    justify-content: space-between;
+    position: relative;
+  }
+
+  .milestone-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: absolute;
+    transform: translateX(-50%);
+    top: -32px;
+  }
+
+  .node-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: background 0.3s;
+  }
+
+  .milestone-node.active .node-dot {
+    background: #10b981;
+    box-shadow: 0 0 8px rgba(16,185,129,0.6);
+  }
+
+  .node-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--ink-mid);
+    margin-top: 24px;
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  .node-val {
+    font-size: 0.68rem;
+    color: var(--ink-light);
+  }
+
+  .next-tier-tip {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--amber);
+    background: var(--amber-bg);
+    padding: 10px 16px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  /* Table / Breakdown Design */
+  .details-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  @media (min-width: 900px) {
+    .details-grid {
+      grid-template-columns: 1.4fr 1fr;
+    }
+  }
+
+  .details-card {
+    background: var(--white);
+    border: 1px solid rgba(15,31,61,.08);
+    border-radius: 24px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+  }
+
+  .details-title {
+    font-family: var(--font-display);
+    color: var(--navy);
+    font-size: 1.15rem;
+    margin: 0 0 16px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .details-title span.badge {
+    font-family: var(--font-body);
+    font-size: 0.74rem;
+    background: var(--blue-bg);
+    color: var(--blue);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 700;
+  }
+
+  .table-responsive {
+    overflow-x: auto;
+    margin-top: 12px;
+    border-radius: 16px;
+    border: 1px solid rgba(15,31,61,.06);
+  }
+
+  .report-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.84rem;
+    text-align: left;
+  }
+
+  .report-table th {
+    background: #f8fbff;
+    padding: 12px 16px;
+    font-weight: 700;
+    color: var(--navy);
+    border-bottom: 1px solid rgba(15,31,61,.06);
+  }
+
+  .report-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(15,31,61,.04);
+    color: var(--ink);
+    vertical-align: middle;
+  }
+
+  .report-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .report-table tr.active-tier {
+    background: rgba(16,185,129,0.06);
+    font-weight: 600;
+  }
+
+  .report-table tr.active-tier td {
+    color: var(--green);
+  }
+
+  .text-right { text-align: right; }
+  .text-center { text-align: center; }
+
+  .empty-state {
+    padding: 30px 20px;
+    text-align: center;
+    color: var(--ink-light);
+    font-style: italic;
+  }
+
+  .fallback-warning {
+    background: var(--amber-bg);
+    border: 1px solid rgba(180,83,9,.18);
+    color: var(--amber);
+    padding: 14px 18px;
+    border-radius: 16px;
+    font-size: 0.84rem;
+    line-height: 1.5;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .fallback-warning svg {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+  }
+
+  .loading-overlay {
+    padding: 60px 20px;
+    text-align: center;
+    font-size: 1rem;
+    color: var(--ink-light);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid rgba(15,31,61,0.08);
+    border-top: 3px solid var(--gold);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+</style>
+</head>
+<body>
+
+<div class="income-container">
+
+  <!-- Header & Filters -->
+  <div class="header-section">
+    <div>
+      <h1 class="header-title">💳 Chi tiết thu nhập</h1>
+    </div>
+    <div class="controls-row">
+      <select class="control-select" id="teacherSelect" style="display: none;"></select>
+      <input class="control-input" id="monthPicker" type="month">
+    </div>
+  </div>
+
+  <!-- Database fallback warning -->
+  <div class="fallback-warning" id="fallbackWarning" style="display: none;">
+    <svg viewBox="0 0 20 20" fill="currentColor">
+      <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+    </svg>
+    <div>
+      <b>Lưu ý hệ thống:</b> Chưa chạy SQL migration để khởi tạo bảng <code>teacher_salaries</code>. Giao diện đang sử dụng cơ chế lương mặc định (Lương cứng: 6,000,000đ, Thưởng Bậc 1: 30%). Vui lòng liên hệ Admin chạy tệp <code>SQL_create_teacher_salaries.sql</code> trên database.
+    </div>
+  </div>
+
+  <!-- Admin settings card -->
+  <div class="config-card" id="adminConfigCard" style="display: none;">
+    <h3 style="margin: 0 0 14px 0; color: var(--navy); font-size: 1rem; font-weight: 700;">⚙️ Cấu hình mức lương</h3>
+    <form class="config-grid" id="salaryConfigForm" onsubmit="saveSalaryConfig(event)">
+      <div class="config-field">
+        <label>Lương cứng (VNĐ)</label>
+        <input class="control-input" id="configBaseSalary" type="number" min="0" placeholder="VD: 6000000" required>
+      </div>
+      <div class="config-field">
+        <label>Tỷ lệ thưởng Bậc 1 (%)</label>
+        <input class="control-input" id="configBasePercent" type="number" min="0" max="100" placeholder="VD: 30" required>
+      </div>
+      <div>
+        <button class="btn-save" type="submit">Lưu cấu hình</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Main data content -->
+  <div id="loadingBlock" class="loading-overlay">
+    <div class="spinner"></div>
+    <div>Đang tính toán thu nhập...</div>
+  </div>
+
+  <div id="dataBlock" style="display: none; display: flex; flex-direction: column; gap: 24px;">
+    <!-- KPI cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card revenue">
+        <span class="kpi-label">Doanh thu thực thu</span>
+        <div class="kpi-value" id="kpiRevenue">0đ</div>
+        <span class="kpi-sub" id="kpiRevenueSub">Tổng gộp các lớp & khóa học</span>
+      </div>
+      <div class="kpi-card salary">
+        <span class="kpi-label">Lương cứng</span>
+        <div class="kpi-value" id="kpiSalary">0đ</div>
+        <span class="kpi-sub">Theo thỏa thuận hợp đồng</span>
+      </div>
+      <div class="kpi-card bonus">
+        <span class="kpi-label">Thưởng doanh thu</span>
+        <div class="kpi-value" id="kpiBonus">0đ</div>
+        <span class="kpi-sub" id="kpiBonusSub">Tính lũy tiến từng phần</span>
+      </div>
+      <div class="kpi-card income">
+        <span class="kpi-label">Tổng thu nhập tháng</span>
+        <div class="kpi-value" id="kpiTotalIncome">0đ</div>
+        <span class="kpi-sub">Lương cứng + Thưởng</span>
+      </div>
+    </div>
+
+    <!-- Progress / Milestones visualizer -->
+    <div class="milestone-card">
+      <h3 class="milestone-title">🎯 Cột mốc doanh thu thực tế</h3>
+      <div style="position: relative; padding: 20px 0 10px 0;">
+        <div class="progress-track">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="milestone-nodes" id="milestoneNodes"></div>
+      </div>
+      <div id="nextTierTipBox"></div>
+    </div>
+
+    <!-- Details Grid -->
+    <div class="details-grid">
+      <!-- Left: progressive breakdown & Class revenue -->
+      <div style="display: flex; flex-direction: column; gap: 24px;">
+        <div class="details-card">
+          <h3 class="details-title">📊 Chi tiết thưởng lũy tiến <span class="badge">Bảng tính</span></h3>
+          <div class="table-responsive">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>Bậc thưởng</th>
+                  <th>Khoảng doanh thu</th>
+                  <th class="text-right">Doanh thu đạt</th>
+                  <th class="text-center">Tỷ lệ</th>
+                  <th class="text-right">Tiền thưởng</th>
+                </tr>
+              </thead>
+              <tbody id="bonusBreakdownBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="details-card">
+          <h3 class="details-title">🏫 Phân bổ doanh thu lớp học <span class="badge" id="classCountBadge">0 lớp</span></h3>
+          <div class="table-responsive">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>Lớp học</th>
+                  <th class="text-center">Học sinh</th>
+                  <th class="text-right">Cần thu</th>
+                  <th class="text-right">Thực thu</th>
+                  <th class="text-right">Phân bổ GV</th>
+                </tr>
+              </thead>
+              <tbody id="classRevenueBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Course revenue -->
+      <div style="display: flex; flex-direction: column; gap: 24px;">
+        <div class="details-card">
+          <h3 class="details-title">🎓 Doanh thu từ khóa học <span class="badge" id="courseCountBadge">0 khóa</span></h3>
+          <div class="table-responsive">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>Tên khóa học</th>
+                  <th>Học sinh</th>
+                  <th class="text-right">Học phí</th>
+                </tr>
+              </thead>
+              <tbody id="courseRevenueBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script>
+  let currentUser = null;
+  let viewerProfile = null;
+  let selectedTeacherId = null;
+  let isDbFallback = false;
+
+  // Cached lists for admin
+  let teachersList = [];
+  
+  // Salary default setting
+  const DEFAULT_BASE_SALARY = 6000000;
+  const DEFAULT_BASE_PERCENT = 30;
+  
+  // Current loaded teacher salary config
+  let teacherSalaryConfig = {
+    base_salary: DEFAULT_BASE_SALARY,
+    base_tier_percent: DEFAULT_BASE_PERCENT
+  };
+
+  function getSb() {
+    if (window.sb) return window.sb;
+    throw new Error("Supabase chưa sẵn sàng");
+  }
+
+  function fmt(v) {
+    return new Intl.NumberFormat("vi-VN").format(Math.round(v));
+  }
+
+  function todayYM() {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  function ymToDate(ym) { return ym + "-01"; }
+
+  function monthEnd(ym) {
+    const [y, m] = ym.split("-").map(Number);
+    const last = new Date(y, m, 0);
+    return `${y}-${String(m).padStart(2,"0")}-${String(last.getDate()).padStart(2,"0")}`;
+  }
+
+  function getSchedulesForMonth(allSchedules, ym) {
+    const mStart = ymToDate(ym);
+    const eligible = allSchedules.filter(s => (s.effective_from || "2000-01-01") <= mStart);
+    if (eligible.length === 0) return [];
+    const maxEf = eligible.reduce((max, s) => {
+      const ef = s.effective_from || "2000-01-01";
+      return ef > max ? ef : max;
+    }, "2000-01-01");
+    return eligible.filter(s => (s.effective_from || "2000-01-01") === maxEf);
+  }
+
+  function generateOccurrences(schedules, ym) {
+    const [year, month] = ym.split("-").map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const items = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(year, month - 1, d);
+      const weekday = date.getDay() === 0 ? 7 : date.getDay();
+      schedules.forEach(s => {
+        if (s.weekday === weekday) {
+          items.push({
+            date: `${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`,
+            schedule_id: Number(s.id || 0),
+            session_no: Number(s.session_no || 1),
+            schedule: s
+          });
+        }
+      });
+    }
+    return items.sort((a,b) => a.date.localeCompare(b.date) || a.session_no - b.session_no);
+  }
+
+  function calcTuition({ tuition_type, tuition_fee, makeup_fee, present, absent, makeup, totalSessions }) {
+    const fee      = Number(tuition_fee) || 0;
+    const mkFee    = (makeup_fee != null && makeup_fee !== "") ? Number(makeup_fee) : null;
+
+    let amount = 0;
+    if (tuition_type === "per_session") {
+      const mFee = mkFee !== null ? mkFee : fee;
+      amount = (present * fee) + (makeup * mFee);
+    } else if (tuition_type === "per_month") {
+      const perSession = totalSessions > 0 ? fee / totalSessions : 0;
+      const mFee = mkFee !== null ? mkFee : perSession;
+      amount = fee + (makeup * mFee);
+      amount = Math.max(0, amount);
+    } else if (tuition_type === "per_course") {
+      amount = fee;
+    }
+    return amount;
+  }
+
+  // Calculate progressive bonus tier breakdown
+  function calculateSalaryBreakdown(revenue, baseSalary, baseTierPercent) {
+    const breakdown = [];
+    let totalBonus = 0;
+    
+    // Ngưỡng hòa vốn cơ sở 0 - 10M
+    const thresholdVal = Math.min(revenue, 10000000);
+    breakdown.push({
+      tierName: "Định mức hòa vốn",
+      range: "0 - 10M VNĐ",
+      revenueInTier: thresholdVal,
+      rate: 0,
+      bonus: 0,
+      active: revenue > 0
+    });
+    
+    if (revenue > 10000000) {
+      // Bậc 1: 10M - 50M (Độ dài 40M)
+      const rev1 = Math.min(revenue, 50000000) - 10000000;
+      const rate1 = baseTierPercent;
+      const bonus1 = rev1 * (rate1 / 100);
+      totalBonus += bonus1;
+      breakdown.push({
+        tierName: "Bậc 1",
+        range: "10M - 50M VNĐ",
+        revenueInTier: rev1,
+        rate: rate1,
+        bonus: bonus1,
+        active: true
+      });
+      
+      // Các bậc tiếp theo, mỗi bậc 50M
+      let currentLimit = 50000000;
+      let tierIndex = 2;
+      let currentRate = baseTierPercent + 5;
+      
+      while (revenue > currentLimit) {
+        const nextLimit = currentLimit + 50000000;
+        const rev = Math.min(revenue, nextLimit) - currentLimit;
+        const rate = Math.min(100, currentRate);
+        const bonus = rev * (rate / 100);
+        totalBonus += bonus;
+        
+        breakdown.push({
+          tierName: `Bậc ${tierIndex}`,
+          range: `${currentLimit / 1000000}M - ${nextLimit / 1000000}M VNĐ`,
+          revenueInTier: rev,
+          rate: rate,
+          bonus: bonus,
+          active: true
+        });
+        
+        currentLimit = nextLimit;
+        currentRate += 5;
+        tierIndex++;
+      }
+      
+      // Hiển thị một bậc tiếp theo dự kiến ở trạng thái xám (nếu chưa đạt 100% trần thưởng)
+      if (currentRate - 5 < 100) {
+        const nextLimit = currentLimit + 50000000;
+        breakdown.push({
+          tierName: `Bậc ${tierIndex} (Chưa đạt)`,
+          range: `${currentLimit / 1000000}M - ${nextLimit / 1000000}M VNĐ`,
+          revenueInTier: 0,
+          rate: Math.min(100, currentRate),
+          bonus: 0,
+          active: false
+        });
+      }
+    } else if (revenue > 0) {
+      // Chưa vượt 10M, Bậc 1 hiển thị xám
+      breakdown.push({
+        tierName: "Bậc 1 (Chưa đạt)",
+        range: "10M - 50M VNĐ",
+        revenueInTier: 0,
+        rate: baseTierPercent,
+        bonus: 0,
+        active: false
+      });
+    }
+    
+    return {
+      baseSalary: baseSalary,
+      totalBonus: totalBonus,
+      totalIncome: baseSalary + totalBonus,
+      breakdown: breakdown
+    };
+  }
+
+  // Check if teacher_salaries table is available
+  async function checkDatabaseSupport() {
+    const sb = getSb();
+    try {
+      // Query to check table existence (using a short limit query)
+      const { error } = await sb.from("teacher_salaries").select("teacher_id").limit(1);
+      if (error && (error.code === "PGRST116" || error.message.includes("does not exist"))) {
+        isDbFallback = true;
+      }
+    } catch (_) {
+      isDbFallback = true;
+    }
+    
+    document.getElementById("fallbackWarning").style.display = isDbFallback ? "flex" : "none";
+  }
+
+  // Load teacher salary config
+  async function loadTeacherSalaryConfig(teacherId) {
+    if (isDbFallback) {
+      teacherSalaryConfig = {
+        base_salary: DEFAULT_BASE_SALARY,
+        base_tier_percent: DEFAULT_BASE_PERCENT
+      };
+      return;
+    }
+
+    const sb = getSb();
+    try {
+      const { data, error } = await sb
+        .from("teacher_salaries")
+        .select("base_salary, base_tier_percent")
+        .eq("teacher_id", teacherId)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        teacherSalaryConfig = {
+          base_salary: Number(data.base_salary),
+          base_tier_percent: Number(data.base_tier_percent)
+        };
+      } else {
+        // Defaults if no config is customized yet
+        teacherSalaryConfig = {
+          base_salary: DEFAULT_BASE_SALARY,
+          base_tier_percent: DEFAULT_BASE_PERCENT
+        };
+      }
+    } catch (err) {
+      console.warn("Lỗi tải cấu hình lương, dùng mặc định:", err);
+      teacherSalaryConfig = {
+        base_salary: DEFAULT_BASE_SALARY,
+        base_tier_percent: DEFAULT_BASE_PERCENT
+      };
+    }
+  }
+
+  // Save salary configuration (Admin only)
+  async function saveSalaryConfig(event) {
+    event.preventDefault();
+    if (viewerProfile.role !== "admin" || isDbFallback) return;
+
+    const baseSalaryInput = document.getElementById("configBaseSalary");
+    const basePercentInput = document.getElementById("configBasePercent");
+    const baseSalary = Number(baseSalaryInput.value);
+    const basePercent = Number(basePercentInput.value);
+
+    if (isNaN(baseSalary) || baseSalary < 0) {
+      alert("Lương cứng không hợp lệ.");
+      return;
+    }
+    if (isNaN(basePercent) || basePercent < 0 || basePercent > 100) {
+      alert("Tỷ lệ % bậc 1 phải từ 0 đến 100.");
+      return;
+    }
+
+    const sb = getSb();
+    const btn = event.target.querySelector("button");
+    btn.disabled = true;
+    btn.innerText = "Đang lưu...";
+
+    try {
+      const { error } = await sb
+        .from("teacher_salaries")
+        .upsert({
+          teacher_id: selectedTeacherId,
+          base_salary: baseSalary,
+          base_tier_percent: basePercent,
+          updated_at: new Date().toISOString()
+        }, { onConflict: "teacher_id" });
+
+      if (error) throw error;
+      
+      alert("Đã cập nhật cơ chế lương thành công.");
+      teacherSalaryConfig = { base_salary: baseSalary, base_tier_percent: basePercent };
+      await calculateAndRender();
+    } catch (err) {
+      alert("Lỗi khi lưu cấu hình: " + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerText = "Lưu cấu hình";
+    }
+  }
+
+  // Load teacher select options for admins
+  async function loadTeachers() {
+    const sb = getSb();
+    const { data, error } = await sb
+      .from("users")
+      .select("id, full_name, role")
+      .in("role", ["teacher", "admin"])
+      .order("full_name");
+
+    if (error) {
+      console.error("Lỗi tải danh sách giáo viên:", error);
+      return;
+    }
+
+    teachersList = data || [];
+    const select = document.getElementById("teacherSelect");
+    select.innerHTML = teachersList.map(t => `<option value="${t.id}">${t.full_name} (${t.role === "admin" ? "Admin" : "Giáo viên"})</option>`).join("");
+    select.style.display = "block";
+    
+    // Choose selected or first teacher in list
+    if (teachersList.length) {
+      selectedTeacherId = teachersList[0].id;
+      select.value = selectedTeacherId;
+    }
+  }
+
+  // Trigger calculations and rendering
+  async function calculateAndRender() {
+    const loader = document.getElementById("loadingBlock");
+    const dataBlock = document.getElementById("dataBlock");
+    loader.style.display = "flex";
+    dataBlock.style.display = "none";
+
+    const ym = document.getElementById("monthPicker").value;
+    if (!ym) return;
+
+    // Load custom configuration
+    await loadTeacherSalaryConfig(selectedTeacherId);
+
+    // Sync admin config inputs
+    if (viewerProfile.role === "admin" && !isDbFallback) {
+      document.getElementById("configBaseSalary").value = teacherSalaryConfig.base_salary;
+      document.getElementById("configBasePercent").value = teacherSalaryConfig.base_tier_percent;
+    }
+
+    const sb = getSb();
+    const mStart = ymToDate(ym);
+    const mEnd = monthEnd(ym);
+
+    try {
+      // 1. Fetch managed classes
+      const { data: classTeachers, error: errClasses } = await sb
+        .from("class_teachers")
+        .select("class_id")
+        .eq("teacher_id", selectedTeacherId);
+
+      if (errClasses) throw errClasses;
+
+      const managedClassIds = (classTeachers || []).map(ct => ct.class_id).filter(Boolean);
+
+      // 2. Fetch managed courses
+      const { data: courseManagers, error: errCourses } = await sb
+        .from("course_managers")
+        .select("course_id")
+        .eq("teacher_id", selectedTeacherId);
+
+      if (errCourses) throw errCourses;
+
+      const managedCourseIds = (courseManagers || []).map(cm => cm.course_id).filter(Boolean);
+
+      // Parallel data fetching for calculations
+      const [
+        { data: classesData },
+        { data: allClassStudents },
+        { data: allAttendance },
+        { data: allPayments },
+        { data: chosenSchedules },
+        { data: courseEnrollments },
+        { data: coursesData }
+      ] = await Promise.all([
+        sb.from("classes").select("id, class_name, tuition_fee, tuition_type, makeup_fee, class_schedules(id, session_no, weekday, effective_from)").eq("hidden", false),
+        sb.from("class_students").select("class_id, student_id, joined_at, left_at, user:users!fk_student(id, full_name)"),
+        sb.from("attendance").select("student_id, class_id, date, status, schedule_id").gte("date", mStart).lte("date", mEnd),
+        sb.from("tuition_payments").select("*").eq("month", mStart),
+        sb.from("class_student_schedules").select("class_id, student_id, schedule_id"),
+        managedCourseIds.length ? sb.from("course_enrollments").select("course_id, student_id, enrolled_at, student:users!student_id(full_name)").in("course_id", managedCourseIds).gte("enrolled_at", mStart + "T00:00:00Z").lte("enrolled_at", mEnd + "T23:59:59Z") : Promise.resolve({ data: [] }),
+        managedCourseIds.length ? sb.from("courses").select("id, name, tuition_fee").in("id", managedCourseIds) : Promise.resolve({ data: [] })
+      ]);
+
+      const classesMap = {};
+      (classesData || []).forEach(c => { classesMap[c.id] = c; });
+
+      const coursesMap = {};
+      (coursesData || []).forEach(c => { coursesMap[c.id] = c; });
+
+      const attMap = {};
+      (allAttendance || []).forEach(a => {
+        attMap[`${a.student_id}_${a.class_id}_${a.date}_${a.schedule_id || 0}`] = a.status;
+      });
+
+      const chosenMap = {};
+      (chosenSchedules || []).forEach(row => {
+        const key = `${row.student_id}_${row.class_id}`;
+        if (!chosenMap[key]) chosenMap[key] = new Set();
+        chosenMap[key].add(Number(row.schedule_id));
+      });
+
+      const paymentMap = {};
+      (allPayments || []).forEach(p => { paymentMap[p.student_id] = p; });
+
+      // Identify students active in the teacher's classes
+      const teacherClassStudents = (allClassStudents || []).filter(cs => managedClassIds.includes(cs.class_id));
+      const activeStudentIds = [...new Set(teacherClassStudents.map(cs => cs.student_id))];
+
+      // To compute proportional share, calculate expected tuition across ALL classes for each active student
+      const studentClassExpectedMap = {}; // student_id -> class_id -> amount
+      const studentTotalExpectedMap = {}; // student_id -> sum_expected
+
+      (allClassStudents || []).forEach(cs => {
+        if (!activeStudentIds.includes(cs.student_id)) return;
+        const cls = classesMap[cs.class_id];
+        if (!cls) return;
+
+        const joined = cs.joined_at ? cs.joined_at.slice(0, 10) : "0000-00-00";
+        const left = cs.left_at ? cs.left_at.slice(0, 10) : "9999-99-99";
+        if (joined > mEnd || left < mStart) return;
+
+        const schedules = getSchedulesForMonth(cls.class_schedules || [], ym);
+        const chosenIds = chosenMap[`${cs.student_id}_${cs.class_id}`];
+        const studentSchedules = chosenIds?.size ? schedules.filter(s => chosenIds.has(Number(s.id))) : schedules;
+        const activeOccurrences = generateOccurrences(studentSchedules, ym).filter(item => item.date >= joined && item.date <= left);
+        const totalSessions = activeOccurrences.length;
+
+        let present = 0, absent = 0, makeup = 0;
+        activeOccurrences.forEach(item => {
+          const status = attMap[`${cs.student_id}_${cs.class_id}_${item.date}_${item.schedule_id}`]
+            || attMap[`${cs.student_id}_${cs.class_id}_${item.date}_0`]
+            || "present";
+          if (status === "present") present++;
+          else if (status === "absent") absent++;
+          else if (status === "makeup") makeup++;
+        });
+
+        // Determine if payment record is locked and check its snapshot
+        const p = paymentMap[cs.student_id];
+        let amount = 0;
+        if (p?.locked_at && p?.locked_snapshot?.classes) {
+          const snapClass = p.locked_snapshot.classes.find(c => c.classId === cs.class_id);
+          amount = snapClass ? snapClass.amount : 0;
+        } else {
+          amount = calcTuition({
+            tuition_type: cls.tuition_type,
+            tuition_fee: cls.tuition_fee,
+            makeup_fee: cls.makeup_fee,
+            present, absent, makeup, totalSessions
+          });
+        }
+
+        if (!studentClassExpectedMap[cs.student_id]) studentClassExpectedMap[cs.student_id] = {};
+        studentClassExpectedMap[cs.student_id][cs.class_id] = amount;
+        studentTotalExpectedMap[cs.student_id] = (studentTotalExpectedMap[cs.student_id] || 0) + amount;
+      });
+
+      // Calculate class revenue and allocations
+      let totalClassRevenueAllocated = 0;
+      const classRevenueRows = [];
+      const classSummaries = {}; // class_id -> { className, studentsCount, totalExpected, totalActualPaid, allocatedTeacherRevenue }
+
+      managedClassIds.forEach(classId => {
+        const cls = classesMap[classId];
+        if (!cls) return;
+        classSummaries[classId] = {
+          className: cls.class_name,
+          studentsCount: 0,
+          totalExpected: 0,
+          totalActualPaid: 0,
+          allocatedTeacherRevenue: 0
+        };
+      });
+
+      teacherClassStudents.forEach(cs => {
+        const classId = cs.class_id;
+        const cls = classesMap[classId];
+        if (!cls) return;
+
+        const classExpected = studentClassExpectedMap[cs.student_id]?.[classId] || 0;
+        const totalExpected = studentTotalExpectedMap[cs.student_id] || 0;
+        const p = paymentMap[cs.student_id];
+        const amountPaid = p?.amount_paid || 0;
+        
+        // Locked status
+        const isLocked = Boolean(p?.locked_at);
+        const expectedDue = isLocked && p?.locked_snapshot ? (p.locked_snapshot.amount || 0) : totalExpected;
+
+        let studentClassRevenue = 0;
+        if (expectedDue > 0) {
+          studentClassRevenue = (classExpected / expectedDue) * amountPaid;
+        }
+
+        classSummaries[classId].studentsCount++;
+        classSummaries[classId].totalExpected += classExpected;
+        classSummaries[classId].totalActualPaid += (classExpected / expectedDue) * amountPaid || 0;
+        classSummaries[classId].allocatedTeacherRevenue += studentClassRevenue;
+        totalClassRevenueAllocated += studentClassRevenue;
+      });
+
+      // Render class revenue rows
+      const classTbody = document.getElementById("classRevenueBody");
+      const classListKeys = Object.keys(classSummaries);
+      document.getElementById("classCountBadge").textContent = `${classListKeys.length} lớp`;
+      if (classListKeys.length) {
+        classTbody.innerHTML = classListKeys.map(key => {
+          const s = classSummaries[key];
+          return `
+            <tr>
+              <td><b>${s.className}</b></td>
+              <td class="text-center">${s.studentsCount}</td>
+              <td class="text-right">${fmt(s.totalExpected)}đ</td>
+              <td class="text-right">${fmt(s.totalActualPaid)}đ</td>
+              <td class="text-right" style="font-weight:700;color:var(--green)">${fmt(s.allocatedTeacherRevenue)}đ</td>
+            </tr>
+          `;
+        }).join("");
+      } else {
+        classTbody.innerHTML = `<tr><td colspan="5" class="empty-state">Không có lớp học nào do giáo viên này quản lý trong tháng.</td></tr>`;
+      }
+
+      // Calculate Course Revenue
+      let totalCourseRevenue = 0;
+      const courseRows = [];
+      (courseEnrollments || []).forEach(row => {
+        const crs = coursesMap[row.course_id];
+        if (!crs) return;
+        const fee = Number(crs.tuition_fee) || 0;
+        totalCourseRevenue += fee;
+        courseRows.push({
+          courseName: crs.name,
+          studentName: row.student?.full_name || "Học sinh",
+          fee: fee
+        });
+      });
+
+      const courseTbody = document.getElementById("courseRevenueBody");
+      document.getElementById("courseCountBadge").textContent = `${courseRows.length} lượt học sinh`;
+      if (courseRows.length) {
+        courseTbody.innerHTML = courseRows.map(r => `
+          <tr>
+            <td><b>${r.courseName}</b></td>
+            <td>${r.studentName}</td>
+            <td class="text-right" style="font-weight:700;color:var(--green)">${fmt(r.fee)}đ</td>
+          </tr>
+        `).join("");
+      } else {
+        courseTbody.innerHTML = `<tr><td colspan="3" class="empty-state">Không có học sinh đăng ký học khóa học do GV quản lý trong tháng này.</td></tr>`;
+      }
+
+      // Aggregate revenue
+      const totalRevenue = totalClassRevenueAllocated + totalCourseRevenue;
+      
+      // Calculate progressive breakdown
+      const salaryDetails = calculateSalaryBreakdown(totalRevenue, teacherSalaryConfig.base_salary, teacherSalaryConfig.base_tier_percent);
+
+      // Render KPIs
+      document.getElementById("kpiRevenue").textContent = fmt(totalRevenue) + "đ";
+      document.getElementById("kpiSalary").textContent = fmt(salaryDetails.baseSalary) + "đ";
+      document.getElementById("kpiBonus").textContent = fmt(salaryDetails.totalBonus) + "đ";
+      document.getElementById("kpiTotalIncome").textContent = fmt(salaryDetails.totalIncome) + "đ";
+      
+      document.getElementById("kpiRevenueSub").innerHTML = `Lớp ghép: ${fmt(totalClassRevenueAllocated)}đ | Khóa: ${fmt(totalCourseRevenue)}đ`;
+      
+      // Render breakdown table
+      const breakdownTbody = document.getElementById("bonusBreakdownBody");
+      breakdownTbody.innerHTML = salaryDetails.breakdown.map(b => `
+        <tr class="${b.active && b.bonus > 0 ? 'active-tier' : ''}" style="${!b.active ? 'opacity: 0.5' : ''}">
+          <td><b>${b.tierName}</b></td>
+          <td>${b.range}</td>
+          <td class="text-right">${fmt(b.revenueInTier)}đ</td>
+          <td class="text-center">${b.rate}%</td>
+          <td class="text-right" style="font-weight:700">${b.bonus > 0 ? '+' + fmt(b.bonus) + 'đ' : '0đ'}</td>
+        </tr>
+      `).join("");
+
+      // Render milestones & progress bar
+      renderMilestones(totalRevenue, salaryDetails.breakdown);
+
+      loader.style.display = "none";
+      dataBlock.style.display = "flex";
+
+    } catch (err) {
+      console.error(err);
+      loader.innerHTML = `<div style="color:var(--red)">Lỗi khi xử lý dữ liệu: ${err.message}</div>`;
+    }
+  }
+
+  // Render progressive milestones progress bar
+  function renderMilestones(revenue, tiers) {
+    const nodesWrap = document.getElementById("milestoneNodes");
+    const progressFill = document.getElementById("progressFill");
+    const tipBox = document.getElementById("nextTierTipBox");
+
+    // Standard steps for visual track (0, 10M, 50M, 100M, 150M, 200M)
+    const milestones = [
+      { val: 0, label: "Khởi điểm" },
+      { val: 10000000, label: "Định mức (10M)" },
+      { val: 50000000, label: "Bậc 1 (50M)" },
+      { val: 100000000, label: "Bậc 2 (100M)" },
+      { val: 150000000, label: "Bậc 3 (150M)" },
+      { val: 200000000, label: "Bậc 4 (200M)" }
+    ];
+
+    const maxVal = milestones[milestones.length - 1].val;
+    const progressPct = Math.min(100, (revenue / maxVal) * 100);
+    progressFill.style.width = `${progressPct}%`;
+
+    nodesWrap.innerHTML = milestones.map((m, idx) => {
+      const leftPct = (m.val / maxVal) * 100;
+      const isActive = revenue >= m.val;
+      return `
+        <div class="milestone-node ${isActive ? 'active' : ''}" style="left: ${leftPct}%">
+          <div class="node-dot"></div>
+          <div class="node-label">
+            <div>${m.label}</div>
+            <div class="node-val">${m.val > 0 ? fmt(m.val) + 'đ' : ''}</div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    // Next tier alert tip
+    let nextTier = null;
+    for (let i = 0; i < milestones.length; i++) {
+      if (revenue < milestones[i].val) {
+        nextTier = milestones[i];
+        break;
+      }
+    }
+
+    if (nextTier) {
+      const diff = nextTier.val - revenue;
+      tipBox.innerHTML = `
+        <div class="next-tier-tip">
+          🚀 Bạn cần tạo thêm <b>${fmt(diff)}đ</b> doanh thu nữa để đạt cột mốc tiếp theo: <b>${nextTier.label}</b>!
+        </div>
+      `;
+    } else {
+      // Exceeded 200M track
+      tipBox.innerHTML = `
+        <div class="next-tier-tip" style="background:#d1fae5; color:#065f46;">
+          🎉 Tuyệt vời! Bạn đã vượt qua tất cả các cột mốc hiển thị cơ bản trong tháng này!
+        </div>
+      `;
+    }
+  }
+
+  // Initialize
+  async function init() {
+    const picker = document.getElementById("monthPicker");
+    picker.value = todayYM();
+    picker.addEventListener("change", calculateAndRender);
+
+    const select = document.getElementById("teacherSelect");
+    select.addEventListener("change", (e) => {
+      selectedTeacherId = e.target.value;
+      calculateAndRender();
+    });
+
+    const sb = getSb();
+    const { data: { user } } = await sb.auth.getUser();
+    currentUser = user;
+
+    if (!user) {
+      window.location.href = "dashboard.html";
+      return;
+    }
+
+    const { data: profile, error } = await sb
+      .from("users")
+      .select("id, role, full_name")
+      .eq("id", user.id)
+      .single();
+
+    if (error || !profile) {
+      alert("Không tải được profile người dùng.");
+      return;
+    }
+
+    viewerProfile = profile;
+    await checkDatabaseSupport();
+
+    if (profile.role === "admin") {
+      document.getElementById("adminConfigCard").style.display = isDbFallback ? "none" : "block";
+      await loadTeachers();
+    } else if (profile.role === "teacher") {
+      selectedTeacherId = user.id;
+      document.getElementById("adminConfigCard").style.display = "none";
+      document.getElementById("teacherSelect").style.display = "none";
+      
+      // Customize title
+      document.querySelector(".header-title").textContent = `💳 Thu nhập của tôi - ${profile.full_name}`;
+    } else {
+      // Accountant fallback, or unauthorized roles
+      document.body.innerHTML = `
+        <div style="padding:40px; text-align:center; max-width:500px; margin: 100px auto; background:#fff; border-radius:20px; box-shadow:var(--shadow);">
+          <div style="font-size:3rem; margin-bottom:12px;">🔒</div>
+          <h3 style="color:var(--navy); font-family:var(--font-display);">Không có quyền truy cập</h3>
+          <p style="color:var(--ink-mid); font-size:0.9rem;">Trang này chỉ hiển thị dành cho Quản trị viên và Giáo viên.</p>
+          <a class="btn-save" href="dashboard.html" style="text-decoration:none; margin-top:20px; display:inline-block;">Quay lại Bảng điều khiển</a>
+        </div>
+      `;
+      return;
+    }
+
+    // Run first calculation
+    if (selectedTeacherId) {
+      await calculateAndRender();
+    }
+  }
+
+  window.onload = init;
+</script>
+</body>
+</html>
