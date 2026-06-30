@@ -893,10 +893,6 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     <span>📘</span>
     <span>Lớp học</span>
   </button>
-  <button class="mobile-nav-item" type="button" data-role="parent,assistant,accountant" data-page="teacher_schedule.html">
-    <span>👨‍🏫</span>
-    <span>GV &amp; TKB</span>
-  </button>
   <button class="mobile-nav-item" type="button" data-role="admin,student,parent,accountant" data-page="tuition.html">
     <span>💰</span>
     <span>Học phí</span>
@@ -905,11 +901,11 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     <span>💳</span>
     <span>Thu nhập</span>
   </button>
-  <button class="mobile-nav-item" type="button" data-role="admin,teacher,student,parent" data-page="public_exam.html">
+  <button class="mobile-nav-item" type="button" data-role="teacher,student" data-page="public_exam.html">
     <span>🎯</span>
     <span>Đề thi</span>
   </button>
-  <button class="mobile-nav-item" type="button" data-role="admin,teacher,student" data-page="game.html">
+  <button class="mobile-nav-item" type="button" data-role="student" data-page="game.html">
     <span>🎮</span>
     <span>Game</span>
   </button>
@@ -917,7 +913,23 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     <span>📋</span>
     <span>Công việc</span>
   </button>
-  <button class="mobile-nav-item" type="button" data-role="assistant,accountant" data-page="resources.html">
+  <button class="mobile-nav-item" type="button" data-role="assistant,parent" data-page="teacher_schedule.html">
+    <span>👨‍🏫</span>
+    <span>GV &amp; TKB</span>
+  </button>
+  <button class="mobile-nav-item" type="button" data-role="parent" data-page="personal_schedule.html">
+    <span>📅</span>
+    <span>Lịch học</span>
+  </button>
+  <button class="mobile-nav-item" type="button" data-role="assistant" data-page="trial_requests.html">
+    <span>🌱</span>
+    <span>Học thử</span>
+  </button>
+  <button class="mobile-nav-item" type="button" data-role="admin" data-page="sourcedata.html">
+    <span>⚙️</span>
+    <span>Hệ thống</span>
+  </button>
+  <button class="mobile-nav-item" type="button" data-role="accountant" data-page="resources.html">
     <span>📚</span>
     <span>Tài liệu</span>
   </button>
@@ -986,6 +998,13 @@ const contentFrame = document.getElementById("contentFrame");
 const mobileNavItems = [...document.querySelectorAll("#mobileNav .mobile-nav-item")];
 const mobileQuickActionItems = [...document.querySelectorAll("#mobileQuickActions .mobile-quick-action")];
 const mobileToolsToggle = document.getElementById("mobileToolsToggle");
+const MOBILE_NAV_ORDER = {
+  teacher: ["home.html", "courses.html", "class.html", "tasks.html", "public_exam.html", "income.html", "menu"],
+  assistant: ["home.html", "courses.html", "class.html", "tasks.html", "teacher_schedule.html", "trial_requests.html", "menu"],
+  parent: ["home.html", "courses.html", "class.html", "teacher_schedule.html", "personal_schedule.html", "tuition.html", "menu"],
+  student: ["home.html", "courses.html", "class.html", "public_exam.html", "game.html", "tuition.html", "menu"],
+  admin: ["home.html", "courses.html", "class.html", "tuition.html", "income.html", "sourcedata.html", "menu"],
+};
 let mobileToolsManualOpen = false;
 let dashboardMenuReady = false;
 let pendingChatPopupUserId = "";
@@ -1118,6 +1137,7 @@ function applyGuestMenu(){
   mobileNavItems.forEach(item => {
     const guestPages = new Set(["home.html", "courses.html", "class.html", "tuition.html", "public_exam.html", "game.html"]);
     item.style.display = item.dataset.action === "menu" || guestPages.has(item.dataset.page) ? "flex" : "none";
+    item.style.order = "";
   });
   document.getElementById("mobileQuickActions")?.style.setProperty("display", "none");
 }
@@ -1129,7 +1149,12 @@ function applyRoleMenu(role){
   });
   mobileNavItems.forEach(item => {
     const roles = (item.dataset.role || "").split(",").filter(Boolean);
-    item.style.display = !roles.length || roles.includes(role) ? "flex" : "none";
+    const navKey = item.dataset.action === "menu" ? "menu" : item.dataset.page;
+    const roleOrder = MOBILE_NAV_ORDER[role] || [];
+    const orderIndex = roleOrder.indexOf(navKey);
+    const isRoleAllowed = !roles.length || roles.includes(role);
+    item.style.display = isRoleAllowed && (!roleOrder.length || orderIndex >= 0) ? "flex" : "none";
+    item.style.order = orderIndex >= 0 ? String(orderIndex + 1) : "";
   });
   document.getElementById("mobileQuickActions")?.style.removeProperty("display");
 }
