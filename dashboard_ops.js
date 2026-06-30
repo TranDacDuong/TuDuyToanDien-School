@@ -285,11 +285,21 @@
         classScoreMap.set(classId, classPrev);
       });
 
-      const thisRevenue = revenueByMonth[thisMonth] || { due: 0, paid: 0 };
+      const revenueMonths = keys.filter(key => Number(revenueByMonth[key]?.due || 0) || Number(revenueByMonth[key]?.paid || 0));
+      const currentRevenue = revenueByMonth[thisMonth] || { due: 0, paid: 0 };
+      const displayRevenueMonth = (Number(currentRevenue.due || 0) || Number(currentRevenue.paid || 0))
+        ? thisMonth
+        : revenueMonths[revenueMonths.length - 1] || thisMonth;
+      const displayRevenue = revenueByMonth[displayRevenueMonth] || { due: 0, paid: 0 };
       const newStudentsThisMonth = students.filter(item => String(item.created_at || "").slice(0, 10) >= thisMonthStart && String(item.created_at || "").slice(0, 10) <= thisMonthEnd).length;
 
-      setText("opsRevenueValue", `${money(thisRevenue.paid)} / ${money(thisRevenue.due)}`);
-      setText("opsRevenueSub", thisRevenue.due ? `Đã thu ${pct((thisRevenue.paid / thisRevenue.due) * 100)} kế hoạch tháng` : "Chưa có dữ liệu học phí tháng này");
+      setText("opsRevenueValue", `${money(displayRevenue.paid)} / ${money(displayRevenue.due)}`);
+      setText(
+        "opsRevenueSub",
+        displayRevenue.due
+          ? `Tháng ${monthLabel(displayRevenueMonth)} • đã thu ${pct((displayRevenue.paid / displayRevenue.due) * 100)} doanh thu`
+          : "Chưa có dữ liệu học phí"
+      );
       setText("opsStudentGrowthValue", `${newStudentsThisMonth} / ${students.length}`);
       setText("opsStudentGrowthSub", "Học sinh mới tháng này / tổng học sinh");
       setText("opsActiveClassCount", String(classes.length));
