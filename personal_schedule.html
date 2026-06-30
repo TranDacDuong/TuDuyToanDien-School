@@ -339,7 +339,7 @@ async function loadSchedule() {
     // 1. Fetch active class enrollments for the student during this week
     const { data: enrollments, error: enrollError } = await sb
       .from("class_students")
-      .select("class_id, joined_at, left_at, class:classes(id, class_name, subjects(name))")
+      .select("class_id, joined_at, left_at, class:classes!class_students_class_id_fkey(id, class_name, subjects(name))")
       .eq("student_id", selectedStudentId);
 
     if (enrollError) throw enrollError;
