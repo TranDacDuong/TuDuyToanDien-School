@@ -30,6 +30,31 @@
     return localDate(date);
   }
 
+  function monthStart(dateText) {
+    return `${String(dateText || localDate()).slice(0, 7)}-01`;
+  }
+
+  function weekdayOf(dateText) {
+    const date = new Date(`${dateText}T00:00:00+07:00`);
+    return date.getDay() === 0 ? 7 : date.getDay();
+  }
+
+  function activeSchedulesForMonth(schedules, dateText) {
+    const start = monthStart(dateText);
+    const eligible = (schedules || []).filter(item => String(item.effective_from || "2000-01-01").slice(0, 10) <= start);
+    if (!eligible.length) return [];
+    const maxEffective = eligible.reduce((max, item) => {
+      const value = String(item.effective_from || "2000-01-01").slice(0, 10);
+      return value > max ? value : max;
+    }, "2000-01-01");
+    return eligible.filter(item => String(item.effective_from || "2000-01-01").slice(0, 10) === maxEffective);
+  }
+
+  function localDateTimeIso(dateText, timeText, fallbackHour = "07:00") {
+    const time = String(timeText || fallbackHour).slice(0, 5) || fallbackHour;
+    return new Date(`${dateText}T${time}:00+07:00`).toISOString();
+  }
+
   function formatShortDate(value) {
     const date = value ? new Date(`${value}T00:00:00+07:00`) : new Date();
     return new Intl.DateTimeFormat("vi-VN", {
@@ -111,6 +136,90 @@
       exam_grading: "Chấm bài", trial_request: "Học thử", parent_link: "Phụ huynh",
       class_staff: "Nhân sự", manual: "Được giao",
     }[value] || "Công việc";
+  }
+
+  function hasScheduleTaskFor(existingAssignments, userId, classId, dateText) {
+    return (existingAssignments || []).some(item => {
+      const task = item.task || {};
+      return item.user_id === userId
+        && task.task_type === "class_schedule"
+        && task.available_on === dateText
+        && String(task.metadata?.class_id || "") === String(classId || "");
+    });
+  }
+
+  async function loadScheduleFallbackTasks(existingAssignments) {
+    const today = localDate();
+    const weekday = weekdayOf(today);
+    let staffQuery = sb.from("class_teachers").select("class_id,teacher_id");
+    if (S.profile.role !== "admin") staffQuery = staffQuery.eq("teacher_id", S.user.id);
+
+    const { data: staffRows, error: staffError } = await staffQuery;
+    if (staffError || !(staffRows || []).length) {
+      if (staffError) console.warn("Schedule fallback staff:", staffError);
+      return [];
+    }
+
+    const classIds = [...new Set(staffRows.map(row => row.class_id).filter(Boolean))];
+    const userIds = [...new Set(staffRows.map(row => row.teacher_id).filter(Boolean))];
+    if (!classIds.length || !userIds.length) return [];
+
+    const [{ data: classes, error: classError }, { data: users, error: userError }] = await Promise.all([
+      sb.from("classes")
+        .select("id,class_name,hidden,class_schedules(id,class_id,session_no,weekday,start_time,end_time,effective_from,rooms(room_name))")
+        .in("id", classIds)
+        .eq("hidden", false),
+      sb.from("users").select("id,full_name,email,role").in("id", userIds),
+    ]);
+    if (classError || userError) {
+      console.warn("Schedule fallback:", classError || userError);
+      return [];
+    }
+
+    const classById = new Map((classes || []).map(item => [item.id, item]));
+    const userById = new Map((users || []).map(item => [item.id, item]));
+    const fallbackRows = [];
+
+    (staffRows || []).forEach(row => {
+      const cls = classById.get(row.class_id);
+      const assignee = userById.get(row.teacher_id);
+      if (!cls || !assignee || !INTERNAL_ROLES.has(assignee.role)) return;
+      if (hasScheduleTaskFor(existingAssignments, row.teacher_id, row.class_id, today)) return;
+
+      activeSchedulesForMonth(cls.class_schedules || [], today)
+        .filter(schedule => Number(schedule.weekday) === weekday)
+        .forEach(schedule => {
+          const start = String(schedule.start_time || "").slice(0, 5);
+          const end = String(schedule.end_time || "").slice(0, 5);
+          const timeRange = start ? ` • ${start}${end ? "-" + end : ""}` : "";
+          const room = schedule.rooms?.room_name ? ` • ${schedule.rooms.room_name}` : "";
+          fallbackRows.push({
+            id: `schedule-fallback:${row.teacher_id}:${row.class_id}:${schedule.id}:${today}`,
+            user_id: row.teacher_id,
+            status: "open",
+            assignee,
+            task: {
+              title: `Lịch phụ trách lớp ${cls.class_name || "Lớp học"}`,
+              description: `Buổi ${schedule.session_no || 1} • ${formatShortDate(today)}${timeRange}${room}`,
+              task_type: "class_schedule",
+              priority: "normal",
+              available_on: today,
+              due_at: localDateTimeIso(today, schedule.start_time),
+              action_url: `class.html?openClassId=${row.class_id}`,
+              auto_generated: true,
+              verification_mode: "manual",
+              metadata: {
+                fallback_from_schedule: true,
+                class_id: row.class_id,
+                schedule_id: schedule.id,
+                session_no: schedule.session_no || 1,
+              },
+            },
+          });
+        });
+    });
+
+    return fallbackRows;
   }
 
   function renderSummary() {
@@ -200,7 +309,9 @@
       E.list.innerHTML = `<div class="task-empty">Chưa tải được công việc: ${esc(error.message)}</div>`;
       return;
     }
-    S.assignments = (data || []).filter(item => INTERNAL_ROLES.has(item.assignee?.role || S.profile?.role));
+    const assignments = (data || []).filter(item => INTERNAL_ROLES.has(item.assignee?.role || S.profile?.role));
+    const scheduleFallbacks = await loadScheduleFallbackTasks(assignments);
+    S.assignments = [...assignments, ...scheduleFallbacks];
     render();
   }
 

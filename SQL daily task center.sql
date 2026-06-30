@@ -238,7 +238,7 @@ BEGIN
     JOIN public.class_sessions cs ON cs.class_id = c.id
       AND cs.session_date BETWEEN v_today - 1 AND v_today + 7
     LEFT JOIN public.lessons l ON l.id = cs.lesson_id
-    WHERE u.role::text IN ('teacher', 'assistant')
+    WHERE u.role::text IN ('admin', 'teacher', 'assistant')
       AND (p_user_id IS NULL OR u.id = p_user_id)
   LOOP
     v_due := COALESCE(
@@ -321,7 +321,7 @@ BEGIN
     JOIN public.classes c ON c.id = ct.class_id AND COALESCE(c.hidden, false) = false
     JOIN public.class_sessions cs ON cs.class_id = c.id
       AND cs.session_date BETWEEN v_today - 7 AND v_today
-    WHERE u.role::text IN ('teacher', 'assistant')
+    WHERE u.role::text IN ('admin', 'teacher', 'assistant')
       AND (p_user_id IS NULL OR u.id = p_user_id)
   LOOP
     v_due := COALESCE(r.ends_at, ((r.session_date::text || ' 21:00:00+07')::timestamptz));
