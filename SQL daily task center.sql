@@ -684,6 +684,57 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.delete_old_task_assignments(p_user_id uuid DEFAULT NULL)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_actor uuid := auth.uid();
+  v_today date := (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date;
+  v_deleted_assignments integer := 0;
+  v_deleted_tasks integer := 0;
+BEGIN
+  IF v_actor IS NULL THEN
+    RAISE EXCEPTION 'Authentication required';
+  END IF;
+
+  IF NOT public.is_admin(v_actor) THEN
+    p_user_id := v_actor;
+  END IF;
+
+  IF p_user_id IS NOT NULL AND p_user_id <> v_actor AND NOT public.is_admin(v_actor) THEN
+    RAISE EXCEPTION 'Not allowed';
+  END IF;
+
+  WITH deleted AS (
+    DELETE FROM public.task_assignments a
+    USING public.daily_tasks t
+    WHERE a.task_id = t.id
+      AND (p_user_id IS NULL OR a.user_id = p_user_id)
+      AND COALESCE((t.due_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date, t.available_on) < v_today
+    RETURNING a.id
+  )
+  SELECT count(*) INTO v_deleted_assignments FROM deleted;
+
+  WITH deleted_tasks AS (
+    DELETE FROM public.daily_tasks t
+    WHERE NOT EXISTS (
+      SELECT 1 FROM public.task_assignments a WHERE a.task_id = t.id
+    )
+    RETURNING t.id
+  )
+  SELECT count(*) INTO v_deleted_tasks FROM deleted_tasks;
+
+  RETURN jsonb_build_object(
+    'ok', true,
+    'deleted_assignments', v_deleted_assignments,
+    'deleted_tasks', v_deleted_tasks,
+    'before_date', v_today
+  );
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.create_manual_task(
   p_title text,
   p_description text,
@@ -791,8 +842,10 @@ REVOKE ALL ON FUNCTION public.upsert_generated_task(uuid, text, text, text, text
 REVOKE ALL ON FUNCTION public.refresh_daily_tasks(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_verified_task_statuses(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.set_task_assignment_status(uuid, text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.delete_old_task_assignments(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.create_manual_task(text, text, text, timestamptz, text, uuid[]) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.refresh_daily_tasks(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.sync_verified_task_statuses(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.set_task_assignment_status(uuid, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.delete_old_task_assignments(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.create_manual_task(text, text, text, timestamptz, text, uuid[]) TO authenticated;

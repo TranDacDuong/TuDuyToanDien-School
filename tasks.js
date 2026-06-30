@@ -226,9 +226,11 @@
   function renderSummary() {
     const today = localDate();
     const open = S.assignments.filter(item => !["completed", "cancelled"].includes(item.status));
-    E.todayCount.textContent = open.filter(item => item.task?.available_on <= today
-      && (!item.task?.due_at || localDate(new Date(item.task.due_at)) <= today)).length;
-    E.importantCount.textContent = open.filter(item => ["urgent", "important"].includes(item.task?.priority)).length;
+    E.todayCount.textContent = open.filter(item => taskDay(item) === today).length;
+    E.importantCount.textContent = open.filter(item =>
+      !REMINDER_TYPES.has(item.task?.task_type)
+      && ["urgent", "important"].includes(item.task?.priority)
+    ).length;
     E.overdueCount.textContent = open.filter(isOverdue).length;
     E.completedCount.textContent = S.assignments.filter(item => item.status === "completed").length;
   }
@@ -322,6 +324,18 @@
     });
     if (error) return alert(error.message);
     toast(status === "completed" ? "Đã hoàn thành công việc." : "Đã cập nhật trạng thái.");
+    await loadTasks();
+  }
+
+  async function deleteOldTasks() {
+    const ok = confirm("Xóa tất cả công việc trong các ngày trước hôm nay? Công việc hôm nay và tương lai sẽ được giữ lại.");
+    if (!ok) return;
+    const { data, error } = await sb.rpc("delete_old_task_assignments", {
+      p_user_id: S.profile.role === "admin" ? null : S.user.id,
+    });
+    if (error) return alert(error.message);
+    const deleted = Number(data?.deleted_assignments || 0);
+    toast(deleted ? `Đã xóa ${deleted} công việc cũ.` : "Không có công việc cũ để xóa.");
     await loadTasks();
   }
 
@@ -454,6 +468,7 @@
       if (target.dataset.actionUrl) openAction(target.dataset.actionUrl);
     });
     byId("taskRefreshButton").addEventListener("click", () => loadTasks({ refresh: true }));
+    byId("taskDeleteOldButton").addEventListener("click", deleteOldTasks);
     byId("taskCreateButton").addEventListener("click", openCreateModal);
     byId("taskSettingsButton").addEventListener("click", async () => { await loadPreferences(); openModal("taskSettingsModal"); });
     byId("manualTaskAssigneeSearch").addEventListener("input", renderAssignees);
