@@ -264,14 +264,16 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   font-size: .94rem;
   text-shadow: 0 1px 6px rgba(10,20,40,.16);
 }
-.ops-kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+.ops-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .ops-kpi {
   padding: 16px 18px; border-radius: 20px; background: rgba(255,255,255,.94);
   border: 1px solid rgba(15,31,61,.08); box-shadow: 0 14px 30px rgba(15,31,61,.06);
 }
 .ops-kpi-label { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-light); }
 .ops-kpi-value { margin-top: 10px; font-size: 1.9rem; font-weight: 800; color: var(--navy); }
+.ops-kpi-sub { margin-top: 7px; color: var(--ink-mid); font-size: .78rem; line-height: 1.45; }
 .ops-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(340px, .9fr); gap: 14px; }
+.ops-grid.two-up { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .ops-grid.three-up { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .ops-grid.four-up { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .ops-card {
@@ -279,6 +281,37 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   border: 1px solid rgba(15,31,61,.08); box-shadow: 0 14px 30px rgba(15,31,61,.06);
 }
 .ops-card h3 { margin: 0 0 12px; font-size: 1rem; color: var(--navy); font-family: var(--font-display); }
+.ops-card-sub { margin: -6px 0 14px; color: var(--ink-light); font-size: .8rem; line-height: 1.55; }
+.ops-chart { min-height: 240px; }
+.ops-bars { min-height: 240px; display: flex; align-items: stretch; gap: 10px; }
+.ops-bar-item,
+.ops-dual-item { flex: 1; min-width: 0; display: grid; grid-template-rows: auto 1fr auto; gap: 8px; text-align: center; }
+.ops-bar-value,
+.ops-dual-values { color: var(--ink-mid); font-size: .72rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ops-bar-track,
+.ops-dual-track { height: 170px; display: flex; align-items: flex-end; justify-content: center; gap: 4px; padding: 8px 6px; border-radius: 16px; background: #f3f6fb; border: 1px solid rgba(15,31,61,.06); }
+.ops-dual-bars { min-height: 212px; display: flex; align-items: stretch; gap: 10px; width: 100%; }
+.ops-bar-fill { width: 100%; max-width: 38px; min-height: 6px; border-radius: 999px 999px 5px 5px; background: linear-gradient(180deg,#60a5fa,#2563eb); box-shadow: 0 10px 20px rgba(37,99,235,.14); }
+.ops-dual-track .ops-bar-fill { width: 18px; }
+.ops-bar-fill.money { background: linear-gradient(180deg,#facc15,#f59e0b); box-shadow: 0 10px 20px rgba(245,158,11,.16); }
+.ops-bar-fill.new-students { background: linear-gradient(180deg,#86efac,#16a34a); }
+.ops-bar-fill.left-students { background: linear-gradient(180deg,#fca5a5,#dc2626); }
+.ops-bar-fill.absent { background: linear-gradient(180deg,#c084fc,#7c3aed); }
+.ops-bar-label { color: var(--ink-light); font-size: .72rem; font-weight: 800; }
+.ops-chart-legend { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 12px; color: var(--ink-mid); font-size: .76rem; font-weight: 800; }
+.ops-chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.ops-chart-legend i { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
+.ops-line-wrap { width: 100%; }
+.ops-line-wrap svg { width: 100%; height: auto; display: block; }
+.ops-grid-line { stroke: rgba(15,31,61,.08); stroke-width: 1; }
+.ops-axis { fill: var(--ink-light); font-size: 12px; font-weight: 700; }
+.ops-rank-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.ops-rank-card { border-radius: 18px; border: 1px solid rgba(15,31,61,.08); padding: 14px; background: linear-gradient(180deg,#fff 0%,#fbfdff 100%); }
+.ops-rank-card.good { border-color: rgba(16,185,129,.24); background: linear-gradient(180deg,#f0fdf4 0%,#fff 100%); }
+.ops-rank-card.warn { border-color: rgba(245,158,11,.28); background: linear-gradient(180deg,#fff7ed 0%,#fff 100%); }
+.ops-rank-card span { color: var(--ink-light); font-size: .74rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.ops-rank-card strong { display: block; color: var(--navy); font-size: .95rem; margin-top: 8px; }
+.ops-rank-card em { display: block; color: var(--ink-mid); font-size: .78rem; font-style: normal; margin-top: 5px; }
 .ops-list { display: grid; gap: 10px; }
 .ops-list-item {
   padding: 12px 14px; border-radius: 16px; background: linear-gradient(180deg,#fff 0%,#fbfdff 100%);
@@ -829,48 +862,49 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   <section id="opsHub">
     <div class="ops-shell">
       <div class="ops-hero">
-        <h2>Trung Tâm Điều Hành</h2>
-        <p>Theo dõi các điểm nghẽn quan trọng, mở nhanh đúng màn quản trị và xử lý công việc đang tồn trước khi nó lan rộng ra toàn hệ thống.</p>
+        <h2>Bảng Điều Hành Trung Tâm</h2>
+        <p>Theo dõi nhanh tài chính, tăng trưởng học sinh, vận hành lớp học và chất lượng học tập theo tháng.</p>
       </div>
       <div class="ops-kpis">
-        <div class="ops-kpi"><div class="ops-kpi-label">Học sinh</div><div class="ops-kpi-value" id="opsStudentCount">0</div></div>
-        <div class="ops-kpi"><div class="ops-kpi-label">Lớp đang hoạt động</div><div class="ops-kpi-value" id="opsClassCount">0</div></div>
-        <div class="ops-kpi"><div class="ops-kpi-label">Câu hỏi</div><div class="ops-kpi-value" id="opsQuestionCount">0</div></div>
-        <div class="ops-kpi"><div class="ops-kpi-label">Đề kiểm tra</div><div class="ops-kpi-value" id="opsExamCount">0</div></div>
-        <div class="ops-kpi"><div class="ops-kpi-label">Tự luận chờ chấm</div><div class="ops-kpi-value" id="opsPendingEssayCount">0</div></div>
-        <div class="ops-kpi"><div class="ops-kpi-label">Điểm TB bài nộp</div><div class="ops-kpi-value" id="opsAverageScore">—</div></div>
-      </div>
-      <div class="ops-grid">
-        <div class="ops-card">
-          <h3>Thao Tác Nhanh</h3>
-          <div class="ops-actions">
-            <button class="ops-action" data-testid="dashboard-ops-missing-answer" type="button" onclick="openDashboardPage('question.html?answer=missing')"><strong>Câu thiếu đáp án</strong><span>Mở Ngân hàng câu hỏi với bộ lọc chỉ còn các câu đang để trống đáp án.</span></button>
-            <button class="ops-action" data-testid="dashboard-ops-duplicates" type="button" onclick="openDashboardPage('question.html?focus=duplicates')"><strong>Kiểm tra câu trùng</strong><span>Đi thẳng vào popup kiểm tra câu trùng trong phạm vi hiện có.</span></button>
-            <button class="ops-action" data-testid="dashboard-ops-exams" type="button" onclick="openDashboardPage('exam.html')"><strong>Tạo hoặc nhân bản đề</strong><span>Mở khu quản lý đề để tạo đề mới hoặc clone từ đề đã dùng ổn định.</span></button>
-            <button class="ops-action" data-testid="dashboard-ops-logs" type="button" onclick="openDashboardPage('sourcedata.html?tab=adminLogs&logStatus=error')"><strong>Mở nhật ký vận hành</strong><span>Xem nhanh các lỗi vận hành gần đây hoặc lọc tiếp theo tác vụ, đối tượng và người thao tác.</span></button>
-          </div>
+        <div class="ops-kpi">
+          <div class="ops-kpi-label">Thực thu / Doanh thu</div>
+          <div class="ops-kpi-value" id="opsRevenueValue">0đ / 0đ</div>
+          <div class="ops-kpi-sub" id="opsRevenueSub">Đang tải dữ liệu tháng này...</div>
         </div>
-        <div class="ops-card">
-          <h3>Cảnh Báo Vận Hành</h3>
-          <div class="ops-alerts" id="opsAlerts"><div class="ops-empty">Đang tải cảnh báo vận hành...</div></div>
+        <div class="ops-kpi">
+          <div class="ops-kpi-label">Học sinh mới / Tổng</div>
+          <div class="ops-kpi-value" id="opsStudentGrowthValue">0 / 0</div>
+          <div class="ops-kpi-sub" id="opsStudentGrowthSub">Đang tải dữ liệu học sinh...</div>
+        </div>
+        <div class="ops-kpi">
+          <div class="ops-kpi-label">Lớp đang hoạt động</div>
+          <div class="ops-kpi-value" id="opsActiveClassCount">0</div>
+          <div class="ops-kpi-sub" id="opsActiveClassSub">Tổng lớp đang hoạt động</div>
         </div>
       </div>
-      <div class="ops-grid four-up">
+      <div class="ops-grid two-up">
         <div class="ops-card">
-          <h3>Điểm Theo Lớp</h3>
-          <div class="ops-list" id="opsClassPerformance"><div class="ops-empty">Đang tải hiệu suất theo lớp...</div></div>
+          <h3>Tổng doanh thu các tháng</h3>
+          <p class="ops-card-sub">Theo dõi tổng doanh thu học phí phát sinh từng tháng.</p>
+          <div class="ops-chart" id="opsRevenueChart"><div class="ops-empty">Đang tải doanh thu...</div></div>
         </div>
         <div class="ops-card">
-          <h3>Tiến Độ Học Sinh</h3>
-          <div class="ops-list" id="opsStudentProgress"><div class="ops-empty">Đang tải tiến độ học sinh...</div></div>
+          <h3>Học sinh mới / nghỉ theo tháng</h3>
+          <p class="ops-card-sub">So sánh lượng học sinh mới với số học sinh rời lớp trong từng tháng.</p>
+          <div class="ops-chart" id="opsStudentFlowChart"><div class="ops-empty">Đang tải tăng trưởng học sinh...</div></div>
+        </div>
+      </div>
+      <div class="ops-grid two-up">
+        <div class="ops-card">
+          <h3>Tổng số ca nghỉ của học sinh</h3>
+          <p class="ops-card-sub">Tổng lượt vắng mặt/vắng có phép theo tháng.</p>
+          <div class="ops-chart" id="opsAbsenceChart"><div class="ops-empty">Đang tải chuyên cần...</div></div>
         </div>
         <div class="ops-card">
-          <h3>Đề Khó / Dễ</h3>
-          <div class="ops-list" id="opsExamInsights"><div class="ops-empty">Đang tải phân tích đề thi...</div></div>
-        </div>
-        <div class="ops-card">
-          <h3>Câu Hay Sai</h3>
-          <div class="ops-list" id="opsQuestionInsights"><div class="ops-empty">Đang tải câu hỏi cần chú ý...</div></div>
+          <h3>Điểm trung bình theo môn và theo tháng</h3>
+          <p class="ops-card-sub">Mỗi đường là một môn học, tính theo tỷ lệ điểm bài nộp đã có kết quả.</p>
+          <div class="ops-chart" id="opsScoreChart"><div class="ops-empty">Đang tải điểm trung bình...</div></div>
+          <div class="ops-rank-grid" id="opsClassScoreCards"><div class="ops-empty">Đang tải xếp hạng lớp...</div></div>
         </div>
       </div>
     </div>
@@ -986,7 +1020,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
-<script src="dashboard_ops.js"></script>
+<script src="dashboard_ops.js?v=20260630-admin-dashboard1"></script>
 <script>
 let badgeChannels = [];
 let currentDashboardUser = null;
