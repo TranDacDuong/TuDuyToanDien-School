@@ -312,7 +312,10 @@
       E.list.innerHTML = `<div class="task-empty">Chưa tải được công việc: ${esc(error.message)}</div>`;
       return;
     }
-    const assignments = (data || []).filter(item => INTERNAL_ROLES.has(item.assignee?.role || S.profile?.role));
+    const assignments = (data || []).filter(item =>
+      item.status !== "cancelled"
+      && INTERNAL_ROLES.has(item.assignee?.role || S.profile?.role)
+    );
     const scheduleFallbacks = await loadScheduleFallbackTasks(assignments);
     S.assignments = [...assignments, ...scheduleFallbacks];
     render();
@@ -327,14 +330,61 @@
     await loadTasks();
   }
 
+  function oldStoredAssignments() {
+    const today = localDate();
+    return S.assignments.filter(item =>
+      !String(item.id || "").startsWith("schedule-fallback:")
+      && taskDay(item) < today
+    );
+  }
+
+  function isMissingRpcError(error) {
+    return /Could not find the function|schema cache|PGRST202/i.test(error?.message || "");
+  }
+
+  async function deleteOldTasksFallback() {
+    const rows = oldStoredAssignments();
+    if (!rows.length) return 0;
+
+    if (S.profile.role === "admin") {
+      let deleted = 0;
+      for (let i = 0; i < rows.length; i += 100) {
+        const ids = rows.slice(i, i + 100).map(item => item.id);
+        const { error } = await sb.from("task_assignments").delete().in("id", ids);
+        if (error) throw error;
+        deleted += ids.length;
+      }
+      return deleted;
+    }
+
+    let cancelled = 0;
+    for (const item of rows) {
+      const { error } = await sb.rpc("set_task_assignment_status", {
+        p_assignment_id: item.id,
+        p_status: "cancelled",
+        p_note: "Người dùng xóa công việc cũ",
+      });
+      if (error) throw error;
+      cancelled += 1;
+    }
+    return cancelled;
+  }
+
   async function deleteOldTasks() {
     const ok = confirm("Xóa tất cả công việc trong các ngày trước hôm nay? Công việc hôm nay và tương lai sẽ được giữ lại.");
     if (!ok) return;
     const { data, error } = await sb.rpc("delete_old_task_assignments", {
       p_user_id: S.profile.role === "admin" ? null : S.user.id,
     });
-    if (error) return alert(error.message);
-    const deleted = Number(data?.deleted_assignments || 0);
+    let deleted = Number(data?.deleted_assignments || 0);
+    if (error) {
+      if (!isMissingRpcError(error)) return alert(error.message);
+      try {
+        deleted = await deleteOldTasksFallback();
+      } catch (fallbackError) {
+        return alert(fallbackError.message || "Không xóa được công việc cũ.");
+      }
+    }
     toast(deleted ? `Đã xóa ${deleted} công việc cũ.` : "Không có công việc cũ để xóa.");
     await loadTasks();
   }
