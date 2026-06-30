@@ -31,6 +31,16 @@
     return `${ym(date)}-${String(last.getDate()).padStart(2, "0")}`;
   }
 
+  function ymToDate(monthKey) {
+    return `${monthKey}-01`;
+  }
+
+  function monthEndByKey(monthKey) {
+    const [year, month] = String(monthKey || "").split("-").map(Number);
+    const last = new Date(year, month, 0);
+    return `${year}-${String(month).padStart(2, "0")}-${String(last.getDate()).padStart(2, "0")}`;
+  }
+
   function addMonths(date, amount) {
     return new Date(date.getFullYear(), date.getMonth() + amount, 1);
   }
@@ -64,6 +74,62 @@
       });
     });
     return months;
+  }
+
+  function getSchedulesForMonth(allSchedules, monthKey) {
+    const mStart = ymToDate(monthKey);
+    const eligible = (allSchedules || []).filter(item => String(item.effective_from || "2000-01-01").slice(0, 10) <= mStart);
+    if (!eligible.length) return [];
+    const maxEffective = eligible.reduce((max, item) => {
+      const value = String(item.effective_from || "2000-01-01").slice(0, 10);
+      return value > max ? value : max;
+    }, "2000-01-01");
+    return eligible.filter(item => String(item.effective_from || "2000-01-01").slice(0, 10) === maxEffective);
+  }
+
+  function generateOccurrences(schedules, monthKey) {
+    const [year, month] = String(monthKey || "").split("-").map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const items = [];
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = new Date(year, month - 1, day);
+      const weekday = date.getDay() === 0 ? 7 : date.getDay();
+      (schedules || []).forEach(schedule => {
+        if (Number(schedule.weekday) !== weekday) return;
+        items.push({
+          date: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+          schedule_id: Number(schedule.id || 0),
+          session_no: Number(schedule.session_no || 1),
+          schedule,
+        });
+      });
+    }
+    return items.sort((a, b) => a.date.localeCompare(b.date) || a.session_no - b.session_no);
+  }
+
+  function attendanceStatusFor(attMap, studentId, classId, occurrence) {
+    return attMap[`${studentId}_${classId}_${occurrence.date}_${occurrence.schedule_id}`]
+      || attMap[`${studentId}_${classId}_${occurrence.date}_0`]
+      || null;
+  }
+
+  function calcTuition({ tuition_type, tuition_fee, makeup_fee, present, makeup, totalSessions }) {
+    const fee = Number(tuition_fee) || 0;
+    const makeupFee = (makeup_fee != null && makeup_fee !== "") ? Number(makeup_fee) : null;
+
+    if (tuition_type === "per_session") {
+      const mFee = makeupFee !== null ? makeupFee : fee;
+      return (present * fee) + (makeup * mFee);
+    }
+
+    if (tuition_type === "per_month") {
+      const perSession = totalSessions > 0 ? fee / totalSessions : 0;
+      const mFee = makeupFee !== null ? makeupFee : perSession;
+      return Math.max(0, fee + (makeup * mFee));
+    }
+
+    if (tuition_type === "per_course") return fee;
+    return 0;
   }
 
   async function fetchAllPages(buildQuery, pageSize = 1000) {
@@ -205,16 +271,18 @@
         classStudentRes,
         classRes,
         attendanceRes,
+        chosenScheduleRes,
         examResultRes,
       ] = await Promise.all([
         fetchAllPages(() => sb.from("tuition_payments").select("month,amount_due,amount_paid").lte("month", thisMonthStart).order("month", { ascending: true })),
         fetchAllPages(() => sb.from("users").select("id,role,created_at").eq("role", "student").order("created_at", { ascending: true })),
         fetchAllPages(() => sb.from("class_students").select("class_id,student_id,joined_at,left_at").order("joined_at", { ascending: true })),
-        fetchAllPages(() => sb.from("classes").select("id,class_name,hidden,subjects(name)").eq("hidden", false).order("class_name", { ascending: true })),
+        fetchAllPages(() => sb.from("classes").select("id,class_name,hidden,tuition_fee,tuition_type,makeup_fee,subjects(name),class_schedules(id,session_no,weekday,start_time,end_time,effective_from)").eq("hidden", false).order("class_name", { ascending: true })),
         fetchAllPages(() => sb.from("attendance").select("class_id,student_id,date,status").lte("date", toDate).order("date", { ascending: true })),
+        fetchAllPages(() => sb.from("class_student_schedules").select("class_id,student_id,schedule_id")),
         fetchAllPages(() => sb.from("exam_results").select("class_id,submitted_at,score_auto,score_total,exam:exams(total_points,classes(class_name,subjects(name)))").not("submitted_at", "is", null).order("submitted_at", { ascending: true })),
       ]);
-      const firstError = tuitionRes.error || studentRes.error || classStudentRes.error || classRes.error || attendanceRes.error || examResultRes.error;
+      const firstError = tuitionRes.error || studentRes.error || classStudentRes.error || classRes.error || attendanceRes.error || chosenScheduleRes.error || examResultRes.error;
       if (firstError) throw firstError;
 
       const tuitions = tuitionRes.data || [];
@@ -222,6 +290,7 @@
       const classStudents = classStudentRes.data || [];
       const classes = classRes.data || [];
       const attendance = attendanceRes.data || [];
+      const chosenSchedules = chosenScheduleRes.data || [];
       const examResults = examResultRes.data || [];
       const monthsWithData = new Set([thisMonth]);
       [
@@ -234,12 +303,67 @@
       const sortedMonths = [...monthsWithData].sort();
       const keys = monthRange(sortedMonths[0], sortedMonths[sortedMonths.length - 1]);
 
+      const classMap = Object.fromEntries(classes.map(item => [item.id, item]));
+      const attendanceMap = {};
+      attendance.forEach(item => {
+        attendanceMap[`${item.student_id}_${item.class_id}_${item.date}_${item.schedule_id || 0}`] = item.status;
+      });
+      const chosenMap = {};
+      chosenSchedules.forEach(item => {
+        const key = `${item.student_id}_${item.class_id}`;
+        if (!chosenMap[key]) chosenMap[key] = new Set();
+        chosenMap[key].add(Number(item.schedule_id));
+      });
+
       const revenueByMonth = Object.fromEntries(keys.map(key => [key, { due: 0, paid: 0 }]));
       tuitions.forEach(item => {
         const key = String(item.month || "").slice(0, 7);
         if (!revenueByMonth[key]) return;
-        revenueByMonth[key].due += Number(item.amount_due || 0);
         revenueByMonth[key].paid += Number(item.amount_paid || 0);
+      });
+
+      keys.forEach(monthKey => {
+        const mStart = ymToDate(monthKey);
+        const mEnd = monthEndByKey(monthKey);
+
+        classStudents.forEach(classStudent => {
+          const cls = classMap[classStudent.class_id];
+          if (!cls) return;
+          const joined = classStudent.joined_at ? String(classStudent.joined_at).slice(0, 10) : "0000-00-00";
+          const left = classStudent.left_at ? String(classStudent.left_at).slice(0, 10) : "9999-99-99";
+          if (joined > mEnd || left < mStart) return;
+
+          const schedules = getSchedulesForMonth(cls.class_schedules || [], monthKey);
+          const chosenIds = chosenMap[`${classStudent.student_id}_${classStudent.class_id}`];
+          const studentSchedules = chosenIds?.size
+            ? schedules.filter(schedule => chosenIds.has(Number(schedule.id)))
+            : schedules;
+
+          const activeOccurrences = generateOccurrences(studentSchedules, monthKey).filter(occurrence => {
+            if (occurrence.date > left) return false;
+            if (occurrence.date >= joined) return true;
+            const actualStatus = attendanceStatusFor(attendanceMap, classStudent.student_id, classStudent.class_id, occurrence);
+            return actualStatus === "present" || actualStatus === "makeup";
+          });
+          const totalSessions = activeOccurrences.length;
+
+          let present = 0;
+          let makeup = 0;
+          activeOccurrences.forEach(occurrence => {
+            const status = attendanceStatusFor(attendanceMap, classStudent.student_id, classStudent.class_id, occurrence) || "present";
+            if (status === "present") present += 1;
+            else if (status === "makeup") makeup += 1;
+          });
+
+          revenueByMonth[monthKey].due += calcTuition({
+            tuition_type: cls.tuition_type,
+            tuition_fee: cls.tuition_fee,
+            makeup_fee: cls.makeup_fee,
+            present,
+            makeup,
+            totalSessions,
+          });
+        });
       });
 
       const studentAdds = Object.fromEntries(keys.map(key => [key, 0]));
