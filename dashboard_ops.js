@@ -1,5 +1,4 @@
 (function () {
-  const MONTH_COUNT = 6;
   const ABSENT_STATUSES = new Set(["absent", "excused"]);
 
   function byId(id) {
@@ -41,9 +40,41 @@
     return `T${month}/${String(year).slice(2)}`;
   }
 
-  function monthKeys(count = MONTH_COUNT) {
-    const now = new Date();
-    return Array.from({ length: count }, (_, index) => ym(addMonths(now, index - count + 1)));
+  function monthRange(startKey, endKey) {
+    if (!startKey || !endKey) return [ym(new Date())];
+    const [startYear, startMonth] = String(startKey).split("-").map(Number);
+    const [endYear, endMonth] = String(endKey).split("-").map(Number);
+    const start = new Date(startYear, startMonth - 1, 1);
+    const end = new Date(endYear, endMonth - 1, 1);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return [ym(new Date())];
+    const keys = [];
+    for (let cursor = start; cursor <= end; cursor = addMonths(cursor, 1)) {
+      keys.push(ym(cursor));
+    }
+    return keys;
+  }
+
+  function collectDataMonths(rows, fields) {
+    const months = new Set();
+    (rows || []).forEach(row => {
+      fields.forEach(field => {
+        const value = row?.[field];
+        const key = String(value || "").slice(0, 7);
+        if (/^\d{4}-\d{2}$/.test(key)) months.add(key);
+      });
+    });
+    return months;
+  }
+
+  async function fetchAllPages(buildQuery, pageSize = 1000) {
+    const rows = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await buildQuery().range(from, from + pageSize - 1);
+      if (error) return { data: rows, error };
+      rows.push(...(data || []));
+      if (!data || data.length < pageSize) break;
+    }
+    return { data: rows, error: null };
   }
 
   function renderBars(id, rows, options = {}) {
@@ -166,9 +197,6 @@
       const thisMonth = ym(now);
       const thisMonthStart = monthStart(now);
       const thisMonthEnd = monthEnd(now);
-      const keys = monthKeys();
-      const fromMonth = `${keys[0]}-01`;
-      const fromDate = fromMonth;
       const toDate = monthEnd(now);
 
       const [
@@ -179,12 +207,12 @@
         attendanceRes,
         examResultRes,
       ] = await Promise.all([
-        sb.from("tuition_payments").select("month,amount_due,amount_paid").gte("month", fromMonth).lte("month", thisMonthStart),
-        sb.from("users").select("id,role,created_at").eq("role", "student"),
-        sb.from("class_students").select("class_id,student_id,joined_at,left_at").or(`joined_at.gte.${fromDate},left_at.gte.${fromDate}`),
-        sb.from("classes").select("id,class_name,hidden,subjects(name)").eq("hidden", false),
-        sb.from("attendance").select("class_id,student_id,date,status").gte("date", fromDate).lte("date", toDate),
-        sb.from("exam_results").select("class_id,submitted_at,score_auto,score_total,exam:exams(total_points,classes(class_name,subjects(name)))").not("submitted_at", "is", null).gte("submitted_at", `${fromDate}T00:00:00+07:00`).limit(4000),
+        fetchAllPages(() => sb.from("tuition_payments").select("month,amount_due,amount_paid").lte("month", thisMonthStart).order("month", { ascending: true })),
+        fetchAllPages(() => sb.from("users").select("id,role,created_at").eq("role", "student").order("created_at", { ascending: true })),
+        fetchAllPages(() => sb.from("class_students").select("class_id,student_id,joined_at,left_at").order("joined_at", { ascending: true })),
+        fetchAllPages(() => sb.from("classes").select("id,class_name,hidden,subjects(name)").eq("hidden", false).order("class_name", { ascending: true })),
+        fetchAllPages(() => sb.from("attendance").select("class_id,student_id,date,status").lte("date", toDate).order("date", { ascending: true })),
+        fetchAllPages(() => sb.from("exam_results").select("class_id,submitted_at,score_auto,score_total,exam:exams(total_points,classes(class_name,subjects(name)))").not("submitted_at", "is", null).order("submitted_at", { ascending: true })),
       ]);
       const firstError = tuitionRes.error || studentRes.error || classStudentRes.error || classRes.error || attendanceRes.error || examResultRes.error;
       if (firstError) throw firstError;
@@ -195,6 +223,16 @@
       const classes = classRes.data || [];
       const attendance = attendanceRes.data || [];
       const examResults = examResultRes.data || [];
+      const monthsWithData = new Set([thisMonth]);
+      [
+        ...collectDataMonths(tuitions, ["month"]),
+        ...collectDataMonths(students, ["created_at"]),
+        ...collectDataMonths(classStudents, ["joined_at", "left_at"]),
+        ...collectDataMonths(attendance, ["date"]),
+        ...collectDataMonths(examResults, ["submitted_at"]),
+      ].forEach(key => monthsWithData.add(key));
+      const sortedMonths = [...monthsWithData].sort();
+      const keys = monthRange(sortedMonths[0], sortedMonths[sortedMonths.length - 1]);
 
       const revenueByMonth = Object.fromEntries(keys.map(key => [key, { due: 0, paid: 0 }]));
       tuitions.forEach(item => {
