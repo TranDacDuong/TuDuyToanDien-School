@@ -104,6 +104,7 @@
   }
 
   function isOverdue(item) {
+    if (REMINDER_TYPES.has(item.task?.task_type)) return false;
     return item.status !== "completed" && item.status !== "cancelled"
       && item.task?.due_at && new Date(item.task.due_at) < new Date();
   }
