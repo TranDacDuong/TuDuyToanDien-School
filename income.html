@@ -177,91 +177,208 @@
 
   /* Progress/Milestone Visualizer */
   .milestone-card {
-    background: linear-gradient(145deg, #ffffff 0%, #fbfcff 100%);
+    background:
+      radial-gradient(circle at top left, rgba(245,158,11,.15), transparent 34%),
+      linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
     border: 1px solid rgba(15,31,61,.08);
-    border-radius: 24px;
-    padding: 24px;
-    box-shadow: var(--shadow);
+    border-radius: 28px;
+    padding: 26px;
+    box-shadow: 0 18px 45px rgba(15,31,61,.08);
+    overflow: hidden;
+  }
+
+  .milestone-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
   }
 
   .milestone-title {
     font-family: var(--font-display);
     color: var(--navy);
-    font-size: 1.2rem;
-    margin: 0 0 16px 0;
+    font-size: 1.28rem;
+    margin: 0;
+  }
+
+  .milestone-subtitle {
+    color: var(--ink-light);
+    font-size: 0.86rem;
+    margin: 6px 0 0;
+  }
+
+  .milestone-current {
+    color: var(--navy);
+    background: #fff;
+    border: 1px solid rgba(15,31,61,.08);
+    border-radius: 18px;
+    box-shadow: 0 10px 24px rgba(15,31,61,.07);
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    padding: 12px 16px;
+    white-space: nowrap;
+  }
+
+  .milestone-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin: 22px 0 18px;
+  }
+
+  .milestone-summary-item {
+    background: rgba(255,255,255,.76);
+    border: 1px solid rgba(15,31,61,.07);
+    border-radius: 18px;
+    padding: 14px 16px;
+  }
+
+  .milestone-summary-item span {
+    color: var(--ink-light);
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+
+  .milestone-summary-item b {
+    color: var(--navy);
+    display: block;
+    font-size: 0.98rem;
+    margin-top: 5px;
+  }
+
+  .progress-wrap {
+    background: rgba(255,255,255,.7);
+    border: 1px solid rgba(15,31,61,.06);
+    border-radius: 999px;
+    padding: 5px;
   }
 
   .progress-track {
-    height: 10px;
-    background: rgba(15,31,61,.05);
+    height: 14px;
+    background: rgba(15,31,61,.06);
     border-radius: 999px;
+    overflow: hidden;
     position: relative;
-    margin: 25px 0 15px 0;
   }
 
   .progress-fill {
     height: 100%;
     background: linear-gradient(90deg, #3b82f6 0%, #f59e0b 50%, #10b981 100%);
     border-radius: 999px;
+    box-shadow: 0 0 18px rgba(245,158,11,.28);
     width: 0%;
     transition: width 1s ease-out;
   }
 
   .milestone-nodes {
-    display: flex;
-    justify-content: space-between;
-    position: relative;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-top: 18px;
   }
 
   .milestone-node {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    position: absolute;
-    transform: translateX(-50%);
-    top: -32px;
+    background: rgba(255,255,255,.78);
+    border: 1px solid rgba(15,31,61,.08);
+    border-radius: 18px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    min-height: 92px;
+    padding: 14px;
+    transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+  }
+
+  .milestone-node.done {
+    border-color: rgba(16,185,129,.28);
+    background: linear-gradient(145deg, rgba(236,253,245,.96), rgba(255,255,255,.85));
+  }
+
+  .milestone-node.next {
+    border-color: rgba(245,158,11,.42);
+    box-shadow: 0 12px 28px rgba(245,158,11,.12);
+    transform: translateY(-2px);
   }
 
   .node-dot {
-    width: 14px;
-    height: 14px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     background: #e2e8f0;
-    border: 3px solid #fff;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    transition: background 0.3s;
+    border: 5px solid #fff;
+    box-shadow: 0 8px 18px rgba(15,31,61,.12);
+    margin-top: 2px;
   }
 
-  .milestone-node.active .node-dot {
+  .milestone-node.done .node-dot {
     background: #10b981;
-    box-shadow: 0 0 8px rgba(16,185,129,0.6);
+  }
+
+  .milestone-node.next .node-dot {
+    background: #f59e0b;
+    box-shadow: 0 0 0 5px rgba(245,158,11,.13), 0 8px 18px rgba(245,158,11,.24);
   }
 
   .node-label {
-    font-size: 0.7rem;
+    color: var(--navy);
+    font-size: 0.9rem;
     font-weight: 700;
-    color: var(--ink-mid);
-    margin-top: 24px;
-    white-space: nowrap;
-    text-align: center;
+    line-height: 1.25;
+    min-width: 0;
   }
 
   .node-val {
-    font-size: 0.68rem;
+    color: var(--ink-mid);
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-top: 4px;
+  }
+
+  .node-status {
     color: var(--ink-light);
+    font-size: 0.74rem;
+    font-weight: 700;
+    margin-top: 10px;
+  }
+
+  .milestone-node.done .node-status {
+    color: #059669;
+  }
+
+  .milestone-node.next .node-status {
+    color: #b45309;
   }
 
   .next-tier-tip {
     font-size: 0.85rem;
     font-weight: 600;
-    color: var(--amber);
-    background: var(--amber-bg);
-    padding: 10px 16px;
-    border-radius: 12px;
-    display: inline-flex;
+    color: #92400e;
+    background: #fffbeb;
+    border: 1px solid rgba(245,158,11,.25);
+    padding: 12px 16px;
+    border-radius: 16px;
+    display: flex;
     align-items: center;
     gap: 8px;
-    margin-top: 10px;
+    margin-top: 16px;
+  }
+
+  @media (max-width: 720px) {
+    .milestone-head {
+      flex-direction: column;
+    }
+
+    .milestone-current {
+      width: 100%;
+      text-align: center;
+    }
+
+    .milestone-summary {
+      grid-template-columns: 1fr;
+    }
   }
 
   /* Table / Breakdown Design */
@@ -479,13 +596,33 @@
 
     <!-- Progress / Milestones visualizer -->
     <div class="milestone-card">
-      <h3 class="milestone-title">🎯 Cột mốc doanh thu thực tế</h3>
-      <div style="position: relative; padding: 20px 0 10px 0;">
+      <div class="milestone-head">
+        <div>
+          <h3 class="milestone-title">🎯 Cột mốc doanh thu thực tế</h3>
+          <p class="milestone-subtitle">Theo dõi doanh thu đã thu, mốc đã đạt và chặng tiếp theo trong tháng.</p>
+        </div>
+        <div class="milestone-current" id="milestoneCurrentRevenue">0đ</div>
+      </div>
+      <div class="milestone-summary">
+        <div class="milestone-summary-item">
+          <span>Đã đạt</span>
+          <b id="milestoneAchievedLabel">Khởi điểm</b>
+        </div>
+        <div class="milestone-summary-item">
+          <span>Mốc tiếp theo</span>
+          <b id="milestoneNextLabel">Định mức</b>
+        </div>
+        <div class="milestone-summary-item">
+          <span>Tiến độ</span>
+          <b id="milestoneProgressLabel">0%</b>
+        </div>
+      </div>
+      <div class="progress-wrap">
         <div class="progress-track">
           <div class="progress-fill" id="progressFill"></div>
         </div>
-        <div class="milestone-nodes" id="milestoneNodes"></div>
       </div>
+      <div class="milestone-nodes" id="milestoneNodes"></div>
       <div id="nextTierTipBox"></div>
     </div>
 
@@ -1148,8 +1285,12 @@
     const nodesWrap = document.getElementById("milestoneNodes");
     const progressFill = document.getElementById("progressFill");
     const tipBox = document.getElementById("nextTierTipBox");
+    const currentRevenueEl = document.getElementById("milestoneCurrentRevenue");
+    const achievedLabelEl = document.getElementById("milestoneAchievedLabel");
+    const nextLabelEl = document.getElementById("milestoneNextLabel");
+    const progressLabelEl = document.getElementById("milestoneProgressLabel");
 
-    // Standard steps for visual track (0, 10M, 50M, 100M, 150M, 200M)
+    // Standard steps for visual cards (0, 10M, 50M, 100M, 150M, 200M)
     const milestones = [
       { val: 0, label: "Khởi điểm" },
       { val: 10000000, label: "Định mức (10M)" },
@@ -1163,28 +1304,35 @@
     const progressPct = Math.min(100, (revenue / maxVal) * 100);
     progressFill.style.width = `${progressPct}%`;
 
+    const achievedTier = [...milestones].reverse().find(m => revenue >= m.val) || milestones[0];
+    const nextTier = milestones.find(m => revenue < m.val) || null;
+
+    currentRevenueEl.textContent = `${fmt(revenue)}đ`;
+    achievedLabelEl.textContent = achievedTier.label;
+    nextLabelEl.textContent = nextTier ? `${nextTier.label} • ${fmt(nextTier.val)}đ` : "Đã vượt tất cả mốc";
+    progressLabelEl.textContent = `${Math.round(progressPct)}%`;
+
     nodesWrap.innerHTML = milestones.map((m, idx) => {
-      const leftPct = (m.val / maxVal) * 100;
-      const isActive = revenue >= m.val;
+      const isDone = revenue >= m.val;
+      const isNext = nextTier && nextTier.val === m.val;
+      const remaining = Math.max(0, m.val - revenue);
+      const statusText = isDone
+        ? "Đã đạt"
+        : isNext
+          ? `Còn ${fmt(remaining)}đ`
+          : "Chưa tới mốc";
+
       return `
-        <div class="milestone-node ${isActive ? 'active' : ''}" style="left: ${leftPct}%">
+        <div class="milestone-node ${isDone ? 'done' : isNext ? 'next' : 'pending'}">
           <div class="node-dot"></div>
           <div class="node-label">
             <div>${m.label}</div>
             <div class="node-val">${m.val > 0 ? fmt(m.val) + 'đ' : ''}</div>
+            <div class="node-status">${statusText}</div>
           </div>
         </div>
       `;
     }).join("");
-
-    // Next tier alert tip
-    let nextTier = null;
-    for (let i = 0; i < milestones.length; i++) {
-      if (revenue < milestones[i].val) {
-        nextTier = milestones[i];
-        break;
-      }
-    }
 
     if (nextTier) {
       const diff = nextTier.val - revenue;
