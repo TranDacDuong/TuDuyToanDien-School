@@ -113,6 +113,12 @@
     return eligible.filter(s => (s.effective_from || "2000-01-01") === maxEf);
   }
 
+  function attendanceStatusFor(attMap, studentId, classId, item) {
+    return attMap[`${studentId}_${classId}_${item.date}_${item.schedule_id}`]
+      || attMap[`${studentId}_${classId}_${item.date}_0`]
+      || null;
+  }
+
   /* ─────────────────────────────────────────────
      TÍNH HỌC PHÍ
   ───────────────────────────────────────────── */
@@ -666,14 +672,17 @@ Nhập số tiền hoàn lại (>0):`,
         const studentSchedules = chosenIds?.size
           ? schedules.filter(s => chosenIds.has(Number(s.id)))
           : schedules;
-        const activeOccurrences = generateOccurrences(studentSchedules, ym).filter(item => item.date >= joined && item.date <= left);
+        const activeOccurrences = generateOccurrences(studentSchedules, ym).filter(item => {
+          if (item.date > left) return false;
+          if (item.date >= joined) return true;
+          const actualStatus = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item);
+          return actualStatus === "present" || actualStatus === "makeup";
+        });
         const totalSessions = activeOccurrences.length;
 
         let present = 0, absent = 0, makeup = 0;
         activeOccurrences.forEach(item => {
-          const status = attMap[`${cs.student_id}_${cs.class_id}_${item.date}_${item.schedule_id}`]
-            || attMap[`${cs.student_id}_${cs.class_id}_${item.date}_0`]
-            || "present";
+          const status = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item) || "present";
           if (status === "present")     present++;
           else if (status === "absent") absent++;
           else if (status === "makeup") makeup++;
