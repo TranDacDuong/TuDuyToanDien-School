@@ -5,12 +5,14 @@
     assignments: [],
     users: [],
     selectedDate: "",
+    viewMode: "today",
+    selectedUserId: "all",
     preferences: null,
   };
 
   const E = {};
   const byId = id => document.getElementById(id);
-  const INTERNAL_ROLES = new Set(["admin", "teacher", "assistant"]);
+  const INTERNAL_ROLES = new Set(["admin", "teacher", "assistant", "marketing"]);
   const REMINDER_TYPES = new Set(["class_schedule", "child_schedule", "attendance"]);
   const esc = value => String(value || "")
     .replace(/&/g, "&amp;").replace(/</g, "&lt;")
@@ -27,6 +29,12 @@
   function addDays(dateText, amount) {
     const date = dateText ? new Date(`${dateText}T00:00:00+07:00`) : new Date();
     date.setDate(date.getDate() + amount);
+    return localDate(date);
+  }
+
+  function addMonths(dateText, amount) {
+    const date = dateText ? new Date(`${dateText}T00:00:00+07:00`) : new Date();
+    date.setMonth(date.getMonth() + amount);
     return localDate(date);
   }
 
@@ -96,6 +104,23 @@
     return localDate();
   }
 
+  function startOfWeek(dateText = localDate()) {
+    const date = new Date(`${dateText}T00:00:00+07:00`);
+    const day = date.getDay() === 0 ? 7 : date.getDay();
+    date.setDate(date.getDate() - day + 1);
+    return localDate(date);
+  }
+
+  function endOfMonth(dateText = localDate()) {
+    const year = Number(String(dateText).slice(0, 4));
+    const month = Number(String(dateText).slice(5, 7));
+    return localDate(new Date(year, month, 0));
+  }
+
+  function inRange(day, start, end) {
+    return day >= start && day <= end;
+  }
+
   function statusInfo(item) {
     const task = item.task || {};
     if (REMINDER_TYPES.has(task.task_type)) return { className: "reminder", icon: "•", label: "Lời nhắc nhở" };
@@ -111,14 +136,22 @@
 
   function visibleAssignments() {
     const selected = S.selectedDate || localDate();
+    const start = S.viewMode === "week" ? startOfWeek(selected)
+      : S.viewMode === "month" ? monthStart(selected)
+      : selected;
+    const end = S.viewMode === "week" ? addDays(start, 6)
+      : S.viewMode === "month" ? endOfMonth(selected)
+      : selected;
     return S.assignments.filter(item => {
-      const task = item.task || {};
       const day = taskDay(item);
-      return day === selected;
+      if (S.profile?.role === "admin" && S.selectedUserId !== "all" && item.user_id !== S.selectedUserId) return false;
+      return inRange(day, start, end);
     }).sort((a, b) => {
       const priority = { urgent: 0, important: 1, normal: 2 };
       const status = Number(a.status === "completed") - Number(b.status === "completed");
       if (status) return status;
+      const dayDiff = taskDay(a).localeCompare(taskDay(b));
+      if (dayDiff && S.viewMode !== "today") return dayDiff;
       const priorityDiff = (priority[a.task?.priority] ?? 3) - (priority[b.task?.priority] ?? 3);
       if (priorityDiff) return priorityDiff;
       return new Date(a.task?.due_at || "2999-01-01") - new Date(b.task?.due_at || "2999-01-01");
@@ -225,14 +258,17 @@
 
   function renderSummary() {
     const today = localDate();
-    const open = S.assignments.filter(item => !["completed", "cancelled"].includes(item.status));
+    const scoped = S.assignments.filter(item =>
+      S.profile?.role !== "admin" || S.selectedUserId === "all" || item.user_id === S.selectedUserId
+    );
+    const open = scoped.filter(item => !["completed", "cancelled"].includes(item.status));
     E.todayCount.textContent = open.filter(item => taskDay(item) === today).length;
     E.importantCount.textContent = open.filter(item =>
       !REMINDER_TYPES.has(item.task?.task_type)
       && ["urgent", "important"].includes(item.task?.priority)
     ).length;
     E.overdueCount.textContent = open.filter(isOverdue).length;
-    E.completedCount.textContent = S.assignments.filter(item => item.status === "completed").length;
+    E.completedCount.textContent = scoped.filter(item => item.status === "completed").length;
   }
 
   function taskCard(item) {
@@ -279,17 +315,116 @@
     `).join("");
   }
 
+  function viewTitle() {
+    const selected = S.selectedDate || localDate();
+    if (S.viewMode === "week") {
+      const start = startOfWeek(selected);
+      return `Tuần ${formatShortDate(start)} - ${formatShortDate(addDays(start, 6))}`;
+    }
+    if (S.viewMode === "month") return `Tháng ${String(selected).slice(5, 7)}/${String(selected).slice(0, 4)}`;
+    return formatShortDate(selected);
+  }
+
+  function renderMonthOverview(rows) {
+    const completed = rows.filter(item => item.status === "completed").length;
+    const overdue = rows.filter(isOverdue).length;
+    const targetLike = rows.filter(item => item.task?.task_type === "target" || item.task?.metadata?.metric_target || item.task?.metadata?.progress_target);
+    return `
+      <section class="task-month-overview">
+        <div><span>Tổng công việc</span><strong>${rows.length}</strong></div>
+        <div><span>Đã hoàn thành</span><strong>${completed}</strong></div>
+        <div><span>Quá hạn</span><strong>${overdue}</strong></div>
+        <div><span>Chỉ tiêu / tiến độ</span><strong>${targetLike.length}</strong></div>
+      </section>`;
+  }
+
+  function emptyLabel() {
+    if (S.viewMode === "week") return "tuần này";
+    if (S.viewMode === "month") return "tháng này";
+    return `ngày ${formatShortDate(S.selectedDate || localDate())}`;
+  }
+
+  function roleLabel(value) {
+    return {
+      admin: "Admin",
+      teacher: "Giáo viên",
+      assistant: "Trợ giảng",
+      marketing: "Marketing",
+    }[value] || value || "Nhân viên";
+  }
+
+  function mergedStaffUsers() {
+    const map = new Map();
+    (S.users || []).forEach(user => {
+      if (user?.id && INTERNAL_ROLES.has(user.role)) map.set(user.id, user);
+    });
+    (S.assignments || []).forEach(item => {
+      const user = item.assignee;
+      if (user?.id && INTERNAL_ROLES.has(user.role)) map.set(user.id, user);
+    });
+    return [...map.values()].sort((a, b) =>
+      String(a.full_name || a.email || "").localeCompare(String(b.full_name || b.email || ""), "vi")
+    );
+  }
+
+  function renderStaffFilter() {
+    if (!E.adminFilter || !E.staffFilter) return;
+    const isAdmin = S.profile?.role === "admin";
+    E.adminFilter.classList.toggle("show", isAdmin);
+    if (!isAdmin) return;
+    const selected = S.selectedUserId || "all";
+    const options = mergedStaffUsers().map(user =>
+      `<option value="${esc(user.id)}">${esc(user.full_name || user.email)} - ${esc(roleLabel(user.role))}</option>`
+    ).join("");
+    E.staffFilter.innerHTML = `<option value="all">Tất cả nhân viên</option>${options}`;
+    E.staffFilter.value = selected;
+    if (E.staffFilter.value !== selected) {
+      S.selectedUserId = "all";
+      E.staffFilter.value = "all";
+    }
+  }
+
   function render() {
     renderSummary();
+    renderStaffFilter();
     syncDatebar();
     const rows = visibleAssignments();
+    const overview = S.viewMode === "month" ? renderMonthOverview(rows) : "";
+    if (!rows.length) {
+      E.list.innerHTML = `<div class="task-empty">Không có công việc trong ${esc(emptyLabel())}.</div>`;
+      return;
+    }
     E.list.innerHTML = rows.length
-      ? renderGrouped(rows)
+      ? overview + renderGrouped(rows)
       : `<div class="task-empty">Không có công việc trong ngày ${esc(formatShortDate(S.selectedDate || localDate()))}.</div>`;
   }
 
   function syncDatebar() {
-    if (E.currentDay) E.currentDay.textContent = formatShortDate(S.selectedDate || localDate());
+    if (E.currentDay) E.currentDay.textContent = viewTitle();
+    document.querySelectorAll("[data-task-view]").forEach(button => {
+      button.classList.toggle("active", button.dataset.taskView === S.viewMode);
+    });
+    if (E.staffFilter) E.staffFilter.value = S.selectedUserId || "all";
+  }
+
+  function shiftSelectedDate(amount) {
+    const selected = S.selectedDate || localDate();
+    if (S.viewMode === "week") return addDays(selected, amount * 7);
+    if (S.viewMode === "month") return addMonths(selected, amount);
+    return addDays(selected, amount);
+  }
+
+  async function loadInternalUsers() {
+    if (S.users.length) return;
+    const { data, error } = await sb.from("users")
+      .select("id,full_name,email,role")
+      .in("role", [...INTERNAL_ROLES])
+      .order("full_name");
+    if (error) {
+      console.warn("Load task staff users:", error);
+      return;
+    }
+    S.users = data || [];
   }
 
   async function loadTasks({ refresh = false } = {}) {
@@ -434,11 +569,7 @@
   }
 
   async function openCreateModal() {
-    if (!S.users.length) {
-      const { data, error } = await sb.from("users").select("id,full_name,email,role").in("role", [...INTERNAL_ROLES]).order("full_name");
-      if (error) return alert(error.message);
-      S.users = data || [];
-    }
+    await loadInternalUsers();
     renderAssignees();
     openModal("taskCreateModal");
   }
@@ -505,11 +636,21 @@
 
   function bindEvents() {
     E.prevDay.addEventListener("click", () => {
-      S.selectedDate = addDays(S.selectedDate || localDate(), -1);
+      S.selectedDate = shiftSelectedDate(-1);
       render();
     });
     E.nextDay.addEventListener("click", () => {
-      S.selectedDate = addDays(S.selectedDate || localDate(), 1);
+      S.selectedDate = shiftSelectedDate(1);
+      render();
+    });
+    document.querySelectorAll("[data-task-view]").forEach(button => {
+      button.addEventListener("click", () => {
+        S.viewMode = button.dataset.taskView || "today";
+        render();
+      });
+    });
+    E.staffFilter?.addEventListener("change", () => {
+      S.selectedUserId = E.staffFilter.value || "all";
       render();
     });
     E.list.addEventListener("click", event => {
@@ -532,6 +673,7 @@
       list: byId("taskList"), prevDay: byId("taskPrevDay"), currentDay: byId("taskCurrentDay"), nextDay: byId("taskNextDay"),
       todayCount: byId("taskTodayCount"), importantCount: byId("taskImportantCount"),
       overdueCount: byId("taskOverdueCount"), completedCount: byId("taskCompletedCount"),
+      adminFilter: byId("taskAdminFilter"), staffFilter: byId("taskStaffFilter"),
       toast: byId("taskToast"),
     });
     const { data: { user } } = await sb.auth.getUser();
@@ -551,6 +693,8 @@
     S.selectedDate = localDate();
     byId("taskGreeting").textContent = `${profile.full_name || "Bạn"}, đây là các việc cần chú ý hôm nay.`;
     byId("taskCreateButton").style.display = profile.role === "admin" ? "grid" : "none";
+    if (profile.role === "admin") await loadInternalUsers();
+    renderStaffFilter();
     bindEvents();
     await loadTasks({ refresh: true });
     window.MindupLiveUI?.watchTable?.("task_assignments", () => loadTasks());
