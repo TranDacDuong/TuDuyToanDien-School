@@ -43,7 +43,7 @@
         if(openBtn)   openBtn.style.display = "";
         if(filters)   filters.style.display = "contents";
         if(filterBar) filterBar.style.display = "none"; /* class_list sẽ bật sau khi load */
-      } else if(role === "teacher"){
+      } else if(role === "teacher" || role === "assistant"){
         /* Teacher: hiện nút tạo lớp trong khối thao tác gọn */
         if(openBtn)   openBtn.style.display = "";
         if(filters)   filters.style.display = "none";

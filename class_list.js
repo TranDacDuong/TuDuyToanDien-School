@@ -336,7 +336,7 @@
                 ? `<button class="edit-btn" type="button" onclick="event.stopPropagation(); window.restoreClass('${cls.id}')">↺ Khôi phục</button>`
                 : `<button class="delete-btn" type="button" onclick="event.stopPropagation(); window.deleteClass('${cls.id}','${role}')">🗑 Xóa</button>`}
             </div>`
-          : role === "teacher"
+          : (role === "teacher" || role === "assistant")
             ? `<div class="class-actions">
                 ${cls.hidden
                   ? `<button class="edit-btn" type="button" onclick="event.stopPropagation(); window.restoreClass('${cls.id}')">↺ Khôi phục</button>`
