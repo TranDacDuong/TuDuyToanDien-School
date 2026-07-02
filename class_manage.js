@@ -127,46 +127,108 @@
       .join("; ");
   }
 
-  function parseMonthInput(value){
-    const fallback = { month: _currentMonth, year: _currentYear, value: _currentYear+"-"+String(_currentMonth+1).padStart(2,"0") };
-    if(!value || !/^\d{4}-\d{2}$/.test(value)) return fallback;
-    const year = Number(value.slice(0,4));
-    const month = Number(value.slice(5,7)) - 1;
-    if(!Number.isFinite(year) || !Number.isFinite(month) || month < 0 || month > 11) return fallback;
-    return { month, year, value };
+  function dateFromStr(value){
+    return new Date(String(value).slice(0,10)+"T00:00:00");
   }
 
-  function getClassScheduleGroupsForMonth(monthValue){
-    const parsed = parseMonthInput(monthValue);
-    const schedules = getSchedulesForMonth(_cachedClass?.class_schedules || [], parsed.month, parsed.year);
-    return groupSchedulesBySession(schedules);
+  function dateToStr(date){
+    return date.getFullYear()+"-"+String(date.getMonth()+1).padStart(2,"0")+"-"+String(date.getDate()).padStart(2,"0");
   }
 
-  function buildClassSessionDateChoicesHtml(sessionNo, monthValue, selectedDates = new Set()){
-    const parsed = parseMonthInput(monthValue);
-    const grouped = getClassScheduleGroupsForMonth(parsed.value);
-    const schedules = grouped[Number(sessionNo)] || [];
-    if(!schedules.length){
-      return '<div style="padding:10px 12px;border:1px dashed #cbd5e1;border-radius:10px;color:var(--ink-light);font-size:.82rem">Không có lịch lớp khớp với buổi này trong tháng đã chọn.</div>';
+  function addDays(date, count){
+    const next = new Date(date);
+    next.setDate(next.getDate() + count);
+    return next;
+  }
+
+  function getSchedulesForDate(dateValue){
+    const date = dateFromStr(dateValue);
+    const wd = date.getDay() === 0 ? 7 : date.getDay();
+    return getSchedulesForMonth(_cachedClass?.class_schedules || [], date.getMonth(), date.getFullYear())
+      .filter(s => Number(s.weekday) === Number(wd));
+  }
+
+  function getSessionDatesFromBaseDate(dateValue){
+    const baseSchedules = getSchedulesForDate(dateValue);
+    if(!baseSchedules.length) return { sessionNo: null, dates: [], scheduleMap: new Map() };
+    const sessionNo = Number(baseSchedules[0].session_no || 1);
+    const baseDate = dateFromStr(dateValue);
+    const baseWd = baseDate.getDay() === 0 ? 7 : baseDate.getDay();
+    const monday = addDays(baseDate, 1 - baseWd);
+    const scheduleMap = new Map();
+    const dates = [];
+    for(let i=0;i<7;i++){
+      const date = addDays(monday, i);
+      const value = dateToStr(date);
+      const matched = getSchedulesForDate(value).filter(s => Number(s.session_no || 1) === sessionNo);
+      if(matched.length){
+        dates.push(value);
+        scheduleMap.set(value, matched);
+      }
     }
-    const byDate = new Map();
-    generateOccurrences(schedules, parsed.month, parsed.year).forEach(item => {
-      if(!byDate.has(item.date)) byDate.set(item.date, []);
-      byDate.get(item.date).push(item.schedule);
-    });
-    const dates = [...byDate.keys()].sort();
-    if(!selectedDates.size) dates.forEach(date => selectedDates.add(date));
-    return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px">'+
-      dates.map(date => {
-        const checked = selectedDates.has(date) ? "checked" : "";
-        const label = date.slice(8,10)+"/"+date.slice(5,7);
-        const detail = scheduleGroupText(byDate.get(date));
-        return '<label style="display:flex;gap:9px;align-items:flex-start;padding:10px 11px;border:1px solid var(--border);border-radius:10px;background:#fff;cursor:pointer">'+
-          '<input class="cvSessionDateChoice" type="checkbox" value="'+date+'" '+checked+' style="margin-top:2px">'+
-          '<span><span style="display:block;font-weight:800;color:var(--navy)">'+esc(label)+'</span>'+
-          '<span style="display:block;font-size:.78rem;color:var(--ink-mid);line-height:1.45">'+esc(detail)+'</span></span>'+
-        '</label>';
-      }).join("")+
+    return { sessionNo, dates, scheduleMap };
+  }
+
+  function buildSelectedClassSessionDatesHtml(baseDate){
+    if(!baseDate){
+      return '<div style="padding:10px 12px;border:1px dashed #cbd5e1;border-radius:10px;color:var(--ink-light);font-size:.82rem">Chọn một ngày học trên lịch để hệ thống tự lấy các lịch còn lại cùng buổi.</div>';
+    }
+    const result = getSessionDatesFromBaseDate(baseDate);
+    if(!result.dates.length){
+      return '<div style="padding:10px 12px;border:1px dashed #fca5a5;border-radius:10px;color:var(--red);font-size:.82rem">Ngày đã chọn không khớp với lịch học nào của lớp.</div>';
+    }
+    return '<div style="display:grid;gap:8px">'+
+      '<div style="font-size:.78rem;color:var(--ink-mid);line-height:1.55">Đã nhận diện <b>Buổi '+result.sessionNo+'</b>. Các ngày dưới đây sẽ dùng chung một bài học:</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px">'+
+        result.dates.map(date => {
+          const detail = scheduleGroupText(result.scheduleMap.get(date));
+          return '<div style="padding:10px 11px;border:1px solid var(--border);border-radius:10px;background:#fff">'+
+            '<input class="cvSessionDateChoice" type="hidden" value="'+date+'">'+
+            '<div style="font-weight:800;color:var(--navy)">'+esc(date.slice(8,10)+"/"+date.slice(5,7)+"/"+date.slice(0,4))+'</div>'+
+            '<div style="font-size:.78rem;color:var(--ink-mid);line-height:1.45">'+esc(detail)+'</div>'+
+          '</div>';
+        }).join("")+
+      '</div>'+
+    '</div>';
+  }
+
+  function buildClassSessionCalendarHtml(viewMonthValue, selectedDate = ""){
+    const view = /^\d{4}-\d{2}$/.test(viewMonthValue || "") ? viewMonthValue : (_currentYear+"-"+String(_currentMonth+1).padStart(2,"0"));
+    const year = Number(view.slice(0,4));
+    const month = Number(view.slice(5,7)) - 1;
+    const first = new Date(year, month, 1);
+    const start = addDays(first, -((first.getDay() + 6) % 7));
+    const prev = new Date(year, month - 1, 1);
+    const next = new Date(year, month + 1, 1);
+    const cells = [];
+    for(let i=0;i<42;i++){
+      const date = addDays(start, i);
+      const value = dateToStr(date);
+      const inMonth = date.getMonth() === month;
+      const schedules = getSchedulesForDate(value);
+      const enabled = schedules.length > 0;
+      const selected = value === selectedDate;
+      const bg = selected ? "var(--navy)" : enabled ? "#eff6ff" : "#f8fafc";
+      const color = selected ? "#fff" : enabled ? "var(--navy)" : "#cbd5e1";
+      const border = selected ? "var(--navy)" : enabled ? "#bfdbfe" : "#e2e8f0";
+      cells.push('<button type="button" '+(enabled ? 'onclick="cvSelectClassSessionBaseDate(\''+value+'\')"' : 'disabled')+
+        ' title="'+(enabled ? esc(scheduleGroupText(schedules)) : "Không có lịch học")+'" '+
+        'style="min-height:48px;border:1px solid '+border+';border-radius:10px;background:'+bg+';color:'+color+';cursor:'+(enabled?'pointer':'not-allowed')+';opacity:'+(inMonth?'1':'.45')+';font-weight:800;font-family:var(--font-body);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">'+
+          '<span>'+date.getDate()+'</span>'+
+          (enabled ? '<span style="font-size:.62rem;font-weight:800">'+esc("B"+(schedules[0].session_no || 1))+'</span>' : '')+
+        '</button>');
+    }
+    const title = "Tháng "+String(month+1).padStart(2,"0")+"/"+year;
+    return '<div>'+
+      '<input id="cvSessionCalendarMonth" type="hidden" value="'+view+'">'+
+      '<input id="cvSessionBaseDate" type="hidden" value="'+esc(selectedDate || "")+'">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">'+
+        '<button type="button" onclick="cvRenderClassSessionCalendar(\''+prev.getFullYear()+"-"+String(prev.getMonth()+1).padStart(2,"0")+'\')" class="btn btn-outline btn-sm">‹</button>'+
+        '<div style="font-weight:800;color:var(--navy)">'+esc(title)+'</div>'+
+        '<button type="button" onclick="cvRenderClassSessionCalendar(\''+next.getFullYear()+"-"+String(next.getMonth()+1).padStart(2,"0")+'\')" class="btn btn-outline btn-sm">›</button>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px">'+["T2","T3","T4","T5","T6","T7","CN"].map(d => '<div style="font-size:.7rem;font-weight:800;color:var(--ink-mid);text-align:center">'+d+'</div>').join("")+'</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">'+cells.join("")+'</div>'+
     '</div>';
   }
 
@@ -1978,12 +2040,17 @@
         }).join("");
   };
 
-  window.cvRefreshClassSessionDateChoices = function(){
-    const monthValue = document.getElementById("cvSessionMonth")?.value || "";
-    const sessionNo = document.getElementById("cvSessionScheduleGroup")?.value || "";
-    const holder = document.getElementById("cvSessionDateChoices");
+  window.cvRenderClassSessionCalendar = function(monthValue, selectedDate = document.getElementById("cvSessionBaseDate")?.value || ""){
+    const holder = document.getElementById("cvSessionCalendar");
     if(!holder) return;
-    holder.innerHTML = buildClassSessionDateChoicesHtml(sessionNo, monthValue, new Set());
+    holder.innerHTML = buildClassSessionCalendarHtml(monthValue, selectedDate);
+  };
+
+  window.cvSelectClassSessionBaseDate = function(dateValue){
+    const monthValue = String(dateValue || "").slice(0,7);
+    window.cvRenderClassSessionCalendar(monthValue, dateValue);
+    const choices = document.getElementById("cvSessionDateChoices");
+    if(choices) choices.innerHTML = buildSelectedClassSessionDatesHtml(dateValue);
   };
 
   window.cvOpenAddClassSession = async function(sessionId = ""){
@@ -2035,22 +2102,11 @@
     const groupSessions = currentSession
       ? (sessions || []).filter(item => item.lesson_id === currentSession.lesson_id && Number(item.session_order || 0) === Number(currentSession.session_order || 0))
       : [];
-    const selectedDates = new Set(groupSessions.map(item => String(item.session_date || "").slice(0,10)).filter(Boolean));
-    const sessionMonth = currentSession?.session_date
-      ? String(currentSession.session_date).slice(0,7)
+    const selectedDateList = groupSessions.map(item => String(item.session_date || "").slice(0,10)).filter(Boolean).sort();
+    const baseSessionDate = selectedDateList[0] || "";
+    const calendarMonth = baseSessionDate
+      ? baseSessionDate.slice(0,7)
       : _currentYear+"-"+String(_currentMonth+1).padStart(2,"0");
-    const scheduleGroups = getClassScheduleGroupsForMonth(sessionMonth);
-    const scheduleNos = Object.keys(scheduleGroups).map(Number).sort((a,b)=>a-b);
-    const currentWeekday = currentSession?.session_date
-      ? (new Date(String(currentSession.session_date).slice(0,10)+"T00:00:00").getDay() || 7)
-      : null;
-    const matchedSchedule = currentWeekday
-      ? Object.values(scheduleGroups).flat().find(s => Number(s.weekday) === Number(currentWeekday))
-      : null;
-    const selectedScheduleNo = matchedSchedule?.session_no || scheduleNos[0] || 1;
-    const scheduleGroupOptions = scheduleNos.length
-      ? scheduleNos.map(no => '<option value="'+no+'" '+(Number(selectedScheduleNo)===Number(no) ? "selected" : "")+'>Buổi '+no+': '+esc(scheduleGroupText(scheduleGroups[no]))+'</option>').join("")
-      : '<option value="">Lớp chưa có lịch học trong tháng này</option>';
     const modal = document.createElement("div");
     modal.id = "cvClassSessionModal";
     modal.style.cssText = "position:fixed;inset:0;background:rgba(10,20,40,.5);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:320";
@@ -2062,16 +2118,12 @@
         '</div>'+
         '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">'+
           '<div><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Số buổi</label><input id="cvSessionOrder" type="number" min="1" value="'+(currentSession?.session_order || nextOrder)+'" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"></div>'+
-          '<div><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Tháng học</label><input id="cvSessionMonth" type="month" value="'+sessionMonth+'" onchange="cvRefreshClassSessionDateChoices()" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"></div>'+
-        '</div>'+
-        '<div style="margin-top:14px">'+
-          '<label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Lịch của lớp</label>'+
-          '<select id="cvSessionScheduleGroup" onchange="cvRefreshClassSessionDateChoices()" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box">'+scheduleGroupOptions+'</select>'+
-          '<div style="font-size:.76rem;color:var(--ink-mid);margin-top:6px;line-height:1.55">Các lịch có cùng Buổi sẽ được gộp lại. Ví dụ Buổi 1 gồm T2 và T5 thì cùng dùng một bài học.</div>'+
+          '<div style="font-size:.78rem;color:var(--ink-mid);line-height:1.55;align-self:end">Chọn 1 ngày học trên lịch. Hệ thống sẽ tự nhận Buổi mấy và lấy các lịch còn lại cùng buổi trong tuần đó, kể cả khác tháng.</div>'+
         '</div>'+
         '<div style="margin-top:14px">'+
           '<label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Ngày học</label>'+
-          '<div id="cvSessionDateChoices">'+buildClassSessionDateChoicesHtml(selectedScheduleNo, sessionMonth, selectedDates)+'</div>'+
+          '<div id="cvSessionCalendar">'+buildClassSessionCalendarHtml(calendarMonth, baseSessionDate)+'</div>'+
+          '<div id="cvSessionDateChoices" style="margin-top:10px">'+buildSelectedClassSessionDatesHtml(baseSessionDate)+'</div>'+
         '</div>'+
         '<div style="margin-top:14px"><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Tên bài học</label><input id="cvSessionLessonName" type="text" value="'+esc(lesson?.name || "")+'" placeholder="Ví dụ: Bài 5. Sự biến thiên của hàm số" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"></div>'+
         '<div style="margin-top:14px"><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Mô tả</label><textarea id="cvSessionSummary" rows="4" placeholder="Mô tả ngắn cho buổi học này" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box;resize:vertical">'+esc(lesson?.summary || "")+'</textarea></div>'+
@@ -2101,7 +2153,7 @@
     const sb = getSb();
     const lessonName = (document.getElementById("cvSessionLessonName")?.value || "").trim();
     const sessionOrder = Number(document.getElementById("cvSessionOrder")?.value || 0);
-    const selectedDates = Array.from(document.querySelectorAll(".cvSessionDateChoice:checked"))
+    const selectedDates = Array.from(document.querySelectorAll(".cvSessionDateChoice"))
       .map(input => input.value)
       .filter(Boolean)
       .sort();
