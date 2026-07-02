@@ -294,7 +294,7 @@
   }
 
   function canManageClassContent(role = _role){
-    return role === "admin" || role === "teacher" || role === "assistant";
+    return role === "admin" || role === "teacher";
   }
 
   function canEvaluateClassSession(role = _role){
@@ -752,7 +752,7 @@
             '</td>';
         }
       });
-      const stopBtn = (isActive && (role === "admin" || role === "teacher" || role === "assistant"))
+      const stopBtn = (isActive && (role === "admin" || role === "teacher"))
         ? '<button onclick="cvStopStudent(\''+_classId+'\',\''+s.student_id+'\')" '+
           'class="btn btn-outline btn-sm" style="font-size:.72rem;padding:3px 9px">Ngừng</button>'
         : '<span style="font-size:.72rem;color:var(--ink-light)">—</span>';
@@ -1398,7 +1398,7 @@
     const actionHtml = canEvaluate
       ? '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
           '<button onclick="openSessionEvaluation(\''+session.id+'\')" class="btn btn-primary btn-sm">Đánh giá buổi học</button>'+
-          ((role === "admin" || role === "teacher" || role === "assistant") ?
+          ((role === "admin" || role === "teacher") ?
           '<button onclick="cvOpenAddClassSession(\''+session.id+'\')" class="btn btn-outline btn-sm">Sửa buổi</button>'+
           '<button onclick="cvDeleteClassSession(\''+session.id+'\')" class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5">Xóa buổi</button>' : '')+
         '</div>'
@@ -1591,7 +1591,7 @@
       });
 
     const gameSectionHtml = buildClassGamesSection(role, gameRooms||[], gamePlayers||[]);
-    const actionsHtml = (role==="admin"||role==="teacher"||role==="assistant")
+    const actionsHtml = (role==="admin"||role==="teacher")
       ? '<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">'+
           '<button onclick="cvOpenAddClassSession()" class="btn btn-primary btn-sm">+ Thêm buổi học</button>'+
         '</div>'
@@ -1620,7 +1620,7 @@
       if(!playerMap[p.room_id]) playerMap[p.room_id]=[];
       playerMap[p.room_id].push(p);
     });
-    const openCreateBtn = (role==="admin"||role==="teacher"||role==="assistant")
+    const openCreateBtn = (role==="admin"||role==="teacher")
       ? '<button onclick="cvOpenClassGame()" class="btn btn-outline btn-sm">🎮 Tạo phòng game cho lớp</button>'
       : "";
     const roomsHtml = (rooms||[]).length
