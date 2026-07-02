@@ -1900,7 +1900,7 @@ WITH CHECK (
     SELECT 1
     FROM public.users u
     WHERE u.id = auth.uid()
-      AND u.role IN ('admin', 'teacher')
+      AND u.role IN ('admin', 'teacher', 'assistant')
   )
 );
 
@@ -1912,7 +1912,7 @@ USING (
     SELECT 1
     FROM public.users u
     WHERE u.id = auth.uid()
-      AND u.role IN ('admin', 'teacher')
+      AND u.role IN ('admin', 'teacher', 'assistant')
   )
 )
 WITH CHECK (
@@ -1920,7 +1920,7 @@ WITH CHECK (
     SELECT 1
     FROM public.users u
     WHERE u.id = auth.uid()
-      AND u.role IN ('admin', 'teacher')
+      AND u.role IN ('admin', 'teacher', 'assistant')
   )
 );
 
@@ -1932,7 +1932,7 @@ USING (
     SELECT 1
     FROM public.users u
     WHERE u.id = auth.uid()
-      AND u.role IN ('admin', 'teacher')
+      AND u.role IN ('admin', 'teacher', 'assistant')
   )
 );
 
@@ -1944,7 +1944,7 @@ WITH CHECK (
   auth.uid() = created_by
   AND EXISTS (
     SELECT 1 FROM public.users u
-    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher', 'assistant')
   )
 );
 
@@ -1954,13 +1954,13 @@ FOR UPDATE
 USING (
   EXISTS (
     SELECT 1 FROM public.users u
-    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher', 'assistant')
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM public.users u
-    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher', 'assistant')
   )
 );
 
@@ -1970,7 +1970,7 @@ FOR DELETE
 USING (
   EXISTS (
     SELECT 1 FROM public.users u
-    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher')
+    WHERE u.id = auth.uid() AND u.role IN ('admin', 'teacher', 'assistant')
   )
 );
 

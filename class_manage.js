@@ -414,6 +414,10 @@
     return role === "admin" || role === "teacher";
   }
 
+  function canManageClassSessions(role = _role){
+    return role === "admin" || role === "teacher" || role === "assistant";
+  }
+
   function canEvaluateClassSession(role = _role){
     return role === "admin" || role === "teacher" || role === "assistant";
   }
@@ -1520,7 +1524,7 @@
     const practiceHtml = role === "student"
       ? renderStudentPracticeBlock(examInfo, examState)
       : renderAdminPracticeBlock(examInfo, examState);
-    const canManage = role === "admin" || role === "teacher";
+    const canManage = canManageClassSessions(role);
     const editSessionId = session.primary_id || session.id;
     const actionHtml = canManage
       ? '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
@@ -1757,7 +1761,7 @@
       });
 
     const gameSectionHtml = buildClassGamesSection(role, gameRooms||[], gamePlayers||[]);
-    const actionsHtml = (role==="admin"||role==="teacher")
+    const actionsHtml = canManageClassSessions(role)
       ? '<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">'+
           '<button onclick="cvOpenAddClassSession()" class="btn btn-primary btn-sm">+ Thêm buổi học</button>'+
         '</div>'
@@ -2054,7 +2058,7 @@
   };
 
   window.cvOpenAddClassSession = async function(sessionId = ""){
-    if(_role !== "admin" && _role !== "teacher") return;
+    if(!canManageClassSessions(_role)) return;
     const sb = getSb();
     const { error: probeError } = await sb.from("class_sessions").select("id").eq("class_id", _classId).limit(1);
     if(probeError && isMissingRelationError(probeError)){

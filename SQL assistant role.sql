@@ -106,6 +106,96 @@ WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS class_sessions_insert_policy ON public.class_sessions;
+CREATE POLICY class_sessions_insert_policy ON public.class_sessions
+FOR INSERT
+WITH CHECK (
+  auth.uid() = created_by
+  AND EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
+  )
+);
+
+DROP POLICY IF EXISTS class_sessions_update_policy ON public.class_sessions;
+CREATE POLICY class_sessions_update_policy ON public.class_sessions
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
+  )
+);
+
+DROP POLICY IF EXISTS class_sessions_delete_policy ON public.class_sessions;
+CREATE POLICY class_sessions_delete_policy ON public.class_sessions
+FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
+  )
+);
+
+DROP POLICY IF EXISTS lessons_insert_policy ON public.lessons;
+CREATE POLICY lessons_insert_policy ON public.lessons
+FOR INSERT
+WITH CHECK (
+  auth.uid() = created_by
+  AND EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
+  )
+);
+
+DROP POLICY IF EXISTS lessons_update_policy ON public.lessons;
+CREATE POLICY lessons_update_policy ON public.lessons
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
+  )
+);
+
+DROP POLICY IF EXISTS lessons_delete_policy ON public.lessons;
+CREATE POLICY lessons_delete_policy ON public.lessons
+FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
+  )
+);
+
 DROP POLICY IF EXISTS courses_select_policy ON public.courses;
 CREATE POLICY courses_select_policy ON public.courses
 FOR SELECT
