@@ -86,6 +86,26 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS class_student_schedules_staff_manage ON public.class_student_schedules;
+CREATE POLICY class_student_schedules_staff_manage ON public.class_student_schedules
+FOR ALL
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
+  )
+);
+
 DROP POLICY IF EXISTS courses_select_policy ON public.courses;
 CREATE POLICY courses_select_policy ON public.courses
 FOR SELECT

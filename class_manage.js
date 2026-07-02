@@ -252,6 +252,7 @@
   let _studentSearchPool = null;
   let _classSessionExamCatalog = { exam: [], pdf: [] };
   let _studentScheduleMap = {};
+  let _studentScheduleLoadError = null;
   let _parentStudentIds = new Set();
 
   function normalizeSearchText(value){
@@ -487,11 +488,15 @@
     }
     _cachedClass = data;
     renderShell();
-    const { data: chosenSchedules } = await sb
+    const { data: chosenSchedules, error: chosenScheduleError } = await sb
       .from("class_student_schedules")
       .select("student_id,schedule_id")
       .eq("class_id", _classId);
     _studentScheduleMap = {};
+    _studentScheduleLoadError = chosenScheduleError || null;
+    if(chosenScheduleError){
+      console.warn("Không tải được lịch học riêng của học sinh:", chosenScheduleError);
+    }
     (chosenSchedules || []).forEach(row => {
       if(!_studentScheduleMap[row.student_id]) _studentScheduleMap[row.student_id] = new Set();
       _studentScheduleMap[row.student_id].add(Number(row.schedule_id));
@@ -614,6 +619,11 @@
     const dates = role === "student"
       ? generateStudentOccurrences(window._currentUserId, schedulesThisMonth, _currentMonth, _currentYear)
       : collectDatesForStudents(visibleStudents, schedulesThisMonth, _currentMonth, _currentYear);
+    const scheduleLoadWarning = _studentScheduleLoadError && ["admin","teacher","assistant"].includes(role)
+      ? '<div style="margin-bottom:10px;padding:10px 12px;border:1px solid #fbbf24;background:#fffbeb;color:#92400e;border-radius:10px;font-size:.86rem;font-weight:700">'+
+        'Chưa tải được lịch học riêng của học sinh, bảng điểm danh có thể chưa chia đúng lịch. Lỗi: '+esc(_studentScheduleLoadError.message || _studentScheduleLoadError)+
+        '</div>'
+      : "";
     let evaluationSessions = [];
     if(canEvaluateClassSession(role)){
       const { data: storedSessions, error: sessionLoadError } = await sb
@@ -671,7 +681,7 @@
           (me.user?.full_name || "Tôi")+' <span style="font-size:.7rem;color:var(--gold)">(Tôi)</span>'+
           "</td>"+myCells+
         "</tr>";
-      tc.innerHTML =
+      tc.innerHTML = scheduleLoadWarning +
         '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">'+
         '<table class="table" style="font-size:.8rem">'+
         "<thead><tr>"+
@@ -704,7 +714,7 @@
           s.user.full_name+(isMe?' <span style="font-size:.7rem;color:var(--gold)">(Tôi)</span>':"")+
           "</td>"+cells+"</tr>";
       });
-      tc.innerHTML =
+      tc.innerHTML = scheduleLoadWarning +
         '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">'+
         '<table class="table" style="font-size:.8rem">'+
         "<thead><tr>"+
@@ -798,7 +808,7 @@
       '<div id="cvSearchResults" style="margin-top:12px;max-height:52vh;overflow-y:auto"></div>'+
       "</div></div></div>";
 
-    tc.innerHTML=
+    tc.innerHTML= scheduleLoadWarning +
       '<div style="margin-bottom:14px">'+
       '<button onclick="cvOpenAddStudent()" class="btn btn-primary btn-sm">+ Thêm học sinh</button>'+
       '</div>'+
