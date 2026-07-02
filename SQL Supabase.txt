@@ -1873,7 +1873,9 @@ CREATE TABLE IF NOT EXISTS public.class_sessions (
   )
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS class_sessions_class_order_unique
+DROP INDEX IF EXISTS public.class_sessions_class_order_unique;
+
+CREATE INDEX IF NOT EXISTS class_sessions_class_order_idx
   ON public.class_sessions (class_id, session_order);
 
 CREATE UNIQUE INDEX IF NOT EXISTS class_sessions_class_date_unique

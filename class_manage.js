@@ -116,6 +116,60 @@
     return map;
   }
 
+  function scheduleGroupText(schedules){
+    return (schedules || [])
+      .slice()
+      .sort((a,b)=>Number(a.weekday || 0)-Number(b.weekday || 0) || String(a.start_time || "").localeCompare(String(b.start_time || "")))
+      .map(s => {
+        const time = String(s.start_time || "").slice(0,5)+"-"+String(s.end_time || "").slice(0,5);
+        return (daysMap[s.weekday] || "?")+" "+time+(s.rooms?.room_name ? " "+s.rooms.room_name : "");
+      })
+      .join("; ");
+  }
+
+  function parseMonthInput(value){
+    const fallback = { month: _currentMonth, year: _currentYear, value: _currentYear+"-"+String(_currentMonth+1).padStart(2,"0") };
+    if(!value || !/^\d{4}-\d{2}$/.test(value)) return fallback;
+    const year = Number(value.slice(0,4));
+    const month = Number(value.slice(5,7)) - 1;
+    if(!Number.isFinite(year) || !Number.isFinite(month) || month < 0 || month > 11) return fallback;
+    return { month, year, value };
+  }
+
+  function getClassScheduleGroupsForMonth(monthValue){
+    const parsed = parseMonthInput(monthValue);
+    const schedules = getSchedulesForMonth(_cachedClass?.class_schedules || [], parsed.month, parsed.year);
+    return groupSchedulesBySession(schedules);
+  }
+
+  function buildClassSessionDateChoicesHtml(sessionNo, monthValue, selectedDates = new Set()){
+    const parsed = parseMonthInput(monthValue);
+    const grouped = getClassScheduleGroupsForMonth(parsed.value);
+    const schedules = grouped[Number(sessionNo)] || [];
+    if(!schedules.length){
+      return '<div style="padding:10px 12px;border:1px dashed #cbd5e1;border-radius:10px;color:var(--ink-light);font-size:.82rem">Không có lịch lớp khớp với buổi này trong tháng đã chọn.</div>';
+    }
+    const byDate = new Map();
+    generateOccurrences(schedules, parsed.month, parsed.year).forEach(item => {
+      if(!byDate.has(item.date)) byDate.set(item.date, []);
+      byDate.get(item.date).push(item.schedule);
+    });
+    const dates = [...byDate.keys()].sort();
+    if(!selectedDates.size) dates.forEach(date => selectedDates.add(date));
+    return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px">'+
+      dates.map(date => {
+        const checked = selectedDates.has(date) ? "checked" : "";
+        const label = date.slice(8,10)+"/"+date.slice(5,7);
+        const detail = scheduleGroupText(byDate.get(date));
+        return '<label style="display:flex;gap:9px;align-items:flex-start;padding:10px 11px;border:1px solid var(--border);border-radius:10px;background:#fff;cursor:pointer">'+
+          '<input class="cvSessionDateChoice" type="checkbox" value="'+date+'" '+checked+' style="margin-top:2px">'+
+          '<span><span style="display:block;font-weight:800;color:var(--navy)">'+esc(label)+'</span>'+
+          '<span style="display:block;font-size:.78rem;color:var(--ink-mid);line-height:1.45">'+esc(detail)+'</span></span>'+
+        '</label>';
+      }).join("")+
+    '</div>';
+  }
+
   function getStudentSchedules(studentId, schedules){
     const selectedIds = _studentScheduleMap[studentId];
     if(!selectedIds || !selectedIds.size) return schedules || [];
@@ -1404,16 +1458,21 @@
     const practiceHtml = role === "student"
       ? renderStudentPracticeBlock(examInfo, examState)
       : renderAdminPracticeBlock(examInfo, examState);
-    const canEvaluate = role === "admin" || role === "teacher" || role === "assistant";
-    const actionHtml = canEvaluate
+    const canManage = role === "admin" || role === "teacher";
+    const editSessionId = session.primary_id || session.id;
+    const actionHtml = canManage
       ? '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-          '<button onclick="openSessionEvaluation(\''+session.id+'\')" class="btn btn-primary btn-sm">Đánh giá buổi học</button>'+
-          ((role === "admin" || role === "teacher") ?
-          '<button onclick="cvOpenAddClassSession(\''+session.id+'\')" class="btn btn-outline btn-sm">Sửa buổi</button>'+
-          '<button onclick="cvDeleteClassSession(\''+session.id+'\')" class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5">Xóa buổi</button>' : '')+
+          '<button onclick="cvOpenAddClassSession(\''+editSessionId+'\')" class="btn btn-outline btn-sm">Sửa buổi</button>'+
+          '<button onclick="cvDeleteClassSession(\''+editSessionId+'\')" class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5">Xóa buổi</button>'+
         '</div>'
       : "";
     const orderLabel = session.display_order || session.session_order || "—";
+    const dateList = (session.session_dates && session.session_dates.length)
+      ? session.session_dates
+      : [session.session_date].filter(Boolean);
+    const dateChips = dateList.map(date =>
+      '<span style="font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8">'+esc(fmtSessionDate(date))+'</span>'
+    ).join("");
     return '<div style="background:var(--white);border:1px solid var(--border);border-radius:18px;padding:'+(isCompactMobile ? '16px' : '16px 18px')+'">'+
       '<div style="display:grid;grid-template-columns:'+(isCompactMobile ? '1fr' : '82px minmax(0,1fr) auto')+';gap:16px;align-items:'+(isCompactMobile ? 'stretch' : 'center')+'">'+
         '<div style="width:'+(isCompactMobile ? '100%' : '82px')+';height:'+(isCompactMobile ? 'auto' : '82px')+';min-height:58px;border-radius:16px;background:linear-gradient(135deg,#0f3c73 0%,#1d6bd1 100%);box-shadow:0 12px 28px rgba(15,60,115,.18);color:#fff;display:flex;flex-direction:'+(isCompactMobile ? 'row' : 'column')+';align-items:center;justify-content:center;gap:'+(isCompactMobile ? '10px' : '2px')+';padding:'+(isCompactMobile ? '12px 14px' : '8px')+'">'+
@@ -1422,7 +1481,7 @@
         '</div>'+
         '<div style="min-width:0">'+
           '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">'+
-            '<span style="font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#eff6ff;color:#1d4ed8">'+esc(fmtSessionDate(session.session_date))+'</span>'+
+            dateChips+
             (examInfo ? '<span style="font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#fff7ed;color:#c2410c">Có đề luyện tập</span>' : '<span style="font-size:.74rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#f5f5f4;color:#57534e">Chưa gắn đề luyện tập</span>')+
           '</div>'+
           '<div style="font-weight:700;font-size:1rem;color:var(--navy);margin-top:'+(isCompactMobile ? '8px' : '4px')+'">'+esc(lesson?.name || "Chưa có tên bài học")+'</div>'+
@@ -1433,6 +1492,41 @@
         '<div style="display:flex;justify-content:'+(isCompactMobile ? 'stretch' : 'flex-end')+';width:'+(isCompactMobile ? '100%' : 'auto')+'">'+actionHtml+'</div>'+
       '</div>'+
     '</div>';
+  }
+
+  function groupClassSessionsForLearning(sessions){
+    const map = new Map();
+    (sessions || []).forEach(session => {
+      const key = [
+        session.lesson_id || "",
+        Number(session.session_order || 0),
+        session.exam_id || "",
+        session.pdf_exam_id || "",
+        session.starts_at || "",
+        session.ends_at || ""
+      ].join("|");
+      if(!map.has(key)){
+        map.set(key, {
+          ...session,
+          primary_id: session.id,
+          session_dates: [],
+          session_ids: []
+        });
+      }
+      const group = map.get(key);
+      const date = String(session.session_date || "").slice(0,10);
+      if(date && !group.session_dates.includes(date)) group.session_dates.push(date);
+      group.session_ids.push(session.id);
+      if(String(session.created_at || "") > String(group.created_at || "")){
+        group.primary_id = session.id;
+        group.created_at = session.created_at;
+      }
+    });
+    return [...map.values()].map(group => ({
+      ...group,
+      session_dates: group.session_dates.sort(),
+      session_date: group.session_dates[0] || group.session_date
+    }));
   }
 
 
@@ -1566,7 +1660,7 @@
           reviewExams: reviewExams
         };
 
-    const manualSessions = sessions
+    const manualSessions = groupClassSessionsForLearning(sessions)
       .sort((a, b) => {
         const orderCompare = Number(b.session_order || 0) - Number(a.session_order || 0);
         if(orderCompare !== 0) return orderCompare;
@@ -1884,6 +1978,14 @@
         }).join("");
   };
 
+  window.cvRefreshClassSessionDateChoices = function(){
+    const monthValue = document.getElementById("cvSessionMonth")?.value || "";
+    const sessionNo = document.getElementById("cvSessionScheduleGroup")?.value || "";
+    const holder = document.getElementById("cvSessionDateChoices");
+    if(!holder) return;
+    holder.innerHTML = buildClassSessionDateChoicesHtml(sessionNo, monthValue, new Set());
+  };
+
   window.cvOpenAddClassSession = async function(sessionId = ""){
     if(_role !== "admin" && _role !== "teacher") return;
     const sb = getSb();
@@ -1927,9 +2029,28 @@
       lesson = lessonData;
     }
 
-    const nextOrder = (sessions || []).length + 1;
+    const nextOrder = Math.max(0, ...(sessions || []).map(item => Number(item.session_order || 0))) + 1;
     const practiceType = currentSession?.pdf_exam_id ? "pdf" : currentSession?.exam_id ? "exam" : "";
     const practiceId = currentSession?.pdf_exam_id || currentSession?.exam_id || "";
+    const groupSessions = currentSession
+      ? (sessions || []).filter(item => item.lesson_id === currentSession.lesson_id && Number(item.session_order || 0) === Number(currentSession.session_order || 0))
+      : [];
+    const selectedDates = new Set(groupSessions.map(item => String(item.session_date || "").slice(0,10)).filter(Boolean));
+    const sessionMonth = currentSession?.session_date
+      ? String(currentSession.session_date).slice(0,7)
+      : _currentYear+"-"+String(_currentMonth+1).padStart(2,"0");
+    const scheduleGroups = getClassScheduleGroupsForMonth(sessionMonth);
+    const scheduleNos = Object.keys(scheduleGroups).map(Number).sort((a,b)=>a-b);
+    const currentWeekday = currentSession?.session_date
+      ? (new Date(String(currentSession.session_date).slice(0,10)+"T00:00:00").getDay() || 7)
+      : null;
+    const matchedSchedule = currentWeekday
+      ? Object.values(scheduleGroups).flat().find(s => Number(s.weekday) === Number(currentWeekday))
+      : null;
+    const selectedScheduleNo = matchedSchedule?.session_no || scheduleNos[0] || 1;
+    const scheduleGroupOptions = scheduleNos.length
+      ? scheduleNos.map(no => '<option value="'+no+'" '+(Number(selectedScheduleNo)===Number(no) ? "selected" : "")+'>Buổi '+no+': '+esc(scheduleGroupText(scheduleGroups[no]))+'</option>').join("")
+      : '<option value="">Lớp chưa có lịch học trong tháng này</option>';
     const modal = document.createElement("div");
     modal.id = "cvClassSessionModal";
     modal.style.cssText = "position:fixed;inset:0;background:rgba(10,20,40,.5);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:320";
@@ -1941,7 +2062,16 @@
         '</div>'+
         '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">'+
           '<div><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Số buổi</label><input id="cvSessionOrder" type="number" min="1" value="'+(currentSession?.session_order || nextOrder)+'" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"></div>'+
-          '<div><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Ngày học</label><input id="cvSessionDate" type="date" value="'+(currentSession?.session_date || "")+'" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"></div>'+
+          '<div><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Tháng học</label><input id="cvSessionMonth" type="month" value="'+sessionMonth+'" onchange="cvRefreshClassSessionDateChoices()" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"></div>'+
+        '</div>'+
+        '<div style="margin-top:14px">'+
+          '<label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Lịch của lớp</label>'+
+          '<select id="cvSessionScheduleGroup" onchange="cvRefreshClassSessionDateChoices()" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box">'+scheduleGroupOptions+'</select>'+
+          '<div style="font-size:.76rem;color:var(--ink-mid);margin-top:6px;line-height:1.55">Các lịch có cùng Buổi sẽ được gộp lại. Ví dụ Buổi 1 gồm T2 và T5 thì cùng dùng một bài học.</div>'+
+        '</div>'+
+        '<div style="margin-top:14px">'+
+          '<label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Ngày học</label>'+
+          '<div id="cvSessionDateChoices">'+buildClassSessionDateChoicesHtml(selectedScheduleNo, sessionMonth, selectedDates)+'</div>'+
         '</div>'+
         '<div style="margin-top:14px"><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Tên bài học</label><input id="cvSessionLessonName" type="text" value="'+esc(lesson?.name || "")+'" placeholder="Ví dụ: Bài 5. Sự biến thiên của hàm số" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box"></div>'+
         '<div style="margin-top:14px"><label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Mô tả</label><textarea id="cvSessionSummary" rows="4" placeholder="Mô tả ngắn cho buổi học này" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font-body);box-sizing:border-box;resize:vertical">'+esc(lesson?.summary || "")+'</textarea></div>'+
@@ -1971,7 +2101,11 @@
     const sb = getSb();
     const lessonName = (document.getElementById("cvSessionLessonName")?.value || "").trim();
     const sessionOrder = Number(document.getElementById("cvSessionOrder")?.value || 0);
-    const sessionDate = document.getElementById("cvSessionDate")?.value || null;
+    const selectedDates = Array.from(document.querySelectorAll(".cvSessionDateChoice:checked"))
+      .map(input => input.value)
+      .filter(Boolean)
+      .sort();
+    const sessionDate = selectedDates[0] || null;
     const practiceType = document.getElementById("cvSessionPracticeType")?.value || "";
     const practiceId = document.getElementById("cvSessionPracticeId")?.value || "";
     const startsAt = document.getElementById("cvSessionStartsAt")?.value || null;
@@ -1985,8 +2119,8 @@
       alert("Số buổi phải lớn hơn 0.");
       return;
     }
-    if(!sessionDate){
-      alert("Bạn cần chọn ngày học cho buổi này.");
+    if(!selectedDates.length){
+      alert("Bạn cần chọn ít nhất một ngày học khớp với lịch của lớp.");
       return;
     }
     if((startsAt && !endsAt) || (!startsAt && endsAt)){
@@ -2017,7 +2151,6 @@
     const sessionPayload = {
       class_id: _classId,
       session_order: sessionOrder,
-      session_date: sessionDate,
       exam_id: practiceType === "exam" ? practiceId : null,
       pdf_exam_id: practiceType === "pdf" ? practiceId : null,
       starts_at: startsAt ? new Date(startsAt).toISOString() : null,
@@ -2026,15 +2159,59 @@
     };
 
     if(sessionId){
-      const { error: lessonError } = await sb.from("lessons").update(lessonPayload).eq("id", lessonId);
+      const { data: currentGroupSeed, error: currentGroupSeedError } = await sb
+        .from("class_sessions")
+        .select("lesson_id,session_order")
+        .eq("id", sessionId)
+        .single();
+      if(currentGroupSeedError){
+        alert("Không thể đọc buổi học hiện tại: " + currentGroupSeedError.message);
+        return;
+      }
+      const groupLessonId = lessonId || currentGroupSeed?.lesson_id;
+      const oldSessionOrder = Number(currentGroupSeed?.session_order || sessionOrder);
+      const { error: lessonError } = await sb.from("lessons").update(lessonPayload).eq("id", groupLessonId);
       if(lessonError){
         alert("Không thể cập nhật bài học: " + lessonError.message);
         return;
       }
-      const { error: sessionError } = await sb.from("class_sessions").update(sessionPayload).eq("id", sessionId);
-      if(sessionError){
-        alert("Không thể cập nhật buổi học: " + sessionError.message);
+      const { data: oldSessions, error: oldSessionsError } = await sb
+        .from("class_sessions")
+        .select("id,session_date")
+        .eq("class_id", _classId)
+        .eq("lesson_id", groupLessonId)
+        .eq("session_order", oldSessionOrder);
+      if(oldSessionsError){
+        alert("Không thể đọc các ngày học hiện tại: " + oldSessionsError.message);
         return;
+      }
+      const oldByDate = new Map((oldSessions || []).map(item => [String(item.session_date || "").slice(0,10), item]));
+      const selectedDateSet = new Set(selectedDates);
+      const removedIds = (oldSessions || [])
+        .filter(item => !selectedDateSet.has(String(item.session_date || "").slice(0,10)))
+        .map(item => item.id);
+      if(removedIds.length){
+        const { error: removeError } = await sb.from("class_sessions").delete().in("id", removedIds);
+        if(removeError){
+          alert("Không thể gỡ ngày học khỏi buổi này: " + removeError.message);
+          return;
+        }
+      }
+      for(const date of selectedDates){
+        const existing = oldByDate.get(date);
+        if(existing){
+          const { error: sessionError } = await sb.from("class_sessions").update({ ...sessionPayload, session_date: date }).eq("id", existing.id);
+          if(sessionError){
+            alert("Không thể cập nhật ngày học " + date + ": " + sessionError.message);
+            return;
+          }
+        } else {
+          const { error: sessionError } = await sb.from("class_sessions").insert({ ...sessionPayload, lesson_id: groupLessonId, session_date: date });
+          if(sessionError){
+            alert("Không thể thêm ngày học " + date + ": " + sessionError.message);
+            return;
+          }
+        }
       }
     } else {
       const { data: lessonRow, error: lessonError } = await sb.from("lessons").insert(lessonPayload).select("id").single();
@@ -2042,7 +2219,8 @@
         alert("Không thể tạo bài học: " + lessonError.message);
         return;
       }
-      const { error: sessionError } = await sb.from("class_sessions").insert({ ...sessionPayload, lesson_id: lessonRow.id });
+      const sessionRows = selectedDates.map(date => ({ ...sessionPayload, lesson_id: lessonRow.id, session_date: date }));
+      const { error: sessionError } = await sb.from("class_sessions").insert(sessionRows);
       if(sessionError){
         await sb.from("lessons").delete().eq("id", lessonRow.id);
         alert("Không thể tạo buổi học: " + sessionError.message);
