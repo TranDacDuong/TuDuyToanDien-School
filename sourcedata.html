@@ -971,6 +971,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
     <div class="fg"><label>Trường</label><input id="seSc" placeholder="Tên trường"></div>
     <div class="modal-s-actions">
       <button class="btn btn-outline btn-sm" onclick="sCloseModal()">Hủy</button>
+      <button class="btn btn-danger btn-sm" id="sResetPwdBtn" onclick="sResetStudentPassword()">🔑 Reset mật khẩu</button>
       <button class="btn btn-primary btn-sm" onclick="sSaveStudent()">💾 Lưu</button>
     </div>
   </div>
@@ -2118,6 +2119,51 @@ async function sEditStudent(id){
   }
 }
 function sCloseModal(){ document.getElementById('sModal').classList.remove('open'); }
+
+async function sResetStudentPassword() {
+  if (!_sEditId) return;
+  const s = _sAll.find(x => x.id === _sEditId);
+  if (!s) {
+    alert("Không tìm thấy thông tin học sinh.");
+    return;
+  }
+  const email = s.email;
+  if (!email) {
+    alert("Học sinh này chưa có email để reset.");
+    return;
+  }
+  const confirmReset = confirm(`Bạn có chắc chắn muốn đặt lại mật khẩu cho học sinh "${s.full_name || email}" về "mindup" không?`);
+  if (!confirmReset) return;
+
+  const btn = document.getElementById('sResetPwdBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "⏳ Đang reset...";
+  }
+  try {
+    const { data, error } = await sb.rpc('admin_reset_user_password', {
+      p_user_email: email,
+      p_new_password: 'mindup'
+    });
+    if (error) {
+      alert("Lỗi khi reset mật khẩu: " + error.message);
+    } else {
+      if (data && data.success) {
+        toast(`🔑 Đã reset mật khẩu của ${s.full_name || email} về "mindup"`);
+      } else {
+        alert("Lỗi: " + (data ? data.message : "Không rõ nguyên nhân"));
+      }
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Đã xảy ra lỗi hệ thống khi reset mật khẩu.");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "🔑 Reset mật khẩu";
+    }
+  }
+}
 
 async function sSaveStudent(){
   const payload = {
