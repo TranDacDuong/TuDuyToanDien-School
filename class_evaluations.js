@@ -109,15 +109,6 @@
     const activeIds = new Set((activeLinks || []).map(link => link.student_id).filter(Boolean));
     if (!sessionDate || !activeIds.size) return [];
 
-    const { data: attendanceRows, error: attendanceError } = await client
-      .from("attendance")
-      .select("student_id")
-      .eq("class_id", session.class_id)
-      .eq("date", sessionDate);
-    if (!attendanceError && attendanceRows?.length) {
-      return [...new Set(attendanceRows.map(row => row.student_id).filter(id => activeIds.has(id)))];
-    }
-
     const { data: schedules, error: scheduleError } = await client
       .from("class_schedules")
       .select("id,weekday,effective_from")
