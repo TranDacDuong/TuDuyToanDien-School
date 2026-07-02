@@ -439,11 +439,12 @@
     const baseStyle = "min-width:"+minWidth+"px;white-space:nowrap;"+attendanceSessionStyle(item.session_no, "header");
     const label = d.slice(8,10)+"/"+d.slice(5,7);
     if(canEvaluateClassSession(role) && session?.id && d <= todayStr()){
+      const scoreButton = '<button type="button" onclick="cvOpenSessionScoreModal(\''+session.id+'\',\''+d+'\',\''+(item.schedule_id || 0)+'\')" title="Nhập điểm BTVN / Đề luyện tập" aria-label="Nhập điểm ngày '+label+'" style="border:0;background:rgba(255,255,255,.16);color:inherit;border-radius:7px;padding:4px 6px;font:inherit;font-weight:800;cursor:pointer;line-height:1">📝</button>';
       return '<th class="center" style="'+baseStyle+'">'+
         '<button type="button" onclick="openSessionEvaluation(\''+session.id+'\')" title="Nhận xét buổi học" aria-label="Nhận xét buổi học ngày '+label+'" '+
           'style="border:0;background:rgba(255,255,255,.16);color:inherit;border-radius:8px;padding:5px 7px;font:inherit;font-weight:800;cursor:pointer;line-height:1;display:inline-flex;align-items:center;gap:4px">'+
           label+'<span aria-hidden="true" style="font-size:.78em;opacity:.9">✎</span>'+
-        '</button>'+
+        '</button>'+scoreButton+
       '</th>';
     }
     return '<th class="center" style="'+baseStyle+'">'+label+'</th>';
@@ -941,6 +942,142 @@
       "</tr></thead><tbody>"+rowsHtml+"</tbody></table></div>"+
       searchModal;
   }
+
+  function getSessionScoreStudents(dateValue, scheduleId){
+    const date = String(dateValue || "").slice(0,10);
+    const sid = Number(scheduleId || 0);
+    const schedules = getSchedulesForMonth(_cachedClass?.class_schedules || [], dateFromStr(date).getMonth(), dateFromStr(date).getFullYear());
+    return (_cachedClass?.students || [])
+      .filter(s => {
+        const joined = s.joined_at ? s.joined_at.slice(0,10) : "0000-00-00";
+        const left = s.left_at ? s.left_at.slice(0,10) : "9999-99-99";
+        if(joined > date || left < date) return false;
+        return getStudentSchedules(s.student_id, schedules).some(sc => Number(sc.id) === sid);
+      })
+      .sort((a,b)=>String(a.user?.full_name || "").localeCompare(String(b.user?.full_name || ""), "vi"));
+  }
+
+  window.cvCloseSessionScoreModal = function(){
+    document.getElementById("cvSessionScoreModal")?.remove();
+  };
+
+  window.cvOpenSessionScoreModal = async function(sessionId, dateValue, scheduleId){
+    if(!canEvaluateClassSession(_role)) return;
+    const sb = getSb();
+    const students = getSessionScoreStudents(dateValue, scheduleId);
+    if(!students.length){
+      alert("Không có học sinh nào thuộc lịch học này.");
+      return;
+    }
+    const [{ data: session, error: sessionError }, { data: rows, error: scoreError }] = await Promise.all([
+      sb.from("class_sessions").select("id,session_order,session_date,lesson_id,lesson:lessons(name)").eq("id", sessionId).single(),
+      sb.from("class_session_scores").select("student_id,score,max_score,note").eq("class_session_id", sessionId)
+    ]);
+    if(sessionError){
+      alert("Không thể tải buổi học: " + sessionError.message);
+      return;
+    }
+    if(scoreError){
+      alert("Không thể tải điểm buổi học. Có thể bạn chưa chạy SQL tạo bảng class_session_scores. Lỗi: " + scoreError.message);
+      return;
+    }
+    const scoreMap = new Map((rows || []).map(row => [row.student_id, row]));
+    const defaultMax = (rows || []).find(row => row.max_score)?.max_score || 10;
+    const modal = document.createElement("div");
+    modal.id = "cvSessionScoreModal";
+    modal.style.cssText = "position:fixed;inset:0;background:rgba(10,20,40,.55);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:1200;padding:14px";
+    const studentRows = students.map(s => {
+      const row = scoreMap.get(s.student_id) || {};
+      return '<tr>'+
+        '<td style="padding:9px 10px;font-weight:700;color:var(--navy)">'+esc(s.user?.full_name || "Học sinh")+'</td>'+
+        '<td style="padding:7px 8px;text-align:center;width:112px"><input class="cvSessionScoreInput" data-student-id="'+s.student_id+'" type="number" min="0" step="0.25" value="'+(row.score ?? "")+'" style="width:86px;padding:7px 8px;border:1px solid var(--border);border-radius:8px;text-align:center"></td>'+
+        '<td style="padding:7px 8px"><input class="cvSessionScoreNote" data-student-id="'+s.student_id+'" type="text" value="'+esc(row.note || "")+'" placeholder="Ghi chú..." style="width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:8px"></td>'+
+      '</tr>';
+    }).join("");
+    modal.innerHTML =
+      '<div style="background:var(--white);border-radius:16px;width:min(96vw,860px);max-height:90vh;overflow:hidden;box-shadow:var(--shadow-lg);display:flex;flex-direction:column">'+
+        '<div style="padding:16px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:12px;align-items:flex-start">'+
+          '<div><h3 style="margin:0;color:var(--navy);font-family:var(--font-display);font-size:1.05rem">Nhập điểm BTVN / Đề luyện tập</h3>'+
+          '<div style="font-size:.82rem;color:var(--ink-mid);margin-top:5px;line-height:1.5">Buổi '+(session.session_order || "—")+' · '+esc(session.lesson?.name || "Buổi học")+' · '+esc(String(dateValue).slice(8,10)+"/"+String(dateValue).slice(5,7)+"/"+String(dateValue).slice(0,4))+'</div></div>'+
+          '<button type="button" onclick="cvCloseSessionScoreModal()" style="background:var(--surface);border:0;border-radius:8px;width:32px;height:32px;cursor:pointer">✕</button>'+
+        '</div>'+
+        '<div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+          '<label style="font-size:.8rem;font-weight:800;color:var(--ink-mid)">Điểm tối đa</label>'+
+          '<input id="cvSessionScoreMax" type="number" min="0.25" step="0.25" value="'+defaultMax+'" style="width:90px;padding:7px 9px;border:1px solid var(--border);border-radius:8px">'+
+          '<span style="font-size:.78rem;color:var(--ink-mid)">Bỏ trống điểm của học sinh nếu chưa chấm/chưa nộp.</span>'+
+        '</div>'+
+        '<div style="overflow:auto;padding:0 18px 16px">'+
+          '<table class="table" style="font-size:.84rem;margin-top:12px">'+
+            '<thead><tr><th style="text-align:left">Học sinh</th><th class="center">Điểm</th><th style="text-align:left">Ghi chú</th></tr></thead>'+
+            '<tbody>'+studentRows+'</tbody>'+
+          '</table>'+
+        '</div>'+
+        '<div style="padding:13px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px">'+
+          '<button type="button" onclick="cvCloseSessionScoreModal()" class="btn btn-outline">Hủy</button>'+
+          '<button type="button" onclick="cvSaveSessionScores(\''+sessionId+'\')" class="btn btn-primary">Lưu điểm</button>'+
+        '</div>'+
+      '</div>';
+    document.body.appendChild(modal);
+  };
+
+  window.cvSaveSessionScores = async function(sessionId){
+    const sb = getSb();
+    const maxScore = Number(document.getElementById("cvSessionScoreMax")?.value || 10);
+    if(!Number.isFinite(maxScore) || maxScore <= 0){
+      alert("Điểm tối đa phải lớn hơn 0.");
+      return;
+    }
+    const inputs = Array.from(document.querySelectorAll(".cvSessionScoreInput"));
+    const upserts = [];
+    const deletes = [];
+    for(const input of inputs){
+      const studentId = input.dataset.studentId;
+      const raw = String(input.value || "").trim();
+      const note = document.querySelector('.cvSessionScoreNote[data-student-id="'+studentId+'"]')?.value?.trim() || "";
+      if(!raw){
+        deletes.push(studentId);
+        continue;
+      }
+      const score = Number(raw);
+      if(!Number.isFinite(score) || score < 0 || score > maxScore){
+        alert("Điểm phải nằm trong khoảng 0 đến " + maxScore + ".");
+        input.focus();
+        return;
+      }
+      upserts.push({
+        class_session_id: sessionId,
+        class_id: _classId,
+        student_id: studentId,
+        score,
+        max_score: maxScore,
+        note: note || null,
+        created_by: window._currentUserId,
+        updated_at: new Date().toISOString()
+      });
+    }
+    if(deletes.length){
+      const { error: deleteError } = await sb
+        .from("class_session_scores")
+        .delete()
+        .eq("class_session_id", sessionId)
+        .in("student_id", deletes);
+      if(deleteError){
+        alert("Không thể xóa điểm bỏ trống: " + deleteError.message);
+        return;
+      }
+    }
+    if(upserts.length){
+      const { error: upsertError } = await sb
+        .from("class_session_scores")
+        .upsert(upserts, { onConflict: "class_session_id,student_id" });
+      if(upsertError){
+        alert("Không thể lưu điểm: " + upsertError.message);
+        return;
+      }
+    }
+    window.cvCloseSessionScoreModal();
+    alert("Đã lưu điểm buổi học.");
+  };
 
   window.cvToggleAtt = async function(classId,studentId,date,current,scheduleId,sessionNo){
     const next=statusCycle[(statusCycle.indexOf(current)+1)%3];

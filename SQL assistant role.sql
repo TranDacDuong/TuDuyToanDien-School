@@ -196,6 +196,70 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS class_session_scores_select_policy ON public.class_session_scores;
+CREATE POLICY class_session_scores_select_policy ON public.class_session_scores
+FOR SELECT
+USING (
+  student_id = auth.uid()
+  OR EXISTS (
+    SELECT 1 FROM public.parent_students ps
+    WHERE ps.parent_id = auth.uid()
+      AND ps.student_id = class_session_scores.student_id
+      AND ps.revoked_at IS NULL
+  )
+  OR EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
+  )
+);
+
+DROP POLICY IF EXISTS class_session_scores_insert_policy ON public.class_session_scores;
+CREATE POLICY class_session_scores_insert_policy ON public.class_session_scores
+FOR INSERT
+WITH CHECK (
+  auth.uid() = created_by
+  AND EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
+  )
+);
+
+DROP POLICY IF EXISTS class_session_scores_update_policy ON public.class_session_scores;
+CREATE POLICY class_session_scores_update_policy ON public.class_session_scores
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
+  )
+);
+
+DROP POLICY IF EXISTS class_session_scores_delete_policy ON public.class_session_scores;
+CREATE POLICY class_session_scores_delete_policy ON public.class_session_scores
+FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE u.id = auth.uid()
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
+  )
+);
+
 DROP POLICY IF EXISTS courses_select_policy ON public.courses;
 CREATE POLICY courses_select_policy ON public.courses
 FOR SELECT
