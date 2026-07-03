@@ -30,7 +30,7 @@
     .task-modal-box{width:min(640px,100%);max-height:calc(100dvh - 32px);overflow:auto;background:#fff;border-radius:8px;padding:18px}.task-modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
     .task-modal-head h2{margin:0;font-size:1.08rem;color:var(--navy)}.task-form{display:grid;grid-template-columns:1fr 1fr;gap:11px}.task-field{display:grid;gap:5px}.task-field.full{grid-column:1/-1}.task-field label{font-size:.76rem;font-weight:800;color:var(--ink-mid)}
     .task-field input,.task-field select,.task-field textarea{width:100%;border:1px solid var(--border);border-radius:7px;padding:9px 10px;font:inherit}.task-field textarea{min-height:86px;resize:vertical}
-    .assignee-list{max-height:190px;overflow:auto;border:1px solid var(--border);border-radius:7px;padding:7px;display:grid;gap:4px}.assignee-row{display:flex;align-items:center;gap:8px;padding:6px;border-radius:6px}.assignee-row:hover{background:#f8fafc}
+    .assignee-list{max-height:190px;overflow:auto;border:1px solid var(--border);border-radius:7px;padding:7px;display:grid;gap:4px}.assignee-row{display:flex;align-items:center;gap:8px;padding:6px;border-radius:6px}.assignee-row:hover{background:#f8fafc}.assignee-row.selected{background:#eff6ff;border:1px solid #bfdbfe}.assignee-picked{display:flex;gap:6px;flex-wrap:wrap;min-height:24px}.assignee-chip{display:inline-flex;align-items:center;gap:6px;background:#e0f2fe;color:#075985;border-radius:999px;padding:4px 8px;font-size:.74rem;font-weight:800}.assignee-chip button{border:0;background:transparent;color:inherit;cursor:pointer;font:inherit;padding:0}.task-result-box{grid-column:1/-1;margin-top:10px;border-top:1px dashed var(--border);padding-top:10px;display:grid;gap:8px}.task-result-box label{font-size:.76rem;font-weight:900;color:var(--ink-mid)}.task-result-input{width:100%;min-height:42px;max-height:260px;resize:none;overflow:hidden;border:1px solid var(--border);border-radius:7px;padding:9px 10px;font:inherit;font-size:.82rem;line-height:1.45}.task-result-note{background:#f8fafc;border:1px solid var(--border);border-radius:7px;padding:9px 10px;color:var(--ink-mid);font-size:.82rem;white-space:pre-wrap}
     .task-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.task-toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:#0f1f3d;color:#fff;padding:10px 14px;border-radius:7px;font-size:.82rem;transition:.2s;z-index:1000}.task-toast.show{opacity:1;transform:translate(-50%,0)}
     @media(max-width:760px){body{padding:12px 10px calc(18px + env(safe-area-inset-bottom))}.task-summary,.task-month-overview{grid-template-columns:repeat(2,1fr)}.task-admin-filter{grid-template-columns:1fr}.task-datebar{grid-template-columns:1fr 1.15fr 1fr}.task-date-btn{height:38px;font-size:.76rem}.task-card{grid-template-columns:1fr}.task-actions{justify-content:flex-start}.task-actions .task-btn{flex:1}.task-form{grid-template-columns:1fr}.task-field.full{grid-column:auto}.task-head h1{font-size:1.3rem}}
   </style>
@@ -86,7 +86,9 @@
         <div class="task-field"><label>Mức độ</label><select id="manualTaskPriority"><option value="normal">Thông thường</option><option value="important">Quan trọng</option><option value="urgent">Khẩn cấp</option></select></div>
         <div class="task-field"><label>Thời hạn</label><input id="manualTaskDueAt" type="datetime-local"></div>
         <div class="task-field full"><label>Đường dẫn xử lý</label><input id="manualTaskActionUrl" placeholder="VD: class.html hoặc tuition.html"></div>
+        <div class="task-field full"><label>Chọn nhanh người nhận</label><select id="manualTaskAssigneeSelect"><option value="">Chọn nhân viên để thêm</option></select></div>
         <div class="task-field full"><label>Người nhận</label><input id="manualTaskAssigneeSearch" placeholder="Tìm theo tên hoặc email"></div>
+        <div class="task-field full"><label>Đã chọn</label><div class="assignee-picked" id="manualTaskPicked"></div></div>
         <div class="task-field full"><div class="assignee-list" id="manualTaskAssignees"></div></div>
       </div>
       <div class="task-modal-actions"><button class="task-btn" type="button" data-close-modal="taskCreateModal">Hủy</button><button class="task-btn primary" type="button" id="manualTaskSave">Giao việc</button></div>
@@ -110,6 +112,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js"></script>
   <script src="notification_helper.js"></script>
-  <script src="tasks.js?v=20260703-manual-task-assignee1"></script>
+  <script src="tasks.js?v=20260703-manual-task-submit1"></script>
 </body>
 </html>

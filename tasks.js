@@ -126,6 +126,11 @@
     return REMINDER_TYPES.has(item.task?.task_type);
   }
 
+  function isManualAssignedTask(item) {
+    const task = item.task || {};
+    return task.task_type === "manual" || task.source_type === "manual" || task.auto_generated === false;
+  }
+
   function isProgressComplete(item) {
     const progress = item.task?.progress;
     return Boolean(progress?.total) && Number(progress.current || 0) >= Number(progress.total || 0);
@@ -311,6 +316,26 @@
       </div>`;
   }
 
+  function taskResultHtml(item) {
+    if (!isManualAssignedTask(item)) return "";
+    const completed = effectiveStatus(item) === "completed";
+    const note = String(item.note || "").trim();
+    if (completed) {
+      return note
+        ? `<div class="task-result-box"><label>Kết quả đã nộp</label><div class="task-result-note">${esc(note)}</div></div>`
+        : "";
+    }
+    if (S.profile?.role === "admin" && item.user_id !== S.user?.id) return "";
+    return `
+      <div class="task-result-box">
+        <label for="taskResult_${esc(item.id)}">Kết quả thực hiện</label>
+        <textarea class="task-result-input" id="taskResult_${esc(item.id)}" data-result-input="${esc(item.id)}" placeholder="Nhập kết quả công việc...">${esc(note)}</textarea>
+        <div style="display:flex;justify-content:flex-end">
+          <button class="task-btn success" type="button" data-submit-result="${esc(item.id)}">Nộp</button>
+        </div>
+      </div>`;
+  }
+
   function taskCard(item) {
     const task = item.task || {};
     const completed = effectiveStatus(item) === "completed";
@@ -333,6 +358,7 @@
             <span>${task.auto_generated ? "Hệ thống tự tạo" : "Admin giao"}</span>
             ${task.verification_mode !== "manual" ? "<span>Tự xác minh hoàn thành</span>" : ""}
           </div>
+          ${taskResultHtml(item)}
         </div>
         <div class="task-actions">
           <span class="task-status ${state.className}"><span>${state.icon}</span><span>${state.label}</span></span>
@@ -501,6 +527,7 @@
     const overview = S.viewMode === "month" ? renderMonthOverview(rows) : "";
     if (S.viewMode === "month" && rows.length) {
       E.list.innerHTML = renderMonthDashboard(rows);
+      resizeResultInputs();
       return;
     }
     if (!rows.length) {
@@ -510,6 +537,7 @@
     E.list.innerHTML = rows.length
       ? overview + renderGrouped(rows)
       : `<div class="task-empty">Không có công việc trong ngày ${esc(formatShortDate(S.selectedDate || localDate()))}.</div>`;
+    resizeResultInputs();
   }
 
   function syncDatebar() {
@@ -683,6 +711,32 @@
     }));
   }
 
+  async function enrichTaskResultNotes(assignments) {
+    const ids = (assignments || [])
+      .filter(item => !item.note && !String(item.id || "").startsWith("schedule-fallback:"))
+      .map(item => item.id)
+      .filter(Boolean);
+    if (!ids.length) return;
+    const { data, error } = await sb.from("task_events")
+      .select("assignment_id,note,to_status,created_at")
+      .in("assignment_id", ids)
+      .eq("to_status", "completed")
+      .not("note", "is", null)
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.warn("Load task result notes:", error);
+      return;
+    }
+    const noteMap = new Map();
+    (data || []).forEach(row => {
+      const note = String(row.note || "").trim();
+      if (note && !noteMap.has(row.assignment_id)) noteMap.set(row.assignment_id, note);
+    });
+    (assignments || []).forEach(item => {
+      if (!item.note && noteMap.has(item.id)) item.note = noteMap.get(item.id);
+    });
+  }
+
   async function loadTasks({ refresh = false } = {}) {
     E.list.innerHTML = '<div class="task-empty">Đang tổng hợp công việc...</div>';
     if (refresh) {
@@ -707,6 +761,7 @@
       item.status !== "cancelled"
       && INTERNAL_ROLES.has(item.assignee?.role || S.profile?.role)
     );
+    await enrichTaskResultNotes(assignments);
     const scheduleFallbacks = await loadScheduleFallbackTasks(assignments);
     S.assignments = [...assignments, ...scheduleFallbacks];
     await enrichTaskProgress(S.assignments);
@@ -720,6 +775,33 @@
     });
     if (error) return alert(error.message);
     toast(status === "completed" ? "Đã hoàn thành công việc." : "Đã cập nhật trạng thái.");
+    await loadTasks();
+  }
+
+  function autoResizeTextarea(textarea) {
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 260)}px`;
+  }
+
+  function resizeResultInputs() {
+    document.querySelectorAll(".task-result-input").forEach(autoResizeTextarea);
+  }
+
+  async function submitTaskResult(id) {
+    const input = [...document.querySelectorAll("[data-result-input]")].find(element => element.dataset.resultInput === id);
+    const note = String(input?.value || "").trim();
+    if (!note) {
+      input?.focus();
+      return alert("Hãy nhập kết quả công việc trước khi nộp.");
+    }
+    const { error } = await sb.rpc("set_task_assignment_status", {
+      p_assignment_id: id,
+      p_status: "completed",
+      p_note: note,
+    });
+    if (error) return alert(error.message);
+    toast("Đã nộp kết quả và hoàn thành công việc.");
     await loadTasks();
   }
 
@@ -815,21 +897,59 @@
     byId(id)?.classList.remove("show");
   }
 
+  function selectedManualUsers() {
+    const ids = new Set([...S.manualAssigneeIds].map(String));
+    return (S.users || []).filter(user => ids.has(String(user.id)));
+  }
+
+  function renderPickedAssignees() {
+    const picked = byId("manualTaskPicked");
+    if (!picked) return;
+    const users = selectedManualUsers();
+    picked.innerHTML = users.length
+      ? users.map(user => `<span class="assignee-chip">${esc(user.full_name || user.email)}<button type="button" data-remove-assignee="${esc(user.id)}">×</button></span>`).join("")
+      : '<span style="font-size:.78rem;color:var(--ink-light)">Chưa chọn người nhận nào</span>';
+  }
+
+  function renderAssigneeSelect() {
+    const select = byId("manualTaskAssigneeSelect");
+    if (!select) return;
+    const options = (S.users || []).map(user =>
+      `<option value="${esc(user.id)}">${esc(user.full_name || user.email)} - ${esc(roleLabel(user.role))}${user.email ? ` - ${esc(user.email)}` : ""}</option>`
+    ).join("");
+    select.innerHTML = `<option value="">Chọn nhân viên để thêm</option>${options}`;
+    select.value = "";
+  }
+
+  function addManualAssignee(userId) {
+    if (!userId) return;
+    S.manualAssigneeIds.add(String(userId));
+    renderAssignees();
+  }
+
+  function removeManualAssignee(userId) {
+    S.manualAssigneeIds.delete(String(userId));
+    renderAssignees();
+  }
+
   function renderAssignees() {
     const query = (byId("manualTaskAssigneeSearch").value || "").trim().toLowerCase();
-    byId("manualTaskAssignees").innerHTML = S.users.filter(user =>
+    const rows = S.users.filter(user =>
       !query || `${user.full_name || ""} ${user.email || ""}`.toLowerCase().includes(query)
-    ).map(user => `
-      <label class="assignee-row">
-        <input type="checkbox" value="${esc(user.id)}" ${S.manualAssigneeIds.has(user.id) ? "checked" : ""}>
+    );
+    byId("manualTaskAssignees").innerHTML = rows.length ? rows.map(user => `
+      <label class="assignee-row ${S.manualAssigneeIds.has(String(user.id)) ? "selected" : ""}">
+        <input type="checkbox" value="${esc(user.id)}" ${S.manualAssigneeIds.has(String(user.id)) ? "checked" : ""}>
         <span><strong>${esc(user.full_name || user.email)}</strong><br><small>${esc(user.role)} · ${esc(user.email)}</small></span>
-      </label>`).join("");
+      </label>`).join("") : '<div style="padding:8px;color:var(--ink-light);font-size:.82rem">Không tìm thấy nhân viên phù hợp.</div>';
+    renderPickedAssignees();
   }
 
   async function openCreateModal() {
     await loadInternalUsers();
     S.manualAssigneeIds = new Set();
     byId("manualTaskAssigneeSearch").value = "";
+    renderAssigneeSelect();
     renderAssignees();
     openModal("taskCreateModal");
   }
@@ -867,6 +987,8 @@
     ["manualTaskTitle", "manualTaskDescription", "manualTaskDueAt", "manualTaskActionUrl"].forEach(id => byId(id).value = "");
     S.manualAssigneeIds = new Set();
     byId("manualTaskAssigneeSearch").value = "";
+    byId("manualTaskAssigneeSelect").value = "";
+    renderAssignees();
     toast(`Đã giao việc cho ${userIds.length} người.`);
     await loadTasks();
   }
@@ -920,18 +1042,31 @@
     E.list.addEventListener("click", event => {
       const target = event.target.closest("button");
       if (!target) return;
+      if (target.dataset.submitResult) return submitTaskResult(target.dataset.submitResult);
       if (target.dataset.actionUrl) openAction(target.dataset.actionUrl);
+    });
+    E.list.addEventListener("input", event => {
+      const input = event.target.closest(".task-result-input");
+      if (input) autoResizeTextarea(input);
     });
     byId("taskRefreshButton").addEventListener("click", () => loadTasks({ refresh: true }));
     byId("taskDeleteOldButton").addEventListener("click", deleteOldTasks);
     byId("taskCreateButton").addEventListener("click", openCreateModal);
     byId("taskSettingsButton").addEventListener("click", async () => { await loadPreferences(); openModal("taskSettingsModal"); });
+    byId("manualTaskAssigneeSelect")?.addEventListener("change", event => {
+      addManualAssignee(event.target.value);
+      event.target.value = "";
+    });
     byId("manualTaskAssigneeSearch").addEventListener("input", renderAssignees);
+    byId("manualTaskPicked")?.addEventListener("click", event => {
+      const button = event.target.closest("[data-remove-assignee]");
+      if (button) removeManualAssignee(button.dataset.removeAssignee);
+    });
     byId("manualTaskAssignees").addEventListener("change", event => {
       const input = event.target.closest('input[type="checkbox"]');
       if (!input) return;
-      if (input.checked) S.manualAssigneeIds.add(input.value);
-      else S.manualAssigneeIds.delete(input.value);
+      if (input.checked) addManualAssignee(input.value);
+      else removeManualAssignee(input.value);
     });
     byId("manualTaskSave").addEventListener("click", saveManualTask);
     byId("taskPreferencesSave").addEventListener("click", savePreferences);
