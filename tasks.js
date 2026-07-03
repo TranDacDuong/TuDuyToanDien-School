@@ -128,7 +128,10 @@
 
   function isManualAssignedTask(item) {
     const task = item.task || {};
-    return task.task_type === "manual" || task.source_type === "manual" || task.auto_generated === false;
+    return task.task_type === "manual"
+      || task.source_type === "manual"
+      || task.auto_generated === false
+      || task.metadata?.requires_result === true;
   }
 
   function isProgressComplete(item) {
@@ -199,7 +202,8 @@
       session_evaluation: "Đánh giá", student_exam: "Bài tập", tuition: "Học phí",
       course_session: "Khóa học",
       exam_grading: "Chấm bài", trial_request: "Học thử", parent_link: "Phụ huynh",
-      class_staff: "Nhân sự", manual: "Được giao",
+      class_staff: "Nhân sự", social_comment: "Tương tác bài viết",
+      facebook_posting: "Facebook", manual: "Được giao",
     }[value] || "Công việc";
   }
 

@@ -512,6 +512,40 @@ BEGIN
     v_count := v_count + 3;
   END LOOP;
 
+  -- Assistant daily social/content operations.
+  FOR r IN SELECT id AS user_id FROM public.users
+    WHERE role::text = 'assistant' AND (p_user_id IS NULL OR id = p_user_id)
+  LOOP
+    PERFORM public.upsert_generated_task(
+      r.user_id, 'assistant_social_comment:' || v_today || ':' || r.user_id,
+      'Comment dạo các bài viết ngày hôm trước',
+      'Kiểm tra các bài viết của ngày hôm trước và tương tác/bình luận phù hợp để giữ nhịp cộng đồng.',
+      'social_comment', 'social_daily', v_today::text, 'normal',
+      v_today, (v_today::text || ' 12:00:00+07')::timestamptz,
+      'home.html', 'manual',
+      jsonb_build_object(
+        'target_date', v_today - 1,
+        'requires_result', true
+      )
+    );
+
+    PERFORM public.upsert_generated_task(
+      r.user_id, 'assistant_facebook_posting:' || v_today || ':' || r.user_id,
+      'Đăng bài/Hẹn lịch đăng bài trên Facebook',
+      'Mục tiêu tham khảo 8 bài/ngày; có thể ít hơn hoặc nhiều hơn tùy kế hoạch nội dung.',
+      'facebook_posting', 'social_daily', v_today::text, 'important',
+      v_today, (v_today::text || ' 21:00:00+07')::timestamptz,
+      NULL, 'manual',
+      jsonb_build_object(
+        'suggested_target', 8,
+        'target_unit', 'bài/ngày',
+        'requires_result', true
+      )
+    );
+
+    v_count := v_count + 2;
+  END LOOP;
+
   PERFORM public.sync_verified_task_statuses(p_user_id);
   RETURN jsonb_build_object('ok', true, 'processed', v_count, 'date', v_today);
 END;
