@@ -1798,7 +1798,7 @@ document.getElementById('tSMon').addEventListener('change', tApplyFilter);
 /* ══════════════════════════════
    HỌC SINH
 ══════════════════════════════ */
-let _sAll=[], _sFilt=[], _sPage=1, _sSortF='full_name', _sSortD=1, _sEditId=null;
+let _sAll=[], _sFilt=[], _sPage=1, _sSortF='full_name', _sSortD=1, _sEditId=null, _sLinkedParents={};
 const S_PAGE=15;
 
 function sRmVN(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đĐ]/g,m=>m==='đ'?'d':'D').toLowerCase(); }
@@ -1931,8 +1931,39 @@ async function sHandleImportFile(event){
 async function loadStudents(){
   const {data} = await sb.from('users').select('*').eq('role','student').order('full_name');
   _sAll = data||[];
+  await sLoadLinkedParentsForStudents(_sAll);
   document.getElementById('sStatTotal').textContent = _sAll.length;
   sApplyFilter();
+}
+
+async function sLoadLinkedParentsForStudents(students){
+  _sLinkedParents = {};
+  const studentIds = [...new Set((students || []).map(item => item.id).filter(Boolean))];
+  if(!studentIds.length) return;
+  const { data: links, error: linkError } = await sb.from('parent_students')
+    .select('parent_id,student_id')
+    .in('student_id', studentIds)
+    .is('revoked_at', null);
+  if(linkError){
+    console.warn('Không tải được liên kết phụ huynh:', linkError);
+    return;
+  }
+  const parentIds = [...new Set((links || []).map(item => item.parent_id).filter(Boolean))];
+  if(!parentIds.length) return;
+  const { data: parents, error: parentError } = await sb.from('users')
+    .select('id,full_name,email,phone,role')
+    .in('id', parentIds);
+  if(parentError){
+    console.warn('Không tải được tài khoản phụ huynh:', parentError);
+    return;
+  }
+  const parentMap = Object.fromEntries((parents || []).filter(item => item.role === 'parent').map(item => [item.id, item]));
+  (links || []).forEach(link => {
+    const parent = parentMap[link.parent_id];
+    if(!parent) return;
+    if(!_sLinkedParents[link.student_id]) _sLinkedParents[link.student_id] = [];
+    _sLinkedParents[link.student_id].push(parent);
+  });
 }
 
 function sApplyFilter(){
@@ -1981,11 +2012,14 @@ function sRender(){
   if(!slice.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="9">🔍 Không tìm thấy học sinh nào</td></tr>'; sPgRender(); return; }
   tbody.innerHTML=slice.map((s,i)=>{
     const av=s.avatar_url?`<img class="s-av" src="${esc(s.avatar_url)}" onerror="this.style.display='none'">`:`<div class="s-ini">${sIni(s.full_name)}</div>`;
+    const linkedParents = _sLinkedParents[s.id] || [];
+    const parentName = linkedParents.map(parent => parent.full_name).filter(Boolean).join(', ') || s.parent_full_name || '—';
+    const parentEmails = linkedParents.map(parent => parent.email).filter(Boolean).join(', ');
     return `<tr>
       <td style="color:var(--ink-light);text-align:center">${start+i+1}</td>
       <td><div style="display:flex;align-items:center;gap:8px">${av}<div><div style="font-weight:600;color:var(--navy);font-size:.85rem">${esc(s.full_name||'—')}</div><div style="font-size:.72rem;color:var(--ink-light)">${esc(s.email||'')}</div></div></div></td>
       <td>${s.phone?`<button style="background:none;border:none;color:var(--blue);font-size:.82rem;cursor:pointer;padding:0;font-family:var(--font-body);font-weight:500" onclick="sCopyPhone('${s.phone}')">📞 ${esc(s.phone)}</button>`:'<span style="color:var(--ink-light)">—</span>'}</td>
-      <td>${esc(s.parent_full_name||'—')}</td>
+      <td><div style="font-weight:600;color:var(--navy)">${esc(parentName)}</div>${parentEmails ? `<div style="font-size:.72rem;color:var(--ink-light);margin-top:2px">${esc(parentEmails)}</div>` : ''}</td>
       <td>${s.parent_phone?`<button style="background:none;border:none;color:var(--blue);font-size:.82rem;cursor:pointer;padding:0;font-family:var(--font-body);font-weight:500" onclick="sCopyPhone('${s.parent_phone}')">📞 ${esc(s.parent_phone)}</button>`:'<span style="color:var(--ink-light)">—</span>'}</td>
       <td>${s.birth_year||'—'}</td>
       <td>${esc(s.province||'—')}</td>
