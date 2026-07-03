@@ -232,10 +232,41 @@
     '</div>';
   }
 
+  function scheduleKey(s){
+    if(!s) return "";
+    return [
+      Number(s.session_no || 1),
+      Number(s.weekday || 0),
+      String(s.start_time || "").slice(0,5),
+      String(s.end_time || "").slice(0,5)
+    ].join("|");
+  }
+
+  function selectedScheduleRows(selectedIds){
+    const all = _cachedClass?.class_schedules || [];
+    return [...(selectedIds || new Set())]
+      .map(id => all.find(s => Number(s.id) === Number(id)))
+      .filter(Boolean);
+  }
+
   function getStudentSchedules(studentId, schedules){
+    const targetSchedules = schedules || [];
     const selectedIds = _studentScheduleMap[studentId];
-    if(!selectedIds || !selectedIds.size) return schedules || [];
-    return (schedules || []).filter(s => selectedIds.has(Number(s.id)));
+    if(!selectedIds || !selectedIds.size) return targetSchedules;
+
+    const direct = targetSchedules.filter(s => selectedIds.has(Number(s.id)));
+    if(direct.length) return direct;
+
+    const mapped = [];
+    selectedScheduleRows(selectedIds).forEach(selected => {
+      const sameSession = targetSchedules.filter(s => Number(s.session_no || 1) === Number(selected.session_no || 1));
+      if(!sameSession.length) return;
+      const exact = sameSession.find(s => scheduleKey(s) === scheduleKey(selected));
+      const sameWeekday = sameSession.find(s => Number(s.weekday || 0) === Number(selected.weekday || 0));
+      const fallback = exact || sameWeekday || sameSession[0];
+      if(fallback && !mapped.some(s => Number(s.id) === Number(fallback.id))) mapped.push(fallback);
+    });
+    return mapped.length ? mapped : targetSchedules;
   }
 
   function isStudentScheduledOn(studentId, dateValue, schedules){
