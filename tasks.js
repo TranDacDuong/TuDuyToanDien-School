@@ -121,6 +121,24 @@
     return day >= start && day <= end;
   }
 
+  function isReminderTask(item) {
+    return REMINDER_TYPES.has(item.task?.task_type);
+  }
+
+  function pct(current, total) {
+    if (!total) return 0;
+    return Math.max(0, Math.min(100, Math.round((Number(current || 0) / Number(total || 0)) * 100)));
+  }
+
+  function uniq(values) {
+    return [...new Set((values || []).filter(Boolean))];
+  }
+
+  function monthRange(dateText = localDate()) {
+    const start = monthStart(dateText);
+    return { start, end: endOfMonth(dateText) };
+  }
+
   function statusInfo(item) {
     const task = item.task || {};
     if (REMINDER_TYPES.has(task.task_type)) return { className: "reminder", icon: "•", label: "Lời nhắc nhở" };
@@ -136,18 +154,16 @@
 
   function visibleAssignments() {
     const selected = S.selectedDate || localDate();
-    const start = S.viewMode === "week" ? startOfWeek(selected)
-      : S.viewMode === "month" ? monthStart(selected)
-      : selected;
-    const end = S.viewMode === "week" ? addDays(start, 6)
-      : S.viewMode === "month" ? endOfMonth(selected)
-      : selected;
+    const start = S.viewMode === "month" ? monthStart(selected) : selected;
+    const end = S.viewMode === "month" ? endOfMonth(selected) : selected;
     return S.assignments.filter(item => {
       const day = taskDay(item);
       if (S.profile?.role === "admin" && S.selectedUserId !== "all" && item.user_id !== S.selectedUserId) return false;
       return inRange(day, start, end);
     }).sort((a, b) => {
       const priority = { urgent: 0, important: 1, normal: 2 };
+      const reminderDiff = Number(isReminderTask(a)) - Number(isReminderTask(b));
+      if (reminderDiff) return reminderDiff;
       const status = Number(a.status === "completed") - Number(b.status === "completed");
       if (status) return status;
       const dayDiff = taskDay(a).localeCompare(taskDay(b));
@@ -271,6 +287,20 @@
     E.completedCount.textContent = scoped.filter(item => item.status === "completed").length;
   }
 
+  function taskProgressHtml(item) {
+    const progress = item.task?.progress;
+    if (!progress || !Number(progress.total)) return "";
+    const percent = pct(progress.current, progress.total);
+    return `
+      <div class="task-progress-row" style="margin-top:9px">
+        <div class="task-progress-head">
+          <span>${esc(progress.label || "Tiến độ")}</span>
+          <span>${Number(progress.current || 0)}/${Number(progress.total || 0)} · ${percent}%</span>
+        </div>
+        <div class="task-progress-track"><div class="task-progress-fill" style="width:${percent}%"></div></div>
+      </div>`;
+  }
+
   function taskCard(item) {
     const task = item.task || {};
     const completed = item.status === "completed";
@@ -286,6 +316,7 @@
             ${overdue ? '<span class="task-badge overdue">Quá hạn</span>' : ""}
           </div>
           ${task.description ? `<p class="task-description">${esc(task.description)}</p>` : ""}
+          ${taskProgressHtml(item)}
           <div class="task-meta">
             ${S.profile?.role === "admin" && item.assignee ? `<span>Người nhận: ${esc(item.assignee.full_name || item.assignee.email)}</span>` : ""}
             <span>${task.due_at ? `Hạn ${formatDateTime(task.due_at)}` : "Không có thời hạn"}</span>
@@ -317,10 +348,6 @@
 
   function viewTitle() {
     const selected = S.selectedDate || localDate();
-    if (S.viewMode === "week") {
-      const start = startOfWeek(selected);
-      return `Tuần ${formatShortDate(start)} - ${formatShortDate(addDays(start, 6))}`;
-    }
     if (S.viewMode === "month") return `Tháng ${String(selected).slice(5, 7)}/${String(selected).slice(0, 4)}`;
     return formatShortDate(selected);
   }
@@ -338,8 +365,80 @@
       </section>`;
   }
 
+  function renderProgressList(rows) {
+    const progressRows = rows
+      .filter(item => item.task?.progress?.total)
+      .sort((a, b) => pct(a.task.progress.current, a.task.progress.total) - pct(b.task.progress.current, b.task.progress.total))
+      .slice(0, 8);
+    if (!progressRows.length) return '<div class="task-empty" style="padding:20px">Chưa có công việc nào có tiến độ đo được trong tháng này.</div>';
+    return `<div class="task-progress-list">${progressRows.map(item => {
+      const progress = item.task.progress;
+      const percent = pct(progress.current, progress.total);
+      return `
+        <div class="task-progress-row">
+          <div class="task-progress-head">
+            <span>${esc(item.task?.title || "Công việc")}</span>
+            <span>${Number(progress.current || 0)}/${Number(progress.total || 0)} · ${percent}%</span>
+          </div>
+          <div class="task-progress-track"><div class="task-progress-fill" style="width:${percent}%"></div></div>
+        </div>`;
+    }).join("")}</div>`;
+  }
+
+  function renderMiniChart(rows) {
+    const { start, end } = monthRange(S.selectedDate || localDate());
+    const days = [];
+    for (let day = start; day <= end; day = addDays(day, 1)) days.push(day);
+    const counts = days.map(day => rows.filter(item => !isReminderTask(item) && taskDay(item) === day).length);
+    const max = Math.max(1, ...counts);
+    return `
+      <div class="task-mini-chart" style="--bars:${days.length}">
+        ${days.map((day, idx) => {
+          const height = Math.max(5, Math.round((counts[idx] / max) * 100));
+          return `<div class="task-mini-bar" title="${esc(formatShortDate(day))}: ${counts[idx]} việc" style="height:${height}%"></div>`;
+        }).join("")}
+      </div>
+      <div style="display:flex;justify-content:space-between;color:var(--ink-light);font-size:.72rem;margin-top:6px">
+        <span>${esc(formatShortDate(start))}</span><span>${esc(formatShortDate(end))}</span>
+      </div>`;
+  }
+
+  function renderMonthDashboard(rows) {
+    const actionRows = rows.filter(item => !isReminderTask(item));
+    const reminderRows = rows.filter(isReminderTask);
+    const completed = actionRows.filter(item => item.status === "completed").length;
+    const overdue = actionRows.filter(isOverdue).length;
+    const progressRows = actionRows.filter(item => item.task?.progress?.total);
+    const progressDone = progressRows.reduce((sum, item) => sum + Number(item.task.progress.current || 0), 0);
+    const progressTotal = progressRows.reduce((sum, item) => sum + Number(item.task.progress.total || 0), 0);
+    const unfinished = actionRows.filter(item => item.status !== "completed").slice(0, 12);
+    const reminders = reminderRows.slice(0, 12);
+    return `
+      <section class="task-month-dashboard">
+        <section class="task-month-overview">
+          <div><span>Cần hoàn thiện</span><strong>${actionRows.filter(item => item.status !== "completed").length}</strong></div>
+          <div><span>Đã hoàn thành</span><strong>${completed}/${actionRows.length}</strong></div>
+          <div><span>Quá hạn</span><strong>${overdue}</strong></div>
+          <div><span>Tiến độ đo được</span><strong>${progressTotal ? `${progressDone}/${progressTotal}` : "0/0"}</strong></div>
+        </section>
+        <section class="task-panel">
+          <h2>Tiến độ cần hoàn thiện</h2>
+          ${renderProgressList(actionRows)}
+        </section>
+        <section class="task-panel">
+          <h2>Biểu đồ công việc trong tháng</h2>
+          ${renderMiniChart(actionRows)}
+        </section>
+        <h2 class="task-month-section-title">Việc cần xử lý</h2>
+        ${unfinished.length ? unfinished.map(taskCard).join("") : '<div class="task-empty" style="padding:22px">Không còn công việc cần hoàn thiện trong tháng này.</div>'}
+        <section class="task-reminder-group">
+          <h2 class="task-month-section-title">Nhắc nhở trong tháng</h2>
+          ${reminders.length ? reminders.map(taskCard).join("") : '<div class="task-empty" style="padding:22px">Không có nhắc nhở trong tháng này.</div>'}
+        </section>
+      </section>`;
+  }
+
   function emptyLabel() {
-    if (S.viewMode === "week") return "tuần này";
     if (S.viewMode === "month") return "tháng này";
     return `ngày ${formatShortDate(S.selectedDate || localDate())}`;
   }
@@ -390,6 +489,10 @@
     syncDatebar();
     const rows = visibleAssignments();
     const overview = S.viewMode === "month" ? renderMonthOverview(rows) : "";
+    if (S.viewMode === "month" && rows.length) {
+      E.list.innerHTML = renderMonthDashboard(rows);
+      return;
+    }
     if (!rows.length) {
       E.list.innerHTML = `<div class="task-empty">Không có công việc trong ${esc(emptyLabel())}.</div>`;
       return;
@@ -409,7 +512,6 @@
 
   function shiftSelectedDate(amount) {
     const selected = S.selectedDate || localDate();
-    if (S.viewMode === "week") return addDays(selected, amount * 7);
     if (S.viewMode === "month") return addMonths(selected, amount);
     return addDays(selected, amount);
   }
@@ -425,6 +527,78 @@
       return;
     }
     S.users = data || [];
+  }
+
+  async function enrichTaskProgress(assignments) {
+    const rows = (assignments || []).filter(item => {
+      const task = item.task || {};
+      return task.metadata && ["attendance", "session_evaluation"].includes(task.task_type);
+    });
+    if (!rows.length) return;
+
+    const classIds = uniq(rows.map(item => item.task?.metadata?.class_id));
+    const sessionIds = uniq(rows.map(item => item.task?.metadata?.session_id));
+    const attendanceDates = uniq(rows.map(item => item.task?.metadata?.session_date || item.task?.available_on));
+
+    const [studentsRes, evaluationsRes, attendanceRes] = await Promise.all([
+      classIds.length
+        ? sb.from("class_students").select("class_id,student_id,joined_at,left_at").in("class_id", classIds)
+        : Promise.resolve({ data: [], error: null }),
+      sessionIds.length
+        ? sb.from("session_student_evaluations").select("class_session_id,student_id,state").in("class_session_id", sessionIds)
+        : Promise.resolve({ data: [], error: null }),
+      classIds.length && attendanceDates.length
+        ? sb.from("attendance").select("class_id,student_id,date,status").in("class_id", classIds).in("date", attendanceDates)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (studentsRes.error || evaluationsRes.error || attendanceRes.error) {
+      console.warn("Task progress:", studentsRes.error || evaluationsRes.error || attendanceRes.error);
+      return;
+    }
+
+    const studentsByClass = new Map();
+    (studentsRes.data || []).forEach(row => {
+      if (!studentsByClass.has(row.class_id)) studentsByClass.set(row.class_id, []);
+      studentsByClass.get(row.class_id).push(row);
+    });
+    const evaluationMap = new Map();
+    (evaluationsRes.data || []).forEach(row => {
+      if (row.state !== "sent") return;
+      const key = String(row.class_session_id);
+      if (!evaluationMap.has(key)) evaluationMap.set(key, new Set());
+      evaluationMap.get(key).add(row.student_id);
+    });
+    const attendanceMap = new Map();
+    (attendanceRes.data || []).forEach(row => {
+      const key = `${row.class_id}:${row.date}`;
+      if (!attendanceMap.has(key)) attendanceMap.set(key, new Set());
+      attendanceMap.get(key).add(row.student_id);
+    });
+
+    const activeStudentCount = (classId, dateText) => (studentsByClass.get(classId) || []).filter(row => {
+      const joined = row.joined_at ? String(row.joined_at).slice(0, 10) : "0000-00-00";
+      const left = row.left_at ? String(row.left_at).slice(0, 10) : "9999-99-99";
+      return joined <= dateText && left >= dateText;
+    }).length;
+
+    rows.forEach(item => {
+      const task = item.task || {};
+      const meta = task.metadata || {};
+      const classId = meta.class_id;
+      const dateText = String(meta.session_date || task.available_on || taskDay(item)).slice(0, 10);
+      if (!classId || !dateText) return;
+      const total = activeStudentCount(classId, dateText);
+      if (!total) return;
+      if (task.task_type === "session_evaluation" && meta.session_id) {
+        const current = evaluationMap.get(String(meta.session_id))?.size || 0;
+        task.progress = { current, total, label: "Đã đánh giá học sinh" };
+      }
+      if (task.task_type === "attendance") {
+        const current = attendanceMap.get(`${classId}:${dateText}`)?.size || 0;
+        task.progress = { current, total, label: "Đã điểm danh học sinh" };
+      }
+    });
   }
 
   async function loadTasks({ refresh = false } = {}) {
@@ -453,6 +627,7 @@
     );
     const scheduleFallbacks = await loadScheduleFallbackTasks(assignments);
     S.assignments = [...assignments, ...scheduleFallbacks];
+    await enrichTaskProgress(S.assignments);
     render();
   }
 
