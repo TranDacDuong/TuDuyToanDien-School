@@ -324,18 +324,18 @@
     if (!isManualAssignedTask(item)) return "";
     const completed = effectiveStatus(item) === "completed";
     const note = String(item.note || "").trim();
-    if (completed) {
-      return note
+    const canEditResult = !(S.profile?.role === "admin" && item.user_id !== S.user?.id);
+    if (!canEditResult) {
+      return completed && note
         ? `<div class="task-result-box"><label>Kết quả đã nộp</label><div class="task-result-note">${esc(note)}</div></div>`
         : "";
     }
-    if (S.profile?.role === "admin" && item.user_id !== S.user?.id) return "";
     return `
       <div class="task-result-box">
-        <label for="taskResult_${esc(item.id)}">Kết quả thực hiện</label>
+        <label for="taskResult_${esc(item.id)}">${completed ? "Chỉnh sửa kết quả đã nộp" : "Kết quả thực hiện"}</label>
         <textarea class="task-result-input" id="taskResult_${esc(item.id)}" data-result-input="${esc(item.id)}" placeholder="Nhập kết quả công việc...">${esc(note)}</textarea>
         <div style="display:flex;justify-content:flex-end">
-          <button class="task-btn success" type="button" data-submit-result="${esc(item.id)}">Nộp</button>
+          <button class="task-btn success" type="button" data-submit-result="${esc(item.id)}">${completed ? "Cập nhật kết quả" : "Nộp"}</button>
         </div>
       </div>`;
   }
@@ -849,7 +849,7 @@
       p_note: note,
     });
     if (error) return alert(error.message);
-    toast("Đã nộp kết quả và hoàn thành công việc.");
+    toast("Đã lưu kết quả công việc.");
     await loadTasks();
   }
 
