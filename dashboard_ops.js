@@ -11,7 +11,7 @@
   }
 
   function money(value) {
-    return `${new Intl.NumberFormat("vi-VN").format(Math.round(Number(value || 0)))}Ä‘`;
+    return `${new Intl.NumberFormat("vi-VN").format(Math.round(Number(value || 0)))}đ`;
   }
 
   function pct(value) {
@@ -147,7 +147,7 @@
     const el = byId(id);
     if (!el) return;
     if (!rows.length) {
-      el.innerHTML = '<div class="ops-empty">ChÆ°a cÃ³ Ä‘á»§ dá»¯ liá»‡u Ä‘á»ƒ hiá»ƒn thá»‹.</div>';
+      el.innerHTML = '<div class="ops-empty">Chưa có đủ dữ liệu để hiển thị.</div>';
       return;
     }
     const max = Math.max(...rows.map(row => Number(row.value || 0)), 1);
@@ -167,7 +167,7 @@
     const el = byId(id);
     if (!el) return;
     if (!rows.length) {
-      el.innerHTML = '<div class="ops-empty">ChÆ°a cÃ³ Ä‘á»§ dá»¯ liá»‡u Ä‘á»ƒ hiá»ƒn thá»‹.</div>';
+      el.innerHTML = '<div class="ops-empty">Chưa có đủ dữ liệu để hiển thị.</div>';
       return;
     }
     const max = Math.max(...rows.flatMap(row => [Number(row.a || 0), Number(row.b || 0)]), 1);
@@ -200,7 +200,7 @@
     if (!el) return;
     const visibleSeries = series.filter(item => item.values.some(value => Number(value) > 0));
     if (!visibleSeries.length) {
-      el.innerHTML = '<div class="ops-empty">ChÆ°a cÃ³ Ä‘á»§ dá»¯ liá»‡u Ä‘iá»ƒm Ä‘á»ƒ hiá»ƒn thá»‹.</div>';
+      el.innerHTML = '<div class="ops-empty">Chưa có đủ dữ liệu điểm để hiển thị.</div>';
       return;
     }
     const width = 640;
@@ -216,7 +216,7 @@
 
     el.innerHTML = `
       <div class="ops-line-wrap">
-        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Äiá»ƒm trung bÃ¬nh theo mÃ´n vÃ  theo thÃ¡ng">
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Điểm trung bình theo môn và theo tháng">
           ${axis.map(mark => `<line x1="${pad.left}" y1="${y(mark)}" x2="${width - pad.right}" y2="${y(mark)}" class="ops-grid-line"></line><text x="10" y="${y(mark) + 4}" class="ops-axis">${mark}%</text>`).join("")}
           ${labels.map((label, index) => `<text x="${x(index)}" y="${height - 18}" text-anchor="middle" class="ops-axis">${label}</text>`).join("")}
           ${visibleSeries.map((item, seriesIndex) => {
@@ -237,7 +237,7 @@
     const el = byId("opsClassScoreCards");
     if (!el) return;
     if (!stats.length) {
-      el.innerHTML = '<div class="ops-empty">ChÆ°a cÃ³ dá»¯ liá»‡u Ä‘iá»ƒm theo lá»›p.</div>';
+      el.innerHTML = '<div class="ops-empty">Chưa có dữ liệu điểm theo lớp.</div>';
       return;
     }
     const sorted = [...stats].sort((a, b) => b.avg - a.avg);
@@ -245,14 +245,14 @@
     const lowest = sorted[sorted.length - 1];
     el.innerHTML = `
       <div class="ops-rank-card good">
-        <span>Lá»›p Ä‘iá»ƒm cao nháº¥t</span>
+        <span>Lớp điểm cao nhất</span>
         <strong>${best.className}</strong>
-        <em>${pct(best.avg)} â€¢ ${best.count} lÆ°á»£t ná»™p</em>
+        <em>${pct(best.avg)} • ${best.count} lượt nộp</em>
       </div>
       <div class="ops-rank-card warn">
-        <span>Lá»›p Ä‘iá»ƒm tháº¥p nháº¥t</span>
+        <span>Lớp điểm thấp nhất</span>
         <strong>${lowest.className}</strong>
-        <em>${pct(lowest.avg)} â€¢ ${lowest.count} lÆ°á»£t ná»™p</em>
+        <em>${pct(lowest.avg)} • ${lowest.count} lượt nộp</em>
       </div>
     `;
   }
@@ -392,7 +392,7 @@
         if (absentByMonth[key] !== undefined && ABSENT_STATUSES.has(String(item.status || ""))) absentByMonth[key] += 1;
       });
 
-      const classNameMap = Object.fromEntries(classes.map(item => [item.id, item.class_name || "Lá»›p há»c"]));
+      const classNameMap = Object.fromEntries(classes.map(item => [item.id, item.class_name || "Lớp học"]));
       const subjectMonthMap = new Map();
       const classScoreMap = new Map();
         examResults.forEach(item => {
@@ -402,7 +402,7 @@
           const key = String(item.submitted_at || "").slice(0, 7);
         if (!keys.includes(key)) return;
         const ratio = Math.max(0, Math.min(100, (score / total) * 100));
-        const subject = item.exam?.classes?.subjects?.name || "KhÃ¡c";
+        const subject = item.exam?.classes?.subjects?.name || "Khác";
         const subjectKey = `${subject}|${key}`;
         const subjectPrev = subjectMonthMap.get(subjectKey) || { subject, month: key, total: 0, count: 0 };
         subjectPrev.total += ratio;
@@ -411,7 +411,7 @@
 
         const classId = item.class_id || item.exam?.classes?.id || "";
         if (!classId) return;
-        const classPrev = classScoreMap.get(classId) || { classId, className: classNameMap[classId] || item.exam?.classes?.class_name || "Lá»›p há»c", total: 0, count: 0 };
+        const classPrev = classScoreMap.get(classId) || { classId, className: classNameMap[classId] || item.exam?.classes?.class_name || "Lớp học", total: 0, count: 0 };
         classPrev.total += ratio;
           classPrev.count += 1;
           classScoreMap.set(classId, classPrev);
@@ -425,7 +425,7 @@
           if (!keys.includes(key)) return;
           const ratio = Math.max(0, Math.min(100, (score / total) * 100));
           const cls = classMap[item.class_id];
-          const subject = cls?.subjects?.name || "KhÃ¡c";
+          const subject = cls?.subjects?.name || "Khác";
           const subjectKey = `${subject}|${key}`;
           const subjectPrev = subjectMonthMap.get(subjectKey) || { subject, month: key, total: 0, count: 0 };
           subjectPrev.total += ratio;
@@ -434,7 +434,7 @@
 
           const classId = item.class_id || "";
           if (!classId) return;
-          const classPrev = classScoreMap.get(classId) || { classId, className: classNameMap[classId] || cls?.class_name || "Lá»›p há»c", total: 0, count: 0 };
+          const classPrev = classScoreMap.get(classId) || { classId, className: classNameMap[classId] || cls?.class_name || "Lớp học", total: 0, count: 0 };
           classPrev.total += ratio;
           classPrev.count += 1;
           classScoreMap.set(classId, classPrev);
@@ -452,18 +452,18 @@
       setText(
         "opsRevenueSub",
         displayRevenue.due
-          ? `ThÃ¡ng ${monthLabel(displayRevenueMonth)} â€¢ Ä‘Ã£ thu ${pct((displayRevenue.paid / displayRevenue.due) * 100)} doanh thu`
-          : "ChÆ°a cÃ³ dá»¯ liá»‡u há»c phÃ­"
+          ? `Tháng ${monthLabel(displayRevenueMonth)} • đã thu ${pct((displayRevenue.paid / displayRevenue.due) * 100)} doanh thu`
+          : "Chưa có dữ liệu học phí"
       );
       setText("opsStudentGrowthValue", `${newStudentsThisMonth} / ${students.length}`);
-      setText("opsStudentGrowthSub", "Há»c sinh má»›i thÃ¡ng nÃ y / tá»•ng há»c sinh");
+      setText("opsStudentGrowthSub", "Học sinh mới tháng này / tổng học sinh");
       setText("opsActiveClassCount", String(classes.length));
-      setText("opsActiveClassSub", "Tá»•ng lá»›p Ä‘ang hoáº¡t Ä‘á»™ng");
+      setText("opsActiveClassSub", "Tổng lớp đang hoạt động");
 
       renderBars("opsRevenueChart", keys.map(key => ({ label: monthLabel(key), value: revenueByMonth[key]?.due || 0 })), { format: money, className: "money" });
       renderDualBars("opsStudentFlowChart", keys.map(key => ({ label: monthLabel(key), a: studentAdds[key] || 0, b: studentLeaves[key]?.size || 0 })), {
-        aLabel: "Há»c sinh má»›i",
-        bLabel: "Há»c sinh nghá»‰",
+        aLabel: "Học sinh mới",
+        bLabel: "Học sinh nghỉ",
         aClass: "new-students",
         bClass: "left-students",
       });
@@ -483,7 +483,7 @@
       console.warn("loadAdminOps failed", error);
       ["opsRevenueChart", "opsStudentFlowChart", "opsAbsenceChart", "opsScoreChart"].forEach(id => {
         const el = byId(id);
-        if (el) el.innerHTML = '<div class="ops-empty">KhÃ´ng táº£i Ä‘Æ°á»£c dá»¯ liá»‡u dashboard lÃºc nÃ y.</div>';
+        if (el) el.innerHTML = '<div class="ops-empty">Không tải được dữ liệu dashboard lúc này.</div>';
       });
     }
   }

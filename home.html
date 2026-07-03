@@ -2304,8 +2304,8 @@ async function loadStudentReportData(studentId) {
         const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
         return {
           date: r.submitted_at,
-          label: `${dateStr} - ${r.exams?.title || "Bai KT"}`,
-          subject: r.exams?.classes?.subjects?.name || "Khac",
+          label: `${dateStr} - ${r.exams?.title || "Bài KT"}`,
+          subject: r.exams?.classes?.subjects?.name || "Khác",
           score10: Math.round((score / maxPts) * 10 * 10) / 10,
         };
       }),
@@ -2320,8 +2320,8 @@ async function loadStudentReportData(studentId) {
         const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
         return {
           date: dateValue,
-          label: `${dateStr} - ${session.lesson?.name || "BTVN/De luyen tap"}`,
-          subject: cls.subjects?.name || "Khac",
+          label: `${dateStr} - ${session.lesson?.name || "BTVN/Đề luyện tập"}`,
+          subject: cls.subjects?.name || "Khác",
           score10: Math.round((score / maxPts) * 10 * 10) / 10,
         };
       }),
@@ -2329,7 +2329,7 @@ async function loadStudentReportData(studentId) {
 
   const subjectMap = {};
   scorePoints.forEach(r => {
-    const subName = r.subject || "KhÃ¡c";
+    const subName = r.subject || "Khác";
     if (!subjectMap[subName]) subjectMap[subName] = [];
     subjectMap[subName].push(r);
   });
@@ -2378,7 +2378,7 @@ async function loadStudentReportData(studentId) {
     ctx.fillStyle = "#94a3b8";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("ChÆ°a cÃ³ káº¿t quáº£ bÃ i luyá»‡n táº­p nÃ o.", canvas.width / 2, canvas.height / 2);
+    ctx.fillText("Chưa có kết quả bài luyện tập nào.", canvas.width / 2, canvas.height / 2);
     return;
   }
 
@@ -2409,7 +2409,7 @@ async function loadStudentReportData(studentId) {
                 label += ': ';
               }
               if (context.parsed.y !== null) {
-                label += context.parsed.y + '/10 Ä‘iá»ƒm';
+                label += context.parsed.y + '/10 điểm';
               }
               return label;
             }
