@@ -8,6 +8,7 @@
     viewMode: "today",
     selectedUserId: "all",
     preferences: null,
+    manualAssigneeIds: new Set(),
   };
 
   const E = {};
@@ -820,19 +821,23 @@
       !query || `${user.full_name || ""} ${user.email || ""}`.toLowerCase().includes(query)
     ).map(user => `
       <label class="assignee-row">
-        <input type="checkbox" value="${user.id}">
+        <input type="checkbox" value="${esc(user.id)}" ${S.manualAssigneeIds.has(user.id) ? "checked" : ""}>
         <span><strong>${esc(user.full_name || user.email)}</strong><br><small>${esc(user.role)} · ${esc(user.email)}</small></span>
       </label>`).join("");
   }
 
   async function openCreateModal() {
     await loadInternalUsers();
+    S.manualAssigneeIds = new Set();
+    byId("manualTaskAssigneeSearch").value = "";
     renderAssignees();
     openModal("taskCreateModal");
   }
 
   async function saveManualTask() {
-    const userIds = [...byId("manualTaskAssignees").querySelectorAll('input[type="checkbox"]:checked')].map(input => input.value);
+    const checkedIds = [...byId("manualTaskAssignees").querySelectorAll('input[type="checkbox"]:checked')].map(input => input.value);
+    checkedIds.forEach(id => S.manualAssigneeIds.add(id));
+    const userIds = [...S.manualAssigneeIds];
     const title = byId("manualTaskTitle").value.trim();
     if (!title || !userIds.length) return alert("Hãy nhập tiêu đề và chọn ít nhất một người nhận.");
     const dueValue = byId("manualTaskDueAt").value;
@@ -860,6 +865,8 @@
     }
     closeModal("taskCreateModal");
     ["manualTaskTitle", "manualTaskDescription", "manualTaskDueAt", "manualTaskActionUrl"].forEach(id => byId(id).value = "");
+    S.manualAssigneeIds = new Set();
+    byId("manualTaskAssigneeSearch").value = "";
     toast(`Đã giao việc cho ${userIds.length} người.`);
     await loadTasks();
   }
@@ -920,6 +927,12 @@
     byId("taskCreateButton").addEventListener("click", openCreateModal);
     byId("taskSettingsButton").addEventListener("click", async () => { await loadPreferences(); openModal("taskSettingsModal"); });
     byId("manualTaskAssigneeSearch").addEventListener("input", renderAssignees);
+    byId("manualTaskAssignees").addEventListener("change", event => {
+      const input = event.target.closest('input[type="checkbox"]');
+      if (!input) return;
+      if (input.checked) S.manualAssigneeIds.add(input.value);
+      else S.manualAssigneeIds.delete(input.value);
+    });
     byId("manualTaskSave").addEventListener("click", saveManualTask);
     byId("taskPreferencesSave").addEventListener("click", savePreferences);
     document.querySelectorAll("[data-close-modal]").forEach(button => button.addEventListener("click", () => closeModal(button.dataset.closeModal)));
