@@ -532,28 +532,24 @@
   async function enrichTaskProgress(assignments) {
     const rows = (assignments || []).filter(item => {
       const task = item.task || {};
-      return task.metadata && ["attendance", "session_evaluation"].includes(task.task_type);
+      return task.metadata && task.task_type === "session_evaluation";
     });
     if (!rows.length) return;
 
     const classIds = uniq(rows.map(item => item.task?.metadata?.class_id));
     const sessionIds = uniq(rows.map(item => item.task?.metadata?.session_id));
-    const attendanceDates = uniq(rows.map(item => item.task?.metadata?.session_date || item.task?.available_on));
 
-    const [studentsRes, evaluationsRes, attendanceRes] = await Promise.all([
+    const [studentsRes, evaluationsRes] = await Promise.all([
       classIds.length
         ? sb.from("class_students").select("class_id,student_id,joined_at,left_at").in("class_id", classIds)
         : Promise.resolve({ data: [], error: null }),
       sessionIds.length
         ? sb.from("session_student_evaluations").select("class_session_id,student_id,state").in("class_session_id", sessionIds)
         : Promise.resolve({ data: [], error: null }),
-      classIds.length && attendanceDates.length
-        ? sb.from("attendance").select("class_id,student_id,date,status").in("class_id", classIds).in("date", attendanceDates)
-        : Promise.resolve({ data: [], error: null }),
     ]);
 
-    if (studentsRes.error || evaluationsRes.error || attendanceRes.error) {
-      console.warn("Task progress:", studentsRes.error || evaluationsRes.error || attendanceRes.error);
+    if (studentsRes.error || evaluationsRes.error) {
+      console.warn("Task progress:", studentsRes.error || evaluationsRes.error);
       return;
     }
 
@@ -569,13 +565,6 @@
       if (!evaluationMap.has(key)) evaluationMap.set(key, new Set());
       evaluationMap.get(key).add(row.student_id);
     });
-    const attendanceMap = new Map();
-    (attendanceRes.data || []).forEach(row => {
-      const key = `${row.class_id}:${row.date}`;
-      if (!attendanceMap.has(key)) attendanceMap.set(key, new Set());
-      attendanceMap.get(key).add(row.student_id);
-    });
-
     const activeStudentCount = (classId, dateText) => (studentsByClass.get(classId) || []).filter(row => {
       const joined = row.joined_at ? String(row.joined_at).slice(0, 10) : "0000-00-00";
       const left = row.left_at ? String(row.left_at).slice(0, 10) : "9999-99-99";
@@ -593,10 +582,6 @@
       if (task.task_type === "session_evaluation" && meta.session_id) {
         const current = evaluationMap.get(String(meta.session_id))?.size || 0;
         task.progress = { current, total, label: "Đã đánh giá học sinh" };
-      }
-      if (task.task_type === "attendance") {
-        const current = attendanceMap.get(`${classId}:${dateText}`)?.size || 0;
-        task.progress = { current, total, label: "Đã điểm danh học sinh" };
       }
     });
   }
