@@ -126,8 +126,7 @@
       const sameSession = (daySchedules || []).filter(item => Number(item.session_no || 1) === Number(selected.session_no || 1));
       if (!sameSession.length) return false;
       return sameSession.some(item => scheduleKey(item) === scheduleKey(selected))
-        || sameSession.some(item => Number(item.weekday || 0) === Number(selected.weekday || 0))
-        || sameSession.length > 0;
+        || sameSession.some(item => Number(item.weekday || 0) === Number(selected.weekday || 0));
     });
   }
 
