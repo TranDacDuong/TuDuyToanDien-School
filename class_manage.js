@@ -914,9 +914,9 @@
             '</td>';
         }
       });
-      const stopBtn = (isActive && (role === "admin" || role === "teacher"))
+      const stopBtn = (isActive && canTakeAttendance(role))
         ? '<button onclick="cvStopStudent(\''+_classId+'\',\''+s.student_id+'\')" '+
-          'class="btn btn-outline btn-sm" style="font-size:.72rem;padding:3px 9px">Ngừng</button>'
+          'class="btn btn-outline btn-sm" style="font-size:.72rem;padding:4px 10px;border-color:#fecaca;color:#b91c1c;background:#fff5f5">Ngừng học</button>'
         : '<span style="font-size:.72rem;color:var(--ink-light)">—</span>';
       const studentName = s.user?.full_name || "—";
       const studentNameHtml = canTakeAttendance(role)
