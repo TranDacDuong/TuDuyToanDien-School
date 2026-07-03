@@ -925,19 +925,22 @@
           'style="appearance:none;border:0;background:transparent;padding:0;margin:0;color:var(--navy);font:inherit;font-weight:700;text-align:left;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px">'+
           esc(studentName)+'</button>'
         : esc(studentName);
+      const inlineStopBtn = stopBtn.includes("cvStopStudent")
+        ? '<div style="margin-top:5px">'+stopBtn+'</div>'
+        : "";
       rowsHtml+="<tr>"+
         '<td style="text-align:left;font-weight:600;position:sticky;left:0;background:#fff;z-index:1;'+
         'border-right:1px solid var(--border);padding:6px 10px">'+
         studentNameHtml+
+        inlineStopBtn+
         (!isActive?'<br><span style="font-size:.7rem;color:var(--ink-light);font-weight:400">nghỉ '+left+"</span>":"")+
         "</td>"+cells+
-        '<td class="center">'+stopBtn+"</td>"+
         "</tr>";
     });
 
     rowsHtml+=
       '<tr style="background:var(--gold-pale)">'+
-      '<td colspan="'+(dates.length+2)+'" style="padding:8px;text-align:left">'+
+      '<td colspan="'+(dates.length+1)+'" style="padding:8px;text-align:left">'+
       '<button onclick="cvClassOff(\''+_classId+'\')" class="btn btn-sm" '+
       'style="background:var(--amber);color:#fff;border:none;box-shadow:0 2px 8px rgba(180,83,9,.2)">📅 Lớp nghỉ hôm nay</button>'+
       "</td></tr>";
@@ -969,7 +972,6 @@
       "<thead><tr>"+
       '<th style="text-align:left;min-width:130px;position:sticky;left:0;background:var(--navy);z-index:1">Học sinh</th>'+
       dateHeaders+
-      '<th class="center" style="min-width:80px">Ngừng</th>'+
       "</tr></thead><tbody>"+rowsHtml+"</tbody></table></div>"+
       searchModal;
   }
