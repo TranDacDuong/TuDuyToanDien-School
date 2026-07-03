@@ -104,6 +104,33 @@
     return eligible.filter(item => String(item.effective_from || "2000-01-01").slice(0, 10) === maxEffective);
   }
 
+  function scheduleKey(schedule) {
+    if (!schedule) return "";
+    return [
+      Number(schedule.session_no || 1),
+      Number(schedule.weekday || 0),
+      String(schedule.start_time || "").slice(0, 5),
+      String(schedule.end_time || "").slice(0, 5),
+    ].join("|");
+  }
+
+  function selectedScheduleMatchesDay(selectedIds, daySchedules, allSchedules) {
+    if (!selectedIds || !selectedIds.size) return true;
+    const dayIds = new Set((daySchedules || []).map(item => Number(item.id)));
+    if ([...selectedIds].some(id => dayIds.has(Number(id)))) return true;
+
+    const selectedRows = [...selectedIds]
+      .map(id => (allSchedules || []).find(item => Number(item.id) === Number(id)))
+      .filter(Boolean);
+    return selectedRows.some(selected => {
+      const sameSession = (daySchedules || []).filter(item => Number(item.session_no || 1) === Number(selected.session_no || 1));
+      if (!sameSession.length) return false;
+      return sameSession.some(item => scheduleKey(item) === scheduleKey(selected))
+        || sameSession.some(item => Number(item.weekday || 0) === Number(selected.weekday || 0))
+        || sameSession.length > 0;
+    });
+  }
+
   async function getSessionStudentIds(client, session, activeLinks) {
     const sessionDate = String(session.session_date || "").slice(0, 10);
     const activeIds = new Set((activeLinks || []).map(link => link.student_id).filter(Boolean));
@@ -111,15 +138,14 @@
 
     const { data: schedules, error: scheduleError } = await client
       .from("class_schedules")
-      .select("id,weekday,effective_from")
+      .select("id,session_no,weekday,start_time,end_time,effective_from")
       .eq("class_id", session.class_id);
     if (scheduleError) return [...activeIds];
 
     const weekday = getWeekday(sessionDate);
-    const dayScheduleIds = pickEffectiveSchedules(schedules || [], sessionDate)
-      .filter(item => Number(item.weekday) === weekday)
-      .map(item => Number(item.id));
-    if (!dayScheduleIds.length) return [];
+    const daySchedules = pickEffectiveSchedules(schedules || [], sessionDate)
+      .filter(item => Number(item.weekday) === weekday);
+    if (!daySchedules.length) return [];
 
     const { data: studentSchedules, error: studentScheduleError } = await client
       .from("class_student_schedules")
@@ -127,7 +153,6 @@
       .eq("class_id", session.class_id);
     if (studentScheduleError) return [...activeIds];
 
-    const dayScheduleSet = new Set(dayScheduleIds);
     const selectedByStudent = new Map();
     (studentSchedules || []).forEach(row => {
       if (!selectedByStudent.has(row.student_id)) selectedByStudent.set(row.student_id, new Set());
@@ -136,8 +161,7 @@
 
     return [...activeIds].filter(studentId => {
       const selected = selectedByStudent.get(studentId);
-      if (!selected || !selected.size) return true;
-      return [...selected].some(scheduleId => dayScheduleSet.has(scheduleId));
+      return selectedScheduleMatchesDay(selected, daySchedules, schedules || []);
     });
   }
 
