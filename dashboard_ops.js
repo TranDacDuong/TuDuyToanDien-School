@@ -11,7 +11,7 @@
   }
 
   function money(value) {
-    return `${new Intl.NumberFormat("vi-VN").format(Math.round(Number(value || 0)))}đ`;
+    return `${new Intl.NumberFormat("vi-VN").format(Math.round(Number(value || 0)))}Ä‘`;
   }
 
   function pct(value) {
@@ -147,7 +147,7 @@
     const el = byId(id);
     if (!el) return;
     if (!rows.length) {
-      el.innerHTML = '<div class="ops-empty">Chưa có đủ dữ liệu để hiển thị.</div>';
+      el.innerHTML = '<div class="ops-empty">ChÆ°a cÃ³ Ä‘á»§ dá»¯ liá»‡u Ä‘á»ƒ hiá»ƒn thá»‹.</div>';
       return;
     }
     const max = Math.max(...rows.map(row => Number(row.value || 0)), 1);
@@ -167,7 +167,7 @@
     const el = byId(id);
     if (!el) return;
     if (!rows.length) {
-      el.innerHTML = '<div class="ops-empty">Chưa có đủ dữ liệu để hiển thị.</div>';
+      el.innerHTML = '<div class="ops-empty">ChÆ°a cÃ³ Ä‘á»§ dá»¯ liá»‡u Ä‘á»ƒ hiá»ƒn thá»‹.</div>';
       return;
     }
     const max = Math.max(...rows.flatMap(row => [Number(row.a || 0), Number(row.b || 0)]), 1);
@@ -200,7 +200,7 @@
     if (!el) return;
     const visibleSeries = series.filter(item => item.values.some(value => Number(value) > 0));
     if (!visibleSeries.length) {
-      el.innerHTML = '<div class="ops-empty">Chưa có đủ dữ liệu điểm để hiển thị.</div>';
+      el.innerHTML = '<div class="ops-empty">ChÆ°a cÃ³ Ä‘á»§ dá»¯ liá»‡u Ä‘iá»ƒm Ä‘á»ƒ hiá»ƒn thá»‹.</div>';
       return;
     }
     const width = 640;
@@ -216,7 +216,7 @@
 
     el.innerHTML = `
       <div class="ops-line-wrap">
-        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Điểm trung bình theo môn và theo tháng">
+        <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Äiá»ƒm trung bÃ¬nh theo mÃ´n vÃ  theo thÃ¡ng">
           ${axis.map(mark => `<line x1="${pad.left}" y1="${y(mark)}" x2="${width - pad.right}" y2="${y(mark)}" class="ops-grid-line"></line><text x="10" y="${y(mark) + 4}" class="ops-axis">${mark}%</text>`).join("")}
           ${labels.map((label, index) => `<text x="${x(index)}" y="${height - 18}" text-anchor="middle" class="ops-axis">${label}</text>`).join("")}
           ${visibleSeries.map((item, seriesIndex) => {
@@ -237,7 +237,7 @@
     const el = byId("opsClassScoreCards");
     if (!el) return;
     if (!stats.length) {
-      el.innerHTML = '<div class="ops-empty">Chưa có dữ liệu điểm theo lớp.</div>';
+      el.innerHTML = '<div class="ops-empty">ChÆ°a cÃ³ dá»¯ liá»‡u Ä‘iá»ƒm theo lá»›p.</div>';
       return;
     }
     const sorted = [...stats].sort((a, b) => b.avg - a.avg);
@@ -245,14 +245,14 @@
     const lowest = sorted[sorted.length - 1];
     el.innerHTML = `
       <div class="ops-rank-card good">
-        <span>Lớp điểm cao nhất</span>
+        <span>Lá»›p Ä‘iá»ƒm cao nháº¥t</span>
         <strong>${best.className}</strong>
-        <em>${pct(best.avg)} • ${best.count} lượt nộp</em>
+        <em>${pct(best.avg)} â€¢ ${best.count} lÆ°á»£t ná»™p</em>
       </div>
       <div class="ops-rank-card warn">
-        <span>Lớp điểm thấp nhất</span>
+        <span>Lá»›p Ä‘iá»ƒm tháº¥p nháº¥t</span>
         <strong>${lowest.className}</strong>
-        <em>${pct(lowest.avg)} • ${lowest.count} lượt nộp</em>
+        <em>${pct(lowest.avg)} â€¢ ${lowest.count} lÆ°á»£t ná»™p</em>
       </div>
     `;
   }
@@ -269,38 +269,46 @@
         tuitionRes,
         studentRes,
         classStudentRes,
-        classRes,
-        attendanceRes,
-        chosenScheduleRes,
-        examResultRes,
-      ] = await Promise.all([
+          classRes,
+          attendanceRes,
+          chosenScheduleRes,
+          examResultRes,
+          sessionScoreRes,
+        ] = await Promise.all([
         fetchAllPages(() => sb.from("tuition_payments").select("month,amount_due,amount_paid").lte("month", thisMonthStart).order("month", { ascending: true })),
         fetchAllPages(() => sb.from("users").select("id,role,created_at").eq("role", "student").order("created_at", { ascending: true })),
         fetchAllPages(() => sb.from("class_students").select("class_id,student_id,joined_at,left_at").order("joined_at", { ascending: true })),
         fetchAllPages(() => sb.from("classes").select("id,class_name,hidden,tuition_fee,tuition_type,makeup_fee,subjects(name),class_schedules(id,session_no,weekday,start_time,end_time,effective_from)").eq("hidden", false).order("class_name", { ascending: true })),
-        fetchAllPages(() => sb.from("attendance").select("class_id,student_id,date,status").lte("date", toDate).order("date", { ascending: true })),
-        fetchAllPages(() => sb.from("class_student_schedules").select("class_id,student_id,schedule_id")),
-        fetchAllPages(() => sb.from("exam_results").select("class_id,submitted_at,score_auto,score_total,exam:exams(total_points,classes(class_name,subjects(name)))").not("submitted_at", "is", null).order("submitted_at", { ascending: true })),
-      ]);
-      const firstError = tuitionRes.error || studentRes.error || classStudentRes.error || classRes.error || attendanceRes.error || chosenScheduleRes.error || examResultRes.error;
+          fetchAllPages(() => sb.from("attendance").select("class_id,student_id,date,status").lte("date", toDate).order("date", { ascending: true })),
+          fetchAllPages(() => sb.from("class_student_schedules").select("class_id,student_id,schedule_id")),
+          fetchAllPages(() => sb.from("exam_results").select("class_id,submitted_at,score_auto,score_total,exam:exams(total_points,classes(class_name,subjects(name)))").not("submitted_at", "is", null).order("submitted_at", { ascending: true })),
+          fetchAllPages(() => sb.from("class_session_scores").select("class_id,score,max_score,created_at,class_sessions(session_date)").order("created_at", { ascending: true })),
+        ]);
+        const firstError = tuitionRes.error || studentRes.error || classStudentRes.error || classRes.error || attendanceRes.error || chosenScheduleRes.error || examResultRes.error || sessionScoreRes.error;
       if (firstError) throw firstError;
 
       const tuitions = tuitionRes.data || [];
       const students = studentRes.data || [];
       const classStudents = classStudentRes.data || [];
       const classes = classRes.data || [];
-      const attendance = attendanceRes.data || [];
-      const chosenSchedules = chosenScheduleRes.data || [];
-      const examResults = examResultRes.data || [];
+        const attendance = attendanceRes.data || [];
+        const chosenSchedules = chosenScheduleRes.data || [];
+        const examResults = examResultRes.data || [];
+        const sessionScores = sessionScoreRes.data || [];
       const monthsWithData = new Set([thisMonth]);
       [
         ...collectDataMonths(tuitions, ["month"]),
-        ...collectDataMonths(students, ["created_at"]),
-        ...collectDataMonths(classStudents, ["joined_at", "left_at"]),
-        ...collectDataMonths(attendance, ["date"]),
-        ...collectDataMonths(examResults, ["submitted_at"]),
-      ].forEach(key => monthsWithData.add(key));
-      const sortedMonths = [...monthsWithData].sort();
+          ...collectDataMonths(students, ["created_at"]),
+          ...collectDataMonths(classStudents, ["joined_at", "left_at"]),
+          ...collectDataMonths(attendance, ["date"]),
+          ...collectDataMonths(examResults, ["submitted_at"]),
+          ...collectDataMonths(sessionScores, ["created_at"]),
+        ].forEach(key => monthsWithData.add(key));
+        sessionScores.forEach(item => {
+          const key = String(item.class_sessions?.session_date || "").slice(0, 7);
+          if (key) monthsWithData.add(key);
+        });
+        const sortedMonths = [...monthsWithData].sort();
       const keys = monthRange(sortedMonths[0], sortedMonths[sortedMonths.length - 1]);
 
       const classMap = Object.fromEntries(classes.map(item => [item.id, item]));
@@ -384,17 +392,17 @@
         if (absentByMonth[key] !== undefined && ABSENT_STATUSES.has(String(item.status || ""))) absentByMonth[key] += 1;
       });
 
-      const classNameMap = Object.fromEntries(classes.map(item => [item.id, item.class_name || "Lớp học"]));
+      const classNameMap = Object.fromEntries(classes.map(item => [item.id, item.class_name || "Lá»›p há»c"]));
       const subjectMonthMap = new Map();
       const classScoreMap = new Map();
-      examResults.forEach(item => {
-        const total = Number(item.exam?.total_points || 0);
-        const score = Number(item.score_total ?? item.score_auto);
-        if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(score)) return;
-        const key = String(item.submitted_at || "").slice(0, 7);
+        examResults.forEach(item => {
+          const total = Number(item.exam?.total_points || 0);
+          const score = Number(item.score_total ?? item.score_auto);
+          if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(score)) return;
+          const key = String(item.submitted_at || "").slice(0, 7);
         if (!keys.includes(key)) return;
         const ratio = Math.max(0, Math.min(100, (score / total) * 100));
-        const subject = item.exam?.classes?.subjects?.name || "Khác";
+        const subject = item.exam?.classes?.subjects?.name || "KhÃ¡c";
         const subjectKey = `${subject}|${key}`;
         const subjectPrev = subjectMonthMap.get(subjectKey) || { subject, month: key, total: 0, count: 0 };
         subjectPrev.total += ratio;
@@ -403,13 +411,36 @@
 
         const classId = item.class_id || item.exam?.classes?.id || "";
         if (!classId) return;
-        const classPrev = classScoreMap.get(classId) || { classId, className: classNameMap[classId] || item.exam?.classes?.class_name || "Lớp học", total: 0, count: 0 };
+        const classPrev = classScoreMap.get(classId) || { classId, className: classNameMap[classId] || item.exam?.classes?.class_name || "Lá»›p há»c", total: 0, count: 0 };
         classPrev.total += ratio;
-        classPrev.count += 1;
-        classScoreMap.set(classId, classPrev);
-      });
+          classPrev.count += 1;
+          classScoreMap.set(classId, classPrev);
+        });
 
-      const revenueMonths = keys.filter(key => Number(revenueByMonth[key]?.due || 0) || Number(revenueByMonth[key]?.paid || 0));
+        sessionScores.forEach(item => {
+          const total = Number(item.max_score || 0);
+          const score = Number(item.score);
+          if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(score)) return;
+          const key = String(item.class_sessions?.session_date || item.created_at || "").slice(0, 7);
+          if (!keys.includes(key)) return;
+          const ratio = Math.max(0, Math.min(100, (score / total) * 100));
+          const cls = classMap[item.class_id];
+          const subject = cls?.subjects?.name || "KhÃ¡c";
+          const subjectKey = `${subject}|${key}`;
+          const subjectPrev = subjectMonthMap.get(subjectKey) || { subject, month: key, total: 0, count: 0 };
+          subjectPrev.total += ratio;
+          subjectPrev.count += 1;
+          subjectMonthMap.set(subjectKey, subjectPrev);
+
+          const classId = item.class_id || "";
+          if (!classId) return;
+          const classPrev = classScoreMap.get(classId) || { classId, className: classNameMap[classId] || cls?.class_name || "Lá»›p há»c", total: 0, count: 0 };
+          classPrev.total += ratio;
+          classPrev.count += 1;
+          classScoreMap.set(classId, classPrev);
+        });
+
+        const revenueMonths = keys.filter(key => Number(revenueByMonth[key]?.due || 0) || Number(revenueByMonth[key]?.paid || 0));
       const currentRevenue = revenueByMonth[thisMonth] || { due: 0, paid: 0 };
       const displayRevenueMonth = (Number(currentRevenue.due || 0) || Number(currentRevenue.paid || 0))
         ? thisMonth
@@ -421,18 +452,18 @@
       setText(
         "opsRevenueSub",
         displayRevenue.due
-          ? `Tháng ${monthLabel(displayRevenueMonth)} • đã thu ${pct((displayRevenue.paid / displayRevenue.due) * 100)} doanh thu`
-          : "Chưa có dữ liệu học phí"
+          ? `ThÃ¡ng ${monthLabel(displayRevenueMonth)} â€¢ Ä‘Ã£ thu ${pct((displayRevenue.paid / displayRevenue.due) * 100)} doanh thu`
+          : "ChÆ°a cÃ³ dá»¯ liá»‡u há»c phÃ­"
       );
       setText("opsStudentGrowthValue", `${newStudentsThisMonth} / ${students.length}`);
-      setText("opsStudentGrowthSub", "Học sinh mới tháng này / tổng học sinh");
+      setText("opsStudentGrowthSub", "Há»c sinh má»›i thÃ¡ng nÃ y / tá»•ng há»c sinh");
       setText("opsActiveClassCount", String(classes.length));
-      setText("opsActiveClassSub", "Tổng lớp đang hoạt động");
+      setText("opsActiveClassSub", "Tá»•ng lá»›p Ä‘ang hoáº¡t Ä‘á»™ng");
 
       renderBars("opsRevenueChart", keys.map(key => ({ label: monthLabel(key), value: revenueByMonth[key]?.due || 0 })), { format: money, className: "money" });
       renderDualBars("opsStudentFlowChart", keys.map(key => ({ label: monthLabel(key), a: studentAdds[key] || 0, b: studentLeaves[key]?.size || 0 })), {
-        aLabel: "Học sinh mới",
-        bLabel: "Học sinh nghỉ",
+        aLabel: "Há»c sinh má»›i",
+        bLabel: "Há»c sinh nghá»‰",
         aClass: "new-students",
         bClass: "left-students",
       });
@@ -452,7 +483,7 @@
       console.warn("loadAdminOps failed", error);
       ["opsRevenueChart", "opsStudentFlowChart", "opsAbsenceChart", "opsScoreChart"].forEach(id => {
         const el = byId(id);
-        if (el) el.innerHTML = '<div class="ops-empty">Không tải được dữ liệu dashboard lúc này.</div>';
+        if (el) el.innerHTML = '<div class="ops-empty">KhÃ´ng táº£i Ä‘Æ°á»£c dá»¯ liá»‡u dashboard lÃºc nÃ y.</div>';
       });
     }
   }
