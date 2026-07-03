@@ -334,8 +334,9 @@
       <div class="task-result-box">
         <label for="taskResult_${esc(item.id)}">${completed ? "Chỉnh sửa kết quả đã nộp" : "Kết quả thực hiện"}</label>
         <textarea class="task-result-input" id="taskResult_${esc(item.id)}" data-result-input="${esc(item.id)}" placeholder="Nhập kết quả công việc...">${esc(note)}</textarea>
-        <div style="display:flex;justify-content:flex-end">
-          <button class="task-btn success" type="button" data-submit-result="${esc(item.id)}">${completed ? "Cập nhật kết quả" : "Nộp"}</button>
+        <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
+          ${completed ? `<button class="task-btn" type="button" data-cancel-submit="${esc(item.id)}">Hủy nộp</button>` : ""}
+          <button class="task-btn success" type="button" data-submit-result="${esc(item.id)}">${completed ? "Lưu chỉnh sửa" : "Nộp"}</button>
         </div>
       </div>`;
   }
@@ -853,6 +854,19 @@
     await loadTasks();
   }
 
+  async function cancelTaskSubmission(id) {
+    const ok = confirm("Hủy nộp công việc này và chuyển về trạng thái Chưa hoàn thành?");
+    if (!ok) return;
+    const { error } = await sb.rpc("set_task_assignment_status", {
+      p_assignment_id: id,
+      p_status: "open",
+      p_note: "Hủy nộp kết quả",
+    });
+    if (error) return alert(error.message);
+    toast("Đã hủy nộp. Công việc đã chuyển về Chưa hoàn thành.");
+    await loadTasks();
+  }
+
   function oldStoredAssignments() {
     const today = localDate();
     return S.assignments.filter(item =>
@@ -1095,6 +1109,7 @@
     E.list.addEventListener("click", event => {
       const target = event.target.closest("button");
       if (!target) return;
+      if (target.dataset.cancelSubmit) return cancelTaskSubmission(target.dataset.cancelSubmit);
       if (target.dataset.submitResult) return submitTaskResult(target.dataset.submitResult);
       if (target.dataset.actionUrl) openAction(target.dataset.actionUrl);
     });
