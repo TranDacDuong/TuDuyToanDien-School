@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Báº£ng tin</title>
+<title>Bảng tin</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -187,7 +187,7 @@ body {
 #countdownBox:empty::before,
 #contactList:empty::before,
 #overviewNews:empty::before {
-  content: "Äang táº£i ná»™i dung...";
+  content: "Đang tải nội dung...";
   display: block;
   padding: 18px 14px;
   border: 1px dashed rgba(15,31,61,.12);
@@ -1554,32 +1554,32 @@ body {
 
   <div class="home-header-row">
     <div class="home-tabs">
-      <button class="home-tab-btn active" id="homeTabOverview" type="button" onclick="setHomeTab('overview')">ThÃ´ng tin</button>
-      <button class="home-tab-btn" id="homeTabDiscussion" type="button" onclick="setHomeTab('discussion')">Tháº£o luáº­n</button>
+      <button class="home-tab-btn active" id="homeTabOverview" type="button" onclick="setHomeTab('overview')">Thông tin</button>
+      <button class="home-tab-btn" id="homeTabDiscussion" type="button" onclick="setHomeTab('discussion')">Thảo luận</button>
     </div>
     <div class="social-hub"></div>
   </div>
 
   <section class="overview-section active" id="overviewSection">
     <div class="overview-main" id="overviewMain">
-      <!-- BÃ¡o cÃ¡o há»c táº­p cÃ¡ nhÃ¢n cá»§a Há»c sinh/Phá»¥ huynh -->
+      <!-- Báo cáo học tập cá nhân của Học sinh/Phụ huynh -->
       <div class="overview-card" id="studentReportCard" style="display:none; border: 1.5px solid rgba(29,107,209,0.18); box-shadow: 0 14px 36px rgba(29,107,209,0.06); margin-bottom: 22px;">
         <div class="overview-card-head" style="background: radial-gradient(circle at top right, rgba(29,107,209,0.08), transparent 38%), linear-gradient(180deg, #f7faff 0%, #ffffff 100%); position: relative; padding-left: 36px;">
           <div style="position: absolute; left: 20px; top: 16px; width: 5px; height: 28px; border-radius: 999px; background: linear-gradient(180deg, #10b981, #1d6bd1);"></div>
-          <div class="overview-card-title">ðŸ“ˆ BÃ¡o cÃ¡o há»c táº­p cÃ¡ nhÃ¢n</div>
-          <div class="overview-card-sub" id="studentReportSub">Biá»ƒu Ä‘á»“ tiáº¿n trÃ¬nh Ä‘iá»ƒm sá»‘, chuyÃªn cáº§n vÃ  nháº­n xÃ©t cá»§a con.</div>
+          <div class="overview-card-title">📈 Báo cáo học tập cá nhân</div>
+          <div class="overview-card-sub" id="studentReportSub">Biểu đồ tiến trình điểm số, chuyên cần và nhận xét của con.</div>
         </div>
         <div class="overview-card-body" style="display:flex; flex-direction:column; gap:20px; padding: 20px;">
           <!-- Parent student selector dropdown -->
           <div id="parentStudentSelectorRow" style="display:none; align-items:center; gap:10px; flex-wrap:wrap; border-bottom:1px solid rgba(15,31,61,0.06); padding-bottom:12px;">
-            <span style="font-size:13px; font-weight:700; color:var(--navy);">Chá»n há»c sinh:</span>
+            <span style="font-size:13px; font-weight:700; color:var(--navy);">Chọn học sinh:</span>
             <select class="admin-select" id="parentStudentSelect" style="width:200px; padding:6px 10px;" onchange="onReportStudentChange()"></select>
           </div>
 
           <!-- Score chart wrapper -->
           <div>
             <h4 style="margin:0 0 10px; color:var(--navy); font-size:14px; display:flex; align-items:center; gap:6px;">
-              <span>ðŸ“Š Biá»ƒu Ä‘á»“ tiáº¿n trÃ¬nh Ä‘iá»ƒm sá»‘</span>
+              <span>📊 Biểu đồ tiến trình điểm số</span>
             </h4>
             <div style="position:relative; height:240px; width:100%; background:#fff; border-radius:14px; border:1px solid rgba(15,31,61,0.06); padding:10px;">
               <canvas id="studentScoreChart"></canvas>
@@ -1590,24 +1590,24 @@ body {
           <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
             <!-- Attendance KPI card -->
             <div style="background:linear-gradient(180deg,#fcfdfe 0%,#f8fbff 100%); border:1px solid rgba(15,31,61,0.06); border-radius:16px; padding:14px;">
-              <h4 style="margin:0 0 10px; color:var(--navy); font-size:13px;">ðŸ“… ChuyÃªn cáº§n thÃ¡ng nÃ y</h4>
+              <h4 style="margin:0 0 10px; color:var(--navy); font-size:13px;">📅 Chuyên cần tháng này</h4>
               <div style="display:flex; align-items:center; gap:16px;">
                 <div style="position:relative; width:64px; height:64px; display:flex; align-items:center; justify-content:center; border-radius: 50%; background: #eef4ff; border: 4px solid #1d6bd1;">
                   <div id="attendancePercent" style="font-size:16px; font-weight:800; color:#1d6bd1;">0%</div>
                 </div>
                 <div style="flex:1; display:grid; gap:4px; font-size:12px; color:var(--ink-mid);">
-                  <div style="display:flex; justify-content:space-between;"><span>CÃ³ máº·t:</span><b id="attPresent" style="color:var(--green)">0 buá»•i</b></div>
-                  <div style="display:flex; justify-content:space-between;"><span>Váº¯ng há»c:</span><b id="attAbsent" style="color:var(--red)">0 buá»•i</b></div>
-                  <div style="display:flex; justify-content:space-between;"><span>Há»c bÃ¹:</span><b id="attMakeup" style="color:#d97706">0 buá»•i</b></div>
+                  <div style="display:flex; justify-content:space-between;"><span>Có mặt:</span><b id="attPresent" style="color:var(--green)">0 buổi</b></div>
+                  <div style="display:flex; justify-content:space-between;"><span>Vắng học:</span><b id="attAbsent" style="color:var(--red)">0 buổi</b></div>
+                  <div style="display:flex; justify-content:space-between;"><span>Học bù:</span><b id="attMakeup" style="color:#d97706">0 buổi</b></div>
                 </div>
               </div>
             </div>
 
             <!-- Recent Comments card -->
             <div style="background:linear-gradient(180deg,#fcfdfe 0%,#f8fbff 100%); border:1px solid rgba(15,31,61,0.06); border-radius:16px; padding:14px;">
-              <h4 style="margin:0 0 10px; color:var(--navy); font-size:13px;">ðŸ’¬ Nháº­n xÃ©t gáº§n Ä‘Ã¢y cá»§a giÃ¡o viÃªn</h4>
+              <h4 style="margin:0 0 10px; color:var(--navy); font-size:13px;">💬 Nhận xét gần đây của giáo viên</h4>
               <div id="studentCommentsList" style="display:flex; flex-direction:column; gap:8px;">
-                <div style="font-size:12px; color:var(--ink-light); font-style:italic;">ChÆ°a cÃ³ nháº­n xÃ©t nÃ o trong thÃ¡ng nÃ y.</div>
+                <div style="font-size:12px; color:var(--ink-light); font-style:italic;">Chưa có nhận xét nào trong tháng này.</div>
               </div>
             </div>
           </div>
@@ -1616,35 +1616,35 @@ body {
 
       <div class="overview-card overview-admin" id="overviewAdminCard">
         <div class="overview-card-head">
-          <div class="overview-card-title">Tin tá»©c Trang chá»§</div>
-          <div class="overview-card-sub">ÄÄƒng bÃ i tin tá»©c Ä‘á»ƒ hiá»ƒn thá»‹ á»Ÿ cá»™t pháº£i cá»§a Trang chá»§.</div>
+          <div class="overview-card-title">Tin tức Trang chủ</div>
+          <div class="overview-card-sub">Đăng bài tin tức để hiển thị ở cột phải của Trang chủ.</div>
         </div>
         <div class="overview-card-body">
           <div class="admin-section full">
-            <div class="admin-title">ÄÄƒng bÃ i cho Trang chá»§</div>
-            <input class="admin-field" id="overviewPostTitle" type="text" placeholder="TiÃªu Ä‘á» bÃ i viáº¿t">
+            <div class="admin-title">Đăng bài cho Trang chủ</div>
+            <input class="admin-field" id="overviewPostTitle" type="text" placeholder="Tiêu đề bài viết">
             <div style="height:10px;"></div>
-            <textarea class="admin-textarea" id="overviewPostContent" placeholder="Ná»™i dung bÃ i viáº¿t cho tab Trang chá»§..."></textarea>
+            <textarea class="admin-textarea" id="overviewPostContent" placeholder="Nội dung bài viết cho tab Trang chủ..."></textarea>
             <div class="admin-actions">
-              <button class="btn btn-primary btn-sm" type="button" onclick="createOverviewPost()">ÄÄƒng lÃªn Trang chá»§</button>
+              <button class="btn btn-primary btn-sm" type="button" onclick="createOverviewPost()">Đăng lên Trang chủ</button>
             </div>
           </div>
         </div>
       </div>
       <div class="overview-card">
         <div class="overview-card-head">
-          <div class="overview-card-title">GiÃ¡o viÃªn cá»§a trung tÃ¢m</div>
-          <div class="overview-card-sub">Danh sÃ¡ch giÃ¡o viÃªn do quáº£n trá»‹ viÃªn chá»n vÃ  sáº¯p xáº¿p.</div>
+          <div class="overview-card-title">Giáo viên của trung tâm</div>
+          <div class="overview-card-sub">Danh sách giáo viên do quản trị viên chọn và sắp xếp.</div>
         </div>
         <div class="overview-card-body">
           <div class="teacher-grid" id="overviewTeachers">
-            <div class="empty-feed" style="padding:24px 16px;"><p>Äang táº£i giÃ¡o viÃªn...</p></div>
+            <div class="empty-feed" style="padding:24px 16px;"><p>Đang tải giáo viên...</p></div>
           </div>
           <div class="inline-admin-block" id="overviewTeachersAdminBlock" style="display:none;">
-            <div class="inline-admin-title">Quáº£n lÃ½ giÃ¡o viÃªn trÃªn Trang chá»§</div>
+            <div class="inline-admin-title">Quản lý giáo viên trên Trang chủ</div>
             <select class="admin-select" id="homeTeacherSelectInline"></select>
             <div class="admin-actions">
-              <button class="btn btn-primary btn-sm" type="button" onclick="addTeacherToHome()">ThÃªm giÃ¡o viÃªn</button>
+              <button class="btn btn-primary btn-sm" type="button" onclick="addTeacherToHome()">Thêm giáo viên</button>
             </div>
             <div class="admin-list" id="homeTeacherAdminListInline"></div>
           </div>
@@ -1652,32 +1652,32 @@ body {
       </div>
       <div class="overview-card">
         <div class="overview-card-head">
-          <div class="overview-card-title">Giá»›i thiá»‡u trung tÃ¢m</div>
-          <div class="overview-card-sub">BÃ i giá»›i thiá»‡u duy nháº¥t do quáº£n trá»‹ viÃªn cáº­p nháº­t.</div>
+          <div class="overview-card-title">Giới thiệu trung tâm</div>
+          <div class="overview-card-sub">Bài giới thiệu duy nhất do quản trị viên cập nhật.</div>
         </div>
         <div class="overview-card-body">
           <div class="overview-list" id="overviewIntro">
-            <div class="empty-feed" style="padding:24px 16px;"><p>Äang táº£i bÃ i giá»›i thiá»‡u...</p></div>
+            <div class="empty-feed" style="padding:24px 16px;"><p>Đang tải bài giới thiệu...</p></div>
           </div>
           <div class="inline-admin-block" id="overviewIntroAdminBlock" style="display:none;">
-            <div class="inline-admin-title">Chá»‰nh sá»­a giá»›i thiá»‡u trung tÃ¢m</div>
-            <input class="admin-field" id="centerIntroTitleInline" type="text" placeholder="TiÃªu Ä‘á» giá»›i thiá»‡u">
+            <div class="inline-admin-title">Chỉnh sửa giới thiệu trung tâm</div>
+            <input class="admin-field" id="centerIntroTitleInline" type="text" placeholder="Tiêu đề giới thiệu">
             <div style="height:10px;"></div>
-            <textarea class="admin-textarea" id="centerIntroContentInline" placeholder="Ná»™i dung giá»›i thiá»‡u vá» trung tÃ¢m..."></textarea>
+            <textarea class="admin-textarea" id="centerIntroContentInline" placeholder="Nội dung giới thiệu về trung tâm..."></textarea>
             <div class="admin-actions">
-              <button class="btn btn-primary btn-sm" type="button" onclick="saveCenterIntro()">LÆ°u bÃ i giá»›i thiá»‡u</button>
+              <button class="btn btn-primary btn-sm" type="button" onclick="saveCenterIntro()">Lưu bài giới thiệu</button>
             </div>
           </div>
         </div>
       </div>
       <div class="overview-card">
         <div class="overview-card-head">
-          <div class="overview-card-title">KhÃ³a há»c ná»•i báº­t</div>
-          <div class="overview-card-sub">CÃ¡c bÃ i viáº¿t ná»•i báº­t do admin táº¡o</div>
+          <div class="overview-card-title">Khóa học nổi bật</div>
+          <div class="overview-card-sub">Các bài viết nổi bật do admin tạo</div>
         </div>
         <div class="overview-card-body">
           <div class="overview-list" id="overviewCourses">
-            <div class="empty-feed" style="padding:24px 16px;"><p>Äang táº£i ná»™i dung...</p></div>
+            <div class="empty-feed" style="padding:24px 16px;"><p>Đang tải nội dung...</p></div>
           </div>
         </div>
       </div>
@@ -1685,64 +1685,64 @@ body {
     <aside class="overview-side">
       <div class="overview-card">
         <div class="overview-card-head">
-          <div class="overview-card-title">ÄÄƒng kÃ½ há»c thá»­</div>
-          <div class="overview-card-sub">Äá»ƒ láº¡i thÃ´ng tin, admin sáº½ nháº­n yÃªu cáº§u vÃ  liÃªn há»‡ láº¡i.</div>
+          <div class="overview-card-title">Đăng ký học thử</div>
+          <div class="overview-card-sub">Để lại thông tin, admin sẽ nhận yêu cầu và liên hệ lại.</div>
         </div>
         <div class="overview-card-body">
           <form class="trial-form" id="trialLessonForm" onsubmit="submitTrialLessonRequest(event)">
             <div class="trial-field">
-              <label for="trialName">TÃªn</label>
+              <label for="trialName">Tên</label>
               <input class="trial-input" id="trialName" name="student_name" type="text" autocomplete="name" required>
             </div>
             <div class="trial-field">
-              <label for="trialPhone">SÄT</label>
+              <label for="trialPhone">SĐT</label>
               <input class="trial-input" id="trialPhone" name="phone" type="tel" autocomplete="tel" required>
             </div>
             <div class="trial-field">
-              <label for="trialGrade">Khá»‘i</label>
+              <label for="trialGrade">Khối</label>
               <select class="trial-select" id="trialGrade" name="grade" required>
-                <option value="">Chá»n khá»‘i</option>
-                <option value="6">Khá»‘i 6</option>
-                <option value="7">Khá»‘i 7</option>
-                <option value="8">Khá»‘i 8</option>
-                <option value="9">Khá»‘i 9</option>
-                <option value="10">Khá»‘i 10</option>
-                <option value="11">Khá»‘i 11</option>
-                <option value="12">Khá»‘i 12</option>
+                <option value="">Chọn khối</option>
+                <option value="6">Khối 6</option>
+                <option value="7">Khối 7</option>
+                <option value="8">Khối 8</option>
+                <option value="9">Khối 9</option>
+                <option value="10">Khối 10</option>
+                <option value="11">Khối 11</option>
+                <option value="12">Khối 12</option>
               </select>
             </div>
             <div class="trial-field">
-              <label for="trialSubject">MÃ´n</label>
+              <label for="trialSubject">Môn</label>
               <input class="trial-input" id="trialSubject" name="subject" type="text" list="trialSubjectOptions" required>
               <datalist id="trialSubjectOptions">
-                <option value="ToÃ¡n Há»c"></option>
-                <option value="Váº­t LÃ½"></option>
-                <option value="HÃ³a Há»c"></option>
-                <option value="Sinh Há»c"></option>
-                <option value="Ngá»¯ VÄƒn"></option>
-                <option value="Tiáº¿ng Anh"></option>
+                <option value="Toán Học"></option>
+                <option value="Vật Lý"></option>
+                <option value="Hóa Học"></option>
+                <option value="Sinh Học"></option>
+                <option value="Ngữ Văn"></option>
+                <option value="Tiếng Anh"></option>
               </datalist>
             </div>
-            <button class="trial-submit" id="trialSubmitBtn" type="submit">Gá»­i ngay cho Admin</button>
+            <button class="trial-submit" id="trialSubmitBtn" type="submit">Gửi ngay cho Admin</button>
             <div class="trial-message" id="trialMessage"></div>
           </form>
         </div>
       </div>
       <div class="overview-card">
         <div class="overview-card-head">
-          <div class="overview-card-title">Äáº¿m ngÆ°á»£c ngÃ y thi</div>
-          <div class="overview-card-sub">Má»‘c ngÃ y thi cÃ³ thá»ƒ chá»‰nh láº¡i theo lá»‹ch thá»±c táº¿</div>
+          <div class="overview-card-title">Đếm ngược ngày thi</div>
+          <div class="overview-card-sub">Mốc ngày thi có thể chỉnh lại theo lịch thực tế</div>
         </div>
         <div class="overview-card-body">
           <div class="countdown-box" id="countdownBox"></div>
           <div class="inline-admin-block" id="countdownAdminBlock" style="display:none;">
-            <div class="inline-admin-title">Quáº£n lÃ½ cÃ¡c ká»³ thi</div>
+            <div class="inline-admin-title">Quản lý các kỳ thi</div>
             <div class="admin-inline">
-              <input class="admin-field" id="examEventTitleInline" type="text" placeholder="TÃªn ká»³ thi">
+              <input class="admin-field" id="examEventTitleInline" type="text" placeholder="Tên kỳ thi">
               <input class="admin-field" id="examEventAtInline" type="datetime-local">
             </div>
             <div class="admin-actions">
-              <button class="btn btn-primary btn-sm" type="button" onclick="createExamEvent()">LÆ°u ká»³ thi</button>
+              <button class="btn btn-primary btn-sm" type="button" onclick="createExamEvent()">Lưu kỳ thi</button>
             </div>
             <div class="admin-list" id="examAdminListInline"></div>
           </div>
@@ -1750,26 +1750,26 @@ body {
       </div>
       <div class="overview-card">
         <div class="overview-card-head">
-          <div class="overview-card-title">LiÃªn há»‡</div>
+          <div class="overview-card-title">Liên hệ</div>
         </div>
         <div class="overview-card-body">
           <div class="contact-list" id="contactList"></div>
           <div class="inline-admin-block" id="contactAdminBlock" style="display:none;">
-            <div class="inline-admin-title">Chá»‰nh sá»­a liÃªn há»‡</div>
-            <textarea class="admin-textarea" id="contactInfoInputInline" placeholder="Má»—i dÃ²ng lÃ  má»™t ná»™i dung liÃªn há»‡"></textarea>
+            <div class="inline-admin-title">Chỉnh sửa liên hệ</div>
+            <textarea class="admin-textarea" id="contactInfoInputInline" placeholder="Mỗi dòng là một nội dung liên hệ"></textarea>
             <div class="admin-actions">
-              <button class="btn btn-primary btn-sm" type="button" onclick="saveContactInfo()">LÆ°u liÃªn há»‡</button>
+              <button class="btn btn-primary btn-sm" type="button" onclick="saveContactInfo()">Lưu liên hệ</button>
             </div>
           </div>
         </div>
       </div>
       <div class="overview-card">
         <div class="overview-card-head">
-          <div class="overview-card-title">Tin tá»©c</div>
+          <div class="overview-card-title">Tin tức</div>
         </div>
         <div class="overview-card-body">
           <div class="overview-news-list" id="overviewNews">
-            <div class="empty-feed" style="padding:24px 16px;"><p>Äang táº£i tin tá»©c...</p></div>
+            <div class="empty-feed" style="padding:24px 16px;"><p>Đang tải tin tức...</p></div>
           </div>
         </div>
       </div>
@@ -1781,9 +1781,9 @@ body {
 
   <div id="posts">
     <div class="empty-feed">
-      <div class="icon">â³</div>
-      <strong>Äang táº£i báº£ng tin</strong>
-      <p>Dá»¯ liá»‡u bÃ i viáº¿t Ä‘ang Ä‘Æ°á»£c chuáº©n bá»‹...</p>
+      <div class="icon">⏳</div>
+      <strong>Đang tải bảng tin</strong>
+      <p>Dữ liệu bài viết đang được chuẩn bị...</p>
     </div>
   </div>
   </section>
@@ -1807,13 +1807,13 @@ let currentHomeTab = "overview";
 let cachedVisiblePosts = [];
 const HIDDEN_NOTIFICATION_TYPES = ["friend_request", "friend_accept", "message_new"];
 let examEvents = [];
-let contactInfo = "Trung tÃ¢m: liÃªn há»‡ quáº£n trá»‹ viÃªn Ä‘á»ƒ Ä‘Æ°á»£c há»— trá»£ nhanh.\nGiÃ¡o viÃªn: theo dÃµi thÃ´ng bÃ¡o hoáº·c nháº¯n tin trá»±c tiáº¿p trong há»‡ thá»‘ng.\nKhÃ³a há»c: xem cÃ¡c cáº­p nháº­t má»›i trong má»¥c thÃ´ng tin trung tÃ¢m.";
+let contactInfo = "Trung tâm: liên hệ quản trị viên để được hỗ trợ nhanh.\nGiáo viên: theo dõi thông báo hoặc nhắn tin trực tiếp trong hệ thống.\nKhóa học: xem các cập nhật mới trong mục thông tin trung tâm.";
 let homeSettingsLoaded = false;
 let allTeachers = [];
 let homeTeachers = [];
 let pinnedHomeCourses = [];
 let courseManagers = [];
-let centerIntro = { title: "Giá»›i thiá»‡u trung tÃ¢m", content: "" };
+let centerIntro = { title: "Giới thiệu trung tâm", content: "" };
 const uiIcons = {
   search: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="6"></circle><path d="M20 20l-4.2-4.2"></path></svg>',
   bell: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M15 17H5.5a1 1 0 0 1-.8-1.6L6 13.5V10a6 6 0 1 1 12 0v3.5l1.3 1.9A1 1 0 0 1 18.5 17H15"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg>',
@@ -1861,7 +1861,7 @@ function ensureHomeOverlayShell() {
     panel.id = "socialPanel";
     panel.innerHTML = `
       <div class="social-panel-head">
-        <div class="social-panel-title" id="socialPanelTitle">Tiá»‡n Ã­ch</div>
+        <div class="social-panel-title" id="socialPanelTitle">Tiện ích</div>
         <button class="btn btn-outline btn-sm icon-btn" type="button" onclick="closeSocialPanel()" title="&#272;&#243;ng" aria-label="&#272;&#243;ng">&times;</button>
       </div>
       <iframe class="social-panel-frame" id="socialPanelFrame" src="about:blank" loading="lazy"></iframe>
@@ -1886,7 +1886,7 @@ function ensureHomeOverlayShell() {
     popup.id = "chatPopup";
     popup.innerHTML = `
       <div class="chat-popup-head">
-        <div class="chat-popup-title">Nháº¯n tin</div>
+        <div class="chat-popup-title">Nhắn tin</div>
         <button class="btn btn-outline btn-sm icon-btn" type="button" onclick="closeChatPopup()" title="&#272;&#243;ng" aria-label="&#272;&#243;ng">&times;</button>
       </div>
       <iframe class="chat-popup-frame" id="chatPopupFrame" src="about:blank" loading="lazy"></iframe>
@@ -1900,29 +1900,29 @@ function enhanceHomeHub() {
   if (!hub) return;
   if (!currentUser) {
     hub.innerHTML = `
-      <button class="hub-button" type="button" title="ÄÄƒng nháº­p" onclick="parent?.openAuthModal ? parent.openAuthModal('login') : location.href='dashboard.html'">
+      <button class="hub-button" type="button" title="Đăng nhập" onclick="parent?.openAuthModal ?parent.openAuthModal('login') : location.href='dashboard.html'">
         <span class="hub-icon">${uiIcons.search}</span>
       </button>
     `;
     return;
   }
   hub.innerHTML = `
-    <button class="hub-button" type="button" title="TÃ¬m kiáº¿m" onclick="toggleSocialPanel('search')">
+    <button class="hub-button" type="button" title="Tìm kiếm" onclick="toggleSocialPanel('search')">
       <span class="hub-icon">${uiIcons.search}</span>
     </button>
-    <button class="hub-button" type="button" title="ThÃ´ng bÃ¡o" onclick="toggleSocialPanel('notifications')">
+    <button class="hub-button" type="button" title="Thông báo" onclick="toggleSocialPanel('notifications')">
       <span class="hub-icon">${uiIcons.bell}</span>
       <span class="hub-badge" id="homeNotificationBadge">0</span>
     </button>
-    <button class="hub-button" type="button" title="Lá»i má»i káº¿t báº¡n" onclick="toggleSocialPanel('friend_requests')">
+    <button class="hub-button" type="button" title="Lời mời kết bạn" onclick="toggleSocialPanel('friend_requests')">
       <span class="hub-icon">${uiIcons.friends}</span>
       <span class="hub-badge" id="homeFriendRequestBadge">0</span>
     </button>
-    <button class="hub-button" type="button" title="Nháº¯n tin" onclick="toggleSocialPanel('messages')">
+    <button class="hub-button" type="button" title="Nhắn tin" onclick="toggleSocialPanel('messages')">
       <span class="hub-icon">${uiIcons.message}</span>
       <span class="hub-badge" id="homeMessageBadge">0</span>
     </button>
-    <a class="hub-link" id="homeProfileLink" href="profile.html" title="Trang cÃ¡ nhÃ¢n">
+    <a class="hub-link" id="homeProfileLink" href="profile.html" title="Trang cá nhân">
       <img class="hub-icon" id="homeProfileAvatar" src="default-avatar.png" alt="Avatar" onerror="this.src='default-avatar.png'">
     </a>
   `;
@@ -1939,33 +1939,33 @@ function enhanceComposerUI() {
         <img class="compose-avatar" id="composeAvatar" src="default-avatar.png">
         <div>
           <div class="compose-name" id="composeName"></div>
-          <div class="compose-headline">Chia sáº» Ä‘iá»u báº¡n Ä‘ang nghÄ© vá»›i má»i ngÆ°á»i</div>
+          <div class="compose-headline">Chia sẻ điều bạn đang nghĩ với mọi người</div>
         </div>
       </div>
-      <textarea class="compose-textarea" id="postContent" rows="3" placeholder="Báº¡n Ä‘ang nghÄ© gÃ¬?"></textarea>
+      <textarea class="compose-textarea" id="postContent" rows="3" placeholder="Bạn đang nghĩ gì?"></textarea>
       <div class="compose-inline-tools">
         <div class="compose-inline-left">
           <div style="position:relative;">
-            <button class="compose-icon-btn" id="composeVisibilityButton" type="button" title="CÃ´ng khai" aria-label="CÃ´ng khai" onclick="toggleVisibilityMenu(event)">ðŸŒ</button>
+            <button class="compose-icon-btn" id="composeVisibilityButton" type="button" title="Công khai" aria-label="Công khai" onclick="toggleVisibilityMenu(event)">🌍</button>
             <div class="visibility-menu" id="visibilityMenu">
-              <button class="visibility-option" type="button" onclick="setComposeVisibility('public')">ðŸŒ CÃ´ng khai</button>
-              <button class="visibility-option" type="button" onclick="setComposeVisibility('friends')">ðŸ‘¥ Báº¡n bÃ¨</button>
-              <button class="visibility-option" type="button" onclick="setComposeVisibility('private')">ðŸ”’ RiÃªng tÆ°</button>
+              <button class="visibility-option" type="button" onclick="setComposeVisibility('public')">🌍 Công khai</button>
+              <button class="visibility-option" type="button" onclick="setComposeVisibility('friends')">👥 Bạn bè</button>
+              <button class="visibility-option" type="button" onclick="setComposeVisibility('private')">🔒 Riêng tư</button>
             </div>
           </div>
-          <button class="compose-icon-btn" type="button" title="Chá»n áº£nh" onclick="document.getElementById('postImage').click()">ðŸ–¼ï¸</button>
+          <button class="compose-icon-btn" type="button" title="Chọn ảnh" onclick="document.getElementById('postImage').click()">🖼️</button>
         </div>
         <div class="compose-inline-right">
-          <span class="compose-note" id="composeNote">â³ BÃ i sáº½ Ä‘Æ°á»£c duyá»‡t trÆ°á»›c khi hiá»ƒn thá»‹</span>
-          <button class="compose-icon-btn" type="button" title="ÄÄƒng bÃ i" onclick="createPost()">ðŸ“¨</button>
+          <span class="compose-note" id="composeNote">⏳ Bài sẽ được duyệt trước khi hiển thị</span>
+          <button class="compose-icon-btn" type="button" title="Đăng bài" onclick="createPost()">📨</button>
         </div>
       </div>
       <div class="compose-footer hidden-bar">
         <div class="compose-tools">
           <select class="compose-select" id="postVisibility">
-            <option value="public">CÃ´ng khai</option>
-            <option value="friends">Báº¡n bÃ¨</option>
-            <option value="private">RiÃªng tÆ°</option>
+            <option value="public">Công khai</option>
+            <option value="friends">Bạn bè</option>
+            <option value="private">Riêng tư</option>
           </select>
           <div class="compose-media">
             <input class="compose-file" type="file" id="postImage" accept="image/*" onchange="previewPostImage(event)">
@@ -1973,17 +1973,17 @@ function enhanceComposerUI() {
         </div>
       </div>
       <div class="compose-preview" id="composePreview">
-        <img id="composePreviewImg" src="" alt="Xem trÆ°á»›c áº£nh bÃ i viáº¿t">
+        <img id="composePreviewImg" src="" alt="Xem trước ảnh bài viết">
       </div>
     </div>
   `;
 }
 
 const socialPanelConfig = {
-  search: { title: "TÃ¬m kiáº¿m", src: "search.html?tray=1" },
-  notifications: { title: "ThÃ´ng bÃ¡o", src: "notifications.html" },
-  friend_requests: { title: "Lá»i má»i káº¿t báº¡n", src: "friend_requests.html" },
-  messages: { title: "Nháº¯n tin", src: "messages.html?tray=1" }
+  search: { title: "Tìm kiếm", src: "search.html?tray=1" },
+  notifications: { title: "Thông báo", src: "notifications.html" },
+  friend_requests: { title: "Lời mời kết bạn", src: "friend_requests.html" },
+  messages: { title: "Nhắn tin", src: "messages.html?tray=1" }
 };
 
 function positionSocialPanel() {
@@ -2070,9 +2070,9 @@ window.setComposeVisibility = function(value) {
   const button = document.getElementById("composeVisibilityButton");
   const menu = document.getElementById("visibilityMenu");
   const configMap = {
-    public: { icon: "ðŸŒ", label: "CÃ´ng khai" },
-    friends: { icon: "ðŸ‘¥", label: "Báº¡n bÃ¨" },
-    private: { icon: "ðŸ”’", label: "RiÃªng tÆ°" }
+    public: { icon: "🌍", label: "Công khai" },
+    friends: { icon: "👥", label: "Bạn bè" },
+    private: { icon: "🔒", label: "Riêng tư" }
   };
   const config = configMap[value] || configMap.public;
   if (select) select.value = value;
@@ -2138,13 +2138,13 @@ async function init() {
   const card = document.getElementById("composeCard");
   card.style.display = "block";
   document.getElementById("composeAvatar").src = p.avatar_url || "default-avatar.png";
-  document.getElementById("composeName").textContent = p.full_name || "Báº¡n";
+  document.getElementById("composeName").textContent = p.full_name || "Bạn";
   if (role === "student") document.getElementById("composeNote").classList.add("show");
   document.getElementById("overviewAdminCard")?.classList.toggle("show", role === "admin");
-  document.getElementById("countdownAdminBlock")?.style.setProperty("display", role === "admin" ? "block" : "none");
-  document.getElementById("contactAdminBlock")?.style.setProperty("display", role === "admin" ? "block" : "none");
-  document.getElementById("overviewTeachersAdminBlock")?.style.setProperty("display", role === "admin" ? "block" : "none");
-  document.getElementById("overviewIntroAdminBlock")?.style.setProperty("display", role === "admin" ? "block" : "none");
+  document.getElementById("countdownAdminBlock")?.style.setProperty("display", role === "admin" ?"block" : "none");
+  document.getElementById("contactAdminBlock")?.style.setProperty("display", role === "admin" ?"block" : "none");
+  document.getElementById("overviewTeachersAdminBlock")?.style.setProperty("display", role === "admin" ?"block" : "none");
+  document.getElementById("overviewIntroAdminBlock")?.style.setProperty("display", role === "admin" ?"block" : "none");
   setupHomeLinks();
   updateHomeTabs();
   renderCountdown();
@@ -2175,13 +2175,13 @@ async function initStudentReport() {
       .is("revoked_at", null);
 
     if (lErr) {
-      console.error("Lá»—i táº£i danh sÃ¡ch con:", lErr);
+      console.error("Lỗi tải danh sách con:", lErr);
       return;
     }
 
     const students = (links || []).map(l => l.student).filter(Boolean);
     if (!students.length) {
-      document.getElementById("studentReportSub").textContent = "KhÃ´ng tÃ¬m tháº¥y tÃ i khoáº£n há»c sinh liÃªn káº¿t vá»›i phá»¥ huynh.";
+      document.getElementById("studentReportSub").textContent = "Không tìm thấy tài khoản học sinh liên kết với phụ huynh.";
       return;
     }
 
@@ -2201,7 +2201,7 @@ window.onReportStudentChange = async function() {
 };
 
 async function loadStudentReportData(studentId) {
-  // 1. ChuyÃªn cáº§n
+  // 1. Chuyên cần
   const today = new Date();
   const y = today.getFullYear();
   const m = today.getMonth() + 1;
@@ -2224,14 +2224,14 @@ async function loadStudentReportData(studentId) {
     else if (a.status === "makeup") makeup++;
   });
   const total = present + absent + makeup;
-  const pct = total > 0 ? Math.round(((present + makeup) / total) * 100) : 0;
+  const pct = total > 0 ?Math.round(((present + makeup) / total) * 100) : 0;
 
   document.getElementById("attendancePercent").textContent = pct + "%";
-  document.getElementById("attPresent").textContent = present + " buá»•i";
-  document.getElementById("attAbsent").textContent = absent + " buá»•i";
-  document.getElementById("attMakeup").textContent = makeup + " buá»•i";
+  document.getElementById("attPresent").textContent = present + " buổi";
+  document.getElementById("attAbsent").textContent = absent + " buổi";
+  document.getElementById("attMakeup").textContent = makeup + " buổi";
 
-  // 2. Nháº­n xÃ©t giÃ¡o viÃªn
+  // 2. Nhận xét giáo viên
   const { data: evals } = await sb
     .from("session_student_evaluations")
     .select(`
@@ -2249,8 +2249,8 @@ async function loadStudentReportData(studentId) {
   const cmtList = document.getElementById("studentCommentsList");
   if (evals && evals.length) {
     cmtList.innerHTML = evals.map(e => {
-      const text = e.final_message || e.generated_message || "ChÆ°a cÃ³ ná»™i dung";
-      const className = e.classes?.class_name || "Lá»›p há»c";
+      const text = e.final_message || e.generated_message || "Chưa có nội dung";
+      const className = e.classes?.class_name || "Lớp học";
       const dateStr = new Date(e.created_at).toLocaleDateString("vi-VN");
       return `
         <div style="padding:10px; background:#fff; border-radius:10px; border:1px solid rgba(15,31,61,0.05); font-size:12px; line-height:1.5;">
@@ -2260,10 +2260,10 @@ async function loadStudentReportData(studentId) {
       `;
     }).join("");
   } else {
-    cmtList.innerHTML = `<div style="font-size:12px; color:var(--ink-light); font-style:italic;">ChÆ°a cÃ³ nháº­n xÃ©t nÃ o Ä‘Æ°á»£c gá»­i trong thÃ¡ng nÃ y.</div>`;
+    cmtList.innerHTML = `<div style="font-size:12px; color:var(--ink-light); font-style:italic;">Chưa có nhận xét nào được gửi trong tháng này.</div>`;
   }
 
-  // 3. Biá»ƒu Ä‘á»“ Ä‘iá»ƒm sá»‘ Chart.js
+  // 3. Biểu đồ điểm số Chart.js
   const { data: results } = await sb
       .from("exam_results")
       .select(`
@@ -2286,10 +2286,10 @@ async function loadStudentReportData(studentId) {
     const scoreClassIds = [...new Set((sessionScores || []).map(r => r.class_id).filter(Boolean))];
     const [{ data: scoreSessions }, { data: scoreClasses }] = await Promise.all([
       sessionIds.length
-        ? sb.from("class_sessions").select("id,session_date,lesson:lessons(name)").in("id", sessionIds)
+        ?sb.from("class_sessions").select("id,session_date,lesson:lessons(name)").in("id", sessionIds)
         : Promise.resolve({ data: [] }),
       scoreClassIds.length
-        ? sb.from("classes").select("id,class_name,subject_id,subjects(name)").in("id", scoreClassIds)
+        ?sb.from("classes").select("id,class_name,subject_id,subjects(name)").in("id", scoreClassIds)
         : Promise.resolve({ data: [] }),
     ]);
     const scoreSessionMap = Object.fromEntries((scoreSessions || []).map(item => [item.id, item]));
@@ -2298,7 +2298,7 @@ async function loadStudentReportData(studentId) {
     const scorePoints = [
       ...(results || []).map(r => {
         const maxPts = Number(r.exams?.total_points) || 10;
-        const score = Number(r.score_total ?? r.score_auto);
+        const score = Number(r.score_total ?r.score_auto);
         if (!Number.isFinite(score) || !Number.isFinite(maxPts) || maxPts <= 0) return null;
         const d = new Date(r.submitted_at);
         const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
@@ -2347,7 +2347,7 @@ async function loadStudentReportData(studentId) {
     ];
     const color = colors[idx % colors.length];
 
-    const data = scorePoints.map(r => r.subject === subName ? r.score10 : null);
+    const data = scorePoints.map(r => r.subject === subName ?r.score10 : null);
 
     return {
       label: subName,
@@ -2463,7 +2463,7 @@ async function loadLikedPosts() {
 
 async function loadOverviewSettings() {
   const courseQuery = (role === "student" || role === "guest")
-    ? sb.from("courses").select("id, name, description, cover_url, start_date, end_date, status, tuition_fee, planned_sessions").eq("is_home_pinned", true).eq("status", "open").order("updated_at", { ascending: false })
+    ?sb.from("courses").select("id, name, description, cover_url, start_date, end_date, status, tuition_fee, planned_sessions").eq("is_home_pinned", true).eq("status", "open").order("updated_at", { ascending: false })
     : sb.from("courses").select("id, name, description, cover_url, start_date, end_date, status, tuition_fee, planned_sessions").eq("is_home_pinned", true).order("updated_at", { ascending: false });
 
   const [examRes, settingRes, teacherRes, homeTeacherRes, courseRes, courseManagerRes] = await Promise.all([
@@ -2487,7 +2487,7 @@ async function loadOverviewSettings() {
       try {
         centerIntro = JSON.parse(settingsMap.home_center_intro) || centerIntro;
       } catch {
-        centerIntro = { title: "Giá»›i thiá»‡u trung tÃ¢m", content: settingsMap.home_center_intro || "" };
+        centerIntro = { title: "Giới thiệu trung tâm", content: settingsMap.home_center_intro || "" };
       }
     }
   }
@@ -2558,24 +2558,24 @@ function renderContactInfo() {
     .filter(Boolean);
 
   wrap.innerHTML = lines.length
-    ? lines.map(line => `<div class="contact-item">${formatRichText(line)}</div>`).join("")
-    : `<div class="empty-feed" style="padding:18px 14px;"><p>ChÆ°a cÃ³ thÃ´ng tin liÃªn há»‡.</p></div>`;
+    ?lines.map(line => `<div class="contact-item">${formatRichText(line)}</div>`).join("")
+    : `<div class="empty-feed" style="padding:18px 14px;"><p>Chưa có thông tin liên hệ.</p></div>`;
 }
 
 function renderAdminExamList() {
   const wrap = document.getElementById("examAdminListInline");
   if (!wrap) return;
   wrap.innerHTML = examEvents.length
-    ? examEvents.map(event => `
+    ?examEvents.map(event => `
         <div class="admin-list-item">
           <div>
-            <div>${esc(event.title || "Ká»³ thi")}</div>
+            <div>${esc(event.title || "Kỳ thi")}</div>
             <div class="admin-list-meta">${formatPostTime(event.exam_at)}</div>
           </div>
-          ${role === "admin" ? `<button class="tiny-btn" type="button" onclick="deleteExamEvent('${event.id}')">XÃ³a</button>` : ""}
+          ${role === "admin" ?`<button class="tiny-btn" type="button" onclick="deleteExamEvent('${event.id}')">Xóa</button>` : ""}
         </div>
       `).join("")
-    : `<div class="empty-feed" style="padding:14px 12px;"><p>ChÆ°a cÃ³ ká»³ thi nÃ o.</p></div>`;
+    : `<div class="empty-feed" style="padding:14px 12px;"><p>Chưa có kỳ thi nào.</p></div>`;
 }
 
 function renderTeacherSelectOptions() {
@@ -2584,22 +2584,22 @@ function renderTeacherSelectOptions() {
   const usedIds = new Set(homeTeachers.map(item => item.user_id));
   const available = allTeachers.filter(teacher => !usedIds.has(teacher.id));
   select.innerHTML = available.length
-    ? `<option value="">Chá»n giÃ¡o viÃªn</option>` + available.map(teacher =>
-        `<option value="${teacher.id}">${esc(teacher.full_name || "GiÃ¡o viÃªn")} - ${esc(teacher.subject || "ChÆ°a cáº­p nháº­t mÃ´n")}</option>`
+    ?`<option value="">Chọn giáo viên</option>` + available.map(teacher =>
+        `<option value="${teacher.id}">${esc(teacher.full_name || "Giáo viên")} - ${esc(teacher.subject || "Chưa cập nhật môn")}</option>`
       ).join("")
-    : `<option value="">KhÃ´ng cÃ²n giÃ¡o viÃªn nÃ o Ä‘á»ƒ thÃªm</option>`;
+    : `<option value="">Không còn giáo viên nào để thêm</option>`;
 }
 
 function renderCenterIntro() {
   const wrap = document.getElementById("overviewIntro");
   if (!wrap) return;
   if (!centerIntro?.title && !centerIntro?.content) {
-    wrap.innerHTML = `<div class="empty-feed" style="padding:24px 16px;"><p>ChÆ°a cÃ³ bÃ i giá»›i thiá»‡u nÃ o.</p></div>`;
+    wrap.innerHTML = `<div class="empty-feed" style="padding:24px 16px;"><p>Chưa có bài giới thiệu nào.</p></div>`;
     return;
   }
   wrap.innerHTML = `
     <article class="overview-post">
-      <div class="intro-card-title">${esc(centerIntro.title || "Giá»›i thiá»‡u trung tÃ¢m")}</div>
+      <div class="intro-card-title">${esc(centerIntro.title || "Giới thiệu trung tâm")}</div>
       <div class="intro-card-text">${formatRichText(centerIntro.content || "")}</div>
     </article>
   `;
@@ -2624,12 +2624,12 @@ window.submitTrialLessonRequest = async function(event) {
   message.textContent = "";
   if (!payload.student_name || !payload.phone || !payload.grade || !payload.subject) {
     message.classList.add("error");
-    message.textContent = "Vui lÃ²ng nháº­p Ä‘á»§ TÃªn, SÄT, Khá»‘i vÃ  MÃ´n.";
+    message.textContent = "Vui lòng nhập đủ Tên, SĐT, Khối và Môn.";
     return;
   }
 
   button.disabled = true;
-  button.textContent = "Äang gá»­i...";
+  button.textContent = "Đang gửi...";
   try {
     const { error } = await sb
       .from("trial_lesson_requests")
@@ -2638,14 +2638,14 @@ window.submitTrialLessonRequest = async function(event) {
     if (error) throw error;
     form.reset();
     message.classList.add("success");
-    message.textContent = "ÄÃ£ gá»­i yÃªu cáº§u há»c thá»­. Admin sáº½ liÃªn há»‡ láº¡i sá»›m.";
+    message.textContent = "Đã gửi yêu cầu học thử. Admin sẽ liên hệ lại sớm.";
   } catch (error) {
     message.classList.add("error");
-    message.textContent = "ChÆ°a gá»­i Ä‘Æ°á»£c yÃªu cáº§u. Vui lÃ²ng thá»­ láº¡i hoáº·c liÃªn há»‡ trá»±c tiáº¿p vá»›i trung tÃ¢m.";
+    message.textContent = "Chưa gửi được yêu cầu. Vui lòng thử lại hoặc liên hệ trực tiếp với trung tâm.";
     console.warn("Trial lesson request failed", error);
   } finally {
     button.disabled = false;
-    button.textContent = "Gá»­i ngay cho Admin";
+    button.textContent = "Gửi ngay cho Admin";
   }
 };
 
@@ -2677,7 +2677,7 @@ async function loadHomeHubBadges() {
 function updateHubBadge(id, count) {
   const badge = document.getElementById(id);
   if (!badge) return;
-  badge.textContent = count > 99 ? "99+" : String(count || 0);
+  badge.textContent = count > 99 ?"99+" : String(count || 0);
   badge.classList.toggle("show", count > 0);
 }
 
@@ -2712,7 +2712,7 @@ function renderDiscussionPosts(posts) {
   const wrap = document.getElementById("posts");
   if (!wrap) return;
   if (!posts.length) {
-    wrap.innerHTML = `<div class="empty-feed"><div class="icon">ðŸ“­</div><p>ChÆ°a cÃ³ bÃ i viáº¿t nÃ o.</p></div>`;
+    wrap.innerHTML = `<div class="empty-feed"><div class="icon">📭</div><p>Chưa có bài viết nào.</p></div>`;
     return;
   }
   wrap.innerHTML = "";
@@ -2724,8 +2724,8 @@ function renderDiscussionPosts(posts) {
 
 function extractPostExcerpt(post, maxLength = 160) {
   const content = String(post?.content || "").replace(/\s+/g, " ").trim();
-  if (!content) return "Ná»™i dung Ä‘ang Ä‘Æ°á»£c cáº­p nháº­t.";
-  return content.length > maxLength ? content.slice(0, maxLength) + "..." : content;
+  if (!content) return "Nội dung đang được cập nhật.";
+  return content.length > maxLength ?content.slice(0, maxLength) + "..." : content;
 }
 
 function formatPostTime(value) {
@@ -2786,7 +2786,7 @@ window.toggleCmt = function(pid) {
   const s = document.getElementById("cmt_" + pid);
   if (!s) return;
   const open = s.style.display === "block";
-  s.style.display = open ? "none" : "block";
+  s.style.display = open ?"none" : "block";
   if (!open) { loadComments(pid); setTimeout(()=>document.getElementById("cmtIn_"+pid)?.focus(),80); }
 };
 
@@ -2803,7 +2803,7 @@ window.savePostEdit = async function(pid) {
   const content = document.getElementById("editContent_" + pid)?.value.trim();
   const visibility = document.getElementById("editVisibility_" + pid)?.value || "public";
   if (!content) {
-    alert("Ná»™i dung bÃ i viáº¿t khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng");
+    alert("Nội dung bài viết không được để trống");
     return;
   }
 
@@ -2813,7 +2813,7 @@ window.savePostEdit = async function(pid) {
     .eq("id", pid);
 
   if (error) {
-    alert("Lá»—i khi cáº­p nháº­t bÃ i viáº¿t: " + error.message);
+    alert("Lỗi khi cập nhật bài viết: " + error.message);
     return;
   }
 
@@ -2821,7 +2821,7 @@ window.savePostEdit = async function(pid) {
 };
 
 window.removePostImage = async function(pid) {
-  if (!confirm("Báº¡n cÃ³ cháº¯c muá»‘n xÃ³a áº£nh Ä‘Ã­nh kÃ¨m khá»i bÃ i viáº¿t khÃ´ng?")) return;
+  if (!confirm("Bạn có chắc muốn xóa ảnh đính kèm khỏi bài viết không?")) return;
   const { data: mediaRows } = await sb
     .from("post_media")
     .select("file_url")
@@ -2835,7 +2835,7 @@ window.removePostImage = async function(pid) {
     .eq("file_type", "image");
 
   if (error) {
-    alert("Lá»—i khi xÃ³a áº£nh bÃ i viáº¿t: " + error.message);
+    alert("Lỗi khi xóa ảnh bài viết: " + error.message);
     return;
   }
 
@@ -2862,25 +2862,25 @@ window.likePost = async function(pid) {
   btn?.classList.add("liked");
   const { data: post } = await sb.from("posts").select("user_id").eq("id", pid).maybeSingle();
   if (post?.user_id) {
-    await createNotification(post.user_id, "post_like", (currentProfile?.full_name || currentUser.email || "Má»™t ngÆ°á»i dÃ¹ng") + " Ä‘Ã£ thÃ­ch bÃ i viáº¿t cá»§a báº¡n.", pid);
+    await createNotification(post.user_id, "post_like", (currentProfile?.full_name || currentUser.email || "Một người dùng") + " đã thích bài viết của bạn.", pid);
   }
 };
 
 window.pinPost = async function(pid) {
   const { error } = await sb.from("posts").update({ is_pinned: true }).eq("id", pid);
-  if (error) { alert("Lá»—i: " + error.message); return; }
+  if (error) { alert("Lỗi: " + error.message); return; }
   loadPosts();
 };
 
 window.moderatePost = async function(pid, status) {
-  if (!confirm(status === "approved" ? "Duyá»‡t bÃ i nÃ y?" : "Tá»« chá»‘i bÃ i nÃ y?")) return;
+  if (!confirm(status === "approved" ?"Duyệt bài này?" : "Từ chối bài này?")) return;
   const { data: updatedPost, error } = await sb.from("posts").update({ status }).eq("id", pid).select("user_id").single();
-  if (error) { alert("Lá»—i: " + error.message); return; }
+  if (error) { alert("Lỗi: " + error.message); return; }
   if (updatedPost?.user_id) {
     await createNotification(
       updatedPost.user_id,
-      status === "approved" ? "post_approved" : "post_rejected",
-      status === "approved" ? "BÃ i viáº¿t cá»§a báº¡n Ä‘Ã£ Ä‘Æ°á»£c duyá»‡t." : "BÃ i viáº¿t cá»§a báº¡n Ä‘Ã£ bá»‹ tá»« chá»‘i.",
+      status === "approved" ?"post_approved" : "post_rejected",
+      status === "approved" ?"Bài viết của bạn đã được duyệt." : "Bài viết của bạn đã bị từ chối.",
       pid
     );
   }
@@ -2888,12 +2888,12 @@ window.moderatePost = async function(pid, status) {
 };
 
 window.deletePost = async function(pid) {
-  if (!confirm("XÃ³a bÃ i nÃ y?")) return;
+  if (!confirm("Xóa bài này?")) return;
   const { data: mediaRows } = await sb.from("post_media").select("file_url").eq("post_id", pid);
   await sb.from("comments").delete().eq("post_id", pid);
   await sb.from("likes").delete().eq("post_id", pid);
   const { error } = await sb.from("posts").delete().eq("id", pid);
-  if (error) { alert("Lá»—i: " + error.message); return; }
+  if (error) { alert("Lỗi: " + error.message); return; }
   await window.MindupImageUpload?.deleteUploadedImages?.((mediaRows || []).map(item => item.file_url));
   document.getElementById("post_" + pid)?.remove();
 };
@@ -2906,7 +2906,7 @@ window.commentPost = async function(pid) {
   inp.value = "";
   const { data: post } = await sb.from("posts").select("user_id").eq("id", pid).maybeSingle();
   if (post?.user_id) {
-    await createNotification(post.user_id, "post_comment", (currentProfile?.full_name || currentUser.email || "Má»™t ngÆ°á»i dÃ¹ng") + " Ä‘Ã£ bÃ¬nh luáº­n vÃ o bÃ i viáº¿t cá»§a báº¡n.", pid);
+    await createNotification(post.user_id, "post_comment", (currentProfile?.full_name || currentUser.email || "Một người dùng") + " đã bình luận vào bài viết của bạn.", pid);
   }
   loadComments(pid);
 };
@@ -2928,10 +2928,10 @@ window.sendReply = async function(pid, parentId) {
 };
 
 window.deleteComment = async function(pid, cid) {
-  if (!confirm("XÃ³a bÃ¬nh luáº­n nÃ y?")) return;
+  if (!confirm("Xóa bình luận này?")) return;
   const { error } = await sb.from("comments").delete().eq("id", cid);
   if (error) {
-    alert("Lá»—i khi xÃ³a bÃ¬nh luáº­n: " + error.message);
+    alert("Lỗi khi xóa bình luận: " + error.message);
     return;
   }
   loadComments(pid);
@@ -2939,11 +2939,11 @@ window.deleteComment = async function(pid, cid) {
 };
 
 window.editComment = async function(pid, cid, oldContent) {
-  const next = prompt("Sá»­a ná»™i dung bÃ¬nh luáº­n:", oldContent || "");
+  const next = prompt("Sửa nội dung bình luận:", oldContent || "");
   if (next === null) return;
   const content = next.trim();
   if (!content) {
-    alert("Ná»™i dung bÃ¬nh luáº­n khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng");
+    alert("Nội dung bình luận không được để trống");
     return;
   }
 
@@ -2953,7 +2953,7 @@ window.editComment = async function(pid, cid, oldContent) {
     .eq("id", cid);
 
   if (error) {
-    alert("Lá»—i khi sá»­a bÃ¬nh luáº­n: " + error.message);
+    alert("Lỗi khi sửa bình luận: " + error.message);
     return;
   }
 
@@ -2971,7 +2971,7 @@ async function loadComments(pid) {
   const tops    = (data||[]).filter(c => !c.parent_id);
   const replies = (data||[]).filter(c =>  c.parent_id);
   if (!tops.length) {
-    list.innerHTML = `<div class="empty-feed" style="padding:18px 14px; margin-top:10px;"><strong>ChÆ°a cÃ³ bÃ¬nh luáº­n nÃ o</strong><p>HÃ£y lÃ  ngÆ°á»i Ä‘áº§u tiÃªn Ä‘á»ƒ láº¡i pháº£n há»“i cho bÃ i viáº¿t nÃ y.</p></div>`;
+    list.innerHTML = `<div class="empty-feed" style="padding:18px 14px; margin-top:10px;"><strong>Chưa có bình luận nào</strong><p>Hãy là người đầu tiên để lại phản hồi cho bài viết này.</p></div>`;
     return;
   }
   list.innerHTML = tops.map(c => {
@@ -2982,9 +2982,9 @@ async function loadComments(pid) {
       <div class="cmt-item reply-indent">
         <img class="cmt-avatar" src="${r.users?.avatar_url||'default-avatar.png'}" onerror="this.src='default-avatar.png'">
         <div class="cmt-bubble">
-          <div class="cmt-name">${esc(r.users?.full_name??"User")}</div>
+          <div class="cmt-name">${esc(r.users?.full_name?"User")}</div>
           <div class="cmt-text">${formatRichText(r.content)}</div>
-          ${(role === "admin" || r.user_id === currentUser.id) ? `<div class="cmt-tools"><span class="edit-link" onclick="editComment('${pid}','${r.id}',${JSON.stringify(String(r.content || ""))})">Sá»­a</span><span class="delete-link" onclick="deleteComment('${pid}','${r.id}')">XÃ³a</span></div>` : ""}
+          ${(role === "admin" || r.user_id === currentUser.id) ?`<div class="cmt-tools"><span class="edit-link" onclick="editComment('${pid}','${r.id}',${JSON.stringify(String(r.content || ""))})">Sửa</span><span class="delete-link" onclick="deleteComment('${pid}','${r.id}')">Xóa</span></div>` : ""}
         </div>
       </div>`).join("");
     return `
@@ -2992,19 +2992,19 @@ async function loadComments(pid) {
         <img class="cmt-avatar" src="${c.users?.avatar_url||'default-avatar.png'}" onerror="this.src='default-avatar.png'">
         <div style="flex:1">
           <div class="cmt-bubble">
-            <div class="cmt-name">${esc(c.users?.full_name??"User")}</div>
+            <div class="cmt-name">${esc(c.users?.full_name?"User")}</div>
             <div class="cmt-text">${formatRichText(c.content)}</div>
             <div class="cmt-time">${t}</div>
           </div>
           <div class="cmt-tools">
-            <span class="reply-link" onclick="showReply('${c.id}')">Tráº£ lá»i</span>
-            ${canEditTop ? `<span class="edit-link" onclick="editComment('${pid}','${c.id}',${JSON.stringify(String(c.content || ""))})">Sá»­a</span>` : ""}
-            ${canDeleteTop ? `<span class="delete-link" onclick="deleteComment('${pid}','${c.id}')">XÃ³a</span>` : ""}
+            <span class="reply-link" onclick="showReply('${c.id}')">Trả lời</span>
+            ${canEditTop ?`<span class="edit-link" onclick="editComment('${pid}','${c.id}',${JSON.stringify(String(c.content || ""))})">Sửa</span>` : ""}
+            ${canDeleteTop ?`<span class="delete-link" onclick="deleteComment('${pid}','${c.id}')">Xóa</span>` : ""}
           </div>
           <div class="reply-box" id="rbox_${c.id}">
-            <input class="cmt-input" id="rIn_${c.id}" placeholder="Tráº£ lá»i..."
+            <input class="cmt-input" id="rIn_${c.id}" placeholder="Trả lời..."
               onkeydown="if(event.key==='Enter')sendReply('${pid}','${c.id}')">
-            <button class="cmt-send" onclick="sendReply('${pid}','${c.id}')">âž¤</button>
+            <button class="cmt-send" onclick="sendReply('${pid}','${c.id}')">➤</button>
           </div>
           ${rHtml}
         </div>
@@ -3023,8 +3023,8 @@ function escAttr(s) {
 function formatMoney(v) {
   const num = Number(v || 0);
   return Number.isFinite(num) && num > 0
-    ? new Intl.NumberFormat("vi-VN").format(num) + "Ä‘"
-    : "ChÆ°a cáº­p nháº­t";
+    ?new Intl.NumberFormat("vi-VN").format(num) + "đ"
+    : "Chưa cập nhật";
 }
 
 function getCourseManagerLabel(courseId) {
@@ -3034,16 +3034,16 @@ function getCourseManagerLabel(courseId) {
   const names = managerIds
     .map(id => (allTeachers || []).find(teacher => teacher.id === id)?.full_name)
     .filter(Boolean);
-  if (!names.length) return "ChÆ°a gÃ¡n giÃ¡o viÃªn";
+  if (!names.length) return "Chưa gán giáo viên";
   if (names.length === 1) return names[0];
-  return names.slice(0, 2).join(", ") + (names.length > 2 ? ` +${names.length - 2}` : "");
+  return names.slice(0, 2).join(", ") + (names.length > 2 ?` +${names.length - 2}` : "");
 }
 
 function formatRichText(text) {
   const escaped = esc(text || "");
   return escaped
     .replace(/((https?:\/\/|www\.)[^\s<]+)/gi, (raw) => {
-      const href = raw.startsWith("http") ? raw : `https://${raw}`;
+      const href = raw.startsWith("http") ?raw : `https://${raw}`;
       return `<a href="${href}" target="_blank" rel="noopener noreferrer">${raw}</a>`;
     })
     .replace(/\n/g, "<br>");
@@ -3051,7 +3051,7 @@ function formatRichText(text) {
 
 function inferTitleFromContent(content) {
   const firstLine = String(content || "").split("\n").map(line => line.trim()).find(Boolean) || "";
-  return firstLine.length > 120 ? firstLine.slice(0, 120) : firstLine;
+  return firstLine.length > 120 ?firstLine.slice(0, 120) : firstLine;
 }
 
 function renderHomeContent() {
@@ -3069,20 +3069,20 @@ function renderHomeContent() {
 
 function extractPostTitle(post) {
   const explicitTitle = String(post?.title || "").trim();
-  if (explicitTitle) return explicitTitle.length > 72 ? explicitTitle.slice(0, 72) + "..." : explicitTitle;
+  if (explicitTitle) return explicitTitle.length > 72 ?explicitTitle.slice(0, 72) + "..." : explicitTitle;
   const inferred = inferTitleFromContent(post?.content || "");
-  return inferred.length > 72 ? inferred.slice(0, 72) + "..." : inferred || "BÃ i viáº¿t cáº­p nháº­t";
+  return inferred.length > 72 ?inferred.slice(0, 72) + "..." : inferred || "Bài viết cập nhật";
 }
 
 function renderCountdown() {
   const wrap = document.getElementById("countdownBox");
   if (!wrap) return;
   if (!homeSettingsLoaded) {
-    wrap.innerHTML = `<div class="empty-feed" style="padding:18px 14px;"><p>Äang táº£i cÃ¡c má»‘c thi...</p></div>`;
+    wrap.innerHTML = `<div class="empty-feed" style="padding:18px 14px;"><p>Đang tải các mốc thi...</p></div>`;
     return;
   }
   if (!examEvents.length) {
-    wrap.innerHTML = `<div class="empty-feed" style="padding:18px 14px;"><p>ChÆ°a cÃ³ ká»³ thi nÃ o Ä‘Æ°á»£c táº¡o.</p></div>`;
+    wrap.innerHTML = `<div class="empty-feed" style="padding:18px 14px;"><p>Chưa có kỳ thi nào được tạo.</p></div>`;
     return;
   }
 
@@ -3095,13 +3095,13 @@ function renderCountdown() {
     return `
       <div class="countdown-event">
         <div class="countdown-event-head">
-          <div class="countdown-event-title">${esc(event.title || "Ká»³ thi")}</div>
+          <div class="countdown-event-title">${esc(event.title || "Kỳ thi")}</div>
           <div class="countdown-event-time">${formatPostTime(event.exam_at)}</div>
         </div>
         <div class="countdown-event-pills">
-          <div class="countdown-pill"><span class="countdown-number">${days}</span><span class="countdown-label">NgÃ y</span></div>
-          <div class="countdown-pill"><span class="countdown-number">${hours}</span><span class="countdown-label">Giá»</span></div>
-          <div class="countdown-pill"><span class="countdown-number">${minutes}</span><span class="countdown-label">PhÃºt</span></div>
+          <div class="countdown-pill"><span class="countdown-number">${days}</span><span class="countdown-label">Ngày</span></div>
+          <div class="countdown-pill"><span class="countdown-number">${hours}</span><span class="countdown-label">Giờ</span></div>
+          <div class="countdown-pill"><span class="countdown-number">${minutes}</span><span class="countdown-label">Phút</span></div>
         </div>
       </div>
     `;
@@ -3112,7 +3112,7 @@ async function loadPosts() {
   const wrap = document.getElementById("posts");
   if (!wrap) return;
   if (!wrap.dataset.loadedOnce) {
-    wrap.innerHTML = `<div class="empty-feed"><div class="icon">â³</div><strong>Äang táº£i báº£ng tin</strong><p>Dá»¯ liá»‡u bÃ i viáº¿t Ä‘ang Ä‘Æ°á»£c chuáº©n bá»‹...</p></div>`;
+    wrap.innerHTML = `<div class="empty-feed"><div class="icon">⏳</div><strong>Đang tải bảng tin</strong><p>Dữ liệu bài viết đang được chuẩn bị...</p></div>`;
   }
 
   const { data: posts, error } = await sb
@@ -3121,7 +3121,7 @@ async function loadPosts() {
     .order("created_at", { ascending: false });
 
   if (error) {
-    wrap.innerHTML = `<div class="empty-feed"><p>KhÃ´ng táº£i Ä‘Æ°á»£c dá»¯ liá»‡u bÃ i viáº¿t.</p></div>`;
+    wrap.innerHTML = `<div class="empty-feed"><p>Không tải được dữ liệu bài viết.</p></div>`;
     return;
   }
 
@@ -3136,7 +3136,7 @@ async function createPost() {
   const imageFile = document.getElementById("postImage").files?.[0];
   if (!text && !imageFile) return;
 
-  const status = (role === "admin" || role === "teacher") ? "approved" : "pending";
+  const status = (role === "admin" || role === "teacher") ?"approved" : "pending";
   const title = inferTitleFromContent(text) || null;
   const { data: insertedPost, error } = await sb
     .from("posts")
@@ -3154,7 +3154,7 @@ async function createPost() {
     .single();
 
   if (error) {
-    alert("Lá»—i: " + error.message);
+    alert("Lỗi: " + error.message);
     return;
   }
 
@@ -3176,7 +3176,7 @@ async function createPost() {
         throw mediaError;
       }
     } catch (uploadError) {
-      alert("BÃ i viáº¿t Ä‘Ã£ táº¡o nhÆ°ng upload áº£nh lá»—i: " + uploadError.message);
+      alert("Bài viết đã tạo nhưng upload ảnh lỗi: " + uploadError.message);
     }
   }
 
@@ -3196,7 +3196,7 @@ window.createExamEvent = async function() {
   const title = titleInput?.value.trim();
   const examAt = timeInput?.value;
   if (!title || !examAt) {
-    alert("Báº¡n cáº§n nháº­p tÃªn ká»³ thi vÃ  thá»i gian thi.");
+    alert("Bạn cần nhập tên kỳ thi và thời gian thi.");
     return;
   }
 
@@ -3207,7 +3207,7 @@ window.createExamEvent = async function() {
   });
 
   if (error) {
-    alert("Lá»—i khi lÆ°u ká»³ thi: " + error.message);
+    alert("Lỗi khi lưu kỳ thi: " + error.message);
     return;
   }
 
@@ -3218,10 +3218,10 @@ window.createExamEvent = async function() {
 
 window.deleteExamEvent = async function(eventId) {
   if (role !== "admin") return;
-  if (!confirm("XÃ³a ká»³ thi nÃ y?")) return;
+  if (!confirm("Xóa kỳ thi này?")) return;
   const { error } = await sb.from("exam_events").delete().eq("id", eventId);
   if (error) {
-    alert("Lá»—i khi xÃ³a ká»³ thi: " + error.message);
+    alert("Lỗi khi xóa kỳ thi: " + error.message);
     return;
   }
   await loadOverviewSettings();
@@ -3239,7 +3239,7 @@ window.saveContactInfo = async function() {
   }, { onConflict: "setting_key" });
 
   if (error) {
-    alert("Lá»—i khi lÆ°u liÃªn há»‡: " + error.message);
+    alert("Lỗi khi lưu liên hệ: " + error.message);
     return;
   }
 
@@ -3256,60 +3256,60 @@ function buildCard(post) {
 
   const div = document.createElement("div");
   div.id = "post_" + post.id;
-  div.className = "post-card" + (isPending ? " pending-card" : "") + (isRejected ? " rejected-card" : "");
+  div.className = "post-card" + (isPending ?" pending-card" : "") + (isRejected ?" rejected-card" : "");
 
   const dt = new Date(post.created_at);
   const timeStr = dt.toLocaleString("vi-VN", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" });
-  const likeCount = post.likes?.[0]?.count ?? 0;
-  const cmtCount = post.comments?.[0]?.count ?? 0;
+  const likeCount = post.likes?.[0]?.count ?0;
+  const cmtCount = post.comments?.[0]?.count ?0;
   const isLiked = likedPostIds.has(post.id);
 
-  const statusBadge = isPending ? `<span class="badge-pending">Chá» duyá»‡t</span>` : isRejected ? `<span class="badge-rejected">Tá»« chá»‘i</span>` : "";
+  const statusBadge = isPending ?`<span class="badge-pending">Chờ duyệt</span>` : isRejected ?`<span class="badge-rejected">Từ chối</span>` : "";
   const visibilityBadge = post.visibility === "friends"
-    ? `<span class="badge-visibility">Báº¡n bÃ¨</span>`
+    ?`<span class="badge-visibility">Bạn bè</span>`
     : post.visibility === "private"
-      ? `<span class="badge-visibility">RiÃªng tÆ°</span>`
-      : `<span class="badge-visibility">CÃ´ng khai</span>`;
+      ?`<span class="badge-visibility">Riêng tư</span>`
+      : `<span class="badge-visibility">Công khai</span>`;
 
-  const modBar = (canMod && isPending) ? `
+  const modBar = (canMod && isPending) ?`
     <div class="mod-bar">
-      <button class="btn-ok" onclick="moderatePost('${post.id}','approved')">âœ… Duyá»‡t</button>
-      <button class="btn-no" onclick="moderatePost('${post.id}','rejected')">âŒ Tá»« chá»‘i</button>
+      <button class="btn-ok" onclick="moderatePost('${post.id}','approved')">✅ Duyệt</button>
+      <button class="btn-no" onclick="moderatePost('${post.id}','rejected')">âŒ Từ chối</button>
     </div>` : "";
 
   const pendingNotice = (isPending && isMyPost && role === "student")
-    ? `<div class="post-pending-notice">â³ BÃ i Ä‘ang chá» admin/giÃ¡o viÃªn duyá»‡t</div>` : "";
+    ?`<div class="post-pending-notice">⏳ Bài đang chờ admin/giáo viên duyệt</div>` : "";
   const mediaHtml = (post.post_media || [])
     .filter(item => item.file_type === "image")
     .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
-    .map(item => `<div class="post-media-wrap"><img class="post-media-img" src="${item.file_url}" alt="áº¢nh bÃ i viáº¿t"></div>`)
+    .map(item => `<div class="post-media-wrap"><img class="post-media-img" src="${item.file_url}" alt="Ảnh bài viết"></div>`)
     .join("");
 
-  const actionBar = (!currentUser && !isPending && !isRejected) ? `
+  const actionBar = (!currentUser && !isPending && !isRejected) ?`
     <div class="post-actions">
-      <button class="act-btn" onclick="parent?.openAuthModal ? parent.openAuthModal('login') : location.href='dashboard.html'">ÄÄƒng nháº­p Ä‘á»ƒ tÆ°Æ¡ng tÃ¡c</button>
-    </div>` : (!isPending && !isRejected) ? `
+      <button class="act-btn" onclick="parent?.openAuthModal ?parent.openAuthModal('login') : location.href='dashboard.html'">Đăng nhập để tương tác</button>
+    </div>` : (!isPending && !isRejected) ?`
     <div class="post-actions">
-      <button class="act-btn ${isLiked ? "liked" : ""}" id="likeBtn_${post.id}" onclick="likePost('${post.id}')">â¤ï¸ <span id="likeCount_${post.id}">${likeCount}</span></button>
-      <button class="act-btn" onclick="toggleCmt('${post.id}')">ðŸ’¬ ${cmtCount}</button>
+      <button class="act-btn ${isLiked ?"liked" : ""}" id="likeBtn_${post.id}" onclick="likePost('${post.id}')">❤️ <span id="likeCount_${post.id}">${likeCount}</span></button>
+      <button class="act-btn" onclick="toggleCmt('${post.id}')">💬 ${cmtCount}</button>
       <div class="act-spacer"></div>
-      ${(isAdmin || isMyPost) ? `<button class="act-btn edit" onclick="toggleEditPost('${post.id}')">âœï¸ Sá»­a</button>` : ""}
-      ${(isAdmin || isMyPost) ? `<button class="act-btn danger" onclick="deletePost('${post.id}')">ðŸ—‘</button>` : ""}
+      ${(isAdmin || isMyPost) ?`<button class="act-btn edit" onclick="toggleEditPost('${post.id}')">✏️ Sửa</button>` : ""}
+      ${(isAdmin || isMyPost) ?`<button class="act-btn danger" onclick="deletePost('${post.id}')">🗑</button>` : ""}
     </div>
     <div class="edit-box" id="edit_${post.id}">
       <textarea class="edit-textarea" id="editContent_${post.id}">${esc(post.content)}</textarea>
       <div class="edit-tools">
         <div class="edit-media-actions">
           <select class="compose-select" id="editVisibility_${post.id}">
-            <option value="public" ${post.visibility === "public" ? "selected" : ""}>CÃ´ng khai</option>
-            <option value="friends" ${post.visibility === "friends" ? "selected" : ""}>Báº¡n bÃ¨</option>
-            <option value="private" ${post.visibility === "private" ? "selected" : ""}>RiÃªng tÆ°</option>
+            <option value="public" ${post.visibility === "public" ?"selected" : ""}>Công khai</option>
+            <option value="friends" ${post.visibility === "friends" ?"selected" : ""}>Bạn bè</option>
+            <option value="private" ${post.visibility === "private" ?"selected" : ""}>Riêng tư</option>
           </select>
-          ${(post.post_media || []).some(item => item.file_type === "image") ? `<button class="btn btn-outline btn-sm" onclick="removePostImage('${post.id}')">XÃ³a áº£nh</button>` : ""}
+          ${(post.post_media || []).some(item => item.file_type === "image") ?`<button class="btn btn-outline btn-sm" onclick="removePostImage('${post.id}')">Xóa ảnh</button>` : ""}
         </div>
         <div class="edit-actions">
-          <button class="btn btn-outline btn-sm" onclick="toggleEditPost('${post.id}')">Há»§y</button>
-          <button class="btn btn-primary btn-sm" onclick="savePostEdit('${post.id}')">LÆ°u thay Ä‘á»•i</button>
+          <button class="btn btn-outline btn-sm" onclick="toggleEditPost('${post.id}')">Hủy</button>
+          <button class="btn btn-primary btn-sm" onclick="savePostEdit('${post.id}')">Lưu thay đổi</button>
         </div>
       </div>
     </div>
@@ -3317,8 +3317,8 @@ function buildCard(post) {
       <div id="cmtList_${post.id}"></div>
       <div class="cmt-input-row">
         <img class="cmt-avatar" src="${currentProfile?.avatar_url||'default-avatar.png'}" onerror="this.src='default-avatar.png'">
-        <input class="cmt-input" id="cmtIn_${post.id}" placeholder="Viáº¿t bÃ¬nh luáº­n..." onkeydown="if(event.key==='Enter')commentPost('${post.id}')">
-        <button class="cmt-send" onclick="commentPost('${post.id}')">âž¤</button>
+        <input class="cmt-input" id="cmtIn_${post.id}" placeholder="Viết bình luận..." onkeydown="if(event.key==='Enter')commentPost('${post.id}')">
+        <button class="cmt-send" onclick="commentPost('${post.id}')">➤</button>
       </div>
     </div>` : "";
 
@@ -3327,7 +3327,7 @@ function buildCard(post) {
       <img class="post-avatar" src="${post.users?.avatar_url||'default-avatar.png'}" onerror="this.src='default-avatar.png'">
       <div class="post-meta">
         <div class="post-author">
-          <a class="post-author-link" href="profile.html?id=${post.user_id}">${esc(post.users?.full_name ?? "NgÆ°á»i dÃ¹ng")}</a>
+          <a class="post-author-link" href="profile.html?id=${post.user_id}">${esc(post.users?.full_name ?"Người dùng")}</a>
           ${visibilityBadge}
           ${statusBadge}
         </div>
@@ -3342,13 +3342,13 @@ function buildCard(post) {
   if (actionWrap) {
     const stats = document.createElement("div");
     stats.className = "post-stats";
-    stats.innerHTML = `<span>${likeCount} lÆ°á»£t thÃ­ch</span><span>${cmtCount} bÃ¬nh luáº­n</span>`;
+    stats.innerHTML = `<span>${likeCount} lượt thích</span><span>${cmtCount} bình luận</span>`;
     actionWrap.before(stats);
 
     const likeBtn = div.querySelector("#likeBtn_" + post.id);
     if (likeBtn) {
       likeBtn.classList.add("main");
-      likeBtn.innerHTML = `<span class="ui-icon">${uiIcons.like}</span><span>ThÃ­ch</span>`;
+      likeBtn.innerHTML = `<span class="ui-icon">${uiIcons.like}</span><span>Thích</span>`;
     }
 
     const commentBtn = Array.from(actionWrap.querySelectorAll(".act-btn")).find(btn =>
@@ -3356,19 +3356,19 @@ function buildCard(post) {
     );
     if (commentBtn) {
       commentBtn.classList.add("main");
-      commentBtn.innerHTML = `<span class="ui-icon">${uiIcons.comment}</span><span>BÃ¬nh luáº­n</span>`;
+      commentBtn.innerHTML = `<span class="ui-icon">${uiIcons.comment}</span><span>Bình luận</span>`;
     }
 
     const editBtn = actionWrap.querySelector(".act-btn.edit");
     if (editBtn) {
       editBtn.classList.add("soft");
-      editBtn.innerHTML = `<span class="ui-icon">${uiIcons.edit}</span><span>Sá»­a</span>`;
+      editBtn.innerHTML = `<span class="ui-icon">${uiIcons.edit}</span><span>Sửa</span>`;
     }
 
     const deleteBtn = actionWrap.querySelector(".act-btn.danger");
     if (deleteBtn) {
       deleteBtn.classList.add("soft");
-      deleteBtn.innerHTML = `<span class="ui-icon">${uiIcons.trash}</span><span>XÃ³a</span>`;
+      deleteBtn.innerHTML = `<span class="ui-icon">${uiIcons.trash}</span><span>Xóa</span>`;
     }
   }
 
@@ -3399,22 +3399,22 @@ function renderOverviewPost(post, compact = false) {
   return `
     <article class="overview-post">
       <a class="overview-post-title" href="post.html?id=${post.id}">${esc(extractPostTitle(post))}</a>
-      <div class="overview-post-meta">${esc(post.users?.full_name || "Há»‡ thá»‘ng")} â€¢ ${formatPostTime(post.created_at)}</div>
-      <div class="overview-post-text">${formatRichText(extractPostExcerpt(post, compact ? 120 : 180))}</div>
+      <div class="overview-post-meta">${esc(post.users?.full_name || "Hệ thống")} • ${formatPostTime(post.created_at)}</div>
+      <div class="overview-post-text">${formatRichText(extractPostExcerpt(post, compact ?120 : 180))}</div>
     </article>
   `;
 }
 
 function renderPinnedCourseCard(course) {
   const dateLabel = course.start_date || course.end_date
-    ? `${course.start_date ? formatPostTime(course.start_date) : "ChÆ°a rÃµ"}${course.end_date ? ` - ${formatPostTime(course.end_date)}` : ""}`
-    : "Äang cáº­p nháº­t lá»‹ch há»c";
-  const description = ((course.description || "").trim().slice(0, 180) || "KhÃ³a há»c Ä‘ang Ä‘Æ°á»£c cáº­p nháº­t ná»™i dung.").replace(/\n/g, " ");
-  const statusLabel = course.status === "open" ? "Äang má»Ÿ" : "ÄÃ£ Ä‘Ã³ng";
-  const sessionsLabel = Number(course.planned_sessions || 0) > 0 ? `${course.planned_sessions} buá»•i` : "Theo lá»‹ch há»c";
+    ?`${course.start_date ?formatPostTime(course.start_date) : "Chưa rõ"}${course.end_date ?` - ${formatPostTime(course.end_date)}` : ""}`
+    : "Đang cập nhật lịch học";
+  const description = ((course.description || "").trim().slice(0, 180) || "Khóa học đang được cập nhật nội dung.").replace(/\n/g, " ");
+  const statusLabel = course.status === "open" ?"Đang mở" : "Đã đóng";
+  const sessionsLabel = Number(course.planned_sessions || 0) > 0 ?`${course.planned_sessions} buổi` : "Theo lịch học";
   const managerLabel = getCourseManagerLabel(course.id);
   const coverMedia = course.cover_url
-    ? `<img src="${escAttr(course.cover_url)}" alt="${escAttr(course.name || "KhÃ³a há»c")}">`
+    ?`<img src="${escAttr(course.cover_url)}" alt="${escAttr(course.name || "Khóa học")}">`
     : "";
   return `
     <article class="featured-course-card">
@@ -3428,29 +3428,29 @@ function renderPinnedCourseCard(course) {
       <div class="featured-course-body">
         <div>
           <div class="featured-course-topline">
-            <span class="featured-course-pill">KhÃ³a há»c online</span>
+            <span class="featured-course-pill">Khóa học online</span>
             <span class="featured-course-pill">${esc(sessionsLabel)}</span>
           </div>
-          <a class="featured-course-title" href="courses.html?courseId=${course.id}">${esc(course.name || "KhÃ³a há»c")}</a>
+          <a class="featured-course-title" href="courses.html?courseId=${course.id}">${esc(course.name || "Khóa học")}</a>
           <div class="featured-course-desc">${formatRichText(description)}</div>
         </div>
         <div>
           <div class="featured-course-stats">
             <div class="featured-course-stat">
-              <div class="featured-course-stat-label">Há»c phÃ­</div>
+              <div class="featured-course-stat-label">Học phí</div>
               <div class="featured-course-stat-value">${esc(formatMoney(course.tuition_fee))}</div>
             </div>
             <div class="featured-course-stat">
-              <div class="featured-course-stat-label">GiÃ¡o viÃªn cá»§a khÃ³a há»c</div>
+              <div class="featured-course-stat-label">Giáo viên của khóa học</div>
               <div class="featured-course-stat-value">${esc(managerLabel)}</div>
             </div>
             <div class="featured-course-stat">
-              <div class="featured-course-stat-label">Truy cáº­p</div>
-              <div class="featured-course-stat-value">${course.status === "open" ? "ÄÄƒng kÃ½ há»c" : "Chá» má»Ÿ láº¡i"}</div>
+              <div class="featured-course-stat-label">Truy cập</div>
+              <div class="featured-course-stat-value">${course.status === "open" ?"Đăng ký học" : "Chờ mở lại"}</div>
             </div>
           </div>
           <div class="featured-course-actions">
-            <a class="featured-course-link" href="courses.html?courseId=${course.id}">Xem chi tiáº¿t khÃ³a há»c</a>
+            <a class="featured-course-link" href="courses.html?courseId=${course.id}">Xem chi tiết khóa học</a>
           </div>
         </div>
       </div>
@@ -3469,17 +3469,17 @@ function renderOverviewSection(posts) {
     .slice(0, 8);
 
   coursesWrap.innerHTML = pinnedHomeCourses.length
-    ? `<div class="featured-course-list">${pinnedHomeCourses.map(renderPinnedCourseCard).join("")}</div>`
-    : `<div class="empty-feed" style="padding:24px 16px;"><p>ChÆ°a cÃ³ khÃ³a há»c ná»•i báº­t nÃ o.</p></div>`;
+    ?`<div class="featured-course-list">${pinnedHomeCourses.map(renderPinnedCourseCard).join("")}</div>`
+    : `<div class="empty-feed" style="padding:24px 16px;"><p>Chưa có khóa học nổi bật nào.</p></div>`;
 
   newsWrap.innerHTML = newsPosts.length
-    ? newsPosts.map(post => `
+    ?newsPosts.map(post => `
         <div class="overview-news-item">
           <span class="overview-news-dot"></span>
           <a class="overview-news-link" href="post.html?id=${post.id}">${esc(extractPostTitle(post))}</a>
         </div>
       `).join("")
-    : `<div class="empty-feed" style="padding:24px 16px;"><p>ChÆ°a cÃ³ tin tá»©c nÃ o.</p></div>`;
+    : `<div class="empty-feed" style="padding:24px 16px;"><p>Chưa có tin tức nào.</p></div>`;
 
   document.getElementById("overviewCourses")?.closest(".overview-card")?.style.setProperty("display", "");
   renderHomeTeachers();
@@ -3525,12 +3525,12 @@ window.addTeacherToHome = async function() {
   const select = document.getElementById("homeTeacherSelectInline");
   const userId = select?.value;
   if (!userId) {
-    alert("HÃ£y chá»n má»™t giÃ¡o viÃªn trÆ°á»›c khi thÃªm vÃ o Trang chá»§.");
+    alert("Hãy chọn một giáo viên trước khi thêm vào Trang chủ.");
     return;
   }
   const exists = homeTeachers.some(item => item.user_id === userId);
   if (exists) {
-    alert("GiÃ¡o viÃªn nÃ y Ä‘Ã£ cÃ³ trÃªn Trang chá»§ rá»“i.");
+    alert("Giáo viên này đã có trên Trang chủ rồi.");
     await loadOverviewSettings();
     return;
   }
@@ -3538,11 +3538,11 @@ window.addTeacherToHome = async function() {
   const { error } = await sb.from("home_teachers").insert({ user_id: userId, sort_order: nextOrder, created_by: currentUser.id });
   if (error) {
     if (error.message?.includes("home_teachers_user_id_key")) {
-      alert("GiÃ¡o viÃªn nÃ y Ä‘Ã£ cÃ³ trÃªn Trang chá»§ rá»“i.");
+      alert("Giáo viên này đã có trên Trang chủ rồi.");
       await loadOverviewSettings();
       return;
     }
-    alert("Lá»—i khi thÃªm giÃ¡o viÃªn: " + error.message + (error.message?.includes("home_teachers") ? "\nHÃ£y kiá»ƒm tra láº¡i SQL Ä‘Ã£ cháº¡y cho báº£ng home_teachers." : ""));
+    alert("Lỗi khi thêm giáo viên: " + error.message + (error.message?.includes("home_teachers") ?"\nHãy kiểm tra lại SQL đã chạy cho bảng home_teachers." : ""));
     return;
   }
   await loadOverviewSettings();
@@ -3552,7 +3552,7 @@ window.removeTeacherFromHome = async function(homeTeacherId) {
   if (role !== "admin") return;
   const { error } = await sb.from("home_teachers").delete().eq("id", homeTeacherId);
   if (error) {
-    alert("Lá»—i khi xÃ³a giÃ¡o viÃªn khá»i Trang chá»§: " + error.message);
+    alert("Lỗi khi xóa giáo viên khỏi Trang chủ: " + error.message);
     return;
   }
   await loadOverviewSettings();
@@ -3560,7 +3560,7 @@ window.removeTeacherFromHome = async function(homeTeacherId) {
 
 window.saveCenterIntro = async function() {
   if (role !== "admin") return;
-  const title = document.getElementById("centerIntroTitleInline")?.value.trim() || "Giá»›i thiá»‡u trung tÃ¢m";
+  const title = document.getElementById("centerIntroTitleInline")?.value.trim() || "Giới thiệu trung tâm";
   const content = document.getElementById("centerIntroContentInline")?.value.trim() || "";
   const value = JSON.stringify({ title, content });
   const { error } = await sb.from("site_settings").upsert({
@@ -3570,7 +3570,7 @@ window.saveCenterIntro = async function() {
     updated_at: new Date().toISOString()
   }, { onConflict: "setting_key" });
   if (error) {
-    alert("Lá»—i khi lÆ°u bÃ i giá»›i thiá»‡u: " + error.message);
+    alert("Lỗi khi lưu bài giới thiệu: " + error.message);
     return;
   }
   centerIntro = { title, content };
@@ -3581,14 +3581,14 @@ function renderHomeTeachers() {
   const wrap = document.getElementById("overviewTeachers");
   if (!wrap) return;
   if (!homeTeachers.length) {
-    wrap.innerHTML = `<div class="empty-feed" style="padding:24px 16px;"><p>ChÆ°a cÃ³ giÃ¡o viÃªn nÃ o Ä‘Æ°á»£c ghim trÃªn Trang chá»§.</p></div>`;
+    wrap.innerHTML = `<div class="empty-feed" style="padding:24px 16px;"><p>Chưa có giáo viên nào được ghim trên Trang chủ.</p></div>`;
     return;
   }
 
   wrap.innerHTML = homeTeachers.map(item => {
     const teacher = item.user || allTeachers.find(entry => entry.id === item.user_id) || {};
-    const teacherName = teacher.full_name || `GiÃ¡o viÃªn ${String(item.user_id || "").slice(0, 8)}`;
-    const teacherSubject = teacher.subject || "ChÆ°a cáº­p nháº­t mÃ´n";
+    const teacherName = teacher.full_name || `Giáo viên ${String(item.user_id || "").slice(0, 8)}`;
+    const teacherSubject = teacher.subject || "Chưa cập nhật môn";
     return `
       <a class="teacher-card" href="profile.html?id=${item.user_id}">
         <img class="teacher-card-avatar" src="${teacher.avatar_url || 'default-avatar.png'}" alt="${esc(teacherName)}" onerror="this.src='default-avatar.png'">
@@ -3603,17 +3603,17 @@ function renderHomeTeacherAdminList() {
   const wrap = document.getElementById("homeTeacherAdminListInline");
   if (!wrap) return;
   if (!homeTeachers.length) {
-    wrap.innerHTML = `<div class="empty-feed" style="padding:14px 12px;"><p>ChÆ°a cÃ³ giÃ¡o viÃªn nÃ o trÃªn Trang chá»§.</p></div>`;
+    wrap.innerHTML = `<div class="empty-feed" style="padding:14px 12px;"><p>Chưa có giáo viên nào trên Trang chủ.</p></div>`;
     return;
   }
 
   wrap.innerHTML = homeTeachers.map((item, index) => `
     <div class="admin-list-item teacher-admin-item" draggable="true" data-home-teacher-id="${item.id}" data-index="${index}">
       <div>
-        <div>${esc(item.user?.full_name || `GiÃ¡o viÃªn ${String(item.user_id || "").slice(0, 8)}`)}</div>
-        <div class="admin-list-meta">${esc(item.user?.subject || "ChÆ°a cáº­p nháº­t mÃ´n")}</div>
+        <div>${esc(item.user?.full_name || `Giáo viên ${String(item.user_id || "").slice(0, 8)}`)}</div>
+        <div class="admin-list-meta">${esc(item.user?.subject || "Chưa cập nhật môn")}</div>
       </div>
-      <button class="tiny-btn" type="button" onclick="removeTeacherFromHome('${item.id}')">XÃ³a</button>
+      <button class="tiny-btn" type="button" onclick="removeTeacherFromHome('${item.id}')">Xóa</button>
     </div>
   `).join("");
 
@@ -3630,9 +3630,9 @@ window.createOverviewPost = async function() {
   const titleInput = document.getElementById("overviewPostTitle");
   const contentInput = document.getElementById("overviewPostContent");
   const rawContent = contentInput?.value.trim() || "";
-  const title = (titleInput?.value.trim() || inferTitleFromContent(rawContent) || "ThÃ´ng bÃ¡o má»›i").trim();
+  const title = (titleInput?.value.trim() || inferTitleFromContent(rawContent) || "Thông báo mới").trim();
   if (!rawContent) {
-    alert("Báº¡n cáº§n nháº­p ná»™i dung cho bÃ i viáº¿t Trang chá»§.");
+    alert("Bạn cần nhập nội dung cho bài viết Trang chủ.");
     return;
   }
 
@@ -3648,7 +3648,7 @@ window.createOverviewPost = async function() {
   });
 
   if (error) {
-    alert("Lá»—i khi Ä‘Äƒng tin tá»©c Trang chá»§: " + error.message);
+    alert("Lỗi khi đăng tin tức Trang chủ: " + error.message);
     return;
   }
 
