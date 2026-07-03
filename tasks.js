@@ -555,16 +555,59 @@
   }
 
   async function loadInternalUsers() {
-    if (S.users.length) return;
-    const { data, error } = await sb.from("users")
+    const userMap = new Map((S.users || []).filter(user => user?.id).map(user => [user.id, user]));
+
+    const mergeUsers = rows => {
+      (rows || []).forEach(user => {
+        if (user?.id && INTERNAL_ROLES.has(user.role)) userMap.set(user.id, user);
+      });
+    };
+
+    const rpcRes = await sb.rpc("list_task_staff_users");
+    if (rpcRes.error && !/Could not find the function|schema cache|PGRST202/i.test(rpcRes.error.message || "")) {
+      console.warn("Load task staff users RPC:", rpcRes.error);
+    }
+    mergeUsers(rpcRes.data);
+
+    const staffRes = await sb.from("users")
       .select("id,full_name,email,role")
       .in("role", [...INTERNAL_ROLES])
       .order("full_name");
-    if (error) {
-      console.warn("Load task staff users:", error);
-      return;
+    if (staffRes.error) console.warn("Load task staff users:", staffRes.error);
+    mergeUsers(staffRes.data);
+
+    if (!userMap.size) {
+      const allRes = await sb.from("users")
+        .select("id,full_name,email,role")
+        .order("full_name");
+      if (allRes.error) console.warn("Load all users for task staff:", allRes.error);
+      mergeUsers(allRes.data);
     }
-    S.users = data || [];
+
+    if (!userMap.size) {
+      const teacherRes = await sb.from("class_teachers")
+        .select("teacher:users!class_teachers_teacher_id_fkey(id,full_name,email,role)");
+      if (teacherRes.error) console.warn("Load class teachers for task staff:", teacherRes.error);
+      mergeUsers((teacherRes.data || []).map(row => row.teacher));
+    }
+
+    (S.assignments || []).forEach(item => {
+      const user = item.assignee;
+      if (user?.id && INTERNAL_ROLES.has(user.role)) userMap.set(user.id, user);
+    });
+
+    if (S.profile?.id && INTERNAL_ROLES.has(S.profile.role)) {
+      userMap.set(S.profile.id, {
+        id: S.profile.id,
+        full_name: S.profile.full_name,
+        email: S.user?.email || "",
+        role: S.profile.role,
+      });
+    }
+
+    S.users = [...userMap.values()].sort((a, b) =>
+      String(a.full_name || a.email || "").localeCompare(String(b.full_name || b.email || ""), "vi")
+    );
   }
 
   function scheduleKey(schedule) {
@@ -764,6 +807,7 @@
     await enrichTaskResultNotes(assignments);
     const scheduleFallbacks = await loadScheduleFallbackTasks(assignments);
     S.assignments = [...assignments, ...scheduleFallbacks];
+    if (S.profile.role === "admin") await loadInternalUsers();
     await enrichTaskProgress(S.assignments);
     await syncProgressCompletedAssignments();
     render();
@@ -914,6 +958,11 @@
   function renderAssigneeSelect() {
     const select = byId("manualTaskAssigneeSelect");
     if (!select) return;
+    if (!S.users.length) {
+      select.innerHTML = '<option value="">Không tải được danh sách nhân viên</option>';
+      select.value = "";
+      return;
+    }
     const options = (S.users || []).map(user =>
       `<option value="${esc(user.id)}">${esc(user.full_name || user.email)} - ${esc(roleLabel(user.role))}${user.email ? ` - ${esc(user.email)}` : ""}</option>`
     ).join("");
@@ -941,7 +990,7 @@
       <label class="assignee-row ${S.manualAssigneeIds.has(String(user.id)) ? "selected" : ""}">
         <input type="checkbox" value="${esc(user.id)}" ${S.manualAssigneeIds.has(String(user.id)) ? "checked" : ""}>
         <span><strong>${esc(user.full_name || user.email)}</strong><br><small>${esc(user.role)} · ${esc(user.email)}</small></span>
-      </label>`).join("") : '<div style="padding:8px;color:var(--ink-light);font-size:.82rem">Không tìm thấy nhân viên phù hợp.</div>';
+      </label>`).join("") : `<div style="padding:8px;color:var(--ink-light);font-size:.82rem">${S.users.length ? "Không tìm thấy nhân viên phù hợp." : "Không tải được danh sách nhân viên. Có thể cần kiểm tra quyền đọc bảng users."}</div>`;
     renderPickedAssignees();
   }
 
