@@ -18,6 +18,11 @@
     return `${Math.round(Number(value || 0))}%`;
   }
 
+  function score10(value) {
+    const score = Math.round((Number(value || 0) / 10) * 10) / 10;
+    return `${Number.isInteger(score) ? score : score.toFixed(1)}/10`;
+  }
+
   function ym(date) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
   }
@@ -217,13 +222,13 @@
     el.innerHTML = `
       <div class="ops-line-wrap">
         <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Điểm trung bình theo môn và theo tháng">
-          ${axis.map(mark => `<line x1="${pad.left}" y1="${y(mark)}" x2="${width - pad.right}" y2="${y(mark)}" class="ops-grid-line"></line><text x="10" y="${y(mark) + 4}" class="ops-axis">${mark}%</text>`).join("")}
+          ${axis.map(mark => `<line x1="${pad.left}" y1="${y(mark)}" x2="${width - pad.right}" y2="${y(mark)}" class="ops-grid-line"></line><text x="10" y="${y(mark) + 4}" class="ops-axis">${score10(mark)}</text>`).join("")}
           ${labels.map((label, index) => `<text x="${x(index)}" y="${height - 18}" text-anchor="middle" class="ops-axis">${label}</text>`).join("")}
           ${visibleSeries.map((item, seriesIndex) => {
             const color = colors[seriesIndex % colors.length];
             const points = item.values.map((value, index) => `${x(index)},${y(value)}`).join(" ");
             return `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
-              ${item.values.map((value, index) => `<circle cx="${x(index)}" cy="${y(value)}" r="4" fill="${color}"><title>${item.name}: ${Math.round(value)}%</title></circle>`).join("")}`;
+              ${item.values.map((value, index) => `<circle cx="${x(index)}" cy="${y(value)}" r="4" fill="${color}"><title>${item.name}: ${score10(value)}</title></circle>`).join("")}`;
           }).join("")}
         </svg>
         <div class="ops-chart-legend">
@@ -247,12 +252,12 @@
       <div class="ops-rank-card good">
         <span>Lớp điểm cao nhất</span>
         <strong>${best.className}</strong>
-        <em>${pct(best.avg)} • ${best.count} lượt nộp</em>
+        <em>${score10(best.avg)} • ${best.count} lượt nộp</em>
       </div>
       <div class="ops-rank-card warn">
         <span>Lớp điểm thấp nhất</span>
         <strong>${lowest.className}</strong>
-        <em>${pct(lowest.avg)} • ${lowest.count} lượt nộp</em>
+        <em>${score10(lowest.avg)} • ${lowest.count} lượt nộp</em>
       </div>
     `;
   }
