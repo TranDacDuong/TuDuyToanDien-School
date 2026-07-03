@@ -125,6 +125,15 @@
     return REMINDER_TYPES.has(item.task?.task_type);
   }
 
+  function isProgressComplete(item) {
+    const progress = item.task?.progress;
+    return Boolean(progress?.total) && Number(progress.current || 0) >= Number(progress.total || 0);
+  }
+
+  function effectiveStatus(item) {
+    return isProgressComplete(item) ? "completed" : item.status;
+  }
+
   function pct(current, total) {
     if (!total) return 0;
     return Math.max(0, Math.min(100, Math.round((Number(current || 0) / Number(total || 0)) * 100)));
@@ -142,13 +151,13 @@
   function statusInfo(item) {
     const task = item.task || {};
     if (REMINDER_TYPES.has(task.task_type)) return { className: "reminder", icon: "•", label: "Lời nhắc nhở" };
-    if (item.status === "completed") return { className: "done", icon: "✓", label: "Đã hoàn thành" };
+    if (effectiveStatus(item) === "completed") return { className: "done", icon: "✓", label: "Đã hoàn thành" };
     return { className: "todo", icon: "✕", label: "Chưa hoàn thành" };
   }
 
   function isOverdue(item) {
     if (REMINDER_TYPES.has(item.task?.task_type)) return false;
-    return item.status !== "completed" && item.status !== "cancelled"
+    return effectiveStatus(item) !== "completed" && item.status !== "cancelled"
       && item.task?.due_at && new Date(item.task.due_at) < new Date();
   }
 
@@ -164,7 +173,7 @@
       const priority = { urgent: 0, important: 1, normal: 2 };
       const reminderDiff = Number(isReminderTask(a)) - Number(isReminderTask(b));
       if (reminderDiff) return reminderDiff;
-      const status = Number(a.status === "completed") - Number(b.status === "completed");
+      const status = Number(effectiveStatus(a) === "completed") - Number(effectiveStatus(b) === "completed");
       if (status) return status;
       const dayDiff = taskDay(a).localeCompare(taskDay(b));
       if (dayDiff && S.viewMode !== "today") return dayDiff;
@@ -277,14 +286,14 @@
     const scoped = S.assignments.filter(item =>
       S.profile?.role !== "admin" || S.selectedUserId === "all" || item.user_id === S.selectedUserId
     );
-    const open = scoped.filter(item => !["completed", "cancelled"].includes(item.status));
+    const open = scoped.filter(item => effectiveStatus(item) !== "completed" && item.status !== "cancelled");
     E.todayCount.textContent = open.filter(item => taskDay(item) === today).length;
     E.importantCount.textContent = open.filter(item =>
       !REMINDER_TYPES.has(item.task?.task_type)
       && ["urgent", "important"].includes(item.task?.priority)
     ).length;
     E.overdueCount.textContent = open.filter(isOverdue).length;
-    E.completedCount.textContent = scoped.filter(item => item.status === "completed").length;
+    E.completedCount.textContent = scoped.filter(item => effectiveStatus(item) === "completed").length;
   }
 
   function taskProgressHtml(item) {
@@ -303,7 +312,7 @@
 
   function taskCard(item) {
     const task = item.task || {};
-    const completed = item.status === "completed";
+    const completed = effectiveStatus(item) === "completed";
     const overdue = isOverdue(item);
     const state = statusInfo(item);
     return `
@@ -353,7 +362,7 @@
   }
 
   function renderMonthOverview(rows) {
-    const completed = rows.filter(item => item.status === "completed").length;
+    const completed = rows.filter(item => effectiveStatus(item) === "completed").length;
     const overdue = rows.filter(isOverdue).length;
     const targetLike = rows.filter(item => item.task?.task_type === "target" || item.task?.metadata?.metric_target || item.task?.metadata?.progress_target);
     return `
@@ -406,17 +415,17 @@
   function renderMonthDashboard(rows) {
     const actionRows = rows.filter(item => !isReminderTask(item));
     const reminderRows = rows.filter(isReminderTask);
-    const completed = actionRows.filter(item => item.status === "completed").length;
+    const completed = actionRows.filter(item => effectiveStatus(item) === "completed").length;
     const overdue = actionRows.filter(isOverdue).length;
     const progressRows = actionRows.filter(item => item.task?.progress?.total);
     const progressDone = progressRows.reduce((sum, item) => sum + Number(item.task.progress.current || 0), 0);
     const progressTotal = progressRows.reduce((sum, item) => sum + Number(item.task.progress.total || 0), 0);
-    const unfinished = actionRows.filter(item => item.status !== "completed").slice(0, 12);
+    const unfinished = actionRows.filter(item => effectiveStatus(item) !== "completed").slice(0, 12);
     const reminders = reminderRows.slice(0, 12);
     return `
       <section class="task-month-dashboard">
         <section class="task-month-overview">
-          <div><span>Cần hoàn thiện</span><strong>${actionRows.filter(item => item.status !== "completed").length}</strong></div>
+          <div><span>Cần hoàn thiện</span><strong>${actionRows.filter(item => effectiveStatus(item) !== "completed").length}</strong></div>
           <div><span>Đã hoàn thành</span><strong>${completed}/${actionRows.length}</strong></div>
           <div><span>Quá hạn</span><strong>${overdue}</strong></div>
           <div><span>Tiến độ đo được</span><strong>${progressTotal ? `${progressDone}/${progressTotal}` : "0/0"}</strong></div>
@@ -654,6 +663,25 @@
     });
   }
 
+  async function syncProgressCompletedAssignments() {
+    const rows = S.assignments.filter(item =>
+      isProgressComplete(item)
+      && item.status !== "completed"
+      && item.status !== "cancelled"
+      && !String(item.id || "").startsWith("schedule-fallback:")
+    );
+    if (!rows.length) return;
+    await Promise.all(rows.map(async item => {
+      const { error } = await sb.rpc("set_task_assignment_status", {
+        p_assignment_id: item.id,
+        p_status: "completed",
+        p_note: "Tự hoàn thành khi tiến độ đạt 100%",
+      });
+      if (!error) item.status = "completed";
+      else console.warn("Sync completed progress task:", error);
+    }));
+  }
+
   async function loadTasks({ refresh = false } = {}) {
     E.list.innerHTML = '<div class="task-empty">Đang tổng hợp công việc...</div>';
     if (refresh) {
@@ -681,6 +709,7 @@
     const scheduleFallbacks = await loadScheduleFallbackTasks(assignments);
     S.assignments = [...assignments, ...scheduleFallbacks];
     await enrichTaskProgress(S.assignments);
+    await syncProgressCompletedAssignments();
     render();
   }
 
