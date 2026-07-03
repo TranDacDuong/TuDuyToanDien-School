@@ -529,6 +529,42 @@
     S.users = data || [];
   }
 
+  function scheduleKey(schedule) {
+    if (!schedule) return "";
+    return [
+      Number(schedule.session_no || 1),
+      Number(schedule.weekday || 0),
+      String(schedule.start_time || "").slice(0, 5),
+      String(schedule.end_time || "").slice(0, 5),
+    ].join("|");
+  }
+
+  function pickEffectiveSchedulesForDate(schedules, dateText) {
+    const eligible = (schedules || []).filter(item => String(item.effective_from || "2000-01-01").slice(0, 10) <= dateText);
+    if (!eligible.length) return [];
+    const maxEffective = eligible.reduce((max, item) => {
+      const value = String(item.effective_from || "2000-01-01").slice(0, 10);
+      return value > max ? value : max;
+    }, "2000-01-01");
+    return eligible.filter(item => String(item.effective_from || "2000-01-01").slice(0, 10) === maxEffective);
+  }
+
+  function selectedScheduleMatchesDay(selectedIds, daySchedules, allSchedules) {
+    if (!selectedIds || !selectedIds.size) return true;
+    const dayIds = new Set((daySchedules || []).map(item => Number(item.id)));
+    if ([...selectedIds].some(id => dayIds.has(Number(id)))) return true;
+
+    const selectedRows = [...selectedIds]
+      .map(id => (allSchedules || []).find(item => Number(item.id) === Number(id)))
+      .filter(Boolean);
+    return selectedRows.some(selected => {
+      const sameSession = (daySchedules || []).filter(item => Number(item.session_no || 1) === Number(selected.session_no || 1));
+      if (!sameSession.length) return false;
+      return sameSession.some(item => scheduleKey(item) === scheduleKey(selected))
+        || sameSession.some(item => Number(item.weekday || 0) === Number(selected.weekday || 0));
+    });
+  }
+
   async function enrichTaskProgress(assignments) {
     const rows = (assignments || []).filter(item => {
       const task = item.task || {};
@@ -539,24 +575,45 @@
     const classIds = uniq(rows.map(item => item.task?.metadata?.class_id));
     const sessionIds = uniq(rows.map(item => item.task?.metadata?.session_id));
 
-    const [studentsRes, evaluationsRes] = await Promise.all([
+    const [studentsRes, evaluationsRes, sessionsRes, schedulesRes, choicesRes] = await Promise.all([
       classIds.length
         ? sb.from("class_students").select("class_id,student_id,joined_at,left_at").in("class_id", classIds)
         : Promise.resolve({ data: [], error: null }),
       sessionIds.length
         ? sb.from("session_student_evaluations").select("class_session_id,student_id,state").in("class_session_id", sessionIds)
         : Promise.resolve({ data: [], error: null }),
+      sessionIds.length
+        ? sb.from("class_sessions").select("id,class_id,session_date").in("id", sessionIds)
+        : Promise.resolve({ data: [], error: null }),
+      classIds.length
+        ? sb.from("class_schedules").select("id,class_id,session_no,weekday,start_time,end_time,effective_from").in("class_id", classIds)
+        : Promise.resolve({ data: [], error: null }),
+      classIds.length
+        ? sb.from("class_student_schedules").select("class_id,student_id,schedule_id").in("class_id", classIds)
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
-    if (studentsRes.error || evaluationsRes.error) {
-      console.warn("Task progress:", studentsRes.error || evaluationsRes.error);
+    if (studentsRes.error || evaluationsRes.error || sessionsRes.error || schedulesRes.error || choicesRes.error) {
+      console.warn("Task progress:", studentsRes.error || evaluationsRes.error || sessionsRes.error || schedulesRes.error || choicesRes.error);
       return;
     }
 
+    const sessionById = new Map((sessionsRes.data || []).map(row => [String(row.id), row]));
     const studentsByClass = new Map();
     (studentsRes.data || []).forEach(row => {
       if (!studentsByClass.has(row.class_id)) studentsByClass.set(row.class_id, []);
       studentsByClass.get(row.class_id).push(row);
+    });
+    const schedulesByClass = new Map();
+    (schedulesRes.data || []).forEach(row => {
+      if (!schedulesByClass.has(row.class_id)) schedulesByClass.set(row.class_id, []);
+      schedulesByClass.get(row.class_id).push(row);
+    });
+    const selectedByClassStudent = new Map();
+    (choicesRes.data || []).forEach(row => {
+      const key = `${row.class_id}:${row.student_id}`;
+      if (!selectedByClassStudent.has(key)) selectedByClassStudent.set(key, new Set());
+      selectedByClassStudent.get(key).add(Number(row.schedule_id));
     });
     const evaluationMap = new Map();
     (evaluationsRes.data || []).forEach(row => {
@@ -565,22 +622,33 @@
       if (!evaluationMap.has(key)) evaluationMap.set(key, new Set());
       evaluationMap.get(key).add(row.student_id);
     });
-    const activeStudentCount = (classId, dateText) => (studentsByClass.get(classId) || []).filter(row => {
-      const joined = row.joined_at ? String(row.joined_at).slice(0, 10) : "0000-00-00";
-      const left = row.left_at ? String(row.left_at).slice(0, 10) : "9999-99-99";
-      return joined <= dateText && left >= dateText;
-    }).length;
+    const scheduledStudentIdsForSession = (classId, dateText) => {
+      const classSchedules = schedulesByClass.get(classId) || [];
+      const daySchedules = pickEffectiveSchedulesForDate(classSchedules, dateText)
+        .filter(schedule => Number(schedule.weekday) === weekdayOf(dateText));
+      if (!daySchedules.length) return [];
+      return (studentsByClass.get(classId) || []).filter(row => {
+        const joined = row.joined_at ? String(row.joined_at).slice(0, 10) : "0000-00-00";
+        const left = row.left_at ? String(row.left_at).slice(0, 10) : "9999-99-99";
+        if (joined > dateText || left < dateText) return false;
+        const selected = selectedByClassStudent.get(`${classId}:${row.student_id}`);
+        return selectedScheduleMatchesDay(selected, daySchedules, classSchedules);
+      }).map(row => row.student_id);
+    };
 
     rows.forEach(item => {
       const task = item.task || {};
       const meta = task.metadata || {};
-      const classId = meta.class_id;
-      const dateText = String(meta.session_date || task.available_on || taskDay(item)).slice(0, 10);
+      const session = sessionById.get(String(meta.session_id || ""));
+      const classId = meta.class_id || session?.class_id;
+      const dateText = String(meta.session_date || session?.session_date || task.available_on || taskDay(item)).slice(0, 10);
       if (!classId || !dateText) return;
-      const total = activeStudentCount(classId, dateText);
+      const scheduledIds = scheduledStudentIdsForSession(classId, dateText);
+      const total = scheduledIds.length;
       if (!total) return;
       if (task.task_type === "session_evaluation" && meta.session_id) {
-        const current = evaluationMap.get(String(meta.session_id))?.size || 0;
+        const sentIds = evaluationMap.get(String(meta.session_id)) || new Set();
+        const current = scheduledIds.filter(studentId => sentIds.has(studentId)).length;
         task.progress = { current, total, label: "Đã đánh giá học sinh" };
       }
     });
