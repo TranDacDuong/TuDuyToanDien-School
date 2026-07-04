@@ -639,8 +639,12 @@ Nhập số tiền hoàn lại (>0):`,
       (classes || []).forEach(c => { classMap[c.id] = c; });
 
       const attMap = {};
+      const attRowsByStudentClass = {};
       (attData || []).forEach(a => {
         attMap[`${a.student_id}_${a.class_id}_${a.date}_${a.schedule_id || 0}`] = a.status;
+        const key = `${a.student_id}_${a.class_id}`;
+        if (!attRowsByStudentClass[key]) attRowsByStudentClass[key] = [];
+        attRowsByStudentClass[key].push(a);
       });
 
       const chosenMap = {};
@@ -678,6 +682,24 @@ Nhập số tiền hoàn lại (>0):`,
           const actualStatus = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item);
           return actualStatus === "present" || actualStatus === "makeup";
         });
+        const occurrenceKeys = new Set(activeOccurrences.map(item => `${item.date}_${item.schedule_id || 0}`));
+        (attRowsByStudentClass[`${cs.student_id}_${cs.class_id}`] || []).forEach(row => {
+          const date = String(row.date || "").slice(0, 10);
+          const status = row.status || "";
+          const scheduleId = Number(row.schedule_id || 0);
+          const key = `${date}_${scheduleId}`;
+          if (!date || occurrenceKeys.has(key) || date > left) return;
+          if (date < joined && status !== "present" && status !== "makeup") return;
+          activeOccurrences.push({
+            date,
+            schedule_id: scheduleId,
+            session_no: 0,
+            schedule: null,
+            from_attendance_only: true,
+          });
+          occurrenceKeys.add(key);
+        });
+        activeOccurrences.sort((a, b) => a.date.localeCompare(b.date) || Number(a.schedule_id || 0) - Number(b.schedule_id || 0));
         const totalSessions = activeOccurrences.length;
 
         let present = 0, absent = 0, makeup = 0;
