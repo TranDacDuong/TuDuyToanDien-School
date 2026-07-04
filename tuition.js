@@ -228,6 +228,7 @@
 
   /* Trạng thái dựa vào amount_paid vs amount_due */
   function getStatus(amountDue, amountPaid) {
+    if ((Number(amountDue) || 0) <= 0) return "paid";
     if (!amountPaid || amountPaid <= 0) return "unpaid";
     if (amountPaid < amountDue)         return "partial";
     if (amountPaid > amountDue)         return "overpaid";
