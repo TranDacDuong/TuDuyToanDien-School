@@ -536,6 +536,7 @@ async function ensureStudentAccount({ create = true } = {}) {
     setAccountInfo("student", "Nhập họ tên và SĐT học sinh để kiểm tra tài khoản.", "warn");
     return null;
   }
+  const plannedCredentials = previewCredentials("student", fullName, phone);
   setAccountInfo("student", loadingAccountHtml("Đang kiểm tra tài khoản học sinh..."), "loading");
 
   const existingId = document.getElementById("studentId").value;
@@ -556,14 +557,12 @@ async function ensureStudentAccount({ create = true } = {}) {
     setAccountInfo("student", accountHtml("Đã liên kết với tài khoản học sinh", existing.email || existing.full_name));
     return existing;
   }
-  const password = defaultPasswordFromPhone(phone);
-  const email = generatedEmail("", fullName, phone);
   if (!create) {
-    setAccountInfo("student", editableAccountHtml("student", "Sẽ tạo tài khoản học sinh khi bấm Lưu học thử", email, password), "warn");
+    setAccountInfo("student", editableAccountHtml("student", "Sẽ tạo tài khoản học sinh khi bấm Lưu học thử", plannedCredentials.email, plannedCredentials.password), "warn");
     return null;
   }
 
-  const credentials = previewCredentials("student", fullName, phone);
+  const credentials = plannedCredentials;
   if (!credentials.email.includes("@") || credentials.password.length < 6) {
     setAccountInfo("student", "Gmail phải hợp lệ và mật khẩu tối thiểu 6 ký tự.", "warn");
     return null;
@@ -603,6 +602,7 @@ async function ensureParentAccount(studentId, { create = true } = {}) {
     setAccountInfo("parent", "Nhập họ tên và SĐT phụ huynh để kiểm tra tài khoản.", "warn");
     return null;
   }
+  const plannedCredentials = previewCredentials("parent", fullName, phone);
   setAccountInfo("parent", loadingAccountHtml("Đang kiểm tra tài khoản phụ huynh..."), "loading");
 
   const existingId = document.getElementById("parentId").value;
@@ -632,14 +632,12 @@ async function ensureParentAccount(studentId, { create = true } = {}) {
     }
     return existing;
   }
-  const password = defaultPasswordFromPhone(phone);
-  const email = generatedEmail("", fullName, phone);
   if (!create) {
-    setAccountInfo("parent", editableAccountHtml("parent", "Sẽ tạo tài khoản phụ huynh khi bấm Lưu học thử", email, password), "warn");
+    setAccountInfo("parent", editableAccountHtml("parent", "Sẽ tạo tài khoản phụ huynh khi bấm Lưu học thử", plannedCredentials.email, plannedCredentials.password), "warn");
     return null;
   }
 
-  const credentials = previewCredentials("parent", fullName, phone);
+  const credentials = plannedCredentials;
   if (!credentials.email.includes("@") || credentials.password.length < 6) {
     setAccountInfo("parent", "Gmail phải hợp lệ và mật khẩu tối thiểu 6 ký tự.", "warn");
     return null;
