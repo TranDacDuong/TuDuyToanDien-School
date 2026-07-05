@@ -32,8 +32,8 @@
   }
 
   const STATIC_BANK_INFO = {
-    bank: "MB",
-    account: "YOUR_MB_ACCOUNT_NUMBER", // Bạn hãy thay đổi số tài khoản MB của bạn ở đây để hiển thị mã QR
+    bank: "TCB",
+    account: "8209224001",
   };
 
   function buildPaymentQrUrl(studentName, ym, amount) {
