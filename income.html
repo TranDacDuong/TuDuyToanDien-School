@@ -751,6 +751,64 @@
     return eligible.filter(s => (s.effective_from || "2000-01-01") === maxEf);
   }
 
+  function scheduleKey(schedule) {
+    return [
+      Number(schedule?.session_no || 1),
+      Number(schedule?.weekday || 0),
+      String(schedule?.start_time || "").slice(0, 5),
+      String(schedule?.end_time || "").slice(0, 5),
+    ].join("|");
+  }
+
+  function scheduleMatchesChosen(schedule, chosenIds, allSchedules) {
+    if (!chosenIds?.size) return true;
+    if (chosenIds.has(Number(schedule?.id))) return true;
+    const key = scheduleKey(schedule);
+    return (allSchedules || []).some(item =>
+      chosenIds.has(Number(item.id))
+      && (
+        scheduleKey(item) === key
+        || (
+          Number(item.session_no || 1) === Number(schedule?.session_no || 1)
+          && Number(item.weekday || 0) === Number(schedule?.weekday || 0)
+        )
+      )
+    );
+  }
+
+  function getActiveSchedulesForDate(allSchedules, dateText) {
+    const eligible = (allSchedules || []).filter(s => String(s.effective_from || "2000-01-01").slice(0, 10) <= dateText);
+    if (!eligible.length) return [];
+    const maxEf = eligible.reduce((max, s) => {
+      const ef = String(s.effective_from || "2000-01-01").slice(0, 10);
+      return ef > max ? ef : max;
+    }, "2000-01-01");
+    return eligible.filter(s => String(s.effective_from || "2000-01-01").slice(0, 10) === maxEf);
+  }
+
+  function generateOccurrencesForStudent(allSchedules, ym, chosenIds) {
+    const [year, month] = ym.split("-").map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const items = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(year, month - 1, d);
+      const dateText = `${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+      const weekday = date.getDay() === 0 ? 7 : date.getDay();
+      getActiveSchedulesForDate(allSchedules, dateText)
+        .filter(s => Number(s.weekday) === weekday)
+        .filter(s => scheduleMatchesChosen(s, chosenIds, allSchedules))
+        .forEach(s => {
+          items.push({
+            date: dateText,
+            schedule_id: Number(s.id || 0),
+            session_no: Number(s.session_no || 1),
+            schedule: s
+          });
+        });
+    }
+    return items.sort((a,b) => a.date.localeCompare(b.date) || a.session_no - b.session_no);
+  }
+
   function generateOccurrences(schedules, ym) {
     const [year, month] = ym.split("-").map(Number);
     const daysInMonth = new Date(year, month, 0).getDate();
@@ -1070,7 +1128,7 @@
         { data: courseEnrollments },
         { data: coursesData }
       ] = await Promise.all([
-        sb.from("classes").select("id, class_name, tuition_fee, tuition_type, makeup_fee, class_schedules(id, session_no, weekday, effective_from)").eq("hidden", false),
+        sb.from("classes").select("id, class_name, tuition_fee, tuition_type, makeup_fee, class_schedules(id, session_no, weekday, start_time, end_time, effective_from)").eq("hidden", false),
         sb.from("class_students").select("class_id, student_id, joined_at, left_at, user:users!fk_student(id, full_name)"),
         sb.from("attendance").select("student_id, class_id, date, status, schedule_id").gte("date", mStart).lte("date", mEnd),
         sb.from("tuition_payments").select("*").eq("month", mStart),
@@ -1146,10 +1204,8 @@
         const left = cs.left_at ? cs.left_at.slice(0, 10) : "9999-99-99";
         if (joined > mEnd || left < mStart) return;
 
-        const schedules = getSchedulesForMonth(cls.class_schedules || [], ym);
         const chosenIds = chosenMap[`${cs.student_id}_${cs.class_id}`];
-        const studentSchedules = chosenIds?.size ? schedules.filter(s => chosenIds.has(Number(s.id))) : schedules;
-        const activeOccurrences = generateOccurrences(studentSchedules, ym).filter(item => {
+        const activeOccurrences = generateOccurrencesForStudent(cls.class_schedules || [], ym, chosenIds).filter(item => {
           if (item.date > left) return false;
           if (item.date >= joined) return true;
           const actualStatus = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item);
