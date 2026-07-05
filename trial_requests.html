@@ -54,6 +54,16 @@ tbody tr:hover td{background:#fff7ed}
 .actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px}
 .selected-student{display:none;margin-top:8px;padding:8px 10px;border-radius:10px;background:#ecfdf5;color:#047857;font-size:.82rem;font-weight:700}
 .selected-student.show{display:block}
+.account-info{display:none;padding:10px 12px;border-radius:14px;border:1px solid #bbf7d0;background:#ecfdf5;color:#047857;font-size:.82rem;font-weight:700;line-height:1.55}
+.account-info.show{display:block}
+.account-info.warn{border-color:#fed7aa;background:#fff7ed;color:#c2410c}
+.account-info.loading{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8}
+.account-info-title{display:flex;align-items:center;gap:8px;font-weight:900}
+.account-info-grid{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;margin-top:5px;font-weight:700}
+.account-info-grid span:nth-child(odd){color:inherit;opacity:.76}
+.account-info-grid b{word-break:break-all;color:var(--navy)}
+.mini-spinner{width:14px;height:14px;border-radius:999px;border:2px solid rgba(29,78,216,.22);border-top-color:#1d4ed8;animation:spin .7s linear infinite;display:inline-block;flex:0 0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
 .student-results{margin-top:8px;display:grid;gap:6px}
 .student-result{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid rgba(39,58,91,.12);border-radius:12px;padding:8px 10px;background:#fff}
 .empty{padding:28px;text-align:center;color:var(--ink-light)}
@@ -126,10 +136,12 @@ tbody tr:hover td{background:#fff7ed}
       <input type="hidden" id="studentId">
       <input type="hidden" id="parentId">
       <div class="form-grid">
-        <div class="field"><label>Họ tên học sinh</label><input id="studentName" class="input" placeholder="VD: Nguyễn Văn A"><div id="studentAccountInfo" class="selected-student"></div></div>
+        <div class="field"><label>Họ tên học sinh</label><input id="studentName" class="input" placeholder="VD: Nguyễn Văn A"></div>
         <div class="field"><label>SĐT học sinh</label><input id="studentPhone" class="input" placeholder="SĐT học sinh"></div>
-        <div class="field"><label>Họ tên phụ huynh</label><input id="parentName" class="input" placeholder="VD: Nguyễn Thị B"><div id="parentAccountInfo" class="selected-student"></div></div>
+        <div class="field full"><div id="studentAccountInfo" class="account-info"></div></div>
+        <div class="field"><label>Họ tên phụ huynh</label><input id="parentName" class="input" placeholder="VD: Nguyễn Thị B"></div>
         <div class="field"><label>SĐT phụ huynh</label><input id="parentPhone" class="input" placeholder="SĐT phụ huynh"></div>
+        <div class="field full"><div id="parentAccountInfo" class="account-info"></div></div>
         <div class="field"><label>Khối</label><select id="gradeText" class="select" onchange="renderSubjectOptions();populateClassSelect();loadClassSchedules()"></select></div>
         <div class="field"><label>Môn</label><select id="subjectText" class="select" onchange="populateClassSelect();loadClassSchedules()"></select></div>
         <div class="field full"><label>Lớp học thử</label><select id="classId" class="select" onchange="loadClassSchedules()"></select></div>
@@ -442,13 +454,24 @@ async function syncStatuses(){
 }
 function copyPhone(phone){ if(!phone) return; navigator.clipboard?.writeText(phone); toast("Đã sao chép SĐT"); }
 
+function accountHtml(title, email, password = "") {
+  return `
+    <div class="account-info-title">${esc(title)}</div>
+    <div class="account-info-grid">
+      <span>Gmail</span><b>${esc(email || "—")}</b>
+      ${password ? `<span>Mật khẩu</span><b>${esc(password)}</b>` : ""}
+    </div>`;
+}
+function loadingAccountHtml(label) {
+  return `<div class="account-info-title"><span class="mini-spinner"></span><span>${esc(label)}</span></div>`;
+}
 function setAccountInfo(kind, message = "", tone = "ok") {
   const box = document.getElementById(kind === "parent" ? "parentAccountInfo" : "studentAccountInfo");
   if (!box) return;
   box.classList.toggle("show", Boolean(message));
-  box.style.background = tone === "warn" ? "#fff7ed" : "#ecfdf5";
-  box.style.color = tone === "warn" ? "#c2410c" : "#047857";
-  box.textContent = message;
+  box.classList.toggle("warn", tone === "warn");
+  box.classList.toggle("loading", tone === "loading");
+  box.innerHTML = String(message || "").includes("<") ? message : esc(message);
 }
 
 async function findUserByPhone(phone, role) {
@@ -467,9 +490,7 @@ async function findUserByPhone(phone, role) {
       .limit(10);
     if (!fuzzy.error && fuzzy.data?.length) candidates.push(...fuzzy.data);
   }
-  return candidates.find(user => user.role === role && phoneDigits(user.phone) === digits)
-    || candidates.find(user => phoneDigits(user.phone) === digits)
-    || null;
+  return candidates.find(user => user.role === role && phoneDigits(user.phone) === digits) || null;
 }
 
 function updateStudentFieldsFromAccount(student) {
@@ -488,6 +509,7 @@ async function ensureStudentAccount({ create = true } = {}) {
     setAccountInfo("student", "Nhập họ tên và SĐT học sinh để kiểm tra tài khoản.", "warn");
     return null;
   }
+  setAccountInfo("student", loadingAccountHtml("Đang kiểm tra tài khoản học sinh..."), "loading");
 
   const existingId = document.getElementById("studentId").value;
   if (existingId) {
@@ -495,20 +517,16 @@ async function ensureStudentAccount({ create = true } = {}) {
     if (cached?.phone && phoneDigits(cached.phone) && phoneDigits(cached.phone) !== phoneDigits(phone)) {
       document.getElementById("studentId").value = "";
     } else {
-      setAccountInfo("student", `Đã liên kết với tài khoản ${cached?.email || existingId}.`);
+      setAccountInfo("student", accountHtml("Đã liên kết với tài khoản học sinh", cached?.email || existingId));
       return cached || { id: existingId };
     }
   }
 
   const existing = await findUserByPhone(phone, "student");
-  if (existing?.role && existing.role !== "student") {
-    setAccountInfo("student", `SĐT này đang thuộc tài khoản ${existing.role}: ${existing.email || existing.full_name || existing.id}.`, "warn");
-    return null;
-  }
   if (existing) {
     S.studentMap[existing.id] = existing;
     updateStudentFieldsFromAccount(existing);
-    setAccountInfo("student", `Đã liên kết với tài khoản ${existing.email || existing.full_name}.`);
+    setAccountInfo("student", accountHtml("Đã liên kết với tài khoản học sinh", existing.email || existing.full_name));
     return existing;
   }
   if (!create) {
@@ -518,6 +536,7 @@ async function ensureStudentAccount({ create = true } = {}) {
 
   const password = defaultPasswordFromPhone(phone);
   const email = generatedEmail("", fullName, phone);
+  setAccountInfo("student", loadingAccountHtml("Chưa có tài khoản, đang tạo tài khoản học sinh..."), "loading");
   const { data, error } = await sb.rpc("admin_import_students_batch", {
     p_rows: [{
       email,
@@ -541,7 +560,7 @@ async function ensureStudentAccount({ create = true } = {}) {
   if (findError || !student) throw findError || new Error("Không tìm thấy tài khoản học sinh vừa tạo.");
   S.studentMap[student.id] = student;
   updateStudentFieldsFromAccount(student);
-  setAccountInfo("student", `Tài khoản mới: ${student.email || email} • Mật khẩu: ${created?.password || password}`);
+  setAccountInfo("student", accountHtml("Tài khoản học sinh mới", student.email || email, created?.password || password));
   return student;
 }
 
@@ -552,6 +571,7 @@ async function ensureParentAccount(studentId, { create = true } = {}) {
     setAccountInfo("parent", "Nhập họ tên và SĐT phụ huynh để kiểm tra tài khoản.", "warn");
     return null;
   }
+  setAccountInfo("parent", loadingAccountHtml("Đang kiểm tra tài khoản phụ huynh..."), "loading");
 
   const existingId = document.getElementById("parentId").value;
   if (existingId) {
@@ -564,18 +584,15 @@ async function ensureParentAccount(studentId, { create = true } = {}) {
           p_rows: [{ email: parent.email, full_name: fullName || parent.full_name || "Phụ huynh", phone: phone || parent.phone || "", student_id: studentId, relationship: "parent" }]
         });
       }
+      setAccountInfo("parent", accountHtml("Đã liên kết với tài khoản phụ huynh", parent?.email || existingId));
       return parent || { id: existingId };
     }
   }
 
   const existing = await findUserByPhone(phone, "parent");
-  if (existing?.role && existing.role !== "parent") {
-    setAccountInfo("parent", `SĐT này đang thuộc tài khoản ${existing.role}: ${existing.email || existing.full_name || existing.id}.`, "warn");
-    return null;
-  }
   if (existing) {
     document.getElementById("parentId").value = existing.id || "";
-    setAccountInfo("parent", `Đã liên kết với tài khoản ${existing.email || existing.full_name}.`);
+    setAccountInfo("parent", accountHtml("Đã liên kết với tài khoản phụ huynh", existing.email || existing.full_name));
     if (studentId) {
       await sb.rpc("admin_import_parents_batch", {
         p_rows: [{ email: existing.email, full_name: fullName || existing.full_name || "Phụ huynh", phone: phone || existing.phone || "", student_id: studentId, relationship: "parent" }]
@@ -590,6 +607,7 @@ async function ensureParentAccount(studentId, { create = true } = {}) {
 
   const password = defaultPasswordFromPhone(phone);
   const email = generatedEmail("phuhuynh", fullName, phone);
+  setAccountInfo("parent", loadingAccountHtml("Chưa có tài khoản, đang tạo tài khoản phụ huynh..."), "loading");
   const { data, error } = await sb.rpc("admin_import_parents_batch", {
     p_rows: [{
       email,
@@ -611,7 +629,7 @@ async function ensureParentAccount(studentId, { create = true } = {}) {
     .maybeSingle();
   if (findError || !parent) throw findError || new Error("Không tìm thấy tài khoản phụ huynh vừa tạo.");
   document.getElementById("parentId").value = parent.id || "";
-  setAccountInfo("parent", `Tài khoản mới: ${parent.email || email} • Mật khẩu: ${created?.password || password}`);
+  setAccountInfo("parent", accountHtml("Tài khoản phụ huynh mới", parent.email || email, created?.password || password));
   return parent;
 }
 
@@ -650,7 +668,7 @@ function openTrialModal(id){
   populateClassSelect();
   document.getElementById("classId").value = item?.trial_class_id || "";
   loadClassSchedules(item);
-  setAccountInfo("student", item?.linkedStudent ? `Đã liên kết với tài khoản ${item.linkedStudent.email || item.linkedStudent.full_name || item.linkedStudent.id}.` : "");
+  setAccountInfo("student", item?.linkedStudent ? accountHtml("Đã liên kết với tài khoản học sinh", item.linkedStudent.email || item.linkedStudent.full_name || item.linkedStudent.id) : "");
   setAccountInfo("parent", "");
   document.getElementById("trialModal").classList.add("show");
 }
