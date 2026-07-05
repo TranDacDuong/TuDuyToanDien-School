@@ -62,6 +62,7 @@ tbody tr:hover td{background:#fff7ed}
 .account-info-grid{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;margin-top:5px;font-weight:700}
 .account-info-grid span:nth-child(odd){color:inherit;opacity:.76}
 .account-info-grid b{word-break:break-all;color:var(--navy)}
+.account-credential-input{width:100%;border:1px solid rgba(39,58,91,.16);border-radius:10px;padding:7px 9px;font:inherit;font-size:.82rem;background:#fff;color:var(--navy)}
 .mini-spinner{width:14px;height:14px;border-radius:999px;border:2px solid rgba(29,78,216,.22);border-top-color:#1d4ed8;animation:spin .7s linear infinite;display:inline-block;flex:0 0 auto}
 @keyframes spin{to{transform:rotate(360deg)}}
 .student-results{margin-top:8px;display:grid;gap:6px}
@@ -472,6 +473,22 @@ function accountHtml(title, email, password = "") {
       ${password ? `<span>Mật khẩu</span><b>${esc(password)}</b>` : ""}
     </div>`;
 }
+function editableAccountHtml(kind, title, email, password = "") {
+  return `
+    <div class="account-info-title">${esc(title)}</div>
+    <div class="account-info-grid">
+      <span>Gmail</span><input class="account-credential-input" id="${kind}PreviewEmail" value="${escAttr(email || "")}" autocomplete="off">
+      <span>Mật khẩu</span><input class="account-credential-input" id="${kind}PreviewPassword" value="${escAttr(password || "")}" autocomplete="new-password">
+    </div>`;
+}
+function previewCredentials(kind, fullName, phone) {
+  const emailEl = document.getElementById(`${kind}PreviewEmail`);
+  const passwordEl = document.getElementById(`${kind}PreviewPassword`);
+  return {
+    email: (emailEl?.value || generatedEmail("", fullName, phone)).trim().toLowerCase(),
+    password: (passwordEl?.value || defaultPasswordFromPhone(phone)).trim() || "123456",
+  };
+}
 function loadingAccountHtml(label) {
   return `<div class="account-info-title"><span class="mini-spinner"></span><span>${esc(label)}</span></div>`;
 }
@@ -542,19 +559,24 @@ async function ensureStudentAccount({ create = true } = {}) {
   const password = defaultPasswordFromPhone(phone);
   const email = generatedEmail("", fullName, phone);
   if (!create) {
-    setAccountInfo("student", accountHtml("Sẽ tạo tài khoản học sinh khi bấm Lưu học thử", email, password), "warn");
+    setAccountInfo("student", editableAccountHtml("student", "Sẽ tạo tài khoản học sinh khi bấm Lưu học thử", email, password), "warn");
     return null;
   }
 
+  const credentials = previewCredentials("student", fullName, phone);
+  if (!credentials.email.includes("@") || credentials.password.length < 6) {
+    setAccountInfo("student", "Gmail phải hợp lệ và mật khẩu tối thiểu 6 ký tự.", "warn");
+    return null;
+  }
   setAccountInfo("student", loadingAccountHtml("Chưa có tài khoản, đang tạo tài khoản học sinh..."), "loading");
   const { data, error } = await sb.rpc("admin_import_students_batch", {
     p_rows: [{
-      email,
+      email: credentials.email,
       full_name: fullName,
       phone,
       parent_full_name: document.getElementById("parentName").value.trim(),
       parent_phone: document.getElementById("parentPhone").value.trim(),
-      password,
+      password: credentials.password,
       role: "student"
     }]
   });
@@ -565,12 +587,12 @@ async function ensureStudentAccount({ create = true } = {}) {
   const created = data?.created_accounts?.[0];
   const { data: student, error: findError } = await sb.from("users")
     .select("id,full_name,email,phone,parent_full_name,parent_phone,role")
-    .eq("email", created?.email || email)
+    .eq("email", created?.email || credentials.email)
     .maybeSingle();
   if (findError || !student) throw findError || new Error("Không tìm thấy tài khoản học sinh vừa tạo.");
   S.studentMap[student.id] = student;
   updateStudentFieldsFromAccount(student);
-  setAccountInfo("student", accountHtml("Tài khoản học sinh mới", student.email || email, created?.password || password));
+  setAccountInfo("student", accountHtml("Tài khoản học sinh mới", student.email || credentials.email, created?.password || credentials.password));
   return student;
 }
 
@@ -613,17 +635,22 @@ async function ensureParentAccount(studentId, { create = true } = {}) {
   const password = defaultPasswordFromPhone(phone);
   const email = generatedEmail("", fullName, phone);
   if (!create) {
-    setAccountInfo("parent", accountHtml("Sẽ tạo tài khoản phụ huynh khi bấm Lưu học thử", email, password), "warn");
+    setAccountInfo("parent", editableAccountHtml("parent", "Sẽ tạo tài khoản phụ huynh khi bấm Lưu học thử", email, password), "warn");
     return null;
   }
 
+  const credentials = previewCredentials("parent", fullName, phone);
+  if (!credentials.email.includes("@") || credentials.password.length < 6) {
+    setAccountInfo("parent", "Gmail phải hợp lệ và mật khẩu tối thiểu 6 ký tự.", "warn");
+    return null;
+  }
   setAccountInfo("parent", loadingAccountHtml("Chưa có tài khoản, đang tạo tài khoản phụ huynh..."), "loading");
   const { data, error } = await sb.rpc("admin_import_parents_batch", {
     p_rows: [{
-      email,
+      email: credentials.email,
       full_name: fullName,
       phone,
-      password,
+      password: credentials.password,
       student_id: studentId || null,
       relationship: "parent"
     }]
@@ -635,11 +662,11 @@ async function ensureParentAccount(studentId, { create = true } = {}) {
   const created = data?.created_accounts?.[0];
   const { data: parent, error: findError } = await sb.from("users")
     .select("id,full_name,email,phone,role")
-    .eq("email", created?.email || email)
+    .eq("email", created?.email || credentials.email)
     .maybeSingle();
   if (findError || !parent) throw findError || new Error("Không tìm thấy tài khoản phụ huynh vừa tạo.");
   document.getElementById("parentId").value = parent.id || "";
-  setAccountInfo("parent", accountHtml("Tài khoản phụ huynh mới", parent.email || email, created?.password || password));
+  setAccountInfo("parent", accountHtml("Tài khoản phụ huynh mới", parent.email || credentials.email, created?.password || credentials.password));
   return parent;
 }
 
