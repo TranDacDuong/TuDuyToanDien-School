@@ -172,7 +172,7 @@ let S = { requests:[], classes:[], grades:[], subjects:[], classMap:{}, schedule
 
 function esc(s){ return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function escAttr(s){ return esc(s).replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
-function rmVN(s){ return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim(); }
+function rmVN(s){ return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/đ/g,"d").replace(/Đ/g,"D").toLowerCase().trim(); }
 function toast(msg,dur=2000){ const el=document.getElementById("toast"); if(!el) return; el.textContent=msg; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),dur); }
 function slugName(name){ return rmVN(name).replace(/[^a-z0-9]+/g,"").slice(0,28) || "hocsinh"; }
 function phoneDigits(phone){ return String(phone || "").replace(/\D+/g,""); }
