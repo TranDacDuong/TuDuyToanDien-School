@@ -8,7 +8,7 @@
     initialRoomId: "",
     grades: [],
     subjects: [],
-    chapters: [],
+    topics: [],
     classes: [],
     classIds: [],
     friends: [],
@@ -160,7 +160,7 @@
     pickerTitle: document.getElementById("gameQuestionPickerTitle"),
     pickerGrade: document.getElementById("gameQuestionPickerGrade"),
     pickerSubject: document.getElementById("gameQuestionPickerSubject"),
-    pickerChapter: document.getElementById("gameQuestionPickerChapter"),
+    pickerTopic: document.getElementById("gameQuestionPickerTopic"),
     pickerSearch: document.getElementById("gameQuestionPickerSearch"),
     pickerList: document.getElementById("gameQuestionPickerList"),
     pickerSelected: document.getElementById("gameQuestionPickerSelected"),
@@ -1474,8 +1474,8 @@
     return new Map(rows.filter((item) => item.id).map((item) => [item.id, item]));
   }
 
-  function syncPickerChapters() {
-    fillChapters(EL.pickerChapter, EL.pickerSubject?.value || "", "Tất cả chương");
+  function syncPickerTopics() {
+    fillTopics(EL.pickerTopic, EL.pickerSubject?.value || "", "Tất cả chủ đề");
   }
 
   function updateQuestionPickerApplyState() {
@@ -1522,9 +1522,9 @@
     EL.pickerList.innerHTML = rows.length
       ? rows.map((question) => {
         const selected = selectedIds.has(question.id);
-        const chapterName = question.chapters?.name || GAME.chapters.find((item) => item.id === question.chapter_id)?.name || "Chưa có chương";
+        const topicName = question.topics?.name || GAME.topics.find((item) => item.id === question.topic_id)?.name || "Chưa có chủ đề";
         return `<div class="game-question-picker-item">
-          <div class="game-question-picker-meta"><span>${esc(getQuestionPickerTypeLabel(question.question_type))}</span><span>${esc(chapterName)}</span><span>Độ khó ${Number(question.difficulty || 5)}</span><span>${esc(question.id)}</span></div>
+          <div class="game-question-picker-meta"><span>${esc(getQuestionPickerTypeLabel(question.question_type))}</span><span>${esc(topicName)}</span><span>Độ khó ${Number(question.difficulty || 5)}</span><span>${esc(question.id)}</span></div>
           <div class="game-question-picker-text">${esc(getPlayerQuestionTitle(question))}</div>
           <div class="game-question-picker-actions">
             <button class="btn ${selected ? "btn-outline" : "btn-primary"} btn-sm" type="button" data-picker-toggle="${escAttr(question.id)}">${selected ? "Bỏ chọn" : "Chọn câu hỏi"}</button>
@@ -1561,28 +1561,28 @@
     EL.pickerList.innerHTML = '<div class="empty">Đang tải danh sách câu hỏi...</div>';
     const gradeId = EL.pickerGrade?.value || "";
     const subjectId = EL.pickerSubject?.value || "";
-    const chapterId = EL.pickerChapter?.value || "";
+    const topicId = EL.pickerTopic?.value || "";
     const search = String(EL.pickerSearch?.value || "").trim();
 
-    let chapterIds = [];
-    if (chapterId) {
-      chapterIds = [chapterId];
+    let topicIds = [];
+    if (topicId) {
+      topicIds = [topicId];
     } else if (subjectId) {
-      chapterIds = GAME.chapters.filter((chapter) => chapter.subject_id === subjectId).map((chapter) => chapter.id);
+      topicIds = GAME.topics.filter((topic) => topic.subject_id === subjectId).map((topic) => topic.id);
     } else if (gradeId) {
       const subjectIds = GAME.subjects.filter((subject) => subject.grade_id === gradeId).map((subject) => subject.id);
-      chapterIds = GAME.chapters.filter((chapter) => subjectIds.includes(chapter.subject_id)).map((chapter) => chapter.id);
+      topicIds = GAME.topics.filter((topic) => subjectIds.includes(topic.subject_id)).map((topic) => topic.id);
     }
 
     let query = sb.from("question_bank")
-      .select("id,question_text,question_type,difficulty,answer,hidden,chapter_id,chapters(id,name,subject_id)")
+      .select("id,question_text,question_type,difficulty,answer,hidden,topic_id,topics(id,name,subject_id)")
       .eq("hidden", false)
       .in("question_type", GAME_ALLOWED_QUESTION_TYPES)
       .order("created_at", { ascending: false })
       .limit(200);
 
-    if (chapterIds.length) query = query.in("chapter_id", chapterIds);
-    else if (gradeId || subjectId || chapterId) query = query.eq("chapter_id", "00000000-0000-0000-0000-000000000000");
+    if (topicIds.length) query = query.in("topic_id", topicIds);
+    else if (gradeId || subjectId || topicId) query = query.eq("topic_id", "00000000-0000-0000-0000-000000000000");
     if (search) query = query.ilike("question_text", `%${search}%`);
 
     const { data, error } = await query;
@@ -1617,7 +1617,7 @@
     if (EL.pickerGrade) EL.pickerGrade.value = gradeSource?.value || "";
     fillSubjects(EL.pickerSubject, EL.pickerGrade?.value || "", "Tất cả môn");
     if (EL.pickerSubject) EL.pickerSubject.value = subjectSource?.value || "";
-    syncPickerChapters();
+    syncPickerTopics();
     if (EL.pickerSearch) EL.pickerSearch.value = "";
     EL.pickerModal?.classList.add("show");
     renderQuestionPickerSelected();
@@ -2096,18 +2096,18 @@
     GAME.user = user;
     GAME.accessToken = session?.access_token || "";
 
-    const [{ data: profile }, { data: grades }, { data: subjects }, { data: chapters }] = await Promise.all([
+    const [{ data: profile }, { data: grades }, { data: subjects }, { data: topics }] = await Promise.all([
       sb.from("users").select("id,role,grade_id").eq("id", user.id).single(),
       sb.from("grades").select("id,name").order("name"),
       sb.from("subjects").select("id,name,grade_id").order("name"),
-      sb.from("chapters").select("id,name,subject_id").order("name"),
+      sb.from("topics").select("id,name,subject_id").order("name"),
     ]);
 
     GAME.profile = profile || null;
     GAME.role = profile?.role || "student";
     GAME.grades = grades || [];
     GAME.subjects = subjects || [];
-    GAME.chapters = chapters || [];
+    GAME.topics = topics || [];
     await loadGameCatalog();
     configureCreateRoomForm();
     injectAutoModeLobby();
@@ -2177,14 +2177,14 @@
     });
     EL.pickerGrade?.addEventListener("change", () => {
       fillSubjects(EL.pickerSubject, EL.pickerGrade.value, "Tất cả môn");
-      syncPickerChapters();
+      syncPickerTopics();
       loadQuestionPickerRows();
     });
     EL.pickerSubject?.addEventListener("change", () => {
-      syncPickerChapters();
+      syncPickerTopics();
       loadQuestionPickerRows();
     });
-    EL.pickerChapter?.addEventListener("change", loadQuestionPickerRows);
+    EL.pickerTopic?.addEventListener("change", loadQuestionPickerRows);
     EL.pickerSearch?.addEventListener("input", loadQuestionPickerRows);
     EL.pickerApplyBtn?.addEventListener("click", applyQuestionPickerSelection);
     EL.roomClass?.addEventListener("change", () => {
@@ -2290,10 +2290,10 @@
     if (el === EL.subjectFilter) renderSubjectCards();
   }
 
-  function fillChapters(el, subjectId, placeholder) {
+  function fillTopics(el, subjectId, placeholder) {
     if (!el) return;
-    const list = subjectId ? GAME.chapters.filter((chapter) => chapter.subject_id === subjectId) : [];
-    el.innerHTML = `<option value="">${placeholder}</option>` + list.map((chapter) => `<option value="${chapter.id}">${esc(chapter.name)}</option>`).join("");
+    const list = subjectId ? GAME.topics.filter((topic) => topic.subject_id === subjectId) : [];
+    el.innerHTML = `<option value="">${placeholder}</option>` + list.map((topic) => `<option value="${topic.id}">${esc(topic.name)}</option>`).join("");
   }
 
   function fillClasses(el, placeholder) {
@@ -3756,18 +3756,18 @@
         }
       }
     }
-    const { data: chapters } = await sb.from("chapters").select("id").eq("subject_id", room.subject_id);
-    const chapterIds = (chapters || []).map((item) => item.id);
+    const { data: topics } = await sb.from("topics").select("id").eq("subject_id", room.subject_id);
+    const topicIds = (topics || []).map((item) => item.id);
     let bank = [];
-    if (chapterIds.length) {
+    if (topicIds.length) {
       const { data } = await sb.from("question_bank")
         .select("id,question_type,question_text,question_img,answer,answer_count,hidden,difficulty")
-        .in("chapter_id", chapterIds);
+        .in("topic_id", topicIds);
       bank = data || [];
     }
     if (bank.length < room.question_count) {
       const { data: fallbackBank } = await sb.from("question_bank")
-        .select("id,chapter_id,question_type,question_text,question_img,answer,answer_count,hidden,difficulty");
+        .select("id,topic_id,question_type,question_text,question_img,answer,answer_count,hidden,difficulty");
       const merged = [...bank];
       (fallbackBank || []).forEach((question) => {
         if (!merged.some((item) => item.id === question.id)) merged.push(question);

@@ -3,7 +3,6 @@
 ========================= */
 const grade         = document.getElementById("grade");
 const subject       = document.getElementById("subject");
-const chapter       = document.getElementById("chapter");
 const topic         = document.getElementById("topic");
 const question_type = document.getElementById("question_type");
 const difficulty    = document.getElementById("difficulty");
@@ -33,7 +32,6 @@ async function loadSelectData() {
 
   grade.addEventListener("change", async () => {
     subject.innerHTML = `<option value="">Chọn môn</option>`;
-    chapter.innerHTML = `<option value="">Chọn chương</option>`;
     topic.innerHTML = `<option value="">Chọn chủ đề</option>`;
     if (!grade.value) return;
 
@@ -44,22 +42,11 @@ async function loadSelectData() {
   });
 
   subject.addEventListener("change", async () => {
-    chapter.innerHTML = `<option value="">Chọn chương</option>`;
     topic.innerHTML = `<option value="">Chọn chủ đề</option>`;
     if (!subject.value) return;
 
-    const { data: chapters, error } = await sb
-      .from("chapters").select("*").eq("subject_id", subject.value).order("id");
-    if (error) { console.error(error); return; }
-    chapters?.forEach(c => chapter.appendChild(new Option(c.name, c.id)));
-  });
-
-  chapter.addEventListener("change", async () => {
-    topic.innerHTML = `<option value="">Chọn chủ đề</option>`;
-    if (!chapter.value) return;
-
     const { data: topics, error } = await sb
-      .from("topics").select("*").eq("chapter_id", chapter.value).order("id");
+      .from("topics").select("*").eq("subject_id", subject.value).order("name");
     if (error) { console.error(error); return; }
     topics?.forEach(t => topic.appendChild(new Option(t.name, t.id)));
   });
@@ -72,14 +59,13 @@ async function saveQuestion(shouldClose = true) {
   const { data: { user } } = await sb.auth.getUser();
   const userId = user?.id || null;
 
-  const chapterVal  = chapter.value;
   const topicVal    = topic.value;
   const typeVal     = question_type.value;
   const diffVal     = parseInt(difficulty.value) || null;
   const questionVal = questionText.value.trim();
   const answerVal   = answerText.value.trim();
 
-  if (!chapterVal) { alert("Vui lòng chọn chương!"); return; }
+  if (!topicVal) { alert("Vui lòng chọn chủ đề!"); return; }
   if (!questionVal && questionImgBox.style.display !== "block") {
     alert("Vui lòng nhập nội dung câu hỏi!"); return;
   }
@@ -148,7 +134,6 @@ async function saveQuestion(shouldClose = true) {
   }
 
   const dataObj = {
-    chapter_id:    chapterVal || null,
     topic_id:      topicVal || null,
     question_type: typeVal,
     difficulty:    diffVal,

@@ -382,9 +382,9 @@
     const sb = getSb();
     const gradeId = document.getElementById("bGrade").value;
     const subSel  = document.getElementById("bSubject");
-    const chapSel = document.getElementById("bChapter");
+    const topicSel = document.getElementById("bTopic");
     subSel.innerHTML  = '<option value="">Tất cả môn</option>';
-    chapSel.innerHTML = '<option value="">Tất cả chương</option>';
+    topicSel.innerHTML = '<option value="">Tất cả chủ đề</option>';
     if (gradeId) {
       const { data } = await sb.from("subjects").select("*").eq("grade_id", gradeId).order("name");
       (data || []).forEach(s => subSel.appendChild(new Option(s.name, s.id)));
@@ -395,11 +395,11 @@
   window.bankSubjectChange = async function () {
     const sb = getSb();
     const subjectId = document.getElementById("bSubject").value;
-    const chapSel   = document.getElementById("bChapter");
-    chapSel.innerHTML = '<option value="">Tất cả chương</option>';
+    const topicSel   = document.getElementById("bTopic");
+    topicSel.innerHTML = '<option value="">Tất cả chủ đề</option>';
     if (subjectId) {
-      const { data } = await sb.from("chapters").select("*").eq("subject_id", subjectId).order("name");
-      (data || []).forEach(c => chapSel.appendChild(new Option(c.name, c.id)));
+      const { data } = await sb.from("topics").select("*").eq("subject_id", subjectId).order("name");
+      (data || []).forEach(t => topicSel.appendChild(new Option(t.name, t.id)));
     }
     bankPage = 0; loadBank();
   };
@@ -414,7 +414,7 @@
     const sb      = getSb();
     const gradeId = document.getElementById("bGrade").value;
     const subId   = document.getElementById("bSubject").value;
-    const chapId  = document.getElementById("bChapter").value;
+    const topicId = document.getElementById("bTopic").value;
     const type    = document.getElementById("bType").value;
     const diff    = document.getElementById("bDiff").value;
     const search  = document.getElementById("bSearch").value.trim();
@@ -422,28 +422,28 @@
 
     let query = sb
       .from("question_bank")
-      .select("*, chapters(id,name,subjects(id,name,grades(id,name)))", { count: "exact" })
+      .select("*, topics(id,name,subjects(id,name,grades(id,name)))", { count: "exact" })
       .eq("hidden", false);
 
     if (currentRole === "teacher") {
       query = sb
         .from("question_bank")
-        .select("*, chapters(id,name,subjects(id,name,grades(id,name)))", { count: "exact" })
+        .select("*, topics(id,name,subjects(id,name,grades(id,name)))", { count: "exact" })
         .or(`hidden.eq.false,created_by.eq.${currentUser.id}`);
     }
 
-    if (chapId) {
-      query = query.eq("chapter_id", chapId);
+    if (topicId) {
+      query = query.eq("topic_id", topicId);
     } else if (subId) {
-      const { data: chs } = await sb.from("chapters").select("id").eq("subject_id", subId);
-      if (chs?.length) query = query.in("chapter_id", chs.map(c => c.id));
-      else query = query.eq("chapter_id", "00000000-0000-0000-0000-000000000000");
+      const { data: topics } = await sb.from("topics").select("id").eq("subject_id", subId);
+      if (topics?.length) query = query.in("topic_id", topics.map(t => t.id));
+      else query = query.eq("topic_id", "00000000-0000-0000-0000-000000000000");
     } else if (gradeId) {
       const { data: subs } = await sb.from("subjects").select("id").eq("grade_id", gradeId);
       if (subs?.length) {
-        const { data: chs } = await sb.from("chapters").select("id").in("subject_id", subs.map(s => s.id));
-        if (chs?.length) query = query.in("chapter_id", chs.map(c => c.id));
-        else query = query.eq("chapter_id", "00000000-0000-0000-0000-000000000000");
+        const { data: topics } = await sb.from("topics").select("id").in("subject_id", subs.map(s => s.id));
+        if (topics?.length) query = query.in("topic_id", topics.map(t => t.id));
+        else query = query.eq("topic_id", "00000000-0000-0000-0000-000000000000");
       }
     }
 
@@ -480,7 +480,7 @@
         <span class="type-chip ${TYPE_CLASS[q.question_type] || ""}">${TYPE_LABEL[q.question_type] || q.question_type}</span>
         <div class="q-text">${q.question_text || "<i style='color:var(--muted)'>(Xem ảnh bên dưới)</i>"}</div>
         ${hasImg ? `<img src="${q.question_img}" style="width:100%;max-height:120px;object-fit:contain;border-radius:5px;margin-top:5px;display:block;border:1px solid var(--border)">` : ""}
-        <div class="q-meta">Mức ${q.difficulty || "?"} • ${q.chapters?.name || ""}</div>
+        <div class="q-meta">Mức ${q.difficulty || "?"} • ${q.topics?.name || ""}</div>
         ${!inExam ? `<button class="bank-add-btn" onclick="addFromBank('${q.id}')">+ Thêm</button>` : ""}`;
       // Nếu có ảnh thì nút Thêm nằm dưới, không absolute
       if (hasImg && !inExam) {
@@ -548,19 +548,19 @@
 
     const gradeId   = document.getElementById("bGrade").value;
     const subId     = document.getElementById("bSubject").value;
-    const chapId    = document.getElementById("bChapter").value;
+    const topicId   = document.getElementById("bTopic").value;
     const inExamIds = new Set(examItems.map(i => i.question.id));
 
-    let query = sb.from("question_bank").select("*, chapters(id,name)").eq("hidden", false);
-    if (chapId) query = query.eq("chapter_id", chapId);
+    let query = sb.from("question_bank").select("*, topics(id,name)").eq("hidden", false);
+    if (topicId) query = query.eq("topic_id", topicId);
     else if (subId) {
-      const { data: chs } = await sb.from("chapters").select("id").eq("subject_id", subId);
-      if (chs?.length) query = query.in("chapter_id", chs.map(c => c.id));
+      const { data: topics } = await sb.from("topics").select("id").eq("subject_id", subId);
+      if (topics?.length) query = query.in("topic_id", topics.map(t => t.id));
     } else if (gradeId) {
       const { data: subs } = await sb.from("subjects").select("id").eq("grade_id", gradeId);
       if (subs?.length) {
-        const { data: chs } = await sb.from("chapters").select("id").in("subject_id", subs.map(s => s.id));
-        if (chs?.length) query = query.in("chapter_id", chs.map(c => c.id));
+        const { data: topics } = await sb.from("topics").select("id").in("subject_id", subs.map(s => s.id));
+        if (topics?.length) query = query.in("topic_id", topics.map(t => t.id));
       }
     }
     if (type) query = query.eq("question_type", type);

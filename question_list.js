@@ -22,6 +22,18 @@ const typeText = {
   essay: "Tự luận",
 }
 
+function questionSubject(q) {
+  return q?.topics?.subjects || null
+}
+
+function questionGrade(q) {
+  return questionSubject(q)?.grades || null
+}
+
+function questionTopicName(q) {
+  return q?.topics?.name || ""
+}
+
 let exactDuplicateIds = new Set()
 let fuzzySuggestionMap = new Map()
 let fuzzyAuditScopeKey = ""
@@ -57,7 +69,6 @@ async function loadGrades() {
 f_grade.onchange = async () => {
   resetToFirstPage()
   f_subject.innerHTML = "<option value=''>Môn</option>"
-  f_chapter.innerHTML = "<option value=''>Chương</option>"
   f_topic.innerHTML = "<option value=''>Chủ đề</option>"
   if (!f_grade.value) {
     render()
@@ -73,29 +84,13 @@ f_grade.onchange = async () => {
 
 f_subject.onchange = async () => {
   resetToFirstPage()
-  f_chapter.innerHTML = "<option value=''>Chương</option>"
   f_topic.innerHTML = "<option value=''>Chủ đề</option>"
   if (!f_subject.value) {
     render()
     return
   }
 
-  const { data } = await sb.from("chapters").select("*").eq("subject_id", f_subject.value)
-  ;(data || []).forEach((c) => {
-    f_chapter.innerHTML += `<option value="${c.id}">${c.name}</option>`
-  })
-  render()
-}
-
-f_chapter.onchange = async () => {
-  resetToFirstPage()
-  f_topic.innerHTML = "<option value=''>Chủ đề</option>"
-  if (!f_chapter.value) {
-    render()
-    return
-  }
-
-  const { data } = await sb.from("topics").select("*").eq("chapter_id", f_chapter.value).order("id")
+  const { data } = await sb.from("topics").select("*").eq("subject_id", f_subject.value).order("name")
   ;(data || []).forEach((t) => {
     f_topic.innerHTML += `<option value="${t.id}">${t.name}</option>`
   })
@@ -142,7 +137,7 @@ async function loadCreatorFilter() {
 async function loadQuestions() {
   const { data, error } = await sb.from("question_bank").select(`
     *,
-    chapters(id,name,subjects(id,name,grades(id,name))),
+    topics(id,name,subjects(id,name,grades(id,name))),
     creator:users!created_by(id,full_name)
   `)
 
@@ -251,7 +246,7 @@ function buildQuestionSnapshot(q) {
   return {
     id: q.id,
     question_type: q.question_type || "essay",
-    chapter_id: q.chapter_id || "",
+    topic_id: q.topic_id || "",
     question_text: q.question_text || "",
     normalized_text: q._normalized_text || normalizeDuplicateText(q.question_text || ""),
     token_set: q._token_set || buildTokenSet(q._normalized_text || normalizeDuplicateText(q.question_text || "")),
@@ -317,9 +312,8 @@ function getBaseFilteredQuestions() {
   let list = [...questions]
 
   if (!isAdmin) list = list.filter((q) => !q.hidden)
-  if (f_grade.value) list = list.filter((q) => q.chapters?.subjects?.grades?.id == f_grade.value)
-  if (f_subject.value) list = list.filter((q) => q.chapters?.subjects?.id == f_subject.value)
-  if (f_chapter.value) list = list.filter((q) => q.chapter_id == f_chapter.value)
+  if (f_grade.value) list = list.filter((q) => questionGrade(q)?.id == f_grade.value)
+  if (f_subject.value) list = list.filter((q) => questionSubject(q)?.id == f_subject.value)
   if (f_topic.value) list = list.filter((q) => q.topic_id == f_topic.value)
   if (f_type.value) list = list.filter((q) => q.question_type === f_type.value)
   if (f_difficulty.value) list = list.filter((q) => q.difficulty == f_difficulty.value)
@@ -607,9 +601,9 @@ function render() {
           <div class="questionText">${escapeHtml(q.question_text || "").replace(/\n/g, "<br>")}${hiddenBadge}</div>
           ${q.question_img ? `<div class="questionImgBox"><img class="questionImg" src="${q.question_img}" onclick="event.stopPropagation();window.open('${q.question_img}')"></div>` : ""}
         </td>
-        <td class="${faded}">${q.chapters?.subjects?.grades?.name || ""}</td>
-        <td class="${faded}">${q.chapters?.subjects?.name || ""}</td>
-        <td class="${faded}">${q.chapters?.name || ""}</td>
+        <td class="${faded}">${questionGrade(q)?.name || ""}</td>
+        <td class="${faded}">${questionSubject(q)?.name || ""}</td>
+        <td class="${faded}">${questionTopicName(q)}</td>
         <td class="${faded}">${typeText[q.question_type] || q.question_type}</td>
         <td class="${faded}">${statusBadge}</td>
         <td class="${faded}">${q.difficulty ?? ""}</td>
@@ -767,8 +761,8 @@ function renderDuplicateReviewItem(member, group) {
         </div>
         <div class="dup-item-text">${escapeHtml(member.question_text || "").replace(/\n/g, "<br>")}</div>
       </div>
-      <div class="dup-meta">Môn<br><b>${escapeHtml(member.chapters?.subjects?.name || "")}</b></div>
-      <div class="dup-meta">Chương<br><b>${escapeHtml(member.chapters?.name || "")}</b></div>
+      <div class="dup-meta">Môn<br><b>${escapeHtml(questionSubject(member)?.name || "")}</b></div>
+      <div class="dup-meta">Chủ đề<br><b>${escapeHtml(questionTopicName(member))}</b></div>
       <div class="dup-meta">Đáp án<br><b>${escapeHtml(member.answer || "(trống)")}</b></div>
       <div class="dup-actions">
         <button type="button" class="dup-mini" onclick="event.stopPropagation();editQ('${member.id}')">Sửa</button>
@@ -894,8 +888,8 @@ function renderQuestionIssueReview() {
               <div style="display:grid;gap:8px;margin-top:10px">${notes}</div>
             </div>
             <div class="report-meta">
-              <div><b>Môn:</b> ${escapeHtml(question?.chapters?.subjects?.name || "—")}</div>
-              <div><b>Chương:</b> ${escapeHtml(question?.chapters?.name || "—")}</div>
+              <div><b>Môn:</b> ${escapeHtml(questionSubject(question)?.name || "—")}</div>
+              <div><b>Chủ đề:</b> ${escapeHtml(questionTopicName(question) || "—")}</div>
               <div><b>ID câu hỏi:</b> ${escapeHtml(group.questionId)}</div>
               <div class="report-actions">
                 <button class="btn btn-primary btn-sm" type="button" onclick="openQuestionIssueTarget('${group.questionId}')">Mở câu hỏi</button>
@@ -1055,7 +1049,7 @@ function groupSnapshotsForFuzzy(items) {
   items.forEach((item) => {
     const snapshot = buildQuestionSnapshot(item)
     if (!snapshot.normalized_text) return
-    const key = `${snapshot.question_type}|${snapshot.chapter_id || "all"}`
+    const key = `${snapshot.question_type}|${snapshot.topic_id || "all"}`
     const list = groups.get(key) || []
     list.push(snapshot)
     groups.set(key, list)
@@ -1372,9 +1366,8 @@ async function editQ(id) {
 
   injectActionBtns(q)
 
-  const gradeId = q.chapters?.subjects?.grades?.id
-  const subjectId = q.chapters?.subjects?.id
-  const chapterId = q.chapter_id
+  const gradeId = questionGrade(q)?.id
+  const subjectId = questionSubject(q)?.id
 
   grade.value = gradeId || ""
 
@@ -1385,17 +1378,10 @@ async function editQ(id) {
   })
   subject.value = subjectId || ""
 
-  const { data: chapters } = await sb.from("chapters").select("*").eq("subject_id", subjectId)
-  chapter.innerHTML = "<option value=''>Chương</option>"
-  ;(chapters || []).forEach((c) => {
-    chapter.innerHTML += `<option value="${c.id}">${c.name}</option>`
-  })
-  chapter.value = chapterId || ""
-
   const topic = document.getElementById("topic");
   if (topic) {
-    if (chapterId) {
-      const { data: topics } = await sb.from("topics").select("*").eq("chapter_id", chapterId)
+    if (subjectId) {
+      const { data: topics } = await sb.from("topics").select("*").eq("subject_id", subjectId).order("name")
       topic.innerHTML = "<option value=''>Chủ đề</option>"
       ;(topics || []).forEach((t) => {
         topic.innerHTML += `<option value="${t.id}">${t.name}</option>`

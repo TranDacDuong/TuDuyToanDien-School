@@ -550,7 +550,7 @@ QUY TAC QUAN TRONG:
     for (let i = 1; i <= 10; i++) diff.appendChild(new Option("Độ khó " + i, i));
   }
 
-  /* ── Load khối / môn / chương ── */
+  /* ── Load khối / môn / chủ đề ── */
   async function loadFilters() {
     const sb = getSb();
     const { data: grades } = await sb.from("grades").select("*").order("name");
@@ -559,10 +559,8 @@ QUY TAC QUAN TRONG:
 
     gradeEl.onchange = async () => {
       const subjEl = document.getElementById("aiSubject");
-      const chapEl = document.getElementById("aiChapter");
       const topicEl = document.getElementById("aiTopic");
       subjEl.innerHTML = '<option value="">Chọn môn</option>';
-      chapEl.innerHTML = '<option value="">Chọn chương</option>';
       if (topicEl) topicEl.innerHTML = '<option value="">Chọn chủ đề</option>';
       if (!gradeEl.value) return;
       const { data } = await sb.from("subjects").select("*").eq("grade_id", gradeEl.value).order("name");
@@ -570,28 +568,13 @@ QUY TAC QUAN TRONG:
     };
 
     document.getElementById("aiSubject").onchange = async () => {
-      const chapEl = document.getElementById("aiChapter");
       const topicEl = document.getElementById("aiTopic");
-      chapEl.innerHTML = '<option value="">Chọn chương</option>';
       if (topicEl) topicEl.innerHTML = '<option value="">Chọn chủ đề</option>';
       const subjVal = document.getElementById("aiSubject").value;
       if (!subjVal) return;
-      const { data } = await sb.from("chapters").select("*").eq("subject_id", subjVal).order("name");
-      (data||[]).forEach(c => chapEl.appendChild(new Option(c.name, c.id)));
+      const { data } = await sb.from("topics").select("*").eq("subject_id", subjVal).order("name");
+      (data||[]).forEach(t => topicEl?.appendChild(new Option(t.name, t.id)));
     };
-
-    const chapEl = document.getElementById("aiChapter");
-    if (chapEl) {
-      chapEl.onchange = async () => {
-        const topicEl = document.getElementById("aiTopic");
-        if (!topicEl) return;
-        topicEl.innerHTML = '<option value="">Chọn chủ đề</option>';
-        const chapVal = chapEl.value;
-        if (!chapVal) return;
-        const { data } = await sb.from("topics").select("*").eq("chapter_id", chapVal).order("name");
-        (data||[]).forEach(t => topicEl.appendChild(new Option(t.name, t.id)));
-      };
-    }
   }
 
   /* ══════════════════════════════════════════════
@@ -1119,11 +1102,10 @@ QUY TAC QUAN TRONG:
   ══════════════════════════════════════════════ */
   window.saveAllQuestions = async function() {
     const sb        = getSb();
-    const chapterId = document.getElementById("aiChapter").value;
     const topicId   = document.getElementById("aiTopic")?.value || null;
     const difficulty = document.getElementById("aiDifficulty").value;
 
-    if (!chapterId) { alert("Vui lòng chọn Chương trước khi lưu!"); return; }
+    if (!topicId) { alert("Vui lòng chọn Chủ đề trước khi lưu!"); return; }
 
     const toSave = _questions.filter(q => q !== null && (q.question_text || q._rightImg));
     if (!toSave.length) { alert("Không có câu hỏi nào để lưu!"); return; }
@@ -1150,7 +1132,6 @@ QUY TAC QUAN TRONG:
 
       const diff = document.getElementById("diff_"+i)?.value || difficulty || null;
       const dataObj = {
-        chapter_id:    chapterId,
         topic_id:      topicId || null,
         question_type: q.question_type || "multi_choice",
         difficulty:    diff ? parseInt(diff) : null,

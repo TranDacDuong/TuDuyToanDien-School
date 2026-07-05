@@ -298,7 +298,7 @@ h1 { font-size:32px; margin-bottom:8px; font-family:var(--font-display); color:#
         <div class="filters">
           <select id="bGrade"   onchange="bankGradeChange()"><option value="">Tất cả khối</option></select>
           <select id="bSubject" onchange="bankSubjectChange()"><option value="">Tất cả môn</option></select>
-          <select id="bChapter" onchange="loadBank()"><option value="">Tất cả chương</option></select>
+          <select id="bTopic" onchange="loadBank()"><option value="">Tất cả chủ đề</option></select>
           <div style="display:flex;gap:5px">
             <select id="bType" onchange="loadBank()" style="flex:1">
               <option value="">Tất cả loại</option>
@@ -370,7 +370,7 @@ h1 { font-size:32px; margin-bottom:8px; font-family:var(--font-display); color:#
         <option value="short_answer">Trả lời ngắn</option>
         <option value="essay">Tự luận</option>
       </select>
-      <p style="font-size:12px;color:var(--muted)">Áp dụng bộ lọc hiện tại (khối/môn/chương)</p>
+      <p style="font-size:12px;color:var(--muted)">Áp dụng bộ lọc hiện tại (khối/môn/chủ đề)</p>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
       <button class="btn sec" onclick="closeRandomModal()">Hủy</button>
