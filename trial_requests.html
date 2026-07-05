@@ -529,13 +529,13 @@ async function ensureStudentAccount({ create = true } = {}) {
     setAccountInfo("student", accountHtml("Đã liên kết với tài khoản học sinh", existing.email || existing.full_name));
     return existing;
   }
+  const password = defaultPasswordFromPhone(phone);
+  const email = generatedEmail("", fullName, phone);
   if (!create) {
-    setAccountInfo("student", "Chưa có tài khoản học sinh với SĐT này. Bấm Lưu học thử để tạo tài khoản mới.", "warn");
+    setAccountInfo("student", accountHtml("Sẽ tạo tài khoản học sinh khi bấm Lưu học thử", email, password), "warn");
     return null;
   }
 
-  const password = defaultPasswordFromPhone(phone);
-  const email = generatedEmail("", fullName, phone);
   setAccountInfo("student", loadingAccountHtml("Chưa có tài khoản, đang tạo tài khoản học sinh..."), "loading");
   const { data, error } = await sb.rpc("admin_import_students_batch", {
     p_rows: [{
@@ -600,13 +600,13 @@ async function ensureParentAccount(studentId, { create = true } = {}) {
     }
     return existing;
   }
+  const password = defaultPasswordFromPhone(phone);
+  const email = generatedEmail("", fullName, phone);
   if (!create) {
-    setAccountInfo("parent", "Chưa có tài khoản phụ huynh với SĐT này. Bấm Lưu học thử để tạo tài khoản mới.", "warn");
+    setAccountInfo("parent", accountHtml("Sẽ tạo tài khoản phụ huynh khi bấm Lưu học thử", email, password), "warn");
     return null;
   }
 
-  const password = defaultPasswordFromPhone(phone);
-  const email = generatedEmail("", fullName, phone);
   setAccountInfo("parent", loadingAccountHtml("Chưa có tài khoản, đang tạo tài khoản phụ huynh..."), "loading");
   const { data, error } = await sb.rpc("admin_import_parents_batch", {
     p_rows: [{
