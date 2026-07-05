@@ -1079,8 +1079,12 @@
       (coursesData || []).forEach(c => { coursesMap[c.id] = c; });
 
       const attMap = {};
+      const attRowsByStudentClass = {};
       (allAttendance || []).forEach(a => {
         attMap[`${a.student_id}_${a.class_id}_${a.date}_${a.schedule_id || 0}`] = a.status;
+        const key = `${a.student_id}_${a.class_id}`;
+        if (!attRowsByStudentClass[key]) attRowsByStudentClass[key] = [];
+        attRowsByStudentClass[key].push(a);
       });
 
       const chosenMap = {};
@@ -1091,7 +1095,32 @@
       });
 
       const paymentMap = {};
-      (allPayments || []).forEach(p => { paymentMap[p.student_id] = p; });
+      (allPayments || []).forEach(p => {
+        const studentId = p.student_id;
+        if (!studentId) return;
+        const amountPaid = Number(p.amount_paid || 0);
+        const amountDue = Number(p.amount_due || 0);
+        if (!paymentMap[studentId]) {
+          paymentMap[studentId] = { ...p, amount_paid: amountPaid, amount_due: amountDue };
+          return;
+        }
+        const existing = paymentMap[studentId];
+        existing.amount_paid = Number(existing.amount_paid || 0) + amountPaid;
+        existing.amount_due = Number(existing.amount_due || 0) + amountDue;
+        const existingLocked = existing.locked_at ? new Date(existing.locked_at).getTime() : 0;
+        const currentLocked = p.locked_at ? new Date(p.locked_at).getTime() : 0;
+        if (currentLocked > existingLocked && p.locked_snapshot) {
+          existing.locked_at = p.locked_at;
+          existing.locked_snapshot = p.locked_snapshot;
+        }
+      });
+
+      const getSnapshotClasses = payment => Array.isArray(payment?.locked_snapshot?.classes)
+        ? payment.locked_snapshot.classes
+        : [];
+      const getSnapshotClass = (payment, classId) => getSnapshotClasses(payment)
+        .find(item => String(item.classId || item.class_id || "") === String(classId || ""));
+      const getSnapshotAmount = snapClass => Number(snapClass?.amount || snapClass?.amount_due || 0);
 
       // Identify students active in the teacher's classes
       const teacherClassStudents = (allClassStudents || []).filter(cs => managedClassIds.includes(cs.class_id));
@@ -1119,6 +1148,23 @@
           const actualStatus = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item);
           return actualStatus === "present" || actualStatus === "makeup";
         });
+        const occurrenceKeys = new Set(activeOccurrences.map(item => `${item.date}_${item.schedule_id || 0}`));
+        (attRowsByStudentClass[`${cs.student_id}_${cs.class_id}`] || []).forEach(row => {
+          const date = String(row.date || "").slice(0, 10);
+          const status = row.status || "";
+          const scheduleId = Number(row.schedule_id || 0);
+          const key = `${date}_${scheduleId}`;
+          if (!date || occurrenceKeys.has(key) || date > left) return;
+          if (date < joined && status !== "present" && status !== "makeup") return;
+          activeOccurrences.push({
+            date,
+            schedule_id: scheduleId,
+            session_no: 0,
+            schedule: null,
+          });
+          occurrenceKeys.add(key);
+        });
+        activeOccurrences.sort((a,b) => a.date.localeCompare(b.date) || Number(a.schedule_id || 0) - Number(b.schedule_id || 0));
         const totalSessions = activeOccurrences.length;
 
         let present = 0, absent = 0, makeup = 0;
@@ -1132,9 +1178,9 @@
         // Determine if payment record is locked and check its snapshot
         const p = paymentMap[cs.student_id];
         let amount = 0;
-        if (p?.locked_at && p?.locked_snapshot?.classes) {
-          const snapClass = p.locked_snapshot.classes.find(c => c.classId === cs.class_id);
-          amount = snapClass ? snapClass.amount : 0;
+        if (p?.locked_at && getSnapshotClasses(p).length) {
+          const snapClass = getSnapshotClass(p, cs.class_id);
+          amount = snapClass ? getSnapshotAmount(snapClass) : 0;
         } else {
           amount = calcTuition({
             tuition_type: cls.tuition_type,
@@ -1174,20 +1220,24 @@
         const classExpected = studentClassExpectedMap[cs.student_id]?.[classId] || 0;
         const totalExpected = studentTotalExpectedMap[cs.student_id] || 0;
         const p = paymentMap[cs.student_id];
-        const amountPaid = p?.amount_paid || 0;
+        const amountPaid = Number(p?.amount_paid || 0);
         
         // Locked status
         const isLocked = Boolean(p?.locked_at);
-        const expectedDue = isLocked && p?.locked_snapshot ? (p.locked_snapshot.amount || 0) : totalExpected;
+        const expectedDue = isLocked && p?.locked_snapshot
+          ? Number(p.locked_snapshot.amount || p.amount_due || 0)
+          : Number(p?.amount_due || totalExpected || 0);
 
         let studentClassRevenue = 0;
         if (expectedDue > 0) {
           studentClassRevenue = (classExpected / expectedDue) * amountPaid;
+        } else if (totalExpected > 0) {
+          studentClassRevenue = (classExpected / totalExpected) * amountPaid;
         }
 
         classSummaries[classId].studentsCount++;
         classSummaries[classId].totalExpected += classExpected;
-        classSummaries[classId].totalActualPaid += (classExpected / expectedDue) * amountPaid || 0;
+        classSummaries[classId].totalActualPaid += studentClassRevenue;
         classSummaries[classId].allocatedTeacherRevenue += studentClassRevenue;
         totalClassRevenueAllocated += studentClassRevenue;
       });
