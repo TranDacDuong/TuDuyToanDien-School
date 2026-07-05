@@ -175,7 +175,7 @@ function phoneDigits(phone){ return String(phone || "").replace(/\D+/g,""); }
 function defaultPasswordFromPhone(phone){ const digits = phoneDigits(phone); return digits.length >= 6 ? digits : "123456"; }
 function generatedEmail(prefix, fullName, phone){
   const digits = phoneDigits(phone);
-  const suffix = `${digits ? digits.slice(-4) : ""}${String(Date.now()).slice(-5)}`;
+  const suffix = digits ? digits.slice(-4) : "";
   return `${prefix}${slugName(fullName)}${suffix}@gmail.com`;
 }
 function fmtTime(value){ if(!value) return "—"; const d=new Date(value); return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("vi-VN"); }
@@ -530,7 +530,7 @@ async function ensureStudentAccount({ create = true } = {}) {
     return existing;
   }
   if (!create) {
-    setAccountInfo("student", "Chưa có tài khoản học sinh với SĐT này. Khi lưu sẽ tự tạo tài khoản mới.", "warn");
+    setAccountInfo("student", "Chưa có tài khoản học sinh với SĐT này. Bấm Lưu học thử để tạo tài khoản mới.", "warn");
     return null;
   }
 
@@ -601,12 +601,12 @@ async function ensureParentAccount(studentId, { create = true } = {}) {
     return existing;
   }
   if (!create) {
-    setAccountInfo("parent", "Chưa có tài khoản phụ huynh với SĐT này. Khi lưu sẽ tự tạo tài khoản mới.", "warn");
+    setAccountInfo("parent", "Chưa có tài khoản phụ huynh với SĐT này. Bấm Lưu học thử để tạo tài khoản mới.", "warn");
     return null;
   }
 
   const password = defaultPasswordFromPhone(phone);
-  const email = generatedEmail("phuhuynh", fullName, phone);
+  const email = generatedEmail("", fullName, phone);
   setAccountInfo("parent", loadingAccountHtml("Chưa có tài khoản, đang tạo tài khoản phụ huynh..."), "loading");
   const { data, error } = await sb.rpc("admin_import_parents_batch", {
     p_rows: [{
@@ -647,8 +647,8 @@ async function ensureTrialAccounts({ create = true } = {}) {
 function scheduleAccountCheck(kind) {
   clearTimeout(S.accountCheckTimers[kind]);
   S.accountCheckTimers[kind] = setTimeout(() => {
-    if (kind === "student") ensureStudentAccount({ create: true }).catch(() => {});
-    else ensureParentAccount(document.getElementById("studentId").value || null, { create: true }).catch(() => {});
+    if (kind === "student") ensureStudentAccount({ create: false }).catch(() => {});
+    else ensureParentAccount(document.getElementById("studentId").value || null, { create: false }).catch(() => {});
   }, 450);
 }
 
