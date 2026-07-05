@@ -124,23 +124,14 @@ tbody tr:hover td{background:#fff7ed}
     <div class="modal-body">
       <input type="hidden" id="editId">
       <input type="hidden" id="studentId">
+      <input type="hidden" id="parentId">
       <div class="form-grid">
-        <div class="field"><label>Họ tên học sinh</label><input id="studentName" class="input" placeholder="VD: Nguyễn Văn A"></div>
+        <div class="field"><label>Họ tên học sinh</label><input id="studentName" class="input" placeholder="VD: Nguyễn Văn A"><div id="studentAccountInfo" class="selected-student"></div></div>
         <div class="field"><label>SĐT học sinh</label><input id="studentPhone" class="input" placeholder="SĐT học sinh"></div>
-        <div class="field"><label>Họ tên phụ huynh</label><input id="parentName" class="input" placeholder="VD: Nguyễn Thị B"></div>
+        <div class="field"><label>Họ tên phụ huynh</label><input id="parentName" class="input" placeholder="VD: Nguyễn Thị B"><div id="parentAccountInfo" class="selected-student"></div></div>
         <div class="field"><label>SĐT phụ huynh</label><input id="parentPhone" class="input" placeholder="SĐT phụ huynh"></div>
         <div class="field"><label>Khối</label><select id="gradeText" class="select" onchange="renderSubjectOptions();populateClassSelect();loadClassSchedules()"></select></div>
         <div class="field"><label>Môn</label><select id="subjectText" class="select" onchange="populateClassSelect();loadClassSchedules()"></select></div>
-        <div class="field full">
-          <label>Link tài khoản học sinh hiện có</label>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input id="studentSearch" class="input" placeholder="Tìm theo tên, email hoặc SĐT">
-            <button class="btn btn-outline" type="button" onclick="searchStudents()">Tìm</button>
-            <button class="btn btn-outline" type="button" onclick="clearStudentLink()">Bỏ link</button>
-          </div>
-          <div id="selectedStudent" class="selected-student"></div>
-          <div id="studentResults" class="student-results"></div>
-        </div>
         <div class="field full"><label>Lớp học thử</label><select id="classId" class="select" onchange="loadClassSchedules()"></select></div>
         <div class="field"><label>Lịch học thử buổi 1</label><select id="schedule1Id" class="select" onchange="suggestDate(1)"></select></div>
         <div class="field"><label>Ngày học thử buổi 1</label><select id="session1At" class="select"></select></div>
@@ -149,7 +140,6 @@ tbody tr:hover td{background:#fff7ed}
         <div class="field full"><label>Ghi chú</label><textarea id="note" class="input" placeholder="Nguồn thông tin, nhu cầu học, ghi chú khi gọi điện..."></textarea></div>
       </div>
       <div class="actions">
-        <button class="btn btn-outline" type="button" onclick="createStudentAccount()">Thêm tài khoản</button>
         <button class="btn btn-outline" type="button" onclick="saveTrialRequest()">Lưu học thử</button>
         <button class="btn btn-outline" type="button" onclick="deleteTrialFromModal()">Xóa học sinh học thử</button>
         <button class="btn btn-primary" type="button" onclick="addTrialToClassFromModal()">Thêm vào lớp</button>
@@ -162,13 +152,20 @@ tbody tr:hover td{background:#fff7ed}
 
 <script>
 const DAYS = {1:"T2",2:"T3",3:"T4",4:"T5",5:"T6",6:"T7",7:"CN"};
-let S = { requests:[], classes:[], grades:[], subjects:[], classMap:{}, scheduleMap:{}, studentMap:{} };
+let S = { requests:[], classes:[], grades:[], subjects:[], classMap:{}, scheduleMap:{}, studentMap:{}, accountCheckTimers:{} };
 
 function esc(s){ return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function escAttr(s){ return esc(s).replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
 function rmVN(s){ return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim(); }
 function toast(msg,dur=2000){ const el=document.getElementById("toast"); if(!el) return; el.textContent=msg; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),dur); }
 function slugName(name){ return rmVN(name).replace(/[^a-z0-9]+/g,"").slice(0,28) || "hocsinh"; }
+function phoneDigits(phone){ return String(phone || "").replace(/\D+/g,""); }
+function defaultPasswordFromPhone(phone){ const digits = phoneDigits(phone); return digits.length >= 6 ? digits : "123456"; }
+function generatedEmail(prefix, fullName, phone){
+  const digits = phoneDigits(phone);
+  const suffix = `${digits ? digits.slice(-4) : ""}${String(Date.now()).slice(-5)}`;
+  return `${prefix}${slugName(fullName)}${suffix}@gmail.com`;
+}
 function fmtTime(value){ if(!value) return "—"; const d=new Date(value); return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("vi-VN"); }
 function localDate(value){ if(!value) return ""; const d=new Date(value); if(Number.isNaN(d.getTime())) return ""; const pad=n=>String(n).padStart(2,"0"); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 function dayKey(value){ if(!value) return ""; const d=new Date(value); if(Number.isNaN(d.getTime())) return ""; const pad=n=>String(n).padStart(2,"0"); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
@@ -445,11 +442,204 @@ async function syncStatuses(){
 }
 function copyPhone(phone){ if(!phone) return; navigator.clipboard?.writeText(phone); toast("Đã sao chép SĐT"); }
 
+function setAccountInfo(kind, message = "", tone = "ok") {
+  const box = document.getElementById(kind === "parent" ? "parentAccountInfo" : "studentAccountInfo");
+  if (!box) return;
+  box.classList.toggle("show", Boolean(message));
+  box.style.background = tone === "warn" ? "#fff7ed" : "#ecfdf5";
+  box.style.color = tone === "warn" ? "#c2410c" : "#047857";
+  box.textContent = message;
+}
+
+async function findUserByPhone(phone, role) {
+  const digits = phoneDigits(phone);
+  if (!digits) return null;
+  const candidates = [];
+  const exact = await sb.from("users")
+    .select("id,full_name,email,phone,role,parent_full_name,parent_phone")
+    .eq("phone", phone)
+    .limit(5);
+  if (!exact.error && exact.data?.length) candidates.push(...exact.data);
+  if (digits.length >= 8) {
+    const fuzzy = await sb.from("users")
+      .select("id,full_name,email,phone,role,parent_full_name,parent_phone")
+      .ilike("phone", `%${digits.slice(-8)}%`)
+      .limit(10);
+    if (!fuzzy.error && fuzzy.data?.length) candidates.push(...fuzzy.data);
+  }
+  return candidates.find(user => user.role === role && phoneDigits(user.phone) === digits)
+    || candidates.find(user => phoneDigits(user.phone) === digits)
+    || null;
+}
+
+function updateStudentFieldsFromAccount(student) {
+  if (!student) return;
+  document.getElementById("studentId").value = student.id || "";
+  if (!document.getElementById("studentName").value) document.getElementById("studentName").value = student.full_name || "";
+  if (!document.getElementById("studentPhone").value) document.getElementById("studentPhone").value = student.phone || "";
+  if (!document.getElementById("parentName").value) document.getElementById("parentName").value = student.parent_full_name || "";
+  if (!document.getElementById("parentPhone").value) document.getElementById("parentPhone").value = student.parent_phone || "";
+}
+
+async function ensureStudentAccount({ create = true } = {}) {
+  const fullName = document.getElementById("studentName").value.trim();
+  const phone = document.getElementById("studentPhone").value.trim();
+  if (!fullName || !phone) {
+    setAccountInfo("student", "Nhập họ tên và SĐT học sinh để kiểm tra tài khoản.", "warn");
+    return null;
+  }
+
+  const existingId = document.getElementById("studentId").value;
+  if (existingId) {
+    const cached = S.studentMap[existingId];
+    if (cached?.phone && phoneDigits(cached.phone) && phoneDigits(cached.phone) !== phoneDigits(phone)) {
+      document.getElementById("studentId").value = "";
+    } else {
+      setAccountInfo("student", `Đã liên kết với tài khoản ${cached?.email || existingId}.`);
+      return cached || { id: existingId };
+    }
+  }
+
+  const existing = await findUserByPhone(phone, "student");
+  if (existing?.role && existing.role !== "student") {
+    setAccountInfo("student", `SĐT này đang thuộc tài khoản ${existing.role}: ${existing.email || existing.full_name || existing.id}.`, "warn");
+    return null;
+  }
+  if (existing) {
+    S.studentMap[existing.id] = existing;
+    updateStudentFieldsFromAccount(existing);
+    setAccountInfo("student", `Đã liên kết với tài khoản ${existing.email || existing.full_name}.`);
+    return existing;
+  }
+  if (!create) {
+    setAccountInfo("student", "Chưa có tài khoản học sinh với SĐT này. Khi lưu sẽ tự tạo tài khoản mới.", "warn");
+    return null;
+  }
+
+  const password = defaultPasswordFromPhone(phone);
+  const email = generatedEmail("", fullName, phone);
+  const { data, error } = await sb.rpc("admin_import_students_batch", {
+    p_rows: [{
+      email,
+      full_name: fullName,
+      phone,
+      parent_full_name: document.getElementById("parentName").value.trim(),
+      parent_phone: document.getElementById("parentPhone").value.trim(),
+      password,
+      role: "student"
+    }]
+  });
+  if (error) {
+    setAccountInfo("student", "Không tạo được tài khoản học sinh: " + error.message, "warn");
+    throw error;
+  }
+  const created = data?.created_accounts?.[0];
+  const { data: student, error: findError } = await sb.from("users")
+    .select("id,full_name,email,phone,parent_full_name,parent_phone,role")
+    .eq("email", created?.email || email)
+    .maybeSingle();
+  if (findError || !student) throw findError || new Error("Không tìm thấy tài khoản học sinh vừa tạo.");
+  S.studentMap[student.id] = student;
+  updateStudentFieldsFromAccount(student);
+  setAccountInfo("student", `Tài khoản mới: ${student.email || email} • Mật khẩu: ${created?.password || password}`);
+  return student;
+}
+
+async function ensureParentAccount(studentId, { create = true } = {}) {
+  const fullName = document.getElementById("parentName").value.trim();
+  const phone = document.getElementById("parentPhone").value.trim();
+  if (!fullName || !phone) {
+    setAccountInfo("parent", "Nhập họ tên và SĐT phụ huynh để kiểm tra tài khoản.", "warn");
+    return null;
+  }
+
+  const existingId = document.getElementById("parentId").value;
+  if (existingId) {
+    const { data: parent } = await sb.from("users").select("id,full_name,email,phone,role").eq("id", existingId).maybeSingle();
+    if (parent?.phone && phoneDigits(parent.phone) && phoneDigits(parent.phone) !== phoneDigits(phone)) {
+      document.getElementById("parentId").value = "";
+    } else {
+      if (studentId && parent?.email) {
+        await sb.rpc("admin_import_parents_batch", {
+          p_rows: [{ email: parent.email, full_name: fullName || parent.full_name || "Phụ huynh", phone: phone || parent.phone || "", student_id: studentId, relationship: "parent" }]
+        });
+      }
+      return parent || { id: existingId };
+    }
+  }
+
+  const existing = await findUserByPhone(phone, "parent");
+  if (existing?.role && existing.role !== "parent") {
+    setAccountInfo("parent", `SĐT này đang thuộc tài khoản ${existing.role}: ${existing.email || existing.full_name || existing.id}.`, "warn");
+    return null;
+  }
+  if (existing) {
+    document.getElementById("parentId").value = existing.id || "";
+    setAccountInfo("parent", `Đã liên kết với tài khoản ${existing.email || existing.full_name}.`);
+    if (studentId) {
+      await sb.rpc("admin_import_parents_batch", {
+        p_rows: [{ email: existing.email, full_name: fullName || existing.full_name || "Phụ huynh", phone: phone || existing.phone || "", student_id: studentId, relationship: "parent" }]
+      });
+    }
+    return existing;
+  }
+  if (!create) {
+    setAccountInfo("parent", "Chưa có tài khoản phụ huynh với SĐT này. Khi lưu sẽ tự tạo tài khoản mới.", "warn");
+    return null;
+  }
+
+  const password = defaultPasswordFromPhone(phone);
+  const email = generatedEmail("phuhuynh", fullName, phone);
+  const { data, error } = await sb.rpc("admin_import_parents_batch", {
+    p_rows: [{
+      email,
+      full_name: fullName,
+      phone,
+      password,
+      student_id: studentId || null,
+      relationship: "parent"
+    }]
+  });
+  if (error) {
+    setAccountInfo("parent", "Không tạo được tài khoản phụ huynh: " + error.message, "warn");
+    throw error;
+  }
+  const created = data?.created_accounts?.[0];
+  const { data: parent, error: findError } = await sb.from("users")
+    .select("id,full_name,email,phone,role")
+    .eq("email", created?.email || email)
+    .maybeSingle();
+  if (findError || !parent) throw findError || new Error("Không tìm thấy tài khoản phụ huynh vừa tạo.");
+  document.getElementById("parentId").value = parent.id || "";
+  setAccountInfo("parent", `Tài khoản mới: ${parent.email || email} • Mật khẩu: ${created?.password || password}`);
+  return parent;
+}
+
+async function ensureTrialAccounts({ create = true } = {}) {
+  const student = await ensureStudentAccount({ create });
+  if (!student?.id) return { student: null, parent: null };
+  const parent = await ensureParentAccount(student.id, { create });
+  await sb.from("users").update({
+    parent_full_name: document.getElementById("parentName").value.trim() || null,
+    parent_phone: document.getElementById("parentPhone").value.trim() || null,
+  }).eq("id", student.id);
+  return { student, parent };
+}
+
+function scheduleAccountCheck(kind) {
+  clearTimeout(S.accountCheckTimers[kind]);
+  S.accountCheckTimers[kind] = setTimeout(() => {
+    if (kind === "student") ensureStudentAccount({ create: true }).catch(() => {});
+    else ensureParentAccount(document.getElementById("studentId").value || null, { create: true }).catch(() => {});
+  }, 450);
+}
+
 function openTrialModal(id){
   const item = id ? S.requests.find(row=>row.id===id) : null;
   document.getElementById("modalTitle").textContent = item ? "Chi tiết học sinh học thử" : "Thêm học sinh học thử";
   document.getElementById("editId").value = item?.id || "";
   document.getElementById("studentId").value = item?.student_id || "";
+  document.getElementById("parentId").value = "";
   document.getElementById("studentName").value = item?.student_name || "";
   document.getElementById("studentPhone").value = item?.phone || "";
   document.getElementById("parentName").value = item?.parent_full_name || "";
@@ -457,46 +647,14 @@ function openTrialModal(id){
   renderGradeOptions(item?.grade || "");
   renderSubjectOptions(item?.subject || "");
   document.getElementById("note").value = item?.note || "";
-  document.getElementById("studentSearch").value = "";
-  document.getElementById("studentResults").innerHTML = "";
   populateClassSelect();
   document.getElementById("classId").value = item?.trial_class_id || "";
   loadClassSchedules(item);
-  renderLinkedStudent(item?.linkedStudent || null);
+  setAccountInfo("student", item?.linkedStudent ? `Đã liên kết với tài khoản ${item.linkedStudent.email || item.linkedStudent.full_name || item.linkedStudent.id}.` : "");
+  setAccountInfo("parent", "");
   document.getElementById("trialModal").classList.add("show");
 }
 function closeTrialModal(){ document.getElementById("trialModal").classList.remove("show"); }
-function renderLinkedStudent(student){
-  const box = document.getElementById("selectedStudent");
-  if(!student){ box.classList.remove("show"); box.textContent=""; return; }
-  box.classList.add("show");
-  box.textContent = `Đã link tài khoản: ${student.full_name || student.email || student.id}${student.email ? " • "+student.email : ""}`;
-}
-function clearStudentLink(){ document.getElementById("studentId").value=""; renderLinkedStudent(null); }
-async function searchStudents(){
-  const q = document.getElementById("studentSearch").value.trim();
-  const box = document.getElementById("studentResults");
-  if(!q){ box.innerHTML='<div style="font-size:.78rem;color:var(--ink-light)">Nhập tên, email hoặc SĐT để tìm học sinh.</div>'; return; }
-  box.innerHTML='<div style="font-size:.78rem;color:var(--ink-light)">Đang tìm...</div>';
-  const needle = q.replace(/[,%]/g," ");
-  const {data,error} = await sb.from("users").select("id,full_name,email,phone,parent_full_name,parent_phone").eq("role","student").or(`full_name.ilike.%${needle}%,email.ilike.%${needle}%,phone.ilike.%${needle}%`).limit(8);
-  if(error){ box.innerHTML=`<div style="font-size:.78rem;color:var(--red)">${esc(error.message)}</div>`; return; }
-  if(!data?.length){ box.innerHTML='<div style="font-size:.78rem;color:var(--ink-light)">Không tìm thấy học sinh phù hợp.</div>'; return; }
-  data.forEach(s=>{ S.studentMap[s.id]=s; });
-  box.innerHTML = data.map(s=>`<div class="student-result"><div><div style="font-weight:800;color:var(--navy)">${esc(s.full_name || "Học sinh")}</div><div style="font-size:.74rem;color:var(--ink-light)">${esc(s.email || "")}${s.phone ? " • "+esc(s.phone) : ""}</div></div><button class="btn btn-primary" type="button" onclick="selectStudent('${s.id}')">Link</button></div>`).join("");
-}
-function selectStudent(id){
-  const s = S.studentMap[id];
-  document.getElementById("studentId").value = id;
-  renderLinkedStudent(s || {id});
-  document.getElementById("studentResults").innerHTML = "";
-  if(s){
-    if(!document.getElementById("studentName").value) document.getElementById("studentName").value = s.full_name || "";
-    if(!document.getElementById("studentPhone").value) document.getElementById("studentPhone").value = s.phone || "";
-    if(!document.getElementById("parentName").value) document.getElementById("parentName").value = s.parent_full_name || "";
-    if(!document.getElementById("parentPhone").value) document.getElementById("parentPhone").value = s.parent_phone || "";
-  }
-}
 function payloadFromForm(){
   const schedule1 = document.getElementById("schedule1Id").value || null;
   const schedule2 = document.getElementById("schedule2Id").value || null;
@@ -521,7 +679,7 @@ function payloadFromForm(){
 }
 async function saveTrialRequest(options={}){
   const id = document.getElementById("editId").value;
-  const payload = payloadFromForm();
+  let payload = payloadFromForm();
   if(!payload.student_name || !payload.phone || !payload.parent_full_name || !payload.parent_phone || !payload.grade || !payload.subject){
     alert("Vui lòng nhập đủ họ tên học sinh, SĐT học sinh, họ tên phụ huynh, SĐT phụ huynh, khối và môn.");
     return null;
@@ -533,6 +691,14 @@ async function saveTrialRequest(options={}){
   if(payload._schedule1 && payload._date1 && !dateMatchesSchedule(payload._date1, payload._schedule1)){ alert("Ngày học thử buổi 1 phải đúng thứ của lịch đã chọn."); return null; }
   if(payload._schedule2 && payload._date2 && !dateMatchesSchedule(payload._date2, payload._schedule2)){ alert("Ngày học thử buổi 2 phải đúng thứ của lịch đã chọn."); return null; }
   if(payload.trial_session_1_at && payload.trial_session_2_at && new Date(payload.trial_session_2_at) <= new Date(payload.trial_session_1_at)){ alert("Thời gian học thử buổi 2 phải sau buổi 1."); return null; }
+  try {
+    const accounts = await ensureTrialAccounts({ create: true });
+    if (!accounts.student?.id) return null;
+  } catch (error) {
+    alert("Không thể tạo/liên kết tài khoản: " + (error.message || error));
+    return null;
+  }
+  payload = payloadFromForm();
   delete payload._date1; delete payload._date2; delete payload._schedule1; delete payload._schedule2;
   payload.status = computedStatus({...payload, status: payload.trial_class_id ? "scheduled" : "pending_schedule"});
   if(!id) payload.source_url = "admin";
@@ -542,27 +708,6 @@ async function saveTrialRequest(options={}){
   if(!options.silent) toast("Đã lưu học thử");
   await loadTrialRequests();
   return true;
-}
-async function createStudentAccount(){
-  const id = document.getElementById("editId").value;
-  if(!id){ alert("Hãy lưu học sinh học thử trước, sau đó mở lại dòng đó để tạo tài khoản."); return; }
-  const item = S.requests.find(row=>row.id===id);
-  if(!item || item.student_id){ alert(item?.student_id ? "Học sinh này đã được link tài khoản." : "Không tìm thấy học sinh học thử này."); return; }
-  const fullName = document.getElementById("studentName").value.trim() || item.student_name || "";
-  const phone = document.getElementById("studentPhone").value.trim() || item.phone || "";
-  if(!fullName || !phone){ alert("Cần có họ tên và SĐT để tạo tài khoản học sinh."); return; }
-  const digits = phone.replace(/\D+/g,"");
-  const email = `${slugName(fullName)}${digits ? digits.slice(-4) : String(Date.now()).slice(-5)}@gmail.com`;
-  const password = digits.length >= 6 ? digits : "123456";
-  const {error} = await sb.rpc("admin_import_students_batch",{p_rows:[{email,full_name:fullName,phone,parent_full_name:document.getElementById("parentName").value.trim(),parent_phone:document.getElementById("parentPhone").value.trim(),password,role:"student"}]});
-  if(error){ alert("Không thể tạo tài khoản học sinh: "+error.message); return; }
-  const {data:student,error:findError} = await sb.from("users").select("id,full_name,email,phone,parent_full_name,parent_phone").eq("email",email).maybeSingle();
-  if(findError || !student){ alert("Đã gọi tạo tài khoản nhưng chưa tìm thấy tài khoản vừa tạo. Hãy tải lại rồi thử link thủ công."); return; }
-  const {error:updateError} = await sb.from("trial_lesson_requests").update({student_id:student.id,handled_at:new Date().toISOString()}).eq("id",id);
-  if(updateError){ alert("Tạo tài khoản xong nhưng chưa link được vào học thử: "+updateError.message); return; }
-  alert(`Đã tạo tài khoản học sinh.\nEmail: ${email}\nMật khẩu: ${password}`);
-  await loadTrialRequests();
-  openTrialModal(id);
 }
 async function deleteTrial(id){
   if(!id) return;
@@ -630,6 +775,14 @@ async function addTrialToClassFromModal(){
 document.getElementById("statusFilter").addEventListener("change",renderRequests);
 document.getElementById("gradeFilter").addEventListener("change",()=>{ renderSubjectFilter(); renderRequests(); });
 document.getElementById("subjectFilter").addEventListener("change",renderRequests);
+["studentName","studentPhone"].forEach(id=>{
+  const el = document.getElementById(id);
+  el?.addEventListener("blur",()=>scheduleAccountCheck("student"));
+});
+["parentName","parentPhone"].forEach(id=>{
+  const el = document.getElementById(id);
+  el?.addEventListener("blur",()=>scheduleAccountCheck("parent"));
+});
 window.MindupLiveUI?.watchTable?.("trial_lesson_requests", loadTrialRequests);
 loadTrialRequests();
 </script>
