@@ -134,6 +134,16 @@
       || task.metadata?.requires_result === true;
   }
 
+  function progressPercent(item) {
+    const progress = item.task?.progress;
+    return pct(progress?.current || 0, progress?.total || 0);
+  }
+
+  function isAdminActionTask(item) {
+    return !isReminderTask(item)
+      && (Number(item.task?.progress?.total || 0) > 0 || isManualAssignedTask(item));
+  }
+
   function isProgressComplete(item) {
     const progress = item.task?.progress;
     return Boolean(progress?.total) && Number(progress.current || 0) >= Number(progress.total || 0);
@@ -177,9 +187,14 @@
     return S.assignments.filter(item => {
       const day = taskDay(item);
       if (S.profile?.role === "admin" && S.selectedUserId !== "all" && item.user_id !== S.selectedUserId) return false;
+      if (S.profile?.role === "admin" && !isAdminActionTask(item)) return false;
       return inRange(day, start, end);
     }).sort((a, b) => {
       const priority = { urgent: 0, important: 1, normal: 2 };
+      if (S.profile?.role === "admin") {
+        const progressDiff = progressPercent(b) - progressPercent(a);
+        if (progressDiff) return progressDiff;
+      }
       const reminderDiff = Number(isReminderTask(a)) - Number(isReminderTask(b));
       if (reminderDiff) return reminderDiff;
       const status = Number(effectiveStatus(a) === "completed") - Number(effectiveStatus(b) === "completed");
@@ -218,6 +233,7 @@
   }
 
   async function loadScheduleFallbackTasks(existingAssignments) {
+    if (S.profile.role === "admin") return [];
     const today = localDate();
     const weekday = weekdayOf(today);
     let staffQuery = sb.from("class_teachers").select("class_id,teacher_id");
@@ -295,7 +311,7 @@
     const today = localDate();
     const scoped = S.assignments.filter(item =>
       S.profile?.role !== "admin" || S.selectedUserId === "all" || item.user_id === S.selectedUserId
-    );
+    ).filter(item => S.profile?.role !== "admin" || isAdminActionTask(item));
     const open = scoped.filter(item => effectiveStatus(item) !== "completed" && item.status !== "cancelled");
     E.todayCount.textContent = open.filter(item => taskDay(item) === today).length;
     E.importantCount.textContent = open.filter(item =>
@@ -409,7 +425,7 @@
   function renderProgressList(rows) {
     const progressRows = rows
       .filter(item => item.task?.progress?.total)
-      .sort((a, b) => pct(a.task.progress.current, a.task.progress.total) - pct(b.task.progress.current, b.task.progress.total))
+      .sort((a, b) => progressPercent(b) - progressPercent(a))
       .slice(0, 8);
     if (!progressRows.length) return '<div class="task-empty" style="padding:20px">Chưa có công việc nào có tiến độ đo được trong tháng này.</div>';
     return `<div class="task-progress-list">${progressRows.map(item => {
@@ -445,14 +461,17 @@
   }
 
   function renderMonthDashboard(rows) {
-    const actionRows = rows.filter(item => !isReminderTask(item));
-    const reminderRows = rows.filter(isReminderTask);
+    const adminOnly = S.profile?.role === "admin";
+    const actionRows = adminOnly
+      ? rows.filter(isAdminActionTask).sort((a, b) => progressPercent(b) - progressPercent(a))
+      : rows.filter(item => !isReminderTask(item));
+    const reminderRows = adminOnly ? [] : rows.filter(isReminderTask);
     const completed = actionRows.filter(item => effectiveStatus(item) === "completed").length;
     const overdue = actionRows.filter(isOverdue).length;
     const progressRows = actionRows.filter(item => item.task?.progress?.total);
     const progressDone = progressRows.reduce((sum, item) => sum + Number(item.task.progress.current || 0), 0);
     const progressTotal = progressRows.reduce((sum, item) => sum + Number(item.task.progress.total || 0), 0);
-    const unfinished = actionRows.filter(item => effectiveStatus(item) !== "completed").slice(0, 12);
+    const mainRows = adminOnly ? actionRows.slice(0, 30) : actionRows.filter(item => effectiveStatus(item) !== "completed").slice(0, 12);
     const reminders = reminderRows.slice(0, 12);
     return `
       <section class="task-month-dashboard">
@@ -466,16 +485,16 @@
           <h2>Tiến độ cần hoàn thiện</h2>
           ${renderProgressList(actionRows)}
         </section>
-        <section class="task-panel">
+        ${adminOnly ? "" : `<section class="task-panel">
           <h2>Biểu đồ công việc trong tháng</h2>
           ${renderMiniChart(actionRows)}
-        </section>
-        <h2 class="task-month-section-title">Việc cần xử lý</h2>
-        ${unfinished.length ? unfinished.map(taskCard).join("") : '<div class="task-empty" style="padding:22px">Không còn công việc cần hoàn thiện trong tháng này.</div>'}
-        <section class="task-reminder-group">
+        </section>`}
+        <h2 class="task-month-section-title">${adminOnly ? "Công việc theo tiến độ / nộp thành quả" : "Việc cần xử lý"}</h2>
+        ${mainRows.length ? mainRows.map(taskCard).join("") : '<div class="task-empty" style="padding:22px">Không còn công việc cần hoàn thiện trong tháng này.</div>'}
+        ${adminOnly ? "" : `<section class="task-reminder-group">
           <h2 class="task-month-section-title">Nhắc nhở trong tháng</h2>
           ${reminders.length ? reminders.map(taskCard).join("") : '<div class="task-empty" style="padding:22px">Không có nhắc nhở trong tháng này.</div>'}
-        </section>
+        </section>`}
       </section>`;
   }
 
