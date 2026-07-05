@@ -332,18 +332,27 @@ function populateClassSelect(){
 }
 function loadClassSchedules(item){
   const classId = document.getElementById("classId")?.value || "";
-  const schedules = activeSchedulesForClass(classId);
+  const schedules = [...activeSchedulesForClass(classId)];
+  [item?.trial_schedule_1_id, item?.trial_schedule_2_id].filter(Boolean).forEach(id => {
+    const savedSchedule = S.scheduleMap[Number(id)];
+    if(savedSchedule && !schedules.some(s => Number(s.id) === Number(id))) schedules.push(savedSchedule);
+  });
+  schedules.sort((a,b)=>Number(a.session_no||1)-Number(b.session_no||1)||Number(a.weekday||0)-Number(b.weekday||0)||String(a.start_time||"").localeCompare(String(b.start_time||"")));
   const makeOptions = selected => '<option value="">-- Chọn lịch --</option>' + schedules.map(s=>`<option value="${s.id}" ${Number(selected)===Number(s.id)?"selected":""}>${esc(scheduleLabel(s.id))}</option>`).join("");
   document.getElementById("schedule1Id").innerHTML = makeOptions(item?.trial_schedule_1_id || "");
   document.getElementById("schedule2Id").innerHTML = makeOptions(item?.trial_schedule_2_id || "");
-  document.getElementById("session1At").value = localDate(item?.trial_session_1_at);
-  document.getElementById("session2At").value = localDate(item?.trial_session_2_at);
+  const savedDate1 = localDate(item?.trial_session_1_at);
+  const savedDate2 = localDate(item?.trial_session_2_at);
+  document.getElementById("session1At").value = savedDate1;
+  document.getElementById("session2At").value = savedDate2;
   if(!item && schedules.length){
     document.getElementById("schedule1Id").value = schedules[0].id;
     document.getElementById("schedule2Id").value = (schedules[1] || schedules[0]).id;
     suggestDate(1); suggestDate(2);
+    return;
   }
-  refreshDateOptions(1); refreshDateOptions(2);
+  refreshDateOptions(1, savedDate1);
+  refreshDateOptions(2, savedDate2);
 }
 function suggestDate(no){
   const scheduleId = Number(document.getElementById(`schedule${no}Id`)?.value || 0);
@@ -356,14 +365,15 @@ function suggestDate(no){
   target.value = nextDateForSchedule(S.scheduleMap[scheduleId], after);
   refreshDateOptions(2);
 }
-function refreshDateOptions(no){
+function refreshDateOptions(no, forcedSelected){
   const input = document.getElementById(`session${no}At`);
   const scheduleId = document.getElementById(`schedule${no}Id`)?.value || "";
   if(!input) return;
-  const selected = input.value;
+  const selected = forcedSelected !== undefined ? forcedSelected : input.value;
   const after = no===2 ? fromLocalDate(document.getElementById("session1At")?.value, document.getElementById("schedule1Id")?.value) : null;
   const options = dateOptions(scheduleId, after, selected);
   input.innerHTML = options.length ? '<option value="">-- Chọn ngày học thử --</option>' + options.map(v=>`<option value="${v}" ${v===selected?"selected":""}>${esc(scheduleDateLabel(v))}</option>`).join("") : '<option value="">-- Chọn lịch trước --</option>';
+  if(selected) input.value = selected;
   input.onchange = () => { if(no===1) refreshDateOptions(2); };
 }
 
