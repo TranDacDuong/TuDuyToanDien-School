@@ -63,6 +63,9 @@ tbody tr:hover td{background:#fff7ed}
 .account-info-grid span:nth-child(odd){color:inherit;opacity:.76}
 .account-info-grid b{word-break:break-all;color:var(--navy)}
 .account-credential-input{width:100%;border:1px solid rgba(39,58,91,.16);border-radius:10px;padding:7px 9px;font:inherit;font-size:.82rem;background:#fff;color:var(--navy)}
+.account-action-row{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
+.account-action-btn{border:1px solid rgba(15,31,61,.14);background:#fff;border-radius:999px;padding:6px 10px;font:inherit;font-size:.78rem;font-weight:900;color:var(--navy);cursor:pointer}
+.account-warning{margin-top:8px;color:#b91c1c;font-weight:900}
 .mini-spinner{width:14px;height:14px;border-radius:999px;border:2px solid rgba(29,78,216,.22);border-top-color:#1d4ed8;animation:spin .7s linear infinite;display:inline-block;flex:0 0 auto}
 @keyframes spin{to{transform:rotate(360deg)}}
 .student-results{margin-top:8px;display:grid;gap:6px}
@@ -165,7 +168,7 @@ tbody tr:hover td{background:#fff7ed}
 
 <script>
 const DAYS = {1:"T2",2:"T3",3:"T4",4:"T5",5:"T6",6:"T7",7:"CN"};
-let S = { requests:[], classes:[], grades:[], subjects:[], classMap:{}, scheduleMap:{}, studentMap:{}, accountCheckTimers:{} };
+let S = { requests:[], classes:[], grades:[], subjects:[], classMap:{}, scheduleMap:{}, studentMap:{}, accountCheckTimers:{}, newAccountMode:{student:false,parent:false} };
 
 function esc(s){ return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function escAttr(s){ return esc(s).replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
@@ -465,13 +468,17 @@ async function syncStatuses(){
 }
 function copyPhone(phone){ if(!phone) return; navigator.clipboard?.writeText(phone); toast("Đã sao chép SĐT"); }
 
-function accountHtml(title, email, password = "") {
+function newAccountButtonHtml(kind) {
+  return `<div class="account-action-row"><button class="account-action-btn" type="button" onclick="useNewAccount('${kind}')">+ Tạo tài khoản mới</button></div>`;
+}
+function accountHtml(title, email, password = "", actionHtml = "") {
   return `
     <div class="account-info-title">${esc(title)}</div>
     <div class="account-info-grid">
       <span>Gmail</span><b>${esc(email || "—")}</b>
       ${password ? `<span>Mật khẩu</span><b>${esc(password)}</b>` : ""}
-    </div>`;
+    </div>
+    ${actionHtml || ""}`;
 }
 function editableAccountHtml(kind, title, email, password = "") {
   return `
@@ -480,6 +487,14 @@ function editableAccountHtml(kind, title, email, password = "") {
       <span>Gmail</span><input class="account-credential-input" id="${kind}PreviewEmail" value="${escAttr(email || "")}" autocomplete="off">
       <span>Mật khẩu</span><input class="account-credential-input" id="${kind}PreviewPassword" value="${escAttr(password || "")}" autocomplete="new-password">
     </div>`;
+}
+function duplicateEmailHtml(kind, email, password, duplicateUser) {
+  const phone = duplicateUser?.phone || "Chưa có SĐT";
+  const name = duplicateUser?.full_name || duplicateUser?.email || "";
+  return `
+    <div class="account-info-title">Gmail này đang trùng</div>
+    <div class="account-warning">${esc(email)} đã thuộc tài khoản ${esc(name)} - SĐT: ${esc(phone)}</div>
+    ${editableAccountHtml(kind, "Sửa lại gmail/mật khẩu rồi bấm Lưu học thử", email, password)}`;
 }
 function previewCredentials(kind, fullName, phone) {
   const emailEl = document.getElementById(`${kind}PreviewEmail`);
@@ -519,6 +534,37 @@ async function findUserByPhone(phone, role) {
   }
   return candidates.find(user => user.role === role && phoneDigits(user.phone) === digits) || null;
 }
+async function findUserByEmail(email) {
+  const normalized = String(email || "").trim().toLowerCase();
+  if (!normalized) return null;
+  const { data } = await sb.from("users")
+    .select("id,full_name,email,phone,role")
+    .ilike("email", normalized)
+    .maybeSingle();
+  return data || null;
+}
+
+function renderNewAccountPreview(kind) {
+  const isStudent = kind === "student";
+  const fullName = document.getElementById(isStudent ? "studentName" : "parentName").value.trim();
+  const phone = document.getElementById(isStudent ? "studentPhone" : "parentPhone").value.trim();
+  if (!fullName || !phone) {
+    setAccountInfo(kind, `Nhập họ tên và SĐT ${isStudent ? "học sinh" : "phụ huynh"} để tạo tài khoản mới.`, "warn");
+    return;
+  }
+  setAccountInfo(kind, editableAccountHtml(
+    kind,
+    `Sẽ tạo tài khoản ${isStudent ? "học sinh" : "phụ huynh"} mới khi bấm Lưu học thử`,
+    generatedEmail("", fullName, phone),
+    defaultPasswordFromPhone(phone)
+  ), "warn");
+}
+function useNewAccount(kind) {
+  S.newAccountMode[kind] = true;
+  if (kind === "student") document.getElementById("studentId").value = "";
+  if (kind === "parent") document.getElementById("parentId").value = "";
+  renderNewAccountPreview(kind);
+}
 
 function updateStudentFieldsFromAccount(student) {
   if (!student) return;
@@ -540,21 +586,21 @@ async function ensureStudentAccount({ create = true } = {}) {
   setAccountInfo("student", loadingAccountHtml("Đang kiểm tra tài khoản học sinh..."), "loading");
 
   const existingId = document.getElementById("studentId").value;
-  if (existingId) {
+  if (existingId && !S.newAccountMode.student) {
     const cached = S.studentMap[existingId];
     if (cached?.phone && phoneDigits(cached.phone) && phoneDigits(cached.phone) !== phoneDigits(phone)) {
       document.getElementById("studentId").value = "";
     } else {
-      setAccountInfo("student", accountHtml("Đã liên kết với tài khoản học sinh", cached?.email || existingId));
+      setAccountInfo("student", accountHtml("Đã liên kết với tài khoản học sinh", cached?.email || existingId, "", newAccountButtonHtml("student")));
       return cached || { id: existingId };
     }
   }
 
   const existing = await findUserByPhone(phone, "student");
-  if (existing) {
+  if (existing && !S.newAccountMode.student) {
     S.studentMap[existing.id] = existing;
     updateStudentFieldsFromAccount(existing);
-    setAccountInfo("student", accountHtml("Đã liên kết với tài khoản học sinh", existing.email || existing.full_name));
+    setAccountInfo("student", accountHtml("Đã liên kết với tài khoản học sinh", existing.email || existing.full_name, "", newAccountButtonHtml("student")));
     return existing;
   }
   if (!create) {
@@ -566,6 +612,11 @@ async function ensureStudentAccount({ create = true } = {}) {
   if (!credentials.email.includes("@") || credentials.password.length < 6) {
     setAccountInfo("student", "Gmail phải hợp lệ và mật khẩu tối thiểu 6 ký tự.", "warn");
     return null;
+  }
+  const duplicate = await findUserByEmail(credentials.email);
+  if (duplicate) {
+    setAccountInfo("student", duplicateEmailHtml("student", credentials.email, credentials.password, duplicate), "warn");
+    throw new Error(`Gmail học sinh đang trùng với SĐT ${duplicate.phone || "chưa có"}.`);
   }
   setAccountInfo("student", loadingAccountHtml("Chưa có tài khoản, đang tạo tài khoản học sinh..."), "loading");
   const { data, error } = await sb.rpc("admin_import_students_batch", {
@@ -590,6 +641,7 @@ async function ensureStudentAccount({ create = true } = {}) {
     .maybeSingle();
   if (findError || !student) throw findError || new Error("Không tìm thấy tài khoản học sinh vừa tạo.");
   S.studentMap[student.id] = student;
+  S.newAccountMode.student = false;
   updateStudentFieldsFromAccount(student);
   setAccountInfo("student", accountHtml("Tài khoản học sinh mới", student.email || credentials.email, created?.password || credentials.password));
   return student;
@@ -606,7 +658,7 @@ async function ensureParentAccount(studentId, { create = true } = {}) {
   setAccountInfo("parent", loadingAccountHtml("Đang kiểm tra tài khoản phụ huynh..."), "loading");
 
   const existingId = document.getElementById("parentId").value;
-  if (existingId) {
+  if (existingId && !S.newAccountMode.parent) {
     const { data: parent } = await sb.from("users").select("id,full_name,email,phone,role").eq("id", existingId).maybeSingle();
     if (parent?.phone && phoneDigits(parent.phone) && phoneDigits(parent.phone) !== phoneDigits(phone)) {
       document.getElementById("parentId").value = "";
@@ -616,15 +668,15 @@ async function ensureParentAccount(studentId, { create = true } = {}) {
           p_rows: [{ email: parent.email, full_name: fullName || parent.full_name || "Phụ huynh", phone: phone || parent.phone || "", student_id: studentId, relationship: "parent" }]
         });
       }
-      setAccountInfo("parent", accountHtml("Đã liên kết với tài khoản phụ huynh", parent?.email || existingId));
+      setAccountInfo("parent", accountHtml("Đã liên kết với tài khoản phụ huynh", parent?.email || existingId, "", newAccountButtonHtml("parent")));
       return parent || { id: existingId };
     }
   }
 
   const existing = await findUserByPhone(phone, "parent");
-  if (existing) {
+  if (existing && !S.newAccountMode.parent) {
     document.getElementById("parentId").value = existing.id || "";
-    setAccountInfo("parent", accountHtml("Đã liên kết với tài khoản phụ huynh", existing.email || existing.full_name));
+    setAccountInfo("parent", accountHtml("Đã liên kết với tài khoản phụ huynh", existing.email || existing.full_name, "", newAccountButtonHtml("parent")));
     if (studentId) {
       await sb.rpc("admin_import_parents_batch", {
         p_rows: [{ email: existing.email, full_name: fullName || existing.full_name || "Phụ huynh", phone: phone || existing.phone || "", student_id: studentId, relationship: "parent" }]
@@ -641,6 +693,11 @@ async function ensureParentAccount(studentId, { create = true } = {}) {
   if (!credentials.email.includes("@") || credentials.password.length < 6) {
     setAccountInfo("parent", "Gmail phải hợp lệ và mật khẩu tối thiểu 6 ký tự.", "warn");
     return null;
+  }
+  const duplicate = await findUserByEmail(credentials.email);
+  if (duplicate) {
+    setAccountInfo("parent", duplicateEmailHtml("parent", credentials.email, credentials.password, duplicate), "warn");
+    throw new Error(`Gmail phụ huynh đang trùng với SĐT ${duplicate.phone || "chưa có"}.`);
   }
   setAccountInfo("parent", loadingAccountHtml("Chưa có tài khoản, đang tạo tài khoản phụ huynh..."), "loading");
   const { data, error } = await sb.rpc("admin_import_parents_batch", {
@@ -663,6 +720,7 @@ async function ensureParentAccount(studentId, { create = true } = {}) {
     .eq("email", created?.email || credentials.email)
     .maybeSingle();
   if (findError || !parent) throw findError || new Error("Không tìm thấy tài khoản phụ huynh vừa tạo.");
+  S.newAccountMode.parent = false;
   document.getElementById("parentId").value = parent.id || "";
   setAccountInfo("parent", accountHtml("Tài khoản phụ huynh mới", parent.email || credentials.email, created?.password || credentials.password));
   return parent;
@@ -689,6 +747,7 @@ function scheduleAccountCheck(kind) {
 
 function openTrialModal(id){
   const item = id ? S.requests.find(row=>row.id===id) : null;
+  S.newAccountMode = { student:false, parent:false };
   document.getElementById("modalTitle").textContent = item ? "Chi tiết học sinh học thử" : "Thêm học sinh học thử";
   document.getElementById("editId").value = item?.id || "";
   document.getElementById("studentId").value = item?.student_id || "";
@@ -703,7 +762,7 @@ function openTrialModal(id){
   populateClassSelect();
   document.getElementById("classId").value = item?.trial_class_id || "";
   loadClassSchedules(item);
-  setAccountInfo("student", item?.linkedStudent ? accountHtml("Đã liên kết với tài khoản học sinh", item.linkedStudent.email || item.linkedStudent.full_name || item.linkedStudent.id) : "");
+  setAccountInfo("student", item?.linkedStudent ? accountHtml("Đã liên kết với tài khoản học sinh", item.linkedStudent.email || item.linkedStudent.full_name || item.linkedStudent.id, "", newAccountButtonHtml("student")) : "");
   setAccountInfo("parent", "");
   document.getElementById("trialModal").classList.add("show");
 }
