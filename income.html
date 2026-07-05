@@ -156,6 +156,7 @@
   .kpi-card.salary::before { background: linear-gradient(180deg, #3b82f6, #2563eb); }
   .kpi-card.bonus::before { background: linear-gradient(180deg, #f59e0b, #d97706); }
   .kpi-card.income::before { background: linear-gradient(180deg, #8b5cf6, #7c3aed); }
+  .kpi-card.projected::before { background: linear-gradient(180deg, #ec4899, #be185d); }
 
   .kpi-label {
     font-size: 0.82rem;
@@ -592,6 +593,11 @@
         <div class="kpi-value" id="kpiTotalIncome">0đ</div>
         <span class="kpi-sub">Lương cứng + Thưởng</span>
       </div>
+      <div class="kpi-card projected">
+        <span class="kpi-label">Dự kiến khi thu đủ</span>
+        <div class="kpi-value" id="kpiProjectedIncome">0đ</div>
+        <span class="kpi-sub" id="kpiProjectedSub">Nếu thu đủ học phí dự kiến</span>
+      </div>
     </div>
 
     <!-- Progress / Milestones visualizer -->
@@ -659,6 +665,7 @@
                   <th class="text-right">Cần thu</th>
                   <th class="text-right">Thực thu</th>
                   <th class="text-right">Phân bổ GV</th>
+                  <th class="text-right">Dự kiến GV</th>
                 </tr>
               </thead>
               <tbody id="classRevenueBody"></tbody>
@@ -1208,7 +1215,8 @@
           studentsCount: 0,
           totalExpected: 0,
           totalActualPaid: 0,
-          allocatedTeacherRevenue: 0
+          allocatedTeacherRevenue: 0,
+          projectedTeacherRevenue: 0
         };
       });
 
@@ -1239,6 +1247,7 @@
         classSummaries[classId].totalExpected += classExpected;
         classSummaries[classId].totalActualPaid += studentClassRevenue;
         classSummaries[classId].allocatedTeacherRevenue += studentClassRevenue;
+        classSummaries[classId].projectedTeacherRevenue += classExpected;
         totalClassRevenueAllocated += studentClassRevenue;
       });
 
@@ -1256,11 +1265,12 @@
               <td class="text-right">${fmt(s.totalExpected)}đ</td>
               <td class="text-right">${fmt(s.totalActualPaid)}đ</td>
               <td class="text-right" style="font-weight:700;color:var(--green)">${fmt(s.allocatedTeacherRevenue)}đ</td>
+              <td class="text-right" style="font-weight:700;color:#be185d">${fmt(s.projectedTeacherRevenue)}đ</td>
             </tr>
           `;
         }).join("");
       } else {
-        classTbody.innerHTML = `<tr><td colspan="5" class="empty-state">Không có lớp học nào do giáo viên này quản lý trong tháng.</td></tr>`;
+        classTbody.innerHTML = `<tr><td colspan="6" class="empty-state">Không có lớp học nào do giáo viên này quản lý trong tháng.</td></tr>`;
       }
 
       // Calculate Course Revenue
@@ -1294,17 +1304,23 @@
 
       // Aggregate revenue
       const totalRevenue = totalClassRevenueAllocated + totalCourseRevenue;
+      const totalProjectedClassRevenue = Object.values(classSummaries)
+        .reduce((sum, item) => sum + Number(item.projectedTeacherRevenue || 0), 0);
+      const totalProjectedRevenue = totalProjectedClassRevenue + totalCourseRevenue;
       
       // Calculate progressive breakdown
       const salaryDetails = calculateSalaryBreakdown(totalRevenue, teacherSalaryConfig.base_salary, teacherSalaryConfig.base_tier_percent);
+      const projectedSalaryDetails = calculateSalaryBreakdown(totalProjectedRevenue, teacherSalaryConfig.base_salary, teacherSalaryConfig.base_tier_percent);
 
       // Render KPIs
       document.getElementById("kpiRevenue").textContent = fmt(totalRevenue) + "đ";
       document.getElementById("kpiSalary").textContent = fmt(salaryDetails.baseSalary) + "đ";
       document.getElementById("kpiBonus").textContent = fmt(salaryDetails.totalBonus) + "đ";
       document.getElementById("kpiTotalIncome").textContent = fmt(salaryDetails.totalIncome) + "đ";
+      document.getElementById("kpiProjectedIncome").textContent = fmt(projectedSalaryDetails.totalIncome) + "đ";
       
       document.getElementById("kpiRevenueSub").innerHTML = `Lớp ghép: ${fmt(totalClassRevenueAllocated)}đ | Khóa: ${fmt(totalCourseRevenue)}đ`;
+      document.getElementById("kpiProjectedSub").innerHTML = `Doanh thu đủ: ${fmt(totalProjectedRevenue)}đ | Thưởng: ${fmt(projectedSalaryDetails.totalBonus)}đ`;
       
       // Render breakdown table
       const breakdownTbody = document.getElementById("bonusBreakdownBody");
