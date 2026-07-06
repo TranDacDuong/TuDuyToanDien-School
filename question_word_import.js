@@ -21,9 +21,15 @@
 
     try {
       const arrayBuffer = await file.arrayBuffer();
+      const docxValidation = validateDocxPackage(arrayBuffer);
+      if (!docxValidation.valid) {
+        alert(docxValidation.message);
+        return;
+      }
+
       const [rawResult, htmlResult] = await Promise.all([
-        window.mammoth.extractRawText({ arrayBuffer }),
-        window.mammoth.convertToHtml({ arrayBuffer }),
+        window.mammoth.extractRawText({ arrayBuffer: arrayBuffer.slice(0) }),
+        window.mammoth.convertToHtml({ arrayBuffer: arrayBuffer.slice(0) }),
       ]);
 
       const source = buildStructuredWordSource(htmlResult?.value || "", rawResult?.value || "");
@@ -45,8 +51,56 @@
       });
       openImportReviewModal(enrichedQuestions, parsed.warnings);
     } catch (error) {
-      alert("Không đọc được file Word: " + (error?.message || error));
+      alert(formatWordImportError(error));
     }
+  }
+
+  function validateDocxPackage(arrayBuffer) {
+    const bytes = new Uint8Array(arrayBuffer || new ArrayBuffer(0));
+    if (bytes.length < 4) {
+      return {
+        valid: false,
+        message: "Không đọc được file Word: file đang rỗng hoặc bị lỗi.",
+      };
+    }
+
+    const isZipPackage = bytes[0] === 0x50 && bytes[1] === 0x4B;
+    if (!isZipPackage) {
+      return {
+        valid: false,
+        message: "Không đọc được file Word: file này không phải .docx hợp lệ. Nếu đây là file .doc cũ hoặc file vừa bị đổi đuôi sang .docx, hãy mở bằng Microsoft Word/Google Docs rồi Save As/Download lại đúng định dạng Word Document (.docx).",
+      };
+    }
+
+    const packageText = bytesToLatin1Preview(bytes);
+    if (!packageText.includes("[Content_Types].xml") || !packageText.includes("word/document.xml")) {
+      return {
+        valid: false,
+        message: "Không đọc được file Word: file .docx này không có phần nội dung chính của Word. Bạn hãy mở file bằng Microsoft Word/Google Docs rồi lưu lại thành file .docx mới, sau đó import lại.",
+      };
+    }
+
+    return { valid: true, message: "" };
+  }
+
+  function bytesToLatin1Preview(bytes) {
+    const chunkSize = 0x8000;
+    const parts = [];
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      parts.push(String.fromCharCode(...bytes.subarray(i, Math.min(i + chunkSize, bytes.length))));
+    }
+    return parts.join("");
+  }
+
+  function formatWordImportError(error) {
+    const message = String(error?.message || error || "");
+    if (/main document part/i.test(message)) {
+      return "Không đọc được file Word: file .docx này thiếu phần nội dung chính của Word. Thường là do file không phải .docx thật, file bị đổi đuôi, hoặc file export bị lỗi. Hãy mở file bằng Microsoft Word/Google Docs rồi Save As/Download lại thành Word Document (.docx).";
+    }
+    if (/end of central directory|zip|corrupt|invalid/i.test(message)) {
+      return "Không đọc được file Word: file .docx có vẻ bị lỗi hoặc không đúng định dạng. Hãy lưu lại file thành .docx mới rồi thử import lại.";
+    }
+    return "Không đọc được file Word: " + message;
   }
 
   function buildStructuredWordSource(html, rawFallback) {
