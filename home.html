@@ -2298,7 +2298,7 @@ async function loadStudentReportData(studentId) {
     const scorePoints = [
       ...(results || []).map(r => {
         const maxPts = Number(r.exams?.total_points) || 10;
-        const score = Number(r.score_total ?r.score_auto);
+        const score = Number(r.score_total ?? r.score_auto);
         if (!Number.isFinite(score) || !Number.isFinite(maxPts) || maxPts <= 0) return null;
         const d = new Date(r.submitted_at);
         const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
@@ -3260,8 +3260,8 @@ function buildCard(post) {
 
   const dt = new Date(post.created_at);
   const timeStr = dt.toLocaleString("vi-VN", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" });
-  const likeCount = post.likes?.[0]?.count ?0;
-  const cmtCount = post.comments?.[0]?.count ?0;
+  const likeCount = post.likes?.[0]?.count ?? 0;
+  const cmtCount = post.comments?.[0]?.count ?? 0;
   const isLiked = likedPostIds.has(post.id);
 
   const statusBadge = isPending ?`<span class="badge-pending">Chờ duyệt</span>` : isRejected ?`<span class="badge-rejected">Từ chối</span>` : "";
@@ -3327,7 +3327,7 @@ function buildCard(post) {
       <img class="post-avatar" src="${post.users?.avatar_url||'default-avatar.png'}" onerror="this.src='default-avatar.png'">
       <div class="post-meta">
         <div class="post-author">
-          <a class="post-author-link" href="profile.html?id=${post.user_id}">${esc(post.users?.full_name ?"Người dùng")}</a>
+          <a class="post-author-link" href="profile.html?id=${post.user_id}">${esc(post.users?.full_name || "Người dùng")}</a>
           ${visibilityBadge}
           ${statusBadge}
         </div>
