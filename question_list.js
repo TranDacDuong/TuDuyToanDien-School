@@ -120,7 +120,7 @@ f_difficulty.onchange = () => {
 }
 
 async function loadCreatorFilter() {
-  const { data } = await sb.from("users").select("id,full_name").in("role", ["admin", "teacher"]).order("full_name")
+  const { data } = await sb.from("users").select("id,full_name").in("role", ["admin", "teacher", "assistant"]).order("full_name")
   const sel = document.getElementById("f_creator")
   if (!sel) return
 
@@ -164,7 +164,7 @@ function isMissingQuestionIssueTable(error) {
 }
 
 async function loadQuestionIssueReports(silent = false) {
-  if (!["admin", "teacher"].includes(currentRole)) return
+  if (!["admin", "teacher", "assistant"].includes(currentRole)) return
   const listEl = document.getElementById("questionIssueList")
   const summaryEl = document.getElementById("questionIssueSummary")
   if (listEl && !silent) listEl.innerHTML = `<div class="empty-state"><strong>Đang tải báo lỗi</strong><p>Hệ thống đang lấy phản hồi từ học sinh.</p></div>`
@@ -1553,7 +1553,7 @@ async function getUserRole() {
   if (!user) return
   const { data } = await sb.from("users").select("role").eq("id", user.id).single()
   currentRole = data?.role || ""
-  if (!["admin", "teacher"].includes(currentRole)) {
+  if (!["admin", "teacher", "assistant"].includes(currentRole)) {
     window.location.href = "dashboard.html"
     return false
   }

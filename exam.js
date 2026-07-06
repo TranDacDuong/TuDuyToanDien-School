@@ -52,6 +52,10 @@
   let bankData      = [];
   let currentExamMode = "normal";
 
+  function isOwnerLimitedRole(role = currentRole) {
+    return role === "teacher" || role === "assistant";
+  }
+
   /* ── Init ── */
   async function initUser() {
     const sb = getSb();
@@ -60,7 +64,7 @@
     currentUser = user;
     const { data: profile } = await sb.from("users").select("role").eq("id", user.id).single();
     currentRole = String(profile?.role || "teacher");
-    if (!["admin", "teacher"].includes(currentRole)) {
+    if (!["admin", "teacher", "assistant"].includes(currentRole)) {
       location.href = "dashboard.html";
       return false;
     }
@@ -191,7 +195,7 @@
     if (!confirm("Xóa đề này? Các lớp đang dùng đề này sẽ mất liên kết.")) return;
     const sb = getSb();
     const { data: exam } = await sb.from("exams").select("created_by").eq("id", id).single();
-    if (currentRole === "teacher" && exam?.created_by !== currentUser.id) {
+    if (isOwnerLimitedRole() && exam?.created_by !== currentUser.id) {
       alert("Bạn không có quyền xóa đề này."); return;
     }
     await sb.from("class_exams").delete().eq("exam_id", id);
@@ -212,7 +216,7 @@
       alert("Không tải được đề cần nhân bản.");
       return;
     }
-    if (currentRole === "teacher" && exam.created_by !== currentUser.id) {
+    if (isOwnerLimitedRole() && exam.created_by !== currentUser.id) {
       alert("Bạn không có quyền nhân bản đề này.");
       return;
     }
@@ -276,7 +280,7 @@
     if (!confirm("Xóa đề PDF này?")) return;
     const sb = getSb();
     const { data: exam } = await sb.from("pdf_exams").select("created_by").eq("id", id).single();
-    if (currentRole === "teacher" && exam?.created_by !== currentUser.id) {
+    if (isOwnerLimitedRole() && exam?.created_by !== currentUser.id) {
       alert("Bạn không có quyền xóa đề PDF này."); return;
     }
     const { error } = await sb.from("pdf_exams").delete().eq("id", id);
@@ -301,7 +305,7 @@
     bankPage  = 0;
     bankData  = [];
 
-    if (examId && currentRole === "teacher") {
+    if (examId && isOwnerLimitedRole()) {
       const sb = getSb();
       const { data: exam } = await sb.from("exams").select("created_by").eq("id", examId).single();
       if (exam?.created_by !== currentUser.id) readOnly = true;
@@ -425,7 +429,7 @@
       .select("*, topics(id,name,subjects(id,name,grades(id,name)))", { count: "exact" })
       .eq("hidden", false);
 
-    if (currentRole === "teacher") {
+    if (isOwnerLimitedRole()) {
       query = sb
         .from("question_bank")
         .select("*, topics(id,name,subjects(id,name,grades(id,name)))", { count: "exact" })
@@ -883,7 +887,7 @@
     let examId = editingExamId;
     if (examId) {
       const { data: existing } = await sb.from("exams").select("created_by").eq("id", examId).single();
-      if (currentRole === "teacher" && existing?.created_by !== currentUser.id) {
+      if (isOwnerLimitedRole() && existing?.created_by !== currentUser.id) {
         alert("Bạn không có quyền sửa đề này."); return;
       }
       const { error } = await sb.from("exams").update(payload).eq("id", examId);
