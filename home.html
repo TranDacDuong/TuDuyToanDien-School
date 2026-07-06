@@ -2982,7 +2982,7 @@ async function loadComments(pid) {
       <div class="cmt-item reply-indent">
         <img class="cmt-avatar" src="${r.users?.avatar_url||'default-avatar.png'}" onerror="this.src='default-avatar.png'">
         <div class="cmt-bubble">
-          <div class="cmt-name">${esc(r.users?.full_name?"User")}</div>
+          <div class="cmt-name">${esc(r.users?.full_name || "User")}</div>
           <div class="cmt-text">${formatRichText(r.content)}</div>
           ${(role === "admin" || r.user_id === currentUser.id) ?`<div class="cmt-tools"><span class="edit-link" onclick="editComment('${pid}','${r.id}',${JSON.stringify(String(r.content || ""))})">Sửa</span><span class="delete-link" onclick="deleteComment('${pid}','${r.id}')">Xóa</span></div>` : ""}
         </div>
@@ -2992,7 +2992,7 @@ async function loadComments(pid) {
         <img class="cmt-avatar" src="${c.users?.avatar_url||'default-avatar.png'}" onerror="this.src='default-avatar.png'">
         <div style="flex:1">
           <div class="cmt-bubble">
-            <div class="cmt-name">${esc(c.users?.full_name?"User")}</div>
+            <div class="cmt-name">${esc(c.users?.full_name || "User")}</div>
             <div class="cmt-text">${formatRichText(c.content)}</div>
             <div class="cmt-time">${t}</div>
           </div>
