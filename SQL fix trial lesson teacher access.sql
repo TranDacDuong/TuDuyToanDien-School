@@ -1,5 +1,5 @@
--- Allow teachers to use the Trial Requests page.
--- Run this if teachers get 403/permission errors on trial_lesson_requests.
+-- Allow staff to use the Trial Requests page.
+-- Run this if teachers/assistants get 403/permission errors on trial_lesson_requests.
 
 DROP POLICY IF EXISTS trial_lesson_requests_select_staff_policy ON public.trial_lesson_requests;
 DROP POLICY IF EXISTS trial_lesson_requests_insert_staff_policy ON public.trial_lesson_requests;
@@ -13,7 +13,7 @@ USING (
     SELECT 1
     FROM public.users u
     WHERE u.id = auth.uid()
-      AND u.role IN ('admin', 'teacher')
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
   )
 );
 
@@ -24,7 +24,7 @@ WITH CHECK (
     SELECT 1
     FROM public.users u
     WHERE u.id = auth.uid()
-      AND u.role IN ('admin', 'teacher')
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
   )
 );
 
@@ -35,7 +35,7 @@ USING (
     SELECT 1
     FROM public.users u
     WHERE u.id = auth.uid()
-      AND u.role IN ('admin', 'teacher')
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
   )
 )
 WITH CHECK (
@@ -43,7 +43,7 @@ WITH CHECK (
     SELECT 1
     FROM public.users u
     WHERE u.id = auth.uid()
-      AND u.role IN ('admin', 'teacher')
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
   )
 );
 
@@ -54,7 +54,6 @@ USING (
     SELECT 1
     FROM public.users u
     WHERE u.id = auth.uid()
-      AND u.role IN ('admin', 'teacher')
+      AND u.role::text IN ('admin', 'teacher', 'assistant')
   )
 );
-
