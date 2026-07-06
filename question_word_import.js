@@ -20,7 +20,7 @@
     }
 
     try {
-      const arrayBuffer = await file.arrayBuffer();
+      const arrayBuffer = normalizeDocxZipPaths(await file.arrayBuffer());
       const docxValidation = validateDocxPackage(arrayBuffer);
       if (!docxValidation.valid) {
         alert(docxValidation.message);
@@ -55,6 +55,55 @@
     }
   }
 
+  function normalizeDocxZipPaths(arrayBuffer) {
+    const source = new Uint8Array(arrayBuffer || new ArrayBuffer(0));
+    const bytes = new Uint8Array(source);
+    const view = new DataView(bytes.buffer);
+
+    for (let offset = 0; offset <= bytes.length - 4; offset++) {
+      const signature = view.getUint32(offset, true);
+      if (signature === 0x04034b50) {
+        const nameLength = safeGetUint16(view, offset + 26);
+        const extraLength = safeGetUint16(view, offset + 28);
+        const nameStart = offset + 30;
+        if (replaceZipEntryNameSlashes(bytes, nameStart, nameLength)) {
+          offset = Math.max(offset, nameStart + nameLength + Math.max(extraLength || 0, 0) - 1);
+        }
+      } else if (signature === 0x02014b50) {
+        const nameLength = safeGetUint16(view, offset + 28);
+        const extraLength = safeGetUint16(view, offset + 30);
+        const commentLength = safeGetUint16(view, offset + 32);
+        const nameStart = offset + 46;
+        if (replaceZipEntryNameSlashes(bytes, nameStart, nameLength)) {
+          offset = Math.max(offset, nameStart + nameLength + Math.max(extraLength || 0, 0) + Math.max(commentLength || 0, 0) - 1);
+        }
+      }
+    }
+
+    return bytes.buffer;
+  }
+
+  function safeGetUint16(view, offset) {
+    if (!view || offset < 0 || offset + 2 > view.byteLength) return null;
+    return view.getUint16(offset, true);
+  }
+
+  function replaceZipEntryNameSlashes(bytes, start, length) {
+    if (!Number.isFinite(length) || length <= 0 || start < 0 || start + length > bytes.length) return false;
+    let looksLikeZipName = false;
+    for (let i = start; i < start + length; i++) {
+      const code = bytes[i];
+      if (code === 0 || code > 0x7F) return false;
+      if (code === 0x2F || code === 0x5C || code === 0x2E || code === 0x5F || code === 0x2D) looksLikeZipName = true;
+      if ((code >= 0x30 && code <= 0x39) || (code >= 0x41 && code <= 0x5A) || (code >= 0x61 && code <= 0x7A)) looksLikeZipName = true;
+    }
+    if (!looksLikeZipName) return false;
+    for (let i = start; i < start + length; i++) {
+      if (bytes[i] === 0x5C) bytes[i] = 0x2F;
+    }
+    return true;
+  }
+
   function validateDocxPackage(arrayBuffer) {
     const bytes = new Uint8Array(arrayBuffer || new ArrayBuffer(0));
     if (bytes.length < 4) {
@@ -72,7 +121,7 @@
       };
     }
 
-    const packageText = bytesToLatin1Preview(bytes);
+    const packageText = bytesToLatin1Preview(bytes).replace(/\\/g, "/");
     if (!packageText.includes("[Content_Types].xml") || !packageText.includes("word/document.xml")) {
       return {
         valid: false,
