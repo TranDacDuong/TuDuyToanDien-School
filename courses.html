@@ -18,7 +18,10 @@ body{margin:0;font-family:var(--font-body);background:radial-gradient(circle at 
 textarea{min-height:110px;resize:vertical}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px}
 .course-card{overflow:hidden;display:flex;flex-direction:column}
-.cover{min-height:176px;padding:20px;display:flex;flex-direction:column;justify-content:space-between;background:radial-gradient(circle at top right, rgba(255,255,255,.18), transparent 30%),linear-gradient(135deg,#103d74 0%,#1d6bd1 68%,#d4a63a 100%);color:#fff}
+.cover{position:relative;min-height:176px;padding:20px;display:flex;flex-direction:column;justify-content:space-between;background:radial-gradient(circle at top right, rgba(255,255,255,.18), transparent 30%),linear-gradient(135deg,#103d74 0%,#1d6bd1 68%,#d4a63a 100%);color:#fff;overflow:hidden}
+.cover::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,20,40,.12),rgba(10,20,40,.52));z-index:1;pointer-events:none}
+.cover>*{position:relative;z-index:2}
+.course-cover-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
 .course-body{padding:18px;display:grid;gap:14px}
 .meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .meta>div{background:linear-gradient(180deg,#f7f9fc 0%,#fbfdff 100%);border-radius:18px;padding:12px;border:1px solid rgba(39,58,91,.06)}.meta span{display:block;font-size:.78rem;color:#72829a;margin-bottom:4px}
