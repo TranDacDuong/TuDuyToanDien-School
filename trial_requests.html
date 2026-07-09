@@ -168,7 +168,7 @@ tbody tr:hover td{background:#fff7ed}
 
 <script>
 const DAYS = {1:"T2",2:"T3",3:"T4",4:"T5",5:"T6",6:"T7",7:"CN"};
-let S = { requests:[], classes:[], grades:[], subjects:[], classMap:{}, scheduleMap:{}, studentMap:{}, accountCheckTimers:{}, newAccountMode:{student:false,parent:false} };
+let S = { requests:[], classes:[], grades:[], subjects:[], classMap:{}, scheduleMap:{}, studentMap:{}, parentMap:{}, accountCheckTimers:{}, newAccountMode:{student:false,parent:false} };
 
 function esc(s){ return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function escAttr(s){ return esc(s).replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
@@ -227,6 +227,12 @@ function sourceDisplay(item){
   if(text.includes("home.html")) return "Trang chủ";
   if(text === "admin" || !text) return "Admin nhập";
   return "Website";
+}
+function linkedAccountHtml(label, account) {
+  if (!account?.email) {
+    return `<div style="font-size:.74rem;color:var(--ink-light);margin-top:4px">Chưa link tài khoản ${esc(label)}</div>`;
+  }
+  return `<div style="font-size:.74rem;color:#047857;margin-top:4px">Đã link: ${esc(account.email)}</div>`;
 }
 function classLabel(classId){ return S.classMap[classId]?.class_name || "Chưa chọn lớp"; }
 function scheduleLabel(id){
@@ -411,6 +417,7 @@ async function loadTrialRequests(){
     const studentIds = [...new Set(rows.map(x=>x.student_id).filter(Boolean))];
     let teacherMap = {};
     S.studentMap = {};
+    S.parentMap = {};
     if(teacherIds.length){
       const {data:teachers} = await sb.from("users").select("id,full_name,email").in("id",teacherIds);
       teacherMap = Object.fromEntries((teachers||[]).map(t=>[t.id,t]));
@@ -418,8 +425,31 @@ async function loadTrialRequests(){
     if(studentIds.length){
       const {data:students} = await sb.from("users").select("id,full_name,email,phone,parent_full_name,parent_phone").in("id",studentIds);
       S.studentMap = Object.fromEntries((students||[]).map(s=>[s.id,s]));
+      let parentLinks = [];
+      const embeddedParents = await sb.from("parent_students")
+        .select("student_id,parent:users!parent_students_parent_id_fkey(id,full_name,email,phone,role)")
+        .in("student_id", studentIds)
+        .is("revoked_at", null);
+      if(!embeddedParents.error){
+        parentLinks = (embeddedParents.data || []).map(row => ({ student_id: row.student_id, parent: row.parent })).filter(row => row.parent?.id);
+      } else {
+        const linkRes = await sb.from("parent_students")
+          .select("student_id,parent_id")
+          .in("student_id", studentIds)
+          .is("revoked_at", null);
+        const parentIds = [...new Set((linkRes.data || []).map(row=>row.parent_id).filter(Boolean))];
+        let parentById = {};
+        if(parentIds.length){
+          const {data:parents} = await sb.from("users").select("id,full_name,email,phone,role").in("id", parentIds);
+          parentById = Object.fromEntries((parents || []).map(parent => [parent.id, parent]));
+        }
+        parentLinks = (linkRes.data || []).map(row => ({ student_id: row.student_id, parent: parentById[row.parent_id] })).filter(row => row.parent?.id);
+      }
+      parentLinks.forEach(row => {
+        if(!S.parentMap[row.student_id]) S.parentMap[row.student_id] = row.parent;
+      });
     }
-    S.requests = rows.map(item=>({...item, teacher: teacherMap[item.teacher_id] || null, linkedStudent: S.studentMap[item.student_id] || null}));
+    S.requests = rows.map(item=>({...item, teacher: teacherMap[item.teacher_id] || null, linkedStudent: S.studentMap[item.student_id] || null, linkedParent: S.parentMap[item.student_id] || null}));
     await syncStatuses();
     renderRequests();
   }catch(error){
@@ -433,7 +463,7 @@ function renderRequests(){
   const subjectFilter = rmVN(document.getElementById("subjectFilter")?.value || "");
   const rows = S.requests.filter(item=>{
     const effective = computedStatus(item);
-    const haystack = rmVN(`${item.student_name||""} ${item.phone||""} ${item.parent_full_name||""} ${item.parent_phone||""} ${item.grade||""} ${item.subject||""} ${item.teacher?.full_name||""} ${classLabel(item.trial_class_id)} ${sourceDisplay(item)} ${item.linkedStudent?.full_name||""} ${item.linkedStudent?.email||""}`);
+    const haystack = rmVN(`${item.student_name||""} ${item.phone||""} ${item.parent_full_name||""} ${item.parent_phone||""} ${item.grade||""} ${item.subject||""} ${item.teacher?.full_name||""} ${classLabel(item.trial_class_id)} ${sourceDisplay(item)} ${item.linkedStudent?.full_name||""} ${item.linkedStudent?.email||""} ${item.linkedParent?.full_name||""} ${item.linkedParent?.email||""}`);
     const cls = S.classMap[item.trial_class_id] || {};
     const itemGrade = rmVN(item.grade || cls.grades?.name || cls.grade?.name || "");
     const itemSubject = rmVN(item.subject || cls.subjects?.name || cls.subject?.name || "");
@@ -453,8 +483,8 @@ function renderRequests(){
     return `
     <tr class="${soon ? "urgent-row" : ""}" onclick="openTrialModal('${item.id}')">
       <td><div style="white-space:nowrap;font-weight:800;color:var(--navy)">${esc(fmtTime(item.created_at))}</div><div style="font-size:.76rem;color:var(--ink-light);margin-top:4px">${esc(sourceDisplay(item))}</div>${soon?`<div class="urgent-label ${soon.day}">${esc(soon.label)}</div>`:""}</td>
-      <td><b style="color:var(--navy)">${esc(item.student_name || "—")}</b><div style="margin-top:6px"><button class="phone-btn" type="button" onclick="event.stopPropagation();copyPhone('${escAttr(item.phone || "")}')">${esc(item.phone || "—")}</button></div><div style="margin-top:6px"><span class="status-pill status-${st}">${statusLabel(st)}</span></div>${item.linkedStudent?`<div style="font-size:.74rem;color:#047857;margin-top:4px">Đã link: ${esc(item.linkedStudent.full_name || item.linkedStudent.email || "")}</div>`:`<div style="font-size:.74rem;color:var(--ink-light);margin-top:4px">Chưa link tài khoản học sinh</div>`}${item.note?`<div style="font-size:.72rem;color:var(--ink-light);margin-top:4px;max-width:240px">${esc(item.note)}</div>`:""}</td>
-      <td><div style="font-weight:800;color:var(--navy)">${esc(item.parent_full_name || "—")}</div><div style="margin-top:6px"><button class="phone-btn" type="button" onclick="event.stopPropagation();copyPhone('${escAttr(item.parent_phone || "")}')">${esc(item.parent_phone || "—")}</button></div></td>
+      <td><b style="color:var(--navy)">${esc(item.student_name || "—")}</b><div style="margin-top:6px"><button class="phone-btn" type="button" onclick="event.stopPropagation();copyPhone('${escAttr(item.phone || "")}')">${esc(item.phone || "—")}</button></div><div style="margin-top:6px"><span class="status-pill status-${st}">${statusLabel(st)}</span></div>${linkedAccountHtml("học sinh", item.linkedStudent)}${item.note?`<div style="font-size:.72rem;color:var(--ink-light);margin-top:4px;max-width:240px">${esc(item.note)}</div>`:""}</td>
+      <td><div style="font-weight:800;color:var(--navy)">${esc(item.parent_full_name || "—")}</div><div style="margin-top:6px"><button class="phone-btn" type="button" onclick="event.stopPropagation();copyPhone('${escAttr(item.parent_phone || "")}')">${esc(item.parent_phone || "—")}</button></div>${linkedAccountHtml("phụ huynh", item.linkedParent)}</td>
       <td><div style="font-weight:800;color:var(--navy)">${esc(item.grade || "—")}</div><div style="font-size:.78rem;color:var(--ink-mid);margin-top:4px">${esc(item.subject || "—")}</div></td>
       <td><div style="font-weight:900;color:var(--navy)">${esc(classLabel(item.trial_class_id))}</div><div style="font-size:.74rem;color:var(--ink-mid);line-height:1.55;margin-top:4px"><div>1) ${esc(scheduleLabel(item.trial_schedule_1_id))}</div><div>${esc(fmtTime(item.trial_session_1_at))}</div><div style="margin-top:4px">2) ${esc(scheduleLabel(item.trial_schedule_2_id))}</div><div>${esc(fmtTime(item.trial_session_2_at))}</div></div></td>
     </tr>`;
@@ -751,7 +781,7 @@ function openTrialModal(id){
   document.getElementById("modalTitle").textContent = item ? "Chi tiết học sinh học thử" : "Thêm học sinh học thử";
   document.getElementById("editId").value = item?.id || "";
   document.getElementById("studentId").value = item?.student_id || "";
-  document.getElementById("parentId").value = "";
+  document.getElementById("parentId").value = item?.linkedParent?.id || "";
   document.getElementById("studentName").value = item?.student_name || "";
   document.getElementById("studentPhone").value = item?.phone || "";
   document.getElementById("parentName").value = item?.parent_full_name || "";
@@ -763,7 +793,7 @@ function openTrialModal(id){
   document.getElementById("classId").value = item?.trial_class_id || "";
   loadClassSchedules(item);
   setAccountInfo("student", item?.linkedStudent ? accountHtml("Đã liên kết với tài khoản học sinh", item.linkedStudent.email || item.linkedStudent.full_name || item.linkedStudent.id, "", newAccountButtonHtml("student")) : "");
-  setAccountInfo("parent", "");
+  setAccountInfo("parent", item?.linkedParent ? accountHtml("Đã liên kết với tài khoản phụ huynh", item.linkedParent.email || item.linkedParent.full_name || item.linkedParent.id, "", newAccountButtonHtml("parent")) : "");
   document.getElementById("trialModal").classList.add("show");
 }
 function closeTrialModal(){ document.getElementById("trialModal").classList.remove("show"); }
