@@ -1,10 +1,14 @@
 (function registerMindUpPwa(){
   const VAPID_PUBLIC_KEY = "BFeo1qo3R-OG_92Fh36HtY12Gae0G27neKtmXn2KS9KoG_gbOS3BRPKUH7uWij7544kuU0a4VL4x3EP4iwYsu2o";
   const INSTALL_ACCEPTED_KEY = "mindup_install_prompt_accepted";
+  const INSTALL_DISMISSED_AT_KEY = "mindup_install_prompt_dismissed_at";
   const LOCAL_NOTIFY_ENABLED_KEY = "mindup_local_notifications_enabled";
   const LOCAL_NOTIFY_LAST_SEEN_KEY = "mindup_local_notifications_last_seen_at";
+  const PUSH_PROMPT_DISMISSED_AT_KEY = "mindup_push_prompt_dismissed_at";
+  const PUSH_DENIED_ACK_KEY = "mindup_push_permission_denied_ack";
   const LOCAL_NOTIFY_POLL_MS = 30000;
   const PROMPT_DELAY_MS = 1400;
+  const PROMPT_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
   const PUSH_RECEIPT_KEY = "/__mindup_last_push_receipt__";
 
   let serviceWorkerRegistrationPromise = null;
@@ -89,6 +93,16 @@
 
   function isAndroidDevice() {
     return /Android/i.test(navigator.userAgent);
+  }
+
+  function getStoredTime(key) {
+    const value = Number(localStorage.getItem(key) || 0);
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function isSnoozed(key, durationMs = PROMPT_SNOOZE_MS) {
+    const last = getStoredTime(key);
+    return last > 0 && Date.now() - last < durationMs;
   }
 
   function waitForSupabase(timeoutMs = 8000) {
@@ -532,6 +546,8 @@
       return false;
     }
     if (!user?.id || !isMobileDevice() || !isPushSupported() || !isPushConfigured()) return false;
+    if (Notification.permission === "denied") return !localStorage.getItem(PUSH_DENIED_ACK_KEY);
+    if (isSnoozed(PUSH_PROMPT_DISMISSED_AT_KEY)) return false;
     return Notification.permission !== "granted";
   }
 
@@ -543,6 +559,8 @@
     }
     const localPreview = /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
       && new URLSearchParams(location.search).get("ios_guide") === "1";
+    if (localStorage.getItem(INSTALL_ACCEPTED_KEY) === "1") return false;
+    if (isSnoozed(INSTALL_DISMISSED_AT_KEY)) return false;
     if (localPreview) return !isStandaloneApp();
     return Boolean(user?.id && isMobileDevice() && !isStandaloneApp());
   }
@@ -1122,11 +1140,13 @@
     `;
 
     prompt.querySelector(".mindup-push-later").addEventListener("click", () => {
+      localStorage.setItem(INSTALL_DISMISSED_AT_KEY, String(Date.now()));
       removeInstallPrompt();
       window.setTimeout(initPushPrompt, 500);
     });
     prompt.querySelector(".mindup-push-enable").addEventListener("click", async () => {
       if (isIos || !deferredInstallPrompt) {
+        localStorage.setItem(INSTALL_ACCEPTED_KEY, "1");
         removeInstallPrompt();
         window.setTimeout(initPushPrompt, 500);
         return;
@@ -1162,13 +1182,14 @@
       ${blocked ? `<p>Thông báo đang bị chặn trên trình duyệt hoặc hệ điều hành.${androidHint}</p>` : ""}
       <div class="mindup-push-actions">
         <button class="mindup-push-later" type="button">Để sau</button>
-        <button class="mindup-push-enable" type="button">Bật thông báo</button>
+        <button class="mindup-push-enable" type="button">${blocked ? "Đã hiểu" : "Bật thông báo"}</button>
       </div>
       <div class="mindup-push-status" hidden></div>
     `;
 
     const status = prompt.querySelector(".mindup-push-status");
     prompt.querySelector(".mindup-push-later").addEventListener("click", () => {
+      localStorage.setItem(PUSH_PROMPT_DISMISSED_AT_KEY, String(Date.now()));
       removePrompt();
     });
     prompt.querySelector(".mindup-push-enable").addEventListener("click", async () => {
@@ -1176,6 +1197,8 @@
       if (Notification.permission === "denied") {
         status.textContent = "Thông báo đang bị chặn. Vui lòng mở Cài đặt của Chrome hoặc app MindUp, sau đó bật quyền Thông báo.";
         status.hidden = false;
+        localStorage.setItem(PUSH_DENIED_ACK_KEY, "1");
+        window.setTimeout(removePrompt, 4000);
         return;
       }
       try {
@@ -1187,6 +1210,11 @@
         } else if (!result.ok) {
           status.textContent = "Bạn có thể bật lại thông báo trong cài đặt trình duyệt hoặc cài đặt app MindUp.";
           status.hidden = false;
+          if (result.permission === "denied" || Notification.permission === "denied") {
+            localStorage.setItem(PUSH_DENIED_ACK_KEY, "1");
+          } else {
+            localStorage.setItem(PUSH_PROMPT_DISMISSED_AT_KEY, String(Date.now()));
+          }
         }
       } catch (error) {
         console.warn("MindUp push subscription failed:", error);
@@ -1207,6 +1235,8 @@
     const user = await getCurrentUser();
     if (!user?.id || !isPushSupported()) return;
     if (Notification.permission === "granted") {
+      localStorage.removeItem(PUSH_DENIED_ACK_KEY);
+      localStorage.removeItem(PUSH_PROMPT_DISMISSED_AT_KEY);
       enableLocalNotifications(user.id);
       const subscription = await ensurePushSubscription(user.id, { repairRevoked: true }).catch((error) => {
         console.warn("MindUp push auto repair failed:", error);
