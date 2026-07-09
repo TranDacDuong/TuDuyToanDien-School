@@ -693,6 +693,35 @@
   </div>
 
   <div id="dataBlock" style="display: none; display: flex; flex-direction: column; gap: 24px;">
+    <div class="admin-profit-panel" id="staffSelfIncomePanel" style="display:none;">
+      <h3 class="panel-title">Thu nhập tháng của tôi</h3>
+      <div class="admin-profit-grid">
+        <div class="profit-metric">
+          <span>Lương cứng</span>
+          <b id="staffSelfBaseSalary">0đ</b>
+        </div>
+        <div class="profit-metric">
+          <span>Lương thưởng</span>
+          <b id="staffSelfBonus">0đ</b>
+        </div>
+        <div class="profit-metric">
+          <span>Tổng thu nhập</span>
+          <b id="staffSelfTotalIncome">0đ</b>
+        </div>
+      </div>
+      <div class="expense-form" style="grid-template-columns:1fr 1fr;margin-top:16px">
+        <div class="config-field">
+          <label>Lương cứng</label>
+          <input class="control-input" id="staffSelfBaseInput" type="number" disabled>
+        </div>
+        <div class="config-field">
+          <label>Lương thưởng</label>
+          <input class="control-input" id="staffSelfBonusInput" type="number" disabled>
+        </div>
+      </div>
+      <div class="empty-state" style="margin-top:14px">Lương cứng và lương thưởng do Admin cập nhật theo từng tháng.</div>
+    </div>
+
     <div class="admin-profit-panel" id="adminProfitPanel" style="display:none;">
       <h3 class="panel-title">Tổng quan thu nhập Admin</h3>
       <div class="admin-profit-grid">
@@ -1010,13 +1039,24 @@
     return String(selectedStaffProfile()?.role || "") === "teacher";
   }
 
+  function isFixedSalaryStaffRole(role) {
+    return ["assistant", "marketing"].includes(String(role || ""));
+  }
+
+  function isSelectedFixedSalaryStaff() {
+    return isFixedSalaryStaffRole(selectedStaffProfile()?.role);
+  }
+
   function syncIncomeModePanels() {
     const adminMode = isSelectedAdminStaff();
+    const fixedStaffSelfMode = viewerProfile?.role !== "admin" && isFixedSalaryStaffRole(viewerProfile?.role);
     const adminPanel = document.getElementById("adminProfitPanel");
+    const staffSelfPanel = document.getElementById("staffSelfIncomePanel");
     const teacherSections = document.getElementById("teacherIncomeSections");
     const adminConfig = document.getElementById("adminConfigCard");
     if (adminPanel) adminPanel.style.display = adminMode ? "block" : "none";
-    if (teacherSections) teacherSections.style.display = adminMode ? "none" : "flex";
+    if (staffSelfPanel) staffSelfPanel.style.display = fixedStaffSelfMode ? "block" : "none";
+    if (teacherSections) teacherSections.style.display = (adminMode || fixedStaffSelfMode) ? "none" : "flex";
     if (adminConfig && viewerProfile?.role === "admin") {
       adminConfig.style.display = (!adminMode && !isDbFallback) ? "block" : "none";
     }
@@ -1823,6 +1863,19 @@
     `).join("") : `<tr><td colspan="6" class="empty-state">Chưa có nhân viên khác trong bảng lương tháng này.</td></tr>`;
   }
 
+  async function renderFixedStaffSelfIncome(ym) {
+    const salary = await loadStaffMonthlySalaryConfig(currentUser?.id, ym);
+    const base = Number(salary.base_salary || 0);
+    const bonus = Number(salary.bonus_amount || 0);
+    setText("staffSelfBaseSalary", fmt(base) + "đ");
+    setText("staffSelfBonus", fmt(bonus) + "đ");
+    setText("staffSelfTotalIncome", fmt(base + bonus) + "đ");
+    const baseInput = document.getElementById("staffSelfBaseInput");
+    const bonusInput = document.getElementById("staffSelfBonusInput");
+    if (baseInput) baseInput.value = base;
+    if (bonusInput) bonusInput.value = bonus;
+  }
+
   async function calculateAdminIncome(ym) {
     if (viewerProfile?.role !== "admin") return;
     const sb = getSb();
@@ -2036,6 +2089,18 @@
     }
     selectedTeacherId = safeSelectedTeacherId;
     syncIncomeModePanels();
+
+    if (viewerProfile?.role !== "admin" && isFixedSalaryStaffRole(viewerProfile?.role)) {
+      try {
+        await renderFixedStaffSelfIncome(ym);
+      } catch (err) {
+        console.error("Lỗi tải thu nhập nhân viên:", err);
+        document.getElementById("staffSelfIncomePanel").innerHTML = `<div class="empty-state">Không tải được thu nhập tháng: ${esc(err.message)}</div>`;
+      }
+      loader.style.display = "none";
+      dataBlock.style.display = "flex";
+      return;
+    }
 
     if (isSelectedAdminStaff()) {
       try {
@@ -2506,7 +2571,7 @@
     if (profile.role === "admin") {
       await loadTeachers();
       syncIncomeModePanels();
-    } else if (profile.role === "teacher") {
+    } else if (["teacher", "assistant", "marketing"].includes(profile.role)) {
       selectedTeacherId = user.id;
       document.getElementById("adminConfigCard").style.display = "none";
       document.getElementById("teacherSelect").style.display = "none";
@@ -2520,7 +2585,7 @@
         <div style="padding:40px; text-align:center; max-width:500px; margin: 100px auto; background:#fff; border-radius:20px; box-shadow:var(--shadow);">
           <div style="font-size:3rem; margin-bottom:12px;">🔒</div>
           <h3 style="color:var(--navy); font-family:var(--font-display);">Không có quyền truy cập</h3>
-          <p style="color:var(--ink-mid); font-size:0.9rem;">Trang này chỉ hiển thị dành cho Quản trị viên và Giáo viên.</p>
+          <p style="color:var(--ink-mid); font-size:0.9rem;">Trang này chỉ hiển thị dành cho Quản trị viên, Giáo viên và Nhân viên nội bộ.</p>
           <a class="btn-save" href="dashboard.html" style="text-decoration:none; margin-top:20px; display:inline-block;">Quay lại Bảng điều khiển</a>
         </div>
       `;
