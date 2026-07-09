@@ -329,8 +329,10 @@
           ? `<div class="class-info" style="margin-top:6px;padding:8px 10px;border-radius:10px;background:${stuCount > roomCapacity ? "rgba(239,68,68,.12)" : "rgba(245,158,11,.12)"};border:1px solid ${stuCount > roomCapacity ? "rgba(239,68,68,.28)" : "rgba(245,158,11,.28)"};color:${stuCount > roomCapacity ? "#b91c1c" : "#92400e"};font-weight:700">⚠ ${stuCount > roomCapacity ? "Số lượng học sinh đang vượt quá" : "Số lượng học sinh đã chạm tới"} sức chứa phòng học (${roomCapacity}).</div>`
           : "";
 
+        const viewButtonHtml = `<button class="edit-btn" type="button" onclick="event.stopPropagation(); if(window.openClassView) window.openClassView('${cls.id}', '${String(cls.class_name || "").replace(/'/g, "\\'")}')">Xem chi tiết</button>`;
         const actionHtml = role === "admin"
           ? `<div class="class-actions">
+              ${viewButtonHtml}
               <button class="edit-btn" type="button" onclick="event.stopPropagation(); if(window.openClassView) window.openClassView('${cls.id}', '${String(cls.class_name || "").replace(/'/g, "\\'")}')">✏ Sửa</button>
               ${cls.hidden
                 ? `<button class="edit-btn" type="button" onclick="event.stopPropagation(); window.restoreClass('${cls.id}')">↺ Khôi phục</button>`
@@ -338,11 +340,12 @@
             </div>`
           : role === "teacher"
             ? `<div class="class-actions">
+                ${viewButtonHtml}
                 ${cls.hidden
                   ? `<button class="edit-btn" type="button" onclick="event.stopPropagation(); window.restoreClass('${cls.id}')">↺ Khôi phục</button>`
                   : `<button class="delete-btn" type="button" onclick="event.stopPropagation(); window.deleteClass('${cls.id}','${role}')">🗑 Xóa</button>`}
               </div>`
-            : "";
+            : `<div class="class-actions">${viewButtonHtml}</div>`;
 
         card.innerHTML = `
           <div>
