@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS public.task_templates (
   priority text NOT NULL DEFAULT 'normal',
   recurrence text NOT NULL CHECK (recurrence IN ('daily', 'weekly')),
   weekday int CHECK (weekday BETWEEN 1 AND 7),
+  start_on date NOT NULL DEFAULT CURRENT_DATE,
   action_url text,
   requirements jsonb NOT NULL DEFAULT '[]'::jsonb,
   assignee_ids uuid[] NOT NULL DEFAULT '{}'::uuid[],
@@ -15,8 +16,11 @@ CREATE TABLE IF NOT EXISTS public.task_templates (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE public.task_templates
+ADD COLUMN IF NOT EXISTS start_on date NOT NULL DEFAULT CURRENT_DATE;
+
 CREATE INDEX IF NOT EXISTS task_templates_active_idx
-  ON public.task_templates (active, recurrence, weekday);
+  ON public.task_templates (active, recurrence, weekday, start_on);
 
 ALTER TABLE public.task_templates ENABLE ROW LEVEL SECURITY;
 
@@ -61,6 +65,7 @@ BEGIN
       SELECT *
       FROM public.task_templates
       WHERE active = true
+        AND v_day >= COALESCE(start_on, CURRENT_DATE)
         AND (
           recurrence = 'daily'
           OR (recurrence = 'weekly' AND weekday = EXTRACT(ISODOW FROM v_day)::int)
@@ -68,7 +73,7 @@ BEGIN
     LOOP
       v_task_id := gen_random_uuid();
       v_source_key := 'template:' || v_template.id || ':' || public.task_period_key(v_day, v_template.recurrence);
-      v_due_at := (v_day::timestamp + interval '23 hours 59 minutes') AT TIME ZONE 'Asia/Ho_Chi_Minh';
+      v_due_at := NULL;
 
       INSERT INTO public.daily_tasks (
         id, title, description, task_type, source_type, source_id, source_key,
@@ -113,6 +118,7 @@ CREATE OR REPLACE FUNCTION public.create_manual_task(
   p_title text,
   p_description text,
   p_priority text,
+  p_available_on date,
   p_due_at timestamptz,
   p_action_url text,
   p_user_ids uuid[],
@@ -138,19 +144,20 @@ BEGIN
 
   IF v_recurrence IN ('daily', 'weekly') THEN
     INSERT INTO public.task_templates (
-      title, description, priority, recurrence, weekday, action_url,
+      title, description, priority, recurrence, weekday, start_on, action_url,
       requirements, assignee_ids, created_by
     ) VALUES (
       trim(p_title), NULLIF(trim(COALESCE(p_description, '')), ''),
       COALESCE(p_priority, 'normal'), v_recurrence,
       CASE WHEN v_recurrence = 'weekly' THEN COALESCE(p_weekday, EXTRACT(ISODOW FROM now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::int) ELSE NULL END,
+      COALESCE(p_available_on, (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date),
       NULLIF(trim(COALESCE(p_action_url, '')), ''),
       v_requirements, p_user_ids, auth.uid()
     )
     RETURNING id INTO v_template_id;
 
     PERFORM public.materialize_admin_task_templates(
-      (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date,
+      COALESCE(p_available_on, (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date),
       (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date + 31
     );
     RETURN v_template_id;
@@ -163,7 +170,7 @@ BEGIN
   ) VALUES (
     v_task_id, trim(p_title), NULLIF(trim(COALESCE(p_description, '')), ''),
     'manual', 'manual', v_task_id::text, 'manual:' || v_task_id,
-    COALESCE(p_priority, 'normal'), (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date,
+    COALESCE(p_priority, 'normal'), COALESCE(p_available_on, (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date),
     p_due_at, NULLIF(trim(COALESCE(p_action_url, '')), ''), false, 'manual', auth.uid(),
     jsonb_build_object('requires_result', true, 'requirements', v_requirements)
   );
@@ -182,6 +189,6 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.materialize_admin_task_templates(date, date) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.create_manual_task(text, text, text, timestamptz, text, uuid[], jsonb, text, int) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.create_manual_task(text, text, text, date, timestamptz, text, uuid[], jsonb, text, int) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.materialize_admin_task_templates(date, date) TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.create_manual_task(text, text, text, timestamptz, text, uuid[], jsonb, text, int) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.create_manual_task(text, text, text, date, timestamptz, text, uuid[], jsonb, text, int) TO authenticated;

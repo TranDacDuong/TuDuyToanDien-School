@@ -66,6 +66,10 @@
     return new Date(`${dateText}T${time}:00+07:00`).toISOString();
   }
 
+  function endOfDayIso(dateText) {
+    return new Date(`${dateText}T23:59:00+07:00`).toISOString();
+  }
+
   function formatShortDate(value) {
     const date = value ? new Date(`${value}T00:00:00+07:00`) : new Date();
     return new Intl.DateTimeFormat("vi-VN", {
@@ -176,6 +180,18 @@
     }).filter(req => String(req.title || "").trim());
   }
 
+  function requirementValue(payload, key) {
+    const raw = payload?.requirements?.[key];
+    if (raw && typeof raw === "object") return String(raw.value || raw.text || raw.note || "").trim();
+    return String(raw || "").trim();
+  }
+
+  function requirementDone(payload, key) {
+    const raw = payload?.requirements?.[key];
+    if (raw && typeof raw === "object") return Boolean(raw.done);
+    return Boolean(String(raw || "").trim());
+  }
+
   function taskResultPayload(item) {
     const note = String(item.note || "").trim();
     if (!note) return { note: "", requirements: {} };
@@ -192,7 +208,7 @@
     const requirements = taskRequirements(item);
     if (!requirements.length) return null;
     const payload = taskResultPayload(item);
-    const current = requirements.filter(req => String(payload.requirements?.[req.key] || "").trim()).length;
+    const current = requirements.filter(req => requirementDone(payload, req.key)).length;
     return { current, total: requirements.length, label: "Mục đã nộp" };
   }
 
@@ -925,7 +941,7 @@
       const { error } = await sb.rpc("set_task_assignment_status", {
         p_assignment_id: item.id,
         p_status: "completed",
-        p_note: "Tự hoàn thành khi tiến độ đạt 100%",
+        p_note: item.note || "Tự hoàn thành khi tiến độ đạt 100%",
       });
       if (!error) item.status = "completed";
       else console.warn("Sync completed progress task:", error);
@@ -941,7 +957,6 @@
     const { data, error } = await sb.from("task_events")
       .select("assignment_id,note,to_status,created_at")
       .in("assignment_id", ids)
-      .eq("to_status", "completed")
       .not("note", "is", null)
       .order("created_at", { ascending: false });
     if (error) {
@@ -1036,9 +1051,14 @@
       const list = document.createElement("div");
       list.className = "task-requirement-list";
       list.innerHTML = requirements.map(req => `
-        <div class="task-requirement-item ${String(payload.requirements?.[req.key] || "").trim() ? "task-requirement-done" : ""}">
+        <div class="task-requirement-item ${requirementDone(payload, req.key) ? "task-requirement-done" : ""}">
           <div class="task-requirement-title">${esc(req.title)}</div>
-          <textarea class="task-result-input" data-requirement-input="${esc(id)}" data-requirement-key="${esc(req.key)}" placeholder="Nhập kết quả cho mục này...">${esc(payload.requirements?.[req.key] || "")}</textarea>
+          <textarea class="task-result-input" data-requirement-input="${esc(id)}" data-requirement-key="${esc(req.key)}" placeholder="Nhập kết quả cho mục này...">${esc(requirementValue(payload, req.key))}</textarea>
+          <div style="display:flex;justify-content:flex-end">
+            <button class="task-btn ${requirementDone(payload, req.key) ? "success" : ""}" type="button" data-complete-requirement="${esc(id)}" data-requirement-key="${esc(req.key)}">
+              ${requirementDone(payload, req.key) ? "Đã hoàn thành mục" : "Hoàn thành mục"}
+            </button>
+          </div>
         </div>
       `).join("");
       if (noteInput) resultBox.insertBefore(list, noteInput);
@@ -1051,17 +1071,11 @@
     const note = String(input?.value || "").trim();
     const item = S.assignments.find(row => String(row.id) === String(id));
     const requirements = taskRequirements(item);
-    const requirementValues = {};
-    requirements.forEach(req => {
-      const reqInput = [...document.querySelectorAll("[data-requirement-input]")]
-        .filter(element => element.dataset.requirementInput === id)
-        .find(element => element.dataset.requirementKey === req.key);
-      requirementValues[req.key] = String(reqInput?.value || "").trim();
-    });
-    const missingRequirement = requirements.find(req => !requirementValues[req.key]);
-    if (missingRequirement) return alert(`Hãy nhập kết quả cho mục: ${missingRequirement.title}`);
+    const payload = collectTaskResultPayload(id, item, note);
+    const missingRequirement = requirements.find(req => !requirementDone(payload, req.key));
+    if (missingRequirement) return alert(`Hãy bấm hoàn thành mục: ${missingRequirement.title}`);
     const storedNote = requirements.length
-      ? JSON.stringify({ __task_result_v2: true, note, requirements: requirementValues })
+      ? JSON.stringify({ __task_result_v2: true, note, requirements: payload.requirements })
       : note;
     if (!requirements.length && !note) {
       input?.focus();
@@ -1077,16 +1091,70 @@
     await loadTasks();
   }
 
+  function collectTaskResultPayload(id, item, noteText = null) {
+    const payload = taskResultPayload(item);
+    const noteInput = [...document.querySelectorAll("[data-result-input]")].find(element => element.dataset.resultInput === id);
+    const note = noteText ?? String(noteInput?.value || "").trim();
+    const requirements = {};
+    taskRequirements(item).forEach(req => {
+      const reqInput = [...document.querySelectorAll("[data-requirement-input]")]
+        .filter(element => element.dataset.requirementInput === id)
+        .find(element => element.dataset.requirementKey === req.key);
+      const oldRaw = payload.requirements?.[req.key];
+      const oldDone = requirementDone(payload, req.key);
+      requirements[req.key] = {
+        value: String(reqInput?.value || requirementValue(payload, req.key) || "").trim(),
+        done: oldDone,
+      };
+      if (oldRaw && typeof oldRaw === "object" && oldRaw.done === false) requirements[req.key].done = false;
+    });
+    return { note, requirements };
+  }
+
+  async function completeRequirement(id, key) {
+    const item = S.assignments.find(row => String(row.id) === String(id));
+    if (!item) return;
+    const payload = collectTaskResultPayload(id, item);
+    const req = taskRequirements(item).find(row => row.key === key);
+    if (!req) return;
+    const value = String(payload.requirements?.[key]?.value || "").trim();
+    if (!value) return alert(`Hãy nhập kết quả cho mục: ${req.title}`);
+    payload.requirements[key] = { value, done: true };
+    const requirements = taskRequirements(item);
+    const allDone = requirements.every(row => Boolean(payload.requirements?.[row.key]?.done));
+    const storedNote = JSON.stringify({ __task_result_v2: true, note: payload.note || "", requirements: payload.requirements });
+    const { error } = await sb.rpc("set_task_assignment_status", {
+      p_assignment_id: id,
+      p_status: allDone ? "completed" : "open",
+      p_note: storedNote,
+    });
+    if (error) return alert(error.message);
+    toast(allDone ? "Đã hoàn thành toàn bộ công việc." : "Đã lưu kết quả mục này.");
+    await loadTasks();
+  }
+
   async function cancelTaskSubmission(id) {
     const ok = confirm("Hủy nộp công việc này và chuyển về trạng thái Chưa hoàn thành?");
     if (!ok) return;
+    const item = S.assignments.find(row => String(row.id) === String(id));
+    const payload = taskResultPayload(item);
+    const resetRequirements = {};
+    taskRequirements(item).forEach(req => {
+      resetRequirements[req.key] = {
+        value: requirementValue(payload, req.key),
+        done: false,
+      };
+    });
+    const preservedNote = taskRequirements(item).length
+      ? JSON.stringify({ __task_result_v2: true, note: payload.note || "", requirements: resetRequirements })
+      : (item?.note || "");
     const { error } = await sb.rpc("set_task_assignment_status", {
       p_assignment_id: id,
       p_status: "open",
-      p_note: "Hủy nộp kết quả",
+      p_note: preservedNote,
     });
     if (error) return alert(error.message);
-    toast("Đã hủy nộp. Công việc đã chuyển về Chưa hoàn thành.");
+    toast("Đã hủy nộp. Nội dung kết quả vẫn được giữ nguyên.");
     await loadTasks();
   }
 
@@ -1264,6 +1332,7 @@
     await loadInternalUsers();
     S.manualAssigneeIds = new Set();
     byId("manualTaskAssigneeSearch").value = "";
+    if (byId("manualTaskAvailableOn")) byId("manualTaskAvailableOn").value = localDate();
     renderAssigneeSelect();
     renderAssignees();
     openModal("taskCreateModal");
@@ -1275,10 +1344,10 @@
     const userIds = [...S.manualAssigneeIds];
     const title = byId("manualTaskTitle").value.trim();
     if (!title || !userIds.length) return alert("Hãy nhập tiêu đề và chọn ít nhất một người nhận.");
-    const dueValue = byId("manualTaskDueAt").value;
-    if (!dueValue) return alert("Hãy chọn deadline / hạn nộp công việc.");
+    const availableOn = byId("manualTaskAvailableOn")?.value || localDate();
     const recurrence = byId("manualTaskRecurrence")?.value || "once";
     const weekday = Number(byId("manualTaskWeekday")?.value || 1);
+    const dueValue = recurrence === "once" ? endOfDayIso(availableOn) : null;
     const requirements = String(byId("manualTaskRequirements")?.value || "")
       .split(/\r?\n/)
       .map(line => line.trim())
@@ -1288,7 +1357,8 @@
       p_title: title,
       p_description: byId("manualTaskDescription").value.trim(),
       p_priority: byId("manualTaskPriority").value,
-      p_due_at: dueValue ? new Date(dueValue).toISOString() : null,
+      p_available_on: availableOn,
+      p_due_at: dueValue,
       p_action_url: byId("manualTaskActionUrl").value.trim(),
       p_user_ids: userIds,
       p_requirements: requirements,
@@ -1310,7 +1380,7 @@
       console.warn("Không gửi được thông báo giao việc", notifyError);
     }
     closeModal("taskCreateModal");
-    ["manualTaskTitle", "manualTaskDescription", "manualTaskDueAt", "manualTaskActionUrl", "manualTaskRequirements"].forEach(id => byId(id).value = "");
+    ["manualTaskTitle", "manualTaskDescription", "manualTaskAvailableOn", "manualTaskActionUrl", "manualTaskRequirements"].forEach(id => byId(id).value = "");
     byId("manualTaskRecurrence").value = "once";
     S.manualAssigneeIds = new Set();
     byId("manualTaskAssigneeSearch").value = "";
@@ -1377,6 +1447,7 @@
       const target = event.target.closest("button");
       if (!target) return;
       if (target.dataset.cancelSubmit) return cancelTaskSubmission(target.dataset.cancelSubmit);
+      if (target.dataset.completeRequirement) return completeRequirement(target.dataset.completeRequirement, target.dataset.requirementKey);
       if (target.dataset.submitResult) return submitTaskResult(target.dataset.submitResult);
       if (target.dataset.deleteTask) return deleteManualTaskAssignment(target.dataset.deleteTask);
       if (target.dataset.actionUrl) openAction(target.dataset.actionUrl);
