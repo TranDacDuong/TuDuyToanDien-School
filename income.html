@@ -165,6 +165,19 @@
     font-size: 1.25rem;
   }
 
+  .admin-staff-income {
+    display: grid;
+    gap: 18px;
+    margin-top: 18px;
+  }
+
+  .admin-staff-income h4 {
+    margin: 0 0 10px;
+    color: var(--navy);
+    font-size: 1rem;
+    font-weight: 800;
+  }
+
   .expense-form {
     display: grid;
     grid-template-columns: 1.2fr 1fr 1.6fr auto;
@@ -710,6 +723,45 @@
         <div class="profit-metric">
           <span>Thu nhập Admin ước tính</span>
           <b id="adminProjectedNetIncome">0đ</b>
+        </div>
+      </div>
+
+      <div class="admin-staff-income">
+        <div class="details-card">
+          <h4>Thu nhập giáo viên</h4>
+          <div class="table-responsive">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>Giáo viên</th>
+                  <th class="text-right">Doanh thu thực tế</th>
+                  <th class="text-right">Thu nhập thực tế</th>
+                  <th class="text-right">Doanh thu dự kiến</th>
+                  <th class="text-right">Thu nhập ước tính</th>
+                </tr>
+              </thead>
+              <tbody id="adminTeacherIncomeBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="details-card">
+          <h4>Thu nhập nhân viên khác</h4>
+          <div class="table-responsive">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>Nhân viên</th>
+                  <th>Vai trò</th>
+                  <th class="text-right">Doanh thu thực tế</th>
+                  <th class="text-right">Thu nhập thực tế</th>
+                  <th class="text-right">Doanh thu dự kiến</th>
+                  <th class="text-right">Thu nhập ước tính</th>
+                </tr>
+              </thead>
+              <tbody id="adminOtherStaffIncomeBody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -1608,6 +1660,45 @@
     `).join("");
   }
 
+  function roleLabel(role) {
+    return {
+      admin: "Admin",
+      teacher: "Giáo viên",
+      assistant: "Trợ giảng",
+      marketing: "Marketing",
+    }[String(role || "")] || "Nhân viên";
+  }
+
+  function renderAdminStaffIncomeBreakdown(rows) {
+    const teacherBody = document.getElementById("adminTeacherIncomeBody");
+    const otherBody = document.getElementById("adminOtherStaffIncomeBody");
+    if (!teacherBody || !otherBody) return;
+
+    const teacherRows = (rows || []).filter(row => row.role === "teacher");
+    const otherRows = (rows || []).filter(row => row.role !== "teacher");
+
+    teacherBody.innerHTML = teacherRows.length ? teacherRows.map(row => `
+      <tr>
+        <td><b>${esc(row.name)}</b></td>
+        <td class="text-right">${fmt(row.actualRevenue)}đ</td>
+        <td class="text-right" style="font-weight:700;color:var(--green)">${fmt(row.actualIncome)}đ</td>
+        <td class="text-right">${fmt(row.projectedRevenue)}đ</td>
+        <td class="text-right" style="font-weight:700;color:#be185d">${fmt(row.projectedIncome)}đ</td>
+      </tr>
+    `).join("") : `<tr><td colspan="5" class="empty-state">Chưa có giáo viên nào trong bảng lương tháng này.</td></tr>`;
+
+    otherBody.innerHTML = otherRows.length ? otherRows.map(row => `
+      <tr>
+        <td><b>${esc(row.name)}</b></td>
+        <td>${esc(roleLabel(row.role))}</td>
+        <td class="text-right">${fmt(row.actualRevenue)}đ</td>
+        <td class="text-right" style="font-weight:700;color:var(--green)">${fmt(row.actualIncome)}đ</td>
+        <td class="text-right">${fmt(row.projectedRevenue)}đ</td>
+        <td class="text-right" style="font-weight:700;color:#be185d">${fmt(row.projectedIncome)}đ</td>
+      </tr>
+    `).join("") : `<tr><td colspan="6" class="empty-state">Chưa có nhân viên khác trong bảng lương tháng này.</td></tr>`;
+  }
+
   async function calculateAdminIncome(ym) {
     if (viewerProfile?.role !== "admin") return;
     const sb = getSb();
@@ -1664,6 +1755,7 @@
       }, 0);
       let staffSalaryTotal = 0;
       let projectedStaffSalaryTotal = 0;
+      const staffIncomeRows = [];
       (staff || []).forEach(person => {
         const cfg = salaryConfigs[person.id] || { base_salary: DEFAULT_BASE_SALARY, base_tier_percent: DEFAULT_BASE_PERCENT };
         const staffRevenue = calculateTeacherRevenueFromContext({
@@ -1678,6 +1770,15 @@
         const projectedSalary = calculateSalaryBreakdown(staffRevenue.projectedRevenue, Number(cfg.base_salary || 0), Number(cfg.base_tier_percent || 0));
         staffSalaryTotal += Number(salary.totalIncome || 0);
         projectedStaffSalaryTotal += Number(projectedSalary.totalIncome || 0);
+        staffIncomeRows.push({
+          id: person.id,
+          name: person.full_name || "Nhân viên",
+          role: String(person.role || ""),
+          actualRevenue: Number(staffRevenue.actualRevenue || 0),
+          projectedRevenue: Number(staffRevenue.projectedRevenue || 0),
+          actualIncome: Number(salary.totalIncome || 0),
+          projectedIncome: Number(projectedSalary.totalIncome || 0),
+        });
       });
 
       const expenseTotal = (expenses || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
@@ -1690,6 +1791,7 @@
       setText("adminProjectedRevenue", fmt(systemProjectedRevenue) + "đ");
       setText("adminProjectedStaffSalary", fmt(projectedStaffSalaryTotal) + "đ");
       setText("adminProjectedNetIncome", fmt(projectedNetIncome) + "đ");
+      renderAdminStaffIncomeBreakdown(staffIncomeRows);
       renderOperatingExpenses(expenses);
     } catch (err) {
       console.error("Lỗi tính thu nhập admin:", err);
