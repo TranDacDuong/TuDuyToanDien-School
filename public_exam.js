@@ -90,7 +90,7 @@
 
     if (!_allExams.length) {
       grid.innerHTML = `<div class="empty-state">
-        <div style="font-size:2.5rem;margin-bottom:10px">ðŸ“„</div>
+        <div style="font-size:2.5rem;margin-bottom:10px" aria-hidden="true">📄</div>
         <p>Chưa có đề thi nào.</p>
       </div>`;
       return;
