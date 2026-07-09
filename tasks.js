@@ -6,6 +6,7 @@
     users: [],
     selectedDate: "",
     viewMode: "today",
+    adminScope: "personal",
     selectedUserId: "all",
     preferences: null,
     manualAssigneeIds: new Set(),
@@ -135,6 +136,35 @@
       || task.metadata?.requires_result === true;
   }
 
+  function taskRequirements(item) {
+    const raw = item.task?.metadata?.requirements;
+    if (!Array.isArray(raw)) return [];
+    return raw.map((req, index) => {
+      if (typeof req === "string") return { key: `req_${index + 1}`, title: req };
+      return { key: req.key || `req_${index + 1}`, title: req.title || req.label || `Mục ${index + 1}` };
+    }).filter(req => String(req.title || "").trim());
+  }
+
+  function taskResultPayload(item) {
+    const note = String(item.note || "").trim();
+    if (!note) return { note: "", requirements: {} };
+    try {
+      const parsed = JSON.parse(note);
+      if (parsed && typeof parsed === "object" && parsed.__task_result_v2) {
+        return { note: parsed.note || "", requirements: parsed.requirements || {} };
+      }
+    } catch (_) {}
+    return { note, requirements: {} };
+  }
+
+  function requirementProgress(item) {
+    const requirements = taskRequirements(item);
+    if (!requirements.length) return null;
+    const payload = taskResultPayload(item);
+    const current = requirements.filter(req => String(payload.requirements?.[req.key] || "").trim()).length;
+    return { current, total: requirements.length, label: "Mục đã nộp" };
+  }
+
   function canDeleteAssignment(item) {
     return S.profile?.role === "admin"
       && !String(item.id || "").startsWith("schedule-fallback:")
@@ -143,7 +173,7 @@
   }
 
   function progressPercent(item) {
-    const progress = item.task?.progress;
+    const progress = requirementProgress(item) || item.task?.progress;
     return pct(progress?.current || 0, progress?.total || 0);
   }
 
@@ -153,7 +183,7 @@
   }
 
   function isProgressComplete(item) {
-    const progress = item.task?.progress;
+    const progress = requirementProgress(item) || item.task?.progress;
     return Boolean(progress?.total) && Number(progress.current || 0) >= Number(progress.total || 0);
   }
 
@@ -194,8 +224,9 @@
     const end = S.viewMode === "month" ? endOfMonth(selected) : selected;
     return S.assignments.filter(item => {
       const day = taskDay(item);
+      if (S.profile?.role === "admin" && S.adminScope === "personal" && item.user_id !== S.user?.id) return false;
       if (S.profile?.role === "admin" && S.selectedUserId !== "all" && item.user_id !== S.selectedUserId) return false;
-      if (S.profile?.role === "admin" && !isAdminActionTask(item)) return false;
+      if (S.profile?.role === "admin" && S.adminScope === "center" && !isAdminActionTask(item)) return false;
       return inRange(day, start, end);
     }).sort((a, b) => {
       const priority = { urgent: 0, important: 1, normal: 2 };
@@ -319,7 +350,8 @@
     const today = localDate();
     const scoped = S.assignments.filter(item =>
       S.profile?.role !== "admin" || S.selectedUserId === "all" || item.user_id === S.selectedUserId
-    ).filter(item => S.profile?.role !== "admin" || isAdminActionTask(item));
+    ).filter(item => S.profile?.role !== "admin" || S.adminScope !== "personal" || item.user_id === S.user?.id)
+      .filter(item => S.profile?.role !== "admin" || S.adminScope !== "center" || isAdminActionTask(item));
     const open = scoped.filter(item => effectiveStatus(item) !== "completed" && item.status !== "cancelled");
     E.todayCount.textContent = open.filter(item => taskDay(item) === today).length;
     E.importantCount.textContent = open.filter(item =>
@@ -331,7 +363,7 @@
   }
 
   function taskProgressHtml(item) {
-    const progress = item.task?.progress;
+    const progress = requirementProgress(item) || item.task?.progress;
     if (!progress || !Number(progress.total)) return "";
     const percent = pct(progress.current, progress.total);
     return `
@@ -347,7 +379,9 @@
   function taskResultHtml(item) {
     if (!isManualAssignedTask(item)) return "";
     const completed = effectiveStatus(item) === "completed";
-    const note = String(item.note || "").trim();
+    const payload = taskResultPayload(item);
+    const note = String(payload.note || "").trim();
+    const requirements = taskRequirements(item);
     const canEditResult = !(S.profile?.role === "admin" && item.user_id !== S.user?.id);
     if (!canEditResult) {
       return completed && note
@@ -436,12 +470,12 @@
 
   function renderProgressList(rows) {
     const progressRows = rows
-      .filter(item => item.task?.progress?.total)
+      .filter(item => (requirementProgress(item) || item.task?.progress)?.total)
       .sort((a, b) => progressPercent(b) - progressPercent(a))
       .slice(0, 8);
     if (!progressRows.length) return '<div class="task-empty" style="padding:20px">Chưa có công việc nào có tiến độ đo được trong tháng này.</div>';
     return `<div class="task-progress-list">${progressRows.map(item => {
-      const progress = item.task.progress;
+      const progress = requirementProgress(item) || item.task.progress;
       const percent = pct(progress.current, progress.total);
       return `
         <div class="task-progress-row">
@@ -480,9 +514,9 @@
     const reminderRows = adminOnly ? [] : rows.filter(isReminderTask);
     const completed = actionRows.filter(item => effectiveStatus(item) === "completed").length;
     const overdue = actionRows.filter(isOverdue).length;
-    const progressRows = actionRows.filter(item => item.task?.progress?.total);
-    const progressDone = progressRows.reduce((sum, item) => sum + Number(item.task.progress.current || 0), 0);
-    const progressTotal = progressRows.reduce((sum, item) => sum + Number(item.task.progress.total || 0), 0);
+    const progressRows = actionRows.filter(item => (requirementProgress(item) || item.task?.progress)?.total);
+    const progressDone = progressRows.reduce((sum, item) => sum + Number((requirementProgress(item) || item.task.progress).current || 0), 0);
+    const progressTotal = progressRows.reduce((sum, item) => sum + Number((requirementProgress(item) || item.task.progress).total || 0), 0);
     const mainRows = adminOnly ? actionRows.slice(0, 30) : actionRows.filter(item => effectiveStatus(item) !== "completed").slice(0, 12);
     const reminders = reminderRows.slice(0, 12);
     return `
@@ -507,6 +541,43 @@
           <h2 class="task-month-section-title">Nhắc nhở trong tháng</h2>
           ${reminders.length ? reminders.map(taskCard).join("") : '<div class="task-empty" style="padding:22px">Không có nhắc nhở trong tháng này.</div>'}
         </section>`}
+      </section>`;
+  }
+
+  function renderCenterDashboard(rows) {
+    const actionRows = rows.filter(isAdminActionTask);
+    const completed = actionRows.filter(item => effectiveStatus(item) === "completed").length;
+    const overdue = actionRows.filter(isOverdue).length;
+    const percent = pct(completed, actionRows.length);
+    const byUser = new Map();
+    actionRows.forEach(item => {
+      const id = item.user_id || "unknown";
+      if (!byUser.has(id)) byUser.set(id, { user: item.assignee, total: 0, done: 0, overdue: 0 });
+      const row = byUser.get(id);
+      row.total += 1;
+      if (effectiveStatus(item) === "completed") row.done += 1;
+      if (isOverdue(item)) row.overdue += 1;
+    });
+    const staffRows = [...byUser.values()].sort((a, b) => pct(b.done, b.total) - pct(a.done, a.total)).slice(0, 10);
+    return `
+      <section class="task-panel">
+        <h2>Thống kê Trung tâm</h2>
+        <div class="task-center-grid">
+          <div class="task-center-card"><span>Tổng công việc</span><strong>${actionRows.length}</strong></div>
+          <div class="task-center-card"><span>Đã hoàn thành</span><strong>${completed}</strong></div>
+          <div class="task-center-card"><span>Quá hạn</span><strong>${overdue}</strong></div>
+          <div class="task-center-card"><span>Tỷ lệ hoàn thành</span><strong>${percent}%</strong></div>
+        </div>
+      </section>
+      <section class="task-panel">
+        <h2>Tiến độ theo nhân viên</h2>
+        ${staffRows.length ? `<div class="task-progress-list">${staffRows.map(row => {
+          const donePct = pct(row.done, row.total);
+          return `<div class="task-progress-row">
+            <div class="task-progress-head"><span>${esc(row.user?.full_name || row.user?.email || "Nhân viên")}</span><span>${row.done}/${row.total} · ${donePct}% · Quá hạn ${row.overdue}</span></div>
+            <div class="task-progress-track"><div class="task-progress-fill" style="width:${donePct}%"></div></div>
+          </div>`;
+        }).join("")}</div>` : '<div class="task-empty" style="padding:20px">Chưa có dữ liệu trung tâm.</div>'}
       </section>`;
   }
 
@@ -542,6 +613,15 @@
     if (!E.adminFilter || !E.staffFilter) return;
     const isAdmin = S.profile?.role === "admin";
     E.adminFilter.classList.toggle("show", isAdmin);
+    E.adminScopeTabs?.classList.toggle("show", isAdmin);
+    document.querySelectorAll("[data-admin-scope]").forEach(button => {
+      button.classList.toggle("active", button.dataset.adminScope === S.adminScope);
+    });
+    if (isAdmin && S.adminScope !== "center") {
+      E.adminFilter.classList.remove("show");
+      S.selectedUserId = "all";
+      return;
+    }
     if (!isAdmin) return;
     const selected = S.selectedUserId || "all";
     const options = mergedStaffUsers().map(user =>
@@ -560,9 +640,12 @@
     renderStaffFilter();
     syncDatebar();
     const rows = visibleAssignments();
+    const centerDashboard = S.profile?.role === "admin" && S.adminScope === "center"
+      ? renderCenterDashboard(rows)
+      : "";
     const overview = S.viewMode === "month" ? renderMonthOverview(rows) : "";
     if (S.viewMode === "month" && rows.length) {
-      E.list.innerHTML = renderMonthDashboard(rows);
+      E.list.innerHTML = centerDashboard + renderMonthDashboard(rows);
       resizeResultInputs();
       return;
     }
@@ -571,7 +654,7 @@
       return;
     }
     E.list.innerHTML = rows.length
-      ? overview + renderGrouped(rows)
+      ? centerDashboard + overview + renderGrouped(rows)
       : `<div class="task-empty">Không có công việc trong ngày ${esc(formatShortDate(S.selectedDate || localDate()))}.</div>`;
     resizeResultInputs();
   }
@@ -824,6 +907,16 @@
 
   async function loadTasks({ refresh = false } = {}) {
     E.list.innerHTML = '<div class="task-empty">Đang tổng hợp công việc...</div>';
+    if (S.profile?.role) {
+      const { start, end } = S.viewMode === "month"
+        ? monthRange(S.selectedDate || localDate())
+        : { start: S.selectedDate || localDate(), end: addDays(S.selectedDate || localDate(), 31) };
+      const { error: templateError } = await sb.rpc("materialize_admin_task_templates", {
+        p_from: start,
+        p_to: end,
+      });
+      if (templateError && !isMissingRpcError(templateError)) console.warn("Task template materialize:", templateError);
+    }
     if (refresh) {
       const { error: refreshError } = await sb.rpc("refresh_daily_tasks", {
         p_user_id: S.profile.role === "admin" ? null : S.user.id,
@@ -871,20 +964,60 @@
   }
 
   function resizeResultInputs() {
+    enhanceRequirementInputs();
     document.querySelectorAll(".task-result-input").forEach(autoResizeTextarea);
+  }
+
+  function enhanceRequirementInputs() {
+    document.querySelectorAll(".task-card[data-task]").forEach(card => {
+      const id = card.dataset.task;
+      if (card.querySelector(".task-requirement-list")) return;
+      const item = S.assignments.find(row => String(row.id) === String(id));
+      const requirements = taskRequirements(item);
+      if (!item || !requirements.length) return;
+      const noteInput = [...card.querySelectorAll("[data-result-input]")]
+        .find(element => element.dataset.resultInput === id);
+      const resultBox = card.querySelector(".task-result-box");
+      if (!resultBox) return;
+      const payload = taskResultPayload(item);
+      const list = document.createElement("div");
+      list.className = "task-requirement-list";
+      list.innerHTML = requirements.map(req => `
+        <div class="task-requirement-item ${String(payload.requirements?.[req.key] || "").trim() ? "task-requirement-done" : ""}">
+          <div class="task-requirement-title">${esc(req.title)}</div>
+          <textarea class="task-result-input" data-requirement-input="${esc(id)}" data-requirement-key="${esc(req.key)}" placeholder="Nhập kết quả cho mục này...">${esc(payload.requirements?.[req.key] || "")}</textarea>
+        </div>
+      `).join("");
+      if (noteInput) resultBox.insertBefore(list, noteInput);
+      else resultBox.appendChild(list);
+    });
   }
 
   async function submitTaskResult(id) {
     const input = [...document.querySelectorAll("[data-result-input]")].find(element => element.dataset.resultInput === id);
     const note = String(input?.value || "").trim();
-    if (!note) {
+    const item = S.assignments.find(row => String(row.id) === String(id));
+    const requirements = taskRequirements(item);
+    const requirementValues = {};
+    requirements.forEach(req => {
+      const reqInput = [...document.querySelectorAll("[data-requirement-input]")]
+        .filter(element => element.dataset.requirementInput === id)
+        .find(element => element.dataset.requirementKey === req.key);
+      requirementValues[req.key] = String(reqInput?.value || "").trim();
+    });
+    const missingRequirement = requirements.find(req => !requirementValues[req.key]);
+    if (missingRequirement) return alert(`Hãy nhập kết quả cho mục: ${missingRequirement.title}`);
+    const storedNote = requirements.length
+      ? JSON.stringify({ __task_result_v2: true, note, requirements: requirementValues })
+      : note;
+    if (!requirements.length && !note) {
       input?.focus();
       return alert("Hãy nhập kết quả công việc trước khi nộp.");
     }
     const { error } = await sb.rpc("set_task_assignment_status", {
       p_assignment_id: id,
       p_status: "completed",
-      p_note: note,
+      p_note: storedNote,
     });
     if (error) return alert(error.message);
     toast("Đã lưu kết quả công việc.");
@@ -1090,6 +1223,13 @@
     const title = byId("manualTaskTitle").value.trim();
     if (!title || !userIds.length) return alert("Hãy nhập tiêu đề và chọn ít nhất một người nhận.");
     const dueValue = byId("manualTaskDueAt").value;
+    const recurrence = byId("manualTaskRecurrence")?.value || "once";
+    const weekday = Number(byId("manualTaskWeekday")?.value || 1);
+    const requirements = String(byId("manualTaskRequirements")?.value || "")
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(Boolean)
+      .map((title, index) => ({ key: `req_${index + 1}`, title }));
     const { data: taskId, error } = await sb.rpc("create_manual_task", {
       p_title: title,
       p_description: byId("manualTaskDescription").value.trim(),
@@ -1097,6 +1237,9 @@
       p_due_at: dueValue ? new Date(dueValue).toISOString() : null,
       p_action_url: byId("manualTaskActionUrl").value.trim(),
       p_user_ids: userIds,
+      p_requirements: requirements,
+      p_recurrence: recurrence,
+      p_weekday: weekday,
     });
     if (error) return alert(error.message);
     try {
@@ -1113,7 +1256,8 @@
       console.warn("Không gửi được thông báo giao việc", notifyError);
     }
     closeModal("taskCreateModal");
-    ["manualTaskTitle", "manualTaskDescription", "manualTaskDueAt", "manualTaskActionUrl"].forEach(id => byId(id).value = "");
+    ["manualTaskTitle", "manualTaskDescription", "manualTaskDueAt", "manualTaskActionUrl", "manualTaskRequirements"].forEach(id => byId(id).value = "");
+    byId("manualTaskRecurrence").value = "once";
     S.manualAssigneeIds = new Set();
     byId("manualTaskAssigneeSearch").value = "";
     byId("manualTaskAssigneeSelect").value = "";
@@ -1164,6 +1308,13 @@
         render();
       });
     });
+    document.querySelectorAll("[data-admin-scope]").forEach(button => {
+      button.addEventListener("click", () => {
+        S.adminScope = button.dataset.adminScope || "personal";
+        S.selectedUserId = "all";
+        render();
+      });
+    });
     E.staffFilter?.addEventListener("change", () => {
       S.selectedUserId = E.staffFilter.value || "all";
       render();
@@ -1209,7 +1360,7 @@
       list: byId("taskList"), prevDay: byId("taskPrevDay"), currentDay: byId("taskCurrentDay"), nextDay: byId("taskNextDay"),
       todayCount: byId("taskTodayCount"), importantCount: byId("taskImportantCount"),
       overdueCount: byId("taskOverdueCount"), completedCount: byId("taskCompletedCount"),
-      adminFilter: byId("taskAdminFilter"), staffFilter: byId("taskStaffFilter"),
+      adminFilter: byId("taskAdminFilter"), staffFilter: byId("taskStaffFilter"), adminScopeTabs: byId("taskAdminScopeTabs"),
       toast: byId("taskToast"),
     });
     const { data: { user } } = await sb.auth.getUser();
