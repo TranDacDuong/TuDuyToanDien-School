@@ -323,6 +323,13 @@
     return new Date(iso).toLocaleDateString("vi-VN");
   }
 
+  function formatAttendanceDate(dateText) {
+    if (!dateText) return "—";
+    const date = new Date(`${dateText}T00:00:00+07:00`);
+    const weekday = new Intl.DateTimeFormat("vi-VN", { weekday: "short" }).format(date);
+    return `${weekday}, ${date.toLocaleDateString("vi-VN")}`;
+  }
+
   function getStudentGroup(studentId) {
     return currentRows.find(r => r.studentId === studentId)
       || grouped.find(r => r.studentId === studentId)
@@ -414,18 +421,45 @@
     if (!items.length) {
       return `<div style="margin-top:12px;font-size:12px;color:var(--muted)">Chưa có buổi học/điểm danh trong tháng này.</div>`;
     }
-    const statusText = { present: "Có", absent: "Vắng", makeup: "Học bù" };
+    const statusText = { present: "Có", absent: "Vắng", makeup: "Học bù", unknown: "Chưa rõ" };
+    const counts = items.reduce((acc, item) => {
+      const status = item.status || "present";
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {});
     return `
-      <div style="margin-top:12px">
-        <div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:7px">Điểm danh chi tiết</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">
-          ${items.map(item => {
+      <div class="attendance-table-wrap">
+        <div class="attendance-table-title">
+          <span>Điểm danh chi tiết</span>
+          <div class="attendance-summary-pills">
+            <span class="pill present">Có: ${counts.present || 0}</span>
+            <span class="pill absent">Vắng: ${counts.absent || 0}</span>
+            <span class="pill makeup">Học bù: ${counts.makeup || 0}</span>
+          </div>
+        </div>
+        <table class="attendance-detail-table">
+          <thead>
+            <tr>
+              <th>Ngày học</th>
+              <th>Lịch học</th>
+              <th>Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map(item => {
             const status = item.status || "present";
             const label = statusText[status] || status;
             const session = item.session_no ? `B${item.session_no}` : "Buổi";
-            return `<span class="pill ${status}" title="${item.date}">${item.date.slice(8,10)}/${item.date.slice(5,7)} • ${session} • ${label}</span>`;
+            const schedule = item.scheduleLabel || session;
+            return `
+              <tr>
+                <td><span class="attendance-date">${formatAttendanceDate(item.date)}</span></td>
+                <td><div class="attendance-schedule">${schedule}</div></td>
+                <td><span class="attendance-status ${status}">${label}</span></td>
+              </tr>`;
           }).join("")}
-        </div>
+          </tbody>
+        </table>
       </div>
     `;
   }
@@ -753,17 +787,27 @@ Nhập số tiền hoàn lại (>0):`,
       activeOccurrences.sort((a, b) => a.date.localeCompare(b.date) || Number(a.schedule_id || 0) - Number(b.schedule_id || 0));
       const totalSessions = activeOccurrences.length;
 
+      const daysMap = {1:"T2",2:"T3",3:"T4",4:"T5",5:"T6",6:"T7",7:"CN"};
       let present = 0, absent = 0, makeup = 0;
       const attendanceDetails = activeOccurrences.map(item => {
         const status = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item) || "present";
         if (status === "present") present++;
         else if (status === "absent") absent++;
         else if (status === "makeup") makeup++;
+        const s = item.schedule || null;
+        const timeLabel = s?.start_time && s?.end_time
+          ? `${String(s.start_time).slice(0,5)}–${String(s.end_time).slice(0,5)}`
+          : "";
+        const roomLabel = s?.rooms?.room_name ? ` • ${s.rooms.room_name}` : "";
+        const scheduleLabel = s
+          ? `Buổi ${s.session_no || item.session_no || 1}: ${daysMap[s.weekday] || ""} ${timeLabel}${roomLabel}`.trim()
+          : (item.from_attendance_only ? "Điểm danh bổ sung" : `Buổi ${item.session_no || ""}`.trim());
         return {
           date: item.date,
           status,
           schedule_id: item.schedule_id,
           session_no: item.session_no,
+          scheduleLabel,
         };
       });
 
@@ -774,7 +818,6 @@ Nhập số tiền hoàn lại (>0):`,
         present, absent, makeup, totalSessions,
       });
 
-      const daysMap = {1:"T2",2:"T3",3:"T4",4:"T5",5:"T6",6:"T7",7:"CN"};
       const studentSchedules = [...new Map(activeOccurrences
         .map(item => item.schedule)
         .filter(Boolean)

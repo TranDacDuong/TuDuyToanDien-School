@@ -221,6 +221,76 @@ tr:hover td { background: #f8fbff; }
 .pill.absent  { background: #fee2e2; color: #b91c1c; }
 .pill.makeup  { background: #fef9c3; color: #854d0e; }
 
+.attendance-table-wrap {
+  margin-top: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  overflow-x: auto;
+  background: #fff;
+}
+.attendance-table-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, #f8fbff 0%, #eef6ff 100%);
+  border-bottom: 1px solid #e2e8f0;
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 800;
+}
+.attendance-summary-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.attendance-detail-table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+}
+.attendance-detail-table th,
+.attendance-detail-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #eef3f8;
+  font-size: 12px;
+  vertical-align: middle;
+}
+.attendance-detail-table th {
+  background: #fff;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.attendance-detail-table tr:last-child td { border-bottom: none; }
+.attendance-date {
+  font-weight: 800;
+  color: #0f172a;
+  white-space: nowrap;
+}
+.attendance-schedule {
+  color: #475569;
+  line-height: 1.35;
+}
+.attendance-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.attendance-status.present { background: #dcfce7; color: #15803d; }
+.attendance-status.absent { background: #fee2e2; color: #b91c1c; }
+.attendance-status.makeup { background: #fef9c3; color: #854d0e; }
+.attendance-status.unknown { background: #e2e8f0; color: #475569; }
+
 /* amount */
 .amount { font-weight: 700; font-size: 14px; color: #0f172a; }
 .amount.discount { color: var(--red); font-size: 12px; font-weight: 400; }
