@@ -875,6 +875,8 @@
     base_tier_percent: DEFAULT_BASE_PERCENT
   };
   let lastTeacherRevenueForProjection = 0;
+  const INCOME_SELECTABLE_ROLES = new Set(["admin", "teacher", "assistant", "marketing"]);
+  const INCOME_PAYROLL_ROLES = new Set(["teacher", "assistant", "marketing"]);
 
   function getSb() {
     if (window.sb) return window.sb;
@@ -1278,15 +1280,21 @@
     const { data, error } = await sb
       .from("users")
       .select("id, full_name, role")
-      .in("role", ["teacher", "assistant", "marketing", "admin"])
       .order("full_name");
 
     if (error) {
       console.error("Lỗi tải danh sách giáo viên:", error);
+      if (viewerProfile?.role === "admin" && normalizeUuid(currentUser?.id)) {
+        teachersList = [{ id: currentUser.id, full_name: viewerProfile.full_name || "Admin", role: "admin" }];
+        const select = document.getElementById("teacherSelect");
+        select.innerHTML = `<option value="${currentUser.id}">${esc(viewerProfile.full_name || "Admin")} (Admin)</option>`;
+        select.style.display = "block";
+        selectedTeacherId = currentUser.id;
+      }
       return;
     }
 
-    teachersList = (data || []).filter(t => normalizeUuid(t.id));
+    teachersList = (data || []).filter(t => normalizeUuid(t.id) && INCOME_SELECTABLE_ROLES.has(String(t.role || "")));
     if (!teachersList.length && viewerProfile?.role === "admin" && normalizeUuid(currentUser?.id)) {
       teachersList = [{
         id: currentUser.id,
@@ -1584,7 +1592,8 @@
         coursesData,
         expenses
       ] = await Promise.all([
-        fetchAllRows(() => sb.from("users").select("id, full_name, role").in("role", ["teacher", "assistant", "marketing"])),
+        fetchAllRows(() => sb.from("users").select("id, full_name, role"))
+          .then(rows => rows.filter(item => INCOME_PAYROLL_ROLES.has(String(item.role || "")))),
         fetchAllRows(() => sb.from("class_teachers").select("teacher_id, class_id")),
         fetchAllRows(() => sb.from("course_managers").select("teacher_id, course_id")),
         fetchAllRows(() => sb.from("classes").select("id, class_name, tuition_fee, tuition_type, makeup_fee, class_schedules(id, session_no, weekday, start_time, end_time, effective_from)").eq("hidden", false)),
