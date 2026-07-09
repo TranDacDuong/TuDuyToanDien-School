@@ -23,12 +23,12 @@ BEGIN
     WHERE conrelid = 'public.class_student_schedules'::regclass
       AND contype IN ('p', 'u')
       AND (
-        SELECT array_agg(att.attname ORDER BY u.ord)
+        SELECT array_agg(att.attname::text ORDER BY u.ord)
         FROM unnest(conkey) WITH ORDINALITY AS u(attnum, ord)
         JOIN pg_attribute att
           ON att.attrelid = conrelid
          AND att.attnum = u.attnum
-      ) = ARRAY['class_id','student_id','session_no']
+      ) = ARRAY['class_id','student_id','session_no']::text[]
   LOOP
     EXECUTE format('ALTER TABLE public.class_student_schedules DROP CONSTRAINT %I', r.conname);
   END LOOP;
@@ -52,12 +52,12 @@ BEGIN
         WHERE con.conindid = idx.indexrelid
       )
       AND (
-        SELECT array_agg(att.attname ORDER BY u.ord)
+        SELECT array_agg(att.attname::text ORDER BY u.ord)
         FROM unnest(idx.indkey) WITH ORDINALITY AS u(attnum, ord)
         JOIN pg_attribute att
           ON att.attrelid = idx.indrelid
          AND att.attnum = u.attnum
-      ) = ARRAY['class_id','student_id','session_no']
+      ) = ARRAY['class_id','student_id','session_no']::text[]
   LOOP
     EXECUTE format('DROP INDEX IF EXISTS %s', r.index_name);
   END LOOP;

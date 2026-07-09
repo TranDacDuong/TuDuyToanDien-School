@@ -1275,6 +1275,14 @@
     return rows;
   }
 
+  function withTimeout(promise, timeoutMs, message) {
+    let timer;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(message || "Yêu cầu xử lý quá lâu.")), timeoutMs);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+  }
+
   function normalizePaymentMap(payments) {
     const paymentMap = {};
     (payments || []).forEach(p => {
@@ -1631,7 +1639,10 @@
     dataBlock.style.display = "none";
 
     const ym = document.getElementById("monthPicker").value;
-    if (!ym) return;
+    if (!ym) {
+      loader.innerHTML = `<div style="color:var(--red)">Vui lòng chọn tháng cần tính thu nhập.</div>`;
+      return;
+    }
 
     // Load custom configuration
     await loadTeacherSalaryConfig(selectedTeacherId);
@@ -1945,7 +1956,18 @@
 
       // Render milestones & progress bar
       renderMilestones(totalRevenue, salaryDetails.breakdown);
-      await calculateAdminIncome(ym);
+      if (viewerProfile?.role === "admin") {
+        try {
+          await withTimeout(
+            calculateAdminIncome(ym),
+            20000,
+            "Phần thu nhập admin tải quá lâu. Vui lòng kiểm tra lại dữ liệu học phí/lương/chi phí hoặc thử tải lại trang."
+          );
+        } catch (adminErr) {
+          console.error("Lỗi tính thu nhập admin:", adminErr);
+          document.getElementById("expenseList").innerHTML = `<div class="empty-state">Không tải được dữ liệu thu nhập admin: ${adminErr.message}</div>`;
+        }
+      }
 
       loader.style.display = "none";
       dataBlock.style.display = "flex";
@@ -2089,6 +2111,14 @@
     // Run first calculation
     if (selectedTeacherId) {
       await calculateAndRender();
+    } else {
+      const loader = document.getElementById("loadingBlock");
+      const dataBlock = document.getElementById("dataBlock");
+      loader.style.display = "none";
+      dataBlock.style.display = "flex";
+      if (profile.role === "admin") {
+        document.getElementById("expenseList").innerHTML = `<div class="empty-state">Chưa có nhân viên nào để tính thu nhập chi tiết.</div>`;
+      }
     }
   }
 
