@@ -1599,6 +1599,70 @@
     };
   }
 
+  function calculateSystemProjectedRevenueFromContext({ context, ym, mStart, mEnd }) {
+    let totalClassRevenue = 0;
+    (context.allClassStudents || []).forEach(cs => {
+      const cls = context.classesMap[cs.class_id];
+      if (!cls) return;
+
+      const joined = cs.joined_at ? cs.joined_at.slice(0, 10) : "0000-00-00";
+      const left = cs.left_at ? cs.left_at.slice(0, 10) : "9999-99-99";
+      if (joined > mEnd || left < mStart) return;
+
+      const chosenIds = context.chosenMap[`${cs.student_id}_${cs.class_id}`];
+      const activeOccurrences = generateOccurrencesForStudent(cls.class_schedules || [], ym, chosenIds).filter(item => {
+        if (item.date > left) return false;
+        if (item.date >= joined) return true;
+        const actualStatus = attendanceStatusFor(context.attMap, cs.student_id, cs.class_id, item);
+        return actualStatus === "present" || actualStatus === "makeup";
+      });
+      const occurrenceKeys = new Set(activeOccurrences.map(item => `${item.date}_${item.schedule_id || 0}`));
+      (context.attRowsByStudentClass[`${cs.student_id}_${cs.class_id}`] || []).forEach(row => {
+        const date = String(row.date || "").slice(0, 10);
+        const status = row.status || "";
+        const scheduleId = Number(row.schedule_id || 0);
+        const key = `${date}_${scheduleId}`;
+        if (!date || occurrenceKeys.has(key) || date > left) return;
+        if (date < joined && status !== "present" && status !== "makeup") return;
+        activeOccurrences.push({ date, schedule_id: scheduleId, session_no: 0, schedule: null });
+        occurrenceKeys.add(key);
+      });
+
+      let present = 0, absent = 0, makeup = 0;
+      activeOccurrences.forEach(item => {
+        const status = attendanceStatusFor(context.attMap, cs.student_id, cs.class_id, item) || "present";
+        if (status === "present") present++;
+        else if (status === "absent") absent++;
+        else if (status === "makeup") makeup++;
+      });
+
+      const p = context.paymentMap[cs.student_id];
+      let amount = 0;
+      if (p?.locked_at && getSnapshotClasses(p).length) {
+        const snapClass = getSnapshotClass(p, cs.class_id);
+        amount = snapClass ? getSnapshotAmount(snapClass) : 0;
+      } else {
+        amount = calcTuition({
+          tuition_type: cls.tuition_type,
+          tuition_fee: cls.tuition_fee,
+          makeup_fee: cls.makeup_fee,
+          present,
+          absent,
+          makeup,
+          totalSessions: activeOccurrences.length,
+        });
+      }
+      totalClassRevenue += Number(amount || 0);
+    });
+
+    const totalCourseRevenue = (context.courseEnrollments || []).reduce((sum, row) => {
+      const crs = context.coursesMap[row.course_id];
+      return sum + Number(crs?.tuition_fee || 0);
+    }, 0);
+
+    return totalClassRevenue + totalCourseRevenue;
+  }
+
   async function loadSalaryConfigMap(staffIds) {
     const map = {};
     staffIds.forEach(id => {
@@ -1782,11 +1846,13 @@
       });
 
       const systemRevenue = (allPayments || []).reduce((sum, item) => sum + Number(item.amount_paid || 0), 0);
-      const systemProjectedRevenue = (allPayments || []).reduce((sum, item) => {
+      const paymentProjectedRevenue = (allPayments || []).reduce((sum, item) => {
         const due = Number(item.amount_due || 0);
         const paid = Number(item.amount_paid || 0);
         return sum + Math.max(due, paid);
       }, 0);
+      const calculatedProjectedRevenue = calculateSystemProjectedRevenueFromContext({ context, ym, mStart, mEnd });
+      const systemProjectedRevenue = Math.max(paymentProjectedRevenue, calculatedProjectedRevenue, systemRevenue);
       let staffSalaryTotal = 0;
       let projectedStaffSalaryTotal = 0;
       const staffIncomeRows = [];
