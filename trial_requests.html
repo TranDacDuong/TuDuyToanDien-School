@@ -142,6 +142,7 @@ tbody tr:hover td{background:#fff7ed}
       <div class="form-grid">
         <div class="field"><label>Họ tên học sinh</label><input id="studentName" class="input" placeholder="VD: Nguyễn Văn A"></div>
         <div class="field"><label>SĐT học sinh</label><input id="studentPhone" class="input" placeholder="SĐT học sinh"></div>
+        <div class="field"><label>Trường học sinh</label><input id="studentSchool" class="input" placeholder="VD: THCS/THPT..."></div>
         <div class="field full"><div id="studentAccountInfo" class="account-info"></div></div>
         <div class="field"><label>Họ tên phụ huynh</label><input id="parentName" class="input" placeholder="VD: Nguyễn Thị B"></div>
         <div class="field"><label>SĐT phụ huynh</label><input id="parentPhone" class="input" placeholder="SĐT phụ huynh"></div>
@@ -423,7 +424,7 @@ async function loadTrialRequests(){
       teacherMap = Object.fromEntries((teachers||[]).map(t=>[t.id,t]));
     }
     if(studentIds.length){
-      const {data:students} = await sb.from("users").select("id,full_name,email,phone,parent_full_name,parent_phone").in("id",studentIds);
+      const {data:students} = await sb.from("users").select("id,full_name,email,phone,parent_full_name,parent_phone,school").in("id",studentIds);
       S.studentMap = Object.fromEntries((students||[]).map(s=>[s.id,s]));
       let parentLinks = [];
       const embeddedParents = await sb.from("parent_students")
@@ -463,7 +464,7 @@ function renderRequests(){
   const subjectFilter = rmVN(document.getElementById("subjectFilter")?.value || "");
   const rows = S.requests.filter(item=>{
     const effective = computedStatus(item);
-    const haystack = rmVN(`${item.student_name||""} ${item.phone||""} ${item.parent_full_name||""} ${item.parent_phone||""} ${item.grade||""} ${item.subject||""} ${item.teacher?.full_name||""} ${classLabel(item.trial_class_id)} ${sourceDisplay(item)} ${item.linkedStudent?.full_name||""} ${item.linkedStudent?.email||""} ${item.linkedParent?.full_name||""} ${item.linkedParent?.email||""}`);
+    const haystack = rmVN(`${item.student_name||""} ${item.phone||""} ${item.school||""} ${item.parent_full_name||""} ${item.parent_phone||""} ${item.grade||""} ${item.subject||""} ${item.teacher?.full_name||""} ${classLabel(item.trial_class_id)} ${sourceDisplay(item)} ${item.linkedStudent?.full_name||""} ${item.linkedStudent?.email||""} ${item.linkedParent?.full_name||""} ${item.linkedParent?.email||""}`);
     const cls = S.classMap[item.trial_class_id] || {};
     const itemGrade = rmVN(item.grade || cls.grades?.name || cls.grade?.name || "");
     const itemSubject = rmVN(item.subject || cls.subjects?.name || cls.subject?.name || "");
@@ -483,7 +484,7 @@ function renderRequests(){
     return `
     <tr class="${soon ? "urgent-row" : ""}" onclick="openTrialModal('${item.id}')">
       <td><div style="white-space:nowrap;font-weight:800;color:var(--navy)">${esc(fmtTime(item.created_at))}</div><div style="font-size:.76rem;color:var(--ink-light);margin-top:4px">${esc(sourceDisplay(item))}</div>${soon?`<div class="urgent-label ${soon.day}">${esc(soon.label)}</div>`:""}</td>
-      <td><b style="color:var(--navy)">${esc(item.student_name || "—")}</b><div style="margin-top:6px"><button class="phone-btn" type="button" onclick="event.stopPropagation();copyPhone('${escAttr(item.phone || "")}')">${esc(item.phone || "—")}</button></div><div style="margin-top:6px"><span class="status-pill status-${st}">${statusLabel(st)}</span></div>${linkedAccountHtml("học sinh", item.linkedStudent)}${item.note?`<div style="font-size:.72rem;color:var(--ink-light);margin-top:4px;max-width:240px">${esc(item.note)}</div>`:""}</td>
+      <td><b style="color:var(--navy)">${esc(item.student_name || "—")}</b><div style="margin-top:6px"><button class="phone-btn" type="button" onclick="event.stopPropagation();copyPhone('${escAttr(item.phone || "")}')">${esc(item.phone || "—")}</button></div><div style="font-size:.76rem;color:var(--ink-mid);margin-top:5px">Trường: ${esc(item.school || item.linkedStudent?.school || "—")}</div><div style="margin-top:6px"><span class="status-pill status-${st}">${statusLabel(st)}</span></div>${linkedAccountHtml("học sinh", item.linkedStudent)}${item.note?`<div style="font-size:.72rem;color:var(--ink-light);margin-top:4px;max-width:240px">${esc(item.note)}</div>`:""}</td>
       <td><div style="font-weight:800;color:var(--navy)">${esc(item.parent_full_name || "—")}</div><div style="margin-top:6px"><button class="phone-btn" type="button" onclick="event.stopPropagation();copyPhone('${escAttr(item.parent_phone || "")}')">${esc(item.parent_phone || "—")}</button></div>${linkedAccountHtml("phụ huynh", item.linkedParent)}</td>
       <td><div style="font-weight:800;color:var(--navy)">${esc(item.grade || "—")}</div><div style="font-size:.78rem;color:var(--ink-mid);margin-top:4px">${esc(item.subject || "—")}</div></td>
       <td><div style="font-weight:900;color:var(--navy)">${esc(classLabel(item.trial_class_id))}</div><div style="font-size:.74rem;color:var(--ink-mid);line-height:1.55;margin-top:4px"><div>1) ${esc(scheduleLabel(item.trial_schedule_1_id))}</div><div>${esc(fmtTime(item.trial_session_1_at))}</div><div style="margin-top:4px">2) ${esc(scheduleLabel(item.trial_schedule_2_id))}</div><div>${esc(fmtTime(item.trial_session_2_at))}</div></div></td>
@@ -551,13 +552,13 @@ async function findUserByPhone(phone, role) {
   if (!digits) return null;
   const candidates = [];
   const exact = await sb.from("users")
-    .select("id,full_name,email,phone,role,parent_full_name,parent_phone")
+    .select("id,full_name,email,phone,role,parent_full_name,parent_phone,school")
     .eq("phone", phone)
     .limit(5);
   if (!exact.error && exact.data?.length) candidates.push(...exact.data);
   if (digits.length >= 8) {
     const fuzzy = await sb.from("users")
-      .select("id,full_name,email,phone,role,parent_full_name,parent_phone")
+      .select("id,full_name,email,phone,role,parent_full_name,parent_phone,school")
       .ilike("phone", `%${digits.slice(-8)}%`)
       .limit(10);
     if (!fuzzy.error && fuzzy.data?.length) candidates.push(...fuzzy.data);
@@ -601,6 +602,7 @@ function updateStudentFieldsFromAccount(student) {
   document.getElementById("studentId").value = student.id || "";
   if (!document.getElementById("studentName").value) document.getElementById("studentName").value = student.full_name || "";
   if (!document.getElementById("studentPhone").value) document.getElementById("studentPhone").value = student.phone || "";
+  if (!document.getElementById("studentSchool").value) document.getElementById("studentSchool").value = student.school || "";
   if (!document.getElementById("parentName").value) document.getElementById("parentName").value = student.parent_full_name || "";
   if (!document.getElementById("parentPhone").value) document.getElementById("parentPhone").value = student.parent_phone || "";
 }
@@ -608,6 +610,7 @@ function updateStudentFieldsFromAccount(student) {
 async function ensureStudentAccount({ create = true } = {}) {
   const fullName = document.getElementById("studentName").value.trim();
   const phone = document.getElementById("studentPhone").value.trim();
+  const school = document.getElementById("studentSchool").value.trim();
   if (!fullName || !phone) {
     setAccountInfo("student", "Nhập họ tên và SĐT học sinh để kiểm tra tài khoản.", "warn");
     return null;
@@ -656,6 +659,7 @@ async function ensureStudentAccount({ create = true } = {}) {
       phone,
       parent_full_name: document.getElementById("parentName").value.trim(),
       parent_phone: document.getElementById("parentPhone").value.trim(),
+      school,
       password: credentials.password,
       role: "student"
     }]
@@ -666,7 +670,7 @@ async function ensureStudentAccount({ create = true } = {}) {
   }
   const created = data?.created_accounts?.[0];
   const { data: student, error: findError } = await sb.from("users")
-    .select("id,full_name,email,phone,parent_full_name,parent_phone,role")
+    .select("id,full_name,email,phone,parent_full_name,parent_phone,school,role")
     .eq("email", created?.email || credentials.email)
     .maybeSingle();
   if (findError || !student) throw findError || new Error("Không tìm thấy tài khoản học sinh vừa tạo.");
@@ -763,6 +767,7 @@ async function ensureTrialAccounts({ create = true } = {}) {
   await sb.from("users").update({
     parent_full_name: document.getElementById("parentName").value.trim() || null,
     parent_phone: document.getElementById("parentPhone").value.trim() || null,
+    school: document.getElementById("studentSchool").value.trim() || null,
   }).eq("id", student.id);
   return { student, parent };
 }
@@ -784,6 +789,7 @@ function openTrialModal(id){
   document.getElementById("parentId").value = item?.linkedParent?.id || "";
   document.getElementById("studentName").value = item?.student_name || "";
   document.getElementById("studentPhone").value = item?.phone || "";
+  document.getElementById("studentSchool").value = item?.school || item?.linkedStudent?.school || "";
   document.getElementById("parentName").value = item?.parent_full_name || "";
   document.getElementById("parentPhone").value = item?.parent_phone || "";
   renderGradeOptions(item?.grade || "");
@@ -805,6 +811,7 @@ function payloadFromForm(){
   return {
     student_name: document.getElementById("studentName").value.trim(),
     phone: document.getElementById("studentPhone").value.trim(),
+    school: document.getElementById("studentSchool").value.trim(),
     parent_full_name: document.getElementById("parentName").value.trim(),
     parent_phone: document.getElementById("parentPhone").value.trim(),
     grade: document.getElementById("gradeText").value.trim(),
@@ -822,8 +829,8 @@ function payloadFromForm(){
 async function saveTrialRequest(options={}){
   const id = document.getElementById("editId").value;
   let payload = payloadFromForm();
-  if(!payload.student_name || !payload.phone || !payload.parent_full_name || !payload.parent_phone || !payload.grade || !payload.subject){
-    alert("Vui lòng nhập đủ họ tên học sinh, SĐT học sinh, họ tên phụ huynh, SĐT phụ huynh, khối và môn.");
+  if(!payload.student_name || !payload.phone || !payload.school || !payload.parent_full_name || !payload.parent_phone || !payload.grade || !payload.subject){
+    alert("Vui lòng nhập đủ họ tên học sinh, SĐT học sinh, trường học sinh, họ tên phụ huynh, SĐT phụ huynh, khối và môn.");
     return null;
   }
   if((payload.trial_class_id || payload.trial_schedule_1_id || payload.trial_schedule_2_id || payload.trial_session_1_at || payload.trial_session_2_at) && !(payload.trial_class_id && payload.trial_schedule_1_id && payload.trial_schedule_2_id && payload.trial_session_1_at && payload.trial_session_2_at)){
