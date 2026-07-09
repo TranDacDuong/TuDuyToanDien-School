@@ -753,10 +753,10 @@
                 <tr>
                   <th>Nhân viên</th>
                   <th>Vai trò</th>
-                  <th class="text-right">Doanh thu thực tế</th>
-                  <th class="text-right">Thu nhập thực tế</th>
-                  <th class="text-right">Doanh thu dự kiến</th>
-                  <th class="text-right">Thu nhập ước tính</th>
+                  <th class="text-right">Lương cứng</th>
+                  <th class="text-right">Lương thưởng</th>
+                  <th class="text-right">Tổng thu nhập</th>
+                  <th>Cập nhật</th>
                 </tr>
               </thead>
               <tbody id="adminOtherStaffIncomeBody"></tbody>
@@ -1626,6 +1626,34 @@
     return map;
   }
 
+  async function loadStaffMonthlySalaryMap(staffIds, ym) {
+    const map = {};
+    (staffIds || []).forEach(id => {
+      map[id] = { base_salary: 0, bonus_amount: 0 };
+    });
+    if (!staffIds?.length) return map;
+    const sb = getSb();
+    const { data, error } = await sb
+      .from("staff_monthly_salaries")
+      .select("staff_id, base_salary, bonus_amount")
+      .eq("salary_month", ymToDate(ym))
+      .in("staff_id", staffIds);
+    if (error) {
+      if (error.code === "42P01" || error.message?.includes("staff_monthly_salaries")) {
+        console.warn("Chưa có bảng staff_monthly_salaries, dùng lương mặc định cho nhân viên khác.");
+        return map;
+      }
+      throw error;
+    }
+    (data || []).forEach(row => {
+      map[row.staff_id] = {
+        base_salary: Number(row.base_salary || 0),
+        bonus_amount: Number(row.bonus_amount || 0),
+      };
+    });
+    return map;
+  }
+
   async function loadOperatingExpenses(ym) {
     const sb = getSb();
     const { data, error } = await sb
@@ -1691,10 +1719,14 @@
       <tr>
         <td><b>${esc(row.name)}</b></td>
         <td>${esc(roleLabel(row.role))}</td>
-        <td class="text-right">${fmt(row.actualRevenue)}đ</td>
+        <td class="text-right">
+          <input class="control-input" id="staffBase_${esc(row.id)}" type="number" min="0" value="${Number(row.baseSalary || 0)}" style="max-width:130px;text-align:right">
+        </td>
+        <td class="text-right">
+          <input class="control-input" id="staffBonus_${esc(row.id)}" type="number" min="0" value="${Number(row.bonusAmount || 0)}" style="max-width:130px;text-align:right">
+        </td>
         <td class="text-right" style="font-weight:700;color:var(--green)">${fmt(row.actualIncome)}đ</td>
-        <td class="text-right">${fmt(row.projectedRevenue)}đ</td>
-        <td class="text-right" style="font-weight:700;color:#be185d">${fmt(row.projectedIncome)}đ</td>
+        <td><button class="btn-save" type="button" onclick="saveStaffMonthlySalary('${esc(row.id)}')">Lưu</button></td>
       </tr>
     `).join("") : `<tr><td colspan="6" class="empty-state">Chưa có nhân viên khác trong bảng lương tháng này.</td></tr>`;
   }
@@ -1736,6 +1768,8 @@
       const context = buildIncomeContext({ classesData, allClassStudents, allAttendance, allPayments, chosenSchedules, courseEnrollments, coursesData });
       const staffIds = (staff || []).map(item => item.id);
       const salaryConfigs = await loadSalaryConfigMap(staffIds);
+      const nonTeacherStaffIds = (staff || []).filter(item => item.role !== "teacher").map(item => item.id);
+      const monthlySalaryMap = await loadStaffMonthlySalaryMap(nonTeacherStaffIds, ym);
       const classMapByStaff = {};
       const courseMapByStaff = {};
       (classTeachers || []).forEach(row => {
@@ -1766,8 +1800,18 @@
           mStart,
           mEnd,
         });
-        const salary = calculateSalaryBreakdown(staffRevenue.actualRevenue, Number(cfg.base_salary || 0), Number(cfg.base_tier_percent || 0));
-        const projectedSalary = calculateSalaryBreakdown(staffRevenue.projectedRevenue, Number(cfg.base_salary || 0), Number(cfg.base_tier_percent || 0));
+        const isTeacher = person.role === "teacher";
+        const monthlySalary = monthlySalaryMap[person.id] || { base_salary: 0, bonus_amount: 0 };
+        const salary = isTeacher
+          ? calculateSalaryBreakdown(staffRevenue.actualRevenue, Number(cfg.base_salary || 0), Number(cfg.base_tier_percent || 0))
+          : {
+              baseSalary: Number(monthlySalary.base_salary || 0),
+              totalBonus: Number(monthlySalary.bonus_amount || 0),
+              totalIncome: Number(monthlySalary.base_salary || 0) + Number(monthlySalary.bonus_amount || 0),
+            };
+        const projectedSalary = isTeacher
+          ? calculateSalaryBreakdown(staffRevenue.projectedRevenue, Number(cfg.base_salary || 0), Number(cfg.base_tier_percent || 0))
+          : salary;
         staffSalaryTotal += Number(salary.totalIncome || 0);
         projectedStaffSalaryTotal += Number(projectedSalary.totalIncome || 0);
         staffIncomeRows.push({
@@ -1776,6 +1820,8 @@
           role: String(person.role || ""),
           actualRevenue: Number(staffRevenue.actualRevenue || 0),
           projectedRevenue: Number(staffRevenue.projectedRevenue || 0),
+          baseSalary: Number(salary.baseSalary || 0),
+          bonusAmount: Number(salary.totalBonus || 0),
           actualIncome: Number(salary.totalIncome || 0),
           projectedIncome: Number(projectedSalary.totalIncome || 0),
         });
@@ -1832,6 +1878,33 @@
     await calculateAndRender();
   }
 
+  async function saveStaffMonthlySalary(staffId) {
+    if (viewerProfile?.role !== "admin") return;
+    const safeStaffId = normalizeUuid(staffId);
+    if (!safeStaffId) return alert("Nhân viên không hợp lệ.");
+    const ym = document.getElementById("monthPicker").value;
+    const baseSalary = Number(document.getElementById(`staffBase_${safeStaffId}`)?.value || 0);
+    const bonusAmount = Number(document.getElementById(`staffBonus_${safeStaffId}`)?.value || 0);
+    if (baseSalary < 0 || bonusAmount < 0) return alert("Lương cứng và lương thưởng không được âm.");
+
+    const sb = getSb();
+    const { error } = await sb.from("staff_monthly_salaries").upsert({
+      staff_id: safeStaffId,
+      salary_month: ymToDate(ym),
+      base_salary: baseSalary,
+      bonus_amount: bonusAmount,
+      updated_by: currentUser.id,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "staff_id,salary_month" });
+    if (error) {
+      if (error.code === "42P01" || error.message?.includes("staff_monthly_salaries")) {
+        return alert("Chưa có bảng staff_monthly_salaries. Hãy chạy SQL staff monthly salaries trước.");
+      }
+      return alert("Lỗi lưu lương nhân viên: " + error.message);
+    }
+    await calculateAndRender();
+  }
+
   function calculateCustomProjection() {
     const input = document.getElementById("projectedRevenueInput");
     const result = document.getElementById("customProjectionResult");
@@ -1846,6 +1919,7 @@
 
   window.saveOperatingExpense = saveOperatingExpense;
   window.deleteOperatingExpense = deleteOperatingExpense;
+  window.saveStaffMonthlySalary = saveStaffMonthlySalary;
   window.calculateCustomProjection = calculateCustomProjection;
 
   // Trigger calculations and rendering
