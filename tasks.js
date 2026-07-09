@@ -771,6 +771,23 @@
     });
   }
 
+  function selectedScheduleIdsForDate(historyRows, dateText) {
+    if (!Array.isArray(historyRows) || !historyRows.length) return null;
+    const eligible = historyRows.filter(row => String(row.effective_from || "2000-01-01").slice(0, 10) <= dateText);
+    if (!eligible.length) return null;
+    const maxEffective = eligible.reduce((max, row) => {
+      const value = String(row.effective_from || "2000-01-01").slice(0, 10);
+      return value > max ? value : max;
+    }, "2000-01-01");
+    const ids = new Set(
+      eligible
+        .filter(row => String(row.effective_from || "2000-01-01").slice(0, 10) === maxEffective)
+        .map(row => Number(row.schedule_id))
+        .filter(Boolean)
+    );
+    return ids.size ? ids : null;
+  }
+
   async function enrichTaskProgress(assignments) {
     const rows = (assignments || []).filter(item => {
       const task = item.task || {};
@@ -795,7 +812,7 @@
         ? sb.from("class_schedules").select("id,class_id,session_no,weekday,start_time,end_time,effective_from").in("class_id", classIds)
         : Promise.resolve({ data: [], error: null }),
       classIds.length
-        ? sb.from("class_student_schedules").select("class_id,student_id,schedule_id").in("class_id", classIds)
+        ? sb.from("class_student_schedules").select("class_id,student_id,schedule_id,effective_from").in("class_id", classIds)
         : Promise.resolve({ data: [], error: null }),
     ]);
 
@@ -818,8 +835,8 @@
     const selectedByClassStudent = new Map();
     (choicesRes.data || []).forEach(row => {
       const key = `${row.class_id}:${row.student_id}`;
-      if (!selectedByClassStudent.has(key)) selectedByClassStudent.set(key, new Set());
-      selectedByClassStudent.get(key).add(Number(row.schedule_id));
+      if (!selectedByClassStudent.has(key)) selectedByClassStudent.set(key, []);
+      selectedByClassStudent.get(key).push(row);
     });
     const evaluationMap = new Map();
     (evaluationsRes.data || []).forEach(row => {
@@ -837,7 +854,7 @@
         const joined = row.joined_at ? String(row.joined_at).slice(0, 10) : "0000-00-00";
         const left = row.left_at ? String(row.left_at).slice(0, 10) : "9999-99-99";
         if (joined > dateText || left < dateText) return false;
-        const selected = selectedByClassStudent.get(`${classId}:${row.student_id}`);
+        const selected = selectedScheduleIdsForDate(selectedByClassStudent.get(`${classId}:${row.student_id}`), dateText);
         return selectedScheduleMatchesDay(selected, daySchedules, classSchedules);
       }).map(row => row.student_id);
     };

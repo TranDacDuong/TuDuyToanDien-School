@@ -112,6 +112,23 @@
     return items.sort((a, b) => a.date.localeCompare(b.date) || a.session_no - b.session_no);
   }
 
+  function chosenIdsForDate(chosenRows, dateText) {
+    if (!Array.isArray(chosenRows) || !chosenRows.length) return null;
+    const eligible = chosenRows.filter(row => String(row.effective_from || "2000-01-01").slice(0, 10) <= dateText);
+    if (!eligible.length) return null;
+    const maxEffective = eligible.reduce((max, row) => {
+      const value = String(row.effective_from || "2000-01-01").slice(0, 10);
+      return value > max ? value : max;
+    }, "2000-01-01");
+    const ids = new Set(
+      eligible
+        .filter(row => String(row.effective_from || "2000-01-01").slice(0, 10) === maxEffective)
+        .map(row => Number(row.schedule_id))
+        .filter(Boolean)
+    );
+    return ids.size ? ids : null;
+  }
+
   function attendanceStatusFor(attMap, studentId, classId, occurrence) {
     return attMap[`${studentId}_${classId}_${occurrence.date}_${occurrence.schedule_id}`]
       || attMap[`${studentId}_${classId}_${occurrence.date}_0`]
@@ -285,7 +302,7 @@
         fetchAllPages(() => sb.from("class_students").select("class_id,student_id,joined_at,left_at").order("joined_at", { ascending: true })),
         fetchAllPages(() => sb.from("classes").select("id,class_name,hidden,tuition_fee,tuition_type,makeup_fee,subjects(name),class_schedules(id,session_no,weekday,start_time,end_time,effective_from)").eq("hidden", false).order("class_name", { ascending: true })),
           fetchAllPages(() => sb.from("attendance").select("class_id,student_id,date,status").lte("date", toDate).order("date", { ascending: true })),
-          fetchAllPages(() => sb.from("class_student_schedules").select("class_id,student_id,schedule_id")),
+          fetchAllPages(() => sb.from("class_student_schedules").select("class_id,student_id,schedule_id,effective_from")),
           fetchAllPages(() => sb.from("exam_results").select("class_id,submitted_at,score_auto,score_total,exam:exams(total_points,classes(class_name,subjects(name)))").not("submitted_at", "is", null).order("submitted_at", { ascending: true })),
           fetchAllPages(() => sb.from("class_session_scores").select("class_id,score,max_score,created_at,class_sessions(session_date)").order("created_at", { ascending: true })),
         ]);
@@ -324,8 +341,8 @@
       const chosenMap = {};
       chosenSchedules.forEach(item => {
         const key = `${item.student_id}_${item.class_id}`;
-        if (!chosenMap[key]) chosenMap[key] = new Set();
-        chosenMap[key].add(Number(item.schedule_id));
+        if (!chosenMap[key]) chosenMap[key] = [];
+        chosenMap[key].push(item);
       });
 
       const revenueByMonth = Object.fromEntries(keys.map(key => [key, { due: 0, paid: 0 }]));
@@ -347,12 +364,10 @@
           if (joined > mEnd || left < mStart) return;
 
           const schedules = getSchedulesForMonth(cls.class_schedules || [], monthKey);
-          const chosenIds = chosenMap[`${classStudent.student_id}_${classStudent.class_id}`];
-          const studentSchedules = chosenIds?.size
-            ? schedules.filter(schedule => chosenIds.has(Number(schedule.id)))
-            : schedules;
-
-          const activeOccurrences = generateOccurrences(studentSchedules, monthKey).filter(occurrence => {
+          const chosenRows = chosenMap[`${classStudent.student_id}_${classStudent.class_id}`];
+          const activeOccurrences = generateOccurrences(schedules, monthKey).filter(occurrence => {
+            const chosenIds = chosenIdsForDate(chosenRows, occurrence.date);
+            if (chosenIds?.size && !chosenIds.has(Number(occurrence.schedule_id))) return false;
             if (occurrence.date > left) return false;
             if (occurrence.date >= joined) return true;
             const actualStatus = attendanceStatusFor(attendanceMap, classStudent.student_id, classStudent.class_id, occurrence);

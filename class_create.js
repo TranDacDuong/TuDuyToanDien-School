@@ -387,7 +387,7 @@ form.onsubmit = async (e) => {
     const effectiveFrom = effectiveFromValue();
     const [{ data: oldSchedules }, { data: oldChoices }] = await Promise.all([
       sb.from("class_schedules").select("id,session_no,weekday,start_time,end_time,effective_from").eq("class_id", classId),
-      sb.from("class_student_schedules").select("class_id,student_id,session_no,schedule_id").eq("class_id", classId),
+      sb.from("class_student_schedules").select("class_id,student_id,session_no,schedule_id,effective_from").eq("class_id", classId),
     ]);
     const sameMonthIds = (oldSchedules || [])
       .filter(s => (s.effective_from || "2000-01-01") === effectiveFrom)
@@ -405,7 +405,7 @@ form.onsubmit = async (e) => {
     }
     const newScheduleIds = (newSchedules || []).map(s => s.id);
     const scheduleReplacements = buildScheduleReplacementMap(activeOldSchedules, newSchedules || []);
-    const { error: deleteChoiceError } = await sb.from("class_student_schedules").delete().eq("class_id", classId);
+    const { error: deleteChoiceError } = await sb.from("class_student_schedules").delete().eq("class_id", classId).eq("effective_from", effectiveFrom);
     if(deleteChoiceError){
       if(newScheduleIds.length) await sb.from("class_schedules").delete().in("id", newScheduleIds);
       alert("Lỗi cập nhật lịch học sinh: "+deleteChoiceError.message);
@@ -429,12 +429,12 @@ form.onsubmit = async (e) => {
         String(s.end_time || "").slice(0,5) === String(old?.end_time || "").slice(0,5)
       );
       const next = mapped || exact || candidates[0];
-      return next ? { class_id: classId, student_id: choice.student_id, session_no: no, schedule_id: next.id } : null;
+      return next ? { class_id: classId, student_id: choice.student_id, session_no: no, schedule_id: next.id, effective_from: effectiveFrom } : null;
     }).filter(Boolean);
     if(replacementChoices.length){
-      const { error: choiceError } = await sb.from("class_student_schedules").upsert(replacementChoices, { onConflict: "class_id,student_id,session_no" });
+      const { error: choiceError } = await sb.from("class_student_schedules").upsert(replacementChoices, { onConflict: "class_id,student_id,session_no,effective_from" });
       if(choiceError){
-        if(oldChoices?.length) await sb.from("class_student_schedules").upsert(oldChoices, { onConflict: "class_id,student_id,session_no" });
+        if(oldChoices?.length) await sb.from("class_student_schedules").upsert(oldChoices, { onConflict: "class_id,student_id,session_no,effective_from" });
         if(newScheduleIds.length) await sb.from("class_schedules").delete().in("id", newScheduleIds);
         alert("Lỗi cập nhật lịch học sinh: "+choiceError.message);
         return;
@@ -507,8 +507,8 @@ form.onsubmit = async (e) => {
     if(sameMonthIds.length){
       const { error: delErr } = await sb.from("class_schedules").delete().in("id", sameMonthIds);
       if(delErr){
-        await sb.from("class_student_schedules").delete().eq("class_id", classId);
-        if(oldChoices?.length) await sb.from("class_student_schedules").upsert(oldChoices, { onConflict: "class_id,student_id,session_no" });
+        await sb.from("class_student_schedules").delete().eq("class_id", classId).eq("effective_from", effectiveFrom);
+        if(oldChoices?.length) await sb.from("class_student_schedules").upsert(oldChoices, { onConflict: "class_id,student_id,session_no,effective_from" });
         if(newScheduleIds.length) await sb.from("class_schedules").delete().in("id", newScheduleIds);
         alert("Lỗi thay lịch trong tháng: "+delErr.message);
         return;

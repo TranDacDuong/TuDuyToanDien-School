@@ -3289,6 +3289,7 @@ async function addTrialStudentToClass(id){
     return;
   }
   const joinedAt = new Date().toISOString();
+  const effectiveFrom = joinedAt.slice(0,10);
   const { error: insertError } = await sb.from('class_students').insert({ class_id:classId, student_id:studentId, joined_at:joinedAt });
   if(insertError){
     alert('Không thể thêm học sinh vào lớp: ' + insertError.message);
@@ -3304,9 +3305,10 @@ async function addTrialStudentToClass(id){
       class_id:classId,
       student_id:studentId,
       session_no:Number(s.session_no || 1),
-      schedule_id:Number(s.id)
+      schedule_id:Number(s.id),
+      effective_from: effectiveFrom
     }));
-    const { error: scheduleError } = await sb.from('class_student_schedules').upsert(scheduleRows, { onConflict:'class_id,student_id,session_no' });
+    const { error: scheduleError } = await sb.from('class_student_schedules').upsert(scheduleRows, { onConflict:'class_id,student_id,session_no,effective_from' });
     if(scheduleError) alert('Đã thêm vào lớp nhưng chưa lưu được lịch học sinh: ' + scheduleError.message);
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;

@@ -148,18 +148,33 @@
 
     const { data: studentSchedules, error: studentScheduleError } = await client
       .from("class_student_schedules")
-      .select("student_id,schedule_id")
+      .select("student_id,schedule_id,effective_from")
       .eq("class_id", session.class_id);
     if (studentScheduleError) return [...activeIds];
 
     const selectedByStudent = new Map();
     (studentSchedules || []).forEach(row => {
-      if (!selectedByStudent.has(row.student_id)) selectedByStudent.set(row.student_id, new Set());
-      selectedByStudent.get(row.student_id).add(Number(row.schedule_id));
+      const effective = String(row.effective_from || "2000-01-01").slice(0, 10);
+      if (effective > sessionDate) return;
+      if (!selectedByStudent.has(row.student_id)) selectedByStudent.set(row.student_id, []);
+      selectedByStudent.get(row.student_id).push(row);
     });
 
     return [...activeIds].filter(studentId => {
-      const selected = selectedByStudent.get(studentId);
+      const history = selectedByStudent.get(studentId) || [];
+      let selected = null;
+      if (history.length) {
+        const maxEffective = history.reduce((max, row) => {
+          const value = String(row.effective_from || "2000-01-01").slice(0, 10);
+          return value > max ? value : max;
+        }, "2000-01-01");
+        selected = new Set(
+          history
+            .filter(row => String(row.effective_from || "2000-01-01").slice(0, 10) === maxEffective)
+            .map(row => Number(row.schedule_id))
+            .filter(Boolean)
+        );
+      }
       return selectedScheduleMatchesDay(selected, daySchedules, schedules || []);
     });
   }

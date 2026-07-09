@@ -249,9 +249,31 @@
       .filter(Boolean);
   }
 
-  function getStudentSchedules(studentId, schedules){
+  function getStudentSelectedScheduleIds(studentId, dateValue){
+    const history = _studentScheduleHistory?.[studentId] || [];
+    if(history.length){
+      const targetDate = String(dateValue || todayStr()).slice(0, 10);
+      const eligible = history.filter(row => String(row.effective_from || "2000-01-01").slice(0, 10) <= targetDate);
+      if(eligible.length){
+        const maxEffective = eligible.reduce((max, row) => {
+          const value = String(row.effective_from || "2000-01-01").slice(0, 10);
+          return value > max ? value : max;
+        }, "2000-01-01");
+        const selected = new Set(
+          eligible
+            .filter(row => String(row.effective_from || "2000-01-01").slice(0, 10) === maxEffective)
+            .map(row => Number(row.schedule_id))
+            .filter(Boolean)
+        );
+        if(selected.size) return selected;
+      }
+    }
+    return _studentScheduleMap[studentId];
+  }
+
+  function getStudentSchedules(studentId, schedules, dateValue){
     const targetSchedules = schedules || [];
-    const selectedIds = _studentScheduleMap[studentId];
+    const selectedIds = getStudentSelectedScheduleIds(studentId, dateValue);
     if(!selectedIds || !selectedIds.size) return targetSchedules;
 
     const direct = targetSchedules.filter(s => selectedIds.has(Number(s.id)));
@@ -272,13 +294,15 @@
   function isStudentScheduledOn(studentId, dateValue, schedules){
     const date = new Date(dateValue);
     const wd = date.getDay() === 0 ? 7 : date.getDay();
-    return getStudentSchedules(studentId, schedules).some(s => s.weekday === wd);
+    return getStudentSchedules(studentId, schedules, dateValue).some(s => s.weekday === wd);
   }
 
   
 
   function generateStudentOccurrences(studentId, schedules, month, year){
-    return generateOccurrences(getStudentSchedules(studentId, schedules), month, year);
+    return generateOccurrences(schedules, month, year).filter(item =>
+      getStudentSchedules(studentId, schedules, item.date).some(s => Number(s.id) === Number(item.schedule_id))
+    );
   }
 
   function collectDatesForStudents(students, schedules, month, year){
@@ -399,6 +423,7 @@
   let _studentSearchPool = null;
   let _classSessionExamCatalog = { exam: [], pdf: [] };
   let _studentScheduleMap = {};
+  let _studentScheduleHistory = {};
   let _studentScheduleLoadError = null;
   let _parentStudentIds = new Set();
 
@@ -642,16 +667,21 @@
     renderShell();
     const { data: chosenSchedules, error: chosenScheduleError } = await sb
       .from("class_student_schedules")
-      .select("student_id,schedule_id")
+      .select("student_id,schedule_id,session_no,effective_from")
       .eq("class_id", _classId);
     _studentScheduleMap = {};
+    _studentScheduleHistory = {};
     _studentScheduleLoadError = chosenScheduleError || null;
     if(chosenScheduleError){
       console.warn("Không tải được lịch học riêng của học sinh:", chosenScheduleError);
     }
     (chosenSchedules || []).forEach(row => {
-      if(!_studentScheduleMap[row.student_id]) _studentScheduleMap[row.student_id] = new Set();
-      _studentScheduleMap[row.student_id].add(Number(row.schedule_id));
+      if(!_studentScheduleHistory[row.student_id]) _studentScheduleHistory[row.student_id] = [];
+      _studentScheduleHistory[row.student_id].push(row);
+    });
+    Object.keys(_studentScheduleHistory).forEach(studentId => {
+      const selected = getStudentSelectedScheduleIds(studentId, todayStr());
+      if(selected?.size) _studentScheduleMap[studentId] = selected;
     });
     if(_activeTab === "attendance") await renderAttendanceTab();
     else await renderExamsTab();
@@ -811,7 +841,7 @@
       dates.forEach(item=>{
         const d = item.date, scheduleId = item.schedule_id;
         const cellStyle = 'padding:4px;'+attendanceSessionStyle(item.session_no);
-        if(!getStudentSchedules(me.student_id, schedulesThisMonth).some(s => Number(s.id) === scheduleId)){
+        if(!getStudentSchedules(me.student_id, schedulesThisMonth, d).some(s => Number(s.id) === scheduleId)){
           myCells+='<td class="center" style="'+cellStyle+'"></td>';
           return;
         }
@@ -885,7 +915,7 @@
       dates.forEach(item=>{
         const d = item.date, scheduleId = item.schedule_id, sessionNo = item.session_no;
         const cellStyle = 'padding:4px;'+attendanceSessionStyle(sessionNo);
-        if(!getStudentSchedules(s.student_id, schedulesThisMonth).some(sc => Number(sc.id) === scheduleId)){
+          if(!getStudentSchedules(s.student_id, schedulesThisMonth, d).some(sc => Number(sc.id) === scheduleId)){
           cells+='<td class="center" style="'+cellStyle+'"></td>';
           return;
         }
@@ -985,7 +1015,7 @@
         const joined = s.joined_at ? s.joined_at.slice(0,10) : "0000-00-00";
         const left = s.left_at ? s.left_at.slice(0,10) : "9999-99-99";
         if(joined > date || left < date) return false;
-        return getStudentSchedules(s.student_id, schedules).some(sc => Number(sc.id) === sid);
+        return getStudentSchedules(s.student_id, schedules, item.date).some(sc => Number(sc.id) === sid);
       })
       .sort((a,b)=>String(a.user?.full_name || "").localeCompare(String(b.user?.full_name || ""), "vi"));
   }
@@ -1212,7 +1242,7 @@
     if(!active.length) return;
     const rows = [];
     active.forEach(s => {
-      getStudentSchedules(s.student_id, sched)
+      getStudentSchedules(s.student_id, sched, today)
         .filter(sc => sc.weekday === todayWd)
         .forEach(sc => rows.push({
           class_id: classId,
@@ -1274,7 +1304,8 @@
     if(inp){ inp.style.display="none"; inp.disabled=true; }
 
     const sched=getSchedulesForMonth(_cachedClass.class_schedules||[],_currentMonth,_currentYear);
-    const selectedIds=_studentScheduleMap[studentId] || new Set();
+    const today = todayStr();
+    const selectedIds=getStudentSelectedScheduleIds(studentId, today) || new Set();
     resultsDiv.innerHTML =
       '<div style="padding:10px;border-radius:10px;background:#fff;border:1px solid var(--border)">'+
         '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center">'+
@@ -1284,7 +1315,8 @@
           '</div>'+
           '<button onclick="cvCloseAddStudent()" class="btn btn-outline btn-sm">Đóng</button>'+
         '</div>'+
-        '<p style="font-size:.82rem;color:var(--ink-mid);margin:10px 0 0">Chọn lịch học áp dụng cho học sinh này trong lớp hiện tại. Mỗi buổi chọn một khung lịch.</p>'+
+        '<p style="font-size:.82rem;color:var(--ink-mid);margin:10px 0 0">Chọn ngày bắt đầu đổi lịch và lịch học mới. Các ngày trước ngày này vẫn giữ nguyên lịch cũ.</p>'+
+        '<div style="margin-top:10px" class="fg"><label>Ngày bắt đầu đổi lịch</label><input id="cvScheduleEffectiveFrom" type="date" value="'+today+'"></div>'+
         buildSchedulePickerHtml(sched, selectedIds)+
         '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">'+
           '<button onclick="cvConfirmEditStudentSchedule(\''+studentId+'\',\''+jsArg(studentName)+'\')" class="btn btn-primary btn-sm">Lưu lịch học</button>'+
@@ -1298,34 +1330,37 @@
     if(!canTakeAttendance(_role)) return;
     const sb=getSb();
     const sched=getSchedulesForMonth(_cachedClass.class_schedules||[],_currentMonth,_currentYear);
+    const effectiveFrom = document.getElementById("cvScheduleEffectiveFrom")?.value || "";
+    if(!effectiveFrom){
+      alert("Vui lòng chọn ngày bắt đầu đổi lịch.");
+      return;
+    }
     const selectedSchedules = chooseSchedulesForStudent(studentName, sched);
     if(selectedSchedules === null) return;
     if(!selectedSchedules.length && sched.length){
       alert("Lớp chưa có lịch học hợp lệ.");
       return;
     }
-
-    const { error: deleteError } = await sb
-      .from("class_student_schedules")
-      .delete()
-      .eq("class_id", _classId)
-      .eq("student_id", studentId);
-    if(deleteError){ alert("Lỗi xóa lịch học cũ: "+deleteError.message); return; }
-
     if(selectedSchedules.length){
       const rows = selectedSchedules.map(s => ({
         class_id: _classId,
         student_id: studentId,
         session_no: Number(s.session_no || 1),
-        schedule_id: s.id
+        schedule_id: s.id,
+        effective_from: effectiveFrom
       }));
       const { error: scheduleError } = await sb
         .from("class_student_schedules")
-        .upsert(rows, { onConflict: "class_id,student_id,session_no" });
+        .upsert(rows, { onConflict: "class_id,student_id,session_no,effective_from" });
       if(scheduleError){ alert("Lỗi lưu lịch học sinh: "+scheduleError.message); return; }
-      _studentScheduleMap[studentId] = new Set(selectedSchedules.map(s => Number(s.id)));
+      if(!_studentScheduleHistory[studentId]) _studentScheduleHistory[studentId] = [];
+      _studentScheduleHistory[studentId] = _studentScheduleHistory[studentId].filter(row => String(row.effective_from || "2000-01-01").slice(0,10) !== effectiveFrom);
+      _studentScheduleHistory[studentId].push(...rows);
+      const currentSelected = getStudentSelectedScheduleIds(studentId, todayStr());
+      if(currentSelected?.size) _studentScheduleMap[studentId] = currentSelected;
     } else {
-      delete _studentScheduleMap[studentId];
+      alert("Lớp chưa có lịch học hợp lệ.");
+      return;
     }
 
     await window.AppAdminTools?.recordAudit?.("class_student_schedule_updated", {
@@ -1335,6 +1370,7 @@
       student_id: studentId,
       student_name: studentName || null,
       schedule_ids: selectedSchedules.map(s => s.id),
+      effective_from: effectiveFrom,
     });
     cvCloseAddStudent();
     await renderAttendanceTab();
@@ -1440,10 +1476,12 @@
         class_id: classId,
         student_id: studentId,
         session_no: Number(s.session_no || 1),
-        schedule_id: s.id
+        schedule_id: s.id,
+        effective_from: today
       }));
-      const { error: scheduleError } = await sb.from("class_student_schedules").upsert(rows, { onConflict: "class_id,student_id,session_no" });
+      const { error: scheduleError } = await sb.from("class_student_schedules").upsert(rows, { onConflict: "class_id,student_id,session_no,effective_from" });
       if(scheduleError){ alert("Lỗi lưu lịch học sinh: "+scheduleError.message); return; }
+      _studentScheduleHistory[studentId] = rows;
       _studentScheduleMap[studentId] = new Set(selectedSchedules.map(s => Number(s.id)));
     }
     const pastRows=generateOccurrences(selectedSchedules.length ? selectedSchedules : sched,_currentMonth,_currentYear)
