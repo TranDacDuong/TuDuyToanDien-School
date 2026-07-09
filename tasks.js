@@ -15,6 +15,7 @@
   const byId = id => document.getElementById(id);
   const INTERNAL_ROLES = new Set(["admin", "teacher", "assistant", "marketing"]);
   const REMINDER_TYPES = new Set(["class_schedule", "child_schedule", "attendance"]);
+  let taskStaffLoadWarned = false;
   const esc = value => String(value || "")
     .replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -580,6 +581,7 @@
 
   async function loadInternalUsers() {
     const userMap = new Map((S.users || []).filter(user => user?.id).map(user => [user.id, user]));
+    const loadErrors = [];
 
     const mergeUsers = rows => {
       (rows || []).forEach(user => {
@@ -589,7 +591,7 @@
 
     const rpcRes = await sb.rpc("list_task_staff_users");
     if (rpcRes.error && !/Could not find the function|schema cache|PGRST202/i.test(rpcRes.error.message || "")) {
-      console.warn("Load task staff users RPC:", rpcRes.error);
+      loadErrors.push({ source: "rpc:list_task_staff_users", error: rpcRes.error });
     }
     mergeUsers(rpcRes.data);
 
@@ -597,21 +599,21 @@
       .select("id,full_name,email,role")
       .in("role", [...INTERNAL_ROLES])
       .order("full_name");
-    if (staffRes.error) console.warn("Load task staff users:", staffRes.error);
+    if (staffRes.error) loadErrors.push({ source: "users:internal_roles", error: staffRes.error });
     mergeUsers(staffRes.data);
 
     if (!userMap.size) {
       const allRes = await sb.from("users")
         .select("id,full_name,email,role")
         .order("full_name");
-      if (allRes.error) console.warn("Load all users for task staff:", allRes.error);
+      if (allRes.error) loadErrors.push({ source: "users:all", error: allRes.error });
       mergeUsers(allRes.data);
     }
 
     if (!userMap.size) {
       const teacherRes = await sb.from("class_teachers")
         .select("teacher:users!class_teachers_teacher_id_fkey(id,full_name,email,role)");
-      if (teacherRes.error) console.warn("Load class teachers for task staff:", teacherRes.error);
+      if (teacherRes.error) loadErrors.push({ source: "class_teachers", error: teacherRes.error });
       mergeUsers((teacherRes.data || []).map(row => row.teacher));
     }
 
@@ -627,6 +629,11 @@
         email: S.user?.email || "",
         role: S.profile.role,
       });
+    }
+
+    if (!userMap.size && loadErrors.length && !taskStaffLoadWarned) {
+      taskStaffLoadWarned = true;
+      console.warn("Load task staff users failed:", loadErrors);
     }
 
     S.users = [...userMap.values()].sort((a, b) =>
