@@ -1193,19 +1193,21 @@ function applyRoleMenu(role){
 }
 
 function setActiveMenuItem(page){
-  const basePage = String(page || "").split("?")[0].split("#")[0];
+  const activePage = page === "ops-center" ? "home.html" : page;
+  const basePage = String(activePage || "").split("?")[0].split("#")[0];
   const items = [...document.querySelectorAll("#menu li")];
-  const hasExact = items.some(item => item.dataset.page === page);
+  const hasExact = items.some(item => item.dataset.page === activePage);
   items.forEach(item => {
-    item.classList.toggle("active", hasExact ? item.dataset.page === page : item.dataset.page === basePage);
+    item.classList.toggle("active", hasExact ? item.dataset.page === activePage : item.dataset.page === basePage);
   });
 }
 
 function setActiveMobileNav(page){
-  const basePage = String(page || "").split("?")[0].split("#")[0];
-  const hasExact = mobileNavItems.some(item => item.dataset.page === page);
+  const activePage = page === "ops-center" ? "home.html" : page;
+  const basePage = String(activePage || "").split("?")[0].split("#")[0];
+  const hasExact = mobileNavItems.some(item => item.dataset.page === activePage);
   mobileNavItems.forEach(item => {
-    item.classList.toggle("active", hasExact ? item.dataset.page === page : item.dataset.page === basePage);
+    item.classList.toggle("active", hasExact ? item.dataset.page === activePage : item.dataset.page === basePage);
   });
 }
 
@@ -1241,9 +1243,20 @@ function normalizeDashboardPage(page){
   return cleanPath + (queryPart ? "?" + queryPart : "") + hash;
 }
 
+function resolveRoleDashboardPage(page){
+  const normalized = normalizeDashboardPage(page);
+  const basePage = normalized.split("?")[0].split("#")[0];
+  const isPlainHome = normalized === "home.html";
+  if(currentDashboardProfile?.role === "admin" && isPlainHome && basePage === "home.html"){
+    return "ops-center";
+  }
+  return normalized;
+}
+
 function canOpenDashboardPage(page){
   if(!currentDashboardProfile?.role) return true;
   const basePage = String(page || "").split("?")[0].split("#")[0];
+  if(basePage === "ops-center") return currentDashboardProfile.role === "admin";
   const menuItem = document.querySelector(`#menu li[data-page="${basePage}"]`);
   const mobileItem = document.querySelector(`#mobileNav .mobile-nav-item[data-page="${basePage}"]`);
   const role = currentDashboardProfile.role;
@@ -1312,7 +1325,7 @@ function updateBadgeElements(ids, count){
 
 function openDashboardPage(page, options = {}){
   const { syncMenu = true, syncMobile = true, updateUrl = true, replaceUrl = false } = options;
-  page = normalizeDashboardPage(page);
+  page = resolveRoleDashboardPage(page);
   if(!page) return;
   const basePage = page.split("?")[0];
   if(!currentDashboardUser && !PUBLIC_DASHBOARD_PAGES.has(basePage)){

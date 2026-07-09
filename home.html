@@ -2131,6 +2131,10 @@ async function init() {
   enhanceHomeHub();
   const { data: p } = await sb.from("users").select("*").eq("id", user.id).single();
   role = p.role; currentProfile = p;
+  if (role === "admin" && window.self === window.top) {
+    window.location.replace("dashboard.html?page=ops-center");
+    return;
+  }
   await loadFriendIds();
   await loadLikedPosts();
   await loadOverviewSettings();
