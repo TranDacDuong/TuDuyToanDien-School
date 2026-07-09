@@ -893,12 +893,39 @@
   function ymToDate(ym) { return ym + "-01"; }
 
   function isValidUuid(value) {
-    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ""));
   }
 
   function normalizeUuid(value) {
     const text = String(value || "").trim();
     return isValidUuid(text) ? text : null;
+  }
+
+  function ensureSelectedTeacherId() {
+    selectedTeacherId = normalizeUuid(selectedTeacherId);
+    if (selectedTeacherId) return selectedTeacherId;
+
+    const select = document.getElementById("teacherSelect");
+    const selectValue = normalizeUuid(select?.value);
+    if (selectValue) {
+      selectedTeacherId = selectValue;
+      return selectedTeacherId;
+    }
+
+    const firstStaff = (teachersList || []).find(item => normalizeUuid(item?.id));
+    if (firstStaff) {
+      selectedTeacherId = firstStaff.id;
+      if (select) select.value = selectedTeacherId;
+      return selectedTeacherId;
+    }
+
+    const currentUserId = normalizeUuid(currentUser?.id);
+    if (viewerProfile?.role === "admin" && currentUserId) {
+      selectedTeacherId = currentUserId;
+      return selectedTeacherId;
+    }
+
+    return null;
   }
 
   function monthEnd(ym) {
@@ -1260,13 +1287,22 @@
     }
 
     teachersList = (data || []).filter(t => normalizeUuid(t.id));
+    if (!teachersList.length && viewerProfile?.role === "admin" && normalizeUuid(currentUser?.id)) {
+      teachersList = [{
+        id: currentUser.id,
+        full_name: viewerProfile.full_name || "Admin",
+        role: "admin",
+      }];
+    }
     const select = document.getElementById("teacherSelect");
-    select.innerHTML = teachersList.map(t => `<option value="${t.id}">${t.full_name} (${t.role === "admin" ? "Admin" : "Giáo viên"})</option>`).join("");
+    select.innerHTML = teachersList.length
+      ? teachersList.map(t => `<option value="${t.id}">${esc(t.full_name || t.email || "Nhân viên")} (${t.role === "admin" ? "Admin" : t.role === "assistant" ? "Trợ giảng" : t.role === "marketing" ? "Marketing" : "Giáo viên"})</option>`).join("")
+      : `<option value="">Không tải được danh sách nhân viên</option>`;
     select.style.display = "block";
     
     // Choose selected or first teacher in list
     if (teachersList.length) {
-      selectedTeacherId = teachersList[0].id;
+      selectedTeacherId = normalizeUuid(selectedTeacherId) || teachersList[0].id;
       select.value = selectedTeacherId;
     }
   }
@@ -1666,7 +1702,7 @@
       return;
     }
 
-    const safeSelectedTeacherId = normalizeUuid(selectedTeacherId);
+    const safeSelectedTeacherId = ensureSelectedTeacherId();
     if (!safeSelectedTeacherId) {
       loader.innerHTML = `<div style="color:var(--red)">Vui lòng chọn giáo viên/nhân viên hợp lệ để tính thu nhập.</div>`;
       return;
