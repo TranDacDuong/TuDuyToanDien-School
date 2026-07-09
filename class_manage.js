@@ -1137,10 +1137,38 @@
         alert("Không thể lưu điểm: " + upsertError.message);
         return;
       }
+      mirrorSessionScoresToLearningThreads(sessionId, upserts).catch(console.warn);
     }
     window.cvCloseSessionScoreModal();
     alert("Đã lưu điểm buổi học.");
   };
+
+  async function mirrorSessionScoresToLearningThreads(sessionId, scoreRows){
+    if(!window.LearningMessages || !scoreRows?.length) return;
+    const sb = getSb();
+    const studentIds = [...new Set(scoreRows.map(row => row.student_id).filter(Boolean))];
+    const [{ data: session }, { data: users }] = await Promise.all([
+      sb.from("class_sessions").select("id,session_order,session_date,lesson:lessons(name)").eq("id", sessionId).maybeSingle(),
+      studentIds.length ? sb.from("users").select("id,full_name").in("id", studentIds) : Promise.resolve({ data: [] })
+    ]);
+    const nameMap = new Map((users || []).map(user => [user.id, user.full_name || "Học sinh"]));
+    await Promise.allSettled(scoreRows.map(row => {
+      const content = window.LearningMessages.sessionScoreContent({
+        studentName: nameMap.get(row.student_id) || "Học sinh",
+        className: _className || _cachedClass?.class_name || _cachedClass?.name || "",
+        lessonName: session?.lesson?.name || (session?.session_order ? `Buổi ${session.session_order}` : ""),
+        sessionDate: session?.session_date ? String(session.session_date).slice(0,10) : "",
+        score: row.score,
+        maxScore: row.max_score || 10,
+        note: row.note || "",
+      });
+      return window.LearningMessages.sendToAllAudiences({
+        studentId: row.student_id,
+        content,
+        realSenderId: window._currentUserId || null,
+      });
+    }));
+  }
 
   window.cvToggleAtt = async function(classId,studentId,date,current,scheduleId,sessionNo){
     const next=statusCycle[(statusCycle.indexOf(current)+1)%3];

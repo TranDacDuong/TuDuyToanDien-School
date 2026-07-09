@@ -190,6 +190,7 @@
     };
 
     const expandedPayload = await expandParentNotifications([payload]);
+    mirrorNotificationsToLearningThreads(expandedPayload).catch(console.warn);
     if (canFallbackToDirectPush(expandedPayload)) {
       const { error } = await getSb()
         .from("notifications")
@@ -247,6 +248,7 @@
     if (!payloads.length) return { count: 0 };
 
     const expandedPayloads = await expandParentNotifications(payloads);
+    mirrorNotificationsToLearningThreads(expandedPayloads).catch(console.warn);
 
     const chunkSize = 100;
     const insertedIds = [];
@@ -278,6 +280,30 @@
 
     if (push !== false && insertedIds.length) sendPushForNotifications(insertedIds);
     return { count: payloads.length, expandedCount: expandedPayloads.length, insertedCount: insertedIds.length };
+  }
+
+  async function mirrorNotificationsToLearningThreads(payloads) {
+    if (!window.LearningMessages || !Array.isArray(payloads) || !payloads.length) return;
+    const actorId = await getCurrentUserId().catch(() => null);
+    const jobs = payloads
+      .map(payload => {
+        const meta = normalizeMeta(payload.meta);
+        const studentId = meta.student_id || meta.studentId || null;
+        if (!studentId || !payload.user_id || !payload.message) return null;
+        const content = window.LearningMessages.notificationContent({
+          title: payload.title || "",
+          message: payload.message || "",
+          targetUrl: payload.target_url || "",
+        });
+        return window.LearningMessages.sendToAudience({
+          studentId,
+          audienceUserId: payload.user_id,
+          content,
+          realSenderId: actorId,
+        });
+      })
+      .filter(Boolean);
+    if (jobs.length) await Promise.allSettled(jobs);
   }
 
   async function getCourseStudentIds(courseId) {

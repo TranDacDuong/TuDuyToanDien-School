@@ -73,10 +73,27 @@
         console.warn('[MindUpBot] Không gửi được tin nhắn:', error.message);
         return null;
       }
+      mirrorStudentBotMessage(userId, content, realSenderId).catch(() => {});
       return msgId || null;
     } catch (err) {
       console.warn('[MindUpBot] Lỗi khi gửi tin nhắn:', err);
       return null;
+    }
+  }
+
+  async function mirrorStudentBotMessage(userId, content, realSenderId = null) {
+    if (!window.LearningMessages || !userId || !content) return;
+    try {
+      const sb = getSb();
+      const { data } = await sb.from('users').select('id,role').eq('id', userId).maybeSingle();
+      if (data?.role !== 'student') return;
+      await window.LearningMessages.sendToAllAudiences({
+        studentId: userId,
+        content,
+        realSenderId: realSenderId || null
+      });
+    } catch (error) {
+      console.warn('[MindUpBot] Không mirror được tin học tập:', error);
     }
   }
 
