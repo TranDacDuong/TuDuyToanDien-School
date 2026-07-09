@@ -677,7 +677,7 @@
         <input class="control-input" id="configBaseSalary" type="number" min="0" placeholder="VD: 6000000" required>
       </div>
       <div class="config-field">
-        <label>Tỷ lệ thưởng Bậc 1 (%)</label>
+        <label id="configBonusLabel">Tỷ lệ thưởng Bậc 1 (%)</label>
         <input class="control-input" id="configBasePercent" type="number" min="0" max="100" placeholder="VD: 30" required>
       </div>
       <div>
@@ -1006,6 +1006,10 @@
     return viewerProfile?.role === "admin" && String(selectedStaffProfile()?.role || "") === "admin";
   }
 
+  function isSelectedTeacherStaff() {
+    return String(selectedStaffProfile()?.role || "") === "teacher";
+  }
+
   function syncIncomeModePanels() {
     const adminMode = isSelectedAdminStaff();
     const adminPanel = document.getElementById("adminProfitPanel");
@@ -1316,21 +1320,21 @@
     if (viewerProfile.role !== "admin" || isDbFallback) return;
 
     const baseSalaryInput = document.getElementById("configBaseSalary");
-    const basePercentInput = document.getElementById("configBasePercent");
-    const baseSalary = Number(baseSalaryInput.value);
-    const basePercent = Number(basePercentInput.value);
+    const bonusInput = document.getElementById("configBasePercent");
+    const baseSalary = Number(baseSalaryInput.value || 0);
+    const bonusValue = Number(bonusInput.value || 0);
+    const safeStaffId = normalizeUuid(selectedTeacherId);
 
-    if (isNaN(baseSalary) || baseSalary < 0) {
-      alert("Lương cứng không hợp lệ.");
-      return;
-    }
-    if (isNaN(basePercent) || basePercent < 0 || basePercent > 100) {
-      alert("Tỷ lệ % bậc 1 phải từ 0 đến 100.");
-      return;
-    }
-    const safeTeacherId = normalizeUuid(selectedTeacherId);
-    if (!safeTeacherId) {
+    if (!safeStaffId) {
       alert("Vui lòng chọn giáo viên/nhân viên hợp lệ trước khi lưu cấu hình.");
+      return;
+    }
+    if (isNaN(baseSalary) || baseSalary < 0 || isNaN(bonusValue) || bonusValue < 0) {
+      alert("Lương cứng và lương thưởng/tỷ lệ thưởng phải hợp lệ.");
+      return;
+    }
+    if (isSelectedTeacherStaff() && bonusValue > 100) {
+      alert("Tỷ lệ % bậc 1 phải từ 0 đến 100.");
       return;
     }
 
@@ -1340,19 +1344,36 @@
     btn.innerText = "Đang lưu...";
 
     try {
-      const { error } = await sb
-        .from("teacher_salaries")
-        .upsert({
-          teacher_id: safeTeacherId,
+      if (isSelectedTeacherStaff()) {
+        const { error } = await sb
+          .from("teacher_salaries")
+          .upsert({
+            teacher_id: safeStaffId,
+            base_salary: baseSalary,
+            base_tier_percent: bonusValue,
+            updated_at: new Date().toISOString()
+          }, { onConflict: "teacher_id" });
+        if (error) throw error;
+        teacherSalaryConfig = { base_salary: baseSalary, base_tier_percent: bonusValue };
+      } else {
+        const ym = document.getElementById("monthPicker").value;
+        const { error } = await sb.from("staff_monthly_salaries").upsert({
+          staff_id: safeStaffId,
+          salary_month: ymToDate(ym),
           base_salary: baseSalary,
-          base_tier_percent: basePercent,
-          updated_at: new Date().toISOString()
-        }, { onConflict: "teacher_id" });
+          bonus_amount: bonusValue,
+          updated_by: currentUser.id,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "staff_id,salary_month" });
+        if (error) {
+          if (error.code === "42P01" || error.message?.includes("staff_monthly_salaries")) {
+            throw new Error("Chưa có bảng staff_monthly_salaries. Hãy chạy SQL staff monthly salaries trước.");
+          }
+          throw error;
+        }
+      }
 
-      if (error) throw error;
-      
-      alert("Đã cập nhật cơ chế lương thành công.");
-      teacherSalaryConfig = { base_salary: baseSalary, base_tier_percent: basePercent };
+      alert("Đã cập nhật cấu hình lương thành công.");
       await calculateAndRender();
     } catch (err) {
       alert("Lỗi khi lưu cấu hình: " + err.message);
@@ -1718,6 +1739,13 @@
     return map;
   }
 
+  async function loadStaffMonthlySalaryConfig(staffId, ym) {
+    const safeStaffId = normalizeUuid(staffId);
+    if (!safeStaffId) return { base_salary: 0, bonus_amount: 0 };
+    const map = await loadStaffMonthlySalaryMap([safeStaffId], ym);
+    return map[safeStaffId] || { base_salary: 0, bonus_amount: 0 };
+  }
+
   async function loadOperatingExpenses(ym) {
     const sb = getSb();
     const { data, error } = await sb
@@ -2026,13 +2054,32 @@
     }
 
     // Load custom configuration
-    await loadTeacherSalaryConfig(safeSelectedTeacherId);
+    const selectedIsTeacher = isSelectedTeacherStaff();
+    if (selectedIsTeacher) await loadTeacherSalaryConfig(safeSelectedTeacherId);
     syncIncomeModePanels();
 
     // Sync admin config inputs
     if (viewerProfile.role === "admin" && !isDbFallback) {
-      document.getElementById("configBaseSalary").value = teacherSalaryConfig.base_salary;
-      document.getElementById("configBasePercent").value = teacherSalaryConfig.base_tier_percent;
+      const bonusLabel = document.getElementById("configBonusLabel");
+      const bonusInput = document.getElementById("configBasePercent");
+      document.getElementById("configBaseSalary").value = selectedIsTeacher ? teacherSalaryConfig.base_salary : 0;
+      if (selectedIsTeacher) {
+        if (bonusLabel) bonusLabel.textContent = "Tỷ lệ thưởng Bậc 1 (%)";
+        if (bonusInput) {
+          bonusInput.max = "100";
+          bonusInput.placeholder = "VD: 30";
+          bonusInput.value = teacherSalaryConfig.base_tier_percent;
+        }
+      } else {
+        const staffSalary = await loadStaffMonthlySalaryConfig(safeSelectedTeacherId, ym);
+        document.getElementById("configBaseSalary").value = Number(staffSalary.base_salary || 0);
+        if (bonusLabel) bonusLabel.textContent = "Lương thưởng";
+        if (bonusInput) {
+          bonusInput.removeAttribute("max");
+          bonusInput.placeholder = "VD: 1000000";
+          bonusInput.value = Number(staffSalary.bonus_amount || 0);
+        }
+      }
     }
 
     const sb = getSb();
