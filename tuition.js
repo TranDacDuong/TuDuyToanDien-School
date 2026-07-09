@@ -81,6 +81,27 @@
     return `${y}-${String(m).padStart(2,"0")}-${String(last.getDate()).padStart(2,"0")}`;
   }
 
+  function addMonths(ym, delta) {
+    const [year, month] = String(ym || todayYM()).split("-").map(Number);
+    const date = new Date(year, month - 1 + delta, 1);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  function monthRange(startYm, endYm) {
+    const result = [];
+    let cur = startYm;
+    while (cur && cur <= endYm) {
+      result.push(cur);
+      cur = addMonths(cur, 1);
+    }
+    return result;
+  }
+
+  function monthLabel(ym) {
+    const [year, month] = String(ym || "").split("-");
+    return month && year ? `Tháng ${Number(month)}/${year}` : ym;
+  }
+
   function generateOccurrences(schedules, ym) {
     const [year, month] = ym.split("-").map(Number);
     const daysInMonth = new Date(year, month, 0).getDate();
@@ -138,6 +159,23 @@
     );
   }
 
+  function chosenIdsForDate(chosenRows, dateText) {
+    if (!Array.isArray(chosenRows) || !chosenRows.length) return null;
+    const eligible = chosenRows.filter(row => String(row.effective_from || "2000-01-01").slice(0, 10) <= dateText);
+    if (!eligible.length) return null;
+    const maxEffective = eligible.reduce((max, row) => {
+      const value = String(row.effective_from || "2000-01-01").slice(0, 10);
+      return value > max ? value : max;
+    }, "2000-01-01");
+    const ids = new Set(
+      eligible
+        .filter(row => String(row.effective_from || "2000-01-01").slice(0, 10) === maxEffective)
+        .map(row => Number(row.schedule_id))
+        .filter(Boolean)
+    );
+    return ids.size ? ids : null;
+  }
+
   function getActiveSchedulesForDate(allSchedules, dateText) {
     const eligible = (allSchedules || []).filter(s => String(s.effective_from || "2000-01-01").slice(0, 10) <= dateText);
     if (!eligible.length) return [];
@@ -148,7 +186,7 @@
     return eligible.filter(s => String(s.effective_from || "2000-01-01").slice(0, 10) === maxEf);
   }
 
-  function generateOccurrencesForStudent(allSchedules, ym, chosenIds) {
+  function generateOccurrencesForStudent(allSchedules, ym, chosenRows) {
     const [year, month] = ym.split("-").map(Number);
     const daysInMonth = new Date(year, month, 0).getDate();
     const items = [];
@@ -158,7 +196,7 @@
       const weekday = date.getDay() === 0 ? 7 : date.getDay();
       getActiveSchedulesForDate(allSchedules, dateText)
         .filter(s => Number(s.weekday) === weekday)
-        .filter(s => scheduleMatchesChosen(s, chosenIds, allSchedules))
+        .filter(s => scheduleMatchesChosen(s, chosenIdsForDate(chosenRows, dateText), allSchedules))
         .forEach(s => {
           items.push({
             date: dateText,
@@ -292,7 +330,7 @@
   }
 
   function buildTuitionDetailHtml(group) {
-    const payment = paymentMap[group.studentId];
+    const payment = group.payment || paymentMap[group.studentId];
     const amountPaid = payment?.amount_paid || 0;
     const status = getStatus(group.amount, amountPaid);
     const remaining = Math.max(0, group.amount - amountPaid);
@@ -344,6 +382,7 @@
             </div>
           </div>
           ${c.noteCalc ? `<div style="margin-top:10px;font-size:12px;color:var(--muted)">${c.noteCalc}</div>` : ""}
+          ${renderAttendanceDetails(c.attendanceDetails)}
         </div>
       `).join("")}
       <div class="detail-card">
@@ -367,6 +406,26 @@
         </div>
         ${payment?.note ? `<div class="invoice-note" style="margin-top:12px">${payment.note}</div>` : ""}
         <div style="margin-top:16px">${buildPaymentQrBlock(group.studentName, group.ym, qrAmount, group.studentId)}</div>
+      </div>
+    `;
+  }
+
+  function renderAttendanceDetails(items = []) {
+    if (!items.length) {
+      return `<div style="margin-top:12px;font-size:12px;color:var(--muted)">Chưa có buổi học/điểm danh trong tháng này.</div>`;
+    }
+    const statusText = { present: "Có", absent: "Vắng", makeup: "Học bù" };
+    return `
+      <div style="margin-top:12px">
+        <div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:7px">Điểm danh chi tiết</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${items.map(item => {
+            const status = item.status || "present";
+            const label = statusText[status] || status;
+            const session = item.session_no ? `B${item.session_no}` : "Buổi";
+            return `<span class="pill ${status}" title="${item.date}">${item.date.slice(8,10)}/${item.date.slice(5,7)} • ${session} • ${label}</span>`;
+          }).join("")}
+        </div>
       </div>
     `;
   }
@@ -577,6 +636,7 @@ Nhập số tiền hoàn lại (>0):`,
   function syncToolbarVisibility() {
     const classFilter = document.getElementById("classFilter");
     const paidFilter = document.getElementById("paidFilter");
+    const monthInput = document.getElementById("monthPicker");
     const notifyBtn = document.getElementById("notifyTuitionBtn");
     const lockBtn = document.getElementById("lockTuitionBtn");
     const rowCount = document.getElementById("rowCount");
@@ -590,6 +650,7 @@ Nhập số tiền hoàn lại (>0):`,
     if (currentRole === "student" || currentRole === "parent") {
       if (classFilter) classFilter.style.display = "none";
       if (paidFilter) paidFilter.style.display = "none";
+      if (monthInput) monthInput.style.display = "none";
       if (notifyBtn) notifyBtn.style.display = "none";
       if (lockBtn) lockBtn.style.display = "none";
       if (reloadBtn) reloadBtn.style.display = "none";
@@ -602,6 +663,7 @@ Nhập số tiền hoàn lại (>0):`,
     }
 
     if (classFilter) classFilter.style.display = "";
+    if (monthInput) monthInput.style.display = "";
     if (rowCount) rowCount.style.display = "";
     if (summary) summary.style.display = "";
     if (tableWrap) tableWrap.style.display = "";
@@ -625,6 +687,119 @@ Nhập số tiền hoàn lại (>0):`,
     sel.innerHTML = `<option value="">Tất cả lớp</option>`;
     options.forEach(([id, name]) => sel.appendChild(new Option(name, id)));
     if (currentValue && classMap[currentValue]) sel.value = currentValue;
+  }
+
+  function buildRowsForMonth({ ym, classes, classStudents, attData, chosenSchedules }) {
+    const mStart = ymToDate(ym);
+    const mEnd = monthEnd(ym);
+    const classMap = {};
+    (classes || []).forEach(c => { classMap[c.id] = c; });
+
+    const attMap = {};
+    const attRowsByStudentClass = {};
+    (attData || []).forEach(a => {
+      const date = String(a.date || "").slice(0, 10);
+      if (date < mStart || date > mEnd) return;
+      attMap[`${a.student_id}_${a.class_id}_${date}_${a.schedule_id || 0}`] = a.status;
+      const key = `${a.student_id}_${a.class_id}`;
+      if (!attRowsByStudentClass[key]) attRowsByStudentClass[key] = [];
+      attRowsByStudentClass[key].push({ ...a, date });
+    });
+
+    const chosenMap = {};
+    (chosenSchedules || []).forEach(row => {
+      const key = `${row.student_id}_${row.class_id}`;
+      if (!chosenMap[key]) chosenMap[key] = [];
+      chosenMap[key].push(row);
+    });
+
+    const rows = [];
+    (classStudents || []).forEach(cs => {
+      if (currentRole === "student" && cs.student_id !== currentUserId) return;
+      if (currentRole === "parent" && !parentStudentIds.has(cs.student_id)) return;
+      if (currentRole === "assistant" && !assistantClassIds.has(cs.class_id)) return;
+      const cls = classMap[cs.class_id];
+      if (!cls) return;
+
+      const joined = cs.joined_at ? cs.joined_at.slice(0, 10) : "0000-00-00";
+      const left = cs.left_at ? cs.left_at.slice(0, 10) : "9999-99-99";
+      if (joined > mEnd || left < mStart) return;
+
+      const schedules = cls.class_schedules || [];
+      const chosenRows = chosenMap[`${cs.student_id}_${cs.class_id}`];
+      const activeOccurrences = generateOccurrencesForStudent(schedules, ym, chosenRows).filter(item => {
+        if (item.date > left) return false;
+        if (item.date >= joined) return true;
+        const actualStatus = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item);
+        return actualStatus === "present" || actualStatus === "makeup";
+      });
+      const occurrenceKeys = new Set(activeOccurrences.map(item => `${item.date}_${item.schedule_id || 0}`));
+      (attRowsByStudentClass[`${cs.student_id}_${cs.class_id}`] || []).forEach(row => {
+        const date = String(row.date || "").slice(0, 10);
+        const status = row.status || "";
+        const scheduleId = Number(row.schedule_id || 0);
+        const key = `${date}_${scheduleId}`;
+        if (!date || occurrenceKeys.has(key) || date > left) return;
+        if (date < joined && status !== "present" && status !== "makeup") return;
+        activeOccurrences.push({
+          date,
+          schedule_id: scheduleId,
+          session_no: 0,
+          schedule: null,
+          from_attendance_only: true,
+        });
+        occurrenceKeys.add(key);
+      });
+      activeOccurrences.sort((a, b) => a.date.localeCompare(b.date) || Number(a.schedule_id || 0) - Number(b.schedule_id || 0));
+      const totalSessions = activeOccurrences.length;
+
+      let present = 0, absent = 0, makeup = 0;
+      const attendanceDetails = activeOccurrences.map(item => {
+        const status = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item) || "present";
+        if (status === "present") present++;
+        else if (status === "absent") absent++;
+        else if (status === "makeup") makeup++;
+        return {
+          date: item.date,
+          status,
+          schedule_id: item.schedule_id,
+          session_no: item.session_no,
+        };
+      });
+
+      const { billableSessions, feePerSession, amount, noteCalc } = calcTuition({
+        tuition_type: cls.tuition_type,
+        tuition_fee: cls.tuition_fee,
+        makeup_fee: cls.makeup_fee,
+        present, absent, makeup, totalSessions,
+      });
+
+      const daysMap = {1:"T2",2:"T3",3:"T4",4:"T5",5:"T6",6:"T7",7:"CN"};
+      const studentSchedules = [...new Map(activeOccurrences
+        .map(item => item.schedule)
+        .filter(Boolean)
+        .map(schedule => [Number(schedule.id), schedule])
+      ).values()];
+      const scheduleLabel = studentSchedules
+        .map(s => `Buổi ${s.session_no || 1}: ${daysMap[s.weekday]} (${s.start_time.slice(0,5)}–${s.end_time.slice(0,5)})`)
+        .join(", ");
+
+      rows.push({
+        studentId: cs.student_id,
+        classId: cs.class_id,
+        studentName: cs.user?.full_name || "—",
+        phone: canViewStudentPhone() ? (cs.user?.phone || "") : "",
+        className: cls.class_name,
+        tuitionType: cls.tuition_type,
+        tuitionFee: cls.tuition_fee,
+        makeupFee: cls.makeup_fee,
+        scheduleLabel,
+        totalSessions, present, absent, makeup,
+        attendanceDetails,
+        billableSessions, feePerSession, amount, noteCalc, ym,
+      });
+    });
+    return rows;
   }
 
   /* ─────────────────────────────────────────────
@@ -660,6 +835,10 @@ Nhập số tiền hoàn lại (>0):`,
     const mEnd   = monthEnd(ym);
 
     try {
+      if (currentRole === "student" || currentRole === "parent") {
+        await loadPortalTuition();
+        return;
+      }
       const [
         { data: classes,       error: e1 },
         { data: classStudents, error: e2 },
@@ -685,7 +864,7 @@ Nhập số tiền hoàn lại (>0):`,
           .select("*").eq("month", mStart),
 
         sb.from("class_student_schedules")
-          .select("class_id, student_id, schedule_id"),
+          .select("class_id, student_id, schedule_id, effective_from"),
       ]);
 
       if (e1) throw e1;
@@ -694,110 +873,12 @@ Nhập số tiền hoàn lại (>0):`,
       if (e4) throw e4;
       if (e5) throw e5;
 
-      const classMap = {};
-      (classes || []).forEach(c => { classMap[c.id] = c; });
-
-      const attMap = {};
-      const attRowsByStudentClass = {};
-      (attData || []).forEach(a => {
-        attMap[`${a.student_id}_${a.class_id}_${a.date}_${a.schedule_id || 0}`] = a.status;
-        const key = `${a.student_id}_${a.class_id}`;
-        if (!attRowsByStudentClass[key]) attRowsByStudentClass[key] = [];
-        attRowsByStudentClass[key].push(a);
-      });
-
-      const chosenMap = {};
-      (chosenSchedules || []).forEach(row => {
-        const key = `${row.student_id}_${row.class_id}`;
-        if (!chosenMap[key]) chosenMap[key] = new Set();
-        chosenMap[key].add(Number(row.schedule_id));
-      });
-
       // paymentMap: studentId → record
       paymentMap = {};
       (payments || []).forEach(p => { paymentMap[p.student_id] = p; });
 
       // Tính chi tiết từng học sinh × lớp
-      allRows = [];
-      (classStudents || []).forEach(cs => {
-        if (currentRole === "student" && cs.student_id !== currentUserId) return;
-        if (currentRole === "parent" && !parentStudentIds.has(cs.student_id)) return;
-        if (currentRole === "assistant" && !assistantClassIds.has(cs.class_id)) return;
-        const cls = classMap[cs.class_id];
-        if (!cls) return;
-
-        const joined = cs.joined_at ? cs.joined_at.slice(0, 10) : "0000-00-00";
-        const left   = cs.left_at   ? cs.left_at.slice(0, 10)   : "9999-99-99";
-        if (joined > mEnd || left < mStart) return;
-
-        const schedules = cls.class_schedules || [];
-        const chosenIds = chosenMap[`${cs.student_id}_${cs.class_id}`];
-        const activeOccurrences = generateOccurrencesForStudent(schedules, ym, chosenIds).filter(item => {
-          if (item.date > left) return false;
-          if (item.date >= joined) return true;
-          const actualStatus = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item);
-          return actualStatus === "present" || actualStatus === "makeup";
-        });
-        const occurrenceKeys = new Set(activeOccurrences.map(item => `${item.date}_${item.schedule_id || 0}`));
-        (attRowsByStudentClass[`${cs.student_id}_${cs.class_id}`] || []).forEach(row => {
-          const date = String(row.date || "").slice(0, 10);
-          const status = row.status || "";
-          const scheduleId = Number(row.schedule_id || 0);
-          const key = `${date}_${scheduleId}`;
-          if (!date || occurrenceKeys.has(key) || date > left) return;
-          if (date < joined && status !== "present" && status !== "makeup") return;
-          activeOccurrences.push({
-            date,
-            schedule_id: scheduleId,
-            session_no: 0,
-            schedule: null,
-            from_attendance_only: true,
-          });
-          occurrenceKeys.add(key);
-        });
-        activeOccurrences.sort((a, b) => a.date.localeCompare(b.date) || Number(a.schedule_id || 0) - Number(b.schedule_id || 0));
-        const totalSessions = activeOccurrences.length;
-
-        let present = 0, absent = 0, makeup = 0;
-        activeOccurrences.forEach(item => {
-          const status = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item) || "present";
-          if (status === "present")     present++;
-          else if (status === "absent") absent++;
-          else if (status === "makeup") makeup++;
-        });
-
-        const { billableSessions, feePerSession, amount, noteCalc } = calcTuition({
-          tuition_type: cls.tuition_type,
-          tuition_fee:  cls.tuition_fee,
-          makeup_fee:   cls.makeup_fee,
-          present, absent, makeup, totalSessions,
-        });
-
-        // Tạo label lịch học: "T2 (07:00–09:00), T4 (07:00–09:00)"
-        const daysMap = {1:"T2",2:"T3",3:"T4",4:"T5",5:"T6",6:"T7",7:"CN"};
-        const studentSchedules = [...new Map(activeOccurrences
-          .map(item => item.schedule)
-          .filter(Boolean)
-          .map(schedule => [Number(schedule.id), schedule])
-        ).values()];
-        const scheduleLabel = studentSchedules
-          .map(s => `Buổi ${s.session_no || 1}: ${daysMap[s.weekday]} (${s.start_time.slice(0,5)}–${s.end_time.slice(0,5)})`)
-          .join(", ");
-
-        allRows.push({
-          studentId:   cs.student_id,
-          classId:     cs.class_id,
-          studentName: cs.user?.full_name || "—",
-          phone:       canViewStudentPhone() ? (cs.user?.phone || "") : "",
-          className:   cls.class_name,
-          tuitionType: cls.tuition_type,
-          tuitionFee:  cls.tuition_fee,
-          makeupFee:   cls.makeup_fee,
-          scheduleLabel,
-          totalSessions, present, absent, makeup,
-          billableSessions, feePerSession, amount, noteCalc, ym,
-        });
-      });
+      allRows = buildRowsForMonth({ ym, classes, classStudents, attData, chosenSchedules });
 
       // Gộp theo studentId
       buildGrouped();
@@ -814,8 +895,12 @@ Nhập số tiền hoàn lại (>0):`,
      BUILD GROUPED — gộp allRows theo studentId
   ───────────────────────────────────────────── */
   function buildGrouped() {
+    grouped = groupRows(allRows);
+  }
+
+  function groupRows(rows) {
     const map = {};
-    allRows.forEach(r => {
+    (rows || []).forEach(r => {
       if (!map[r.studentId]) {
         map[r.studentId] = {
           studentId:   r.studentId,
@@ -841,6 +926,7 @@ Nhập số tiền hoàn lại (>0):`,
         present:          r.present,
         absent:           r.absent,
         makeup:           r.makeup,
+        attendanceDetails: r.attendanceDetails || [],
         billableSessions: r.billableSessions,
         feePerSession:    r.feePerSession,
         amount:           r.amount,
@@ -854,9 +940,165 @@ Nhập số tiền hoàn lại (>0):`,
       g.amount          += r.amount;
     });
 
-    grouped = Object.values(map).sort((a, b) =>
+    return Object.values(map).sort((a, b) =>
       a.studentName.localeCompare(b.studentName)
     );
+  }
+
+  function paymentKeyMonth(row) {
+    return String(row?.month || "").slice(0, 7);
+  }
+
+  function buildPaymentByMonth(payments) {
+    const map = {};
+    (payments || []).forEach(payment => {
+      const ym = paymentKeyMonth(payment);
+      if (!ym || !payment.student_id) return;
+      if (!map[ym]) map[ym] = {};
+      map[ym][payment.student_id] = payment;
+    });
+    return map;
+  }
+
+  function renderPortalMultiMonth(monthGroups) {
+    const detailWrap = document.getElementById("studentDetailView");
+    const detailBody = document.getElementById("studentDetailBody");
+    if (!detailWrap || !detailBody) return;
+    detailWrap.classList.add("show");
+    if (!monthGroups.length) {
+      detailBody.innerHTML = '<div class="empty" style="padding:24px 0">Không có dữ liệu học phí.</div>';
+      return;
+    }
+    detailBody.innerHTML = monthGroups.map(section => `
+      <div class="detail-card" style="background:#fff">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+          <div>
+            <div style="font-size:12px;color:var(--muted)">Kỳ học phí</div>
+            <div style="font-size:18px;font-weight:900;color:var(--navy)">${monthLabel(section.ym)}</div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);font-weight:700">${section.groups.length} học sinh</div>
+        </div>
+        <div style="margin-top:10px;display:grid;gap:12px">
+          ${section.groups.map(group => buildTuitionDetailHtml(group)).join("")}
+        </div>
+      </div>
+    `).join("");
+  }
+
+  async function loadPortalTuition() {
+    const sb = getSb();
+    const detailBody = document.getElementById("studentDetailBody");
+    if (detailBody) detailBody.innerHTML = '<div class="loading">⏳ Đang tải học phí và điểm danh...</div>';
+
+    const today = todayYM();
+    const todayEnd = monthEnd(today);
+    const [
+      { data: classes, error: e1 },
+      { data: classStudents, error: e2 },
+      { data: chosenSchedules, error: e3 },
+    ] = await Promise.all([
+      sb.from("classes")
+        .select(`id, class_name, tuition_fee, tuition_type, makeup_fee,
+                 class_schedules(id, session_no, weekday, start_time, end_time, effective_from)`)
+        .eq("hidden", false),
+      sb.from("class_students")
+        .select(`id, class_id, student_id, joined_at, left_at,
+                 user:users!fk_student(id, full_name, email)`),
+      sb.from("class_student_schedules")
+        .select("class_id, student_id, schedule_id, effective_from"),
+    ]);
+    if (e1) throw e1;
+    if (e2) throw e2;
+    if (e3) throw e3;
+
+    const scopedClassStudents = (classStudents || []).filter(cs => {
+      if (currentRole === "student") return cs.student_id === currentUserId;
+      if (currentRole === "parent") return parentStudentIds.has(cs.student_id);
+      return false;
+    });
+    if (!scopedClassStudents.length) {
+      renderPortalMultiMonth([]);
+      return;
+    }
+
+    const earliestJoined = scopedClassStudents.reduce((min, row) => {
+      const value = String(row.joined_at || today + "-01").slice(0, 10);
+      return value < min ? value : min;
+    }, today + "-01");
+    const startYm = String(earliestJoined).slice(0, 7);
+    const allCandidateMonths = monthRange(startYm, today);
+    const queryStartYm = addMonths(startYm, -1);
+    const queryStart = ymToDate(queryStartYm);
+
+    const studentIds = [...new Set(scopedClassStudents.map(row => row.student_id).filter(Boolean))];
+    const [{ data: attData, error: e4 }, { data: payments, error: e5 }] = await Promise.all([
+      sb.from("attendance")
+        .select("student_id, class_id, date, status, schedule_id")
+        .in("student_id", studentIds)
+        .gte("date", queryStart)
+        .lte("date", todayEnd),
+      sb.from("tuition_payments")
+        .select("*")
+        .in("student_id", studentIds)
+        .gte("month", queryStart)
+        .lte("month", ymToDate(today)),
+    ]);
+    if (e4) throw e4;
+    if (e5) throw e5;
+
+    const paymentByMonth = buildPaymentByMonth(payments || []);
+    const groupedByMonth = {};
+    allCandidateMonths.forEach(ym => {
+      const rows = buildRowsForMonth({ ym, classes, classStudents: scopedClassStudents, attData, chosenSchedules });
+      const groups = groupRows(rows).map(group => ({
+        ...group,
+        payment: paymentByMonth[ym]?.[group.studentId] || null,
+      }));
+      groupedByMonth[ym] = groups;
+    });
+
+    const unpaidMonths = allCandidateMonths.filter(ym => {
+      const groups = groupedByMonth[ym] || [];
+      if (!groups.length) return false;
+      return groups.some(group => {
+        const paid = Number(group.payment?.amount_paid || 0);
+        return getStatus(group.amount, paid) !== "paid";
+      });
+    });
+
+    const visibleMonths = new Set();
+    if (unpaidMonths.length) {
+      visibleMonths.add(addMonths(unpaidMonths[0], -1));
+      unpaidMonths.forEach(ym => visibleMonths.add(ym));
+    } else {
+      visibleMonths.add(today);
+    }
+
+    const monthGroups = [...visibleMonths]
+      .filter(ym => ym <= today)
+      .sort()
+      .map(ym => {
+        const rows = groupedByMonth[ym] || groupRows(buildRowsForMonth({ ym, classes, classStudents: scopedClassStudents, attData, chosenSchedules }));
+        const groups = rows.map(group => ({
+          ...group,
+          payment: paymentByMonth[ym]?.[group.studentId] || null,
+        }));
+        return { ym, groups };
+      })
+      .filter(section => section.groups.length);
+
+    allRows = monthGroups.flatMap(section => section.groups.flatMap(group =>
+      (group.classes || []).map(c => ({
+        studentId: group.studentId,
+        studentName: group.studentName,
+        classId: c.classId,
+        className: c.className,
+        amount: c.amount,
+        ym: section.ym,
+      }))
+    ));
+    currentRows = monthGroups.flatMap(section => section.groups);
+    renderPortalMultiMonth(monthGroups);
   }
 
   /* ─────────────────────────────────────────────
@@ -890,6 +1132,7 @@ Nhập số tiền hoàn lại (>0):`,
         scheduleLabel: r.scheduleLabel,
         totalSessions: r.totalSessions,
         present:       r.present, absent:            r.absent, makeup: r.makeup,
+        attendanceDetails: r.attendanceDetails || [],
         billableSessions: r.billableSessions, feePerSession:    r.feePerSession,
         amount:        r.amount, noteCalc:           r.noteCalc,
       });
