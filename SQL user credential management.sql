@@ -158,8 +158,37 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.list_parent_student_credentials()
+RETURNS TABLE (
+  id uuid,
+  full_name text,
+  email text,
+  phone text,
+  account_password text
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    u.id,
+    u.full_name,
+    u.email,
+    u.phone,
+    u.account_password
+  FROM public.parent_students ps
+  JOIN public.users u ON u.id = ps.student_id
+  WHERE ps.parent_id = auth.uid()
+    AND ps.revoked_at IS NULL
+  ORDER BY u.full_name NULLS LAST, u.email;
+$$;
+
 REVOKE ALL ON FUNCTION public.admin_update_user_credentials(uuid, text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.admin_update_user_credentials(uuid, text, text) TO authenticated;
 
 REVOKE ALL ON FUNCTION public.admin_reset_user_password(text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.admin_reset_user_password(text, text) TO authenticated;
+
+REVOKE ALL ON FUNCTION public.list_parent_student_credentials() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.list_parent_student_credentials() TO authenticated;

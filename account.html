@@ -274,6 +274,64 @@ button:hover{
   margin-top:16px;
 }
 
+.credential-box{
+  margin:18px 0 0;
+  padding:22px;
+  border-radius:22px;
+  background:linear-gradient(180deg,#fff 0%,#f8fbff 100%);
+  border:1px solid var(--line);
+}
+
+.credential-list{
+  display:grid;
+  gap:10px;
+  margin-top:14px;
+}
+
+.credential-item{
+  border:1px solid rgba(39,58,91,.12);
+  border-radius:16px;
+  padding:12px;
+  background:#fff;
+}
+
+.credential-title{
+  font-weight:800;
+  color:var(--navy);
+  margin-bottom:8px;
+}
+
+.credential-grid{
+  display:grid;
+  grid-template-columns:110px minmax(0,1fr);
+  gap:8px 10px;
+  align-items:center;
+  font-size:.9rem;
+}
+
+.credential-grid span{
+  color:var(--ink-light);
+  font-size:.78rem;
+  font-weight:700;
+}
+
+.credential-grid input{
+  width:100%;
+  border:1px solid rgba(39,58,91,.14);
+  border-radius:10px;
+  padding:8px 10px;
+  background:#f8fafc;
+  color:var(--ink);
+  font-weight:700;
+}
+
+.credential-note{
+  margin-top:10px;
+  color:var(--ink-light);
+  font-size:.78rem;
+  line-height:1.45;
+}
+
 #toast{
   position:fixed;
   bottom:22px;
@@ -525,6 +583,21 @@ button:hover{
           <button type="button" onclick="saveProfile()">Lưu thông tin</button>
         </div>
 
+        <div class="credential-box">
+          <div class="section-title">
+            <div>
+              <h3>Tài khoản đăng nhập</h3>
+              <p>Xem email và mật khẩu hiện tại mà hệ thống đang lưu để kiểm tra đúng format.</p>
+            </div>
+          </div>
+          <div id="credentialList" class="credential-list">
+            <div class="credential-note">Đang tải thông tin tài khoản...</div>
+          </div>
+          <div class="credential-note">
+            Lưu ý: Supabase không cho đọc ngược mật khẩu đã hash. Phần này chỉ hiển thị mật khẩu mới nhất từng được trung tâm/app tạo hoặc đổi trên hệ thống.
+          </div>
+        </div>
+
         <div class="password-box">
           <div class="section-title">
             <div>
@@ -555,6 +628,31 @@ button:hover{
 <script>
 let currentUser=null;
 let currentProfileRole="student";
+let currentAccountPassword="";
+
+function esc(text){
+  return String(text ?? "").replace(/[&<>"']/g, m => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#039;"
+  }[m]));
+}
+
+function credentialItemHtml(title, email, password){
+  const shownPassword = password || "Chưa có mật khẩu được lưu";
+  return `
+    <div class="credential-item">
+      <div class="credential-title">${esc(title)}</div>
+      <div class="credential-grid">
+        <span>Email</span>
+        <input value="${esc(email || "—")}" readonly>
+        <span>Mật khẩu</span>
+        <input value="${esc(shownPassword)}" readonly>
+      </div>
+    </div>`;
+}
 
 async function init(){
   const { data:{user} } = await sb.auth.getUser();
@@ -602,12 +700,44 @@ async function loadProfile(){
   document.getElementById("school").value=data.school ?? "";
   document.getElementById("bio").value=data.bio ?? "";
   currentProfileRole=data.role || "student";
+  currentAccountPassword=data.account_password || "";
   const gradeSelect=document.getElementById("gradeId");
   if(gradeSelect) gradeSelect.value=data.grade_id ?? "";
 
   if(data.avatar_url){
     document.getElementById("avatarPreview").src=data.avatar_url;
   }
+  renderCredentials(data);
+}
+
+async function loadLinkedStudentCredentials(){
+  const { data, error } = await sb.rpc("list_parent_student_credentials");
+  if(error){
+    console.warn("Không tải được tài khoản học sinh liên kết:", error);
+    return [];
+  }
+  return data || [];
+}
+
+async function renderCredentials(profile){
+  const box=document.getElementById("credentialList");
+  if(!box) return;
+  const rows=[
+    credentialItemHtml("Tài khoản của tôi", profile.email || currentUser?.email || "", profile.account_password || "")
+  ];
+  if(profile.role === "parent"){
+    const children=await loadLinkedStudentCredentials();
+    if(children.length){
+      rows.push(...children.map(child => credentialItemHtml(
+        `Tài khoản học sinh: ${child.full_name || child.email || "Học sinh"}`,
+        child.email || "",
+        child.account_password || ""
+      )));
+    }else{
+      rows.push(`<div class="credential-note">Chưa có học sinh nào được liên kết với tài khoản phụ huynh này.</div>`);
+    }
+  }
+  box.innerHTML=rows.join("");
 }
 
 async function saveProfile(){
@@ -672,6 +802,9 @@ async function changePassword(){
     return;
   }
 
+  await sb.from("users").update({ account_password: password }).eq("id", currentUser.id);
+  currentAccountPassword=password;
+  await loadProfile();
   showToast("Đổi mật khẩu thành công");
   document.getElementById("newPassword").value="";
 }
