@@ -892,6 +892,15 @@
 
   function ymToDate(ym) { return ym + "-01"; }
 
+  function isValidUuid(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+  }
+
+  function normalizeUuid(value) {
+    const text = String(value || "").trim();
+    return isValidUuid(text) ? text : null;
+  }
+
   function monthEnd(ym) {
     const [y, m] = ym.split("-").map(Number);
     const last = new Date(y, m, 0);
@@ -1137,7 +1146,15 @@
 
   // Load teacher salary config
   async function loadTeacherSalaryConfig(teacherId) {
+    const safeTeacherId = normalizeUuid(teacherId);
     if (isDbFallback) {
+      teacherSalaryConfig = {
+        base_salary: DEFAULT_BASE_SALARY,
+        base_tier_percent: DEFAULT_BASE_PERCENT
+      };
+      return;
+    }
+    if (!safeTeacherId) {
       teacherSalaryConfig = {
         base_salary: DEFAULT_BASE_SALARY,
         base_tier_percent: DEFAULT_BASE_PERCENT
@@ -1150,7 +1167,7 @@
       const { data, error } = await sb
         .from("teacher_salaries")
         .select("base_salary, base_tier_percent")
-        .eq("teacher_id", teacherId)
+        .eq("teacher_id", safeTeacherId)
         .maybeSingle();
 
       if (error) throw error;
@@ -1194,6 +1211,11 @@
       alert("Tỷ lệ % bậc 1 phải từ 0 đến 100.");
       return;
     }
+    const safeTeacherId = normalizeUuid(selectedTeacherId);
+    if (!safeTeacherId) {
+      alert("Vui lòng chọn giáo viên/nhân viên hợp lệ trước khi lưu cấu hình.");
+      return;
+    }
 
     const sb = getSb();
     const btn = event.target.querySelector("button");
@@ -1204,7 +1226,7 @@
       const { error } = await sb
         .from("teacher_salaries")
         .upsert({
-          teacher_id: selectedTeacherId,
+          teacher_id: safeTeacherId,
           base_salary: baseSalary,
           base_tier_percent: basePercent,
           updated_at: new Date().toISOString()
@@ -1237,7 +1259,7 @@
       return;
     }
 
-    teachersList = data || [];
+    teachersList = (data || []).filter(t => normalizeUuid(t.id));
     const select = document.getElementById("teacherSelect");
     select.innerHTML = teachersList.map(t => `<option value="${t.id}">${t.full_name} (${t.role === "admin" ? "Admin" : "Giáo viên"})</option>`).join("");
     select.style.display = "block";
@@ -1644,8 +1666,15 @@
       return;
     }
 
+    const safeSelectedTeacherId = normalizeUuid(selectedTeacherId);
+    if (!safeSelectedTeacherId) {
+      loader.innerHTML = `<div style="color:var(--red)">Vui lòng chọn giáo viên/nhân viên hợp lệ để tính thu nhập.</div>`;
+      return;
+    }
+    selectedTeacherId = safeSelectedTeacherId;
+
     // Load custom configuration
-    await loadTeacherSalaryConfig(selectedTeacherId);
+    await loadTeacherSalaryConfig(safeSelectedTeacherId);
 
     // Sync admin config inputs
     if (viewerProfile.role === "admin" && !isDbFallback) {
@@ -1662,7 +1691,7 @@
       const { data: classTeachers, error: errClasses } = await sb
         .from("class_teachers")
         .select("class_id")
-        .eq("teacher_id", selectedTeacherId);
+        .eq("teacher_id", safeSelectedTeacherId);
 
       if (errClasses) throw errClasses;
 
@@ -1672,7 +1701,7 @@
       const { data: courseManagers, error: errCourses } = await sb
         .from("course_managers")
         .select("course_id")
-        .eq("teacher_id", selectedTeacherId);
+        .eq("teacher_id", safeSelectedTeacherId);
 
       if (errCourses) throw errCourses;
 
@@ -2057,7 +2086,7 @@
 
     const select = document.getElementById("teacherSelect");
     select.addEventListener("change", (e) => {
-      selectedTeacherId = e.target.value;
+      selectedTeacherId = normalizeUuid(e.target.value);
       calculateAndRender();
     });
 
