@@ -424,11 +424,11 @@ async function loadTrialRequests(){
       teacherMap = Object.fromEntries((teachers||[]).map(t=>[t.id,t]));
     }
     if(studentIds.length){
-      const {data:students} = await sb.from("users").select("id,full_name,email,phone,parent_full_name,parent_phone,school").in("id",studentIds);
+      const {data:students} = await sb.from("users").select("id,full_name,email,phone,parent_full_name,parent_phone,school,account_password").in("id",studentIds);
       S.studentMap = Object.fromEntries((students||[]).map(s=>[s.id,s]));
       let parentLinks = [];
       const embeddedParents = await sb.from("parent_students")
-        .select("student_id,parent:users!parent_students_parent_id_fkey(id,full_name,email,phone,role)")
+        .select("student_id,parent:users!parent_students_parent_id_fkey(id,full_name,email,phone,role,account_password)")
         .in("student_id", studentIds)
         .is("revoked_at", null);
       if(!embeddedParents.error){
@@ -441,7 +441,7 @@ async function loadTrialRequests(){
         const parentIds = [...new Set((linkRes.data || []).map(row=>row.parent_id).filter(Boolean))];
         let parentById = {};
         if(parentIds.length){
-          const {data:parents} = await sb.from("users").select("id,full_name,email,phone,role").in("id", parentIds);
+          const {data:parents} = await sb.from("users").select("id,full_name,email,phone,role,account_password").in("id", parentIds);
           parentById = Object.fromEntries((parents || []).map(parent => [parent.id, parent]));
         }
         parentLinks = (linkRes.data || []).map(row => ({ student_id: row.student_id, parent: parentById[row.parent_id] })).filter(row => row.parent?.id);
@@ -511,13 +511,14 @@ function accountHtml(title, email, password = "", actionHtml = "") {
     </div>
     ${actionHtml || ""}`;
 }
-function editableAccountHtml(kind, title, email, password = "") {
+function editableAccountHtml(kind, title, email, password = "", actionHtml = "") {
   return `
     <div class="account-info-title">${esc(title)}</div>
     <div class="account-info-grid">
       <span>Gmail</span><input class="account-credential-input" id="${kind}PreviewEmail" value="${escAttr(email || "")}" autocomplete="off">
       <span>Mật khẩu</span><input class="account-credential-input" id="${kind}PreviewPassword" value="${escAttr(password || "")}" autocomplete="new-password">
-    </div>`;
+    </div>
+    ${actionHtml || ""}`;
 }
 function duplicateEmailHtml(kind, email, password, duplicateUser) {
   const phone = duplicateUser?.phone || "Chưa có SĐT";
@@ -547,18 +548,45 @@ function setAccountInfo(kind, message = "", tone = "ok") {
   box.innerHTML = String(message || "").includes("<") ? message : esc(message);
 }
 
+async function updateManagedCredentials(userId, email, password) {
+  if (!userId) return null;
+  const cleanEmail = String(email || "").trim().toLowerCase();
+  const cleanPassword = String(password || "").trim();
+  if (!cleanEmail && !cleanPassword) return null;
+  const { data, error } = await sb.rpc("admin_update_user_credentials", {
+    p_user_id: userId,
+    p_new_email: cleanEmail || null,
+    p_new_password: cleanPassword || null,
+  });
+  if (error) throw error;
+  return data;
+}
+
+async function updateAccountCredentialsIfVisible(kind, user) {
+  if (!user?.id) return user;
+  const emailEl = document.getElementById(`${kind}PreviewEmail`);
+  const passwordEl = document.getElementById(`${kind}PreviewPassword`);
+  if (!emailEl && !passwordEl) return user;
+  const email = emailEl?.value.trim().toLowerCase() || user.email || "";
+  const password = passwordEl?.value.trim() || "";
+  const result = await updateManagedCredentials(user.id, email, password);
+  if (result?.email) user.email = result.email;
+  if (password) user.account_password = password;
+  return user;
+}
+
 async function findUserByPhone(phone, role) {
   const digits = phoneDigits(phone);
   if (!digits) return null;
   const candidates = [];
   const exact = await sb.from("users")
-    .select("id,full_name,email,phone,role,parent_full_name,parent_phone,school")
+    .select("id,full_name,email,phone,role,parent_full_name,parent_phone,school,account_password")
     .eq("phone", phone)
     .limit(5);
   if (!exact.error && exact.data?.length) candidates.push(...exact.data);
   if (digits.length >= 8) {
     const fuzzy = await sb.from("users")
-      .select("id,full_name,email,phone,role,parent_full_name,parent_phone,school")
+      .select("id,full_name,email,phone,role,parent_full_name,parent_phone,school,account_password")
       .ilike("phone", `%${digits.slice(-8)}%`)
       .limit(10);
     if (!fuzzy.error && fuzzy.data?.length) candidates.push(...fuzzy.data);
@@ -569,7 +597,7 @@ async function findUserByEmail(email) {
   const normalized = String(email || "").trim().toLowerCase();
   if (!normalized) return null;
   const { data } = await sb.from("users")
-    .select("id,full_name,email,phone,role")
+    .select("id,full_name,email,phone,role,account_password")
     .ilike("email", normalized)
     .maybeSingle();
   return data || null;
@@ -624,8 +652,9 @@ async function ensureStudentAccount({ create = true } = {}) {
     if (cached?.phone && phoneDigits(cached.phone) && phoneDigits(cached.phone) !== phoneDigits(phone)) {
       document.getElementById("studentId").value = "";
     } else {
-      setAccountInfo("student", accountHtml("Đã liên kết với tài khoản học sinh", cached?.email || existingId, "", newAccountButtonHtml("student")));
-      return cached || { id: existingId };
+      const updated = create ? await updateAccountCredentialsIfVisible("student", cached || { id: existingId }) : (cached || { id: existingId });
+      setAccountInfo("student", editableAccountHtml("student", "Đã liên kết với tài khoản học sinh", updated?.email || existingId, updated?.account_password || "", newAccountButtonHtml("student")));
+      return updated || { id: existingId };
     }
   }
 
@@ -633,8 +662,9 @@ async function ensureStudentAccount({ create = true } = {}) {
   if (existing && !S.newAccountMode.student) {
     S.studentMap[existing.id] = existing;
     updateStudentFieldsFromAccount(existing);
-    setAccountInfo("student", accountHtml("Đã liên kết với tài khoản học sinh", existing.email || existing.full_name, "", newAccountButtonHtml("student")));
-    return existing;
+    const updated = create ? await updateAccountCredentialsIfVisible("student", existing) : existing;
+    setAccountInfo("student", editableAccountHtml("student", "Đã liên kết với tài khoản học sinh", updated.email || "", updated.account_password || "", newAccountButtonHtml("student")));
+    return updated;
   }
   if (!create) {
     setAccountInfo("student", editableAccountHtml("student", "Sẽ tạo tài khoản học sinh khi bấm Lưu học thử", plannedCredentials.email, plannedCredentials.password), "warn");
@@ -670,10 +700,12 @@ async function ensureStudentAccount({ create = true } = {}) {
   }
   const created = data?.created_accounts?.[0];
   const { data: student, error: findError } = await sb.from("users")
-    .select("id,full_name,email,phone,parent_full_name,parent_phone,school,role")
+    .select("id,full_name,email,phone,parent_full_name,parent_phone,school,role,account_password")
     .eq("email", created?.email || credentials.email)
     .maybeSingle();
   if (findError || !student) throw findError || new Error("Không tìm thấy tài khoản học sinh vừa tạo.");
+  await updateManagedCredentials(student.id, student.email || credentials.email, created?.password || credentials.password);
+  student.account_password = created?.password || credentials.password;
   S.studentMap[student.id] = student;
   S.newAccountMode.student = false;
   updateStudentFieldsFromAccount(student);
@@ -693,30 +725,32 @@ async function ensureParentAccount(studentId, { create = true } = {}) {
 
   const existingId = document.getElementById("parentId").value;
   if (existingId && !S.newAccountMode.parent) {
-    const { data: parent } = await sb.from("users").select("id,full_name,email,phone,role").eq("id", existingId).maybeSingle();
+    const { data: parent } = await sb.from("users").select("id,full_name,email,phone,role,account_password").eq("id", existingId).maybeSingle();
     if (parent?.phone && phoneDigits(parent.phone) && phoneDigits(parent.phone) !== phoneDigits(phone)) {
       document.getElementById("parentId").value = "";
     } else {
-      if (studentId && parent?.email) {
+      const updated = create ? await updateAccountCredentialsIfVisible("parent", parent || { id: existingId }) : (parent || { id: existingId });
+      if (studentId && updated?.email) {
         await sb.rpc("admin_import_parents_batch", {
-          p_rows: [{ email: parent.email, full_name: fullName || parent.full_name || "Phụ huynh", phone: phone || parent.phone || "", student_id: studentId, relationship: "parent" }]
+          p_rows: [{ email: updated.email, full_name: fullName || updated.full_name || "Phụ huynh", phone: phone || updated.phone || "", student_id: studentId, relationship: "parent" }]
         });
       }
-      setAccountInfo("parent", accountHtml("Đã liên kết với tài khoản phụ huynh", parent?.email || existingId, "", newAccountButtonHtml("parent")));
-      return parent || { id: existingId };
+      setAccountInfo("parent", editableAccountHtml("parent", "Đã liên kết với tài khoản phụ huynh", updated?.email || existingId, updated?.account_password || "", newAccountButtonHtml("parent")));
+      return updated || { id: existingId };
     }
   }
 
   const existing = await findUserByPhone(phone, "parent");
   if (existing && !S.newAccountMode.parent) {
     document.getElementById("parentId").value = existing.id || "";
-    setAccountInfo("parent", accountHtml("Đã liên kết với tài khoản phụ huynh", existing.email || existing.full_name, "", newAccountButtonHtml("parent")));
+    const updated = create ? await updateAccountCredentialsIfVisible("parent", existing) : existing;
+    setAccountInfo("parent", editableAccountHtml("parent", "Đã liên kết với tài khoản phụ huynh", updated.email || "", updated.account_password || "", newAccountButtonHtml("parent")));
     if (studentId) {
       await sb.rpc("admin_import_parents_batch", {
-        p_rows: [{ email: existing.email, full_name: fullName || existing.full_name || "Phụ huynh", phone: phone || existing.phone || "", student_id: studentId, relationship: "parent" }]
+        p_rows: [{ email: updated.email, full_name: fullName || updated.full_name || "Phụ huynh", phone: phone || updated.phone || "", student_id: studentId, relationship: "parent" }]
       });
     }
-    return existing;
+    return updated;
   }
   if (!create) {
     setAccountInfo("parent", editableAccountHtml("parent", "Sẽ tạo tài khoản phụ huynh khi bấm Lưu học thử", plannedCredentials.email, plannedCredentials.password), "warn");
@@ -750,10 +784,12 @@ async function ensureParentAccount(studentId, { create = true } = {}) {
   }
   const created = data?.created_accounts?.[0];
   const { data: parent, error: findError } = await sb.from("users")
-    .select("id,full_name,email,phone,role")
+    .select("id,full_name,email,phone,role,account_password")
     .eq("email", created?.email || credentials.email)
     .maybeSingle();
   if (findError || !parent) throw findError || new Error("Không tìm thấy tài khoản phụ huynh vừa tạo.");
+  await updateManagedCredentials(parent.id, parent.email || credentials.email, created?.password || credentials.password);
+  parent.account_password = created?.password || credentials.password;
   S.newAccountMode.parent = false;
   document.getElementById("parentId").value = parent.id || "";
   setAccountInfo("parent", accountHtml("Tài khoản phụ huynh mới", parent.email || credentials.email, created?.password || credentials.password));
@@ -798,8 +834,8 @@ function openTrialModal(id){
   populateClassSelect();
   document.getElementById("classId").value = item?.trial_class_id || "";
   loadClassSchedules(item);
-  setAccountInfo("student", item?.linkedStudent ? accountHtml("Đã liên kết với tài khoản học sinh", item.linkedStudent.email || item.linkedStudent.full_name || item.linkedStudent.id, "", newAccountButtonHtml("student")) : "");
-  setAccountInfo("parent", item?.linkedParent ? accountHtml("Đã liên kết với tài khoản phụ huynh", item.linkedParent.email || item.linkedParent.full_name || item.linkedParent.id, "", newAccountButtonHtml("parent")) : "");
+  setAccountInfo("student", item?.linkedStudent ? editableAccountHtml("student", "Đã liên kết với tài khoản học sinh", item.linkedStudent.email || "", item.linkedStudent.account_password || "", newAccountButtonHtml("student")) : "");
+  setAccountInfo("parent", item?.linkedParent ? editableAccountHtml("parent", "Đã liên kết với tài khoản phụ huynh", item.linkedParent.email || "", item.linkedParent.account_password || "", newAccountButtonHtml("parent")) : "");
   document.getElementById("trialModal").classList.add("show");
 }
 function closeTrialModal(){ document.getElementById("trialModal").classList.remove("show"); }

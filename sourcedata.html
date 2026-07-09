@@ -562,6 +562,11 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <div class="fg"><label>Email tài khoản học sinh</label><input id="tEmail" placeholder="Nhập email để tìm..."></div>
       <div class="found-user" id="tFoundUser"></div>
     </div>
+    <div id="tCredentialSection" style="display:none">
+      <div class="fg"><label>Gmail tài khoản</label><input id="tAccountEmail" placeholder="email@example.com"></div>
+      <div class="fg"><label>Mật khẩu tài khoản</label><input id="tAccountPassword" placeholder="Nhập mật khẩu mới nếu muốn đổi"></div>
+      <div style="font-size:.76rem;color:var(--ink-light);margin:-4px 0 10px">Mật khẩu chỉ hiện nếu từng được trung tâm tạo/đổi trên hệ thống. Với tài khoản cũ, nhập mật khẩu mới để đặt lại.</div>
+    </div>
     <div class="fg">
       <label>Môn giảng dạy</label>
       <select id="tSubject">
@@ -931,12 +936,14 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <button class="modal-mclose" onclick="sCloseModal()">✕</button>
     </div>
     <div class="fg"><label>Họ tên</label><input id="seN"  placeholder="Họ và tên"></div>
+    <div class="fg"><label>Gmail học sinh</label><input id="seEmail" placeholder="gmail học sinh"></div>
+    <div class="fg"><label>Mật khẩu học sinh</label><input id="sePassword" placeholder="Nhập mật khẩu mới nếu muốn đổi"></div>
     <div class="fg"><label>SĐT</label><input id="seP"     placeholder="SĐT"></div>
     <div class="fg"><label>Họ tên phụ huynh</label><input id="seParentN" placeholder="Họ và tên phụ huynh"></div>
     <div class="fg"><label>SĐT phụ huynh</label><input id="seParentP" placeholder="SĐT phụ huynh"></div>
     <div class="fg"><label>Gmail phụ huynh</label><input id="seParentEmail" placeholder="gmail phụ huynh"></div>
     <div id="seParentEmailStatus" class="se-parent-status"></div>
-    <div class="fg se-parent-password" id="seParentPasswordWrap"><label>Mật khẩu phụ huynh</label><input id="seParentPassword" placeholder="Mặc định là SĐT phụ huynh"></div>
+    <div class="fg se-parent-password" id="seParentPasswordWrap"><label>Mật khẩu phụ huynh</label><input id="seParentPassword" placeholder="Nhập mật khẩu mới nếu muốn đổi"></div>
     <div class="fg"><label>Năm sinh</label><input id="seB" type="number" placeholder="Năm sinh"></div>
     <div class="fg"><label>Tỉnh</label><input id="sePv"   placeholder="Tỉnh/thành"></div>
     <div class="fg"><label>Trường</label><input id="seSc" placeholder="Tên trường"></div>
@@ -1422,7 +1429,7 @@ function tPhone(p){ navigator.clipboard.writeText(p).then(()=>toast('📋 Đã s
 
 async function loadTeachers(){
   const [{ data: teachers }, { data: ct }, { data: cls }] = await Promise.all([
-    sb.from('users').select('id,full_name,email,phone,birth_year,subject,avatar_url,role').in('role',['teacher','assistant','accountant']).order('full_name'),
+    sb.from('users').select('id,full_name,email,phone,birth_year,subject,avatar_url,role,account_password').in('role',['teacher','assistant','accountant']).order('full_name'),
     sb.from('class_teachers').select('teacher_id,class_id'),
     sb.from('classes').select('id,class_name').eq('hidden',false),
   ]);
@@ -1487,8 +1494,9 @@ function openAddTeacher(){
   _tEditId = null;
   document.getElementById('tModalTitle').textContent = 'Thêm giáo viên';
   document.getElementById('tAddSection').style.display = 'block';
+  document.getElementById('tCredentialSection').style.display = 'none';
   document.getElementById('tFoundUser').style.display  = 'none';
-  ['tEditId','tEmail','tSubject','tBirth','tPhone'].forEach(id => document.getElementById(id).value='');
+  ['tEditId','tEmail','tSubject','tBirth','tPhone','tAccountEmail','tAccountPassword'].forEach(id => document.getElementById(id).value='');
   document.getElementById('tRole').value = 'teacher';
   const resetBtn = document.getElementById('tResetPwdBtn');
   if (resetBtn) resetBtn.style.display = 'none';
@@ -1500,8 +1508,11 @@ function openEditTeacher(id){
   const t = _teachers.find(x=>x.id===id); if(!t) return;
   document.getElementById('tModalTitle').textContent = 'Sửa thông tin giáo viên';
   document.getElementById('tAddSection').style.display = 'none';
+  document.getElementById('tCredentialSection').style.display = 'block';
   document.getElementById('tEditId').value   = id;
   document.getElementById('tRole').value     = t.role || 'teacher';
+  document.getElementById('tAccountEmail').value = t.email || '';
+  document.getElementById('tAccountPassword').value = t.account_password || '';
   document.getElementById('tSubject').value  = t.subject    || '';
   document.getElementById('tBirth').value    = t.birth_year || '';
   document.getElementById('tPhone').value    = t.phone      || '';
@@ -1557,6 +1568,20 @@ async function tResetTeacherPassword() {
 
 function closeTModal(){ document.getElementById('tModal').classList.remove('open'); }
 
+async function updateManagedCredentials(userId, email, password){
+  if(!userId) return null;
+  const cleanEmail = (email || '').trim().toLowerCase();
+  const cleanPassword = (password || '').trim();
+  if(!cleanEmail && !cleanPassword) return null;
+  const { data, error } = await sb.rpc('admin_update_user_credentials', {
+    p_user_id: userId,
+    p_new_email: cleanEmail || null,
+    p_new_password: cleanPassword || null,
+  });
+  if(error) throw error;
+  return data;
+}
+
 async function submitTeacher(){
   const subject    = document.getElementById('tSubject').value;
   const selectedRole = document.getElementById('tRole').value;
@@ -1564,6 +1589,8 @@ async function submitTeacher(){
   const birth_year = parseInt(document.getElementById('tBirth').value)||null;
   const phone      = document.getElementById('tPhone').value.trim()||null;
   if(_tEditId){
+    const credentialEmail = document.getElementById('tAccountEmail')?.value.trim().toLowerCase() || '';
+    const credentialPassword = document.getElementById('tAccountPassword')?.value.trim() || '';
     const outcome = await window.AppAdminTools?.runAdminAction?.({
       action: 'teacher_updated',
       details: {
@@ -1575,7 +1602,10 @@ async function submitTeacher(){
         has_phone: !!phone,
       },
       errorPrefix: 'Không thể cập nhật giáo viên',
-      operation: async () => sb.from('users').update({role:staffRole,subject,birth_year,phone}).eq('id',_tEditId),
+      operation: async () => {
+        if(credentialEmail || credentialPassword) await updateManagedCredentials(_tEditId, credentialEmail, credentialPassword);
+        return sb.from('users').update({role:staffRole,subject,birth_year,phone}).eq('id',_tEditId);
+      },
     });
     if(outcome && !outcome.ok) return;
     toast('✅ Đã cập nhật nhân sự');
@@ -1754,6 +1784,12 @@ async function sHandleImportFile(event){
     const { data, error } = await sb.rpc('admin_import_students_batch', { p_rows: payload });
     if(error) throw error;
     const created=(data?.created_accounts||[]).map(item=>({'Họ tên':item.full_name||'','Email':item.email||'','Mật khẩu':item.password||'','Trạng thái':item.status||'created'}));
+    await Promise.all((data?.created_accounts || [])
+      .filter(item => item.email && item.password)
+      .map(async item => {
+        const { data: user } = await sb.from('users').select('id,email').eq('email', item.email).maybeSingle();
+        if(user?.id) await updateManagedCredentials(user.id, user.email || item.email, item.password);
+      }));
     if(created.length){
       const ws=XLSX.utils.json_to_sheet(created);
       const wb=XLSX.utils.book_new();
@@ -1810,7 +1846,7 @@ async function sLoadLinkedParentsForStudents(students){
   const parentIds = [...new Set((links || []).map(item => item.parent_id).filter(Boolean))];
   if(!parentIds.length) return;
   const { data: parents, error: parentError } = await sb.from('users')
-    .select('id,full_name,email,phone,role')
+    .select('id,full_name,email,phone,role,account_password')
     .in('id', parentIds);
   if(parentError){
     console.warn('Không tải được tài khoản phụ huynh:', parentError);
@@ -1968,7 +2004,7 @@ async function sCheckParentEmail(){
     sSetParentEmailStatus('Email phụ huynh chưa hợp lệ.', 'warn');
     return null;
   }
-  const { data, error } = await sb.from('users').select('id,full_name,email,phone,role').eq('email', email).maybeSingle();
+  const { data, error } = await sb.from('users').select('id,full_name,email,phone,role,account_password').eq('email', email).maybeSingle();
   if(error){
     sSetParentPasswordVisible(true);
     sSetParentEmailStatus(error.message || 'Chưa kiểm tra được email phụ huynh.', 'warn');
@@ -1976,8 +2012,9 @@ async function sCheckParentEmail(){
   }
   if(data?.role === 'parent'){
     _sParentEmailExisting = data;
-    sSetParentPasswordVisible(false);
-    sSetParentEmailStatus(`Email này đã là tài khoản phụ huynh: ${data.full_name || data.email}. Không cần nhập mật khẩu.`, 'ok');
+    sSetParentPasswordVisible(true);
+    if(!document.getElementById('seParentPassword').value) document.getElementById('seParentPassword').value = data.account_password || '';
+    sSetParentEmailStatus(`Email này đã là tài khoản phụ huynh: ${data.full_name || data.email}. Có thể nhập mật khẩu mới nếu muốn đổi.`, 'ok');
     return data;
   }
   if(data){
@@ -2000,7 +2037,7 @@ async function sLoadLinkedParentForStudent(studentId){
     .maybeSingle();
   if(!link?.parent_id) return null;
   const { data: parent } = await sb.from('users')
-    .select('id,full_name,email,phone,role')
+    .select('id,full_name,email,phone,role,account_password')
     .eq('id', link.parent_id)
     .maybeSingle();
   return parent?.role === 'parent' ? parent : null;
@@ -2015,9 +2052,7 @@ async function sSyncParentAccountForStudent(studentId, payload){
   if(!email || !email.includes('@')) throw new Error('Email phụ huynh chưa hợp lệ.');
   const existing = await sCheckParentEmail();
   if(existing && existing.role !== 'parent') throw new Error('Email phụ huynh đang thuộc tài khoản không phải phụ huynh.');
-  const password = existing?.role === 'parent'
-    ? ''
-    : (document.getElementById('seParentPassword')?.value.trim() || sParentDefaultPassword(parentPhone));
+  const password = document.getElementById('seParentPassword')?.value.trim() || (existing?.role === 'parent' ? '' : sParentDefaultPassword(parentPhone));
   const { error } = await sb.rpc('admin_import_parents_batch', {
     p_rows: [{
       email,
@@ -2029,6 +2064,10 @@ async function sSyncParentAccountForStudent(studentId, payload){
     }]
   });
   if(error) throw error;
+  const { data: parentAfterSave } = await sb.from('users').select('id,email').eq('email', email).maybeSingle();
+  if(parentAfterSave?.id && (email || password)){
+    await updateManagedCredentials(parentAfterSave.id, email, password);
+  }
 }
 
 async function sEditStudent(id){
@@ -2038,6 +2077,8 @@ async function sEditStudent(id){
   _sParentEmailExisting = null;
   _sParentPasswordTouched = false;
   document.getElementById('seN').value  = s.full_name  ||'';
+  document.getElementById('seEmail').value = s.email || '';
+  document.getElementById('sePassword').value = s.account_password || '';
   document.getElementById('seP').value  = s.phone      ||'';
   document.getElementById('seParentN').value = s.parent_full_name || '';
   document.getElementById('seParentP').value = s.parent_phone || '';
@@ -2052,11 +2093,12 @@ async function sEditStudent(id){
   const parent = await sLoadLinkedParentForStudent(id);
   if(parent){
     document.getElementById('seParentEmail').value = parent.email || '';
+    document.getElementById('seParentPassword').value = parent.account_password || '';
     if(!document.getElementById('seParentN').value) document.getElementById('seParentN').value = parent.full_name || '';
     if(!document.getElementById('seParentP').value) document.getElementById('seParentP').value = parent.phone || '';
     _sParentEmailExisting = parent;
-    sSetParentPasswordVisible(false);
-    sSetParentEmailStatus(`Đang liên kết với tài khoản phụ huynh: ${parent.full_name || parent.email}.`, 'ok');
+    sSetParentPasswordVisible(true);
+    sSetParentEmailStatus(`Đang liên kết với tài khoản phụ huynh: ${parent.full_name || parent.email}. Có thể nhập mật khẩu mới nếu muốn đổi.`, 'ok');
   } else if(s.parent_full_name){
     await sSuggestParentEmail(true);
   }
@@ -2132,6 +2174,7 @@ async function sSaveStudent(){
     operation: async () => {
       const updateResult = await sb.from('users').update({ ...payload }).eq('id',_sEditId);
       if(updateResult?.error) throw updateResult.error;
+      await updateManagedCredentials(_sEditId, document.getElementById('seEmail')?.value.trim(), document.getElementById('sePassword')?.value.trim());
       await sSyncParentAccountForStudent(_sEditId, payload);
       return updateResult;
     },
@@ -3001,6 +3044,7 @@ async function createTrialStudentAccount(){
     alert('Đã gọi tạo tài khoản nhưng chưa tìm thấy tài khoản vừa tạo. Hãy tải lại danh sách học sinh rồi thử link thủ công.');
     return;
   }
+  await updateManagedCredentials(student.id, student.email || email, password);
   const { error: updateError } = await sb.from('trial_lesson_requests').update({
     student_id: student.id,
     handled_at: new Date().toISOString()
