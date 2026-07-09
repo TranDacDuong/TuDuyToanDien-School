@@ -107,6 +107,37 @@
     return localDate();
   }
 
+  function taskStartDay(item) {
+    const task = item.task || {};
+    return String(task.available_on || item.created_at || task.created_at || localDate()).slice(0, 10);
+  }
+
+  function taskEndDay(item) {
+    const task = item.task || {};
+    return task.due_at ? localDate(new Date(task.due_at)) : taskStartDay(item);
+  }
+
+  function taskCoversDate(item, dateText) {
+    const start = taskStartDay(item);
+    const end = taskEndDay(item);
+    return dateText >= start && dateText <= end;
+  }
+
+  function taskOverlapsRange(item, start, end) {
+    return taskStartDay(item) <= end && taskEndDay(item) >= start;
+  }
+
+  function isLongRunningTask(item) {
+    return isManualAssignedTask(item) && taskStartDay(item) < taskEndDay(item);
+  }
+
+  function taskDisplayDay(item) {
+    if (item.__displayDay) return item.__displayDay;
+    const selected = S.selectedDate || localDate();
+    if (S.viewMode !== "month" && taskCoversDate(item, selected)) return selected;
+    return taskDay(item);
+  }
+
   function startOfWeek(dateText = localDate()) {
     const date = new Date(`${dateText}T00:00:00+07:00`);
     const day = date.getDay() === 0 ? 7 : date.getDay();
@@ -223,13 +254,16 @@
     const start = S.viewMode === "month" ? monthStart(selected) : selected;
     const end = S.viewMode === "month" ? endOfMonth(selected) : selected;
     return S.assignments.filter(item => {
-      const day = taskDay(item);
       if (S.profile?.role === "admin" && S.adminScope === "personal" && item.user_id !== S.user?.id) return false;
       if (S.profile?.role === "admin" && S.selectedUserId !== "all" && item.user_id !== S.selectedUserId) return false;
       if (S.profile?.role === "admin" && S.adminScope === "center" && !isAdminActionTask(item)) return false;
-      return inRange(day, start, end);
+      return taskOverlapsRange(item, start, end);
     }).sort((a, b) => {
       const priority = { urgent: 0, important: 1, normal: 2 };
+      const activeLongA = isLongRunningTask(a) && taskCoversDate(a, selected) && effectiveStatus(a) !== "completed";
+      const activeLongB = isLongRunningTask(b) && taskCoversDate(b, selected) && effectiveStatus(b) !== "completed";
+      const longDiff = Number(activeLongB) - Number(activeLongA);
+      if (longDiff) return longDiff;
       if (S.profile?.role === "admin") {
         const progressDiff = progressPercent(b) - progressPercent(a);
         if (progressDiff) return progressDiff;
@@ -238,7 +272,7 @@
       if (reminderDiff) return reminderDiff;
       const status = Number(effectiveStatus(a) === "completed") - Number(effectiveStatus(b) === "completed");
       if (status) return status;
-      const dayDiff = taskDay(a).localeCompare(taskDay(b));
+      const dayDiff = taskDisplayDay(a).localeCompare(taskDisplayDay(b));
       if (dayDiff && S.viewMode !== "today") return dayDiff;
       const priorityDiff = (priority[a.task?.priority] ?? 3) - (priority[b.task?.priority] ?? 3);
       if (priorityDiff) return priorityDiff;
@@ -353,7 +387,7 @@
     ).filter(item => S.profile?.role !== "admin" || S.adminScope !== "personal" || item.user_id === S.user?.id)
       .filter(item => S.profile?.role !== "admin" || S.adminScope !== "center" || isAdminActionTask(item));
     const open = scoped.filter(item => effectiveStatus(item) !== "completed" && item.status !== "cancelled");
-    E.todayCount.textContent = open.filter(item => taskDay(item) === today).length;
+    E.todayCount.textContent = open.filter(item => taskCoversDate(item, today)).length;
     E.importantCount.textContent = open.filter(item =>
       !REMINDER_TYPES.has(item.task?.task_type)
       && ["urgent", "important"].includes(item.task?.priority)
@@ -404,6 +438,7 @@
     const completed = effectiveStatus(item) === "completed";
     const overdue = isOverdue(item);
     const state = statusInfo(item);
+    const isLongTask = isLongRunningTask(item);
     const deleteButton = canDeleteAssignment(item)
       ? `<button class="task-btn danger" type="button" data-delete-task="${esc(item.id)}" title="Xóa công việc này">Xóa</button>`
       : "";
@@ -419,6 +454,7 @@
           ${task.description ? `<p class="task-description">${esc(task.description)}</p>` : ""}
           ${taskProgressHtml(item)}
           <div class="task-meta">
+            ${isLongTask ? `<span>Hiện từ ${esc(formatShortDate(taskStartDay(item)))} đến ${esc(formatShortDate(taskEndDay(item)))}</span>` : ""}
             ${S.profile?.role === "admin" && item.assignee ? `<span>Người nhận: ${esc(item.assignee.full_name || item.assignee.email)}</span>` : ""}
             <span>${task.due_at ? `Hạn ${formatDateTime(task.due_at)}` : "Không có thời hạn"}</span>
             <span>${task.auto_generated ? "Hệ thống tự tạo" : "Admin giao"}</span>
@@ -437,7 +473,7 @@
   function renderGrouped(rows) {
     const groups = new Map();
     rows.forEach(item => {
-      const key = taskDay(item);
+      const key = taskDisplayDay(item);
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(item);
     });
@@ -492,7 +528,7 @@
     const { start, end } = monthRange(S.selectedDate || localDate());
     const days = [];
     for (let day = start; day <= end; day = addDays(day, 1)) days.push(day);
-    const counts = days.map(day => rows.filter(item => !isReminderTask(item) && taskDay(item) === day).length);
+    const counts = days.map(day => rows.filter(item => !isReminderTask(item) && taskCoversDate(item, day)).length);
     const max = Math.max(1, ...counts);
     return `
       <div class="task-mini-chart" style="--bars:${days.length}">
@@ -1240,6 +1276,7 @@
     const title = byId("manualTaskTitle").value.trim();
     if (!title || !userIds.length) return alert("Hãy nhập tiêu đề và chọn ít nhất một người nhận.");
     const dueValue = byId("manualTaskDueAt").value;
+    if (!dueValue) return alert("Hãy chọn deadline / hạn nộp công việc.");
     const recurrence = byId("manualTaskRecurrence")?.value || "once";
     const weekday = Number(byId("manualTaskWeekday")?.value || 1);
     const requirements = String(byId("manualTaskRequirements")?.value || "")
