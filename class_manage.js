@@ -1442,6 +1442,7 @@
     const resultsDiv=document.getElementById("cvSearchResults");
     if(!resultsDiv) return;
     const sched=getSchedulesForMonth(_cachedClass.class_schedules||[],_currentMonth,_currentYear);
+    const today = todayStr();
     resultsDiv.innerHTML =
       '<div style="padding:10px;border-radius:10px;background:#fff;border:1px solid var(--border)">'+
         '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center">'+
@@ -1450,6 +1451,11 @@
             '<div style="font-size:.82rem;color:var(--ink-mid);margin-top:2px">'+esc(studentName)+'</div>'+
           '</div>'+
           '<button onclick="cvSearchStudents()" class="btn btn-outline btn-sm">Đổi học sinh</button>'+
+        '</div>'+
+        '<div style="margin-top:10px" class="fg">'+
+          '<label>Ngày bắt đầu vào lớp</label>'+
+          '<input id="cvAddStudentJoinedAt" type="date" value="'+today+'">'+
+          '<div style="font-size:.78rem;color:var(--ink-light);margin-top:4px">Chọn đúng ngày học sinh bắt đầu học thực tế để học phí và điểm danh tháng cũ tính đúng.</div>'+
         '</div>'+
         buildSchedulePickerHtml(sched)+
         '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">'+
@@ -1460,6 +1466,12 @@
 
   window.cvConfirmAddStudent = async function(studentId,studentName){
     const sb=getSb(), classId=_classId, today=todayStr();
+    const joinedDate = document.getElementById("cvAddStudentJoinedAt")?.value || "";
+    if(!joinedDate){
+      alert("Vui lòng chọn ngày bắt đầu vào lớp.");
+      return;
+    }
+    const joinedAt = joinedDate + "T12:00:00";
     const sched=getSchedulesForMonth(_cachedClass.class_schedules||[],_currentMonth,_currentYear);
     const selectedSchedules = chooseSchedulesForStudent(studentName, sched);
     if(selectedSchedules === null) return;
@@ -1468,7 +1480,7 @@
       return;
     }
     const{data:newRow,error}=await sb.from("class_students")
-      .insert([{class_id:classId,student_id:studentId,joined_at:new Date().toISOString()}])
+      .insert([{class_id:classId,student_id:studentId,joined_at:joinedAt}])
       .select().single();
     if(error){alert("Lỗi: "+error.message);return;}
     if(selectedSchedules.length){
@@ -1477,7 +1489,7 @@
         student_id: studentId,
         session_no: Number(s.session_no || 1),
         schedule_id: s.id,
-        effective_from: today
+        effective_from: joinedDate
       }));
       const { error: scheduleError } = await sb.from("class_student_schedules").upsert(rows, { onConflict: "class_id,student_id,session_no,effective_from" });
       if(scheduleError){ alert("Lỗi lưu lịch học sinh: "+scheduleError.message); return; }
@@ -1485,7 +1497,7 @@
       _studentScheduleMap[studentId] = new Set(selectedSchedules.map(s => Number(s.id)));
     }
     const pastRows=generateOccurrences(selectedSchedules.length ? selectedSchedules : sched,_currentMonth,_currentYear)
-      .filter(item=>item.date<today)
+      .filter(item=>item.date>=joinedDate && item.date<today)
       .map(item=>({class_id:classId,student_id:studentId,date:item.date,status:"absent",schedule_id:item.schedule_id,session_no:item.session_no}));
     if(pastRows.length>0){
       await sb.from("attendance").upsert(
@@ -1501,6 +1513,7 @@
       class_id: classId,
       student_id: studentId,
       student_name: userData?.full_name || studentName || null,
+      joined_at: joinedDate,
     });
     cvCloseAddStudent();
     await renderAttendanceTab();

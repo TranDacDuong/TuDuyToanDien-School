@@ -905,6 +905,18 @@ async function deleteTrial(id){
   await loadTrialRequests();
 }
 function deleteTrialFromModal(){ const id=document.getElementById("editId").value; if(!id){ closeTrialModal(); return; } deleteTrial(id); }
+function askClassJoinDate(defaultDate = ""){
+  const today = new Date();
+  const fallback = defaultDate || `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+  const value = prompt("Nhập ngày học sinh bắt đầu vào lớp (YYYY-MM-DD):", fallback);
+  if(value === null) return null;
+  const date = String(value || "").trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){
+    alert("Vui lòng nhập ngày theo định dạng YYYY-MM-DD.");
+    return null;
+  }
+  return date;
+}
 function buildTrialStudentScheduleRows(item, effectiveFrom){
   const selectedIds = [item?.trial_schedule_1_id, item?.trial_schedule_2_id].filter(Boolean);
   const rowsBySession = new Map();
@@ -927,17 +939,18 @@ async function addTrialToClass(id){
   if(!item.student_id){ alert("Hãy tạo hoặc link tài khoản học sinh trước khi thêm vào lớp."); return; }
   if(!item.trial_class_id){ alert("Chưa chọn lớp học thử."); return; }
   if(computedStatus(item)!=="trial_2_done" && !confirm("Học sinh chưa hoàn thành đủ 2 buổi học thử. Bạn vẫn muốn thêm vào lớp?")) return;
-  const joinedAt = new Date().toISOString();
-  const effectiveFrom = joinedAt.slice(0,10);
   const existing = await sb.from("class_students").select("id").eq("class_id",item.trial_class_id).eq("student_id",item.student_id).maybeSingle();
   if(!existing.data){
+    const effectiveFrom = askClassJoinDate(String(item.trial_session_1_at || "").slice(0,10));
+    if(!effectiveFrom) return;
+    const joinedAt = effectiveFrom + "T12:00:00";
     const {error} = await sb.from("class_students").insert({class_id:item.trial_class_id,student_id:item.student_id,joined_at:joinedAt});
     if(error){ alert("Không thể thêm học sinh vào lớp: "+error.message); return; }
-  }
-  const selectedScheduleRows = buildTrialStudentScheduleRows(item, effectiveFrom);
-  if(selectedScheduleRows.length){
-    const {error:scheduleError} = await sb.from("class_student_schedules").upsert(selectedScheduleRows, { onConflict:"class_id,student_id,session_no,effective_from" });
-    if(scheduleError){ alert("Đã thêm học sinh vào lớp nhưng chưa lưu được đúng lịch học thử: "+scheduleError.message); return; }
+    const selectedScheduleRows = buildTrialStudentScheduleRows(item, effectiveFrom);
+    if(selectedScheduleRows.length){
+      const {error:scheduleError} = await sb.from("class_student_schedules").upsert(selectedScheduleRows, { onConflict:"class_id,student_id,session_no,effective_from" });
+      if(scheduleError){ alert("Đã thêm học sinh vào lớp nhưng chưa lưu được đúng lịch học thử: "+scheduleError.message); return; }
+    }
   }
   const {error:deleteError} = await sb.from("trial_lesson_requests").delete().eq("id",id);
   if(deleteError) alert("Đã thêm vào lớp nhưng chưa xóa được khỏi danh sách học thử: "+deleteError.message);

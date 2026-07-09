@@ -3260,6 +3260,19 @@ function trialGenerateOccurrences(schedules, month, year){
   return items;
 }
 
+function askTrialClassJoinDate(defaultDate = ''){
+  const now = new Date();
+  const fallback = defaultDate || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const value = prompt('Nhập ngày học sinh bắt đầu vào lớp (YYYY-MM-DD):', fallback);
+  if(value === null) return null;
+  const date = String(value || '').trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){
+    alert('Vui lòng nhập ngày theo định dạng YYYY-MM-DD.');
+    return null;
+  }
+  return date;
+}
+
 async function addTrialStudentToClass(id){
   const item = _trialRequests.find(row => row.id === id);
   if(!item) return;
@@ -3288,8 +3301,9 @@ async function addTrialStudentToClass(id){
     await loadTrialRequests();
     return;
   }
-  const joinedAt = new Date().toISOString();
-  const effectiveFrom = joinedAt.slice(0,10);
+  const effectiveFrom = askTrialClassJoinDate(String(item.trial_session_1_at || '').slice(0,10));
+  if(!effectiveFrom) return;
+  const joinedAt = effectiveFrom + 'T12:00:00';
   const { error: insertError } = await sb.from('class_students').insert({ class_id:classId, student_id:studentId, joined_at:joinedAt });
   if(insertError){
     alert('Không thể thêm học sinh vào lớp: ' + insertError.message);
@@ -3313,7 +3327,7 @@ async function addTrialStudentToClass(id){
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
     const pastRows = trialGenerateOccurrences(selectedSchedules, now.getMonth(), now.getFullYear())
-      .filter(row => row.date < today)
+      .filter(row => row.date >= effectiveFrom && row.date < today)
       .map(row => ({ class_id:classId, student_id:studentId, date:row.date, status:'absent', schedule_id:row.schedule_id, session_no:row.session_no }));
     if(pastRows.length){
       const { error: attendanceError } = await sb.from('attendance').upsert(pastRows, { onConflict:'class_id,student_id,date,schedule_id' });
@@ -3324,7 +3338,8 @@ async function addTrialStudentToClass(id){
     target_type:'class_student',
     target_id:classId,
     trial_request_id:id,
-    student_id:studentId
+    student_id:studentId,
+    joined_at: effectiveFrom
   });
   const { data: deletedTrialRows, error: deleteTrialError } = await sb.from('trial_lesson_requests').delete().eq('id', id).select('id');
   if(deleteTrialError){
