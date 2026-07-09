@@ -38,5 +38,5 @@ CREATE POLICY teacher_salaries_all_admin ON public.teacher_salaries
 INSERT INTO public.teacher_salaries (teacher_id, base_salary, base_tier_percent)
 SELECT id, 6000000, 30
 FROM public.users
-WHERE role IN ('teacher', 'admin')
+WHERE role IN ('teacher', 'assistant', 'marketing', 'admin')
 ON CONFLICT (teacher_id) DO NOTHING;

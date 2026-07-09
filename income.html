@@ -116,6 +116,115 @@
     box-shadow: 0 12px 20px rgba(29,107,209,.25);
   }
 
+  .admin-profit-panel,
+  .projection-panel {
+    background: var(--white);
+    border: 1px solid rgba(15,31,61,.08);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+    padding: 20px;
+  }
+
+  .admin-profit-panel {
+    border-left: 5px solid #0f766e;
+  }
+
+  .panel-title {
+    margin: 0 0 12px;
+    color: var(--navy);
+    font-family: var(--font-display);
+    font-size: 1.12rem;
+  }
+
+  .admin-profit-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 14px;
+  }
+
+  .profit-metric {
+    border: 1px solid rgba(15,31,61,.08);
+    background: linear-gradient(180deg,#fff,#f8fafc);
+    border-radius: 16px;
+    padding: 14px;
+  }
+
+  .profit-metric span {
+    display: block;
+    color: var(--ink-light);
+    font-size: .78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  .profit-metric b {
+    display: block;
+    margin-top: 7px;
+    color: var(--navy);
+    font-size: 1.25rem;
+  }
+
+  .expense-form {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1.6fr auto;
+    gap: 10px;
+    align-items: end;
+    margin-top: 18px;
+  }
+
+  .expense-list {
+    margin-top: 14px;
+    display: grid;
+    gap: 8px;
+  }
+
+  .expense-row {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1.6fr auto;
+    gap: 10px;
+    align-items: center;
+    border: 1px solid rgba(15,31,61,.07);
+    border-radius: 14px;
+    padding: 10px 12px;
+    background: #fff;
+    font-size: .88rem;
+  }
+
+  .expense-row .amount {
+    font-weight: 800;
+    color: #b91c1c;
+    text-align: right;
+  }
+
+  .btn-danger {
+    border: 1px solid rgba(220,38,38,.24);
+    background: #fff5f5;
+    color: #b91c1c;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font: inherit;
+    font-size: .82rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .projection-form {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr);
+    gap: 12px;
+    align-items: center;
+  }
+
+  .projection-result {
+    border-left: 4px solid #ec4899;
+    background: #fff7fb;
+    border-radius: 14px;
+    padding: 12px 14px;
+    color: var(--navy);
+    font-weight: 700;
+  }
+
   /* KPIs Display */
   .kpi-grid {
     display: grid;
@@ -571,6 +680,45 @@
   </div>
 
   <div id="dataBlock" style="display: none; display: flex; flex-direction: column; gap: 24px;">
+    <div class="admin-profit-panel" id="adminProfitPanel" style="display:none;">
+      <h3 class="panel-title">Tổng quan thu nhập Admin</h3>
+      <div class="admin-profit-grid">
+        <div class="profit-metric">
+          <span>Tổng doanh thu thực thu</span>
+          <b id="adminSystemRevenue">0đ</b>
+        </div>
+        <div class="profit-metric">
+          <span>Lương tất cả nhân viên</span>
+          <b id="adminStaffSalary">0đ</b>
+        </div>
+        <div class="profit-metric">
+          <span>Chi phí vận hành</span>
+          <b id="adminExpenseTotal">0đ</b>
+        </div>
+        <div class="profit-metric">
+          <span>Thu nhập Admin</span>
+          <b id="adminNetIncome">0đ</b>
+        </div>
+      </div>
+
+      <form class="expense-form" id="expenseForm" onsubmit="saveOperatingExpense(event)">
+        <div class="config-field">
+          <label>Tên chi phí</label>
+          <input class="control-input" id="expenseTitle" type="text" placeholder="VD: Tiền thuê nhà" required>
+        </div>
+        <div class="config-field">
+          <label>Số tiền</label>
+          <input class="control-input" id="expenseAmount" type="number" min="0" placeholder="VD: 5000000" required>
+        </div>
+        <div class="config-field">
+          <label>Ghi chú</label>
+          <input class="control-input" id="expenseNote" type="text" placeholder="Không bắt buộc">
+        </div>
+        <button class="btn-save" type="submit">Thêm chi phí</button>
+      </form>
+      <div class="expense-list" id="expenseList"></div>
+    </div>
+
     <!-- KPI cards -->
     <div class="kpi-grid">
       <div class="kpi-card revenue">
@@ -597,6 +745,15 @@
         <span class="kpi-label">Dự kiến khi thu đủ</span>
         <div class="kpi-value" id="kpiProjectedIncome">0đ</div>
         <span class="kpi-sub" id="kpiProjectedSub">Nếu thu đủ học phí dự kiến</span>
+      </div>
+    </div>
+
+    <div class="projection-panel" id="teacherProjectionPanel">
+      <h3 class="panel-title">Giả lập thu nhập theo doanh thu dự kiến</h3>
+      <div class="projection-form">
+        <input class="control-input" id="projectedRevenueInput" type="number" min="0" placeholder="Nhập doanh thu dự kiến">
+        <button class="btn-save" type="button" onclick="calculateCustomProjection()">Tính thử</button>
+        <div class="projection-result" id="customProjectionResult">Nhập doanh thu để xem thu nhập dự kiến.</div>
       </div>
     </div>
 
@@ -717,6 +874,7 @@
     base_salary: DEFAULT_BASE_SALARY,
     base_tier_percent: DEFAULT_BASE_PERCENT
   };
+  let lastTeacherRevenueForProjection = 0;
 
   function getSb() {
     if (window.sb) return window.sb;
@@ -1054,7 +1212,7 @@
     const { data, error } = await sb
       .from("users")
       .select("id, full_name, role")
-      .in("role", ["teacher", "admin"])
+      .in("role", ["teacher", "assistant", "marketing", "admin"])
       .order("full_name");
 
     if (error) {
@@ -1073,6 +1231,380 @@
       select.value = selectedTeacherId;
     }
   }
+
+  function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  }
+
+  function esc(value) {
+    return String(value ?? "").replace(/[&<>"']/g, char => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    }[char]));
+  }
+
+  async function fetchAllRows(buildQuery, pageSize = 1000) {
+    const rows = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await buildQuery().range(from, from + pageSize - 1);
+      if (error) throw error;
+      rows.push(...(data || []));
+      if (!data || data.length < pageSize) break;
+    }
+    return rows;
+  }
+
+  function normalizePaymentMap(payments) {
+    const paymentMap = {};
+    (payments || []).forEach(p => {
+      const studentId = p.student_id;
+      if (!studentId) return;
+      const amountPaid = Number(p.amount_paid || 0);
+      const amountDue = Number(p.amount_due || 0);
+      if (!paymentMap[studentId]) {
+        paymentMap[studentId] = { ...p, amount_paid: amountPaid, amount_due: amountDue };
+        return;
+      }
+      const existing = paymentMap[studentId];
+      existing.amount_paid = Number(existing.amount_paid || 0) + amountPaid;
+      existing.amount_due = Number(existing.amount_due || 0) + amountDue;
+      const existingLocked = existing.locked_at ? new Date(existing.locked_at).getTime() : 0;
+      const currentLocked = p.locked_at ? new Date(p.locked_at).getTime() : 0;
+      if (currentLocked > existingLocked && p.locked_snapshot) {
+        existing.locked_at = p.locked_at;
+        existing.locked_snapshot = p.locked_snapshot;
+      }
+    });
+    return paymentMap;
+  }
+
+  function buildIncomeContext({ classesData, allClassStudents, allAttendance, allPayments, chosenSchedules, courseEnrollments, coursesData }) {
+    const classesMap = {};
+    (classesData || []).forEach(c => { classesMap[c.id] = c; });
+    const coursesMap = {};
+    (coursesData || []).forEach(c => { coursesMap[c.id] = c; });
+    const attMap = {};
+    const attRowsByStudentClass = {};
+    (allAttendance || []).forEach(a => {
+      attMap[`${a.student_id}_${a.class_id}_${a.date}_${a.schedule_id || 0}`] = a.status;
+      const key = `${a.student_id}_${a.class_id}`;
+      if (!attRowsByStudentClass[key]) attRowsByStudentClass[key] = [];
+      attRowsByStudentClass[key].push(a);
+    });
+    const chosenMap = {};
+    (chosenSchedules || []).forEach(row => {
+      const key = `${row.student_id}_${row.class_id}`;
+      if (!chosenMap[key]) chosenMap[key] = new Set();
+      chosenMap[key].add(Number(row.schedule_id));
+    });
+    return {
+      classesMap,
+      coursesMap,
+      attMap,
+      attRowsByStudentClass,
+      chosenMap,
+      paymentMap: normalizePaymentMap(allPayments || []),
+      allClassStudents: allClassStudents || [],
+      courseEnrollments: courseEnrollments || [],
+    };
+  }
+
+  function getSnapshotClasses(payment) {
+    return Array.isArray(payment?.locked_snapshot?.classes) ? payment.locked_snapshot.classes : [];
+  }
+
+  function getSnapshotClass(payment, classId) {
+    return getSnapshotClasses(payment).find(item => String(item.classId || item.class_id || "") === String(classId || ""));
+  }
+
+  function getSnapshotAmount(snapClass) {
+    return Number(snapClass?.amount || snapClass?.amount_due || 0);
+  }
+
+  function calculateTeacherRevenueFromContext({ managedClassIds, managedCourseIds, context, ym, mStart, mEnd }) {
+    const teacherClassStudents = (context.allClassStudents || []).filter(cs => managedClassIds.includes(cs.class_id));
+    const activeStudentIds = [...new Set(teacherClassStudents.map(cs => cs.student_id))];
+    const studentClassExpectedMap = {};
+    const studentTotalExpectedMap = {};
+
+    (context.allClassStudents || []).forEach(cs => {
+      if (!activeStudentIds.includes(cs.student_id)) return;
+      const cls = context.classesMap[cs.class_id];
+      if (!cls) return;
+
+      const joined = cs.joined_at ? cs.joined_at.slice(0, 10) : "0000-00-00";
+      const left = cs.left_at ? cs.left_at.slice(0, 10) : "9999-99-99";
+      if (joined > mEnd || left < mStart) return;
+
+      const chosenIds = context.chosenMap[`${cs.student_id}_${cs.class_id}`];
+      const activeOccurrences = generateOccurrencesForStudent(cls.class_schedules || [], ym, chosenIds).filter(item => {
+        if (item.date > left) return false;
+        if (item.date >= joined) return true;
+        const actualStatus = attendanceStatusFor(context.attMap, cs.student_id, cs.class_id, item);
+        return actualStatus === "present" || actualStatus === "makeup";
+      });
+      const occurrenceKeys = new Set(activeOccurrences.map(item => `${item.date}_${item.schedule_id || 0}`));
+      (context.attRowsByStudentClass[`${cs.student_id}_${cs.class_id}`] || []).forEach(row => {
+        const date = String(row.date || "").slice(0, 10);
+        const status = row.status || "";
+        const scheduleId = Number(row.schedule_id || 0);
+        const key = `${date}_${scheduleId}`;
+        if (!date || occurrenceKeys.has(key) || date > left) return;
+        if (date < joined && status !== "present" && status !== "makeup") return;
+        activeOccurrences.push({ date, schedule_id: scheduleId, session_no: 0, schedule: null });
+        occurrenceKeys.add(key);
+      });
+      activeOccurrences.sort((a,b) => a.date.localeCompare(b.date) || Number(a.schedule_id || 0) - Number(b.schedule_id || 0));
+
+      let present = 0, absent = 0, makeup = 0;
+      activeOccurrences.forEach(item => {
+        const status = attendanceStatusFor(context.attMap, cs.student_id, cs.class_id, item) || "present";
+        if (status === "present") present++;
+        else if (status === "absent") absent++;
+        else if (status === "makeup") makeup++;
+      });
+
+      const p = context.paymentMap[cs.student_id];
+      let amount = 0;
+      if (p?.locked_at && getSnapshotClasses(p).length) {
+        const snapClass = getSnapshotClass(p, cs.class_id);
+        amount = snapClass ? getSnapshotAmount(snapClass) : 0;
+      } else {
+        amount = calcTuition({
+          tuition_type: cls.tuition_type,
+          tuition_fee: cls.tuition_fee,
+          makeup_fee: cls.makeup_fee,
+          present,
+          absent,
+          makeup,
+          totalSessions: activeOccurrences.length,
+        });
+      }
+
+      if (!studentClassExpectedMap[cs.student_id]) studentClassExpectedMap[cs.student_id] = {};
+      studentClassExpectedMap[cs.student_id][cs.class_id] = amount;
+      studentTotalExpectedMap[cs.student_id] = (studentTotalExpectedMap[cs.student_id] || 0) + amount;
+    });
+
+    let totalClassRevenueAllocated = 0;
+    let totalProjectedClassRevenue = 0;
+    teacherClassStudents.forEach(cs => {
+      const classExpected = studentClassExpectedMap[cs.student_id]?.[cs.class_id] || 0;
+      const totalExpected = studentTotalExpectedMap[cs.student_id] || 0;
+      const p = context.paymentMap[cs.student_id];
+      const amountPaid = Number(p?.amount_paid || 0);
+      const expectedDue = p?.locked_at && p?.locked_snapshot
+        ? Number(p.locked_snapshot.amount || p.amount_due || 0)
+        : Number(p?.amount_due || totalExpected || 0);
+      let studentClassRevenue = 0;
+      if (expectedDue > 0) studentClassRevenue = (classExpected / expectedDue) * amountPaid;
+      else if (totalExpected > 0) studentClassRevenue = (classExpected / totalExpected) * amountPaid;
+      totalClassRevenueAllocated += studentClassRevenue;
+      totalProjectedClassRevenue += classExpected;
+    });
+
+    let totalCourseRevenue = 0;
+    (context.courseEnrollments || []).forEach(row => {
+      if (!managedCourseIds.includes(row.course_id)) return;
+      const crs = context.coursesMap[row.course_id];
+      totalCourseRevenue += Number(crs?.tuition_fee || 0);
+    });
+
+    return {
+      actualRevenue: totalClassRevenueAllocated + totalCourseRevenue,
+      projectedRevenue: totalProjectedClassRevenue + totalCourseRevenue,
+    };
+  }
+
+  async function loadSalaryConfigMap(staffIds) {
+    const map = {};
+    staffIds.forEach(id => {
+      map[id] = {
+        base_salary: DEFAULT_BASE_SALARY,
+        base_tier_percent: DEFAULT_BASE_PERCENT,
+      };
+    });
+    if (isDbFallback || !staffIds.length) return map;
+    const sb = getSb();
+    const { data, error } = await sb
+      .from("teacher_salaries")
+      .select("teacher_id, base_salary, base_tier_percent")
+      .in("teacher_id", staffIds);
+    if (error) {
+      console.warn("Không tải được cấu hình lương nhân viên:", error);
+      return map;
+    }
+    (data || []).forEach(row => {
+      map[row.teacher_id] = {
+        base_salary: Number(row.base_salary || DEFAULT_BASE_SALARY),
+        base_tier_percent: Number(row.base_tier_percent || DEFAULT_BASE_PERCENT),
+      };
+    });
+    return map;
+  }
+
+  async function loadOperatingExpenses(ym) {
+    const sb = getSb();
+    const { data, error } = await sb
+      .from("operating_expenses")
+      .select("id, title, amount, note, expense_month")
+      .eq("expense_month", ymToDate(ym))
+      .order("created_at", { ascending: false });
+    if (error) {
+      if (error.code === "42P01" || error.message?.includes("operating_expenses")) {
+        document.getElementById("expenseList").innerHTML = `<div class="empty-state">Chưa có bảng chi phí. Hãy chạy SQL operating_expenses trước.</div>`;
+        return [];
+      }
+      throw error;
+    }
+    return data || [];
+  }
+
+  function renderOperatingExpenses(rows) {
+    const wrap = document.getElementById("expenseList");
+    if (!wrap) return;
+    if (!rows.length) {
+      wrap.innerHTML = `<div class="empty-state">Chưa có chi phí nào trong tháng này.</div>`;
+      return;
+    }
+    wrap.innerHTML = rows.map(row => `
+      <div class="expense-row">
+        <div><b>${esc(row.title || "Chi phí")}</b></div>
+        <div class="amount">${fmt(row.amount)}đ</div>
+        <div>${esc(row.note || "")}</div>
+        <button class="btn-danger" type="button" onclick="deleteOperatingExpense('${row.id}')">Xóa</button>
+      </div>
+    `).join("");
+  }
+
+  async function calculateAdminIncome(ym) {
+    if (viewerProfile?.role !== "admin") return;
+    const sb = getSb();
+    const mStart = ymToDate(ym);
+    const mEnd = monthEnd(ym);
+
+    try {
+      const [
+        staff,
+        classTeachers,
+        courseManagers,
+        classesData,
+        allClassStudents,
+        allAttendance,
+        allPayments,
+        chosenSchedules,
+        courseEnrollments,
+        coursesData,
+        expenses
+      ] = await Promise.all([
+        fetchAllRows(() => sb.from("users").select("id, full_name, role").in("role", ["teacher", "assistant", "marketing"])),
+        fetchAllRows(() => sb.from("class_teachers").select("teacher_id, class_id")),
+        fetchAllRows(() => sb.from("course_managers").select("teacher_id, course_id")),
+        fetchAllRows(() => sb.from("classes").select("id, class_name, tuition_fee, tuition_type, makeup_fee, class_schedules(id, session_no, weekday, start_time, end_time, effective_from)").eq("hidden", false)),
+        fetchAllRows(() => sb.from("class_students").select("class_id, student_id, joined_at, left_at")),
+        fetchAllRows(() => sb.from("attendance").select("student_id, class_id, date, status, schedule_id").gte("date", mStart).lte("date", mEnd)),
+        fetchAllRows(() => sb.from("tuition_payments").select("*").eq("month", mStart)),
+        fetchAllRows(() => sb.from("class_student_schedules").select("class_id, student_id, schedule_id")),
+        fetchAllRows(() => sb.from("course_enrollments").select("course_id, student_id, enrolled_at").gte("enrolled_at", mStart + "T00:00:00Z").lte("enrolled_at", mEnd + "T23:59:59Z")),
+        fetchAllRows(() => sb.from("courses").select("id, name, tuition_fee")),
+        loadOperatingExpenses(ym),
+      ]);
+
+      const context = buildIncomeContext({ classesData, allClassStudents, allAttendance, allPayments, chosenSchedules, courseEnrollments, coursesData });
+      const staffIds = (staff || []).map(item => item.id);
+      const salaryConfigs = await loadSalaryConfigMap(staffIds);
+      const classMapByStaff = {};
+      const courseMapByStaff = {};
+      (classTeachers || []).forEach(row => {
+        if (!classMapByStaff[row.teacher_id]) classMapByStaff[row.teacher_id] = [];
+        classMapByStaff[row.teacher_id].push(row.class_id);
+      });
+      (courseManagers || []).forEach(row => {
+        if (!courseMapByStaff[row.teacher_id]) courseMapByStaff[row.teacher_id] = [];
+        courseMapByStaff[row.teacher_id].push(row.course_id);
+      });
+
+      const systemRevenue = (allPayments || []).reduce((sum, item) => sum + Number(item.amount_paid || 0), 0);
+      let staffSalaryTotal = 0;
+      (staff || []).forEach(person => {
+        const cfg = salaryConfigs[person.id] || { base_salary: DEFAULT_BASE_SALARY, base_tier_percent: DEFAULT_BASE_PERCENT };
+        const revenue = calculateTeacherRevenueFromContext({
+          managedClassIds: classMapByStaff[person.id] || [],
+          managedCourseIds: courseMapByStaff[person.id] || [],
+          context,
+          ym,
+          mStart,
+          mEnd,
+        }).actualRevenue;
+        const salary = calculateSalaryBreakdown(revenue, Number(cfg.base_salary || 0), Number(cfg.base_tier_percent || 0));
+        staffSalaryTotal += Number(salary.totalIncome || 0);
+      });
+
+      const expenseTotal = (expenses || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+      const netIncome = systemRevenue - staffSalaryTotal - expenseTotal;
+      setText("adminSystemRevenue", fmt(systemRevenue) + "đ");
+      setText("adminStaffSalary", fmt(staffSalaryTotal) + "đ");
+      setText("adminExpenseTotal", fmt(expenseTotal) + "đ");
+      setText("adminNetIncome", fmt(netIncome) + "đ");
+      renderOperatingExpenses(expenses);
+    } catch (err) {
+      console.error("Lỗi tính thu nhập admin:", err);
+      document.getElementById("expenseList").innerHTML = `<div class="empty-state">Không tải được dữ liệu thu nhập admin: ${err.message}</div>`;
+    }
+  }
+
+  async function saveOperatingExpense(event) {
+    event.preventDefault();
+    if (viewerProfile?.role !== "admin") return;
+    const title = document.getElementById("expenseTitle").value.trim();
+    const amount = Number(document.getElementById("expenseAmount").value || 0);
+    const note = document.getElementById("expenseNote").value.trim();
+    const ym = document.getElementById("monthPicker").value;
+    if (!title || !amount || amount < 0) {
+      alert("Vui lòng nhập tên chi phí và số tiền hợp lệ.");
+      return;
+    }
+    const sb = getSb();
+    const { error } = await sb.from("operating_expenses").insert({
+      expense_month: ymToDate(ym),
+      title,
+      amount,
+      note,
+      created_by: currentUser.id,
+    });
+    if (error) return alert("Lỗi lưu chi phí: " + error.message);
+    event.target.reset();
+    await calculateAndRender();
+  }
+
+  async function deleteOperatingExpense(id) {
+    if (viewerProfile?.role !== "admin") return;
+    if (!confirm("Xóa khoản chi phí này?")) return;
+    const sb = getSb();
+    const { error } = await sb.from("operating_expenses").delete().eq("id", id);
+    if (error) return alert("Lỗi xóa chi phí: " + error.message);
+    await calculateAndRender();
+  }
+
+  function calculateCustomProjection() {
+    const input = document.getElementById("projectedRevenueInput");
+    const result = document.getElementById("customProjectionResult");
+    const value = Number(input?.value || 0);
+    if (!value || value < 0) {
+      result.textContent = "Nhập doanh thu dự kiến hợp lệ để tính thử.";
+      return;
+    }
+    const details = calculateSalaryBreakdown(value, teacherSalaryConfig.base_salary, teacherSalaryConfig.base_tier_percent);
+    result.textContent = `Nếu doanh thu đạt ${fmt(value)}đ: thu nhập dự kiến ${fmt(details.totalIncome)}đ (lương cứng ${fmt(details.baseSalary)}đ + thưởng ${fmt(details.totalBonus)}đ).`;
+  }
+
+  window.saveOperatingExpense = saveOperatingExpense;
+  window.deleteOperatingExpense = deleteOperatingExpense;
+  window.calculateCustomProjection = calculateCustomProjection;
 
   // Trigger calculations and rendering
   async function calculateAndRender() {
@@ -1367,6 +1899,7 @@
       // Calculate progressive breakdown
       const salaryDetails = calculateSalaryBreakdown(totalRevenue, teacherSalaryConfig.base_salary, teacherSalaryConfig.base_tier_percent);
       const projectedSalaryDetails = calculateSalaryBreakdown(totalProjectedRevenue, teacherSalaryConfig.base_salary, teacherSalaryConfig.base_tier_percent);
+      lastTeacherRevenueForProjection = totalRevenue;
 
       // Render KPIs
       document.getElementById("kpiRevenue").textContent = fmt(totalRevenue) + "đ";
@@ -1377,6 +1910,9 @@
       
       document.getElementById("kpiRevenueSub").innerHTML = `Lớp ghép: ${fmt(totalClassRevenueAllocated)}đ | Khóa: ${fmt(totalCourseRevenue)}đ`;
       document.getElementById("kpiProjectedSub").innerHTML = `Doanh thu đủ: ${fmt(totalProjectedRevenue)}đ | Thưởng: ${fmt(projectedSalaryDetails.totalBonus)}đ`;
+      const projectedInput = document.getElementById("projectedRevenueInput");
+      if (projectedInput && !projectedInput.value) projectedInput.value = Math.round(totalProjectedRevenue || totalRevenue || 0);
+      calculateCustomProjection();
       
       // Render breakdown table
       const breakdownTbody = document.getElementById("bonusBreakdownBody");
@@ -1392,6 +1928,7 @@
 
       // Render milestones & progress bar
       renderMilestones(totalRevenue, salaryDetails.breakdown);
+      await calculateAdminIncome(ym);
 
       loader.style.display = "none";
       dataBlock.style.display = "flex";
@@ -1507,6 +2044,7 @@
 
     viewerProfile = profile;
     await checkDatabaseSupport();
+    document.getElementById("adminProfitPanel").style.display = profile.role === "admin" ? "block" : "none";
 
     if (profile.role === "admin") {
       document.getElementById("adminConfigCard").style.display = isDbFallback ? "none" : "block";
