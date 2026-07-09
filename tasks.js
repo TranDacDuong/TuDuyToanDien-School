@@ -135,6 +135,13 @@
       || task.metadata?.requires_result === true;
   }
 
+  function canDeleteAssignment(item) {
+    return S.profile?.role === "admin"
+      && !String(item.id || "").startsWith("schedule-fallback:")
+      && isManualAssignedTask(item)
+      && !item.task?.auto_generated;
+  }
+
   function progressPercent(item) {
     const progress = item.task?.progress;
     return pct(progress?.current || 0, progress?.total || 0);
@@ -363,6 +370,9 @@
     const completed = effectiveStatus(item) === "completed";
     const overdue = isOverdue(item);
     const state = statusInfo(item);
+    const deleteButton = canDeleteAssignment(item)
+      ? `<button class="task-btn danger" type="button" data-delete-task="${esc(item.id)}" title="Xóa công việc này">Xóa</button>`
+      : "";
     return `
       <article class="task-card ${esc(task.priority)} ${completed ? "completed" : ""}" data-task="${item.id}">
         <div>
@@ -385,6 +395,7 @@
         <div class="task-actions">
           <span class="task-status ${state.className}"><span>${state.icon}</span><span>${state.label}</span></span>
           ${task.action_url ? `<button class="task-btn primary" type="button" data-action-url="${esc(task.action_url)}">Mở</button>` : ""}
+          ${deleteButton}
         </div>
       </article>`;
   }
@@ -893,6 +904,31 @@
     await loadTasks();
   }
 
+  async function deleteManualTaskAssignment(id) {
+    const item = S.assignments.find(row => String(row.id) === String(id));
+    if (!item || !canDeleteAssignment(item)) return;
+    const assigneeName = item.assignee?.full_name || item.assignee?.email || "người nhận này";
+    const ok = confirm(`Xóa công việc "${item.task?.title || "đã giao"}" của ${assigneeName}?`);
+    if (!ok) return;
+
+    const taskId = item.task_id || item.task?.id || null;
+    const { error } = await sb.from("task_assignments").delete().eq("id", id);
+    if (error) return alert(error.message);
+
+    if (taskId) {
+      const { count } = await sb
+        .from("task_assignments")
+        .select("id", { count: "exact", head: true })
+        .eq("task_id", taskId);
+      if (!count) {
+        await sb.from("daily_tasks").delete().eq("id", taskId).eq("source_type", "manual");
+      }
+    }
+
+    toast("Đã xóa công việc.");
+    await loadTasks();
+  }
+
   function oldStoredAssignments() {
     const today = localDate();
     return S.assignments.filter(item =>
@@ -1137,6 +1173,7 @@
       if (!target) return;
       if (target.dataset.cancelSubmit) return cancelTaskSubmission(target.dataset.cancelSubmit);
       if (target.dataset.submitResult) return submitTaskResult(target.dataset.submitResult);
+      if (target.dataset.deleteTask) return deleteManualTaskAssignment(target.dataset.deleteTask);
       if (target.dataset.actionUrl) openAction(target.dataset.actionUrl);
     });
     E.list.addEventListener("input", event => {

@@ -24,6 +24,8 @@
     .task-badge.urgent{background:#fee2e2;color:#b91c1c}.task-badge.important{background:#fff7ed;color:#c2410c}.task-badge.overdue{background:#7f1d1d;color:#fff}
     .task-description{margin:7px 0;color:var(--ink-mid);font-size:.82rem;line-height:1.5}.task-meta{display:flex;gap:12px;flex-wrap:wrap;color:var(--ink-light);font-size:.74rem}
     .task-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap}.task-status{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:900;white-space:nowrap}.task-status.done{color:#15803d}.task-status.todo{color:#dc2626}.task-status.reminder{color:#64748b}.task-btn{border:1px solid var(--border);background:#fff;color:var(--navy);padding:8px 10px;border-radius:7px;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer}
+    .task-btn.danger{border-color:rgba(220,38,38,.28);color:#b91c1c;background:#fff5f5}.task-btn.danger:hover{background:#fee2e2}
+    .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
     .task-btn.primary{background:var(--navy);color:#fff;border-color:var(--navy)}.task-btn.success{background:#15803d;color:#fff;border-color:#15803d}
     .task-empty{background:#fff;border:1px dashed var(--border);border-radius:8px;padding:48px 20px;text-align:center;color:var(--ink-light)}
     .task-modal{position:fixed;inset:0;z-index:900;background:rgba(15,31,61,.55);display:none;align-items:center;justify-content:center;padding:16px}.task-modal.show{display:flex}
@@ -43,10 +45,10 @@
     <header class="task-head">
       <div><h1>Công việc</h1><p id="taskGreeting">Công việc học tập và vận hành cần xử lý.</p></div>
       <div class="task-head-actions">
-        <button class="icon-command" type="button" id="taskCreateButton" title="Giao việc" aria-label="Giao việc" style="display:none">＋</button>
-        <button class="icon-command" type="button" id="taskDeleteOldButton" title="Xóa công việc cũ" aria-label="Xóa công việc cũ">🗑</button>
-        <button class="icon-command" type="button" id="taskSettingsButton" title="Cài đặt thông báo" aria-label="Cài đặt thông báo">⚙</button>
-        <button class="icon-command" type="button" id="taskRefreshButton" title="Làm mới" aria-label="Làm mới">↻</button>
+        <button class="icon-command" type="button" id="taskCreateButton" title="Giao việc" aria-label="Giao việc" data-testid="task-create-button" style="display:none"><span aria-hidden="true">＋</span><span class="sr-only">Giao việc</span></button>
+        <button class="icon-command" type="button" id="taskDeleteOldButton" title="Xóa công việc cũ" aria-label="Xóa công việc cũ" data-testid="task-delete-old-button"><span aria-hidden="true">🗑</span><span class="sr-only">Xóa công việc cũ</span></button>
+        <button class="icon-command" type="button" id="taskSettingsButton" title="Cài đặt thông báo" aria-label="Cài đặt thông báo" data-testid="task-settings-button"><span aria-hidden="true">⚙</span><span class="sr-only">Cài đặt thông báo</span></button>
+        <button class="icon-command" type="button" id="taskRefreshButton" title="Làm mới" aria-label="Làm mới" data-testid="task-refresh-button"><span aria-hidden="true">↻</span><span class="sr-only">Làm mới</span></button>
       </div>
     </header>
 
@@ -112,6 +114,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js"></script>
   <script src="notification_helper.js"></script>
-  <script src="tasks.js?v=20260709-staff-warning1"></script>
+  <script src="tasks.js?v=20260709-manual-delete1"></script>
 </body>
 </html>
