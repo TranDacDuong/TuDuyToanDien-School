@@ -10,6 +10,8 @@
     selectedUserId: "all",
     preferences: null,
     manualAssigneeIds: new Set(),
+    taskTemplates: [],
+    editingTemplateId: null,
   };
 
   const E = {};
@@ -729,18 +731,67 @@
       : "";
     const overview = S.viewMode === "month" ? renderMonthOverview(rows) : "";
     if (S.viewMode === "month" && rows.length) {
-      E.list.innerHTML = centerDashboard + renderMonthDashboard(rows);
+      E.list.innerHTML = renderAdminTemplatePanel() + centerDashboard + renderMonthDashboard(rows);
       resizeResultInputs();
       return;
     }
     if (!rows.length) {
-      E.list.innerHTML = `<div class="task-empty">Không có công việc trong ${esc(emptyLabel())}.</div>`;
+      E.list.innerHTML = renderAdminTemplatePanel() + `<div class="task-empty">Không có công việc trong ${esc(emptyLabel())}.</div>`;
       return;
     }
     E.list.innerHTML = rows.length
-      ? centerDashboard + overview + renderGrouped(rows)
+      ? renderAdminTemplatePanel() + centerDashboard + overview + renderGrouped(rows)
       : `<div class="task-empty">Không có công việc trong ngày ${esc(formatShortDate(S.selectedDate || localDate()))}.</div>`;
     resizeResultInputs();
+  }
+
+  function weekdayLabel(value) {
+    const labels = { 1: "Thứ 2", 2: "Thứ 3", 3: "Thứ 4", 4: "Thứ 5", 5: "Thứ 6", 6: "Thứ 7", 7: "Chủ nhật" };
+    return labels[Number(value)] || "Hằng tuần";
+  }
+
+  function templateAssigneeNames(template) {
+    const ids = new Set((template.assignee_ids || []).map(String));
+    const users = (S.users || []).filter(user => ids.has(String(user.id)));
+    if (!users.length) return `${ids.size || 0} người nhận`;
+    const names = users.slice(0, 3).map(user => user.full_name || user.email || "Nhân viên");
+    const more = users.length > 3 ? ` +${users.length - 3}` : "";
+    return names.join(", ") + more;
+  }
+
+  function renderAdminTemplatePanel() {
+    if (S.profile?.role !== "admin") return "";
+    const templates = (S.taskTemplates || []).filter(template => !isDeprecatedSocialTask(template));
+    const rows = templates.length ? templates.map(template => {
+      const requirements = Array.isArray(template.requirements) ? template.requirements : [];
+      const recurrence = template.recurrence === "weekly" ? `Hằng tuần • ${weekdayLabel(template.weekday)}` : "Hằng ngày";
+      return `
+        <div class="task-template-row">
+          <div>
+            <div class="task-template-title">${esc(template.title)}</div>
+            <div class="task-template-meta">${esc(recurrence)} • Bắt đầu ${esc(formatShortDate(template.start_on || localDate()))} • ${esc(templateAssigneeNames(template))}</div>
+            ${template.description ? `<div class="task-template-desc">${esc(template.description)}</div>` : ""}
+            <div class="task-template-meta">${requirements.length ? `${requirements.length} mục cần nộp` : "Không có mục nộp kết quả"}${template.action_url ? ` • ${esc(template.action_url)}` : ""}</div>
+          </div>
+          <div class="task-template-actions">
+            <button class="task-btn" type="button" data-edit-template="${esc(template.id)}">Sửa</button>
+            <button class="task-btn danger" type="button" data-delete-template="${esc(template.id)}">Xóa</button>
+          </div>
+        </div>
+      `;
+    }).join("") : '<div class="task-empty compact">Chưa có công việc tự động hằng ngày/hằng tuần nào.</div>';
+    return `
+      <section class="task-template-panel">
+        <div class="task-template-head">
+          <div>
+            <h2>Công việc tự động đã tạo</h2>
+            <p>Danh sách các công việc hằng ngày/hằng tuần do admin tạo. Có thể sửa hoặc xóa từng mẫu.</p>
+          </div>
+          <button class="task-btn primary" type="button" data-open-template-create="true">Tạo công việc tự động</button>
+        </div>
+        <div class="task-template-list">${rows}</div>
+      </section>
+    `;
   }
 
   function syncDatebar() {
@@ -775,7 +826,7 @@
 
     const staffRes = await sb.from("users")
       .select("id,full_name,email,role")
-      .in("role", [...INTERNAL_ROLES])
+      .in("role", ["admin", "teacher", "assistant"])
       .order("full_name");
     if (staffRes.error) loadErrors.push({ source: "users:internal_roles", error: staffRes.error });
     mergeUsers(staffRes.data);
@@ -1041,9 +1092,10 @@
       && !isDeprecatedSocialTask(item)
     );
     await enrichTaskResultNotes(assignments);
-    const scheduleFallbacks = await loadScheduleFallbackTasks(assignments);
-    S.assignments = [...assignments, ...scheduleFallbacks];
+    const scheduleFallbacks = (await loadScheduleFallbackTasks(assignments)).filter(item => !isDeprecatedSocialTask(item));
+    S.assignments = [...assignments, ...scheduleFallbacks].filter(item => !isDeprecatedSocialTask(item));
     if (S.profile.role === "admin") await loadInternalUsers();
+    await loadTaskTemplates();
     await enrichTaskProgress(S.assignments);
     await syncProgressCompletedAssignments();
     render();
@@ -1363,14 +1415,95 @@
     renderPickedAssignees();
   }
 
-  async function openCreateModal() {
-    await loadInternalUsers();
-    S.manualAssigneeIds = new Set();
+  function setCreateModalMode(mode) {
+    const isEdit = mode === "edit";
+    const title = byId("taskCreateModalTitle");
+    const save = byId("manualTaskSave");
+    if (title) title.textContent = isEdit ? "Sửa công việc tự động" : "Giao việc";
+    if (save) save.textContent = isEdit ? "Lưu thay đổi" : "Giao việc";
+  }
+
+  function fillManualTaskForm(template = null) {
+    byId("manualTaskTitle").value = template?.title || "";
+    byId("manualTaskDescription").value = template?.description || "";
+    byId("manualTaskPriority").value = template?.priority || "normal";
+    byId("manualTaskAvailableOn").value = template?.start_on || localDate();
+    byId("manualTaskActionUrl").value = template?.action_url || "";
+    byId("manualTaskRecurrence").value = template?.recurrence || "once";
+    byId("manualTaskWeekday").value = String(template?.weekday || weekdayOf(localDate()));
+    const requirements = Array.isArray(template?.requirements) ? template.requirements : [];
+    byId("manualTaskRequirements").value = requirements.map(req => req.title || req.name || "").filter(Boolean).join("\n");
+    S.manualAssigneeIds = new Set((template?.assignee_ids || []).map(String));
     if (byId("manualTaskAssigneeSearch")) byId("manualTaskAssigneeSearch").value = "";
-    if (byId("manualTaskAvailableOn")) byId("manualTaskAvailableOn").value = localDate();
+    if (byId("manualTaskAssigneeSelect")) byId("manualTaskAssigneeSelect").value = "";
+  }
+
+  async function openCreateModal(defaultRecurrence = "once") {
+    await loadInternalUsers();
+    S.editingTemplateId = null;
+    setCreateModalMode("create");
+    fillManualTaskForm(null);
+    if (byId("manualTaskRecurrence")) byId("manualTaskRecurrence").value = defaultRecurrence;
     renderAssigneeSelect();
     renderAssignees();
     openModal("taskCreateModal");
+  }
+
+  async function openEditTemplateModal(templateId) {
+    const template = (S.taskTemplates || []).find(item => String(item.id) === String(templateId));
+    if (!template) return alert("Không tìm thấy công việc tự động cần sửa.");
+    await loadInternalUsers();
+    S.editingTemplateId = template.id;
+    setCreateModalMode("edit");
+    fillManualTaskForm(template);
+    renderAssigneeSelect();
+    renderAssignees();
+    openModal("taskCreateModal");
+  }
+
+  async function loadTaskTemplates() {
+    if (S.profile?.role !== "admin") {
+      S.taskTemplates = [];
+      return;
+    }
+    const { data, error } = await sb
+      .from("task_templates")
+      .select("*")
+      .eq("active", true)
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.warn("Không tải được danh sách công việc tự động:", error);
+      S.taskTemplates = [];
+      return;
+    }
+    S.taskTemplates = (data || []).filter(template => !isDeprecatedSocialTask(template));
+  }
+
+  async function deleteTemplateFutureGeneratedTasks(templateId) {
+    const today = localDate();
+    const { data: tasks } = await sb
+      .from("daily_tasks")
+      .select("id")
+      .eq("source_type", "task_template")
+      .eq("source_id", String(templateId))
+      .gte("available_on", today);
+    const ids = (tasks || []).map(item => item.id).filter(Boolean);
+    if (ids.length) {
+      await sb.from("task_events").delete().in("task_id", ids);
+      await sb.from("task_assignments").delete().in("task_id", ids);
+      await sb.from("daily_tasks").delete().in("id", ids);
+    }
+  }
+
+  async function deleteTaskTemplate(templateId) {
+    const template = (S.taskTemplates || []).find(item => String(item.id) === String(templateId));
+    if (!template) return;
+    if (!confirm(`Xóa công việc tự động "${template.title}"?\n\nCác công việc đã sinh trong tương lai cũng sẽ được xóa.`)) return;
+    await deleteTemplateFutureGeneratedTasks(templateId);
+    const { error } = await sb.from("task_templates").delete().eq("id", templateId);
+    if (error) return alert(error.message);
+    toast("Đã xóa công việc tự động.");
+    await loadTasks();
   }
 
   async function saveManualTask() {
@@ -1391,6 +1524,38 @@
       .map(line => line.trim())
       .filter(Boolean)
       .map((title, index) => ({ key: `req_${index + 1}`, title }));
+    if (S.editingTemplateId) {
+      if (!["daily", "weekly"].includes(recurrence)) {
+        return alert("Chỉ công việc hằng ngày/hằng tuần mới nằm trong danh sách công việc tự động để sửa.");
+      }
+      const payload = {
+        title,
+        description: (byId("manualTaskDescription")?.value || "").trim(),
+        priority: byId("manualTaskPriority")?.value || "normal",
+        recurrence,
+        weekday: recurrence === "weekly" ? weekday : null,
+        start_on: availableOn,
+        action_url: (byId("manualTaskActionUrl")?.value || "").trim() || null,
+        requirements,
+        assignee_ids: userIds,
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await sb.from("task_templates").update(payload).eq("id", S.editingTemplateId);
+      if (error) return alert(error.message);
+      await deleteTemplateFutureGeneratedTasks(S.editingTemplateId);
+      const { error: materializeError } = await sb.rpc("materialize_admin_task_templates", {
+        p_from: availableOn,
+        p_to: addDays(availableOn, recurrence === "weekly" ? 35 : 14),
+      });
+      if (materializeError && !isMissingRpcError(materializeError)) console.warn("Task template materialize:", materializeError);
+      closeModal("taskCreateModal");
+      S.editingTemplateId = null;
+      fillManualTaskForm(null);
+      renderAssignees();
+      toast("Đã cập nhật công việc tự động.");
+      await loadTasks();
+      return;
+    }
     const { data: taskId, error } = await sb.rpc("create_manual_task", {
       p_title: title,
       p_description: (byId("manualTaskDescription")?.value || "").trim(),
@@ -1423,6 +1588,8 @@
       if (input) input.value = "";
     });
     if (byId("manualTaskRecurrence")) byId("manualTaskRecurrence").value = "once";
+    S.editingTemplateId = null;
+    setCreateModalMode("create");
     S.manualAssigneeIds = new Set();
     if (byId("manualTaskAssigneeSearch")) byId("manualTaskAssigneeSearch").value = "";
     if (byId("manualTaskAssigneeSelect")) byId("manualTaskAssigneeSelect").value = "";
@@ -1487,6 +1654,9 @@
     E.list.addEventListener("click", event => {
       const target = event.target.closest("button");
       if (!target) return;
+      if (target.dataset.openTemplateCreate) return openCreateModal("daily");
+      if (target.dataset.editTemplate) return openEditTemplateModal(target.dataset.editTemplate);
+      if (target.dataset.deleteTemplate) return deleteTaskTemplate(target.dataset.deleteTemplate);
       if (target.dataset.cancelSubmit) return cancelTaskSubmission(target.dataset.cancelSubmit);
       if (target.dataset.completeRequirement) return completeRequirement(target.dataset.completeRequirement, target.dataset.requirementKey);
       if (target.dataset.submitResult) return submitTaskResult(target.dataset.submitResult);
