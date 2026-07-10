@@ -19,7 +19,11 @@ BEGIN
     'classes',
     'class_schedules',
     'class_teachers',
-    'class_students'
+    'class_students',
+    'conversations',
+    'conversation_members',
+    'messages',
+    'notifications'
   ]
   LOOP
     IF to_regclass('public.' || table_name) IS NOT NULL
@@ -35,3 +39,8 @@ BEGIN
     END IF;
   END LOOP;
 END $$;
+
+ALTER TABLE IF EXISTS public.conversations REPLICA IDENTITY FULL;
+ALTER TABLE IF EXISTS public.conversation_members REPLICA IDENTITY FULL;
+ALTER TABLE IF EXISTS public.messages REPLICA IDENTITY FULL;
+ALTER TABLE IF EXISTS public.notifications REPLICA IDENTITY FULL;

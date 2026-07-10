@@ -539,6 +539,7 @@ let userSearchToken = 0;
 let selectedUserFromQuery = null;
 let messageChannel = null;
 let notificationChannel = null;
+let conversationListChannel = null;
 let presenceChannel = null;
 let presencePingInterval = null;
 let activePresenceIds = new Set();
@@ -546,6 +547,7 @@ let friendsLoadToken = 0;
 let loadedMessages = [];
 let isLoadingOlderMessages = false;
 let hasOlderMessages = true;
+let friendsReloadTimer = null;
 const MESSAGE_PAGE_SIZE = 10;
 const queryParams = new URLSearchParams(location.search);
 const isTrayMode = queryParams.get("tray") === "1";
@@ -585,6 +587,14 @@ async function createNotification(userId, type, message, refId) {
   });
 }
 
+function scheduleFriendsReload(delay = 180) {
+  if (!currentUser) return;
+  clearTimeout(friendsReloadTimer);
+  friendsReloadTimer = setTimeout(() => {
+    loadFriends().catch(console.warn);
+  }, delay);
+}
+
 async function init() {
   if (isTrayMode) {
     document.documentElement.classList.add("tray-mode");
@@ -610,6 +620,7 @@ async function init() {
 
   subscribePresence();
   subscribeNotificationChanges();
+  subscribeConversationListChanges();
   if (isPopupMode && selectedUserFromQuery === MINDUP_BOT_ID) {
     selectedUserFromQuery = null;
     await openConversation(MINDUP_BOT_ID, "MindUp - Tư Duy Toàn Diện", "favicon.png", "bot");
@@ -1376,12 +1387,48 @@ function subscribeConversationMessages(conversationId) {
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "messages", filter: "conversation_id=eq." + conversationId },
-      async () => {
-        await loadMessages();
-        await loadFriends();
+      async (payload) => {
+        handleRealtimeMessagePayload(payload);
       }
     )
     .subscribe();
+}
+
+async function handleRealtimeMessagePayload(payload) {
+  if (!currentConversationId) return;
+  const wrap = document.getElementById("messageList");
+  const wasNearBottom = wrap.scrollHeight - wrap.clientHeight - wrap.scrollTop < 96;
+  const row = payload?.new || payload?.old || null;
+  if (!row || String(row.conversation_id || "") !== String(currentConversationId)) return;
+
+  if (payload.eventType === "DELETE") {
+    loadedMessages = loadedMessages.filter(item => item.id !== row.id);
+  } else if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+    const next = {
+      id: row.id,
+      content: row.content,
+      created_at: row.created_at,
+      sender_id: row.sender_id,
+      real_sender_id: row.real_sender_id,
+    };
+    const byId = new Map(loadedMessages.map(item => [item.id, item]));
+    byId.set(next.id, { ...(byId.get(next.id) || {}), ...next });
+    loadedMessages = Array.from(byId.values()).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  } else {
+    await loadMessages({ scrollToBottom: wasNearBottom });
+    scheduleFriendsReload();
+    return;
+  }
+
+  if (!loadedMessages.length) {
+    wrap.innerHTML = '<div class="empty"><strong>Chưa có tin nhắn nào</strong>Hãy gửi lời chào đầu tiên để bắt đầu cuộc trò chuyện.</div>';
+  } else {
+    renderLoadedMessages();
+    if (wasNearBottom || payload.eventType === "INSERT") {
+      wrap.scrollTop = wrap.scrollHeight;
+    }
+  }
+  scheduleFriendsReload();
 }
 
 function subscribeNotificationChanges() {
@@ -1395,10 +1442,21 @@ function subscribeNotificationChanges() {
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "notifications", filter: "user_id=eq." + currentUser.id },
-      async () => {
-        await loadFriends();
-      }
+      () => scheduleFriendsReload()
     )
+    .subscribe();
+}
+
+function subscribeConversationListChanges() {
+  if (conversationListChannel) {
+    sb.removeChannel(conversationListChannel);
+    conversationListChannel = null;
+  }
+  if (!currentUser) return;
+  conversationListChannel = sb
+    .channel("message-list:" + currentUser.id)
+    .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => scheduleFriendsReload())
+    .on("postgres_changes", { event: "*", schema: "public", table: "conversation_members", filter: "user_id=eq." + currentUser.id }, () => scheduleFriendsReload())
     .subscribe();
 }
 
@@ -1701,8 +1759,10 @@ async function uploadChatImage(file, caption) {
 window.addEventListener("beforeunload", () => {
   if (messageChannel) sb.removeChannel(messageChannel);
   if (notificationChannel) sb.removeChannel(notificationChannel);
+  if (conversationListChannel) sb.removeChannel(conversationListChannel);
   if (presenceChannel) sb.removeChannel(presenceChannel);
   if (presencePingInterval) clearInterval(presencePingInterval);
+  if (friendsReloadTimer) clearTimeout(friendsReloadTimer);
 });
 
 document.getElementById("messageInput").addEventListener("keydown", function(event) {
