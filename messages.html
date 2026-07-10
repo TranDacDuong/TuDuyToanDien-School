@@ -656,7 +656,8 @@ function makeConversationListItem(user, options = {}) {
     users: {
       full_name: user?.full_name || options.full_name || "Người dùng",
       avatar_url: user?.avatar_url || options.avatar_url || "default-avatar.png",
-      role: user?.role || options.role || ""
+      role: user?.role || options.role || "",
+      birth_year: user?.birth_year || options.birth_year || null
     },
     conversationId: options.conversationId || null,
     preview: options.preview || "",
@@ -666,6 +667,7 @@ function makeConversationListItem(user, options = {}) {
     isSearchResult: Boolean(options.isSearchResult),
     isLearningThread: Boolean(options.isLearningThread),
     isMindUpTeacherThread: Boolean(options.isMindUpTeacherThread),
+    isOfficialMindUpChannel: Boolean(options.isOfficialMindUpChannel),
     studentId: options.studentId || null,
     studentName: options.studentName || "",
     teacherId: options.teacherId || null,
@@ -683,10 +685,11 @@ async function fetchUsersByIds(userIds) {
 
   const { data, error } = await sb
     .from("users")
-    .select("id, full_name, avatar_url, role")
+    .select("id, full_name, avatar_url, role, birth_year")
     .in("id", ids);
 
   if (error) throw error;
+  await prefetchUserContextProfiles(data || []);
   return new Map((data || []).map(user => [user.id, user]));
 }
 
@@ -879,9 +882,10 @@ async function loadFriends() {
     const conversation = conversationByUserId.get(userId);
     const user = userById.get(userId) || friendRow?.users || { id: userId };
     const lastMessage = conversation ? lastMessageMap.get(conversation.id) : null;
+    const BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
+    const isOfficialMindUpChannel = String(conversation?.direct_key || "").split("_").includes(BOT_ID);
     let prefix = "";
     if (lastMessage) {
-      const BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
       if (lastMessage.sender_id === currentUser.id || lastMessage.real_sender_id === currentUser.id) {
         prefix = "Bạn: ";
       } else if (lastMessage.sender_id === BOT_ID) {
@@ -897,7 +901,8 @@ async function loadFriends() {
       preview,
       lastActivity: lastMessage?.created_at || conversation?.created_at || null,
       unreadCount: unreadMap.get(userId) || 0,
-      isFriend: friendById.has(userId)
+      isFriend: friendById.has(userId),
+      isOfficialMindUpChannel
     });
   });
 
@@ -1460,12 +1465,14 @@ function renderLoadedMessages() {
   wrap.innerHTML = loadedMessages.map(item => {
     const isMine = item.sender_id === currentUser.id || item.real_sender_id === currentUser.id;
     const isBot = item.sender_id === BOT_ID;
-    const realSenderId = item.real_sender_id;
-    const botLabel = isBot ? `<div class="bot-msg-label">${esc(getMindUpDisplaySender(realSenderId))}</div>` : '';
+    const displaySenderId = isBot ? item.real_sender_id : (!isMine ? item.sender_id : null);
+    const displaySenderProfile = displaySenderId ? _realSenderProfiles.get(displaySenderId) : null;
+    const shouldShowSenderLabel = isBot || (displaySenderProfile && isStudentOrParentRole(displaySenderProfile.role));
+    const senderLabel = shouldShowSenderLabel ? `<div class="bot-msg-label">${esc(getMindUpDisplaySender(displaySenderId))}</div>` : '';
     return `
       <div class="message-row ${isMine ? 'mine' : ''}">
         <div class="bubble ${isBot ? 'bot-bubble' : ''}">
-          ${botLabel}
+          ${senderLabel}
           ${renderMessageBody(item.content)}
           <div class="bubble-time">${formatTime(item.created_at)}</div>
         </div>
@@ -1838,6 +1845,9 @@ function escapeJs(value) {
 const MINDUP_BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
 const _realSenderNames = new Map();
 const _realSenderProfiles = new Map();
+const _studentGradeLabels = new Map();
+const _parentChildrenLabels = new Map();
+const _senderContextLoaded = new Set();
 
 function isMindUpStaffRole(role) {
   return ['admin','teacher','assistant','marketing'].includes(String(role || ''));
@@ -1851,9 +1861,27 @@ function shouldRouteToMindUpOfficial(targetRole) {
   return isStudentOrParentRole(currentProfile?.role) && isMindUpStaffRole(targetRole);
 }
 
-function formatStudentSenderLabel(profile) {
+function formatStudentNameWithContext(profile) {
   const name = profile?.full_name || "Học sinh";
-  return `Học sinh ${name}${profile?.birth_year ? ` ${profile.birth_year}` : ""}`;
+  const birthYear = profile?.birth_year ? ` ${profile.birth_year}` : "";
+  const gradeLabel = _studentGradeLabels.get(profile?.id);
+  return `${name}${birthYear}${gradeLabel ? ` • ${gradeLabel}` : ""}`;
+}
+
+function formatStudentSenderLabel(profile) {
+  return `Học sinh ${formatStudentNameWithContext(profile)}`;
+}
+
+function formatParentSenderLabel(profile) {
+  const name = profile?.full_name || "Phụ huynh";
+  const children = _parentChildrenLabels.get(profile?.id) || [];
+  return children.length ? `${name} • PH của ${children.join(", ")}` : name;
+}
+
+function getOfficialAudienceDisplayName(user) {
+  if (user?.role === "student") return formatStudentSenderLabel(user);
+  if (user?.role === "parent") return formatParentSenderLabel(user);
+  return user?.full_name || "Người dùng";
 }
 
 function getMindUpDisplaySender(realSenderId) {
@@ -1862,12 +1890,120 @@ function getMindUpDisplaySender(realSenderId) {
     return "🤖 MINDUP - TƯ DUY TOÀN DIỆN";
   }
   if (profile.role === "student") return formatStudentSenderLabel(profile);
-  if (profile.role === "parent") return profile.full_name || "Phụ huynh";
+  if (profile.role === "parent") return formatParentSenderLabel(profile);
   return profile.full_name || "Người gửi";
 }
 
+function getUniqueGradeLabel(grades) {
+  const names = [...new Set((grades || []).map(name => String(name || "").trim()).filter(Boolean))];
+  if (!names.length) return "";
+  return names
+    .map(name => /^khối\s+/i.test(name) ? name : `Khối ${name}`)
+    .join(", ");
+}
+
+async function prefetchUserContextProfiles(profiles) {
+  const relevantProfiles = (profiles || []).filter(profile =>
+    profile?.id &&
+    (profile.role === "student" || profile.role === "parent") &&
+    !_senderContextLoaded.has(profile.id)
+  );
+  if (!relevantProfiles.length) return;
+
+  relevantProfiles.forEach(profile => _senderContextLoaded.add(profile.id));
+
+  const directStudentIds = relevantProfiles
+    .filter(profile => profile.role === "student")
+    .map(profile => profile.id);
+  const parentIds = relevantProfiles
+    .filter(profile => profile.role === "parent")
+    .map(profile => profile.id);
+
+  const childProfilesById = new Map();
+  let parentLinks = [];
+
+  try {
+    if (parentIds.length) {
+      const { data: links, error: linkError } = await sb
+        .from("parent_students")
+        .select("parent_id, student_id")
+        .in("parent_id", parentIds)
+        .is("revoked_at", null);
+      if (linkError) throw linkError;
+      parentLinks = links || [];
+
+      const childIds = [...new Set(parentLinks.map(link => link.student_id).filter(Boolean))];
+      if (childIds.length) {
+        const { data: children, error: childError } = await sb
+          .from("users")
+          .select("id, full_name, role, birth_year")
+          .in("id", childIds);
+        if (childError) throw childError;
+        (children || []).forEach(child => childProfilesById.set(child.id, child));
+      }
+    }
+
+    const allStudentIds = [...new Set([
+      ...directStudentIds,
+      ...parentLinks.map(link => link.student_id).filter(Boolean)
+    ])];
+
+    if (allStudentIds.length) {
+      const { data: classLinks, error: classLinkError } = await sb
+        .from("class_students")
+        .select("student_id, class_id, left_at")
+        .in("student_id", allStudentIds);
+      if (classLinkError) throw classLinkError;
+
+      const activeLinks = (classLinks || []).filter(link => !link.left_at);
+      const linksForGrade = activeLinks.length ? activeLinks : (classLinks || []);
+      const classIds = [...new Set(linksForGrade.map(link => link.class_id).filter(Boolean))];
+
+      if (classIds.length) {
+        const { data: classes, error: classError } = await sb
+          .from("classes")
+          .select("id, grade_id")
+          .in("id", classIds);
+        if (classError) throw classError;
+
+        const gradeIds = [...new Set((classes || []).map(cls => cls.grade_id).filter(Boolean))];
+        const gradeNameById = new Map();
+        if (gradeIds.length) {
+          const { data: grades, error: gradeError } = await sb
+            .from("grades")
+            .select("id, name")
+            .in("id", gradeIds);
+          if (gradeError) throw gradeError;
+          (grades || []).forEach(grade => gradeNameById.set(grade.id, grade.name));
+        }
+
+        const classGradeById = new Map((classes || []).map(cls => [cls.id, gradeNameById.get(cls.grade_id) || ""]));
+        allStudentIds.forEach(studentId => {
+          const gradeNames = linksForGrade
+            .filter(link => link.student_id === studentId)
+            .map(link => classGradeById.get(link.class_id))
+            .filter(Boolean);
+          const label = getUniqueGradeLabel(gradeNames);
+          if (label) _studentGradeLabels.set(studentId, label);
+        });
+      }
+    }
+
+    parentIds.forEach(parentId => {
+      const labels = parentLinks
+        .filter(link => link.parent_id === parentId)
+        .map(link => childProfilesById.get(link.student_id))
+        .filter(Boolean)
+        .map(child => formatStudentNameWithContext(child));
+      _parentChildrenLabels.set(parentId, labels);
+    });
+  } catch (error) {
+    console.warn("Could not load sender context for MindUp chat", error);
+  }
+}
+
 async function prefetchRealSenderProfiles() {
-  const ids = [...new Set(loadedMessages.filter(m => m.real_sender_id).map(m => m.real_sender_id))];
+  const ids = [...new Set(loadedMessages.flatMap(m => [m.real_sender_id, m.sender_id]).filter(Boolean))];
   const missing = ids.filter(id => !_realSenderProfiles.has(id));
   if (!missing.length) return;
   try {
@@ -1876,6 +2012,7 @@ async function prefetchRealSenderProfiles() {
       _realSenderProfiles.set(u.id, u);
       _realSenderNames.set(u.id, u.full_name || u.id);
     });
+    await prefetchUserContextProfiles(data || []);
     renderLoadedMessages();
   } catch {}
 }
@@ -1953,13 +2090,17 @@ const _renderFriendListCore = (list) => {
   wrap.innerHTML = list.map(item => {
     const isMindUp = item.friend_id === BOT_ID;
     const isLearning = item.isLearningThread;
-    const displayName = isMindUp ? 'MindUp - Tư Duy Toàn Diện' : esc(item.users?.full_name || 'Người dùng');
+    const isOfficialAudience = item.isOfficialMindUpChannel && isMindUpStaffRole(currentProfile?.role);
+    const rawDisplayName = isMindUp
+      ? 'MindUp - Tư Duy Toàn Diện'
+      : (isOfficialAudience ? getOfficialAudienceDisplayName(item.users) : (item.users?.full_name || 'Người dùng'));
+    const displayName = esc(rawDisplayName);
     const avatar = (isMindUp || isLearning) ? 'favicon.png' : (item.users?.avatar_url || 'default-avatar.png');
-    const relationLabel = isLearning ? (item.metaName || 'Hồ sơ học tập') : (isMindUp ? 'Kênh chính thức' : (item.isFriend ? 'Bạn bè' : (item.conversationId ? 'Đã nhắn tin' : 'Người dùng')));
+    const relationLabel = isLearning ? (item.metaName || 'Hồ sơ học tập') : (isMindUp || isOfficialAudience ? 'Kênh chính thức MindUp' : (item.isFriend ? 'Bạn bè' : (item.conversationId ? 'Đã nhắn tin' : 'Người dùng')));
     const preview = item.preview || (item.isSearchResult ? 'Bắt đầu trò chuyện' : 'Chưa có tin nhắn nào');
     const click = isLearning
       ? `openLearningConversation('${escapeJs(item.conversationId)}')`
-      : `openConversation('${item.friend_id}', '${escapeJs(isMindUp ? 'MindUp - Tư Duy Toàn Diện' : (item.users?.full_name || 'Người dùng'))}', '${escapeJs(avatar)}', '${escapeJs(item.users?.role || '')}')`;
+      : `openConversation('${item.friend_id}', '${escapeJs(rawDisplayName)}', '${escapeJs(avatar)}', '${escapeJs(item.users?.role || '')}')`;
     return `
       <div class="friend-card ${isMindUp || isLearning ? 'mindup-pinned' : ''}" id="friend_${item.friend_id}" onclick="${click}">
         <img class="avatar" src="${avatar}" alt="Avatar" onerror="this.src='default-avatar.png'">
@@ -1969,7 +2110,7 @@ const _renderFriendListCore = (list) => {
             <div class="name">${displayName}</div>
             <div class="friend-time">${item.lastActivity ? esc(formatListTime(item.lastActivity)) : ''}</div>
           </div>
-          <div class="meta">${esc(isMindUp || isLearning ? '🤖 MindUp' : formatRole(item.users?.role || ''))} • ${esc(relationLabel)}</div>
+          <div class="meta">${esc(isMindUp || isLearning || isOfficialAudience ? '🤖 MindUp' : formatRole(item.users?.role || ''))} • ${esc(relationLabel)}</div>
           <div class="preview">${esc(preview)}</div>
         </div>
         <div class="friend-badge ${item.unreadCount ? 'show' : ''}">${item.unreadCount > 99 ? '99+' : item.unreadCount || ''}</div>
