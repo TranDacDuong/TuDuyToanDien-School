@@ -16,10 +16,43 @@
   const byId = id => document.getElementById(id);
   const INTERNAL_ROLES = new Set(["admin", "teacher", "assistant", "marketing"]);
   const REMINDER_TYPES = new Set(["class_schedule", "child_schedule", "attendance"]);
+  const DEPRECATED_SOCIAL_TASK_PATTERNS = [
+    "comment dạo",
+    "comment dao",
+    "bài viết ngày hôm trước",
+    "bai viet ngay hom truoc",
+    "đăng bài",
+    "dang bai",
+    "hẹn lịch đăng bài",
+    "hen lich dang bai",
+    "facebook"
+  ];
   let taskStaffLoadWarned = false;
   const esc = value => String(value || "")
     .replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+  function normalizeSearchText(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .toLowerCase();
+  }
+
+  function isDeprecatedSocialTask(item) {
+    const task = item?.task || item || {};
+    const typeText = normalizeSearchText([task.task_type, task.source_type].join(" "));
+    if (/\b(facebook_posting|social_comment)\b/.test(typeText)) return true;
+    const content = normalizeSearchText([
+      task.title,
+      task.description,
+      task.source_key,
+      task.metadata && JSON.stringify(task.metadata)
+    ].join(" "));
+    return DEPRECATED_SOCIAL_TASK_PATTERNS.some(pattern => content.includes(normalizeSearchText(pattern)));
+  }
 
   function localDate(value = new Date()) {
     const parts = new Intl.DateTimeFormat("en-CA", {
@@ -1005,6 +1038,7 @@
     const assignments = (data || []).filter(item =>
       item.status !== "cancelled"
       && INTERNAL_ROLES.has(item.assignee?.role || S.profile?.role)
+      && !isDeprecatedSocialTask(item)
     );
     await enrichTaskResultNotes(assignments);
     const scheduleFallbacks = await loadScheduleFallbackTasks(assignments);
