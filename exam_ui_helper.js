@@ -267,9 +267,18 @@
     });
   });
 
+  let observerStarted = false;
+
   function start() {
     enhance(document);
-    observer.observe(document.body, { childList: true, subtree: true });
+    if (observerStarted) return;
+    const target = document.body || document.documentElement;
+    if (!target || typeof target.nodeType !== "number") {
+      setTimeout(start, 0);
+      return;
+    }
+    observer.observe(target, { childList: true, subtree: true });
+    observerStarted = true;
   }
 
   if (document.readyState === "loading") {
