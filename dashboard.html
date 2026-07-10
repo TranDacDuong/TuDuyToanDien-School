@@ -802,6 +802,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   </div>
 
   <ul id="menu">
+    <li data-role="admin" data-page="ops-center"><span class="menu-label">📊 Bảng điều hành</span></li>
     <li data-role="admin,teacher,assistant,student,parent,accountant" data-page="home.html"><span class="menu-label">🏠 Trang chủ</span></li>
     <li data-role="admin,teacher,assistant,student,parent,accountant" data-page="courses.html"><span class="menu-label">🎓 Khóa học</span></li>
     <li data-role="admin,teacher,assistant,student,parent,accountant" data-page="class.html"><span class="menu-label">📘 Lớp học</span></li>
@@ -811,7 +812,6 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     <li data-role="admin,teacher,student,parent" data-page="public_exam.html"><span class="menu-label">🎯 Đề thi</span></li>
     <li data-role="admin,teacher,student" data-page="game.html"><span class="menu-label">🎮 Game</span></li>
     <li data-role="admin,student,parent,accountant"  data-page="tuition.html"><span class="menu-label">💰 Học phí</span></li>
-    <li data-role="admin,teacher,accountant" data-page="reports.html"><span class="menu-label">📊 Báo cáo</span></li>
     <li data-role="admin,teacher" data-page="income.html"><span class="menu-label">💳 Thu nhập</span></li>
     <li data-role="admin,teacher,assistant,student,parent,accountant" data-page="resources.html"><span class="menu-label">📚 Tài liệu tham khảo</span></li>
     <li data-role="admin,teacher,assistant"         data-page="question.html"><span class="menu-label">🧠 Ngân hàng câu hỏi</span></li>
@@ -914,6 +914,10 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 </main>
 
 <nav id="mobileNav" aria-label="Điều hướng nhanh">
+  <button class="mobile-nav-item" type="button" data-role="admin" data-page="ops-center">
+    <span>📊</span>
+    <span>Bảng điều hành</span>
+  </button>
   <button class="mobile-nav-item" type="button" data-role="admin,teacher,assistant,student,parent,accountant" data-page="home.html">
     <span>🏠</span>
     <span>Trang chủ</span>
@@ -1036,7 +1040,7 @@ const MOBILE_NAV_ORDER = {
   assistant: ["home.html", "courses.html", "class.html", "tasks.html", "teacher_schedule.html", "trial_requests.html", "menu"],
   parent: ["home.html", "courses.html", "class.html", "teacher_schedule.html", "personal_schedule.html", "tuition.html", "menu"],
   student: ["home.html", "courses.html", "class.html", "public_exam.html", "game.html", "tuition.html", "menu"],
-  admin: ["home.html", "courses.html", "class.html", "tuition.html", "income.html", "sourcedata.html", "menu"],
+  admin: ["ops-center", "home.html", "courses.html", "class.html", "tuition.html", "income.html", "sourcedata.html", "menu"],
 };
 let mobileToolsManualOpen = false;
 let dashboardMenuReady = false;
@@ -1193,7 +1197,7 @@ function applyRoleMenu(role){
 }
 
 function setActiveMenuItem(page){
-  const activePage = page === "ops-center" ? "home.html" : page;
+  const activePage = page;
   const basePage = String(activePage || "").split("?")[0].split("#")[0];
   const items = [...document.querySelectorAll("#menu li")];
   const hasExact = items.some(item => item.dataset.page === activePage);
@@ -1203,7 +1207,7 @@ function setActiveMenuItem(page){
 }
 
 function setActiveMobileNav(page){
-  const activePage = page === "ops-center" ? "home.html" : page;
+  const activePage = page;
   const basePage = String(activePage || "").split("?")[0].split("#")[0];
   const hasExact = mobileNavItems.some(item => item.dataset.page === activePage);
   mobileNavItems.forEach(item => {
@@ -1551,7 +1555,7 @@ async function submitAuthForm(){
       }
       closeAuthModal();
       await initDashboard(data?.user || null);
-      openDashboardPage("home.html", { replaceUrl: true });
+      openDashboardPage(currentDashboardProfile?.role === "admin" ? "ops-center" : "home.html", { replaceUrl: true });
       return;
     }
     const { error } = await sb.auth.signUp({ email, password });
