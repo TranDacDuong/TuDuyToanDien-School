@@ -53,7 +53,7 @@ AS $$
     SELECT 1
     FROM public.users u
     WHERE u.id = p_user_id
-      AND u.role IN ('admin', 'teacher', 'assistant', 'marketing', 'accountant')
+      AND u.role::text IN ('admin', 'teacher', 'assistant', 'marketing', 'accountant')
   );
 $$;
 
@@ -68,7 +68,7 @@ AS $$
     SELECT 1
     FROM public.users u
     WHERE u.id = p_user_id
-      AND u.role = 'admin'
+      AND u.role::text = 'admin'
   );
 $$;
 
