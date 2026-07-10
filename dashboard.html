@@ -1245,11 +1245,6 @@ function normalizeDashboardPage(page){
 
 function resolveRoleDashboardPage(page){
   const normalized = normalizeDashboardPage(page);
-  const basePage = normalized.split("?")[0].split("#")[0];
-  const isPlainHome = normalized === "home.html";
-  if(currentDashboardProfile?.role === "admin" && isPlainHome && basePage === "home.html"){
-    return "ops-center";
-  }
   return normalized;
 }
 
@@ -1405,11 +1400,6 @@ function setupMenu(){
     const requestedBase = requestedPage.split("?")[0].split("#")[0];
     const hasMenuItem = !!document.querySelector(`#menu li[data-page="${requestedBase}"]`);
     openDashboardPage(requestedPage, { syncMenu: hasMenuItem, updateUrl: false });
-    return;
-  }
-  const adminCenterAllowed = !!document.querySelector('#menu li[data-page="sourcedata.html"][style*="display: flex"], #menu li[data-page="sourcedata.html"]:not([style])');
-  if(adminCenterAllowed){
-    openDashboardPage("ops-center", { syncMenu: false, syncMobile: false, replaceUrl: true });
     return;
   }
   const first = [...items].find(i => i.style.display !== "none");
