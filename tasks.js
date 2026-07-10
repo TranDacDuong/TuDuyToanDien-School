@@ -1316,11 +1316,13 @@
   }
 
   function renderAssignees() {
-    const query = (byId("manualTaskAssigneeSearch").value || "").trim().toLowerCase();
+    const assigneeBox = byId("manualTaskAssignees");
+    if (!assigneeBox) return;
+    const query = (byId("manualTaskAssigneeSearch")?.value || "").trim().toLowerCase();
     const rows = S.users.filter(user =>
       !query || `${user.full_name || ""} ${user.email || ""}`.toLowerCase().includes(query)
     );
-    byId("manualTaskAssignees").innerHTML = rows.length ? rows.map(user => `
+    assigneeBox.innerHTML = rows.length ? rows.map(user => `
       <label class="assignee-row ${S.manualAssigneeIds.has(String(user.id)) ? "selected" : ""}">
         <input type="checkbox" value="${esc(user.id)}" ${S.manualAssigneeIds.has(String(user.id)) ? "checked" : ""}>
         <span><strong>${esc(user.full_name || user.email)}</strong><br><small>${esc(user.role)} · ${esc(user.email)}</small></span>
@@ -1331,7 +1333,7 @@
   async function openCreateModal() {
     await loadInternalUsers();
     S.manualAssigneeIds = new Set();
-    byId("manualTaskAssigneeSearch").value = "";
+    if (byId("manualTaskAssigneeSearch")) byId("manualTaskAssigneeSearch").value = "";
     if (byId("manualTaskAvailableOn")) byId("manualTaskAvailableOn").value = localDate();
     renderAssigneeSelect();
     renderAssignees();
@@ -1339,10 +1341,13 @@
   }
 
   async function saveManualTask() {
-    const checkedIds = [...byId("manualTaskAssignees").querySelectorAll('input[type="checkbox"]:checked')].map(input => input.value);
+    const assigneeBox = byId("manualTaskAssignees");
+    const checkedIds = assigneeBox
+      ? [...assigneeBox.querySelectorAll('input[type="checkbox"]:checked')].map(input => input.value)
+      : [];
     checkedIds.forEach(id => S.manualAssigneeIds.add(id));
     const userIds = [...S.manualAssigneeIds];
-    const title = byId("manualTaskTitle").value.trim();
+    const title = (byId("manualTaskTitle")?.value || "").trim();
     if (!title || !userIds.length) return alert("Hãy nhập tiêu đề và chọn ít nhất một người nhận.");
     const availableOn = byId("manualTaskAvailableOn")?.value || localDate();
     const recurrence = byId("manualTaskRecurrence")?.value || "once";
@@ -1355,11 +1360,11 @@
       .map((title, index) => ({ key: `req_${index + 1}`, title }));
     const { data: taskId, error } = await sb.rpc("create_manual_task", {
       p_title: title,
-      p_description: byId("manualTaskDescription").value.trim(),
-      p_priority: byId("manualTaskPriority").value,
+      p_description: (byId("manualTaskDescription")?.value || "").trim(),
+      p_priority: byId("manualTaskPriority")?.value || "normal",
       p_available_on: availableOn,
       p_due_at: dueValue,
-      p_action_url: byId("manualTaskActionUrl").value.trim(),
+      p_action_url: (byId("manualTaskActionUrl")?.value || "").trim(),
       p_user_ids: userIds,
       p_requirements: requirements,
       p_recurrence: recurrence,
@@ -1380,11 +1385,14 @@
       console.warn("Không gửi được thông báo giao việc", notifyError);
     }
     closeModal("taskCreateModal");
-    ["manualTaskTitle", "manualTaskDescription", "manualTaskAvailableOn", "manualTaskActionUrl", "manualTaskRequirements"].forEach(id => byId(id).value = "");
-    byId("manualTaskRecurrence").value = "once";
+    ["manualTaskTitle", "manualTaskDescription", "manualTaskAvailableOn", "manualTaskActionUrl", "manualTaskRequirements"].forEach(id => {
+      const input = byId(id);
+      if (input) input.value = "";
+    });
+    if (byId("manualTaskRecurrence")) byId("manualTaskRecurrence").value = "once";
     S.manualAssigneeIds = new Set();
-    byId("manualTaskAssigneeSearch").value = "";
-    byId("manualTaskAssigneeSelect").value = "";
+    if (byId("manualTaskAssigneeSearch")) byId("manualTaskAssigneeSearch").value = "";
+    if (byId("manualTaskAssigneeSelect")) byId("manualTaskAssigneeSelect").value = "";
     renderAssignees();
     toast(`Đã giao việc cho ${userIds.length} người.`);
     await loadTasks();
