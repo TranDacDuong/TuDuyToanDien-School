@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Điểm danh nhân viên - MindUp</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="theme.css?v=20260615-ios1">
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#f6f0e4 0%,#f8fbff 100%);color:var(--ink);font-family:var(--font-body);padding:18px}
+    .page{width:min(1120px,100%);margin:0 auto;display:grid;gap:14px}
+    .head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+    h1{margin:0;color:var(--navy);font-family:var(--font-display);font-size:1.55rem}
+    .head p{margin:5px 0 0;color:var(--ink-mid);font-size:.9rem;line-height:1.55}
+    .card{background:#fff;border:1px solid rgba(15,31,61,.08);border-radius:18px;box-shadow:0 12px 28px rgba(15,31,61,.06);padding:16px}
+    .location-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center}
+    .location-title{font-weight:900;color:var(--navy);font-size:1.02rem}
+    .muted{color:var(--ink-light);font-size:.82rem;line-height:1.55}
+    .radius-pill{display:inline-flex;align-items:center;gap:7px;background:#ecfdf5;color:#047857;border:1px solid #bbf7d0;border-radius:999px;padding:8px 12px;font-weight:900;font-size:.82rem;white-space:nowrap}
+    .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px}
+    .status-card{display:grid;gap:12px}
+    .status-main{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .stat{border:1px solid var(--border);background:#f8fafc;border-radius:14px;padding:13px}
+    .stat span{display:block;color:var(--ink-light);font-size:.72rem;font-weight:900;text-transform:uppercase}
+    .stat strong{display:block;color:var(--navy);font-size:1rem;margin-top:5px;line-height:1.35}
+    .actions{display:flex;gap:10px;flex-wrap:wrap}
+    .btn{border:1px solid var(--border);background:#fff;color:var(--navy);border-radius:12px;padding:11px 14px;font:inherit;font-weight:900;cursor:pointer}
+    .btn.primary{background:var(--navy);border-color:var(--navy);color:#fff}
+    .btn.success{background:#15803d;border-color:#15803d;color:#fff}
+    .btn:disabled{opacity:.55;cursor:not-allowed}
+    .note{width:100%;min-height:76px;resize:vertical;border:1px solid var(--border);border-radius:12px;padding:10px 12px;font:inherit}
+    .feedback{display:none;border-radius:14px;padding:12px 13px;font-size:.86rem;line-height:1.55}
+    .feedback.show{display:block}
+    .feedback.ok{background:#ecfdf5;border:1px solid #bbf7d0;color:#047857}
+    .feedback.warn{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412}
+    .feedback.err{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c}
+    .history{display:grid;gap:9px}
+    .log{border:1px solid var(--border);border-radius:14px;padding:12px;display:grid;gap:6px;background:#fff}
+    .log.valid{border-color:#bbf7d0;background:#f7fef9}
+    .log.invalid{border-color:#fed7aa;background:#fffaf2}
+    .log-top{display:flex;justify-content:space-between;gap:10px;align-items:center}
+    .log-type{font-weight:900;color:var(--navy)}
+    .badge{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:.72rem;font-weight:900}
+    .badge.valid{background:#dcfce7;color:#15803d}
+    .badge.invalid{background:#ffedd5;color:#c2410c}
+    .admin-panel{display:none}
+    .admin-panel.show{display:grid;gap:10px}
+    .admin-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .admin-toolbar input{height:38px;border:1px solid var(--border);border-radius:10px;padding:0 10px;font:inherit}
+    .admin-list{display:grid;gap:8px}
+    .admin-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;border:1px solid var(--border);border-radius:14px;padding:12px;background:#fff}
+    .empty{border:1px dashed var(--border);border-radius:14px;padding:22px;text-align:center;color:var(--ink-light);background:#fff}
+    @media(max-width:820px){body{padding:12px 10px calc(18px + env(safe-area-inset-bottom))}.grid{grid-template-columns:1fr}.location-card,.admin-row{grid-template-columns:1fr}.status-main{grid-template-columns:1fr}.actions .btn{flex:1}.radius-pill{width:max-content}}
+  </style>
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0f1f3d">
+  <script src="pwa.js?v=20260709-notification-fix1" defer></script>
+</head>
+<body>
+<main class="page">
+  <header class="head">
+    <div>
+      <h1>Điểm danh</h1>
+      <p>Nhân viên cần bật quyền vị trí và đứng trong phạm vi cho phép để điểm danh tại trung tâm.</p>
+    </div>
+    <button class="btn" type="button" onclick="loadData()">Làm mới</button>
+  </header>
+
+  <section class="card location-card">
+    <div>
+      <div class="location-title" id="locationName">MindUp - Tư Duy Toàn Diện</div>
+      <div class="muted" id="locationAddress">Số 124 phố Chùa Quỳnh, Phường Bạch Mai, thành phố Hà Nội</div>
+      <div class="muted" id="locationCoords">Tọa độ: 20.9999701, 105.8576233</div>
+    </div>
+    <div class="radius-pill">📍 Hợp lệ dưới <span id="locationRadius">200m</span></div>
+  </section>
+
+  <section class="grid">
+    <div class="card status-card">
+      <div>
+        <div class="location-title">Điểm danh hôm nay</div>
+        <div class="muted">Trình duyệt sẽ hỏi quyền vị trí khi bạn bấm điểm danh.</div>
+      </div>
+      <div class="status-main">
+        <div class="stat"><span>Giờ vào hợp lệ</span><strong id="checkInText">Chưa có</strong></div>
+        <div class="stat"><span>Giờ ra hợp lệ</span><strong id="checkOutText">Chưa có</strong></div>
+        <div class="stat"><span>Vị trí gần nhất</span><strong id="lastDistanceText">Chưa kiểm tra</strong></div>
+        <div class="stat"><span>Trạng thái</span><strong id="todayStatusText">Chưa điểm danh</strong></div>
+      </div>
+      <textarea class="note" id="attendanceNote" placeholder="Ghi chú nếu cần, ví dụ: máy tính định vị sai, dạy online, đi công tác..."></textarea>
+      <div class="actions">
+        <button class="btn primary" id="checkInBtn" type="button" onclick="markAttendance('check_in')">Điểm danh vào</button>
+        <button class="btn success" id="checkOutBtn" type="button" onclick="markAttendance('check_out')">Điểm danh ra</button>
+      </div>
+      <div class="feedback" id="feedbackBox"></div>
+    </div>
+
+    <div class="card">
+      <div class="location-title">Lịch sử hôm nay</div>
+      <div class="muted">Các lần thử ngoài phạm vi vẫn được ghi lại nhưng không được tính là hợp lệ.</div>
+      <div class="history" id="historyList"><div class="empty">Đang tải dữ liệu...</div></div>
+    </div>
+  </section>
+
+  <section class="card admin-panel" id="adminPanel">
+    <div class="head">
+      <div>
+        <div class="location-title">Admin: Điểm danh nhân viên</div>
+        <div class="muted">Xem nhanh các lượt điểm danh theo ngày.</div>
+      </div>
+      <div class="admin-toolbar">
+        <input type="date" id="adminDate">
+        <button class="btn" type="button" onclick="loadAdminLogs()">Xem</button>
+      </div>
+    </div>
+    <div class="admin-list" id="adminList"><div class="empty">Chọn ngày để xem điểm danh.</div></div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script>
+const DEFAULT_LOCATION = {
+  name: "MindUp - Tư Duy Toàn Diện",
+  address: "Số 124 phố Chùa Quỳnh, Phường Bạch Mai, thành phố Hà Nội",
+  latitude: 20.9999701,
+  longitude: 105.8576233,
+  radius_meters: 200
+};
+
+let currentUser = null;
+let currentProfile = null;
+let activeLocation = DEFAULT_LOCATION;
+let todayLogs = [];
+
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch]));
+}
+
+function ymd(date = new Date()) {
+  const d = new Date(date);
+  const offset = d.getTimezoneOffset();
+  return new Date(d.getTime() - offset * 60000).toISOString().slice(0, 10);
+}
+
+function formatTime(value) {
+  if (!value) return "Chưa có";
+  return new Date(value).toLocaleString("vi-VN", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
+}
+
+function formatMeters(value) {
+  if (!Number.isFinite(Number(value))) return "Chưa có";
+  const meters = Math.round(Number(value));
+  return meters >= 1000 ? `${(meters / 1000).toFixed(2)}km` : `${meters}m`;
+}
+
+function statusLabel(status) {
+  if (status === "valid") return "Hợp lệ";
+  if (status === "outside_range") return "Ngoài phạm vi";
+  if (status === "low_accuracy") return "GPS sai số cao";
+  if (status === "location_denied") return "Từ chối vị trí";
+  if (status === "manual_review") return "Chờ duyệt";
+  return "Chưa xác định";
+}
+
+function getPosition() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Thiết bị/trình duyệt này không hỗ trợ định vị."));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0
+    });
+  });
+}
+
+function setFeedback(message, type = "ok") {
+  const box = document.getElementById("feedbackBox");
+  box.className = `feedback show ${type}`;
+  box.innerHTML = message;
+}
+
+function setBusy(busy) {
+  document.getElementById("checkInBtn").disabled = busy;
+  document.getElementById("checkOutBtn").disabled = busy;
+}
+
+async function init() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) {
+    location.href = "index.html";
+    return;
+  }
+  currentUser = user;
+  const { data: profile, error } = await sb.from("users").select("id,full_name,role").eq("id", user.id).maybeSingle();
+  if (error) {
+    document.getElementById("historyList").innerHTML = `<div class="empty">Không tải được hồ sơ: ${esc(error.message)}</div>`;
+    return;
+  }
+  currentProfile = profile || {};
+  if (!["admin", "teacher", "assistant", "marketing", "accountant"].includes(currentProfile.role)) {
+    document.querySelector(".page").innerHTML = '<div class="card"><h1>Không có quyền truy cập</h1><p class="muted">Chỉ nhân viên MindUp mới sử dụng được phần điểm danh.</p></div>';
+    return;
+  }
+  document.getElementById("adminDate").value = ymd();
+  if (currentProfile.role === "admin") document.getElementById("adminPanel").classList.add("show");
+  await loadData();
+}
+
+async function loadLocation() {
+  const { data, error } = await sb
+    .from("staff_attendance_locations")
+    .select("id,name,address,latitude,longitude,radius_meters")
+    .eq("is_active", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (!error && data) activeLocation = data;
+  document.getElementById("locationName").textContent = activeLocation.name;
+  document.getElementById("locationAddress").textContent = activeLocation.address;
+  document.getElementById("locationCoords").textContent = `Tọa độ: ${activeLocation.latitude}, ${activeLocation.longitude}`;
+  document.getElementById("locationRadius").textContent = `${activeLocation.radius_meters || 200}m`;
+}
+
+async function loadData() {
+  await loadLocation();
+  await loadTodayLogs();
+  if (currentProfile?.role === "admin") await loadAdminLogs();
+}
+
+async function loadTodayLogs() {
+  const start = ymd() + "T00:00:00+07:00";
+  const end = ymd() + "T23:59:59+07:00";
+  const { data, error } = await sb
+    .from("staff_attendance_logs")
+    .select("*")
+    .eq("user_id", currentUser.id)
+    .gte("checked_at", start)
+    .lte("checked_at", end)
+    .order("checked_at", { ascending: false });
+  if (error) {
+    document.getElementById("historyList").innerHTML = `<div class="empty">Chưa tải được điểm danh. Nếu đây là lần đầu dùng, hãy chạy SQL mình gửi ở cuối.</div>`;
+    return;
+  }
+  todayLogs = data || [];
+  renderToday();
+}
+
+function renderToday() {
+  const validIn = todayLogs.find(log => log.check_type === "check_in" && log.is_valid);
+  const validOut = todayLogs.find(log => log.check_type === "check_out" && log.is_valid);
+  const latest = todayLogs[0];
+  document.getElementById("checkInText").textContent = formatTime(validIn?.checked_at);
+  document.getElementById("checkOutText").textContent = formatTime(validOut?.checked_at);
+  document.getElementById("lastDistanceText").textContent = latest ? `${formatMeters(latest.distance_meters)} • ${statusLabel(latest.status)}` : "Chưa kiểm tra";
+  document.getElementById("todayStatusText").textContent = validIn ? (validOut ? "Đã vào/ra hợp lệ" : "Đã vào hợp lệ") : "Chưa có lượt hợp lệ";
+
+  const list = document.getElementById("historyList");
+  if (!todayLogs.length) {
+    list.innerHTML = '<div class="empty">Hôm nay chưa có lượt điểm danh nào.</div>';
+    return;
+  }
+  list.innerHTML = todayLogs.map(log => `
+    <div class="log ${log.is_valid ? "valid" : "invalid"}">
+      <div class="log-top">
+        <div class="log-type">${log.check_type === "check_in" ? "Điểm danh vào" : "Điểm danh ra"}</div>
+        <span class="badge ${log.is_valid ? "valid" : "invalid"}">${statusLabel(log.status)}</span>
+      </div>
+      <div class="muted">${formatTime(log.checked_at)} • Cách trung tâm ${formatMeters(log.distance_meters)} • Sai số GPS ${formatMeters(log.accuracy_meters)}</div>
+      ${log.note ? `<div class="muted">Ghi chú: ${esc(log.note)}</div>` : ""}
+    </div>
+  `).join("");
+}
+
+window.markAttendance = async function(checkType) {
+  setBusy(true);
+  setFeedback("Đang lấy vị trí hiện tại, vui lòng chờ vài giây...", "warn");
+  try {
+    const position = await getPosition();
+    const coords = position.coords;
+    const note = document.getElementById("attendanceNote").value.trim();
+    const deviceInfo = {
+      userAgent: navigator.userAgent,
+      platform: navigator.platform || "",
+      language: navigator.language || "",
+      screen: `${screen.width}x${screen.height}`
+    };
+    const { data, error } = await sb.rpc("mark_staff_attendance", {
+      p_check_type: checkType,
+      p_latitude: coords.latitude,
+      p_longitude: coords.longitude,
+      p_accuracy_meters: coords.accuracy,
+      p_note: note || null,
+      p_device_info: deviceInfo
+    });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row?.is_valid) {
+      setFeedback(`Đã điểm danh hợp lệ. Bạn đang cách trung tâm khoảng <strong>${formatMeters(row.distance_meters)}</strong>.`, "ok");
+      document.getElementById("attendanceNote").value = "";
+    } else {
+      const reason = row?.status === "low_accuracy"
+        ? `GPS đang sai số cao (${formatMeters(row.accuracy_meters)}). Hãy bật định vị chính xác rồi thử lại.`
+        : `Bạn đang cách trung tâm khoảng <strong>${formatMeters(row?.distance_meters)}</strong>, cần dưới ${activeLocation.radius_meters || 200}m để hợp lệ.`;
+      setFeedback(reason, "warn");
+    }
+    await loadData();
+  } catch (error) {
+    const message = error?.code === 1
+      ? "Bạn chưa cấp quyền vị trí. Hãy cho phép trình duyệt/app truy cập vị trí rồi thử lại."
+      : (error.message || "Không điểm danh được.");
+    setFeedback(esc(message), "err");
+  } finally {
+    setBusy(false);
+  }
+};
+
+window.loadAdminLogs = async function() {
+  if (currentProfile?.role !== "admin") return;
+  const date = document.getElementById("adminDate").value || ymd();
+  const start = date + "T00:00:00+07:00";
+  const end = date + "T23:59:59+07:00";
+  const { data, error } = await sb
+    .from("staff_attendance_logs")
+    .select("*, user:users!staff_attendance_logs_user_id_fkey(id,full_name,email,role)")
+    .gte("checked_at", start)
+    .lte("checked_at", end)
+    .order("checked_at", { ascending: false });
+  const list = document.getElementById("adminList");
+  if (error) {
+    list.innerHTML = `<div class="empty">Không tải được dữ liệu admin: ${esc(error.message)}</div>`;
+    return;
+  }
+  const rows = data || [];
+  if (!rows.length) {
+    list.innerHTML = '<div class="empty">Ngày này chưa có lượt điểm danh nào.</div>';
+    return;
+  }
+  list.innerHTML = rows.map(log => `
+    <div class="admin-row">
+      <div>
+        <strong>${esc(log.user?.full_name || log.user?.email || "Nhân viên")}</strong>
+        <div class="muted">${log.check_type === "check_in" ? "Vào" : "Ra"} lúc ${formatTime(log.checked_at)} • ${statusLabel(log.status)} • Cách ${formatMeters(log.distance_meters)}</div>
+      </div>
+      <span class="badge ${log.is_valid ? "valid" : "invalid"}">${log.is_valid ? "Hợp lệ" : "Không hợp lệ"}</span>
+    </div>
+  `).join("");
+};
+
+init();
+</script>
+</body>
+</html>
