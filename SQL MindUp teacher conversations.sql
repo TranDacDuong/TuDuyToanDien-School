@@ -114,6 +114,7 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.list_mindup_teacher_conversations();
 CREATE OR REPLACE FUNCTION public.list_mindup_teacher_conversations()
 RETURNS TABLE (
   conversation_id uuid,
@@ -123,6 +124,8 @@ RETURNS TABLE (
   audience_user_id uuid,
   audience_name text,
   audience_role text,
+  audience_label text,
+  thread_title text,
   last_content text,
   last_at timestamptz
 )
@@ -139,6 +142,30 @@ AS $$
     c.mindup_audience_user_id,
     au.full_name,
     au.role::text,
+    CASE
+      WHEN au.role::text = 'student' THEN trim(concat('Học sinh ', au.full_name, CASE WHEN au.birth_year IS NOT NULL THEN ' ' || au.birth_year::text ELSE '' END))
+      WHEN au.role::text = 'parent' THEN COALESCE(NULLIF(au.full_name, ''), 'Phụ huynh')
+      ELSE COALESCE(NULLIF(au.full_name, ''), 'Người gửi')
+    END,
+    CASE
+      WHEN au.role::text = 'parent' THEN
+        'PH ' || COALESCE(
+          NULLIF((
+            SELECT string_agg(
+              trim(concat(s.full_name, CASE WHEN s.birth_year IS NOT NULL THEN ' ' || s.birth_year::text ELSE '' END)),
+              ', '
+              ORDER BY s.full_name
+            )
+            FROM public.parent_students ps
+            JOIN public.users s ON s.id = ps.student_id
+            WHERE ps.parent_id = au.id
+              AND ps.revoked_at IS NULL
+          ), ''),
+          COALESCE(NULLIF(au.full_name, ''), 'Phụ huynh')
+        )
+      WHEN au.role::text = 'student' THEN trim(concat('Học sinh ', au.full_name, CASE WHEN au.birth_year IS NOT NULL THEN ' ' || au.birth_year::text ELSE '' END))
+      ELSE COALESCE(NULLIF(au.full_name, ''), 'Người gửi')
+    END,
     lm.content,
     lm.created_at
   FROM public.conversations c

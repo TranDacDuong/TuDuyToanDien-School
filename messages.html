@@ -679,6 +679,7 @@ function makeConversationListItem(user, options = {}) {
     teacherName: options.teacherName || "",
     audienceUserId: options.audienceUserId || null,
     audienceName: options.audienceName || "",
+    audienceLabel: options.audienceLabel || "",
     metaName: options.metaName || ""
   };
 }
@@ -757,11 +758,13 @@ async function fetchMindUpTeacherConversationItems() {
     return (data || []).map(row => {
       const teacherName = row.teacher_name || "Giáo viên";
       const audienceName = row.audience_name || "Người gửi";
+      const audienceLabel = row.audience_label || audienceName;
+      const threadTitle = row.thread_title || audienceLabel;
       const displayName = isStaff
-        ? `MindUp - Tư Duy Toàn Diện + ${audienceName}`
+        ? threadTitle
         : "MindUp - Tư Duy Toàn Diện";
       const metaName = isStaff
-        ? `Liên hệ giáo viên: ${teacherName} • Người gửi: ${audienceName}`
+        ? `Liên hệ giáo viên: ${teacherName} • ${audienceLabel}`
         : `Liên hệ giáo viên: ${teacherName}`;
 
       return makeConversationListItem({
@@ -779,6 +782,7 @@ async function fetchMindUpTeacherConversationItems() {
         teacherName,
         audienceUserId: row.audience_user_id,
         audienceName,
+        audienceLabel,
         full_name: displayName,
         role: "mindup_teacher",
         metaName,
@@ -1460,30 +1464,22 @@ window.addEventListener("resize", () => {
 function renderLoadedMessages() {
   const wrap = document.getElementById("messageList");
   const BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
-  const isStaff = ['admin','teacher','assistant'].includes(currentProfile?.role || '');
   wrap.innerHTML = loadedMessages.map(item => {
     const isMine = item.sender_id === currentUser.id || item.real_sender_id === currentUser.id;
     const isBot = item.sender_id === BOT_ID;
     const realSenderId = item.real_sender_id;
-    // Lấy tên người gửi thực nếu là staff
-    let realSenderNote = '';
-    if (isBot && isStaff && realSenderId) {
-      realSenderNote = `<div class="real-sender-label">MindUp + ${esc(_realSenderNames.get(realSenderId) || realSenderId.slice(0,8)+'...')}</div>`;
-    }
-    const botLabel = isBot ? '<div class="bot-msg-label">🤖 MindUp - Tư Duy Toàn Diện</div>' : '';
+    const botLabel = isBot ? `<div class="bot-msg-label">${esc(getMindUpDisplaySender(realSenderId))}</div>` : '';
     return `
       <div class="message-row ${isMine ? 'mine' : ''}">
         <div class="bubble ${isBot ? 'bot-bubble' : ''}">
           ${botLabel}
           ${renderMessageBody(item.content)}
-          ${realSenderNote}
           <div class="bubble-time">${formatTime(item.created_at)}</div>
         </div>
       </div>
     `;
   }).join('');
-  // Prefetch real sender names if needed
-  if (isStaff) prefetchRealSenderNames();
+  prefetchRealSenderProfiles();
 }
 
 async function loadMessages({ reset = false, scrollToBottom = false } = {}) {
@@ -1848,14 +1844,37 @@ function escapeJs(value) {
 // === MindUp Bot Helpers ===
 const MINDUP_BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
 const _realSenderNames = new Map();
+const _realSenderProfiles = new Map();
 
-async function prefetchRealSenderNames() {
+function isMindUpStaffRole(role) {
+  return ['admin','teacher','assistant','marketing'].includes(String(role || ''));
+}
+
+function formatStudentSenderLabel(profile) {
+  const name = profile?.full_name || "Học sinh";
+  return `Học sinh ${name}${profile?.birth_year ? ` ${profile.birth_year}` : ""}`;
+}
+
+function getMindUpDisplaySender(realSenderId) {
+  const profile = _realSenderProfiles.get(realSenderId);
+  if (!realSenderId || !profile || isMindUpStaffRole(profile.role)) {
+    return "🤖 MINDUP - TƯ DUY TOÀN DIỆN";
+  }
+  if (profile.role === "student") return formatStudentSenderLabel(profile);
+  if (profile.role === "parent") return profile.full_name || "Phụ huynh";
+  return profile.full_name || "Người gửi";
+}
+
+async function prefetchRealSenderProfiles() {
   const ids = [...new Set(loadedMessages.filter(m => m.real_sender_id).map(m => m.real_sender_id))];
-  const missing = ids.filter(id => !_realSenderNames.has(id));
+  const missing = ids.filter(id => !_realSenderProfiles.has(id));
   if (!missing.length) return;
   try {
-    const { data } = await sb.from('users').select('id,full_name').in('id', missing);
-    (data || []).forEach(u => _realSenderNames.set(u.id, u.full_name || u.id));
+    const { data } = await sb.from('users').select('id,full_name,role,birth_year').in('id', missing);
+    (data || []).forEach(u => {
+      _realSenderProfiles.set(u.id, u);
+      _realSenderNames.set(u.id, u.full_name || u.id);
+    });
     renderLoadedMessages();
   } catch {}
 }
