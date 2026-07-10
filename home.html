@@ -2063,7 +2063,7 @@ window.openChatPopupForTeacher = function(teacherId) {
   const popup = document.getElementById("chatPopup");
   const frame = document.getElementById("chatPopupFrame");
   if (!popup || !frame || !teacherId) return;
-  frame.src = "messages.html?popup=1&teacher=" + encodeURIComponent(teacherId);
+  frame.src = "messages.html?popup=1&user=00000000-0000-0000-0000-000000000001";
   frame.dataset.loaded = frame.src;
   popup.classList.add("open");
 };

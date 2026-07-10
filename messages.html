@@ -610,22 +610,15 @@ async function init() {
 
   subscribePresence();
   subscribeNotificationChanges();
+  if (isPopupMode && selectedUserFromQuery === MINDUP_BOT_ID) {
+    selectedUserFromQuery = null;
+    await openConversation(MINDUP_BOT_ID, "MindUp - Tư Duy Toàn Diện", "favicon.png", "bot");
+    return;
+  }
   if (isPopupMode && selectedTeacherFromQuery) {
-    const teacherId = selectedTeacherFromQuery;
-    const { data: targetTeacher } = await sb
-      .from("users")
-      .select("id, full_name, avatar_url, role")
-      .eq("id", teacherId)
-      .maybeSingle();
-    if (targetTeacher?.id) {
-      selectedTeacherFromQuery = null;
-      await openMindUpTeacherConversation(null, {
-        teacherId: targetTeacher.id,
-        teacherName: targetTeacher.full_name || "Giáo viên",
-        teacherAvatar: targetTeacher.avatar_url || "favicon.png",
-      });
-      return;
-    }
+    selectedTeacherFromQuery = null;
+    await openConversation(MINDUP_BOT_ID, "MindUp - Tư Duy Toàn Diện", "favicon.png", "bot");
+    return;
   }
   if (isPopupMode && selectedUserFromQuery) {
     const friendId = selectedUserFromQuery;
@@ -798,7 +791,7 @@ async function loadFriends() {
   const requestToken = ++friendsLoadToken;
   const wrap = document.getElementById("friendList");
 
-  const [{ data: friendships, error: friendshipError }, { data: conversations, error: conversationError }, { data: unreadNotifications }, learningItems, mindUpTeacherItems] = await Promise.all([
+  const [{ data: friendships, error: friendshipError }, { data: conversations, error: conversationError }, { data: unreadNotifications }, learningItems] = await Promise.all([
     sb
       .from("friendships")
       .select("friend_id, users!friendships_friend_id_fkey(id, full_name, avatar_url, role)")
@@ -815,8 +808,7 @@ async function loadFriends() {
       .eq("user_id", currentUser.id)
       .eq("type", "message_new")
       .eq("is_read", false),
-    fetchLearningConversationItems(),
-    fetchMindUpTeacherConversationItems()
+    fetchLearningConversationItems()
   ]);
 
   if (friendshipError || conversationError) {
@@ -866,10 +858,6 @@ async function loadFriends() {
   (learningItems || []).forEach(item => {
     item.unreadCount = unreadMap.get(item.friend_id) || 0;
   });
-  (mindUpTeacherItems || []).forEach(item => {
-    item.unreadCount = unreadMap.get(item.friend_id) || 0;
-  });
-
   const conversationIds = directConversations.map(item => item.id);
   const lastMessageMap = new Map();
   if (conversationIds.length) {
@@ -915,7 +903,7 @@ async function loadFriends() {
 
   if (requestToken !== friendsLoadToken) return;
 
-  const merged = [...(mindUpTeacherItems || []), ...(learningItems || []), ...enriched]
+  const merged = [...(learningItems || []), ...enriched]
     .filter((item, index, list) => list.findIndex(other => other.friend_id === item.friend_id) === index);
 
   merged.sort((a, b) => {
@@ -1102,26 +1090,22 @@ function setComposerEnabled(enabled) {
 }
 
 window.openConversation = async function(friendId, friendName, friendAvatar, friendRole) {
-  const shouldUseMindUpTeacherThread = ["student", "parent"].includes(currentProfile?.role || "") && friendRole === "teacher";
+  const shouldUseMindUpOfficial = shouldRouteToMindUpOfficial(friendRole);
   if (isTrayMode) {
     window.parent?.postMessage({
       type: "open-chat-popup",
       payload: {
-        userId: shouldUseMindUpTeacherThread ? null : friendId,
-        teacherId: shouldUseMindUpTeacherThread ? friendId : null,
-        name: friendName,
-        avatar: friendAvatar,
-        role: friendRole
+        userId: shouldUseMindUpOfficial ? MINDUP_BOT_ID : friendId,
+        officialMindUp: shouldUseMindUpOfficial,
+        name: shouldUseMindUpOfficial ? "MindUp - Tư Duy Toàn Diện" : friendName,
+        avatar: shouldUseMindUpOfficial ? "favicon.png" : friendAvatar,
+        role: shouldUseMindUpOfficial ? "bot" : friendRole
       }
     }, "*");
     return;
   }
-  if (shouldUseMindUpTeacherThread) {
-    await openMindUpTeacherConversation(null, {
-      teacherId: friendId,
-      teacherName: friendName,
-      teacherAvatar: friendAvatar,
-    });
+  if (shouldUseMindUpOfficial) {
+    await openConversation(MINDUP_BOT_ID, "MindUp - Tư Duy Toàn Diện", "favicon.png", "bot");
     return;
   }
 
@@ -1279,7 +1263,16 @@ async function ensureConversation(friendId, friendRole, knownConversationId = nu
   }
   const BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
   const isTargetStudentOrParent = ['student', 'parent'].includes(friendRole || '');
-  const isCurrentStaff = ['admin', 'teacher', 'assistant'].includes(currentProfile?.role || '');
+  const isCurrentStaff = isMindUpStaffRole(currentProfile?.role || '');
+
+  if (friendId === BOT_ID || (isTargetStudentOrParent && isCurrentStaff)) {
+    const supportUserId = friendId === BOT_ID ? currentUser.id : friendId;
+    const { data: officialConversationId, error: officialError } = await sb.rpc("ensure_bot_conversation", {
+      p_user_id: supportUserId
+    });
+    if (officialError) throw officialError;
+    return officialConversationId;
+  }
 
   let directKey;
   if (isTargetStudentOrParent && (isCurrentStaff || friendId === BOT_ID)) {
@@ -1581,7 +1574,7 @@ window.sendMessage = async function() {
   const BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
   const activeFriendInfo = friendMap.get(activeFriend?.id);
   const isTargetStudentOrParent = ['student', 'parent'].includes(activeFriendInfo?.users?.role || activeFriend?.role || '');
-  const isCurrentStaff = ['admin', 'teacher', 'assistant'].includes(currentProfile?.role || '');
+  const isCurrentStaff = isMindUpStaffRole(currentProfile?.role || '');
 
   let error;
   if (activeFriend?.mindUpTeacherThread || activeFriendInfo?.isMindUpTeacherThread) {
@@ -1848,6 +1841,14 @@ const _realSenderProfiles = new Map();
 
 function isMindUpStaffRole(role) {
   return ['admin','teacher','assistant','marketing'].includes(String(role || ''));
+}
+
+function isStudentOrParentRole(role) {
+  return ['student','parent'].includes(String(role || ''));
+}
+
+function shouldRouteToMindUpOfficial(targetRole) {
+  return isStudentOrParentRole(currentProfile?.role) && isMindUpStaffRole(targetRole);
 }
 
 function formatStudentSenderLabel(profile) {

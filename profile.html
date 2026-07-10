@@ -981,9 +981,12 @@ window.openProfileChatPopup = function(userId) {
   const popup = document.getElementById("profileChatPopup");
   const frame = document.getElementById("profileChatPopupFrame");
   if (!popup || !frame) return;
-  const isTeacherProfile = viewedProfile?.role === "teacher" && currentProfile && ["student", "parent"].includes(currentProfile.role);
-  const src = isTeacherProfile
-    ? "messages.html?popup=1&teacher=" + encodeURIComponent(userId)
+  const mindupStaffRoles = ["admin", "teacher", "assistant", "marketing"];
+  const shouldUseOfficialMindUp = currentProfile
+    && ["student", "parent"].includes(currentProfile.role)
+    && mindupStaffRoles.includes(viewedProfile?.role);
+  const src = shouldUseOfficialMindUp
+    ? "messages.html?popup=1&user=00000000-0000-0000-0000-000000000001"
     : "messages.html?popup=1&user=" + encodeURIComponent(userId);
   if (frame.dataset.loaded !== src) {
     frame.src = src;
