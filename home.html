@@ -2058,6 +2058,16 @@ window.openChatPopupForUser = function(userId) {
   popup.classList.add("open");
 };
 
+window.openChatPopupForTeacher = function(teacherId) {
+  ensureHomeOverlayShell();
+  const popup = document.getElementById("chatPopup");
+  const frame = document.getElementById("chatPopupFrame");
+  if (!popup || !frame || !teacherId) return;
+  frame.src = "messages.html?popup=1&teacher=" + encodeURIComponent(teacherId);
+  frame.dataset.loaded = frame.src;
+  popup.classList.add("open");
+};
+
 window.toggleVisibilityMenu = function(event) {
   event?.stopPropagation();
   const menu = document.getElementById("visibilityMenu");
@@ -2101,10 +2111,12 @@ document.addEventListener("click", (event) => {
 window.addEventListener("message", (event) => {
   const data = event.data;
   if (!data || data.type !== "open-chat-popup") return;
+  const teacherId = data.payload?.teacherId;
   const userId = data.payload?.userId;
-  if (!userId) return;
+  if (!userId && !teacherId) return;
   closeSocialPanel();
-  openChatPopupForUser(userId);
+  if (teacherId) openChatPopupForTeacher(teacherId);
+  else openChatPopupForUser(userId);
 });
 
 window.addEventListener("resize", () => {

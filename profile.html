@@ -923,6 +923,7 @@ section.box:has(#teacherTrialForm) .panel-title {
 <script src="image_upload.js"></script>
 <script>
 let currentUser = null;
+let currentProfile = null;
 let viewedProfile = null;
 let viewedUserId = null;
 let profileChannels = [];
@@ -980,7 +981,10 @@ window.openProfileChatPopup = function(userId) {
   const popup = document.getElementById("profileChatPopup");
   const frame = document.getElementById("profileChatPopupFrame");
   if (!popup || !frame) return;
-  const src = "messages.html?popup=1&user=" + encodeURIComponent(userId);
+  const isTeacherProfile = viewedProfile?.role === "teacher" && currentProfile && ["student", "parent"].includes(currentProfile.role);
+  const src = isTeacherProfile
+    ? "messages.html?popup=1&teacher=" + encodeURIComponent(userId)
+    : "messages.html?popup=1&user=" + encodeURIComponent(userId);
   if (frame.dataset.loaded !== src) {
     frame.src = src;
     frame.dataset.loaded = src;
@@ -995,6 +999,14 @@ window.closeProfileChatPopup = function() {
 async function init() {
   const { data: { user } } = await sb.auth.getUser();
   currentUser = user || null;
+  if (currentUser?.id) {
+    const { data: signedInProfile } = await sb
+      .from("users")
+      .select("id, role")
+      .eq("id", currentUser.id)
+      .maybeSingle();
+    currentProfile = signedInProfile || null;
+  }
   const params = new URLSearchParams(location.search);
   viewedUserId = params.get("id") || user?.id;
   if (!viewedUserId) {
