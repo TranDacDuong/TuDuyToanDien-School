@@ -695,7 +695,11 @@ async function fetchUsersByIds(userIds) {
 
 async function fetchLearningConversationItems() {
   if (!window.LearningMessages) return [];
-  await sb.rpc("materialize_my_learning_conversations").catch(() => null);
+  try {
+    await sb.rpc("materialize_my_learning_conversations");
+  } catch (_) {
+    // Function may be absent while SQL migrations are being applied; keep chat list usable.
+  }
   const { data, error } = await sb.rpc("list_student_learning_conversations");
   if (error) {
     if (!/Could not find the function|schema cache|PGRST202/i.test(error.message || "")) {
