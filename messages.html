@@ -34,10 +34,10 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
 }
 .popup-mode body { background: transparent; }
 .popup-mode .page { padding: 0; height: 100vh; }
-.popup-mode .shell { grid-template-columns: 1fr; gap: 0; height: 100vh; }
+.popup-mode .shell { grid-template-columns: 1fr; gap: 0; height: 100vh; min-width: 0; }
 .popup-mode .chat-panel { display: none; }
 .popup-mode.mobile-chat-open aside.panel { display: none; }
-.popup-mode.mobile-chat-open .chat-panel { display: grid; }
+.popup-mode.mobile-chat-open .chat-panel { display: grid; grid-template-rows: auto minmax(0,1fr) auto; min-height: 100vh; }
 .popup-mode .panel {
   border-radius: 0;
   border: none;
@@ -49,6 +49,7 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
 }
 .popup-mode .message-list {
   padding: 14px;
+  min-height: 0;
 }
 .popup-mode .composer {
   padding: 10px 12px 12px;
@@ -70,9 +71,11 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
 }
 .popup-mode .composer-row {
   flex-direction: row !important;
+  align-items: center;
   gap: 6px;
 }
 .popup-mode .composer textarea {
+  flex: 1 1 auto;
   width: auto;
   min-width: 0;
   min-height: 38px;
@@ -81,8 +84,11 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
   border-radius: 18px;
   resize: none;
 }
+.popup-mode #attachBtn,
 .popup-mode #sendBtn {
-  width: 30px !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
 }
 .composer-icon {
   display: block;
@@ -471,38 +477,6 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
       </div>
       <div class="search-wrap">
         <input id="friendSearch" class="search-input" placeholder="Tìm người dùng hoặc cuộc trò chuyện..." oninput="filterFriends()">
-      </div>
-      <div id="friendList" class="friend-list">
-        <div class="empty"><strong>Đang tải</strong>Danh sách bạn bè đang được chuẩn bị...</div>
-      </div>
-    </aside>
-
-    <section class="panel chat-panel">
-      <div class="chat-head">
-        <div class="chat-head-bar">
-          <button class="chat-back" type="button" onclick="closeMobileConversation()">←</button>
-        </div>
-        <div id="chatTitle" class="chat-title">Chưa chọn cuộc trò chuyện</div>
-        <div id="chatSub" class="chat-sub">Hãy chọn một người ở cột bên trái</div>
-      </div>
-      <div id="messageList" class="message-list">
-        <div class="empty"><strong>Chưa chọn cuộc trò chuyện</strong>Hãy chọn một người ở cột bên trái để bắt đầu nhắn tin.</div>
-      </div>
-      <div class="composer">
-        <div id="imagePreview" class="image-preview">
-          <img id="imagePreviewImg" alt="Xem trước ảnh">
-        </div>
-        <div class="composer-row">
-          <button class="btn" type="button" id="attachBtn" onclick="chooseMessageImage()" title="Chọn ảnh" aria-label="Chọn ảnh" disabled><svg class="composer-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v13H4zM7 15l3.4-3.5 2.6 2.6 1.8-1.8L18 15.5M8 9h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-          <textarea id="messageInput" placeholder="Nhập tin nhắn..." disabled></textarea>
-          <button class="btn btn-primary" id="sendBtn" onclick="sendMessage()" title="Gửi tin nhắn" aria-label="Gửi tin nhắn" disabled><svg class="composer-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 3-7.6 18-3.1-7.3L3 10.6 21 3Zm-10.7 10.7L21 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-        </div>
-        <div class="composer-tools">
-          <div class="attach-wrap">
-            <input id="messageImage" class="hidden-input" type="file" accept="image/*" onchange="previewMessageImage()">
-            <span id="attachName" class="attach-name"></span>
-          </div>
-        </div>
       </div>
       <div id="friendList" class="friend-list">
         <div class="empty"><strong>Đang tải</strong>Danh sách bạn bè đang được chuẩn bị...</div>
