@@ -826,6 +826,16 @@ body {
   z-index: 1100;
 }
 .chat-popup.open { display: block; }
+.chat-popup.mindup-fullscreen {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-height: none;
+  border-radius: 0;
+}
 .chat-popup-head {
   display: flex;
   align-items: center;
@@ -843,6 +853,10 @@ body {
   height: calc(100% - 50px);
   border: none;
   background: #fff;
+}
+.chat-popup.mindup-fullscreen .chat-popup-frame {
+  height: calc(100dvh - 50px);
+  min-height: 0;
 }
 /* â”€â”€ Compose â”€â”€ */
 .compose-card {
@@ -1480,6 +1494,22 @@ body {
   #chatPopup .chat-popup-frame {
     min-height: 70dvh;
   }
+
+  #chatPopup.mindup-fullscreen {
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: 100dvh !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+  }
+
+  #chatPopup.mindup-fullscreen .chat-popup-frame {
+    height: calc(100dvh - 50px);
+    min-height: 0;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1537,6 +1567,22 @@ body {
 
   #chatPopup .chat-popup-frame {
     min-height: calc(100dvh - 110px);
+  }
+
+  #chatPopup.mindup-fullscreen {
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: 100dvh !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+  }
+
+  #chatPopup.mindup-fullscreen .chat-popup-frame {
+    height: calc(100dvh - 50px);
+    min-height: 0;
   }
 }
 </style>
@@ -2036,6 +2082,7 @@ window.toggleChatPopup = function() {
 
   const isOpen = popup.classList.contains("open");
   popup.classList.toggle("open", !isOpen);
+  popup.classList.remove("mindup-fullscreen");
   if (!isOpen && !frame.dataset.loaded) {
     frame.src = "messages.html";
     frame.dataset.loaded = "messages.html";
@@ -2048,11 +2095,23 @@ window.closeChatPopup = function() {
   popup.classList.remove("open");
 };
 
-window.openChatPopupForUser = function(userId) {
+function setChatPopupMindUpMode(enabled) {
+  const popup = document.getElementById("chatPopup");
+  if (!popup) return;
+  popup.classList.toggle("mindup-fullscreen", Boolean(enabled));
+}
+
+function isMindUpOfficialChatTarget(userId, payload = {}) {
+  const botId = "00000000-0000-0000-0000-000000000001";
+  return Boolean(payload?.officialMindUp) || String(userId || "") === botId;
+}
+
+window.openChatPopupForUser = function(userId, options = {}) {
   ensureHomeOverlayShell();
   const popup = document.getElementById("chatPopup");
   const frame = document.getElementById("chatPopupFrame");
   if (!popup || !frame || !userId) return;
+  setChatPopupMindUpMode(isMindUpOfficialChatTarget(userId, options));
   frame.src = "messages.html?popup=1&user=" + encodeURIComponent(userId);
   frame.dataset.loaded = frame.src;
   popup.classList.add("open");
@@ -2063,6 +2122,7 @@ window.openChatPopupForTeacher = function(teacherId) {
   const popup = document.getElementById("chatPopup");
   const frame = document.getElementById("chatPopupFrame");
   if (!popup || !frame || !teacherId) return;
+  setChatPopupMindUpMode(true);
   frame.src = "messages.html?popup=1&user=00000000-0000-0000-0000-000000000001";
   frame.dataset.loaded = frame.src;
   popup.classList.add("open");
@@ -2116,7 +2176,7 @@ window.addEventListener("message", (event) => {
   if (!userId && !teacherId) return;
   closeSocialPanel();
   if (teacherId) openChatPopupForTeacher(teacherId);
-  else openChatPopupForUser(userId);
+  else openChatPopupForUser(userId, data.payload || {});
 });
 
 window.addEventListener("resize", () => {
