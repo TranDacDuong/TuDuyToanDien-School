@@ -216,8 +216,19 @@ function fillPdfGrades(el, placeholder) {
 
 function fillPdfSubjects(el, gradeId, placeholder) {
   if (!el) return;
-  const list = gradeId ? PDF_STATE.subjects.filter((subject) => subject.grade_id === gradeId) : PDF_STATE.subjects;
-  el.innerHTML = `<option value="">${placeholder}</option>` + list.map((subject) => `<option value="${subject.id}">${esc(subject.name)}</option>`).join("");
+  const source = gradeId ? PDF_STATE.subjects.filter((subject) => subject.grade_id === gradeId) : PDF_STATE.subjects;
+  const seen = new Set();
+  const list = [];
+  source.forEach((subject) => {
+    const name = String(subject?.name || "").trim();
+    const key = name.toLocaleLowerCase("vi");
+    if (!name || seen.has(key)) return;
+    seen.add(key);
+    list.push(subject);
+  });
+  list.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "vi"));
+  const isFilter = el === PDF_EL.subjectFilter;
+  el.innerHTML = `<option value="">${placeholder}</option>` + list.map((subject) => `<option value="${isFilter ? esc(subject.name) : subject.id}">${esc(subject.name)}</option>`).join("");
 }
 
 function getPdfQuestions(examId) {
@@ -502,13 +513,14 @@ function renderDraftQuestionList() {
 function renderPdfExamGrid() {
   const keyword = String(PDF_EL.keyword?.value || "").trim().toLowerCase();
   const gradeId = PDF_EL.gradeFilter?.value || "";
-  const subjectId = PDF_EL.subjectFilter?.value || "";
+  const subjectFilter = PDF_EL.subjectFilter?.value || "";
   const status = PDF_STATE.role === "student" ? "open" : (PDF_EL.statusFilter?.value || "");
   const list = PDF_STATE.exams.filter((exam) => {
+    const subjectName = PDF_STATE.subjects.find((item) => item.id === exam.subject_id)?.name || "";
     const text = `${exam.title || ""} ${exam.description || ""}`.toLowerCase();
     if (keyword && !text.includes(keyword)) return false;
     if (gradeId && exam.grade_id !== gradeId) return false;
-    if (subjectId && exam.subject_id !== subjectId) return false;
+    if (subjectFilter && subjectName !== subjectFilter) return false;
     if (status && exam.status !== status) return false;
     return true;
   });

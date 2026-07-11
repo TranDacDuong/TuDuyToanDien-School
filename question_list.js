@@ -76,7 +76,14 @@ f_grade.onchange = async () => {
   }
 
   const { data } = await sb.from("subjects").select("*").eq("grade_id", f_grade.value)
-  ;(data || []).forEach((s) => {
+  const seenSubjects = new Set()
+  ;(data || []).filter((s) => {
+    const name = String(s.name || "").trim()
+    const key = name.toLocaleLowerCase("vi")
+    if (!name || seenSubjects.has(key)) return false
+    seenSubjects.add(key)
+    return true
+  }).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi")).forEach((s) => {
     f_subject.innerHTML += `<option value="${s.id}">${s.name}</option>`
   })
   render()

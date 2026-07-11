@@ -1021,6 +1021,7 @@
         return !!getActiveGameConfig(GAME.selectedAutoMode, gradeId, subject.id);
       });
     }
+    subjects = uniqueSubjectsByName(subjects);
     grid.innerHTML = subjects.length
       ? subjects.map((subject) => {
           const selected = EL.subjectFilter?.value === subject.id;
@@ -2283,9 +2284,20 @@
     if (el === EL.gradeFilter) renderGradeCards();
   }
 
+  function uniqueSubjectsByName(list) {
+    const map = new Map();
+    (list || []).forEach((subject) => {
+      const name = String(subject?.name || "").trim();
+      const key = name.toLocaleLowerCase("vi");
+      if (!name || map.has(key)) return;
+      map.set(key, subject);
+    });
+    return [...map.values()].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "vi"));
+  }
+
   function fillSubjects(el, gradeId, placeholder) {
     if (!el) return;
-    const list = gradeId ? GAME.subjects.filter((subject) => subject.grade_id === gradeId) : GAME.subjects;
+    const list = uniqueSubjectsByName(gradeId ? GAME.subjects.filter((subject) => subject.grade_id === gradeId) : GAME.subjects);
     el.innerHTML = `<option value="">${placeholder}</option>` + list.map((subject) => `<option value="${subject.id}">${esc(subject.name)}</option>`).join("");
     if (el === EL.subjectFilter) renderSubjectCards();
   }

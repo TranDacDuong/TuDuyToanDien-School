@@ -38,7 +38,14 @@ async function loadSelectData() {
     const { data: subjects, error } = await sb
       .from("subjects").select("*").eq("grade_id", grade.value).order("id");
     if (error) { console.error(error); return; }
-    subjects?.forEach(s => subject.appendChild(new Option(s.name, s.id)));
+    const seenSubjects = new Set();
+    (subjects || []).filter(s => {
+      const name = String(s.name || "").trim();
+      const key = name.toLocaleLowerCase("vi");
+      if (!name || seenSubjects.has(key)) return false;
+      seenSubjects.add(key);
+      return true;
+    }).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi")).forEach(s => subject.appendChild(new Option(s.name, s.id)));
   });
 
   subject.addEventListener("change", async () => {

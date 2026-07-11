@@ -179,7 +179,11 @@ async function loadBase(){
 
 function fillSubjects(el,gradeId,ph){
   const list=gradeId?S.subjects.filter(x=>x.grade_id===gradeId):S.subjects;
-  el.innerHTML=`<option value="">${ph}</option>`+list.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
+  const seen=new Set(), unique=[];
+  list.forEach(x=>{const name=String(x.name||'').trim(),key=normalize(name);if(!name||seen.has(key))return;seen.add(key);unique.push(x)});
+  unique.sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'vi'));
+  const isFilter=el===E.subjectFilter;
+  el.innerHTML=`<option value="">${ph}</option>`+unique.map(x=>`<option value="${isFilter?esc(x.name):x.id}">${esc(x.name)}</option>`).join('');
 }
 
 async function loadData(){
@@ -196,8 +200,9 @@ function renderMaterials(){
   const g=E.gradeFilter.value;
   const s=E.subjectFilter.value;
   const list=S.materials.filter(item=>{
+    const subjectName=S.subjects.find(x=>x.id===item.subject_id)?.name||'';
     if(g&&item.grade_id!==g) return false;
-    if(s&&item.subject_id!==s) return false;
+    if(s&&normalize(subjectName)!==normalize(s)) return false;
     if(k&&!normalize(`${item.title||''} ${item.description||''}`).includes(k)) return false;
     return true;
   });

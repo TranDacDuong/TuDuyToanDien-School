@@ -564,7 +564,14 @@ QUY TAC QUAN TRONG:
       if (topicEl) topicEl.innerHTML = '<option value="">Chọn chủ đề</option>';
       if (!gradeEl.value) return;
       const { data } = await sb.from("subjects").select("*").eq("grade_id", gradeEl.value).order("name");
-      (data||[]).forEach(s => subjEl.appendChild(new Option(s.name, s.id)));
+      const seenSubjects = new Set();
+      (data||[]).filter(s => {
+        const name = String(s.name || "").trim();
+        const key = name.toLocaleLowerCase("vi");
+        if (!name || seenSubjects.has(key)) return false;
+        seenSubjects.add(key);
+        return true;
+      }).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi")).forEach(s => subjEl.appendChild(new Option(s.name, s.id)));
     };
 
     document.getElementById("aiSubject").onchange = async () => {

@@ -391,7 +391,14 @@
     topicSel.innerHTML = '<option value="">Tất cả chủ đề</option>';
     if (gradeId) {
       const { data } = await sb.from("subjects").select("*").eq("grade_id", gradeId).order("name");
-      (data || []).forEach(s => subSel.appendChild(new Option(s.name, s.id)));
+      const seenSubjects = new Set();
+      (data || []).filter(s => {
+        const name = String(s.name || "").trim();
+        const key = name.toLocaleLowerCase("vi");
+        if (!name || seenSubjects.has(key)) return false;
+        seenSubjects.add(key);
+        return true;
+      }).forEach(s => subSel.appendChild(new Option(s.name, s.id)));
     }
     bankPage = 0; loadBank();
   };

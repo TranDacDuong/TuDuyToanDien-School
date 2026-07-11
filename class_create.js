@@ -335,7 +335,14 @@ async function loadSubjects(gradeId){
   const sb = getSb();
   const {data} = await sb.from("subjects").select("id,name").eq("grade_id",gradeId).order("name");
   subjectSelect.innerHTML = '<option value="">-- Chọn môn --</option>';
-  data.forEach(s => subjectSelect.appendChild(new Option(s.name, s.id)));
+  const seenSubjects = new Set();
+  (data || []).filter(s => {
+    const name = String(s.name || "").trim();
+    const key = name.toLocaleLowerCase("vi");
+    if (!name || seenSubjects.has(key)) return false;
+    seenSubjects.add(key);
+    return true;
+  }).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi")).forEach(s => subjectSelect.appendChild(new Option(s.name, s.id)));
 }
 
 gradeSelect.onchange = () => loadSubjects(gradeSelect.value);

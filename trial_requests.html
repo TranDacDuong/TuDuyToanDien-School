@@ -310,7 +310,13 @@ function renderSubjectOptions(selected=""){
   const sel = document.getElementById("subjectText");
   const gradeText = document.getElementById("gradeText")?.value || "";
   const grade = S.grades.find(g=>String(g.name||"")===String(gradeText));
-  const subjects = S.subjects.filter(s=>!grade?.id || s.grade_id===grade.id).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi"));
+  const seen = new Set();
+  const subjects = S.subjects.filter(s=>!grade?.id || s.grade_id===grade.id).filter(s=>{
+    const name=String(s.name||"").trim(), key=rmVN(name);
+    if(!name || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi"));
   sel.innerHTML = '<option value="">-- Chọn môn --</option>' + subjects.map(s=>`<option value="${escAttr(s.name||"")}" ${String(s.name||"")===String(selected)?"selected":""}>${esc(s.name||"")}</option>`).join("");
 }
 function renderSubjectFilter(){
