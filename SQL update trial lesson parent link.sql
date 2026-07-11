@@ -1,8 +1,7 @@
--- Add parent contact fields for trial lesson requests.
+-- Lưu trực tiếp tài khoản phụ huynh đã link vào bản ghi học thử.
+-- Giúp danh sách học thử luôn hiện đúng "Đã link" ngay sau khi bấm Lưu học thử.
 
 ALTER TABLE public.trial_lesson_requests
-ADD COLUMN IF NOT EXISTS parent_full_name text,
-ADD COLUMN IF NOT EXISTS parent_phone text,
 ADD COLUMN IF NOT EXISTS parent_id uuid;
 
 DO $$

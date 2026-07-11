@@ -2817,17 +2817,37 @@ async function loadTrialRequests(){
   const rows = data || [];
   const teacherIds = [...new Set(rows.map(item => item.teacher_id).filter(Boolean))];
   const studentIds = [...new Set(rows.map(item => item.student_id).filter(Boolean))];
+  const directParentIds = [...new Set(rows.map(item => item.parent_id).filter(Boolean))];
   let teacherMap = {};
+  let directParentMap = {};
+  let parentMapByStudent = {};
   _trialStudentMap = {};
   if(teacherIds.length){
     const { data: teachers } = await sb.from('users').select('id,full_name,email').in('id', teacherIds);
     teacherMap = Object.fromEntries((teachers || []).map(t => [t.id, t]));
   }
+  if(directParentIds.length){
+    const { data: parents } = await sb.from('users').select('id,full_name,email,phone,role,account_password').in('id', directParentIds);
+    directParentMap = Object.fromEntries((parents || []).filter(parent => parent.role === 'parent').map(parent => [parent.id, parent]));
+  }
   if(studentIds.length){
     const { data: students } = await sb.from('users').select('id,full_name,email,phone,parent_full_name,parent_phone,school').in('id', studentIds);
     _trialStudentMap = Object.fromEntries((students || []).map(s => [s.id, s]));
+    const { data: links } = await sb.from('parent_students')
+      .select('student_id,parent_id')
+      .in('student_id', studentIds)
+      .is('revoked_at', null);
+    const linkParentIds = [...new Set((links || []).map(row => row.parent_id).filter(Boolean))];
+    let linkParentMap = {};
+    if(linkParentIds.length){
+      const { data: parents } = await sb.from('users').select('id,full_name,email,phone,role,account_password').in('id', linkParentIds);
+      linkParentMap = Object.fromEntries((parents || []).filter(parent => parent.role === 'parent').map(parent => [parent.id, parent]));
+    }
+    (links || []).forEach(link => {
+      if(!parentMapByStudent[link.student_id] && linkParentMap[link.parent_id]) parentMapByStudent[link.student_id] = linkParentMap[link.parent_id];
+    });
   }
-  _trialRequests = rows.map(item => ({ ...item, teacher: teacherMap[item.teacher_id] || null, linkedStudent: _trialStudentMap[item.student_id] || null }));
+  _trialRequests = rows.map(item => ({ ...item, teacher: teacherMap[item.teacher_id] || null, linkedStudent: _trialStudentMap[item.student_id] || null, linkedParent: directParentMap[item.parent_id] || parentMapByStudent[item.student_id] || null }));
   syncTrialComputedStatuses();
   renderTrialRequests();
 }
@@ -2881,6 +2901,7 @@ function renderTrialRequests(){
       <td>
         <div style="font-weight:700;color:var(--navy)">${esc(item.parent_full_name || '—')}</div>
         <div style="margin-top:6px"><button class="btn btn-outline btn-sm" type="button" onclick="event.stopPropagation()" data-copy-phone="${escAttr(item.parent_phone || '')}">${esc(item.parent_phone || '—')}</button></div>
+        ${item.linkedParent ? `<div style="font-size:.74rem;color:#047857;margin-top:3px">Đã link: ${esc(item.linkedParent.email || item.linkedParent.full_name || '')}</div>` : `<div style="font-size:.74rem;color:var(--ink-light);margin-top:3px">Chưa link tài khoản phụ huynh</div>`}
       </td>
       <td>
         <div style="font-weight:700;color:var(--navy)">${esc(item.grade || '—')}</div>
