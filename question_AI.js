@@ -555,7 +555,14 @@ QUY TAC QUAN TRONG:
     const sb = getSb();
     const { data: grades } = await sb.from("grades").select("*").order("name");
     const gradeEl = document.getElementById("aiGrade");
-    (grades||[]).forEach(g => gradeEl.appendChild(new Option(g.name, g.id)));
+    const seenGrades = new Set();
+    (grades||[]).filter(g => {
+      const name = String(g.name || "").trim();
+      const key = name.toLocaleLowerCase("vi");
+      if (!name || seenGrades.has(key)) return false;
+      seenGrades.add(key);
+      return true;
+    }).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi")).forEach(g => gradeEl.appendChild(new Option(g.name, g.id)));
 
     gradeEl.onchange = async () => {
       const subjEl = document.getElementById("aiSubject");
@@ -580,7 +587,14 @@ QUY TAC QUAN TRONG:
       const subjVal = document.getElementById("aiSubject").value;
       if (!subjVal) return;
       const { data } = await sb.from("topics").select("*").eq("subject_id", subjVal).order("name");
-      (data||[]).forEach(t => topicEl?.appendChild(new Option(t.name, t.id)));
+      const seenTopics = new Set();
+      (data||[]).filter(t => {
+        const name = String(t.name || "").trim();
+        const key = name.toLocaleLowerCase("vi");
+        if (!name || seenTopics.has(key)) return false;
+        seenTopics.add(key);
+        return true;
+      }).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi")).forEach(t => topicEl?.appendChild(new Option(t.name, t.id)));
     };
   }
 

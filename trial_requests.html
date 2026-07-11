@@ -300,7 +300,13 @@ function dateOptions(scheduleId, afterValue, selectedDate){
 function renderGradeOptions(selected=""){
   const grade = document.getElementById("gradeText");
   const filter = document.getElementById("gradeFilter");
-  const grades = [...S.grades].sort((a,b)=>parseInt(a.name)-parseInt(b.name));
+  const seen = new Set();
+  const grades = [...S.grades].filter(g=>{
+    const name=String(g.name||"").trim(), key=rmVN(name);
+    if(!name || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).sort((a,b)=>parseInt(a.name)-parseInt(b.name));
   const html = '<option value="">-- Chọn khối --</option>' + grades.map(g=>`<option value="${escAttr(g.name||"")}" ${String(g.name||"")===String(selected)?"selected":""}>Khối ${esc(g.name||"")}</option>`).join("");
   grade.innerHTML = html;
   const prev = filter.value || "";
@@ -309,9 +315,9 @@ function renderGradeOptions(selected=""){
 function renderSubjectOptions(selected=""){
   const sel = document.getElementById("subjectText");
   const gradeText = document.getElementById("gradeText")?.value || "";
-  const grade = S.grades.find(g=>String(g.name||"")===String(gradeText));
+  const gradeIds = S.grades.filter(g=>String(g.name||"")===String(gradeText)).map(g=>g.id);
   const seen = new Set();
-  const subjects = S.subjects.filter(s=>!grade?.id || s.grade_id===grade.id).filter(s=>{
+  const subjects = S.subjects.filter(s=>!gradeIds.length || gradeIds.includes(s.grade_id)).filter(s=>{
     const name=String(s.name||"").trim(), key=rmVN(name);
     if(!name || seen.has(key)) return false;
     seen.add(key);
@@ -323,9 +329,9 @@ function renderSubjectFilter(){
   const sel = document.getElementById("subjectFilter");
   const prev = sel.value || "";
   const gradeText = document.getElementById("gradeFilter")?.value || "";
-  const grade = S.grades.find(g=>String(g.name||"")===String(gradeText));
+  const gradeIds = S.grades.filter(g=>String(g.name||"")===String(gradeText)).map(g=>g.id);
   const map = new Map();
-  S.subjects.filter(s=>!grade?.id || s.grade_id===grade.id).forEach(s=>{
+  S.subjects.filter(s=>!gradeIds.length || gradeIds.includes(s.grade_id)).forEach(s=>{
     const name = String(s.name || "").trim(), key = rmVN(name);
     if(name && key && !map.has(key)) map.set(key,name);
   });

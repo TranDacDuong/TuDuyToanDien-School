@@ -28,7 +28,14 @@ async function loadSelectData() {
   if (gErr) { console.error(gErr); return; }
 
   grade.innerHTML = `<option value="">Chọn khối</option>`;
-  grades?.forEach(g => grade.appendChild(new Option(g.name, g.id)));
+  const seenGrades = new Set();
+  (grades || []).filter(g => {
+    const name = String(g.name || "").trim();
+    const key = name.toLocaleLowerCase("vi");
+    if (!name || seenGrades.has(key)) return false;
+    seenGrades.add(key);
+    return true;
+  }).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi")).forEach(g => grade.appendChild(new Option(g.name, g.id)));
 
   grade.addEventListener("change", async () => {
     subject.innerHTML = `<option value="">Chọn môn</option>`;
@@ -55,7 +62,14 @@ async function loadSelectData() {
     const { data: topics, error } = await sb
       .from("topics").select("*").eq("subject_id", subject.value).order("name");
     if (error) { console.error(error); return; }
-    topics?.forEach(t => topic.appendChild(new Option(t.name, t.id)));
+    const seenTopics = new Set();
+    (topics || []).filter(t => {
+      const name = String(t.name || "").trim();
+      const key = name.toLocaleLowerCase("vi");
+      if (!name || seenTopics.has(key)) return false;
+      seenTopics.add(key);
+      return true;
+    }).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi")).forEach(t => topic.appendChild(new Option(t.name, t.id)));
   });
 }
 

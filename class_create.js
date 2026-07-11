@@ -328,7 +328,14 @@ async function loadGrades(){
   const sb = getSb();
   const {data} = await sb.from("grades").select("id,name").order("name");
   gradeSelect.innerHTML = '<option value="">-- Chọn khối --</option>';
-  data.forEach(g => gradeSelect.appendChild(new Option(g.name, g.id)));
+  const seenGrades = new Set();
+  (data || []).filter(g => {
+    const name = String(g.name || "").trim();
+    const key = name.toLocaleLowerCase("vi");
+    if(!name || seenGrades.has(key)) return false;
+    seenGrades.add(key);
+    return true;
+  }).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi")).forEach(g => gradeSelect.appendChild(new Option(g.name, g.id)));
 }
 
 async function loadSubjects(gradeId){

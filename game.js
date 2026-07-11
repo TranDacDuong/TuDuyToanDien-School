@@ -2280,7 +2280,15 @@
 
   function fillGrades(el, placeholder) {
     if (!el) return;
-    el.innerHTML = `<option value="">${placeholder}</option>` + GAME.grades.map((grade) => `<option value="${grade.id}">${esc(grade.name)}</option>`).join("");
+    const seen = new Set();
+    const list = (GAME.grades || []).filter((grade) => {
+      const name = String(grade?.name || "").trim();
+      const key = name.toLocaleLowerCase("vi");
+      if (!name || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "vi"));
+    el.innerHTML = `<option value="">${placeholder}</option>` + list.map((grade) => `<option value="${grade.id}">${esc(grade.name)}</option>`).join("");
     if (el === EL.gradeFilter) renderGradeCards();
   }
 
@@ -2304,7 +2312,14 @@
 
   function fillTopics(el, subjectId, placeholder) {
     if (!el) return;
-    const list = subjectId ? GAME.topics.filter((topic) => topic.subject_id === subjectId) : [];
+    const seen = new Set();
+    const list = (subjectId ? GAME.topics.filter((topic) => topic.subject_id === subjectId) : []).filter((topic) => {
+      const name = String(topic?.name || "").trim();
+      const key = name.toLocaleLowerCase("vi");
+      if (!name || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "vi"));
     el.innerHTML = `<option value="">${placeholder}</option>` + list.map((topic) => `<option value="${topic.id}">${esc(topic.name)}</option>`).join("");
   }
 

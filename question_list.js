@@ -59,10 +59,18 @@ async function loadGrades() {
     return
   }
 
-  grades = (data || []).sort((a, b) => Number(a.name) - Number(b.name))
+  grades = data || []
+  const seenGrades = new Set()
+  const displayGrades = grades.filter((g) => {
+    const name = String(g.name || "").trim()
+    const key = name.toLocaleLowerCase("vi")
+    if (!name || seenGrades.has(key)) return false
+    seenGrades.add(key)
+    return true
+  }).sort((a, b) => Number(a.name) - Number(b.name))
   f_grade.innerHTML = "<option value=''>Khối</option>"
-  grades.forEach((g) => {
-    f_grade.innerHTML += `<option value="${g.id}">${g.name}</option>`
+  displayGrades.forEach((g) => {
+    f_grade.innerHTML += `<option value="${g.name}">${g.name}</option>`
   })
 }
 
@@ -75,7 +83,10 @@ f_grade.onchange = async () => {
     return
   }
 
-  const { data } = await sb.from("subjects").select("*").eq("grade_id", f_grade.value)
+  const gradeIds = grades.filter((g) => String(g.name || "") === String(f_grade.value)).map((g) => g.id)
+  const { data } = gradeIds.length
+    ? await sb.from("subjects").select("*").in("grade_id", gradeIds)
+    : { data: [] }
   const seenSubjects = new Set()
   ;(data || []).filter((s) => {
     const name = String(s.name || "").trim()
@@ -84,7 +95,7 @@ f_grade.onchange = async () => {
     seenSubjects.add(key)
     return true
   }).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi")).forEach((s) => {
-    f_subject.innerHTML += `<option value="${s.id}">${s.name}</option>`
+    f_subject.innerHTML += `<option value="${s.name}">${s.name}</option>`
   })
   render()
 }
@@ -97,9 +108,19 @@ f_subject.onchange = async () => {
     return
   }
 
-  const { data } = await sb.from("topics").select("*").eq("subject_id", f_subject.value).order("name")
-  ;(data || []).forEach((t) => {
-    f_topic.innerHTML += `<option value="${t.id}">${t.name}</option>`
+  const subjectIds = [...new Set(questions.map((q) => questionSubject(q)).filter((s) => String(s?.name || "") === String(f_subject.value)).map((s) => s.id))]
+  const { data } = subjectIds.length
+    ? await sb.from("topics").select("*").in("subject_id", subjectIds).order("name")
+    : { data: [] }
+  const seenTopics = new Set()
+  ;(data || []).filter((t) => {
+    const name = String(t.name || "").trim()
+    const key = name.toLocaleLowerCase("vi")
+    if (!name || seenTopics.has(key)) return false
+    seenTopics.add(key)
+    return true
+  }).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi")).forEach((t) => {
+    f_topic.innerHTML += `<option value="${t.name}">${t.name}</option>`
   })
   render()
 }
@@ -319,9 +340,9 @@ function getBaseFilteredQuestions() {
   let list = [...questions]
 
   if (!isAdmin) list = list.filter((q) => !q.hidden)
-  if (f_grade.value) list = list.filter((q) => questionGrade(q)?.id == f_grade.value)
-  if (f_subject.value) list = list.filter((q) => questionSubject(q)?.id == f_subject.value)
-  if (f_topic.value) list = list.filter((q) => q.topic_id == f_topic.value)
+  if (f_grade.value) list = list.filter((q) => String(questionGrade(q)?.name || "") === String(f_grade.value))
+  if (f_subject.value) list = list.filter((q) => String(questionSubject(q)?.name || "") === String(f_subject.value))
+  if (f_topic.value) list = list.filter((q) => String(questionTopicName(q) || "") === String(f_topic.value))
   if (f_type.value) list = list.filter((q) => q.question_type === f_type.value)
   if (f_difficulty.value) list = list.filter((q) => q.difficulty == f_difficulty.value)
 
@@ -1390,7 +1411,14 @@ async function editQ(id) {
     if (subjectId) {
       const { data: topics } = await sb.from("topics").select("*").eq("subject_id", subjectId).order("name")
       topic.innerHTML = "<option value=''>Chủ đề</option>"
-      ;(topics || []).forEach((t) => {
+      const seenTopics = new Set()
+      ;(topics || []).filter((t) => {
+        const name = String(t.name || "").trim()
+        const key = name.toLocaleLowerCase("vi")
+        if (!name || seenTopics.has(key)) return false
+        seenTopics.add(key)
+        return true
+      }).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi")).forEach((t) => {
         topic.innerHTML += `<option value="${t.id}">${t.name}</option>`
       })
       topic.value = q.topic_id || ""

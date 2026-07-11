@@ -158,11 +158,21 @@
       sb.from("subjects").select("id,name,grade_id").order("name"),
     ]);
     _allSubjects = subjects || [];
+    const uniqueByName = (items) => {
+      const seen = new Set();
+      return (items || []).filter(item => {
+        const name = String(item?.name || "").trim();
+        const key = name.toLocaleLowerCase("vi");
+        if(!name || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi"));
+    };
 
     const gradeEl = document.getElementById("filterGrade");
     if(gradeEl){
       gradeEl.innerHTML = '<option value="">Tất cả khối</option>';
-      (grades||[]).forEach(g => gradeEl.appendChild(new Option(g.name, g.id)));
+      uniqueByName(grades).forEach(g => gradeEl.appendChild(new Option(g.name, g.name)));
     }
     const subEl = document.getElementById("filterSubject");
     if(subEl){
@@ -179,16 +189,25 @@
   }
 
   function onGradeChange(){
-    const gradeId = document.getElementById("filterGrade")?.value || "";
+    const gradeName = document.getElementById("filterGrade")?.value || "";
     const subEl   = document.getElementById("filterSubject");
     if(!subEl) return;
-    if(!gradeId){
+    if(!gradeName){
       subEl.innerHTML = '<option value="">Chọn khối trước</option>';
       subEl.disabled = true;
     } else {
-      const filtered = _allSubjects.filter(s => s.grade_id === gradeId);
+      const gradeIds = _allClasses.filter(c => String(c.grades?.name || "") === String(gradeName)).map(c => c.grade_id);
+      const gradeSet = new Set(gradeIds);
+      const seen = new Set();
+      const filtered = _allSubjects.filter(s => gradeSet.has(s.grade_id)).filter(s => {
+        const name = String(s.name || "").trim();
+        const key = name.toLocaleLowerCase("vi");
+        if(!name || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi"));
       subEl.innerHTML = '<option value="">Tất cả môn</option>';
-      filtered.forEach(s => subEl.appendChild(new Option(s.name, s.id)));
+      filtered.forEach(s => subEl.appendChild(new Option(s.name, s.name)));
       subEl.disabled = false;
     }
     applyFilters();
@@ -209,13 +228,13 @@
   }
 
   function applyFilters(){
-    const gradeId = document.getElementById("filterGrade")?.value   || "";
-    const subId   = document.getElementById("filterSubject")?.value || "";
+    const gradeName = document.getElementById("filterGrade")?.value   || "";
+    const subName   = document.getElementById("filterSubject")?.value || "";
     const teachId = document.getElementById("filterTeacher")?.value || "";
 
     const filtered = _allClasses.filter(c => {
-      if(gradeId && c.grade_id   !== gradeId) return false;
-      if(subId   && c.subject_id !== subId)   return false;
+      if(gradeName && String(c.grades?.name || "") !== String(gradeName)) return false;
+      if(subName   && String(c.subjects?.name || "") !== String(subName)) return false;
       if(teachId){
         const ids = _teacherMap[c.id] || [];
         if(!ids.includes(teachId)) return false;

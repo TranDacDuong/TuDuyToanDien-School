@@ -211,12 +211,22 @@ async function loadPdfData(reopenScreen) {
 
 function fillPdfGrades(el, placeholder) {
   if (!el) return;
-  el.innerHTML = `<option value="">${placeholder}</option>` + PDF_STATE.grades.map((grade) => `<option value="${grade.id}">${esc(grade.name)}</option>`).join("");
+  const seen = new Set();
+  const list = (PDF_STATE.grades || []).filter((grade) => {
+    const name = String(grade?.name || "").trim();
+    const key = name.toLocaleLowerCase("vi");
+    if (!name || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "vi"));
+  const isFilter = el === PDF_EL.gradeFilter;
+  el.innerHTML = `<option value="">${placeholder}</option>` + list.map((grade) => `<option value="${isFilter ? esc(grade.name) : grade.id}">${esc(grade.name)}</option>`).join("");
 }
 
 function fillPdfSubjects(el, gradeId, placeholder) {
   if (!el) return;
-  const source = gradeId ? PDF_STATE.subjects.filter((subject) => subject.grade_id === gradeId) : PDF_STATE.subjects;
+  const gradeIds = el === PDF_EL.subjectFilter && gradeId ? PDF_STATE.grades.filter((grade) => String(grade.name || "") === String(gradeId)).map((grade) => grade.id) : [];
+  const source = gradeId ? PDF_STATE.subjects.filter((subject) => el === PDF_EL.subjectFilter ? gradeIds.includes(subject.grade_id) : subject.grade_id === gradeId) : PDF_STATE.subjects;
   const seen = new Set();
   const list = [];
   source.forEach((subject) => {
@@ -512,14 +522,15 @@ function renderDraftQuestionList() {
 
 function renderPdfExamGrid() {
   const keyword = String(PDF_EL.keyword?.value || "").trim().toLowerCase();
-  const gradeId = PDF_EL.gradeFilter?.value || "";
+  const gradeFilter = PDF_EL.gradeFilter?.value || "";
   const subjectFilter = PDF_EL.subjectFilter?.value || "";
   const status = PDF_STATE.role === "student" ? "open" : (PDF_EL.statusFilter?.value || "");
   const list = PDF_STATE.exams.filter((exam) => {
+    const gradeName = PDF_STATE.grades.find((item) => item.id === exam.grade_id)?.name || "";
     const subjectName = PDF_STATE.subjects.find((item) => item.id === exam.subject_id)?.name || "";
     const text = `${exam.title || ""} ${exam.description || ""}`.toLowerCase();
     if (keyword && !text.includes(keyword)) return false;
-    if (gradeId && exam.grade_id !== gradeId) return false;
+    if (gradeFilter && gradeName !== gradeFilter) return false;
     if (subjectFilter && subjectName !== subjectFilter) return false;
     if (status && exam.status !== status) return false;
     return true;

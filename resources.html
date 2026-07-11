@@ -149,7 +149,15 @@ E.materialViewerModal.addEventListener('click',event=>{if(event.target===E.mater
 
 function esc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function normalize(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase().trim()}
-function fillSelect(el,items,ph){el.innerHTML=`<option value="">${ph}</option>`+items.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}
+function uniqueByName(items){
+  const seen=new Set();
+  return (items||[]).filter(x=>{const name=String(x?.name||'').trim(),key=normalize(name);if(!name||seen.has(key))return false;seen.add(key);return true;}).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'vi'));
+}
+function fillSelect(el,items,ph){
+  const list=uniqueByName(items);
+  const isFilter=el===E.gradeFilter;
+  el.innerHTML=`<option value="">${ph}</option>`+list.map(x=>`<option value="${isFilter?esc(x.name):x.id}">${esc(x.name)}</option>`).join('');
+}
 function isDriveUrl(url){return /^https?:\/\/(drive|docs)\.google\.com\//i.test(String(url||'').trim())}
 function getMaterialPreviewUrl(rawUrl){let url;try{url=new URL(rawUrl)}catch{return null}if(!['http:','https:'].includes(url.protocol))return null;const host=url.hostname.replace(/^www\./,'').toLowerCase();const driveMatch=url.pathname.match(/\/file\/d\/([^/]+)/);if(host==='drive.google.com'&&driveMatch)return `https://drive.google.com/file/d/${encodeURIComponent(driveMatch[1])}/preview`;const openId=host==='drive.google.com'&&url.searchParams.get('id');if(openId)return `https://drive.google.com/file/d/${encodeURIComponent(openId)}/preview`;if(host==='docs.google.com'){const parts=url.pathname.split('/').filter(Boolean),idIndex=parts.indexOf('d');if(idIndex>=0&&parts[idIndex+1])return `https://docs.google.com/${encodeURIComponent(parts[0])}/d/${encodeURIComponent(parts[idIndex+1])}/preview`}return url.href}
 function openMaterialViewer(rawUrl,title){const previewUrl=getMaterialPreviewUrl(rawUrl);if(!previewUrl)return alert('Không thể mở tài liệu này. Vui lòng kiểm tra lại đường dẫn.');E.materialViewerTitle.textContent=title||'Xem tài liệu';E.materialViewerExternal.href=rawUrl;E.materialViewerBody.innerHTML=`<iframe class="viewer-frame" src="${esc(previewUrl)}" title="${esc(E.materialViewerTitle.textContent)}" allow="autoplay" allowfullscreen></iframe>`;E.materialViewerModal.classList.add('show')}
@@ -201,7 +209,8 @@ function renderMaterials(){
   const s=E.subjectFilter.value;
   const list=S.materials.filter(item=>{
     const subjectName=S.subjects.find(x=>x.id===item.subject_id)?.name||'';
-    if(g&&item.grade_id!==g) return false;
+    const gradeName=S.grades.find(x=>x.id===item.grade_id)?.name||'';
+    if(g&&normalize(gradeName)!==normalize(g)) return false;
     if(s&&normalize(subjectName)!==normalize(s)) return false;
     if(k&&!normalize(`${item.title||''} ${item.description||''}`).includes(k)) return false;
     return true;

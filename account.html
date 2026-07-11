@@ -676,7 +676,15 @@ async function loadGrades(){
     console.error(error);
     return;
   }
-  select.innerHTML='<option value="">Chọn khối</option>' + (data||[]).map(g=>`<option value="${g.id}">${g.name}</option>`).join("");
+  const seenGrades = new Set();
+  const grades = (data||[]).filter(g => {
+    const name = String(g.name || "").trim();
+    const key = name.toLocaleLowerCase("vi");
+    if(!name || seenGrades.has(key)) return false;
+    seenGrades.add(key);
+    return true;
+  }).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi"));
+  select.innerHTML='<option value="">Chọn khối</option>' + grades.map(g=>`<option value="${g.id}">${g.name}</option>`).join("");
 }
 
 async function loadProfile(){

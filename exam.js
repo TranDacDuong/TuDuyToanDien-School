@@ -379,7 +379,14 @@
     const { data } = await sb.from("grades").select("*").order("name");
     const sel = document.getElementById("bGrade");
     sel.innerHTML = '<option value="">Tất cả khối</option>';
-    (data || []).forEach(g => sel.appendChild(new Option(g.name, g.id)));
+    const seenGrades = new Set();
+    (data || []).filter(g => {
+      const name = String(g.name || "").trim();
+      const key = name.toLocaleLowerCase("vi");
+      if (!name || seenGrades.has(key)) return false;
+      seenGrades.add(key);
+      return true;
+    }).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi")).forEach(g => sel.appendChild(new Option(g.name, g.id)));
   }
 
   window.bankGradeChange = async function () {
@@ -410,7 +417,14 @@
     topicSel.innerHTML = '<option value="">Tất cả chủ đề</option>';
     if (subjectId) {
       const { data } = await sb.from("topics").select("*").eq("subject_id", subjectId).order("name");
-      (data || []).forEach(t => topicSel.appendChild(new Option(t.name, t.id)));
+      const seenTopics = new Set();
+      (data || []).filter(t => {
+        const name = String(t.name || "").trim();
+        const key = name.toLocaleLowerCase("vi");
+        if (!name || seenTopics.has(key)) return false;
+        seenTopics.add(key);
+        return true;
+      }).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"vi")).forEach(t => topicSel.appendChild(new Option(t.name, t.id)));
     }
     bankPage = 0; loadBank();
   };

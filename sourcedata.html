@@ -2714,7 +2714,14 @@ function renderTrialGradeOptions(selectedValue = ''){
   const sel = document.getElementById('trialGradeText');
   if(!sel) return;
   const prev = selectedValue || sel.value || '';
-  const sorted = (_trialGrades || []).slice().sort((a,b) => parseInt(a.name)-parseInt(b.name));
+  const seen = new Set();
+  const sorted = (_trialGrades || []).filter(g => {
+    const name = String(g.name || '').trim();
+    const key = rmVN(name);
+    if(!name || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).sort((a,b) => parseInt(a.name)-parseInt(b.name));
   sel.innerHTML = '<option value="">-- Chọn khối --</option>' +
     sorted.map(g => `<option value="${escAttr(g.name || '')}" ${String(g.name || '')===String(prev)?'selected':''}>Khối ${esc(g.name || '')}</option>`).join('');
   if(prev && ![...sel.options].some(opt => opt.value === prev)){
@@ -2727,9 +2734,17 @@ function renderTrialSubjectOptions(selectedValue = ''){
   if(!sel) return;
   const prev = selectedValue || sel.value || '';
   const gradeText = document.getElementById('trialGradeText')?.value || '';
-  const grade = (_trialGrades || []).find(g => String(g.name || '') === String(gradeText));
+  const gradeIds = (_trialGrades || []).filter(g => String(g.name || '') === String(gradeText)).map(g => g.id);
+  const seen = new Set();
   const subjects = (_trialSubjects || [])
-    .filter(s => !grade?.id || s.grade_id === grade.id)
+    .filter(s => !gradeIds.length || gradeIds.includes(s.grade_id))
+    .filter(s => {
+      const name = String(s.name || '').trim();
+      const key = rmVN(name);
+      if(!name || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
     .sort((a,b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'));
   sel.innerHTML = '<option value="">-- Chọn môn --</option>' +
     subjects.map(s => `<option value="${escAttr(s.name || '')}" ${String(s.name || '')===String(prev)?'selected':''}>${esc(s.name || '')}</option>`).join('');
@@ -2744,13 +2759,20 @@ function renderTrialRequestFilterOptions(){
   if(!gradeSel || !subjectSel) return;
   const prevGrade = gradeSel.value || '';
   const prevSubject = subjectSel.value || '';
-  const grades = (_trialGrades || []).slice().sort((a,b) => parseInt(a.name)-parseInt(b.name));
+  const seenGrades = new Set();
+  const grades = (_trialGrades || []).filter(g => {
+    const name = String(g.name || '').trim();
+    const key = rmVN(name);
+    if(!name || seenGrades.has(key)) return false;
+    seenGrades.add(key);
+    return true;
+  }).sort((a,b) => parseInt(a.name)-parseInt(b.name));
   gradeSel.innerHTML = '<option value="">Tất cả khối</option>' +
     grades.map(g => `<option value="${escAttr(g.name || '')}" ${String(g.name || '')===String(prevGrade)?'selected':''}>Khối ${esc(g.name || '')}</option>`).join('');
-  const selectedGrade = (_trialGrades || []).find(g => String(g.name || '') === String(gradeSel.value || ''));
+  const selectedGradeIds = (_trialGrades || []).filter(g => String(g.name || '') === String(gradeSel.value || '')).map(g => g.id);
   const subjectMap = new Map();
   (_trialSubjects || [])
-    .filter(s => !selectedGrade?.id || s.grade_id === selectedGrade.id)
+    .filter(s => !selectedGradeIds.length || selectedGradeIds.includes(s.grade_id))
     .forEach(s => {
       const name = String(s.name || '').trim();
       const key = rmVN(name);
