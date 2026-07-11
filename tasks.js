@@ -248,13 +248,17 @@
 
   function staffAttendanceRows() {
     const map = new Map();
-    mergedStaffUsers().forEach(user => {
+    const staffUsers = mergedStaffUsers();
+    const adminIds = new Set(staffUsers.filter(user => user?.role === "admin").map(user => String(user.id)));
+    if (S.profile?.role === "admin" && S.profile?.id) adminIds.add(String(S.profile.id));
+    staffUsers.filter(user => user?.role !== "admin").forEach(user => {
       if (user?.id) map.set(String(user.id), { user, logs: [] });
     });
     (S.attendanceAdminLogs || []).forEach(log => {
       const logUser = attendanceLogUser(log);
       const userId = String(log.user_id || logUser?.id || "");
       if (!userId) return;
+      if (adminIds.has(userId) || logUser?.role === "admin") return;
       if (!map.has(userId)) {
         map.set(userId, {
           user: logUser || { id: userId, full_name: "Nhân viên", email: "", role: "" },
