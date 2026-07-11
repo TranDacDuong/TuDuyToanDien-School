@@ -12,11 +12,20 @@
     manualAssigneeIds: new Set(),
     taskTemplates: [],
     editingTemplateId: null,
+    attendanceLocation: null,
+    attendanceLogs: [],
   };
 
   const E = {};
   const byId = id => document.getElementById(id);
   const INTERNAL_ROLES = new Set(["admin", "teacher", "assistant", "marketing"]);
+  const DEFAULT_ATTENDANCE_LOCATION = {
+    name: "MindUp - Tư Duy Toàn Diện",
+    address: "Số 124 phố Chùa Quỳnh, Phường Bạch Mai, thành phố Hà Nội",
+    latitude: 20.9999701,
+    longitude: 105.8576233,
+    radius_meters: 200,
+  };
   const REMINDER_TYPES = new Set(["class_schedule", "child_schedule", "attendance"]);
   const DEPRECATED_SOCIAL_TASK_PATTERNS = [
     "comment dạo",
@@ -125,6 +134,154 @@
       timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit",
       year: "numeric", hour: "2-digit", minute: "2-digit",
     }).format(new Date(value));
+  }
+
+  function formatAttendanceTime(value) {
+    if (!value) return "Chưa có";
+    return new Intl.DateTimeFormat("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit",
+    }).format(new Date(value));
+  }
+
+  function formatMeters(value) {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) return "Chưa rõ";
+    const n = Number(value);
+    return n >= 1000 ? `${(n / 1000).toFixed(2)}km` : `${Math.round(n)}m`;
+  }
+
+  function attendanceStatusLabel(value) {
+    return {
+      valid: "Hợp lệ",
+      outside_radius: "Ngoài phạm vi",
+      pending: "Chờ kiểm tra",
+      invalid: "Không hợp lệ",
+    }[value] || "Chưa rõ";
+  }
+
+  function setStaffAttendanceFeedback(message = "", type = "ok") {
+    if (!E.attendanceFeedback) return;
+    E.attendanceFeedback.textContent = message;
+    E.attendanceFeedback.className = `staff-attendance-feedback ${message ? "show" : ""} ${type}`;
+  }
+
+  function setStaffAttendanceBusy(isBusy) {
+    [E.staffCheckInBtn, E.staffCheckOutBtn].forEach(button => {
+      if (button) button.disabled = Boolean(isBusy);
+    });
+  }
+
+  function getStaffPosition() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) return reject(new Error("Thiết bị/trình duyệt chưa hỗ trợ chia sẻ vị trí."));
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      });
+    });
+  }
+
+  async function loadStaffAttendanceLocation() {
+    S.attendanceLocation = DEFAULT_ATTENDANCE_LOCATION;
+    const { data, error } = await sb.from("staff_attendance_locations")
+      .select("id,name,address,latitude,longitude,radius_meters")
+      .eq("is_active", true)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (!error && data) S.attendanceLocation = data;
+    if (error && !/does not exist|schema cache|permission denied/i.test(error.message || "")) {
+      console.warn("Load staff attendance location:", error);
+    }
+  }
+
+  async function loadStaffAttendanceToday() {
+    const today = localDate();
+    const start = `${today}T00:00:00+07:00`;
+    const end = `${today}T23:59:59+07:00`;
+    const { data, error } = await sb.from("staff_attendance_logs")
+      .select("*")
+      .eq("user_id", S.user.id)
+      .gte("checked_at", start)
+      .lte("checked_at", end)
+      .order("checked_at", { ascending: false });
+    if (error) {
+      S.attendanceLogs = [];
+      if (/does not exist|schema cache/i.test(error.message || "")) {
+        setStaffAttendanceFeedback("Chưa cấu hình dữ liệu chấm công. Hãy chạy file SQL staff location attendance.sql trên Supabase.", "warn");
+      } else {
+        setStaffAttendanceFeedback(`Không tải được dữ liệu chấm công: ${error.message}`, "err");
+      }
+      console.warn("Load staff attendance today:", error);
+      return;
+    }
+    S.attendanceLogs = data || [];
+  }
+
+  function renderStaffAttendance() {
+    if (!E.attendanceCard) return;
+    E.attendanceCard.style.display = INTERNAL_ROLES.has(S.profile?.role) ? "grid" : "none";
+    if (!INTERNAL_ROLES.has(S.profile?.role)) return;
+    const location = S.attendanceLocation || DEFAULT_ATTENDANCE_LOCATION;
+    E.attendanceLocation.textContent = `${location.name || "MindUp"} • ${location.address || ""} • hợp lệ dưới ${Number(location.radius_meters || 200)}m`;
+    const logs = S.attendanceLogs || [];
+    const validIn = logs.find(row => row.check_type === "check_in" && row.is_valid) || logs.find(row => row.check_type === "check_in");
+    const validOut = logs.find(row => row.check_type === "check_out" && row.is_valid) || logs.find(row => row.check_type === "check_out");
+    const latest = logs[0];
+    E.staffCheckInText.textContent = formatAttendanceTime(validIn?.checked_at);
+    E.staffCheckOutText.textContent = formatAttendanceTime(validOut?.checked_at);
+    E.staffDistanceText.textContent = latest
+      ? `${formatMeters(latest.distance_meters)} • ${attendanceStatusLabel(latest.status)}`
+      : "Chưa kiểm tra";
+  }
+
+  async function loadStaffAttendance() {
+    if (!INTERNAL_ROLES.has(S.profile?.role)) return;
+    await loadStaffAttendanceLocation();
+    await loadStaffAttendanceToday();
+    renderStaffAttendance();
+  }
+
+  async function markStaffAttendance(checkType) {
+    setStaffAttendanceBusy(true);
+    setStaffAttendanceFeedback("Đang lấy vị trí hiện tại...", "warn");
+    try {
+      const position = await getStaffPosition();
+      const coords = position.coords || {};
+      setStaffAttendanceFeedback("Đang gửi dữ liệu chấm công...", "warn");
+      const { data, error } = await sb.rpc("mark_staff_attendance", {
+        p_check_type: checkType,
+        p_latitude: coords.latitude,
+        p_longitude: coords.longitude,
+        p_accuracy_meters: coords.accuracy,
+        p_note: String(E.staffAttendanceNote?.value || "").trim() || null,
+        p_device_info: {
+          userAgent: navigator.userAgent || "",
+          platform: navigator.platform || "",
+          language: navigator.language || "",
+          screen: window.screen ? `${screen.width}x${screen.height}` : "",
+        },
+      });
+      if (error) throw error;
+      const result = Array.isArray(data) ? data[0] : data;
+      const distance = result?.distance_meters;
+      const isValid = result?.is_valid;
+      setStaffAttendanceFeedback(
+        isValid
+          ? `Chấm công hợp lệ. Khoảng cách: ${formatMeters(distance)}.`
+          : `Chấm công đã ghi nhận nhưng chưa hợp lệ. Khoảng cách: ${formatMeters(distance)}.`,
+        isValid ? "ok" : "warn"
+      );
+      if (isValid && E.staffAttendanceNote) E.staffAttendanceNote.value = "";
+      await loadStaffAttendance();
+    } catch (error) {
+      const message = error?.code === 1
+        ? "Bạn cần cho phép chia sẻ vị trí để chấm công."
+        : (error?.message || "Không chấm công được. Vui lòng thử lại.");
+      setStaffAttendanceFeedback(message, "err");
+    } finally {
+      setStaffAttendanceBusy(false);
+    }
   }
 
   function formatDay(value) {
@@ -1736,6 +1893,8 @@
     byId("taskRefreshButton").addEventListener("click", () => loadTasks({ refresh: true }));
     byId("taskDeleteOldButton").addEventListener("click", deleteOldTasks);
     byId("taskCreateButton").addEventListener("click", openCreateModal);
+    E.staffCheckInBtn?.addEventListener("click", () => markStaffAttendance("check_in"));
+    E.staffCheckOutBtn?.addEventListener("click", () => markStaffAttendance("check_out"));
     byId("taskSettingsButton").addEventListener("click", async () => { await loadPreferences(); openModal("taskSettingsModal"); });
     byId("manualTaskAssigneeSelect")?.addEventListener("change", event => {
       addManualAssignee(event.target.value);
@@ -1763,6 +1922,10 @@
       todayCount: byId("taskTodayCount"), importantCount: byId("taskImportantCount"),
       overdueCount: byId("taskOverdueCount"), completedCount: byId("taskCompletedCount"),
       adminFilter: byId("taskAdminFilter"), staffFilter: byId("taskStaffFilter"), adminScopeTabs: byId("taskAdminScopeTabs"),
+      attendanceCard: byId("staffAttendanceCard"), attendanceLocation: byId("staffAttendanceLocation"),
+      staffCheckInText: byId("staffCheckInText"), staffCheckOutText: byId("staffCheckOutText"), staffDistanceText: byId("staffDistanceText"),
+      staffCheckInBtn: byId("staffCheckInBtn"), staffCheckOutBtn: byId("staffCheckOutBtn"),
+      staffAttendanceNote: byId("staffAttendanceNote"), attendanceFeedback: byId("staffAttendanceFeedback"),
       toast: byId("taskToast"),
     });
     const { data: { user } } = await sb.auth.getUser();
@@ -1785,8 +1948,10 @@
     if (profile.role === "admin") await loadInternalUsers();
     renderStaffFilter();
     bindEvents();
+    await loadStaffAttendance();
     await loadTasks({ refresh: true });
     window.MindupLiveUI?.watchTable?.("task_assignments", () => loadTasks());
+    window.MindupLiveUI?.watchTable?.("staff_attendance_logs", () => loadStaffAttendance());
   }
 
   init();
