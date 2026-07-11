@@ -226,8 +226,9 @@
 
   function renderStaffAttendance() {
     if (!E.attendanceCard) return;
-    E.attendanceCard.style.display = INTERNAL_ROLES.has(S.profile?.role) ? "grid" : "none";
-    if (!INTERNAL_ROLES.has(S.profile?.role)) return;
+    const canSelfCheck = INTERNAL_ROLES.has(S.profile?.role) && S.profile?.role !== "admin";
+    E.attendanceCard.style.display = canSelfCheck ? "grid" : "none";
+    if (!canSelfCheck) return;
     const location = S.attendanceLocation || DEFAULT_ATTENDANCE_LOCATION;
     E.attendanceLocation.textContent = `${location.name || "MindUp"} • ${location.address || ""} • hợp lệ dưới ${Number(location.radius_meters || 200)}m`;
     const logs = S.attendanceLogs || [];
@@ -361,8 +362,12 @@
   async function loadStaffAttendance() {
     if (!INTERNAL_ROLES.has(S.profile?.role)) return;
     await loadStaffAttendanceLocation();
-    await loadStaffAttendanceToday();
-    renderStaffAttendance();
+    if (S.profile?.role !== "admin") {
+      await loadStaffAttendanceToday();
+      renderStaffAttendance();
+    } else {
+      renderStaffAttendance();
+    }
     await loadStaffAttendanceAdmin();
   }
 
