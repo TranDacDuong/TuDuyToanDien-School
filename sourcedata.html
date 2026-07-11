@@ -1964,8 +1964,13 @@ function sSetParentPasswordVisible(visible){
   document.getElementById('seParentPasswordWrap')?.classList.toggle('hidden', !visible);
 }
 
-function sParentEmailCandidate(base, index){
-  return `${base}${index}@gmail.com`;
+function sLast4Phone(phone){
+  const digits = String(phone || '').replace(/\D+/g, '');
+  return digits ? digits.slice(-4) : '';
+}
+function sParentEmailCandidate(fullName, phone){
+  const suffix = sLast4Phone(phone);
+  return `${sSlugName(fullName || 'phuhuynh')}${suffix}@gmail.com`;
 }
 
 async function sSuggestParentEmail(force = false){
@@ -1973,21 +1978,18 @@ async function sSuggestParentEmail(force = false){
   if(!emailEl) return '';
   if(_sParentEmailTouched && !force) return emailEl.value.trim().toLowerCase();
   const parentName = document.getElementById('seParentN')?.value.trim() || '';
+  const parentPhone = document.getElementById('seParentP')?.value.trim() || '';
   if(!parentName){
     emailEl.value = '';
     sSetParentPasswordVisible(true);
     sSetParentEmailStatus('');
     return '';
   }
-  const base = sSlugName(parentName) || 'phuhuynh';
-  const candidates = Array.from({ length: 40 }, (_, index) => sParentEmailCandidate(base, index + 1));
-  const { data } = await sb.from('users').select('email').in('email', candidates);
-  const used = new Set((data || []).map(item => String(item.email || '').toLowerCase()));
-  const email = candidates.find(candidate => !used.has(candidate)) || `${base}${Date.now()}@gmail.com`;
+  const email = sParentEmailCandidate(parentName, parentPhone);
   emailEl.value = email;
   _sParentEmailExisting = null;
   sSetParentPasswordVisible(true);
-  sSetParentEmailStatus('Email phụ huynh mới. Mật khẩu mặc định đang lấy theo SĐT phụ huynh.', 'ok');
+  sSetParentEmailStatus('Email phụ huynh được tạo theo họ tên + 4 số cuối SĐT. Nếu email trùng, hệ thống sẽ báo rõ tài khoản đang trùng.', 'ok');
   return email;
 }
 
@@ -2029,12 +2031,12 @@ async function sCheckParentEmail(){
 }
 
 async function sLoadLinkedParentForStudent(studentId){
-  const { data: link } = await sb.from('parent_students')
-    .select('parent_id')
+  const { data: links } = await sb.from('parent_students')
+    .select('id,parent_id,created_at')
     .eq('student_id', studentId)
     .is('revoked_at', null)
-    .limit(1)
-    .maybeSingle();
+    .order('created_at', { ascending:false });
+  const link = (links || [])[0];
   if(!link?.parent_id) return null;
   const { data: parent } = await sb.from('users')
     .select('id,full_name,email,phone,role,account_password')
@@ -2065,6 +2067,14 @@ async function sSyncParentAccountForStudent(studentId, payload){
   });
   if(error) throw error;
   const { data: parentAfterSave } = await sb.from('users').select('id,email').eq('email', email).maybeSingle();
+  if(parentAfterSave?.id){
+    const { error: revokeError } = await sb.from('parent_students')
+      .update({ revoked_at:new Date().toISOString() })
+      .eq('student_id', studentId)
+      .neq('parent_id', parentAfterSave.id)
+      .is('revoked_at', null);
+    if(revokeError) throw revokeError;
+  }
   if(parentAfterSave?.id && (email || password)){
     await updateManagedCredentials(parentAfterSave.id, email, password);
   }
@@ -2226,6 +2236,8 @@ document.getElementById('seParentP')?.addEventListener('input',()=>{
   if(!_sParentPasswordTouched && !document.getElementById('seParentPasswordWrap')?.classList.contains('hidden')){
     document.getElementById('seParentPassword').value = sParentDefaultPassword(document.getElementById('seParentP').value);
   }
+  clearTimeout(_sParentEmailTimer);
+  if(!_sParentEmailTouched) _sParentEmailTimer = setTimeout(()=>sSuggestParentEmail(true), 250);
 });
 document.getElementById('seParentEmail')?.addEventListener('input',()=>{
   _sParentEmailTouched = true;
@@ -2389,8 +2401,16 @@ async function plLinkParentStudent(){
     operation: async () => {
       const { data, error } = await sb.rpc('admin_import_parents_batch', { p_rows: [{ email, full_name, phone, password, student_id, relationship }] });
       if(error) throw error;
+      const { data: parent } = await sb.from('users').select('id').eq('email', email).maybeSingle();
+      if(parent?.id){
+        const { error: revokeError } = await sb.from('parent_students')
+          .update({ revoked_at:new Date().toISOString() })
+          .eq('student_id', student_id)
+          .neq('parent_id', parent.id)
+          .is('revoked_at', null);
+        if(revokeError) throw revokeError;
+      }
       if(note){
-        const { data: parent } = await sb.from('users').select('id').eq('email', email).maybeSingle();
         if(parent?.id){
           const { error: noteError } = await sb.from('parent_students')
             .update({ note })
@@ -2429,7 +2449,15 @@ async function plRelink(id){
     action: 'parent_student_relinked',
     details: { target_type:'parent_student', target_id:id, parent_id:item.parent_id, student_id:item.student_id },
     errorPrefix: 'Không thể liên kết lại',
-    operation: async () => sb.from('parent_students').update({ revoked_at:null }).eq('id', id)
+    operation: async () => {
+      const { error: revokeError } = await sb.from('parent_students')
+        .update({ revoked_at:new Date().toISOString() })
+        .eq('student_id', item.student_id)
+        .neq('id', id)
+        .is('revoked_at', null);
+      if(revokeError) throw revokeError;
+      return sb.from('parent_students').update({ revoked_at:null }).eq('id', id);
+    }
   });
   if(!outcome?.ok) return;
   toast('Đã liên kết lại');

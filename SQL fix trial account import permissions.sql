@@ -386,6 +386,13 @@ BEGIN
     END IF;
 
     IF v_student_id IS NOT NULL THEN
+      UPDATE public.parent_students
+      SET revoked_at = now(),
+          updated_at = now()
+      WHERE student_id = v_student_id
+        AND parent_id <> v_parent_id
+        AND revoked_at IS NULL;
+
       INSERT INTO public.parent_students (parent_id, student_id, relationship, created_by, revoked_at)
       VALUES (v_parent_id, v_student_id, coalesce(nullif(row_item->>'relationship', ''), 'parent'), auth.uid(), NULL)
       ON CONFLICT (parent_id, student_id)
