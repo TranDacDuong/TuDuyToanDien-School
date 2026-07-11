@@ -1323,7 +1323,7 @@ function updateBadgeElements(ids, count){
 }
 
 function openDashboardPage(page, options = {}){
-  const { syncMenu = true, syncMobile = true, updateUrl = true, replaceUrl = false } = options;
+  const { syncMenu = true, syncMobile = true, updateUrl = true, replaceUrl = false, forceReload = false } = options;
   page = resolveRoleDashboardPage(page);
   if(!page) return;
   const basePage = page.split("?")[0];
@@ -1354,7 +1354,7 @@ function openDashboardPage(page, options = {}){
   }
   opsHub?.classList.remove("show");
   contentWrap?.classList.remove("hidden");
-  if(getFrameDashboardPage() === page){
+  if(!forceReload && getFrameDashboardPage() === page){
     closeSidebar();
     return;
   }
@@ -1555,7 +1555,7 @@ async function submitAuthForm(){
       }
       closeAuthModal();
       await initDashboard(data?.user || null);
-      openDashboardPage(currentDashboardProfile?.role === "admin" ? "ops-center" : "home.html", { replaceUrl: true });
+      openDashboardPage(currentDashboardProfile?.role === "admin" ? "ops-center" : "home.html", { replaceUrl: true, forceReload: true });
       return;
     }
     const { error } = await sb.auth.signUp({ email, password });
