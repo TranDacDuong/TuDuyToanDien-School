@@ -426,6 +426,64 @@ tr:hover td { background: #f8fbff; }
   border: 1px solid #e2e8f0;
   border-radius: 18px;
 }
+.tuition-payment-top {
+  margin-top: 12px;
+  padding: 16px;
+  background:
+    radial-gradient(circle at top right, rgba(29,107,209,.12), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: 18px;
+}
+.tuition-payment-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.tuition-payment-title {
+  font-weight: 800;
+  color: var(--navy);
+}
+.tuition-payment-month {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.tuition-payment-grid {
+  display: grid;
+  grid-template-columns: minmax(220px,.9fr) minmax(260px,1.1fr);
+  gap: 14px;
+  align-items: start;
+}
+.tuition-payment-numbers {
+  display: grid;
+  gap: 8px;
+}
+.tuition-payment-number {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 11px 13px;
+}
+.tuition-payment-number span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.tuition-payment-number b {
+  color: var(--navy);
+  font-size: 15px;
+}
+.tuition-payment-number.paid b { color: var(--green); }
+.tuition-payment-number.remaining b { color: var(--red); }
+.tuition-payment-number.overpaid b { color: #0369a1; }
+@media(max-width:760px){.tuition-payment-grid{grid-template-columns:1fr}}
 .student-detail-view {
   display: none;
   background:

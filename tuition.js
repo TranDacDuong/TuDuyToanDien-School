@@ -360,18 +360,26 @@
     const qrAmount = remaining > 0 ? remaining : 0;
 
     return `
-      <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
-        <div>
-          <div style="font-size:12px;color:var(--muted)">Tháng</div>
-          <div style="font-size:15px;font-weight:700;color:var(--navy)">${group.ym}</div>
+      <div class="tuition-payment-top">
+        <div class="tuition-payment-head">
+          <div>
+            <div class="tuition-payment-title">Thanh toán học phí</div>
+            <div class="tuition-payment-month">Tháng ${group.ym}</div>
+          </div>
+          <span class="status-badge ${status}">${statusLabel[status]}</span>
         </div>
-        <div>
-          <div style="font-size:12px;color:var(--muted)">Trạng thái</div>
-          <div><span class="status-badge ${status}">${statusLabel[status]}</span></div>
-        </div>
-        <div>
-          <div style="font-size:12px;color:var(--muted)">Đã nộp</div>
-          <div style="font-size:15px;font-weight:700;color:var(--green)">${fmt(amountPaid)}đ</div>
+        <div class="tuition-payment-grid">
+          <div class="tuition-payment-numbers">
+            <div class="tuition-payment-number"><span>Tổng cần nộp</span><b>${fmt(group.amount)}đ</b></div>
+            <div class="tuition-payment-number paid"><span>Đã nộp</span><b>${fmt(amountPaid)}đ</b></div>
+            <div class="tuition-payment-number remaining"><span>Còn thiếu</span><b>${fmt(remaining)}đ</b></div>
+            ${overpaid > 0 ? `<div class="tuition-payment-number overpaid"><span>Nộp thừa</span><b>${fmt(overpaid)}đ</b></div>` : ""}
+            <div class="tuition-payment-number"><span>Ngày thu gần nhất</span><b>${fmtDate(payment?.paid_at)}</b></div>
+          </div>
+          <div>
+            ${buildPaymentQrBlock(group.studentName, group.ym, qrAmount, group.studentId)}
+            ${payment?.note ? `<div class="invoice-note" style="margin-top:12px">${payment.note}</div>` : ""}
+          </div>
         </div>
       </div>
       ${group.classes.map(c => `
@@ -407,28 +415,6 @@
           ${renderAttendanceDetails(c.attendanceDetails, group.studentName)}
         </div>
       `).join("")}
-      <div class="detail-card">
-        <div class="detail-grid">
-          <div class="detail-metric">
-            <div class="label">Tổng cần thu</div>
-            <div class="value">${fmt(group.amount)}đ</div>
-          </div>
-          <div class="detail-metric">
-            <div class="label">Còn thiếu</div>
-            <div class="value">${fmt(remaining)}đ</div>
-          </div>
-          <div class="detail-metric">
-            <div class="label">Nộp thừa</div>
-            <div class="value">${fmt(overpaid)}đ</div>
-          </div>
-          <div class="detail-metric">
-            <div class="label">Ngày thu gần nhất</div>
-            <div class="value">${fmtDate(payment?.paid_at)}</div>
-          </div>
-        </div>
-        ${payment?.note ? `<div class="invoice-note" style="margin-top:12px">${payment.note}</div>` : ""}
-        <div style="margin-top:16px">${buildPaymentQrBlock(group.studentName, group.ym, qrAmount, group.studentId)}</div>
-      </div>
     `;
   }
 
