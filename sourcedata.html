@@ -352,6 +352,15 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 .se-parent-status.ok { background:#ecfdf5; color:#047857; border:1px solid #bbf7d0; }
 .se-parent-status.warn { background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; }
 .se-parent-password.hidden { display:none; }
+.mobile-status-stack { display:grid; gap:4px; min-width:150px; }
+.mobile-status-line { display:flex; align-items:center; gap:5px; flex-wrap:wrap; font-size:.7rem; line-height:1.35; }
+.mobile-status-role { min-width:22px; font-weight:800; color:var(--ink-mid); }
+.mobile-status-pill { display:inline-flex; align-items:center; border-radius:999px; padding:2px 7px; font-weight:800; border:1px solid transparent; white-space:nowrap; }
+.mobile-status-pill.ok { background:#ecfdf5; color:#047857; border-color:#bbf7d0; }
+.mobile-status-pill.warn { background:#fff7ed; color:#c2410c; border-color:#fed7aa; }
+.mobile-status-pill.bad { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
+.mobile-status-pill.muted { background:#f8fafc; color:var(--ink-mid); border-color:var(--border); }
+.mobile-status-time { color:var(--ink-light); font-size:.68rem; }
 @media (max-width: 860px) {
   body { padding: 14px 10px 24px; }
   .page-hd,.tabs,.form-card,.table-card,.t-search-bar,.tc-card,.s-table-card { border-radius: 20px; }
@@ -382,7 +391,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="MindUp">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<script src="pwa.js?v=20260709-notification-fix1" defer></script>
+<script src="pwa.js?v=20260712-mobile-app-status1" defer></script>
 </head>
 <body>
 
@@ -623,13 +632,14 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
               <th class="sortable" data-field="phone"      onclick="sSort('phone')">SĐT <span class="sort-icon">↕</span></th>
               <th class="sortable" data-field="parent_full_name" onclick="sSort('parent_full_name')" style="min-width:150px">Phụ huynh <span class="sort-icon">↕</span></th>
               <th class="sortable" data-field="parent_phone" onclick="sSort('parent_phone')">SĐT PH <span class="sort-icon">↕</span></th>
+              <th style="min-width:170px">App / Thông báo</th>
               <th class="sortable" data-field="birth_year" onclick="sSort('birth_year')">Năm sinh <span class="sort-icon">↕</span></th>
               <th class="sortable" data-field="province"   onclick="sSort('province')">Tỉnh <span class="sort-icon">↕</span></th>
               <th class="sortable" data-field="school"     onclick="sSort('school')" style="min-width:130px">Trường <span class="sort-icon">↕</span></th>
               <th style="width:110px;text-align:center">Hành động</th>
             </tr>
           </thead>
-          <tbody id="sTable"><tr class="empty-row"><td colspan="9">⏳ Đang tải...</td></tr></tbody>
+          <tbody id="sTable"><tr class="empty-row"><td colspan="10">⏳ Đang tải...</td></tr></tbody>
         </table>
       </div>
       <div class="s-pg">
@@ -1687,7 +1697,7 @@ document.getElementById('tSMon').addEventListener('change', tApplyFilter);
 /* ══════════════════════════════
    HỌC SINH
 ══════════════════════════════ */
-let _sAll=[], _sFilt=[], _sPage=1, _sSortF='full_name', _sSortD=1, _sEditId=null, _sLinkedParents={};
+let _sAll=[], _sFilt=[], _sPage=1, _sSortF='full_name', _sSortD=1, _sEditId=null, _sLinkedParents={}, _sMobileStatus={};
 const S_PAGE=15;
 
 function sRmVN(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đĐ]/g,m=>m==='đ'?'d':'D').toLowerCase(); }
@@ -1827,6 +1837,7 @@ async function loadStudents(){
   const {data} = await sb.from('users').select('*').eq('role','student').order('full_name');
   _sAll = data||[];
   await sLoadLinkedParentsForStudents(_sAll);
+  await sLoadMobileStatusesForStudents(_sAll);
   document.getElementById('sStatTotal').textContent = _sAll.length;
   sApplyFilter();
 }
@@ -1859,6 +1870,55 @@ async function sLoadLinkedParentsForStudents(students){
     if(!_sLinkedParents[link.student_id]) _sLinkedParents[link.student_id] = [];
     _sLinkedParents[link.student_id].push(parent);
   });
+}
+
+async function sLoadMobileStatusesForStudents(students){
+  _sMobileStatus = {};
+  const studentIds = (students || []).map(item => item.id).filter(Boolean);
+  const parentIds = Object.values(_sLinkedParents || {}).flat().map(parent => parent.id).filter(Boolean);
+  const ids = [...new Set([...studentIds, ...parentIds])];
+  if(!ids.length) return;
+  const { data, error } = await sb
+    .from('user_mobile_app_status')
+    .select('user_id,is_mobile,is_standalone_app,notification_permission,has_push_subscription,last_seen_at,last_mobile_seen_at,updated_at,platform')
+    .in('user_id', ids);
+  if(error){
+    console.warn('Không tải được trạng thái app/thông báo:', error);
+    return;
+  }
+  _sMobileStatus = Object.fromEntries((data || []).map(item => [item.user_id, item]));
+}
+
+function sMobileStatusPill(text, type){
+  return `<span class="mobile-status-pill ${type || 'muted'}">${esc(text)}</span>`;
+}
+
+function sFormatMobileSeen(value){
+  if(!value) return '';
+  const date = new Date(value);
+  if(Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('vi-VN');
+}
+
+function sUserMobileStatusHtml(userId, roleLabel){
+  const status = _sMobileStatus[userId] || null;
+  const hasMobileLogin = Boolean(status?.last_mobile_seen_at || status?.is_mobile);
+  const permission = String(status?.notification_permission || '').toLowerCase();
+  const hasNotification = permission === 'granted' && Boolean(status?.has_push_subscription);
+  const appPill = hasMobileLogin
+    ? sMobileStatusPill(status?.is_standalone_app ? 'Đã cài app' : 'Đã đăng nhập mobile', 'ok')
+    : sMobileStatusPill('Chưa cài app', 'bad');
+  const notificationPill = hasNotification
+    ? sMobileStatusPill('Đã bật TB', 'ok')
+    : sMobileStatusPill(permission === 'denied' ? 'Đã chặn TB' : 'Chưa bật TB', permission === 'denied' ? 'bad' : 'warn');
+  const seen = sFormatMobileSeen(status?.last_mobile_seen_at || status?.last_seen_at);
+  return `<div class="mobile-status-line"><span class="mobile-status-role">${esc(roleLabel)}</span>${appPill}${notificationPill}${seen ? `<span class="mobile-status-time">${esc(seen)}</span>` : ''}</div>`;
+}
+
+function sStudentMobileStatusHtml(student, linkedParents){
+  const rows = [sUserMobileStatusHtml(student.id, 'HS')];
+  (linkedParents || []).forEach(parent => rows.push(sUserMobileStatusHtml(parent.id, 'PH')));
+  return `<div class="mobile-status-stack">${rows.join('')}</div>`;
 }
 
 function sApplyFilter(){
@@ -1904,7 +1964,7 @@ function sRender(){
   const start=(_sPage-1)*S_PAGE, slice=_sFilt.slice(start,start+S_PAGE);
   document.getElementById('sStatShow').textContent=_sFilt.length;
   const tbody=document.getElementById('sTable');
-  if(!slice.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="9">🔍 Không tìm thấy học sinh nào</td></tr>'; sPgRender(); return; }
+  if(!slice.length){ tbody.innerHTML='<tr class="empty-row"><td colspan="10">🔍 Không tìm thấy học sinh nào</td></tr>'; sPgRender(); return; }
   tbody.innerHTML=slice.map((s,i)=>{
     const av=s.avatar_url?`<img class="s-av" src="${esc(s.avatar_url)}" onerror="this.style.display='none'">`:`<div class="s-ini">${sIni(s.full_name)}</div>`;
     const linkedParents = _sLinkedParents[s.id] || [];
@@ -1916,6 +1976,7 @@ function sRender(){
       <td>${s.phone?`<button style="background:none;border:none;color:var(--blue);font-size:.82rem;cursor:pointer;padding:0;font-family:var(--font-body);font-weight:500" onclick="sCopyPhone('${s.phone}')">📞 ${esc(s.phone)}</button>`:'<span style="color:var(--ink-light)">—</span>'}</td>
       <td><div style="font-weight:600;color:var(--navy)">${esc(parentName)}</div>${parentEmails ? `<div style="font-size:.72rem;color:var(--ink-light);margin-top:2px">${esc(parentEmails)}</div>` : ''}</td>
       <td>${s.parent_phone?`<button style="background:none;border:none;color:var(--blue);font-size:.82rem;cursor:pointer;padding:0;font-family:var(--font-body);font-weight:500" onclick="sCopyPhone('${s.parent_phone}')">📞 ${esc(s.parent_phone)}</button>`:'<span style="color:var(--ink-light)">—</span>'}</td>
+      <td>${sStudentMobileStatusHtml(s, linkedParents)}</td>
       <td>${s.birth_year||'—'}</td>
       <td>${esc(s.province||'—')}</td>
       <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s.school||'')}">${esc(s.school||'—')}</td>

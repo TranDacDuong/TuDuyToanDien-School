@@ -16,6 +16,7 @@
   let pushRetryTimer = null;
   let deferredInstallPrompt = null;
   let localNotificationPollTimer = null;
+  let mobileStatusSyncTimer = null;
 
   function isTopLevelWindow() {
     try {
@@ -83,6 +84,16 @@
     return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 820;
   }
 
+  function getDevicePlatform() {
+    const ua = navigator.userAgent || "";
+    if (/Android/i.test(ua)) return "android";
+    if (/iPhone|iPad|iPod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) return "ios";
+    if (/Windows/i.test(ua)) return "windows";
+    if (/Macintosh|Mac OS X/i.test(ua)) return "macos";
+    if (/Linux/i.test(ua)) return "linux";
+    return "unknown";
+  }
+
   function isIosDevice() {
     const iosUserAgent = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     const ipadDesktopMode = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
@@ -130,6 +141,51 @@
     } catch (error) {
       return null;
     }
+  }
+
+  async function getCurrentPushEndpoint() {
+    if (!isPushSupported() || Notification.permission !== "granted") return "";
+    try {
+      const registration = await getServiceWorkerRegistration();
+      const subscription = await registration?.pushManager?.getSubscription?.();
+      return subscription?.endpoint || "";
+    } catch (error) {
+      return "";
+    }
+  }
+
+  async function syncMobileAppStatus(options = {}) {
+    const user = await getCurrentUser();
+    if (!user?.id) return null;
+    const client = await waitForSupabase();
+    if (!client?.rpc) return null;
+    const isMobile = isMobileDevice();
+    const permission = "Notification" in window ? Notification.permission : "unsupported";
+    const endpoint = options.endpoint || await getCurrentPushEndpoint();
+    const payload = {
+      p_is_mobile: isMobile,
+      p_is_standalone_app: isStandaloneApp(),
+      p_platform: getDevicePlatform(),
+      p_notification_permission: permission,
+      p_push_endpoint: endpoint || null,
+      p_user_agent: navigator.userAgent || null
+    };
+    try {
+      const { error } = await client.rpc("upsert_my_mobile_app_status", payload);
+      if (error) throw error;
+      return { ok: true, ...payload };
+    } catch (error) {
+      console.warn("MindUp mobile app status sync failed:", error);
+      return { ok: false, error };
+    }
+  }
+
+  function scheduleMobileAppStatusSync(delayMs = 800) {
+    if (mobileStatusSyncTimer) window.clearTimeout(mobileStatusSyncTimer);
+    mobileStatusSyncTimer = window.setTimeout(() => {
+      mobileStatusSyncTimer = null;
+      syncMobileAppStatus().catch(() => null);
+    }, delayMs);
   }
 
   function urlBase64ToUint8Array(value) {
@@ -398,11 +454,13 @@
     enableLocalNotifications(user.id, true);
     try {
       const subscription = await ensurePushSubscription(user.id, { repairRevoked: true });
+      syncMobileAppStatus({ endpoint: subscription?.endpoint || "" }).catch(() => null);
       removePrompt();
       return { ok: Boolean(subscription), permission, push: true, endpoint: subscription?.endpoint || "" };
     } catch (error) {
       if (!isPushServiceError(error)) throw error;
       schedulePushRetry(user.id);
+      syncMobileAppStatus().catch(() => null);
       return {
         ok: true,
         permission,
@@ -1246,6 +1304,7 @@
         }
         return null;
       });
+      syncMobileAppStatus({ endpoint: subscription?.endpoint || "" }).catch(() => null);
       if (!subscription) showPrompt();
       return;
     }
@@ -1267,6 +1326,7 @@
       if (event !== "SIGNED_IN" || !session?.user) return;
       window.setTimeout(initInstallPrompt, 500);
       window.setTimeout(initPushPrompt, 1800);
+      window.setTimeout(scheduleMobileAppStatusSync, 900);
     });
   }
 
@@ -1276,11 +1336,13 @@
     sendTestToCurrentUser: sendTestPushToCurrentUser,
     showServiceWorkerTest: showServiceWorkerTestNotification,
     isConfigured: isPushConfigured,
-    isSupported: isPushSupported
+    isSupported: isPushSupported,
+    syncMobileStatus: syncMobileAppStatus
   };
 
   window.addEventListener("load", function(){
     window.setTimeout(initInstallPrompt, PROMPT_DELAY_MS);
+    window.setTimeout(scheduleMobileAppStatusSync, PROMPT_DELAY_MS + 500);
     window.setTimeout(initPushPrompt, PROMPT_DELAY_MS + 1600);
     watchAuthForPrompts();
   });
