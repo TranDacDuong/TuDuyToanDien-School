@@ -13,6 +13,15 @@
     return new Intl.NumberFormat("vi-VN").format(Math.round(v));
   }
 
+  function esc(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
   function toAscii(value) {
     return String(value || "")
       .normalize("NFD")
@@ -330,6 +339,12 @@
     return `${weekday}, ${date.toLocaleDateString("vi-VN")}`;
   }
 
+  function formatAttendanceShortDate(dateText) {
+    if (!dateText) return "—";
+    const date = new Date(`${dateText}T00:00:00+07:00`);
+    return new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit" }).format(date);
+  }
+
   function getStudentGroup(studentId) {
     return currentRows.find(r => r.studentId === studentId)
       || grouped.find(r => r.studentId === studentId)
@@ -389,7 +404,7 @@
             </div>
           </div>
           ${c.noteCalc ? `<div style="margin-top:10px;font-size:12px;color:var(--muted)">${c.noteCalc}</div>` : ""}
-          ${renderAttendanceDetails(c.attendanceDetails)}
+          ${renderAttendanceDetails(c.attendanceDetails, group.studentName)}
         </div>
       `).join("")}
       <div class="detail-card">
@@ -417,11 +432,20 @@
     `;
   }
 
-  function renderAttendanceDetails(items = []) {
+  function attendanceSessionClass(sessionNo) {
+    const n = Math.max(1, Number(sessionNo || 1));
+    return `attendance-session-${((n - 1) % 7) + 1}`;
+  }
+
+  function renderAttendanceDetails(items = [], studentName = "Học sinh") {
     if (!items.length) {
       return `<div style="margin-top:12px;font-size:12px;color:var(--muted)">Chưa có buổi học/điểm danh trong tháng này.</div>`;
     }
     const statusText = { present: "Có", absent: "Vắng", makeup: "Học bù", unknown: "Chưa rõ" };
+    const sortedItems = [...items].sort((a, b) =>
+      String(a.date || "").localeCompare(String(b.date || ""))
+      || Number(a.schedule_id || 0) - Number(b.schedule_id || 0)
+    );
     const counts = items.reduce((acc, item) => {
       const status = item.status || "present";
       acc[status] = (acc[status] || 0) + 1;
@@ -440,24 +464,25 @@
         <table class="attendance-detail-table">
           <thead>
             <tr>
-              <th>Ngày học</th>
-              <th>Lịch học</th>
-              <th>Trạng thái</th>
+              <th class="attendance-student-head">Học sinh</th>
+              ${sortedItems.map(item => {
+                const sessionClass = attendanceSessionClass(item.session_no);
+                const schedule = item.scheduleLabel || "";
+                return `<th class="${sessionClass}" title="${esc(schedule)}"><span class="attendance-date">${formatAttendanceShortDate(item.date)}</span></th>`;
+              }).join("")}
             </tr>
           </thead>
           <tbody>
-            ${items.map(item => {
-            const status = item.status || "present";
-            const label = statusText[status] || status;
-            const session = item.session_no ? `B${item.session_no}` : "Buổi";
-            const schedule = item.scheduleLabel || session;
-            return `
               <tr>
-                <td><span class="attendance-date">${formatAttendanceDate(item.date)}</span></td>
-                <td><div class="attendance-schedule">${schedule}</div></td>
-                <td><span class="attendance-status ${status}">${label}</span></td>
-              </tr>`;
-          }).join("")}
+                <td class="attendance-student-cell">${esc(studentName || "Học sinh")}</td>
+                ${sortedItems.map(item => {
+                  const status = item.status || "present";
+                  const label = statusText[status] || status;
+                  const sessionClass = attendanceSessionClass(item.session_no);
+                  const schedule = item.scheduleLabel || "";
+                  return `<td class="${sessionClass}" title="${esc(schedule)}"><span class="attendance-status ${status}">${label}</span></td>`;
+                }).join("")}
+              </tr>
           </tbody>
         </table>
       </div>

@@ -250,43 +250,66 @@ tr:hover td { background: #f8fbff; }
 }
 .attendance-detail-table {
   width: 100%;
-  min-width: 520px;
+  min-width: 720px;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 .attendance-detail-table th,
 .attendance-detail-table td {
-  padding: 9px 10px;
-  border-bottom: 1px solid #eef3f8;
+  padding: 8px 10px;
+  border: 1px solid #dbeafe;
   font-size: 12px;
   vertical-align: middle;
+  text-align: center;
 }
 .attendance-detail-table th {
-  background: #fff;
-  color: #64748b;
+  background: #eff6ff;
+  color: #1d4ed8;
   font-size: 11px;
   font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: .03em;
-}
-.attendance-detail-table tr:last-child td { border-bottom: none; }
-.attendance-date {
-  font-weight: 800;
-  color: #0f172a;
   white-space: nowrap;
 }
-.attendance-schedule {
-  color: #475569;
-  line-height: 1.35;
+.attendance-student-head,
+.attendance-student-cell {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: 170px;
+  min-width: 170px;
+  max-width: 170px;
+  text-align: left !important;
+}
+.attendance-student-head {
+  background: #0f2c57 !important;
+  color: #fbbf24 !important;
+}
+.attendance-student-cell {
+  background: #fff;
+  color: #0f172a;
+  font-weight: 800;
+  box-shadow: 1px 0 0 #e2e8f0;
+}
+.attendance-session-1 { background:#eff6ff !important; color:#1d4ed8 !important; border-color:#bfdbfe !important; }
+.attendance-session-2 { background:#f0fdf4 !important; color:#15803d !important; border-color:#bbf7d0 !important; }
+.attendance-session-3 { background:#fff7ed !important; color:#c2410c !important; border-color:#fed7aa !important; }
+.attendance-session-4 { background:#f5f3ff !important; color:#7c3aed !important; border-color:#ddd6fe !important; }
+.attendance-session-5 { background:#fdf2f8 !important; color:#be185d !important; border-color:#fbcfe8 !important; }
+.attendance-session-6 { background:#ecfeff !important; color:#0e7490 !important; border-color:#a5f3fc !important; }
+.attendance-session-7 { background:#fefce8 !important; color:#a16207 !important; border-color:#fde68a !important; }
+.attendance-date {
+  font-weight: 800;
+  white-space: nowrap;
 }
 .attendance-status {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 72px;
-  padding: 4px 9px;
+  min-width: 48px;
+  padding: 5px 10px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 800;
+  box-shadow: 0 4px 10px rgba(15,23,42,.12);
 }
 .attendance-status.present { background: #dcfce7; color: #15803d; }
 .attendance-status.absent { background: #fee2e2; color: #b91c1c; }
