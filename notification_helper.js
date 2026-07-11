@@ -40,6 +40,29 @@
     "trial_lesson_request"
   ]);
 
+  const STUDENT_LEARNING_TYPES = new Set([
+    "course_enrolled",
+    "course_request_approved",
+    "course_request_rejected",
+    "course_session_added",
+    "course_session_updated",
+    "class_session_added",
+    "class_session_updated",
+    "class_exam_added",
+    "session_evaluation",
+    "tuition_due",
+    "tuition_reminder",
+    "trial_lesson_request"
+  ]);
+
+  function withLearningStudentMeta(row) {
+    const item = { ...row, meta: normalizeMeta(row.meta) };
+    if (STUDENT_LEARNING_TYPES.has(item.type) && !item.meta.student_id && !item.meta.studentId) {
+      item.meta = { ...item.meta, student_id: item.user_id };
+    }
+    return item;
+  }
+
   async function getLinkedParentsForStudents(studentIds) {
     const ids = [...new Set((studentIds || []).filter(Boolean))];
     if (!ids.length) return [];
@@ -71,17 +94,19 @@
       return acc;
     }, {});
 
-    const expanded = [...rows];
-    rows.forEach(item => {
+    const normalizedRows = rows.map(withLearningStudentMeta);
+    const expanded = [...normalizedRows];
+    normalizedRows.forEach(item => {
       if (!PARENT_VISIBLE_TYPES.has(item.type)) return;
-      (linksByStudent[item.user_id] || []).forEach(parentId => {
+      const studentId = item.meta?.student_id || item.meta?.studentId || item.user_id;
+      (linksByStudent[studentId] || []).forEach(parentId => {
         if (!parentId || parentId === item.actor_id || parentId === item.user_id) return;
         expanded.push({
           ...item,
           user_id: parentId,
           meta: {
             ...(item.meta || {}),
-            student_id: item.user_id,
+            student_id: studentId,
             parent_copy: true
           }
         });
@@ -347,7 +372,7 @@
     const studentIds = await getCourseStudentIds(courseId);
     const items = studentIds.map(studentId => {
       const built = builder(studentId) || {};
-      return { ...built, userId: built.userId || studentId };
+      return { ...built, userId: built.userId || studentId, meta: { ...(built.meta || {}), student_id: built.meta?.student_id || built.meta?.studentId || studentId } };
     });
     return createBulkNotifications(items);
   }
@@ -357,7 +382,7 @@
     const studentIds = await getClassStudentIds(classId);
     const items = studentIds.map(studentId => {
       const built = builder(studentId) || {};
-      return { ...built, userId: built.userId || studentId };
+      return { ...built, userId: built.userId || studentId, meta: { ...(built.meta || {}), student_id: built.meta?.student_id || built.meta?.studentId || studentId } };
     });
     return createBulkNotifications(items);
   }
@@ -367,7 +392,7 @@
     const studentIds = await getAllStudentIds();
     const items = studentIds.map(studentId => {
       const built = builder(studentId) || {};
-      return { ...built, userId: built.userId || studentId };
+      return { ...built, userId: built.userId || studentId, meta: { ...(built.meta || {}), student_id: built.meta?.student_id || built.meta?.studentId || studentId } };
     });
     return createBulkNotifications(items);
   }

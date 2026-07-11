@@ -64,6 +64,8 @@ type Candidate = {
   message: string;
   task?: Task;
   targetUrl?: string;
+  studentId?: string;
+  studentIds?: string[];
 };
 
 type ScheduledCandidate = Candidate & { userId: string };
@@ -241,7 +243,15 @@ async function insertNotification(input: {
   message: string;
   taskId?: string;
   targetUrl?: string;
+  meta?: Record<string, unknown>;
 }) {
+  const meta = {
+    task_id: input.taskId || null,
+    branded_sender: true,
+    sender_name: "MindUp - Tư duy Toàn Diện",
+    sender_avatar: "pwa-icon-192.png",
+    ...(input.meta || {}),
+  };
   const rows = await rest<Array<{ id: string }>>("notifications?select=id", {
     method: "POST",
     headers: { Prefer: "return=representation" },
@@ -253,15 +263,96 @@ async function insertNotification(input: {
       message: input.message,
       ref_id: input.taskId || null,
       target_url: input.targetUrl || "tasks.html",
-      meta: {
-        task_id: input.taskId || null,
-        branded_sender: true,
-        sender_name: "MindUp - Tư duy Toàn Diện",
-        sender_avatar: "pwa-icon-192.png",
-      },
+      meta,
     }),
   });
   return rows[0]?.id || null;
+}
+
+const MINDUP_BOT_ID = "00000000-0000-0000-0000-000000000001";
+
+function learningContent(title: string, message: string, targetUrl?: string) {
+  const action = targetUrl
+    ? `\n__ACTION__${JSON.stringify({ type: "url", label: "Mở chi tiết", url: targetUrl })}`
+    : "";
+  return [`Thông báo: ${title}`, message, action].filter(Boolean).join("\n");
+}
+
+async function ensureLearningConversation(studentId: string, audienceUserId: string) {
+  const directKey = `mindup_student:${studentId}:audience:${audienceUserId}`;
+  const encodedKey = encodeURIComponent(directKey);
+  const existing = await rest<Array<{ id: string }>>(
+    `conversations?direct_key=eq.${encodedKey}&select=id&limit=1`,
+  );
+  if (existing[0]?.id) return existing[0].id;
+
+  const rows = await rest<Array<{ id: string }>>("conversations?select=id", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      kind: "direct",
+      direct_key: directKey,
+      student_id: studentId,
+      audience_user_id: audienceUserId,
+      is_learning_thread: true,
+    }),
+  });
+  const conversationId = rows[0]?.id;
+  if (!conversationId) throw new Error("Could not create learning conversation");
+  await rest("conversation_members", {
+    method: "POST",
+    headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+    body: JSON.stringify({ conversation_id: conversationId, user_id: audienceUserId }),
+  }).catch(() => null);
+  return conversationId;
+}
+
+async function mirrorLearningMessage(input: {
+  audienceUserId: string;
+  studentId: string;
+  actorId: string;
+  title: string;
+  message: string;
+  targetUrl?: string;
+}) {
+  if (!input.audienceUserId || !input.studentId || !input.message) return;
+  try {
+    const conversationId = await ensureLearningConversation(input.studentId, input.audienceUserId);
+    await rest("messages", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        conversation_id: conversationId,
+        sender_id: MINDUP_BOT_ID,
+        real_sender_id: input.actorId || MINDUP_BOT_ID,
+        content: learningContent(input.title, input.message, input.targetUrl),
+      }),
+    });
+  } catch (error) {
+    console.warn("Learning chat mirror skipped:", error);
+  }
+}
+
+function learningStudentIds(candidate: Candidate) {
+  const ids = [
+    ...(candidate.studentIds || []),
+    candidate.studentId || "",
+    String(candidate.task?.metadata?.student_id || candidate.task?.metadata?.studentId || ""),
+  ].filter(Boolean);
+  return [...new Set(ids)];
+}
+
+async function mirrorCandidateToLearningThreads(candidate: Candidate, userId: string, actorId: string, title: string, targetUrl: string) {
+  const studentIds = learningStudentIds(candidate);
+  if (!studentIds.length) return;
+  await Promise.allSettled(studentIds.map(studentId => mirrorLearningMessage({
+    audienceUserId: userId,
+    studentId,
+    actorId,
+    title,
+    message: candidate.message,
+    targetUrl,
+  })));
 }
 
 async function insertLog(userId: string, kind: string, date: string, taskId: string | null, notificationId: string | null) {
@@ -541,6 +632,7 @@ async function buildRoleScheduledCandidates(now: Date, force = false) {
         type: "task_due_reminder",
         message: `Còn khoảng 1 giờ nữa bạn có buổi học ${occurrence.className} lúc ${shortTime(occurrence.schedule.start_time)}.`,
         targetUrl: `class.html?openClassId=${occurrence.schedule.class_id}`,
+        studentId: student.id,
       });
     }
   }
@@ -598,7 +690,7 @@ async function buildRoleScheduledCandidates(now: Date, force = false) {
       const extra = Math.max(0, tomorrowItems.length - 3);
       const message = `${tomorrowItems.length ? `Ngày mai bạn có ${tomorrowItems.length} buổi học: ${scheduleText}${extra ? `; và ${extra} buổi khác` : ""}.` : "Ngày mai bạn không có buổi học."}${practiceCount ? ` Bạn còn ${practiceCount} bài luyện tập chưa hoàn thành.` : ""}`;
       studentDigest.set(student.id, { scheduleCount: tomorrowItems.length, practiceCount, scheduleText });
-      candidates.push({ userId: student.id, kind: "student_evening_digest_2100", type: "task_daily_digest", message, targetUrl: "class.html" });
+      candidates.push({ userId: student.id, kind: "student_evening_digest_2100", type: "task_daily_digest", message, targetUrl: "class.html", studentId: student.id });
     }
 
     const linksByParent = new Map<string, string[]>();
@@ -614,7 +706,7 @@ async function buildRoleScheduledCandidates(now: Date, force = false) {
         return `${name}: ${digest.scheduleCount} buổi học ngày mai, ${digest.practiceCount} bài luyện tập chưa hoàn thành`;
       }).filter(Boolean);
       if (!parts.length) continue;
-      candidates.push({ userId: parentId, kind: "parent_evening_digest_2100", type: "task_daily_digest", message: parts.join("; ") + ".", targetUrl: "class.html" });
+      candidates.push({ userId: parentId, kind: "parent_evening_digest_2100", type: "task_daily_digest", message: parts.join("; ") + ".", targetUrl: "class.html", studentIds: childIds.filter(childId => studentDigest.has(childId)) });
     }
   }
 
@@ -702,6 +794,7 @@ Deno.serve(async req => {
       for (const candidate of candidates) {
         if (await hasLog(preference.user_id, candidate.kind, clock.date, candidate.task?.id)) continue;
         const targetUrl = candidate.targetUrl || candidate.task?.action_url || "tasks.html";
+        const studentIds = learningStudentIds(candidate);
         const notificationId = await insertNotification({
           userId: preference.user_id,
           actorId,
@@ -710,7 +803,9 @@ Deno.serve(async req => {
           message: candidate.message,
           taskId: candidate.task?.id,
           targetUrl,
+          meta: studentIds.length ? { student_id: studentIds[0], student_ids: studentIds } : undefined,
         });
+        await mirrorCandidateToLearningThreads(candidate, preference.user_id, actorId, "MindUp - Tư duy Toàn Diện", targetUrl);
         await insertLog(preference.user_id, candidate.kind, clock.date, candidate.task?.id || null, notificationId);
         created += 1;
         if (pushReady && notificationId) {
@@ -733,6 +828,7 @@ Deno.serve(async req => {
       const clock = localParts(now, APP_TIMEZONE);
       if (await hasLog(candidate.userId, candidate.kind, clock.date)) continue;
       const targetUrl = candidate.targetUrl || "notifications.html";
+      const studentIds = learningStudentIds(candidate);
       const notificationId = await insertNotification({
         userId: candidate.userId,
         actorId,
@@ -740,7 +836,9 @@ Deno.serve(async req => {
         title: "MindUp - Tư duy Toàn Diện",
         message: candidate.message,
         targetUrl,
+        meta: studentIds.length ? { student_id: studentIds[0], student_ids: studentIds } : undefined,
       });
+      await mirrorCandidateToLearningThreads(candidate, candidate.userId, actorId, "MindUp - Tư duy Toàn Diện", targetUrl);
       await insertLog(candidate.userId, candidate.kind, clock.date, null, notificationId);
       created += 1;
       if (pushReady && notificationId) {

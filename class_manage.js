@@ -2266,6 +2266,28 @@
       score_essay: Math.round(essaySum*100)/100,
       score_total: grand
     });
+    if(window.LearningMessages){
+      try{
+        const [{ data: resultRow }, { data: examRow }] = await Promise.all([
+          sb.from("exam_results").select("student_id").eq("id",resultId).maybeSingle(),
+          sb.from("exams").select("title").eq("id",examId).maybeSingle()
+        ]);
+        if(resultRow?.student_id){
+          const content = window.LearningMessages.notificationContent({
+            title: "Điểm đề luyện tập",
+            message: `${studentName} vừa có điểm đề luyện tập ${examRow?.title || ""}: ${grand}/${totalPts || 10}.`,
+            targetUrl: `class.html?openClassId=${encodeURIComponent(_classId || "")}&tab=exams`
+          });
+          window.LearningMessages.sendToAllAudiences({
+            studentId: resultRow.student_id,
+            content,
+            realSenderId: window._currentUserId || null,
+          }).catch(console.warn);
+        }
+      }catch(error){
+        console.warn("Mirror exam score to learning chat failed:", error);
+      }
+    }
     const toast=document.createElement("div");
     toast.textContent="✅ Đã lưu điểm "+studentName+": "+grand+"/"+totalPts;
     toast.style.cssText="position:fixed;bottom:24px;right:24px;background:var(--navy);color:var(--gold-light);"+
