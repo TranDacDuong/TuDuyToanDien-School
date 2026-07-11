@@ -16,6 +16,7 @@
     attendanceLogs: [],
     attendanceAdminDate: "",
     attendanceAdminLogs: [],
+    attendanceAdminExpanded: false,
   };
 
   const E = {};
@@ -273,6 +274,10 @@
     const isAdmin = S.profile?.role === "admin";
     E.attendanceAdminPanel.classList.toggle("show", isAdmin);
     if (!isAdmin) return;
+    E.attendanceAdminBody?.classList.toggle("show", S.attendanceAdminExpanded);
+    if (E.attendanceAdminToggle) {
+      E.attendanceAdminToggle.textContent = S.attendanceAdminExpanded ? "Thu danh sách" : "Mở danh sách";
+    }
     if (E.attendanceAdminDate && !E.attendanceAdminDate.value) E.attendanceAdminDate.value = S.attendanceAdminDate || localDate();
     const rows = staffAttendanceRows();
     const withValidIn = rows.filter(row => row.logs.some(log => log.check_type === "check_in" && log.is_valid)).length;
@@ -2007,6 +2012,10 @@
     E.staffCheckOutBtn?.addEventListener("click", () => markStaffAttendance("check_out"));
     E.attendanceAdminRefresh?.addEventListener("click", () => loadStaffAttendanceAdmin());
     E.attendanceAdminDate?.addEventListener("change", () => loadStaffAttendanceAdmin());
+    E.attendanceAdminToggle?.addEventListener("click", () => {
+      S.attendanceAdminExpanded = !S.attendanceAdminExpanded;
+      renderStaffAttendanceAdmin();
+    });
     byId("taskSettingsButton").addEventListener("click", async () => { await loadPreferences(); openModal("taskSettingsModal"); });
     byId("manualTaskAssigneeSelect")?.addEventListener("change", event => {
       addManualAssignee(event.target.value);
@@ -2038,6 +2047,7 @@
       staffAttendanceNote: byId("staffAttendanceNote"), attendanceFeedback: byId("staffAttendanceFeedback"),
       attendanceAdminPanel: byId("staffAttendanceAdminPanel"), attendanceAdminDate: byId("staffAttendanceAdminDate"),
       attendanceAdminRefresh: byId("staffAttendanceAdminRefresh"), attendanceAdminSummary: byId("staffAttendanceAdminSummary"),
+      attendanceAdminToggle: byId("staffAttendanceAdminToggle"), attendanceAdminBody: byId("staffAttendanceAdminBody"),
       attendanceAdminList: byId("staffAttendanceAdminList"),
       toast: byId("taskToast"),
     });
