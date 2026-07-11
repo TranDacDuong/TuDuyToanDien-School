@@ -6,7 +6,7 @@
     users: [],
     selectedDate: "",
     viewMode: "today",
-    adminScope: "personal",
+    adminScope: "center",
     selectedUserId: "all",
     preferences: null,
     manualAssigneeIds: new Set(),
@@ -190,6 +190,18 @@
     return localDate(new Date(year, month, 0));
   }
 
+  function weekRange(dateText = localDate()) {
+    const start = startOfWeek(dateText);
+    return { start, end: addDays(start, 6) };
+  }
+
+  function activeViewRange() {
+    const selected = S.selectedDate || localDate();
+    if (S.viewMode === "month") return monthRange(selected);
+    if (S.viewMode === "week") return weekRange(selected);
+    return { start: selected, end: selected };
+  }
+
   function inRange(day, start, end) {
     return day >= start && day <= end;
   }
@@ -302,12 +314,10 @@
 
   function visibleAssignments() {
     const selected = S.selectedDate || localDate();
-    const start = S.viewMode === "month" ? monthStart(selected) : selected;
-    const end = S.viewMode === "month" ? endOfMonth(selected) : selected;
+    const { start, end } = activeViewRange();
     return S.assignments.filter(item => {
-      if (S.profile?.role === "admin" && S.adminScope === "personal" && item.user_id !== S.user?.id) return false;
       if (S.profile?.role === "admin" && S.selectedUserId !== "all" && item.user_id !== S.selectedUserId) return false;
-      if (S.profile?.role === "admin" && S.adminScope === "center" && !isAdminActionTask(item)) return false;
+      if (S.profile?.role === "admin" && !isAdminActionTask(item)) return false;
       return taskOverlapsRange(item, start, end);
     }).sort((a, b) => {
       const priority = { urgent: 0, important: 1, normal: 2 };
@@ -434,8 +444,7 @@
     const today = localDate();
     const scoped = S.assignments.filter(item =>
       S.profile?.role !== "admin" || S.selectedUserId === "all" || item.user_id === S.selectedUserId
-    ).filter(item => S.profile?.role !== "admin" || S.adminScope !== "personal" || item.user_id === S.user?.id)
-      .filter(item => S.profile?.role !== "admin" || S.adminScope !== "center" || isAdminActionTask(item));
+    ).filter(item => S.profile?.role !== "admin" || isAdminActionTask(item));
     const open = scoped.filter(item => effectiveStatus(item) !== "completed" && item.status !== "cancelled");
     E.todayCount.textContent = open.filter(item => taskCoversDate(item, today)).length;
     E.importantCount.textContent = open.filter(item =>
@@ -454,6 +463,42 @@
       <div class="task-progress-row" style="margin-top:9px">
         <div class="task-progress-head">
           <span>${esc(progress.label || "Tiến độ")}</span>
+          <span>${Number(progress.current || 0)}/${Number(progress.total || 0)} · ${percent}%</span>
+        </div>
+        <div class="task-progress-track"><div class="task-progress-fill" style="width:${percent}%"></div></div>
+      </div>`;
+  }
+
+  function recurrenceProgress(item) {
+    const task = item.task || {};
+    const templateId = task.metadata?.template_id;
+    const recurrence = task.metadata?.recurrence;
+    if (!templateId || !["daily", "weekly"].includes(recurrence)) return null;
+    const selected = S.selectedDate || localDate();
+    const start = monthStart(selected);
+    const currentMonth = String(selected).slice(0, 7) === String(localDate()).slice(0, 7);
+    const end = currentMonth ? localDate() : endOfMonth(selected);
+    const rows = S.assignments.filter(row => {
+      const rowTask = row.task || {};
+      const day = String(rowTask.available_on || "").slice(0, 10);
+      return row.user_id === item.user_id
+        && String(rowTask.metadata?.template_id || "") === String(templateId)
+        && day >= start
+        && day <= end;
+    });
+    const total = rows.length;
+    const done = rows.filter(row => effectiveStatus(row) === "completed").length;
+    return total ? { current: done, total, label: recurrence === "weekly" ? "Tiến độ tuần trong tháng" : "Tiến độ ngày trong tháng" } : null;
+  }
+
+  function recurrenceProgressHtml(item) {
+    const progress = recurrenceProgress(item);
+    if (!progress) return "";
+    const percent = pct(progress.current, progress.total);
+    return `
+      <div class="task-progress-row" style="margin-top:9px">
+        <div class="task-progress-head">
+          <span>${esc(progress.label)}</span>
           <span>${Number(progress.current || 0)}/${Number(progress.total || 0)} · ${percent}%</span>
         </div>
         <div class="task-progress-track"><div class="task-progress-fill" style="width:${percent}%"></div></div>
@@ -503,6 +548,7 @@
           </div>
           ${task.description ? `<p class="task-description">${esc(task.description)}</p>` : ""}
           ${taskProgressHtml(item)}
+          ${recurrenceProgressHtml(item)}
           <div class="task-meta">
             ${isLongTask ? `<span>Hiện từ ${esc(formatShortDate(taskStartDay(item)))} đến ${esc(formatShortDate(taskEndDay(item)))}</span>` : ""}
             ${S.profile?.role === "admin" && item.assignee ? `<span>Người nhận: ${esc(item.assignee.full_name || item.assignee.email)}</span>` : ""}
@@ -538,6 +584,10 @@
   function viewTitle() {
     const selected = S.selectedDate || localDate();
     if (S.viewMode === "month") return `Tháng ${String(selected).slice(5, 7)}/${String(selected).slice(0, 4)}`;
+    if (S.viewMode === "week") {
+      const { start, end } = weekRange(selected);
+      return `${formatShortDate(start)} - ${formatShortDate(end)}`;
+    }
     return formatShortDate(selected);
   }
 
@@ -551,6 +601,22 @@
         <div><span>Đã hoàn thành</span><strong>${completed}</strong></div>
         <div><span>Quá hạn</span><strong>${overdue}</strong></div>
         <div><span>Chỉ tiêu / tiến độ</span><strong>${targetLike.length}</strong></div>
+      </section>`;
+  }
+
+  function renderPeriodOverview(rows) {
+    if (S.viewMode === "month") return renderMonthOverview(rows);
+    const actionRows = rows.filter(item => !isReminderTask(item));
+    const completed = actionRows.filter(item => effectiveStatus(item) === "completed").length;
+    const overdue = actionRows.filter(isOverdue).length;
+    const remaining = actionRows.filter(item => effectiveStatus(item) !== "completed" && item.status !== "cancelled").length;
+    const label = S.viewMode === "week" ? "Tuần này" : "Hôm nay";
+    return `
+      <section class="task-month-overview">
+        <div><span>${esc(label)}</span><strong>${completed}/${actionRows.length}</strong></div>
+        <div><span>Còn lại</span><strong>${remaining}</strong></div>
+        <div><span>Quá hạn</span><strong>${overdue}</strong></div>
+        <div><span>Tỷ lệ</span><strong>${pct(completed, actionRows.length)}%</strong></div>
       </section>`;
   }
 
@@ -631,44 +697,43 @@
   }
 
   function renderCenterDashboard(rows) {
+    const staff = mergedStaffUsers();
     const actionRows = rows.filter(isAdminActionTask);
-    const completed = actionRows.filter(item => effectiveStatus(item) === "completed").length;
-    const overdue = actionRows.filter(isOverdue).length;
-    const percent = pct(completed, actionRows.length);
-    const byUser = new Map();
+    const statsByUser = new Map(staff.map(user => [user.id, { user, total: 0, done: 0, overdue: 0 }]));
     actionRows.forEach(item => {
-      const id = item.user_id || "unknown";
-      if (!byUser.has(id)) byUser.set(id, { user: item.assignee, total: 0, done: 0, overdue: 0 });
-      const row = byUser.get(id);
+      const id = item.user_id;
+      if (!statsByUser.has(id) && item.assignee) statsByUser.set(id, { user: item.assignee, total: 0, done: 0, overdue: 0 });
+      const row = statsByUser.get(id);
+      if (!row) return;
       row.total += 1;
       if (effectiveStatus(item) === "completed") row.done += 1;
       if (isOverdue(item)) row.overdue += 1;
     });
-    const staffRows = [...byUser.values()].sort((a, b) => pct(b.done, b.total) - pct(a.done, a.total)).slice(0, 10);
-    return `
-      <section class="task-panel">
-        <h2>Thống kê Trung tâm</h2>
-        <div class="task-center-grid">
-          <div class="task-center-card"><span>Tổng công việc</span><strong>${actionRows.length}</strong></div>
-          <div class="task-center-card"><span>Đã hoàn thành</span><strong>${completed}</strong></div>
-          <div class="task-center-card"><span>Quá hạn</span><strong>${overdue}</strong></div>
-          <div class="task-center-card"><span>Tỷ lệ hoàn thành</span><strong>${percent}%</strong></div>
-        </div>
-      </section>
-      <section class="task-panel">
-        <h2>Tiến độ theo nhân viên</h2>
-        ${staffRows.length ? `<div class="task-progress-list">${staffRows.map(row => {
-          const donePct = pct(row.done, row.total);
-          return `<div class="task-progress-row">
-            <div class="task-progress-head"><span>${esc(row.user?.full_name || row.user?.email || "Nhân viên")}</span><span>${row.done}/${row.total} · ${donePct}% · Quá hạn ${row.overdue}</span></div>
-            <div class="task-progress-track"><div class="task-progress-fill" style="width:${donePct}%"></div></div>
-          </div>`;
-        }).join("")}</div>` : '<div class="task-empty" style="padding:20px">Chưa có dữ liệu trung tâm.</div>'}
-      </section>`;
+    const card = row => {
+      const user = row.user || {};
+      const initials = String(user.full_name || user.email || "NV").trim().split(/\s+/).map(part => part[0]).slice(-2).join("").toUpperCase();
+      const percent = pct(row.done, row.total);
+      return `<button class="task-staff-card" type="button" data-staff-detail="${esc(user.id)}">
+        <span class="task-staff-avatar">${esc(initials || "NV")}</span>
+        <span>
+          <span class="task-staff-name">${esc(user.full_name || user.email || "Nhân viên")}</span>
+          <span class="task-staff-role">${esc(roleLabel(user.role))}</span>
+          <span class="task-staff-score"><span>${row.done}/${row.total} việc</span><span>${percent}%</span><span>Quá hạn ${row.overdue}</span></span>
+        </span>
+      </button>`;
+    };
+    const teachers = [...statsByUser.values()].filter(row => row.user?.role === "teacher");
+    const others = [...statsByUser.values()].filter(row => row.user?.role !== "teacher");
+    const section = (title, list) => `<section class="task-staff-section"><h2>${esc(title)}</h2><div class="task-staff-grid">${list.length ? list.map(card).join("") : '<div class="task-empty compact">Chưa có nhân viên.</div>'}</div></section>`;
+    return `<section class="task-staff-wrap">
+      ${section("Giáo viên", teachers)}
+      ${section("Nhân viên khác", others)}
+    </section>`;
   }
 
   function emptyLabel() {
     if (S.viewMode === "month") return "tháng này";
+    if (S.viewMode === "week") return "tuần này";
     return `ngày ${formatShortDate(S.selectedDate || localDate())}`;
   }
 
@@ -698,16 +763,7 @@
   function renderStaffFilter() {
     if (!E.adminFilter || !E.staffFilter) return;
     const isAdmin = S.profile?.role === "admin";
-    E.adminFilter.classList.toggle("show", isAdmin);
-    E.adminScopeTabs?.classList.toggle("show", isAdmin);
-    document.querySelectorAll("[data-admin-scope]").forEach(button => {
-      button.classList.toggle("active", button.dataset.adminScope === S.adminScope);
-    });
-    if (isAdmin && S.adminScope !== "center") {
-      E.adminFilter.classList.remove("show");
-      S.selectedUserId = "all";
-      return;
-    }
+    E.adminFilter.classList.remove("show");
     if (!isAdmin) return;
     const selected = S.selectedUserId || "all";
     const options = mergedStaffUsers().map(user =>
@@ -726,21 +782,29 @@
     renderStaffFilter();
     syncDatebar();
     const rows = visibleAssignments();
-    const centerDashboard = S.profile?.role === "admin" && S.adminScope === "center"
-      ? renderCenterDashboard(rows)
-      : "";
-    const overview = S.viewMode === "month" ? renderMonthOverview(rows) : "";
+    if (S.profile?.role === "admin" && S.selectedUserId === "all") {
+      E.list.innerHTML = `<section class="task-admin-layout">${renderAdminTemplatePanel()}${renderCenterDashboard(rows)}</section>`;
+      return;
+    }
+    const selectedStaff = S.profile?.role === "admin" && S.selectedUserId !== "all"
+      ? mergedStaffUsers().find(user => String(user.id) === String(S.selectedUserId))
+      : null;
+    const detailHead = selectedStaff ? `<section class="task-staff-detail-head">
+      <div><strong>${esc(selectedStaff.full_name || selectedStaff.email || "Nhân viên")}</strong><div style="color:var(--ink-light);font-size:.78rem;margin-top:3px">${esc(roleLabel(selectedStaff.role))} • ${esc(viewTitle())}</div></div>
+      <button class="task-btn" type="button" data-staff-detail="all">← Quay lại danh sách nhân viên</button>
+    </section>` : "";
+    const overview = renderPeriodOverview(rows);
     if (S.viewMode === "month" && rows.length) {
-      E.list.innerHTML = renderAdminTemplatePanel() + centerDashboard + renderMonthDashboard(rows);
+      E.list.innerHTML = detailHead + renderMonthDashboard(rows);
       resizeResultInputs();
       return;
     }
     if (!rows.length) {
-      E.list.innerHTML = renderAdminTemplatePanel() + `<div class="task-empty">Không có công việc trong ${esc(emptyLabel())}.</div>`;
+      E.list.innerHTML = detailHead + `<div class="task-empty">Không có công việc trong ${esc(emptyLabel())}.</div>`;
       return;
     }
     E.list.innerHTML = rows.length
-      ? renderAdminTemplatePanel() + centerDashboard + overview + renderGrouped(rows)
+      ? detailHead + overview + renderGrouped(rows)
       : `<div class="task-empty">Không có công việc trong ngày ${esc(formatShortDate(S.selectedDate || localDate()))}.</div>`;
     resizeResultInputs();
   }
@@ -805,6 +869,7 @@
   function shiftSelectedDate(amount) {
     const selected = S.selectedDate || localDate();
     if (S.viewMode === "month") return addMonths(selected, amount);
+    if (S.viewMode === "week") return addDays(selected, amount * 7);
     return addDays(selected, amount);
   }
 
@@ -1059,9 +1124,9 @@
   async function loadTasks({ refresh = false } = {}) {
     E.list.innerHTML = '<div class="task-empty">Đang tổng hợp công việc...</div>';
     if (S.profile?.role) {
-      const { start, end } = S.viewMode === "month"
-        ? monthRange(S.selectedDate || localDate())
-        : { start: S.selectedDate || localDate(), end: addDays(S.selectedDate || localDate(), 31) };
+      const activeRange = activeViewRange();
+      const start = activeRange.start;
+      const end = S.viewMode === "today" ? addDays(start, 31) : activeRange.end;
       const { error: templateError } = await sb.rpc("materialize_admin_task_templates", {
         p_from: start,
         p_to: end,
@@ -1428,6 +1493,7 @@
     byId("manualTaskDescription").value = template?.description || "";
     byId("manualTaskPriority").value = template?.priority || "normal";
     byId("manualTaskAvailableOn").value = template?.start_on || localDate();
+    if (byId("manualTaskDueOn")) byId("manualTaskDueOn").value = "";
     byId("manualTaskActionUrl").value = template?.action_url || "";
     byId("manualTaskRecurrence").value = template?.recurrence || "once";
     byId("manualTaskWeekday").value = String(template?.weekday || weekdayOf(localDate()));
@@ -1518,7 +1584,8 @@
     const availableOn = byId("manualTaskAvailableOn")?.value || localDate();
     const recurrence = byId("manualTaskRecurrence")?.value || "once";
     const weekday = Number(byId("manualTaskWeekday")?.value || 1);
-    const dueValue = recurrence === "once" ? endOfDayIso(availableOn) : null;
+    const dueOn = byId("manualTaskDueOn")?.value || availableOn;
+    const dueValue = recurrence === "once" ? endOfDayIso(dueOn) : null;
     const requirements = String(byId("manualTaskRequirements")?.value || "")
       .split(/\r?\n/)
       .map(line => line.trim())
@@ -1583,7 +1650,7 @@
       console.warn("Không gửi được thông báo giao việc", notifyError);
     }
     closeModal("taskCreateModal");
-    ["manualTaskTitle", "manualTaskDescription", "manualTaskAvailableOn", "manualTaskActionUrl", "manualTaskRequirements"].forEach(id => {
+    ["manualTaskTitle", "manualTaskDescription", "manualTaskAvailableOn", "manualTaskDueOn", "manualTaskActionUrl", "manualTaskRequirements"].forEach(id => {
       const input = byId(id);
       if (input) input.value = "";
     });
@@ -1628,23 +1695,17 @@
   function bindEvents() {
     E.prevDay.addEventListener("click", () => {
       S.selectedDate = shiftSelectedDate(-1);
-      render();
+      loadTasks();
     });
     E.nextDay.addEventListener("click", () => {
       S.selectedDate = shiftSelectedDate(1);
-      render();
+      loadTasks();
     });
     document.querySelectorAll("[data-task-view]").forEach(button => {
       button.addEventListener("click", () => {
         S.viewMode = button.dataset.taskView || "today";
-        render();
-      });
-    });
-    document.querySelectorAll("[data-admin-scope]").forEach(button => {
-      button.addEventListener("click", () => {
-        S.adminScope = button.dataset.adminScope || "personal";
         S.selectedUserId = "all";
-        render();
+        loadTasks();
       });
     });
     E.staffFilter?.addEventListener("change", () => {
@@ -1655,6 +1716,11 @@
       const target = event.target.closest("button");
       if (!target) return;
       if (target.dataset.openTemplateCreate) return openCreateModal("daily");
+      if (target.dataset.staffDetail) {
+        S.selectedUserId = target.dataset.staffDetail || "all";
+        render();
+        return;
+      }
       if (target.dataset.editTemplate) return openEditTemplateModal(target.dataset.editTemplate);
       if (target.dataset.deleteTemplate) return deleteTaskTemplate(target.dataset.deleteTemplate);
       if (target.dataset.cancelSubmit) return cancelTaskSubmission(target.dataset.cancelSubmit);
