@@ -716,21 +716,6 @@
     return fallbackRows;
   }
 
-  function renderSummary() {
-    const today = localDate();
-    const scoped = S.assignments.filter(item =>
-      S.profile?.role !== "admin" || S.selectedUserId === "all" || item.user_id === S.selectedUserId
-    ).filter(item => S.profile?.role !== "admin" || isAdminActionTask(item));
-    const open = scoped.filter(item => effectiveStatus(item) !== "completed" && item.status !== "cancelled");
-    E.todayCount.textContent = open.filter(item => taskCoversDate(item, today)).length;
-    E.importantCount.textContent = open.filter(item =>
-      !REMINDER_TYPES.has(item.task?.task_type)
-      && ["urgent", "important"].includes(item.task?.priority)
-    ).length;
-    E.overdueCount.textContent = open.filter(isOverdue).length;
-    E.completedCount.textContent = scoped.filter(item => effectiveStatus(item) === "completed").length;
-  }
-
   function taskProgressHtml(item) {
     const progress = requirementProgress(item) || item.task?.progress;
     if (!progress || !Number(progress.total)) return "";
@@ -1054,7 +1039,6 @@
   }
 
   function render() {
-    renderSummary();
     renderStaffFilter();
     renderStaffAttendanceAdmin();
     syncDatebar();
@@ -2047,8 +2031,6 @@
   async function init() {
     Object.assign(E, {
       list: byId("taskList"), prevDay: byId("taskPrevDay"), currentDay: byId("taskCurrentDay"), nextDay: byId("taskNextDay"),
-      todayCount: byId("taskTodayCount"), importantCount: byId("taskImportantCount"),
-      overdueCount: byId("taskOverdueCount"), completedCount: byId("taskCompletedCount"),
       adminFilter: byId("taskAdminFilter"), staffFilter: byId("taskStaffFilter"), adminScopeTabs: byId("taskAdminScopeTabs"),
       attendanceCard: byId("staffAttendanceCard"), attendanceLocation: byId("staffAttendanceLocation"),
       staffCheckInText: byId("staffCheckInText"), staffCheckOutText: byId("staffCheckOutText"), staffDistanceText: byId("staffDistanceText"),
