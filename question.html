@@ -725,7 +725,7 @@ button {
     <div>
       <label id="answerLabel" style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;display:flex;align-items:center;gap:6px">
         Chọn đáp án đúng
-        <button type="button" class="btn-add-ans" onclick="addAnswer()">+</button>
+        <button type="button" class="btn-add-ans" onclick="addAnswer()" title="Thêm đáp án" aria-label="Thêm đáp án">+</button>
         <button type="button" class="btn-rem-ans" onclick="removeAnswer()">−</button>
       </label>
       <div id="answerArea"></div>
@@ -734,7 +734,7 @@ button {
     <div class="modal-footer modal-footer-sticky">
       <div id="qProgress" style="display:none;font-size:.8rem;font-weight:700;color:var(--navy);padding:6px 12px;background:var(--surface);border-radius:8px;border:1px solid var(--border)"></div>
       <button id="saveBtn" onclick="saveQuestion()">Lưu câu hỏi</button>
-      <button class="btn-close icon-btn" onclick="closeModal()" title="&#272;&#243;ng" aria-label="&#272;&#243;ng">&times;</button>
+      <button class="btn-close icon-btn" type="button" onclick="closeModal()" title="&#272;&#243;ng" aria-label="&#272;&#243;ng">&times;</button>
       <div id="modalActionBtns" style="display:flex;gap:8px;margin-left:auto"></div>
     </div>
   </div>

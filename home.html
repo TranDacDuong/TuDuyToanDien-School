@@ -1999,11 +1999,11 @@ function enhanceComposerUI() {
               <button class="visibility-option" type="button" onclick="setComposeVisibility('private')">🔒 Riêng tư</button>
             </div>
           </div>
-          <button class="compose-icon-btn" type="button" title="Chọn ảnh" onclick="document.getElementById('postImage').click()">🖼️</button>
+          <button class="compose-icon-btn" type="button" title="Chọn ảnh" aria-label="Chọn ảnh" onclick="document.getElementById('postImage').click()">🖼️</button>
         </div>
         <div class="compose-inline-right">
           <span class="compose-note" id="composeNote">⏳ Bài sẽ được duyệt trước khi hiển thị</span>
-          <button class="compose-icon-btn" type="button" title="Đăng bài" onclick="createPost()">📨</button>
+          <button class="compose-icon-btn" type="button" title="Đăng bài" aria-label="Đăng bài" onclick="createPost()">📨</button>
         </div>
       </div>
       <div class="compose-footer hidden-bar">
@@ -3366,7 +3366,7 @@ function buildCard(post) {
       <button class="act-btn" onclick="toggleCmt('${post.id}')">💬 ${cmtCount}</button>
       <div class="act-spacer"></div>
       ${(isAdmin || isMyPost) ?`<button class="act-btn edit" onclick="toggleEditPost('${post.id}')">✏️ Sửa</button>` : ""}
-      ${(isAdmin || isMyPost) ?`<button class="act-btn danger" onclick="deletePost('${post.id}')">🗑</button>` : ""}
+      ${(isAdmin || isMyPost) ?`<button class="act-btn danger" type="button" title="Xóa bài viết" aria-label="Xóa bài viết" onclick="deletePost('${post.id}')">🗑</button>` : ""}
     </div>
     <div class="edit-box" id="edit_${post.id}">
       <textarea class="edit-textarea" id="editContent_${post.id}">${esc(post.content)}</textarea>

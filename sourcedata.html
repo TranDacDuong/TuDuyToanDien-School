@@ -1078,7 +1078,7 @@ async function loadRooms(){
         <td style="color:var(--ink-mid)">${esc(r.note||"—")}</td>
         <td><div class="act-wrap">
           <button class="btn-edit-sm" onclick="editRoom('${r.id}','${esc(r.room_name)}','${r.capacity||""}','${esc(r.note||"")}')">✏</button>
-          <button class="btn-del-sm"  onclick="deleteRoom('${r.id}')">🗑</button>
+          <button class="btn-del-sm" type="button" title="Xóa phòng học" aria-label="Xóa phòng học" onclick="deleteRoom('${r.id}')">🗑</button>
         </div></td>
       </tr>`).join("")
     : `<tr class="empty-row" data-live-key="room-empty"><td colspan="4">Chưa có phòng nào</td></tr>`);
@@ -1147,7 +1147,7 @@ async function loadGrades(){
         <td><span class="grade-badge">Khối ${esc(g.name)}</span></td>
         <td><div class="act-wrap">
           <button class="btn-edit-sm" onclick="editGrade('${g.id}','${esc(g.name)}')">✏</button>
-          <button class="btn-del-sm"  onclick="deleteGrade('${g.id}')">🗑</button>
+          <button class="btn-del-sm" type="button" title="Xóa khối" aria-label="Xóa khối" onclick="deleteGrade('${g.id}')">🗑</button>
         </div></td>
       </tr>`).join("")
     : `<tr class="empty-row" data-live-key="grade-empty"><td colspan="2">Chưa có khối nào</td></tr>`);
@@ -1213,7 +1213,7 @@ async function loadSubjects(){
         <td><span class="subject-badge">${esc(s.name)}</span></td>
         <td><div class="act-wrap">
           <button class="btn-edit-sm" onclick="editSubject('${s.id}','${esc(s.name)}','${s.grade_id}')">✏</button>
-          <button class="btn-del-sm"  onclick="deleteSubject('${s.id}')">🗑</button>
+          <button class="btn-del-sm" type="button" title="Xóa môn học" aria-label="Xóa môn học" onclick="deleteSubject('${s.id}')">🗑</button>
         </div></td>
       </tr>`).join("")
     : `<tr class="empty-row" data-live-key="subject-empty"><td colspan="3">Chưa có môn nào</td></tr>`);
@@ -1291,7 +1291,7 @@ async function loadTopics(){
         <td><b>${esc(t.name)}</b></td>
         <td><div class="act-wrap">
           <button class="btn-edit-sm" onclick="editTopic('${t.id}','${esc(t.name)}','${subject?.id || ""}','${subject?.grades?.id || ""}')">✏</button>
-          <button class="btn-del-sm"  onclick="deleteTopic('${t.id}')">🗑</button>
+          <button class="btn-del-sm" type="button" title="Xóa chủ đề" aria-label="Xóa chủ đề" onclick="deleteTopic('${t.id}')">🗑</button>
         </div></td>
       </tr>`;
     }).join("")
@@ -1921,7 +1921,7 @@ function sRender(){
       <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s.school||'')}">${esc(s.school||'—')}</td>
       <td><div class="act-wrap" style="justify-content:center">
         <button class="btn-edit-sm" onclick="sEditStudent('${s.id}')">✏</button>
-        <button class="btn-del-sm"  onclick="sDelStudent('${s.id}')">🗑</button>
+        <button class="btn-del-sm" type="button" title="Xóa học sinh" aria-label="Xóa học sinh" onclick="sDelStudent('${s.id}')">🗑</button>
       </div></td>
     </tr>`;
   }).join('');

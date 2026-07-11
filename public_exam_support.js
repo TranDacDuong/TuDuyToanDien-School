@@ -197,7 +197,7 @@
             <div style="font-family:var(--font-display);font-size:1.08rem;color:var(--navy)">Báo lỗi câu hỏi</div>
             <div style="font-size:.8rem;color:var(--ink-light);margin-top:4px">Phản hồi này sẽ được gửi tới giáo viên hoặc admin để kiểm tra.</div>
           </div>
-          <button type="button" data-report-close style="border:none;background:var(--surface);color:var(--ink-mid);width:32px;height:32px;border-radius:10px;cursor:pointer;font-weight:800">×</button>
+          <button type="button" data-report-close title="Đóng" aria-label="Đóng" style="border:none;background:var(--surface);color:var(--ink-mid);width:32px;height:32px;border-radius:10px;cursor:pointer;font-weight:800">×</button>
         </div>
         <div id="questionReportStem" style="padding:12px 14px;background:#f8fbff;border:1px solid var(--border);border-radius:16px;font-size:.86rem;line-height:1.6;color:var(--ink);white-space:pre-line"></div>
         <div style="display:grid;gap:12px;margin-top:14px">

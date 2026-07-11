@@ -1039,7 +1039,7 @@
           '<div style="font-size:.9rem;color:var(--ink-mid);margin-top:4px">Điểm tự động</div>' +
           (hasEssay ? '<div style="margin-top:14px;padding:10px 14px;background:#fef3c7;border-radius:8px;font-size:.82rem;color:#b45309">⏳ Phần tự luận sẽ được giáo viên chấm sau</div>' : "") +
         "</div>" +
-        '<button onclick="cvGoBackToExams()" style="background:var(--navy);color:var(--gold-light);border:none;padding:12px 32px;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);margin-right:10px" title="Quay l&#7841;i" aria-label="Quay l&#7841;i" class="icon-btn">&larr;</button>' +
+        '<button type="button" onclick="cvGoBackToExams()" style="background:var(--navy);color:var(--gold-light);border:none;padding:12px 32px;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body);margin-right:10px" title="Quay l&#7841;i" aria-label="Quay l&#7841;i" class="icon-btn">&larr;</button>' +
         '<button onclick="cvReviewExamDetail()" style="background:var(--surface);color:var(--navy);border:1.5px solid var(--border);padding:12px 24px;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">📋 Xem lại từng câu</button>' +
       "</div>";
 

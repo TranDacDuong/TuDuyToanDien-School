@@ -1716,7 +1716,7 @@
     if (!picked) return;
     const users = selectedManualUsers();
     picked.innerHTML = users.length
-      ? users.map(user => `<span class="assignee-chip">${esc(user.full_name || user.email)}<button type="button" data-remove-assignee="${esc(user.id)}">×</button></span>`).join("")
+      ? users.map(user => `<span class="assignee-chip">${esc(user.full_name || user.email)}<button type="button" data-remove-assignee="${esc(user.id)}" title="Bỏ người nhận" aria-label="Bỏ người nhận ${esc(user.full_name || user.email)}">×</button></span>`).join("")
       : '<span style="font-size:.78rem;color:var(--ink-light)">Chưa chọn người nhận nào</span>';
   }
 

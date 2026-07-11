@@ -732,7 +732,7 @@ QUY TAC QUAN TRONG:
       <select class="field-select" style="width:100px;flex-shrink:0;font-size:.8rem" id="diff_${idx}">
         ${[...Array(10)].map((_,i)=>`<option value="${i+1}" ${q.difficulty==i+1?"selected":""}>Độ khó ${i+1}</option>`).join("")}
       </select>
-      <button class="qcard-del" onclick="deleteQuestion(${idx})" title="Xóa câu này">🗑</button>
+      <button class="qcard-del" type="button" onclick="deleteQuestion(${idx})" title="Xóa câu này" aria-label="Xóa câu này">🗑</button>
       ${q.has_figure ? '<span style="font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:10px;background:#fef3c7;color:#b45309">⚠ Có hình vẽ — cần paste ảnh</span>' : ""}`;
     card.appendChild(hd);
 

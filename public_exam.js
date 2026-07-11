@@ -372,7 +372,7 @@
     grid.style.display = "block";
     grid.innerHTML = `
       <div style="margin-bottom:16px">
-        <button class="btn btn-outline btn-sm icon-btn" onclick="loadExamList()" title="Quay l&#7841;i" aria-label="Quay l&#7841;i">&larr;</button>
+        <button class="btn btn-outline btn-sm icon-btn" type="button" onclick="loadExamList()" title="Quay l&#7841;i" aria-label="Quay l&#7841;i">&larr;</button>
         <span style="font-weight:700;font-size:.95rem;color:var(--navy);margin-left:12px">${examTitle}</span>
       </div>
       <div style="color:var(--ink-light)">Đang tải kết quả...</div>`;
@@ -434,7 +434,7 @@
     });
     grid.innerHTML = `
       <div style="margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <button class="btn btn-outline btn-sm icon-btn" onclick="loadExamList()" title="Quay l&#7841;i" aria-label="Quay l&#7841;i">&larr;</button>
+        <button class="btn btn-outline btn-sm icon-btn" type="button" onclick="loadExamList()" title="Quay l&#7841;i" aria-label="Quay l&#7841;i">&larr;</button>
         <div style="flex:1">
           <div style="font-family:var(--font-display);font-size:1.1rem;font-weight:700;color:var(--navy)">${examTitle}</div>
           <div style="font-size:.78rem;color:var(--ink-mid);margin-top:2px">${ranked.length} thí sinh đã nộp bài &nbsp;•&nbsp; Tổng điểm: ${totalPoints}</div>
@@ -590,7 +590,7 @@
 
     grid.innerHTML =
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">'
-      + '<button class="btn btn-outline btn-sm icon-btn" id="peBackBtn" title="Quay l&#7841;i" aria-label="Quay l&#7841;i">&larr;</button>'
+      + '<button class="btn btn-outline btn-sm icon-btn" id="peBackBtn" type="button" title="Quay l&#7841;i" aria-label="Quay l&#7841;i">&larr;</button>'
       + '<div style="flex:1">'
       + '<div style="font-weight:700;font-size:.95rem;color:var(--navy)">'+studentName+'</div>'
       + '<div style="font-size:.75rem;color:var(--ink-mid)">'+(pe?.exam?.title||"")+'&nbsp;•&nbsp; Nộp: '+(result?.submitted_at?fmtDT(result.submitted_at):"—")+'</div>'

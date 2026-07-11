@@ -1306,7 +1306,7 @@ Nhập số tiền hoàn lại (>0):`,
             <span class="student-name">${g.studentName}</span>
           </span>
           ${canViewStudentPhone() && g.phone ? `<div style="font-size:11px;color:var(--muted)">${g.phone}</div>` : ""}
-          <div class="hint-link">Xem chi tiết ${g.classes.length} lớp học</div>
+          <button class="hint-link" type="button" onclick="event.stopPropagation();openTuitionDetail('${g.studentId}')">Xem chi tiết ${g.classes.length} lớp học</button>
           ${noteBlock}
         </td>
 

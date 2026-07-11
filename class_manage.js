@@ -2177,7 +2177,7 @@
     /* Header */
     tc.innerHTML=
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">'+
-        '<button class="btn btn-outline btn-sm icon-btn" id="cvDetailBackBtn" title="Quay l&#7841;i" aria-label="Quay l&#7841;i">&larr;</button>'+
+        '<button class="btn btn-outline btn-sm icon-btn" id="cvDetailBackBtn" type="button" title="Quay l&#7841;i" aria-label="Quay l&#7841;i">&larr;</button>'+
         '<div style="flex:1">'+
           '<div style="font-weight:700;font-size:.95rem;color:var(--navy)">'+studentName+'</div>'+
           '<div style="font-size:.75rem;color:var(--ink-mid)">'+exam?.title+' &nbsp;•&nbsp; Nộp: '+(result?.submitted_at?fmtDT(result.submitted_at):"—")+'</div>'+
