@@ -14,6 +14,8 @@
     editingTemplateId: null,
     attendanceLocation: null,
     attendanceLogs: [],
+    attendanceAdminDate: "",
+    attendanceAdminLogs: [],
   };
 
   const E = {};
@@ -153,6 +155,9 @@
     return {
       valid: "Hợp lệ",
       outside_radius: "Ngoài phạm vi",
+      outside_range: "Ngoài phạm vi",
+      low_accuracy: "GPS sai số cao",
+      manual_review: "Chờ duyệt",
       pending: "Chờ kiểm tra",
       invalid: "Không hợp lệ",
     }[value] || "Chưa rõ";
@@ -235,11 +240,125 @@
       : "Chưa kiểm tra";
   }
 
+  function attendanceLogUser(log) {
+    return log?.user || log?.users || log?.staff || null;
+  }
+
+  function staffAttendanceRows() {
+    const map = new Map();
+    mergedStaffUsers().forEach(user => {
+      if (user?.id) map.set(String(user.id), { user, logs: [] });
+    });
+    (S.attendanceAdminLogs || []).forEach(log => {
+      const logUser = attendanceLogUser(log);
+      const userId = String(log.user_id || logUser?.id || "");
+      if (!userId) return;
+      if (!map.has(userId)) {
+        map.set(userId, {
+          user: logUser || { id: userId, full_name: "Nhân viên", email: "", role: "" },
+          logs: [],
+        });
+      } else if (logUser) {
+        map.get(userId).user = { ...map.get(userId).user, ...logUser };
+      }
+      map.get(userId).logs.push(log);
+    });
+    return [...map.values()].sort((a, b) =>
+      String(a.user?.full_name || a.user?.email || "").localeCompare(String(b.user?.full_name || b.user?.email || ""), "vi")
+    );
+  }
+
+  function renderStaffAttendanceAdmin() {
+    if (!E.attendanceAdminPanel) return;
+    const isAdmin = S.profile?.role === "admin";
+    E.attendanceAdminPanel.classList.toggle("show", isAdmin);
+    if (!isAdmin) return;
+    if (E.attendanceAdminDate && !E.attendanceAdminDate.value) E.attendanceAdminDate.value = S.attendanceAdminDate || localDate();
+    const rows = staffAttendanceRows();
+    const withValidIn = rows.filter(row => row.logs.some(log => log.check_type === "check_in" && log.is_valid)).length;
+    const withValidOut = rows.filter(row => row.logs.some(log => log.check_type === "check_out" && log.is_valid)).length;
+    const noLogs = rows.filter(row => !row.logs.length).length;
+    const invalidOnly = rows.filter(row => row.logs.length && !row.logs.some(log => log.is_valid)).length;
+    if (E.attendanceAdminSummary) {
+      E.attendanceAdminSummary.innerHTML = `
+        <div><span>Đã vào hợp lệ</span><strong>${withValidIn}/${rows.length}</strong></div>
+        <div><span>Đã ra hợp lệ</span><strong>${withValidOut}/${rows.length}</strong></div>
+        <div><span>Chưa chấm công</span><strong>${noLogs}</strong></div>
+        <div><span>Ngoài phạm vi</span><strong>${invalidOnly}</strong></div>
+      `;
+    }
+    if (!E.attendanceAdminList) return;
+    if (!rows.length) {
+      E.attendanceAdminList.innerHTML = '<div class="task-empty compact">Chưa có dữ liệu nhân viên để đối chiếu chấm công.</div>';
+      return;
+    }
+    E.attendanceAdminList.innerHTML = rows.map(row => {
+      const logs = row.logs || [];
+      const validIn = logs.find(log => log.check_type === "check_in" && log.is_valid) || logs.find(log => log.check_type === "check_in");
+      const validOut = logs.find(log => log.check_type === "check_out" && log.is_valid) || logs.find(log => log.check_type === "check_out");
+      const latest = logs[0];
+      const status = !logs.length
+        ? { text: "Chưa chấm công", cls: "muted" }
+        : logs.some(log => log.is_valid)
+          ? { text: validOut?.is_valid ? "Đã vào/ra" : "Đã chấm công", cls: "ok" }
+          : { text: "Chưa hợp lệ", cls: "warn" };
+      const note = latest?.note ? ` • Ghi chú: ${esc(latest.note)}` : "";
+      return `
+        <div class="attendance-admin-row">
+          <div>
+            <div class="attendance-admin-name">${esc(row.user?.full_name || row.user?.email || "Nhân viên")}</div>
+            <div class="attendance-admin-meta">${esc(roleLabel(row.user?.role))}${row.user?.email ? ` • ${esc(row.user.email)}` : ""}</div>
+            <div class="attendance-admin-meta">
+              Vào: ${esc(formatAttendanceTime(validIn?.checked_at))} • Ra: ${esc(formatAttendanceTime(validOut?.checked_at))}
+              ${latest ? ` • Gần nhất: ${esc(formatMeters(latest.distance_meters))} / ${esc(attendanceStatusLabel(latest.status))}` : ""}
+              ${note}
+            </div>
+          </div>
+          <span class="attendance-admin-badge ${status.cls}">${esc(status.text)}</span>
+        </div>
+      `;
+    }).join("");
+  }
+
+  async function loadStaffAttendanceAdmin() {
+    if (S.profile?.role !== "admin") return;
+    S.attendanceAdminDate = E.attendanceAdminDate?.value || S.attendanceAdminDate || localDate();
+    if (E.attendanceAdminDate) E.attendanceAdminDate.value = S.attendanceAdminDate;
+    const start = `${S.attendanceAdminDate}T00:00:00+07:00`;
+    const end = `${S.attendanceAdminDate}T23:59:59+07:00`;
+    let query = sb.from("staff_attendance_logs")
+      .select("*,user:users!staff_attendance_logs_user_id_fkey(id,full_name,email,role)")
+      .gte("checked_at", start)
+      .lte("checked_at", end)
+      .order("checked_at", { ascending: false });
+    let { data, error } = await query;
+    if (error && /relationship|foreign key|could not find/i.test(error.message || "")) {
+      const fallback = await sb.from("staff_attendance_logs")
+        .select("*")
+        .gte("checked_at", start)
+        .lte("checked_at", end)
+        .order("checked_at", { ascending: false });
+      data = fallback.data;
+      error = fallback.error;
+    }
+    if (error) {
+      S.attendanceAdminLogs = [];
+      if (E.attendanceAdminList) {
+        E.attendanceAdminList.innerHTML = `<div class="task-empty compact">Không tải được chấm công nhân viên: ${esc(error.message)}</div>`;
+      }
+      console.warn("Load staff attendance admin:", error);
+      return;
+    }
+    S.attendanceAdminLogs = data || [];
+    renderStaffAttendanceAdmin();
+  }
+
   async function loadStaffAttendance() {
     if (!INTERNAL_ROLES.has(S.profile?.role)) return;
     await loadStaffAttendanceLocation();
     await loadStaffAttendanceToday();
     renderStaffAttendance();
+    await loadStaffAttendanceAdmin();
   }
 
   async function markStaffAttendance(checkType) {
@@ -937,6 +1056,7 @@
   function render() {
     renderSummary();
     renderStaffFilter();
+    renderStaffAttendanceAdmin();
     syncDatebar();
     const rows = visibleAssignments();
     if (S.profile?.role === "admin" && S.selectedUserId === "all") {
@@ -1052,6 +1172,12 @@
       .order("full_name");
     if (staffRes.error) loadErrors.push({ source: "users:internal_roles", error: staffRes.error });
     mergeUsers(staffRes.data);
+
+    const allStaffRes = await sb.from("users")
+      .select("id,full_name,email,role")
+      .order("full_name");
+    if (allStaffRes.error) loadErrors.push({ source: "users:all_staff", error: allStaffRes.error });
+    mergeUsers(allStaffRes.data);
 
     if (!userMap.size) {
       const allRes = await sb.from("users")
@@ -1895,6 +2021,8 @@
     byId("taskCreateButton").addEventListener("click", openCreateModal);
     E.staffCheckInBtn?.addEventListener("click", () => markStaffAttendance("check_in"));
     E.staffCheckOutBtn?.addEventListener("click", () => markStaffAttendance("check_out"));
+    E.attendanceAdminRefresh?.addEventListener("click", () => loadStaffAttendanceAdmin());
+    E.attendanceAdminDate?.addEventListener("change", () => loadStaffAttendanceAdmin());
     byId("taskSettingsButton").addEventListener("click", async () => { await loadPreferences(); openModal("taskSettingsModal"); });
     byId("manualTaskAssigneeSelect")?.addEventListener("change", event => {
       addManualAssignee(event.target.value);
@@ -1926,6 +2054,9 @@
       staffCheckInText: byId("staffCheckInText"), staffCheckOutText: byId("staffCheckOutText"), staffDistanceText: byId("staffDistanceText"),
       staffCheckInBtn: byId("staffCheckInBtn"), staffCheckOutBtn: byId("staffCheckOutBtn"),
       staffAttendanceNote: byId("staffAttendanceNote"), attendanceFeedback: byId("staffAttendanceFeedback"),
+      attendanceAdminPanel: byId("staffAttendanceAdminPanel"), attendanceAdminDate: byId("staffAttendanceAdminDate"),
+      attendanceAdminRefresh: byId("staffAttendanceAdminRefresh"), attendanceAdminSummary: byId("staffAttendanceAdminSummary"),
+      attendanceAdminList: byId("staffAttendanceAdminList"),
       toast: byId("taskToast"),
     });
     const { data: { user } } = await sb.auth.getUser();
@@ -1943,6 +2074,8 @@
       return;
     }
     S.selectedDate = localDate();
+    S.attendanceAdminDate = localDate();
+    if (E.attendanceAdminDate) E.attendanceAdminDate.value = S.attendanceAdminDate;
     byId("taskGreeting").textContent = `${profile.full_name || "Bạn"}, đây là các việc cần chú ý hôm nay.`;
     byId("taskCreateButton").style.display = profile.role === "admin" ? "grid" : "none";
     if (profile.role === "admin") await loadInternalUsers();
