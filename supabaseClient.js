@@ -67,6 +67,7 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
           to { background-color: transparent; }
         }
         .mindup-live-ui-updated { animation: mindupLiveUiPulse .72s ease-out; }
+        .mindup-optimistic-busy { opacity: .72; cursor: wait !important; }
         @media (prefers-reduced-motion: reduce) {
           .mindup-live-ui-updated { animation: none; }
         }
@@ -142,7 +143,60 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
       return mutedRealtimeTables.has(String(table));
     }
 
-    return { patchHTML, watchTable, isRealtimeMuted };
+    function setElementBusy(element, busy = true, text = "") {
+      if (!element) return;
+      ensureStyles();
+      if (busy) {
+        if (!element.dataset.originalText) element.dataset.originalText = element.textContent || "";
+        element.disabled = true;
+        element.setAttribute("aria-busy", "true");
+        element.classList.add("mindup-optimistic-busy");
+        if (text) element.textContent = text;
+      } else {
+        element.disabled = false;
+        element.removeAttribute("aria-busy");
+        element.classList.remove("mindup-optimistic-busy");
+        if (element.dataset.originalText) {
+          element.textContent = element.dataset.originalText;
+          delete element.dataset.originalText;
+        }
+      }
+    }
+
+    async function optimistic(options = {}) {
+      const {
+        apply,
+        save,
+        rollback,
+        success,
+        error,
+        busyElement,
+        busyText,
+        doneText,
+      } = options;
+      if (typeof save !== "function") return null;
+      setElementBusy(busyElement, true, busyText);
+      try {
+        if (typeof apply === "function") apply();
+        const result = await save();
+        if (result?.error) throw result.error;
+        if (typeof success === "function") success(result);
+        setElementBusy(busyElement, false);
+        if (doneText && busyElement) busyElement.textContent = doneText;
+        return result;
+      } catch (err) {
+        try {
+          if (typeof rollback === "function") rollback(err);
+        } finally {
+          setElementBusy(busyElement, false);
+        }
+        if (typeof error === "function") error(err);
+        else alert(err?.message || err || "Không lưu được thay đổi.");
+        return null;
+      }
+    }
+
+    return { patchHTML, watchTable, isRealtimeMuted, setElementBusy, optimistic };
   })();
   window.AppAuth = (function () {
     function normalizeLoginEmail(value) {

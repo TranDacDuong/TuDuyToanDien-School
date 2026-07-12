@@ -2006,6 +2006,218 @@
     toast("Đã lưu cài đặt thông báo.");
   }
 
+  function snapshotAssignments() {
+    try {
+      return JSON.parse(JSON.stringify(S.assignments || []));
+    } catch (_) {
+      return [...(S.assignments || [])];
+    }
+  }
+
+  function restoreAssignments(rows) {
+    S.assignments = rows || [];
+    render();
+  }
+
+  function updateAssignmentLocal(id, patch = {}) {
+    const item = S.assignments.find(row => String(row.id) === String(id));
+    if (!item) return null;
+    Object.assign(item, patch);
+    return item;
+  }
+
+  function findTaskButton(attr, value, extraAttr = null, extraValue = null) {
+    return [...document.querySelectorAll("button")].find(button =>
+      String(button.dataset?.[attr] || "") === String(value)
+      && (!extraAttr || String(button.dataset?.[extraAttr] || "") === String(extraValue))
+    );
+  }
+
+  async function runTaskOptimistic(options = {}) {
+    if (window.MindupLiveUI?.optimistic) return window.MindupLiveUI.optimistic(options);
+    const { apply, save, rollback, success, error, busyElement, busyText } = options;
+    const originalText = busyElement?.textContent || "";
+    if (busyElement) {
+      busyElement.disabled = true;
+      busyElement.setAttribute("aria-busy", "true");
+      if (busyText) busyElement.textContent = busyText;
+    }
+    try {
+      apply?.();
+      const result = await save?.();
+      if (result?.error) throw result.error;
+      success?.(result);
+      return result;
+    } catch (err) {
+      rollback?.(err);
+      if (typeof error === "function") error(err);
+      else alert(err?.message || err || "Không lưu được thay đổi.");
+      return null;
+    } finally {
+      if (busyElement) {
+        busyElement.disabled = false;
+        busyElement.removeAttribute("aria-busy");
+        if (originalText) busyElement.textContent = originalText;
+      }
+    }
+  }
+
+  async function setStatus(id, status) {
+    const item = S.assignments.find(row => String(row.id) === String(id));
+    if (!item) return;
+    const previous = snapshotAssignments();
+    const busyElement = findTaskButton("status", id) || findTaskButton("cancelSubmit", id);
+    await runTaskOptimistic({
+      busyElement,
+      busyText: "Đang lưu...",
+      apply: () => {
+        updateAssignmentLocal(id, { status, note: null });
+        render();
+      },
+      save: () => sb.rpc("set_task_assignment_status", {
+        p_assignment_id: id,
+        p_status: status,
+        p_note: null,
+      }),
+      rollback: () => restoreAssignments(previous),
+      success: () => toast(status === "completed" ? "Đã hoàn thành công việc." : "Đã cập nhật trạng thái."),
+    });
+  }
+
+  async function submitTaskResult(id) {
+    const input = [...document.querySelectorAll("[data-result-input]")].find(element => element.dataset.resultInput === id);
+    const note = String(input?.value || "").trim();
+    const item = S.assignments.find(row => String(row.id) === String(id));
+    const requirements = taskRequirements(item);
+    const payload = collectTaskResultPayload(id, item, note);
+    const missingRequirement = requirements.find(req => !requirementDone(payload, req.key));
+    if (missingRequirement) return alert(`Hãy bấm hoàn thành mục: ${missingRequirement.title}`);
+    const storedNote = requirements.length
+      ? JSON.stringify({ __task_result_v2: true, note, requirements: payload.requirements })
+      : note;
+    if (!requirements.length && !note) {
+      input?.focus();
+      return alert("Hãy nhập kết quả công việc trước khi nộp.");
+    }
+    const previous = snapshotAssignments();
+    const busyElement = findTaskButton("submitResult", id);
+    await runTaskOptimistic({
+      busyElement,
+      busyText: "Đang nộp...",
+      apply: () => {
+        updateAssignmentLocal(id, { status: "completed", note: storedNote });
+        render();
+      },
+      save: () => sb.rpc("set_task_assignment_status", {
+        p_assignment_id: id,
+        p_status: "completed",
+        p_note: storedNote,
+      }),
+      rollback: () => restoreAssignments(previous),
+      success: () => toast("Đã lưu kết quả công việc."),
+    });
+  }
+
+  async function completeRequirement(id, key) {
+    const item = S.assignments.find(row => String(row.id) === String(id));
+    if (!item) return;
+    const payload = collectTaskResultPayload(id, item);
+    const req = taskRequirements(item).find(row => row.key === key);
+    if (!req) return;
+    const value = String(payload.requirements?.[key]?.value || "").trim();
+    if (!value) return alert(`Hãy nhập kết quả cho mục: ${req.title}`);
+    payload.requirements[key] = { value, done: true };
+    const requirements = taskRequirements(item);
+    const allDone = requirements.every(row => Boolean(payload.requirements?.[row.key]?.done));
+    const storedNote = JSON.stringify({ __task_result_v2: true, note: payload.note || "", requirements: payload.requirements });
+    const nextStatus = allDone ? "completed" : "open";
+    const previous = snapshotAssignments();
+    const busyElement = findTaskButton("completeRequirement", id, "requirementKey", key);
+    await runTaskOptimistic({
+      busyElement,
+      busyText: "Đang lưu...",
+      apply: () => {
+        updateAssignmentLocal(id, { status: nextStatus, note: storedNote });
+        render();
+      },
+      save: () => sb.rpc("set_task_assignment_status", {
+        p_assignment_id: id,
+        p_status: nextStatus,
+        p_note: storedNote,
+      }),
+      rollback: () => restoreAssignments(previous),
+      success: () => toast(allDone ? "Đã hoàn thành toàn bộ công việc." : "Đã lưu kết quả mục này."),
+    });
+  }
+
+  async function cancelTaskSubmission(id) {
+    const ok = confirm("Hủy nộp công việc này và chuyển về trạng thái Chưa hoàn thành?");
+    if (!ok) return;
+    const item = S.assignments.find(row => String(row.id) === String(id));
+    const payload = taskResultPayload(item);
+    const resetRequirements = {};
+    taskRequirements(item).forEach(req => {
+      resetRequirements[req.key] = {
+        value: requirementValue(payload, req.key),
+        done: false,
+      };
+    });
+    const preservedNote = taskRequirements(item).length
+      ? JSON.stringify({ __task_result_v2: true, note: payload.note || "", requirements: resetRequirements })
+      : (item?.note || "");
+    const previous = snapshotAssignments();
+    const busyElement = findTaskButton("cancelSubmit", id);
+    await runTaskOptimistic({
+      busyElement,
+      busyText: "Đang hủy...",
+      apply: () => {
+        updateAssignmentLocal(id, { status: "open", note: preservedNote });
+        render();
+      },
+      save: () => sb.rpc("set_task_assignment_status", {
+        p_assignment_id: id,
+        p_status: "open",
+        p_note: preservedNote,
+      }),
+      rollback: () => restoreAssignments(previous),
+      success: () => toast("Đã hủy nộp. Nội dung kết quả vẫn được giữ nguyên."),
+    });
+  }
+
+  async function deleteManualTaskAssignment(id) {
+    const item = S.assignments.find(row => String(row.id) === String(id));
+    if (!item || !canDeleteAssignment(item)) return;
+    const assigneeName = item.assignee?.full_name || item.assignee?.email || "người nhận này";
+    const ok = confirm(`Xóa công việc "${item.task?.title || "đã giao"}" của ${assigneeName}?`);
+    if (!ok) return;
+
+    const previous = snapshotAssignments();
+    const taskId = item.task_id || item.task?.id || null;
+    const busyElement = findTaskButton("deleteTask", id);
+    await runTaskOptimistic({
+      busyElement,
+      busyText: "Đang xóa...",
+      apply: () => {
+        S.assignments = S.assignments.filter(row => String(row.id) !== String(id));
+        render();
+      },
+      save: async () => {
+        const result = await sb.from("task_assignments").delete().eq("id", id);
+        if (result.error) return result;
+        if (taskId) {
+          const { count } = await sb
+            .from("task_assignments")
+            .select("id", { count: "exact", head: true })
+            .eq("task_id", taskId);
+          if (!count) await sb.from("daily_tasks").delete().eq("id", taskId).eq("source_type", "manual");
+        }
+        return result;
+      },
+      rollback: () => restoreAssignments(previous),
+      success: () => toast("Đã xóa công việc."),
+    });
+  }
+
   function bindEvents() {
     E.prevDay.addEventListener("click", () => {
       S.selectedDate = shiftSelectedDate(-1);
