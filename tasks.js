@@ -780,6 +780,29 @@
       </div>`;
   }
 
+  function readonlyTaskResultHtml(payload, note, requirements) {
+    const submittedRequirements = requirements.map(req => {
+      const value = requirementValue(payload, req.key);
+      const done = requirementDone(payload, req.key);
+      return { ...req, value, done };
+    });
+    const hasRequirementData = submittedRequirements.some(req => req.value || req.done);
+    if (!note && !hasRequirementData) return "";
+    return `
+      <div class="task-result-box">
+        <label>Káº¿t quáº£ Ä‘Ã£ ná»™p</label>
+        ${note ? `<div class="task-result-note">${esc(note)}</div>` : ""}
+        ${requirements.length ? `<div class="task-requirement-list">
+          ${submittedRequirements.map(req => `
+            <div class="task-requirement-item ${req.done ? "task-requirement-done" : ""}">
+              <div class="task-requirement-title">${esc(req.title)} â€¢ ${req.done ? "ÄÃ£ hoÃ n thÃ nh" : "ChÆ°a hoÃ n thÃ nh"}</div>
+              <div class="task-result-note">${req.value ? esc(req.value) : "<em>ChÆ°a nháº­p káº¿t quáº£</em>"}</div>
+            </div>
+          `).join("")}
+        </div>` : ""}
+      </div>`;
+  }
+
   function taskResultHtml(item) {
     if (!isManualAssignedTask(item)) return "";
     const completed = effectiveStatus(item) === "completed";
@@ -788,9 +811,7 @@
     const requirements = taskRequirements(item);
     const canEditResult = !(S.profile?.role === "admin" && item.user_id !== S.user?.id);
     if (!canEditResult) {
-      return completed && note
-        ? `<div class="task-result-box"><label>Kết quả đã nộp</label><div class="task-result-note">${esc(note)}</div></div>`
-        : "";
+      return readonlyTaskResultHtml(payload, note, requirements);
     }
     return `
       <div class="task-result-box">
