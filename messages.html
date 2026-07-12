@@ -306,15 +306,15 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
   margin-top: 12px;
   padding: 12px;
   border-radius: 14px;
-  background: rgba(255,255,255,.9);
+  background: #fff;
   border: 1px solid rgba(15,31,61,.08);
-  color: var(--ink);
+  color: #10233f;
   overflow-x: auto;
 }
 .message-row.mine .bubble-chart {
-  background: rgba(255,255,255,.14);
-  border-color: rgba(255,255,255,.22);
-  color: #fff;
+  background: #fff;
+  border-color: rgba(15,31,61,.08);
+  color: #10233f;
 }
 .bubble-chart-title {
   font-weight: 800;
@@ -322,7 +322,7 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
   margin-bottom: 10px;
   font-size: .82rem;
 }
-.message-row.mine .bubble-chart-title { color: #fff; }
+.message-row.mine .bubble-chart-title { color: var(--navy); }
 .score-chart-bars {
   display: flex;
   align-items: flex-end;
@@ -333,9 +333,7 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
   border-bottom: 1px solid rgba(15,31,61,.12);
   min-width: 380px;
 }
-.message-row.mine .score-chart-bars {
-  border-color: rgba(255,255,255,.26);
-}
+.message-row.mine .score-chart-bars { border-color: rgba(15,31,61,.12); }
 .score-chart-col {
   flex: 1 1 0;
   min-width: 18px;
@@ -352,7 +350,7 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
   line-height: 1;
   color: var(--ink-mid);
 }
-.message-row.mine .score-chart-value { color: rgba(255,255,255,.82); }
+.message-row.mine .score-chart-value { color: var(--ink-mid); }
 .score-chart-bar {
   width: 100%;
   min-height: 4px;
@@ -373,7 +371,7 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
   text-align: center;
   white-space: nowrap;
 }
-.message-row.mine .score-chart-labels { color: rgba(255,255,255,.76); }
+.message-row.mine .score-chart-labels { color: var(--ink-light); }
 .bubble-time { margin-top: 6px; font-size: .72rem; opacity: .75; }
 .composer {
   border-top: 1px solid rgba(15,31,61,.06);
