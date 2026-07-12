@@ -2123,7 +2123,7 @@ window.openChatPopupForTeacher = function(teacherId) {
   const frame = document.getElementById("chatPopupFrame");
   if (!popup || !frame || !teacherId) return;
   setChatPopupMindUpMode(true);
-  frame.src = "messages.html?popup=1&v=20260710-realtime1&user=00000000-0000-0000-0000-000000000001";
+  frame.src = "messages.html?popup=1&v=20260710-realtime1&teacher=" + encodeURIComponent(teacherId);
   frame.dataset.loaded = frame.src;
   popup.classList.add("open");
 };
