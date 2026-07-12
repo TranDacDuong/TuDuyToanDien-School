@@ -782,6 +782,18 @@ function rememberFamilyLinks(links) {
     const parents = _studentParentIds.get(link.student_id) || [];
     if (!parents.includes(link.parent_id)) parents.push(link.parent_id);
     _studentParentIds.set(link.student_id, parents);
+    if (link.student_name || link.student_birth_year) {
+      const childLabel = formatStudentNameWithContext({
+        id: link.student_id,
+        full_name: link.student_name || "",
+        birth_year: link.student_birth_year || ""
+      });
+      const children = _parentChildrenLabels.get(link.parent_id) || [];
+      if (childLabel && !children.includes(childLabel)) {
+        children.push(childLabel);
+        _parentChildrenLabels.set(link.parent_id, children);
+      }
+    }
   });
 }
 
@@ -2245,6 +2257,11 @@ function getOfficialFamilyKey(user) {
   return parents.length ? `family:${parents[0]}` : `student:${user.id}`;
 }
 
+function shouldRenderOfficialAudienceItem(item) {
+  return isMindUpStaffRole(currentProfile?.role) &&
+    (item?.isOfficialMindUpChannel || isStudentOrParentRole(item?.users?.role));
+}
+
 function officialFamilySortWeight(user) {
   if (user?.role === "parent") return 0;
   if (user?.role === "student") return 1;
@@ -2256,7 +2273,7 @@ function sortConversationsByFamily(list) {
   const groupNames = new Map();
   (list || []).forEach(item => {
     const user = item.users || {};
-    const groupKey = item.isOfficialMindUpChannel ? getOfficialFamilyKey(user) : `solo:${item.friend_id}`;
+    const groupKey = shouldRenderOfficialAudienceItem(item) ? getOfficialFamilyKey(user) : `solo:${item.friend_id}`;
     item._familyGroupKey = groupKey;
     const ts = item.lastActivity ? new Date(item.lastActivity).getTime() : 0;
     groupLatest.set(groupKey, Math.max(groupLatest.get(groupKey) || 0, ts));
@@ -2302,7 +2319,11 @@ async function prefetchUserContextProfiles(profiles) {
   const relevantProfiles = (profiles || []).filter(profile =>
     profile?.id &&
     (profile.role === "student" || profile.role === "parent") &&
-    !_senderContextLoaded.has(profile.id)
+    (
+      !_senderContextLoaded.has(profile.id) ||
+      (profile.role === "parent" && !_parentChildrenLabels.has(profile.id)) ||
+      (profile.role === "student" && !_studentParentIds.has(profile.id))
+    )
   );
   if (!relevantProfiles.length) return;
 
@@ -2520,7 +2541,7 @@ const _renderFriendListCore = (list) => {
   wrap.innerHTML = visibleList.map(item => {
     const isMindUp = item.friend_id === BOT_ID;
     const isLearning = item.isLearningThread;
-    const isOfficialAudience = item.isOfficialMindUpChannel && isMindUpStaffRole(currentProfile?.role);
+    const isOfficialAudience = shouldRenderOfficialAudienceItem(item);
     const rawDisplayName = isMindUp
       ? 'MindUp - Tư Duy Toàn Diện'
       : (isOfficialAudience ? getOfficialAudienceDisplayName(item.users) : (item.users?.full_name || 'Người dùng'));
@@ -2568,7 +2589,7 @@ window.loadMoreConversations = function() {
 };
 
 window.openFullMessagesPage = function() {
-  const target = "messages.html?v=20260713-message-list6";
+  const target = "messages.html?v=20260713-message-list7";
   try {
     if (window.top && window.top !== window && typeof window.top.openDashboardPage === "function") {
       window.top.openDashboardPage(target, { syncMenu: true, syncMobile: true });

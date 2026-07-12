@@ -1,10 +1,14 @@
 -- RPC for Messages: load linked parent/student rows for official MindUp chats.
 -- This avoids the frontend depending on direct parent_students SELECT policies.
 
+DROP FUNCTION IF EXISTS public.list_message_family_links(uuid[]);
+
 CREATE OR REPLACE FUNCTION public.list_message_family_links(p_user_ids uuid[])
 RETURNS TABLE (
   parent_id uuid,
-  student_id uuid
+  student_id uuid,
+  student_name text,
+  student_birth_year text
 )
 LANGUAGE sql
 SECURITY DEFINER
@@ -26,8 +30,13 @@ AS $$
       OR r.user_id = ps.student_id
     WHERE ps.revoked_at IS NULL
   )
-  SELECT DISTINCT rl.parent_id, rl.student_id
+  SELECT DISTINCT
+    rl.parent_id,
+    rl.student_id,
+    s.full_name AS student_name,
+    s.birth_year::text AS student_birth_year
   FROM raw_links rl
+  LEFT JOIN public.users s ON s.id = rl.student_id
   CROSS JOIN me
   WHERE
     me.role IN ('admin', 'assistant', 'marketing', 'accountant', 'staff')
