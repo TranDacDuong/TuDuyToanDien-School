@@ -1176,13 +1176,13 @@
     if(!window.LearningMessages || !scoreRows?.length) return;
     const sb = getSb();
     const studentIds = [...new Set(scoreRows.map(row => row.student_id).filter(Boolean))];
-    const [{ data: session }, { data: users }, { data: allScoreRows }] = await Promise.all([
-      sb.from("class_sessions").select("id,session_order,session_date,lesson:lessons(name)").eq("id", sessionId).maybeSingle(),
-      studentIds.length ? sb.from("users").select("id,full_name").in("id", studentIds) : Promise.resolve({ data: [] }),
-      sb.from("class_session_scores").select("student_id,score,max_score").eq("class_session_id", sessionId)
+    const [{ data: session }, { data: users }] = await Promise.all([
+      sb.from("class_sessions").select("id,class_id,lesson_id,session_order,session_date,lesson:lessons(name)").eq("id", sessionId).maybeSingle(),
+      studentIds.length ? sb.from("users").select("id,full_name").in("id", studentIds) : Promise.resolve({ data: [] })
     ]);
+    const groupInfo = await loadSessionScoreGroupInfo(sb, session, sessionId);
     const nameMap = new Map((users || []).map(user => [user.id, user.full_name || "Học sinh"]));
-    const stats = buildSessionScoreStats(allScoreRows || []);
+    const stats = buildSessionScoreStats(groupInfo.scoreRows || []);
     await Promise.allSettled(scoreRows.map(async row => {
       const buildScoreContent = window.LearningMessages.sessionScoreContentAsync || window.LearningMessages.sessionScoreContent;
       const normalized = normalizeScoreToTen(row.score, row.max_score || 10);
@@ -1191,7 +1191,7 @@
         studentName: nameMap.get(row.student_id) || "Học sinh",
         className: _className || _cachedClass?.class_name || _cachedClass?.name || "",
         lessonName: session?.lesson?.name || (session?.session_order ? `Buổi ${session.session_order}` : ""),
-        sessionDate: session?.session_date ? String(session.session_date).slice(0,10) : "",
+        sessionDate: groupInfo.dateLabel || (session?.session_date ? String(session.session_date).slice(0,10) : ""),
         score: row.score,
         maxScore: row.max_score || 10,
         scoreOnTen: normalized,
@@ -1205,9 +1205,55 @@
         studentId: row.student_id,
         content,
         realSenderId: window._currentUserId || null,
-        messageKey: `session_score:${sessionId}:${row.student_id}`,
+        messageKey: `session_score:${groupInfo.messageGroupKey || sessionId}:${row.student_id}`,
       });
     }));
+  }
+
+  async function loadSessionScoreGroupInfo(sb, session, fallbackSessionId){
+    const fallback = {
+      sessionIds: [fallbackSessionId].filter(Boolean),
+      scoreRows: [],
+      dateLabel: session?.session_date ? String(session.session_date).slice(0,10) : "",
+      messageGroupKey: fallbackSessionId
+    };
+    if(!session?.class_id || !session?.lesson_id || !Number(session?.session_order || 0)){
+      const { data } = await sb
+        .from("class_session_scores")
+        .select("student_id,score,max_score,updated_at,class_session_id")
+        .eq("class_session_id", fallbackSessionId);
+      fallback.scoreRows = data || [];
+      return fallback;
+    }
+    const { data: groupSessions, error: groupError } = await sb
+      .from("class_sessions")
+      .select("id,session_date")
+      .eq("class_id", session.class_id)
+      .eq("lesson_id", session.lesson_id)
+      .eq("session_order", session.session_order);
+    if(groupError || !groupSessions?.length){
+      const { data } = await sb
+        .from("class_session_scores")
+        .select("student_id,score,max_score,updated_at,class_session_id")
+        .eq("class_session_id", fallbackSessionId);
+      fallback.scoreRows = data || [];
+      return fallback;
+    }
+    const sessionIds = groupSessions.map(item => item.id).filter(Boolean);
+    const dates = groupSessions
+      .map(item => String(item.session_date || "").slice(0,10))
+      .filter(Boolean)
+      .sort();
+    const { data: scoreRows } = await sb
+      .from("class_session_scores")
+      .select("student_id,score,max_score,updated_at,class_session_id")
+      .in("class_session_id", sessionIds);
+    return {
+      sessionIds,
+      scoreRows: scoreRows || [],
+      dateLabel: dates.join(", "),
+      messageGroupKey: `${session.lesson_id}:${Number(session.session_order || 0)}`
+    };
   }
 
   function normalizeScoreToTen(score, maxScore){
@@ -1218,7 +1264,15 @@
   }
 
   function buildSessionScoreStats(rows){
-    const scored = (rows || [])
+    const latestByStudent = new Map();
+    (rows || []).forEach(row => {
+      if(!row?.student_id) return;
+      const current = latestByStudent.get(row.student_id);
+      const rowTime = Date.parse(row.updated_at || "") || 0;
+      const currentTime = Date.parse(current?.updated_at || "") || 0;
+      if(!current || rowTime >= currentTime) latestByStudent.set(row.student_id, row);
+    });
+    const scored = Array.from(latestByStudent.values())
       .map(row => ({
         student_id: row.student_id,
         score: Number(row.score),

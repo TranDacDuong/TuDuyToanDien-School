@@ -137,13 +137,19 @@
   function scoreDistributionText(distribution) {
     const rows = Array.isArray(distribution) ? distribution : [];
     if (!rows.length) return "";
+    const maxCount = Math.max(1, ...rows.map(item => Number(item.count || 0)));
+    const levels = [4, 3, 2, 1];
+    const columnChart = levels.map(level => {
+      const threshold = maxCount * level / levels.length;
+      return rows.map(item => Number(item.count || 0) >= threshold ? "█" : "·").join(" ");
+    }).join("\n");
+    const countLine = rows.map(item => String(Number(item.count || 0))).join(" ");
+    const labelLine = rows.map(item => String(item.label || "").replace("-", "‑")).join(" ");
     return [
-      "Phổ điểm trong lớp:",
-      ...rows.map(item => {
-        const count = Number(item.count || 0);
-        const bar = count > 0 ? "█".repeat(Math.min(count, 12)) : "·";
-        return `${item.label}: ${bar} ${count}`;
-      })
+      "Đồ thị phổ điểm trong lớp:",
+      columnChart,
+      `SL: ${countLine}`,
+      labelLine
     ].join("\n");
   }
 
