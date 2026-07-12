@@ -478,9 +478,20 @@
   /* ─────────────────────────────────────────────
      HELPER: upsert payment record
   ───────────────────────────────────────────── */
-  async function upsertPayment(studentId, ym, fields) {
+  async function fetchPaymentRecord(studentId, ym) {
     const sb = getSb();
-    const existing = paymentMap[studentId] || {};
+    const { data, error } = await sb
+      .from("tuition_payments")
+      .select("*")
+      .eq("student_id", studentId)
+      .eq("month", ymToDate(ym))
+      .maybeSingle();
+    if (error) throw error;
+    return data || {};
+  }
+
+  async function upsertPaymentRecord(studentId, ym, fields, existing = {}) {
+    const sb = getSb();
     const { data, error } = await sb
       .from("tuition_payments")
       .upsert({
@@ -497,7 +508,53 @@
       }, { onConflict: "student_id,month" })
       .select().single();
     if (error) throw error;
+    return data;
+  }
+
+  async function upsertPayment(studentId, ym, fields) {
+    const existing = paymentMap[studentId] || {};
+    const data = await upsertPaymentRecord(studentId, ym, fields, existing);
     paymentMap[studentId] = data;
+  }
+
+  async function carryOverTuitionPayment(studentId, sourceYm, surplusAmount, paidAt) {
+    const surplus = Math.max(0, Math.round(Number(surplusAmount) || 0));
+    if (!studentId || !surplus) return null;
+    const nextYm = addMonths(sourceYm, 1);
+    const existingNext = await fetchPaymentRecord(studentId, nextYm);
+    const nextPaid = Number(existingNext.amount_paid || 0) + surplus;
+    const currentNote = String(existingNext.note || "").trim();
+    const carryNote = `Chuyển dư từ học phí tháng ${sourceYm}: ${fmt(surplus)}đ`;
+    const note = currentNote && !currentNote.includes(carryNote)
+      ? `${currentNote}\n${carryNote}`
+      : (currentNote || carryNote);
+    return upsertPaymentRecord(studentId, nextYm, {
+      amount_due: existingNext.amount_due || 0,
+      amount_paid: nextPaid,
+      paid_at: paidAt || new Date().toISOString(),
+      note,
+    }, existingNext);
+  }
+
+  async function normalizeOverpaidPayments(rows, ym) {
+    if (!canManagePayments()) return false;
+    let changed = false;
+    for (const group of rows || []) {
+      const payment = paymentMap[group.studentId];
+      const paid = Number(payment?.amount_paid || 0);
+      const due = Math.max(0, Number(group.amount || 0));
+      if (!payment?.id || paid <= due) continue;
+      const surplus = paid - due;
+      const now = payment.paid_at || new Date().toISOString();
+      await upsertPayment(group.studentId, ym, {
+        amount_due: due,
+        amount_paid: due,
+        paid_at: now,
+      });
+      await carryOverTuitionPayment(group.studentId, ym, surplus, now);
+      changed = true;
+    }
+    return changed;
   }
 
   /* ─────────────────────────────────────────────
@@ -522,7 +579,9 @@ Nhập số tiền thu thêm lần này:`,
     const addAmount = parseInt(input.replace(/[^0-9]/g, ""));
     if (isNaN(addAmount) || addAmount <= 0) { alert("Số tiền không hợp lệ"); return; }
 
-    const newPaid = alreadyPaid + addAmount;
+    const totalPaidInput = alreadyPaid + addAmount;
+    const newPaid = Math.min(totalPaidInput, amountDue);
+    const carryOverAmount = Math.max(0, totalPaidInput - amountDue);
     const now     = new Date().toISOString();
 
     try {
@@ -531,6 +590,10 @@ Nhập số tiền thu thêm lần này:`,
         amount_paid: newPaid,
         paid_at:     now,
       });
+      let carryOverPayment = null;
+      if (carryOverAmount > 0) {
+        carryOverPayment = await carryOverTuitionPayment(studentId, ym, carryOverAmount, now);
+      }
       await window.AppAdminTools?.recordAudit?.("tuition_payment_collected", {
         target_type: "tuition_payment",
         target_id: paymentMap[studentId]?.id || null,
@@ -539,10 +602,13 @@ Nhập số tiền thu thêm lần này:`,
         amount_due: amountDue,
         added_amount: addAmount,
         amount_paid: newPaid,
+        carried_over_amount: carryOverAmount,
+        carried_over_to_month: carryOverAmount > 0 ? addMonths(ym, 1) : null,
+        carried_over_payment_id: carryOverPayment?.id || null,
       });
       // === MINDUP BOT: Xác nhận học phí (gửi khi đã đóng đủ) ===
       try {
-        if(window.MindUpBot && newPaid >= amountDue) {
+        if(window.MindUpBot && amountDue > 0 && newPaid >= amountDue) {
           const sb = getSb();
           // Lấy thông tin học sinh + phụ huynh
           const [{ data: studentInfo }, { data: parentLinks }] = await Promise.all([
@@ -564,6 +630,9 @@ Nhập số tiền thu thêm lần này:`,
         }
       } catch(botErr){ console.warn('[MindUpBot] Lỗi gửi tin nhắn xác nhận học phí:', botErr); }
       // === END MINDUP BOT ===
+      if (carryOverAmount > 0) {
+        alert(`Đã ghi nhận đủ học phí tháng ${ym} và chuyển ${fmt(carryOverAmount)}đ sang tháng ${addMonths(ym, 1)}.`);
+      }
       renderRows();
     } catch (err) { alert("Lỗi: " + err.message); }
   };
@@ -941,6 +1010,7 @@ Nhập số tiền hoàn lại (>0):`,
 
       // Gộp theo studentId
       buildGrouped();
+      await normalizeOverpaidPayments(grouped, ym);
       syncClassFilterOptions();
       renderRows();
 
