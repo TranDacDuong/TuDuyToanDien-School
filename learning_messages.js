@@ -120,19 +120,62 @@
     return appendActionIfMissing(content, { type: "reply", label: "💬 Phản hồi nhận xét" });
   }
 
-  function sessionScoreContent({ studentName, className, lessonName, sessionDate, score, maxScore = 10, note }) {
+  function scoreDistributionText(distribution) {
+    const rows = Array.isArray(distribution) ? distribution : [];
+    if (!rows.length) return "";
+    return [
+      "Phổ điểm trong lớp:",
+      ...rows.map(item => {
+        const count = Number(item.count || 0);
+        const bar = count > 0 ? "█".repeat(Math.min(count, 12)) : "·";
+        return `${item.label}: ${bar} ${count}`;
+      })
+    ].join("\n");
+  }
+
+  function sessionScoreContent({ studentName, className, lessonName, sessionDate, score, maxScore = 10, note, rank, totalRanked, distribution }) {
+    const normalizedScore = maxScore ? Math.round((Number(score || 0) / Number(maxScore || 10)) * 100) / 10 : Number(score || 0);
+    const rankLine = rank && totalRanked
+      ? `Xếp hạng trong lớp: **${rank}/${totalRanked}**`
+      : "";
+    const distributionBlock = scoreDistributionText(distribution);
     return [
       `📊 Điểm BTVN/Đề luyện tập${className ? ` lớp **${className}**` : ""}`,
       studentName ? `Học sinh: **${studentName}**` : "",
       lessonName ? `Bài/buổi: **${lessonName}**` : "",
       sessionDate ? `Ngày học: **${sessionDate}**` : "",
       `Điểm: **${score}/${maxScore}**`,
+      maxScore && Number(maxScore) !== 10 ? `Quy đổi thang 10: **${normalizedScore}/10**` : "",
+      rankLine,
+      distributionBlock ? `\n${distributionBlock}` : "",
       cleanText(note) ? `Ghi chú: ${cleanText(note)}` : "",
     ].filter(Boolean).join("\n");
   }
 
-  async function sessionScoreContentAsync({ studentName, className, lessonName, sessionDate, score, maxScore = 10, note }) {
-    const fallback = sessionScoreContent({ studentName, className, lessonName, sessionDate, score, maxScore, note });
+  function sessionScoreStatsBlock({ rank, totalRanked, distribution }) {
+    const lines = [];
+    if (rank && totalRanked) lines.push(`Xếp hạng trong lớp: **${rank}/${totalRanked}**`);
+    const distributionBlock = scoreDistributionText(distribution);
+    if (distributionBlock) lines.push(distributionBlock);
+    return lines.join("\n\n");
+  }
+
+  function appendScoreStatsIfMissing(content, stats) {
+    const text = cleanText(content);
+    const block = sessionScoreStatsBlock(stats);
+    if (!text || !block) return text;
+    const hasRank = /xếp\s*hạng/i.test(text);
+    const hasDistribution = /phổ\s*điểm/i.test(text);
+    if (hasRank && hasDistribution) return text;
+    const actionMatch = text.match(/\n*__(ACTION|EVALUATION)__\s*\{/i);
+    if (!actionMatch || actionMatch.index === undefined) return `${text}\n\n${block}`;
+    const beforeAction = text.slice(0, actionMatch.index).trimEnd();
+    const actionPart = text.slice(actionMatch.index).trimStart();
+    return `${beforeAction}\n\n${block}\n\n${actionPart}`.trim();
+  }
+
+  async function sessionScoreContentAsync({ studentName, className, lessonName, sessionDate, score, maxScore = 10, note, rank, totalRanked, distribution }) {
+    const fallback = sessionScoreContent({ studentName, className, lessonName, sessionDate, score, maxScore, note, rank, totalRanked, distribution });
     const content = await templateContent("session_score_notice", fallback, {
       student_name: studentName || "",
       class_name: className || "",
@@ -140,9 +183,13 @@
       session_date: sessionDate || "",
       score: score ?? "",
       max_score: maxScore ?? 10,
+      rank: rank || "",
+      total_ranked: totalRanked || "",
+      score_distribution: scoreDistributionText(distribution),
       note: cleanText(note),
     });
-    return appendActionIfMissing(content, { type: "reply", label: "💬 Hỏi lại thầy cô" });
+    const withStats = appendScoreStatsIfMissing(content, { rank, totalRanked, distribution });
+    return appendActionIfMissing(withStats, { type: "reply", label: "💬 Hỏi lại thầy cô" });
   }
 
   function notificationContent({ title, message, targetUrl }) {

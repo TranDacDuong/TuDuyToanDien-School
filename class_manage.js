@@ -1176,13 +1176,17 @@
     if(!window.LearningMessages || !scoreRows?.length) return;
     const sb = getSb();
     const studentIds = [...new Set(scoreRows.map(row => row.student_id).filter(Boolean))];
-    const [{ data: session }, { data: users }] = await Promise.all([
+    const [{ data: session }, { data: users }, { data: allScoreRows }] = await Promise.all([
       sb.from("class_sessions").select("id,session_order,session_date,lesson:lessons(name)").eq("id", sessionId).maybeSingle(),
-      studentIds.length ? sb.from("users").select("id,full_name").in("id", studentIds) : Promise.resolve({ data: [] })
+      studentIds.length ? sb.from("users").select("id,full_name").in("id", studentIds) : Promise.resolve({ data: [] }),
+      sb.from("class_session_scores").select("student_id,score,max_score").eq("class_session_id", sessionId)
     ]);
     const nameMap = new Map((users || []).map(user => [user.id, user.full_name || "Học sinh"]));
+    const stats = buildSessionScoreStats(allScoreRows || []);
     await Promise.allSettled(scoreRows.map(async row => {
       const buildScoreContent = window.LearningMessages.sessionScoreContentAsync || window.LearningMessages.sessionScoreContent;
+      const normalized = normalizeScoreToTen(row.score, row.max_score || 10);
+      const rankInfo = stats.rankByStudentId.get(row.student_id) || {};
       const content = await buildScoreContent({
         studentName: nameMap.get(row.student_id) || "Học sinh",
         className: _className || _cachedClass?.class_name || _cachedClass?.name || "",
@@ -1190,6 +1194,10 @@
         sessionDate: session?.session_date ? String(session.session_date).slice(0,10) : "",
         score: row.score,
         maxScore: row.max_score || 10,
+        scoreOnTen: normalized,
+        rank: rankInfo.rank || "",
+        totalRanked: stats.totalRanked || "",
+        distribution: stats.distribution,
         note: row.note || "",
       });
       if (!content) return { skipped: true };
@@ -1199,6 +1207,52 @@
         realSenderId: window._currentUserId || null,
       });
     }));
+  }
+
+  function normalizeScoreToTen(score, maxScore){
+    const raw = Number(score);
+    const max = Number(maxScore || 10);
+    if(!Number.isFinite(raw) || !Number.isFinite(max) || max <= 0) return null;
+    return Math.max(0, Math.min(10, raw / max * 10));
+  }
+
+  function buildSessionScoreStats(rows){
+    const scored = (rows || [])
+      .map(row => ({
+        student_id: row.student_id,
+        score: Number(row.score),
+        max_score: Number(row.max_score || 10),
+        score10: normalizeScoreToTen(row.score, row.max_score || 10)
+      }))
+      .filter(row => row.student_id && Number.isFinite(row.score10));
+
+    const buckets = Array.from({ length: 10 }, (_, index) => ({
+      label: `${index}-${index + 1}`,
+      count: 0
+    }));
+    scored.forEach(row => {
+      const bucketIndex = Math.min(9, Math.max(0, Math.floor(row.score10)));
+      buckets[bucketIndex].count += 1;
+    });
+
+    const sorted = scored.slice().sort((a, b) => {
+      if(b.score10 !== a.score10) return b.score10 - a.score10;
+      return String(a.student_id).localeCompare(String(b.student_id));
+    });
+    const rankByStudentId = new Map();
+    let previousScore = null;
+    let currentRank = 0;
+    sorted.forEach((row, index) => {
+      if(previousScore === null || row.score10 !== previousScore) currentRank = index + 1;
+      previousScore = row.score10;
+      rankByStudentId.set(row.student_id, { rank: currentRank, score10: row.score10 });
+    });
+
+    return {
+      totalRanked: scored.length,
+      rankByStudentId,
+      distribution: buckets
+    };
   }
 
   window.cvToggleAtt = async function(classId,studentId,date,current,scheduleId,sessionNo){
