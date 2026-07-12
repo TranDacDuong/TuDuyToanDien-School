@@ -212,8 +212,6 @@ window.addComment = async function() {
 };
 
 function subscribeRealtime() {
-  if (!currentPostId) return;
-
   if (postChannel) {
     sb.removeChannel(postChannel);
     postChannel = null;
@@ -222,27 +220,6 @@ function subscribeRealtime() {
     sb.removeChannel(commentChannel);
     commentChannel = null;
   }
-
-  postChannel = sb
-    .channel("post-detail:" + currentPostId)
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "posts", filter: "id=eq." + currentPostId },
-      () => loadPost()
-    )
-    .subscribe();
-
-  commentChannel = sb
-    .channel("post-comments:" + currentPostId)
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "comments", filter: "post_id=eq." + currentPostId },
-      async () => {
-        await loadPost();
-        await loadComments();
-      }
-    )
-    .subscribe();
 }
 
 function renderError(message) {

@@ -1031,26 +1031,6 @@ async function init() {
 
 function subscribeProfileRealtime() {
   clearProfileRealtime();
-
-  const tables = [
-    { table: "users", filter: "id=eq." + viewedUserId, handler: refreshProfileView },
-    { table: "posts", filter: "user_id=eq." + viewedUserId, handler: refreshPostSection },
-    { table: "likes", handler: refreshPostSection },
-    { table: "comments", handler: refreshPostSection },
-    { table: "friendships", handler: refreshProfileView },
-    { table: "friend_requests", handler: refreshRelationshipState }
-  ];
-
-  profileChannels = tables.map(item =>
-    sb
-      .channel("profile:" + item.table + ":" + viewedUserId + ":" + Math.random().toString(36).slice(2))
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: item.table, filter: item.filter },
-        () => item.handler()
-      )
-      .subscribe()
-  );
 }
 
 function clearProfileRealtime() {
