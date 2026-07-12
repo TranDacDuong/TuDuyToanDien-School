@@ -304,11 +304,11 @@
 
   function normalizeLocalNotificationUrl(value) {
     try {
-      const url = new URL(value || "notifications.html", window.location.origin);
-      if (url.origin !== window.location.origin) return "notifications.html";
-      return `${url.pathname}${url.search}${url.hash}`.replace(/^\//, "") || "notifications.html";
+      const url = new URL(value || "messages.html", window.location.origin);
+      if (url.origin !== window.location.origin) return "messages.html";
+      return `${url.pathname}${url.search}${url.hash}`.replace(/^\//, "") || "messages.html";
     } catch (error) {
-      return "notifications.html";
+      return "messages.html";
     }
   }
 
@@ -537,7 +537,7 @@
         userIds: [user.id],
         title: options.title || "MindUp test",
         message: options.message || "Thong bao day thu nghiem tu MindUp.",
-        targetUrl: options.targetUrl || "notifications.html",
+        targetUrl: options.targetUrl || "messages.html",
         type: options.type || "system",
         debug: true
       })

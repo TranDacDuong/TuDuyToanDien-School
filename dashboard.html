@@ -839,9 +839,9 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
         <span>🔎</span>
         <span>Tìm kiếm</span>
       </button>
-      <button class="mobile-quick-action" type="button" data-page="notifications.html">
+      <button class="mobile-quick-action" type="button" data-page="messages.html">
         <span>🔔</span>
-        <span>Thông báo</span>
+        <span>Tin MINDUP</span>
         <span class="mobile-quick-action-badge" id="notificationBadgeTop">0</span>
       </button>
       <button class="mobile-quick-action" type="button" data-page="friend_requests.html">
@@ -1333,7 +1333,7 @@ function openDashboardPage(page, options = {}){
   }
   if(currentDashboardUser && currentDashboardProfile && !canOpenDashboardPage(page)){
     page = basePage === "tasks.html" && ["student", "parent"].includes(currentDashboardProfile.role)
-      ? "notifications.html"
+      ? "messages.html"
       : "home.html";
   }
   if(updateUrl) syncDashboardUrl(page, replaceUrl);
@@ -1607,8 +1607,7 @@ async function loadNotificationBadge(userId){
     .eq("user_id", userId)
     .eq("is_read", false);
 
-  const count = (data || []).filter(item => !HIDDEN_NOTIFICATION_TYPES.includes(item.type)).length;
-  updateBadgeElements(["notificationBadge", "notificationBadgeTop"], error ? 0 : count);
+  updateBadgeElements(["notificationBadge", "notificationBadgeTop"], 0);
 }
 
 async function loadMessageBadge(userId){

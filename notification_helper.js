@@ -22,6 +22,7 @@
   }
 
   const PARENT_VISIBLE_TYPES = new Set([
+    "course_created",
     "course_enrolled",
     "course_request_approved",
     "course_request_rejected",
@@ -30,6 +31,10 @@
     "class_session_added",
     "class_session_updated",
     "class_exam_added",
+    "exam_score_notice",
+    "exam_result",
+    "low_score_review",
+    "review_exam_reminder",
     "session_evaluation",
     "task_assigned",
     "task_daily_digest",
@@ -41,6 +46,7 @@
   ]);
 
   const STUDENT_LEARNING_TYPES = new Set([
+    "course_created",
     "course_enrolled",
     "course_request_approved",
     "course_request_rejected",
@@ -49,6 +55,10 @@
     "class_session_added",
     "class_session_updated",
     "class_exam_added",
+    "exam_score_notice",
+    "exam_result",
+    "low_score_review",
+    "review_exam_reminder",
     "session_evaluation",
     "tuition_due",
     "tuition_reminder",
@@ -81,12 +91,13 @@
 
   async function expandParentNotifications(payloads) {
     const rows = Array.isArray(payloads) ? payloads : [];
+    const normalizedRows = rows.map(withLearningStudentMeta);
     const studentIds = rows
       .filter(item => PARENT_VISIBLE_TYPES.has(item.type))
       .map(item => item.user_id)
       .filter(Boolean);
     const parentLinks = await getLinkedParentsForStudents(studentIds);
-    if (!parentLinks.length) return rows;
+    if (!parentLinks.length) return normalizedRows;
 
     const linksByStudent = parentLinks.reduce((acc, link) => {
       if (!acc[link.student_id]) acc[link.student_id] = [];
@@ -94,7 +105,6 @@
       return acc;
     }, {});
 
-    const normalizedRows = rows.map(withLearningStudentMeta);
     const expanded = [...normalizedRows];
     normalizedRows.forEach(item => {
       if (!PARENT_VISIBLE_TYPES.has(item.type)) return;

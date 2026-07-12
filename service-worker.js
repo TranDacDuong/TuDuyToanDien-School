@@ -88,7 +88,7 @@ self.addEventListener("push", event => {
     timestamp: Date.now(),
     vibrate: payload.vibrate || [160, 80, 160],
     data: {
-      url: payload.url || payload.target_url || "notifications.html",
+      url: payload.url || payload.target_url || "messages.html",
       notificationId: payload.notificationId || payload.id || null,
       receivedAt: new Date().toISOString()
     }
@@ -102,7 +102,7 @@ self.addEventListener("push", event => {
 
 self.addEventListener("notificationclick", event => {
   event.notification.close();
-  const targetUrl = normalizeClientUrl(event.notification.data?.url || "notifications.html");
+  const targetUrl = normalizeClientUrl(event.notification.data?.url || "messages.html");
 
   event.waitUntil((async () => {
     const windowClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
@@ -166,10 +166,10 @@ function readPushPayload(event) {
 function normalizeClientUrl(value) {
   try {
     const url = new URL(value, self.location.origin);
-    if (url.origin !== self.location.origin) return "notifications.html";
+    if (url.origin !== self.location.origin) return "messages.html";
     return url.href;
   } catch (error) {
-    return "notifications.html";
+    return "messages.html";
   }
 }
 

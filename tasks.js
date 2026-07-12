@@ -2068,10 +2068,10 @@
     S.profile = profile;
     if (!INTERNAL_ROLES.has(profile.role)) {
       if (window.parent && window.parent !== window && typeof window.parent.openDashboardPage === "function") {
-        window.parent.openDashboardPage("notifications.html", { syncMenu: false, syncMobile: false, replaceUrl: true });
+        window.parent.openDashboardPage("messages.html", { syncMenu: false, syncMobile: false, replaceUrl: true });
         return;
       }
-      location.href = "notifications.html";
+      location.href = "messages.html";
       return;
     }
     S.selectedDate = localDate();
