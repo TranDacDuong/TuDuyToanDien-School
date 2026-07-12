@@ -272,13 +272,23 @@
   function start() {
     enhance(document);
     if (observerStarted) return;
-    const target = document.body || document.documentElement;
-    if (!target || typeof target.nodeType !== "number") {
+    const isDomNode = (node) => !!node
+      && typeof node.nodeType === "number"
+      && typeof node.appendChild === "function"
+      && typeof node.querySelectorAll === "function";
+    const target = isDomNode(document.body)
+      ? document.body
+      : (isDomNode(document.documentElement) ? document.documentElement : null);
+    if (!target) {
       setTimeout(start, 0);
       return;
     }
-    observer.observe(target, { childList: true, subtree: true });
-    observerStarted = true;
+    try {
+      observer.observe(target, { childList: true, subtree: true });
+      observerStarted = true;
+    } catch (_) {
+      setTimeout(start, 0);
+    }
   }
 
   if (document.readyState === "loading") {
