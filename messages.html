@@ -1682,12 +1682,6 @@ function subscribeConversationListChanges() {
     sb.removeChannel(conversationListChannel);
     conversationListChannel = null;
   }
-  if (!currentUser) return;
-  conversationListChannel = sb
-    .channel("message-list:" + currentUser.id)
-    .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => scheduleFriendsReload())
-    .on("postgres_changes", { event: "*", schema: "public", table: "conversation_members", filter: "user_id=eq." + currentUser.id }, () => scheduleFriendsReload())
-    .subscribe();
 }
 
 function subscribePresence() {
