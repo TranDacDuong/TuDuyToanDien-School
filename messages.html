@@ -450,9 +450,15 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
   flex-direction: column;
   gap: 6px;
 }
+.eval-widget.score-scale {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
 .eval-option {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   padding: 8px 12px;
   border-radius: 12px;
@@ -463,6 +469,12 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
   font-weight: 600;
   color: #0f3c73;
   transition: .15s;
+}
+.eval-widget.score-scale .eval-option {
+  min-height: 40px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  font-size: .78rem;
 }
 .eval-option:hover { background: #fef3c7; border-color: #b08020; }
 .eval-option.selected { background: #0f3c73; color: #fff; border-color: #0f3c73; }
@@ -1987,10 +1999,11 @@ function renderMessageBody(value) {
     try {
       const evalData = JSON.parse(evalPart.json);
       const sessionId = evalData.sessionId || '';
+      const isScoreScale = evalData.scale === "0_10_understanding" || (evalData.options || []).length >= 10;
       const opts = (evalData.options || []).map((opt, i) =>
         `<button type="button" class="eval-option" id="evopt_${esc(sessionId)}_${i}" onclick="handleEvalOption('${escapeJs(sessionId)}', '${escapeJs(opt.value)}', ${i}, ${(evalData.options||[]).length})">${esc(opt.label)}</button>`
       ).join('');
-      actionHtml += `<div class="eval-widget" id="evalWidget_${esc(sessionId)}">${opts}</div>`;
+      actionHtml += `<div class="eval-widget ${isScoreScale ? 'score-scale' : ''}" id="evalWidget_${esc(sessionId)}">${opts}</div>`;
     } catch {}
   }
   return `<div class="bubble-caption">${renderMarkdown(text)}</div>${actionHtml}`;

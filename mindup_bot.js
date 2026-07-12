@@ -50,6 +50,18 @@
     return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] || '');
   }
 
+  function buildSessionUnderstandingScale(sessionId) {
+    const options = Array.from({ length: 11 }, (_, score) => ({
+      value: String(score),
+      label: score === 0
+        ? '0 - Không hiểu bài'
+        : score === 10
+          ? '10 - Hiểu bài'
+          : String(score)
+    }));
+    return '__EVALUATION__' + JSON.stringify({ sessionId, scale: '0_10_understanding', options });
+  }
+
   /**
    * Hàm gốc: Gửi một tin nhắn từ Bot MindUp đến một user
    * @param {string} userId - ID người nhận
@@ -308,15 +320,20 @@
    */
   async function sendSessionEvaluationWidget(studentId, { className, sessionId }) {
     const defaultContent =
-      '⭐ Buổi học lớp **{{class_name}}** hôm nay thế nào em nhỉ? Hãy cho thầy cô biết mức độ hiểu bài của em nhé!\n\n__EVALUATION__{"sessionId":"{{session_id}}","options":[{"value":"understood","label":"😊 Hiểu bài"},{"value":"partial","label":"😐 Mơ hồ"},{"value":"confused","label":"🙁 Khó hiểu"}]}';
+      '⭐ Buổi học lớp **{{class_name}}** hôm nay thế nào em nhỉ? Hãy chấm mức độ hiểu bài của em theo thang điểm từ **0 đến 10** nhé!\n\n0 = Không hiểu bài, 10 = Hiểu bài\n\n__EVALUATION__{"sessionId":"{{session_id}}","scale":"0_10_understanding","options":[{"value":"0","label":"0 - Không hiểu bài"},{"value":"1","label":"1"},{"value":"2","label":"2"},{"value":"3","label":"3"},{"value":"4","label":"4"},{"value":"5","label":"5"},{"value":"6","label":"6"},{"value":"7","label":"7"},{"value":"8","label":"8"},{"value":"9","label":"9"},{"value":"10","label":"10 - Hiểu bài"}]}';
 
     const tpl = await getTemplate('session_evaluation_widget', defaultContent);
     if (!tpl) return null;
 
-    const content = renderTemplate(tpl, {
+    const rendered = renderTemplate(tpl, {
       class_name: className,
       session_id: sessionId
     });
+    const baseContent = rendered.replace(/__EVALUATION__[\s\S]*$/i, '').trim();
+    const helperLine = /0\s*=|0\s*-/i.test(baseContent) && /10\s*=|10\s*-/i.test(baseContent)
+      ? ''
+      : '\n\n0 = Không hiểu bài, 10 = Hiểu bài';
+    const content = `${baseContent}${helperLine}\n\n${buildSessionUnderstandingScale(sessionId)}`;
 
     return sendBotMessage(studentId, content);
   }
