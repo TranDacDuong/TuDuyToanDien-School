@@ -839,11 +839,6 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
         <span>🔎</span>
         <span>Tìm kiếm</span>
       </button>
-      <button class="mobile-quick-action" type="button" data-page="messages.html">
-        <span>🔔</span>
-        <span>Tin MINDUP</span>
-        <span class="mobile-quick-action-badge" id="notificationBadgeTop">0</span>
-      </button>
       <button class="mobile-quick-action" type="button" data-page="friend_requests.html">
         <span>🤝</span>
         <span>Lời mời</span>
@@ -1133,7 +1128,6 @@ async function initDashboard(userOverride = null){
   loadUserInfo(profile);
   if(profile.role === "admin") window.DashboardOps?.loadAdminOps?.();
   loadFriendRequestBadge(user.id);
-  loadNotificationBadge(user.id);
   loadMessageBadge(user.id);
   subscribeBadgeChanges(user.id);
   document.body.style.visibility = "visible";
@@ -1600,25 +1594,22 @@ async function loadFriendRequestBadge(userId){
   updateBadgeElements(["friendRequestBadge", "friendRequestBadgeTop"], error ? 0 : count || 0);
 }
 
-async function loadNotificationBadge(userId){
-  const { data, error } = await sb
-    .from("notifications")
-    .select("type")
-    .eq("user_id", userId)
-    .eq("is_read", false);
-
-  updateBadgeElements(["notificationBadge", "notificationBadgeTop"], 0);
-}
-
 async function loadMessageBadge(userId){
-  const { count, error } = await sb
+  const { count: messageCount, error: messageError } = await sb
     .from("notifications")
     .select("*", { count: "exact", head: true })
     .eq("user_id", userId)
     .eq("is_read", false)
     .eq("type", "message_new");
 
-  updateBadgeElements(["messageBadge", "messageBadgeTop"], error ? 0 : count || 0);
+  const { data: otherRows, error: otherError } = await sb
+    .from("notifications")
+    .select("type")
+    .eq("user_id", userId)
+    .eq("is_read", false);
+
+  const otherCount = (otherRows || []).filter(item => !HIDDEN_NOTIFICATION_TYPES.includes(item.type)).length;
+  updateBadgeElements(["messageBadge", "messageBadgeTop"], (messageError || otherError) ? 0 : (messageCount || 0) + otherCount);
 }
 
 function subscribeBadgeChanges(userId){
@@ -1630,10 +1621,7 @@ function subscribeBadgeChanges(userId){
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "notifications", filter: "user_id=eq." + userId },
-      () => {
-        loadNotificationBadge(userId);
-        loadMessageBadge(userId);
-      }
+      () => loadMessageBadge(userId)
     )
     .subscribe();
 
