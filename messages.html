@@ -776,10 +776,29 @@ async function fetchUsersByIds(userIds) {
   return new Map((data || []).map(user => [user.id, user]));
 }
 
-async function fetchRelatedFamilyUserIds(userIds) {
+function rememberFamilyLinks(links) {
+  (links || []).forEach(link => {
+    if (!link?.student_id || !link?.parent_id) return;
+    const parents = _studentParentIds.get(link.student_id) || [];
+    if (!parents.includes(link.parent_id)) parents.push(link.parent_id);
+    _studentParentIds.set(link.student_id, parents);
+  });
+}
+
+async function fetchMessageFamilyLinks(userIds) {
   const ids = [...new Set((userIds || []).filter(Boolean))];
   if (!ids.length) return [];
-  const related = new Set();
+  try {
+    const { data, error } = await sb.rpc("list_message_family_links", { p_user_ids: ids });
+    if (!error) {
+      rememberFamilyLinks(data || []);
+      return data || [];
+    }
+    console.warn("Could not load message family links via RPC", error);
+  } catch (error) {
+    console.warn("Could not call message family links RPC", error);
+  }
+
   try {
     const [childrenRes, parentsRes] = await Promise.all([
       sb.from("parent_students")
@@ -791,20 +810,28 @@ async function fetchRelatedFamilyUserIds(userIds) {
         .in("student_id", ids)
         .is("revoked_at", null)
     ]);
-    [...(childrenRes.data || []), ...(parentsRes.data || [])].forEach(link => {
-      if (!link?.student_id || !link?.parent_id) return;
-      related.add(link.student_id);
-      related.add(link.parent_id);
-      const parents = _studentParentIds.get(link.student_id) || [];
-      if (!parents.includes(link.parent_id)) parents.push(link.parent_id);
-      _studentParentIds.set(link.student_id, parents);
-    });
+    const links = [...(childrenRes.data || []), ...(parentsRes.data || [])];
+    rememberFamilyLinks(links);
     if (childrenRes.error || parentsRes.error) {
       console.warn("Could not load linked family conversations", childrenRes.error || parentsRes.error);
     }
+    return links;
   } catch (error) {
     console.warn("Could not load linked family conversations", error);
+    return [];
   }
+}
+
+async function fetchRelatedFamilyUserIds(userIds) {
+  const ids = [...new Set((userIds || []).filter(Boolean))];
+  if (!ids.length) return [];
+  const related = new Set();
+  const links = await fetchMessageFamilyLinks(ids);
+  links.forEach(link => {
+    if (!link?.student_id || !link?.parent_id) return;
+    related.add(link.student_id);
+    related.add(link.parent_id);
+  });
   return [...related];
 }
 
@@ -2293,38 +2320,18 @@ async function prefetchUserContextProfiles(profiles) {
 
   try {
     if (parentIds.length || directStudentIds.length) {
-      const [linksByParent, linksByStudent] = await Promise.all([
-        parentIds.length
-          ? sb.from("parent_students")
-              .select("parent_id, student_id")
-              .in("parent_id", parentIds)
-              .is("revoked_at", null)
-          : Promise.resolve({ data: [], error: null }),
-        directStudentIds.length
-          ? sb.from("parent_students")
-              .select("parent_id, student_id")
-              .in("student_id", directStudentIds)
-              .is("revoked_at", null)
-          : Promise.resolve({ data: [], error: null })
-      ]);
-      if (linksByParent.error || linksByStudent.error) throw (linksByParent.error || linksByStudent.error);
+      const links = await fetchMessageFamilyLinks([...parentIds, ...directStudentIds]);
       const linkMap = new Map();
-      [...(linksByParent.data || []), ...(linksByStudent.data || [])].forEach(link => {
+      (links || []).forEach(link => {
         if (link?.parent_id && link?.student_id) linkMap.set(`${link.parent_id}:${link.student_id}`, link);
       });
       parentLinks = [...linkMap.values()];
-      parentLinks.forEach(link => {
-        if (!link?.student_id || !link?.parent_id) return;
-        const parents = _studentParentIds.get(link.student_id) || [];
-        if (!parents.includes(link.parent_id)) parents.push(link.parent_id);
-        _studentParentIds.set(link.student_id, parents);
-      });
 
       const childIds = [...new Set(parentLinks.map(link => link.student_id).filter(Boolean))];
       if (childIds.length) {
         const { data: children, error: childError } = await sb
           .from("users")
-          .select("id, full_name, role, birth_year")
+          .select("id, full_name, email, role, birth_year")
           .in("id", childIds);
         if (childError) throw childError;
         (children || []).forEach(child => childProfilesById.set(child.id, child));
@@ -2561,7 +2568,7 @@ window.loadMoreConversations = function() {
 };
 
 window.openFullMessagesPage = function() {
-  const target = "messages.html?v=20260713-message-list5";
+  const target = "messages.html?v=20260713-message-list6";
   try {
     if (window.top && window.top !== window && typeof window.top.openDashboardPage === "function") {
       window.top.openDashboardPage(target, { syncMenu: true, syncMobile: true });
