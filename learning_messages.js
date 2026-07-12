@@ -48,6 +48,10 @@
     return `__ACTION__${JSON.stringify({ type, label, url })}`;
   }
 
+  function chartToken({ type = "score_distribution", title = "Phổ điểm trong lớp", buckets = [] } = {}) {
+    return `__CHART__${JSON.stringify({ type, title, buckets })}`;
+  }
+
   function appendActionIfMissing(content, action) {
     const text = cleanText(content);
     if (!text || hasEmbeddedAction(text) || !action) return text;
@@ -137,20 +141,22 @@
   function scoreDistributionText(distribution) {
     const rows = Array.isArray(distribution) ? distribution : [];
     if (!rows.length) return "";
-    const maxCount = Math.max(1, ...rows.map(item => Number(item.count || 0)));
-    const levels = [4, 3, 2, 1];
-    const columnChart = levels.map(level => {
-      const threshold = maxCount * level / levels.length;
-      return rows.map(item => Number(item.count || 0) >= threshold ? "█" : "·").join(" ");
-    }).join("\n");
-    const countLine = rows.map(item => String(Number(item.count || 0))).join(" ");
-    const labelLine = rows.map(item => String(item.label || "").replace("-", "‑")).join(" ");
-    return [
-      "Đồ thị phổ điểm trong lớp:",
-      columnChart,
-      `SL: ${countLine}`,
-      labelLine
-    ].join("\n");
+    return "Xem đồ thị phổ điểm bên dưới.";
+  }
+
+  function scoreDistributionChartToken(distribution) {
+    const buckets = (Array.isArray(distribution) ? distribution : [])
+      .map(item => ({
+        label: String(item.label || ""),
+        count: Number(item.count || 0)
+      }))
+      .filter(item => item.label);
+    if (!buckets.length) return "";
+    return chartToken({
+      type: "score_distribution",
+      title: "Phổ điểm trong lớp",
+      buckets
+    });
   }
 
   function sessionScoreContent({ studentName, className, lessonName, sessionDate, score, maxScore = 10, note, rank, totalRanked, distribution }) {
@@ -158,7 +164,7 @@
     const rankLine = rank && totalRanked
       ? `Xếp hạng trong lớp: **${rank}/${totalRanked}**`
       : "";
-    const distributionBlock = scoreDistributionText(distribution);
+    const distributionBlock = scoreDistributionChartToken(distribution);
     return [
       `📊 Điểm BTVN/Đề luyện tập${className ? ` lớp **${className}**` : ""}`,
       studentName ? `Học sinh: **${studentName}**` : "",
@@ -175,7 +181,7 @@
   function sessionScoreStatsBlock({ rank, totalRanked, distribution }) {
     const lines = [];
     if (rank && totalRanked) lines.push(`Xếp hạng trong lớp: **${rank}/${totalRanked}**`);
-    const distributionBlock = scoreDistributionText(distribution);
+    const distributionBlock = scoreDistributionChartToken(distribution);
     if (distributionBlock) lines.push(distributionBlock);
     return lines.join("\n\n");
   }
@@ -185,7 +191,7 @@
     const block = sessionScoreStatsBlock(stats);
     if (!text || !block) return text;
     const hasRank = /xếp\s*hạng/i.test(text);
-    const hasDistribution = /phổ\s*điểm/i.test(text);
+    const hasDistribution = /__CHART__\s*\{/i.test(text);
     if (hasRank && hasDistribution) return text;
     const actionMatch = text.match(/\n*__(ACTION|EVALUATION)__\s*\{/i);
     if (!actionMatch || actionMatch.index === undefined) return `${text}\n\n${block}`;

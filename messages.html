@@ -302,6 +302,75 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
   white-space: pre-wrap;
   word-break: break-word;
 }
+.bubble-chart {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.9);
+  border: 1px solid rgba(15,31,61,.08);
+  color: var(--ink);
+}
+.message-row.mine .bubble-chart {
+  background: rgba(255,255,255,.14);
+  border-color: rgba(255,255,255,.22);
+  color: #fff;
+}
+.bubble-chart-title {
+  font-weight: 800;
+  color: var(--navy);
+  margin-bottom: 10px;
+  font-size: .82rem;
+}
+.message-row.mine .bubble-chart-title { color: #fff; }
+.score-chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 7px;
+  height: 132px;
+  padding: 8px 4px 2px;
+  border-left: 1px solid rgba(15,31,61,.12);
+  border-bottom: 1px solid rgba(15,31,61,.12);
+}
+.message-row.mine .score-chart-bars {
+  border-color: rgba(255,255,255,.26);
+}
+.score-chart-col {
+  flex: 1 1 0;
+  min-width: 18px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 5px;
+}
+.score-chart-value {
+  font-size: .68rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ink-mid);
+}
+.message-row.mine .score-chart-value { color: rgba(255,255,255,.82); }
+.score-chart-bar {
+  width: 100%;
+  min-height: 4px;
+  border-radius: 8px 8px 3px 3px;
+  background: linear-gradient(180deg,#fbbf24 0%,#2563eb 100%);
+  box-shadow: 0 8px 18px rgba(37,99,235,.18);
+}
+.score-chart-labels {
+  display: flex;
+  gap: 7px;
+  padding: 6px 4px 0;
+  font-size: .62rem;
+  color: var(--ink-light);
+}
+.score-chart-labels span {
+  flex: 1 1 0;
+  text-align: center;
+  white-space: nowrap;
+}
+.message-row.mine .score-chart-labels { color: rgba(255,255,255,.76); }
 .bubble-time { margin-top: 6px; font-size: .72rem; opacity: .75; }
 .composer {
   border-top: 1px solid rgba(15,31,61,.06);
@@ -2048,6 +2117,7 @@ function stripEmbeddedMessageTokens(value) {
   let text = String(value || "");
   text = extractEmbeddedJsonToken(text, "__ACTION__").text;
   text = extractEmbeddedJsonToken(text, "__EVALUATION__").text;
+  text = extractEmbeddedJsonToken(text, "__CHART__").text;
   return text.trim();
 }
 
@@ -2086,6 +2156,30 @@ function buildMessageActionHtml(action) {
   return `<button type="button" class="bubble-action-btn" onclick="handleMessageAction('${escapeJs(act.type)}', '${escapeJs(url)}')">${esc(act.label)}</button>`;
 }
 
+function buildMessageChartHtml(chart) {
+  const buckets = Array.isArray(chart?.buckets) ? chart.buckets : [];
+  if (!buckets.length) return "";
+  const maxCount = Math.max(1, ...buckets.map(item => Number(item.count || 0)));
+  const bars = buckets.map(item => {
+    const count = Math.max(0, Number(item.count || 0));
+    const height = count > 0 ? Math.max(8, Math.round(count / maxCount * 100)) : 0;
+    return `
+      <div class="score-chart-col">
+        <div class="score-chart-value">${esc(count)}</div>
+        <div class="score-chart-bar" style="height:${height}%"></div>
+      </div>
+    `;
+  }).join("");
+  const labels = buckets.map(item => `<span>${esc(item.label || "")}</span>`).join("");
+  return `
+    <div class="bubble-chart">
+      <div class="bubble-chart-title">${esc(chart?.title || "Phổ điểm")}</div>
+      <div class="score-chart-bars">${bars}</div>
+      <div class="score-chart-labels">${labels}</div>
+    </div>
+  `;
+}
+
 function renderMessageBody(value) {
   const payload = parseMessageContent(value);
   if (payload.type === "image") {
@@ -2095,6 +2189,14 @@ function renderMessageBody(value) {
   // Tách __ACTION__ và __EVALUATION__ ra
   let text = payload.text;
   let actionHtml = '';
+  let chartHtml = '';
+  const chartPart = extractEmbeddedJsonToken(text, "__CHART__");
+  text = chartPart.text;
+  if (chartPart.json) {
+    try {
+      chartHtml += buildMessageChartHtml(JSON.parse(chartPart.json));
+    } catch {}
+  }
   // __ACTION__
   const actionPart = extractEmbeddedJsonToken(text, "__ACTION__");
   text = actionPart.text;
@@ -2118,7 +2220,7 @@ function renderMessageBody(value) {
       actionHtml += `<div class="eval-widget ${isScoreScale ? 'score-scale' : ''}" id="evalWidget_${esc(sessionId)}">${opts}</div>`;
     } catch {}
   }
-  return `<div class="bubble-caption">${renderMarkdown(text)}</div>${actionHtml}`;
+  return `<div class="bubble-caption">${renderMarkdown(text)}</div>${chartHtml}${actionHtml}`;
 }
 
 function getMessagePreview(value) {
