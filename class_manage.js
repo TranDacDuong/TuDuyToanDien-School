@@ -1314,10 +1314,25 @@
     const next=statusCycle[(statusCycle.indexOf(current)+1)%3];
     const sb=getSb();
     const sid = Number(scheduleId || 0) || null;
+    const attBtn=document.getElementById("cvatt_"+studentId+"_"+date+"_"+(sid || 0));
+    const applyOptimisticAttendance = (status, saving = false) => {
+      _attendanceMap[studentId+"_"+date+"_"+(sid || 0)]=status;
+      if(!attBtn) return;
+      const s=statusMap[status];
+      attBtn.className="att-btn "+s.cls;
+      attBtn.textContent=s.text;
+      attBtn.disabled=!!saving;
+      attBtn.style.opacity=saving ? ".7" : "";
+      attBtn.style.pointerEvents=saving ? "none" : "";
+      attBtn.setAttribute("onclick","cvToggleAtt('"+classId+"','"+studentId+"','"+date+"','"+status+"','"+sid+"','"+Number(sessionNo || 1)+"')");
+    };
+    applyOptimisticAttendance(next, true);
     const{error}=await sb.from("attendance").upsert(
       [{class_id:classId,student_id:studentId,date,status:next,schedule_id:sid,session_no:Number(sessionNo || 1)}],
       {onConflict:"class_id,student_id,date"}
     );
+    if(error) applyOptimisticAttendance(current, false);
+    if(!error) applyOptimisticAttendance(next, false);
     if(error){alert("Lỗi: "+error.message);return;}
     _attendanceMap[studentId+"_"+date+"_"+(sid || 0)]=next;
     const btn=document.getElementById("cvatt_"+studentId+"_"+date+"_"+(sid || 0));
