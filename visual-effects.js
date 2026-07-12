@@ -155,13 +155,6 @@
       .eq("setting_key", "ambient_theme")
       .maybeSingle();
     if (data?.setting_value) applyTheme(data.setting_value);
-    window.sb
-      .channel("mindup-ambient-theme")
-      .on("postgres_changes", { event: "*", schema: "public", table: "site_settings", filter: "setting_key=eq.ambient_theme" }, (payload) => {
-        const themeId = payload.new?.setting_value;
-        if (themeId) applyTheme(themeId);
-      })
-      .subscribe();
   }
 
   function init() {
