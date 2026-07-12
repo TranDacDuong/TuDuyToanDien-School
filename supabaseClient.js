@@ -52,7 +52,9 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
       "comments",
       "exam_events",
       "site_settings",
-      "home_teachers"
+      "home_teachers",
+      "task_assignments",
+      "staff_attendance_logs"
     ]);
 
     function ensureStyles() {
