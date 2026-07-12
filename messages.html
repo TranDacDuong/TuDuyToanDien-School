@@ -726,6 +726,55 @@ async function fetchUsersByIds(userIds) {
   return new Map((data || []).map(user => [user.id, user]));
 }
 
+function isOfficialMindUpDirectKey(directKey) {
+  const BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
+  return String(directKey || "").split("_").includes(BOT_ID);
+}
+
+async function fetchTeacherOfficialAudienceIds() {
+  if (currentProfile?.role !== "teacher" || !currentUser?.id) return null;
+  try {
+    const { data: teacherClasses, error: classError } = await sb
+      .from("class_teachers")
+      .select("class_id")
+      .eq("teacher_id", currentUser.id);
+    if (classError) throw classError;
+
+    const classIds = [...new Set((teacherClasses || []).map(item => item.class_id).filter(Boolean))];
+    if (!classIds.length) return new Set();
+
+    const { data: classStudents, error: studentError } = await sb
+      .from("class_students")
+      .select("student_id,left_at")
+      .in("class_id", classIds);
+    if (studentError) throw studentError;
+
+    const now = Date.now();
+    const studentIds = [...new Set((classStudents || [])
+      .filter(item => !item.left_at || new Date(item.left_at).getTime() >= now)
+      .map(item => item.student_id)
+      .filter(Boolean))];
+    const allowed = new Set(studentIds);
+
+    if (studentIds.length) {
+      const { data: parentLinks, error: parentError } = await sb
+        .from("parent_students")
+        .select("parent_id")
+        .in("student_id", studentIds)
+        .is("revoked_at", null);
+      if (parentError) throw parentError;
+      (parentLinks || []).forEach(link => {
+        if (link.parent_id) allowed.add(link.parent_id);
+      });
+    }
+
+    return allowed;
+  } catch (error) {
+    console.warn("Could not filter teacher MindUp official chats", error);
+    return new Set();
+  }
+}
+
 async function fetchLearningConversationItems() {
   // Learning/system notices now live inside the single official MindUp channel
   // for each student/parent, so we intentionally do not render separate
@@ -773,13 +822,21 @@ async function loadFriends() {
 
   const friendRows = friendships || [];
   const friendById = new Map(friendRows.map(item => [item.friend_id, item]));
-  const directConversations = (conversations || [])
+  let directConversations = (conversations || [])
     .filter(item => {
       const key = String(item.direct_key || "");
       return !key.startsWith("mindup_student:") && !key.startsWith("mindup_teacher:");
     })
     .map(item => ({ ...item, partnerId: getDirectPartnerId(item.direct_key) }))
     .filter(item => item.partnerId && item.partnerId !== currentUser.id);
+
+  const teacherOfficialAudienceIds = await fetchTeacherOfficialAudienceIds();
+  if (teacherOfficialAudienceIds) {
+    directConversations = directConversations.filter(item =>
+      !isOfficialMindUpDirectKey(item.direct_key) || teacherOfficialAudienceIds.has(item.partnerId)
+    );
+  }
+
   const conversationByUserId = new Map(directConversations.map(item => [item.partnerId, item]));
   const partnerIdByConversationId = new Map(directConversations.map(item => [item.id, item.partnerId]));
   const participantIds = [...new Set([
