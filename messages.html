@@ -186,8 +186,10 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
 }
 .friend-card:hover, .friend-card.active { border-color: rgba(37,99,235,.16); background: #f4f8ff; }
 .avatar { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(15,31,61,.08); background: var(--surface); }
-.name { color: var(--navy); font-weight: 700; font-size: .9rem; }
+.name { color: var(--navy); font-weight: 700; font-size: .9rem; white-space: pre-line; line-height: 1.35; }
 .meta { color: var(--ink-light); font-size: .78rem; margin-top: 3px; }
+.meta:empty { display: none; }
+.friend-card.official-audience .meta { display: none; }
 .preview {
   color: var(--ink-mid);
   font-size: .78rem;
@@ -693,7 +695,7 @@ async function init() {
     selectedTeacherFromQuery = null;
     const { data: teacher } = await sb
       .from("users")
-      .select("id, full_name, avatar_url, role")
+      .select("id, full_name, email, avatar_url, role, birth_year")
       .eq("id", teacherId)
       .maybeSingle();
     await openConversation(teacher?.id || teacherId, teacher?.full_name || "Giáo viên", teacher?.avatar_url || "default-avatar.png", teacher?.role || "teacher");
@@ -703,7 +705,7 @@ async function init() {
     const friendId = selectedUserFromQuery;
     const { data: targetUser } = await sb
       .from("users")
-      .select("id, full_name, avatar_url, role")
+      .select("id, full_name, email, avatar_url, role, birth_year")
       .eq("id", friendId)
       .maybeSingle();
     if (targetUser?.id) {
@@ -764,12 +766,44 @@ async function fetchUsersByIds(userIds) {
 
   const { data, error } = await sb
     .from("users")
-    .select("id, full_name, avatar_url, role, birth_year")
+    .select("id, full_name, email, avatar_url, role, birth_year")
     .in("id", ids);
 
   if (error) throw error;
   await prefetchUserContextProfiles(data || []);
   return new Map((data || []).map(user => [user.id, user]));
+}
+
+async function fetchRelatedFamilyUserIds(userIds) {
+  const ids = [...new Set((userIds || []).filter(Boolean))];
+  if (!ids.length) return [];
+  const related = new Set();
+  try {
+    const [childrenRes, parentsRes] = await Promise.all([
+      sb.from("parent_students")
+        .select("parent_id, student_id")
+        .in("parent_id", ids)
+        .is("revoked_at", null),
+      sb.from("parent_students")
+        .select("parent_id, student_id")
+        .in("student_id", ids)
+        .is("revoked_at", null)
+    ]);
+    [...(childrenRes.data || []), ...(parentsRes.data || [])].forEach(link => {
+      if (!link?.student_id || !link?.parent_id) return;
+      related.add(link.student_id);
+      related.add(link.parent_id);
+      const parents = _studentParentIds.get(link.student_id) || [];
+      if (!parents.includes(link.parent_id)) parents.push(link.parent_id);
+      _studentParentIds.set(link.student_id, parents);
+    });
+    if (childrenRes.error || parentsRes.error) {
+      console.warn("Could not load linked family conversations", childrenRes.error || parentsRes.error);
+    }
+  } catch (error) {
+    console.warn("Could not load linked family conversations", error);
+  }
+  return [...related];
 }
 
 function isOfficialMindUpDirectKey(directKey) {
@@ -842,7 +876,7 @@ async function loadFriends() {
   const [{ data: friendships, error: friendshipError }, { data: conversations, error: conversationError }, { data: unreadNotifications }, learningItems, mindUpTeacherItems] = await Promise.all([
     sb
       .from("friendships")
-      .select("friend_id, users!friendships_friend_id_fkey(id, full_name, avatar_url, role)")
+      .select("friend_id, users!friendships_friend_id_fkey(id, full_name, email, avatar_url, role, birth_year)")
       .eq("user_id", currentUser.id)
       .order("created_at", { ascending: false }),
     sb
@@ -886,10 +920,17 @@ async function loadFriends() {
 
   const conversationByUserId = new Map(directConversations.map(item => [item.partnerId, item]));
   const partnerIdByConversationId = new Map(directConversations.map(item => [item.id, item.partnerId]));
-  const participantIds = [...new Set([
+  let participantIds = [...new Set([
     ...friendRows.map(item => item.friend_id),
     ...directConversations.map(item => item.partnerId)
   ].filter(Boolean))];
+  if (isMindUpStaffRole(currentProfile?.role)) {
+    let relatedFamilyIds = await fetchRelatedFamilyUserIds(participantIds);
+    if (teacherOfficialAudienceIds) {
+      relatedFamilyIds = relatedFamilyIds.filter(id => teacherOfficialAudienceIds.has(id));
+    }
+    participantIds = [...new Set([...participantIds, ...relatedFamilyIds].filter(Boolean))];
+  }
 
   let userById = new Map();
   try {
@@ -950,7 +991,8 @@ async function loadFriends() {
     const user = userById.get(userId) || friendRow?.users || { id: userId };
     const lastMessage = conversation ? lastMessageMap.get(conversation.id) : null;
     const BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
-    const isOfficialMindUpChannel = String(conversation?.direct_key || "").split("_").includes(BOT_ID);
+    const isOfficialMindUpChannel = String(conversation?.direct_key || "").split("_").includes(BOT_ID)
+      || (isMindUpStaffRole(currentProfile?.role) && isStudentOrParentRole(user?.role));
     let prefix = "";
     if (lastMessage) {
       if (lastMessage.sender_id === currentUser.id || lastMessage.real_sender_id === currentUser.id) {
@@ -975,15 +1017,11 @@ async function loadFriends() {
 
   if (requestToken !== friendsLoadToken) return;
 
-  const merged = [...(mindUpTeacherItems || []), ...(learningItems || []), ...enriched]
+  let merged = [...(mindUpTeacherItems || []), ...(learningItems || []), ...enriched]
     .filter((item, index, list) => list.findIndex(other => other.friend_id === item.friend_id) === index);
 
-  merged.sort((a, b) => {
-    const timeA = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
-    const timeB = b.lastActivity ? new Date(b.lastActivity).getTime() : 0;
-    if (timeA !== timeB) return timeB - timeA;
-    return String(a.users?.full_name || "").localeCompare(String(b.users?.full_name || ""), "vi");
-  });
+  await prefetchUserContextProfiles(merged.map(item => item.users).filter(Boolean));
+  merged = sortConversationsByFamily(merged);
 
   allFriends = merged;
   friendMap = new Map(merged.map(item => [item.friend_id, item]));
@@ -1012,7 +1050,7 @@ async function loadFriends() {
     } else {
       const { data: targetUser } = await sb
         .from("users")
-        .select("id, full_name, avatar_url, role")
+        .select("id, full_name, email, avatar_url, role, birth_year")
         .eq("id", selectedUserId)
         .maybeSingle();
       if (targetUser?.id) {
@@ -1031,7 +1069,7 @@ async function loadFriends() {
     selectedTeacherFromQuery = null;
     const { data: teacher } = await sb
       .from("users")
-      .select("id, full_name, avatar_url, role")
+      .select("id, full_name, email, avatar_url, role, birth_year")
       .eq("id", selectedTeacherId)
       .maybeSingle();
     if (teacher?.id) {
@@ -1112,7 +1150,7 @@ async function searchUsersForConversation(keyword) {
 
   const { data, error } = await sb
     .from("users")
-    .select("id, full_name, avatar_url, role")
+    .select("id, full_name, email, avatar_url, role, birth_year")
     .ilike("full_name", `%${searchText}%`)
     .neq("id", currentUser.id)
     .limit(12);
@@ -1598,12 +1636,18 @@ window.addEventListener("resize", () => {
 function renderLoadedMessages() {
   const wrap = document.getElementById("messageList");
   const BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
+  const viewerIsStaff = isMindUpStaffRole(currentProfile?.role);
+  const activeInfo = friendMap.get(activeFriend?.id);
+  const isOfficialAudienceChat = viewerIsStaff && (activeInfo?.isOfficialMindUpChannel || isStudentOrParentRole(activeInfo?.users?.role || activeFriend?.role));
   wrap.innerHTML = loadedMessages.map(item => {
-    const isMine = item.sender_id === currentUser.id || item.real_sender_id === currentUser.id;
     const isBot = item.sender_id === BOT_ID;
+    const defaultMine = item.sender_id === currentUser.id || item.real_sender_id === currentUser.id;
+    const isMine = isOfficialAudienceChat
+      ? isBot
+      : defaultMine;
     const displaySenderId = isBot ? item.real_sender_id : (!isMine ? item.sender_id : null);
     const displaySenderProfile = displaySenderId ? _realSenderProfiles.get(displaySenderId) : null;
-    const shouldShowSenderLabel = isBot || (displaySenderProfile && isStudentOrParentRole(displaySenderProfile.role));
+    const shouldShowSenderLabel = isBot || (viewerIsStaff && displaySenderProfile && isStudentOrParentRole(displaySenderProfile.role));
     const senderLabel = shouldShowSenderLabel ? `<div class="bot-msg-label">${esc(getMindUpDisplaySender(displaySenderId))}</div>` : '';
     return `
       <div class="message-row ${isMine ? 'mine' : ''}">
@@ -2054,6 +2098,8 @@ function safeUrl(value) {
 function escapeJs(value) {
   return String(value || "")
     .replace(/\\/g, "\\\\")
+    .replace(/\r/g, "\\r")
+    .replace(/\n/g, "\\n")
     .replace(/'/g, "\\'");
 }
 
@@ -2063,10 +2109,11 @@ const _realSenderNames = new Map();
 const _realSenderProfiles = new Map();
 const _studentGradeLabels = new Map();
 const _parentChildrenLabels = new Map();
+const _studentParentIds = new Map();
 const _senderContextLoaded = new Set();
 
 function isMindUpStaffRole(role) {
-  return ['admin','teacher','assistant','marketing'].includes(String(role || ''));
+  return ['admin','teacher','assistant','marketing','accountant','staff'].includes(String(role || ''));
 }
 
 function isStudentOrParentRole(role) {
@@ -2083,10 +2130,17 @@ function shouldRouteToMindUpOfficial(targetRole) {
 }
 
 function formatStudentNameWithContext(profile) {
-  const name = profile?.full_name || "Học sinh";
-  const birthYear = profile?.birth_year ? ` ${profile.birth_year}` : "";
+  const name = profile?.full_name || profile?.email || "Học sinh";
+  const year = profile?.birth_year ? String(profile.birth_year) : "";
+  return year ? `${name} ${year}` : name;
+}
+
+function formatStudentCardName(profile) {
+  const name = profile?.full_name || profile?.email || "Học sinh";
+  const year = profile?.birth_year ? `K${profile.birth_year}` : "";
   const gradeLabel = _studentGradeLabels.get(profile?.id);
-  return `${name}${birthYear}${gradeLabel ? ` • ${gradeLabel}` : ""}`;
+  const secondLine = year ? `Học sinh ${year}` : (gradeLabel ? `Học sinh ${gradeLabel}` : "Học sinh");
+  return `${name}\n${secondLine}`;
 }
 
 function formatStudentSenderLabel(profile) {
@@ -2094,25 +2148,76 @@ function formatStudentSenderLabel(profile) {
 }
 
 function formatParentSenderLabel(profile) {
-  const name = profile?.full_name || "Phụ huynh";
+  const name = profile?.full_name || profile?.email || "Phụ huynh";
   const children = _parentChildrenLabels.get(profile?.id) || [];
-  return children.length ? `${name} • PH của ${children.join(", ")}` : name;
+  return children.length ? `${name} - PH ${children.join(", ")}` : name;
+}
+
+function formatParentCardName(profile) {
+  const name = profile?.full_name || profile?.email || "Phụ huynh";
+  const children = _parentChildrenLabels.get(profile?.id) || [];
+  return [name, ...children.map(child => `PH ${child}`)].join("\n");
 }
 
 function getOfficialAudienceDisplayName(user) {
-  if (user?.role === "student") return formatStudentSenderLabel(user);
-  if (user?.role === "parent") return formatParentSenderLabel(user);
+  if (user?.role === "student") return formatStudentCardName(user);
+  if (user?.role === "parent") return formatParentCardName(user);
   return user?.full_name || "Người dùng";
 }
 
 function getMindUpDisplaySender(realSenderId) {
   const profile = _realSenderProfiles.get(realSenderId);
-  if (!realSenderId || !profile || isMindUpStaffRole(profile.role)) {
+  const isViewerStaff = isMindUpStaffRole(currentProfile?.role);
+  if (!realSenderId || !profile) {
     return "🤖 MINDUP - TƯ DUY TOÀN DIỆN";
+  }
+  if (isMindUpStaffRole(profile.role)) {
+    return isViewerStaff
+      ? `🤖 MINDUP - TƯ DUY TOÀN DIỆN + ${profile.full_name || profile.email || "Nhân viên"}`
+      : "🤖 MINDUP - TƯ DUY TOÀN DIỆN";
   }
   if (profile.role === "student") return formatStudentSenderLabel(profile);
   if (profile.role === "parent") return formatParentSenderLabel(profile);
   return profile.full_name || "Người gửi";
+}
+
+function getOfficialFamilyKey(user) {
+  if (!user?.id || !isStudentOrParentRole(user.role)) return `user:${user?.id || ""}`;
+  if (user.role === "parent") return `family:${user.id}`;
+  const parents = (_studentParentIds.get(user.id) || []).filter(Boolean).sort();
+  return parents.length ? `family:${parents[0]}` : `student:${user.id}`;
+}
+
+function officialFamilySortWeight(user) {
+  if (user?.role === "parent") return 0;
+  if (user?.role === "student") return 1;
+  return 2;
+}
+
+function sortConversationsByFamily(list) {
+  const groupLatest = new Map();
+  (list || []).forEach(item => {
+    const user = item.users || {};
+    const groupKey = item.isOfficialMindUpChannel ? getOfficialFamilyKey(user) : `solo:${item.friend_id}`;
+    item._familyGroupKey = groupKey;
+    const ts = item.lastActivity ? new Date(item.lastActivity).getTime() : 0;
+    groupLatest.set(groupKey, Math.max(groupLatest.get(groupKey) || 0, ts));
+  });
+  return (list || []).slice().sort((a, b) => {
+    const latestA = groupLatest.get(a._familyGroupKey) || 0;
+    const latestB = groupLatest.get(b._familyGroupKey) || 0;
+    if (latestA !== latestB) return latestB - latestA;
+    if (a._familyGroupKey !== b._familyGroupKey) {
+      return String(a.users?.full_name || "").localeCompare(String(b.users?.full_name || ""), "vi");
+    }
+    const weightA = officialFamilySortWeight(a.users);
+    const weightB = officialFamilySortWeight(b.users);
+    if (weightA !== weightB) return weightA - weightB;
+    const timeA = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
+    const timeB = b.lastActivity ? new Date(b.lastActivity).getTime() : 0;
+    if (timeA !== timeB) return timeB - timeA;
+    return String(a.users?.full_name || "").localeCompare(String(b.users?.full_name || ""), "vi");
+  });
 }
 
 function getUniqueGradeLabel(grades) {
@@ -2152,6 +2257,12 @@ async function prefetchUserContextProfiles(profiles) {
         .is("revoked_at", null);
       if (linkError) throw linkError;
       parentLinks = links || [];
+      parentLinks.forEach(link => {
+        if (!link?.student_id || !link?.parent_id) return;
+        const parents = _studentParentIds.get(link.student_id) || [];
+        if (!parents.includes(link.parent_id)) parents.push(link.parent_id);
+        _studentParentIds.set(link.student_id, parents);
+      });
 
       const childIds = [...new Set(parentLinks.map(link => link.student_id).filter(Boolean))];
       if (childIds.length) {
@@ -2228,7 +2339,7 @@ async function prefetchRealSenderProfiles() {
   const missing = ids.filter(id => !_realSenderProfiles.has(id));
   if (!missing.length) return;
   try {
-    const { data } = await sb.from('users').select('id,full_name,role,birth_year').in('id', missing);
+    const { data } = await sb.from('users').select('id,full_name,email,role,birth_year').in('id', missing);
     (data || []).forEach(u => {
       _realSenderProfiles.set(u.id, u);
       _realSenderNames.set(u.id, u.full_name || u.id);
@@ -2352,13 +2463,14 @@ const _renderFriendListCore = (list) => {
       : (isOfficialAudience ? getOfficialAudienceDisplayName(item.users) : (item.users?.full_name || 'Người dùng'));
     const displayName = esc(rawDisplayName);
     const avatar = (isMindUp || isLearning) ? 'favicon.png' : (item.users?.avatar_url || 'default-avatar.png');
-    const relationLabel = isLearning ? (item.metaName || 'Hồ sơ học tập') : (isMindUp || isOfficialAudience ? 'Kênh chính thức MindUp' : (item.isFriend ? 'Bạn bè' : (item.conversationId ? 'Đã nhắn tin' : 'Người dùng')));
+    const relationLabel = isLearning ? (item.metaName || 'Hồ sơ học tập') : (isMindUp || isOfficialAudience ? '' : (item.isFriend ? 'Bạn bè' : (item.conversationId ? 'Đã nhắn tin' : 'Người dùng')));
+    const metaText = (isMindUp || isOfficialAudience) ? "" : `${isLearning ? '🤖 MindUp' : formatRole(item.users?.role || '')} • ${relationLabel}`;
     const preview = item.preview || (item.isSearchResult ? 'Bắt đầu trò chuyện' : 'Chưa có tin nhắn nào');
     const click = isLearning
       ? `openLearningConversation('${escapeJs(item.conversationId)}')`
       : `openConversation('${item.friend_id}', '${escapeJs(rawDisplayName)}', '${escapeJs(avatar)}', '${escapeJs(item.users?.role || '')}')`;
     return `
-      <div class="friend-card ${isMindUp || isLearning ? 'mindup-pinned' : ''}" id="friend_${item.friend_id}" onclick="${click}">
+      <div class="friend-card ${isMindUp || isLearning ? 'mindup-pinned' : ''} ${isOfficialAudience ? 'official-audience' : ''}" id="friend_${item.friend_id}" onclick="${click}">
         <img class="avatar" src="${avatar}" alt="Avatar" onerror="this.src='default-avatar.png'">
         <div class="friend-main">
           <div class="friend-top">
@@ -2366,7 +2478,7 @@ const _renderFriendListCore = (list) => {
             <div class="name">${displayName}</div>
             <div class="friend-time">${item.lastActivity ? esc(formatListTime(item.lastActivity)) : ''}</div>
           </div>
-          <div class="meta">${esc(isMindUp || isLearning || isOfficialAudience ? '🤖 MindUp' : formatRole(item.users?.role || ''))} • ${esc(relationLabel)}</div>
+          <div class="meta">${esc(metaText)}</div>
           <div class="preview">${esc(preview)}</div>
         </div>
         <div class="friend-badge ${item.unreadCount ? 'show' : ''}">${item.unreadCount > 99 ? '99+' : item.unreadCount || ''}</div>
@@ -2393,7 +2505,7 @@ window.loadMoreConversations = function() {
 };
 
 window.openFullMessagesPage = function() {
-  const target = "messages.html?v=20260713-message-list2";
+  const target = "messages.html?v=20260713-message-list4";
   try {
     if (window.top && window.top !== window && typeof window.top.openDashboardPage === "function") {
       window.top.openDashboardPage(target, { syncMenu: true, syncMobile: true });
