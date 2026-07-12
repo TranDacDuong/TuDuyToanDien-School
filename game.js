@@ -2229,12 +2229,10 @@
   }
 
   function setupListRealtime() {
-    if (GAME.listChannel) return;
-    GAME.listChannel = sb.channel(`game-list-${GAME.user.id}-${Date.now()}`);
-    GAME.listChannel
-      .on("postgres_changes", { event: "*", schema: "public", table: "game_rooms" }, () => loadRooms())
-      .on("postgres_changes", { event: "*", schema: "public", table: "game_room_players" }, () => loadRooms())
-      .subscribe();
+    if (GAME.listChannel) {
+      sb.removeChannel(GAME.listChannel);
+      GAME.listChannel = null;
+    }
   }
 
   function teardownRoomRealtime() {
