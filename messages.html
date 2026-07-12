@@ -753,7 +753,9 @@ async function loadFriends() {
       .from("conversations")
       .select("id, direct_key, created_at")
       .eq("kind", "direct")
-      .not("direct_key", "is", null),
+      .not("direct_key", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(300),
     sb
       .from("notifications")
       .select("actor_id, ref_id, meta")
@@ -823,11 +825,13 @@ async function loadFriends() {
   const conversationIds = directConversations.map(item => item.id);
   const lastMessageMap = new Map();
   if (conversationIds.length) {
+    const previewLimit = Math.min(Math.max(conversationIds.length * 3, 60), 300);
     const { data: messages } = await sb
       .from("messages")
       .select("conversation_id, content, sender_id, created_at")
       .in("conversation_id", conversationIds)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(previewLimit);
 
     (messages || []).forEach(item => {
       if (!lastMessageMap.has(item.conversation_id)) {
