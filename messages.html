@@ -373,6 +373,16 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
 }
 .message-row.mine .score-chart-labels { color: var(--ink-light); }
 .bubble-time { margin-top: 6px; font-size: .72rem; opacity: .75; }
+.message-pending { opacity: .78; }
+.message-failed { border-color: #fecaca !important; background: #fff1f2 !important; color: var(--navy) !important; }
+.message-retry-btn {
+  border: 0;
+  background: transparent;
+  color: #b91c1c;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0;
+}
 .composer {
   border-top: 1px solid rgba(15,31,61,.06);
   padding: 14px;
@@ -1757,12 +1767,15 @@ function renderLoadedMessages() {
     const displaySenderProfile = displaySenderId ? _realSenderProfiles.get(displaySenderId) : null;
     const shouldShowSenderLabel = isBot || (viewerIsStaff && displaySenderProfile && isStudentOrParentRole(displaySenderProfile.role));
     const senderLabel = shouldShowSenderLabel ? `<div class="bot-msg-label">${esc(getMindUpDisplaySender(displaySenderId))}</div>` : '';
+    const statusLabel = item._pending
+      ? '<div class="bubble-time">Đang gửi...</div>'
+      : (item._failed ? `<div class="bubble-time">Gửi lỗi • <button class="message-retry-btn" type="button" onclick="retryOptimisticMessage('${esc(item.id)}')">Gửi lại</button></div>` : '');
     return `
       <div class="message-row ${isMine ? 'mine' : ''}">
-        <div class="bubble ${isBot ? 'bot-bubble' : ''}">
+        <div class="bubble ${isBot ? 'bot-bubble' : ''} ${item._pending ? 'message-pending' : ''} ${item._failed ? 'message-failed' : ''}">
           ${senderLabel}
           ${renderMessageBody(item.content)}
-          <div class="bubble-time">${formatTime(item.created_at)}</div>
+          ${statusLabel || `<div class="bubble-time">${formatTime(item.created_at)}</div>`}
         </div>
       </div>
     `;
@@ -1928,6 +1941,139 @@ window.sendMessage = async function() {
 
   input.value = "";
   clearMessageImage();
+  await loadFriends();
+  await loadMessages({ scrollToBottom: true });
+};
+
+function optimisticSenderIdsForActiveConversation() {
+  const BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
+  const activeFriendInfo = friendMap.get(activeFriend?.id);
+  const isTargetStudentOrParent = ['student', 'parent'].includes(activeFriendInfo?.users?.role || activeFriend?.role || '');
+  const isCurrentStaff = isMindUpStaffRole(currentProfile?.role || '');
+  const shouldSendAsBot = activeFriend?.mindUpTeacherThread
+    || activeFriendInfo?.isMindUpTeacherThread
+    || activeFriend?.learningThread
+    || activeFriendInfo?.isLearningThread
+    || (isTargetStudentOrParent && isCurrentStaff);
+  return {
+    sender_id: shouldSendAsBot ? BOT_ID : currentUser.id,
+    real_sender_id: shouldSendAsBot ? currentUser.id : null,
+  };
+}
+
+async function sendMessageContentToServer(content) {
+  const BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
+  const activeFriendInfo = friendMap.get(activeFriend?.id);
+  const isTargetStudentOrParent = ['student', 'parent'].includes(activeFriendInfo?.users?.role || activeFriend?.role || '');
+  const isCurrentStaff = isMindUpStaffRole(currentProfile?.role || '');
+
+  if (activeFriend?.mindUpTeacherThread || activeFriendInfo?.isMindUpTeacherThread) {
+    return sb.rpc('send_mindup_teacher_message', {
+      p_conversation_id: currentConversationId,
+      p_content: content,
+      p_real_sender_id: currentUser.id
+    });
+  }
+  if (activeFriend?.learningThread || activeFriendInfo?.isLearningThread) {
+    const learningTarget = activeFriendInfo || activeFriend || {};
+    return sb.rpc('send_student_learning_message_to_audience', {
+      p_student_id: learningTarget.studentId,
+      p_audience_user_id: learningTarget.audienceUserId || currentUser.id,
+      p_content: content,
+      p_real_sender_id: currentUser.id
+    });
+  }
+  if (isTargetStudentOrParent && isCurrentStaff) {
+    return sb.rpc('send_bot_message', {
+      p_conversation_id: currentConversationId,
+      p_content: content,
+      p_real_sender_id: currentUser.id
+    });
+  }
+  return sb.from("messages").insert({
+    conversation_id: currentConversationId,
+    sender_id: currentUser.id,
+    content
+  });
+}
+
+function appendOptimisticMessage(content) {
+  const senderIds = optimisticSenderIdsForActiveConversation();
+  const temp = {
+    id: `temp:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+    content,
+    created_at: new Date().toISOString(),
+    sender_id: senderIds.sender_id,
+    real_sender_id: senderIds.real_sender_id,
+    _pending: true,
+  };
+  loadedMessages.push(temp);
+  renderLoadedMessages();
+  const wrap = document.getElementById("messageList");
+  wrap.scrollTop = wrap.scrollHeight;
+  return temp;
+}
+
+function markOptimisticMessageFailed(tempId) {
+  const item = loadedMessages.find(row => row.id === tempId);
+  if (!item) return;
+  item._pending = false;
+  item._failed = true;
+  renderLoadedMessages();
+}
+
+function removeOptimisticMessage(tempId) {
+  loadedMessages = loadedMessages.filter(row => row.id !== tempId);
+}
+
+window.retryOptimisticMessage = async function(tempId) {
+  const item = loadedMessages.find(row => row.id === tempId);
+  if (!item || !currentConversationId) return;
+  item._failed = false;
+  item._pending = true;
+  renderLoadedMessages();
+  const { error } = await sendMessageContentToServer(item.content);
+  if (error) {
+    markOptimisticMessageFailed(tempId);
+    alert("Không gửi được tin nhắn: " + error.message);
+    return;
+  }
+  removeOptimisticMessage(tempId);
+  await loadFriends();
+  await loadMessages({ scrollToBottom: true });
+};
+
+window.sendMessage = async function() {
+  const input = document.getElementById("messageInput");
+  const imageInput = document.getElementById("messageImage");
+  const imageFile = imageInput.files?.[0];
+  const text = input.value.trim();
+  if ((!text && !imageFile) || !currentConversationId) return;
+
+  let content = text;
+  if (imageFile) {
+    const sendBtn = document.getElementById("sendBtn");
+    if (sendBtn) sendBtn.disabled = true;
+    content = await uploadChatImage(imageFile, text);
+    if (sendBtn) sendBtn.disabled = false;
+    if (!content) return;
+  }
+
+  input.value = "";
+  clearMessageImage();
+  const optimistic = appendOptimisticMessage(content);
+  const { error } = await sendMessageContentToServer(content);
+  if (error) {
+    const failedPayload = parseMessageContent(content);
+    if (failedPayload.type === "image") {
+      await window.MindupImageUpload?.deleteUploadedImage?.(failedPayload.url).catch(console.warn);
+    }
+    markOptimisticMessageFailed(optimistic.id);
+    alert("Không gửi được tin nhắn: " + error.message);
+    return;
+  }
+
+  removeOptimisticMessage(optimistic.id);
   await loadFriends();
   await loadMessages({ scrollToBottom: true });
 };
