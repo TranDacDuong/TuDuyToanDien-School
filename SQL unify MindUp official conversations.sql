@@ -209,6 +209,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.list_student_learning_conversations();
+
 CREATE OR REPLACE FUNCTION public.list_student_learning_conversations()
 RETURNS TABLE (
   conversation_id uuid,
@@ -270,6 +272,8 @@ BEGIN
   RETURN public.ensure_mindup_official_audience_conversation(v_audience);
 END;
 $$;
+
+DROP FUNCTION IF EXISTS public.list_mindup_teacher_conversations();
 
 CREATE OR REPLACE FUNCTION public.list_mindup_teacher_conversations()
 RETURNS TABLE (
