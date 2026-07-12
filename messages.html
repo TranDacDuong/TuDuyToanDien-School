@@ -32,6 +32,13 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
 .tray-mode .search-wrap {
   padding: 10px 12px 0;
 }
+.tray-full-messages {
+  display: none;
+}
+.tray-mode .tray-full-messages {
+  display: block;
+  margin-top: 10px;
+}
 .friend-list-actions {
   padding: 12px;
   display: grid;
@@ -517,6 +524,7 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
       <div class="sidebar-head">
         <div class="sidebar-title">Nhắn tin</div>
         <div class="sidebar-sub">Chọn một người bạn để bắt đầu trò chuyện</div>
+        <button class="friend-list-action-btn tray-full-messages" type="button" onclick="openFullMessagesPage()">Xem toàn bộ tin nhắn</button>
       </div>
       <div class="search-wrap">
         <input id="friendSearch" class="search-input" placeholder="Tìm người dùng hoặc cuộc trò chuyện..." oninput="filterFriends()">
@@ -2348,11 +2356,7 @@ const _renderFriendListCore = (list) => {
 
 function renderFriendListActions(total, visible, hasMore) {
   if (isTrayMode) {
-    return `
-      <div class="friend-list-actions">
-        <button class="friend-list-action-btn" type="button" onclick="openFullMessagesPage()">Xem toàn bộ tin nhắn</button>
-      </div>
-    `;
+    return "";
   }
   if (!hasMore) return "";
   return `
