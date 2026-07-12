@@ -1015,7 +1015,9 @@
         const joined = s.joined_at ? s.joined_at.slice(0,10) : "0000-00-00";
         const left = s.left_at ? s.left_at.slice(0,10) : "9999-99-99";
         if(joined > date || left < date) return false;
-        return getStudentSchedules(s.student_id, schedules, item.date).some(sc => Number(sc.id) === sid);
+        const studentSchedules = getStudentSchedules(s.student_id, schedules, date);
+        if(!sid) return studentSchedules.length > 0;
+        return studentSchedules.some(sc => Number(sc.id) === sid);
       })
       .sort((a,b)=>String(a.user?.full_name || "").localeCompare(String(b.user?.full_name || ""), "vi"));
   }
