@@ -32,6 +32,26 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
 .tray-mode .search-wrap {
   padding: 10px 12px 0;
 }
+.friend-list-actions {
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+.friend-list-action-btn {
+  width: 100%;
+  border: 1px solid #dbe7f6;
+  background: #f8fbff;
+  color: #12335f;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+}
+.friend-list-action-btn:hover {
+  border-color: #8fb7e8;
+  background: #eef6ff;
+}
 .popup-mode body { background: transparent; }
 .popup-mode .page { padding: 0; height: 100vh; }
 .popup-mode .shell { grid-template-columns: 1fr; gap: 0; height: 100vh; min-width: 0; }
@@ -568,6 +588,9 @@ const MESSAGE_PAGE_SIZE = 10;
 const queryParams = new URLSearchParams(location.search);
 const isTrayMode = queryParams.get("tray") === "1";
 const isPopupMode = queryParams.get("popup") === "1";
+const TRAY_CONVERSATION_LIMIT = 5;
+const FULL_CONVERSATION_PAGE_SIZE = 10;
+let visibleConversationCount = FULL_CONVERSATION_PAGE_SIZE;
 let selectedTeacherFromQuery = null;
 
 const CHAT_IMAGE_PREFIX = "__CHAT_IMAGE__";
@@ -1041,6 +1064,7 @@ function renderFriendList(list) {
 window.filterFriends = function() {
   const keyword = document.getElementById("friendSearch")?.value?.trim() || "";
   clearTimeout(userSearchTimer);
+  visibleConversationCount = FULL_CONVERSATION_PAGE_SIZE;
 
   if (keyword.length < 2) {
     userSearchResults = [];
@@ -2286,7 +2310,11 @@ const _renderFriendListCore = (list) => {
     return;
   }
   const BOT_ID = MINDUP_BOT_ID;
-  wrap.innerHTML = list.map(item => {
+  const hasKeyword = Boolean(document.getElementById("friendSearch")?.value?.trim());
+  const displayLimit = isTrayMode ? TRAY_CONVERSATION_LIMIT : (hasKeyword ? list.length : visibleConversationCount);
+  const visibleList = list.slice(0, displayLimit);
+  const hasMore = !isTrayMode && !hasKeyword && list.length > visibleList.length;
+  wrap.innerHTML = visibleList.map(item => {
     const isMindUp = item.friend_id === BOT_ID;
     const isLearning = item.isLearningThread;
     const isOfficialAudience = item.isOfficialMindUpChannel && isMindUpStaffRole(currentProfile?.role);
@@ -2315,7 +2343,45 @@ const _renderFriendListCore = (list) => {
         <div class="friend-badge ${item.unreadCount ? 'show' : ''}">${item.unreadCount > 99 ? '99+' : item.unreadCount || ''}</div>
       </div>
     `;
-  }).join('');
+  }).join('') + renderFriendListActions(list.length, visibleList.length, hasMore);
+};
+
+function renderFriendListActions(total, visible, hasMore) {
+  if (isTrayMode) {
+    return `
+      <div class="friend-list-actions">
+        <button class="friend-list-action-btn" type="button" onclick="openFullMessagesPage()">Xem toàn bộ tin nhắn</button>
+      </div>
+    `;
+  }
+  if (!hasMore) return "";
+  return `
+    <div class="friend-list-actions">
+      <button class="friend-list-action-btn" type="button" onclick="loadMoreConversations()">Xem thêm 10 đoạn tin nhắn (${visible}/${total})</button>
+    </div>
+  `;
+}
+
+window.loadMoreConversations = function() {
+  visibleConversationCount += FULL_CONVERSATION_PAGE_SIZE;
+  loadFriends().catch(console.warn);
+};
+
+window.openFullMessagesPage = function() {
+  const target = "messages.html";
+  try {
+    if (window.top && window.top !== window && typeof window.top.openDashboardPage === "function") {
+      window.top.openDashboardPage(target, { syncMenu: true, syncMobile: true });
+      return;
+    }
+  } catch (_) {}
+  try {
+    if (window.parent && window.parent !== window && typeof window.parent.openDashboardPage === "function") {
+      window.parent.openDashboardPage(target, { syncMenu: true, syncMobile: true });
+      return;
+    }
+  } catch (_) {}
+  window.open(target, "_blank", "noopener,noreferrer");
 };
 
 // Hook renderFriendList to use MindUp-aware version
