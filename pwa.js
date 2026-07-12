@@ -6,7 +6,7 @@
   const LOCAL_NOTIFY_LAST_SEEN_KEY = "mindup_local_notifications_last_seen_at";
   const PUSH_PROMPT_DISMISSED_AT_KEY = "mindup_push_prompt_dismissed_at";
   const PUSH_DENIED_ACK_KEY = "mindup_push_permission_denied_ack";
-  const LOCAL_NOTIFY_POLL_MS = 30000;
+  const LOCAL_NOTIFY_POLL_MS = 60000;
   const PROMPT_DELAY_MS = 1400;
   const PROMPT_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
   const PUSH_RECEIPT_KEY = "/__mindup_last_push_receipt__";
