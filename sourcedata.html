@@ -3745,6 +3745,12 @@ const DEFAULT_MSG_TEMPLATES = [
   { id:'tuition_confirmed',   name:'Xác nhận học phí đã nộp thành công', content:'✅ MindUp xác nhận đã nhận đủ học phí **tháng {{month_label}}** của học sinh **{{student_name}}** lớp **{{class_name}}** (số tiền: **{{amount}}đ**).\n\nCảm ơn quý phụ huynh đã luôn đồng hành cùng MindUp! 🙏\n\n__ACTION__{"type":"url","label":"🧾 Xem lịch sử học phí","url":"tuition.html"}' },
   { id:'birthday_wish',       name:'Chúc mừng sinh nhật',               content:'🎉🎂 Chúc mừng sinh nhật em **{{student_name}}**!\n\nMindUp - Tư Duy Toàn Diện chúc em tuổi mới luôn tràn đầy niềm vui, sức khỏe dồi dào, học tập thật tốt và đạt được nhiều kết quả cao trong năm học này nhé! 🌟' },
   { id:'welcome_new_student', name:'Chào mừng học viên mới',            content:'🚀 Chào mừng em **{{student_name}}** đã chính thức gia nhập gia đình MindUp - Tư Duy Toàn Diện!\n\nĐây là kênh liên hệ trực tiếp 24/7 giữa em và thầy cô. Bất cứ khi nào có câu hỏi hoặc cần hỗ trợ, em cứ nhắn tin ở đây nhé. Cùng nhau chinh phục các điểm số cao! 🏆\n\n__ACTION__{"type":"url","label":"📖 Hướng dẫn học tập","url":"courses.html"}' },
+  { id:'learning_notification', name:'Tin nhắn học tập chung', content:'🔔 {{title}}\n\n{{message}}\n\n__ACTION__{"type":"url","label":"Mở chi tiết","url":"{{target_url}}"}' },
+  { id:'session_score_notice', name:'Điểm BTVN/Đề luyện tập trong buổi học', content:'📊 Điểm BTVN/Đề luyện tập lớp **{{class_name}}**\n\nHọc sinh: **{{student_name}}**\nBài/buổi: **{{lesson_name}}**\nNgày học: **{{session_date}}**\nĐiểm: **{{score}}/{{max_score}}**\n{{note}}' },
+  { id:'session_evaluation_notice', name:'Nhận xét buổi học gửi phụ huynh', content:'📝 Nhận xét buổi học lớp **{{class_name}}** ngày **{{session_date}}**\n\nHọc sinh: **{{student_name}}**\n\n{{message}}' },
+  { id:'exam_score_notice', name:'Điểm đề luyện tập sau khi chấm', content:'📊 {{title}}\n\n{{message}}\n\n__ACTION__{"type":"url","label":"Xem chi tiết","url":"{{target_url}}"}' },
+  { id:'tuition_due_manual', name:'Nhắc học phí chưa nộp thủ công', content:'Bạn có học phí tháng {{month}} chưa thanh toán. Số tiền cần nộp là {{amount_label}}.' },
+  { id:'tuition_partial_manual', name:'Nhắc học phí còn thiếu thủ công', content:'Bạn còn thiếu {{remaining_label}} học phí tháng {{month}}. Hãy kiểm tra và hoàn tất thanh toán.' },
 ];
 
 async function loadMessageTemplatesAdmin(){

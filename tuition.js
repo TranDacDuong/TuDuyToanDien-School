@@ -545,16 +545,21 @@ Nhập số tiền thu thêm lần này:`,
         if(window.MindUpBot && newPaid >= amountDue) {
           const sb = getSb();
           // Lấy thông tin học sinh + phụ huynh
-          const { data: studentInfo } = await sb.from('users').select('full_name,parent_id').eq('id', studentId).maybeSingle();
-          const parentId = studentInfo?.parent_id || null;
-          if(parentId) {
+          const [{ data: studentInfo }, { data: parentLinks }] = await Promise.all([
+            sb.from('users').select('full_name').eq('id', studentId).maybeSingle(),
+            sb.from('parent_students').select('parent_id').eq('student_id', studentId).is('revoked_at', null)
+          ]);
+          const parentIds = [...new Set((parentLinks || []).map(item => item.parent_id).filter(Boolean))];
+          if(parentIds.length) {
             const studentName = studentInfo?.full_name || 'học sinh';
             const row = (allRows||[]).find(r=>r.studentId===studentId);
             const className = row?.className || '';
             // Format tháng
             const [year, month] = ym.split('-');
             const monthLabel = `${parseInt(month)}/${year}`;
-            await window.MindUpBot.sendTuitionConfirmMessage(parentId, { studentName, className, monthLabel, amount: newPaid });
+            await Promise.allSettled(parentIds.map(parentId =>
+              window.MindUpBot.sendTuitionConfirmMessage(parentId, { studentName, className, monthLabel, amount: newPaid })
+            ));
           }
         }
       } catch(botErr){ console.warn('[MindUpBot] Lỗi gửi tin nhắn xác nhận học phí:', botErr); }

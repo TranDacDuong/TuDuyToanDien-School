@@ -315,17 +315,24 @@
         const meta = normalizeMeta(payload.meta);
         const studentId = meta.student_id || meta.studentId || null;
         if (!studentId || !payload.user_id || !payload.message) return null;
-        const content = window.LearningMessages.notificationContent({
-          title: payload.title || "",
-          message: payload.message || "",
-          targetUrl: payload.target_url || "",
-        });
-        return window.LearningMessages.sendToAudience({
+        const contentPromise = window.LearningMessages.notificationContentAsync
+          ? window.LearningMessages.notificationContentAsync({
+              title: payload.title || "",
+              message: payload.message || "",
+              targetUrl: payload.target_url || "",
+              templateId: meta.template_id || meta.templateId || "learning_notification",
+            })
+          : Promise.resolve(window.LearningMessages.notificationContent({
+              title: payload.title || "",
+              message: payload.message || "",
+              targetUrl: payload.target_url || "",
+            }));
+        return contentPromise.then(content => content && window.LearningMessages.sendToAudience({
           studentId,
           audienceUserId: payload.user_id,
           content,
           realSenderId: actorId,
-        });
+        }));
       })
       .filter(Boolean);
     if (jobs.length) await Promise.allSettled(jobs);

@@ -1152,8 +1152,9 @@
       studentIds.length ? sb.from("users").select("id,full_name").in("id", studentIds) : Promise.resolve({ data: [] })
     ]);
     const nameMap = new Map((users || []).map(user => [user.id, user.full_name || "Học sinh"]));
-    await Promise.allSettled(scoreRows.map(row => {
-      const content = window.LearningMessages.sessionScoreContent({
+    await Promise.allSettled(scoreRows.map(async row => {
+      const buildScoreContent = window.LearningMessages.sessionScoreContentAsync || window.LearningMessages.sessionScoreContent;
+      const content = await buildScoreContent({
         studentName: nameMap.get(row.student_id) || "Học sinh",
         className: _className || _cachedClass?.class_name || _cachedClass?.name || "",
         lessonName: session?.lesson?.name || (session?.session_order ? `Buổi ${session.session_order}` : ""),
@@ -1162,6 +1163,7 @@
         maxScore: row.max_score || 10,
         note: row.note || "",
       });
+      if (!content) return { skipped: true };
       return window.LearningMessages.sendToAllAudiences({
         studentId: row.student_id,
         content,
@@ -2273,12 +2275,14 @@
           sb.from("exams").select("title").eq("id",examId).maybeSingle()
         ]);
         if(resultRow?.student_id){
-          const content = window.LearningMessages.notificationContent({
+          const buildNotificationContent = window.LearningMessages.notificationContentAsync || window.LearningMessages.notificationContent;
+          const content = await buildNotificationContent({
             title: "Điểm đề luyện tập",
             message: `${studentName} vừa có điểm đề luyện tập ${examRow?.title || ""}: ${grand}/${totalPts || 10}.`,
-            targetUrl: `class.html?openClassId=${encodeURIComponent(_classId || "")}&tab=exams`
+            targetUrl: `class.html?openClassId=${encodeURIComponent(_classId || "")}&tab=exams`,
+            templateId: "exam_score_notice"
           });
-          window.LearningMessages.sendToAllAudiences({
+          if (content) window.LearningMessages.sendToAllAudiences({
             studentId: resultRow.student_id,
             content,
             realSenderId: window._currentUserId || null,
