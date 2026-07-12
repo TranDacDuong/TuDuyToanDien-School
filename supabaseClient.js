@@ -28,6 +28,22 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
   window.sb = sb;
   window.MindupLiveUI = (function () {
     let channelIndex = 0;
+    const mutedRealtimeTables = new Set([
+      "rooms",
+      "grades",
+      "subjects",
+      "topics",
+      "reference_materials",
+      "question_bank",
+      "question_issue_reports",
+      "trial_lesson_requests",
+      "tuition_payments",
+      "courses",
+      "course_sessions",
+      "lessons",
+      "course_enrollments",
+      "course_registration_requests"
+    ]);
 
     function ensureStyles() {
       if (document.getElementById("mindupLiveUiStyles")) return;
@@ -85,6 +101,10 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
 
     function watchTable(table, callback, options = {}) {
       if (!table || typeof callback !== "function" || !sb?.channel) return null;
+      if (options.enabled === false) return null;
+      if (!options.forceRealtime && mutedRealtimeTables.has(String(table))) {
+        return null;
+      }
       const debounceMs = Number(options.debounceMs ?? 120);
       let timer = null;
       const channel = sb
@@ -106,7 +126,11 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
       return channel;
     }
 
-    return { patchHTML, watchTable };
+    function isRealtimeMuted(table) {
+      return mutedRealtimeTables.has(String(table));
+    }
+
+    return { patchHTML, watchTable, isRealtimeMuted };
   })();
   window.AppAuth = (function () {
     function normalizeLoginEmail(value) {
