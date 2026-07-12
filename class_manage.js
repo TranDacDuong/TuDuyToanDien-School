@@ -1205,6 +1205,7 @@
         studentId: row.student_id,
         content,
         realSenderId: window._currentUserId || null,
+        messageKey: `session_score:${sessionId}:${row.student_id}`,
       });
     }));
   }

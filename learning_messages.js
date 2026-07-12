@@ -55,13 +55,27 @@
   }
 
   function isMissingLearningRpc(error) {
-    return /Could not find the function|schema cache|PGRST202|send_student_learning_message/i.test(error?.message || "");
+    return /Could not find the function|schema cache|PGRST202|send_student_learning_message|upsert_student_learning_message/i.test(error?.message || "");
   }
 
-  async function sendToAllAudiences({ studentId, content, realSenderId = null }) {
+  async function sendToAllAudiences({ studentId, content, realSenderId = null, messageKey = null }) {
     const text = cleanText(content);
     if (!studentId || !text) return { skipped: true };
     try {
+      if (messageKey) {
+        const { data, error } = await getSb().rpc("upsert_student_learning_message", {
+          p_student_id: studentId,
+          p_content: text,
+          p_message_key: messageKey,
+          p_real_sender_id: realSenderId || null,
+          p_audience_user_ids: null,
+        });
+        if (!error) return { count: data || 0, upserted: true };
+        if (!isMissingLearningRpc(error)) {
+          console.warn("[LearningMessages] upsert all failed:", error);
+          return { error };
+        }
+      }
       const { data, error } = await getSb().rpc("send_student_learning_message", {
         p_student_id: studentId,
         p_content: text,
