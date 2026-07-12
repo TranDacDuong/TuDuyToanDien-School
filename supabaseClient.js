@@ -42,7 +42,17 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
       "course_sessions",
       "lessons",
       "course_enrollments",
-      "course_registration_requests"
+      "course_registration_requests",
+      "classes",
+      "class_schedules",
+      "class_teachers",
+      "class_students",
+      "posts",
+      "likes",
+      "comments",
+      "exam_events",
+      "site_settings",
+      "home_teachers"
     ]);
 
     function ensureStyles() {

@@ -3450,19 +3450,6 @@ function subscribeFeedRealtime() {
     sb.removeChannel(feedChannel);
     feedChannel = null;
   }
-
-  feedChannel = sb
-    .channel("home-feed")
-    .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => scheduleFeedRefresh())
-    .on("postgres_changes", { event: "*", schema: "public", table: "likes" }, () => scheduleFeedRefresh({ withLikes: true }))
-    .on("postgres_changes", { event: "*", schema: "public", table: "comments" }, payload => {
-      const postId = payload?.new?.post_id || payload?.old?.post_id;
-      scheduleFeedRefresh({ postId });
-    })
-    .on("postgres_changes", { event: "*", schema: "public", table: "exam_events" }, () => loadOverviewSettings())
-    .on("postgres_changes", { event: "*", schema: "public", table: "site_settings" }, () => loadOverviewSettings())
-    .on("postgres_changes", { event: "*", schema: "public", table: "home_teachers" }, () => loadOverviewSettings())
-    .subscribe();
 }
 
 function renderOverviewPost(post, compact = false) {
