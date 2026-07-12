@@ -507,13 +507,15 @@ function openSearchTarget(url) {
   return false;
 }
 
-function openSearchChatPopup(userId) {
+function openSearchChatPopup(userId, role = "") {
   if (!userId) return false;
+  const payload = { userId, role };
+  if (["student", "parent"].includes(String(role || ""))) payload.officialMindUp = true;
   if (window.parent && window.parent !== window && typeof window.parent.openChatPopupForUser === "function") {
-    window.parent.openChatPopupForUser(userId);
+    window.parent.openChatPopupForUser(userId, payload);
     return false;
   }
-  window.parent?.postMessage({ type: "dashboard:open-chat-popup", userId }, "*");
+  window.parent?.postMessage({ type: "dashboard:open-chat-popup", ...payload }, "*");
   return false;
 }
 
@@ -534,7 +536,7 @@ function renderUserItem(user) {
         ${user.bio ? `<div class="user-bio">${esc(user.bio)}</div>` : ""}
         <div class="user-actions">
           <a class="btn btn-outline" href="profile.html?id=${user.id}">Xem hồ sơ</a>
-          ${user.id !== currentUser.id ? `<button class="btn btn-outline" type="button" onclick="openSearchChatPopup('${user.id}')">Nhắn tin</button>` : ""}
+          ${user.id !== currentUser.id ? `<button class="btn btn-outline" type="button" onclick="openSearchChatPopup('${user.id}', '${user.role || ""}')">Nhắn tin</button>` : ""}
         </div>
       </div>
     </article>
@@ -643,7 +645,7 @@ function renderUserItemFullscreen(user) {
         ${user.bio ? `<div class="user-bio">${esc(user.bio)}</div>` : ""}
         <div class="user-actions">
           <button class="btn btn-outline" type="button" onclick="openSearchTarget('profile.html?id=${user.id}')">Xem hồ sơ</button>
-          ${user.id !== currentUser.id ? `<button class="btn btn-outline" type="button" onclick="openSearchChatPopup('${user.id}')">Nhắn tin</button>` : ""}
+          ${user.id !== currentUser.id ? `<button class="btn btn-outline" type="button" onclick="openSearchChatPopup('${user.id}', '${user.role || ""}')">Nhắn tin</button>` : ""}
         </div>
       </div>
     </article>

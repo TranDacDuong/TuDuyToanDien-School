@@ -1139,17 +1139,18 @@ function setComposerEnabled(enabled) {
 
 window.openConversation = async function(friendId, friendName, friendAvatar, friendRole) {
   const shouldUseMindUpOfficial = shouldRouteToMindUpOfficial(friendRole);
+  const shouldOpenMindUpBotTarget = shouldOpenMindUpBotConversation(friendRole);
   const shouldOpenTeacherThread = isStudentOrParentRole(currentProfile?.role || "") && friendRole === "teacher";
   if (isTrayMode) {
     window.parent?.postMessage({
       type: "open-chat-popup",
       payload: {
-        userId: shouldOpenTeacherThread ? null : (shouldUseMindUpOfficial ? MINDUP_BOT_ID : friendId),
+        userId: shouldOpenTeacherThread ? null : (shouldOpenMindUpBotTarget ? MINDUP_BOT_ID : friendId),
         teacherId: shouldOpenTeacherThread ? friendId : null,
         officialMindUp: shouldUseMindUpOfficial || shouldOpenTeacherThread,
-        name: shouldUseMindUpOfficial ? "MindUp - Tư Duy Toàn Diện" : friendName,
-        avatar: shouldUseMindUpOfficial ? "favicon.png" : friendAvatar,
-        role: shouldUseMindUpOfficial ? "bot" : friendRole
+        name: shouldOpenMindUpBotTarget ? "MindUp - Tư Duy Toàn Diện" : friendName,
+        avatar: shouldOpenMindUpBotTarget ? "favicon.png" : friendAvatar,
+        role: shouldOpenMindUpBotTarget ? "bot" : friendRole
       }
     }, "*");
     return;
@@ -1161,7 +1162,7 @@ window.openConversation = async function(friendId, friendName, friendAvatar, fri
     });
     return;
   }
-  if (shouldUseMindUpOfficial) {
+  if (shouldOpenMindUpBotTarget) {
     await openConversation(MINDUP_BOT_ID, "MindUp - Tư Duy Toàn Diện", "favicon.png", "bot");
     return;
   }
@@ -2035,8 +2036,13 @@ function isStudentOrParentRole(role) {
   return ['student','parent'].includes(String(role || ''));
 }
 
-function shouldRouteToMindUpOfficial(targetRole) {
+function shouldOpenMindUpBotConversation(targetRole) {
   return isStudentOrParentRole(currentProfile?.role) && isMindUpStaffRole(targetRole);
+}
+
+function shouldRouteToMindUpOfficial(targetRole) {
+  return shouldOpenMindUpBotConversation(targetRole)
+    || (isMindUpStaffRole(currentProfile?.role) && isStudentOrParentRole(targetRole));
 }
 
 function formatStudentNameWithContext(profile) {

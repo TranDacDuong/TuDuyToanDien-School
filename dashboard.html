@@ -1044,7 +1044,7 @@ const MOBILE_NAV_ORDER = {
 };
 let mobileToolsManualOpen = false;
 let dashboardMenuReady = false;
-let pendingChatPopupUserId = "";
+let pendingChatPopupPayload = null;
 /* ── Sidebar toggle ── */
 const sidebar  = document.getElementById("sidebar");
 const tab      = document.getElementById("sidebarTab");
@@ -1435,12 +1435,12 @@ contentFrame.addEventListener("load", () => {
   const framePage = getFrameDashboardPage();
   if(!framePage) return;
   syncSidebarPin(framePage);
-  if(framePage.split("?")[0].split("#")[0] === "home.html" && pendingChatPopupUserId){
+  if(framePage.split("?")[0].split("#")[0] === "home.html" && pendingChatPopupPayload?.userId){
     contentFrame.contentWindow?.postMessage({
       type: "open-chat-popup",
-      payload: { userId: pendingChatPopupUserId }
+      payload: pendingChatPopupPayload
     }, "*");
-    pendingChatPopupUserId = "";
+    pendingChatPopupPayload = null;
   }
   const currentPage = getDashboardUrlPage();
   if(framePage !== currentPage) {
@@ -1451,14 +1451,18 @@ contentFrame.addEventListener("load", () => {
 window.addEventListener("message", (event) => {
   if(event.source !== contentFrame.contentWindow) return;
   if(event.data?.type === "dashboard:open-chat-popup"){
-    pendingChatPopupUserId = String(event.data.userId || "").trim();
-    if(!pendingChatPopupUserId) return;
+    pendingChatPopupPayload = {
+      userId: String(event.data.userId || "").trim(),
+      role: event.data.role || "",
+      officialMindUp: Boolean(event.data.officialMindUp)
+    };
+    if(!pendingChatPopupPayload.userId) return;
     if(getFrameDashboardPage().split("?")[0].split("#")[0] === "home.html"){
       contentFrame.contentWindow?.postMessage({
         type: "open-chat-popup",
-        payload: { userId: pendingChatPopupUserId }
+        payload: pendingChatPopupPayload
       }, "*");
-      pendingChatPopupUserId = "";
+      pendingChatPopupPayload = null;
       return;
     }
     openDashboardPage("home.html");

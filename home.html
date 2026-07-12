@@ -2103,7 +2103,11 @@ function setChatPopupMindUpMode(enabled) {
 
 function isMindUpOfficialChatTarget(userId, payload = {}) {
   const botId = "00000000-0000-0000-0000-000000000001";
-  return Boolean(payload?.officialMindUp) || String(userId || "") === botId;
+  const role = String(payload?.role || payload?.targetRole || "");
+  return Boolean(payload?.officialMindUp)
+    || String(userId || "") === botId
+    || role === "student"
+    || role === "parent";
 }
 
 window.openChatPopupForUser = function(userId, options = {}) {
