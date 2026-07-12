@@ -46,6 +46,16 @@
     .replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+  function linkifyTaskText(value) {
+    const escaped = esc(value);
+    return escaped.replace(/(^|[\s(])((?:https?:\/\/|www\.)[^\s<>"']+)/gi, (match, prefix, rawUrl) => {
+      const trailing = rawUrl.match(/[),.;!?]+$/)?.[0] || "";
+      const cleanUrl = trailing ? rawUrl.slice(0, -trailing.length) : rawUrl;
+      const href = cleanUrl.startsWith("www.") ? `https://${cleanUrl}` : cleanUrl;
+      return `${prefix}<a href="${href}" target="_blank" rel="noopener noreferrer">${cleanUrl}</a>${trailing}`;
+    });
+  }
+
   function normalizeSearchText(value) {
     return String(value || "")
       .normalize("NFD")
@@ -791,12 +801,12 @@
     return `
       <div class="task-result-box">
         <label>Káº¿t quáº£ Ä‘Ã£ ná»™p</label>
-        ${note ? `<div class="task-result-note">${esc(note)}</div>` : ""}
+        ${note ? `<div class="task-result-note">${linkifyTaskText(note)}</div>` : ""}
         ${requirements.length ? `<div class="task-requirement-list">
           ${submittedRequirements.map(req => `
             <div class="task-requirement-item ${req.done ? "task-requirement-done" : ""}">
               <div class="task-requirement-title">${esc(req.title)} â€¢ ${req.done ? "ÄÃ£ hoÃ n thÃ nh" : "ChÆ°a hoÃ n thÃ nh"}</div>
-              <div class="task-result-note">${req.value ? esc(req.value) : "<em>ChÆ°a nháº­p káº¿t quáº£</em>"}</div>
+              <div class="task-result-note">${req.value ? linkifyTaskText(req.value) : "<em>ChÆ°a nháº­p káº¿t quáº£</em>"}</div>
             </div>
           `).join("")}
         </div>` : ""}
