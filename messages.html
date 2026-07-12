@@ -650,10 +650,7 @@ async function init() {
       .select("id, full_name, avatar_url, role")
       .eq("id", teacherId)
       .maybeSingle();
-    await openMindUpTeacherConversation(null, {
-      teacherId,
-      teacherName: teacher?.full_name || "Giáo viên"
-    });
+    await openConversation(teacher?.id || teacherId, teacher?.full_name || "Giáo viên", teacher?.avatar_url || "default-avatar.png", teacher?.role || "teacher");
     return;
   }
   if (isPopupMode && selectedUserFromQuery) {
@@ -730,100 +727,16 @@ async function fetchUsersByIds(userIds) {
 }
 
 async function fetchLearningConversationItems() {
-  if (!window.LearningMessages) return [];
-  try {
-    await sb.rpc("materialize_my_learning_conversations");
-  } catch (_) {
-    // Function may be absent while SQL migrations are being applied; keep chat list usable.
-  }
-  const { data, error } = await sb.rpc("list_student_learning_conversations");
-  if (error) {
-    if (!/Could not find the function|schema cache|PGRST202/i.test(error.message || "")) {
-      console.warn("Could not load learning conversations", error);
-    }
-    return [];
-  }
-  const isStaff = ["admin", "teacher", "assistant"].includes(currentProfile?.role || "");
-  const isParentOrStudent = ["parent", "student"].includes(currentProfile?.role || "");
-  return (data || []).map(row => {
-    const studentName = row.student_name || "Học sinh";
-    const audienceName = row.audience_name || "Người nhận";
-    const displayName = isStaff
-      ? `MindUp - Tư Duy Toàn Diện + ${studentName}`
-      : `MindUp - Tư Duy Toàn Diện${isParentOrStudent ? ` · ${studentName}` : ""}`;
-    const metaName = isStaff
-      ? `Hồ sơ học tập: ${studentName}${row.audience_user_id ? ` • Người nhận: ${audienceName}` : ""}`
-      : `Hồ sơ học tập của ${studentName}`;
-    return makeConversationListItem({
-      id: `learning:${row.conversation_id}`,
-      full_name: displayName,
-      avatar_url: "favicon.png",
-      role: "learning"
-    }, {
-      friend_id: `learning:${row.conversation_id}`,
-      conversationId: row.conversation_id,
-      preview: row.last_content ? getMessagePreview(row.last_content) : "Chưa có cập nhật học tập nào",
-      lastActivity: row.last_at || null,
-      isLearningThread: true,
-      studentId: row.student_id,
-      studentName,
-      audienceUserId: row.audience_user_id,
-      audienceName,
-      full_name: displayName,
-      role: "learning",
-      metaName,
-    });
-  });
+  // Learning/system notices now live inside the single official MindUp channel
+  // for each student/parent, so we intentionally do not render separate
+  // `mindup_student:*` conversations in the sidebar.
+  return [];
 }
 
 async function fetchMindUpTeacherConversationItems() {
-  try {
-    const { data, error } = await sb.rpc("list_mindup_teacher_conversations");
-    if (error) {
-      if (!/Could not find the function|schema cache|PGRST202/i.test(error.message || "")) {
-        console.warn("Could not load MindUp teacher conversations", error);
-      }
-      return [];
-    }
-
-    const isStaff = ["admin", "teacher", "assistant"].includes(currentProfile?.role || "");
-    return (data || []).map(row => {
-      const teacherName = row.teacher_name || "Giáo viên";
-      const audienceName = row.audience_name || "Người gửi";
-      const audienceLabel = row.audience_label || audienceName;
-      const threadTitle = row.thread_title || audienceLabel;
-      const displayName = isStaff
-        ? threadTitle
-        : "MindUp - Tư Duy Toàn Diện";
-      const metaName = isStaff
-        ? `Liên hệ giáo viên: ${teacherName} • ${audienceLabel}`
-        : `Liên hệ giáo viên: ${teacherName}`;
-
-      return makeConversationListItem({
-        id: `mindup_teacher:${row.conversation_id}`,
-        full_name: displayName,
-        avatar_url: "favicon.png",
-        role: "mindup_teacher"
-      }, {
-        friend_id: `mindup_teacher:${row.conversation_id}`,
-        conversationId: row.conversation_id,
-        preview: row.last_content ? getMessagePreview(row.last_content) : `Nhắn tin với MindUp qua ${teacherName}`,
-        lastActivity: row.last_at || null,
-        isMindUpTeacherThread: true,
-        teacherId: row.teacher_id,
-        teacherName,
-        audienceUserId: row.audience_user_id,
-        audienceName,
-        audienceLabel,
-        full_name: displayName,
-        role: "mindup_teacher",
-        metaName,
-      });
-    });
-  } catch (error) {
-    console.warn("Could not load MindUp teacher conversations", error);
-    return [];
-  }
+  // Chats opened from teacher/staff profiles are also routed into the single
+  // official MindUp channel. Old `mindup_teacher:*` threads stay hidden.
+  return [];
 }
 
 async function loadFriends() {
@@ -866,6 +779,7 @@ async function loadFriends() {
     .map(item => ({ ...item, partnerId: getDirectPartnerId(item.direct_key) }))
     .filter(item => item.partnerId && item.partnerId !== currentUser.id);
   const conversationByUserId = new Map(directConversations.map(item => [item.partnerId, item]));
+  const partnerIdByConversationId = new Map(directConversations.map(item => [item.id, item.partnerId]));
   const participantIds = [...new Set([
     ...friendRows.map(item => item.friend_id),
     ...directConversations.map(item => item.partnerId)
@@ -880,6 +794,11 @@ async function loadFriends() {
 
   const unreadMap = new Map();
   (unreadNotifications || []).forEach(item => {
+    const officialPartnerId = item.ref_id ? partnerIdByConversationId.get(item.ref_id) : null;
+    if (officialPartnerId) {
+      unreadMap.set(officialPartnerId, (unreadMap.get(officialPartnerId) || 0) + 1);
+      return;
+    }
     const learningConversationId = item.meta?.conversation_id || item.ref_id;
     if (item.meta?.learning_thread && learningConversationId) {
       const key = `learning:${learningConversationId}`;
@@ -1008,10 +927,7 @@ async function loadFriends() {
       .eq("id", selectedTeacherId)
       .maybeSingle();
     if (teacher?.id) {
-      await openMindUpTeacherConversation(null, {
-        teacherId: teacher.id,
-        teacherName: teacher.full_name || "Giáo viên"
-      });
+      await openConversation(teacher.id, teacher.full_name || "Giáo viên", teacher.avatar_url || "default-avatar.png", teacher.role || "teacher");
     }
   }
   await ensureMindupInFriendList();
@@ -1152,26 +1068,18 @@ function setComposerEnabled(enabled) {
 window.openConversation = async function(friendId, friendName, friendAvatar, friendRole) {
   const shouldUseMindUpOfficial = shouldRouteToMindUpOfficial(friendRole);
   const shouldOpenMindUpBotTarget = shouldOpenMindUpBotConversation(friendRole);
-  const shouldOpenTeacherThread = isStudentOrParentRole(currentProfile?.role || "") && friendRole === "teacher";
   if (isTrayMode) {
     window.parent?.postMessage({
       type: "open-chat-popup",
       payload: {
-        userId: shouldOpenTeacherThread ? null : (shouldOpenMindUpBotTarget ? MINDUP_BOT_ID : friendId),
-        teacherId: shouldOpenTeacherThread ? friendId : null,
-        officialMindUp: shouldUseMindUpOfficial || shouldOpenTeacherThread,
+        userId: shouldOpenMindUpBotTarget ? MINDUP_BOT_ID : friendId,
+        teacherId: null,
+        officialMindUp: shouldUseMindUpOfficial,
         name: shouldOpenMindUpBotTarget ? "MindUp - Tư Duy Toàn Diện" : friendName,
         avatar: shouldOpenMindUpBotTarget ? "favicon.png" : friendAvatar,
         role: shouldOpenMindUpBotTarget ? "bot" : friendRole
       }
     }, "*");
-    return;
-  }
-  if (shouldOpenTeacherThread) {
-    await openMindUpTeacherConversation(null, {
-      teacherId: friendId,
-      teacherName: friendName || "Giáo viên"
-    });
     return;
   }
   if (shouldOpenMindUpBotTarget) {
@@ -1198,7 +1106,7 @@ window.openConversation = async function(friendId, friendName, friendAvatar, fri
     setComposerEnabled(true);
     await loadMessages({ reset: true, scrollToBottom: true });
     subscribeConversationMessages(currentConversationId);
-    markMessageNotificationsRead(friendId)
+    markMessageNotificationsRead(friendId, currentConversationId)
       .then(() => isPopupMode ? null : loadFriends())
       .catch(console.warn);
   } catch (error) {
@@ -1315,15 +1223,20 @@ async function markMindUpTeacherNotificationsRead(conversationId) {
     .eq("is_read", false);
 }
 
-async function markMessageNotificationsRead(friendId) {
-  if (!friendId) return;
-  await sb
+async function markMessageNotificationsRead(friendId, conversationId = null) {
+  if (!friendId && !conversationId) return;
+  let query = sb
     .from("notifications")
     .update({ is_read: true })
     .eq("user_id", currentUser.id)
-    .eq("actor_id", friendId)
     .eq("type", "message_new")
     .eq("is_read", false);
+  if (conversationId) {
+    query = query.eq("ref_id", conversationId);
+  } else {
+    query = query.eq("actor_id", friendId);
+  }
+  await query;
 }
 
 async function ensureConversation(friendId, friendRole, knownConversationId = null) {
