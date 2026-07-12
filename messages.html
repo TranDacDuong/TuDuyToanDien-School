@@ -186,7 +186,9 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
 }
 .friend-card:hover, .friend-card.active { border-color: rgba(37,99,235,.16); background: #f4f8ff; }
 .avatar { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(15,31,61,.08); background: var(--surface); }
-.name { color: var(--navy); font-weight: 700; font-size: .9rem; white-space: pre-line; line-height: 1.35; }
+.name { color: var(--navy); font-size: .9rem; line-height: 1.35; }
+.name-primary { display: block; font-weight: 800; color: var(--navy); }
+.name-sub { display: block; margin-top: 2px; font-weight: 500; color: var(--ink-mid); font-size: .78rem; }
 .meta { color: var(--ink-light); font-size: .78rem; margin-top: 3px; }
 .meta:empty { display: none; }
 .friend-card.official-audience .meta { display: none; }
@@ -2143,6 +2145,14 @@ function formatStudentCardName(profile) {
   return `${name}\n${secondLine}`;
 }
 
+function getStudentCardNameParts(profile) {
+  const name = profile?.full_name || profile?.email || "Học sinh";
+  const year = profile?.birth_year ? `K${profile.birth_year}` : "";
+  const gradeLabel = _studentGradeLabels.get(profile?.id);
+  const subtitle = year ? `Học sinh ${year}` : (gradeLabel ? `Học sinh ${gradeLabel}` : "Học sinh");
+  return { title: name, subtitles: [subtitle] };
+}
+
 function formatStudentSenderLabel(profile) {
   return `Học sinh ${formatStudentNameWithContext(profile)}`;
 }
@@ -2159,10 +2169,30 @@ function formatParentCardName(profile) {
   return [name, ...children.map(child => `PH ${child}`)].join("\n");
 }
 
+function getParentCardNameParts(profile) {
+  const name = profile?.full_name || profile?.email || "Phụ huynh";
+  const children = _parentChildrenLabels.get(profile?.id) || [];
+  return { title: name, subtitles: children.map(child => `PH ${child}`) };
+}
+
 function getOfficialAudienceDisplayName(user) {
   if (user?.role === "student") return formatStudentCardName(user);
   if (user?.role === "parent") return formatParentCardName(user);
   return user?.full_name || "Người dùng";
+}
+
+function getOfficialAudienceNameParts(user) {
+  if (user?.role === "student") return getStudentCardNameParts(user);
+  if (user?.role === "parent") return getParentCardNameParts(user);
+  return { title: user?.full_name || user?.email || "Người dùng", subtitles: [] };
+}
+
+function renderConversationNameHtml(item, displayName, isOfficialAudience) {
+  if (!isOfficialAudience) {
+    return `<span class="name-primary">${esc(displayName)}</span>`;
+  }
+  const parts = getOfficialAudienceNameParts(item.users || {});
+  return `<span class="name-primary">${esc(parts.title)}</span>${(parts.subtitles || []).map(line => `<span class="name-sub">${esc(line)}</span>`).join("")}`;
 }
 
 function getMindUpDisplaySender(realSenderId) {
@@ -2196,19 +2226,32 @@ function officialFamilySortWeight(user) {
 
 function sortConversationsByFamily(list) {
   const groupLatest = new Map();
+  const groupNames = new Map();
   (list || []).forEach(item => {
     const user = item.users || {};
     const groupKey = item.isOfficialMindUpChannel ? getOfficialFamilyKey(user) : `solo:${item.friend_id}`;
     item._familyGroupKey = groupKey;
     const ts = item.lastActivity ? new Date(item.lastActivity).getTime() : 0;
     groupLatest.set(groupKey, Math.max(groupLatest.get(groupKey) || 0, ts));
+    const groupName = groupNames.get(groupKey);
+    const candidateName = user.role === "parent"
+      ? (user.full_name || user.email || "")
+      : (groupName || user.full_name || user.email || "");
+    if (!groupName || (candidateName && String(candidateName).localeCompare(groupName, "vi") < 0)) {
+      groupNames.set(groupKey, candidateName);
+    }
   });
+  const groupRank = new Map([...groupLatest.keys()]
+    .sort((a, b) => {
+      const latestA = groupLatest.get(a) || 0;
+      const latestB = groupLatest.get(b) || 0;
+      if (latestA !== latestB) return latestB - latestA;
+      return String(groupNames.get(a) || "").localeCompare(String(groupNames.get(b) || ""), "vi");
+    })
+    .map((key, index) => [key, index]));
   return (list || []).slice().sort((a, b) => {
-    const latestA = groupLatest.get(a._familyGroupKey) || 0;
-    const latestB = groupLatest.get(b._familyGroupKey) || 0;
-    if (latestA !== latestB) return latestB - latestA;
     if (a._familyGroupKey !== b._familyGroupKey) {
-      return String(a.users?.full_name || "").localeCompare(String(b.users?.full_name || ""), "vi");
+      return (groupRank.get(a._familyGroupKey) || 0) - (groupRank.get(b._familyGroupKey) || 0);
     }
     const weightA = officialFamilySortWeight(a.users);
     const weightB = officialFamilySortWeight(b.users);
@@ -2249,14 +2292,27 @@ async function prefetchUserContextProfiles(profiles) {
   let parentLinks = [];
 
   try {
-    if (parentIds.length) {
-      const { data: links, error: linkError } = await sb
-        .from("parent_students")
-        .select("parent_id, student_id")
-        .in("parent_id", parentIds)
-        .is("revoked_at", null);
-      if (linkError) throw linkError;
-      parentLinks = links || [];
+    if (parentIds.length || directStudentIds.length) {
+      const [linksByParent, linksByStudent] = await Promise.all([
+        parentIds.length
+          ? sb.from("parent_students")
+              .select("parent_id, student_id")
+              .in("parent_id", parentIds)
+              .is("revoked_at", null)
+          : Promise.resolve({ data: [], error: null }),
+        directStudentIds.length
+          ? sb.from("parent_students")
+              .select("parent_id, student_id")
+              .in("student_id", directStudentIds)
+              .is("revoked_at", null)
+          : Promise.resolve({ data: [], error: null })
+      ]);
+      if (linksByParent.error || linksByStudent.error) throw (linksByParent.error || linksByStudent.error);
+      const linkMap = new Map();
+      [...(linksByParent.data || []), ...(linksByStudent.data || [])].forEach(link => {
+        if (link?.parent_id && link?.student_id) linkMap.set(`${link.parent_id}:${link.student_id}`, link);
+      });
+      parentLinks = [...linkMap.values()];
       parentLinks.forEach(link => {
         if (!link?.student_id || !link?.parent_id) return;
         const parents = _studentParentIds.get(link.student_id) || [];
@@ -2461,7 +2517,7 @@ const _renderFriendListCore = (list) => {
     const rawDisplayName = isMindUp
       ? 'MindUp - Tư Duy Toàn Diện'
       : (isOfficialAudience ? getOfficialAudienceDisplayName(item.users) : (item.users?.full_name || 'Người dùng'));
-    const displayName = esc(rawDisplayName);
+    const nameHtml = renderConversationNameHtml(item, rawDisplayName, isOfficialAudience);
     const avatar = (isMindUp || isLearning) ? 'favicon.png' : (item.users?.avatar_url || 'default-avatar.png');
     const relationLabel = isLearning ? (item.metaName || 'Hồ sơ học tập') : (isMindUp || isOfficialAudience ? '' : (item.isFriend ? 'Bạn bè' : (item.conversationId ? 'Đã nhắn tin' : 'Người dùng')));
     const metaText = (isMindUp || isOfficialAudience) ? "" : `${isLearning ? '🤖 MindUp' : formatRole(item.users?.role || '')} • ${relationLabel}`;
@@ -2475,7 +2531,7 @@ const _renderFriendListCore = (list) => {
         <div class="friend-main">
           <div class="friend-top">
             ${(!isMindUp && !isLearning) ? `<span class="status-dot ${activePresenceIds.has(item.friend_id) ? 'online' : ''}"></span>` : ''}
-            <div class="name">${displayName}</div>
+            <div class="name">${nameHtml}</div>
             <div class="friend-time">${item.lastActivity ? esc(formatListTime(item.lastActivity)) : ''}</div>
           </div>
           <div class="meta">${esc(metaText)}</div>
@@ -2505,7 +2561,7 @@ window.loadMoreConversations = function() {
 };
 
 window.openFullMessagesPage = function() {
-  const target = "messages.html?v=20260713-message-list4";
+  const target = "messages.html?v=20260713-message-list5";
   try {
     if (window.top && window.top !== window && typeof window.top.openDashboardPage === "function") {
       window.top.openDashboardPage(target, { syncMenu: true, syncMobile: true });
