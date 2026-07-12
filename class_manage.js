@@ -148,6 +148,33 @@
       .filter(s => Number(s.weekday) === Number(wd));
   }
 
+  function getScheduleForAttendance(dateValue, scheduleId, sessionNo){
+    const sid = Number(scheduleId || 0);
+    const date = dateFromStr(dateValue);
+    const wd = date.getDay() === 0 ? 7 : date.getDay();
+    const allSchedules = _cachedClass?.class_schedules || [];
+    if(sid){
+      const direct = allSchedules.find(s => Number(s.id) === sid);
+      if(direct) return direct;
+    }
+    const schedules = getSchedulesForMonth(allSchedules, date.getMonth(), date.getFullYear())
+      .filter(s => Number(s.weekday) === Number(wd));
+    const no = Number(sessionNo || 0);
+    return schedules.find(s => Number(s.session_no || 1) === no) || schedules[0] || null;
+  }
+
+  function hasAttendanceSessionEnded(dateValue, scheduleId, sessionNo){
+    const schedule = getScheduleForAttendance(dateValue, scheduleId, sessionNo);
+    const endTime = String(schedule?.end_time || "").slice(0, 5);
+    if(!/^\d{2}:\d{2}$/.test(endTime)) return false;
+    const startTime = String(schedule?.start_time || "").slice(0, 5);
+    const endAt = new Date(String(dateValue).slice(0,10)+"T"+endTime+":00");
+    if(/^\d{2}:\d{2}$/.test(startTime) && endTime <= startTime){
+      endAt.setDate(endAt.getDate() + 1);
+    }
+    return new Date() >= endAt;
+  }
+
   function getSessionDatesFromBaseDate(dateValue){
     const baseSchedules = getSchedulesForDate(dateValue);
     if(!baseSchedules.length) return { sessionNo: null, dates: [], scheduleMap: new Map() };
@@ -1192,9 +1219,8 @@
     }
     // === MINDUP BOT: Gửi tin nhắn tự động sau điểm danh ===
     try {
-      if(window.MindUpBot && date === new Date().toISOString().slice(0,10)) {
-        const now = new Date();
-        const isAfterSession = now.getHours() >= 17; // Chỉ gửi sau 17h
+      if(window.MindUpBot && date === todayStr()) {
+        const isAfterSession = hasAttendanceSessionEnded(date, sid, sessionNo);
         if(isAfterSession) {
           const className = _cachedClass?.name || _cachedClass?.class_name || 'lớp học';
           const sessionDate = new Date(date).toLocaleDateString('vi-VN');
