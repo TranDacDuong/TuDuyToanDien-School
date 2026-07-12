@@ -44,6 +44,9 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
   display: grid;
   gap: 8px;
 }
+.friend-list-actions:empty {
+  display: none;
+}
 .friend-list-action-btn {
   width: 100%;
   border: 1px solid #dbe7f6;
@@ -529,6 +532,7 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
       <div class="search-wrap">
         <input id="friendSearch" class="search-input" placeholder="Tìm người dùng hoặc cuộc trò chuyện..." oninput="filterFriends()">
       </div>
+      <div id="friendListTopActions" class="friend-list-actions"></div>
       <div id="friendList" class="friend-list">
         <div class="empty"><strong>Đang tải</strong>Danh sách bạn bè đang được chuẩn bị...</div>
       </div>
@@ -822,6 +826,7 @@ async function fetchMindUpTeacherConversationItems() {
 async function loadFriends() {
   const requestToken = ++friendsLoadToken;
   const wrap = document.getElementById("friendList");
+  const topActions = document.getElementById("friendListTopActions");
 
   const [{ data: friendships, error: friendshipError }, { data: conversations, error: conversationError }, { data: unreadNotifications }, learningItems, mindUpTeacherItems] = await Promise.all([
     sb
@@ -1031,7 +1036,9 @@ async function loadFriends() {
 
 function renderFriendList(list) {
   const wrap = document.getElementById("friendList");
+  const topActions = document.getElementById("friendListTopActions");
   if (!list.length) {
+    if (topActions) topActions.innerHTML = "";
     wrap.innerHTML = '<div class="empty"><strong>Không tìm thấy kết quả</strong>Hãy thử tên người dùng khác.</div>';
     return;
   }
@@ -2313,7 +2320,9 @@ async function ensureMindupInFriendList() {
 // == Override renderFriendList to handle MindUp pinned card ==
 const _renderFriendListCore = (list) => {
   const wrap = document.getElementById("friendList");
+  const topActions = document.getElementById("friendListTopActions");
   if (!list.length) {
+    if (topActions) topActions.innerHTML = "";
     wrap.innerHTML = '<div class="empty"><strong>Không tìm thấy kết quả</strong>Hãy thử tên người dùng khác.</div>';
     return;
   }
@@ -2322,6 +2331,7 @@ const _renderFriendListCore = (list) => {
   const displayLimit = isTrayMode ? TRAY_CONVERSATION_LIMIT : (hasKeyword ? list.length : visibleConversationCount);
   const visibleList = list.slice(0, displayLimit);
   const hasMore = !isTrayMode && !hasKeyword && list.length > visibleList.length;
+  if (topActions) topActions.innerHTML = renderFriendListActions(list.length, visibleList.length, hasMore);
   wrap.innerHTML = visibleList.map(item => {
     const isMindUp = item.friend_id === BOT_ID;
     const isLearning = item.isLearningThread;
@@ -2351,7 +2361,7 @@ const _renderFriendListCore = (list) => {
         <div class="friend-badge ${item.unreadCount ? 'show' : ''}">${item.unreadCount > 99 ? '99+' : item.unreadCount || ''}</div>
       </div>
     `;
-  }).join('') + renderFriendListActions(list.length, visibleList.length, hasMore);
+  }).join('');
 };
 
 function renderFriendListActions(total, visible, hasMore) {
@@ -2372,7 +2382,7 @@ window.loadMoreConversations = function() {
 };
 
 window.openFullMessagesPage = function() {
-  const target = "messages.html";
+  const target = "messages.html?v=20260713-message-list2";
   try {
     if (window.top && window.top !== window && typeof window.top.openDashboardPage === "function") {
       window.top.openDashboardPage(target, { syncMenu: true, syncMobile: true });
