@@ -2024,7 +2024,7 @@ function enhanceComposerUI() {
 const socialPanelConfig = {
   search: { title: "Tìm kiếm", src: "search.html?tray=1" },
   friend_requests: { title: "Lời mời kết bạn", src: "friend_requests.html" },
-  messages: { title: "Nhắn tin", src: "messages.html?tray=1&v=20260713-message-list7" }
+  messages: { title: "Nhắn tin", src: "messages.html?tray=1&v=20260713-message-list8" }
 };
 
 function positionSocialPanel() {
@@ -2079,7 +2079,7 @@ window.toggleChatPopup = function() {
   popup.classList.toggle("open", !isOpen);
   popup.classList.remove("mindup-fullscreen");
   if (!isOpen && !frame.dataset.loaded) {
-    frame.src = "messages.html?v=20260713-message-list7";
+    frame.src = "messages.html?v=20260713-message-list8";
     frame.dataset.loaded = frame.src;
   }
 };
@@ -2111,7 +2111,7 @@ window.openChatPopupForUser = function(userId, options = {}) {
   const frame = document.getElementById("chatPopupFrame");
   if (!popup || !frame || !userId) return;
   setChatPopupMindUpMode(isMindUpOfficialChatTarget(userId, options));
-  frame.src = "messages.html?popup=1&v=20260713-message-list7&user=" + encodeURIComponent(userId);
+  frame.src = "messages.html?popup=1&v=20260713-message-list8&user=" + encodeURIComponent(userId);
   frame.dataset.loaded = frame.src;
   popup.classList.add("open");
 };
@@ -2122,7 +2122,7 @@ window.openChatPopupForTeacher = function(teacherId) {
   const frame = document.getElementById("chatPopupFrame");
   if (!popup || !frame || !teacherId) return;
   setChatPopupMindUpMode(true);
-  frame.src = "messages.html?popup=1&v=20260713-message-list7&teacher=" + encodeURIComponent(teacherId);
+  frame.src = "messages.html?popup=1&v=20260713-message-list8&teacher=" + encodeURIComponent(teacherId);
   frame.dataset.loaded = frame.src;
   popup.classList.add("open");
 };

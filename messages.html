@@ -737,7 +737,9 @@ function makeConversationListItem(user, options = {}) {
   return {
     friend_id: user?.id || options.friend_id || "",
     users: {
+      id: user?.id || options.friend_id || "",
       full_name: user?.full_name || options.full_name || "Người dùng",
+      email: user?.email || options.email || "",
       avatar_url: user?.avatar_url || options.avatar_url || "default-avatar.png",
       role: user?.role || options.role || "",
       birth_year: user?.birth_year || options.birth_year || null
@@ -2589,7 +2591,7 @@ window.loadMoreConversations = function() {
 };
 
 window.openFullMessagesPage = function() {
-  const target = "messages.html?v=20260713-message-list7";
+  const target = "messages.html?v=20260713-message-list8";
   try {
     if (window.top && window.top !== window && typeof window.top.openDashboardPage === "function") {
       window.top.openDashboardPage(target, { syncMenu: true, syncMobile: true });
