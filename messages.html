@@ -1959,7 +1959,7 @@ function buildMessageActionHtml(action) {
   if (!url) {
     return `<button type="button" class="bubble-action-btn" onclick="handleMessageAction('reply', '')">${esc(act.label)}</button>`;
   }
-  return `<a class="bubble-action-btn" href="${safeUrl(url)}" target="_blank" rel="noopener">${esc(act.label)}</a>`;
+  return `<button type="button" class="bubble-action-btn" onclick="handleMessageAction('${escapeJs(act.type)}', '${escapeJs(url)}')">${esc(act.label)}</button>`;
 }
 
 function renderMessageBody(value) {
@@ -2249,7 +2249,21 @@ window.handleMessageAction = function(type, url) {
     }
     return;
   }
-  if (url) window.open(url, "_blank", "noopener");
+  const targetUrl = String(url || "").trim();
+  if (!targetUrl) return;
+  try {
+    if (window.top && window.top !== window && typeof window.top.openDashboardPage === "function") {
+      window.top.openDashboardPage(targetUrl, { syncMenu: true, syncMobile: true });
+      return;
+    }
+  } catch (_) {}
+  try {
+    if (window.parent && window.parent !== window && typeof window.parent.openDashboardPage === "function") {
+      window.parent.openDashboardPage(targetUrl, { syncMenu: true, syncMobile: true });
+      return;
+    }
+  } catch (_) {}
+  window.location.href = targetUrl;
 };
 
 // == Friend list: Pin MindUp at top for student/parent ==
