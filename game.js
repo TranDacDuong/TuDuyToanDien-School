@@ -3408,7 +3408,6 @@
     EL.roomScreen.classList.add("show");
     setupRoomRealtime(roomId);
     await refreshActiveRoom(roomId);
-    GAME.roomPoll = setInterval(() => refreshActiveRoom(roomId, true), 1200);
   }
 
   function hideGameScreen() {
