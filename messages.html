@@ -309,6 +309,7 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
   background: rgba(255,255,255,.9);
   border: 1px solid rgba(15,31,61,.08);
   color: var(--ink);
+  overflow-x: auto;
 }
 .message-row.mine .bubble-chart {
   background: rgba(255,255,255,.14);
@@ -330,6 +331,7 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
   padding: 8px 4px 2px;
   border-left: 1px solid rgba(15,31,61,.12);
   border-bottom: 1px solid rgba(15,31,61,.12);
+  min-width: 380px;
 }
 .message-row.mine .score-chart-bars {
   border-color: rgba(255,255,255,.26);
@@ -364,6 +366,7 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
   padding: 6px 4px 0;
   font-size: .62rem;
   color: var(--ink-light);
+  min-width: 380px;
 }
 .score-chart-labels span {
   flex: 1 1 0;
@@ -2180,6 +2183,41 @@ function buildMessageChartHtml(chart) {
   `;
 }
 
+function extractLegacyScoreChart(text) {
+  const lines = String(text || "").split(/\r?\n/);
+  const titleIndex = lines.findIndex(line => /đồ\s*thị\s*phổ\s*điểm/i.test(line));
+  if (titleIndex < 0) return { text, html: "" };
+
+  const slIndex = lines.findIndex((line, index) => index > titleIndex && /^\s*SL\s*:/i.test(line));
+  if (slIndex < 0) return { text, html: "" };
+
+  const counts = (lines[slIndex].match(/\d+/g) || []).map(Number);
+  let labelIndex = slIndex + 1;
+  while (labelIndex < lines.length && !/\d+\s*-\s*\d+/.test(lines[labelIndex])) labelIndex += 1;
+  const parsedLabels = labelIndex < lines.length
+    ? (lines[labelIndex].match(/\d+\s*-\s*\d+/g) || []).map(label => label.replace(/\s+/g, ""))
+    : [];
+  const labels = parsedLabels.length ? parsedLabels : Array.from({ length: counts.length }, (_, index) => `${index}-${index + 1}`);
+  if (!counts.length || !labels.length) return { text, html: "" };
+
+  const buckets = labels.map((label, index) => ({
+    label,
+    count: Number(counts[index] || 0)
+  }));
+  const cleaned = [
+    ...lines.slice(0, titleIndex),
+    ...lines.slice(labelIndex + 1)
+  ].join("\n").trim();
+
+  return {
+    text: cleaned,
+    html: buildMessageChartHtml({
+      title: "Phổ điểm trong lớp",
+      buckets
+    })
+  };
+}
+
 function renderMessageBody(value) {
   const payload = parseMessageContent(value);
   if (payload.type === "image") {
@@ -2197,6 +2235,9 @@ function renderMessageBody(value) {
       chartHtml += buildMessageChartHtml(JSON.parse(chartPart.json));
     } catch {}
   }
+  const legacyChart = extractLegacyScoreChart(text);
+  text = legacyChart.text;
+  chartHtml += legacyChart.html;
   // __ACTION__
   const actionPart = extractEmbeddedJsonToken(text, "__ACTION__");
   text = actionPart.text;
