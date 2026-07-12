@@ -40,6 +40,20 @@
     return renderTemplate(template, vars);
   }
 
+  function hasEmbeddedAction(content) {
+    return /__(ACTION|EVALUATION)__\s*\{/i.test(String(content || ""));
+  }
+
+  function actionToken({ type = "url", label = "Mở chi tiết", url = "" } = {}) {
+    return `__ACTION__${JSON.stringify({ type, label, url })}`;
+  }
+
+  function appendActionIfMissing(content, action) {
+    const text = cleanText(content);
+    if (!text || hasEmbeddedAction(text) || !action) return text;
+    return `${text}\n\n${actionToken(action)}`;
+  }
+
   function isMissingLearningRpc(error) {
     return /Could not find the function|schema cache|PGRST202|send_student_learning_message/i.test(error?.message || "");
   }
@@ -97,12 +111,13 @@
 
   async function sessionEvaluationContentAsync({ studentName, className, sessionDate, message }) {
     const fallback = sessionEvaluationContent({ studentName, className, sessionDate, message });
-    return templateContent("session_evaluation_notice", fallback, {
+    const content = await templateContent("session_evaluation_notice", fallback, {
       student_name: studentName || "",
       class_name: className || "",
       session_date: sessionDate || "",
       message: cleanText(message),
     });
+    return appendActionIfMissing(content, { type: "reply", label: "💬 Phản hồi nhận xét" });
   }
 
   function sessionScoreContent({ studentName, className, lessonName, sessionDate, score, maxScore = 10, note }) {
@@ -118,7 +133,7 @@
 
   async function sessionScoreContentAsync({ studentName, className, lessonName, sessionDate, score, maxScore = 10, note }) {
     const fallback = sessionScoreContent({ studentName, className, lessonName, sessionDate, score, maxScore, note });
-    return templateContent("session_score_notice", fallback, {
+    const content = await templateContent("session_score_notice", fallback, {
       student_name: studentName || "",
       class_name: className || "",
       lesson_name: lessonName || "",
@@ -127,6 +142,7 @@
       max_score: maxScore ?? 10,
       note: cleanText(note),
     });
+    return appendActionIfMissing(content, { type: "reply", label: "💬 Hỏi lại thầy cô" });
   }
 
   function notificationContent({ title, message, targetUrl }) {
@@ -139,11 +155,14 @@
 
   async function notificationContentAsync({ title, message, targetUrl, templateId = "learning_notification" }) {
     const fallback = notificationContent({ title, message, targetUrl });
-    return templateContent(templateId, fallback, {
+    const content = await templateContent(templateId, fallback, {
       title: title || "",
       message: cleanText(message),
       target_url: targetUrl || "",
     });
+    return appendActionIfMissing(content, targetUrl
+      ? { type: "url", label: "Mở chi tiết", url: targetUrl }
+      : { type: "reply", label: "💬 Phản hồi MindUp" });
   }
 
   window.LearningMessages = {

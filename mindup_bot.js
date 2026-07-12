@@ -187,11 +187,11 @@
     let defaultContent, templateId;
     if (isHighScore) {
       defaultContent =
-        '🌟 Xuất sắc! Em đã đạt thành tích **{{score}}/{{total_points}}** điểm trong đề luyện tập *{{exam_title}}*.\n\nThầy cô rất tự hào về sự cố gắng của em! Tiếp tục phát huy nhé! 🏆';
+        '🌟 Xuất sắc! Em đã đạt thành tích **{{score}}/{{total_points}}** điểm trong đề luyện tập *{{exam_title}}*.\n\nThầy cô rất tự hào về sự cố gắng của em! Tiếp tục phát huy nhé! 🏆\n\n__ACTION__{"type":"reply","label":"💬 Phản hồi thầy cô","url":""}';
       templateId = 'praise_high_score';
     } else {
       defaultContent =
-        '📈 Khen ngợi em **{{student_name}}** đã có sự tiến bộ vượt bậc! Điểm số của em trong đề luyện tập *{{exam_title}}* đã tăng **+{{improvement}}** điểm so với lần trước cùng môn.\n\nSự nỗ lực không ngừng nghỉ của em đang đơm hoa kết trái! 🌸';
+        '📈 Khen ngợi em **{{student_name}}** đã có sự tiến bộ vượt bậc! Điểm số của em trong đề luyện tập *{{exam_title}}* đã tăng **+{{improvement}}** điểm so với lần trước cùng môn.\n\nSự nỗ lực không ngừng nghỉ của em đang đơm hoa kết trái! 🌸\n\n__ACTION__{"type":"reply","label":"💬 Phản hồi thầy cô","url":""}';
       templateId = 'praise_improvement';
     }
 
@@ -213,7 +213,7 @@
    */
   async function sendBigImprovementMessage(studentId, { examTitle, score, totalPoints, improvement }) {
     const defaultContent =
-      '🎉 Tuyệt vời! Thầy cô ghi nhận sự tiến bộ vượt bậc của em!\n\nĐiểm số đề *{{exam_title}}* của em đã tăng **+{{improvement}} điểm** so với đề trước cùng môn, đạt **{{score}}/{{total_points}}** điểm.\n\nSự cố gắng không ngừng nghỉ của em đang mang lại quả ngọt đó! 🍀';
+      '🎉 Tuyệt vời! Thầy cô ghi nhận sự tiến bộ vượt bậc của em!\n\nĐiểm số đề *{{exam_title}}* của em đã tăng **+{{improvement}} điểm** so với đề trước cùng môn, đạt **{{score}}/{{total_points}}** điểm.\n\nSự cố gắng không ngừng nghỉ của em đang mang lại quả ngọt đó! 🍀\n\n__ACTION__{"type":"reply","label":"💬 Phản hồi thầy cô","url":""}';
 
     const tpl = await getTemplate('praise_big_improvement', defaultContent);
     if (!tpl) return null;
@@ -233,7 +233,7 @@
    */
   async function sendLateStudyWarningMessage(studentId, { examTitle }) {
     const defaultContent =
-      '🌙 Thầy cô thấy em vừa hoàn thành đề luyện tập *{{exam_title}}* vào lúc đêm muộn.\n\nRất khen tinh thần tự giác của em, nhưng hãy cố gắng sắp xếp học sớm hơn để bảo vệ sức khỏe và đầu óc minh mẫn nhé! 💤';
+      '🌙 Thầy cô thấy em vừa hoàn thành đề luyện tập *{{exam_title}}* vào lúc đêm muộn.\n\nRất khen tinh thần tự giác của em, nhưng hãy cố gắng sắp xếp học sớm hơn để bảo vệ sức khỏe và đầu óc minh mẫn nhé! 💤\n\n__ACTION__{"type":"reply","label":"💬 Phản hồi thầy cô","url":""}';
 
     const tpl = await getTemplate('late_study_warning', defaultContent);
     if (!tpl) return null;
@@ -360,7 +360,7 @@
    */
   async function sendBirthdayMessage(studentId, { studentName }) {
     const defaultContent =
-      '🎉🎂 Chúc mừng sinh nhật em **{{student_name}}**!\n\nMindUp - Tư Duy Toàn Diện chúc em tuổi mới luôn tràn đầy niềm vui, sức khỏe dồi dào, học tập thật tốt và đạt được nhiều kết quả cao trong năm học này nhé! 🌟';
+      '🎉🎂 Chúc mừng sinh nhật em **{{student_name}}**!\n\nMindUp - Tư Duy Toàn Diện chúc em tuổi mới luôn tràn đầy niềm vui, sức khỏe dồi dào, học tập thật tốt và đạt được nhiều kết quả cao trong năm học này nhé! 🌟\n\n__ACTION__{"type":"reply","label":"💬 Gửi lời cảm ơn","url":""}';
 
     const tpl = await getTemplate('birthday_wish', defaultContent);
     if (!tpl) return null;

@@ -440,6 +440,10 @@ body { margin: 0; font-family: var(--font-body); background: linear-gradient(180
   background: #b08020;
 }
 .bubble-action-btn:hover { opacity: .85; }
+.bubble-action-btn[type="button"] {
+  font-family: inherit;
+  cursor: pointer;
+}
 .eval-widget {
   margin-top: 10px;
   display: flex;
@@ -1922,6 +1926,41 @@ function stripEmbeddedMessageTokens(value) {
   return text.trim();
 }
 
+function normalizeMessageAction(action) {
+  const type = String(action?.type || "url").trim() || "url";
+  const labelMap = {
+    url: "Mở chi tiết",
+    open_exam: "Làm bài ngay",
+    view_result: "Xem lại bài làm",
+    pay_tuition: "Xem học phí",
+    view_tuition: "Xem học phí",
+    reply: "Phản hồi MindUp",
+    open_chat: "Nhắn lại MindUp",
+  };
+  return {
+    type,
+    label: action?.label || labelMap[type] || "Mở chi tiết",
+    url: action?.url || "",
+  };
+}
+
+function buildMessageActionHtml(action) {
+  const act = normalizeMessageAction(action);
+  if (act.type === "reply" || act.type === "open_chat") {
+    return `<button type="button" class="bubble-action-btn" onclick="handleMessageAction('${escapeJs(act.type)}', '')">${esc(act.label)}</button>`;
+  }
+
+  const urlByType = {
+    pay_tuition: "tuition.html",
+    view_tuition: "tuition.html",
+  };
+  const url = act.url || urlByType[act.type] || "";
+  if (!url) {
+    return `<button type="button" class="bubble-action-btn" onclick="handleMessageAction('reply', '')">${esc(act.label)}</button>`;
+  }
+  return `<a class="bubble-action-btn" href="${safeUrl(url)}" target="_blank" rel="noopener">${esc(act.label)}</a>`;
+}
+
 function renderMessageBody(value) {
   const payload = parseMessageContent(value);
   if (payload.type === "image") {
@@ -1937,8 +1976,7 @@ function renderMessageBody(value) {
   if (actionPart.json) {
     try {
       const act = JSON.parse(actionPart.json);
-      const href = act.url ? `href="${safeUrl(act.url)}" target="_blank"` : 'href="#"';
-      actionHtml += `<a class="bubble-action-btn" ${href}>${esc(act.label || 'Xem')}</a>`;
+      actionHtml += buildMessageActionHtml(act);
     } catch {}
   }
   // __EVALUATION__
@@ -2192,6 +2230,20 @@ window.handleEvalOption = async function(sessionId, value, optIdx, totalOpts) {
     done.textContent = '✅ Cảm ơn em đã phản hồi!';
     widget.appendChild(done);
   }
+};
+
+window.handleMessageAction = function(type, url) {
+  const actionType = String(type || "");
+  if (actionType === "reply" || actionType === "open_chat") {
+    const input = document.getElementById("messageInput");
+    if (input) {
+      input.disabled = false;
+      input.focus();
+      input.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+    return;
+  }
+  if (url) window.open(url, "_blank", "noopener");
 };
 
 // == Friend list: Pin MindUp at top for student/parent ==
