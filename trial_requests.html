@@ -936,6 +936,29 @@ async function deleteTrial(id){
   await loadTrialRequests();
 }
 function deleteTrialFromModal(){ const id=document.getElementById("editId").value; if(!id){ closeTrialModal(); return; } deleteTrial(id); }
+async function deleteTrial(id){
+  if(!id) return;
+  if(!confirm("Xóa học sinh này khỏi danh sách học thử? Chỉ xóa khỏi danh sách học thử, không xóa tài khoản học sinh nếu đã tạo.")) return;
+  const previous = S.requests.slice();
+  S.requests = S.requests.filter(row => String(row.id) !== String(id));
+  closeTrialModal();
+  renderRequests();
+  const {data,error} = await sb.from("trial_lesson_requests").delete().eq("id",id).select("id");
+  if(error){
+    S.requests = previous;
+    renderRequests();
+    alert("Không thể xóa học sinh học thử: "+error.message);
+    return;
+  }
+  if(!data?.length){
+    S.requests = previous;
+    renderRequests();
+    alert("Supabase chưa xóa bản ghi nào. Hãy kiểm tra RLS DELETE cho bảng trial_lesson_requests.");
+    return;
+  }
+  toast("Đã xóa khỏi danh sách học thử");
+  await loadTrialRequests();
+}
 function askClassJoinDate(defaultDate = ""){
   const today = new Date();
   const fallback = defaultDate || `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;

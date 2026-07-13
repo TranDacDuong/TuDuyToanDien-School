@@ -1,4 +1,4 @@
-const CACHE_VERSION = "mindup-pwa-v32";
+const CACHE_VERSION = "mindup-pwa-v34";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const PUSH_RECEIPT_CACHE = `${CACHE_VERSION}-push-receipts`;

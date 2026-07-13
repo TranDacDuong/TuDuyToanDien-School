@@ -298,6 +298,21 @@ async function deleteMaterial(id){
 window.openEditMaterialModal=openEditMaterialModal;
 window.openMaterialViewer=openMaterialViewer;
 window.closeMaterialViewer=closeMaterialViewer;
+deleteMaterial=async function(id){
+  if(!(S.role==='admin'||S.role==='teacher')) return;
+  if(!confirm('Xóa tài liệu này?')) return;
+  const previous = S.materials.slice();
+  S.materials = S.materials.filter(item => String(item.id) !== String(id));
+  renderMaterials();
+  const {error}=await sb.from('reference_materials').delete().eq('id',id);
+  if(error){
+    S.materials = previous;
+    renderMaterials();
+    alert('Không thể xóa tài liệu: '+error.message);
+    return;
+  }
+  await loadData();
+};
 window.deleteMaterial=deleteMaterial;
 window.closeMaterialModal=closeMaterialModal;
 window.loadData=loadData;

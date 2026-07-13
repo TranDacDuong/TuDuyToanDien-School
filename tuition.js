@@ -583,6 +583,16 @@ Nhập số tiền thu thêm lần này:`,
     const newPaid = Math.min(totalPaidInput, amountDue);
     const carryOverAmount = Math.max(0, totalPaidInput - amountDue);
     const now     = new Date().toISOString();
+    const previousPayment = paymentMap[studentId] ? {...paymentMap[studentId]} : null;
+    paymentMap[studentId] = {
+      ...(paymentMap[studentId] || {}),
+      student_id: studentId,
+      month: ym,
+      amount_due: amountDue,
+      amount_paid: newPaid,
+      paid_at: now,
+    };
+    renderRows();
 
     try {
       await upsertPayment(studentId, ym, {
@@ -634,7 +644,12 @@ Nhập số tiền thu thêm lần này:`,
         alert(`Đã ghi nhận đủ học phí tháng ${ym} và chuyển ${fmt(carryOverAmount)}đ sang tháng ${addMonths(ym, 1)}.`);
       }
       renderRows();
-    } catch (err) { alert("Lỗi: " + err.message); }
+    } catch (err) {
+      if (previousPayment) paymentMap[studentId] = previousPayment;
+      else delete paymentMap[studentId];
+      renderRows();
+      alert("Lỗi: " + err.message);
+    }
   };
 
   /* ─────────────────────────────────────────────
@@ -661,6 +676,16 @@ Nhập số tiền hoàn lại (>0):`,
     const newPaid = alreadyPaid - refund;
     // Nếu hoàn hết thì xóa paid_at
     const newPaidAt = newPaid > 0 ? (existing?.paid_at || new Date().toISOString()) : null;
+    const previousPayment = paymentMap[studentId] ? {...paymentMap[studentId]} : null;
+    paymentMap[studentId] = {
+      ...(paymentMap[studentId] || {}),
+      student_id: studentId,
+      month: ym,
+      amount_due: amountDue,
+      amount_paid: newPaid,
+      paid_at: newPaidAt,
+    };
+    renderRows();
 
     try {
       await upsertPayment(studentId, ym, {
@@ -678,7 +703,12 @@ Nhập số tiền hoàn lại (>0):`,
         amount_paid: newPaid,
       });
       renderRows();
-    } catch (err) { alert("Lỗi: " + err.message); }
+    } catch (err) {
+      if (previousPayment) paymentMap[studentId] = previousPayment;
+      else delete paymentMap[studentId];
+      renderRows();
+      alert("Lỗi: " + err.message);
+    }
   };
 
   /* ─────────────────────────────────────────────

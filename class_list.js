@@ -425,6 +425,53 @@
     loadMyClasses({silent:true});
   };
 
+  window.deleteClass = async function(id, role){
+    const sb = getSb();
+    const previous = _allClasses.slice();
+    if(role === "admin"){
+      if(!confirm("Xóa hoàn toàn lớp này? Hành động không thể hoàn tác.")) return;
+      _allClasses = _allClasses.filter(cls => String(cls.id) !== String(id));
+      renderClasses(_allClasses);
+      const { error } = await sb.from("classes").delete().eq("id", id);
+      if(error){
+        _allClasses = previous;
+        renderClasses(_allClasses);
+        alert(error.message);
+        return;
+      }
+      await window.AppAdminTools?.recordAudit?.("class_deleted", { target_type: "class", target_id: id });
+    } else {
+      if(!confirm("Ẩn lớp này?")) return;
+      _allClasses = _allClasses.map(cls => String(cls.id) === String(id) ? {...cls, hidden:true} : cls);
+      renderClasses(_allClasses);
+      const { error } = await sb.from("classes").update({hidden:true}).eq("id", id);
+      if(error){
+        _allClasses = previous;
+        renderClasses(_allClasses);
+        alert(error.message);
+        return;
+      }
+      await window.AppAdminTools?.recordAudit?.("class_hidden", { target_type: "class", target_id: id });
+    }
+    loadMyClasses({silent:true});
+  };
+
+  window.restoreClass = async function(id){
+    if(!confirm("Khôi phục lớp này?")) return;
+    const previous = _allClasses.slice();
+    _allClasses = _allClasses.map(cls => String(cls.id) === String(id) ? {...cls, hidden:false} : cls);
+    renderClasses(_allClasses);
+    const { error } = await getSb().from("classes").update({hidden:false}).eq("id", id);
+    if(error){
+      _allClasses = previous;
+      renderClasses(_allClasses);
+      alert(error.message);
+      return;
+    }
+    await window.AppAdminTools?.recordAudit?.("class_restored", { target_type: "class", target_id: id });
+    loadMyClasses({silent:true});
+  };
+
   window.loadMyClasses = loadMyClasses;
   ["classes","class_schedules","class_teachers","class_students"].forEach(table => {
     window.MindupLiveUI?.watchTable?.(table, () => loadMyClasses({silent:true}));
