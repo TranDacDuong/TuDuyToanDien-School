@@ -575,6 +575,56 @@ window.hideSelectedQuestions = hideSelectedQuestions
 window.restoreSelectedQuestions = restoreSelectedQuestions
 window.deleteSelectedQuestions = deleteSelectedQuestions
 
+window.hideSelectedQuestions = async function () {
+  const selected = getSelectedQuestions().filter((q) => !q.hidden)
+  if (!selected.length) return alert("Chưa có câu nào phù hợp để ẩn.")
+  if (!confirm(`Ẩn ${selected.length} câu đã chọn?`)) return
+  const ids = selected.map((q) => q.id)
+  const previous = questions.map((q) => ({ ...q }))
+  questions = questions.map((q) => ids.includes(q.id) ? { ...q, hidden: true } : q)
+  render()
+  const res = await sb.from("question_bank").update({ hidden: true }).in("id", ids)
+  if (res.error) {
+    questions = previous
+    render()
+    alert(res.error.message)
+    return
+  }
+  if (isAdmin) {
+    await window.AppAdminTools?.recordAudit?.("question_bulk_hide", {
+      target_type: "question",
+      question_ids: ids,
+      total: ids.length,
+    })
+  }
+  clearQuestionSelection()
+}
+
+window.restoreSelectedQuestions = async function () {
+  const selected = getSelectedQuestions().filter((q) => q.hidden)
+  if (!selected.length) return alert("Không có câu ẩn nào trong phần đã chọn để khôi phục.")
+  if (!confirm(`Khôi phục ${selected.length} câu đã chọn?`)) return
+  const ids = selected.map((q) => q.id)
+  const previous = questions.map((q) => ({ ...q }))
+  questions = questions.map((q) => ids.includes(q.id) ? { ...q, hidden: false } : q)
+  render()
+  const res = await sb.from("question_bank").update({ hidden: false }).in("id", ids)
+  if (res.error) {
+    questions = previous
+    render()
+    alert(res.error.message)
+    return
+  }
+  if (isAdmin) {
+    await window.AppAdminTools?.recordAudit?.("question_bulk_restore", {
+      target_type: "question",
+      question_ids: ids,
+      total: ids.length,
+    })
+  }
+  clearQuestionSelection()
+}
+
 async function deleteQuestionImages(items) {
   const urls = (items || []).flatMap((q) => [q.question_img, q.answer_img]).filter(Boolean)
   if (!urls.length || !window.MindupImageUpload?.deleteUploadedImages) return
