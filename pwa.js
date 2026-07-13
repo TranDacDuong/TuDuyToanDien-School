@@ -617,10 +617,9 @@
     }
     const localPreview = /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
       && new URLSearchParams(location.search).get("ios_guide") === "1";
-    if (localStorage.getItem(INSTALL_ACCEPTED_KEY) === "1") return false;
     if (isSnoozed(INSTALL_DISMISSED_AT_KEY)) return false;
     if (localPreview) return !isStandaloneApp();
-    return Boolean(user?.id && isMobileDevice() && !isStandaloneApp());
+    return Boolean(isMobileDevice() && !isStandaloneApp());
   }
 
   function ensurePromptStyles() {
@@ -681,6 +680,36 @@
       .mindup-push-status {
         margin-top: 10px;
         color: #b45309;
+        font-size: .78rem;
+      }
+      .mindup-install-launcher {
+        position: fixed;
+        right: 14px;
+        bottom: calc(74px + env(safe-area-inset-bottom));
+        z-index: 9998;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        min-height: 38px;
+        padding: 9px 12px;
+        border: 1px solid rgba(245,158,11,.42);
+        border-radius: 999px;
+        background: linear-gradient(135deg, #fff7ed, #fef3c7);
+        color: #7c2d12;
+        box-shadow: 0 12px 30px rgba(15,31,61,.16);
+        font: inherit;
+        font-size: .82rem;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      .mindup-install-launcher span:first-child {
+        display: inline-grid;
+        place-items: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 999px;
+        background: #0f1f3d;
+        color: #fff;
         font-size: .78rem;
       }
       .mindup-install-steps {
@@ -1055,8 +1084,35 @@
     document.getElementById("mindupInstallPrompt")?.remove();
   }
 
+  function removeInstallLauncher() {
+    document.getElementById("mindupInstallLauncher")?.remove();
+  }
+
+  async function initInstallLauncher() {
+    if (!isTopLevelWindow()) return;
+    removeInstallLauncher();
+    if (!isMobileDevice() || isStandaloneApp()) return;
+    if (document.getElementById("mindupInstallPrompt")) return;
+    ensurePromptStyles();
+
+    const launcher = document.createElement("button");
+    launcher.id = "mindupInstallLauncher";
+    launcher.className = "mindup-install-launcher";
+    launcher.type = "button";
+    launcher.setAttribute("aria-label", isIosDevice() ? "Hướng dẫn cài app MindUp" : "Cài app MindUp");
+    launcher.innerHTML = `<span>＋</span><span>${isIosDevice() ? "Hướng dẫn cài app" : "Cài app"}</span>`;
+    launcher.addEventListener("click", () => {
+      localStorage.removeItem(INSTALL_DISMISSED_AT_KEY);
+      removePrompt();
+      removeInstallLauncher();
+      showInstallPrompt();
+    });
+    document.body.appendChild(launcher);
+  }
+
   function showInstallPrompt() {
     if (document.getElementById("mindupInstallPrompt") || isStandaloneApp()) return;
+    removeInstallLauncher();
     ensurePromptStyles();
 
     const prompt = document.createElement("div");
@@ -1193,19 +1249,21 @@
       `}
       <div class="mindup-push-actions">
         <button class="mindup-push-later" type="button">Để sau</button>
-        <button class="mindup-push-enable" type="button">${canUseNativeInstall ? "Cài app" : "Đã hiểu"}</button>
+        <button class="mindup-push-enable" type="button">${canUseNativeInstall ? "Cài app" : "Mở hướng dẫn"}</button>
       </div>
     `;
 
     prompt.querySelector(".mindup-push-later").addEventListener("click", () => {
       localStorage.setItem(INSTALL_DISMISSED_AT_KEY, String(Date.now()));
       removeInstallPrompt();
+      window.setTimeout(initInstallLauncher, 100);
       window.setTimeout(initPushPrompt, 500);
     });
     prompt.querySelector(".mindup-push-enable").addEventListener("click", async () => {
       if (isIos || !deferredInstallPrompt) {
-        localStorage.setItem(INSTALL_ACCEPTED_KEY, "1");
+        localStorage.setItem(INSTALL_DISMISSED_AT_KEY, String(Date.now()));
         removeInstallPrompt();
+        window.setTimeout(initInstallLauncher, 100);
         window.setTimeout(initPushPrompt, 500);
         return;
       }
@@ -1217,6 +1275,7 @@
         localStorage.setItem(INSTALL_ACCEPTED_KEY, "1");
       }
       removeInstallPrompt();
+      if (outcome?.outcome !== "accepted") window.setTimeout(initInstallLauncher, 100);
       window.setTimeout(initPushPrompt, 500);
     });
 
@@ -1325,6 +1384,7 @@
     client.auth.onAuthStateChange((event, session) => {
       if (event !== "SIGNED_IN" || !session?.user) return;
       window.setTimeout(initInstallPrompt, 500);
+      window.setTimeout(initInstallLauncher, 1200);
       window.setTimeout(initPushPrompt, 1800);
       window.setTimeout(scheduleMobileAppStatusSync, 900);
     });
@@ -1337,11 +1397,13 @@
     showServiceWorkerTest: showServiceWorkerTestNotification,
     isConfigured: isPushConfigured,
     isSupported: isPushSupported,
+    showInstall: showInstallPrompt,
     syncMobileStatus: syncMobileAppStatus
   };
 
   window.addEventListener("load", function(){
     window.setTimeout(initInstallPrompt, PROMPT_DELAY_MS);
+    window.setTimeout(initInstallLauncher, PROMPT_DELAY_MS + 700);
     window.setTimeout(scheduleMobileAppStatusSync, PROMPT_DELAY_MS + 500);
     window.setTimeout(initPushPrompt, PROMPT_DELAY_MS + 1600);
     watchAuthForPrompts();
