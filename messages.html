@@ -483,17 +483,40 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
   .preview { font-size: .75rem; }
   .message-list { padding: 12px; }
   .bubble { max-width: 92%; font-size: .84rem; }
-  .composer { padding: 10px; }
-  .composer-row { gap: 8px; }
+  .composer { padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); }
+  .composer-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
   .composer-tools { gap: 8px; }
   .panel { border-radius: 18px; }
   .friend-card { padding: 12px; }
-  .composer-row { flex-direction: column; }
-  .composer textarea,
-  #sendBtn { width: 100%; }
-  #sendBtn { min-height: 46px; }
-  .attach-wrap { width: 100%; }
-  .attach-wrap .btn { flex: 1 1 100%; min-height: 42px; }
+  .composer textarea {
+    width: auto;
+    min-width: 0;
+    min-height: 38px;
+    max-height: 82px;
+    padding: 9px 11px;
+    border-radius: 18px;
+    resize: none;
+  }
+  #attachBtn,
+  #sendBtn {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+    border-radius: 11px;
+    flex: 0 0 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .composer-icon { width: 15px; height: 15px; }
+  .attach-wrap { width: auto; }
+  .attach-wrap .btn { flex: 0 0 auto; min-height: 36px; }
   .friend-top { flex-wrap: wrap; }
   .friend-time { margin-left: 0; width: 100%; }
 }
