@@ -617,7 +617,7 @@
     }
     const localPreview = /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
       && new URLSearchParams(location.search).get("ios_guide") === "1";
-    if (isSnoozed(INSTALL_DISMISSED_AT_KEY)) return false;
+    if (!isIosDevice() && isSnoozed(INSTALL_DISMISSED_AT_KEY)) return false;
     if (localPreview) return !isStandaloneApp();
     return Boolean(isMobileDevice() && !isStandaloneApp());
   }
@@ -712,6 +712,10 @@
         color: #fff;
         font-size: .78rem;
       }
+      body.mindup-install-guide-open {
+        overflow: hidden;
+        touch-action: none;
+      }
       .mindup-install-steps {
         margin: 0 0 12px;
         padding-left: 18px;
@@ -721,23 +725,21 @@
       }
       .mindup-install-steps li { margin: 2px 0; }
       .mindup-install-prompt.is-ios-guide {
-        left: max(12px, env(safe-area-inset-left));
-        right: max(12px, env(safe-area-inset-right));
-        top: max(12px, env(safe-area-inset-top));
-        bottom: max(12px, env(safe-area-inset-bottom));
+        inset: 0;
         width: auto;
-        max-height: none;
+        max-height: 100dvh;
         padding: 0;
-        overflow-y: auto;
+        overflow: hidden;
         transform: none;
-        border-radius: 20px;
+        border: 0;
+        border-radius: 0;
       }
       .mindup-ios-guide-head {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
         gap: 12px;
-        padding: 18px 18px 12px;
+        padding: max(14px, env(safe-area-inset-top)) 18px 10px;
         border-bottom: 1px solid rgba(15,31,61,.08);
         background: #fff;
       }
@@ -761,15 +763,20 @@
       .mindup-ios-guide-scroll {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 14px;
-        padding: 16px;
+        gap: 10px;
+        height: calc(100dvh - 154px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+        min-height: 0;
+        padding: 12px;
         scrollbar-width: none;
         background: #f4f7fb;
       }
       .mindup-ios-guide-scroll::-webkit-scrollbar { display: none; }
       .mindup-ios-step {
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
         min-width: 0;
-        padding: 12px;
+        padding: 10px;
         border: 1px solid rgba(15,31,61,.09);
         border-radius: 18px;
         background: #fff;
@@ -795,15 +802,15 @@
         line-height: 1.35;
       }
       .mindup-ios-step-copy {
-        margin: 5px 0 10px;
+        margin: 5px 0 8px;
         color: #5f6b82;
-        font-size: .78rem;
+        font-size: .76rem;
         line-height: 1.4;
       }
       .mindup-ios-picture {
         position: relative;
-        height: min(52vh, 420px);
-        min-height: 260px;
+        flex: 1 1 auto;
+        min-height: 0;
         overflow: hidden;
         border: 5px solid #182238;
         border-radius: 26px;
@@ -903,6 +910,42 @@
       .mindup-ios-site-card b { display: block; font-size: .72rem; }
       .mindup-ios-site-card span { color: #64748b; font-size: .56rem; }
       .mindup-ios-site-card .mindup-ios-logo { color: #f6b53b; font-size: 1.35rem; }
+      .mindup-ios-big-symbol {
+        display: grid;
+        place-items: center;
+        width: min(48%, 150px);
+        aspect-ratio: 1;
+        margin: 0 auto 12px;
+        border-radius: 32px;
+        background: linear-gradient(145deg,#ffffff,#dbeafe);
+        color: #1269d3;
+        box-shadow: 0 18px 40px rgba(15,31,61,.16);
+      }
+      .mindup-ios-big-symbol svg {
+        width: 58%;
+        height: 58%;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .mindup-ios-safari-symbol {
+        border-radius: 50%;
+        background:
+          radial-gradient(circle at center, #fff 0 34%, transparent 35%),
+          conic-gradient(from 25deg, #ef4444, #f97316, #22c55e, #06b6d4, #2563eb, #7c3aed, #ef4444);
+        color: #0f1f3d;
+      }
+      .mindup-ios-safari-symbol::before {
+        content: "";
+        width: 16%;
+        height: 48%;
+        border-radius: 999px;
+        background: #ef4444;
+        transform: rotate(35deg);
+        box-shadow: 0 -34px 0 -6px #2563eb;
+      }
       .mindup-ios-sheet {
         position: absolute;
         inset: 25px 5px 5px;
@@ -988,19 +1031,18 @@
       }
       .mindup-ios-guide-note {
         margin: 0;
-        padding: 0 18px 12px;
+        padding: 8px 18px 10px;
         color: #5f6b82;
         font-size: .76rem;
         line-height: 1.45;
         background: #fff;
       }
       .mindup-install-prompt.is-ios-guide .mindup-push-actions {
-        padding: 0 18px max(16px, env(safe-area-inset-bottom));
+        padding: 0 18px max(12px, env(safe-area-inset-bottom));
         background: #fff;
       }
       @media (max-width: 1120px) {
-        .mindup-ios-guide-scroll { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .mindup-ios-picture { height: min(42vh, 360px); }
+        .mindup-ios-guide-scroll { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       }
       @media (max-width: 640px) {
         .mindup-push-prompt {
@@ -1011,31 +1053,67 @@
         }
         .mindup-push-actions button { flex: 1; }
         .mindup-install-prompt.is-ios-guide {
-          left: max(8px, env(safe-area-inset-left));
-          right: max(8px, env(safe-area-inset-right));
-          top: max(8px, env(safe-area-inset-top));
-          bottom: max(8px, env(safe-area-inset-bottom));
+          inset: 0;
           width: auto;
-          max-height: none;
+          max-height: 100dvh;
           transform: none;
-          overflow-y: auto;
+          overflow: hidden;
         }
-        .mindup-ios-guide-head { padding: 14px 14px 10px; }
+        .mindup-ios-guide-head { padding: max(10px, env(safe-area-inset-top)) 10px 7px; }
+        .mindup-ios-guide-head strong { font-size: .9rem; }
+        .mindup-ios-guide-head p { font-size: .68rem; }
+        .mindup-ios-guide-badge { padding: 4px 7px; font-size: .64rem; }
         .mindup-ios-guide-scroll {
-          grid-template-columns: 1fr;
-          gap: 12px;
-          padding: 12px;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 7px;
+          height: calc(100dvh - 126px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+          padding: 8px;
         }
         .mindup-ios-picture {
-          height: min(58vh, 430px);
-          min-height: 320px;
+          border-width: 3px;
+          border-radius: 18px;
         }
-        .mindup-ios-guide-note { padding: 0 14px 10px; }
+        .mindup-ios-picture::before { width: 34px; height: 7px; }
+        .mindup-ios-step { padding: 7px; border-radius: 14px; }
+        .mindup-ios-step-number { width: 20px; height: 20px; margin-bottom: 5px; font-size: .66rem; }
+        .mindup-ios-step-title { font-size: .72rem; }
+        .mindup-ios-step-copy { margin: 3px 0 5px; font-size: .58rem; line-height: 1.3; }
+        .mindup-ios-safari-bar {
+          left: 4px;
+          right: 4px;
+          bottom: 4px;
+          grid-template-columns: 20px 1fr 20px;
+          min-height: 28px;
+          padding: 4px;
+          border-radius: 9px;
+        }
+        .mindup-ios-icon-button { width: 20px; height: 20px; font-size: .84rem; }
+        .mindup-ios-address { font-size: .48rem; }
+        .mindup-ios-share-icon { width: 14px; height: 14px; }
+        .mindup-ios-site { inset: 0 0 34px; padding: 12px 6px 6px; }
+        .mindup-ios-site-card { width: 92%; padding: 10px 5px; border-radius: 10px; }
+        .mindup-ios-logo { width: 32px; height: 32px; margin-bottom: 5px; font-size: 1.05rem; }
+        .mindup-ios-site-card b { font-size: .58rem; }
+        .mindup-ios-site-card span { font-size: .46rem; }
+        .mindup-ios-big-symbol { width: min(58%, 90px); margin-bottom: 8px; border-radius: 22px; }
+        .mindup-ios-sheet { inset: 18px 4px 4px; padding: 6px 5px; border-radius: 12px; }
+        .mindup-ios-share-row { gap: 5px; margin-bottom: 6px; }
+        .mindup-ios-share-person { width: 23px; height: 23px; }
+        .mindup-ios-menu-row { min-height: 21px; padding: 0 5px; font-size: .48rem; }
+        .mindup-ios-home-screen { padding: 22px 8px 8px; }
+        .mindup-ios-home-grid { gap: 9px 6px; }
+        .mindup-ios-home-app { font-size: .42rem; }
+        .mindup-ios-home-app i { width: 26px; height: 26px; border-radius: 7px; }
+        .mindup-ios-home-app.mindup i { font-size: .82rem; }
+        .mindup-ios-guide-note { padding: 5px 10px 7px; font-size: .58rem; }
         .mindup-install-prompt.is-ios-guide .mindup-push-actions {
-          position: sticky;
-          bottom: 0;
-          padding: 10px 14px max(12px, env(safe-area-inset-bottom));
+          padding: 6px 10px max(8px, env(safe-area-inset-bottom));
           border-top: 1px solid rgba(15,31,61,.08);
+        }
+        .mindup-install-prompt.is-ios-guide .mindup-push-actions button {
+          min-height: 34px;
+          padding: 7px 9px;
+          font-size: .76rem;
         }
       }
     `;
@@ -1048,6 +1126,7 @@
 
   function removeInstallPrompt() {
     document.getElementById("mindupInstallPrompt")?.remove();
+    document.body.classList.remove("mindup-install-guide-open");
   }
 
   function removeInstallLauncher() {
@@ -1086,7 +1165,10 @@
     prompt.className = "mindup-push-prompt mindup-install-prompt";
     const isIos = isIosDevice();
     const canUseNativeInstall = Boolean(deferredInstallPrompt);
-    if (isIos) prompt.classList.add("is-ios-guide");
+    if (isIos) {
+      prompt.classList.add("is-ios-guide");
+      document.body.classList.add("mindup-install-guide-open");
+    }
     prompt.innerHTML = isIos ? `
       <div class="mindup-ios-guide-head">
         <div>
@@ -1099,11 +1181,11 @@
         <article class="mindup-ios-step">
           <span class="mindup-ios-step-number">1</span>
           <div class="mindup-ios-step-title">Mở MindUp bằng Safari</div>
-          <div class="mindup-ios-step-copy">Nếu đang ở Chrome, hãy sao chép đường dẫn và mở lại trong Safari.</div>
+          <div class="mindup-ios-step-copy">Dùng Safari trên iPhone để mở website MindUp.</div>
           <div class="mindup-ios-picture" aria-label="Hình minh họa mở trang MindUp trong Safari">
             <div class="mindup-ios-site">
               <div class="mindup-ios-site-card">
-                <span class="mindup-ios-logo">M</span>
+                <span class="mindup-ios-big-symbol mindup-ios-safari-symbol" aria-hidden="true"></span>
                 <b>MindUp</b>
                 <span>www.mindup.edu.vn</span>
               </div>
@@ -1118,11 +1200,17 @@
         <article class="mindup-ios-step">
           <span class="mindup-ios-step-number">2</span>
           <div class="mindup-ios-step-title">Nhấn nút Chia sẻ</div>
-          <div class="mindup-ios-step-copy">Nút hình ô vuông có mũi tên hướng lên nằm trên thanh Safari.</div>
+          <div class="mindup-ios-step-copy">Nhấn biểu tượng ô vuông có mũi tên hướng lên trên thanh Safari.</div>
           <div class="mindup-ios-picture" aria-label="Hình minh họa nút Chia sẻ của Safari">
             <div class="mindup-ios-site">
               <div class="mindup-ios-site-card">
-                <span class="mindup-ios-logo">M</span>
+                <span class="mindup-ios-big-symbol" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M12 15V3"></path>
+                    <path d="M7 8l5-5 5 5"></path>
+                    <path d="M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8"></path>
+                  </svg>
+                </span>
                 <b>MindUp</b>
                 <span>Trang học tập</span>
               </div>
@@ -1143,7 +1231,7 @@
         <article class="mindup-ios-step">
           <span class="mindup-ios-step-number">3</span>
           <div class="mindup-ios-step-title">Chọn “Thêm vào Màn hình chính”</div>
-          <div class="mindup-ios-step-copy">Kéo bảng Chia sẻ lên nếu chưa nhìn thấy lựa chọn này, rồi xác nhận thêm MindUp.</div>
+          <div class="mindup-ios-step-copy">Trong bảng Chia sẻ, chọn mục “Thêm vào Màn hình chính”.</div>
           <div class="mindup-ios-picture" aria-label="Hình minh họa chọn Thêm vào Màn hình chính">
             <div class="mindup-ios-sheet">
               <div class="mindup-ios-sheet-handle"></div>
@@ -1161,8 +1249,8 @@
         </article>
         <article class="mindup-ios-step">
           <span class="mindup-ios-step-number">4</span>
-          <div class="mindup-ios-step-title">Mở từ màn hình chính</div>
-          <div class="mindup-ios-step-copy">Chạm biểu tượng MindUp. Sau đó bạn có thể bật thông báo trong app.</div>
+          <div class="mindup-ios-step-title">Mở ứng dụng MindUp</div>
+          <div class="mindup-ios-step-copy">Quay lại màn hình chính iPhone và mở biểu tượng MindUp vừa tạo.</div>
           <div class="mindup-ios-picture" aria-label="Hình minh họa biểu tượng MindUp trên màn hình chính">
             <div class="mindup-ios-home-screen">
               <div class="mindup-ios-home-grid">
@@ -1199,14 +1287,14 @@
     `;
 
     prompt.querySelector(".mindup-push-later").addEventListener("click", () => {
-      localStorage.setItem(INSTALL_DISMISSED_AT_KEY, String(Date.now()));
+      if (!isIos) localStorage.setItem(INSTALL_DISMISSED_AT_KEY, String(Date.now()));
       removeInstallPrompt();
       window.setTimeout(initInstallLauncher, 100);
       window.setTimeout(initPushPrompt, 500);
     });
     prompt.querySelector(".mindup-push-enable").addEventListener("click", async () => {
       if (isIos || !deferredInstallPrompt) {
-        localStorage.setItem(INSTALL_DISMISSED_AT_KEY, String(Date.now()));
+        if (!isIos) localStorage.setItem(INSTALL_DISMISSED_AT_KEY, String(Date.now()));
         removeInstallPrompt();
         window.setTimeout(initInstallLauncher, 100);
         window.setTimeout(initPushPrompt, 500);
