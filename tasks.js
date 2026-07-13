@@ -14,6 +14,7 @@
     editingTemplateId: null,
     attendanceLocation: null,
     attendanceLogs: [],
+    attendanceHistoryLogs: [],
     attendanceAdminDate: "",
     attendanceAdminLogs: [],
     attendanceAdminExpanded: false,
@@ -156,6 +157,13 @@
     }).format(new Date(value));
   }
 
+  function formatAttendanceClock(value) {
+    if (!value) return "--:--";
+    return new Intl.DateTimeFormat("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit",
+    }).format(new Date(value));
+  }
+
   function formatMeters(value) {
     if (value === null || value === undefined || Number.isNaN(Number(value))) return "Chưa rõ";
     const n = Number(value);
@@ -234,6 +242,64 @@
     S.attendanceLogs = data || [];
   }
 
+  async function loadStaffAttendanceHistory() {
+    const startDay = addDays(localDate(), -13);
+    const start = `${startDay}T00:00:00+07:00`;
+    const end = `${localDate()}T23:59:59+07:00`;
+    const { data, error } = await sb.from("staff_attendance_logs")
+      .select("*")
+      .eq("user_id", S.user.id)
+      .gte("checked_at", start)
+      .lte("checked_at", end)
+      .order("checked_at", { ascending: false })
+      .limit(80);
+    if (error) {
+      S.attendanceHistoryLogs = [];
+      if (E.attendanceHistoryList) {
+        E.attendanceHistoryList.innerHTML = `<div class="task-empty compact">Không tải được lịch sử chấm công: ${esc(error.message)}</div>`;
+      }
+      console.warn("Load staff attendance history:", error);
+      return;
+    }
+    S.attendanceHistoryLogs = data || [];
+  }
+
+  function attendanceLogChip(log) {
+    const isCheckIn = log.check_type === "check_in";
+    const label = isCheckIn ? "Vào" : "Ra";
+    const cls = log.is_valid ? "ok" : (log.status ? "warn" : "muted");
+    return `<span class="attendance-log-chip ${cls}">
+      ${esc(label)} ${esc(formatAttendanceClock(log.checked_at))}
+      ${log.distance_meters !== null && log.distance_meters !== undefined ? ` • ${esc(formatMeters(log.distance_meters))}` : ""}
+      ${log.is_valid ? "" : ` • ${esc(attendanceStatusLabel(log.status))}`}
+    </span>`;
+  }
+
+  function renderStaffAttendanceHistory() {
+    if (!E.attendanceHistoryList) return;
+    const logs = S.attendanceHistoryLogs || [];
+    if (!logs.length) {
+      E.attendanceHistoryList.innerHTML = '<div class="task-empty compact">Chưa có lịch sử chấm công.</div>';
+      return;
+    }
+    const grouped = new Map();
+    logs.forEach(log => {
+      const day = localDate(new Date(log.checked_at));
+      if (!grouped.has(day)) grouped.set(day, []);
+      grouped.get(day).push(log);
+    });
+    E.attendanceHistoryList.innerHTML = [...grouped.entries()].map(([day, dayLogs]) => {
+      const notes = dayLogs.map(log => String(log.note || "").trim()).filter(Boolean);
+      return `
+        <div class="staff-attendance-history-row">
+          <div class="staff-attendance-history-date">${esc(formatShortDate(day))}</div>
+          <div class="staff-attendance-history-events">${dayLogs.map(attendanceLogChip).join("")}</div>
+          ${notes.length ? `<div class="attendance-log-note">Ghi chú: ${esc(notes.join(" • "))}</div>` : ""}
+        </div>
+      `;
+    }).join("");
+  }
+
   function renderStaffAttendance() {
     if (!E.attendanceCard) return;
     const canSelfCheck = INTERNAL_ROLES.has(S.profile?.role) && S.profile?.role !== "admin";
@@ -250,6 +316,7 @@
     E.staffDistanceText.textContent = latest
       ? `${formatMeters(latest.distance_meters)} • ${attendanceStatusLabel(latest.status)}`
       : "Chưa kiểm tra";
+    renderStaffAttendanceHistory();
   }
 
   function attendanceLogUser(log) {
@@ -333,6 +400,7 @@
               ${latest ? ` • Gần nhất: ${esc(formatMeters(latest.distance_meters))} / ${esc(attendanceStatusLabel(latest.status))}` : ""}
               ${note}
             </div>
+            ${logs.length ? `<div class="staff-attendance-history-events">${logs.map(attendanceLogChip).join("")}</div>` : ""}
           </div>
           <span class="attendance-admin-badge ${status.cls}">${esc(status.text)}</span>
         </div>
@@ -378,6 +446,7 @@
     await loadStaffAttendanceLocation();
     if (S.profile?.role !== "admin") {
       await loadStaffAttendanceToday();
+      await loadStaffAttendanceHistory();
       renderStaffAttendance();
     } else {
       renderStaffAttendance();
@@ -2299,6 +2368,7 @@
       staffCheckInText: byId("staffCheckInText"), staffCheckOutText: byId("staffCheckOutText"), staffDistanceText: byId("staffDistanceText"),
       staffCheckInBtn: byId("staffCheckInBtn"), staffCheckOutBtn: byId("staffCheckOutBtn"),
       staffAttendanceNote: byId("staffAttendanceNote"), attendanceFeedback: byId("staffAttendanceFeedback"),
+      attendanceHistoryList: byId("staffAttendanceHistoryList"),
       attendanceAdminPanel: byId("staffAttendanceAdminPanel"), attendanceAdminDate: byId("staffAttendanceAdminDate"),
       attendanceAdminRefresh: byId("staffAttendanceAdminRefresh"), attendanceAdminSummary: byId("staffAttendanceAdminSummary"),
       attendanceAdminToggle: byId("staffAttendanceAdminToggle"), attendanceAdminBody: byId("staffAttendanceAdminBody"),
