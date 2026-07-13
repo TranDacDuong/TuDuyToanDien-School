@@ -92,6 +92,41 @@
     return eligible.filter(item => String(item.effective_from || "2000-01-01").slice(0, 10) === maxEffective);
   }
 
+  function scheduleKey(schedule) {
+    return [
+      Number(schedule?.session_no || 1),
+      Number(schedule?.weekday || 0),
+      String(schedule?.start_time || "").slice(0, 5),
+      String(schedule?.end_time || "").slice(0, 5),
+    ].join("|");
+  }
+
+  function scheduleMatchesChosen(schedule, chosenIds, allSchedules) {
+    if (!chosenIds?.size) return true;
+    if (chosenIds.has(Number(schedule?.id))) return true;
+    const key = scheduleKey(schedule);
+    return (allSchedules || []).some(item =>
+      chosenIds.has(Number(item.id))
+      && (
+        scheduleKey(item) === key
+        || (
+          Number(item.session_no || 1) === Number(schedule?.session_no || 1)
+          && Number(item.weekday || 0) === Number(schedule?.weekday || 0)
+        )
+      )
+    );
+  }
+
+  function getActiveSchedulesForDate(allSchedules, dateText) {
+    const eligible = (allSchedules || []).filter(item => String(item.effective_from || "2000-01-01").slice(0, 10) <= dateText);
+    if (!eligible.length) return [];
+    const maxEffective = eligible.reduce((max, item) => {
+      const value = String(item.effective_from || "2000-01-01").slice(0, 10);
+      return value > max ? value : max;
+    }, "2000-01-01");
+    return eligible.filter(item => String(item.effective_from || "2000-01-01").slice(0, 10) === maxEffective);
+  }
+
   function generateOccurrences(schedules, monthKey) {
     const [year, month] = String(monthKey || "").split("-").map(Number);
     const daysInMonth = new Date(year, month, 0).getDate();
@@ -108,6 +143,29 @@
           schedule,
         });
       });
+    }
+    return items.sort((a, b) => a.date.localeCompare(b.date) || a.session_no - b.session_no);
+  }
+
+  function generateOccurrencesForStudent(allSchedules, monthKey, chosenRows) {
+    const [year, month] = String(monthKey || "").split("-").map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const items = [];
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = new Date(year, month - 1, day);
+      const dateText = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const weekday = date.getDay() === 0 ? 7 : date.getDay();
+      getActiveSchedulesForDate(allSchedules, dateText)
+        .filter(schedule => Number(schedule.weekday) === weekday)
+        .filter(schedule => scheduleMatchesChosen(schedule, chosenIdsForDate(chosenRows, dateText), allSchedules))
+        .forEach(schedule => {
+          items.push({
+            date: dateText,
+            schedule_id: Number(schedule.id || 0),
+            session_no: Number(schedule.session_no || 1),
+            schedule,
+          });
+        });
     }
     return items.sort((a, b) => a.date.localeCompare(b.date) || a.session_no - b.session_no);
   }
@@ -301,7 +359,7 @@
         fetchAllPages(() => sb.from("users").select("id,role,created_at").eq("role", "student").order("created_at", { ascending: true })),
         fetchAllPages(() => sb.from("class_students").select("class_id,student_id,joined_at,left_at").order("joined_at", { ascending: true })),
         fetchAllPages(() => sb.from("classes").select("id,class_name,hidden,tuition_fee,tuition_type,makeup_fee,subjects(name),class_schedules(id,session_no,weekday,start_time,end_time,effective_from)").eq("hidden", false).order("class_name", { ascending: true })),
-          fetchAllPages(() => sb.from("attendance").select("class_id,student_id,date,status").lte("date", toDate).order("date", { ascending: true })),
+          fetchAllPages(() => sb.from("attendance").select("class_id,student_id,date,status,schedule_id").lte("date", toDate).order("date", { ascending: true })),
           fetchAllPages(() => sb.from("class_student_schedules").select("class_id,student_id,schedule_id,effective_from")),
           fetchAllPages(() => sb.from("exam_results").select("class_id,submitted_at,score_auto,score_total,exam:exams(total_points,classes(class_name,subjects(name)))").not("submitted_at", "is", null).order("submitted_at", { ascending: true })),
           fetchAllPages(() => sb.from("class_session_scores").select("class_id,score,max_score,created_at,class_sessions(session_date)").order("created_at", { ascending: true })),
@@ -335,8 +393,12 @@
 
       const classMap = Object.fromEntries(classes.map(item => [item.id, item]));
       const attendanceMap = {};
+      const attendanceRowsByStudentClass = {};
       attendance.forEach(item => {
         attendanceMap[`${item.student_id}_${item.class_id}_${item.date}_${item.schedule_id || 0}`] = item.status;
+        const key = `${item.student_id}_${item.class_id}`;
+        if (!attendanceRowsByStudentClass[key]) attendanceRowsByStudentClass[key] = [];
+        attendanceRowsByStudentClass[key].push(item);
       });
       const chosenMap = {};
       chosenSchedules.forEach(item => {
@@ -363,16 +425,34 @@
           const left = classStudent.left_at ? String(classStudent.left_at).slice(0, 10) : "9999-99-99";
           if (joined > mEnd || left < mStart) return;
 
-          const schedules = getSchedulesForMonth(cls.class_schedules || [], monthKey);
           const chosenRows = chosenMap[`${classStudent.student_id}_${classStudent.class_id}`];
-          const activeOccurrences = generateOccurrences(schedules, monthKey).filter(occurrence => {
-            const chosenIds = chosenIdsForDate(chosenRows, occurrence.date);
-            if (chosenIds?.size && !chosenIds.has(Number(occurrence.schedule_id))) return false;
+          const activeOccurrences = generateOccurrencesForStudent(cls.class_schedules || [], monthKey, chosenRows).filter(occurrence => {
             if (occurrence.date > left) return false;
             if (occurrence.date >= joined) return true;
             const actualStatus = attendanceStatusFor(attendanceMap, classStudent.student_id, classStudent.class_id, occurrence);
             return actualStatus === "present" || actualStatus === "makeup";
           });
+          const occurrenceKeys = new Set(activeOccurrences.map(occurrence => `${occurrence.date}_${occurrence.schedule_id || 0}`));
+          (attendanceRowsByStudentClass[`${classStudent.student_id}_${classStudent.class_id}`] || []).forEach(row => {
+            const date = String(row.date || "").slice(0, 10);
+            const status = String(row.status || "");
+            const scheduleId = Number(row.schedule_id || 0);
+            const key = `${date}_${scheduleId}`;
+            if (!date || date < mStart || date > mEnd || occurrenceKeys.has(key) || date > left) return;
+            if (date < joined && status !== "present" && status !== "makeup") return;
+            activeOccurrences.push({
+              date,
+              schedule_id: scheduleId,
+              session_no: 0,
+              schedule: null,
+              from_attendance_only: true,
+            });
+            occurrenceKeys.add(key);
+          });
+          activeOccurrences.sort((a, b) =>
+            String(a.date || "").localeCompare(String(b.date || ""))
+            || Number(a.schedule_id || 0) - Number(b.schedule_id || 0)
+          );
           const totalSessions = activeOccurrences.length;
 
           let present = 0;
