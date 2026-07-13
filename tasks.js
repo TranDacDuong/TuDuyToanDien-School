@@ -800,13 +800,13 @@
     if (!note && !hasRequirementData) return "";
     return `
       <div class="task-result-box">
-        <label>Káº¿t quáº£ Ä‘Ã£ ná»™p</label>
+        <label>Kết quả đã nộp</label>
         ${note ? `<div class="task-result-note">${linkifyTaskText(note)}</div>` : ""}
         ${requirements.length ? `<div class="task-requirement-list">
           ${submittedRequirements.map(req => `
             <div class="task-requirement-item ${req.done ? "task-requirement-done" : ""}">
-              <div class="task-requirement-title">${esc(req.title)} â€¢ ${req.done ? "ÄÃ£ hoÃ n thÃ nh" : "ChÆ°a hoÃ n thÃ nh"}</div>
-              <div class="task-result-note">${req.value ? linkifyTaskText(req.value) : "<em>ChÆ°a nháº­p káº¿t quáº£</em>"}</div>
+              <div class="task-requirement-title">${esc(req.title)} • ${req.done ? "Đã hoàn thành" : "Chưa hoàn thành"}</div>
+              <div class="task-result-note">${req.value ? linkifyTaskText(req.value) : "<em>Chưa nhập kết quả</em>"}</div>
             </div>
           `).join("")}
         </div>` : ""}
