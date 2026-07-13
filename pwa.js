@@ -721,14 +721,15 @@
       }
       .mindup-install-steps li { margin: 2px 0; }
       .mindup-install-prompt.is-ios-guide {
-        left: 50%;
-        right: auto;
+        left: max(12px, env(safe-area-inset-left));
+        right: max(12px, env(safe-area-inset-right));
+        top: max(12px, env(safe-area-inset-top));
         bottom: max(12px, env(safe-area-inset-bottom));
-        width: min(760px, calc(100vw - 24px));
-        max-height: calc(100dvh - max(24px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+        width: auto;
+        max-height: none;
         padding: 0;
-        overflow: hidden;
-        transform: translateX(-50%);
+        overflow-y: auto;
+        transform: none;
         border-radius: 20px;
       }
       .mindup-ios-guide-head {
@@ -759,25 +760,20 @@
       }
       .mindup-ios-guide-scroll {
         display: grid;
-        grid-auto-flow: column;
-        grid-auto-columns: minmax(190px, 1fr);
-        gap: 10px;
-        padding: 14px 14px 16px;
-        overflow-x: auto;
-        overscroll-behavior-x: contain;
-        scroll-snap-type: x mandatory;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+        padding: 16px;
         scrollbar-width: none;
         background: #f4f7fb;
-        -webkit-overflow-scrolling: touch;
       }
       .mindup-ios-guide-scroll::-webkit-scrollbar { display: none; }
       .mindup-ios-step {
         min-width: 0;
-        padding: 10px;
+        padding: 12px;
         border: 1px solid rgba(15,31,61,.09);
-        border-radius: 14px;
+        border-radius: 18px;
         background: #fff;
-        scroll-snap-align: center;
+        box-shadow: 0 10px 28px rgba(15,31,61,.08);
       }
       .mindup-ios-step-number {
         display: inline-flex;
@@ -793,25 +789,24 @@
         font-weight: 800;
       }
       .mindup-ios-step-title {
-        min-height: 38px;
         color: #0f1f3d;
-        font-size: .84rem;
+        font-size: .92rem;
         font-weight: 800;
         line-height: 1.35;
       }
       .mindup-ios-step-copy {
-        min-height: 36px;
-        margin: 4px 0 9px;
+        margin: 5px 0 10px;
         color: #5f6b82;
-        font-size: .72rem;
+        font-size: .78rem;
         line-height: 1.4;
       }
       .mindup-ios-picture {
         position: relative;
-        height: 186px;
+        height: min(52vh, 420px);
+        min-height: 260px;
         overflow: hidden;
         border: 5px solid #182238;
-        border-radius: 22px;
+        border-radius: 26px;
         background: #f7f9fc;
         box-shadow: 0 8px 20px rgba(15,31,61,.12);
       }
@@ -955,44 +950,6 @@
         font-weight: 800;
         box-shadow: 0 0 0 2px #60a5fa;
       }
-      .mindup-ios-add-screen {
-        position: absolute;
-        inset: 0;
-        padding: 22px 9px 9px;
-        background: #f7f7f9;
-      }
-      .mindup-ios-add-top {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 14px;
-        color: #1269d3;
-        font-size: .62rem;
-      }
-      .mindup-ios-add-top b { color: #111827; font-size: .68rem; }
-      .mindup-ios-add-top .is-highlighted {
-        padding: 4px 7px;
-        border-radius: 7px;
-        background: #dbeafe;
-        box-shadow: 0 0 0 2px #60a5fa;
-        font-weight: 800;
-      }
-      .mindup-ios-app-preview {
-        display: flex;
-        align-items: center;
-        gap: 9px;
-        padding: 10px;
-        border-radius: 11px;
-        background: #fff;
-      }
-      .mindup-ios-app-preview .mindup-ios-logo {
-        width: 39px;
-        height: 39px;
-        margin: 0;
-        flex: 0 0 auto;
-      }
-      .mindup-ios-app-name { display: block; color: #111827; font-size: .7rem; font-weight: 800; }
-      .mindup-ios-app-url { display: block; color: #64748b; font-size: .54rem; }
       .mindup-ios-home-screen {
         position: absolute;
         inset: 0;
@@ -1041,6 +998,10 @@
         padding: 0 18px max(16px, env(safe-area-inset-bottom));
         background: #fff;
       }
+      @media (max-width: 1120px) {
+        .mindup-ios-guide-scroll { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .mindup-ios-picture { height: min(42vh, 360px); }
+      }
       @media (max-width: 640px) {
         .mindup-push-prompt {
           left: 14px;
@@ -1052,18 +1013,23 @@
         .mindup-install-prompt.is-ios-guide {
           left: max(8px, env(safe-area-inset-left));
           right: max(8px, env(safe-area-inset-right));
+          top: max(8px, env(safe-area-inset-top));
           bottom: max(8px, env(safe-area-inset-bottom));
           width: auto;
-          max-height: calc(100dvh - max(16px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+          max-height: none;
           transform: none;
           overflow-y: auto;
         }
         .mindup-ios-guide-head { padding: 14px 14px 10px; }
         .mindup-ios-guide-scroll {
-          grid-auto-columns: minmax(78vw, 280px);
+          grid-template-columns: 1fr;
+          gap: 12px;
           padding: 12px;
         }
-        .mindup-ios-picture { height: 200px; }
+        .mindup-ios-picture {
+          height: min(58vh, 430px);
+          min-height: 320px;
+        }
         .mindup-ios-guide-note { padding: 0 14px 10px; }
         .mindup-install-prompt.is-ios-guide .mindup-push-actions {
           position: sticky;
@@ -1125,7 +1091,7 @@
       <div class="mindup-ios-guide-head">
         <div>
           <strong>Cài MindUp trên iPhone</strong>
-          <p>Vuốt ngang qua từng hình và làm theo các bước dưới đây.</p>
+          <p>Làm theo 4 bước dưới đây trong Safari để đưa MindUp ra màn hình chính.</p>
         </div>
         <span class="mindup-ios-guide-badge">Safari</span>
       </div>
@@ -1177,7 +1143,7 @@
         <article class="mindup-ios-step">
           <span class="mindup-ios-step-number">3</span>
           <div class="mindup-ios-step-title">Chọn “Thêm vào Màn hình chính”</div>
-          <div class="mindup-ios-step-copy">Kéo bảng Chia sẻ lên nếu chưa nhìn thấy lựa chọn này.</div>
+          <div class="mindup-ios-step-copy">Kéo bảng Chia sẻ lên nếu chưa nhìn thấy lựa chọn này, rồi xác nhận thêm MindUp.</div>
           <div class="mindup-ios-picture" aria-label="Hình minh họa chọn Thêm vào Màn hình chính">
             <div class="mindup-ios-sheet">
               <div class="mindup-ios-sheet-handle"></div>
@@ -1195,27 +1161,6 @@
         </article>
         <article class="mindup-ios-step">
           <span class="mindup-ios-step-number">4</span>
-          <div class="mindup-ios-step-title">Nhấn “Thêm”</div>
-          <div class="mindup-ios-step-copy">Kiểm tra tên MindUp, sau đó nhấn Thêm ở góc trên bên phải.</div>
-          <div class="mindup-ios-picture" aria-label="Hình minh họa nút Thêm ứng dụng MindUp">
-            <div class="mindup-ios-add-screen">
-              <div class="mindup-ios-add-top">
-                <span>Hủy</span>
-                <b>Thêm vào MH chính</b>
-                <span class="is-highlighted">Thêm</span>
-              </div>
-              <div class="mindup-ios-app-preview">
-                <span class="mindup-ios-logo">M</span>
-                <span>
-                  <span class="mindup-ios-app-name">MindUp</span>
-                  <span class="mindup-ios-app-url">mindup.edu.vn</span>
-                </span>
-              </div>
-            </div>
-          </div>
-        </article>
-        <article class="mindup-ios-step">
-          <span class="mindup-ios-step-number">✓</span>
           <div class="mindup-ios-step-title">Mở từ màn hình chính</div>
           <div class="mindup-ios-step-copy">Chạm biểu tượng MindUp. Sau đó bạn có thể bật thông báo trong app.</div>
           <div class="mindup-ios-picture" aria-label="Hình minh họa biểu tượng MindUp trên màn hình chính">
@@ -1232,7 +1177,7 @@
           </div>
         </article>
       </div>
-      <p class="mindup-ios-guide-note">iPhone không cho website tự mở nút cài đặt. Bạn chỉ cần thực hiện các bước này trong Safari một lần.</p>
+      <p class="mindup-ios-guide-note">iPhone không cho website tự mở nút cài đặt. Chỉ cần làm 4 bước này trong Safari một lần.</p>
       <div class="mindup-push-actions">
         <button class="mindup-push-later" type="button">Để sau</button>
         <button class="mindup-push-enable" type="button">Đã cài xong</button>
