@@ -1147,6 +1147,17 @@
         updated_at: new Date().toISOString()
       });
     }
+    const saveBtn = Array.from(document.querySelectorAll("button"))
+      .find(button => String(button.getAttribute("onclick") || "").includes("cvSaveSessionScores('" + sessionId + "'"));
+    const modal = document.getElementById("cvSessionScoreModal");
+    window.MindupLiveUI?.setElementBusy?.(saveBtn, true, "Đang lưu...");
+    modal?.querySelectorAll("input,button").forEach(element => {
+      if(element !== saveBtn) element.disabled = true;
+    });
+    const unlockScoreModal = () => {
+      window.MindupLiveUI?.setElementBusy?.(saveBtn, false);
+      modal?.querySelectorAll("input,button").forEach(element => element.disabled = false);
+    };
     if(deletes.length){
       const { error: deleteError } = await sb
         .from("class_session_scores")
@@ -1154,6 +1165,7 @@
         .eq("class_session_id", sessionId)
         .in("student_id", deletes);
       if(deleteError){
+        unlockScoreModal();
         alert("Không thể xóa điểm bỏ trống: " + deleteError.message);
         return;
       }
@@ -1163,6 +1175,7 @@
         .from("class_session_scores")
         .upsert(upserts, { onConflict: "class_session_id,student_id" });
       if(upsertError){
+        unlockScoreModal();
         alert("Không thể lưu điểm: " + upsertError.message);
         return;
       }
