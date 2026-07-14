@@ -931,11 +931,9 @@
         stroke-linejoin: round;
       }
       .mindup-ios-safari-symbol {
-        border-radius: 50%;
-        background:
-          radial-gradient(circle at center, #fff 0 36%, transparent 37%),
-          conic-gradient(from 25deg, #ef4444, #f97316, #22c55e, #06b6d4, #2563eb, #7c3aed, #ef4444);
-        color: #0f1f3d;
+        border-radius: 26%;
+        background: #fff;
+        color: #0f8ee8;
       }
       .mindup-ios-safari-symbol::before {
         content: none;
@@ -1194,11 +1192,24 @@
               <div class="mindup-ios-site-card">
                 <span class="mindup-ios-big-symbol mindup-ios-safari-symbol" aria-hidden="true">
                   <svg viewBox="0 0 64 64" focusable="false">
-                    <circle cx="32" cy="32" r="26" fill="#ffffff" stroke="#0ea5e9" stroke-width="3"></circle>
-                    <circle cx="32" cy="32" r="18" fill="none" stroke="#bfdbfe" stroke-width="1.6"></circle>
-                    <path d="M39 25 27 37" stroke="#ef4444" stroke-width="5" stroke-linecap="round"></path>
-                    <path d="M25 39 37 27" stroke="#2563eb" stroke-width="5" stroke-linecap="round"></path>
-                    <circle cx="32" cy="32" r="3.5" fill="#0f1f3d"></circle>
+                    <defs>
+                      <linearGradient id="mindupSafariBlue" x1="16" y1="10" x2="48" y2="56" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stop-color="#24e6ff"></stop>
+                        <stop offset=".55" stop-color="#0aa7ff"></stop>
+                        <stop offset="1" stop-color="#1264f5"></stop>
+                      </linearGradient>
+                    </defs>
+                    <rect x="4" y="4" width="56" height="56" rx="14" fill="#fff"></rect>
+                    <circle cx="32" cy="32" r="24" fill="url(#mindupSafariBlue)"></circle>
+                    <g stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" opacity=".9">
+                      <path d="M32 9v4"></path><path d="M32 51v4"></path><path d="M9 32h4"></path><path d="M51 32h4"></path>
+                      <path d="M20.5 12.1l1.8 3.2"></path><path d="M43.7 48.7l1.8 3.2"></path><path d="M12.1 43.5l3.2-1.8"></path><path d="M48.7 20.3l3.2-1.8"></path>
+                      <path d="M43.5 12.1l-1.8 3.2"></path><path d="M20.3 48.7l-1.8 3.2"></path><path d="M12.1 20.5l3.2 1.8"></path><path d="M48.7 43.7l3.2 1.8"></path>
+                    </g>
+                    <path d="M47 17 35 36 17 47 29 28Z" fill="#fff" opacity=".95"></path>
+                    <path d="M47 17 35 36 29 28Z" fill="#ef233c"></path>
+                    <path d="M17 47 29 28 35 36Z" fill="#ffffff"></path>
+                    <circle cx="32" cy="32" r="2.4" fill="#ffffff"></circle>
                   </svg>
                 </span>
                 <b>MindUp</b>
