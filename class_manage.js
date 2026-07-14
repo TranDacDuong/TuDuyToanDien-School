@@ -1021,8 +1021,9 @@
       "</div></div></div>";
 
     tc.innerHTML= scheduleLoadWarning +
-      '<div style="margin-bottom:14px">'+
+      '<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">'+
       '<button onclick="cvOpenAddStudent()" class="btn btn-primary btn-sm">+ Thêm học sinh</button>'+
+      (canEvaluateClassSession(role) ? '<button onclick="cvOpenOfflineTestScoreModal()" class="btn btn-outline btn-sm">+ Thêm điểm đề kiểm tra</button>' : '')+
       '</div>'+
       '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">'+
       '<table class="table" style="font-size:.8rem">'+
@@ -1048,6 +1049,234 @@
       })
       .sort((a,b)=>String(a.user?.full_name || "").localeCompare(String(b.user?.full_name || ""), "vi"));
   }
+
+  function getOfflineTestStudents(){
+    return (_cachedClass?.students || [])
+      .filter(s => !s.left_at)
+      .sort((a,b)=>String(a.user?.full_name || "").localeCompare(String(b.user?.full_name || ""), "vi"));
+  }
+
+  function todayValue(){
+    const d = new Date();
+    return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  }
+
+  window.cvCloseOfflineTestScoreModal = function(){
+    document.getElementById("cvOfflineTestScoreModal")?.remove();
+  };
+
+  window.cvOpenOfflineTestScoreModal = async function(){
+    if(!canEvaluateClassSession(_role)) return;
+    const students = getOfflineTestStudents();
+    if(!students.length){
+      alert("Lớp chưa có học sinh đang học để nhập điểm.");
+      return;
+    }
+    const sb = getSb();
+    const { data: tests, error } = await sb
+      .from("class_offline_tests")
+      .select("id,title,test_date,max_score,note")
+      .eq("class_id", _classId)
+      .order("test_date", { ascending: false })
+      .order("created_at", { ascending: false });
+    if(error){
+      alert("Không thể tải danh sách đề kiểm tra. Có thể bạn chưa chạy SQL tạo bảng class_offline_tests. Lỗi: " + error.message);
+      return;
+    }
+    const modal = document.createElement("div");
+    modal.id = "cvOfflineTestScoreModal";
+    modal.style.cssText = "position:fixed;inset:0;background:rgba(10,20,40,.55);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:1200;padding:14px";
+    const testOptions = '<option value="">Tạo đợt kiểm tra mới</option>' + (tests || []).map(t => {
+      const label = (t.test_date ? String(t.test_date).slice(8,10)+"/"+String(t.test_date).slice(5,7)+"/"+String(t.test_date).slice(0,4)+" · " : "") + (t.title || "Đề kiểm tra");
+      return '<option value="'+t.id+'">'+esc(label)+'</option>';
+    }).join("");
+    const studentRows = students.map(s => (
+      '<tr>'+
+        '<td style="padding:9px 10px;font-weight:700;color:var(--navy)">'+esc(s.user?.full_name || "Học sinh")+'</td>'+
+        '<td style="padding:7px 8px;text-align:center;width:112px"><input class="cvOfflineScoreInput" data-student-id="'+s.student_id+'" type="number" min="0" step="0.25" value="" style="width:86px;padding:7px 8px;border:1px solid var(--border);border-radius:8px;text-align:center"></td>'+
+        '<td style="padding:7px 8px"><input class="cvOfflineScoreNote" data-student-id="'+s.student_id+'" type="text" value="" placeholder="Ghi chú..." style="width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:8px"></td>'+
+      '</tr>'
+    )).join("");
+    modal.innerHTML =
+      '<div style="background:var(--white);border-radius:16px;width:min(96vw,900px);max-height:90vh;overflow:hidden;box-shadow:var(--shadow-lg);display:flex;flex-direction:column">'+
+        '<div style="padding:16px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:12px;align-items:flex-start">'+
+          '<div><h3 style="margin:0;color:var(--navy);font-family:var(--font-display);font-size:1.05rem">Thêm điểm đề kiểm tra</h3>'+
+          '<div style="font-size:.82rem;color:var(--ink-mid);margin-top:5px;line-height:1.5">Điểm kiểm tra offline tách riêng khỏi BTVN/Đề luyện tập theo buổi.</div></div>'+
+          '<button type="button" onclick="cvCloseOfflineTestScoreModal()" style="background:var(--surface);border:0;border-radius:8px;width:32px;height:32px;cursor:pointer">✕</button>'+
+        '</div>'+
+        '<div style="padding:14px 18px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:minmax(180px,1.2fr) minmax(180px,1.4fr) 140px 110px;gap:10px;align-items:end">'+
+          '<div><label style="font-size:.76rem;font-weight:800;color:var(--ink-mid);display:block;margin-bottom:5px">Đợt kiểm tra</label><select id="cvOfflineTestSelect" onchange="cvLoadOfflineTestScores(this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px">'+testOptions+'</select></div>'+
+          '<div><label style="font-size:.76rem;font-weight:800;color:var(--ink-mid);display:block;margin-bottom:5px">Tên đề kiểm tra</label><input id="cvOfflineTestTitle" type="text" placeholder="VD: Kiểm tra giữa tháng 7" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px"></div>'+
+          '<div><label style="font-size:.76rem;font-weight:800;color:var(--ink-mid);display:block;margin-bottom:5px">Ngày kiểm tra</label><input id="cvOfflineTestDate" type="date" value="'+todayValue()+'" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px"></div>'+
+          '<div><label style="font-size:.76rem;font-weight:800;color:var(--ink-mid);display:block;margin-bottom:5px">Điểm tối đa</label><input id="cvOfflineTestMax" type="number" min="0.25" step="0.25" value="10" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px"></div>'+
+          '<div style="grid-column:1/-1"><input id="cvOfflineTestNote" type="text" placeholder="Ghi chú chung cho đợt kiểm tra..." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px"></div>'+
+        '</div>'+
+        '<div style="overflow:auto;padding:0 18px 16px">'+
+          '<table class="table" style="font-size:.84rem;margin-top:12px">'+
+            '<thead><tr><th style="text-align:left">Học sinh</th><th class="center">Điểm</th><th style="text-align:left">Ghi chú</th></tr></thead>'+
+            '<tbody>'+studentRows+'</tbody>'+
+          '</table>'+
+        '</div>'+
+        '<div style="padding:13px 18px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">'+
+          '<button type="button" onclick="cvClearOfflineTestForm()" class="btn btn-outline">Tạo đợt mới</button>'+
+          '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">'+
+            '<button type="button" onclick="cvCloseOfflineTestScoreModal()" class="btn btn-outline">Hủy</button>'+
+            '<button type="button" onclick="cvSaveOfflineTestScores()" class="btn btn-primary">Lưu điểm kiểm tra</button>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    document.body.appendChild(modal);
+  };
+
+  window.cvClearOfflineTestForm = function(){
+    const select = document.getElementById("cvOfflineTestSelect");
+    if(select) select.value = "";
+    const title = document.getElementById("cvOfflineTestTitle");
+    const date = document.getElementById("cvOfflineTestDate");
+    const max = document.getElementById("cvOfflineTestMax");
+    const note = document.getElementById("cvOfflineTestNote");
+    if(title) title.value = "";
+    if(date) date.value = todayValue();
+    if(max) max.value = 10;
+    if(note) note.value = "";
+    document.querySelectorAll(".cvOfflineScoreInput").forEach(input => input.value = "");
+    document.querySelectorAll(".cvOfflineScoreNote").forEach(input => input.value = "");
+  };
+
+  window.cvLoadOfflineTestScores = async function(testId){
+    if(!testId){
+      window.cvClearOfflineTestForm();
+      return;
+    }
+    const sb = getSb();
+    const [{ data: test, error: testError }, { data: scores, error: scoreError }] = await Promise.all([
+      sb.from("class_offline_tests").select("id,title,test_date,max_score,note").eq("id", testId).single(),
+      sb.from("class_offline_test_scores").select("student_id,score,note").eq("test_id", testId)
+    ]);
+    if(testError || scoreError){
+      alert("Không thể tải điểm đề kiểm tra: " + (testError?.message || scoreError?.message));
+      return;
+    }
+    const title = document.getElementById("cvOfflineTestTitle");
+    const date = document.getElementById("cvOfflineTestDate");
+    const max = document.getElementById("cvOfflineTestMax");
+    const note = document.getElementById("cvOfflineTestNote");
+    if(title) title.value = test?.title || "";
+    if(date) date.value = String(test?.test_date || todayValue()).slice(0,10);
+    if(max) max.value = test?.max_score || 10;
+    if(note) note.value = test?.note || "";
+    const scoreMap = new Map((scores || []).map(row => [row.student_id, row]));
+    document.querySelectorAll(".cvOfflineScoreInput").forEach(input => {
+      const row = scoreMap.get(input.dataset.studentId);
+      input.value = row?.score ?? "";
+    });
+    document.querySelectorAll(".cvOfflineScoreNote").forEach(input => {
+      const row = scoreMap.get(input.dataset.studentId);
+      input.value = row?.note || "";
+    });
+  };
+
+  window.cvSaveOfflineTestScores = async function(){
+    if(!canEvaluateClassSession(_role)) return;
+    const sb = getSb();
+    const selectedTestId = document.getElementById("cvOfflineTestSelect")?.value || "";
+    const title = document.getElementById("cvOfflineTestTitle")?.value?.trim() || "";
+    const testDate = document.getElementById("cvOfflineTestDate")?.value || "";
+    const maxScore = Number(document.getElementById("cvOfflineTestMax")?.value || 10);
+    const testNote = document.getElementById("cvOfflineTestNote")?.value?.trim() || "";
+    if(!title){
+      alert("Hãy nhập tên đề kiểm tra.");
+      return;
+    }
+    if(!testDate){
+      alert("Hãy chọn ngày kiểm tra.");
+      return;
+    }
+    if(!Number.isFinite(maxScore) || maxScore <= 0){
+      alert("Điểm tối đa phải lớn hơn 0.");
+      return;
+    }
+    let testId = selectedTestId;
+    if(testId){
+      const { error } = await sb.from("class_offline_tests").update({
+        title,
+        test_date: testDate,
+        max_score: maxScore,
+        note: testNote || null,
+        updated_at: new Date().toISOString()
+      }).eq("id", testId);
+      if(error){
+        alert("Không thể cập nhật đợt kiểm tra: " + error.message);
+        return;
+      }
+    } else {
+      const { data, error } = await sb.from("class_offline_tests").insert({
+        class_id: _classId,
+        title,
+        test_date: testDate,
+        max_score: maxScore,
+        note: testNote || null,
+        created_by: window._currentUserId
+      }).select("id").single();
+      if(error){
+        alert("Không thể tạo đợt kiểm tra. Có thể bạn chưa chạy SQL tạo bảng class_offline_tests. Lỗi: " + error.message);
+        return;
+      }
+      testId = data.id;
+    }
+    const upserts = [];
+    const deletes = [];
+    for(const input of Array.from(document.querySelectorAll(".cvOfflineScoreInput"))){
+      const studentId = input.dataset.studentId;
+      const raw = String(input.value || "").trim();
+      const note = document.querySelector('.cvOfflineScoreNote[data-student-id="'+studentId+'"]')?.value?.trim() || "";
+      if(!raw){
+        deletes.push(studentId);
+        continue;
+      }
+      const score = Number(raw);
+      if(!Number.isFinite(score) || score < 0 || score > maxScore){
+        alert("Điểm kiểm tra phải nằm trong khoảng 0 đến " + maxScore + ".");
+        input.focus();
+        return;
+      }
+      upserts.push({
+        test_id: testId,
+        class_id: _classId,
+        student_id: studentId,
+        score,
+        max_score: maxScore,
+        note: note || null,
+        created_by: window._currentUserId,
+        updated_at: new Date().toISOString()
+      });
+    }
+    if(deletes.length){
+      const { error } = await sb.from("class_offline_test_scores").delete().eq("test_id", testId).in("student_id", deletes);
+      if(error){
+        alert("Không thể xóa điểm bỏ trống: " + error.message);
+        return;
+      }
+    }
+    if(upserts.length){
+      const { error } = await sb.from("class_offline_test_scores").upsert(upserts, { onConflict: "test_id,student_id" });
+      if(error){
+        alert("Không thể lưu điểm đề kiểm tra: " + error.message);
+        return;
+      }
+    }
+    window.AppAdminTools?.recordAudit?.("offline_test_scores_saved", {
+      target_type: "class_offline_test",
+      target_id: testId,
+      class_id: _classId,
+      class_name: _className || null,
+      test_title: title,
+      test_date: testDate,
+      score_count: upserts.length
+    });
+    window.cvCloseOfflineTestScoreModal();
+    alert("Đã lưu điểm đề kiểm tra.");
+  };
 
   window.cvCloseSessionScoreModal = function(){
     document.getElementById("cvSessionScoreModal")?.remove();

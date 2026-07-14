@@ -1650,6 +1650,15 @@ body {
             </div>
           </div>
 
+          <div>
+            <h4 style="margin:0 0 10px; color:var(--navy); font-size:14px; display:flex; align-items:center; gap:6px;">
+              <span>🧪 Biểu đồ điểm Đề kiểm tra</span>
+            </h4>
+            <div style="position:relative; height:220px; width:100%; background:#fff; border-radius:14px; border:1px solid rgba(15,31,61,0.06); padding:10px;">
+              <canvas id="studentOfflineTestChart"></canvas>
+            </div>
+          </div>
+
           <!-- Stats & evaluations grid -->
           <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
             <!-- Attendance KPI card -->
@@ -2249,6 +2258,7 @@ async function init() {
 }
 
 let myScoreChart = null;
+let myOfflineTestChart = null;
 
 async function initStudentReport() {
   const card = document.getElementById("studentReportCard");
@@ -2453,6 +2463,8 @@ async function loadStudentReportData(studentId) {
     };
   });
 
+  await loadStudentOfflineTestChart(studentId);
+
   const canvas = document.getElementById("studentScoreChart");
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
@@ -2530,6 +2542,131 @@ async function loadStudentReportData(studentId) {
           grid: {
             display: false
           }
+        }
+      }
+    }
+  });
+}
+
+async function loadStudentOfflineTestChart(studentId) {
+  const canvas = document.getElementById("studentOfflineTestChart");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  if (myOfflineTestChart) {
+    myOfflineTestChart.destroy();
+    myOfflineTestChart = null;
+  }
+
+  const { data: scoreRows, error } = await sb
+    .from("class_offline_test_scores")
+    .select("test_id,class_id,score,max_score,created_at")
+    .eq("student_id", studentId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.font = "13px 'DM Sans', sans-serif";
+    ctx.fillStyle = "#94a3b8";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("Chưa tải được điểm đề kiểm tra. Có thể chưa chạy SQL.", canvas.width / 2, canvas.height / 2);
+    return;
+  }
+
+  const testIds = [...new Set((scoreRows || []).map(row => row.test_id).filter(Boolean))];
+  const classIds = [...new Set((scoreRows || []).map(row => row.class_id).filter(Boolean))];
+  const [{ data: tests }, { data: classes }] = await Promise.all([
+    testIds.length
+      ? sb.from("class_offline_tests").select("id,title,test_date").in("id", testIds)
+      : Promise.resolve({ data: [] }),
+    classIds.length
+      ? sb.from("classes").select("id,class_name,subject_id,subjects(name)").in("id", classIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const testMap = Object.fromEntries((tests || []).map(item => [item.id, item]));
+  const classMap = Object.fromEntries((classes || []).map(item => [item.id, item]));
+  const points = (scoreRows || []).map(row => {
+    const maxPts = Number(row.max_score) || 10;
+    const score = Number(row.score);
+    if (!Number.isFinite(score) || !Number.isFinite(maxPts) || maxPts <= 0) return null;
+    const test = testMap[row.test_id] || {};
+    const cls = classMap[row.class_id] || {};
+    const dateValue = test.test_date || row.created_at;
+    const d = new Date(`${String(dateValue).slice(0, 10)}T00:00:00+07:00`);
+    const dateStr = Number.isNaN(d.getTime()) ? "" : `${d.getDate()}/${d.getMonth() + 1}`;
+    return {
+      date: dateValue,
+      label: `${dateStr} - ${test.title || "Đề kiểm tra"}`,
+      subject: cls.subjects?.name || "Khác",
+      score10: Math.round((score / maxPts) * 10 * 10) / 10,
+    };
+  }).filter(Boolean).sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
+
+  if (!points.length) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.font = "14px 'DM Sans', sans-serif";
+    ctx.fillStyle = "#94a3b8";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("Chưa có điểm đề kiểm tra nào.", canvas.width / 2, canvas.height / 2);
+    return;
+  }
+
+  const subjects = {};
+  points.forEach(point => {
+    const key = point.subject || "Khác";
+    if (!subjects[key]) subjects[key] = [];
+    subjects[key].push(point);
+  });
+  const labels = points.map(point => point.label);
+  const colors = ["#dc2626", "#7c3aed", "#0f766e", "#d97706", "#1d4ed8", "#be185d"];
+  const datasets = Object.keys(subjects).map((subject, idx) => ({
+    label: subject,
+    data: points.map(point => point.subject === subject ? point.score10 : null),
+    borderColor: colors[idx % colors.length],
+    backgroundColor: colors[idx % colors.length] + "22",
+    tension: 0.25,
+    spanGaps: true,
+    borderWidth: 3,
+    pointRadius: 5,
+    pointHoverRadius: 7
+  }));
+
+  myOfflineTestChart = new Chart(ctx, {
+    type: "line",
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: "top",
+          labels: { font: { family: "'DM Sans', sans-serif", size: 11, weight: "bold" }, color: "#1e293b" }
+        },
+        tooltip: {
+          mode: "index",
+          intersect: false,
+          callbacks: {
+            label(context) {
+              const label = context.dataset.label ? context.dataset.label + ": " : "";
+              return label + (context.parsed.y ?? "—") + "/10 điểm";
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          min: 0,
+          max: 10,
+          ticks: { stepSize: 1, font: { family: "'DM Sans', sans-serif", size: 10 }, color: "#64748b" },
+          grid: { color: "rgba(148, 163, 184, 0.1)" }
+        },
+        x: {
+          ticks: { font: { family: "'DM Sans', sans-serif", size: 9 }, color: "#64748b", maxRotation: 30, minRotation: 0 },
+          grid: { display: false }
         }
       }
     }
