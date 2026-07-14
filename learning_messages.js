@@ -1,4 +1,18 @@
 (function () {
+  const DEFAULT_NOTIFICATION_TEMPLATES = {
+    course_created: '📚 MindUp vừa mở khóa học mới **{{course_name}}**.\n\nEm hãy xem chi tiết khóa học và đăng ký nếu phù hợp nhé!\n\n__ACTION__{"type":"url","label":"📖 Xem khóa học","url":"{{target_url}}"}',
+    course_enrolled: '✅ Em đã được thêm vào khóa học **{{course_name}}**.\n\nHãy vào khóa học để xem nội dung học tập, tài liệu và đề luyện tập nhé!\n\n__ACTION__{"type":"url","label":"📖 Vào khóa học","url":"{{target_url}}"}',
+    course_request_approved: '✅ Yêu cầu đăng ký khóa học **{{course_name}}** của em đã được duyệt.\n\nEm đã có thể vào khóa học để bắt đầu học tập.\n\n__ACTION__{"type":"url","label":"📖 Vào khóa học","url":"{{target_url}}"}',
+    course_request_rejected: '⚠️ Yêu cầu đăng ký khóa học **{{course_name}}** của em chưa được duyệt.\n\nNếu cần hỗ trợ, em/phụ huynh hãy nhắn lại cho MindUp nhé.\n\n__ACTION__{"type":"reply","label":"💬 Hỏi lại MindUp","url":""}',
+    course_session_added: '📝 Khóa học **{{course_name}}** vừa có buổi học mới.\n\nBuổi {{session_order}}: **{{lesson_name}}**\n{{session_extra}}\n\n__ACTION__{"type":"url","label":"📖 Xem buổi học","url":"{{target_url}}"}',
+    course_session_updated: '🔄 Buổi học trong khóa **{{course_name}}** vừa được cập nhật.\n\nBuổi {{session_order}}: **{{lesson_name}}**\n{{session_extra}}\n\n__ACTION__{"type":"url","label":"📖 Xem cập nhật","url":"{{target_url}}"}',
+    class_session_added: '📝 Lớp **{{class_name}}** vừa có buổi học mới.\n\nBuổi {{session_order}}: **{{lesson_name}}**\nNgày học: **{{session_date}}**\n{{session_extra}}\n\n__ACTION__{"type":"url","label":"📖 Xem buổi học","url":"{{target_url}}"}',
+    class_session_updated: '🔄 Lớp **{{class_name}}** vừa cập nhật buổi học.\n\nBuổi {{session_order}}: **{{lesson_name}}**\nNgày học: **{{session_date}}**\n{{session_extra}}\n\n__ACTION__{"type":"url","label":"📖 Xem cập nhật","url":"{{target_url}}"}',
+    class_exam_added: '⚠️ MindUp đã tạo cho em một đề ôn tập lỗi sai mới.\n\n{{message}}\n\nHãy làm lại để sửa các câu chưa đúng nhé!\n\n__ACTION__{"type":"url","label":"✏️ Làm đề ôn tập","url":"{{target_url}}"}',
+    session_evaluation: '📝 MindUp gửi phụ huynh nhận xét buổi học hôm nay:\n\n{{message}}\n\n__ACTION__{"type":"url","label":"📖 Xem chi tiết","url":"{{target_url}}"}',
+    tuition_due: '💰 Thông báo học phí\n\n{{message}}\n\n__ACTION__{"type":"url","label":"🧾 Xem học phí","url":"{{target_url}}"}',
+    tuition_reminder: '⚠️ Nhắc học phí còn thiếu\n\n{{message}}\n\n__ACTION__{"type":"url","label":"🧾 Xem học phí","url":"{{target_url}}"}',
+  };
   const BOT_NAME = "MindUp - Tư Duy Toàn Diện";
 
   function getSb() {
@@ -226,9 +240,10 @@
     ].filter(Boolean).join("\n");
   }
 
-  async function notificationContentAsync({ title, message, targetUrl, templateId = "learning_notification" }) {
-    const fallback = notificationContent({ title, message, targetUrl });
+  async function notificationContentAsync({ title, message, targetUrl, templateId = "learning_notification", vars = {} }) {
+    const fallback = DEFAULT_NOTIFICATION_TEMPLATES[templateId] || notificationContent({ title, message, targetUrl });
     const content = await templateContent(templateId, fallback, {
+      ...(vars || {}),
       title: title || "",
       message: cleanText(message),
       target_url: targetUrl || "",

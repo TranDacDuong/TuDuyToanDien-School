@@ -325,12 +325,23 @@
         const meta = normalizeMeta(payload.meta);
         const studentId = meta.student_id || meta.studentId || null;
         if (!studentId || !payload.user_id || !payload.message) return null;
+        const templateVars = {
+          ...meta,
+          course_name: meta.course_name || meta.courseName || "",
+          class_name: meta.class_name || meta.className || "",
+          lesson_name: meta.lesson_name || meta.lessonName || "",
+          session_order: meta.session_order || meta.sessionOrder || "",
+          session_date: meta.session_date || meta.sessionDate || "",
+          exam_title: meta.exam_title || meta.examTitle || "",
+          session_extra: meta.session_extra || meta.sessionExtra || payload.message || "",
+        };
         const contentPromise = window.LearningMessages.notificationContentAsync
           ? window.LearningMessages.notificationContentAsync({
               title: payload.title || "",
               message: payload.message || "",
               targetUrl: payload.target_url || "",
-              templateId: meta.template_id || meta.templateId || "learning_notification",
+              templateId: meta.template_id || meta.templateId || payload.type || "learning_notification",
+              vars: templateVars,
             })
           : Promise.resolve(window.LearningMessages.notificationContent({
               title: payload.title || "",
