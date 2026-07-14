@@ -292,6 +292,64 @@
     }).join("");
   }
 
+  function esc(value){
+    return String(value ?? "")
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;");
+  }
+
+  function jsArg(value){
+    return String(value || "").replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+  }
+
+  function todayWeekday(){
+    const day = new Date().getDay();
+    return day === 0 ? 7 : day;
+  }
+
+  function renderTodayClassSessions(classes, role){
+    if(!["admin","teacher","assistant"].includes(role)) return "";
+    const dayNo = todayWeekday();
+    const sessions = [];
+    (classes || []).forEach(cls => {
+      if(cls.hidden) return;
+      const currentSchedules = getCurrentSchedules(_scheduleMap[cls.id] || [])
+        .filter(s => Number(s.weekday || 0) === dayNo);
+      currentSchedules.forEach(schedule => sessions.push({ cls, schedule }));
+    });
+    sessions.sort((a,b) =>
+      String(a.schedule.start_time || "").localeCompare(String(b.schedule.start_time || "")) ||
+      String(a.cls.class_name || "").localeCompare(String(b.cls.class_name || ""),"vi")
+    );
+    const cards = sessions.length
+      ? sessions.map(({cls, schedule}) => {
+          const time = String(schedule.start_time || "").slice(0,5)+"-"+String(schedule.end_time || "").slice(0,5);
+          const room = schedule.rooms?.room_name || "Chưa có phòng";
+          const count = _studentCount[cls.id] || 0;
+          return `
+            <button class="today-class-card" type="button" onclick="if(window.openClassView) window.openClassView('${cls.id}','${jsArg(cls.class_name)}')">
+              <span class="today-class-time">${esc(time)}</span>
+              <span class="today-class-room">${esc(room)}</span>
+              <strong>${esc(cls.class_name)}</strong>
+              <small>${count} học sinh</small>
+            </button>`;
+        }).join("")
+      : '<div class="today-class-empty">Hôm nay chưa có ca học nào.</div>';
+    return `
+      <section class="today-classes-panel">
+        <div class="today-classes-head">
+          <div>
+            <h2>Lớp học hôm nay</h2>
+            <p>Các ca học trong ngày, sắp xếp theo giờ bắt đầu.</p>
+          </div>
+          <span>${sessions.length} ca</span>
+        </div>
+        <div class="today-class-grid">${cards}</div>
+      </section>`;
+  }
+
   function renderClasses(classes){
     const role    = window._currentRole || "student";
     const countEl = document.getElementById("filterCount");
@@ -314,6 +372,7 @@
     });
 
     const nextContainer = document.createElement("div");
+    nextContainer.innerHTML = renderTodayClassSessions(classes, role);
 
     gradeOrder.forEach(grade => {
       const block = document.createElement("div");

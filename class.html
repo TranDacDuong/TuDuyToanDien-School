@@ -81,6 +81,48 @@ body { margin: 0; background: radial-gradient(circle at top left, rgba(200,150,4
 }
 
 /* ── Class grid ── */
+.today-classes-panel {
+  background: rgba(255,255,255,.94);
+  border: 1px solid rgba(15,31,61,.08);
+  border-radius: 20px;
+  box-shadow: 0 14px 30px rgba(15,31,61,.06);
+  padding: 16px 18px;
+  margin-bottom: 22px;
+}
+.today-classes-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; margin-bottom: 12px;
+}
+.today-classes-head h2 {
+  margin: 0; color: var(--navy); font-size: 1.02rem; font-family: var(--font-display);
+}
+.today-classes-head p { margin: 4px 0 0; color: var(--ink-light); font-size: .78rem; }
+.today-classes-head span {
+  background: #eff6ff; color: #1d4ed8; border-radius: 999px;
+  padding: 4px 10px; font-size: .76rem; font-weight: 800; white-space: nowrap;
+}
+.today-class-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px;
+}
+.today-class-card {
+  appearance: none; border: 1px solid var(--border); border-left: 4px solid var(--gold);
+  border-radius: 14px; background: linear-gradient(180deg,#fff 0%,#fbfdff 100%);
+  padding: 11px 12px; text-align: left; cursor: pointer; font: inherit;
+  display: grid; gap: 5px; transition: .15s;
+}
+.today-class-card:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(15,31,61,.1); }
+.today-class-time { color: var(--navy); font-size: .92rem; font-weight: 900; }
+.today-class-room {
+  width: fit-content; background: var(--gold-pale); color: #92400e;
+  border-radius: 999px; padding: 2px 8px; font-size: .72rem; font-weight: 800;
+}
+.today-class-card strong { color: var(--navy); font-size: .86rem; line-height: 1.35; }
+.today-class-card small { color: var(--ink-light); font-size: .74rem; }
+.today-class-empty {
+  border: 1px dashed var(--border); border-radius: 14px; padding: 16px;
+  color: var(--ink-light); font-size: .86rem; background: #fbfdff;
+}
+
 .class-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -445,7 +487,7 @@ input:focus, select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
 <script src="./learning_messages.js?v=20260713-score-chart1"></script>
 <script src="./class_init.js?v=20260617-open-class-once1"></script>
 <script src="./class_create.js?v=20260615-staff-pickers1"></script>
-<script src="./class_list.js?v=20260713-optimistic-list1"></script>
+<script src="./class_list.js?v=20260714-today-sessions1"></script>
 <script src="./ai_solution.js"></script>
 <script src="./review_helper.js"></script>
 <script src="./exam_ui_helper.js?v=20260713-observer1"></script>
