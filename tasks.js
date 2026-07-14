@@ -1672,16 +1672,13 @@
     return { note, requirements };
   }
 
-  async function uploadRequirementImage(input) {
-    const file = input?.files?.[0];
+  async function uploadRequirementImageFile(id, key, file, sourceInput = null) {
     if (!file) return;
     if (!window.MindupImageUpload?.uploadCompressedImage) {
       alert("Chưa tải được công cụ upload ảnh Drive. Vui lòng tải lại trang rồi thử lại.");
-      input.value = "";
+      if (sourceInput) sourceInput.value = "";
       return;
     }
-    const id = input.dataset.requirementImageFile;
-    const key = input.dataset.requirementKey;
     const urlInput = [...document.querySelectorAll("[data-requirement-image-url]")]
       .filter(element => element.dataset.requirementImageUrl === id)
       .find(element => element.dataset.requirementKey === key);
@@ -1690,7 +1687,7 @@
       .find(element => element.dataset.requirementKey === key);
     try {
       if (status) status.textContent = "Đang upload ảnh...";
-      input.disabled = true;
+      if (sourceInput) sourceInput.disabled = true;
       const uploaded = await window.MindupImageUpload.uploadCompressedImage(file, {
         kind: "task",
         folder: "task-results",
@@ -1703,9 +1700,35 @@
       if (status) status.textContent = "";
       alert("Không thể upload ảnh: " + (error?.message || error));
     } finally {
-      input.disabled = false;
-      input.value = "";
+      if (sourceInput) {
+        sourceInput.disabled = false;
+        sourceInput.value = "";
+      }
     }
+  }
+
+  async function uploadRequirementImage(input) {
+    const file = input?.files?.[0];
+    await uploadRequirementImageFile(input?.dataset?.requirementImageFile, input?.dataset?.requirementKey, file, input);
+  }
+
+  function pastedImageFile(event) {
+    const items = Array.from(event.clipboardData?.items || []);
+    const imageItem = items.find(item => item.kind === "file" && /^image\//i.test(item.type || ""));
+    return imageItem?.getAsFile?.() || null;
+  }
+
+  async function pasteRequirementImage(event) {
+    const target = event.target.closest("[data-requirement-input],[data-requirement-image-url]");
+    if (!target) return;
+    const file = pastedImageFile(event);
+    if (!file) return;
+    event.preventDefault();
+    await uploadRequirementImageFile(
+      target.dataset.requirementInput || target.dataset.requirementImageUrl,
+      target.dataset.requirementKey,
+      file
+    );
   }
 
   async function completeRequirement(id, key) {
@@ -2399,6 +2422,9 @@
     E.list.addEventListener("change", event => {
       const input = event.target.closest("[data-requirement-image-file]");
       if (input) uploadRequirementImage(input);
+    });
+    E.list.addEventListener("paste", event => {
+      pasteRequirementImage(event);
     });
     byId("taskRefreshButton").addEventListener("click", () => loadTasks({ refresh: true }));
     byId("taskDeleteOldButton").addEventListener("click", deleteOldTasks);
