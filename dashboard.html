@@ -909,10 +909,6 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 </main>
 
 <nav id="mobileNav" aria-label="Điều hướng nhanh">
-  <button class="mobile-nav-item" type="button" data-role="admin" data-page="ops-center">
-    <span>📊</span>
-    <span>Bảng điều hành</span>
-  </button>
   <button class="mobile-nav-item" type="button" data-role="admin,teacher,assistant,student,parent,accountant" data-page="home.html">
     <span>🏠</span>
     <span>Trang chủ</span>
@@ -1035,7 +1031,7 @@ const MOBILE_NAV_ORDER = {
   assistant: ["home.html", "courses.html", "class.html", "tasks.html", "teacher_schedule.html", "trial_requests.html", "menu"],
   parent: ["home.html", "courses.html", "class.html", "teacher_schedule.html", "personal_schedule.html", "tuition.html", "menu"],
   student: ["home.html", "courses.html", "class.html", "public_exam.html", "game.html", "tuition.html", "menu"],
-  admin: ["ops-center", "home.html", "courses.html", "class.html", "tuition.html", "income.html", "sourcedata.html", "menu"],
+  admin: ["home.html", "courses.html", "class.html", "tuition.html", "income.html", "sourcedata.html", "menu"],
 };
 let mobileToolsManualOpen = false;
 let dashboardMenuReady = false;
