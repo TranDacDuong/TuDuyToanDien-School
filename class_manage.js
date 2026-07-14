@@ -763,7 +763,7 @@
         '</div>'+
       '</div>'+
 
-      '<div style="display:flex;gap:4px;margin-bottom:16px;background:var(--surface);'+
+      '<div style="display:'+(role==="student"?"none":"flex")+';gap:4px;margin-bottom:16px;background:var(--surface);'+
       'border-radius:10px;padding:4px;width:fit-content">'+
         '<button id="cvTab_attendance" onclick="cvSwitchTab(\'attendance\')" '+
         'style="padding:7px 20px;border:none;border-radius:7px;font-size:.83rem;font-weight:600;'+
