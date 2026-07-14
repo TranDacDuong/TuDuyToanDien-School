@@ -398,6 +398,16 @@ body {
   padding: 12px 2px;
   border-bottom: 1px solid rgba(15,31,61,.06);
 }
+.overview-news-main {
+  flex: 1;
+  min-width: 0;
+}
+.overview-news-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 .overview-news-item:last-child {
   border-bottom: none;
   padding-bottom: 0;
@@ -706,6 +716,14 @@ body {
 }
 .tiny-btn:hover {
   background: #feeceb;
+}
+.tiny-btn.edit {
+  border-color: rgba(29,107,209,.18);
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.tiny-btn.edit:hover {
+  background: #dbeafe;
 }
 .discussion-section {
   display: none;
@@ -1672,7 +1690,8 @@ body {
             <div style="height:10px;"></div>
             <textarea class="admin-textarea" id="overviewPostContent" placeholder="Nội dung bài viết cho tab Trang chủ..."></textarea>
             <div class="admin-actions">
-              <button class="btn btn-primary btn-sm" type="button" onclick="createOverviewPost()">Đăng lên Trang chủ</button>
+              <button class="btn btn-outline btn-sm" id="overviewPostCancelEdit" type="button" onclick="cancelOverviewPostEdit()" style="display:none">Hủy sửa</button>
+              <button class="btn btn-primary btn-sm" id="overviewPostSubmit" type="button" onclick="createOverviewPost()">Đăng lên Trang chủ</button>
             </div>
           </div>
         </div>
@@ -1859,6 +1878,7 @@ let allTeachers = [];
 let homeTeachers = [];
 let pinnedHomeCourses = [];
 let courseManagers = [];
+let editingOverviewPostId = null;
 let centerIntro = { title: "Giới thiệu trung tâm", content: "" };
 const uiIcons = {
   search: '<svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="6"></circle><path d="M20 20l-4.2-4.2"></path></svg>',
@@ -3533,7 +3553,15 @@ function renderOverviewSection(posts) {
     ?newsPosts.map(post => `
         <div class="overview-news-item">
           <span class="overview-news-dot"></span>
-          <a class="overview-news-link" href="post.html?id=${post.id}">${esc(extractPostTitle(post))}</a>
+          <div class="overview-news-main">
+            <a class="overview-news-link" href="post.html?id=${post.id}">${esc(extractPostTitle(post))}</a>
+          </div>
+          ${role === "admin" ? `
+            <div class="overview-news-actions">
+              <button class="tiny-btn edit" type="button" onclick="editOverviewPost('${post.id}')">Sửa</button>
+              <button class="tiny-btn" type="button" onclick="deleteOverviewPost('${post.id}')">Xóa</button>
+            </div>
+          ` : ""}
         </div>
       `).join("")
     : `<div class="empty-feed" style="padding:24px 16px;"><p>Chưa có tin tức nào.</p></div>`;
@@ -3693,7 +3721,7 @@ window.createOverviewPost = async function() {
     return;
   }
 
-  const { error } = await sb.from("posts").insert({
+  const payload = {
     user_id: currentUser.id,
     title,
     content: rawContent,
@@ -3702,15 +3730,77 @@ window.createOverviewPost = async function() {
     feed_tab: "overview",
     home_category: "news",
     is_pinned: true
-  });
+  };
+
+  const { error } = editingOverviewPostId
+    ? await sb.from("posts").update({
+        title: payload.title,
+        content: payload.content,
+        status: payload.status,
+        visibility: payload.visibility,
+        feed_tab: payload.feed_tab,
+        home_category: payload.home_category,
+        is_pinned: payload.is_pinned
+      }).eq("id", editingOverviewPostId)
+    : await sb.from("posts").insert(payload);
 
   if (error) {
-    alert("Lỗi khi đăng tin tức Trang chủ: " + error.message);
+    alert((editingOverviewPostId ? "Lỗi khi cập nhật tin tức Trang chủ: " : "Lỗi khi đăng tin tức Trang chủ: ") + error.message);
     return;
   }
 
+  resetOverviewPostForm();
+  await loadPosts();
+};
+
+function resetOverviewPostForm() {
+  editingOverviewPostId = null;
+  const titleInput = document.getElementById("overviewPostTitle");
+  const contentInput = document.getElementById("overviewPostContent");
+  const submitBtn = document.getElementById("overviewPostSubmit");
+  const cancelBtn = document.getElementById("overviewPostCancelEdit");
   if (titleInput) titleInput.value = "";
   if (contentInput) contentInput.value = "";
+  if (submitBtn) submitBtn.textContent = "Đăng lên Trang chủ";
+  if (cancelBtn) cancelBtn.style.display = "none";
+}
+
+window.cancelOverviewPostEdit = resetOverviewPostForm;
+
+window.editOverviewPost = function(postId) {
+  if (role !== "admin") return;
+  const post = cachedVisiblePosts.find(item => item.id === postId);
+  if (!post) {
+    alert("Không tìm thấy tin tức cần sửa. Hãy tải lại trang rồi thử lại.");
+    return;
+  }
+  editingOverviewPostId = postId;
+  const titleInput = document.getElementById("overviewPostTitle");
+  const contentInput = document.getElementById("overviewPostContent");
+  const submitBtn = document.getElementById("overviewPostSubmit");
+  const cancelBtn = document.getElementById("overviewPostCancelEdit");
+  if (titleInput) titleInput.value = post.title || extractPostTitle(post);
+  if (contentInput) contentInput.value = post.content || "";
+  if (submitBtn) submitBtn.textContent = "Lưu thay đổi";
+  if (cancelBtn) cancelBtn.style.display = "";
+  document.getElementById("overviewAdminCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  titleInput?.focus();
+};
+
+window.deleteOverviewPost = async function(postId) {
+  if (role !== "admin") return;
+  if (!confirm("Xóa tin tức này khỏi Trang chủ?")) return;
+  const { data: mediaRows } = await sb.from("post_media").select("file_url").eq("post_id", postId);
+  await sb.from("comments").delete().eq("post_id", postId);
+  await sb.from("likes").delete().eq("post_id", postId);
+  await sb.from("post_media").delete().eq("post_id", postId);
+  const { error } = await sb.from("posts").delete().eq("id", postId);
+  if (error) {
+    alert("Lỗi khi xóa tin tức Trang chủ: " + error.message);
+    return;
+  }
+  if (editingOverviewPostId === postId) resetOverviewPostForm();
+  await window.MindupImageUpload?.deleteUploadedImages?.((mediaRows || []).map(item => item.file_url));
   await loadPosts();
 };
 
