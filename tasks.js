@@ -15,6 +15,7 @@
     attendanceLocation: null,
     attendanceLogs: [],
     attendanceHistoryLogs: [],
+    attendanceHistoryExpanded: false,
     attendanceAdminDate: "",
     attendanceAdminLogs: [],
     attendanceAdminExpanded: false,
@@ -277,6 +278,13 @@
 
   function renderStaffAttendanceHistory() {
     if (!E.attendanceHistoryList) return;
+    const expanded = Boolean(S.attendanceHistoryExpanded);
+    E.attendanceHistoryList.style.display = expanded ? "grid" : "none";
+    if (E.attendanceHistoryToggle) {
+      E.attendanceHistoryToggle.textContent = expanded ? "Ẩn lịch sử" : "Xem lịch sử";
+      E.attendanceHistoryToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    }
+    if (!expanded) return;
     const logs = S.attendanceHistoryLogs || [];
     if (!logs.length) {
       E.attendanceHistoryList.innerHTML = '<div class="task-empty compact">Chưa có lịch sử chấm công.</div>';
@@ -2333,6 +2341,10 @@
     byId("taskCreateButton").addEventListener("click", openCreateModal);
     E.staffCheckInBtn?.addEventListener("click", () => markStaffAttendance("check_in"));
     E.staffCheckOutBtn?.addEventListener("click", () => markStaffAttendance("check_out"));
+    E.attendanceHistoryToggle?.addEventListener("click", () => {
+      S.attendanceHistoryExpanded = !S.attendanceHistoryExpanded;
+      renderStaffAttendanceHistory();
+    });
     E.attendanceAdminRefresh?.addEventListener("click", () => loadStaffAttendanceAdmin());
     E.attendanceAdminDate?.addEventListener("change", () => loadStaffAttendanceAdmin());
     E.attendanceAdminToggle?.addEventListener("click", () => {
@@ -2368,7 +2380,7 @@
       staffCheckInText: byId("staffCheckInText"), staffCheckOutText: byId("staffCheckOutText"), staffDistanceText: byId("staffDistanceText"),
       staffCheckInBtn: byId("staffCheckInBtn"), staffCheckOutBtn: byId("staffCheckOutBtn"),
       staffAttendanceNote: byId("staffAttendanceNote"), attendanceFeedback: byId("staffAttendanceFeedback"),
-      attendanceHistoryList: byId("staffAttendanceHistoryList"),
+      attendanceHistoryList: byId("staffAttendanceHistoryList"), attendanceHistoryToggle: byId("staffAttendanceHistoryToggle"),
       attendanceAdminPanel: byId("staffAttendanceAdminPanel"), attendanceAdminDate: byId("staffAttendanceAdminDate"),
       attendanceAdminRefresh: byId("staffAttendanceAdminRefresh"), attendanceAdminSummary: byId("staffAttendanceAdminSummary"),
       attendanceAdminToggle: byId("staffAttendanceAdminToggle"), attendanceAdminBody: byId("staffAttendanceAdminBody"),

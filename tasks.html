@@ -74,7 +74,8 @@
           <h3>Lịch sử chấm công</h3>
           <span>14 ngày gần nhất</span>
         </div>
-        <div class="staff-attendance-history-list" id="staffAttendanceHistoryList">
+        <button class="task-btn" type="button" id="staffAttendanceHistoryToggle" aria-expanded="false" style="justify-self:start">Xem lịch sử chấm công</button>
+        <div class="staff-attendance-history-list" id="staffAttendanceHistoryList" style="display:none">
           <div class="task-empty compact">Đang tải lịch sử chấm công...</div>
         </div>
       </div>
@@ -159,6 +160,6 @@
   <script src="supabaseClient.js?v=20260713-optimistic1"></script>
   <script src="notification_helper.js"></script>
   <script src="learning_messages.js"></script>
-  <script src="tasks.js?v=20260714-attendance-history1"></script>
+  <script src="tasks.js?v=20260714-attendance-history-toggle1"></script>
 </body>
 </html>
