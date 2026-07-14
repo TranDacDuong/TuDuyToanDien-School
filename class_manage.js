@@ -771,13 +771,14 @@
         '📋 Điểm danh</button>'+
         '<button id="cvTab_exams" onclick="cvSwitchTab(\'exams\')" '+
         'style="padding:7px 20px;border:none;border-radius:7px;font-size:.83rem;font-weight:600;'+
-        'cursor:pointer;font-family:var(--font-body);background:transparent;color:var(--ink-mid)">'+
+        'cursor:pointer;font-family:var(--font-body);background:transparent;color:var(--ink-mid);'+(role==="student"?'display:none;':'')+'">'+
         '📘 Học tập</button>'+
       '</div>'+
       '<div id="cvTabContent">Đang tải...</div>';
   }
 
   window.cvSwitchTab = async function(tab){
+    if(_role === "student" && tab === "exams") tab = "attendance";
     _activeTab = tab;
     ["attendance","exams"].forEach(t=>{
       const btn = document.getElementById("cvTab_"+t);
@@ -896,7 +897,15 @@
         "<thead><tr>"+
         '<th style="text-align:left;min-width:130px;position:sticky;left:0;background:var(--navy);z-index:1">Học sinh</th>'+
         dateHeaders+
-        "</tr></thead><tbody>"+myRow+"</tbody></table></div>";
+        "</tr></thead><tbody>"+myRow+"</tbody></table></div>"+
+        '<div style="margin-top:22px">'+
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'+
+            '<div style="font-family:var(--font-display);font-size:1.05rem;color:var(--navy);font-weight:700">Học tập</div>'+
+            '<div style="height:1px;flex:1;background:var(--border)"></div>'+
+          '</div>'+
+          '<div id="cvStudentInlineLearning">Đang tải học tập...</div>'+
+        '</div>';
+      await renderExamsContent(document.getElementById("cvStudentInlineLearning"));
       return;
       let rowsHtml="";
       visibleStudents.forEach(s=>{
@@ -2243,7 +2252,11 @@
 
 
   async function renderExamsTab(){
-    const tc=document.getElementById("cvTabContent"); if(!tc) return;
+    await renderExamsContent(document.getElementById("cvTabContent"));
+  }
+
+  async function renderExamsContent(tc){
+    if(!tc) return;
     tc.innerHTML='<p style="color:var(--ink-light);font-size:.85rem">Đang tải buổi học và đề luyện tập...</p>';
     const sb=getSb(), role=_role;
     const isStudent = role === "student";
