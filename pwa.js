@@ -933,18 +933,17 @@
       .mindup-ios-safari-symbol {
         border-radius: 50%;
         background:
-          radial-gradient(circle at center, #fff 0 34%, transparent 35%),
+          radial-gradient(circle at center, #fff 0 36%, transparent 37%),
           conic-gradient(from 25deg, #ef4444, #f97316, #22c55e, #06b6d4, #2563eb, #7c3aed, #ef4444);
         color: #0f1f3d;
       }
       .mindup-ios-safari-symbol::before {
-        content: "";
-        width: 16%;
-        height: 48%;
-        border-radius: 999px;
-        background: #ef4444;
-        transform: rotate(35deg);
-        box-shadow: 0 -34px 0 -6px #2563eb;
+        content: none;
+      }
+      .mindup-ios-safari-symbol svg {
+        width: 76%;
+        height: 76%;
+        filter: drop-shadow(0 2px 4px rgba(15,31,61,.16));
       }
       .mindup-ios-sheet {
         position: absolute;
@@ -1028,6 +1027,14 @@
         font-style: normal;
         font-weight: 800;
         box-shadow: 0 0 0 3px #fff, 0 0 0 5px #60a5fa;
+        overflow: hidden;
+      }
+      .mindup-ios-home-app.mindup i img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: inherit;
       }
       .mindup-ios-guide-note {
         margin: 0;
@@ -1185,7 +1192,15 @@
           <div class="mindup-ios-picture" aria-label="Hình minh họa mở trang MindUp trong Safari">
             <div class="mindup-ios-site">
               <div class="mindup-ios-site-card">
-                <span class="mindup-ios-big-symbol mindup-ios-safari-symbol" aria-hidden="true"></span>
+                <span class="mindup-ios-big-symbol mindup-ios-safari-symbol" aria-hidden="true">
+                  <svg viewBox="0 0 64 64" focusable="false">
+                    <circle cx="32" cy="32" r="26" fill="#ffffff" stroke="#0ea5e9" stroke-width="3"></circle>
+                    <circle cx="32" cy="32" r="18" fill="none" stroke="#bfdbfe" stroke-width="1.6"></circle>
+                    <path d="M39 25 27 37" stroke="#ef4444" stroke-width="5" stroke-linecap="round"></path>
+                    <path d="M25 39 37 27" stroke="#2563eb" stroke-width="5" stroke-linecap="round"></path>
+                    <circle cx="32" cy="32" r="3.5" fill="#0f1f3d"></circle>
+                  </svg>
+                </span>
                 <b>MindUp</b>
                 <span>www.mindup.edu.vn</span>
               </div>
@@ -1258,7 +1273,7 @@
                 <span class="mindup-ios-home-app"><i></i><span>Lịch</span></span>
                 <span class="mindup-ios-home-app"><i></i><span>Ghi chú</span></span>
                 <span class="mindup-ios-home-app"><i></i><span>Safari</span></span>
-                <span class="mindup-ios-home-app mindup"><i>M</i><span>MindUp</span></span>
+                <span class="mindup-ios-home-app mindup"><i><img src="apple-touch-icon.png" alt=""></i><span>MindUp</span></span>
                 <span class="mindup-ios-home-app"><i></i><span>Cài đặt</span></span>
               </div>
             </div>
