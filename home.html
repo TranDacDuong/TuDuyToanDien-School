@@ -1530,6 +1530,30 @@ body {
   }
 }
 
+.student-chart-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+
+.student-chart-box {
+  position: relative;
+  height: 240px;
+  width: 100%;
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid rgba(15,31,61,0.06);
+  padding: 10px;
+}
+
+.student-offline-test-chart-box {
+  height: 220px;
+}
+
+.student-chart-hint {
+  display: none;
+}
+
 @media (max-width: 640px) {
   .feed-wrap {
     padding: 12px 10px 18px;
@@ -1543,6 +1567,36 @@ body {
   .overview-card-body {
     padding-left: 16px;
     padding-right: 16px;
+  }
+
+  #studentReportCard .overview-card-body {
+    gap: 16px !important;
+    padding: 14px 12px !important;
+  }
+
+  .student-chart-scroll {
+    margin: 0 -2px;
+    padding-bottom: 8px;
+  }
+
+  .student-chart-box {
+    height: 300px !important;
+    min-width: 560px;
+    border-radius: 16px;
+    padding: 12px 10px 8px;
+  }
+
+  .student-offline-test-chart-box {
+    height: 280px !important;
+    min-width: 520px;
+  }
+
+  .student-chart-hint {
+    display: block;
+    margin: -4px 0 8px;
+    color: var(--ink-light);
+    font-size: 12px;
+    line-height: 1.35;
   }
 
   .hub-link,
@@ -1645,8 +1699,11 @@ body {
             <h4 style="margin:0 0 10px; color:var(--navy); font-size:14px; display:flex; align-items:center; gap:6px;">
               <span>📊 Biểu đồ tiến trình điểm số</span>
             </h4>
-            <div style="position:relative; height:240px; width:100%; background:#fff; border-radius:14px; border:1px solid rgba(15,31,61,0.06); padding:10px;">
-              <canvas id="studentScoreChart"></canvas>
+            <div class="student-chart-hint">Vuốt ngang để xem rõ từng lần làm bài.</div>
+            <div class="student-chart-scroll">
+              <div class="student-chart-box student-score-chart-box">
+                <canvas id="studentScoreChart"></canvas>
+              </div>
             </div>
           </div>
 
@@ -1654,8 +1711,11 @@ body {
             <h4 style="margin:0 0 10px; color:var(--navy); font-size:14px; display:flex; align-items:center; gap:6px;">
               <span>🧪 Biểu đồ điểm Đề kiểm tra</span>
             </h4>
-            <div style="position:relative; height:220px; width:100%; background:#fff; border-radius:14px; border:1px solid rgba(15,31,61,0.06); padding:10px;">
-              <canvas id="studentOfflineTestChart"></canvas>
+            <div class="student-chart-hint">Vuốt ngang để xem rõ từng bài kiểm tra.</div>
+            <div class="student-chart-scroll">
+              <div class="student-chart-box student-offline-test-chart-box">
+                <canvas id="studentOfflineTestChart"></canvas>
+              </div>
             </div>
           </div>
 
@@ -2260,6 +2320,21 @@ async function init() {
 let myScoreChart = null;
 let myOfflineTestChart = null;
 
+function isStudentChartMobile() {
+  return window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
+}
+
+function setStudentChartWidth(canvas, pointCount, baseWidth = 560) {
+  const box = canvas?.closest?.(".student-chart-box");
+  if (!box) return;
+  if (isStudentChartMobile()) {
+    const count = Math.max(Number(pointCount) || 0, 6);
+    box.style.minWidth = Math.max(baseWidth, count * 64) + "px";
+  } else {
+    box.style.minWidth = "";
+  }
+}
+
 async function initStudentReport() {
   const card = document.getElementById("studentReportCard");
   if (!card) return;
@@ -2405,6 +2480,7 @@ async function loadStudentReportData(studentId) {
         const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
         return {
           date: r.submitted_at,
+          axisLabel: dateStr,
           label: `${dateStr} - ${r.exams?.title || "Bài KT"}`,
           subject: r.exams?.classes?.subjects?.name || "Khác",
           score10: Math.round((score / maxPts) * 10 * 10) / 10,
@@ -2421,6 +2497,7 @@ async function loadStudentReportData(studentId) {
         const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
         return {
           date: dateValue,
+          axisLabel: dateStr,
           label: `${dateStr} - ${session.lesson?.name || "BTVN/Đề luyện tập"}`,
           subject: cls.subjects?.name || "Khác",
           score10: Math.round((score / maxPts) * 10 * 10) / 10,
@@ -2435,7 +2512,8 @@ async function loadStudentReportData(studentId) {
     subjectMap[subName].push(r);
   });
 
-  const labels = scorePoints.map(r => r.label);
+  const mobileScoreChart = isStudentChartMobile();
+  const labels = scorePoints.map(r => mobileScoreChart ? r.axisLabel : r.label);
 
   const datasets = Object.keys(subjectMap).map((subName, idx) => {
     const colors = [
@@ -2467,6 +2545,7 @@ async function loadStudentReportData(studentId) {
 
   const canvas = document.getElementById("studentScoreChart");
   if (!canvas) return;
+  setStudentChartWidth(canvas, scorePoints.length, 560);
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
@@ -2496,9 +2575,11 @@ async function loadStudentReportData(studentId) {
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          position: 'top',
+          position: mobileScoreChart ? 'bottom' : 'top',
           labels: {
-            font: { family: "'DM Sans', sans-serif", size: 11, weight: 'bold' },
+            boxWidth: mobileScoreChart ? 10 : 40,
+            padding: mobileScoreChart ? 10 : 12,
+            font: { family: "'DM Sans', sans-serif", size: mobileScoreChart ? 10 : 11, weight: 'bold' },
             color: '#1e293b'
           }
         },
@@ -2506,6 +2587,10 @@ async function loadStudentReportData(studentId) {
           mode: 'index',
           intersect: false,
           callbacks: {
+            title: function(items) {
+              const index = items?.[0]?.dataIndex ?? 0;
+              return scorePoints[index]?.label || "";
+            },
             label: function(context) {
               let label = context.dataset.label || '';
               if (label) {
@@ -2534,9 +2619,11 @@ async function loadStudentReportData(studentId) {
         },
         x: {
           ticks: {
-            font: { family: "'DM Sans', sans-serif", size: 9 },
+            autoSkip: !mobileScoreChart,
+            maxTicksLimit: mobileScoreChart ? 8 : 12,
+            font: { family: "'DM Sans', sans-serif", size: mobileScoreChart ? 10 : 9 },
             color: '#64748b',
-            maxRotation: 30,
+            maxRotation: mobileScoreChart ? 0 : 30,
             minRotation: 0
           },
           grid: {
@@ -2599,11 +2686,14 @@ async function loadStudentOfflineTestChart(studentId) {
     const dateStr = Number.isNaN(d.getTime()) ? "" : `${d.getDate()}/${d.getMonth() + 1}`;
     return {
       date: dateValue,
+      axisLabel: dateStr,
       label: `${dateStr} - ${test.title || "Đề kiểm tra"}`,
       subject: cls.subjects?.name || "Khác",
       score10: Math.round((score / maxPts) * 10 * 10) / 10,
     };
   }).filter(Boolean).sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
+
+  setStudentChartWidth(canvas, points.length, 520);
 
   if (!points.length) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -2621,7 +2711,8 @@ async function loadStudentOfflineTestChart(studentId) {
     if (!subjects[key]) subjects[key] = [];
     subjects[key].push(point);
   });
-  const labels = points.map(point => point.label);
+  const mobileOfflineTestChart = isStudentChartMobile();
+  const labels = points.map(point => mobileOfflineTestChart ? point.axisLabel : point.label);
   const colors = ["#dc2626", "#7c3aed", "#0f766e", "#d97706", "#1d4ed8", "#be185d"];
   const datasets = Object.keys(subjects).map((subject, idx) => ({
     label: subject,
@@ -2643,13 +2734,22 @@ async function loadStudentOfflineTestChart(studentId) {
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          position: "top",
-          labels: { font: { family: "'DM Sans', sans-serif", size: 11, weight: "bold" }, color: "#1e293b" }
+          position: mobileOfflineTestChart ? "bottom" : "top",
+          labels: {
+            boxWidth: mobileOfflineTestChart ? 10 : 40,
+            padding: mobileOfflineTestChart ? 10 : 12,
+            font: { family: "'DM Sans', sans-serif", size: mobileOfflineTestChart ? 10 : 11, weight: "bold" },
+            color: "#1e293b"
+          }
         },
         tooltip: {
           mode: "index",
           intersect: false,
           callbacks: {
+            title(items) {
+              const index = items?.[0]?.dataIndex ?? 0;
+              return points[index]?.label || "";
+            },
             label(context) {
               const label = context.dataset.label ? context.dataset.label + ": " : "";
               return label + (context.parsed.y ?? "—") + "/10 điểm";
@@ -2665,7 +2765,14 @@ async function loadStudentOfflineTestChart(studentId) {
           grid: { color: "rgba(148, 163, 184, 0.1)" }
         },
         x: {
-          ticks: { font: { family: "'DM Sans', sans-serif", size: 9 }, color: "#64748b", maxRotation: 30, minRotation: 0 },
+          ticks: {
+            autoSkip: !mobileOfflineTestChart,
+            maxTicksLimit: mobileOfflineTestChart ? 8 : 12,
+            font: { family: "'DM Sans', sans-serif", size: mobileOfflineTestChart ? 10 : 9 },
+            color: "#64748b",
+            maxRotation: mobileOfflineTestChart ? 0 : 30,
+            minRotation: 0
+          },
           grid: { display: false }
         }
       }
