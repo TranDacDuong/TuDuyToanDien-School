@@ -244,7 +244,7 @@
   }
 
   async function loadStaffAttendanceHistory() {
-    const startDay = addDays(localDate(), -13);
+    const startDay = addDays(localDate(), -59);
     const start = `${startDay}T00:00:00+07:00`;
     const end = `${localDate()}T23:59:59+07:00`;
     const { data, error } = await sb.from("staff_attendance_logs")
@@ -253,7 +253,7 @@
       .gte("checked_at", start)
       .lte("checked_at", end)
       .order("checked_at", { ascending: false })
-      .limit(80);
+      .limit(240);
     if (error) {
       S.attendanceHistoryLogs = [];
       if (E.attendanceHistoryList) {
