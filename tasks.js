@@ -610,6 +610,12 @@
     return String(raw || "").trim();
   }
 
+  function requirementImageUrl(payload, key) {
+    const raw = payload?.requirements?.[key];
+    if (raw && typeof raw === "object") return String(raw.image_url || raw.imageUrl || raw.drive_url || raw.driveUrl || "").trim();
+    return "";
+  }
+
   function requirementDone(payload, key) {
     const raw = payload?.requirements?.[key];
     if (raw && typeof raw === "object") return Boolean(raw.done);
@@ -870,10 +876,11 @@
   function readonlyTaskResultHtml(payload, note, requirements) {
     const submittedRequirements = requirements.map(req => {
       const value = requirementValue(payload, req.key);
+      const imageUrl = requirementImageUrl(payload, req.key);
       const done = requirementDone(payload, req.key);
-      return { ...req, value, done };
+      return { ...req, value, imageUrl, done };
     });
-    const hasRequirementData = submittedRequirements.some(req => req.value || req.done);
+    const hasRequirementData = submittedRequirements.some(req => req.value || req.imageUrl || req.done);
     if (!note && !hasRequirementData) return "";
     return `
       <div class="task-result-box">
@@ -884,6 +891,7 @@
             <div class="task-requirement-item ${req.done ? "task-requirement-done" : ""}">
               <div class="task-requirement-title">${esc(req.title)} • ${req.done ? "Đã hoàn thành" : "Chưa hoàn thành"}</div>
               <div class="task-result-note">${req.value ? linkifyTaskText(req.value) : "<em>Chưa nhập kết quả</em>"}</div>
+              ${req.imageUrl ? `<a href="${esc(req.imageUrl)}" target="_blank" rel="noopener noreferrer" style="font-size:.78rem;font-weight:800;color:#1d6bd1">Mở ảnh minh chứng</a>` : ""}
             </div>
           `).join("")}
         </div>` : ""}
@@ -1595,6 +1603,14 @@
         <div class="task-requirement-item ${requirementDone(payload, req.key) ? "task-requirement-done" : ""}">
           <div class="task-requirement-title">${esc(req.title)}</div>
           <textarea class="task-result-input" data-requirement-input="${esc(id)}" data-requirement-key="${esc(req.key)}" placeholder="Nhập kết quả cho mục này...">${esc(requirementValue(payload, req.key))}</textarea>
+          <div style="display:grid;gap:6px">
+            <input class="task-result-input" style="min-height:auto;height:38px;resize:none" type="url" data-requirement-image-url="${esc(id)}" data-requirement-key="${esc(req.key)}" placeholder="Link ảnh Google Drive minh chứng..." value="${esc(requirementImageUrl(payload, req.key))}">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <input type="file" accept="image/*" data-requirement-image-file="${esc(id)}" data-requirement-key="${esc(req.key)}" style="font-size:.78rem">
+              ${requirementImageUrl(payload, req.key) ? `<a href="${esc(requirementImageUrl(payload, req.key))}" target="_blank" rel="noopener noreferrer" style="font-size:.76rem;font-weight:800;color:#1d6bd1">Xem ảnh</a>` : ""}
+              <span data-requirement-image-status="${esc(id)}" data-requirement-key="${esc(req.key)}" style="font-size:.76rem;color:var(--ink-light)"></span>
+            </div>
+          </div>
           <div style="display:flex;justify-content:flex-end">
             <button class="task-btn ${requirementDone(payload, req.key) ? "success" : ""}" type="button" data-complete-requirement="${esc(id)}" data-requirement-key="${esc(req.key)}">
               ${requirementDone(payload, req.key) ? "Đã hoàn thành mục" : "Hoàn thành mục"}
@@ -1641,15 +1657,55 @@
       const reqInput = [...document.querySelectorAll("[data-requirement-input]")]
         .filter(element => element.dataset.requirementInput === id)
         .find(element => element.dataset.requirementKey === req.key);
+      const imageInput = [...document.querySelectorAll("[data-requirement-image-url]")]
+        .filter(element => element.dataset.requirementImageUrl === id)
+        .find(element => element.dataset.requirementKey === req.key);
       const oldRaw = payload.requirements?.[req.key];
       const oldDone = requirementDone(payload, req.key);
       requirements[req.key] = {
         value: String(reqInput?.value || requirementValue(payload, req.key) || "").trim(),
+        image_url: String(imageInput?.value || requirementImageUrl(payload, req.key) || "").trim(),
         done: oldDone,
       };
       if (oldRaw && typeof oldRaw === "object" && oldRaw.done === false) requirements[req.key].done = false;
     });
     return { note, requirements };
+  }
+
+  async function uploadRequirementImage(input) {
+    const file = input?.files?.[0];
+    if (!file) return;
+    if (!window.MindupImageUpload?.uploadCompressedImage) {
+      alert("Chưa tải được công cụ upload ảnh Drive. Vui lòng tải lại trang rồi thử lại.");
+      input.value = "";
+      return;
+    }
+    const id = input.dataset.requirementImageFile;
+    const key = input.dataset.requirementKey;
+    const urlInput = [...document.querySelectorAll("[data-requirement-image-url]")]
+      .filter(element => element.dataset.requirementImageUrl === id)
+      .find(element => element.dataset.requirementKey === key);
+    const status = [...document.querySelectorAll("[data-requirement-image-status]")]
+      .filter(element => element.dataset.requirementImageStatus === id)
+      .find(element => element.dataset.requirementKey === key);
+    try {
+      if (status) status.textContent = "Đang upload ảnh...";
+      input.disabled = true;
+      const uploaded = await window.MindupImageUpload.uploadCompressedImage(file, {
+        kind: "task",
+        folder: "task-results",
+      });
+      const url = window.MindupImageUpload.getDisplayUrl(uploaded) || uploaded?.downloadUrl || uploaded?.url || "";
+      if (!url) throw new Error("Không nhận được link ảnh Drive.");
+      if (urlInput) urlInput.value = url;
+      if (status) status.innerHTML = '<a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer" style="font-weight:800;color:#1d6bd1">Đã upload ảnh</a>';
+    } catch (error) {
+      if (status) status.textContent = "";
+      alert("Không thể upload ảnh: " + (error?.message || error));
+    } finally {
+      input.disabled = false;
+      input.value = "";
+    }
   }
 
   async function completeRequirement(id, key) {
@@ -1659,8 +1715,9 @@
     const req = taskRequirements(item).find(row => row.key === key);
     if (!req) return;
     const value = String(payload.requirements?.[key]?.value || "").trim();
-    if (!value) return alert(`Hãy nhập kết quả cho mục: ${req.title}`);
-    payload.requirements[key] = { value, done: true };
+    const imageUrl = String(payload.requirements?.[key]?.image_url || "").trim();
+    if (!value && !imageUrl) return alert(`Hãy nhập kết quả hoặc upload ảnh cho mục: ${req.title}`);
+    payload.requirements[key] = { value, image_url: imageUrl, done: true };
     const requirements = taskRequirements(item);
     const allDone = requirements.every(row => Boolean(payload.requirements?.[row.key]?.done));
     const storedNote = JSON.stringify({ __task_result_v2: true, note: payload.note || "", requirements: payload.requirements });
@@ -1683,6 +1740,7 @@
     taskRequirements(item).forEach(req => {
       resetRequirements[req.key] = {
         value: requirementValue(payload, req.key),
+        image_url: requirementImageUrl(payload, req.key),
         done: false,
       };
     });
@@ -2202,8 +2260,9 @@
     const req = taskRequirements(item).find(row => row.key === key);
     if (!req) return;
     const value = String(payload.requirements?.[key]?.value || "").trim();
-    if (!value) return alert(`Hãy nhập kết quả cho mục: ${req.title}`);
-    payload.requirements[key] = { value, done: true };
+    const imageUrl = String(payload.requirements?.[key]?.image_url || "").trim();
+    if (!value && !imageUrl) return alert(`Hãy nhập kết quả hoặc upload ảnh cho mục: ${req.title}`);
+    payload.requirements[key] = { value, image_url: imageUrl, done: true };
     const requirements = taskRequirements(item);
     const allDone = requirements.every(row => Boolean(payload.requirements?.[row.key]?.done));
     const storedNote = JSON.stringify({ __task_result_v2: true, note: payload.note || "", requirements: payload.requirements });
@@ -2236,6 +2295,7 @@
     taskRequirements(item).forEach(req => {
       resetRequirements[req.key] = {
         value: requirementValue(payload, req.key),
+        image_url: requirementImageUrl(payload, req.key),
         done: false,
       };
     });
@@ -2335,6 +2395,10 @@
     E.list.addEventListener("input", event => {
       const input = event.target.closest(".task-result-input");
       if (input) autoResizeTextarea(input);
+    });
+    E.list.addEventListener("change", event => {
+      const input = event.target.closest("[data-requirement-image-file]");
+      if (input) uploadRequirementImage(input);
     });
     byId("taskRefreshButton").addEventListener("click", () => loadTasks({ refresh: true }));
     byId("taskDeleteOldButton").addEventListener("click", deleteOldTasks);
