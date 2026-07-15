@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Đăng bài Facebook</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css?v=20260615-ios1">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font-body);background:radial-gradient(circle at top left,rgba(200,150,42,.10),transparent 22%),linear-gradient(180deg,#f4efe4 0%,#f8f5ef 28%,#f7faff 100%);color:var(--ink)}
+.page{max-width:1120px;margin:0 auto;padding:24px 24px 56px}
+.hero{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:20px;padding:24px 26px;border-radius:26px;background:radial-gradient(circle at top right,rgba(255,255,255,.22),transparent 34%),linear-gradient(135deg,rgba(15,31,61,.98) 0%,rgba(31,65,128,.95) 56%,rgba(200,150,42,.86) 100%);border:1px solid rgba(35,56,92,.08);box-shadow:0 18px 42px rgba(15,23,42,.08)}
+.hero h1{margin:0 0 8px;color:#fff;font-family:var(--font-display);font-size:2rem}
+.hero p{margin:0;max-width:720px;color:rgba(255,255,255,.82);line-height:1.6}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);color:#fff;font-weight:800;font-size:.82rem}
+.grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(320px,.65fr);gap:18px}
+.card{background:rgba(255,255,255,.94);border:1px solid rgba(35,56,92,.08);border-radius:24px;box-shadow:0 18px 42px rgba(15,23,42,.08);padding:20px}
+.card h2{margin:0 0 14px;color:var(--navy);font-family:var(--font-display);font-size:1.28rem}
+.form{display:grid;gap:14px}
+.field{display:grid;gap:7px}
+.field label{font-weight:800;color:var(--navy);font-size:.88rem}
+.input,.select,.textarea{width:100%;border:1px solid rgba(39,58,91,.14);border-radius:16px;padding:12px 14px;background:#fff;color:var(--ink);font:inherit;outline:none}
+.textarea{min-height:180px;resize:vertical;line-height:1.55}
+.input:focus,.select:focus,.textarea:focus{border-color:rgba(29,107,209,.45);box-shadow:0 0 0 4px rgba(29,107,209,.10)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.hint{color:var(--ink-light);font-size:.82rem;line-height:1.5}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.check-row{display:flex;gap:9px;align-items:flex-start;color:var(--ink-mid);font-size:.86rem;line-height:1.45}
+.check-row input{margin-top:3px}
+.status{display:none;margin-top:14px;border-radius:18px;padding:13px 14px;font-size:.9rem;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+.status.show{display:block}
+.status.ok{background:#ecfdf5;border:1px solid rgba(16,185,129,.24);color:#047857}
+.status.err{background:#fef2f2;border:1px solid rgba(239,68,68,.24);color:#b91c1c}
+.status.info{background:#eff6ff;border:1px solid rgba(29,107,209,.22);color:#1d4ed8}
+.side-list{display:grid;gap:12px}
+.info-box{border-radius:18px;border:1px solid rgba(39,58,91,.10);background:linear-gradient(180deg,#fff 0%,#f8fbff 100%);padding:14px}
+.info-title{font-weight:900;color:var(--navy);margin-bottom:6px}
+.info-box p,.info-box ol{margin:0;color:var(--ink-mid);line-height:1.6;font-size:.88rem}
+.info-box ol{padding-left:19px}
+.post-preview{border-radius:18px;border:1px dashed rgba(29,107,209,.28);background:#fff;padding:14px;display:grid;gap:8px}
+.page-name{font-weight:900;color:var(--navy)}
+.preview-message{white-space:pre-wrap;color:var(--ink);line-height:1.55;min-height:80px}
+.preview-link{display:none;color:#1d4ed8;font-size:.84rem;word-break:break-word}
+.preview-link.show{display:block}
+.history{display:grid;gap:8px;max-height:260px;overflow:auto;padding-right:4px}
+.history-item{border-radius:14px;background:#fff;border:1px solid rgba(39,58,91,.08);padding:10px;font-size:.82rem;color:var(--ink-mid);line-height:1.45}
+.history-item a{color:#1d4ed8;font-weight:800;text-decoration:none}
+.token-wrap{position:relative}
+.token-wrap .input{padding-right:52px}
+.icon-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:0;border-radius:12px;background:#eef4ff;color:#12376b;cursor:pointer}
+@media(max-width:900px){.grid{grid-template-columns:1fr}.page{padding:16px 12px 36px}.row{grid-template-columns:1fr}}
+@media(max-width:640px){.page{padding:14px 10px 28px}.hero,.card{border-radius:22px}.hero{padding:18px}.hero h1{font-size:1.48rem}.card{padding:15px}.textarea{min-height:160px}.actions{flex-direction:column}.actions .btn{width:100%;min-height:46px}.badge{width:100%;justify-content:center}}
+</style>
+<script src="visual-effects.js?v=20260602-mindup1" defer></script>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f1f3d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="MindUp">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<script src="pwa.js?v=20260714-ios-install-4panel2" defer></script>
+</head>
+<body>
+<div class="page">
+  <section class="hero">
+    <div>
+      <h1>Đăng bài Facebook</h1>
+      <p>Trang test đăng bài/hẹn lịch lên Fanpage qua Meta Graph API. Hiện đang setup thử cho Fanpage <strong>MindUp - Tư Duy Sinh Học</strong>.</p>
+    </div>
+    <span class="badge">🧬 MindUp - Tư Duy Sinh Học</span>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Soạn bài đăng thử</h2>
+      <form class="form" id="fbPostForm">
+        <div class="field">
+          <label>Fanpage</label>
+          <select class="select" id="pageSelect">
+            <option value="1163066643562080" selected>MindUp - Tư Duy Sinh Học — 1163066643562080</option>
+          </select>
+          <div class="hint">Đây là Page ID mình đọc được từ Facebook Pages Manager.</div>
+        </div>
+
+        <div class="field">
+          <label>Page Access Token</label>
+          <div class="token-wrap">
+            <input class="input" id="accessToken" type="password" autocomplete="off" placeholder="Dán Page Access Token có quyền pages_manage_posts">
+            <button class="icon-btn" id="toggleTokenBtn" type="button" title="Hiện/ẩn token" aria-label="Hiện/ẩn token">👁</button>
+          </div>
+          <label class="check-row">
+            <input id="rememberToken" type="checkbox">
+            <span>Giữ token trong phiên trình duyệt này để test nhanh. Không lưu token vào database.</span>
+          </label>
+        </div>
+
+        <div class="field">
+          <label>Nội dung bài viết</label>
+          <textarea class="textarea" id="message" maxlength="6000" placeholder="Nhập nội dung muốn đăng lên Fanpage MindUp - Tư Duy Sinh Học..."></textarea>
+          <div class="hint"><span id="charCount">0</span>/6000 ký tự</div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label>Link đính kèm (tuỳ chọn)</label>
+            <input class="input" id="linkUrl" type="url" placeholder="https://mindup.edu.vn/...">
+          </div>
+          <div class="field">
+            <label>Ảnh bằng URL công khai (tuỳ chọn)</label>
+            <input class="input" id="imageUrl" type="url" placeholder="https://.../image.jpg">
+            <div class="hint">Nếu nhập ảnh URL, bài sẽ đăng dạng ảnh kèm caption.</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label>Chế độ đăng</label>
+            <select class="select" id="publishMode">
+              <option value="now">Đăng ngay</option>
+              <option value="schedule">Hẹn lịch đăng</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Thời gian hẹn lịch</label>
+            <input class="input" id="scheduleAt" type="datetime-local" disabled>
+            <div class="hint">Facebook yêu cầu lịch hẹn thường phải sau hiện tại ít nhất khoảng 10 phút.</div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn btn-primary" id="submitBtn" type="submit">Đăng thử lên Fanpage</button>
+          <button class="btn btn-outline" id="previewBtn" type="button">Cập nhật xem trước</button>
+          <a class="btn btn-outline" href="https://www.facebook.com/MindUpTuDuySinhHoc" target="_blank" rel="noopener">Mở Fanpage</a>
+        </div>
+      </form>
+      <div class="status info show" id="statusBox">Sẵn sàng test. Bạn cần dán Page Access Token rồi bấm “Đăng thử lên Fanpage”.</div>
+    </section>
+
+    <aside class="side-list">
+      <div class="card">
+        <h2>Xem trước</h2>
+        <div class="post-preview">
+          <div class="page-name">MindUp - Tư Duy Sinh Học</div>
+          <div class="hint" id="previewMode">Đăng ngay</div>
+          <div class="preview-message" id="previewMessage">Nội dung bài đăng sẽ hiển thị ở đây.</div>
+          <a class="preview-link" id="previewLink" href="#" target="_blank" rel="noopener"></a>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Cách lấy token test</h2>
+        <div class="info-box">
+          <div class="info-title">Token cần quyền gì?</div>
+          <p>Cần Page Access Token của Fanpage, có quyền <strong>pages_manage_posts</strong> và thường cần thêm <strong>pages_show_list</strong>.</p>
+        </div>
+        <div class="info-box">
+          <div class="info-title">Các bước test nhanh</div>
+          <ol>
+            <li>Mở Meta Graph API Explorer.</li>
+            <li>Chọn app Meta của MindUp hoặc tạo app test.</li>
+            <li>Lấy User Token có quyền quản lý Page.</li>
+            <li>Đổi sang Page Access Token của “MindUp - Tư Duy Sinh Học”.</li>
+            <li>Dán token vào trang này và đăng thử.</li>
+          </ol>
+        </div>
+        <a class="btn btn-outline" href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener">Mở Graph API Explorer</a>
+      </div>
+
+      <div class="card">
+        <h2>Lịch sử test trên máy này</h2>
+        <div class="history" id="historyBox"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+const FB_GRAPH_VERSION = "v20.0";
+const FB_TEST_PAGE = {
+  id: "1163066643562080",
+  name: "MindUp - Tư Duy Sinh Học",
+  url: "https://www.facebook.com/MindUpTuDuySinhHoc"
+};
+const HISTORY_KEY = "mindup_facebook_post_test_history";
+const TOKEN_KEY = "mindup_facebook_page_token_session";
+const ALLOWED_ROLES = new Set(["admin", "assistant", "teacher"]);
+let currentProfile = null;
+
+function byId(id){ return document.getElementById(id); }
+function esc(value){
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[ch]));
+}
+function showStatus(type, message){
+  const box = byId("statusBox");
+  box.className = `status ${type} show`;
+  box.textContent = message;
+}
+function setBusy(isBusy){
+  const btn = byId("submitBtn");
+  btn.disabled = isBusy;
+  btn.textContent = isBusy ? "Đang gửi lên Facebook..." : "Đăng thử lên Fanpage";
+}
+function getHistory(){
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); }
+  catch { return []; }
+}
+function saveHistory(item){
+  const rows = [item, ...getHistory()].slice(0, 12);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(rows));
+  renderHistory();
+}
+function renderHistory(){
+  const rows = getHistory();
+  byId("historyBox").innerHTML = rows.length
+    ? rows.map(row => `
+      <div class="history-item">
+        <strong>${esc(row.status || "Test")}</strong> • ${esc(row.time || "")}<br>
+        ${row.postUrl ? `<a href="${esc(row.postUrl)}" target="_blank" rel="noopener">Mở bài đã đăng</a>` : esc(row.note || "")}
+      </div>
+    `).join("")
+    : `<div class="hint">Chưa có lần test nào trên trình duyệt này.</div>`;
+}
+function getScheduleUnix(){
+  if (byId("publishMode").value !== "schedule") return null;
+  const raw = byId("scheduleAt").value;
+  if (!raw) throw new Error("Vui lòng chọn thời gian hẹn lịch.");
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) throw new Error("Thời gian hẹn lịch không hợp lệ.");
+  const minTime = Date.now() + 10 * 60 * 1000;
+  if (date.getTime() < minTime) throw new Error("Thời gian hẹn lịch cần sau hiện tại ít nhất khoảng 10 phút.");
+  return Math.floor(date.getTime() / 1000);
+}
+function updatePreview(){
+  const message = byId("message").value.trim();
+  const link = byId("linkUrl").value.trim() || byId("imageUrl").value.trim();
+  byId("charCount").textContent = String(byId("message").value.length);
+  byId("previewMessage").textContent = message || "Nội dung bài đăng sẽ hiển thị ở đây.";
+  const linkEl = byId("previewLink");
+  if (link) {
+    linkEl.textContent = link;
+    linkEl.href = link;
+    linkEl.classList.add("show");
+  } else {
+    linkEl.textContent = "";
+    linkEl.href = "#";
+    linkEl.classList.remove("show");
+  }
+  const mode = byId("publishMode").value;
+  byId("previewMode").textContent = mode === "schedule"
+    ? `Hẹn lịch: ${byId("scheduleAt").value || "chưa chọn thời gian"}`
+    : "Đăng ngay";
+}
+async function loadProfile(){
+  const user = await window.AppAuth?.getUser?.();
+  if (!user) {
+    showStatus("err", "Vui lòng đăng nhập trước khi dùng chức năng đăng bài Facebook.");
+    byId("fbPostForm").querySelectorAll("input,textarea,select,button").forEach(el => el.disabled = true);
+    return;
+  }
+  const { data: profile, error } = await sb.from("users").select("id,role,full_name,email").eq("id", user.id).maybeSingle();
+  if (error || !profile || !ALLOWED_ROLES.has(profile.role)) {
+    showStatus("err", "Tài khoản này chưa có quyền đăng bài Facebook. Hiện chỉ mở cho admin, trợ giảng và giáo viên.");
+    byId("fbPostForm").querySelectorAll("input,textarea,select,button").forEach(el => el.disabled = true);
+    return;
+  }
+  currentProfile = profile;
+}
+function getEndpoint(hasImage){
+  return `https://graph.facebook.com/${FB_GRAPH_VERSION}/${FB_TEST_PAGE.id}/${hasImage ? "photos" : "feed"}`;
+}
+async function submitPost(event){
+  event.preventDefault();
+  if (!currentProfile) return showStatus("err", "Chưa xác thực được tài khoản trong hệ thống.");
+
+  const token = byId("accessToken").value.trim();
+  const message = byId("message").value.trim();
+  const linkUrl = byId("linkUrl").value.trim();
+  const imageUrl = byId("imageUrl").value.trim();
+  if (!token) return showStatus("err", "Vui lòng dán Page Access Token trước khi đăng thử.");
+  if (!message && !linkUrl && !imageUrl) return showStatus("err", "Vui lòng nhập nội dung, link hoặc ảnh trước khi đăng.");
+
+  const scheduleUnix = getScheduleUnix();
+  const body = new URLSearchParams();
+  body.set("access_token", token);
+  if (imageUrl) {
+    body.set("url", imageUrl);
+    if (message) body.set("caption", message);
+  } else {
+    if (message) body.set("message", message);
+    if (linkUrl) body.set("link", linkUrl);
+  }
+  if (scheduleUnix) {
+    body.set("published", "false");
+    body.set("scheduled_publish_time", String(scheduleUnix));
+  }
+
+  if (byId("rememberToken").checked) {
+    sessionStorage.setItem(TOKEN_KEY, token);
+  } else {
+    sessionStorage.removeItem(TOKEN_KEY);
+  }
+
+  setBusy(true);
+  showStatus("info", "Đang gửi bài lên Meta Graph API...");
+  try {
+    const res = await fetch(getEndpoint(Boolean(imageUrl)), {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body
+    });
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      const err = json.error || {};
+      throw new Error(`${err.message || "Facebook từ chối đăng bài."}${err.code ? `\nMã lỗi: ${err.code}` : ""}${err.error_subcode ? `\nSubcode: ${err.error_subcode}` : ""}`);
+    }
+    const objectId = json.post_id || json.id || "";
+    const postUrl = objectId && !scheduleUnix
+      ? `https://www.facebook.com/${objectId.replace("_", "/posts/")}`
+      : FB_TEST_PAGE.url;
+    showStatus("ok", scheduleUnix
+      ? `Đã hẹn lịch thành công trên Fanpage ${FB_TEST_PAGE.name}.\nID: ${objectId || "(Facebook chưa trả ID bài viết)"}`
+      : `Đã đăng thử thành công lên Fanpage ${FB_TEST_PAGE.name}.\nID: ${objectId || "(không có ID)"}`
+    );
+    saveHistory({
+      status: scheduleUnix ? "Đã hẹn lịch" : "Đã đăng",
+      time: new Date().toLocaleString("vi-VN"),
+      postUrl,
+      note: objectId
+    });
+  } catch (error) {
+    showStatus("err", `Không đăng được bài:\n${error.message || error}`);
+    saveHistory({
+      status: "Lỗi",
+      time: new Date().toLocaleString("vi-VN"),
+      note: error.message || String(error)
+    });
+  } finally {
+    setBusy(false);
+  }
+}
+function initEvents(){
+  const storedToken = sessionStorage.getItem(TOKEN_KEY) || "";
+  if (storedToken) {
+    byId("accessToken").value = storedToken;
+    byId("rememberToken").checked = true;
+  }
+  byId("message").addEventListener("input", updatePreview);
+  byId("linkUrl").addEventListener("input", updatePreview);
+  byId("imageUrl").addEventListener("input", updatePreview);
+  byId("scheduleAt").addEventListener("input", updatePreview);
+  byId("publishMode").addEventListener("change", () => {
+    const scheduled = byId("publishMode").value === "schedule";
+    byId("scheduleAt").disabled = !scheduled;
+    updatePreview();
+  });
+  byId("previewBtn").addEventListener("click", updatePreview);
+  byId("toggleTokenBtn").addEventListener("click", () => {
+    const input = byId("accessToken");
+    input.type = input.type === "password" ? "text" : "password";
+  });
+  byId("fbPostForm").addEventListener("submit", submitPost);
+  updatePreview();
+  renderHistory();
+}
+document.addEventListener("DOMContentLoaded", async () => {
+  initEvents();
+  await loadProfile();
+});
+</script>
+</body>
+</html>
