@@ -622,6 +622,12 @@
     return Boolean(isMobileDevice() && !isStandaloneApp());
   }
 
+  function shouldShowInstallLauncher() {
+    if (!isTopLevelWindow()) return false;
+    if (isStandaloneApp()) return false;
+    return Boolean(isMobileDevice() || isAndroidDevice() || isIosDevice() || deferredInstallPrompt);
+  }
+
   function ensurePromptStyles() {
     if (document.getElementById("mindupPushPromptStyles")) return;
     const style = document.createElement("style");
@@ -1141,7 +1147,7 @@
   async function initInstallLauncher() {
     if (!isTopLevelWindow()) return;
     removeInstallLauncher();
-    if (!isMobileDevice() || isStandaloneApp()) return;
+    if (!shouldShowInstallLauncher()) return;
     if (document.getElementById("mindupInstallPrompt")) return;
     ensurePromptStyles();
 
@@ -1149,8 +1155,8 @@
     launcher.id = "mindupInstallLauncher";
     launcher.className = "mindup-install-launcher";
     launcher.type = "button";
-    launcher.setAttribute("aria-label", isIosDevice() ? "Hướng dẫn cài app MindUp" : "Cài app MindUp");
-    launcher.innerHTML = `<span>＋</span><span>${isIosDevice() ? "Hướng dẫn cài app" : "Cài app"}</span>`;
+    launcher.setAttribute("aria-label", isIosDevice() ? "Hướng dẫn tải app MindUp" : "Tải app MindUp");
+    launcher.innerHTML = `<span>＋</span><span>${isIosDevice() ? "Hướng dẫn tải app" : "Tải app"}</span>`;
     launcher.addEventListener("click", () => {
       localStorage.removeItem(INSTALL_DISMISSED_AT_KEY);
       removePrompt();
@@ -1297,7 +1303,7 @@
         <button class="mindup-push-enable" type="button">Đã cài xong</button>
       </div>
     ` : `
-      <strong>Cài app MindUp trên điện thoại</strong>
+      <strong>Tải app MindUp trên điện thoại</strong>
       <p>Thêm MindUp vào màn hình chính để mở nhanh như app, học thuận tiện hơn và nhận thông tin học tập kịp thời.</p>
       ${canUseNativeInstall ? "" : `
         <ol class="mindup-install-steps">
@@ -1308,7 +1314,7 @@
       `}
       <div class="mindup-push-actions">
         <button class="mindup-push-later" type="button">Để sau</button>
-        <button class="mindup-push-enable" type="button">${canUseNativeInstall ? "Cài app" : "Mở hướng dẫn"}</button>
+        <button class="mindup-push-enable" type="button">${canUseNativeInstall ? "Tải app" : "Mở hướng dẫn"}</button>
       </div>
     `;
 
@@ -1433,7 +1439,11 @@
   async function initInstallPrompt() {
     if (!isTopLevelWindow()) return;
     const user = await getCurrentUser();
-    if (shouldShowInstallPrompt(user)) showInstallPrompt();
+    if (isIosDevice() && shouldShowInstallPrompt(user)) {
+      showInstallPrompt();
+      return;
+    }
+    initInstallLauncher();
   }
 
   async function watchAuthForPrompts() {
