@@ -626,7 +626,7 @@
   function shouldShowInstallLauncher() {
     if (!isTopLevelWindow()) return false;
     if (isStandaloneApp()) return false;
-    return Boolean(isMobileDevice() || isAndroidDevice() || isIosDevice() || deferredInstallPrompt);
+    return Boolean(isMobileDevice() || isAndroidDevice() || isIosDevice());
   }
 
   function ensurePromptStyles() {
