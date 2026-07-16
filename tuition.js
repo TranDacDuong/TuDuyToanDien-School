@@ -314,6 +314,7 @@
   let allRows    = [];
   let grouped    = [];
   let paymentMap = {};
+  let parentContactMap = {};
   let currentRows = [];
   let currentRole = "admin";
   let currentUserId = null;
@@ -322,6 +323,17 @@
 
   function canViewStudentPhone() {
     return currentRole === "admin" || currentRole === "assistant" || currentRole === "accountant";
+  }
+
+  function renderParentContacts(contacts = []) {
+    if (!canViewStudentPhone()) return "";
+    const rows = (contacts || []).filter(Boolean);
+    if (!rows.length) return `<div class="tuition-contact muted">PH: Chưa liên kết tài khoản phụ huynh</div>`;
+    return rows.map(parent => {
+      const name = parent.full_name || parent.email || "Phụ huynh";
+      const phone = parent.phone || "chưa có SĐT";
+      return `<div class="tuition-contact">PH: ${esc(name)} • ${esc(phone)}</div>`;
+    }).join("");
   }
 
   function canManagePayments() {
@@ -948,6 +960,7 @@ Nhập số tiền hoàn lại (>0):`,
         classId: cs.class_id,
         studentName: cs.user?.full_name || "—",
         phone: canViewStudentPhone() ? (cs.user?.phone || "") : "",
+        parentContacts: canViewStudentPhone() ? (parentContactMap[cs.student_id] || []) : [],
         className: cls.class_name,
         tuitionType: cls.tuition_type,
         tuitionFee: cls.tuition_fee,
@@ -1032,6 +1045,39 @@ Nhập số tiền hoàn lại (>0):`,
       if (e4) throw e4;
       if (e5) throw e5;
 
+      parentContactMap = {};
+      if (canViewStudentPhone()) {
+        const studentIds = [...new Set((classStudents || []).map(row => row.student_id).filter(Boolean))];
+        if (studentIds.length) {
+          const { data: parentLinks, error: e6 } = await sb
+            .from("parent_students")
+            .select("student_id, parent_id")
+            .in("student_id", studentIds)
+            .is("revoked_at", null);
+          if (e6) {
+            console.warn("Không tải được thông tin phụ huynh trong bảng học phí:", e6);
+          }
+
+          const parentIds = [...new Set((parentLinks || []).map(row => row.parent_id).filter(Boolean))];
+          const parentById = {};
+          if (parentIds.length) {
+            const { data: parents, error: e7 } = await sb
+              .from("users")
+              .select("id, full_name, email, phone")
+              .in("id", parentIds);
+            if (e7) console.warn("Không tải được tài khoản phụ huynh trong bảng học phí:", e7);
+            else (parents || []).forEach(parent => { parentById[parent.id] = parent; });
+          }
+
+          (parentLinks || []).forEach(link => {
+            const parent = parentById[link.parent_id];
+            if (!parent) return;
+            if (!parentContactMap[link.student_id]) parentContactMap[link.student_id] = [];
+            parentContactMap[link.student_id].push(parent);
+          });
+        }
+      }
+
       // paymentMap: studentId → record
       paymentMap = {};
       (payments || []).forEach(p => { paymentMap[p.student_id] = p; });
@@ -1066,6 +1112,7 @@ Nhập số tiền hoàn lại (>0):`,
           studentId:   r.studentId,
           studentName: r.studentName,
           phone:       r.phone,
+          parentContacts: r.parentContacts || [],
           ym:          r.ym,
           classes:     [],           // chi tiết từng lớp
           totalSessions: 0,
@@ -1075,6 +1122,9 @@ Nhập số tiền hoàn lại (>0):`,
         };
       }
       const g = map[r.studentId];
+      if ((!g.parentContacts || !g.parentContacts.length) && r.parentContacts?.length) {
+        g.parentContacts = r.parentContacts;
+      }
       g.classes.push({
         classId:          r.classId,
         className:        r.className,
@@ -1279,12 +1329,15 @@ Nhập số tiền hoàn lại (>0):`,
       if (!map[r.studentId]) {
         map[r.studentId] = {
           studentId: r.studentId, studentName: r.studentName,
-          phone: r.phone, ym: r.ym,
+          phone: r.phone, parentContacts: r.parentContacts || [], ym: r.ym,
           classes: [], totalSessions: 0,
           present: 0, absent: 0, makeup: 0, billableSessions: 0, amount: 0,
         };
       }
       const g = map[r.studentId];
+      if ((!g.parentContacts || !g.parentContacts.length) && r.parentContacts?.length) {
+        g.parentContacts = r.parentContacts;
+      }
       g.classes.push({
         classId:       r.classId,
         className:     r.className, tuitionType:      r.tuitionType,
@@ -1411,7 +1464,7 @@ Nhập số tiền hoàn lại (>0):`,
           <span class="student-trigger">
             <span class="student-name">${g.studentName}</span>
           </span>
-          ${canViewStudentPhone() && g.phone ? `<div style="font-size:11px;color:var(--muted)">${g.phone}</div>` : ""}
+          ${canViewStudentPhone() ? `<div class="tuition-contact">HS: ${esc(g.phone || "chưa có SĐT")}</div>${renderParentContacts(g.parentContacts)}` : ""}
           <button class="hint-link" type="button" onclick="event.stopPropagation();openTuitionDetail('${g.studentId}')">Xem chi tiết ${g.classes.length} lớp học</button>
           ${noteBlock}
         </td>
