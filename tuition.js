@@ -41,15 +41,16 @@
   }
 
   const STATIC_BANK_INFO = {
-    bank: "TCB",
-    account: "8209224001",
+    bankCode: "TCB",
+    bankName: "Techcombank",
+    account: "220406022268",
   };
 
   function buildPaymentQrUrl(studentName, ym, amount) {
     const finalAmount = Math.max(0, Math.round(Number(amount) || 0));
     if (!finalAmount) return "";
     const addInfo = buildTransferContent(studentName, ym);
-    return `https://img.vietqr.io/image/${STATIC_BANK_INFO.bank}-${STATIC_BANK_INFO.account}-compact2.png?amount=${encodeURIComponent(finalAmount)}&addInfo=${encodeURIComponent(addInfo)}`;
+    return `https://img.vietqr.io/image/${STATIC_BANK_INFO.bankCode}-${STATIC_BANK_INFO.account}-compact2.png?amount=${encodeURIComponent(finalAmount)}&addInfo=${encodeURIComponent(addInfo)}`;
   }
 
   function buildPaymentQrBlock(studentName, ym, amount, studentId) {
@@ -67,7 +68,7 @@
         </div>
         <div class="qr-payment-text">
           <div class="qr-payment-title">Quét mã để thanh toán học phí</div>
-          <div class="qr-payment-line"><span>Ngân hàng:</span><b>${STATIC_BANK_INFO.bank}</b></div>
+          <div class="qr-payment-line"><span>Ngân hàng:</span><b>${STATIC_BANK_INFO.bankName}</b></div>
           <div class="qr-payment-line"><span>Số tài khoản:</span><b>${STATIC_BANK_INFO.account}</b></div>
           <div class="qr-payment-line"><span>Số tiền:</span><b>${fmt(finalAmount)}đ</b></div>
           <div class="qr-payment-line"><span>Nội dung CK:</span><b>${transferContent}</b></div>
