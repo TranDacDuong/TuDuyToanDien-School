@@ -617,6 +617,7 @@
     }
     const localPreview = /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
       && new URLSearchParams(location.search).get("ios_guide") === "1";
+    if (isAndroidDevice()) return !isStandaloneApp();
     if (!isIosDevice() && isSnoozed(INSTALL_DISMISSED_AT_KEY)) return false;
     if (localPreview) return !isStandaloneApp();
     return Boolean(isMobileDevice() && !isStandaloneApp());
@@ -1439,7 +1440,7 @@
   async function initInstallPrompt() {
     if (!isTopLevelWindow()) return;
     const user = await getCurrentUser();
-    if (isIosDevice() && shouldShowInstallPrompt(user)) {
+    if ((isIosDevice() || isAndroidDevice()) && shouldShowInstallPrompt(user)) {
       showInstallPrompt();
       return;
     }
