@@ -94,7 +94,8 @@ h1 {
   box-shadow: none;
 }
 .toolbar select,
-.toolbar input[type=month] {
+.toolbar input[type=month],
+.toolbar input[type=search] {
   padding: 10px 12px;
   border: 1px solid rgba(15,31,61,.12);
   border-radius: 12px;
@@ -104,9 +105,13 @@ h1 {
   color: var(--navy);
 }
 .toolbar-group.filters select,
-.toolbar-group.filters input[type=month] {
+.toolbar-group.filters input[type=month],
+.toolbar-group.filters input[type=search] {
   flex: 1 1 170px;
   min-width: 0;
+}
+.toolbar-group.filters input[type=search] {
+  flex-basis: 280px;
 }
 .badge {
   background: rgba(15,60,115,.08);
@@ -936,6 +941,7 @@ tr.recalc-needed td:first-child { border-left: 3px solid #ef4444; }
   <div class="toolbar">
     <div class="toolbar-group filters">
       <input type="month" id="monthPicker">
+      <input type="search" id="tuitionSearch" placeholder="Tìm HS/SĐT HS/PH/SĐT PH" oninput="renderRows()" autocomplete="off">
       <select id="classFilter" onchange="renderRows()">
         <option value="">Tất cả lớp</option>
       </select>
@@ -1012,6 +1018,6 @@ tr.recalc-needed td:first-child { border-left: 3px solid #ef4444; }
   <div id="printArea"></div>
 </div>
 
-<script src="./tuition.js?v=20260716-parent-contact1"></script>
+<script src="./tuition.js?v=20260717-search-contact1"></script>
 </body>
 </html>

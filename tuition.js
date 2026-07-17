@@ -336,6 +336,33 @@
     }).join("");
   }
 
+  function normalizeSearchText(value) {
+    return toAscii(value).toLowerCase();
+  }
+
+  function onlyDigits(value) {
+    return String(value || "").replace(/\D/g, "");
+  }
+
+  function matchesTuitionSearch(row, rawQuery) {
+    const query = String(rawQuery || "").trim();
+    if (!query) return true;
+    const qText = normalizeSearchText(query);
+    const qDigits = onlyDigits(query);
+    const parentContacts = row.parentContacts || [];
+    const textParts = [
+      row.studentName,
+      row.phone,
+      ...parentContacts.flatMap(parent => [parent.full_name, parent.email, parent.phone])
+    ];
+    const haystack = normalizeSearchText(textParts.filter(Boolean).join(" "));
+    const digitHaystack = onlyDigits(textParts.filter(Boolean).join(" "));
+    return Boolean(
+      (qText && haystack.includes(qText)) ||
+      (qDigits && digitHaystack.includes(qDigits))
+    );
+  }
+
   function canManagePayments() {
     return currentRole === "admin" || currentRole === "accountant";
   }
@@ -798,6 +825,7 @@ Nhập số tiền hoàn lại (>0):`,
   function syncToolbarVisibility() {
     const classFilter = document.getElementById("classFilter");
     const paidFilter = document.getElementById("paidFilter");
+    const searchInput = document.getElementById("tuitionSearch");
     const monthInput = document.getElementById("monthPicker");
     const notifyBtn = document.getElementById("notifyTuitionBtn");
     const lockBtn = document.getElementById("lockTuitionBtn");
@@ -812,6 +840,7 @@ Nhập số tiền hoàn lại (>0):`,
     if (currentRole === "student" || currentRole === "parent") {
       if (classFilter) classFilter.style.display = "none";
       if (paidFilter) paidFilter.style.display = "none";
+      if (searchInput) searchInput.style.display = "none";
       if (monthInput) monthInput.style.display = "none";
       if (notifyBtn) notifyBtn.style.display = "none";
       if (lockBtn) lockBtn.style.display = "none";
@@ -825,6 +854,7 @@ Nhập số tiền hoàn lại (>0):`,
     }
 
     if (classFilter) classFilter.style.display = "";
+    if (searchInput) searchInput.style.display = "";
     if (monthInput) monthInput.style.display = "";
     if (rowCount) rowCount.style.display = "";
     if (summary) summary.style.display = "";
@@ -1318,10 +1348,12 @@ Nhập số tiền hoàn lại (>0):`,
     const ym          = monthPicker.value;
     const classFilter = document.getElementById("classFilter")?.value || "";
     const paidFilter  = document.getElementById("paidFilter")?.value || "";
+    const searchQuery = document.getElementById("tuitionSearch")?.value || "";
 
     // Filter trên allRows trước, rồi re-group
     let filtered = [...allRows];
     if (classFilter) filtered = filtered.filter(r => r.classId === classFilter);
+    if (searchQuery.trim()) filtered = filtered.filter(r => matchesTuitionSearch(r, searchQuery));
 
     // Re-group sau khi filter lớp
     const map = {};
