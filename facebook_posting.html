@@ -964,6 +964,63 @@ async function facebookCreate(post, mode){
   const data = await callFacebookPostingFunction({ action: "create", mode, post });
   return data.facebook_post_id || "";
 }
+async function facebookListScheduled(pageId, since, until){
+  const data = await callFacebookPostingFunction({ action: "list_scheduled", page_id: pageId, since, until });
+  return Array.isArray(data.posts) ? data.posts : [];
+}
+function sameScheduledMinute(a, b){
+  const ams = new Date(a).getTime();
+  const bms = new Date(b).getTime();
+  if (!Number.isFinite(ams) || !Number.isFinite(bms)) return false;
+  return Math.abs(ams - bms) < 60 * 1000;
+}
+async function syncFacebookScheduledStatus(){
+  if (!S.activePageId || !S.posts?.length) return;
+  const since = new Date(S.weekStart);
+  since.setHours(0,0,0,0);
+  const until = addDays(since, 7);
+  until.setMilliseconds(-1);
+
+  let facebookRows = [];
+  try {
+    facebookRows = await facebookListScheduled(S.activePageId, since.toISOString(), until.toISOString());
+  } catch (error) {
+    console.warn("Sync Facebook scheduled posts failed", error);
+    return;
+  }
+  if (!facebookRows.length) return;
+
+  const updates = [];
+  for (const post of S.posts) {
+    if (post.page_id !== S.activePageId || post.status === "published" || post.status === "cancelled") continue;
+    const matched = facebookRows.find(item => sameScheduledMinute(item.scheduled_at, post.scheduled_at));
+    if (!matched) continue;
+    if (post.status === "scheduled" && String(post.facebook_post_id || "") === String(matched.facebook_post_id || matched.id || "")) continue;
+    updates.push({
+      id: post.id,
+      facebook_post_id: matched.facebook_post_id || matched.id || null,
+      status: "scheduled",
+      last_error: null,
+      updated_at: new Date().toISOString(),
+    });
+  }
+  if (!updates.length) return;
+
+  const results = await Promise.all(updates.map(row =>
+    sb.from("facebook_scheduled_posts")
+      .update({
+        facebook_post_id: row.facebook_post_id,
+        status: row.status,
+        last_error: row.last_error,
+        updated_at: row.updated_at,
+      })
+      .eq("id", row.id)
+  ));
+  const failed = results.find(res => res.error);
+  if (failed?.error) throw failed.error;
+  const updateById = new Map(updates.map(row => [String(row.id), row]));
+  S.posts = S.posts.map(post => updateById.has(String(post.id)) ? { ...post, ...updateById.get(String(post.id)) } : post);
+}
 async function schedulePost(mode="schedule"){
   try {
     const existingId = $("postId").value;
@@ -1042,6 +1099,7 @@ async function ensureCurrentWeekPosts(){
     .order("scheduled_at");
   if (postsRes.error) throw postsRes.error;
   S.posts = postsRes.data || [];
+  await syncFacebookScheduledStatus();
 }
 async function materializeMarketingTasks(){
   const weekStart = dateKey(S.weekStart);

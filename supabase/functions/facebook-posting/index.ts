@@ -4,7 +4,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-type FacebookAction = "create" | "delete";
+type FacebookAction = "create" | "delete" | "list_scheduled";
 
 type FacebookPostPayload = {
   page_id?: string;
@@ -442,6 +442,38 @@ async function deleteFacebookPost(pageId: string, facebookPostId: string) {
   return { deleted: true };
 }
 
+async function listFacebookScheduledPosts(pageId: string, since?: string, until?: string) {
+  if (!pageId) throw new Error("Missing page_id");
+  const result = await graphFetchWithPageToken(`/${pageId}/scheduled_posts`, {
+    fields: "id,scheduled_publish_time,created_time,message,permalink_url",
+    limit: "100",
+  }, pageId, "GET");
+
+  const sinceMs = since ? new Date(since).getTime() : Number.NEGATIVE_INFINITY;
+  const untilMs = until ? new Date(until).getTime() : Number.POSITIVE_INFINITY;
+  const rows = (Array.isArray(result?.data) ? result.data : [])
+    .map((item: { id?: string; scheduled_publish_time?: number | string; created_time?: string; message?: string; permalink_url?: string }) => {
+      const seconds = Number(item?.scheduled_publish_time || 0);
+      const scheduledAt = seconds ? new Date(seconds * 1000) : null;
+      return {
+        id: String(item?.id || ""),
+        facebook_post_id: String(item?.id || ""),
+        scheduled_at: scheduledAt ? scheduledAt.toISOString() : "",
+        scheduled_publish_time: seconds || null,
+        created_time: item?.created_time || "",
+        message: item?.message || "",
+        permalink_url: item?.permalink_url || "",
+      };
+    })
+    .filter((item: { id: string; scheduled_at: string }) => {
+      if (!item.id || !item.scheduled_at) return false;
+      const ms = new Date(item.scheduled_at).getTime();
+      return ms >= sinceMs && ms <= untilMs;
+    });
+
+  return { posts: rows };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
@@ -459,6 +491,14 @@ Deno.serve(async (req) => {
     }
     if (action === "delete") {
       const result = await deleteFacebookPost(String(body?.page_id || ""), String(body?.facebook_post_id || ""));
+      return jsonResponse({ ok: true, ...result });
+    }
+    if (action === "list_scheduled") {
+      const result = await listFacebookScheduledPosts(
+        String(body?.page_id || ""),
+        body?.since ? String(body.since) : "",
+        body?.until ? String(body.until) : "",
+      );
       return jsonResponse({ ok: true, ...result });
     }
     return jsonResponse({ error: "Unknown action" }, 400);
