@@ -15,6 +15,15 @@ create table if not exists public.facebook_pages (
 alter table public.facebook_pages
 add column if not exists page_access_token text;
 
+-- Frontend no longer reads Facebook tokens from the database.
+-- Store long-lived tokens as Supabase Edge Function secrets instead:
+--   FACEBOOK_PAGE_ACCESS_TOKEN or FACEBOOK_PAGE_TOKEN_<PAGE_ID>
+update public.facebook_pages
+set page_access_token = null
+where page_access_token is not null;
+
+revoke select(page_access_token) on public.facebook_pages from anon, authenticated;
+
 create table if not exists public.facebook_post_types (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,

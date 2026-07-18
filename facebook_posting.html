@@ -356,7 +356,7 @@ async function loadData(){
   const weekStart = dateKey(S.weekStart);
   const weekEnd = dateKey(addDays(S.weekStart, 6));
   const [pagesRes, typesRes, templatesRes, postsRes] = await Promise.all([
-    sb.from("facebook_pages").select("*").eq("is_active", true).order("display_order"),
+    sb.from("facebook_pages").select("id,page_id,page_name,page_url,display_order,is_active,created_at,updated_at").eq("is_active", true).order("display_order"),
     sb.from("facebook_post_types").select("*").eq("is_active", true).order("name"),
     sb.from("facebook_post_schedule_templates").select("*").eq("is_active", true).order("publish_time"),
     sb.from("facebook_scheduled_posts").select("*").gte("scheduled_date", weekStart).lte("scheduled_date", weekEnd).order("scheduled_at"),
@@ -589,8 +589,8 @@ async function deletePost(){
   const id = $("postId").value;
   if (!id || !confirm("Xóa bài đăng này? Nếu đã hẹn trên Facebook, hệ thống sẽ cố gắng hủy trên Facebook trước.")) return;
   const row = S.posts.find(p => p.id === id);
-  if (row?.facebook_post_id && getToken()) {
-    try { await facebookDelete(row.facebook_post_id, await resolvePageToken(row.page_id)); } catch (e) { console.warn(e); }
+  if (row?.facebook_post_id) {
+    try { await facebookDelete(row.page_id, row.facebook_post_id); } catch (e) { console.warn(e); }
   }
   const { error } = await sb.from("facebook_scheduled_posts").delete().eq("id", id);
   if (error) return alert("Không xóa được bài: " + error.message);
@@ -608,65 +608,30 @@ async function uploadFile(file){
   showPostStatus("ok", "Đã upload ảnh lên Drive.");
 }
 
-function getToken(){
-  return String(currentPage()?.page_access_token || $("accessToken")?.value || localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || window.MINDUP_FACEBOOK_ACCESS_TOKEN || "").trim();
-}
-async function graphFetch(path, params={}, token=getToken(), method="GET"){
-  const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${path.replace(/^\//,"")}`);
-  Object.entries(params || {}).forEach(([k,v]) => { if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, v); });
-  if (method === "GET") url.searchParams.set("access_token", token);
-  const opt = { method };
-  if (method !== "GET") {
-    const body = new URLSearchParams();
-    Object.entries(params || {}).forEach(([k,v]) => { if (v !== undefined && v !== null && v !== "") body.set(k, v); });
-    body.set("access_token", token);
-    opt.body = body;
-    opt.headers = { "Content-Type": "application/x-www-form-urlencoded" };
-  }
-  const res = await fetch(url, opt);
-  const json = await res.json().catch(()=>({}));
-  if (!res.ok || json.error) {
-    const err = json.error || {};
-    throw new Error(`${err.message || "Facebook API lỗi."}${err.code ? `\nMã lỗi: ${err.code}` : ""}${err.error_subcode ? `\nSubcode: ${err.error_subcode}` : ""}`);
-  }
-  return json;
-}
-async function resolvePageToken(pageId){
-  const token = getToken();
-  if (!token) throw new Error("Token Facebook chưa được cấu hình hoặc đã bị xóa. Hãy cập nhật token mới cho fanpage trong hệ thống.");
-  try {
-    const data = await graphFetch("/me/accounts", { fields:"id,name,access_token,tasks" }, token);
-    const page = (data.data || []).find(p => p.id === pageId);
-    if (page?.access_token) return page.access_token;
-  } catch (_) {}
-  return token;
-}
 function facebookPostUrl(id){ return id ? `https://www.facebook.com/${String(id)}` : ""; }
-async function facebookDelete(facebookId, pageToken){
-  return graphFetch(`/${facebookId}`, {}, pageToken, "DELETE");
+async function callFacebookPostingFunction(payload){
+  const sessionRes = await sb.auth.getSession();
+  const accessToken = sessionRes.data?.session?.access_token;
+  if (!accessToken) throw new Error("Vui lòng đăng nhập lại trước khi đăng Facebook.");
+  const res = await fetch(`${window.SUPABASE_URL}/functions/v1/facebook-posting`, {
+    method: "POST",
+    headers: {
+      apikey: window.SUPABASE_KEY,
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) throw new Error(data.error || "Edge Function đăng Facebook bị lỗi.");
+  return data;
+}
+async function facebookDelete(pageId, facebookId){
+  return callFacebookPostingFunction({ action: "delete", page_id: pageId, facebook_post_id: facebookId });
 }
 async function facebookCreate(post, mode){
-  const page = currentPage();
-  const pageToken = await resolvePageToken(page.page_id);
-  const scheduledDate = new Date(post.scheduled_at);
-  const isScheduled = mode === "schedule";
-  if (isScheduled && scheduledDate.getTime() < Date.now() + 10 * 60 * 1000) throw new Error("Facebook yêu cầu thời gian hẹn lịch sau hiện tại ít nhất khoảng 10 phút.");
-  const hasImage = Boolean(post.image_url);
-  const params = {};
-  if (hasImage) {
-    params.url = post.image_url;
-    if (post.content) params.caption = post.content;
-  } else {
-    if (post.content) params.message = post.content;
-    if (post.link_url) params.link = post.link_url;
-  }
-  if (isScheduled) {
-    params.published = "false";
-    params.scheduled_publish_time = String(Math.floor(scheduledDate.getTime() / 1000));
-  }
-  const endpoint = `/${page.page_id}/${hasImage ? "photos" : "feed"}`;
-  const json = await graphFetch(endpoint, params, pageToken, "POST");
-  return json.post_id || json.id || "";
+  const data = await callFacebookPostingFunction({ action: "create", mode, post });
+  return data.facebook_post_id || "";
 }
 async function schedulePost(mode="schedule"){
   try {
@@ -676,7 +641,7 @@ async function schedulePost(mode="schedule"){
     if (!postHasContent(draft)) throw new Error("Vui lòng nhập nội dung, link hoặc ảnh trước khi hẹn/đăng.");
     showPostStatus("info", mode === "schedule" ? "Đang hẹn lịch lên Facebook..." : "Đang đăng lên Facebook...");
     if (existingRow?.facebook_post_id && existingRow.status === "scheduled") {
-      try { await facebookDelete(existingRow.facebook_post_id, await resolvePageToken(existingRow.page_id)); } catch (e) { console.warn(e); }
+      try { await facebookDelete(existingRow.page_id, existingRow.facebook_post_id); } catch (e) { console.warn(e); }
     }
     const fbId = await facebookCreate(draft, mode);
     const update = {
