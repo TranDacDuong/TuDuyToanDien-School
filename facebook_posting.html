@@ -85,6 +85,11 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 .staff-check{display:flex;gap:8px;align-items:center;border:1px solid rgba(39,58,91,.10);background:#fff;border-radius:12px;padding:8px 9px;font-size:.88rem}
 .task-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
 .task-badge{display:inline-flex;align-items:center;border-radius:999px;padding:3px 8px;background:#eef4ff;color:#123c78;font-size:.72rem;font-weight:900}
+.quiz-builder{display:none;border:1px solid rgba(18,60,120,.12);background:linear-gradient(180deg,#f8fbff,#fff);border-radius:18px;padding:14px;gap:12px}
+.quiz-builder.show{display:grid}
+.quiz-answer-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.quiz-preview{max-width:260px;width:100%;border-radius:16px;border:1px solid rgba(39,58,91,.12);box-shadow:0 10px 24px rgba(15,23,42,.08);display:none}
+.quiz-preview.show{display:block}
 .token-card{display:none!important}
 .empty-box{padding:22px 16px;color:#64748b;line-height:1.55;background:#fff;border-radius:18px}
 @media(max-width:1050px){.layout{grid-template-columns:1fr}.page{padding:16px 12px 40px}}
@@ -237,6 +242,25 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
         <div class="field"><label>Loại bài</label><select class="select" id="postType"></select></div>
         <div class="field"><label>Trạng thái</label><input class="input" id="postStatus" disabled></div>
       </div>
+      <div class="quiz-builder" id="quizBuilder">
+        <div>
+          <strong>Soạn nhanh ảnh Quiz</strong>
+          <div class="hint">Nhập câu hỏi và 2/3/4 đáp án, hệ thống sẽ tự sinh ảnh theo mẫu MindUp rồi upload lên Drive.</div>
+        </div>
+        <div class="field"><label>Câu hỏi</label><textarea class="textarea" id="quizQuestion" style="min-height:110px" placeholder="Nhập câu hỏi quiz..."></textarea></div>
+        <div class="grid2">
+          <div class="field"><label>Số đáp án</label><select class="select" id="quizAnswerCount"><option value="2">2 đáp án</option><option value="3">3 đáp án</option><option value="4" selected>4 đáp án</option></select></div>
+          <div class="field"><label>Đáp án đúng / ghi chú nội bộ</label><input class="input" id="quizCorrectAnswer" placeholder="Ví dụ: A hoặc đáp án 1"></div>
+        </div>
+        <div class="quiz-answer-grid" id="quizAnswerFields"></div>
+        <div class="toolbar" style="margin-bottom:0">
+          <div class="toolbar-left">
+            <button class="btn btn-gold" type="button" id="generateQuizImageBtn">Tạo ảnh Quiz</button>
+            <button class="btn btn-outline" type="button" id="previewQuizImageBtn">Xem thử ảnh</button>
+          </div>
+          <img id="quizImagePreview" class="quiz-preview" alt="Xem trước ảnh Quiz">
+        </div>
+      </div>
       <div class="field">
         <label>Nội dung bài viết</label>
         <textarea class="textarea" id="postContent" maxlength="6000" placeholder="Dán caption/nội dung bài đăng vào đây..."></textarea>
@@ -306,6 +330,11 @@ const DEFAULT_TYPES = [
   "Learning Method", "Monday Mindset", "Hard Quiz with Prize", "Q&A", "Meme",
   "Teaching Philosophy", "Enrollment", "Quiz", "Bài hay", "Lỗi sai thường gặp"
 ];
+const QUIZ_TEMPLATES = {
+  2: "assets/facebook-quiz/quiz-2-options.png",
+  3: "assets/facebook-quiz/quiz-3-options.png",
+  4: "assets/facebook-quiz/quiz-4-options.png",
+};
 
 let S = {
   profile: null,
@@ -481,6 +510,162 @@ function defaultRequirementsForType(typeNameValue){
 }
 function normalizeText(value){
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+function isQuizType(postTypeId){
+  const name = normalizeText(typeName(postTypeId));
+  return name.includes("quiz");
+}
+function renderQuizAnswerFields(){
+  const count = Math.max(2, Math.min(4, Number($("quizAnswerCount").value || 4)));
+  const labels = ["A", "B", "C", "D"];
+  const oldValues = Array.from($("quizAnswerFields").querySelectorAll("input")).map(input => input.value);
+  $("quizAnswerFields").innerHTML = labels.slice(0, count).map((label, index) => `
+    <div class="field" style="margin-bottom:0">
+      <label>Đáp án ${label}</label>
+      <input class="input quiz-answer-input" value="${esc(oldValues[index] || "")}" placeholder="Nhập đáp án ${label}">
+    </div>
+  `).join("");
+}
+function toggleQuizBuilder(){
+  const show = isQuizType($("postType").value);
+  $("quizBuilder").classList.toggle("show", show);
+}
+function getQuizData(){
+  const question = $("quizQuestion").value.trim();
+  const answers = Array.from($("quizAnswerFields").querySelectorAll("input"))
+    .map(input => input.value.trim())
+    .filter(Boolean);
+  if (!question) throw new Error("Vui lòng nhập câu hỏi Quiz.");
+  if (answers.length < 2 || answers.length > 4) throw new Error("Quiz cần có từ 2 đến 4 đáp án.");
+  return { question, answers, correctAnswer: $("quizCorrectAnswer").value.trim() };
+}
+function loadImage(src){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Không tải được template ảnh Quiz."));
+    img.src = src;
+  });
+}
+function fitFontSize(ctx, text, maxWidth, maxLines, startSize, minSize, family, weight="700"){
+  for (let size = startSize; size >= minSize; size -= 2) {
+    ctx.font = `${weight} ${size}px ${family}`;
+    if (wrapTextLines(ctx, text, maxWidth).length <= maxLines) return size;
+  }
+  return minSize;
+}
+function wrapTextLines(ctx, text, maxWidth){
+  const paragraphs = String(text || "").split(/\r?\n/);
+  const lines = [];
+  for (const paragraph of paragraphs) {
+    const words = paragraph.trim().split(/\s+/).filter(Boolean);
+    if (!words.length) { lines.push(""); continue; }
+    let line = "";
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word;
+      if (ctx.measureText(test).width <= maxWidth || !line) line = test;
+      else { lines.push(line); line = word; }
+    }
+    if (line) lines.push(line);
+  }
+  return lines;
+}
+function drawWrappedText(ctx, text, box, options={}){
+  const family = options.family || "Arial, sans-serif";
+  const weight = options.weight || "700";
+  const align = options.align || "center";
+  const lineHeightRatio = options.lineHeightRatio || 1.25;
+  const maxLines = options.maxLines || 8;
+  const fontSize = fitFontSize(ctx, text, box.w, maxLines, options.size || 44, options.minSize || 24, family, weight);
+  ctx.font = `${weight} ${fontSize}px ${family}`;
+  ctx.fillStyle = options.color || "#10346b";
+  ctx.textAlign = align;
+  ctx.textBaseline = "middle";
+  const lines = wrapTextLines(ctx, text, box.w).slice(0, maxLines);
+  const lineHeight = fontSize * lineHeightRatio;
+  const totalHeight = (lines.length - 1) * lineHeight;
+  const x = align === "left" ? box.x : box.x + box.w / 2;
+  let y = box.y + box.h / 2 - totalHeight / 2;
+  for (const line of lines) {
+    ctx.fillText(line, x, y);
+    y += lineHeight;
+  }
+}
+function quizAnswerBoxes(count){
+  if (count === 2) return [
+    { x: 190, y: 966, w: 390, h: 94 },
+    { x: 725, y: 966, w: 390, h: 94 },
+  ];
+  if (count === 3) return [
+    { x: 200, y: 820, w: 960, h: 78 },
+    { x: 200, y: 936, w: 960, h: 78 },
+    { x: 200, y: 1050, w: 960, h: 78 },
+  ];
+  return [
+    { x: 176, y: 865, w: 415, h: 86 },
+    { x: 728, y: 865, w: 415, h: 86 },
+    { x: 176, y: 1012, w: 415, h: 86 },
+    { x: 728, y: 1012, w: 415, h: 86 },
+  ];
+}
+async function buildQuizImageDataUrl(){
+  const { question, answers } = getQuizData();
+  const count = answers.length;
+  const template = QUIZ_TEMPLATES[count] || QUIZ_TEMPLATES[4];
+  const img = await loadImage(template);
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth || 1280;
+  canvas.height = img.naturalHeight || 1280;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  drawWrappedText(ctx, question, { x: 126, y: 360, w: 1030, h: 360 }, { size: 46, minSize: 28, maxLines: 7, color:"#082c68", weight:"800" });
+  const labels = ["A.", "B.", "C.", "D."];
+  quizAnswerBoxes(count).forEach((box, index) => {
+    drawWrappedText(ctx, `${labels[index]} ${answers[index]}`, box, { size: count === 3 ? 34 : 30, minSize: 20, maxLines: 2, color:"#10284f", weight:"800" });
+  });
+  return canvas.toDataURL("image/png");
+}
+function buildQuizCaption(){
+  const { question, answers } = getQuizData();
+  const body = [`🧠 Quiz nhanh cùng MindUp!`, "", question, ""];
+  answers.forEach((answer, index) => body.push(`${String.fromCharCode(65 + index)}. ${answer}`));
+  body.push("", "Comment đáp án của em ở dưới bài viết nhé!");
+  return body.join("\n");
+}
+async function previewQuizImage(){
+  try {
+    const dataUrl = await buildQuizImageDataUrl();
+    $("quizImagePreview").src = dataUrl;
+    $("quizImagePreview").classList.add("show");
+    showPostStatus("ok", "Đã tạo ảnh xem thử. Nếu ổn, bấm Tạo ảnh Quiz để upload lên Drive.");
+  } catch (error) {
+    showPostStatus("err", error.message || String(error));
+  }
+}
+async function generateQuizImage(){
+  try {
+    showPostStatus("info", "Đang tạo ảnh Quiz...");
+    const dataUrl = await buildQuizImageDataUrl();
+    $("quizImagePreview").src = dataUrl;
+    $("quizImagePreview").classList.add("show");
+    showPostStatus("info", "Đang upload ảnh Quiz lên Drive...");
+    const uploaded = await window.MindupImageUpload.uploadDataUrl(dataUrl, { kind: "post", folder: "facebook-quiz", fileName: `mindup-quiz-${Date.now()}.png` });
+    const url = window.MindupImageUpload.getDisplayUrl(uploaded);
+    if (!url) throw new Error("Upload xong nhưng không lấy được URL ảnh Quiz.");
+    $("postImageUrl").value = url;
+    if (!$("postContent").value.trim()) $("postContent").value = buildQuizCaption();
+    const correctAnswer = $("quizCorrectAnswer").value.trim();
+    if (correctAnswer) {
+      const currentNote = $("postInternalNote").value.trim();
+      const answerNote = `Đáp án đúng Quiz: ${correctAnswer}`;
+      if (!currentNote.includes(answerNote)) $("postInternalNote").value = [currentNote, answerNote].filter(Boolean).join("\n");
+    }
+    $("postCharCount").textContent = String($("postContent").value.length);
+    updateImagePreview();
+    showPostStatus("ok", "Đã tạo và upload ảnh Quiz. Bạn có thể lưu nháp hoặc hẹn lịch Facebook.");
+  } catch (error) {
+    showPostStatus("err", error.message || String(error));
+  }
 }
 function renderTemplateAssignees(selectedIds=[]){
   const selected = new Set((selectedIds || []).map(String));
@@ -666,6 +851,13 @@ function openPostModal(id="", defaults={}){
   $("postImageUrl").value = row?.image_url || "";
   $("postInternalNote").value = row?.internal_note || "";
   $("postCharCount").textContent = String(($("postContent").value || "").length);
+  $("quizQuestion").value = "";
+  $("quizCorrectAnswer").value = "";
+  $("quizAnswerCount").value = "4";
+  renderQuizAnswerFields();
+  $("quizImagePreview").src = "";
+  $("quizImagePreview").classList.remove("show");
+  toggleQuizBuilder();
   updateImagePreview();
   $("deletePostBtn").style.display = row ? "" : "none";
   showPostStatus("info", row?.facebook_post_id ? `Facebook ID: ${row.facebook_post_id}` : "Lưu nháp trước hoặc hẹn lịch trực tiếp.");
@@ -892,8 +1084,12 @@ function bindEvents(){
   $("schedulePostBtn").addEventListener("click", () => schedulePost("schedule"));
   $("deletePostBtn").addEventListener("click", deletePost);
   $("postContent").addEventListener("input", () => $("postCharCount").textContent = String($("postContent").value.length));
+  $("postType").addEventListener("change", toggleQuizBuilder);
   $("postImageUrl").addEventListener("input", updateImagePreview);
   $("postImageFile").addEventListener("change", ev => uploadFile(ev.target.files?.[0]).catch(e => showPostStatus("err", e.message || String(e))));
+  $("quizAnswerCount").addEventListener("change", renderQuizAnswerFields);
+  $("previewQuizImageBtn").addEventListener("click", previewQuizImage);
+  $("generateQuizImageBtn").addEventListener("click", generateQuizImage);
   $("templateType").addEventListener("change", () => {
     if (!$("templateId").value && !$("templateTaskRequirements").value.trim()) {
       $("templateTaskRequirements").value = defaultRequirementsForType(typeName($("templateType").value)).join("\n");
