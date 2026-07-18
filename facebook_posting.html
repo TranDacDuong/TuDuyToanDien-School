@@ -512,8 +512,8 @@ function normalizeText(value){
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 function isQuizType(postTypeId){
-  const name = normalizeText(typeName(postTypeId));
-  return name.includes("quiz");
+  const rawName = String(typeName(postTypeId) || "").trim();
+  return normalizeText(rawName) === "quiz";
 }
 function renderQuizAnswerFields(){
   const count = Math.max(2, Math.min(4, Number($("quizAnswerCount").value || 4)));
