@@ -78,6 +78,8 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 .week-title{font-weight:900;color:#10284f}
 .quick-list{display:grid;gap:8px;max-height:360px;overflow:auto;padding-right:4px}
 .divider{height:1px;background:rgba(39,58,91,.10);margin:10px 0}
+.token-card{display:none!important}
+.empty-box{padding:22px 16px;color:#64748b;line-height:1.55;background:#fff;border-radius:18px}
 @media(max-width:1050px){.layout{grid-template-columns:1fr}.page{padding:16px 12px 40px}}
 @media(max-width:640px){.hero,.card{border-radius:20px}.hero{padding:18px}.hero h1{font-size:1.45rem}.grid2{grid-template-columns:1fr}.toolbar{align-items:stretch}.toolbar-left,.toolbar-right,.hero-actions{width:100%;flex-direction:column}.btn,.tab{width:100%}.calendar{min-width:780px}.page{padding:12px 8px 30px}}
 </style>
@@ -123,7 +125,6 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
           </div>
           <div class="toolbar-right">
             <span class="week-title" id="weekTitle"></span>
-            <button class="btn btn-primary" id="generateWeekBtn" type="button">Tạo lịch tuần từ lịch mẫu</button>
           </div>
         </div>
 
@@ -139,7 +140,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
     </main>
 
     <aside class="side-list">
-      <section class="card">
+      <section class="card token-card" aria-hidden="true">
         <h2>Token Facebook</h2>
         <div class="field">
           <label>User/Page Access Token</label>
@@ -256,7 +257,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 <script>
 const GRAPH_VERSION = "v25.0";
 const TOKEN_KEY = "mindup_facebook_calendar_token_session";
-const ALLOWED_ROLES = new Set(["admin", "assistant", "teacher", "marketing"]);
+const ALLOWED_ROLES = new Set(["admin", "assistant"]);
 const WEEKDAYS = [
   { value: 1, label: "Thứ 2", short: "T2" },
   { value: 2, label: "Thứ 3", short: "T3" },
@@ -369,6 +370,7 @@ async function loadData(){
   S.templates = templatesRes.data || [];
   S.posts = postsRes.data || [];
   if (!S.activePageId || !S.pages.some(p => p.page_id === S.activePageId)) S.activePageId = S.pages[0]?.page_id || DEFAULT_PAGES[0].page_id;
+  await ensureCurrentWeekPosts();
   renderAll();
 }
 
@@ -384,9 +386,14 @@ function renderAll(){
 }
 function renderTabs(){
   $("pageTabs").innerHTML = S.pages.map(p => `<button type="button" class="tab ${p.page_id===S.activePageId?"active":""}" data-page-id="${esc(p.page_id)}">${esc(p.page_name)}</button>`).join("");
-  $("pageTabs").querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", () => {
+  $("pageTabs").querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", async () => {
     S.activePageId = btn.dataset.pageId;
-    renderAll();
+    try {
+      await ensureCurrentWeekPosts();
+      renderAll();
+    } catch (error) {
+      showStatus("err", error.message || String(error));
+    }
   }));
   const page = currentPage();
   $("activePageTitle").textContent = `Lịch đăng bài: ${page.page_name}`;
@@ -404,7 +411,7 @@ function renderSelects(){
   $("postType").innerHTML = typeOptions;
 }
 function usedTimes(){
-  const set = new Set(["08:00","12:00","20:00"]);
+  const set = new Set();
   [...S.templates, ...S.posts].filter(x => x.page_id === S.activePageId).forEach(x => {
     const raw = x.publish_time || (x.scheduled_at ? new Date(x.scheduled_at).toTimeString().slice(0,5) : "");
     if (raw) set.add(raw.slice(0,5));
@@ -420,6 +427,10 @@ function postsInCell(time, date){
 }
 function renderTemplateCalendar(){
   const times = usedTimes();
+  if (!times.length) {
+    $("templateCalendar").innerHTML = `<div class="empty-box">Fanpage này chưa có lịch mẫu. Bấm <strong>Thêm lịch mẫu</strong> để tạo khung giờ đăng bài đầu tiên.</div>`;
+    return;
+  }
   $("templateCalendar").innerHTML = `
     <table class="calendar">
       <thead><tr><th>Giờ</th>${WEEKDAYS.map(d=>`<th>${d.label}</th>`).join("")}</tr></thead>
@@ -440,6 +451,10 @@ function renderTemplateCalendar(){
 function renderWeeklyCalendar(){
   const times = usedTimes();
   const dates = weekDates();
+  if (!times.length) {
+    $("weeklyCalendar").innerHTML = `<div class="empty-box">Chưa có lịch bài đăng trong tuần này. Khi bạn tạo lịch mẫu, hệ thống sẽ tự sinh lịch bài đăng cho tuần đang xem.</div>`;
+    return;
+  }
   $("weeklyCalendar").innerHTML = `
     <table class="calendar">
       <thead><tr><th>Giờ</th>${dates.map((d,i)=>`<th>${WEEKDAYS[i].short}<br>${formatDate(d)}</th>`).join("")}</tr></thead>
@@ -593,7 +608,9 @@ async function uploadFile(file){
   showPostStatus("ok", "Đã upload ảnh lên Drive.");
 }
 
-function getToken(){ return $("accessToken").value.trim(); }
+function getToken(){
+  return String(currentPage()?.page_access_token || $("accessToken")?.value || localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || window.MINDUP_FACEBOOK_ACCESS_TOKEN || "").trim();
+}
 async function graphFetch(path, params={}, token=getToken(), method="GET"){
   const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${path.replace(/^\//,"")}`);
   Object.entries(params || {}).forEach(([k,v]) => { if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, v); });
@@ -616,7 +633,7 @@ async function graphFetch(path, params={}, token=getToken(), method="GET"){
 }
 async function resolvePageToken(pageId){
   const token = getToken();
-  if (!token) throw new Error("Vui lòng dán User/Page Access Token trước.");
+  if (!token) throw new Error("Token Facebook chưa được cấu hình hoặc đã bị xóa. Hãy cập nhật token mới cho fanpage trong hệ thống.");
   try {
     const data = await graphFetch("/me/accounts", { fields:"id,name,access_token,tasks" }, token);
     const page = (data.data || []).find(p => p.id === pageId);
@@ -681,15 +698,13 @@ async function schedulePost(mode="schedule"){
   }
 }
 
-async function generateWeek(){
-  if (!S.types.length) return alert("Chưa có loại bài đăng.");
-  const pageTemplates = S.templates.filter(t => t.page_id === S.activePageId && t.is_active !== false);
-  if (!pageTemplates.length) return alert("Fanpage này chưa có lịch mẫu.");
+function buildTemplateRowsForWeek(pageId){
+  const pageTemplates = S.templates.filter(t => t.page_id === pageId && t.is_active !== false);
   const rows = [];
   for (const t of pageTemplates) {
     const dayIndex = t.weekday === 0 ? 6 : t.weekday - 1;
     const d = addDays(S.weekStart, dayIndex);
-    const [hh, mm] = String(t.publish_time || "20:00").split(":").map(Number);
+    const [hh, mm] = String(t.publish_time || "00:00").split(":").map(Number);
     d.setHours(hh || 0, mm || 0, 0, 0);
     rows.push({
       page_id: t.page_id,
@@ -705,19 +720,30 @@ async function generateWeek(){
       created_by: S.profile.id,
     });
   }
+  return rows;
+}
+async function ensureCurrentWeekPosts(){
+  if (!S.profile?.id || !S.activePageId) return;
+  const rows = buildTemplateRowsForWeek(S.activePageId);
+  if (!rows.length) return;
   const existingKeys = new Set(
     S.posts
       .filter(p => p.page_id === S.activePageId && p.template_id)
       .map(p => `${p.template_id}|${new Date(p.scheduled_at).getTime()}`)
   );
   const rowsToInsert = rows.filter(row => !existingKeys.has(`${row.template_id}|${new Date(row.scheduled_at).getTime()}`));
-  if (!rowsToInsert.length) {
-    alert("Tuần này đã có đủ lịch bài theo lịch mẫu.");
-    return;
-  }
+  if (!rowsToInsert.length) return;
   const { error } = await sb.from("facebook_scheduled_posts").insert(rowsToInsert);
-  if (error) return alert("Không tạo được lịch tuần: " + error.message);
-  await loadData();
+  if (error) throw error;
+  const weekStart = dateKey(S.weekStart);
+  const weekEnd = dateKey(addDays(S.weekStart, 6));
+  const postsRes = await sb.from("facebook_scheduled_posts")
+    .select("*")
+    .gte("scheduled_date", weekStart)
+    .lte("scheduled_date", weekEnd)
+    .order("scheduled_at");
+  if (postsRes.error) throw postsRes.error;
+  S.posts = postsRes.data || [];
 }
 
 function openTypeModal(id=""){
@@ -754,7 +780,6 @@ function bindEvents(){
   $("prevWeekBtn").addEventListener("click", () => { S.weekStart = addDays(S.weekStart, -7); loadData(); });
   $("nextWeekBtn").addEventListener("click", () => { S.weekStart = addDays(S.weekStart, 7); loadData(); });
   $("weekStartInput").addEventListener("change", () => { const d = new Date($("weekStartInput").value); if(!Number.isNaN(d)) { S.weekStart = startOfWeek(d); loadData(); }});
-  $("generateWeekBtn").addEventListener("click", generateWeek);
   $("openPageBtn").addEventListener("click", () => window.open(currentPage().page_url || `https://www.facebook.com/${currentPage().page_id}`, "_blank", "noopener"));
   $("addTemplateBtn").addEventListener("click", () => openTemplateModal());
   $("closeTemplateModalBtn").addEventListener("click", closeTemplateModal);
@@ -778,16 +803,16 @@ function bindEvents(){
   $("deleteTypeBtn").addEventListener("click", deleteType);
   $("toggleTokenBtn").addEventListener("click", () => $("accessToken").type = $("accessToken").type === "password" ? "text" : "password");
   $("rememberToken").addEventListener("change", () => {
-    if ($("rememberToken").checked) sessionStorage.setItem(TOKEN_KEY, getToken());
-    else sessionStorage.removeItem(TOKEN_KEY);
+    if ($("rememberToken").checked) localStorage.setItem(TOKEN_KEY, $("accessToken").value.trim());
+    else localStorage.removeItem(TOKEN_KEY);
   });
-  $("accessToken").addEventListener("input", () => { if ($("rememberToken").checked) sessionStorage.setItem(TOKEN_KEY, getToken()); });
+  $("accessToken").addEventListener("input", () => { if ($("rememberToken").checked) localStorage.setItem(TOKEN_KEY, $("accessToken").value.trim()); });
   document.querySelectorAll(".modal").forEach(modal => modal.addEventListener("click", ev => { if (ev.target === modal) modal.classList.remove("show"); }));
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
   bindEvents();
-  const stored = sessionStorage.getItem(TOKEN_KEY) || "";
+  const stored = localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || "";
   if (stored) { $("accessToken").value = stored; $("rememberToken").checked = true; }
   try {
     await loadProfile();

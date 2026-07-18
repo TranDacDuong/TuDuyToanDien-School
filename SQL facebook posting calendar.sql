@@ -12,6 +12,9 @@ create table if not exists public.facebook_pages (
   updated_at timestamptz not null default now()
 );
 
+alter table public.facebook_pages
+add column if not exists page_access_token text;
+
 create table if not exists public.facebook_post_types (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
@@ -141,7 +144,7 @@ for select using (
   exists (
     select 1 from public.users u
     where u.id = auth.uid()
-      and u.role::text in ('admin','teacher','assistant','marketing')
+      and u.role::text in ('admin','assistant')
   )
 );
 
@@ -159,7 +162,7 @@ for select using (
   exists (
     select 1 from public.users u
     where u.id = auth.uid()
-      and u.role::text in ('admin','teacher','assistant','marketing')
+      and u.role::text in ('admin','assistant')
   )
 );
 
@@ -169,13 +172,13 @@ for all using (
   exists (
     select 1 from public.users u
     where u.id = auth.uid()
-      and u.role::text in ('admin','teacher','assistant','marketing')
+      and u.role::text in ('admin','assistant')
   )
 ) with check (
   exists (
     select 1 from public.users u
     where u.id = auth.uid()
-      and u.role::text in ('admin','teacher','assistant','marketing')
+      and u.role::text in ('admin','assistant')
   )
 );
 
@@ -185,7 +188,7 @@ for select using (
   exists (
     select 1 from public.users u
     where u.id = auth.uid()
-      and u.role::text in ('admin','teacher','assistant','marketing')
+      and u.role::text in ('admin','assistant')
   )
 );
 
@@ -195,13 +198,13 @@ for all using (
   exists (
     select 1 from public.users u
     where u.id = auth.uid()
-      and u.role::text in ('admin','teacher','assistant','marketing')
+      and u.role::text in ('admin','assistant')
   )
 ) with check (
   exists (
     select 1 from public.users u
     where u.id = auth.uid()
-      and u.role::text in ('admin','teacher','assistant','marketing')
+      and u.role::text in ('admin','assistant')
   )
 );
 
@@ -211,7 +214,7 @@ for select using (
   exists (
     select 1 from public.users u
     where u.id = auth.uid()
-      and u.role::text in ('admin','teacher','assistant','marketing')
+      and u.role::text in ('admin','assistant')
   )
 );
 
@@ -221,12 +224,12 @@ for all using (
   exists (
     select 1 from public.users u
     where u.id = auth.uid()
-      and u.role::text in ('admin','teacher','assistant','marketing')
+      and u.role::text in ('admin','assistant')
   )
 ) with check (
   exists (
     select 1 from public.users u
     where u.id = auth.uid()
-      and u.role::text in ('admin','teacher','assistant','marketing')
+      and u.role::text in ('admin','assistant')
   )
 );
