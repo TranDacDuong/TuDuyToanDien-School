@@ -222,7 +222,7 @@
   }
 
   function getDisplayUrl(uploadResult) {
-    return uploadResult?.lh3Url || uploadResult?.url || uploadResult?.downloadUrl || "";
+    return uploadResult?.downloadUrl || uploadResult?.url || uploadResult?.lh3Url || "";
   }
 
   function getDriveFileId(url) {

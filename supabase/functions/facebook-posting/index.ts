@@ -124,6 +124,25 @@ async function graphFetch(path: string, params: Record<string, string>, token: s
   return json;
 }
 
+async function graphFetchForm(path: string, form: FormData, token: string) {
+  const version = env("FACEBOOK_GRAPH_VERSION") || "v25.0";
+  const url = new URL(`https://graph.facebook.com/${version}/${path.replace(/^\//, "")}`);
+  form.set("access_token", token);
+
+  const res = await fetch(url, { method: "POST", body: form });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || json?.error) {
+    const err = json?.error || {};
+    const parts = [
+      err.message || "Facebook API error",
+      err.code ? `MÃ£ lá»—i: ${err.code}` : "",
+      err.error_subcode ? `Subcode: ${err.error_subcode}` : "",
+    ].filter(Boolean);
+    throw new Error(parts.join("\n"));
+  }
+  return json;
+}
+
 async function getPageTokenFromUserToken(pageId: string) {
   const userToken = env("FACEBOOK_USER_ACCESS_TOKEN") || env("FACEBOOK_LONG_LIVED_USER_TOKEN") || env("FACEBOOK_SYSTEM_USER_TOKEN");
   if (!userToken) return "";
@@ -155,6 +174,212 @@ async function graphFetchWithPageToken(path: string, params: Record<string, stri
   }
 }
 
+async function graphFetchFormWithPageToken(path: string, form: FormData, pageId: string) {
+  const staticToken = await getPageToken(pageId);
+  try {
+    return await graphFetchForm(path, form, staticToken);
+  } catch (error) {
+    if (!isExpiredFacebookTokenError(error)) throw error;
+    const dynamicToken = await getPageTokenFromUserToken(pageId);
+    if (dynamicToken && dynamicToken !== staticToken) {
+      return await graphFetchForm(path, form, dynamicToken);
+    }
+    throw new Error("Facebook token Ä‘Ã£ háº¿t háº¡n. HÃ£y cáº­p nháº­t token dÃ i háº¡n/System User token cho chá»©c nÄƒng Ä‘Äƒng bÃ i Facebook.");
+  }
+}
+
+function getExtensionFromContentType(contentType: string) {
+  const type = String(contentType || "").toLowerCase();
+  if (type.includes("png")) return "png";
+  if (type.includes("webp")) return "webp";
+  if (type.includes("gif")) return "gif";
+  return "jpg";
+}
+
+async function fetchImageAsBlob(imageUrl: string) {
+  let parsed: URL;
+  try {
+    parsed = new URL(imageUrl);
+  } catch (_) {
+    throw new Error("URL áº£nh khÃ´ng há»£p lá»‡.");
+  }
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error("URL áº£nh pháº£i báº¯t Ä‘áº§u báº±ng http hoáº·c https.");
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25_000);
+  try {
+    const res = await fetch(parsed.toString(), {
+      redirect: "follow",
+      headers: {
+        "User-Agent": "MindUpFacebookPosting/1.0",
+      },
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new Error(`KhÃ´ng táº£i Ä‘Æ°á»£c áº£nh (${res.status}). HÃ£y kiá»ƒm tra URL áº£nh cÃ³ cÃ´ng khai khÃ´ng.`);
+    }
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().startsWith("image/")) {
+      throw new Error("URL Ä‘Æ°á»£c nháº­p khÃ´ng tráº£ vá» file áº£nh há»£p lá»‡.");
+    }
+    const blob = await res.blob();
+    if (!blob.size) throw new Error("File áº£nh táº£i vá» bá»‹ rá»—ng.");
+    if (blob.size > 8 * 1024 * 1024) throw new Error("áº¢nh quÃ¡ lá»›n Ä‘á»ƒ Ä‘Äƒng Facebook. HÃ£y náº¿n áº£nh nhá» hÆ¡n 8MB.");
+    return {
+      blob,
+      filename: `mindup-facebook-image.${getExtensionFromContentType(contentType)}`,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function getDriveFileIdFromUrl(url: URL) {
+  if (url.hostname === "lh3.googleusercontent.com") {
+    const match = url.pathname.match(/^\/d\/([\w-]+)/);
+    if (match) return match[1];
+  }
+  if (url.hostname === "drive.google.com") {
+    const byQuery = url.searchParams.get("id");
+    if (byQuery && /^[\w-]+$/.test(byQuery)) return byQuery;
+    const match = url.pathname.match(/^\/file\/d\/([\w-]+)/);
+    if (match) return match[1];
+  }
+  return "";
+}
+
+function buildImageFetchUrls(inputUrl: string) {
+  const parsed = new URL(inputUrl);
+  const urls = [parsed.toString()];
+  const driveFileId = getDriveFileIdFromUrl(parsed);
+  if (driveFileId) {
+    urls.push(`https://drive.google.com/uc?export=download&id=${encodeURIComponent(driveFileId)}`);
+    urls.push(`https://drive.usercontent.google.com/download?id=${encodeURIComponent(driveFileId)}&export=download`);
+  }
+  return Array.from(new Set(urls));
+}
+
+function detectImageMime(bytes: Uint8Array, contentType = "") {
+  const normalized = String(contentType || "").toLowerCase().split(";")[0].trim();
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return "image/gif";
+  if (
+    bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46
+    && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+  ) return "image/webp";
+  if (normalized === "image/svg+xml") return normalized;
+  return "";
+}
+
+async function getGoogleDriveAccessTokenForFacebook() {
+  const clientId = Deno.env.get("GOOGLE_DRIVE_CLIENT_ID") || "";
+  const clientSecret = Deno.env.get("GOOGLE_DRIVE_CLIENT_SECRET") || "";
+  const refreshToken = Deno.env.get("GOOGLE_DRIVE_REFRESH_TOKEN") || "";
+  if (!clientId || !clientSecret || !refreshToken) return "";
+
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return "";
+  return String(data?.access_token || "");
+}
+
+async function fetchDriveImageAsBlobForFacebook(fileId: string) {
+  const accessToken = await getGoogleDriveAccessTokenForFacebook();
+  if (!accessToken) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25_000);
+  try {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, {
+      redirect: "follow",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "User-Agent": "MindUpFacebookPosting/1.0",
+      },
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const mimeType = detectImageMime(bytes, res.headers.get("content-type") || "");
+    if (!mimeType || !bytes.byteLength) return null;
+    if (bytes.byteLength > 8 * 1024 * 1024) throw new Error("Image is too large for Facebook upload. Please keep it under 8MB.");
+
+    return {
+      blob: new Blob([bytes], { type: mimeType }),
+      filename: `mindup-facebook-image.${getExtensionFromContentType(mimeType)}`,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchImageAsBlobForFacebook(imageUrl: string) {
+  let parsed: URL;
+  try {
+    parsed = new URL(imageUrl);
+  } catch (_) {
+    throw new Error("Invalid image URL.");
+  }
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error("Image URL must start with http or https.");
+  }
+
+  const driveFileId = getDriveFileIdFromUrl(parsed);
+  if (driveFileId) {
+    const driveImage = await fetchDriveImageAsBlobForFacebook(driveFileId);
+    if (driveImage) return driveImage;
+  }
+
+  let lastError = "";
+  for (const url of buildImageFetchUrls(imageUrl)) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25_000);
+    try {
+      const res = await fetch(url, {
+        redirect: "follow",
+        headers: { "User-Agent": "MindUpFacebookPosting/1.0" },
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        lastError = `Cannot download image (${res.status}).`;
+        continue;
+      }
+
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      const mimeType = detectImageMime(bytes, res.headers.get("content-type") || "");
+      if (!mimeType) {
+        lastError = "Image URL did not return a valid image file.";
+        continue;
+      }
+      if (!bytes.byteLength) throw new Error("Downloaded image is empty.");
+      if (bytes.byteLength > 8 * 1024 * 1024) throw new Error("Image is too large for Facebook upload. Please keep it under 8MB.");
+
+      return {
+        blob: new Blob([bytes], { type: mimeType }),
+        filename: `mindup-facebook-image.${getExtensionFromContentType(mimeType)}`,
+      };
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error || "Cannot download image.");
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  throw new Error(lastError || "Cannot download image. Please check that the image URL is public.");
+}
+
 function normalizePost(input: unknown): Required<FacebookPostPayload> {
   const post = (input || {}) as FacebookPostPayload;
   const pageId = String(post.page_id || "").trim();
@@ -183,23 +408,30 @@ async function createFacebookPost(postInput: unknown, mode: string) {
     }
   }
 
-  const params: Record<string, string> = {};
   const hasImage = Boolean(post.image_url);
 
   if (hasImage) {
-    params.url = post.image_url || "";
-    if (post.content) params.caption = post.content;
-  } else {
-    if (post.content) params.message = post.content;
-    if (post.link_url) params.link = post.link_url;
+    const params = new FormData();
+    const image = await fetchImageAsBlobForFacebook(post.image_url || "");
+    params.set("source", image.blob, image.filename);
+    if (post.content) params.set("caption", post.content);
+    if (isScheduled && scheduledDate) {
+      params.set("published", "false");
+      params.set("scheduled_publish_time", String(Math.floor(scheduledDate.getTime() / 1000)));
+    }
+    const json = await graphFetchFormWithPageToken(`/${post.page_id}/photos`, params, post.page_id);
+    return { facebook_post_id: json.post_id || json.id || "" };
   }
+
+  const params: Record<string, string> = {};
+  if (post.content) params.message = post.content;
+  if (post.link_url) params.link = post.link_url;
   if (isScheduled && scheduledDate) {
     params.published = "false";
     params.scheduled_publish_time = String(Math.floor(scheduledDate.getTime() / 1000));
   }
 
-  const endpoint = `/${post.page_id}/${hasImage ? "photos" : "feed"}`;
-  const json = await graphFetchWithPageToken(endpoint, params, post.page_id, "POST");
+  const json = await graphFetchWithPageToken(`/${post.page_id}/feed`, params, post.page_id, "POST");
   return { facebook_post_id: json.post_id || json.id || "" };
 }
 
