@@ -623,7 +623,13 @@ async function callFacebookPostingFunction(payload){
     body: JSON.stringify(payload),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.error) throw new Error(data.error || "Edge Function đăng Facebook bị lỗi.");
+  if (!res.ok || data.error) {
+    const detail = data.error || data.message || data.code || "Edge Function đăng Facebook bị lỗi.";
+    if (res.status === 404 || data.code === "NOT_FOUND") {
+      throw new Error("Chưa deploy Edge Function facebook-posting trên Supabase. Hãy deploy function rồi thử lại.");
+    }
+    throw new Error(detail);
+  }
   return data;
 }
 async function facebookDelete(pageId, facebookId){
