@@ -20,6 +20,20 @@ add column if not exists approval_status text not null default 'pending'
 create index if not exists facebook_scheduled_posts_task_id_idx
   on public.facebook_scheduled_posts(task_id);
 
+create or replace function public.facebook_marketing_default_assignees(p_post_type_name text)
+returns uuid[]
+language sql
+stable
+set search_path = public
+as $$
+  select coalesce(array_agg(id order by full_name nulls last, email), '{}'::uuid[])
+  from public.users
+  where role = case
+    when lower(coalesce(p_post_type_name, '')) like '%quiz%' then 'teacher'::user_role
+    else 'assistant'::user_role
+  end
+$$;
+
 create or replace function public.materialize_facebook_marketing_tasks(
   p_from date default null,
   p_to date default null
@@ -38,6 +52,7 @@ declare
   v_source_key text;
   v_count integer := 0;
   v_requirements jsonb;
+  v_assignee_ids uuid[];
 begin
   for r in
     select
@@ -68,8 +83,16 @@ begin
     where t.auto_create_task = true
       and p.status not in ('cancelled', 'published')
       and p.scheduled_date between coalesce(p_from, p.scheduled_date) and coalesce(p_to, p.scheduled_date)
-      and coalesce(array_length(t.task_assignee_ids, 1), 0) > 0
   loop
+    v_assignee_ids := case
+      when coalesce(array_length(r.task_assignee_ids, 1), 0) > 0 then r.task_assignee_ids
+      else public.facebook_marketing_default_assignees(r.post_type_name)
+    end;
+
+    if coalesce(array_length(v_assignee_ids, 1), 0) = 0 then
+      continue;
+    end if;
+
     v_due_date :=
       date_trunc('week', r.scheduled_date::timestamp)::date
       + (coalesce(r.task_due_week_offset, -1) * 7)
@@ -138,7 +161,7 @@ begin
       where id = r.post_id
         and task_id is distinct from v_task_id;
 
-    foreach v_user_id in array r.task_assignee_ids loop
+    foreach v_user_id in array v_assignee_ids loop
       insert into public.task_assignments (task_id, user_id, assigned_by)
       values (v_task_id, v_user_id, coalesce(r.created_by, auth.uid()))
       on conflict (task_id, user_id) do nothing;
@@ -154,6 +177,15 @@ begin
   return v_count;
 end;
 $$;
+
+update public.facebook_post_schedule_templates t
+set task_assignee_ids = public.facebook_marketing_default_assignees(pt.name),
+    updated_at = now()
+from public.facebook_post_types pt
+where t.post_type_id = pt.id
+  and t.auto_create_task = true
+  and coalesce(array_length(t.task_assignee_ids, 1), 0) = 0
+  and coalesce(array_length(public.facebook_marketing_default_assignees(pt.name), 1), 0) > 0;
 
 create or replace function public.trigger_materialize_facebook_marketing_task()
 returns trigger
