@@ -78,12 +78,16 @@ function pageTokenEnvName(pageId: string) {
   return `FACEBOOK_PAGE_TOKEN_${pageId.replace(/[^0-9A-Za-z_]/g, "_")}`;
 }
 
-function getPageToken(pageId: string) {
-  const token = env(pageTokenEnvName(pageId)) || env("FACEBOOK_PAGE_ACCESS_TOKEN");
-  if (!token) {
-    throw new Error(`Missing Facebook token secret for page ${pageId}. Set ${pageTokenEnvName(pageId)} or FACEBOOK_PAGE_ACCESS_TOKEN.`);
-  }
-  return token;
+function getStaticPageToken(pageId: string) {
+  return env(pageTokenEnvName(pageId)) || env("FACEBOOK_PAGE_ACCESS_TOKEN");
+}
+
+function isExpiredFacebookTokenError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return message.includes("Session has expired")
+    || message.includes("Mã lỗi: 190")
+    || message.includes("Subcode: 463")
+    || message.includes("code: 190");
 }
 
 async function graphFetch(path: string, params: Record<string, string>, token: string, method = "POST") {
@@ -120,6 +124,37 @@ async function graphFetch(path: string, params: Record<string, string>, token: s
   return json;
 }
 
+async function getPageTokenFromUserToken(pageId: string) {
+  const userToken = env("FACEBOOK_USER_ACCESS_TOKEN") || env("FACEBOOK_LONG_LIVED_USER_TOKEN") || env("FACEBOOK_SYSTEM_USER_TOKEN");
+  if (!userToken) return "";
+  const result = await graphFetch("/me/accounts", { fields: "id,name,access_token", limit: "100" }, userToken, "GET");
+  const pages = Array.isArray(result?.data) ? result.data : [];
+  const page = pages.find((item: { id?: string }) => String(item?.id || "") === String(pageId));
+  return String(page?.access_token || "");
+}
+
+async function getPageToken(pageId: string) {
+  const token = getStaticPageToken(pageId);
+  if (token) return token;
+  const dynamicToken = await getPageTokenFromUserToken(pageId);
+  if (dynamicToken) return dynamicToken;
+  throw new Error(`Thiếu Facebook token cho page ${pageId}. Hãy set ${pageTokenEnvName(pageId)}, FACEBOOK_PAGE_ACCESS_TOKEN hoặc FACEBOOK_USER_ACCESS_TOKEN dài hạn.`);
+}
+
+async function graphFetchWithPageToken(path: string, params: Record<string, string>, pageId: string, method = "POST") {
+  const staticToken = await getPageToken(pageId);
+  try {
+    return await graphFetch(path, params, staticToken, method);
+  } catch (error) {
+    if (!isExpiredFacebookTokenError(error)) throw error;
+    const dynamicToken = await getPageTokenFromUserToken(pageId);
+    if (dynamicToken && dynamicToken !== staticToken) {
+      return await graphFetch(path, params, dynamicToken, method);
+    }
+    throw new Error("Facebook token đã hết hạn. Hãy cập nhật token dài hạn/System User token cho chức năng đăng bài Facebook.");
+  }
+}
+
 function normalizePost(input: unknown): Required<FacebookPostPayload> {
   const post = (input || {}) as FacebookPostPayload;
   const pageId = String(post.page_id || "").trim();
@@ -148,7 +183,6 @@ async function createFacebookPost(postInput: unknown, mode: string) {
     }
   }
 
-  const pageToken = getPageToken(post.page_id);
   const params: Record<string, string> = {};
   const hasImage = Boolean(post.image_url);
 
@@ -165,15 +199,14 @@ async function createFacebookPost(postInput: unknown, mode: string) {
   }
 
   const endpoint = `/${post.page_id}/${hasImage ? "photos" : "feed"}`;
-  const json = await graphFetch(endpoint, params, pageToken, "POST");
+  const json = await graphFetchWithPageToken(endpoint, params, post.page_id, "POST");
   return { facebook_post_id: json.post_id || json.id || "" };
 }
 
 async function deleteFacebookPost(pageId: string, facebookPostId: string) {
   if (!pageId) throw new Error("Missing page_id");
   if (!facebookPostId) throw new Error("Missing facebook_post_id");
-  const pageToken = getPageToken(pageId);
-  await graphFetch(`/${facebookPostId}`, {}, pageToken, "DELETE");
+  await graphFetchWithPageToken(`/${facebookPostId}`, {}, pageId, "DELETE");
   return { deleted: true };
 }
 
