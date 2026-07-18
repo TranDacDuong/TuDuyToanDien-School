@@ -7,6 +7,9 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="theme.css?v=20260615-ios1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
 <script src="image_upload.js"></script>
@@ -571,7 +574,7 @@ function wrapTextLines(ctx, text, maxWidth){
   return lines;
 }
 function drawWrappedText(ctx, text, box, options={}){
-  const family = options.family || "Arial, sans-serif";
+  const family = options.family || '"DM Sans", Arial, sans-serif';
   const weight = options.weight || "700";
   const align = options.align || "center";
   const lineHeightRatio = options.lineHeightRatio || 1.25;
@@ -591,6 +594,15 @@ function drawWrappedText(ctx, text, box, options={}){
     y += lineHeight;
   }
 }
+async function ensureQuizFontLoaded(){
+  if (!document.fonts?.load) return;
+  await Promise.all([
+    document.fonts.load('600 30px "DM Sans"'),
+    document.fonts.load('700 42px "DM Sans"'),
+    document.fonts.load('800 42px "DM Sans"'),
+  ]);
+  await document.fonts.ready;
+}
 function quizAnswerBoxes(count){
   if (count === 2) return [
     { x: 190, y: 966, w: 390, h: 94 },
@@ -609,6 +621,7 @@ function quizAnswerBoxes(count){
   ];
 }
 async function buildQuizImageDataUrl(){
+  await ensureQuizFontLoaded();
   const { question, answers } = getQuizData();
   const count = answers.length;
   const template = QUIZ_TEMPLATES[count] || QUIZ_TEMPLATES[4];
@@ -618,10 +631,10 @@ async function buildQuizImageDataUrl(){
   canvas.height = img.naturalHeight || 1280;
   const ctx = canvas.getContext("2d");
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  drawWrappedText(ctx, question, { x: 126, y: 360, w: 1030, h: 360 }, { size: 46, minSize: 28, maxLines: 7, color:"#082c68", weight:"800" });
+  drawWrappedText(ctx, question, { x: 126, y: 360, w: 1030, h: 360 }, { size: 42, minSize: 26, maxLines: 7, color:"#082c68", weight:"700", lineHeightRatio:1.22 });
   const labels = ["A.", "B.", "C.", "D."];
   quizAnswerBoxes(count).forEach((box, index) => {
-    drawWrappedText(ctx, `${labels[index]} ${answers[index]}`, box, { size: count === 3 ? 34 : 30, minSize: 20, maxLines: 2, color:"#10284f", weight:"800" });
+    drawWrappedText(ctx, `${labels[index]} ${answers[index]}`, box, { size: count === 3 ? 31 : 28, minSize: 19, maxLines: 2, color:"#10284f", weight:"700", lineHeightRatio:1.18 });
   });
   return canvas.toDataURL("image/png");
 }
