@@ -895,6 +895,26 @@ body {
   font-weight: 900;
   cursor: pointer;
 }
+.perfect-score-celebration.support {
+  background:
+    radial-gradient(circle at 18% 28%, rgba(29, 107, 209, .16), transparent 24%),
+    radial-gradient(circle at 84% 38%, rgba(245, 158, 11, .18), transparent 26%),
+    rgba(8, 21, 43, .14);
+}
+.perfect-score-celebration.support .perfect-fireworks {
+  display: none;
+}
+.perfect-score-celebration.support .perfect-score-card {
+  background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,251,255,.97));
+  border-color: rgba(29, 107, 209, .22);
+}
+.perfect-score-celebration.support .perfect-score-badge {
+  background: radial-gradient(circle at 35% 28%, #ffffff 0 8%, #bfdbfe 10%, #60a5fa 45%, #0f3c73 46%, #1d6bd1 100%);
+}
+.perfect-score-celebration.support .perfect-score-close {
+  background: linear-gradient(135deg, #c8962a, #f59e0b);
+  color: #10284f;
+}
 .perfect-fireworks {
   position: absolute;
   top: 0;
@@ -2492,18 +2512,68 @@ function showPerfectScoreCelebration(studentName, itemLabel, score10) {
   const overlay = document.getElementById("perfectScoreCelebration");
   if (!overlay) return;
   perfectScoreCelebrationShown = true;
+  overlay.classList.remove("support");
   const safeName = String(studentName || "bạn").trim() || "bạn";
   const safeLabel = String(itemLabel || "một bài học").trim() || "một bài học";
   const scoreText = formatScore10(score10);
   const badge = overlay.querySelector(".perfect-score-badge");
+  const closeBtn = overlay.querySelector(".perfect-score-close");
   const title = document.getElementById("perfectScoreTitle");
   const message = document.getElementById("perfectScoreMessage");
   if (badge) badge.textContent = scoreText;
+  if (closeBtn) closeBtn.textContent = "Tuyệt vời!";
   if (title) title.textContent = `Chúc mừng ${safeName}!`;
   if (message) message.textContent = `${safeName} vừa đạt ${scoreText}/10 ở ${safeLabel}. MindUp rất tự hào về sự cố gắng này!`;
   overlay.classList.add("show");
   clearTimeout(showPerfectScoreCelebration._timer);
   showPerfectScoreCelebration._timer = setTimeout(closePerfectScoreCelebration, 7200);
+}
+
+function lowScoreNoticeKey(scoreItem) {
+  const viewer = currentUser?.id || "guest";
+  const source = scoreItem?.source || "score";
+  const id = scoreItem?.id || scoreItem?.at || "recent";
+  const studentId = scoreItem?.studentId || "";
+  const score = formatScore10(scoreItem?.score10);
+  return `mindup_low_score_notice:${viewer}:${studentId}:${source}:${id}:${score}`;
+}
+
+function hasSeenLowScoreNotice(scoreItem) {
+  try {
+    return localStorage.getItem(lowScoreNoticeKey(scoreItem)) === "1";
+  } catch (_) {
+    return false;
+  }
+}
+
+function markLowScoreNoticeSeen(scoreItem) {
+  try {
+    localStorage.setItem(lowScoreNoticeKey(scoreItem), "1");
+  } catch (_) {}
+}
+
+function showLowScoreNotice(scoreItem) {
+  if (perfectScoreCelebrationShown || !scoreItem || hasSeenLowScoreNotice(scoreItem)) return false;
+  const overlay = document.getElementById("perfectScoreCelebration");
+  if (!overlay) return false;
+  perfectScoreCelebrationShown = true;
+  markLowScoreNoticeSeen(scoreItem);
+  overlay.classList.add("support");
+  const safeName = String(scoreItem.studentName || "bạn").trim() || "bạn";
+  const safeLabel = String(scoreItem.label || "một bài học").trim() || "một bài học";
+  const scoreText = formatScore10(scoreItem.score10);
+  const badge = overlay.querySelector(".perfect-score-badge");
+  const closeBtn = overlay.querySelector(".perfect-score-close");
+  const title = document.getElementById("perfectScoreTitle");
+  const message = document.getElementById("perfectScoreMessage");
+  if (badge) badge.textContent = scoreText;
+  if (closeBtn) closeBtn.textContent = "Mình sẽ cố gắng!";
+  if (title) title.textContent = `Cùng cố gắng nhé, ${safeName}!`;
+  if (message) message.textContent = `${safeName} vừa đạt ${scoreText}/10 ở ${safeLabel}. Không sao cả, mình xem lại phần chưa chắc và lần sau bứt lên nhé!`;
+  overlay.classList.add("show");
+  clearTimeout(showPerfectScoreCelebration._timer);
+  showPerfectScoreCelebration._timer = setTimeout(closePerfectScoreCelebration, 8200);
+  return true;
 }
 
 async function findRecentPerfectScoreForStudent(studentId, studentName) {
@@ -2512,20 +2582,20 @@ async function findRecentPerfectScoreForStudent(studentId, studentName) {
 
   const [examRes, sessionRes, offlineRes] = await Promise.all([
     sb.from("exam_results")
-      .select("score_auto,score_total,submitted_at,exams(title,total_points)")
+      .select("id,score_auto,score_total,submitted_at,exams(title,total_points)")
       .eq("student_id", studentId)
       .gte("submitted_at", since)
       .not("submitted_at", "is", null)
       .order("submitted_at", { ascending: false })
       .limit(12),
     sb.from("class_session_scores")
-      .select("score,max_score,created_at,class_session_id,class_sessions(session_date,lesson:lessons(name))")
+      .select("id,score,max_score,created_at,class_session_id,class_sessions(session_date,lesson:lessons(name))")
       .eq("student_id", studentId)
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(12),
     sb.from("class_offline_test_scores")
-      .select("score,max_score,created_at,test_id,class_offline_tests(title,test_date)")
+      .select("id,score,max_score,created_at,test_id,class_offline_tests(title,test_date)")
       .eq("student_id", studentId)
       .gte("created_at", since)
       .order("created_at", { ascending: false })
@@ -2536,6 +2606,9 @@ async function findRecentPerfectScoreForStudent(studentId, studentName) {
   (examRes.data || []).forEach(row => {
     const score10 = normalizeScore10(row.score_total ?? row.score_auto, row.exams?.total_points || 10);
     if (score10 >= 9) candidates.push({
+      id: row.id,
+      source: "exam_result",
+      studentId,
       at: row.submitted_at,
       label: row.exams?.title || "bài luyện tập",
       score10,
@@ -2545,6 +2618,9 @@ async function findRecentPerfectScoreForStudent(studentId, studentName) {
   (sessionRes.data || []).forEach(row => {
     const score10 = normalizeScore10(row.score, row.max_score || 10);
     if (score10 >= 9) candidates.push({
+      id: row.id,
+      source: "session_score",
+      studentId,
       at: row.created_at,
       label: row.class_sessions?.lesson?.name || "BTVN/Đề luyện tập",
       score10,
@@ -2554,6 +2630,9 @@ async function findRecentPerfectScoreForStudent(studentId, studentName) {
   (offlineRes.data || []).forEach(row => {
     const score10 = normalizeScore10(row.score, row.max_score || 10);
     if (score10 >= 9) candidates.push({
+      id: row.id,
+      source: "offline_test_score",
+      studentId,
       at: row.created_at,
       label: row.class_offline_tests?.title || "đề kiểm tra",
       score10,
@@ -2561,6 +2640,74 @@ async function findRecentPerfectScoreForStudent(studentId, studentName) {
     });
   });
   return candidates.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())[0] || null;
+}
+
+async function findRecentLowScoreForStudent(studentId, studentName) {
+  if (!studentId) return null;
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const [examRes, sessionRes, offlineRes] = await Promise.all([
+    sb.from("exam_results")
+      .select("id,score_auto,score_total,submitted_at,exams(title,total_points)")
+      .eq("student_id", studentId)
+      .gte("submitted_at", since)
+      .not("submitted_at", "is", null)
+      .order("submitted_at", { ascending: false })
+      .limit(12),
+    sb.from("class_session_scores")
+      .select("id,score,max_score,created_at,class_session_id,class_sessions(session_date,lesson:lessons(name))")
+      .eq("student_id", studentId)
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(12),
+    sb.from("class_offline_test_scores")
+      .select("id,score,max_score,created_at,test_id,class_offline_tests(title,test_date)")
+      .eq("student_id", studentId)
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(12),
+  ]);
+
+  const candidates = [];
+  (examRes.data || []).forEach(row => {
+    const score10 = normalizeScore10(row.score_total ?? row.score_auto, row.exams?.total_points || 10);
+    if (score10 !== null && score10 < 9) candidates.push({
+      id: row.id,
+      source: "exam_result",
+      studentId,
+      at: row.submitted_at,
+      label: row.exams?.title || "bài luyện tập",
+      score10,
+      studentName,
+    });
+  });
+  (sessionRes.data || []).forEach(row => {
+    const score10 = normalizeScore10(row.score, row.max_score || 10);
+    if (score10 !== null && score10 < 9) candidates.push({
+      id: row.id,
+      source: "session_score",
+      studentId,
+      at: row.created_at,
+      label: row.class_sessions?.lesson?.name || "BTVN/Đề luyện tập",
+      score10,
+      studentName,
+    });
+  });
+  (offlineRes.data || []).forEach(row => {
+    const score10 = normalizeScore10(row.score, row.max_score || 10);
+    if (score10 !== null && score10 < 9) candidates.push({
+      id: row.id,
+      source: "offline_test_score",
+      studentId,
+      at: row.created_at,
+      label: row.class_offline_tests?.title || "đề kiểm tra",
+      score10,
+      studentName,
+    });
+  });
+  return candidates
+    .filter(item => !hasSeenLowScoreNotice(item))
+    .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())[0] || null;
 }
 
 async function maybeShowPerfectScoreCelebration(students) {
@@ -2575,6 +2722,14 @@ async function maybeShowPerfectScoreCelebration(students) {
       }
     } catch (error) {
       console.warn("Không kiểm tra được điểm 10 gần nhất:", error);
+    }
+  }
+  for (const student of list) {
+    try {
+      const lowScore = await findRecentLowScoreForStudent(student.id, student.full_name || student.name || "bạn");
+      if (lowScore && showLowScoreNotice(lowScore)) return;
+    } catch (error) {
+      console.warn("Không kiểm tra được điểm dưới 9 gần nhất:", error);
     }
   }
 }
