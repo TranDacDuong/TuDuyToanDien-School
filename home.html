@@ -2155,7 +2155,7 @@ function ensureHomeOverlayShell() {
       <div class="perfect-score-card" role="dialog" aria-modal="true" aria-label="Chúc mừng điểm 10">
         <div class="perfect-score-badge">10</div>
         <h2 id="perfectScoreTitle">Chúc mừng!</h2>
-        <p id="perfectScoreMessage">Bạn vừa đạt điểm 10. MindUp rất tự hào về bạn!</p>
+        <p id="perfectScoreMessage">Bạn vừa đạt điểm cao. MindUp rất tự hào về bạn!</p>
         <button class="perfect-score-close" type="button" onclick="closePerfectScoreCelebration()">Tuyệt vời!</button>
       </div>
     `;
@@ -2481,17 +2481,26 @@ function closePerfectScoreCelebration() {
 }
 window.closePerfectScoreCelebration = closePerfectScoreCelebration;
 
-function showPerfectScoreCelebration(studentName, itemLabel) {
+function formatScore10(score) {
+  const value = Number(score);
+  if (!Number.isFinite(value)) return "9+";
+  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, "");
+}
+
+function showPerfectScoreCelebration(studentName, itemLabel, score10) {
   if (perfectScoreCelebrationShown) return;
   const overlay = document.getElementById("perfectScoreCelebration");
   if (!overlay) return;
   perfectScoreCelebrationShown = true;
   const safeName = String(studentName || "bạn").trim() || "bạn";
   const safeLabel = String(itemLabel || "một bài học").trim() || "một bài học";
+  const scoreText = formatScore10(score10);
+  const badge = overlay.querySelector(".perfect-score-badge");
   const title = document.getElementById("perfectScoreTitle");
   const message = document.getElementById("perfectScoreMessage");
+  if (badge) badge.textContent = scoreText;
   if (title) title.textContent = `Chúc mừng ${safeName}!`;
-  if (message) message.textContent = `${safeName} vừa đạt 10/10 ở ${safeLabel}. MindUp rất tự hào về sự cố gắng này!`;
+  if (message) message.textContent = `${safeName} vừa đạt ${scoreText}/10 ở ${safeLabel}. MindUp rất tự hào về sự cố gắng này!`;
   overlay.classList.add("show");
   clearTimeout(showPerfectScoreCelebration._timer);
   showPerfectScoreCelebration._timer = setTimeout(closePerfectScoreCelebration, 7200);
@@ -2526,25 +2535,28 @@ async function findRecentPerfectScoreForStudent(studentId, studentName) {
   const candidates = [];
   (examRes.data || []).forEach(row => {
     const score10 = normalizeScore10(row.score_total ?? row.score_auto, row.exams?.total_points || 10);
-    if (score10 === 10) candidates.push({
+    if (score10 >= 9) candidates.push({
       at: row.submitted_at,
       label: row.exams?.title || "bài luyện tập",
+      score10,
       studentName,
     });
   });
   (sessionRes.data || []).forEach(row => {
     const score10 = normalizeScore10(row.score, row.max_score || 10);
-    if (score10 === 10) candidates.push({
+    if (score10 >= 9) candidates.push({
       at: row.created_at,
       label: row.class_sessions?.lesson?.name || "BTVN/Đề luyện tập",
+      score10,
       studentName,
     });
   });
   (offlineRes.data || []).forEach(row => {
     const score10 = normalizeScore10(row.score, row.max_score || 10);
-    if (score10 === 10) candidates.push({
+    if (score10 >= 9) candidates.push({
       at: row.created_at,
       label: row.class_offline_tests?.title || "đề kiểm tra",
+      score10,
       studentName,
     });
   });
@@ -2558,7 +2570,7 @@ async function maybeShowPerfectScoreCelebration(students) {
     try {
       const perfect = await findRecentPerfectScoreForStudent(student.id, student.full_name || student.name || "bạn");
       if (perfect) {
-        showPerfectScoreCelebration(perfect.studentName, perfect.label);
+        showPerfectScoreCelebration(perfect.studentName, perfect.label, perfect.score10);
         return;
       }
     } catch (error) {
