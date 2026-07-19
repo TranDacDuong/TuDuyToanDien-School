@@ -829,6 +829,113 @@ body {
   border: none;
   background: #fff;
 }
+.perfect-score-celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 2600;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 12% 32%, rgba(250, 204, 21, .24), transparent 22%),
+    radial-gradient(circle at 88% 36%, rgba(29, 107, 209, .22), transparent 24%),
+    rgba(8, 21, 43, .18);
+}
+.perfect-score-celebration.show {
+  display: flex;
+  animation: perfectFadeIn .24s ease-out both;
+}
+.perfect-score-card {
+  width: min(430px, calc(100vw - 36px));
+  border-radius: 28px;
+  padding: 26px 22px 24px;
+  text-align: center;
+  color: #0b2d5c;
+  background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(255,249,232,.96));
+  border: 1px solid rgba(212, 166, 58, .38);
+  box-shadow: 0 28px 80px rgba(8, 21, 43, .24);
+  pointer-events: auto;
+  transform-origin: center;
+  animation: perfectPop .5s cubic-bezier(.2,1.4,.42,1) both;
+}
+.perfect-score-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 94px;
+  height: 94px;
+  margin-bottom: 12px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 34px;
+  font-weight: 1000;
+  letter-spacing: -.04em;
+  background: radial-gradient(circle at 35% 28%, #fff7ad 0 8%, #facc15 10%, #f59e0b 45%, #0f3c73 46%, #1d6bd1 100%);
+  box-shadow: 0 18px 36px rgba(29, 107, 209, .25), inset 0 0 0 5px rgba(255,255,255,.45);
+}
+.perfect-score-card h2 {
+  margin: 0 0 8px;
+  font-size: clamp(22px, 5vw, 30px);
+  color: #0f3c73;
+}
+.perfect-score-card p {
+  margin: 0;
+  color: #52637d;
+  line-height: 1.55;
+  font-weight: 700;
+}
+.perfect-score-close {
+  margin-top: 18px;
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 18px;
+  color: #fff;
+  background: linear-gradient(135deg, #0f3c73, #1d6bd1);
+  font-weight: 900;
+  cursor: pointer;
+}
+.perfect-fireworks {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: min(28vw, 230px);
+  overflow: hidden;
+}
+.perfect-fireworks.left { left: 0; }
+.perfect-fireworks.right { right: 0; }
+.perfect-fireworks span {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--c);
+  box-shadow:
+    0 -34px 0 var(--c),
+    24px -24px 0 var(--c),
+    34px 0 0 var(--c),
+    24px 24px 0 var(--c),
+    0 34px 0 var(--c),
+    -24px 24px 0 var(--c),
+    -34px 0 0 var(--c),
+    -24px -24px 0 var(--c);
+  opacity: 0;
+  animation: fireworkBurst 1.35s ease-out infinite;
+  animation-delay: var(--d);
+}
+@keyframes perfectFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes perfectPop {
+  from { opacity: 0; transform: translateY(18px) scale(.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes fireworkBurst {
+  0% { opacity: 0; transform: scale(.15); filter: blur(0); }
+  18% { opacity: 1; }
+  72% { opacity: .78; }
+  100% { opacity: 0; transform: scale(1.45); filter: blur(1px); }
+}
 .chat-popup {
   display: none;
   position: fixed;
@@ -2028,6 +2135,32 @@ function ensureHomeOverlayShell() {
     `;
     document.body.appendChild(popup);
   }
+
+  if (!document.getElementById("perfectScoreCelebration")) {
+    const colors = ["#facc15", "#1d6bd1", "#10b981", "#ef4444", "#f97316", "#8b5cf6"];
+    const bursts = Array.from({ length: 8 }, (_, index) => {
+      const x = 18 + (index % 2) * 54 + (index % 3) * 7;
+      const y = 14 + Math.floor(index / 2) * 20;
+      const color = colors[index % colors.length];
+      const delay = (index * 0.16).toFixed(2);
+      return `<span style="--x:${x}%;--y:${y}%;--c:${color};--d:${delay}s"></span>`;
+    }).join("");
+    const celebration = document.createElement("div");
+    celebration.className = "perfect-score-celebration";
+    celebration.id = "perfectScoreCelebration";
+    celebration.setAttribute("aria-live", "polite");
+    celebration.innerHTML = `
+      <div class="perfect-fireworks left" aria-hidden="true">${bursts}</div>
+      <div class="perfect-fireworks right" aria-hidden="true">${bursts}</div>
+      <div class="perfect-score-card" role="dialog" aria-modal="true" aria-label="Chúc mừng điểm 10">
+        <div class="perfect-score-badge">10</div>
+        <h2 id="perfectScoreTitle">Chúc mừng!</h2>
+        <p id="perfectScoreMessage">Bạn vừa đạt điểm 10. MindUp rất tự hào về bạn!</p>
+        <button class="perfect-score-close" type="button" onclick="closePerfectScoreCelebration()">Tuyệt vời!</button>
+      </div>
+    `;
+    document.body.appendChild(celebration);
+  }
 }
 
 function enhanceHomeHub() {
@@ -2319,6 +2452,7 @@ async function init() {
 
 let myScoreChart = null;
 let myOfflineTestChart = null;
+let perfectScoreCelebrationShown = false;
 
 function isStudentChartMobile() {
   return window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
@@ -2335,6 +2469,104 @@ function setStudentChartWidth(canvas, pointCount, baseWidth = 560) {
   }
 }
 
+function normalizeScore10(score, maxScore) {
+  const raw = Number(score);
+  const max = Number(maxScore) || 10;
+  if (!Number.isFinite(raw) || !Number.isFinite(max) || max <= 0) return null;
+  return Math.round((raw / max) * 10 * 10) / 10;
+}
+
+function closePerfectScoreCelebration() {
+  document.getElementById("perfectScoreCelebration")?.classList.remove("show");
+}
+window.closePerfectScoreCelebration = closePerfectScoreCelebration;
+
+function showPerfectScoreCelebration(studentName, itemLabel) {
+  if (perfectScoreCelebrationShown) return;
+  const overlay = document.getElementById("perfectScoreCelebration");
+  if (!overlay) return;
+  perfectScoreCelebrationShown = true;
+  const safeName = String(studentName || "bạn").trim() || "bạn";
+  const safeLabel = String(itemLabel || "một bài học").trim() || "một bài học";
+  const title = document.getElementById("perfectScoreTitle");
+  const message = document.getElementById("perfectScoreMessage");
+  if (title) title.textContent = `Chúc mừng ${safeName}!`;
+  if (message) message.textContent = `${safeName} vừa đạt 10/10 ở ${safeLabel}. MindUp rất tự hào về sự cố gắng này!`;
+  overlay.classList.add("show");
+  clearTimeout(showPerfectScoreCelebration._timer);
+  showPerfectScoreCelebration._timer = setTimeout(closePerfectScoreCelebration, 7200);
+}
+
+async function findRecentPerfectScoreForStudent(studentId, studentName) {
+  if (!studentId) return null;
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const [examRes, sessionRes, offlineRes] = await Promise.all([
+    sb.from("exam_results")
+      .select("score_auto,score_total,submitted_at,exams(title,total_points)")
+      .eq("student_id", studentId)
+      .gte("submitted_at", since)
+      .not("submitted_at", "is", null)
+      .order("submitted_at", { ascending: false })
+      .limit(12),
+    sb.from("class_session_scores")
+      .select("score,max_score,created_at,class_session_id,class_sessions(session_date,lesson:lessons(name))")
+      .eq("student_id", studentId)
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(12),
+    sb.from("class_offline_test_scores")
+      .select("score,max_score,created_at,test_id,class_offline_tests(title,test_date)")
+      .eq("student_id", studentId)
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(12),
+  ]);
+
+  const candidates = [];
+  (examRes.data || []).forEach(row => {
+    const score10 = normalizeScore10(row.score_total ?? row.score_auto, row.exams?.total_points || 10);
+    if (score10 === 10) candidates.push({
+      at: row.submitted_at,
+      label: row.exams?.title || "bài luyện tập",
+      studentName,
+    });
+  });
+  (sessionRes.data || []).forEach(row => {
+    const score10 = normalizeScore10(row.score, row.max_score || 10);
+    if (score10 === 10) candidates.push({
+      at: row.created_at,
+      label: row.class_sessions?.lesson?.name || "BTVN/Đề luyện tập",
+      studentName,
+    });
+  });
+  (offlineRes.data || []).forEach(row => {
+    const score10 = normalizeScore10(row.score, row.max_score || 10);
+    if (score10 === 10) candidates.push({
+      at: row.created_at,
+      label: row.class_offline_tests?.title || "đề kiểm tra",
+      studentName,
+    });
+  });
+  return candidates.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())[0] || null;
+}
+
+async function maybeShowPerfectScoreCelebration(students) {
+  if (perfectScoreCelebrationShown) return;
+  const list = (Array.isArray(students) ? students : []).filter(item => item?.id);
+  for (const student of list) {
+    try {
+      const perfect = await findRecentPerfectScoreForStudent(student.id, student.full_name || student.name || "bạn");
+      if (perfect) {
+        showPerfectScoreCelebration(perfect.studentName, perfect.label);
+        return;
+      }
+    } catch (error) {
+      console.warn("Không kiểm tra được điểm 10 gần nhất:", error);
+    }
+  }
+}
+
 async function initStudentReport() {
   const card = document.getElementById("studentReportCard");
   if (!card) return;
@@ -2343,6 +2575,7 @@ async function initStudentReport() {
   if (role === "student") {
     document.getElementById("parentStudentSelectorRow").style.display = "none";
     await loadStudentReportData(currentUser.id);
+    await maybeShowPerfectScoreCelebration([{ id: currentUser.id, full_name: currentProfile?.full_name || currentUser.email }]);
   } else if (role === "parent") {
     const { data: links, error: lErr } = await sb
       .from("parent_students")
@@ -2366,6 +2599,7 @@ async function initStudentReport() {
     document.getElementById("parentStudentSelectorRow").style.display = "flex";
 
     await loadStudentReportData(students[0].id);
+    await maybeShowPerfectScoreCelebration(students);
   }
 }
 
