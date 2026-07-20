@@ -202,6 +202,138 @@ aside li.active {
 .guest-auth-bar .authBtn { min-width: 104px; border-radius: 999px; }
 .guest-auth-bar .authBtn.secondary { color: var(--navy); background: #fff; border-color: rgba(15,31,61,.12); }
 
+.recent-message-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 4300;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(15,31,61,.28);
+  backdrop-filter: blur(5px);
+}
+.recent-message-overlay.show { display: flex; }
+.recent-message-modal {
+  width: min(520px, calc(100vw - 28px));
+  max-height: min(78vh, 620px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(255,226,138,.28), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid rgba(15,31,61,.1);
+  box-shadow: 0 28px 70px rgba(15,31,61,.24);
+}
+.recent-message-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 12px;
+  border-bottom: 1px solid rgba(15,31,61,.07);
+}
+.recent-message-title {
+  margin: 0;
+  color: var(--navy);
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+}
+.recent-message-sub {
+  margin-top: 4px;
+  color: var(--ink-light);
+  font-size: .78rem;
+  line-height: 1.45;
+}
+.recent-message-close {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(15,31,61,.1);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--navy);
+  font-weight: 900;
+  cursor: pointer;
+}
+.recent-message-list {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+.recent-message-card {
+  border: 1px solid rgba(15,31,61,.08);
+  border-radius: 16px;
+  background: rgba(255,255,255,.86);
+  padding: 12px;
+  box-shadow: 0 10px 24px rgba(15,31,61,.06);
+}
+.recent-message-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--navy);
+  font-weight: 800;
+  font-size: .86rem;
+}
+.recent-message-time {
+  color: var(--ink-light);
+  font-size: .72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.recent-message-content {
+  margin-top: 7px;
+  color: var(--ink-mid);
+  font-size: .82rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.recent-message-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 14px 14px;
+  border-top: 1px solid rgba(15,31,61,.07);
+}
+.recent-message-btn {
+  border: 1px solid rgba(15,31,61,.1);
+  border-radius: 999px;
+  padding: 9px 14px;
+  background: #fff;
+  color: var(--navy);
+  font: inherit;
+  font-size: .82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.recent-message-btn.primary {
+  border-color: transparent;
+  background: linear-gradient(135deg, #0f3c73, #1d6bd1);
+  color: #fff;
+}
+@media (max-width: 640px) {
+  .recent-message-overlay {
+    align-items: flex-end;
+    padding: 10px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+  .recent-message-modal {
+    width: 100%;
+    max-height: 82vh;
+    border-radius: 22px;
+  }
+}
+
 /* ── Main — full width vì sidebar overlay ── */
 main { flex: 1; display: flex; flex-direction: column; overflow: hidden; width: 100%; }
 .content { flex: 1; padding: 0; overflow: hidden; }
@@ -1020,6 +1152,23 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   </button>
 </nav>
 
+<div id="recentMessageOverlay" class="recent-message-overlay" role="dialog" aria-modal="true" aria-labelledby="recentMessageTitle">
+  <div class="recent-message-modal">
+    <div class="recent-message-head">
+      <div>
+        <h3 id="recentMessageTitle" class="recent-message-title">Thông báo mới</h3>
+        <div id="recentMessageSub" class="recent-message-sub">Các tin nhắn/thông báo mới nhất trong 24 giờ qua.</div>
+      </div>
+      <button class="recent-message-close" type="button" onclick="closeRecentMessagesPopup()" aria-label="Đóng">×</button>
+    </div>
+    <div id="recentMessageList" class="recent-message-list"></div>
+    <div class="recent-message-actions">
+      <button class="recent-message-btn" type="button" onclick="closeRecentMessagesPopup()">Để sau</button>
+      <button class="recent-message-btn primary" type="button" onclick="openRecentMessagesPage()">Mở tin nhắn</button>
+    </div>
+  </div>
+</div>
+
 <div id="profileModal" class="modal">
   <div class="modal-box">
     <h3>⚠ Cập nhật thông tin</h3>
@@ -1089,6 +1238,108 @@ const MOBILE_NAV_ORDER = {
 let mobileToolsManualOpen = false;
 let dashboardMenuReady = false;
 let pendingChatPopupPayload = null;
+let recentMessagesPopupShown = false;
+
+function dashboardEsc(value){
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function cleanRecentMessageContent(content){
+  return String(content || "")
+    .replace(/__(ACTION|CHART|EVALUATION)__\s*\{[^\n]*\}/gi, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function formatRecentMessageTime(value){
+  const date = value ? new Date(value) : null;
+  if(!date || Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function closeRecentMessagesPopup(){
+  document.getElementById("recentMessageOverlay")?.classList.remove("show");
+}
+
+function openRecentMessagesPage(){
+  closeRecentMessagesPopup();
+  openDashboardPage("messages.html", { syncMenu: true, syncMobile: true });
+}
+
+async function loadRecentMessagesPopup(userId){
+  if(recentMessagesPopupShown || !userId) return;
+  recentMessagesPopupShown = true;
+  try{
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data: memberships, error: memberError } = await sb
+      .from("conversation_members")
+      .select("conversation_id")
+      .eq("user_id", userId);
+    if(memberError) throw memberError;
+    const conversationIds = [...new Set((memberships || []).map(row => row.conversation_id).filter(Boolean))];
+    if(!conversationIds.length) return;
+
+    const { data: rows, error: messageError } = await sb
+      .from("messages")
+      .select("id,conversation_id,sender_id,real_sender_id,content,created_at")
+      .in("conversation_id", conversationIds)
+      .gte("created_at", cutoff)
+      .order("created_at", { ascending: false })
+      .limit(40);
+    if(messageError) throw messageError;
+
+    const incoming = (rows || [])
+      .filter(row => String(row.sender_id || "") !== String(userId) && String(row.real_sender_id || "") !== String(userId))
+      .map(row => ({ ...row, cleanContent: cleanRecentMessageContent(row.content) }))
+      .filter(row => row.cleanContent)
+      .slice(0, 6);
+    if(!incoming.length) return;
+
+    const senderIds = [...new Set(incoming
+      .map(row => row.real_sender_id || row.sender_id)
+      .filter(id => id && !String(id).startsWith("00000000-0000-0000-0000-000000000001")))];
+    const senderMap = new Map();
+    if(senderIds.length){
+      const { data: senders } = await sb
+        .from("users")
+        .select("id,full_name,role")
+        .in("id", senderIds);
+      (senders || []).forEach(item => senderMap.set(item.id, item));
+    }
+
+    const list = document.getElementById("recentMessageList");
+    const sub = document.getElementById("recentMessageSub");
+    if(!list) return;
+    if(sub) sub.textContent = `Có ${incoming.length} tin nhắn/thông báo mới trong 24 giờ qua.`;
+    list.innerHTML = incoming.map(row => {
+      const sender = senderMap.get(row.real_sender_id || row.sender_id);
+      const senderName = sender?.full_name || "MindUp - Tư Duy Toàn Diện";
+      return `
+        <article class="recent-message-card">
+          <div class="recent-message-card-title">
+            <span>${dashboardEsc(senderName)}</span>
+            <span class="recent-message-time">${dashboardEsc(formatRecentMessageTime(row.created_at))}</span>
+          </div>
+          <div class="recent-message-content">${dashboardEsc(row.cleanContent)}</div>
+        </article>
+      `;
+    }).join("");
+    document.getElementById("recentMessageOverlay")?.classList.add("show");
+  } catch(error){
+    console.warn("[RecentMessages] Không tải được thông báo 24h:", error);
+  }
+}
 
 function setupMindupEntrySplash(){
   const splash = document.getElementById("mindupEntrySplash");
@@ -1194,6 +1445,7 @@ async function initDashboard(userOverride = null){
   loadMessageBadge(user.id);
   subscribeBadgeChanges(user.id);
   document.body.style.visibility = "visible";
+  setTimeout(() => loadRecentMessagesPopup(user.id), 650);
 }
 
 function loadUserInfo(profile){
