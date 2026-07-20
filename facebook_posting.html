@@ -654,7 +654,7 @@ async function renderQuizHtmlToCanvas(html, className, width, height){
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     return await window.html2canvas(node, {
       backgroundColor: null,
-      scale: 2,
+      scale: 1,
       useCORS: true,
       logging: false,
       width,
@@ -733,10 +733,10 @@ function quizAnswerBoxes(count){
     { x: 1078, y: 1190, w: 420, h: 250 },
   ];
   return [
-    { x: 142, y: 972, w: 610, h: 124 },
-    { x: 880, y: 972, w: 570, h: 124 },
-    { x: 142, y: 1148, w: 610, h: 124 },
-    { x: 880, y: 1148, w: 570, h: 124 },
+    { x: 165, y: 1165, w: 585, h: 140 },
+    { x: 895, y: 1165, w: 555, h: 140 },
+    { x: 165, y: 1338, w: 585, h: 140 },
+    { x: 895, y: 1338, w: 555, h: 140 },
   ];
 }
 function scaleQuizBox(box, width, height){
