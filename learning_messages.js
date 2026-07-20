@@ -232,6 +232,43 @@
     return appendActionIfMissing(withStats, { type: "reply", label: "💬 Hỏi lại thầy cô" });
   }
 
+  function offlineTestScoreContent({ studentName, className, testTitle, testDate, score, maxScore = 10, note, rank, totalRanked, distribution }) {
+    const normalizedScore = maxScore ? Math.round((Number(score || 0) / Number(maxScore || 10)) * 100) / 10 : Number(score || 0);
+    const rankLine = rank && totalRanked
+      ? `Xếp hạng trong lớp: **${rank}/${totalRanked}**`
+      : "";
+    const distributionBlock = scoreDistributionChartToken(distribution);
+    return [
+      `📊 Điểm đề kiểm tra${className ? ` lớp **${className}**` : ""}`,
+      studentName ? `Học sinh: **${studentName}**` : "",
+      testTitle ? `Đề kiểm tra: **${testTitle}**` : "",
+      testDate ? `Ngày kiểm tra: **${testDate}**` : "",
+      `Điểm: **${score}/${maxScore}**`,
+      maxScore && Number(maxScore) !== 10 ? `Quy đổi thang 10: **${normalizedScore}/10**` : "",
+      rankLine,
+      distributionBlock ? `\n${distributionBlock}` : "",
+      cleanText(note) ? `Ghi chú: ${cleanText(note)}` : "",
+    ].filter(Boolean).join("\n");
+  }
+
+  async function offlineTestScoreContentAsync({ studentName, className, testTitle, testDate, score, maxScore = 10, note, rank, totalRanked, distribution }) {
+    const fallback = offlineTestScoreContent({ studentName, className, testTitle, testDate, score, maxScore, note, rank, totalRanked, distribution });
+    const content = await templateContent("offline_test_score_notice", fallback, {
+      student_name: studentName || "",
+      class_name: className || "",
+      test_title: testTitle || "",
+      test_date: testDate || "",
+      score: score ?? "",
+      max_score: maxScore ?? 10,
+      rank: rank || "",
+      total_ranked: totalRanked || "",
+      score_distribution: scoreDistributionText(distribution),
+      note: cleanText(note),
+    });
+    const withStats = appendScoreStatsIfMissing(content, { rank, totalRanked, distribution });
+    return appendActionIfMissing(withStats, { type: "reply", label: "💬 Hỏi lại thầy cô" });
+  }
+
   function notificationContent({ title, message, targetUrl }) {
     return [
       title ? `🔔 ${title}` : "🔔 Thông báo từ MindUp",
@@ -264,6 +301,8 @@
     sessionEvaluationContentAsync,
     sessionScoreContent,
     sessionScoreContentAsync,
+    offlineTestScoreContent,
+    offlineTestScoreContentAsync,
     notificationContent,
     notificationContentAsync,
   };

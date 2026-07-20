@@ -1273,6 +1273,7 @@
         alert("Không thể lưu điểm đề kiểm tra: " + error.message);
         return;
       }
+      mirrorOfflineTestScoresToLearningThreads(testId, upserts).catch(console.warn);
     }
     window.AppAdminTools?.recordAudit?.("offline_test_scores_saved", {
       target_type: "class_offline_test",
@@ -1286,6 +1287,53 @@
     window.cvCloseOfflineTestScoreModal();
     alert("Đã lưu điểm đề kiểm tra.");
   };
+
+  async function mirrorOfflineTestScoresToLearningThreads(testId, scoreRows){
+    if(!window.LearningMessages || !testId || !scoreRows?.length) return;
+    const sb = getSb();
+    const studentIds = [...new Set(scoreRows.map(row => row.student_id).filter(Boolean))];
+    const [{ data: test }, { data: users }, { data: allScores }] = await Promise.all([
+      sb.from("class_offline_tests").select("id,class_id,title,test_date,max_score,note").eq("id", testId).maybeSingle(),
+      studentIds.length ? sb.from("users").select("id,full_name").in("id", studentIds) : Promise.resolve({ data: [] }),
+      sb.from("class_offline_test_scores").select("student_id,score,max_score,note,updated_at").eq("test_id", testId)
+    ]);
+    const nameMap = new Map((users || []).map(user => [user.id, user.full_name || "Học sinh"]));
+    const scoreMap = new Map((allScores || []).map(row => [row.student_id, row]));
+    const stats = buildSessionScoreStats(allScores || []);
+    const testDate = test?.test_date ? String(test.test_date).slice(0,10) : "";
+    const buildScoreContent = window.LearningMessages.offlineTestScoreContentAsync
+      || window.LearningMessages.offlineTestScoreContent
+      || window.LearningMessages.sessionScoreContentAsync
+      || window.LearningMessages.sessionScoreContent;
+
+    await Promise.allSettled(studentIds.map(async studentId => {
+      const latest = scoreMap.get(studentId);
+      if(!latest) return { skipped: true };
+      const rankInfo = stats.rankByStudentId.get(studentId) || {};
+      const content = await buildScoreContent({
+        studentName: nameMap.get(studentId) || "Học sinh",
+        className: _className || _cachedClass?.class_name || _cachedClass?.name || "",
+        testTitle: test?.title || "Đề kiểm tra",
+        testDate,
+        lessonName: test?.title || "Đề kiểm tra",
+        sessionDate: testDate,
+        score: latest.score,
+        maxScore: latest.max_score || test?.max_score || 10,
+        scoreOnTen: normalizeScoreToTen(latest.score, latest.max_score || test?.max_score || 10),
+        rank: rankInfo.rank || "",
+        totalRanked: stats.totalRanked || "",
+        distribution: stats.distribution,
+        note: latest.note || "",
+      });
+      if(!content) return { skipped: true };
+      return window.LearningMessages.sendToAllAudiences({
+        studentId,
+        content,
+        realSenderId: window._currentUserId || null,
+        messageKey: `offline_test_score:${testId}:${studentId}`,
+      });
+    }));
+  }
 
   window.cvCloseSessionScoreModal = function(){
     document.getElementById("cvSessionScoreModal")?.remove();
