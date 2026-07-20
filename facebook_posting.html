@@ -294,12 +294,10 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
         <div class="meta-ai-head">
           <div>
             <strong>Meta AI hỗ trợ soạn bài</strong>
-            <div class="meta-ai-small">Web sẽ tạo prompt theo fanpage, loại bài và lịch đăng. Bạn mở Meta AI, dán prompt, rồi dán kết quả về đây để đưa vào caption.</div>
+            <div class="meta-ai-small">Bấm Mở Meta AI để hệ thống tự tạo và copy prompt. Sau đó dán kết quả Meta AI về đây để đưa vào caption.</div>
           </div>
           <div class="meta-ai-actions">
-            <button class="btn btn-outline" id="buildMetaPromptBtn" type="button">Tạo prompt</button>
-            <button class="btn btn-outline" id="copyMetaPromptBtn" type="button">Copy prompt</button>
-            <a class="btn btn-gold" id="openMetaAiBtn" href="https://www.meta.ai/" target="_blank" rel="noopener">Mở Meta AI</a>
+            <button class="btn btn-gold" id="openMetaAiBtn" type="button">Mở Meta AI</button>
           </div>
         </div>
         <div class="meta-ai-grid">
@@ -315,6 +313,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
         <div class="meta-ai-actions">
           <button class="btn btn-primary" id="applyMetaResultBtn" type="button">Đưa kết quả vào nội dung bài</button>
           <button class="btn btn-outline" id="appendMetaResultBtn" type="button">Chèn thêm vào cuối nội dung</button>
+          <button class="btn btn-outline" id="copyImageIdeaBtn" type="button">Copy gợi ý ảnh + mở ChatGPT</button>
         </div>
       </div>
       <div class="grid2">
@@ -1052,6 +1051,20 @@ async function copyMetaAiPrompt(){
     showPostStatus("info", "Không tự copy được. Mình đã chọn sẵn prompt, bạn bấm Ctrl+C để copy.");
   }
 }
+async function openMetaAiWithPrompt(){
+  const prompt = $("metaAiPrompt").value.trim() || buildMetaAiPrompt();
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(prompt);
+    copied = true;
+  } catch (error) {
+    $("metaAiPrompt").select();
+  }
+  window.open("https://www.meta.ai/", "_blank", "noopener");
+  showPostStatus(copied ? "ok" : "info", copied
+    ? "Đã tạo và copy prompt. Meta AI đã mở ở tab mới, bạn chỉ cần Ctrl+V."
+    : "Đã tạo prompt và mở Meta AI. Trình duyệt không cho copy tự động, bạn bấm Ctrl+C ở ô prompt rồi dán sang Meta AI.");
+}
 function extractMetaSection(text, name){
   return parseMetaAiSections(text)[normalizeMetaHeading(name)] || "";
 }
@@ -1077,11 +1090,15 @@ function parseMetaAiSections(text){
     ["GHI CHU", "GHI CHÚ NỘI BỘ"],
   ]);
   for (const line of lines) {
-    const heading = normalizeMetaHeading(line);
+    const colonIndex = String(line).search(/[:：]/);
+    const headingRaw = colonIndex >= 0 ? String(line).slice(0, colonIndex) : line;
+    const heading = normalizeMetaHeading(headingRaw);
     const key = aliases.get(heading);
     if (key) {
       current = normalizeMetaHeading(key);
       if (!sections[current]) sections[current] = "";
+      const inlineContent = colonIndex >= 0 ? String(line).slice(colonIndex + 1).replace(/^[\s*_`#-]+|[\s*_`#-]+$/g, "").trim() : "";
+      if (inlineContent) sections[current] = `${sections[current] ? `${sections[current]}\n` : ""}${inlineContent}`;
       continue;
     }
     if (current) sections[current] = `${sections[current] ? `${sections[current]}\n` : ""}${line}`;
@@ -1096,6 +1113,46 @@ function cleanMetaAiResult(text){
     .replace(/^```(?:text|markdown)?/i, "")
     .replace(/```$/i, "")
     .trim();
+}
+function buildChatGptImagePrompt(imageIdea){
+  const page = currentPage();
+  const type = currentPostTypeName();
+  const content = $("postContent").value.trim() || cleanMetaAiResult($("metaAiResult").value);
+  return [
+    "Hãy giúp tôi tạo prompt thiết kế ảnh cho bài đăng Facebook của MindUp - Tư Duy Toàn Diện.",
+    "",
+    `Fanpage: ${page.page_name}`,
+    `Loại bài: ${type}`,
+    "",
+    "Gợi ý ảnh từ Meta AI:",
+    imageIdea,
+    "",
+    content ? `Caption/nội dung bài:\n${content}` : "",
+    "",
+    "Yêu cầu ảnh:",
+    "- Phong cách giáo dục hiện đại, sáng sủa, màu xanh MindUp, dễ nhìn trên Facebook.",
+    "- Bố cục rõ, ít chữ, tập trung vào ý chính.",
+    "- Nếu là Quiz, ảnh phải có câu hỏi/đáp án rõ ràng, không lộ đáp án đúng.",
+    "- Trả về prompt ảnh chi tiết bằng tiếng Việt, có gợi ý kích thước vuông 1:1."
+  ].filter(Boolean).join("\n");
+}
+async function copyImageIdeaAndOpenChatGpt(){
+  const raw = $("metaAiResult").value;
+  const imageIdea = extractMetaSection(raw, "GỢI Ý ẢNH") || extractMetaSection(raw, "GOI Y ANH");
+  if (!imageIdea) return alert("Chưa thấy phần GỢI Ý ẢNH trong kết quả Meta AI.");
+  const prompt = buildChatGptImagePrompt(imageIdea);
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(prompt);
+    copied = true;
+  } catch (error) {
+    $("metaAiPrompt").value = prompt;
+    $("metaAiPrompt").select();
+  }
+  window.open("https://chatgpt.com/", "_blank", "noopener");
+  showPostStatus(copied ? "ok" : "info", copied
+    ? "Đã copy prompt gợi ý ảnh và mở ChatGPT ở tab mới."
+    : "Đã tạo prompt gợi ý ảnh và mở ChatGPT. Trình duyệt không cho copy tự động, bạn bấm Ctrl+C ở ô prompt.");
 }
 function setPostContentFromMeta(mode="replace"){
   const result = cleanMetaAiResult($("metaAiResult").value);
@@ -1367,6 +1424,17 @@ function handleQuizQuestionPaste(ev){
   if (!file) return;
   ev.preventDefault();
   setQuizQuestionImage(file);
+}
+function clipboardImageFile(ev){
+  return Array.from(ev.clipboardData?.items || [])
+    .find(item => String(item.type || "").startsWith("image/"))
+    ?.getAsFile?.() || null;
+}
+function handlePostImagePaste(ev){
+  const file = clipboardImageFile(ev);
+  if (!file) return;
+  ev.preventDefault();
+  uploadFile(file).catch(e => showPostStatus("err", e.message || String(e)));
 }
 function updateImagePreview(){
   const url = $("postImageUrl").value.trim();
@@ -1660,10 +1728,12 @@ function bindEvents(){
   $("deletePostBtn").addEventListener("click", deletePost);
   $("postContent").addEventListener("input", () => $("postCharCount").textContent = String($("postContent").value.length));
   $("postType").addEventListener("change", () => { toggleQuizBuilder(); $("metaAiPrompt").value = ""; });
-  $("buildMetaPromptBtn").addEventListener("click", () => { buildMetaAiPrompt(); showPostStatus("ok", "Đã tạo prompt Meta AI."); });
-  $("copyMetaPromptBtn").addEventListener("click", copyMetaAiPrompt);
+  $("openMetaAiBtn").addEventListener("click", openMetaAiWithPrompt);
   $("applyMetaResultBtn").addEventListener("click", () => setPostContentFromMeta("replace"));
   $("appendMetaResultBtn").addEventListener("click", () => setPostContentFromMeta("append"));
+  $("copyImageIdeaBtn").addEventListener("click", copyImageIdeaAndOpenChatGpt);
+  $("postContent").addEventListener("paste", handlePostImagePaste);
+  $("metaAiResult").addEventListener("paste", handlePostImagePaste);
   $("postImageUrl").addEventListener("input", updateImagePreview);
   $("postImageFile").addEventListener("change", ev => uploadFile(ev.target.files?.[0]).catch(e => showPostStatus("err", e.message || String(e))));
   $("quizAnswerCount").addEventListener("change", renderQuizAnswerFields);
@@ -1676,10 +1746,7 @@ function bindEvents(){
       $("templateTaskRequirements").value = defaultRequirementsForType(typeName($("templateType").value)).join("\n");
     }
   });
-  $("imageDropzone").addEventListener("paste", ev => {
-    const file = Array.from(ev.clipboardData?.items || []).find(i => String(i.type||"").startsWith("image/"))?.getAsFile?.();
-    if (file) { ev.preventDefault(); uploadFile(file).catch(e => showPostStatus("err", e.message || String(e))); }
-  });
+  $("imageDropzone").addEventListener("paste", handlePostImagePaste);
   $("addTypeBtn").addEventListener("click", () => openTypeModal());
   $("closeTypeModalBtn").addEventListener("click", closeTypeModal);
   $("saveTypeBtn").addEventListener("click", saveType);
