@@ -697,7 +697,11 @@ function drawWrappedText(ctx, text, box, options={}){
   const align = options.align || "center";
   const lineHeightRatio = options.lineHeightRatio || 1.25;
   const maxLines = options.maxLines || 8;
-  const fontSize = fitFontSize(ctx, text, box.w, maxLines, options.size || 44, options.minSize || 24, family, weight);
+  let fontSize = fitFontSize(ctx, text, box.w, maxLines, options.size || 44, options.minSize || 24, family, weight);
+  while (fontSize > (options.minSize || 24) && (Math.min(maxLines, wrapTextLines(ctx, text, box.w).length) * fontSize * lineHeightRatio) > box.h * 0.9) {
+    fontSize -= 2;
+    ctx.font = `${weight} ${fontSize}px ${family}`;
+  }
   ctx.font = `${weight} ${fontSize}px ${family}`;
   ctx.fillStyle = options.color || "#10346b";
   ctx.textAlign = align;
@@ -749,25 +753,119 @@ function scaleQuizBox(box, width, height){
     h: box.h * sy,
   };
 }
+function quizCanvasScale(width){
+  return width / 1600;
+}
 function quizQuestionBox(width, height){
   return scaleQuizBox({ x: 150, y: 285, w: 1300, h: 600 }, width, height);
 }
 function quizQuestionFontSize(text, hasImage){
   const len = String(text || "").length;
-  if (hasImage) return len > 140 ? 88 : len > 90 ? 108 : 128;
-  if (len > 240) return 82;
-  if (len > 180) return 98;
-  if (len > 120) return 118;
-  if (len > 70) return 145;
-  return 175;
+  if (hasImage) return len > 140 ? 82 : len > 90 ? 96 : 112;
+  if (len > 240) return 72;
+  if (len > 180) return 86;
+  if (len > 120) return 104;
+  if (len > 70) return 122;
+  return 150;
 }
 function quizAnswerFontSize(text, count){
   const len = String(text || "").length;
-  const base = count === 2 ? 150 : count === 3 ? 128 : 108;
-  if (len > 85) return Math.max(62, base - 58);
-  if (len > 55) return Math.max(74, base - 42);
-  if (len > 32) return Math.max(86, base - 24);
+  const base = count === 2 ? 112 : count === 3 ? 92 : 76;
+  if (len > 85) return Math.max(38, base - 42);
+  if (len > 55) return Math.max(46, base - 30);
+  if (len > 32) return Math.max(54, base - 18);
   return base;
+}
+function latexToCanvasText(value){
+  const supers = { "0":"⁰","1":"¹","2":"²","3":"³","4":"⁴","5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹","+":"⁺","-":"⁻","=":"⁼","n":"ⁿ","i":"ⁱ","x":"ˣ","y":"ʸ" };
+  const greek = {
+    "\\alpha":"α","\\beta":"β","\\gamma":"γ","\\delta":"δ","\\theta":"θ","\\lambda":"λ","\\mu":"μ","\\pi":"π","\\sigma":"σ","\\phi":"φ","\\omega":"ω",
+    "\\sin":"sin","\\cos":"cos","\\tan":"tan","\\log":"log","\\ln":"ln"
+  };
+  let text = String(value || "")
+    .replace(/\$\$?/g, "")
+    .replace(/\\\(|\\\)|\\\[|\\\]/g, "")
+    .replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, "($1)/($2)")
+    .replace(/\\sqrt\s*\{([^{}]+)\}/g, "√($1)")
+    .replace(/\\cdot/g, "·")
+    .replace(/\\times/g, "×")
+    .replace(/\\div/g, "÷")
+    .replace(/\\leq/g, "≤")
+    .replace(/\\geq/g, "≥")
+    .replace(/\\neq/g, "≠")
+    .replace(/\\infty/g, "∞")
+    .replace(/\\pm/g, "±");
+  Object.entries(greek).forEach(([key, val]) => { text = text.replaceAll(key, val); });
+  text = text
+    .replace(/\^\{([^{}]+)\}/g, (_, raw) => String(raw).split("").map(ch => supers[ch] || ch).join(""))
+    .replace(/\^([A-Za-z0-9+\-=])/g, (_, ch) => supers[ch] || ch)
+    .replace(/_\{([^{}]+)\}/g, "($1)")
+    .replace(/_([A-Za-z0-9+\-=])/g, "($1)")
+    .replace(/\\/g, "");
+  return text.trim();
+}
+function latexToCanvasTextSafe(value){
+  const supers = { "0":"\u2070","1":"\u00b9","2":"\u00b2","3":"\u00b3","4":"\u2074","5":"\u2075","6":"\u2076","7":"\u2077","8":"\u2078","9":"\u2079","+":"\u207a","-":"\u207b","=":"\u207c","n":"\u207f","i":"\u2071","x":"\u02e3","y":"\u02b8" };
+  const greek = {
+    "\\alpha":"\u03b1","\\beta":"\u03b2","\\gamma":"\u03b3","\\delta":"\u03b4","\\theta":"\u03b8","\\lambda":"\u03bb","\\mu":"\u03bc","\\pi":"\u03c0","\\sigma":"\u03c3","\\phi":"\u03c6","\\omega":"\u03c9",
+    "\\sin":"sin","\\cos":"cos","\\tan":"tan","\\log":"log","\\ln":"ln"
+  };
+  let text = String(value || "")
+    .replace(/\$\$?/g, "")
+    .replace(/\\\(|\\\)|\\\[|\\\]/g, "")
+    .replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, "($1)/($2)")
+    .replace(/\\sqrt\s*\{([^{}]+)\}/g, "\u221a($1)")
+    .replace(/\\cdot/g, "\u00b7")
+    .replace(/\\times/g, "\u00d7")
+    .replace(/\\div/g, "\u00f7")
+    .replace(/\\leq/g, "\u2264")
+    .replace(/\\geq/g, "\u2265")
+    .replace(/\\neq/g, "\u2260")
+    .replace(/\\infty/g, "\u221e")
+    .replace(/\\pm/g, "\u00b1");
+  Object.entries(greek).forEach(([key, val]) => { text = text.replaceAll(key, val); });
+  text = text
+    .replace(/\^\{([^{}]+)\}/g, (_, raw) => String(raw).split("").map(ch => supers[ch] || ch).join(""))
+    .replace(/\^([A-Za-z0-9+\-=])/g, (_, ch) => supers[ch] || ch)
+    .replace(/_\{([^{}]+)\}/g, "($1)")
+    .replace(/_([A-Za-z0-9+\-=])/g, "($1)")
+    .replace(/\\/g, "");
+  return text.trim();
+}
+function drawBigQuizText(ctx, text, box, { size, minSize, maxLines = 4, color = "#082c68" } = {}){
+  const display = latexToCanvasTextSafe(text);
+  drawWrappedText(ctx, display, box, {
+    size,
+    minSize,
+    maxLines,
+    color,
+    weight: "900",
+    family: '"DM Sans", Arial, sans-serif',
+    lineHeightRatio: 1.04,
+  });
+}
+async function drawQuizQuestion(ctx, question, canvasWidth, canvasHeight){
+  const box = quizQuestionBox(canvasWidth, canvasHeight);
+  const hasImage = Boolean(quizQuestionImageDataUrl);
+  const scale = quizCanvasScale(canvasWidth);
+  const textBox = hasImage
+    ? { x: box.x, y: box.y + 34, w: box.w, h: box.h * 0.48 }
+    : box;
+  drawBigQuizText(ctx, question, textBox, {
+    size: quizQuestionFontSize(question, hasImage) * scale,
+    minSize: (hasImage ? 58 : 64) * scale,
+    maxLines: hasImage ? 3 : 5,
+    color: "#082c68",
+  });
+  if (hasImage) {
+    const pasted = await loadImage(quizQuestionImageDataUrl);
+    const maxW = box.w * 0.55;
+    const maxH = box.h * 0.34;
+    const ratio = Math.min(maxW / pasted.naturalWidth, maxH / pasted.naturalHeight, 1);
+    const w = pasted.naturalWidth * ratio;
+    const h = pasted.naturalHeight * ratio;
+    ctx.drawImage(pasted, box.x + (box.w - w) / 2, box.y + box.h * 0.58, w, h);
+  }
 }
 async function buildQuizImageDataUrl(){
   await ensureQuizFontLoaded();
@@ -778,19 +876,18 @@ async function buildQuizImageDataUrl(){
   const canvas = document.createElement("canvas");
   canvas.width = img.naturalWidth || 1280;
   canvas.height = img.naturalHeight || 1280;
+  const scale = quizCanvasScale(canvas.width);
   const ctx = canvas.getContext("2d");
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  const questionHtml = `
-    <div style="font-size:${quizQuestionFontSize(question, Boolean(quizQuestionImageDataUrl))}px">
-      ${renderLatexTextHtml(question)}
-    </div>
-    ${quizQuestionImageDataUrl ? `<img src="${quizQuestionImageDataUrl}" alt="">` : ""}
-  `;
-  await drawRenderedHtml(ctx, questionHtml, "quiz-render-question", quizQuestionBox(canvas.width, canvas.height));
+  await drawQuizQuestion(ctx, question, canvas.width, canvas.height);
   for (const [index, rawBox] of quizAnswerBoxes(count).entries()) {
     const answerText = answers[index];
-    const answerHtml = `<div style="font-size:${quizAnswerFontSize(answerText, count)}px">${renderLatexTextHtml(answerText)}</div>`;
-    await drawRenderedHtml(ctx, answerHtml, "quiz-render-answer", scaleQuizBox(rawBox, canvas.width, canvas.height));
+    drawBigQuizText(ctx, answerText, scaleQuizBox(rawBox, canvas.width, canvas.height), {
+      size: quizAnswerFontSize(answerText, count) * scale,
+      minSize: (count === 4 ? 42 : 52) * scale,
+      maxLines: count === 4 ? 2 : 3,
+      color: "#10284f",
+    });
   }
   return canvas.toDataURL("image/png");
 }
