@@ -101,10 +101,10 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 .quiz-question-image-box.show{display:flex}
 .quiz-question-image-box img{width:86px;height:64px;object-fit:cover;border-radius:10px;border:1px solid rgba(39,58,91,.12);background:#fff}
 .quiz-render-stage{position:fixed;left:-99999px;top:0;width:1100px;background:transparent;pointer-events:none;z-index:-1}
-.quiz-render-question{width:1100px;min-height:260px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;color:#082c68;font-family:"DM Sans",Arial,sans-serif;font-size:54px;font-weight:900;line-height:1.14;letter-spacing:-.02em}
+.quiz-render-question{width:1100px;min-height:260px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;color:#082c68;font-family:"DM Sans",Arial,sans-serif;font-size:76px;font-weight:900;line-height:1.08;letter-spacing:-.025em}
 .quiz-render-question .katex{font-size:1.02em}
 .quiz-render-question img{max-width:560px;max-height:250px;object-fit:contain;border-radius:18px}
-.quiz-render-answer{width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:#10284f;font-family:"DM Sans",Arial,sans-serif;font-size:34px;font-weight:900;line-height:1.14;letter-spacing:-.015em;padding:0 22px}
+.quiz-render-answer{width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:#10284f;font-family:"DM Sans",Arial,sans-serif;font-size:52px;font-weight:900;line-height:1.08;letter-spacing:-.02em;padding:0 24px}
 .quiz-render-answer .katex{font-size:.98em}
 .token-card{display:none!important}
 .empty-box{padding:22px 16px;color:#64748b;line-height:1.55;background:#fff;border-radius:18px}
@@ -753,17 +753,18 @@ function quizQuestionBox(width, height){
 }
 function quizQuestionFontSize(text, hasImage){
   const len = String(text || "").length;
-  if (hasImage) return len > 120 ? 38 : len > 70 ? 44 : 50;
-  if (len > 190) return 38;
-  if (len > 130) return 44;
-  if (len > 80) return 52;
-  return 60;
+  if (hasImage) return len > 140 ? 48 : len > 90 ? 56 : 64;
+  if (len > 220) return 54;
+  if (len > 160) return 62;
+  if (len > 95) return 72;
+  return 88;
 }
 function quizAnswerFontSize(text, count){
   const len = String(text || "").length;
-  const base = count === 3 ? 34 : count === 4 ? 32 : 38;
-  if (len > 60) return Math.max(23, base - 10);
-  if (len > 38) return Math.max(26, base - 6);
+  const base = count === 2 ? 64 : count === 3 ? 58 : 52;
+  if (len > 80) return Math.max(34, base - 18);
+  if (len > 55) return Math.max(38, base - 12);
+  if (len > 34) return Math.max(42, base - 7);
   return base;
 }
 async function buildQuizImageDataUrl(){
