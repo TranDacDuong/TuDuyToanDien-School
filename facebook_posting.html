@@ -11,6 +11,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="supabaseClient.js"></script>
 <script src="image_upload.js"></script>
 <style>
@@ -94,6 +97,15 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 .quiz-answer-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
 .quiz-preview{max-width:260px;width:100%;border-radius:16px;border:1px solid rgba(39,58,91,.12);box-shadow:0 10px 24px rgba(15,23,42,.08);display:none}
 .quiz-preview.show{display:block}
+.quiz-question-image-box{display:none;align-items:center;gap:10px;border:1px solid rgba(29,107,209,.18);background:#f8fbff;border-radius:14px;padding:10px;margin-top:8px}
+.quiz-question-image-box.show{display:flex}
+.quiz-question-image-box img{width:86px;height:64px;object-fit:cover;border-radius:10px;border:1px solid rgba(39,58,91,.12);background:#fff}
+.quiz-render-stage{position:fixed;left:-99999px;top:0;width:1100px;background:transparent;pointer-events:none;z-index:-1}
+.quiz-render-question{width:1100px;min-height:260px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;color:#082c68;font-family:"DM Sans",Arial,sans-serif;font-size:54px;font-weight:900;line-height:1.14;letter-spacing:-.02em}
+.quiz-render-question .katex{font-size:1.02em}
+.quiz-render-question img{max-width:560px;max-height:250px;object-fit:contain;border-radius:18px}
+.quiz-render-answer{width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:#10284f;font-family:"DM Sans",Arial,sans-serif;font-size:34px;font-weight:900;line-height:1.14;letter-spacing:-.015em;padding:0 22px}
+.quiz-render-answer .katex{font-size:.98em}
 .token-card{display:none!important}
 .empty-box{padding:22px 16px;color:#64748b;line-height:1.55;background:#fff;border-radius:18px}
 @media(max-width:1050px){.layout{grid-template-columns:1fr}.page{padding:16px 12px 40px}}
@@ -251,7 +263,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
           <strong>Soạn nhanh ảnh Quiz</strong>
           <div class="hint">Nhập câu hỏi và 2/3/4 đáp án, hệ thống sẽ tự sinh ảnh theo mẫu MindUp rồi upload lên Drive.</div>
         </div>
-        <div class="field"><label>Câu hỏi</label><textarea class="textarea" id="quizQuestion" style="min-height:110px" placeholder="Nhập câu hỏi quiz..."></textarea></div>
+        <div class="field"><label>Câu hỏi</label><textarea class="textarea" id="quizQuestion" style="min-height:110px" placeholder="Nhập câu hỏi quiz... Có thể dùng LaTeX: $x^2+1$ hoặc Ctrl+V ảnh vào ô này."></textarea><div class="quiz-question-image-box" id="quizQuestionImageBox"><img id="quizQuestionImagePreview" alt="Ảnh trong câu hỏi"><div class="hint" style="flex:1">Đã thêm ảnh vào câu hỏi.</div><button class="btn btn-outline" type="button" id="removeQuizQuestionImageBtn">Xóa ảnh</button></div></div>
         <div class="grid2">
           <div class="field"><label>Số đáp án</label><select class="select" id="quizAnswerCount"><option value="2">2 đáp án</option><option value="3">3 đáp án</option><option value="4" selected>4 đáp án</option></select></div>
           <div class="field"><label>Đáp án đúng / ghi chú nội bộ</label><input class="input" id="quizCorrectAnswer" placeholder="Ví dụ: A hoặc đáp án 1"></div>
@@ -335,9 +347,9 @@ const DEFAULT_TYPES = [
   "Teaching Philosophy", "Enrollment", "Quiz", "Bài hay", "Lỗi sai thường gặp"
 ];
 const QUIZ_TEMPLATES = {
-  2: "assets/facebook-quiz/quiz-2-options.png",
-  3: "assets/facebook-quiz/quiz-3-options.png",
-  4: "assets/facebook-quiz/quiz-4-options.png",
+  2: "Ảnh Quiz/2.png",
+  3: "Ảnh Quiz/6.png",
+  4: "Ảnh Quiz/4.png",
 };
 
 let S = {
@@ -350,6 +362,7 @@ let S = {
   activePageId: "",
   weekStart: startOfWeek(new Date()),
 };
+let quizQuestionImageDataUrl = "";
 
 function $(id){ return document.getElementById(id); }
 function esc(v){ return String(v ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
@@ -592,6 +605,68 @@ function loadImage(src){
     img.src = src;
   });
 }
+function escHtml(value){
+  return String(value || "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+function renderLatexTextHtml(value){
+  const source = String(value || "");
+  const regex = /(\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$\$[\s\S]*?\$\$|\$[^$\n]+\$)/g;
+  let html = "";
+  let lastIndex = 0;
+  const appendText = text => { html += escHtml(text).replace(/\n/g, "<br>"); };
+  let match;
+  while ((match = regex.exec(source))) {
+    appendText(source.slice(lastIndex, match.index));
+    const token = match[0];
+    const displayMode = token.startsWith("$$") || token.startsWith("\\[");
+    const latex = token.startsWith("$$")
+      ? token.slice(2, -2)
+      : token.startsWith("\\[")
+        ? token.slice(2, -2)
+        : token.startsWith("\\(")
+          ? token.slice(2, -2)
+          : token.slice(1, -1);
+    try {
+      html += window.katex
+        ? window.katex.renderToString(latex, { throwOnError: false, displayMode })
+        : escHtml(token);
+    } catch {
+      html += escHtml(token);
+    }
+    lastIndex = regex.lastIndex;
+  }
+  appendText(source.slice(lastIndex));
+  return html;
+}
+async function renderQuizHtmlToCanvas(html, className, width, height){
+  if (!window.html2canvas) throw new Error("Chưa tải được bộ tạo ảnh Quiz. Vui lòng thử lại sau vài giây.");
+  const stage = document.createElement("div");
+  stage.className = "quiz-render-stage";
+  const node = document.createElement("div");
+  node.className = className;
+  node.style.width = `${width}px`;
+  node.style.height = `${height}px`;
+  node.innerHTML = html;
+  stage.appendChild(node);
+  document.body.appendChild(stage);
+  try {
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    return await window.html2canvas(node, {
+      backgroundColor: null,
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      width,
+      height,
+    });
+  } finally {
+    stage.remove();
+  }
+}
+async function drawRenderedHtml(ctx, html, className, box){
+  const rendered = await renderQuizHtmlToCanvas(html, className, box.w, box.h);
+  ctx.drawImage(rendered, box.x, box.y, box.w, box.h);
+}
 function fitFontSize(ctx, text, maxWidth, maxLines, startSize, minSize, family, weight="700"){
   for (let size = startSize; size >= minSize; size -= 2) {
     ctx.font = `${weight} ${size}px ${family}`;
@@ -642,25 +717,54 @@ async function ensureQuizFontLoaded(){
     document.fonts.load('600 30px "DM Sans"'),
     document.fonts.load('700 42px "DM Sans"'),
     document.fonts.load('800 42px "DM Sans"'),
+    document.fonts.load('900 60px "DM Sans"'),
   ]);
   await document.fonts.ready;
 }
 function quizAnswerBoxes(count){
   if (count === 2) return [
-    { x: 190, y: 966, w: 390, h: 94 },
-    { x: 725, y: 966, w: 390, h: 94 },
+    { x: 92, y: 1190, w: 610, h: 245 },
+    { x: 850, y: 1190, w: 610, h: 245 },
   ];
   if (count === 3) return [
-    { x: 200, y: 820, w: 960, h: 78 },
-    { x: 200, y: 936, w: 960, h: 78 },
-    { x: 200, y: 1050, w: 960, h: 78 },
+    { x: 128, y: 1190, w: 420, h: 250 },
+    { x: 604, y: 1190, w: 420, h: 250 },
+    { x: 1078, y: 1190, w: 420, h: 250 },
   ];
   return [
-    { x: 176, y: 865, w: 415, h: 86 },
-    { x: 728, y: 865, w: 415, h: 86 },
-    { x: 176, y: 1012, w: 415, h: 86 },
-    { x: 728, y: 1012, w: 415, h: 86 },
+    { x: 142, y: 972, w: 610, h: 124 },
+    { x: 880, y: 972, w: 570, h: 124 },
+    { x: 142, y: 1148, w: 610, h: 124 },
+    { x: 880, y: 1148, w: 570, h: 124 },
   ];
+}
+function scaleQuizBox(box, width, height){
+  const sx = width / 1600;
+  const sy = height / 1600;
+  return {
+    x: box.x * sx,
+    y: box.y * sy,
+    w: box.w * sx,
+    h: box.h * sy,
+  };
+}
+function quizQuestionBox(width, height){
+  return scaleQuizBox({ x: 150, y: 285, w: 1300, h: 600 }, width, height);
+}
+function quizQuestionFontSize(text, hasImage){
+  const len = String(text || "").length;
+  if (hasImage) return len > 120 ? 38 : len > 70 ? 44 : 50;
+  if (len > 190) return 38;
+  if (len > 130) return 44;
+  if (len > 80) return 52;
+  return 60;
+}
+function quizAnswerFontSize(text, count){
+  const len = String(text || "").length;
+  const base = count === 3 ? 34 : count === 4 ? 32 : 38;
+  if (len > 60) return Math.max(23, base - 10);
+  if (len > 38) return Math.max(26, base - 6);
+  return base;
 }
 async function buildQuizImageDataUrl(){
   await ensureQuizFontLoaded();
@@ -673,11 +777,19 @@ async function buildQuizImageDataUrl(){
   canvas.height = img.naturalHeight || 1280;
   const ctx = canvas.getContext("2d");
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  drawWrappedText(ctx, question, { x: 126, y: 360, w: 1030, h: 360 }, { size: 42, minSize: 26, maxLines: 7, color:"#082c68", weight:"700", lineHeightRatio:1.22 });
+  const questionHtml = `
+    <div style="font-size:${quizQuestionFontSize(question, Boolean(quizQuestionImageDataUrl))}px">
+      ${renderLatexTextHtml(question)}
+    </div>
+    ${quizQuestionImageDataUrl ? `<img src="${quizQuestionImageDataUrl}" alt="">` : ""}
+  `;
+  await drawRenderedHtml(ctx, questionHtml, "quiz-render-question", quizQuestionBox(canvas.width, canvas.height));
   const labels = ["A.", "B.", "C.", "D."];
-  quizAnswerBoxes(count).forEach((box, index) => {
-    drawWrappedText(ctx, `${labels[index]} ${answers[index]}`, box, { size: count === 3 ? 31 : 28, minSize: 19, maxLines: 2, color:"#10284f", weight:"700", lineHeightRatio:1.18 });
-  });
+  for (const [index, rawBox] of quizAnswerBoxes(count).entries()) {
+    const answerText = `${labels[index]} ${answers[index]}`;
+    const answerHtml = `<div style="font-size:${quizAnswerFontSize(answerText, count)}px">${renderLatexTextHtml(answerText)}</div>`;
+    await drawRenderedHtml(ctx, answerHtml, "quiz-render-answer", scaleQuizBox(rawBox, canvas.width, canvas.height));
+  }
   return canvas.toDataURL("image/png");
 }
 function buildQuizCaption(){
@@ -909,6 +1021,7 @@ function openPostModal(id="", defaults={}){
   $("quizCorrectAnswer").value = "";
   $("quizAnswerCount").value = "4";
   renderQuizAnswerFields();
+  clearQuizQuestionImage();
   $("quizImagePreview").src = "";
   $("quizImagePreview").classList.remove("show");
   toggleQuizBuilder();
@@ -918,6 +1031,33 @@ function openPostModal(id="", defaults={}){
   $("postModal").classList.add("show");
 }
 function closePostModal(){ $("postModal").classList.remove("show"); }
+function clearQuizQuestionImage(){
+  quizQuestionImageDataUrl = "";
+  const box = $("quizQuestionImageBox");
+  const preview = $("quizQuestionImagePreview");
+  if (preview) preview.src = "";
+  box?.classList.remove("show");
+}
+function setQuizQuestionImage(file){
+  if (!file || !String(file.type || "").startsWith("image/")) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    quizQuestionImageDataUrl = String(reader.result || "");
+    $("quizQuestionImagePreview").src = quizQuestionImageDataUrl;
+    $("quizQuestionImageBox").classList.add("show");
+    showPostStatus("ok", "Đã dán ảnh vào câu hỏi Quiz.");
+  };
+  reader.onerror = () => showPostStatus("err", "Không đọc được ảnh vừa dán.");
+  reader.readAsDataURL(file);
+}
+function handleQuizQuestionPaste(ev){
+  const file = Array.from(ev.clipboardData?.items || [])
+    .find(item => String(item.type || "").startsWith("image/"))
+    ?.getAsFile?.();
+  if (!file) return;
+  ev.preventDefault();
+  setQuizQuestionImage(file);
+}
 function updateImagePreview(){
   const url = $("postImageUrl").value.trim();
   const img = $("imagePreview");
@@ -1213,6 +1353,8 @@ function bindEvents(){
   $("postImageUrl").addEventListener("input", updateImagePreview);
   $("postImageFile").addEventListener("change", ev => uploadFile(ev.target.files?.[0]).catch(e => showPostStatus("err", e.message || String(e))));
   $("quizAnswerCount").addEventListener("change", renderQuizAnswerFields);
+  $("quizQuestion").addEventListener("paste", handleQuizQuestionPaste);
+  $("removeQuizQuestionImageBtn").addEventListener("click", clearQuizQuestionImage);
   $("previewQuizImageBtn").addEventListener("click", previewQuizImage);
   $("generateQuizImageBtn").addEventListener("click", generateQuizImage);
   $("templateType").addEventListener("change", () => {
