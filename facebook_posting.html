@@ -935,7 +935,7 @@ function buildQuizCaption(){
   const { question, answers } = getQuizData();
   const body = [`🧠 Quiz nhanh cùng MindUp!`, "", question, ""];
   answers.forEach((answer, index) => body.push(`${String.fromCharCode(65 + index)}. ${answer}`));
-  body.push("", "Comment đáp án của em ở dưới bài viết nhé!");
+  body.push("", "Comment đáp án của em ở dưới bài viết nhé!", "", "#MindUp #Quiz #PhatTrienTuDuy");
   return body.join("\n");
 }
 async function previewQuizImage(){
