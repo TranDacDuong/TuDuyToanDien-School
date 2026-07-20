@@ -683,6 +683,17 @@ function wrapTextLines(ctx, text, maxWidth){
     if (!words.length) { lines.push(""); continue; }
     let line = "";
     for (const word of words) {
+      if (ctx.measureText(word).width > maxWidth) {
+        if (line) { lines.push(line); line = ""; }
+        let chunk = "";
+        for (const ch of word) {
+          const testChunk = chunk + ch;
+          if (ctx.measureText(testChunk).width <= maxWidth || !chunk) chunk = testChunk;
+          else { lines.push(chunk); chunk = ch; }
+        }
+        if (chunk) line = chunk;
+        continue;
+      }
       const test = line ? `${line} ${word}` : word;
       if (ctx.measureText(test).width <= maxWidth || !line) line = test;
       else { lines.push(line); line = word; }
@@ -697,8 +708,15 @@ function drawWrappedText(ctx, text, box, options={}){
   const align = options.align || "center";
   const lineHeightRatio = options.lineHeightRatio || 1.25;
   const maxLines = options.maxLines || 8;
-  let fontSize = fitFontSize(ctx, text, box.w, maxLines, options.size || 44, options.minSize || 24, family, weight);
-  while (fontSize > (options.minSize || 24) && (Math.min(maxLines, wrapTextLines(ctx, text, box.w).length) * fontSize * lineHeightRatio) > box.h * 0.9) {
+  const padding = options.padding || 0;
+  const innerBox = {
+    x: box.x + padding,
+    y: box.y + padding,
+    w: Math.max(20, box.w - padding * 2),
+    h: Math.max(20, box.h - padding * 2),
+  };
+  let fontSize = fitFontSize(ctx, text, innerBox.w, maxLines, options.size || 44, options.minSize || 24, family, weight);
+  while (fontSize > (options.minSize || 24) && (Math.min(maxLines, wrapTextLines(ctx, text, innerBox.w).length) * fontSize * lineHeightRatio) > innerBox.h * 0.92) {
     fontSize -= 2;
     ctx.font = `${weight} ${fontSize}px ${family}`;
   }
@@ -706,11 +724,11 @@ function drawWrappedText(ctx, text, box, options={}){
   ctx.fillStyle = options.color || "#10346b";
   ctx.textAlign = align;
   ctx.textBaseline = "middle";
-  const lines = wrapTextLines(ctx, text, box.w).slice(0, maxLines);
+  const lines = wrapTextLines(ctx, text, innerBox.w).slice(0, maxLines);
   const lineHeight = fontSize * lineHeightRatio;
   const totalHeight = (lines.length - 1) * lineHeight;
-  const x = align === "left" ? box.x : box.x + box.w / 2;
-  let y = box.y + box.h / 2 - totalHeight / 2;
+  const x = align === "left" ? innerBox.x : innerBox.x + innerBox.w / 2;
+  let y = innerBox.y + innerBox.h / 2 - totalHeight / 2;
   for (const line of lines) {
     ctx.fillText(line, x, y);
     y += lineHeight;
@@ -770,11 +788,24 @@ function quizQuestionFontSize(text, hasImage){
 }
 function quizAnswerFontSize(text, count){
   const len = String(text || "").length;
-  const base = count === 2 ? 112 : count === 3 ? 92 : 76;
-  if (len > 85) return Math.max(38, base - 42);
-  if (len > 55) return Math.max(46, base - 30);
-  if (len > 32) return Math.max(54, base - 18);
+  const base = count === 2 ? 106 : count === 3 ? 86 : 72;
+  if (len > 85) return Math.max(34, base - 44);
+  if (len > 55) return Math.max(40, base - 34);
+  if (len > 32) return Math.max(46, base - 26);
+  if (len > 16) return Math.max(50, base - 16);
   return base;
+}
+function quizAnswerTextBox(rawBox, canvasWidth, canvasHeight){
+  const box = scaleQuizBox(rawBox, canvasWidth, canvasHeight);
+  const scale = quizCanvasScale(canvasWidth);
+  const iconSpace = 118 * scale;
+  const rightPadding = 24 * scale;
+  return {
+    x: box.x + iconSpace,
+    y: box.y,
+    w: Math.max(80 * scale, box.w - iconSpace - rightPadding),
+    h: box.h,
+  };
 }
 function latexToCanvasText(value){
   const supers = { "0":"⁰","1":"¹","2":"²","3":"³","4":"⁴","5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹","+":"⁺","-":"⁻","=":"⁼","n":"ⁿ","i":"ⁱ","x":"ˣ","y":"ʸ" };
@@ -842,6 +873,7 @@ function drawBigQuizText(ctx, text, box, { size, minSize, maxLines = 4, color = 
     weight: "900",
     family: '"DM Sans", Arial, sans-serif',
     lineHeightRatio: 1.04,
+    padding: Math.max(16, box.w * 0.035),
   });
 }
 async function drawQuizQuestion(ctx, question, canvasWidth, canvasHeight){
@@ -882,7 +914,7 @@ async function buildQuizImageDataUrl(){
   await drawQuizQuestion(ctx, question, canvas.width, canvas.height);
   for (const [index, rawBox] of quizAnswerBoxes(count).entries()) {
     const answerText = answers[index];
-    drawBigQuizText(ctx, answerText, scaleQuizBox(rawBox, canvas.width, canvas.height), {
+    drawBigQuizText(ctx, answerText, quizAnswerTextBox(rawBox, canvas.width, canvas.height), {
       size: quizAnswerFontSize(answerText, count) * scale,
       minSize: (count === 4 ? 42 : 52) * scale,
       maxLines: count === 4 ? 2 : 3,
