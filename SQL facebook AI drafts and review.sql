@@ -1,21 +1,5 @@
--- Facebook Marketing -> Task automation for MindUp.
--- Safe to run repeatedly.
-
-alter table public.facebook_post_schedule_templates
-add column if not exists auto_create_task boolean not null default true,
-add column if not exists task_assignee_ids uuid[] not null default '{}'::uuid[],
-add column if not exists task_due_week_offset integer not null default -1,
-add column if not exists task_due_weekday integer not null default 5 check (task_due_weekday between 1 and 7),
-add column if not exists task_due_time time not null default '21:00',
-add column if not exists task_requirements jsonb not null default '[]'::jsonb,
-add column if not exists require_task_approval boolean not null default true;
-
-alter table public.facebook_scheduled_posts
-add column if not exists task_id uuid references public.daily_tasks(id) on delete set null,
-add column if not exists content_status text not null default 'missing_content'
-  check (content_status in ('missing_content','submitted','needs_revision','approved')),
-add column if not exists approval_status text not null default 'pending'
-  check (approval_status in ('pending','approved','rejected'));
+-- Facebook AI drafts + review workflow for MindUp.
+-- Safe to run repeatedly in Supabase SQL editor.
 
 alter table public.facebook_post_types
 add column if not exists ai_prompt text;
@@ -32,33 +16,8 @@ add column if not exists ai_error text,
 add column if not exists reviewed_by uuid references public.users(id) on delete set null,
 add column if not exists reviewed_at timestamptz;
 
-create index if not exists facebook_scheduled_posts_task_id_idx
-  on public.facebook_scheduled_posts(task_id);
-
-alter table public.daily_tasks
-drop constraint if exists daily_tasks_verification_mode_check;
-
-alter table public.daily_tasks
-add constraint daily_tasks_verification_mode_check
-check (verification_mode in (
-  'manual', 'attendance', 'session_evaluation', 'tuition',
-  'exam_grading', 'student_exam', 'trial_request', 'parent_link', 'class_staff',
-  'facebook_schedule'
-));
-
-create or replace function public.facebook_marketing_default_assignees(p_post_type_name text)
-returns uuid[]
-language sql
-stable
-set search_path = public
-as $$
-  select coalesce(array_agg(id order by full_name nulls last, email), '{}'::uuid[])
-  from public.users
-  where role = case
-    when lower(coalesce(p_post_type_name, '')) like '%quiz%' then 'teacher'::user_role
-    else 'assistant'::user_role
-  end
-$$;
+create index if not exists facebook_scheduled_posts_ai_status_idx
+  on public.facebook_scheduled_posts(ai_status);
 
 create or replace function public.materialize_facebook_marketing_tasks(
   p_from date default null,
@@ -95,9 +54,7 @@ begin
       t.task_assignee_ids,
       t.task_due_week_offset,
       t.task_due_weekday,
-      t.task_due_time,
-      t.task_requirements,
-      t.require_task_approval
+      t.task_due_time
     from public.facebook_scheduled_posts p
     join public.facebook_post_schedule_templates t
       on t.id = p.template_id
@@ -125,6 +82,7 @@ begin
 
     v_due_at := (v_due_date::timestamp + coalesce(r.task_due_time, '21:00'::time)) at time zone 'Asia/Ho_Chi_Minh';
     v_source_key := 'facebook_marketing:' || r.post_id::text;
+
     insert into public.daily_tasks (
       title, description, task_type, source_type, source_id, source_key,
       priority, available_on, due_at, action_url, auto_generated,
@@ -237,63 +195,6 @@ begin
 end;
 $$;
 
-update public.facebook_post_schedule_templates t
-set task_assignee_ids = public.facebook_marketing_default_assignees(pt.name),
-    updated_at = now()
-from public.facebook_post_types pt
-where t.post_type_id = pt.id
-  and t.auto_create_task = true
-  and coalesce(array_length(t.task_assignee_ids, 1), 0) = 0
-  and coalesce(array_length(public.facebook_marketing_default_assignees(pt.name), 1), 0) > 0;
-
-update public.facebook_post_schedule_templates
-set task_requirements = '[]'::jsonb,
-    require_task_approval = true,
-    updated_at = now()
-where auto_create_task = true
-  and (
-    coalesce(task_requirements, '[]'::jsonb) <> '[]'::jsonb
-    or require_task_approval is distinct from true
-  );
-
-update public.daily_tasks
-set verification_mode = 'facebook_schedule',
-    metadata = jsonb_set(
-      jsonb_set(
-        jsonb_set(coalesce(metadata, '{}'::jsonb), '{requires_result}', 'false'::jsonb, true),
-        '{requirements}',
-        '[]'::jsonb,
-        true
-      ),
-      '{facebook_review_required}',
-      'true'::jsonb,
-      true
-    ),
-    updated_at = now()
-where source_type = 'facebook_marketing';
-
-select public.sync_facebook_marketing_task_statuses(null, null);
-
-create or replace function public.trigger_materialize_facebook_marketing_task()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  perform public.materialize_facebook_marketing_tasks(new.scheduled_date, new.scheduled_date);
-  return new;
-end;
-$$;
-
-drop trigger if exists trg_facebook_scheduled_posts_materialize_task on public.facebook_scheduled_posts;
-create trigger trg_facebook_scheduled_posts_materialize_task
-after insert or update of template_id, scheduled_at, scheduled_date, status
-on public.facebook_scheduled_posts
-for each row
-when (new.template_id is not null)
-execute function public.trigger_materialize_facebook_marketing_task();
-
 create or replace function public.approve_facebook_scheduled_post(p_post_id uuid)
 returns public.facebook_scheduled_posts
 language plpgsql
@@ -350,8 +251,9 @@ begin
 end;
 $$;
 
-revoke all on function public.materialize_facebook_marketing_tasks(date, date) from public;
-grant execute on function public.materialize_facebook_marketing_tasks(date, date) to authenticated, service_role;
-revoke all on function public.sync_facebook_marketing_task_statuses(date, date) from public;
-grant execute on function public.sync_facebook_marketing_task_statuses(date, date) to authenticated, service_role;
 grant execute on function public.approve_facebook_scheduled_post(uuid) to authenticated, service_role;
+grant execute on function public.materialize_facebook_marketing_tasks(date, date) to authenticated, service_role;
+grant execute on function public.sync_facebook_marketing_task_statuses(date, date) to authenticated, service_role;
+
+select public.materialize_facebook_marketing_tasks(null, null);
+select public.sync_facebook_marketing_task_statuses(null, null);

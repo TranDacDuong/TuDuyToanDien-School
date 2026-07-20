@@ -293,6 +293,19 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
       <div class="meta-ai-box">
         <div class="meta-ai-head">
           <div>
+            <strong>Gemini AI tự tạo bài đăng</strong>
+            <div class="meta-ai-small">Tạo nội dung bài viết, hashtag và ảnh phù hợp theo prompt của Loại bài đăng. Ảnh sẽ được upload lên Drive để hẹn lịch Facebook.</div>
+          </div>
+          <div class="meta-ai-actions">
+            <button class="btn btn-gold" id="generateGeminiDraftBtn" type="button">Tạo bài bằng Gemini</button>
+            <button class="btn btn-primary" id="approvePostBtn" type="button">Xác nhận bài ổn</button>
+          </div>
+        </div>
+        <div class="hint" id="aiDraftStatus">Chưa tạo bằng AI.</div>
+      </div>
+      <div class="meta-ai-box">
+        <div class="meta-ai-head">
+          <div>
             <strong>Meta AI hỗ trợ soạn bài</strong>
             <div class="meta-ai-small">Bấm Mở Meta AI để hệ thống tự tạo và copy prompt. Sau đó dán kết quả Meta AI về đây để đưa vào caption.</div>
           </div>
@@ -348,6 +361,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
       <div class="field"><label>Tên loại bài</label><input class="input" id="typeName" placeholder="Learning Method, Quiz, Meme..."></div>
       <div class="field"><label>Màu nhãn</label><input class="input" id="typeColor" type="color" value="#c8962a"></div>
       <div class="field"><label>Mô tả / gợi ý format</label><textarea class="textarea" id="typeDescription" style="min-height:110px"></textarea></div>
+      <div class="field"><label>Prompt AI cho loại bài này</label><textarea class="textarea" id="typeAiPrompt" style="min-height:170px" placeholder="Ví dụ: Viết bài theo phong cách giáo dục gần gũi, mở đầu bằng một vấn đề học sinh thường gặp, có CTA bình luận..."></textarea><div class="hint">Gemini sẽ dùng prompt này để tạo nội dung bài viết, hashtag và gợi ý/tạo ảnh. Nếu để trống, hệ thống dùng prompt mặc định.</div></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-danger" id="deleteTypeBtn" type="button">Xóa</button>
@@ -424,6 +438,12 @@ function typeName(id){ return typeById(id)?.name || "Chưa chọn loại"; }
 function statusLabel(status){
   return { draft:"Đã soạn nháp", missing_content:"Chưa soạn", scheduled:"Đã hẹn lịch", published:"Đã đăng", error:"Lỗi", cancelled:"Đã hủy" }[status] || status || "Chưa soạn";
 }
+function aiStatusLabel(status){
+  return { idle:"Chưa tạo bằng AI", generating:"Đang tạo bằng AI", drafted:"AI đã tạo draft", error:"AI lỗi" }[status] || "Chưa tạo bằng AI";
+}
+function approvalStatusLabel(status){
+  return { pending:"Chờ kiểm tra", approved:"Đã xác nhận", rejected:"Cần sửa lại" }[status] || "Chờ kiểm tra";
+}
 function statusClass(status){
   if (status === "scheduled") return "scheduled";
   if (status === "published") return "published";
@@ -431,6 +451,12 @@ function statusClass(status){
   return "draft";
 }
 function postHasContent(post){ return Boolean(String(post.content || "").trim() || String(post.link_url || "").trim() || String(post.image_url || "").trim()); }
+function postReviewSummary(post){
+  const parts = [];
+  if (post?.ai_status && post.ai_status !== "idle") parts.push(aiStatusLabel(post.ai_status));
+  if (post?.approval_status) parts.push(approvalStatusLabel(post.approval_status));
+  return parts.length ? `<div class="task-meta"><span class="task-badge">${esc(parts.join(" • "))}</span></div>` : "";
+}
 
 function isFacebookPostingTaskLike(task){
   const text = [
@@ -977,6 +1003,9 @@ function currentPostTypeName(){
 function currentPostTypeDescription(){
   return typeById($("postType")?.value || "")?.description || "";
 }
+function currentPostTypeAiPrompt(){
+  return typeById($("postType")?.value || "")?.ai_prompt || "";
+}
 function metaAiToneForType(type){
   const t = String(type || "").toLowerCase();
   if (t.includes("quiz")) return "Tò mò, thử thách, ngắn gọn, kích thích học sinh bình luận đáp án.";
@@ -1011,6 +1040,7 @@ function buildMetaAiPrompt(){
   const existingContent = $("postContent").value.trim();
   const internalNote = $("postInternalNote").value.trim();
   const typeDescription = currentPostTypeDescription();
+  const typeAiPrompt = currentPostTypeAiPrompt();
   const prompt = [
     "Bạn là trợ lý marketing nội dung cho trung tâm MindUp - Tư Duy Toàn Diện.",
     "Hãy soạn nháp một bài đăng Facebook theo thông tin sau:",
@@ -1019,6 +1049,7 @@ function buildMetaAiPrompt(){
     `Loại bài: ${type}`,
     `Thời gian dự kiến đăng: ${scheduled ? formatDateTime(scheduled) : "Chưa rõ"}`,
     typeDescription ? `Mô tả/format loại bài: ${typeDescription}` : "",
+    typeAiPrompt ? `Prompt riêng của loại bài:\n${typeAiPrompt}` : "",
     internalNote ? `Ghi chú/mục tiêu nội bộ: ${internalNote}` : "",
     existingContent ? `Nội dung nháp hiện có cần cải thiện:\n${existingContent}` : "",
     "",
@@ -1281,7 +1312,7 @@ function renderWeeklyCalendar(){
           ${dates.map(date => {
             const rows = postsInCell(time, date);
             return `<td class="slot-cell ${rows.length?"":"empty"}" data-post-time="${time}" data-post-date="${dateKey(date)}">
-              ${rows.map(p => `<div class="post-pill ${statusClass(p.status)}" data-post-id="${esc(p.id)}"><strong>${esc(typeName(p.post_type_id))}</strong><span>${esc(statusLabel(p.status))}${postHasContent(p) ? " • Có nội dung" : " • Thiếu nội dung"}</span>${p.task_id ? `<div class="task-meta"><span class="task-badge">Đã tạo công việc</span></div>` : ""}</div>`).join("")}
+              ${rows.map(p => `<div class="post-pill ${statusClass(p.status)}" data-post-id="${esc(p.id)}"><strong>${esc(typeName(p.post_type_id))}</strong><span>${esc(statusLabel(p.status))}${postHasContent(p) ? " • Có nội dung" : " • Thiếu nội dung"}</span>${postReviewSummary(p)}${p.task_id ? `<div class="task-meta"><span class="task-badge">Đã tạo công việc</span></div>` : ""}</div>`).join("")}
             </td>`;
           }).join("")}
         </tr>`).join("")}</tbody>
@@ -1381,6 +1412,10 @@ function openPostModal(id="", defaults={}){
   $("postLinkUrl").value = row?.link_url || "";
   $("postImageUrl").value = row?.image_url || "";
   $("postInternalNote").value = row?.internal_note || "";
+  const aiText = row
+    ? `${aiStatusLabel(row.ai_status || "idle")} • ${approvalStatusLabel(row.approval_status || "pending")}${row.ai_error ? ` • Lỗi: ${row.ai_error}` : ""}`
+    : "Chưa tạo bằng AI.";
+  $("aiDraftStatus").textContent = aiText;
   $("postCharCount").textContent = String(($("postContent").value || "").length);
   $("metaAiPrompt").value = "";
   $("metaAiResult").value = "";
@@ -1394,6 +1429,9 @@ function openPostModal(id="", defaults={}){
   toggleQuizBuilder();
   updateImagePreview();
   $("deletePostBtn").style.display = row ? "" : "none";
+  $("approvePostBtn").style.display = row ? "" : "none";
+  $("approvePostBtn").disabled = row?.approval_status === "approved";
+  $("approvePostBtn").textContent = row?.approval_status === "approved" ? "Đã xác nhận" : "Xác nhận bài ổn";
   showPostStatus("info", row?.facebook_post_id ? `Facebook ID: ${row.facebook_post_id}` : "Lưu nháp trước hoặc hẹn lịch trực tiếp.");
   $("postModal").classList.add("show");
 }
@@ -1516,6 +1554,29 @@ async function callFacebookPostingFunction(payload){
   }
   return data;
 }
+async function callFacebookAiDraftFunction(payload){
+  const sessionRes = await sb.auth.getSession();
+  const accessToken = sessionRes.data?.session?.access_token;
+  if (!accessToken) throw new Error("Vui lòng đăng nhập lại trước khi tạo bài bằng Gemini.");
+  const res = await fetch(`${window.SUPABASE_URL}/functions/v1/facebook-ai-draft`, {
+    method: "POST",
+    headers: {
+      apikey: window.SUPABASE_KEY,
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) {
+    const detail = data.error || data.message || data.code || "Edge Function Gemini bị lỗi.";
+    if (res.status === 404 || data.code === "NOT_FOUND") {
+      throw new Error("Chưa deploy Edge Function facebook-ai-draft trên Supabase. Hãy deploy function rồi thử lại.");
+    }
+    throw new Error(detail);
+  }
+  return data;
+}
 async function facebookDelete(pageId, facebookId){
   return callFacebookPostingFunction({ action: "delete", page_id: pageId, facebook_post_id: facebookId });
 }
@@ -1610,6 +1671,59 @@ async function schedulePost(mode="schedule"){
   }
 }
 
+async function generateGeminiDraft(){
+  const btn = $("generateGeminiDraftBtn");
+  const oldText = btn.textContent;
+  try {
+    btn.disabled = true;
+    btn.textContent = "Đang tạo...";
+    showPostStatus("info", "Đang lưu nháp và gọi Gemini tạo nội dung/hashtag/ảnh...");
+    const draft = await savePostDraft({ approval_status: "pending", content_status: "missing_content" });
+    $("postId").value = draft.id;
+    $("aiDraftStatus").textContent = "Đang tạo bằng AI...";
+    const data = await callFacebookAiDraftFunction({ post_id: draft.id });
+    const post = data.post || {};
+    $("postContent").value = post.content || "";
+    $("postImageUrl").value = post.image_url || data.image_url || "";
+    $("postInternalNote").value = post.internal_note || "";
+    $("postStatus").value = statusLabel(post.status || "draft");
+    $("aiDraftStatus").textContent = `${aiStatusLabel(post.ai_status || "drafted")} • ${approvalStatusLabel(post.approval_status || "pending")}`;
+    $("postCharCount").textContent = String(($("postContent").value || "").length);
+    updateImagePreview();
+    showPostStatus("ok", "Gemini đã tạo draft bài đăng. Người được giao hãy kiểm tra rồi bấm Xác nhận bài ổn.");
+    await loadData();
+  } catch (error) {
+    $("aiDraftStatus").textContent = `AI lỗi: ${error.message || String(error)}`;
+    showPostStatus("err", error.message || String(error));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+}
+
+async function approveCurrentPost(){
+  const id = $("postId").value;
+  if (!id) return alert("Vui lòng lưu nháp hoặc tạo bài trước khi xác nhận.");
+  if (!confirm("Xác nhận bài viết này đã ổn và hoàn thành công việc kiểm tra?")) return;
+  const btn = $("approvePostBtn");
+  const oldText = btn.textContent;
+  try {
+    btn.disabled = true;
+    btn.textContent = "Đang xác nhận...";
+    const { data, error } = await sb.rpc("approve_facebook_scheduled_post", { p_post_id: id });
+    if (error) throw error;
+    $("aiDraftStatus").textContent = `${aiStatusLabel(data?.ai_status || "drafted")} • ${approvalStatusLabel(data?.approval_status || "approved")}`;
+    btn.textContent = "Đã xác nhận";
+    showPostStatus("ok", "Đã xác nhận bài ổn. Công việc kiểm tra bài đăng đã được đánh dấu hoàn thành.");
+    await syncMarketingTaskCompletion().catch(()=>{});
+    await loadData();
+  } catch (error) {
+    btn.disabled = false;
+    btn.textContent = oldText;
+    showPostStatus("err", error.message || String(error));
+  }
+}
+
 function buildTemplateRowsForWeek(pageId){
   const pageTemplates = S.templates.filter(t => t.page_id === pageId && t.is_active !== false);
   const rows = [];
@@ -1690,12 +1804,20 @@ function openTypeModal(id=""){
   $("typeName").value = row?.name || "";
   $("typeColor").value = row?.color || "#c8962a";
   $("typeDescription").value = row?.description || "";
+  $("typeAiPrompt").value = row?.ai_prompt || "";
   $("deleteTypeBtn").style.display = row ? "" : "none";
   $("typeModal").classList.add("show");
 }
 function closeTypeModal(){ $("typeModal").classList.remove("show"); }
 async function saveType(){
-  const payload = { name:$("typeName").value.trim(), color:$("typeColor").value || "#c8962a", description:$("typeDescription").value.trim() || null, is_active:true, created_by:S.profile.id };
+  const payload = {
+    name:$("typeName").value.trim(),
+    color:$("typeColor").value || "#c8962a",
+    description:$("typeDescription").value.trim() || null,
+    ai_prompt:$("typeAiPrompt").value.trim() || null,
+    is_active:true,
+    created_by:S.profile.id
+  };
   if (!payload.name) return alert("Vui lòng nhập tên loại bài.");
   const id = $("typeId").value;
   const res = id ? await sb.from("facebook_post_types").update(payload).eq("id", id) : await sb.from("facebook_post_types").insert(payload);
@@ -1726,6 +1848,8 @@ function bindEvents(){
   $("saveDraftBtn").addEventListener("click", async () => { try { await savePostDraft(); showPostStatus("ok","Đã lưu nháp."); await loadData(); } catch(e){ showPostStatus("err", e.message || String(e)); }});
   $("schedulePostBtn").addEventListener("click", () => schedulePost("schedule"));
   $("deletePostBtn").addEventListener("click", deletePost);
+  $("generateGeminiDraftBtn").addEventListener("click", generateGeminiDraft);
+  $("approvePostBtn").addEventListener("click", approveCurrentPost);
   $("postContent").addEventListener("input", () => $("postCharCount").textContent = String($("postContent").value.length));
   $("postType").addEventListener("change", () => { toggleQuizBuilder(); $("metaAiPrompt").value = ""; });
   $("openMetaAiBtn").addEventListener("click", openMetaAiWithPrompt);

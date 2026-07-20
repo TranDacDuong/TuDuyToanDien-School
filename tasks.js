@@ -908,6 +908,7 @@
   }
 
   function taskResultHtml(item) {
+    if (isFacebookReviewTask(item)) return "";
     if (!isManualAssignedTask(item)) return "";
     const completed = effectiveStatus(item) === "completed";
     const payload = taskResultPayload(item);
@@ -924,6 +925,33 @@
         <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
           ${completed ? `<button class="task-btn" type="button" data-cancel-submit="${esc(item.id)}">Hủy nộp</button>` : ""}
           <button class="task-btn success" type="button" data-submit-result="${esc(item.id)}">${completed ? "Lưu chỉnh sửa" : "Nộp"}</button>
+        </div>
+      </div>`;
+  }
+
+  function isFacebookReviewTask(item) {
+    const task = item?.task || {};
+    const meta = task.metadata || {};
+    return task.source_type === "facebook_marketing"
+      || task.verification_mode === "facebook_schedule"
+      || meta.facebook_review_required === true
+      || Boolean(meta.facebook_post_id);
+  }
+
+  function facebookReviewPostId(item) {
+    return item?.task?.metadata?.facebook_post_id || item?.task?.source_id || "";
+  }
+
+  function facebookReviewHtml(item) {
+    if (!isFacebookReviewTask(item)) return "";
+    const completed = effectiveStatus(item) === "completed";
+    return `
+      <div class="task-result-box">
+        <label>Kiểm tra bài đăng Facebook</label>
+        <div class="task-result-note">Mở lịch bài đăng để xem nội dung, hashtag và ảnh. Nếu bài viết đã ổn, bấm xác nhận để hoàn thành công việc.</div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
+          ${item.task?.action_url ? `<button class="task-btn primary" type="button" data-action-url="${esc(item.task.action_url)}">Mở lịch bài</button>` : ""}
+          <button class="task-btn success" type="button" data-confirm-facebook-post="${esc(item.id)}" ${completed ? "disabled" : ""}>${completed ? "Đã xác nhận" : "Xác nhận bài ổn"}</button>
         </div>
       </div>`;
   }
@@ -957,6 +985,7 @@
             ${task.verification_mode !== "manual" ? "<span>Tự xác minh hoàn thành</span>" : ""}
           </div>
           ${taskResultHtml(item)}
+          ${facebookReviewHtml(item)}
         </div>
         <div class="task-actions">
           <span class="task-status ${state.className}"><span>${state.icon}</span><span>${state.label}</span></span>
@@ -2256,6 +2285,25 @@
     });
   }
 
+  async function confirmFacebookPostTask(id) {
+    const item = S.assignments.find(row => String(row.id) === String(id));
+    const postId = facebookReviewPostId(item);
+    if (!item || !postId) return alert("Không tìm thấy bài đăng Facebook gắn với công việc này.");
+    const previous = snapshotAssignments();
+    const busyElement = findTaskButton("confirmFacebookPost", id);
+    await runTaskOptimistic({
+      busyElement,
+      busyText: "Đang xác nhận...",
+      apply: () => {
+        updateAssignmentLocal(id, { status: "completed" });
+        render();
+      },
+      save: () => sb.rpc("approve_facebook_scheduled_post", { p_post_id: postId }),
+      rollback: () => restoreAssignments(previous),
+      success: () => toast("Đã xác nhận bài đăng ổn và hoàn thành công việc."),
+    });
+  }
+
   async function submitTaskResult(id) {
     const input = [...document.querySelectorAll("[data-result-input]")].find(element => element.dataset.resultInput === id);
     const note = String(input?.value || "").trim();
@@ -2426,6 +2474,7 @@
       if (target.dataset.cancelSubmit) return cancelTaskSubmission(target.dataset.cancelSubmit);
       if (target.dataset.completeRequirement) return completeRequirement(target.dataset.completeRequirement, target.dataset.requirementKey);
       if (target.dataset.submitResult) return submitTaskResult(target.dataset.submitResult);
+      if (target.dataset.confirmFacebookPost) return confirmFacebookPostTask(target.dataset.confirmFacebookPost);
       if (target.dataset.deleteTask) return deleteManualTaskAssignment(target.dataset.deleteTask);
       if (target.dataset.actionUrl) openAction(target.dataset.actionUrl);
     });
