@@ -1003,7 +1003,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     <li data-role="admin,teacher,assistant"         data-page="trial_requests.html"><span class="menu-label">🌱 Đăng ký học thử</span></li>
     <li data-role="admin"                 data-page="push_debug.html"><span class="menu-label">🔔 Test thông báo</span></li>
     <li data-role="admin"                 data-page="sourcedata.html"><span class="menu-label">⚙️ Hệ thống</span></li>
-    <li data-role="admin,assistant" data-page="facebook_posting.html"><span class="menu-label">📣 Đăng bài Facebook</span></li>
+    <li data-role="admin,teacher,assistant,marketing,accountant" data-page="facebook_posting.html"><span class="menu-label">📣 Đăng bài Facebook</span></li>
   </ul>
 </aside>
 
@@ -1239,6 +1239,7 @@ let mobileToolsManualOpen = false;
 let dashboardMenuReady = false;
 let pendingChatPopupPayload = null;
 let recentMessagesPopupShown = false;
+let dashboardFacebookPostingAllowed = false;
 
 function dashboardEsc(value){
   return String(value ?? "")
@@ -1266,6 +1267,54 @@ function formatRecentMessageTime(value){
     hour: "2-digit",
     minute: "2-digit"
   });
+}
+
+function isFacebookPostingTaskLike(task){
+  const text = [
+    task?.task_type,
+    task?.source_type,
+    task?.source_key,
+    task?.title,
+    task?.description,
+    task?.action_url,
+    task?.metadata ? JSON.stringify(task.metadata) : ""
+  ].join(" ").toLowerCase();
+  return /facebook_posting|facebook_scheduled_post|facebook_marketing|đăng bài facebook|dang bai facebook/.test(text);
+}
+
+async function userHasFacebookPostingWork(profile){
+  if(!profile?.id) return false;
+  const role = String(profile.role || "");
+  if(["admin", "assistant"].includes(role)) return true;
+  if(!["teacher", "marketing", "accountant"].includes(role)) return false;
+  try{
+    const [{ data: templates }, { data: assignments }] = await Promise.all([
+      sb.from("facebook_post_schedule_templates")
+        .select("id,task_assignee_ids,is_active")
+        .eq("is_active", true),
+      sb.from("task_assignments")
+        .select("id,task:daily_tasks(id,title,description,task_type,source_type,source_key,action_url,metadata)")
+        .eq("user_id", profile.id)
+        .limit(80)
+    ]);
+    const assignedByTemplate = (templates || []).some(row =>
+      Array.isArray(row.task_assignee_ids)
+        && row.task_assignee_ids.map(String).includes(String(profile.id))
+    );
+    if(assignedByTemplate) return true;
+    return (assignments || []).some(row => isFacebookPostingTaskLike(row.task || {}));
+  } catch(error){
+    console.warn("[Dashboard] Không kiểm tra được quyền Đăng bài Facebook:", error);
+    return false;
+  }
+}
+
+async function updateFacebookPostingMenuAccess(profile){
+  dashboardFacebookPostingAllowed = await userHasFacebookPostingWork(profile);
+  const item = document.querySelector('#menu li[data-page="facebook_posting.html"]');
+  if(item && item.style.display !== "none") {
+    item.style.display = dashboardFacebookPostingAllowed ? "flex" : "none";
+  }
 }
 
 function closeRecentMessagesPopup(){
@@ -1437,6 +1486,7 @@ async function initDashboard(userOverride = null){
   }
   document.getElementById("guestAuthBar")?.classList.remove("show");
   applyRoleMenu(profile.role);
+  await updateFacebookPostingMenuAccess(profile);
   setupMenu();
   checkProfile(profile);
   loadUserInfo(profile);
@@ -1565,6 +1615,7 @@ function canOpenDashboardPage(page){
   if(!currentDashboardProfile?.role) return true;
   const basePage = String(page || "").split("?")[0].split("#")[0];
   if(basePage === "ops-center") return currentDashboardProfile.role === "admin";
+  if(basePage === "facebook_posting.html") return dashboardFacebookPostingAllowed;
   const menuItem = document.querySelector(`#menu li[data-page="${basePage}"]`);
   const mobileItem = document.querySelector(`#mobileNav .mobile-nav-item[data-page="${basePage}"]`);
   const role = currentDashboardProfile.role;

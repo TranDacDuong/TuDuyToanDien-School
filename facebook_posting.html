@@ -312,7 +312,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 <script>
 const GRAPH_VERSION = "v25.0";
 const TOKEN_KEY = "mindup_facebook_calendar_token_session";
-const ALLOWED_ROLES = new Set(["admin", "assistant"]);
+const ALLOWED_ROLES = new Set(["admin", "assistant", "teacher", "marketing", "accountant"]);
 const WEEKDAYS = [
   { value: 1, label: "Thứ 2", short: "T2" },
   { value: 2, label: "Thứ 3", short: "T3" },
@@ -384,12 +384,53 @@ function statusClass(status){
 }
 function postHasContent(post){ return Boolean(String(post.content || "").trim() || String(post.link_url || "").trim() || String(post.image_url || "").trim()); }
 
+function isFacebookPostingTaskLike(task){
+  const text = [
+    task?.task_type,
+    task?.source_type,
+    task?.source_key,
+    task?.title,
+    task?.description,
+    task?.action_url,
+    task?.metadata ? JSON.stringify(task.metadata) : ""
+  ].join(" ").toLowerCase();
+  return /facebook_posting|facebook_scheduled_post|facebook_marketing|đăng bài facebook|dang bai facebook/.test(text);
+}
+
+async function hasAssignedFacebookPostingWork(profile){
+  if (!profile?.id) return false;
+  const role = String(profile.role || "");
+  if (["admin", "assistant"].includes(role)) return true;
+  try {
+    const [{ data: templates }, { data: assignments }] = await Promise.all([
+      sb.from("facebook_post_schedule_templates")
+        .select("id,task_assignee_ids,is_active")
+        .eq("is_active", true),
+      sb.from("task_assignments")
+        .select("id,task:daily_tasks(id,title,description,task_type,source_type,source_key,action_url,metadata)")
+        .eq("user_id", profile.id)
+        .limit(100)
+    ]);
+    const assignedByTemplate = (templates || []).some(row =>
+      Array.isArray(row.task_assignee_ids)
+        && row.task_assignee_ids.map(String).includes(String(profile.id))
+    );
+    if (assignedByTemplate) return true;
+    return (assignments || []).some(row => isFacebookPostingTaskLike(row.task || {}));
+  } catch (error) {
+    console.warn("[FacebookPosting] Không kiểm tra được công việc được giao:", error);
+    return false;
+  }
+}
+
 async function loadProfile(){
   const user = await window.AppAuth?.getUser?.();
   if (!user) throw new Error("Vui lòng đăng nhập trước khi dùng chức năng Đăng bài Facebook.");
   const { data, error } = await sb.from("users").select("id,role,full_name,email").eq("id", user.id).maybeSingle();
   if (error) throw error;
   if (!data || !ALLOWED_ROLES.has(String(data.role || ""))) throw new Error("Tài khoản này chưa có quyền quản lý đăng bài Facebook.");
+  const allowedByWork = await hasAssignedFacebookPostingWork(data);
+  if (!allowedByWork) throw new Error("Tài khoản này chưa được giao công việc Đăng bài Facebook.");
   S.profile = data;
 }
 
@@ -419,7 +460,7 @@ async function loadData(){
   const [pagesRes, typesRes, staffRes, templatesRes, postsRes] = await Promise.all([
     sb.from("facebook_pages").select("id,page_id,page_name,page_url,display_order,is_active,created_at,updated_at").eq("is_active", true).order("display_order"),
     sb.from("facebook_post_types").select("*").eq("is_active", true).order("name"),
-    sb.from("users").select("id,full_name,email,role").in("role", ["admin","teacher","assistant"]).order("role").order("full_name"),
+    sb.from("users").select("id,full_name,email,role").order("role").order("full_name"),
     sb.from("facebook_post_schedule_templates").select("*").eq("is_active", true).order("publish_time"),
     sb.from("facebook_scheduled_posts").select("*").gte("scheduled_date", weekStart).lte("scheduled_date", weekEnd).order("scheduled_at"),
   ]);
@@ -430,7 +471,7 @@ async function loadData(){
   if (postsRes.error) throw postsRes.error;
   S.pages = pagesRes.data?.length ? pagesRes.data : DEFAULT_PAGES.map((p,i)=>({ ...p, display_order:i+1, is_active:true }));
   S.types = typesRes.data || [];
-  S.staff = staffRes.data || [];
+  S.staff = (staffRes.data || []).filter(user => ALLOWED_ROLES.has(String(user.role || "")));
   S.templates = templatesRes.data || [];
   S.posts = postsRes.data || [];
   if (!S.activePageId || !S.pages.some(p => p.page_id === S.activePageId)) S.activePageId = S.pages[0]?.page_id || DEFAULT_PAGES[0].page_id;
@@ -484,7 +525,7 @@ function staffName(id){
   return row?.full_name || row?.email || "";
 }
 function roleLabel(role){
-  return { admin:"Admin", teacher:"Giáo viên", assistant:"Trợ giảng" }[role] || role || "Nhân viên";
+  return { admin:"Admin", teacher:"Giáo viên", assistant:"Trợ giảng", marketing:"Marketing", accountant:"Kế toán" }[role] || role || "Nhân viên";
 }
 function assigneeIdsFromTemplate(row){
   return Array.isArray(row?.task_assignee_ids) ? row.task_assignee_ids.map(String) : [];
