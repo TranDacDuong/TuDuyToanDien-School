@@ -880,23 +880,31 @@ async function drawQuizQuestion(ctx, question, canvasWidth, canvasHeight){
   const box = quizQuestionBox(canvasWidth, canvasHeight);
   const hasImage = Boolean(quizQuestionImageDataUrl);
   const scale = quizCanvasScale(canvasWidth);
+  const hasText = Boolean(latexToCanvasTextSafe(question).trim());
   const textBox = hasImage
-    ? { x: box.x, y: box.y + 34, w: box.w, h: box.h * 0.48 }
+    ? { x: box.x, y: box.y + 18 * scale, w: box.w, h: hasText ? box.h * 0.22 : box.h * 0.12 }
     : box;
-  drawBigQuizText(ctx, question, textBox, {
-    size: quizQuestionFontSize(question, hasImage) * scale,
-    minSize: (hasImage ? 58 : 64) * scale,
-    maxLines: hasImage ? 3 : 5,
-    color: "#082c68",
-  });
+  if (hasText) {
+    drawBigQuizText(ctx, question, textBox, {
+      size: Math.min(quizQuestionFontSize(question, hasImage), 82) * scale,
+      minSize: (hasImage ? 52 : 64) * scale,
+      maxLines: hasImage ? 2 : 5,
+      color: "#082c68",
+    });
+  }
   if (hasImage) {
     const pasted = await loadImage(quizQuestionImageDataUrl);
-    const maxW = box.w * 0.55;
-    const maxH = box.h * 0.34;
-    const ratio = Math.min(maxW / pasted.naturalWidth, maxH / pasted.naturalHeight, 1);
+    const imageArea = hasText
+      ? { x: box.x, y: box.y + box.h * 0.24, w: box.w, h: box.h * 0.72 }
+      : { x: box.x, y: box.y + box.h * 0.06, w: box.w, h: box.h * 0.88 };
+    const maxW = imageArea.w * (hasText ? 0.94 : 0.92);
+    const maxH = imageArea.h * 0.98;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    const ratio = Math.min(maxW / pasted.naturalWidth, maxH / pasted.naturalHeight);
     const w = pasted.naturalWidth * ratio;
     const h = pasted.naturalHeight * ratio;
-    ctx.drawImage(pasted, box.x + (box.w - w) / 2, box.y + box.h * 0.58, w, h);
+    ctx.drawImage(pasted, imageArea.x + (imageArea.w - w) / 2, imageArea.y + (imageArea.h - h) / 2, w, h);
   }
 }
 async function buildQuizImageDataUrl(){
