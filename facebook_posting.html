@@ -1558,15 +1558,20 @@ async function callFacebookAiDraftFunction(payload){
   const sessionRes = await sb.auth.getSession();
   const accessToken = sessionRes.data?.session?.access_token;
   if (!accessToken) throw new Error("Vui lòng đăng nhập lại trước khi tạo bài bằng Gemini.");
-  const res = await fetch(`${window.SUPABASE_URL}/functions/v1/facebook-ai-draft`, {
-    method: "POST",
-    headers: {
-      apikey: window.SUPABASE_KEY,
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+  let res;
+  try {
+    res = await fetch(`${window.SUPABASE_URL}/functions/v1/facebook-ai-draft`, {
+      method: "POST",
+      headers: {
+        apikey: window.SUPABASE_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    throw new Error("Không gọi được Edge Function facebook-ai-draft. Khả năng cao function chưa được deploy lên Supabase hoặc bị CORS/mạng chặn. Hãy deploy function facebook-ai-draft và set secret GEMINI_API_KEY rồi thử lại.");
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.error) {
     const detail = data.error || data.message || data.code || "Edge Function Gemini bị lỗi.";
