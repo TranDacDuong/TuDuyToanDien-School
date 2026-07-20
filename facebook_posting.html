@@ -107,10 +107,17 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 .quiz-render-question img{max-width:560px;max-height:250px;object-fit:contain;border-radius:18px}
 .quiz-render-answer{width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:#10284f;font-family:"DM Sans",Arial,sans-serif;font-size:120px;font-weight:900;line-height:1.02;letter-spacing:-.03em;padding:0 24px}
 .quiz-render-answer .katex{font-size:1.08em}
+.meta-ai-box{border:1px solid rgba(18,60,120,.12);background:linear-gradient(180deg,#f8fbff,#fff);border-radius:18px;padding:14px;display:grid;gap:12px}
+.meta-ai-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.meta-ai-head strong{color:#10284f}
+.meta-ai-actions{display:flex;gap:8px;flex-wrap:wrap}
+.meta-ai-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.meta-ai-box .textarea{min-height:120px}
+.meta-ai-small{font-size:.78rem;color:#64748b;line-height:1.45}
 .token-card{display:none!important}
 .empty-box{padding:22px 16px;color:#64748b;line-height:1.55;background:#fff;border-radius:18px}
 @media(max-width:1050px){.layout{grid-template-columns:1fr}.page{padding:16px 12px 40px}}
-@media(max-width:640px){.hero,.card{border-radius:20px}.hero{padding:18px}.hero h1{font-size:1.45rem}.grid2{grid-template-columns:1fr}.toolbar{align-items:stretch}.toolbar-left,.toolbar-right,.hero-actions{width:100%;flex-direction:column}.btn,.tab{width:100%}.calendar{min-width:780px}.page{padding:12px 8px 30px}}
+@media(max-width:640px){.hero,.card{border-radius:20px}.hero{padding:18px}.hero h1{font-size:1.45rem}.grid2,.meta-ai-grid{grid-template-columns:1fr}.toolbar{align-items:stretch}.toolbar-left,.toolbar-right,.hero-actions,.meta-ai-actions{width:100%;flex-direction:column}.btn,.tab{width:100%}.calendar{min-width:780px}.page{padding:12px 8px 30px}}
 </style>
 <script src="visual-effects.js?v=20260602-mindup1" defer></script>
 <link rel="manifest" href="manifest.webmanifest">
@@ -282,6 +289,33 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
         <label>Nội dung bài viết</label>
         <textarea class="textarea" id="postContent" maxlength="6000" placeholder="Dán caption/nội dung bài đăng vào đây..."></textarea>
         <div class="hint"><span id="postCharCount">0</span>/6000 ký tự</div>
+      </div>
+      <div class="meta-ai-box">
+        <div class="meta-ai-head">
+          <div>
+            <strong>Meta AI hỗ trợ soạn bài</strong>
+            <div class="meta-ai-small">Web sẽ tạo prompt theo fanpage, loại bài và lịch đăng. Bạn mở Meta AI, dán prompt, rồi dán kết quả về đây để đưa vào caption.</div>
+          </div>
+          <div class="meta-ai-actions">
+            <button class="btn btn-outline" id="buildMetaPromptBtn" type="button">Tạo prompt</button>
+            <button class="btn btn-outline" id="copyMetaPromptBtn" type="button">Copy prompt</button>
+            <a class="btn btn-gold" id="openMetaAiBtn" href="https://www.meta.ai/" target="_blank" rel="noopener">Mở Meta AI</a>
+          </div>
+        </div>
+        <div class="meta-ai-grid">
+          <div class="field" style="margin-bottom:0">
+            <label>Prompt gửi Meta AI</label>
+            <textarea class="textarea" id="metaAiPrompt" placeholder="Bấm Tạo prompt để sinh prompt cho Meta AI..."></textarea>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Kết quả Meta AI</label>
+            <textarea class="textarea" id="metaAiResult" placeholder="Dán kết quả Meta AI vào đây..."></textarea>
+          </div>
+        </div>
+        <div class="meta-ai-actions">
+          <button class="btn btn-primary" id="applyMetaResultBtn" type="button">Đưa kết quả vào nội dung bài</button>
+          <button class="btn btn-outline" id="appendMetaResultBtn" type="button">Chèn thêm vào cuối nội dung</button>
+        </div>
       </div>
       <div class="grid2">
         <div class="field"><label>Link đính kèm (tuỳ chọn)</label><input class="input" id="postLinkUrl" type="url" placeholder="https://mindup.edu.vn/..."></div>
@@ -938,6 +972,141 @@ function buildQuizCaption(){
   body.push("", "Comment đáp án của em ở dưới bài viết nhé!", "", "#MindUp #Quiz #PhatTrienTuDuy");
   return body.join("\n");
 }
+function currentPostTypeName(){
+  return typeName($("postType")?.value || "");
+}
+function currentPostTypeDescription(){
+  return typeById($("postType")?.value || "")?.description || "";
+}
+function metaAiToneForType(type){
+  const t = String(type || "").toLowerCase();
+  if (t.includes("quiz")) return "Tò mò, thử thách, ngắn gọn, kích thích học sinh bình luận đáp án.";
+  if (t.includes("meme")) return "Vui, gần gũi với học sinh, thông minh nhưng không phản cảm.";
+  if (t.includes("enrollment") || t.includes("tuyển sinh")) return "Rõ lợi ích, tạo động lực đăng ký học thử, không quá sales.";
+  if (t.includes("method") || t.includes("phương pháp")) return "Chia sẻ phương pháp học dễ áp dụng, thực tế, có ví dụ.";
+  if (t.includes("mindset")) return "Truyền động lực, tích cực, ngắn gọn, hợp đầu tuần.";
+  if (t.includes("philosophy") || t.includes("triết")) return "Sâu sắc, phụ huynh đọc thấy tin tưởng, học sinh đọc thấy được đồng hành.";
+  return "Ấm áp, thông minh, gần gũi, đúng tinh thần giáo dục của MindUp.";
+}
+function metaAiOutputRules(type){
+  const t = String(type || "").toLowerCase();
+  const rules = [
+    "Viết bằng tiếng Việt tự nhiên.",
+    "Không dùng giọng văn sáo rỗng, không quá nhiều emoji.",
+    "Caption nên dễ đọc trên Facebook, chia đoạn ngắn.",
+    "Cuối bài có lời kêu gọi bình luận/nhắn tin phù hợp.",
+    "Thêm hashtag: #MindUp #Quiz #PhatTrienTuDuy nếu phù hợp; nếu không phải Quiz vẫn giữ #MindUp #PhatTrienTuDuy."
+  ];
+  if (t.includes("quiz") && !t.includes("hard")) {
+    rules.push("Nếu là bài Quiz, hãy tạo câu hỏi ngắn, 2-4 đáp án, chỉ rõ đáp án đúng ở phần GHI CHÚ NỘI BỘ, nhưng caption không lộ đáp án.");
+  }
+  if (t.includes("hard")) {
+    rules.push("Nếu là Hard Quiz, câu hỏi phải khó hơn, có yếu tố thử thách/giải thưởng, caption không lộ đáp án.");
+  }
+  return rules;
+}
+function buildMetaAiPrompt(){
+  const page = currentPage();
+  const type = currentPostTypeName();
+  const scheduled = fromDateTimeLocal($("postScheduledAt").value);
+  const existingContent = $("postContent").value.trim();
+  const internalNote = $("postInternalNote").value.trim();
+  const typeDescription = currentPostTypeDescription();
+  const prompt = [
+    "Bạn là trợ lý marketing nội dung cho trung tâm MindUp - Tư Duy Toàn Diện.",
+    "Hãy soạn nháp một bài đăng Facebook theo thông tin sau:",
+    "",
+    `Fanpage: ${page.page_name}`,
+    `Loại bài: ${type}`,
+    `Thời gian dự kiến đăng: ${scheduled ? formatDateTime(scheduled) : "Chưa rõ"}`,
+    typeDescription ? `Mô tả/format loại bài: ${typeDescription}` : "",
+    internalNote ? `Ghi chú/mục tiêu nội bộ: ${internalNote}` : "",
+    existingContent ? `Nội dung nháp hiện có cần cải thiện:\n${existingContent}` : "",
+    "",
+    "Giọng văn mong muốn:",
+    metaAiToneForType(type),
+    "",
+    "Yêu cầu đầu ra:",
+    ...metaAiOutputRules(type).map(rule => `- ${rule}`),
+    "",
+    "Trả lời theo đúng format này để tôi copy về hệ thống:",
+    "CAPTION:",
+    "[caption hoàn chỉnh]",
+    "",
+    "GỢI Ý ẢNH:",
+    "[mô tả ảnh/visual nên dùng, nếu có]",
+    "",
+    "GHI CHÚ NỘI BỘ:",
+    "[đáp án đúng, lưu ý đăng bài, hoặc để trống nếu không có]"
+  ].filter(Boolean).join("\n");
+  $("metaAiPrompt").value = prompt;
+  return prompt;
+}
+async function copyMetaAiPrompt(){
+  const prompt = $("metaAiPrompt").value.trim() || buildMetaAiPrompt();
+  try {
+    await navigator.clipboard.writeText(prompt);
+    showPostStatus("ok", "Đã copy prompt. Hãy mở Meta AI, dán prompt rồi copy kết quả về ô Kết quả Meta AI.");
+  } catch (error) {
+    $("metaAiPrompt").select();
+    showPostStatus("info", "Không tự copy được. Mình đã chọn sẵn prompt, bạn bấm Ctrl+C để copy.");
+  }
+}
+function extractMetaSection(text, name){
+  return parseMetaAiSections(text)[normalizeMetaHeading(name)] || "";
+}
+function normalizeMetaHeading(value){
+  return String(value || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[*_`#:\-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
+function parseMetaAiSections(text){
+  const sections = {};
+  let current = "";
+  const lines = String(text || "").replace(/\r/g, "").split("\n");
+  const aliases = new Map([
+    ["CAPTION", "CAPTION"],
+    ["NOI DUNG", "CAPTION"],
+    ["NOI DUNG BAI VIET", "CAPTION"],
+    ["GOI Y ANH", "GỢI Ý ẢNH"],
+    ["GOI Y HINH ANH", "GỢI Ý ẢNH"],
+    ["GHI CHU NOI BO", "GHI CHÚ NỘI BỘ"],
+    ["GHI CHU", "GHI CHÚ NỘI BỘ"],
+  ]);
+  for (const line of lines) {
+    const heading = normalizeMetaHeading(line);
+    const key = aliases.get(heading);
+    if (key) {
+      current = normalizeMetaHeading(key);
+      if (!sections[current]) sections[current] = "";
+      continue;
+    }
+    if (current) sections[current] = `${sections[current] ? `${sections[current]}\n` : ""}${line}`;
+  }
+  Object.keys(sections).forEach(key => sections[key] = sections[key].trim());
+  return sections;
+}
+function cleanMetaAiResult(text){
+  const source = String(text || "").trim();
+  const caption = extractMetaSection(source, "CAPTION");
+  return (caption || source)
+    .replace(/^```(?:text|markdown)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
+}
+function setPostContentFromMeta(mode="replace"){
+  const result = cleanMetaAiResult($("metaAiResult").value);
+  if (!result) return alert("Vui lòng dán kết quả Meta AI trước.");
+  const current = $("postContent").value.trim();
+  $("postContent").value = mode === "append" && current ? `${current}\n\n${result}` : result;
+  $("postCharCount").textContent = String($("postContent").value.length);
+  const note = extractMetaSection($("metaAiResult").value, "GHI CHÚ NỘI BỘ") || extractMetaSection($("metaAiResult").value, "GHI CHU NOI BO");
+  if (note && !$("postInternalNote").value.trim()) $("postInternalNote").value = note;
+  showPostStatus("ok", "Đã đưa kết quả Meta AI vào nội dung bài. Bạn có thể sửa lại rồi lưu/hẹn lịch.");
+}
 async function previewQuizImage(){
   try {
     const dataUrl = await buildQuizImageDataUrl();
@@ -1156,6 +1325,8 @@ function openPostModal(id="", defaults={}){
   $("postImageUrl").value = row?.image_url || "";
   $("postInternalNote").value = row?.internal_note || "";
   $("postCharCount").textContent = String(($("postContent").value || "").length);
+  $("metaAiPrompt").value = "";
+  $("metaAiResult").value = "";
   $("quizQuestion").value = "";
   $("quizCorrectAnswer").value = "";
   $("quizAnswerCount").value = "4";
@@ -1488,7 +1659,11 @@ function bindEvents(){
   $("schedulePostBtn").addEventListener("click", () => schedulePost("schedule"));
   $("deletePostBtn").addEventListener("click", deletePost);
   $("postContent").addEventListener("input", () => $("postCharCount").textContent = String($("postContent").value.length));
-  $("postType").addEventListener("change", toggleQuizBuilder);
+  $("postType").addEventListener("change", () => { toggleQuizBuilder(); $("metaAiPrompt").value = ""; });
+  $("buildMetaPromptBtn").addEventListener("click", () => { buildMetaAiPrompt(); showPostStatus("ok", "Đã tạo prompt Meta AI."); });
+  $("copyMetaPromptBtn").addEventListener("click", copyMetaAiPrompt);
+  $("applyMetaResultBtn").addEventListener("click", () => setPostContentFromMeta("replace"));
+  $("appendMetaResultBtn").addEventListener("click", () => setPostContentFromMeta("append"));
   $("postImageUrl").addEventListener("input", updateImagePreview);
   $("postImageFile").addEventListener("change", ev => uploadFile(ev.target.files?.[0]).catch(e => showPostStatus("err", e.message || String(e))));
   $("quizAnswerCount").addEventListener("change", renderQuizAnswerFields);
