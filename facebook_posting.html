@@ -784,9 +784,8 @@ async function buildQuizImageDataUrl(){
     ${quizQuestionImageDataUrl ? `<img src="${quizQuestionImageDataUrl}" alt="">` : ""}
   `;
   await drawRenderedHtml(ctx, questionHtml, "quiz-render-question", quizQuestionBox(canvas.width, canvas.height));
-  const labels = ["A.", "B.", "C.", "D."];
   for (const [index, rawBox] of quizAnswerBoxes(count).entries()) {
-    const answerText = `${labels[index]} ${answers[index]}`;
+    const answerText = answers[index];
     const answerHtml = `<div style="font-size:${quizAnswerFontSize(answerText, count)}px">${renderLatexTextHtml(answerText)}</div>`;
     await drawRenderedHtml(ctx, answerHtml, "quiz-render-answer", scaleQuizBox(rawBox, canvas.width, canvas.height));
   }
