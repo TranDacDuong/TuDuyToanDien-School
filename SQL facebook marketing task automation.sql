@@ -20,6 +20,17 @@ add column if not exists approval_status text not null default 'pending'
 create index if not exists facebook_scheduled_posts_task_id_idx
   on public.facebook_scheduled_posts(task_id);
 
+alter table public.daily_tasks
+drop constraint if exists daily_tasks_verification_mode_check;
+
+alter table public.daily_tasks
+add constraint daily_tasks_verification_mode_check
+check (verification_mode in (
+  'manual', 'attendance', 'session_evaluation', 'tuition',
+  'exam_grading', 'student_exam', 'trial_request', 'parent_link', 'class_staff',
+  'facebook_schedule'
+));
+
 create or replace function public.facebook_marketing_default_assignees(p_post_type_name text)
 returns uuid[]
 language sql
@@ -51,7 +62,6 @@ declare
   v_due_at timestamptz;
   v_source_key text;
   v_count integer := 0;
-  v_requirements jsonb;
   v_assignee_ids uuid[];
 begin
   for r in
@@ -100,17 +110,6 @@ begin
 
     v_due_at := (v_due_date::timestamp + coalesce(r.task_due_time, '21:00'::time)) at time zone 'Asia/Ho_Chi_Minh';
     v_source_key := 'facebook_marketing:' || r.post_id::text;
-    v_requirements := case
-      when jsonb_typeof(coalesce(r.task_requirements, '[]'::jsonb)) = 'array'
-        and jsonb_array_length(coalesce(r.task_requirements, '[]'::jsonb)) > 0
-      then r.task_requirements
-      else jsonb_build_array(
-        jsonb_build_object('key','content','title','Nội dung bài đăng'),
-        jsonb_build_object('key','image','title','Ảnh/video'),
-        jsonb_build_object('key','note','title','Ghi chú/CTA')
-      )
-    end;
-
     insert into public.daily_tasks (
       title, description, task_type, source_type, source_id, source_key,
       priority, available_on, due_at, action_url, auto_generated,
@@ -129,11 +128,11 @@ begin
       v_due_at,
       'facebook_posting.html',
       true,
-      'manual',
+      'facebook_schedule',
       coalesce(r.created_by, auth.uid()),
       jsonb_build_object(
-        'requires_result', true,
-        'requirements', v_requirements,
+        'requires_result', false,
+        'requirements', '[]'::jsonb,
         'facebook_post_id', r.post_id,
         'facebook_page_id', r.page_id,
         'facebook_page_name', r.page_name,
@@ -141,7 +140,7 @@ begin
         'facebook_post_type_name', r.post_type_name,
         'facebook_scheduled_at', r.scheduled_at,
         'facebook_template_id', r.template_id,
-        'require_approval', coalesce(r.require_task_approval, true)
+        'require_approval', false
       )
     )
     on conflict (source_key) do update
@@ -151,6 +150,7 @@ begin
           available_on = excluded.available_on,
           due_at = excluded.due_at,
           action_url = excluded.action_url,
+          verification_mode = excluded.verification_mode,
           metadata = excluded.metadata,
           updated_at = now()
     returning id into v_task_id;
@@ -178,6 +178,48 @@ begin
 end;
 $$;
 
+create or replace function public.sync_facebook_marketing_task_statuses(
+  p_from date default null,
+  p_to date default null
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_updated integer := 0;
+begin
+  with target as (
+    select
+      a.id as assignment_id,
+      case
+        when p.status in ('scheduled', 'published') then 'completed'
+        when p.status = 'cancelled' then 'cancelled'
+        else 'open'
+      end as next_status
+    from public.task_assignments a
+    join public.daily_tasks t on t.id = a.task_id
+    join public.facebook_scheduled_posts p on p.task_id = t.id
+    where t.source_type = 'facebook_marketing'
+      and (p_from is null or p.scheduled_date >= p_from)
+      and (p_to is null or p.scheduled_date <= p_to)
+  ),
+  updated as (
+    update public.task_assignments a
+      set status = target.next_status,
+          completed_at = case when target.next_status = 'completed' then coalesce(a.completed_at, now()) else null end
+    from target
+    where a.id = target.assignment_id
+      and a.status is distinct from target.next_status
+    returning a.id
+  )
+  select count(*) into v_updated from updated;
+
+  return v_updated;
+end;
+$$;
+
 update public.facebook_post_schedule_templates t
 set task_assignee_ids = public.facebook_marketing_default_assignees(pt.name),
     updated_at = now()
@@ -186,6 +228,29 @@ where t.post_type_id = pt.id
   and t.auto_create_task = true
   and coalesce(array_length(t.task_assignee_ids, 1), 0) = 0
   and coalesce(array_length(public.facebook_marketing_default_assignees(pt.name), 1), 0) > 0;
+
+update public.facebook_post_schedule_templates
+set task_requirements = '[]'::jsonb,
+    require_task_approval = false,
+    updated_at = now()
+where auto_create_task = true
+  and (
+    coalesce(task_requirements, '[]'::jsonb) <> '[]'::jsonb
+    or require_task_approval is distinct from false
+  );
+
+update public.daily_tasks
+set verification_mode = 'facebook_schedule',
+    metadata = jsonb_set(
+      jsonb_set(coalesce(metadata, '{}'::jsonb), '{requires_result}', 'false'::jsonb, true),
+      '{requirements}',
+      '[]'::jsonb,
+      true
+    ),
+    updated_at = now()
+where source_type = 'facebook_marketing';
+
+select public.sync_facebook_marketing_task_statuses(null, null);
 
 create or replace function public.trigger_materialize_facebook_marketing_task()
 returns trigger
@@ -209,3 +274,5 @@ execute function public.trigger_materialize_facebook_marketing_task();
 
 revoke all on function public.materialize_facebook_marketing_tasks(date, date) from public;
 grant execute on function public.materialize_facebook_marketing_tasks(date, date) to authenticated, service_role;
+revoke all on function public.sync_facebook_marketing_task_statuses(date, date) from public;
+grant execute on function public.sync_facebook_marketing_task_statuses(date, date) to authenticated, service_role;

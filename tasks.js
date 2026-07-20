@@ -69,6 +69,7 @@
 
   function isDeprecatedSocialTask(item) {
     const task = item?.task || item || {};
+    if (isFacebookMarketingTask({ task })) return false;
     const typeText = normalizeSearchText([task.task_type, task.source_type].join(" "));
     if (/\b(facebook_posting|social_comment)\b/.test(typeText)) return true;
     const content = normalizeSearchText([
@@ -78,6 +79,13 @@
       task.metadata && JSON.stringify(task.metadata)
     ].join(" "));
     return DEPRECATED_SOCIAL_TASK_PATTERNS.some(pattern => content.includes(normalizeSearchText(pattern)));
+  }
+
+  function isFacebookMarketingTask(item) {
+    const task = item?.task || item || {};
+    const meta = task.metadata || {};
+    return task.source_type === "facebook_marketing"
+      || Boolean(meta.facebook_post_id || meta.facebook_template_id || meta.facebook_scheduled_at);
   }
 
   function localDate(value = new Date()) {
@@ -589,6 +597,7 @@
 
   function isManualAssignedTask(item) {
     const task = item.task || {};
+    if (isFacebookMarketingTask(item)) return false;
     return task.task_type === "manual"
       || task.source_type === "manual"
       || task.auto_generated === false
@@ -1541,6 +1550,11 @@
         p_user_id: S.profile.role === "admin" ? null : S.user.id,
       });
     }
+    const { error: facebookSyncError } = await sb.rpc("sync_facebook_marketing_task_statuses", {
+      p_from: null,
+      p_to: null,
+    });
+    if (facebookSyncError && !isMissingRpcError(facebookSyncError)) console.warn("Facebook task sync:", facebookSyncError);
     let query = sb.from("task_assignments")
       .select("*,task:daily_tasks(*),assignee:users!task_assignments_user_id_fkey(id,full_name,email,role)")
       .order("created_at", { ascending: false });

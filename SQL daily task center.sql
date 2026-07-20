@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS public.daily_tasks (
   verification_mode text NOT NULL DEFAULT 'manual'
     CHECK (verification_mode IN (
       'manual', 'attendance', 'session_evaluation', 'tuition',
-      'exam_grading', 'student_exam', 'trial_request', 'parent_link', 'class_staff'
+      'exam_grading', 'student_exam', 'trial_request', 'parent_link', 'class_staff',
+      'facebook_schedule'
     )),
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_by uuid REFERENCES public.users(id) ON DELETE SET NULL,

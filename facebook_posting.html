@@ -40,6 +40,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 .textarea{min-height:150px;resize:vertical;line-height:1.55}
 .input:focus,.select:focus,.textarea:focus{border-color:rgba(29,107,209,.45);box-shadow:0 0 0 4px rgba(29,107,209,.10)}
 .field{display:grid;gap:7px;margin-bottom:12px}
+.field:has(#templateTaskRequirements){display:none}
 .field label{font-weight:900;color:#10284f;font-size:.88rem}
 .hint{color:#64748b;font-size:.82rem;line-height:1.45}
 .status{display:none;margin:12px 0 0;border-radius:16px;padding:12px 13px;font-size:.9rem;line-height:1.55;white-space:pre-wrap}
@@ -738,11 +739,10 @@ function templateTaskSummary(row){
   if (!row?.auto_create_task) return `<span class="task-badge">Không tự giao việc</span>`;
   const names = assigneeIdsFromTemplate(row).map(staffName).filter(Boolean);
   const dueDay = dueWeekdayShort(row.task_due_weekday);
-  const reqCount = taskRequirementsFromTemplate(row).length;
   return `<div class="task-meta">
     <span class="task-badge">${esc(names.length ? names.join(", ") : "Chưa chọn người làm")}</span>
     <span class="task-badge">Hạn ${esc(dueDay)} tuần trước ${esc(String(row.task_due_time || "21:00").slice(0,5))}</span>
-    <span class="task-badge">${reqCount || 0} mục nộp</span>
+    <span class="task-badge">Tự xong khi đã hẹn lịch</span>
   </div>`;
 }
 function dueWeekdayShort(value){
@@ -832,6 +832,7 @@ function renderTodo(){
 
 function openTemplateModal(id="", defaults={}){
   const row = id ? S.templates.find(t => t.id === id) : null;
+  $("templateTaskRequirements")?.closest(".field")?.style.setProperty("display", "none");
   $("templateModalTitle").textContent = row ? "Sửa lịch mẫu" : "Thêm lịch mẫu";
   $("templateId").value = row?.id || "";
   $("templateWeekday").value = row?.weekday ?? defaults.weekday ?? 1;
@@ -854,9 +855,8 @@ function closeTemplateModal(){ $("templateModal").classList.remove("show"); }
 async function saveTemplate(){
   const autoCreateTask = $("templateAutoTask").checked;
   const assigneeIds = selectedTemplateAssigneeIds();
-  const requirements = textToRequirements($("templateTaskRequirements").value);
+  const requirements = [];
   if (autoCreateTask && !assigneeIds.length) return alert("Vui lòng chọn ít nhất một người được giao công việc.");
-  if (autoCreateTask && !requirements.length) return alert("Vui lòng nhập ít nhất một mục cần nộp kết quả.");
   const payload = {
     page_id: S.activePageId,
     weekday: Number($("templateWeekday").value),
@@ -1141,6 +1141,7 @@ async function ensureCurrentWeekPosts(){
   if (postsRes.error) throw postsRes.error;
   S.posts = postsRes.data || [];
   await syncFacebookScheduledStatus();
+  await syncMarketingTaskCompletion();
 }
 async function materializeMarketingTasks(){
   const weekStart = dateKey(S.weekStart);
@@ -1150,6 +1151,18 @@ async function materializeMarketingTasks(){
     p_to: weekEnd,
   });
   if (error && !String(error.message || "").includes("Could not find the function")) throw error;
+}
+
+async function syncMarketingTaskCompletion(){
+  const weekStart = dateKey(S.weekStart);
+  const weekEnd = dateKey(addDays(S.weekStart, 6));
+  const { error } = await sb.rpc("sync_facebook_marketing_task_statuses", {
+    p_from: weekStart,
+    p_to: weekEnd,
+  });
+  if (error && !/Could not find the function|schema cache|PGRST202/i.test(String(error.message || ""))) {
+    throw error;
+  }
 }
 
 function openTypeModal(id=""){
