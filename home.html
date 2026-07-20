@@ -10,6 +10,12 @@
 <link rel="stylesheet" href="theme.css?v=20260615-ios1">
 <style>
 * { box-sizing: border-box; }
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
 body {
   margin: 0;
   background:
@@ -20,10 +26,12 @@ body {
 }
 
 .feed-wrap {
+  width: 100%;
   max-width: 1060px;
   margin: 0 auto;
   padding: 20px 18px 52px;
   position: relative;
+  overflow-x: clip;
 }
 
 .home-header-row {
@@ -88,8 +96,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  min-width: 0;
 }
 .overview-card {
+  min-width: 0;
+  max-width: 100%;
   background: var(--white);
   border: 1px solid rgba(15,31,61,.07);
   border-radius: 26px;
@@ -128,6 +139,8 @@ body {
 }
 .overview-card-body {
   padding: 18px 20px 20px;
+  min-width: 0;
+  max-width: 100%;
 }
 .overview-list {
   display: flex;
@@ -1658,7 +1671,12 @@ body {
 }
 
 .student-chart-scroll {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 2px;
 }
@@ -1667,6 +1685,7 @@ body {
   position: relative;
   height: 240px;
   width: 100%;
+  max-width: none;
   background: #fff;
   border-radius: 14px;
   border: 1px solid rgba(15,31,61,0.06);
@@ -1708,14 +1727,14 @@ body {
 
   .student-chart-box {
     height: 300px !important;
-    min-width: 560px;
+    min-width: 100%;
     border-radius: 16px;
     padding: 12px 10px 8px;
   }
 
   .student-offline-test-chart-box {
     height: 280px !important;
-    min-width: 520px;
+    min-width: 100%;
   }
 
   .student-chart-hint {
@@ -2483,8 +2502,10 @@ function setStudentChartWidth(canvas, pointCount, baseWidth = 560) {
   if (!box) return;
   if (isStudentChartMobile()) {
     const count = Math.max(Number(pointCount) || 0, 6);
-    box.style.minWidth = Math.max(baseWidth, count * 64) + "px";
+    box.style.width = Math.max(baseWidth, count * 56) + "px";
+    box.style.minWidth = "100%";
   } else {
+    box.style.width = "";
     box.style.minWidth = "";
   }
 }
