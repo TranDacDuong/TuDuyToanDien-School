@@ -665,8 +665,25 @@ function loadImage(src){
 function escHtml(value){
   return String(value || "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 }
+function looksLikeBareLatex(value){
+  const text = String(value || "").trim();
+  if (!text) return false;
+  if (/(\$|\\\(|\\\[)/.test(text)) return false;
+  const hasMathSyntax = /\\[a-zA-Z]+|[\^_=]|[+\-*/]|≤|≥|≠|√|∫|∑/.test(text);
+  const hasVietnameseWords = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(text);
+  return hasMathSyntax && !hasVietnameseWords && text.length <= 180;
+}
 function renderLatexTextHtml(value){
   const source = String(value || "");
+  if (looksLikeBareLatex(source)) {
+    try {
+      return window.katex
+        ? window.katex.renderToString(source, { throwOnError: false, displayMode: false })
+        : escHtml(source);
+    } catch {
+      return escHtml(source);
+    }
+  }
   const regex = /(\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$\$[\s\S]*?\$\$|\$[^$\n]+\$)/g;
   let html = "";
   let lastIndex = 0;
@@ -695,7 +712,7 @@ function renderLatexTextHtml(value){
   appendText(source.slice(lastIndex));
   return html;
 }
-async function renderQuizHtmlToCanvas(html, className, width, height){
+async function renderQuizHtmlToCanvas(html, className, width, height, options={}){
   if (!window.html2canvas) throw new Error("Chưa tải được bộ tạo ảnh Quiz. Vui lòng thử lại sau vài giây.");
   const stage = document.createElement("div");
   stage.className = "quiz-render-stage";
@@ -703,10 +720,28 @@ async function renderQuizHtmlToCanvas(html, className, width, height){
   node.className = className;
   node.style.width = `${width}px`;
   node.style.height = `${height}px`;
+  if (options.fontSize) node.style.fontSize = `${options.fontSize}px`;
+  if (options.color) node.style.color = options.color;
+  if (options.padding != null) node.style.padding = `${options.padding}px`;
+  if (options.lineHeight) node.style.lineHeight = String(options.lineHeight);
+  node.style.overflow = "hidden";
   node.innerHTML = html;
   stage.appendChild(node);
   document.body.appendChild(stage);
   try {
+    if (options.fit !== false && options.fontSize) {
+      const minSize = Math.max(12, Number(options.minSize || 24));
+      let currentSize = Number(options.fontSize || minSize);
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      while (
+        currentSize > minSize
+        && (node.scrollWidth > node.clientWidth + 2 || node.scrollHeight > node.clientHeight + 2)
+      ) {
+        currentSize -= 4;
+        node.style.fontSize = `${currentSize}px`;
+        await new Promise(resolve => requestAnimationFrame(resolve));
+      }
+    }
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     return await window.html2canvas(node, {
       backgroundColor: null,
@@ -722,6 +757,21 @@ async function renderQuizHtmlToCanvas(html, className, width, height){
 }
 async function drawRenderedHtml(ctx, html, className, box){
   const rendered = await renderQuizHtmlToCanvas(html, className, box.w, box.h);
+  ctx.drawImage(rendered, box.x, box.y, box.w, box.h);
+}
+async function drawLatexQuizText(ctx, text, box, { size, minSize, maxLines = 4, color = "#082c68" } = {}){
+  const html = `<div>${renderLatexTextHtml(text)}</div>`;
+  const className = box.h > box.w * 0.32 ? "quiz-render-question" : "quiz-render-answer";
+  const padding = Math.max(16, box.w * 0.035);
+  const lineHeight = 1.04;
+  const rendered = await renderQuizHtmlToCanvas(html, className, box.w, box.h, {
+    fontSize: Math.max(minSize || 24, size || 44),
+    minSize: minSize || 24,
+    color,
+    padding,
+    lineHeight,
+    maxLines,
+  });
   ctx.drawImage(rendered, box.x, box.y, box.w, box.h);
 }
 function fitFontSize(ctx, text, maxWidth, maxLines, startSize, minSize, family, weight="700"){
@@ -919,17 +969,12 @@ function latexToCanvasTextSafe(value){
     .replace(/\\/g, "");
   return text.trim();
 }
-function drawBigQuizText(ctx, text, box, { size, minSize, maxLines = 4, color = "#082c68" } = {}){
-  const display = latexToCanvasTextSafe(text);
-  drawWrappedText(ctx, display, box, {
+async function drawBigQuizText(ctx, text, box, { size, minSize, maxLines = 4, color = "#082c68" } = {}){
+  await drawLatexQuizText(ctx, text, box, {
     size,
     minSize,
     maxLines,
     color,
-    weight: "900",
-    family: '"DM Sans", Arial, sans-serif',
-    lineHeightRatio: 1.04,
-    padding: Math.max(16, box.w * 0.035),
   });
 }
 async function drawQuizQuestion(ctx, question, canvasWidth, canvasHeight){
@@ -941,7 +986,7 @@ async function drawQuizQuestion(ctx, question, canvasWidth, canvasHeight){
     ? { x: box.x, y: box.y + 18 * scale, w: box.w, h: hasText ? box.h * 0.22 : box.h * 0.12 }
     : box;
   if (hasText) {
-    drawBigQuizText(ctx, question, textBox, {
+    await drawBigQuizText(ctx, question, textBox, {
       size: Math.min(quizQuestionFontSize(question, hasImage), 82) * scale,
       minSize: (hasImage ? 52 : 64) * scale,
       maxLines: hasImage ? 2 : 5,
@@ -978,7 +1023,7 @@ async function buildQuizImageDataUrl(){
   await drawQuizQuestion(ctx, question, canvas.width, canvas.height);
   for (const [index, rawBox] of quizAnswerBoxes(count).entries()) {
     const answerText = answers[index];
-    drawBigQuizText(ctx, answerText, quizAnswerTextBox(rawBox, canvas.width, canvas.height), {
+    await drawBigQuizText(ctx, answerText, quizAnswerTextBox(rawBox, canvas.width, canvas.height), {
       size: quizAnswerFontSize(answerText, count) * scale,
       minSize: (count === 4 ? 42 : 52) * scale,
       maxLines: count === 4 ? 2 : 3,
