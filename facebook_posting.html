@@ -104,6 +104,14 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 .quiz-render-question{width:1100px;min-height:260px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;color:#082c68;font-family:"DM Sans",Arial,sans-serif;font-size:150px;font-weight:900;line-height:1.02;letter-spacing:-.035em}
 .quiz-render-question>div,.quiz-render-answer>div{width:100%;max-width:100%;overflow-wrap:anywhere}
 .quiz-render-question .katex{font-size:1.14em}
+.quiz-render-question .katex,
+.quiz-render-question .katex *,
+.quiz-render-answer .katex,
+.quiz-render-answer .katex *{white-space:nowrap!important}
+.quiz-render-question .katex,
+.quiz-render-answer .katex{display:inline-block;max-width:100%}
+.quiz-render-question .katex-display,
+.quiz-render-answer .katex-display{margin:0;white-space:nowrap!important}
 .quiz-render-question img{max-width:560px;max-height:250px;object-fit:contain;border-radius:18px}
 .quiz-render-answer{width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:#10284f;font-family:"DM Sans",Arial,sans-serif;font-size:120px;font-weight:900;line-height:1.02;letter-spacing:-.03em;padding:0 24px}
 .quiz-render-answer .katex{font-size:1.08em}
@@ -692,7 +700,7 @@ function renderLatexTextHtml(value){
   while ((match = regex.exec(source))) {
     appendText(source.slice(lastIndex, match.index));
     const token = match[0];
-    const displayMode = token.startsWith("$$") || token.startsWith("\\[");
+    const displayMode = false;
     const latex = token.startsWith("$$")
       ? token.slice(2, -2)
       : token.startsWith("\\[")
