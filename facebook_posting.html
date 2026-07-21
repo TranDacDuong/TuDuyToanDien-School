@@ -1221,17 +1221,17 @@ async function buildHardQuizImageDataUrl(){
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   const sx = canvas.width / 1536;
-  const sy = canvas.height / 864;
+  const sy = canvas.height / 1024;
   const box = {
-    x: 105 * sx,
-    y: 330 * sy,
-    w: 1325 * sx,
-    h: 270 * sy,
+    x: 115 * sx,
+    y: 350 * sy,
+    w: 1305 * sx,
+    h: 235 * sy,
   };
   await drawBigQuizText(ctx, question, box, {
-    size: 64 * sx,
-    minSize: 34 * sx,
-    maxLines: 5,
+    size: 58 * sx,
+    minSize: 30 * sx,
+    maxLines: 4,
     color: "#082c68",
   });
   return canvas.toDataURL("image/png");
