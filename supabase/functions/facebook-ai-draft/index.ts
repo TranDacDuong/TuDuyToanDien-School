@@ -306,6 +306,93 @@ function mondayMindsetOffset(pageName: string) {
   return 0;
 }
 
+const LEARNING_METHOD_ITEMS = [
+  { name: "Active Recall", group: "Nhớ lâu" },
+  { name: "Spaced Repetition", group: "Nhớ lâu" },
+  { name: "Leitner System", group: "Nhớ lâu" },
+  { name: "Blurting", group: "Nhớ lâu" },
+  { name: "Brain Dump", group: "Nhớ lâu" },
+  { name: "24-Hour Rule", group: "Chiến thuật học nhanh" },
+  { name: "Last 5 Minutes", group: "Chiến thuật học nhanh" },
+  { name: "50/10 Rule", group: "Tập trung" },
+  { name: "Pomodoro", group: "Tập trung" },
+  { name: "Anki/Quizlet", group: "Nhớ lâu" },
+  { name: "Memory Palace", group: "Nhớ lâu" },
+  { name: "Method of Loci", group: "Nhớ lâu" },
+  { name: "Chunking", group: "Nhớ lâu" },
+  { name: "Mnemonic", group: "Nhớ lâu" },
+  { name: "Story Method", group: "Nhớ lâu" },
+  { name: "Dual Coding", group: "Nhớ lâu" },
+  { name: "Feynman Technique", group: "Hiểu sâu" },
+  { name: "SQ3R", group: "Hiểu sâu" },
+  { name: "Cornell Note", group: "Hiểu sâu" },
+  { name: "Mind Mapping", group: "Hiểu sâu" },
+  { name: "Self-Explanation", group: "Hiểu sâu" },
+  { name: "Elaboration", group: "Hiểu sâu" },
+  { name: "Generation Effect", group: "Hiểu sâu" },
+  { name: "Reflection", group: "Hiểu sâu" },
+  { name: "Practice Testing", group: "Hiểu sâu" },
+  { name: "Interleaving", group: "Hiểu sâu" },
+  { name: "Effort-Based Learning", group: "Tư duy học tập" },
+  { name: "80/20 Pareto", group: "Tư duy học tập" },
+  { name: "Kaizen", group: "Tư duy học tập" },
+  { name: "Teaching Method", group: "Hiểu sâu" },
+  { name: "Empty Chair Method", group: "Hiểu sâu" },
+  { name: "Mirror Method", group: "Hiểu sâu" },
+  { name: "Question-First Method", group: "Hiểu sâu" },
+  { name: "Red Pen Rule", group: "Chiến thuật học nhanh" },
+  { name: "Reverse Learning", group: "Hiểu sâu" },
+  { name: "Zettelkasten Method", group: "Hiểu sâu" },
+  { name: "Flow State Priming", group: "Tập trung" },
+  { name: "Off-Screen Reset", group: "Tập trung" },
+  { name: "Ultradian Cycling", group: "Tập trung" },
+  { name: "Single-Task Locking", group: "Tập trung" },
+  { name: "Body Doubling", group: "Tập trung" },
+  { name: "Environment Design", group: "Tập trung" },
+  { name: "Lo-fi/White Noise", group: "Tập trung" },
+  { name: "90-20 Cycle", group: "Tập trung" },
+  { name: "Pre-test", group: "Chiến thuật học nhanh" },
+  { name: "Skim First", group: "Chiến thuật học nhanh" },
+  { name: "Extract, Don't Memorise", group: "Chiến thuật học nhanh" },
+  { name: "Bloom's Taxonomy", group: "Tư duy học tập" },
+  { name: "Learning Pyramid", group: "Tư duy học tập" },
+  { name: "Forgetting Curve", group: "Tư duy học tập" },
+  { name: "Active Learning Strategies", group: "Tư duy học tập" },
+  { name: "Retrieval Practice", group: "Nhớ lâu" },
+  { name: "Desirable Difficulties", group: "Tư duy học tập" },
+];
+
+function learningMethodTopic(scheduledAt: string, pageName: string) {
+  const week = isoWeekNumber(scheduledAt);
+  const year = yearFromDate(scheduledAt);
+  const offset = mondayMindsetOffset(pageName);
+  const index = ((week - 1 - offset) % LEARNING_METHOD_ITEMS.length + LEARNING_METHOD_ITEMS.length) % LEARNING_METHOD_ITEMS.length;
+  const item = LEARNING_METHOD_ITEMS[index] || LEARNING_METHOD_ITEMS[0];
+  return {
+    week,
+    year,
+    offset,
+    methodNumber: index + 1,
+    totalMethods: LEARNING_METHOD_ITEMS.length,
+    name: item.name,
+    group: item.group,
+  };
+}
+
+function learningMethodPromptBlock(method: ReturnType<typeof learningMethodTopic>) {
+  return [
+    "Phương pháp học bắt buộc dùng cho bài Learning Method:",
+    `- Tuần ISO: ${method.week}/${method.year}`,
+    `- Offset fanpage: ${method.offset}`,
+    `- Công thức: ((tuần - 1 - offset) mod ${method.totalMethods}) + 1`,
+    `- Số thứ tự phương pháp: ${method.methodNumber}/${method.totalMethods}`,
+    `- Nhóm: ${method.group}`,
+    `- Tên phương pháp: ${method.name}`,
+    "",
+    "Yêu cầu: bài Learning Method phải dùng đúng phương pháp trên. Không tự chọn phương pháp khác, trừ khi nội dung Problem đã nhập quá đặc thù; nếu phải điều chỉnh thì vẫn phải nhắc phương pháp bắt buộc là trục chính.",
+  ].join("\n");
+}
+
 function mondayMindsetTopic(scheduledAt: string, pageName: string) {
   const week = isoWeekNumber(scheduledAt);
   const year = yearFromDate(scheduledAt);
@@ -433,6 +520,38 @@ function buildGeminiPrompt(args: {
     ].filter(Boolean).join("\n");
   }
 
+  if (isLearningMethod(args.typeName)) {
+    const fanpageTag = pageHashtag(args.pageName);
+    const method = learningMethodTopic(args.scheduledAt, args.pageName);
+    return [
+      "Bạn là chuyên gia content marketing giáo dục cho MindUp - Tư Duy Toàn Diện.",
+      "Nhiệm vụ: tạo bài Learning Method chia sẻ một phương pháp học tập cụ thể, dễ hiểu, có thể áp dụng ngay.",
+      "",
+      "Thông tin bài đăng:",
+      `- Fanpage: ${args.pageName}`,
+      `- Hashtag fanpage bắt buộc: ${fanpageTag}`,
+      `- Thời gian đăng: ${args.scheduledAt}`,
+      args.existingContent ? `- Nội dung nháp/vấn đề admin nhập: ${args.existingContent}` : "",
+      args.internalNote ? `- Ghi chú nội bộ: ${args.internalNote}` : "",
+      "",
+      learningMethodPromptBlock(method),
+      "",
+      "Yêu cầu nội dung:",
+      "- Viết bằng tiếng Việt tự nhiên, thân thiện với học sinh/phụ huynh.",
+      "- Có thể tham khảo insight/quy tắc học tập phổ biến từ nguồn tiếng Anh, nhưng phải viết lại thành bài gốc theo giọng MindUp; không copy nguyên văn.",
+      "- Bài cần có: vấn đề thường gặp, tên phương pháp, vì sao hiệu quả, cách áp dụng 3-5 bước, ví dụ cụ thể.",
+      "- Nếu có bài Problem liên quan trước đó thì hãy viết như một bài giải đáp tiếp nối.",
+      "",
+      "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
+      JSON.stringify({
+        caption: "Caption bài Learning Method bằng tiếng Việt, giải thích phương pháp học cụ thể và cách áp dụng.",
+        hashtags: ["#MindUp", "#LearningMethod", "#PhuongPhapHocTap", "#PhatTrienTuDuy", fanpageTag],
+        image_prompt: "Prompt tiếng Anh tạo ảnh 1:1 cho bài Learning Method, có logo/text MindUp, minh họa phương pháp học rõ ràng, hiện đại, ít chữ, dễ đọc trên điện thoại.",
+        internal_note: `Learning Method tuần ${method.week}/${method.year}; fanpage ${args.pageName}; offset ${method.offset}; method ${method.methodNumber}/${method.totalMethods}: ${method.name} (${method.group})`,
+      }, null, 2),
+    ].filter(Boolean).join("\n");
+  }
+
   if (isProblemType(args.typeName)) {
     const fanpageTag = pageHashtag(args.pageName);
     return [
@@ -456,7 +575,7 @@ function buildGeminiPrompt(args: {
       "- Không copy nguyên văn bài nước ngoài. Có thể tham khảo insight/phương pháp học phổ biến bằng tiếng Anh, rồi viết lại thành bài gốc tiếng Việt theo giọng MindUp.",
       "- Problem: đồng cảm, chạm nỗi đau, ví dụ đời thường, không giải pháp quá sâu, hẹn bài Learning Method.",
       "- Learning Method: nhắc lại vấn đề, nêu phương pháp học, vì sao hiệu quả, cách áp dụng 3-5 bước, ví dụ cụ thể cho học sinh/phụ huynh.",
-      "- Chọn một phương pháp học phù hợp, ví dụ: Active Recall, Spaced Repetition, Feynman Technique, Pomodoro, Error Log, Interleaving, Self-explanation, Cornell Notes, Metacognition.",
+      "- Hệ thống sẽ bổ sung riêng phương pháp học bắt buộc cho bài Learning Method theo tuần và offset fanpage. Không tự chọn ngẫu nhiên nếu đã có phương pháp bắt buộc.",
       "",
       "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
       JSON.stringify({
@@ -933,13 +1052,31 @@ Deno.serve(async (req) => {
         throw new Error("Chưa có bài Learning Method nào sau bài Problem này trong cùng fanpage. Hãy tạo lịch Learning Method trước, rồi bấm Gemini lại.");
       }
       linkedPostId = linkedPost.id;
+      const selectedLearningMethod = learningMethodTopic(
+        linkedPost.scheduled_at,
+        linkedPost.page?.page_name || post.page?.page_name || linkedPost.page_id,
+      );
+      const pairTextPrompt = [
+        textPrompt,
+        "",
+        "Thông tin bài Learning Method được ghép sau bài Problem:",
+        `- Thời gian đăng Learning Method: ${linkedPost.scheduled_at}`,
+        learningMethodPromptBlock(selectedLearningMethod),
+      ].join("\n");
       await patchJson(`facebook_scheduled_posts?id=eq.${encodeURIComponent(linkedPost.id)}`, {
         ai_status: "generating",
         ai_error: null,
         updated_at: new Date().toISOString(),
       });
 
-      const pairDraft = await generateProblemLearningPairDraft(textPrompt);
+      const pairDraft = await generateProblemLearningPairDraft(pairTextPrompt);
+      if (!pairDraft.series.method || stripVietnameseForTag(pairDraft.series.method).toLowerCase() !== stripVietnameseForTag(selectedLearningMethod.name).toLowerCase()) {
+        pairDraft.series.method = selectedLearningMethod.name;
+      }
+      pairDraft.series.sourceReference = [
+        pairDraft.series.sourceReference,
+        `Learning Method ${selectedLearningMethod.methodNumber}/${selectedLearningMethod.totalMethods}; week ${selectedLearningMethod.week}/${selectedLearningMethod.year}; offset ${selectedLearningMethod.offset}; group ${selectedLearningMethod.group}`,
+      ].filter(Boolean).join(" | ");
       const pairId = crypto.randomUUID();
       const problemContent = mergeCaptionAndHashtags(pairDraft.problemPost.caption, pairDraft.problemPost.hashtags);
       const learningContent = mergeCaptionAndHashtags(pairDraft.learningPost.caption, pairDraft.learningPost.hashtags);
@@ -949,14 +1086,14 @@ Deno.serve(async (req) => {
           typeName: post.type?.name || "Problem",
           caption: problemContent,
           imagePrompt: pairDraft.problemPost.imagePrompt,
-          textPrompt,
+          textPrompt: pairTextPrompt,
         }),
         generateImageWithFallback({
           pageName: linkedPost.page?.page_name || post.page?.page_name || linkedPost.page_id,
           typeName: linkedPost.type?.name || "Learning Method",
           caption: learningContent,
           imagePrompt: pairDraft.learningPost.imagePrompt,
-          textPrompt,
+          textPrompt: pairTextPrompt,
         }),
       ]);
 
@@ -997,7 +1134,7 @@ Deno.serve(async (req) => {
           ai_status: "drafted",
           ai_generated_at: new Date().toISOString(),
           ai_model: `${pairDraft.model}; ${problemImage.image.model}`,
-          ai_prompt: textPrompt,
+          ai_prompt: pairTextPrompt,
           ai_image_prompt: problemImage.image.imagePrompt,
           ai_image_url: problemImage.imageUrl,
           ai_error: problemImage.imageWarning || null,
@@ -1020,7 +1157,7 @@ Deno.serve(async (req) => {
           ai_status: "drafted",
           ai_generated_at: new Date().toISOString(),
           ai_model: `${pairDraft.model}; ${learningImage.image.model}`,
-          ai_prompt: textPrompt,
+          ai_prompt: pairTextPrompt,
           ai_image_prompt: learningImage.image.imagePrompt,
           ai_image_url: learningImage.imageUrl,
           ai_error: learningImage.imageWarning || null,

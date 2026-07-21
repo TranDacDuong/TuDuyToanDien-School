@@ -432,6 +432,14 @@ const DEFAULT_TYPE_PROMPTS = {
 - Hashtag gợi ý: #MindUp #VanDeHocTap #PhuHuynh #HocSinh.`,
   "Learning Method": `Loại bài Learning Method dùng để giải đáp một bài Problem trước đó.
 - Chia sẻ một phương pháp học tập khớp với vấn đề đã nêu.
+- Hệ thống tự xác định tuần ISO trong năm và chọn 1 trong 53 phương pháp học theo offset từng fanpage:
+  + MindUp - Tư Duy Toàn Diện: offset 0.
+  + MindUp - Tư duy Toán học: offset 10.
+  + MindUp - Tư Duy Vật Lý: offset 20.
+  + MindUp - Tư duy Hóa Học: offset 30.
+  + MindUp - Tư Duy Sinh Học: offset 40.
+- Công thức: ((số tuần - 1 - offset) mod 53) + 1.
+- Khi bấm Gemini trực tiếp vào Learning Method hoặc bấm Gemini ở Problem để tạo cặp bài, bài Learning Method phải dùng đúng phương pháp học đã được chọn theo tuần/fanpage.
 - Nên tham khảo các ý tưởng/quy tắc học tập phổ biến từ nguồn tiếng Anh, nhưng viết lại thành bài gốc bằng tiếng Việt theo giọng MindUp; không copy nguyên văn.
 - Bài cần có: vấn đề, phương pháp, vì sao hiệu quả, cách áp dụng 3-5 bước, ví dụ cụ thể.
 - Hashtag gợi ý: #MindUp #LearningMethod #PhuongPhapHocTap #PhatTrienTuDuy.`,
