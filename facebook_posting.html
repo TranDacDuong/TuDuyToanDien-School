@@ -56,8 +56,14 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 .time-cell{position:sticky;left:0;background:#f8fbff!important;color:#10284f;font-weight:900;width:90px;text-align:center;padding:12px 8px}
 .slot-cell{height:112px;min-width:128px;padding:8px;background:#fbfdff;cursor:pointer}
 .slot-cell:hover{background:#f2f7ff}
+.slot-cell.drag-over{outline:3px solid rgba(200,150,42,.45);outline-offset:-4px;background:#fff7e6}
 .slot-cell.empty::after{content:"＋ Thêm";display:inline-flex;margin-top:22px;color:#94a3b8;font-weight:900;border:1px dashed rgba(148,163,184,.55);border-radius:12px;padding:8px 10px}
+.day-drop-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:12px}
+.day-drop-card{min-height:112px;border:1px dashed rgba(29,107,209,.35);border-radius:16px;background:#f8fbff;padding:12px;color:#64748b;display:grid;align-content:center;gap:6px;text-align:center;cursor:pointer}
+.day-drop-card.drag-over{background:#fff7e6;border-color:#c8962a;color:#10284f}
 .post-pill{display:grid;gap:4px;border-radius:13px;padding:8px 9px;margin-bottom:7px;background:#fff7e6;border:1px solid rgba(200,150,42,.28);box-shadow:0 6px 16px rgba(15,23,42,.05)}
+.post-pill[draggable="true"],.type-row[draggable="true"]{cursor:grab}
+.post-pill.dragging,.type-row.dragging{opacity:.55}
 .post-pill strong{font-size:.83rem;color:#10284f}
 .post-pill span{font-size:.75rem;color:#64748b}
 .post-pill.draft{background:#f8fafc;border-color:#dbe5f3}
@@ -67,6 +73,8 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 .type-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:999px;border:1px solid rgba(39,58,91,.10);font-size:.78rem;font-weight:900;color:#10284f;background:#fff}
 .type-list,.page-list{display:grid;gap:9px}
 .type-row,.mini-row{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid rgba(39,58,91,.09);border-radius:14px;padding:9px 10px;background:#fff}
+.trash-zone{margin-top:12px;border:1px dashed rgba(239,68,68,.35);background:#fff7f7;color:#b91c1c;border-radius:16px;padding:12px;text-align:center;font-weight:900}
+.trash-zone.drag-over{background:#fee2e2;border-color:#dc2626;box-shadow:0 0 0 4px rgba(220,38,38,.08)}
 .mini-actions{display:flex;gap:6px;align-items:center}
 .icon-small{border:0;border-radius:10px;background:#eef4ff;color:#123c78;width:32px;height:32px;cursor:pointer}
 .modal{position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:50;display:none;align-items:flex-start;justify-content:center;padding:24px 12px;overflow:auto}
@@ -142,7 +150,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
   <section class="hero">
     <div>
       <h1>Đăng bài Facebook</h1>
-      <p>Quản lý 5 lịch đăng bài riêng cho từng fanpage MindUp. Mỗi fanpage có lịch mẫu theo <strong>giờ × thứ</strong>, sau đó sinh lịch tuần thật để soạn nội dung, upload ảnh và hẹn lịch lên Facebook.</p>
+      <p>Quản lý lịch đăng bài riêng cho từng fanpage MindUp. Kéo thả loại bài đăng vào lịch tuần, tuần mới có thể tạo giống tuần trước rồi chỉnh sửa độc lập.</p>
     </div>
     <div class="hero-actions">
       <button class="btn btn-outline" id="reloadBtn" type="button">Tải lại</button>
@@ -162,7 +170,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
           </div>
           <div class="toolbar-right">
             <button class="btn btn-outline" id="openPageBtn" type="button">Mở fanpage</button>
-            <button class="btn btn-gold" id="addTemplateBtn" type="button">Thêm lịch mẫu</button>
+            <button class="btn btn-gold" id="copyPrevWeekBtn" type="button">Tạo giống tuần trước</button>
           </div>
         </div>
 
@@ -181,10 +189,9 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 
         <h3>Lịch bài đăng tuần</h3>
         <div class="calendar-wrap" id="weeklyCalendar"></div>
-
-        <div class="divider"></div>
-        <h3>Lịch mẫu của fanpage</h3>
-        <div class="calendar-wrap" id="templateCalendar"></div>
+        <div class="trash-zone" id="postTrashZone">Kéo bài đăng vào đây để xóa khỏi tuần này</div>
+        <div class="divider" style="display:none"></div>
+        <div class="calendar-wrap" id="templateCalendar" style="display:none"></div>
       </section>
     </main>
 
@@ -390,6 +397,23 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
       <div class="field"><label>Màu nhãn</label><input class="input" id="typeColor" type="color" value="#c8962a"></div>
       <div class="field"><label>Mô tả / gợi ý format</label><textarea class="textarea" id="typeDescription" style="min-height:110px"></textarea></div>
       <div class="field"><label>Prompt AI cho loại bài này</label><textarea class="textarea" id="typeAiPrompt" style="min-height:170px" placeholder="Ví dụ: Viết bài theo phong cách giáo dục gần gũi, mở đầu bằng một vấn đề học sinh thường gặp, có CTA bình luận..."></textarea><div class="hint">Gemini sẽ dùng prompt này để tạo nội dung bài viết, hashtag và gợi ý/tạo ảnh. Nếu để trống, hệ thống dùng prompt mặc định.</div></div>
+      <div class="auto-task-box">
+        <label class="auto-task-head">
+          <input id="typeAutoTask" type="checkbox" checked>
+          <span>
+            <strong>Tự giao công việc khi kéo loại bài này vào lịch tuần</strong>
+            <div class="hint">Nhân viên được giao chỉ cần vào tab Đăng bài Facebook, kiểm tra/sửa bài và bấm “Xác nhận bài viết ổn”.</div>
+          </span>
+        </label>
+        <div class="field">
+          <label>Người phụ trách mặc định</label>
+          <div class="staff-checks" id="typeAssignees"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Hạn hoàn thành trước ngày đăng</label><input class="input" id="typeDueDaysBefore" type="number" min="0" max="30" value="7"></div>
+          <div class="field"><label>Giờ hạn nộp</label><input class="input" id="typeDueTime" type="time" value="21:00"></div>
+        </div>
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-danger" id="deleteTypeBtn" type="button">Xóa</button>
@@ -547,7 +571,10 @@ async function hasAssignedFacebookPostingWork(profile){
   const role = String(profile.role || "");
   if (["admin", "assistant"].includes(role)) return true;
   try {
-    const [{ data: templates }, { data: assignments }] = await Promise.all([
+    const [{ data: types }, { data: templates }, { data: assignments }] = await Promise.all([
+      sb.from("facebook_post_types")
+        .select("id,task_assignee_ids,is_active")
+        .eq("is_active", true),
       sb.from("facebook_post_schedule_templates")
         .select("id,task_assignee_ids,is_active")
         .eq("is_active", true),
@@ -556,6 +583,11 @@ async function hasAssignedFacebookPostingWork(profile){
         .eq("user_id", profile.id)
         .limit(100)
     ]);
+    const assignedByType = (types || []).some(row =>
+      Array.isArray(row.task_assignee_ids)
+        && row.task_assignee_ids.map(String).includes(String(profile.id))
+    );
+    if (assignedByType) return true;
     const assignedByTemplate = (templates || []).some(row =>
       Array.isArray(row.task_assignee_ids)
         && row.task_assignee_ids.map(String).includes(String(profile.id))
@@ -692,6 +724,15 @@ function roleLabel(role){
 }
 function assigneeIdsFromTemplate(row){
   return Array.isArray(row?.task_assignee_ids) ? row.task_assignee_ids.map(String) : [];
+}
+function assigneeIdsFromType(row){
+  return Array.isArray(row?.task_assignee_ids) ? row.task_assignee_ids.map(String) : [];
+}
+function typeTaskSummary(row){
+  if (row?.auto_create_task === false) return "Không tự giao việc";
+  const names = assigneeIdsFromType(row).map(staffName).filter(Boolean);
+  const days = Number(row?.task_due_days_before ?? 7);
+  return `${names.length ? names.join(", ") : "Chưa chọn người"} • trước ${days} ngày`;
 }
 function taskRequirementsFromTemplate(row){
   return Array.isArray(row?.task_requirements) ? row.task_requirements : [];
@@ -1356,6 +1397,19 @@ function renderTemplateAssignees(selectedIds=[]){
 function selectedTemplateAssigneeIds(){
   return Array.from($("templateAssignees").querySelectorAll("input[type='checkbox']:checked")).map(input => input.value);
 }
+function renderTypeAssignees(selectedIds=[]){
+  const selected = new Set((selectedIds || []).map(String));
+  const rows = S.staff.filter(u => u.role !== "admin");
+  $("typeAssignees").innerHTML = rows.length ? rows.map(u => `
+    <label class="staff-check">
+      <input type="checkbox" value="${esc(u.id)}" ${selected.has(String(u.id)) ? "checked" : ""}>
+      <span><strong>${esc(u.full_name || u.email || "Nhân viên")}</strong><br><small>${esc(roleLabel(u.role))}</small></span>
+    </label>
+  `).join("") : `<div class="hint">Chưa tải được danh sách nhân viên.</div>`;
+}
+function selectedTypeAssigneeIds(){
+  return Array.from($("typeAssignees").querySelectorAll("input[type='checkbox']:checked")).map(input => input.value);
+}
 function templateTaskSummary(row){
   if (!row?.auto_create_task) return `<span class="task-badge">Không tự giao việc</span>`;
   const names = assigneeIdsFromTemplate(row).map(staffName).filter(Boolean);
@@ -1373,7 +1427,7 @@ function dueWeekdayShort(value){
 }
 function usedTimes(){
   const set = new Set();
-  [...S.templates, ...S.posts].filter(x => x.page_id === S.activePageId).forEach(x => {
+  S.posts.filter(x => x.page_id === S.activePageId).forEach(x => {
     const raw = x.publish_time || (x.scheduled_at ? new Date(x.scheduled_at).toTimeString().slice(0,5) : "");
     if (raw) set.add(raw.slice(0,5));
   });
@@ -1387,33 +1441,21 @@ function postsInCell(time, date){
   return S.posts.filter(p => p.page_id === S.activePageId && p.scheduled_date === key && new Date(p.scheduled_at).toTimeString().slice(0,5) === time);
 }
 function renderTemplateCalendar(){
-  const times = usedTimes();
-  if (!times.length) {
-    $("templateCalendar").innerHTML = `<div class="empty-box">Fanpage này chưa có lịch mẫu. Bấm <strong>Thêm lịch mẫu</strong> để tạo khung giờ đăng bài đầu tiên.</div>`;
-    return;
-  }
-  $("templateCalendar").innerHTML = `
-    <table class="calendar">
-      <thead><tr><th>Giờ</th>${WEEKDAYS.map(d=>`<th>${d.label}</th>`).join("")}</tr></thead>
-      <tbody>${times.map(time => `
-        <tr>
-          <td class="time-cell">${time}</td>
-          ${WEEKDAYS.map(day => {
-            const rows = templateInCell(time, day.value);
-            return `<td class="slot-cell ${rows.length?"":"empty"}" data-template-time="${time}" data-weekday="${day.value}">
-              ${rows.map(t => `<div class="post-pill draft" data-template-id="${esc(t.id)}"><strong>${esc(typeName(t.post_type_id))}</strong><span>${esc(t.note || "Lịch mẫu")}</span>${templateTaskSummary(t)}</div>`).join("")}
-            </td>`;
-          }).join("")}
-        </tr>`).join("")}</tbody>
-    </table>`;
-  $("templateCalendar").querySelectorAll("[data-template-id]").forEach(el => el.addEventListener("click", ev => { ev.stopPropagation(); openTemplateModal(el.dataset.templateId); }));
-  $("templateCalendar").querySelectorAll("[data-template-time]").forEach(cell => cell.addEventListener("click", () => openTemplateModal("", { publish_time: cell.dataset.templateTime, weekday: cell.dataset.weekday })));
+  if ($("templateCalendar")) $("templateCalendar").innerHTML = "";
 }
 function renderWeeklyCalendar(){
   const times = usedTimes();
   const dates = weekDates();
   if (!times.length) {
-    $("weeklyCalendar").innerHTML = `<div class="empty-box">Chưa có lịch bài đăng trong tuần này. Khi bạn tạo lịch mẫu, hệ thống sẽ tự sinh lịch bài đăng cho tuần đang xem.</div>`;
+    $("weeklyCalendar").innerHTML = `
+      <div class="empty-box">Tuần này chưa có lịch bài đăng. Kéo một loại bài đăng ở bên phải vào ngày cần đăng, hoặc bấm <strong>Tạo giống tuần trước</strong>.</div>
+      <div class="day-drop-grid">
+        ${dates.map((date,i)=>`<div class="day-drop-card" data-post-date="${dateKey(date)}">
+          <strong>${WEEKDAYS[i].short} • ${formatDate(date)}</strong>
+          <span>Kéo loại bài vào đây</span>
+        </div>`).join("")}
+      </div>`;
+    bindCalendarDrops();
     return;
   }
   $("weeklyCalendar").innerHTML = `
@@ -1425,21 +1467,158 @@ function renderWeeklyCalendar(){
           ${dates.map(date => {
             const rows = postsInCell(time, date);
             return `<td class="slot-cell ${rows.length?"":"empty"}" data-post-time="${time}" data-post-date="${dateKey(date)}">
-              ${rows.map(p => `<div class="post-pill ${statusClass(p.status)}" data-post-id="${esc(p.id)}"><strong>${esc(typeName(p.post_type_id))}</strong><span>${esc(statusLabel(p.status))}${postHasContent(p) ? " • Có nội dung" : " • Thiếu nội dung"}</span>${postReviewSummary(p)}${p.task_id ? `<div class="task-meta"><span class="task-badge">Đã tạo công việc</span></div>` : ""}</div>`).join("")}
+              ${rows.map(p => `<div class="post-pill ${statusClass(p.status)}" draggable="true" data-post-id="${esc(p.id)}"><strong>${esc(typeName(p.post_type_id))}</strong><span>${esc(statusLabel(p.status))}${postHasContent(p) ? " • Có nội dung" : " • Thiếu nội dung"}</span>${postReviewSummary(p)}${p.task_id ? `<div class="task-meta"><span class="task-badge">Đã tạo công việc</span></div>` : ""}</div>`).join("")}
             </td>`;
           }).join("")}
         </tr>`).join("")}</tbody>
     </table>`;
-  $("weeklyCalendar").querySelectorAll("[data-post-id]").forEach(el => el.addEventListener("click", ev => { ev.stopPropagation(); openPostModal(el.dataset.postId); }));
+  $("weeklyCalendar").querySelectorAll("[data-post-id]").forEach(el => {
+    el.addEventListener("click", ev => { ev.stopPropagation(); openPostModal(el.dataset.postId); });
+    el.addEventListener("dragstart", ev => {
+      el.classList.add("dragging");
+      ev.dataTransfer.setData("text/plain", `post:${el.dataset.postId}`);
+      ev.dataTransfer.effectAllowed = "move";
+    });
+    el.addEventListener("dragend", () => el.classList.remove("dragging"));
+  });
   $("weeklyCalendar").querySelectorAll("[data-post-time]").forEach(cell => cell.addEventListener("click", () => openPostModal("", { scheduled_date: cell.dataset.postDate, publish_time: cell.dataset.postTime })));
+  bindCalendarDrops();
+}
+async function createPostFromTypeDrop(typeId, scheduledDate, publishTime=""){
+  if (!typeId || !scheduledDate) return;
+  const time = publishTime || prompt("Nhập giờ đăng cho bài này (HH:MM)", "20:00");
+  if (!time) return;
+  if (!/^\d{1,2}:\d{2}$/.test(String(time).trim())) return alert("Giờ đăng không hợp lệ. Ví dụ đúng: 20:00");
+  const d = new Date(`${scheduledDate}T${String(time).trim()}:00`);
+  if (Number.isNaN(d.getTime())) return alert("Ngày/giờ đăng không hợp lệ.");
+  const payload = {
+    page_id: S.activePageId,
+    post_type_id: typeId,
+    scheduled_at: d.toISOString(),
+    scheduled_date: dateKey(d),
+    content: "",
+    link_url: null,
+    image_url: null,
+    internal_note: null,
+    status: "missing_content",
+    content_status: "missing_content",
+    approval_status: "pending",
+    created_by: S.profile.id,
+  };
+  const { error } = await sb.from("facebook_scheduled_posts").insert(payload);
+  if (error) return alert("Không tạo được bài đăng: " + error.message);
+  await materializeMarketingTasks();
+  await loadData();
+}
+async function deletePostById(id){
+  const row = S.posts.find(p => String(p.id) === String(id));
+  if (!row) return;
+  if (!confirm(`Xóa bài ${typeName(row.post_type_id)} lúc ${formatDateTime(new Date(row.scheduled_at))}?`)) return;
+  if (row.facebook_post_id) {
+    try { await facebookDelete(row.page_id, row.facebook_post_id); } catch (e) { console.warn(e); }
+  }
+  const { error } = await sb.from("facebook_scheduled_posts").delete().eq("id", id);
+  if (error) return alert("Không xóa được bài: " + error.message);
+  await loadData();
+}
+function bindCalendarDrops(){
+  const targets = $("weeklyCalendar").querySelectorAll("[data-post-date]");
+  targets.forEach(target => {
+    target.addEventListener("dragover", ev => {
+      if (!ev.dataTransfer?.types?.includes("text/plain")) return;
+      ev.preventDefault();
+      target.classList.add("drag-over");
+    });
+    target.addEventListener("dragleave", () => target.classList.remove("drag-over"));
+    target.addEventListener("drop", async ev => {
+      ev.preventDefault();
+      target.classList.remove("drag-over");
+      const raw = ev.dataTransfer.getData("text/plain") || "";
+      if (!raw.startsWith("type:")) return;
+      await createPostFromTypeDrop(raw.slice(5), target.dataset.postDate, target.dataset.postTime || "");
+    });
+  });
+  const trash = $("postTrashZone");
+  if (trash) {
+    trash.addEventListener("dragover", ev => {
+      if (!ev.dataTransfer?.types?.includes("text/plain")) return;
+      ev.preventDefault();
+      trash.classList.add("drag-over");
+    });
+    trash.addEventListener("dragleave", () => trash.classList.remove("drag-over"));
+    trash.addEventListener("drop", async ev => {
+      ev.preventDefault();
+      trash.classList.remove("drag-over");
+      const raw = ev.dataTransfer.getData("text/plain") || "";
+      if (raw.startsWith("post:")) await deletePostById(raw.slice(5));
+    });
+  }
+}
+async function copyPreviousWeekSchedule({ silent=false } = {}){
+  if (!S.activePageId) return;
+  const currentWeekStart = dateKey(S.weekStart);
+  const currentWeekEnd = dateKey(addDays(S.weekStart, 6));
+  const currentRows = S.posts.filter(p => p.page_id === S.activePageId && p.scheduled_date >= currentWeekStart && p.scheduled_date <= currentWeekEnd);
+  if (currentRows.length) {
+    if (!silent) alert("Tuần này đã có lịch bài đăng rồi. Nếu muốn sửa thì kéo thả/xóa trực tiếp từng bài trong tuần này.");
+    return;
+  }
+  const prevStart = dateKey(addDays(S.weekStart, -7));
+  const prevEnd = dateKey(addDays(S.weekStart, -1));
+  const { data: prevRows, error } = await sb.from("facebook_scheduled_posts")
+    .select("*")
+    .eq("page_id", S.activePageId)
+    .gte("scheduled_date", prevStart)
+    .lte("scheduled_date", prevEnd)
+    .order("scheduled_at");
+  if (error) throw error;
+  const sourceRows = (prevRows || []).filter(p => !["cancelled"].includes(p.status));
+  if (!sourceRows.length) {
+    if (!silent) alert("Tuần trước chưa có lịch để sao chép. Hãy kéo loại bài đăng vào lịch tuần này.");
+    return;
+  }
+  const rowsToInsert = sourceRows.map(p => {
+    const oldDate = new Date(p.scheduled_at);
+    const nextDate = addDays(oldDate, 7);
+    return {
+      page_id: p.page_id,
+      post_type_id: p.post_type_id,
+      scheduled_at: nextDate.toISOString(),
+      scheduled_date: dateKey(nextDate),
+      content: "",
+      link_url: null,
+      image_url: null,
+      internal_note: p.internal_note || null,
+      status: "missing_content",
+      content_status: "missing_content",
+      approval_status: "pending",
+      created_by: S.profile.id,
+      metadata: { copied_from_post_id: p.id, copied_from_week_start: prevStart },
+    };
+  });
+  const { error: insertError } = await sb.from("facebook_scheduled_posts").insert(rowsToInsert);
+  if (insertError) throw insertError;
+  await materializeMarketingTasks();
+  if (silent) return;
+  if (!silent) showStatus("ok", "Đã tạo lịch tuần này giống tuần trước. Các chỉnh sửa tại đây không ảnh hưởng tuần trước.");
+  await loadData();
 }
 function renderTypes(){
   $("postTypesBox").innerHTML = S.types.length ? S.types.map(t => `
-    <div class="type-row">
+    <div class="type-row" draggable="true" data-drag-type-id="${esc(t.id)}" title="Kéo vào lịch tuần để tạo bài đăng">
       <span class="type-chip"><span style="width:10px;height:10px;border-radius:999px;background:${esc(t.color || "#c8962a")}"></span>${esc(t.name)}</span>
+      <span class="hint">${esc(typeTaskSummary(t))}</span>
       <button class="icon-small" type="button" data-type-id="${esc(t.id)}" aria-label="Sửa loại bài">✎</button>
     </div>`).join("") : `<div class="hint">Chưa có loại bài đăng.</div>`;
   $("postTypesBox").querySelectorAll("[data-type-id]").forEach(btn => btn.addEventListener("click", () => openTypeModal(btn.dataset.typeId)));
+  $("postTypesBox").querySelectorAll("[data-drag-type-id]").forEach(row => {
+    row.addEventListener("dragstart", ev => {
+      row.classList.add("dragging");
+      ev.dataTransfer.setData("text/plain", `type:${row.dataset.dragTypeId}`);
+      ev.dataTransfer.effectAllowed = "copy";
+    });
+    row.addEventListener("dragend", () => row.classList.remove("dragging"));
+  });
 }
 function renderTodo(){
   const rows = S.posts.filter(p => p.page_id === S.activePageId && !postHasContent(p) && !["cancelled","published"].includes(p.status)).slice(0,12);
@@ -1904,46 +2083,17 @@ async function approveCurrentPost(){
 }
 
 function buildTemplateRowsForWeek(pageId){
-  const pageTemplates = S.templates.filter(t => t.page_id === pageId && t.is_active !== false);
-  const rows = [];
-  for (const t of pageTemplates) {
-    const dayIndex = t.weekday === 0 ? 6 : t.weekday - 1;
-    const d = addDays(S.weekStart, dayIndex);
-    const [hh, mm] = String(t.publish_time || "00:00").split(":").map(Number);
-    d.setHours(hh || 0, mm || 0, 0, 0);
-    rows.push({
-      page_id: t.page_id,
-      post_type_id: t.post_type_id,
-      template_id: t.id,
-      scheduled_at: d.toISOString(),
-      scheduled_date: dateKey(d),
-      content: "",
-      link_url: null,
-      image_url: null,
-      internal_note: t.note || null,
-      status: "missing_content",
-      created_by: S.profile.id,
-    });
-  }
-  return rows;
+  return [];
 }
 async function ensureCurrentWeekPosts(){
   if (!S.profile?.id || !S.activePageId) return;
-  const rows = buildTemplateRowsForWeek(S.activePageId);
-  if (!rows.length) return;
-  const existingKeys = new Set(
-    S.posts
-      .filter(p => p.page_id === S.activePageId && p.template_id)
-      .map(p => `${p.template_id}|${new Date(p.scheduled_at).getTime()}`)
-  );
-  const rowsToInsert = rows.filter(row => !existingKeys.has(`${row.template_id}|${new Date(row.scheduled_at).getTime()}`));
-  if (rowsToInsert.length) {
-    const { error } = await sb.from("facebook_scheduled_posts").insert(rowsToInsert);
-    if (error) throw error;
-  }
-  await materializeMarketingTasks();
   const weekStart = dateKey(S.weekStart);
   const weekEnd = dateKey(addDays(S.weekStart, 6));
+  const hasCurrentPosts = S.posts.some(p => p.page_id === S.activePageId && p.scheduled_date >= weekStart && p.scheduled_date <= weekEnd);
+  if (!hasCurrentPosts) {
+    await copyPreviousWeekSchedule({ silent: true }).catch(error => console.warn("Không tự copy lịch tuần trước:", error));
+  }
+  await materializeMarketingTasks();
   const postsRes = await sb.from("facebook_scheduled_posts")
     .select("*")
     .gte("scheduled_date", weekStart)
@@ -1984,6 +2134,10 @@ function openTypeModal(id=""){
   $("typeColor").value = row?.color || "#c8962a";
   $("typeDescription").value = row?.description || "";
   $("typeAiPrompt").value = row?.ai_prompt || "";
+  $("typeAutoTask").checked = row ? row.auto_create_task !== false : true;
+  renderTypeAssignees(assigneeIdsFromType(row));
+  $("typeDueDaysBefore").value = String(row?.task_due_days_before ?? 7);
+  $("typeDueTime").value = String(row?.task_due_time || "21:00").slice(0,5);
   $("deleteTypeBtn").style.display = row ? "" : "none";
   $("typeModal").classList.add("show");
 }
@@ -1994,6 +2148,10 @@ async function saveType(){
     color:$("typeColor").value || "#c8962a",
     description:$("typeDescription").value.trim() || null,
     ai_prompt:$("typeAiPrompt").value.trim() || null,
+    auto_create_task:$("typeAutoTask").checked,
+    task_assignee_ids:selectedTypeAssigneeIds(),
+    task_due_days_before:Math.max(0, Math.min(30, Number($("typeDueDaysBefore").value || 7))),
+    task_due_time:$("typeDueTime").value || "21:00",
     is_active:true,
     created_by:S.profile.id
   };
@@ -2019,10 +2177,10 @@ function bindEvents(){
   $("nextWeekBtn").addEventListener("click", () => { S.weekStart = addDays(S.weekStart, 7); loadData(); });
   $("weekStartInput").addEventListener("change", () => { const d = new Date($("weekStartInput").value); if(!Number.isNaN(d)) { S.weekStart = startOfWeek(d); loadData(); }});
   $("openPageBtn").addEventListener("click", () => window.open(currentPage().page_url || `https://www.facebook.com/${currentPage().page_id}`, "_blank", "noopener"));
-  $("addTemplateBtn").addEventListener("click", () => openTemplateModal());
-  $("closeTemplateModalBtn").addEventListener("click", closeTemplateModal);
-  $("saveTemplateBtn").addEventListener("click", saveTemplate);
-  $("deleteTemplateBtn").addEventListener("click", deleteTemplate);
+  $("copyPrevWeekBtn").addEventListener("click", () => copyPreviousWeekSchedule({ silent:false }).catch(error => alert(error.message || String(error))));
+  $("closeTemplateModalBtn")?.addEventListener("click", closeTemplateModal);
+  $("saveTemplateBtn")?.addEventListener("click", saveTemplate);
+  $("deleteTemplateBtn")?.addEventListener("click", deleteTemplate);
   $("closePostModalBtn").addEventListener("click", closePostModal);
   $("saveDraftBtn").addEventListener("click", async () => { try { await savePostDraft(); showPostStatus("ok","Đã lưu nháp."); await loadData(); } catch(e){ showPostStatus("err", e.message || String(e)); }});
   $("schedulePostBtn").addEventListener("click", () => schedulePost("schedule"));
@@ -2050,7 +2208,7 @@ function bindEvents(){
     upsertMondayAnnouncementIntoCaption();
     showPostStatus("ok", "Đã chèn/cập nhật phần công bố Hỏi nhanh đớp trọn vào caption Monday Mindset.");
   });
-  $("templateType").addEventListener("change", () => {
+  $("templateType")?.addEventListener("change", () => {
     if (!$("templateId").value && !$("templateTaskRequirements").value.trim()) {
       $("templateTaskRequirements").value = defaultRequirementsForType(typeName($("templateType").value)).join("\n");
     }
