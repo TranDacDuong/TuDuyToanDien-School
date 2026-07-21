@@ -6,3 +6,4 @@ blob-report/
 mindup-web-uploads-*.json
 google-service-account*.json
 supabase/.temp/
+.codex-tools/

@@ -315,6 +315,101 @@ async function generateImage(prompt: string) {
   };
 }
 
+function escapeXml(value: string) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function stripMarkdown(value: string) {
+  return String(value || "")
+    .replace(/[#*_`~>\[\]()]/g, "")
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function wrapSvgText(text: string, maxChars: number, maxLines: number) {
+  const words = stripMarkdown(text).split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let line = "";
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word;
+    if (next.length <= maxChars || !line) {
+      line = next;
+    } else {
+      lines.push(line);
+      line = word;
+      if (lines.length >= maxLines) break;
+    }
+  }
+  if (line && lines.length < maxLines) lines.push(line);
+  return lines.length ? lines : ["MindUp - Tư Duy Toàn Diện"];
+}
+
+function buildFallbackImage(args: {
+  pageName: string;
+  typeName: string;
+  caption: string;
+  imagePrompt: string;
+  imageError: string;
+}) {
+  const titleLines = wrapSvgText(args.caption || args.imagePrompt || args.typeName, 28, 4);
+  const subtitle = `${args.typeName} • ${args.pageName}`;
+  const yStart = titleLines.length <= 2 ? 415 : 355;
+  const titleTspans = titleLines
+    .map((line, index) => `<tspan x="540" y="${yStart + index * 70}">${escapeXml(line)}</tspan>`)
+    .join("");
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e0f7ff"/>
+      <stop offset="0.48" stop-color="#78c9ff"/>
+      <stop offset="1" stop-color="#2d7be8"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffd76a"/>
+      <stop offset="1" stop-color="#c8962a"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="20" stdDeviation="24" flood-color="#0b2f69" flood-opacity="0.20"/>
+    </filter>
+  </defs>
+  <rect width="1080" height="1080" rx="56" fill="url(#bg)"/>
+  <circle cx="930" cy="150" r="190" fill="#ffffff" opacity="0.18"/>
+  <circle cx="120" cy="950" r="260" fill="#ffffff" opacity="0.16"/>
+  <path d="M0 240 C210 170 390 235 580 170 C770 105 920 115 1080 70 L1080 0 L0 0 Z" fill="#ffffff" opacity="0.22"/>
+  <g filter="url(#shadow)">
+    <rect x="105" y="205" width="870" height="640" rx="48" fill="#ffffff" opacity="0.96"/>
+  </g>
+  <circle cx="540" cy="172" r="86" fill="#063579" filter="url(#shadow)"/>
+  <text x="540" y="158" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="900" fill="#ffffff">MINDUP</text>
+  <text x="540" y="196" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#ffd76a">Tư Duy Toàn Diện</text>
+  <rect x="300" y="245" width="480" height="76" rx="38" fill="#063f9d"/>
+  <text x="540" y="295" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="900" fill="#ffffff">${escapeXml(args.typeName || "Bài đăng MindUp")}</text>
+  <text text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="900" fill="#092f6d">${titleTspans}</text>
+  <text x="540" y="710" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#61718c">${escapeXml(subtitle)}</text>
+  <rect x="205" y="775" width="670" height="64" rx="32" fill="url(#gold)"/>
+  <text x="540" y="817" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="900" fill="#092f6d">HIỂU BẢN CHẤT • ĐIỂM BỨT PHÁ</text>
+  <text x="540" y="930" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="800" fill="#ffffff">MindUp - Tư Duy Toàn Diện</text>
+  <text x="540" y="970" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="600" fill="#e8f4ff">Ảnh fallback tự động khi Gemini Image tạm hết quota</text>
+</svg>`;
+  const bytes = new TextEncoder().encode(svg);
+  return {
+    model: "mindup-fallback-svg",
+    imagePrompt: [
+      args.imagePrompt,
+      args.imageError ? `Fallback reason: ${args.imageError}` : "",
+    ].filter(Boolean).join("\n"),
+    bytes,
+    mimeType: "image/svg+xml",
+  };
+}
+
 async function loadPostBundle(postId: string) {
   const rows = await fetchJson<Array<{
     id: string;
@@ -382,10 +477,31 @@ Deno.serve(async (req) => {
     });
 
     const draft = await generateTextDraft(textPrompt);
-    const image = await generateImage(draft.imagePrompt || textPrompt);
-    const uploaded = await uploadBytesToDrive(image.bytes, "mindup-facebook-ai.png", image.mimeType);
+    let image;
+    let imageWarning = "";
+    try {
+      image = await generateImage(draft.imagePrompt || textPrompt);
+    } catch (imageError) {
+      imageWarning = imageError instanceof Error ? imageError.message : String(imageError || "Gemini image failed");
+      image = buildFallbackImage({
+        pageName: post.page?.page_name || post.page_id,
+        typeName: post.type?.name || "Facebook",
+        caption: draft.caption,
+        imagePrompt: draft.imagePrompt || textPrompt,
+        imageError: imageWarning,
+      });
+    }
+    const uploaded = await uploadBytesToDrive(
+      image.bytes,
+      image.mimeType === "image/svg+xml" ? "mindup-facebook-ai-fallback.svg" : "mindup-facebook-ai.png",
+      image.mimeType,
+    );
     const finalContent = mergeCaptionAndHashtags(draft.caption, draft.hashtags);
-    const finalNote = [draft.internalNote, post.internal_note].filter(Boolean).join("\n\n").trim() || null;
+    const finalNote = [
+      draft.internalNote,
+      imageWarning ? `Lưu ý hệ thống: Gemini tạo ảnh bị lỗi/quota, đã dùng ảnh fallback MindUp. Chi tiết: ${imageWarning}` : "",
+      post.internal_note,
+    ].filter(Boolean).join("\n\n").trim() || null;
 
     const rows = await patchJson<Array<JsonRecord>>(`facebook_scheduled_posts?id=eq.${encodeURIComponent(postId)}`, {
       content: finalContent,
@@ -400,11 +516,17 @@ Deno.serve(async (req) => {
       ai_prompt: textPrompt,
       ai_image_prompt: image.imagePrompt,
       ai_image_url: uploaded.lh3Url || uploaded.url,
-      ai_error: null,
+      ai_error: imageWarning || null,
       updated_at: new Date().toISOString(),
     });
 
-    return jsonResponse({ ok: true, post: rows?.[0] || null, image_url: uploaded.lh3Url || uploaded.url });
+    return jsonResponse({
+      ok: true,
+      post: rows?.[0] || null,
+      image_url: uploaded.lh3Url || uploaded.url,
+      image_fallback: Boolean(imageWarning),
+      image_warning: imageWarning,
+    });
   } catch (error) {
     console.error(error);
     if (postId) {
