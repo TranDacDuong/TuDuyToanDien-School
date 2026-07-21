@@ -488,6 +488,7 @@ const QUIZ_TEMPLATES = {
   4: "Ảnh Quiz/4.png",
 };
 const HARD_QUIZ_TEMPLATE = "Hard Quiz.png";
+const MONDAY_MINDSET_TEMPLATE = "assets/facebook-monday/monday-mindset-bg.png";
 
 let S = {
   profile: null,
@@ -1275,6 +1276,118 @@ function upsertMondayAnnouncementIntoCaption(){
   $("mondayAnnouncementText").value = text;
   return content;
 }
+function extractMondayQuoteFromPost(post){
+  const note = String(post?.internal_note || "");
+  const quoteVi = (note.match(/(?:^|\n)Quote VI:\s*(.+)/i)?.[1] || "").trim();
+  const quoteEn = (note.match(/(?:^|\n)Quote EN:\s*(.+)/i)?.[1] || "").trim();
+  const source = (
+    note.match(/(?:^|\n)(?:Nguồn|Nguá»“n|Source):\s*(.+)/i)?.[1]
+    || note.match(/Jon Gordon(?:-inspired)?/i)?.[0]
+    || ""
+  ).trim();
+  return {
+    quote: quoteVi || quoteEn || String(post?.content || "").replace(/#\S+/g, "").trim(),
+    source: source || "Jon Gordon",
+  };
+}
+function wrapCanvasLines(ctx, text, maxWidth){
+  const words = String(text || "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  const lines = [];
+  let line = "";
+  words.forEach(word => {
+    const next = line ? `${line} ${word}` : word;
+    if (ctx.measureText(next).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = next;
+    }
+  });
+  if (line) lines.push(line);
+  return lines;
+}
+function drawMondayMultilineText(ctx, text, box){
+  const quote = String(text || "").trim();
+  let fontSize = 54;
+  let lines = [];
+  let lineHeight = 66;
+  while (fontSize >= 34) {
+    ctx.font = `800 ${fontSize}px Arial, Helvetica, sans-serif`;
+    lineHeight = Math.round(fontSize * 1.22);
+    lines = wrapCanvasLines(ctx, quote, box.w);
+    if (lines.length * lineHeight <= box.h) break;
+    fontSize -= 3;
+  }
+  const totalH = lines.length * lineHeight;
+  let y = box.y + Math.max(0, (box.h - totalH) / 2) + fontSize;
+  ctx.fillStyle = "#0f2f66";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.shadowColor = "rgba(255,255,255,.85)";
+  ctx.shadowBlur = 4;
+  lines.forEach(line => {
+    ctx.fillText(line, box.x + box.w / 2, y);
+    y += lineHeight;
+  });
+  ctx.shadowBlur = 0;
+}
+async function buildMondayMindsetImageDataUrl(post){
+  const { quote, source } = extractMondayQuoteFromPost(post);
+  if (!quote) throw new Error("Gemini chưa trả về quote Monday Mindset để chèn vào ảnh.");
+  const bg = await loadImage(MONDAY_MINDSET_TEMPLATE);
+  const canvas = document.createElement("canvas");
+  canvas.width = bg.naturalWidth || 1667;
+  canvas.height = bg.naturalHeight || 937;
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
+  const sx = canvas.width / 1667;
+  const sy = canvas.height / 937;
+  const box = { x: 110 * sx, y: 250 * sy, w: 760 * sx, h: 390 * sy };
+  ctx.fillStyle = "#c8962a";
+  ctx.font = `900 ${Math.round(34 * sx)}px Arial, Helvetica, sans-serif`;
+  ctx.textAlign = "left";
+  ctx.fillText("MONDAY MINDSET", box.x, 190 * sy);
+  ctx.fillStyle = "#0f2f66";
+  ctx.font = `900 ${Math.round(78 * sx)}px Georgia, serif`;
+  ctx.fillText("“", box.x, 245 * sy);
+  ctx.textAlign = "right";
+  ctx.fillText("”", box.x + box.w, 680 * sy);
+  drawMondayMultilineText(ctx, quote, box);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#315b92";
+  ctx.font = `700 ${Math.round(24 * sx)}px Arial, Helvetica, sans-serif`;
+  ctx.fillText(`— ${source || "Jon Gordon"} —`, box.x + box.w / 2, 710 * sy);
+  return canvas.toDataURL("image/png");
+}
+async function replaceMondayMindsetImageWithTemplate(post){
+  if (!isMondayMindsetType(post?.post_type_id)) return null;
+  const dataUrl = await buildMondayMindsetImageDataUrl(post);
+  const upload = await window.MindupImageUpload.uploadDataUrl(dataUrl, {
+    kind: "post",
+    folder: "facebook-monday-mindset",
+    fileName: `monday-mindset-${Date.now()}.png`,
+    mimeType: "image/png",
+    maxWidth: 1667,
+    maxHeight: 937,
+    targetBytes: 950 * 1024,
+    maxBytes: 1400 * 1024,
+  });
+  const url = window.MindupImageUpload.getDisplayUrl(upload);
+  if (!url) throw new Error("Không upload được ảnh Monday Mindset lên Drive.");
+  const { data, error } = await sb.from("facebook_scheduled_posts")
+    .update({
+      image_url: url,
+      ai_image_url: url,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", post.id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data || { ...post, image_url: url, ai_image_url: url };
+}
 async function buildHardQuizImageDataUrl(){
   await ensureQuizFontLoaded();
   const { question } = getHardQuizData();
@@ -2029,7 +2142,15 @@ async function generateGeminiDraft(){
     $("postId").value = draft.id;
     $("aiDraftStatus").textContent = "Đang tạo bằng AI...";
     const data = await callFacebookAiDraftFunction({ post_id: draft.id });
-    const post = data.post || {};
+    let post = data.post || {};
+    if (isMondayMindsetType(post.post_type_id)) {
+      showPostStatus("info", "Gemini đã tạo quote. Đang chèn vào đúng nền Monday Mindset và upload ảnh...");
+      const templatedPost = await replaceMondayMindsetImageWithTemplate(post);
+      if (templatedPost) {
+        post = templatedPost;
+        data.image_url = templatedPost.image_url || data.image_url;
+      }
+    }
     $("postContent").value = post.content || "";
     $("postImageUrl").value = post.image_url || data.image_url || "";
     $("postInternalNote").value = post.internal_note || "";
