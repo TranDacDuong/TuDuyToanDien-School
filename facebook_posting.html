@@ -113,7 +113,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 .quiz-render-question .katex-display,
 .quiz-render-answer .katex-display{margin:0;white-space:nowrap!important}
 .quiz-render-question img{max-width:560px;max-height:250px;object-fit:contain;border-radius:18px}
-.quiz-render-answer{width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:#10284f;font-family:"DM Sans",Arial,sans-serif;font-size:120px;font-weight:900;line-height:1.02;letter-spacing:-.03em;padding:0 24px}
+.quiz-render-answer{width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:#10284f;font-family:"DM Sans",Arial,sans-serif;font-size:120px;font-weight:900;line-height:1.02;letter-spacing:-.03em;padding:0 10px}
 .quiz-render-answer .katex{font-size:1.08em}
 .meta-ai-box{border:1px solid rgba(18,60,120,.12);background:linear-gradient(180deg,#f8fbff,#fff);border-radius:18px;padding:14px;display:grid;gap:12px}
 .meta-ai-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -912,8 +912,9 @@ function quizAnswerFontSize(text, count){
 function quizAnswerTextBox(rawBox, canvasWidth, canvasHeight){
   const box = scaleQuizBox(rawBox, canvasWidth, canvasHeight);
   const scale = quizCanvasScale(canvasWidth);
-  const iconSpace = 68 * scale;
-  const rightPadding = 42 * scale;
+  const isThreeAnswerLayout = rawBox.w <= 430;
+  const iconSpace = (isThreeAnswerLayout ? 112 : 68) * scale;
+  const rightPadding = (isThreeAnswerLayout ? 20 : 42) * scale;
   return {
     x: box.x + iconSpace,
     y: box.y,
