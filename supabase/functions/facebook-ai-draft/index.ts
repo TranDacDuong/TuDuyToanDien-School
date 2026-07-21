@@ -393,6 +393,78 @@ function learningMethodPromptBlock(method: ReturnType<typeof learningMethodTopic
   ].join("\n");
 }
 
+
+const CONTENT_TOPIC_POOLS: Record<string, string[]> = {
+  qna: [
+    "Math in GPS and map coordinates", "Probability in lucky draws and giveaways", "Compound interest in saving money", "Optimization in delivery routes", "Scale and ratio in maps", "Matrices behind QR codes", "Statistics in weather forecasts", "Graphs in electricity bills", "Derivatives for finding maximum profit", "Logarithms in pH and sound levels",
+    "Physics of helmets and road safety", "Why elevators make us feel heavier or lighter", "Why rainbows have colors", "Why air conditioners are placed high", "Why footballs can curve", "How noise cancelling headphones work", "Why objects float better in seawater", "Why high voltage wires are dangerous", "Why LED bulbs save energy", "Heat transfer in cooking",
+    "Chemistry of hand sanitizer", "Why bread rises in the oven", "Why metals rust", "Why lemon removes fishy smells", "Why soda bubbles", "How soap removes oil", "pH in skincare products", "Why salt melts ice", "Why bleach should not mix with acid", "Why phone batteries degrade",
+    "Biology of sleep and memory", "Why the heart beats faster when nervous", "Why muscles hurt after exercise", "How breakfast affects concentration", "Why plants grow toward light", "How vaccines train immunity", "Why eyes get tired from screens", "Gut microbiome and focus", "Why hydration matters for studying", "Teen hormones and emotions",
+    "Metaphors in advertising", "Storytelling and persuasion", "Reading books and better writing", "Arguments in everyday debate", "Hidden meaning in communication", "Math for personal finance", "Science needs writing skills", "Reading charts in daily news", "Sports as interdisciplinary learning", "Critical thinking on social media", "AI needs math language and ethics", "Why good questions improve learning", "How one normal day contains many school subjects"
+  ],
+  quiz: [
+    "Order of operations trap", "Negative sign trap", "Equivalent fractions trap", "Percentage increase decrease trap", "Division by zero trap", "Square root condition trap", "Domain condition trap", "Geometry visual illusion trap", "Probability intuition trap", "Number pattern trap",
+    "Mass versus weight trap", "Average speed trap", "Friction direction trap", "Pressure formula trap", "Temperature versus heat trap", "Mirror image trap", "Series versus parallel circuit trap", "Electric power trap", "Floating and sinking trap", "Inertia trap",
+    "Valency trap", "Balancing equation trap", "Mole and mass trap", "Dilute versus concentrated solution trap", "pH acid base trap", "Metal and acid reaction trap", "Precipitate trap", "Redox trap", "Gas produced trap", "Conservation of atoms trap",
+    "DNA versus RNA trap", "Dominant recessive inheritance trap", "Photosynthesis versus respiration trap", "Blood vessel trap", "Digestive system trap", "Hormone trap", "Immunity trap", "Food chain trap", "Prokaryote eukaryote trap", "Evolution misconception trap",
+    "Subject predicate trap", "Rhetorical device trap", "Explicit versus implied meaning trap", "Word choice trap", "Expression mode trap", "Present perfect trap", "A an the trap", "Much many trap", "Homophone trap", "Reading too fast trap", "Unit conversion trap", "Extra data trap", "Answer that sounds right trap"
+  ],
+  hard_quiz: [
+    "Math optimization in travel cost", "Inequality proof with transformations", "Geometry with an auxiliary line", "Conditional probability", "Function with parameter", "System of equations with conditions", "Compound interest application", "Counting cases in combinatorics", "Trigonometric transformation", "Area under a curve application",
+    "Projectile motion", "Conservation of mechanical energy", "Multi-resistor circuit", "Lens image formation", "Liquid pressure", "Thermal equilibrium", "Basic oscillation", "Friction on inclined plane", "Household electricity consumption", "Relative velocity",
+    "Mole and mass conservation", "Metal mixture reacting with acid", "Carbon dioxide and alkaline solution", "pH calculation", "Redox balancing", "Ester or fat basic problem", "Reaction yield", "Chemical identification", "Basic electrolysis", "Reaction chain transformation",
+    "Genetic pedigree", "One or two trait inheritance", "Hardy Weinberg population", "Enzyme and reaction rate", "Cell metabolism", "Ecological community", "Immunity and vaccination", "Blood glucose regulation", "Photosynthesis under changing conditions", "Cellular respiration",
+    "Analyze a poetic image", "Argue against a statement", "Compare two literary details", "Write a social argument paragraph", "Find the message of a literary work", "Optimize a weekly study plan", "Analyze score data", "Read a climate chart", "Energy in daily life", "Design an experiment", "Evaluate online information", "Personal finance planning", "Model a real-world situation"
+  ],
+  meme: [
+    "Study for five minutes then rest for two hours", "The question looks familiar but memory is blank", "Teacher says this one is easy", "Night before exam and the book is thick", "Memorized everything but the test asks understanding", "Calculator dies during homework", "All multiple choice answers look possible", "Promise to study early but open notebook at 11 PM", "Wrong because of missing the word not", "Class goes silent when teacher asks for volunteer",
+    "Parent asks if homework is done while student holds phone", "Solved an answer not in the options", "Confident submission then notice wrong sign", "Best friend asks for help five minutes before test", "Test matches the lesson missed last week", "Understand in class forget at home", "The easiest question is wrong", "Study group becomes story time", "Teacher says oral check is light", "Read the question twice and still confused",
+    "Remember formula forget condition", "Every subject says just review today", "Parent asks why score is not higher", "Goal is 10 points but sleepy after opening book", "Teacher changes seats before test", "Student finds a silly mistake", "Bonus question saves the whole paper", "Playlist ruins serious study plan", "Just finished one subject then another test appears", "Handwriting gets worse in essay",
+    "Class monitor reminds homework submission", "Online class camera turns on accidentally", "Three color pens but still confused", "New year promise to study consistently", "Test asks exactly the skipped part", "Front row student cannot sleep", "Formula was on the next page", "Math and literature talking inside one brain", "Student meets a trick question", "Teacher says five minutes left",
+    "Finish too early and suspect everything", "Calculate what score is needed to recover", "Memorized but forgot keyword", "Receiving test paper moment", "Parent asks what did you learn today", "Thought understood until doing alone", "Whole class misses one question", "After one lesson finally understand the concept", "Remember answer after submission", "Teacher says just review a little", "Difference between reading notes and understanding", "Last question says prove", "Student mood during exam season"
+  ],
+  enrollment: [
+    "Student has weak foundations and does not know where to start", "Student studies hard but scores do not improve", "Parent cannot identify knowledge gaps", "Student fears a subject because formulas feel memorized", "Student works slowly despite understanding", "Student loses marks by reading too fast", "Student lacks self-study method", "Student forgets soon after learning", "Student is afraid to ask questions", "Student needs close progress tracking",
+    "Grade 9 entrance exam needs a clear roadmap", "High school graduation exam needs gap diagnosis", "Good student wants to become excellent", "Excellent student needs advanced problems", "Parent wants visible learning progress", "Small class with personal correction", "Trial lesson to check fit", "One trial lesson finds bottlenecks", "Free placement test", "Thinking-based learning not rote learning",
+    "Improve written solution presentation", "Train strategic test-taking habits", "Learn from personal mistakes", "Attendance feedback and homework tracking", "Teacher feedback after each session", "Roadmap based on target score", "Build foundation before acceleration", "Student loses focus when studying at home", "Student needs weekly motivation", "Busy parent cannot tutor at home",
+    "Online learning lacks interaction", "Offline class improves concentration", "Transition grade needs foundation review", "Grade 9 needs entrance strategy", "Grade 12 needs exam strategy", "Practice tests with detailed correction", "Understand why not just know answer", "Build critical thinking through hard questions", "Trial before long-term class", "Parent receives feedback after trial lesson",
+    "Student lacks confidence", "From fear of subject to understanding", "Small class quality focus", "Study the right gaps to save time", "Clear roadmap beats random exercises", "Someone needs to point out repeated mistakes", "Improve scores by correcting habits", "Choose suitable teacher through trial", "Student needs to ask and speak in class", "Parent wants real progress", "Book a trial lesson this week", "Limited small class seats", "Start with a diagnostic session"
+  ]
+};
+
+function contentPoolKey(typeName: string) {
+  const clean = stripVietnameseForTag(typeName).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (clean === "q a" || clean === "qa" || clean.includes("q a")) return "qna";
+  if (clean === "quiz") return "quiz";
+  if (clean.includes("hard quiz")) return "hard_quiz";
+  if (clean === "meme") return "meme";
+  if (clean === "enrollment") return "enrollment";
+  return "";
+}
+
+function contentTopicFor(typeName: string, scheduledAt: string, pageName: string) {
+  const key = contentPoolKey(typeName);
+  const pool = CONTENT_TOPIC_POOLS[key] || [];
+  const week = isoWeekNumber(scheduledAt);
+  const year = yearFromDate(scheduledAt);
+  const offset = mondayMindsetOffset(pageName);
+  const index = pool.length ? ((week - 1 - offset) % pool.length + pool.length) % pool.length : 0;
+  return { key, week, year, offset, index, number: index + 1, total: pool.length, topic: pool[index] || "" };
+}
+
+function contentTopicBlock(topic: ReturnType<typeof contentTopicFor>) {
+  if (!topic.key) return "";
+  return [
+    "Required weekly/page topic:",
+    `- ISO week: ${topic.week}/${topic.year}`,
+    `- Offset fanpage: ${topic.offset}`,
+    `- Formula: ((week - 1 - offset) mod ${topic.total}) + 1`,
+    `- Topic number: ${topic.number}/${topic.total}`,
+    `- Topic: ${topic.topic}`,
+    "- Do not choose a different topic unless the admin draft explicitly requires it.",
+  ].join("\n");
+}
+
 function mondayMindsetTopic(scheduledAt: string, pageName: string) {
   const week = isoWeekNumber(scheduledAt);
   const year = yearFromDate(scheduledAt);
@@ -472,11 +544,65 @@ function buildGeminiPrompt(args: {
     ].join("\n");
   }
 
+  const scheduledTopic = contentTopicFor(args.typeName, args.scheduledAt, args.pageName);
+
+  if (scheduledTopic.key === "qna") {
+    const fanpageTag = pageHashtag(args.pageName);
+    return [
+      "Bạn là chuyên gia content giáo dục cho MindUp - Tư Duy Toàn Diện.",
+      "Nhiệm vụ: tạo bài Q&A/Tìm hiểu kiến thức môn học trong thực tế. Bài phải làm người đọc thấy: hóa ra kiến thức trên lớp có thật trong đời sống.",
+      "",
+      contentTopicBlock(scheduledTopic),
+      "",
+      "Yêu cầu nội dung:",
+      "- Mở bài bằng một câu hỏi đời sống thật gần gũi.",
+      "- Giải thích bằng kiến thức môn học, nhưng dùng ngôn ngữ dễ hiểu cho học sinh/phụ huynh.",
+      "- Có ví dụ ngắn, không quá dài dòng.",
+      "- Kết bài bằng câu hỏi gợi bình luận: Bạn từng gặp hiện tượng này chưa?",
+      "- Không copy nguyên văn từ nguồn khác; chỉ dùng insight phổ biến rồi viết lại theo giọng MindUp.",
+      "",
+      "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
+      JSON.stringify({
+        caption: "Caption Q&A bằng tiếng Việt, có câu hỏi mở đầu, giải thích ngắn, ví dụ thực tế, CTA bình luận.",
+        hashtags: ["#MindUp", "#TimHieuThucTe", "#KienThucDoiSong", fanpageTag],
+        image_prompt: "Template Q&A MindUp: nền xanh sáng, logo MindUp, tiêu đề TÌM HIỂU THỰC TẾ, một câu hỏi lớn ở giữa, 2-3 bullet insight ngắn.",
+        internal_note: `Q&A topic ${scheduledTopic.number}/${scheduledTopic.total}: ${scheduledTopic.topic}`,
+      }, null, 2),
+    ].filter(Boolean).join("\n");
+  }
+
+  if (scheduledTopic.key === "quiz") {
+    const fanpageTag = pageHashtag(args.pageName);
+    return [
+      "Bạn là giáo viên ra câu hỏi tương tác nhanh cho MindUp - Tư Duy Toàn Diện.",
+      "Nhiệm vụ: tạo bài Quiz cực nhanh, học sinh có thể làm trong 10-30 giây, nhưng có một bẫy nhỏ khiến học sinh dễ sai nếu đọc vội.",
+      "",
+      contentTopicBlock(scheduledTopic),
+      "",
+      "Yêu cầu câu hỏi:",
+      "- Câu hỏi ngắn, rõ, không cần tính toán dài.",
+      "- Có 2-4 đáp án, không ghi A/B/C/D trong nội dung đáp án.",
+      "- Có một bẫy tư duy/đọc đề/đơn vị/dấu/điều kiện.",
+      "- Caption không được lộ đáp án.",
+      "- Internal note phải ghi đáp án đúng và giải thích ngắn để nhân viên kiểm tra.",
+      "",
+      "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
+      JSON.stringify({
+        caption: "Caption Quiz ngắn bằng tiếng Việt, kêu gọi comment đáp án, không lộ đáp án.",
+        hashtags: ["#MindUp", "#Quiz", "#PhatTrienTuDuy", fanpageTag],
+        image_prompt: "Template Quiz MindUp: nền xanh, logo MindUp, vùng câu hỏi lớn, 2-4 ô đáp án ngắn, font lớn, dễ đọc trên điện thoại.",
+        internal_note: "Câu hỏi; các đáp án; đáp án đúng; bẫy nằm ở đâu; giải thích 2-3 câu.",
+      }, null, 2),
+    ].filter(Boolean).join("\n");
+  }
+
   if (isHardQuizWithPrize(args.typeName)) {
     const fanpageTag = pageHashtag(args.pageName);
     return [
       "Bạn là trợ lý nội dung cho MindUp - Tư Duy Toàn Diện.",
       "Nhiệm vụ: tạo bài Facebook cho chương trình Hard Quiz with Prize, tên hiển thị là HỎI NHANH ĐỚP TRỌN.",
+      "",
+      contentTopicBlock(scheduledTopic),
       "",
       "Thông tin bài đăng:",
       `- Fanpage: ${args.pageName}`,
@@ -486,6 +612,8 @@ function buildGeminiPrompt(args: {
       args.internalNote ? `- Ghi chú nội bộ/đáp án/lời giải nếu có: ${args.internalNote}` : "",
       "",
       "Yêu cầu cực kỳ quan trọng:",
+      "- Câu hỏi phải ở mức vận dụng, hơi khó, học sinh bắt buộc phải đặt bút viết khoảng 10 dòng mới giải chắc được.",
+      "- Không tạo câu hỏi mẹo quá ngắn; phải có dữ kiện đủ rõ để giải bằng kiến thức môn học.",
       "- Caption KHÔNG được lộ đáp án đúng.",
       "- Caption phải ghi rõ luật chơi yêu cầu người tham gia LIKE bài viết và SHARE bài viết ở chế độ công khai.",
       "- Người thắng: trả lời đúng câu hỏi và dự đoán số từ 00-99 gần nhất với 2 số cuối giải Đặc biệt XSMB Chủ nhật.",
@@ -597,6 +725,54 @@ function buildGeminiPrompt(args: {
           image_prompt: "Prompt tiếng Anh tạo ảnh 1:1 cho bài Learning Method, có logo/text MindUp, minh họa phương pháp học rõ ràng, hiện đại.",
           internal_note: "Ghi chú nội bộ cho người kiểm tra bài Learning Method.",
         },
+      }, null, 2),
+    ].filter(Boolean).join("\n");
+  }
+
+  if (scheduledTopic.key === "meme") {
+    const fanpageTag = pageHashtag(args.pageName);
+    return [
+      "Bạn là người viết meme giáo dục cho MindUp - Tư Duy Toàn Diện.",
+      "Nhiệm vụ: tạo bài Meme vui liên quan đến học tập, khiến học sinh thấy quen, phụ huynh thấy đáng yêu, không tiêu cực độc hại.",
+      "",
+      contentTopicBlock(scheduledTopic),
+      "",
+      "Yêu cầu nội dung:",
+      "- Caption ngắn, vui, đời thường.",
+      "- Không chế giễu học sinh quá đà; vibe hài hước nhưng tích cực.",
+      "- Có thể dùng format: 'Khi...', 'POV:', 'Não tôi lúc...', 'Học sinh sau khi...'.",
+      "- Kết bài có thể hỏi: Ai từng như này chưa?",
+      "",
+      "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
+      JSON.stringify({
+        caption: "Caption meme ngắn, vui, dễ share.",
+        hashtags: ["#MindUp", "#MemeHocTap", "#HocSinh", fanpageTag],
+        image_prompt: "Template Meme MindUp: nền vui tươi, logo MindUp nhỏ, chữ meme lớn 1-2 dòng, có biểu cảm học sinh/emoji dạng minh họa.",
+        internal_note: `Meme topic ${scheduledTopic.number}/${scheduledTopic.total}: ${scheduledTopic.topic}`,
+      }, null, 2),
+    ].filter(Boolean).join("\n");
+  }
+
+  if (scheduledTopic.key === "enrollment") {
+    const fanpageTag = pageHashtag(args.pageName);
+    return [
+      "Bạn là chuyên gia content tuyển sinh cho trung tâm MindUp - Tư Duy Toàn Diện.",
+      "Nhiệm vụ: tạo bài Enrollment/gạ học sinh đăng ký học thử, nhưng không viết kiểu quảng cáo lố. Bài phải đánh trúng vấn đề thật và mời học thử nhẹ nhàng.",
+      "",
+      contentTopicBlock(scheduledTopic),
+      "",
+      "Yêu cầu nội dung:",
+      "- Mở đầu bằng nỗi đau cụ thể của học sinh/phụ huynh.",
+      "- Nêu cách MindUp hỗ trợ: chẩn đoán lỗ hổng, học theo lỗi sai, lớp nhỏ, giáo viên theo sát, phản hồi sau buổi học.",
+      "- CTA rõ: inbox/đăng ký học thử/đặt lịch học thử.",
+      "- Không cam kết tăng điểm phi thực tế, không dùng ngôn từ gây áp lực quá mức.",
+      "",
+      "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
+      JSON.stringify({
+        caption: "Caption tuyển sinh học thử bằng tiếng Việt, có pain point, giải pháp MindUp, CTA đăng ký học thử.",
+        hashtags: ["#MindUp", "#HocThu", "#DangKyHocThu", "#PhatTrienTuDuy", fanpageTag],
+        image_prompt: "Template Enrollment MindUp: nền xanh/vàng tin cậy, logo MindUp, headline học thử rõ, 3 lợi ích ngắn, CTA Đăng ký học thử.",
+        internal_note: `Enrollment topic ${scheduledTopic.number}/${scheduledTopic.total}: ${scheduledTopic.topic}`,
       }, null, 2),
     ].filter(Boolean).join("\n");
   }
@@ -725,63 +901,6 @@ async function generateProblemLearningPairDraft(prompt: string) {
   };
 }
 
-function extractImageFromInteractions(data: JsonRecord) {
-  const output = data?.output;
-  const candidates = [
-    ...(Array.isArray(output) ? output : []),
-    ...((data?.outputs && Array.isArray(data.outputs)) ? data.outputs as unknown[] : []),
-  ] as JsonRecord[];
-
-  for (const item of candidates) {
-    const image = item?.output_image || item?.image || item?.inline_data || item?.inlineData;
-    if (image && typeof image === "object") {
-      const record = image as JsonRecord;
-      const dataValue = String(record.data || record.bytesBase64Encoded || "");
-      if (dataValue) return { data: dataValue, mimeType: String(record.mime_type || record.mimeType || "image/png") };
-    }
-  }
-
-  const asText = JSON.stringify(data);
-  const dataMatch = asText.match(/"data"\s*:\s*"([A-Za-z0-9+/=]+)"/);
-  if (dataMatch) return { data: dataMatch[1], mimeType: "image/png" };
-  return null;
-}
-
-async function generateImage(prompt: string) {
-  const apiKey = env("GEMINI_API_KEY");
-  if (!apiKey) throw new Error("Thiếu Supabase secret GEMINI_API_KEY.");
-  const model = env("GEMINI_IMAGE_MODEL") || "gemini-3.1-flash-image";
-  const imagePrompt = [
-    prompt,
-    "Square 1:1 Facebook educational post.",
-    "Include a clean MindUp logo/text mark: MindUp - Tư Duy Toàn Diện.",
-    "Modern blue and gold educational design, Vietnamese-friendly typography, readable on mobile.",
-    "Do not add misspelled Vietnamese text except the exact MindUp brand text.",
-  ].join("\n");
-  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
-    method: "POST",
-    headers: {
-      "x-goog-api-key": apiKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      input: [{ type: "text", text: imagePrompt }],
-    }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error?.message || "Gemini image generation failed");
-  const image = extractImageFromInteractions(data);
-  if (!image?.data) throw new Error("Gemini chưa trả về ảnh hợp lệ.");
-  const bytes = Uint8Array.from(atob(image.data), c => c.charCodeAt(0));
-  return {
-    model,
-    imagePrompt,
-    bytes,
-    mimeType: image.mimeType || "image/png",
-  };
-}
-
 function escapeXml(value: string) {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -863,11 +982,11 @@ function buildFallbackImage(args: {
   <rect x="205" y="775" width="670" height="64" rx="32" fill="url(#gold)"/>
   <text x="540" y="817" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="900" fill="#092f6d">HIỂU BẢN CHẤT • ĐIỂM BỨT PHÁ</text>
   <text x="540" y="930" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="800" fill="#ffffff">MindUp - Tư Duy Toàn Diện</text>
-  <text x="540" y="970" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="600" fill="#e8f4ff">Ảnh fallback tự động khi Gemini Image tạm hết quota</text>
+  <text x="540" y="970" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="600" fill="#e8f4ff">Ảnh template tự động của MindUp</text>
 </svg>`;
   const bytes = new TextEncoder().encode(svg);
   return {
-    model: "mindup-fallback-svg",
+    model: "mindup-template-svg",
     imagePrompt: [
       args.imagePrompt,
       args.imageError ? `Fallback reason: ${args.imageError}` : "",
@@ -965,23 +1084,17 @@ async function generateImageWithFallback(args: {
   imagePrompt: string;
   textPrompt: string;
 }) {
-  let image;
-  let imageWarning = "";
-  try {
-    image = await generateImage(args.imagePrompt || args.textPrompt);
-  } catch (imageError) {
-    imageWarning = imageError instanceof Error ? imageError.message : String(imageError || "Gemini image failed");
-    image = buildFallbackImage({
-      pageName: args.pageName,
-      typeName: args.typeName,
-      caption: args.caption,
-      imagePrompt: args.imagePrompt || args.textPrompt,
-      imageError: imageWarning,
-    });
-  }
+  const imageWarning = "";
+  const image = buildFallbackImage({
+    pageName: args.pageName,
+    typeName: args.typeName,
+    caption: args.caption,
+    imagePrompt: args.imagePrompt || args.textPrompt,
+    imageError: "",
+  });
   const uploaded = await uploadBytesToDrive(
     image.bytes,
-    image.mimeType === "image/svg+xml" ? "mindup-facebook-ai-fallback.svg" : "mindup-facebook-ai.png",
+    "mindup-facebook-template.svg",
     image.mimeType,
   );
   return {
@@ -1103,7 +1216,6 @@ Deno.serve(async (req) => {
         pairDraft.series.method ? `Phương pháp giải đáp: ${pairDraft.series.method}` : "",
         pairDraft.series.audience ? `Đối tượng: ${pairDraft.series.audience}` : "",
         pairDraft.series.sourceReference ? `Nguồn/ý tưởng tham khảo: ${pairDraft.series.sourceReference}` : "",
-        problemImage.imageWarning ? `Lưu ý hệ thống: Gemini tạo ảnh Problem bị lỗi/quota, đã dùng ảnh fallback MindUp. Chi tiết: ${problemImage.imageWarning}` : "",
         post.internal_note,
       ].filter(Boolean).join("\n\n").trim() || null;
       const learningNote = [
@@ -1112,7 +1224,6 @@ Deno.serve(async (req) => {
         pairDraft.series.method ? `Phương pháp: ${pairDraft.series.method}` : "",
         pairDraft.series.audience ? `Đối tượng: ${pairDraft.series.audience}` : "",
         pairDraft.series.sourceReference ? `Nguồn/ý tưởng tham khảo: ${pairDraft.series.sourceReference}` : "",
-        learningImage.imageWarning ? `Lưu ý hệ thống: Gemini tạo ảnh Learning Method bị lỗi/quota, đã dùng ảnh fallback MindUp. Chi tiết: ${learningImage.imageWarning}` : "",
         linkedPost.internal_note,
       ].filter(Boolean).join("\n\n").trim() || null;
 
@@ -1181,23 +1292,17 @@ Deno.serve(async (req) => {
     const mondayDisplayText = isMondayMindset(post.type?.name || "") && draft.quoteVi
       ? `${draft.quoteVi}${draft.quoteSource ? ` — ${draft.quoteSource}` : ""}`
       : draft.caption;
-    let image;
-    let imageWarning = "";
-    try {
-      image = await generateImage(draft.imagePrompt || textPrompt);
-    } catch (imageError) {
-      imageWarning = imageError instanceof Error ? imageError.message : String(imageError || "Gemini image failed");
-      image = buildFallbackImage({
-        pageName: post.page?.page_name || post.page_id,
-        typeName: post.type?.name || "Facebook",
-        caption: mondayDisplayText,
-        imagePrompt: draft.imagePrompt || textPrompt,
-        imageError: imageWarning,
-      });
-    }
+    const imageWarning = "";
+    const image = buildFallbackImage({
+      pageName: post.page?.page_name || post.page_id,
+      typeName: post.type?.name || "Facebook",
+      caption: mondayDisplayText,
+      imagePrompt: draft.imagePrompt || textPrompt,
+      imageError: "",
+    });
     const uploaded = await uploadBytesToDrive(
       image.bytes,
-      image.mimeType === "image/svg+xml" ? "mindup-facebook-ai-fallback.svg" : "mindup-facebook-ai.png",
+      "mindup-facebook-template.svg",
       image.mimeType,
     );
     const finalContent = mergeCaptionAndHashtags(draft.caption, draft.hashtags);
@@ -1206,7 +1311,6 @@ Deno.serve(async (req) => {
       draft.quoteVi ? `Quote VI: ${draft.quoteVi}` : "",
       draft.quoteSource ? `Nguồn: ${draft.quoteSource}` : "",
       draft.internalNote,
-      imageWarning ? `Lưu ý hệ thống: Gemini tạo ảnh bị lỗi/quota, đã dùng ảnh fallback MindUp. Chi tiết: ${imageWarning}` : "",
       post.internal_note,
     ].filter(Boolean).join("\n\n").trim() || null;
 
