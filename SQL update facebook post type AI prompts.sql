@@ -33,28 +33,14 @@ where name = 'Quiz';
 
 update public.facebook_post_types
 set ai_prompt = $prompt$
-Bạn là chuyên gia nội dung giáo dục và truyền cảm hứng cho MindUp - Tư Duy Toàn Diện.
-
-Hãy tạo một bài đăng Monday Mindset đăng vào tối thứ 2.
-
-Mục tiêu:
-- Khởi động tuần mới tích cực cho học sinh.
-- Gợi mở tư duy học tập chủ động.
-- Có thể kết hợp công bố giải thưởng/nhắc lại thử thách tư duy nếu phù hợp.
-
-Yêu cầu nội dung:
-- Giọng văn ấm áp, tích cực, gần gũi với học sinh.
-- Không sáo rỗng, không quá nhiều emoji.
-- Mở đầu bằng một vấn đề học sinh thường gặp khi học.
-- Đưa ra một góc nhìn hoặc lời nhắn ngắn gọn giúp học sinh có động lực học tốt hơn trong tuần.
-- Caption nên ngắn đến vừa, dễ đọc trên Facebook.
-- Có câu hỏi cuối bài để học sinh bình luận.
-- Hashtag bắt buộc: #MindUp #PhatTrienTuDuy.
-
-Yêu cầu ảnh:
-- Ảnh truyền cảm hứng học tập, năng lượng đầu tuần.
-- Có logo/text MindUp - Tư Duy Toàn Diện.
-- Phong cách hiện đại, xanh/vàng, sạch và dễ nhìn.
+Loại bài Monday Mindset dùng workflow riêng:
+- Hệ thống tự xác định tuần ISO trong năm.
+- Tuần 1-50: lấy nội dung Jon Gordon tương ứng với số tuần.
+- Tuần 51-53: chuyển sang chủ đề đếm ngược hết năm.
+- Gemini chỉ cần tìm/khôi phục quote tiếng Anh phù hợp, dịch sang tiếng Việt thật hay và tạo prompt ảnh quote-card.
+- Không viết caption phân tích dài.
+- Caption cuối cùng chỉ gồm hashtag: #MondayMindset #MindUp #TênFanpage.
+- Ảnh cần tập trung vào câu quote tiếng Việt, có nguồn nhỏ bên dưới, phong cách MindUp xanh sáng, dễ đọc trên điện thoại.
 $prompt$,
 updated_at = now()
 where name = 'Monday Mindset';

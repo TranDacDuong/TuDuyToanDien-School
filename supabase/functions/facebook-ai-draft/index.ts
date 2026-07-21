@@ -6,6 +6,59 @@ const corsHeaders = {
 
 type JsonRecord = Record<string, unknown>;
 
+const MONDAY_MINDSET_ITEMS = [
+  "GET TO vs. HAVE TO: Thay đổi thái độ từ nghĩa vụ sang đặc ân.",
+  "Talk to Yourself, Don't Listen to Yourself: Nói chuyện với chính mình bằng sự khích lệ thay vì ngồi nghe những suy nghĩ sợ hãi tự động.",
+  "Feed the Positive Dog: Trong bạn có 2 con chó tích cực và tiêu cực, con nào bạn cho ăn nhiều hơn sẽ thắng.",
+  "Love over Fear: Hành động vì tình yêu công việc và sự cống hiến, không phải vì sợ thất bại.",
+  "Energy Giver vs. Energy Drainer: Hãy là nguồn phát năng lượng thay vì máy hút năng lượng của người khác.",
+  "Gratitude Kills Stress: Bạn không thể vừa biết ơn vừa lo âu cùng một lúc.",
+  "Positive Disruption: Dùng sự tích cực để phá vỡ sự trì trệ và tư duy cũ kỹ.",
+  "The Power of a Smile: Nụ cười và năng lượng tích cực có khả năng lây lan sinh học.",
+  "Complaining is Waste of Energy: Phàn nàn không giải quyết được vấn đề, chỉ làm cạn kiệt năng lượng.",
+  "Be a Vitamin, Not a Virus: Mang lại sức sống cho môi trường xung quanh thay vì lan truyền sự tiêu cực.",
+  "Life is Like a Roller Coaster: Cuộc sống có lúc trầm lúc thăng, điểm lùi là đà cho bước tiến tiếp theo.",
+  "Refine, Not Define: Thất bại là để mài giũa bản lĩnh, không phải để định nghĩa con người bạn.",
+  "The Bamboo Principle: Sự kiên trì cắm rễ âm thầm trong bóng tối sẽ tạo nên sự bứt phá thần tốc sau này.",
+  "Embrace the Struggle: Khó khăn không đến để cản đường bạn, nó đến để rèn luyện bạn.",
+  "Don't Let Doubt Win: Sự nghi ngờ tiêu diệt nhiều giấc mơ hơn là thất bại.",
+  "Finish Strong: Cách bạn kết thúc quan trọng không kém cách bạn bắt đầu.",
+  "Keep Moving Forward: Khi gặp giông bão, lựa chọn duy nhất là tiếp tục tiến lên.",
+  "Overcome the Wall: Mọi người thành công đều từng đụng phải bức tường nản lòng và quyết định vượt qua nó.",
+  "Failure is a Teacher: Đặt câu hỏi bài học ở đây là gì thay vì tại sao lại là tôi.",
+  "Grit is Built in the Dark: Sự vững vàng được tạo ra khi không ai nhìn thấy bạn nỗ lực.",
+  "Control What You Can Control: Chỉ tập trung vào thái độ, nỗ lực và hành động của chính mình.",
+  "Focus on the Process, Not the Outcome: Tập trung làm tốt việc hôm nay, kết quả sẽ tự đến.",
+  "1% Better Every Day: Cải thiện bản thân từng chút một mỗi ngày để tạo nên sự thay đổi phi thường.",
+  "One Word That Will Change Your Life: Chọn một từ khóa định hình mục tiêu cho cả năm thay vì danh sách nghị quyết dài dòng.",
+  "Eliminate Distractions: Loại bỏ những tiếng ồn không phục vụ cho sứ mệnh của bạn.",
+  "Win the Morning, Win the Day: Cách bạn bắt đầu buổi sáng quyết định năng lượng của cả ngày.",
+  "Be Present: Hiện diện 100% trong công việc và mối quan hệ ở thời điểm hiện tại.",
+  "Action Cures Fear: Hành động là liều thuốc duy nhất dập tắt sự sợ hãi.",
+  "Do It with Passion or Not at All: Làm việc với niềm đam mê hoặc đừng làm.",
+  "Keep It Simple: Đừng phức tạp hóa mọi thứ, tập trung vào những điều cốt lõi.",
+  "You Can't Do It Alone: Không ai thành công một mình, hãy biết kết nối và nhờ sự trợ giúp.",
+  "Encourage in Public, Coach in Private: Tôn trọng và khen ngợi công khai, góp ý riêng tư.",
+  "Connect Before You Lead: Mối quan hệ tốt là nền tảng của sự lãnh đạo hiệu quả.",
+  "Forgive Fast: Tha thứ nhanh chóng để giải phóng bản thân khỏi gánh nặng oán giận.",
+  "WE before ME: Đặt lợi ích của tập thể lên trên cái tôi cá nhân.",
+  "Build a Culture of Greatness: Văn hóa được xây dựng từ những hành vi nhỏ lặp đi lặp lại hằng ngày.",
+  "Serve Others: Lãnh đạo thực sự là phục vụ và nâng đỡ người khác.",
+  "Tough Love: Yêu thương đi kèm với kỷ luật và tiêu chuẩn cao.",
+  "Celebrate Others' Success: Thành công của đồng đội cũng là thành công của bạn.",
+  "Listen to Understand: Lắng nghe để hiểu và chia sẻ, không phải để đối đáp.",
+  "Purpose Driven: Mục đích sống và làm việc tạo ra nguồn năng lượng vô tận.",
+  "Vision Keeps You Going: Khi bạn có một tầm nhìn rõ ràng, bạn sẽ vượt qua mọi trở ngại.",
+  "Leave a Legacy: Hãy sống và làm việc sao cho giá trị bạn để lại kéo dài mãi mãi.",
+  "Be a Transformer, Not a Conformist: Thay đổi môi trường xung quanh thay vì để môi trường đồng hóa bạn.",
+  "Hope is a Superpower: Hy vọng kết hợp với hành động là sức mạnh định hình tương lai.",
+  "Your Mindset is Your Choice: Tư duy không phải là bẩm sinh, đó là lựa chọn mỗi sáng bạn thức dậy.",
+  "Believe Before You See: Bạn phải tin vào thành công trước khi bạn nhìn thấy nó xuất hiện.",
+  "Trust the Journey: Tin tưởng vào hành trình và bài học mà cuộc sống đang mang lại cho bạn.",
+  "Shine Your Light: Đừng giấu đi năng lực và năng lượng tích cực của bạn.",
+  "Today is a Gift: Hôm nay là một món quà hoàn toàn mới để bạn viết tiếp câu chuyện của mình.",
+];
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -187,6 +240,73 @@ function normalizeHashtags(value: unknown) {
     .filter(item => item.startsWith("#"));
 }
 
+function isMondayMindset(typeName: string) {
+  return String(typeName || "").trim().toLowerCase() === "monday mindset";
+}
+
+function isoWeekNumber(dateInput: string | Date) {
+  const date = dateInput instanceof Date ? new Date(dateInput) : new Date(dateInput);
+  if (Number.isNaN(date.getTime())) return 1;
+  const utc = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const day = utc.getUTCDay() || 7;
+  utc.setUTCDate(utc.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
+  return Math.ceil((((utc.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
+function yearFromDate(dateInput: string | Date) {
+  const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  return Number.isNaN(date.getTime()) ? new Date().getUTCFullYear() : date.getUTCFullYear();
+}
+
+function weeksLeftInYear(dateInput: string | Date) {
+  const date = dateInput instanceof Date ? new Date(dateInput) : new Date(dateInput);
+  if (Number.isNaN(date.getTime())) return 0;
+  const end = Date.UTC(date.getUTCFullYear(), 11, 31, 23, 59, 59);
+  return Math.max(0, Math.ceil((end - date.getTime()) / (7 * 86400000)));
+}
+
+function stripVietnameseForTag(value: string) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D");
+}
+
+function pageHashtag(pageName: string) {
+  const words = stripVietnameseForTag(pageName)
+    .replace(/MindUp/gi, "")
+    .replace(/[^A-Za-z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  const suffix = words.map(word => word.charAt(0).toUpperCase() + word.slice(1)).join("");
+  return suffix ? `#MindUp${suffix}` : "#MindUpTuDuyToanDien";
+}
+
+function mondayMindsetTopic(scheduledAt: string) {
+  const week = isoWeekNumber(scheduledAt);
+  const year = yearFromDate(scheduledAt);
+  const topic = MONDAY_MINDSET_ITEMS[week - 1] || "";
+  if (topic) {
+    return {
+      week,
+      year,
+      mode: "jon_gordon" as const,
+      topic,
+      countdownWeeks: 0,
+    };
+  }
+  return {
+    week,
+    year,
+    mode: "year_countdown" as const,
+    topic: `Đếm ngược hết năm ${year}: còn khoảng ${weeksLeftInYear(scheduledAt)} tuần để kết thúc năm. Hãy chọn một việc quan trọng để hoàn thiện trước khi năm mới bắt đầu.`,
+    countdownWeeks: weeksLeftInYear(scheduledAt),
+  };
+}
+
 function buildGeminiPrompt(args: {
   pageName: string;
   typeName: string;
@@ -195,6 +315,47 @@ function buildGeminiPrompt(args: {
   existingContent: string;
   internalNote: string;
 }) {
+  if (isMondayMindset(args.typeName)) {
+    const monday = mondayMindsetTopic(args.scheduledAt);
+    const fanpageTag = pageHashtag(args.pageName);
+    const isCountdown = monday.mode === "year_countdown";
+    return [
+      "Bạn là trợ lý nội dung cho MindUp - Tư Duy Toàn Diện.",
+      "Nhiệm vụ: tạo bài Monday Mindset dạng quote-card, không viết caption phân tích dài.",
+      "",
+      "Thông tin:",
+      `- Fanpage: ${args.pageName}`,
+      `- Hashtag fanpage bắt buộc: ${fanpageTag}`,
+      `- Tuần ISO trong năm: ${monday.week}/${monday.year}`,
+      `- Chủ đề: ${monday.topic}`,
+      "",
+      isCountdown
+        ? "Vì bộ nội dung Jon Gordon chỉ có 50 tuần, tuần này hãy tạo quote tiếng Anh ngắn về việc đếm ngược hết năm, hoàn thiện mục tiêu, kết thúc năm thật mạnh mẽ. Quote không cần gán tác giả Jon Gordon."
+        : "Hãy tìm/khôi phục một câu nói tiếng Anh ngắn, đúng tinh thần Jon Gordon, phù hợp nhất với chủ đề trên. Nếu không chắc nguyên văn 100%, hãy viết một câu quote tiếng Anh tự nhiên theo phong cách Jon Gordon và ghi nguồn là Jon Gordon-inspired, không bịa là trích dẫn nguyên văn.",
+      "Sau đó dịch câu quote sang tiếng Việt thật hay, giàu cảm hứng, tự nhiên, không dịch máy móc.",
+      "",
+      "Caption chỉ được là hashtag, không thêm mô tả:",
+      `#MondayMindset #MindUp ${fanpageTag}`,
+      "",
+      "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
+      JSON.stringify({
+        caption: `#MondayMindset #MindUp ${fanpageTag}`,
+        hashtags: ["#MondayMindset", "#MindUp", fanpageTag],
+        quote_en: isCountdown ? "Short English countdown quote." : "English Jon Gordon quote or Jon Gordon-inspired quote.",
+        quote_vi: "Bản dịch tiếng Việt thật hay của quote.",
+        quote_source: isCountdown ? "MindUp" : "Jon Gordon / Jon Gordon-inspired",
+        image_prompt: "Prompt tiếng Anh để tạo ảnh Facebook 16:9 hoặc 1:1 phong cách Monday Mindset: nền xanh MindUp, logo MindUp, quote tiếng Việt lớn ở vùng trống, tên tác giả nhỏ bên dưới, typography đẹp, dễ đọc trên điện thoại.",
+        internal_note: `Monday Mindset tuần ${monday.week}/${monday.year}: ${monday.topic}`,
+      }, null, 2),
+      "",
+      "Yêu cầu ảnh:",
+      "- Ảnh phải tập trung vào quote tiếng Việt.",
+      "- Nền xanh sáng, giáo dục, hiện đại, có logo hoặc chữ MindUp - Tư Duy Toàn Diện.",
+      "- Không viết sai tiếng Việt.",
+      "- Nếu có quote tiếng Anh thì chỉ để nhỏ, quote tiếng Việt là chính.",
+    ].join("\n");
+  }
+
   const defaultPrompt = [
     "Bạn là chuyên gia marketing giáo dục cho MindUp - Tư Duy Toàn Diện.",
     "Hãy tạo một bài đăng Facebook tự nhiên, rõ thông điệp, đúng tinh thần giáo dục, không sáo rỗng.",
@@ -248,11 +409,14 @@ async function generateTextDraft(prompt: string) {
   const parsed = tryParseJson(text);
   const hashtags = normalizeHashtags(parsed?.hashtags);
   if (!hashtags.includes("#MindUp")) hashtags.unshift("#MindUp");
-  if (!hashtags.includes("#PhatTrienTuDuy")) hashtags.push("#PhatTrienTuDuy");
+  if (!hashtags.includes("#MondayMindset") && !hashtags.includes("#PhatTrienTuDuy")) hashtags.push("#PhatTrienTuDuy");
   return {
     model,
     caption: String(parsed?.caption || "").trim(),
     hashtags,
+    quoteEn: String(parsed?.quote_en || "").trim(),
+    quoteVi: String(parsed?.quote_vi || "").trim(),
+    quoteSource: String(parsed?.quote_source || "").trim(),
     imagePrompt: String(parsed?.image_prompt || "").trim(),
     internalNote: String(parsed?.internal_note || "").trim(),
   };
@@ -442,6 +606,8 @@ function mergeCaptionAndHashtags(caption: string, hashtags: string[]) {
   const cleanCaption = String(caption || "").trim();
   const cleanTags = Array.from(new Set(hashtags.map(tag => tag.trim()).filter(Boolean)));
   const tagLine = cleanTags.join(" ");
+  if (cleanCaption && tagLine && cleanCaption.replace(/\s+/g, " ").trim() === tagLine) return tagLine.slice(0, 6000);
+  if (cleanCaption && cleanTags.every(tag => cleanCaption.includes(tag))) return cleanCaption.slice(0, 6000);
   return [cleanCaption, tagLine].filter(Boolean).join("\n\n").slice(0, 6000);
 }
 
@@ -477,6 +643,9 @@ Deno.serve(async (req) => {
     });
 
     const draft = await generateTextDraft(textPrompt);
+    const mondayDisplayText = isMondayMindset(post.type?.name || "") && draft.quoteVi
+      ? `${draft.quoteVi}${draft.quoteSource ? ` — ${draft.quoteSource}` : ""}`
+      : draft.caption;
     let image;
     let imageWarning = "";
     try {
@@ -486,7 +655,7 @@ Deno.serve(async (req) => {
       image = buildFallbackImage({
         pageName: post.page?.page_name || post.page_id,
         typeName: post.type?.name || "Facebook",
-        caption: draft.caption,
+        caption: mondayDisplayText,
         imagePrompt: draft.imagePrompt || textPrompt,
         imageError: imageWarning,
       });
@@ -498,6 +667,9 @@ Deno.serve(async (req) => {
     );
     const finalContent = mergeCaptionAndHashtags(draft.caption, draft.hashtags);
     const finalNote = [
+      draft.quoteEn ? `Quote EN: ${draft.quoteEn}` : "",
+      draft.quoteVi ? `Quote VI: ${draft.quoteVi}` : "",
+      draft.quoteSource ? `Nguồn: ${draft.quoteSource}` : "",
       draft.internalNote,
       imageWarning ? `Lưu ý hệ thống: Gemini tạo ảnh bị lỗi/quota, đã dùng ảnh fallback MindUp. Chi tiết: ${imageWarning}` : "",
       post.internal_note,
