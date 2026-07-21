@@ -775,8 +775,12 @@ function toggleQuizBuilder(){
   if (showHardQuiz && !$("hardQuizRules").value.trim()) {
     $("hardQuizRules").value = buildHardQuizRules();
   }
-  if (showMonday && !$("mondayAnnouncementText").value.trim()) {
+  if (showMonday) {
     $("mondayAnnouncementText").value = buildMondayAnnouncementText();
+    if (!$("postContent").value.trim()) {
+      $("postContent").value = buildMondayMindsetCaption();
+      $("postCharCount").textContent = String($("postContent").value.length);
+    }
   }
 }
 function getQuizData(){
@@ -1243,6 +1247,13 @@ function buildMondayAnnouncementText(){
     "",
     `🎉 Chúc mừng ${winner} đã giành phần thưởng tuần này của MindUp!`,
   ].join("\n");
+}
+function buildMondayMindsetCaption(){
+  return [
+    buildMondayAnnouncementText(),
+    "",
+    `#MondayMindset #MindUp ${pageHashtagLocal()}`,
+  ].join("\n").trim();
 }
 function announcementMarker(){
   return "🏆 Công bố kết quả Hỏi nhanh đớp trọn";
@@ -1861,7 +1872,21 @@ function handlePostImagePaste(ev){
 function updateImagePreview(){
   const url = $("postImageUrl").value.trim();
   const img = $("imagePreview");
-  if (url) { img.src = url; img.classList.add("show"); $("imageDropzone").classList.add("has-image"); }
+  img.onload = null;
+  img.onerror = null;
+  if (url) {
+    img.onload = () => {
+      img.classList.add("show");
+      $("imageDropzone").classList.add("has-image");
+    };
+    img.onerror = () => {
+      img.classList.remove("show");
+      $("imageDropzone").classList.remove("has-image");
+      showPostStatus("err", "Không tải được ảnh xem trước. URL ảnh vẫn được giữ ngầm, bạn có thể thử upload/tạo ảnh lại.");
+    };
+    img.src = "";
+    requestAnimationFrame(() => { img.src = url; });
+  }
   else { img.src = ""; img.classList.remove("show"); $("imageDropzone").classList.remove("has-image"); }
 }
 function buildPostMetadata(){
@@ -2004,6 +2029,33 @@ async function facebookListScheduled(pageId, since, until){
   const data = await callFacebookPostingFunction({ action: "list_scheduled", page_id: pageId, since, until });
   return Array.isArray(data.posts) ? data.posts : [];
 }
+function restorePayloadFromPost(row){
+  if (!row) return null;
+  const fields = [
+    "page_id","post_type_id","scheduled_at","scheduled_date","content","link_url","image_url",
+    "internal_note","metadata","status","content_status","approval_status","ai_status",
+    "ai_generated_at","ai_model","ai_prompt","ai_image_prompt","ai_image_url","ai_error",
+    "facebook_post_id","last_error","posted_at","task_id"
+  ];
+  return Object.fromEntries(fields.filter(key => key in row).map(key => [key, row[key]]));
+}
+async function undoTemporaryGeminiSave({ originalId, originalRow, generatedPost }){
+  const generatedId = generatedPost?.id || $("postId").value;
+  if (!originalId && generatedId) {
+    await sb.from("facebook_scheduled_posts").delete().eq("id", generatedId);
+    if (generatedPost?.task_id) {
+      try { await sb.from("daily_tasks").delete().eq("id", generatedPost.task_id); } catch (_) {}
+    }
+    $("postId").value = "";
+    $("deletePostBtn").style.display = "none";
+    return;
+  }
+  if (originalId && originalRow) {
+    const restorePayload = restorePayloadFromPost(originalRow);
+    if (restorePayload) await sb.from("facebook_scheduled_posts").update(restorePayload).eq("id", originalId);
+    $("postId").value = originalId;
+  }
+}
 function sameScheduledMinute(a, b){
   const ams = new Date(a).getTime();
   const bms = new Date(b).getTime();
@@ -2090,10 +2142,13 @@ async function schedulePost(mode="schedule"){
 async function generateGeminiDraft(){
   const btn = $("generateGeminiDraftBtn");
   const oldText = btn.textContent;
+  const originalId = $("postId").value;
+  const originalRow = originalId ? S.posts.find(p => String(p.id) === String(originalId)) : null;
+  let generatedPost = null;
   try {
     btn.disabled = true;
     btn.textContent = "Đang tạo...";
-    showPostStatus("info", "Đang lưu nháp và gọi Gemini tạo nội dung/hashtag/ảnh...");
+    showPostStatus("info", "Đang tạo nội dung/hashtag/ảnh bằng Gemini. Nội dung sẽ chỉ lưu khi bạn bấm Lưu nháp.");
     const draft = await savePostDraft({ approval_status: "pending", content_status: "missing_content" });
     $("postId").value = draft.id;
     $("aiDraftStatus").textContent = "Đang tạo bằng AI...";
@@ -2107,19 +2162,30 @@ async function generateGeminiDraft(){
         data.image_url = templatedPost.image_url || data.image_url;
       }
     }
-    $("postContent").value = post.content || "";
+    generatedPost = post;
+    const isMondayPost = isMondayMindsetType(post.post_type_id);
+    $("postContent").value = isMondayPost ? buildMondayMindsetCaption() : (post.content || "");
     $("postImageUrl").value = post.image_url || data.image_url || "";
     $("postInternalNote").value = post.internal_note || "";
-    $("postStatus").value = statusLabel(post.status || "draft");
+    $("postStatus").value = originalId
+      ? statusLabel(originalRow?.status || "draft")
+      : statusLabel(postHasContent({
+        content: $("postContent").value,
+        link_url: $("postLinkUrl").value,
+        image_url: $("postImageUrl").value,
+      }) ? "draft" : "missing_content");
     $("aiDraftStatus").textContent = aiStatusLabel(post.ai_status || "drafted");
     $("postCharCount").textContent = String(($("postContent").value || "").length);
     updateImagePreview();
+    await undoTemporaryGeminiSave({ originalId, originalRow, generatedPost: post });
     const pairedText = data.related_post
       ? ` Gemini cũng đã tạo luôn bài Learning Method đi kèm: ${data.related_post.scheduled_at ? formatDateTime(new Date(data.related_post.scheduled_at)) : ""}.`
       : "";
-    showPostStatus("ok", `Gemini đã tạo draft bài đăng.${pairedText} Người được giao hãy kiểm tra rồi bấm Xác nhận bài ổn.`);
-    await loadData();
+    showPostStatus("ok", `Gemini đã tạo nội dung và ảnh, nhưng chưa lưu vào hệ thống.${pairedText} Nếu đã ổn, hãy bấm Lưu nháp.`);
   } catch (error) {
+    if (generatedPost || $("postId").value !== originalId) {
+      await undoTemporaryGeminiSave({ originalId, originalRow, generatedPost }).catch(()=>{});
+    }
     $("aiDraftStatus").textContent = `AI lỗi: ${error.message || String(error)}`;
     showPostStatus("err", error.message || String(error));
   } finally {
