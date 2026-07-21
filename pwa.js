@@ -29,6 +29,7 @@
   window.addEventListener("beforeinstallprompt", function(event){
     event.preventDefault();
     deferredInstallPrompt = event;
+    updateInstallPromptForNativeInstall();
     window.setTimeout(initInstallPrompt, 400);
   });
 
@@ -1145,6 +1146,19 @@
     document.getElementById("mindupInstallLauncher")?.remove();
   }
 
+  function updateInstallPromptForNativeInstall() {
+    if (isIosDevice()) return;
+    const prompt = document.getElementById("mindupInstallPrompt");
+    if (!prompt) return;
+    const action = prompt.querySelector(".mindup-push-enable");
+    if (action) action.textContent = "Tải app";
+    const status = prompt.querySelector(".mindup-install-status");
+    if (status && deferredInstallPrompt) {
+      status.hidden = true;
+      status.textContent = "";
+    }
+  }
+
   async function initInstallLauncher() {
     if (!isTopLevelWindow()) return;
     removeInstallLauncher();
@@ -1315,8 +1329,9 @@
       `}
       <div class="mindup-push-actions">
         <button class="mindup-push-later" type="button">Để sau</button>
-        <button class="mindup-push-enable" type="button">${canUseNativeInstall ? "Tải app" : "Mở hướng dẫn"}</button>
+        <button class="mindup-push-enable" type="button">Tải app</button>
       </div>
+      <div class="mindup-push-status mindup-install-status" hidden></div>
     `;
 
     prompt.querySelector(".mindup-push-later").addEventListener("click", () => {
@@ -1327,6 +1342,14 @@
     });
     prompt.querySelector(".mindup-push-enable").addEventListener("click", async () => {
       if (isIos || !deferredInstallPrompt) {
+        if (!isIos && isAndroidDevice()) {
+          const status = prompt.querySelector(".mindup-install-status");
+          if (status) {
+            status.textContent = "Nếu Chrome chưa mở hộp Tải app, hãy chạm menu ba chấm rồi chọn Cài đặt ứng dụng hoặc Thêm vào màn hình chính.";
+            status.hidden = false;
+          }
+          return;
+        }
         if (!isIos) localStorage.setItem(INSTALL_DISMISSED_AT_KEY, String(Date.now()));
         removeInstallPrompt();
         window.setTimeout(initInstallLauncher, 100);
