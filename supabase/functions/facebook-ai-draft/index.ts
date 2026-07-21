@@ -248,6 +248,14 @@ function isHardQuizWithPrize(typeName: string) {
   return String(typeName || "").trim().toLowerCase().includes("hard quiz");
 }
 
+function isProblemType(typeName: string) {
+  return String(typeName || "").trim().toLowerCase() === "problem";
+}
+
+function isLearningMethod(typeName: string) {
+  return String(typeName || "").trim().toLowerCase() === "learning method";
+}
+
 function isoWeekNumber(dateInput: string | Date) {
   const date = dateInput instanceof Date ? new Date(dateInput) : new Date(dateInput);
   if (Number.isNaN(date.getTime())) return 1;
@@ -425,6 +433,55 @@ function buildGeminiPrompt(args: {
     ].filter(Boolean).join("\n");
   }
 
+  if (isProblemType(args.typeName)) {
+    const fanpageTag = pageHashtag(args.pageName);
+    return [
+      "Bạn là chuyên gia content marketing giáo dục cho MindUp - Tư Duy Toàn Diện.",
+      "Nhiệm vụ: tạo một CẶP 2 bài liên kết: bài Problem và bài Learning Method sau đó.",
+      "",
+      "Bối cảnh:",
+      "- Bài Problem nêu một khó khăn thật của học sinh hoặc phụ huynh trong việc học.",
+      "- Bài Learning Method sau đó giải đáp đúng khó khăn đó bằng một phương pháp học cụ thể.",
+      "- Lịch đăng bài Learning Method có thể cùng tuần hoặc tuần sau, không cố định; hệ thống sẽ tự ghép bài gần nhất sau bài Problem.",
+      "- Nội dung cần ăn khớp như một mini-series, nhưng mỗi bài vẫn độc lập nếu người đọc chỉ thấy một bài.",
+      "",
+      "Thông tin bài Problem:",
+      `- Fanpage: ${args.pageName}`,
+      `- Hashtag fanpage bắt buộc: ${fanpageTag}`,
+      `- Thời gian đăng Problem: ${args.scheduledAt}`,
+      args.existingContent ? `- Nội dung nháp/vấn đề admin nhập: ${args.existingContent}` : "",
+      args.internalNote ? `- Ghi chú nội bộ: ${args.internalNote}` : "",
+      "",
+      "Yêu cầu nội dung:",
+      "- Không copy nguyên văn bài nước ngoài. Có thể tham khảo insight/phương pháp học phổ biến bằng tiếng Anh, rồi viết lại thành bài gốc tiếng Việt theo giọng MindUp.",
+      "- Problem: đồng cảm, chạm nỗi đau, ví dụ đời thường, không giải pháp quá sâu, hẹn bài Learning Method.",
+      "- Learning Method: nhắc lại vấn đề, nêu phương pháp học, vì sao hiệu quả, cách áp dụng 3-5 bước, ví dụ cụ thể cho học sinh/phụ huynh.",
+      "- Chọn một phương pháp học phù hợp, ví dụ: Active Recall, Spaced Repetition, Feynman Technique, Pomodoro, Error Log, Interleaving, Self-explanation, Cornell Notes, Metacognition.",
+      "",
+      "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
+      JSON.stringify({
+        series: {
+          problem: "Khó khăn/nỗi đau chính",
+          method: "Tên phương pháp học được chọn",
+          audience: "Học sinh / Phụ huynh / Cả hai",
+          source_reference: "Tên ý tưởng/nguồn tiếng Anh tham khảo nếu có, không cần URL nếu không chắc",
+        },
+        problem_post: {
+          caption: "Caption bài Problem bằng tiếng Việt, có CTA và hẹn bài Learning Method sau đó.",
+          hashtags: ["#MindUp", "#VanDeHocTap", fanpageTag],
+          image_prompt: "Prompt tiếng Anh tạo ảnh 1:1 cho bài Problem, có logo/text MindUp, thể hiện nỗi đau học tập/phụ huynh, không nhiều chữ.",
+          internal_note: "Ghi chú nội bộ cho người kiểm tra bài Problem.",
+        },
+        learning_method_post: {
+          caption: "Caption bài Learning Method bằng tiếng Việt, giải đáp vấn đề bằng phương pháp học cụ thể.",
+          hashtags: ["#MindUp", "#LearningMethod", "#PhuongPhapHocTap", "#PhatTrienTuDuy", fanpageTag],
+          image_prompt: "Prompt tiếng Anh tạo ảnh 1:1 cho bài Learning Method, có logo/text MindUp, minh họa phương pháp học rõ ràng, hiện đại.",
+          internal_note: "Ghi chú nội bộ cho người kiểm tra bài Learning Method.",
+        },
+      }, null, 2),
+    ].filter(Boolean).join("\n");
+  }
+
   const defaultPrompt = [
     "Bạn là chuyên gia marketing giáo dục cho MindUp - Tư Duy Toàn Diện.",
     "Hãy tạo một bài đăng Facebook tự nhiên, rõ thông điệp, đúng tinh thần giáo dục, không sáo rỗng.",
@@ -488,6 +545,64 @@ async function generateTextDraft(prompt: string) {
     quoteSource: String(parsed?.quote_source || "").trim(),
     imagePrompt: String(parsed?.image_prompt || "").trim(),
     internalNote: String(parsed?.internal_note || "").trim(),
+  };
+}
+
+function normalizeDraftPart(value: unknown, fallbackTags: string[] = []) {
+  const record = (value && typeof value === "object" ? value : {}) as JsonRecord;
+  const hashtags = normalizeHashtags(record.hashtags);
+  for (const tag of fallbackTags) {
+    if (tag && !hashtags.includes(tag)) hashtags.push(tag);
+  }
+  if (!hashtags.includes("#MindUp")) hashtags.unshift("#MindUp");
+  return {
+    caption: String(record.caption || "").trim(),
+    hashtags,
+    imagePrompt: String(record.image_prompt || "").trim(),
+    internalNote: String(record.internal_note || "").trim(),
+  };
+}
+
+async function generateProblemLearningPairDraft(prompt: string) {
+  const apiKey = env("GEMINI_API_KEY");
+  if (!apiKey) throw new Error("Thiếu Supabase secret GEMINI_API_KEY.");
+
+  const model = env("GEMINI_TEXT_MODEL") || "gemini-2.5-pro";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.82,
+        response_mime_type: "application/json",
+      },
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error?.message || "Gemini text generation failed");
+
+  const text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("\n") || "";
+  const parsed = tryParseJson(text) as JsonRecord;
+  const series = (parsed.series && typeof parsed.series === "object" ? parsed.series : {}) as JsonRecord;
+  const problemPost = normalizeDraftPart(parsed.problem_post, ["#VanDeHocTap"]);
+  const learningPost = normalizeDraftPart(parsed.learning_method_post, ["#LearningMethod", "#PhuongPhapHocTap", "#PhatTrienTuDuy"]);
+
+  if (!problemPost.caption || !learningPost.caption) {
+    throw new Error("Gemini chưa trả đủ nội dung cho cả Problem và Learning Method.");
+  }
+
+  return {
+    model,
+    series: {
+      problem: String(series.problem || "").trim(),
+      method: String(series.method || "").trim(),
+      audience: String(series.audience || "").trim(),
+      sourceReference: String(series.source_reference || "").trim(),
+    },
+    problemPost,
+    learningPost,
   };
 }
 
@@ -650,12 +765,14 @@ async function loadPostBundle(postId: string) {
     post_type_id: string | null;
     scheduled_at: string;
     content: string | null;
+    image_url?: string | null;
     internal_note: string | null;
     task_id: string | null;
+    metadata?: JsonRecord | string | null;
     page?: { page_name?: string } | null;
     type?: { name?: string; description?: string | null; ai_prompt?: string | null } | null;
   }>>(
-    `facebook_scheduled_posts?id=eq.${encodeURIComponent(postId)}&select=id,page_id,post_type_id,scheduled_at,content,internal_note,task_id,page:facebook_pages(page_name),type:facebook_post_types(name,description,ai_prompt)&limit=1`,
+    `facebook_scheduled_posts?id=eq.${encodeURIComponent(postId)}&select=id,page_id,post_type_id,scheduled_at,content,image_url,internal_note,task_id,metadata,page:facebook_pages(page_name),type:facebook_post_types(name,description,ai_prompt)&limit=1`,
   );
   const post = rows[0];
   if (!post?.id) throw new Error("Không tìm thấy bài đăng Facebook.");
@@ -680,11 +797,110 @@ function mergeCaptionAndHashtags(caption: string, hashtags: string[]) {
   return [cleanCaption, tagLine].filter(Boolean).join("\n\n").slice(0, 6000);
 }
 
+function parseMetadata(value: unknown): JsonRecord {
+  if (!value) return {};
+  if (typeof value === "object") return value as JsonRecord;
+  try {
+    const parsed = JSON.parse(String(value));
+    return parsed && typeof parsed === "object" ? parsed as JsonRecord : {};
+  } catch {
+    return {};
+  }
+}
+
+async function findNextLearningMethodPost(problemPost: {
+  id: string;
+  page_id: string;
+  scheduled_at: string;
+}) {
+  const rows = await fetchJson<Array<{
+    id: string;
+    page_id: string;
+    post_type_id: string | null;
+    scheduled_at: string;
+    content: string | null;
+    image_url?: string | null;
+    internal_note: string | null;
+    task_id: string | null;
+    metadata?: JsonRecord | string | null;
+    page?: { page_name?: string } | null;
+    type?: { name?: string; description?: string | null; ai_prompt?: string | null } | null;
+  }>>(
+    [
+      "facebook_scheduled_posts",
+      `page_id=eq.${encodeURIComponent(problemPost.page_id)}`,
+      `scheduled_at=gt.${encodeURIComponent(problemPost.scheduled_at)}`,
+      "select=id,page_id,post_type_id,scheduled_at,content,image_url,internal_note,task_id,metadata,page:facebook_pages(page_name),type:facebook_post_types!inner(name,description,ai_prompt)",
+      "type.name=eq.Learning%20Method",
+      "order=scheduled_at.asc",
+      "limit=1",
+    ].join("&").replace("facebook_scheduled_posts&", "facebook_scheduled_posts?"),
+  );
+  return rows[0] || null;
+}
+
+async function generateImageWithFallback(args: {
+  pageName: string;
+  typeName: string;
+  caption: string;
+  imagePrompt: string;
+  textPrompt: string;
+}) {
+  let image;
+  let imageWarning = "";
+  try {
+    image = await generateImage(args.imagePrompt || args.textPrompt);
+  } catch (imageError) {
+    imageWarning = imageError instanceof Error ? imageError.message : String(imageError || "Gemini image failed");
+    image = buildFallbackImage({
+      pageName: args.pageName,
+      typeName: args.typeName,
+      caption: args.caption,
+      imagePrompt: args.imagePrompt || args.textPrompt,
+      imageError: imageWarning,
+    });
+  }
+  const uploaded = await uploadBytesToDrive(
+    image.bytes,
+    image.mimeType === "image/svg+xml" ? "mindup-facebook-ai-fallback.svg" : "mindup-facebook-ai.png",
+    image.mimeType,
+  );
+  return {
+    image,
+    imageWarning,
+    imageUrl: uploaded.lh3Url || uploaded.url,
+  };
+}
+
+function buildPairMetadata(args: {
+  existing: JsonRecord;
+  pairId: string;
+  role: "problem" | "learning_method";
+  linkedPostId: string;
+  series: { problem: string; method: string; audience: string; sourceReference: string };
+}) {
+  return {
+    ...args.existing,
+    series: {
+      type: "problem_learning_method",
+      pair_id: args.pairId,
+      role: args.role,
+      linked_post_id: args.linkedPostId,
+      problem: args.series.problem,
+      method: args.series.method,
+      audience: args.series.audience,
+      source_reference: args.series.sourceReference,
+      updated_at: new Date().toISOString(),
+    },
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   let postId = "";
+  let linkedPostId = "";
   try {
     const { user } = await requireAuthenticatedUser(req);
     const role = await getUserRole(user.id);
@@ -710,6 +926,119 @@ Deno.serve(async (req) => {
       existingContent: post.content || "",
       internalNote: post.internal_note || "",
     });
+
+    if (isProblemType(post.type?.name || "")) {
+      const linkedPost = await findNextLearningMethodPost(post);
+      if (!linkedPost?.id) {
+        throw new Error("Chưa có bài Learning Method nào sau bài Problem này trong cùng fanpage. Hãy tạo lịch Learning Method trước, rồi bấm Gemini lại.");
+      }
+      linkedPostId = linkedPost.id;
+      await patchJson(`facebook_scheduled_posts?id=eq.${encodeURIComponent(linkedPost.id)}`, {
+        ai_status: "generating",
+        ai_error: null,
+        updated_at: new Date().toISOString(),
+      });
+
+      const pairDraft = await generateProblemLearningPairDraft(textPrompt);
+      const pairId = crypto.randomUUID();
+      const problemContent = mergeCaptionAndHashtags(pairDraft.problemPost.caption, pairDraft.problemPost.hashtags);
+      const learningContent = mergeCaptionAndHashtags(pairDraft.learningPost.caption, pairDraft.learningPost.hashtags);
+      const [problemImage, learningImage] = await Promise.all([
+        generateImageWithFallback({
+          pageName: post.page?.page_name || post.page_id,
+          typeName: post.type?.name || "Problem",
+          caption: problemContent,
+          imagePrompt: pairDraft.problemPost.imagePrompt,
+          textPrompt,
+        }),
+        generateImageWithFallback({
+          pageName: linkedPost.page?.page_name || post.page?.page_name || linkedPost.page_id,
+          typeName: linkedPost.type?.name || "Learning Method",
+          caption: learningContent,
+          imagePrompt: pairDraft.learningPost.imagePrompt,
+          textPrompt,
+        }),
+      ]);
+
+      const problemNote = [
+        pairDraft.problemPost.internalNote,
+        pairDraft.series.problem ? `Vấn đề: ${pairDraft.series.problem}` : "",
+        pairDraft.series.method ? `Phương pháp giải đáp: ${pairDraft.series.method}` : "",
+        pairDraft.series.audience ? `Đối tượng: ${pairDraft.series.audience}` : "",
+        pairDraft.series.sourceReference ? `Nguồn/ý tưởng tham khảo: ${pairDraft.series.sourceReference}` : "",
+        problemImage.imageWarning ? `Lưu ý hệ thống: Gemini tạo ảnh Problem bị lỗi/quota, đã dùng ảnh fallback MindUp. Chi tiết: ${problemImage.imageWarning}` : "",
+        post.internal_note,
+      ].filter(Boolean).join("\n\n").trim() || null;
+      const learningNote = [
+        pairDraft.learningPost.internalNote,
+        pairDraft.series.problem ? `Giải đáp cho vấn đề: ${pairDraft.series.problem}` : "",
+        pairDraft.series.method ? `Phương pháp: ${pairDraft.series.method}` : "",
+        pairDraft.series.audience ? `Đối tượng: ${pairDraft.series.audience}` : "",
+        pairDraft.series.sourceReference ? `Nguồn/ý tưởng tham khảo: ${pairDraft.series.sourceReference}` : "",
+        learningImage.imageWarning ? `Lưu ý hệ thống: Gemini tạo ảnh Learning Method bị lỗi/quota, đã dùng ảnh fallback MindUp. Chi tiết: ${learningImage.imageWarning}` : "",
+        linkedPost.internal_note,
+      ].filter(Boolean).join("\n\n").trim() || null;
+
+      const [problemRows, learningRows] = await Promise.all([
+        patchJson<Array<JsonRecord>>(`facebook_scheduled_posts?id=eq.${encodeURIComponent(postId)}`, {
+          content: problemContent,
+          image_url: problemImage.imageUrl,
+          internal_note: problemNote,
+          metadata: buildPairMetadata({
+            existing: parseMetadata(post.metadata),
+            pairId,
+            role: "problem",
+            linkedPostId: linkedPost.id,
+            series: pairDraft.series,
+          }),
+          status: "draft",
+          content_status: "submitted",
+          approval_status: "pending",
+          ai_status: "drafted",
+          ai_generated_at: new Date().toISOString(),
+          ai_model: `${pairDraft.model}; ${problemImage.image.model}`,
+          ai_prompt: textPrompt,
+          ai_image_prompt: problemImage.image.imagePrompt,
+          ai_image_url: problemImage.imageUrl,
+          ai_error: problemImage.imageWarning || null,
+          updated_at: new Date().toISOString(),
+        }),
+        patchJson<Array<JsonRecord>>(`facebook_scheduled_posts?id=eq.${encodeURIComponent(linkedPost.id)}`, {
+          content: learningContent,
+          image_url: learningImage.imageUrl,
+          internal_note: learningNote,
+          metadata: buildPairMetadata({
+            existing: parseMetadata(linkedPost.metadata),
+            pairId,
+            role: "learning_method",
+            linkedPostId: postId,
+            series: pairDraft.series,
+          }),
+          status: "draft",
+          content_status: "submitted",
+          approval_status: "pending",
+          ai_status: "drafted",
+          ai_generated_at: new Date().toISOString(),
+          ai_model: `${pairDraft.model}; ${learningImage.image.model}`,
+          ai_prompt: textPrompt,
+          ai_image_prompt: learningImage.image.imagePrompt,
+          ai_image_url: learningImage.imageUrl,
+          ai_error: learningImage.imageWarning || null,
+          updated_at: new Date().toISOString(),
+        }),
+      ]);
+
+      return jsonResponse({
+        ok: true,
+        post: problemRows?.[0] || null,
+        related_post: learningRows?.[0] || null,
+        pair_id: pairId,
+        image_url: problemImage.imageUrl,
+        related_image_url: learningImage.imageUrl,
+        image_fallback: Boolean(problemImage.imageWarning || learningImage.imageWarning),
+        image_warning: [problemImage.imageWarning, learningImage.imageWarning].filter(Boolean).join("\n"),
+      });
+    }
 
     const draft = await generateTextDraft(textPrompt);
     const mondayDisplayText = isMondayMindset(post.type?.name || "") && draft.quoteVi
@@ -772,6 +1101,13 @@ Deno.serve(async (req) => {
     console.error(error);
     if (postId) {
       await patchJson(`facebook_scheduled_posts?id=eq.${encodeURIComponent(postId)}`, {
+        ai_status: "error",
+        ai_error: error instanceof Error ? error.message : String(error || "Gemini failed"),
+        updated_at: new Date().toISOString(),
+      }).catch(() => {});
+    }
+    if (linkedPostId) {
+      await patchJson(`facebook_scheduled_posts?id=eq.${encodeURIComponent(linkedPostId)}`, {
         ai_status: "error",
         ai_error: error instanceof Error ? error.message : String(error || "Gemini failed"),
         updated_at: new Date().toISOString(),

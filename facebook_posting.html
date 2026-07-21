@@ -419,10 +419,22 @@ const DEFAULT_PAGES = [
   { page_id: "1163066643562080", page_name: "MindUp - Tư Duy Sinh Học", page_url: "https://www.facebook.com/1163066643562080" },
 ];
 const DEFAULT_TYPES = [
-  "Learning Method", "Monday Mindset", "Hard Quiz with Prize", "Q&A", "Meme",
+  "Problem", "Learning Method", "Monday Mindset", "Hard Quiz with Prize", "Q&A", "Meme",
   "Teaching Philosophy", "Enrollment", "Quiz", "Bài hay", "Lỗi sai thường gặp"
 ];
 const DEFAULT_TYPE_PROMPTS = {
+  "Problem": `Loại bài Problem dùng để mở đầu chuỗi Problem → Learning Method.
+- Nêu một khó khăn thật của học sinh hoặc phụ huynh khi học, tự học hoặc kèm con học.
+- Viết đúng kiểu đồng cảm, chạm nỗi đau, có ví dụ đời thường.
+- Không giải đáp hết ở bài Problem; chỉ gợi mở và hẹn bài Learning Method sau đó.
+- Khi bấm Gemini ở bài Problem, hệ thống sẽ tự tìm bài Learning Method gần nhất sau bài này của cùng fanpage và tạo cả 2 bài cùng lúc.
+- Caption Problem cần có CTA hỏi phụ huynh/học sinh có đang gặp tình trạng này không.
+- Hashtag gợi ý: #MindUp #VanDeHocTap #PhuHuynh #HocSinh.`,
+  "Learning Method": `Loại bài Learning Method dùng để giải đáp một bài Problem trước đó.
+- Chia sẻ một phương pháp học tập khớp với vấn đề đã nêu.
+- Nên tham khảo các ý tưởng/quy tắc học tập phổ biến từ nguồn tiếng Anh, nhưng viết lại thành bài gốc bằng tiếng Việt theo giọng MindUp; không copy nguyên văn.
+- Bài cần có: vấn đề, phương pháp, vì sao hiệu quả, cách áp dụng 3-5 bước, ví dụ cụ thể.
+- Hashtag gợi ý: #MindUp #LearningMethod #PhuongPhapHocTap #PhatTrienTuDuy.`,
   "Monday Mindset": `Loại bài Monday Mindset dùng workflow riêng:
 - Hệ thống tự xác định tuần ISO trong năm.
 - Tuần 1-50: lấy nội dung Jon Gordon theo số tuần và offset từng fanpage:
@@ -575,10 +587,23 @@ async function ensureDefaultRows(){
       created_by: S.profile.id
     })));
   } else if (S.profile?.role === "admin") {
-    const mondayType = (types || []).find(row => String(row.name || "").trim().toLowerCase() === "monday mindset");
-    const mondayPrompt = DEFAULT_TYPE_PROMPTS["Monday Mindset"];
-    if (mondayType?.id && String(mondayType.ai_prompt || "").trim() !== mondayPrompt.trim()) {
-      await sb.from("facebook_post_types").update({ ai_prompt: mondayPrompt }).eq("id", mondayType.id);
+    const existingNames = new Set((types || []).map(row => String(row.name || "").trim().toLowerCase()));
+    const missingTypes = DEFAULT_TYPES.filter(name => !existingNames.has(name.trim().toLowerCase()));
+    if (missingTypes.length) {
+      await sb.from("facebook_post_types").insert(missingTypes.map((name, i) => ({
+        name,
+        description: "",
+        ai_prompt: DEFAULT_TYPE_PROMPTS[name] || null,
+        color: ["#0ea5e9","#c8962a","#2563eb","#16a34a","#dc2626","#9333ea"][i % 6],
+        is_active: true,
+        created_by: S.profile.id
+      })));
+    }
+    for (const [name, prompt] of Object.entries(DEFAULT_TYPE_PROMPTS)) {
+      const row = (types || []).find(item => String(item.name || "").trim().toLowerCase() === name.trim().toLowerCase());
+      if (row?.id && String(row.ai_prompt || "").trim() !== prompt.trim()) {
+        await sb.from("facebook_post_types").update({ ai_prompt: prompt }).eq("id", row.id);
+      }
     }
   }
 }
@@ -1833,7 +1858,10 @@ async function generateGeminiDraft(){
     $("aiDraftStatus").textContent = `${aiStatusLabel(post.ai_status || "drafted")} • ${approvalStatusLabel(post.approval_status || "pending")}`;
     $("postCharCount").textContent = String(($("postContent").value || "").length);
     updateImagePreview();
-    showPostStatus("ok", "Gemini đã tạo draft bài đăng. Người được giao hãy kiểm tra rồi bấm Xác nhận bài ổn.");
+    const pairedText = data.related_post
+      ? ` Gemini cũng đã tạo luôn bài Learning Method đi kèm: ${data.related_post.scheduled_at ? formatDateTime(new Date(data.related_post.scheduled_at)) : ""}.`
+      : "";
+    showPostStatus("ok", `Gemini đã tạo draft bài đăng.${pairedText} Người được giao hãy kiểm tra rồi bấm Xác nhận bài ổn.`);
     await loadData();
   } catch (error) {
     $("aiDraftStatus").textContent = `AI lỗi: ${error.message || String(error)}`;
