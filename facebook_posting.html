@@ -303,32 +303,6 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
         </div>
         <div class="hint" id="aiDraftStatus">Chưa tạo bằng AI.</div>
       </div>
-      <div class="meta-ai-box">
-        <div class="meta-ai-head">
-          <div>
-            <strong>Meta AI hỗ trợ soạn bài</strong>
-            <div class="meta-ai-small">Bấm Mở Meta AI để hệ thống tự tạo và copy prompt. Sau đó dán kết quả Meta AI về đây để đưa vào caption.</div>
-          </div>
-          <div class="meta-ai-actions">
-            <button class="btn btn-gold" id="openMetaAiBtn" type="button">Mở Meta AI</button>
-          </div>
-        </div>
-        <div class="meta-ai-grid">
-          <div class="field" style="margin-bottom:0">
-            <label>Prompt gửi Meta AI</label>
-            <textarea class="textarea" id="metaAiPrompt" placeholder="Bấm Tạo prompt để sinh prompt cho Meta AI..."></textarea>
-          </div>
-          <div class="field" style="margin-bottom:0">
-            <label>Kết quả Meta AI</label>
-            <textarea class="textarea" id="metaAiResult" placeholder="Dán kết quả Meta AI vào đây..."></textarea>
-          </div>
-        </div>
-        <div class="meta-ai-actions">
-          <button class="btn btn-primary" id="applyMetaResultBtn" type="button">Đưa kết quả vào nội dung bài</button>
-          <button class="btn btn-outline" id="appendMetaResultBtn" type="button">Chèn thêm vào cuối nội dung</button>
-          <button class="btn btn-outline" id="copyImageIdeaBtn" type="button">Copy gợi ý ảnh + mở ChatGPT</button>
-        </div>
-      </div>
       <div class="grid2">
         <div class="field"><label>Link đính kèm (tuỳ chọn)</label><input class="input" id="postLinkUrl" type="url" placeholder="https://mindup.edu.vn/..."></div>
         <div class="field"><label>Ảnh URL công khai</label><input class="input" id="postImageUrl" type="url" placeholder="https://.../image.jpg"></div>
@@ -1000,201 +974,6 @@ function buildQuizCaption(){
 function currentPostTypeName(){
   return typeName($("postType")?.value || "");
 }
-function currentPostTypeDescription(){
-  return typeById($("postType")?.value || "")?.description || "";
-}
-function currentPostTypeAiPrompt(){
-  return typeById($("postType")?.value || "")?.ai_prompt || "";
-}
-function metaAiToneForType(type){
-  const t = String(type || "").toLowerCase();
-  if (t.includes("quiz")) return "Tò mò, thử thách, ngắn gọn, kích thích học sinh bình luận đáp án.";
-  if (t.includes("meme")) return "Vui, gần gũi với học sinh, thông minh nhưng không phản cảm.";
-  if (t.includes("enrollment") || t.includes("tuyển sinh")) return "Rõ lợi ích, tạo động lực đăng ký học thử, không quá sales.";
-  if (t.includes("method") || t.includes("phương pháp")) return "Chia sẻ phương pháp học dễ áp dụng, thực tế, có ví dụ.";
-  if (t.includes("mindset")) return "Truyền động lực, tích cực, ngắn gọn, hợp đầu tuần.";
-  if (t.includes("philosophy") || t.includes("triết")) return "Sâu sắc, phụ huynh đọc thấy tin tưởng, học sinh đọc thấy được đồng hành.";
-  return "Ấm áp, thông minh, gần gũi, đúng tinh thần giáo dục của MindUp.";
-}
-function metaAiOutputRules(type){
-  const t = String(type || "").toLowerCase();
-  const rules = [
-    "Viết bằng tiếng Việt tự nhiên.",
-    "Không dùng giọng văn sáo rỗng, không quá nhiều emoji.",
-    "Caption nên dễ đọc trên Facebook, chia đoạn ngắn.",
-    "Cuối bài có lời kêu gọi bình luận/nhắn tin phù hợp.",
-    "Thêm hashtag: #MindUp #Quiz #PhatTrienTuDuy nếu phù hợp; nếu không phải Quiz vẫn giữ #MindUp #PhatTrienTuDuy."
-  ];
-  if (t.includes("quiz") && !t.includes("hard")) {
-    rules.push("Nếu là bài Quiz, hãy tạo câu hỏi ngắn, 2-4 đáp án, chỉ rõ đáp án đúng ở phần GHI CHÚ NỘI BỘ, nhưng caption không lộ đáp án.");
-  }
-  if (t.includes("hard")) {
-    rules.push("Nếu là Hard Quiz, câu hỏi phải khó hơn, có yếu tố thử thách/giải thưởng, caption không lộ đáp án.");
-  }
-  return rules;
-}
-function buildMetaAiPrompt(){
-  const page = currentPage();
-  const type = currentPostTypeName();
-  const scheduled = fromDateTimeLocal($("postScheduledAt").value);
-  const existingContent = $("postContent").value.trim();
-  const internalNote = $("postInternalNote").value.trim();
-  const typeDescription = currentPostTypeDescription();
-  const typeAiPrompt = currentPostTypeAiPrompt();
-  const prompt = [
-    "Bạn là trợ lý marketing nội dung cho trung tâm MindUp - Tư Duy Toàn Diện.",
-    "Hãy soạn nháp một bài đăng Facebook theo thông tin sau:",
-    "",
-    `Fanpage: ${page.page_name}`,
-    `Loại bài: ${type}`,
-    `Thời gian dự kiến đăng: ${scheduled ? formatDateTime(scheduled) : "Chưa rõ"}`,
-    typeDescription ? `Mô tả/format loại bài: ${typeDescription}` : "",
-    typeAiPrompt ? `Prompt riêng của loại bài:\n${typeAiPrompt}` : "",
-    internalNote ? `Ghi chú/mục tiêu nội bộ: ${internalNote}` : "",
-    existingContent ? `Nội dung nháp hiện có cần cải thiện:\n${existingContent}` : "",
-    "",
-    "Giọng văn mong muốn:",
-    metaAiToneForType(type),
-    "",
-    "Yêu cầu đầu ra:",
-    ...metaAiOutputRules(type).map(rule => `- ${rule}`),
-    "",
-    "Trả lời theo đúng format này để tôi copy về hệ thống:",
-    "CAPTION:",
-    "[caption hoàn chỉnh]",
-    "",
-    "GỢI Ý ẢNH:",
-    "[mô tả ảnh/visual nên dùng, nếu có]",
-    "",
-    "GHI CHÚ NỘI BỘ:",
-    "[đáp án đúng, lưu ý đăng bài, hoặc để trống nếu không có]"
-  ].filter(Boolean).join("\n");
-  $("metaAiPrompt").value = prompt;
-  return prompt;
-}
-async function copyMetaAiPrompt(){
-  const prompt = $("metaAiPrompt").value.trim() || buildMetaAiPrompt();
-  try {
-    await navigator.clipboard.writeText(prompt);
-    showPostStatus("ok", "Đã copy prompt. Hãy mở Meta AI, dán prompt rồi copy kết quả về ô Kết quả Meta AI.");
-  } catch (error) {
-    $("metaAiPrompt").select();
-    showPostStatus("info", "Không tự copy được. Mình đã chọn sẵn prompt, bạn bấm Ctrl+C để copy.");
-  }
-}
-async function openMetaAiWithPrompt(){
-  const prompt = $("metaAiPrompt").value.trim() || buildMetaAiPrompt();
-  let copied = false;
-  try {
-    await navigator.clipboard.writeText(prompt);
-    copied = true;
-  } catch (error) {
-    $("metaAiPrompt").select();
-  }
-  window.open("https://www.meta.ai/", "_blank", "noopener");
-  showPostStatus(copied ? "ok" : "info", copied
-    ? "Đã tạo và copy prompt. Meta AI đã mở ở tab mới, bạn chỉ cần Ctrl+V."
-    : "Đã tạo prompt và mở Meta AI. Trình duyệt không cho copy tự động, bạn bấm Ctrl+C ở ô prompt rồi dán sang Meta AI.");
-}
-function extractMetaSection(text, name){
-  return parseMetaAiSections(text)[normalizeMetaHeading(name)] || "";
-}
-function normalizeMetaHeading(value){
-  return String(value || "")
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[*_`#:\-]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toUpperCase();
-}
-function parseMetaAiSections(text){
-  const sections = {};
-  let current = "";
-  const lines = String(text || "").replace(/\r/g, "").split("\n");
-  const aliases = new Map([
-    ["CAPTION", "CAPTION"],
-    ["NOI DUNG", "CAPTION"],
-    ["NOI DUNG BAI VIET", "CAPTION"],
-    ["GOI Y ANH", "GỢI Ý ẢNH"],
-    ["GOI Y HINH ANH", "GỢI Ý ẢNH"],
-    ["GHI CHU NOI BO", "GHI CHÚ NỘI BỘ"],
-    ["GHI CHU", "GHI CHÚ NỘI BỘ"],
-  ]);
-  for (const line of lines) {
-    const colonIndex = String(line).search(/[:：]/);
-    const headingRaw = colonIndex >= 0 ? String(line).slice(0, colonIndex) : line;
-    const heading = normalizeMetaHeading(headingRaw);
-    const key = aliases.get(heading);
-    if (key) {
-      current = normalizeMetaHeading(key);
-      if (!sections[current]) sections[current] = "";
-      const inlineContent = colonIndex >= 0 ? String(line).slice(colonIndex + 1).replace(/^[\s*_`#-]+|[\s*_`#-]+$/g, "").trim() : "";
-      if (inlineContent) sections[current] = `${sections[current] ? `${sections[current]}\n` : ""}${inlineContent}`;
-      continue;
-    }
-    if (current) sections[current] = `${sections[current] ? `${sections[current]}\n` : ""}${line}`;
-  }
-  Object.keys(sections).forEach(key => sections[key] = sections[key].trim());
-  return sections;
-}
-function cleanMetaAiResult(text){
-  const source = String(text || "").trim();
-  const caption = extractMetaSection(source, "CAPTION");
-  return (caption || source)
-    .replace(/^```(?:text|markdown)?/i, "")
-    .replace(/```$/i, "")
-    .trim();
-}
-function buildChatGptImagePrompt(imageIdea){
-  const page = currentPage();
-  const type = currentPostTypeName();
-  const content = $("postContent").value.trim() || cleanMetaAiResult($("metaAiResult").value);
-  return [
-    "Hãy giúp tôi tạo prompt thiết kế ảnh cho bài đăng Facebook của MindUp - Tư Duy Toàn Diện.",
-    "",
-    `Fanpage: ${page.page_name}`,
-    `Loại bài: ${type}`,
-    "",
-    "Gợi ý ảnh từ Meta AI:",
-    imageIdea,
-    "",
-    content ? `Caption/nội dung bài:\n${content}` : "",
-    "",
-    "Yêu cầu ảnh:",
-    "- Phong cách giáo dục hiện đại, sáng sủa, màu xanh MindUp, dễ nhìn trên Facebook.",
-    "- Bố cục rõ, ít chữ, tập trung vào ý chính.",
-    "- Nếu là Quiz, ảnh phải có câu hỏi/đáp án rõ ràng, không lộ đáp án đúng.",
-    "- Trả về prompt ảnh chi tiết bằng tiếng Việt, có gợi ý kích thước vuông 1:1."
-  ].filter(Boolean).join("\n");
-}
-async function copyImageIdeaAndOpenChatGpt(){
-  const raw = $("metaAiResult").value;
-  const imageIdea = extractMetaSection(raw, "GỢI Ý ẢNH") || extractMetaSection(raw, "GOI Y ANH");
-  if (!imageIdea) return alert("Chưa thấy phần GỢI Ý ẢNH trong kết quả Meta AI.");
-  const prompt = buildChatGptImagePrompt(imageIdea);
-  let copied = false;
-  try {
-    await navigator.clipboard.writeText(prompt);
-    copied = true;
-  } catch (error) {
-    $("metaAiPrompt").value = prompt;
-    $("metaAiPrompt").select();
-  }
-  window.open("https://chatgpt.com/", "_blank", "noopener");
-  showPostStatus(copied ? "ok" : "info", copied
-    ? "Đã copy prompt gợi ý ảnh và mở ChatGPT ở tab mới."
-    : "Đã tạo prompt gợi ý ảnh và mở ChatGPT. Trình duyệt không cho copy tự động, bạn bấm Ctrl+C ở ô prompt.");
-}
-function setPostContentFromMeta(mode="replace"){
-  const result = cleanMetaAiResult($("metaAiResult").value);
-  if (!result) return alert("Vui lòng dán kết quả Meta AI trước.");
-  const current = $("postContent").value.trim();
-  $("postContent").value = mode === "append" && current ? `${current}\n\n${result}` : result;
-  $("postCharCount").textContent = String($("postContent").value.length);
-  const note = extractMetaSection($("metaAiResult").value, "GHI CHÚ NỘI BỘ") || extractMetaSection($("metaAiResult").value, "GHI CHU NOI BO");
-  if (note && !$("postInternalNote").value.trim()) $("postInternalNote").value = note;
-  showPostStatus("ok", "Đã đưa kết quả Meta AI vào nội dung bài. Bạn có thể sửa lại rồi lưu/hẹn lịch.");
-}
 async function previewQuizImage(){
   try {
     const dataUrl = await buildQuizImageDataUrl();
@@ -1417,8 +1196,6 @@ function openPostModal(id="", defaults={}){
     : "Chưa tạo bằng AI.";
   $("aiDraftStatus").textContent = aiText;
   $("postCharCount").textContent = String(($("postContent").value || "").length);
-  $("metaAiPrompt").value = "";
-  $("metaAiResult").value = "";
   $("quizQuestion").value = "";
   $("quizCorrectAnswer").value = "";
   $("quizAnswerCount").value = "4";
@@ -1856,13 +1633,8 @@ function bindEvents(){
   $("generateGeminiDraftBtn").addEventListener("click", generateGeminiDraft);
   $("approvePostBtn").addEventListener("click", approveCurrentPost);
   $("postContent").addEventListener("input", () => $("postCharCount").textContent = String($("postContent").value.length));
-  $("postType").addEventListener("change", () => { toggleQuizBuilder(); $("metaAiPrompt").value = ""; });
-  $("openMetaAiBtn").addEventListener("click", openMetaAiWithPrompt);
-  $("applyMetaResultBtn").addEventListener("click", () => setPostContentFromMeta("replace"));
-  $("appendMetaResultBtn").addEventListener("click", () => setPostContentFromMeta("append"));
-  $("copyImageIdeaBtn").addEventListener("click", copyImageIdeaAndOpenChatGpt);
+  $("postType").addEventListener("change", toggleQuizBuilder);
   $("postContent").addEventListener("paste", handlePostImagePaste);
-  $("metaAiResult").addEventListener("paste", handlePostImagePaste);
   $("postImageUrl").addEventListener("input", updateImagePreview);
   $("postImageFile").addEventListener("change", ev => uploadFile(ev.target.files?.[0]).catch(e => showPostStatus("err", e.message || String(e))));
   $("quizAnswerCount").addEventListener("change", renderQuizAnswerFields);
