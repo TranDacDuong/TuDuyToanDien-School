@@ -171,6 +171,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
           <div class="toolbar-right">
             <button class="btn btn-outline" id="openPageBtn" type="button">Mở fanpage</button>
             <button class="btn btn-gold" id="copyPrevWeekBtn" type="button">Tạo giống tuần trước</button>
+            <button class="btn btn-gold" id="generateWeekDraftsBtn" type="button">Tạo nội dung bài đăng cho tuần này</button>
           </div>
         </div>
 
@@ -2224,6 +2225,108 @@ async function generateGeminiDraft(){
   }
 }
 
+function updateLocalPostsFromGemini(data){
+  const rows = [data?.post, data?.related_post].filter(row => row?.id);
+  if (!rows.length) return;
+  const byId = new Map(rows.map(row => [String(row.id), row]));
+  S.posts = S.posts.map(post => byId.has(String(post.id)) ? { ...post, ...byId.get(String(post.id)) } : post);
+}
+async function finalizeGeneratedPostForBatch(post, data){
+  let row = data?.post || post;
+  if (isMondayMindsetType(row?.post_type_id)) {
+    row = await replaceMondayMindsetImageWithTemplate(row);
+    const mondayContent = buildMondayMindsetCaption();
+    const { data: saved, error } = await sb.from("facebook_scheduled_posts")
+      .update({
+        content: mondayContent,
+        status: "draft",
+        content_status: "submitted",
+        approval_status: "pending",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", row.id)
+      .select("*")
+      .single();
+    if (error) throw error;
+    row = saved || { ...row, content: mondayContent, status: "draft" };
+  }
+  return row;
+}
+async function generateDraftForExistingPost(post){
+  if (!post?.id) throw new Error("Thiếu bài đăng cần tạo nội dung.");
+  await sb.from("facebook_scheduled_posts")
+    .update({ ai_status: "generating", ai_error: null, updated_at: new Date().toISOString() })
+    .eq("id", post.id);
+  const data = await callFacebookAiDraftFunction({ post_id: post.id });
+  const mainPost = await finalizeGeneratedPostForBatch(post, data);
+  data.post = mainPost || data.post;
+  updateLocalPostsFromGemini(data);
+  return data;
+}
+async function generateWeekDrafts(){
+  const btn = $("generateWeekDraftsBtn");
+  const oldText = btn.textContent;
+  const weekStart = dateKey(S.weekStart);
+  const weekEnd = dateKey(addDays(S.weekStart, 6));
+  const initialTargets = S.posts
+    .filter(post =>
+      post.page_id === S.activePageId
+      && post.scheduled_date >= weekStart
+      && post.scheduled_date <= weekEnd
+      && !["scheduled", "published", "cancelled"].includes(String(post.status || ""))
+      && !postHasContent(post)
+    )
+    .sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
+  if (!initialTargets.length) {
+    showStatus("info", "Tuần này không còn bài đăng trống nào cần Gemini tạo nội dung.");
+    return;
+  }
+  const errors = [];
+  let done = 0;
+  let skipped = 0;
+  try {
+    btn.disabled = true;
+    $("copyPrevWeekBtn").disabled = true;
+    showStatus("info", `Bắt đầu tạo ${initialTargets.length} bài đăng bằng Gemini. Hệ thống sẽ chạy từng bài một và tự lưu nháp.`);
+    for (const target of initialTargets) {
+      const current = S.posts.find(post => String(post.id) === String(target.id)) || target;
+      if (postHasContent(current) || ["scheduled", "published", "cancelled"].includes(String(current.status || ""))) {
+        skipped += 1;
+        continue;
+      }
+      done += 1;
+      const label = `${typeName(current.post_type_id)} • ${formatDateTime(new Date(current.scheduled_at))}`;
+      btn.textContent = `Đang tạo ${done}/${initialTargets.length}...`;
+      showStatus("info", `Đang tạo ${done}/${initialTargets.length}: ${label}`);
+      try {
+        const data = await generateDraftForExistingPost(current);
+        if (data?.related_post) {
+          showStatus("info", `Đã tạo ${done}/${initialTargets.length}: ${label}. Gemini cũng đã tạo bài Learning Method đi kèm.`);
+        }
+      } catch (error) {
+        errors.push(`${label}: ${error.message || String(error)}`);
+        await sb.from("facebook_scheduled_posts")
+          .update({ status: "error", ai_status: "error", ai_error: error.message || String(error), updated_at: new Date().toISOString() })
+          .eq("id", current.id);
+      }
+      renderWeeklyCalendar();
+      renderTodo();
+    }
+    await loadData();
+    const successCount = done - errors.length;
+    const skippedText = skipped ? ` (${skipped} bài đã được tạo/cập nhật kèm bài khác nên bỏ qua).` : "";
+    if (errors.length) {
+      showStatus("err", `Đã tạo xong ${successCount}/${initialTargets.length} bài.${skippedText} Có ${errors.length} bài lỗi:\n${errors.slice(0, 5).join("\n")}${errors.length > 5 ? "\n..." : ""}`);
+    } else {
+      showStatus("ok", `Đã tạo và lưu nháp xong ${successCount}/${initialTargets.length} bài đăng cho tuần này.${skippedText}`);
+    }
+  } finally {
+    btn.disabled = false;
+    $("copyPrevWeekBtn").disabled = false;
+    btn.textContent = oldText;
+  }
+}
+
 async function approveCurrentPost(){
   const id = $("postId").value;
   if (!id) return alert("Vui lòng lưu nháp hoặc tạo bài trước khi xác nhận.");
@@ -2343,6 +2446,7 @@ function bindEvents(){
   $("weekStartInput").addEventListener("change", () => { const d = new Date($("weekStartInput").value); if(!Number.isNaN(d)) { S.weekStart = startOfWeek(d); loadData(); }});
   $("openPageBtn").addEventListener("click", () => window.open(currentPage().page_url || `https://www.facebook.com/${currentPage().page_id}`, "_blank", "noopener"));
   $("copyPrevWeekBtn").addEventListener("click", () => copyPreviousWeekSchedule({ silent:false }).catch(error => alert(error.message || String(error))));
+  $("generateWeekDraftsBtn").addEventListener("click", () => generateWeekDrafts().catch(error => showStatus("err", error.message || String(error))));
   $("closeTemplateModalBtn")?.addEventListener("click", closeTemplateModal);
   $("saveTemplateBtn")?.addEventListener("click", saveTemplate);
   $("deleteTemplateBtn")?.addEventListener("click", deleteTemplate);
