@@ -329,22 +329,14 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
           <img id="hardQuizImagePreview" class="quiz-preview" alt="Xem trước ảnh Hỏi nhanh đớp trọn">
         </div>
       </div>
-      <div class="workflow-box" id="mondayAnnouncementBuilder">
-        <label class="inline-check"><input id="mondayAnnounceHardQuiz" type="checkbox"> Công bố kết quả Hỏi nhanh đớp trọn trong bài Monday Mindset</label>
-        <div class="grid2">
-          <div class="field"><label>Tên người trúng thưởng</label><input class="input" id="mondayWinnerName" placeholder="Ví dụ: Nguyễn Văn A"></div>
-          <div class="field"><label>Đáp án đúng</label><input class="input" id="mondayCorrectAnswer" placeholder="Đáp án của Hard Quiz"></div>
-        </div>
-        <div class="grid2">
-          <div class="field"><label>Kết quả XSMB</label><input class="input" id="mondayXsmbResult" placeholder="Ví dụ: giải Đặc biệt 12345 hoặc 45"></div>
-          <div class="field"><label>Kết quả/dự đoán của người thắng</label><input class="input" id="mondayWinnerGuess" placeholder="Ví dụ: dự đoán 46, lệch 1 số"></div>
-        </div>
-        <div class="field"><label>Nội dung công bố sẽ chèn vào caption</label><textarea class="textarea" id="mondayAnnouncementText" style="min-height:140px"></textarea></div>
-        <div class="toolbar" style="margin-bottom:0">
-          <div class="toolbar-left">
-            <button class="btn btn-gold" type="button" id="insertMondayAnnouncementBtn">Chèn/cập nhật công bố vào caption</button>
-          </div>
-        </div>
+      <div id="mondayAnnouncementBuilder" style="display:none">
+        <input id="mondayAnnounceHardQuiz" type="checkbox">
+        <input id="mondayWinnerName">
+        <input id="mondayCorrectAnswer">
+        <input id="mondayXsmbResult">
+        <input id="mondayWinnerGuess">
+        <textarea id="mondayAnnouncementText"></textarea>
+        <button id="insertMondayAnnouncementBtn" type="button"></button>
       </div>
       <div class="field">
         <label>Nội dung bài viết</label>
@@ -364,17 +356,15 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
         </div>
         <div class="hint" id="aiDraftStatus">Chưa tạo bằng AI.</div>
       </div>
-      <div class="grid2">
-        <div class="field"><label>Link đính kèm (tuỳ chọn)</label><input class="input" id="postLinkUrl" type="url" placeholder="https://mindup.edu.vn/..."></div>
-        <div class="field"><label>Ảnh URL công khai</label><input class="input" id="postImageUrl" type="url" placeholder="https://.../image.jpg"></div>
-      </div>
+      <input id="postLinkUrl" type="hidden">
+      <input id="postImageUrl" type="hidden">
       <div class="dropzone" id="imageDropzone" tabindex="0">
         <strong>Ảnh bài đăng</strong>
         <div class="hint">Chọn file hoặc Ctrl+V ảnh vào khu vực này. Ảnh sẽ upload lên Drive rồi dùng URL công khai để đăng Facebook.</div>
         <input id="postImageFile" type="file" accept="image/*" style="margin-top:10px">
         <img id="imagePreview" class="image-preview" alt="Xem trước ảnh">
       </div>
-      <div class="field"><label>Ghi chú nội bộ</label><textarea class="textarea" id="postInternalNote" style="min-height:80px"></textarea></div>
+      <textarea id="postInternalNote" style="display:none"></textarea>
       <div class="status info" id="postStatusBox"></div>
     </div>
     <div class="modal-foot">
@@ -1896,21 +1886,6 @@ function buildPostMetadata(){
       xsmb_source: "XSMB Chủ nhật",
       announce_in: "Monday Mindset thứ Hai tuần sau",
       updated_at: new Date().toISOString(),
-    };
-  }
-  if (isMondayMindsetType(postTypeId)) {
-    if ($("mondayAnnounceHardQuiz").checked) upsertMondayAnnouncementIntoCaption();
-    metadata.monday_mindset = {
-      ...(metadata.monday_mindset || {}),
-      hard_quiz_announcement: {
-        enabled: $("mondayAnnounceHardQuiz").checked,
-        winner_name: $("mondayWinnerName").value.trim(),
-        correct_answer: $("mondayCorrectAnswer").value.trim(),
-        xsmb_result: $("mondayXsmbResult").value.trim(),
-        winner_guess: $("mondayWinnerGuess").value.trim(),
-        text: $("mondayAnnouncementText").value.trim() || buildMondayAnnouncementText(),
-        updated_at: new Date().toISOString(),
-      },
     };
   }
   return metadata;
