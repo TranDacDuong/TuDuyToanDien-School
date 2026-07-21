@@ -61,15 +61,15 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 .day-drop-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:12px}
 .day-drop-card{min-height:112px;border:1px dashed rgba(29,107,209,.35);border-radius:16px;background:#f8fbff;padding:12px;color:#64748b;display:grid;align-content:center;gap:6px;text-align:center;cursor:pointer}
 .day-drop-card.drag-over{background:#fff7e6;border-color:#c8962a;color:#10284f}
-.post-pill{display:grid;gap:4px;border-radius:13px;padding:8px 9px;margin-bottom:7px;background:#fef2f2;border:1px solid rgba(239,68,68,.30);box-shadow:0 6px 16px rgba(15,23,42,.05)}
+.post-pill{display:grid;gap:4px;border-radius:13px;padding:8px 9px;margin-bottom:7px;background:#fee2e2;border:2px solid #ef4444;box-shadow:0 8px 20px rgba(15,23,42,.08)}
 .post-pill[draggable="true"],.type-row[draggable="true"]{cursor:grab}
 .post-pill.dragging,.type-row.dragging{opacity:.55}
-.post-pill strong{font-size:.83rem;color:#10284f}
-.post-pill span{font-size:.75rem;color:#64748b}
-.post-pill.missing_content{background:#fef2f2;border-color:rgba(239,68,68,.32)}
-.post-pill.draft{background:#fff7e6;border-color:rgba(200,150,42,.36)}
-.post-pill.scheduled,.post-pill.published{background:#ecfdf5;border-color:rgba(16,185,129,.30)}
-.post-pill.error{background:#fef2f2;border-color:rgba(239,68,68,.25)}
+.post-pill strong{font-size:.83rem;color:#111827}
+.post-pill span{font-size:.75rem;color:#374151;font-weight:800}
+.post-pill.missing_content{background:#fee2e2;border-color:#ef4444}
+.post-pill.draft{background:#fef3c7;border-color:#f59e0b}
+.post-pill.scheduled,.post-pill.published{background:#bbf7d0;border-color:#22c55e}
+.post-pill.error{background:#fecaca;border-color:#dc2626}
 .type-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:999px;border:1px solid rgba(39,58,91,.10);font-size:.78rem;font-weight:900;color:#10284f;background:#fff}
 .type-list,.page-list{display:grid;gap:9px}
 .type-row,.mini-row{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid rgba(39,58,91,.09);border-radius:14px;padding:9px 10px;background:#fff}
