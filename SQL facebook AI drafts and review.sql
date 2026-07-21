@@ -5,6 +5,7 @@ alter table public.facebook_post_types
 add column if not exists ai_prompt text;
 
 alter table public.facebook_scheduled_posts
+add column if not exists metadata jsonb not null default '{}'::jsonb,
 add column if not exists ai_status text not null default 'idle'
   check (ai_status in ('idle','generating','drafted','error')),
 add column if not exists ai_generated_at timestamptz,

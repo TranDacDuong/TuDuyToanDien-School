@@ -12,6 +12,7 @@ add column if not exists require_task_approval boolean not null default true;
 
 alter table public.facebook_scheduled_posts
 add column if not exists task_id uuid references public.daily_tasks(id) on delete set null,
+add column if not exists metadata jsonb not null default '{}'::jsonb,
 add column if not exists content_status text not null default 'missing_content'
   check (content_status in ('missing_content','submitted','needs_revision','approved')),
 add column if not exists approval_status text not null default 'pending'

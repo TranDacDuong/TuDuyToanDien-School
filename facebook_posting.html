@@ -94,6 +94,11 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 .task-badge{display:inline-flex;align-items:center;border-radius:999px;padding:3px 8px;background:#eef4ff;color:#123c78;font-size:.72rem;font-weight:900}
 .quiz-builder{display:none;border:1px solid rgba(18,60,120,.12);background:linear-gradient(180deg,#f8fbff,#fff);border-radius:18px;padding:14px;gap:12px}
 .quiz-builder.show{display:grid}
+.workflow-box{display:none;border:1px solid rgba(18,60,120,.12);background:linear-gradient(180deg,#f8fbff,#fff);border-radius:18px;padding:14px;gap:12px}
+.workflow-box.show{display:grid}
+.workflow-box strong{color:#10284f}
+.inline-check{display:flex;align-items:flex-start;gap:8px;color:#10284f;font-weight:800}
+.inline-check input{margin-top:3px}
 .quiz-answer-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
 .quiz-preview{max-width:260px;width:100%;border-radius:16px;border:1px solid rgba(39,58,91,.12);box-shadow:0 10px 24px rgba(15,23,42,.08);display:none}
 .quiz-preview.show{display:block}
@@ -293,6 +298,47 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
           <img id="quizImagePreview" class="quiz-preview" alt="Xem trước ảnh Quiz">
         </div>
       </div>
+      <div class="workflow-box" id="hardQuizBuilder">
+        <div>
+          <strong>Hỏi nhanh đớp trọn</strong>
+          <div class="hint">Nhập đề bài để tạo ảnh Hard Quiz. Caption sẽ tự thêm luật chơi: trả lời đúng, dự đoán XSMB, like và share bài viết.</div>
+        </div>
+        <div class="field"><label>Đề bài điền vào ảnh</label><textarea class="textarea" id="hardQuizQuestion" style="min-height:120px" placeholder="Nhập câu hỏi Hard Quiz... Có thể dùng LaTeX: $x^2+1$"></textarea></div>
+        <div class="grid2">
+          <div class="field"><label>Đáp án đúng</label><input class="input" id="hardQuizCorrectAnswer" placeholder="Ví dụ: 42 hoặc x = 1"></div>
+          <div class="field"><label>Phần thưởng</label><input class="input" id="hardQuizPrizeAmount" type="number" min="0" step="1000" value="50000"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Hạn tham gia</label><input class="input" id="hardQuizDeadlineNote" placeholder="Ví dụ: trước giờ quay XSMB Chủ nhật"></div>
+          <div class="field"><label>Cách chốt kết quả</label><input class="input" id="hardQuizResultRule" placeholder="Ví dụ: gần nhất với 2 số cuối giải Đặc biệt XSMB Chủ nhật"></div>
+        </div>
+        <div class="field"><label>Lời giải/ghi chú nội bộ</label><textarea class="textarea" id="hardQuizSolution" style="min-height:80px" placeholder="Không đưa vào caption nếu không cần."></textarea></div>
+        <div class="field"><label>Luật chơi sẽ đưa vào caption</label><textarea class="textarea" id="hardQuizRules" style="min-height:150px"></textarea></div>
+        <div class="toolbar" style="margin-bottom:0">
+          <div class="toolbar-left">
+            <button class="btn btn-gold" type="button" id="generateHardQuizPostBtn">Tạo ảnh + luật chơi</button>
+            <button class="btn btn-outline" type="button" id="previewHardQuizImageBtn">Xem thử ảnh</button>
+          </div>
+          <img id="hardQuizImagePreview" class="quiz-preview" alt="Xem trước ảnh Hỏi nhanh đớp trọn">
+        </div>
+      </div>
+      <div class="workflow-box" id="mondayAnnouncementBuilder">
+        <label class="inline-check"><input id="mondayAnnounceHardQuiz" type="checkbox"> Công bố kết quả Hỏi nhanh đớp trọn trong bài Monday Mindset</label>
+        <div class="grid2">
+          <div class="field"><label>Tên người trúng thưởng</label><input class="input" id="mondayWinnerName" placeholder="Ví dụ: Nguyễn Văn A"></div>
+          <div class="field"><label>Đáp án đúng</label><input class="input" id="mondayCorrectAnswer" placeholder="Đáp án của Hard Quiz"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Kết quả XSMB</label><input class="input" id="mondayXsmbResult" placeholder="Ví dụ: giải Đặc biệt 12345 hoặc 45"></div>
+          <div class="field"><label>Kết quả/dự đoán của người thắng</label><input class="input" id="mondayWinnerGuess" placeholder="Ví dụ: dự đoán 46, lệch 1 số"></div>
+        </div>
+        <div class="field"><label>Nội dung công bố sẽ chèn vào caption</label><textarea class="textarea" id="mondayAnnouncementText" style="min-height:140px"></textarea></div>
+        <div class="toolbar" style="margin-bottom:0">
+          <div class="toolbar-left">
+            <button class="btn btn-gold" type="button" id="insertMondayAnnouncementBtn">Chèn/cập nhật công bố vào caption</button>
+          </div>
+        </div>
+      </div>
       <div class="field">
         <label>Nội dung bài viết</label>
         <textarea class="textarea" id="postContent" maxlength="6000" placeholder="Dán caption/nội dung bài đăng vào đây..."></textarea>
@@ -397,6 +443,7 @@ const QUIZ_TEMPLATES = {
   3: "Ảnh Quiz/6.png",
   4: "Ảnh Quiz/4.png",
 };
+const HARD_QUIZ_TEMPLATE = "Hard Quiz.png";
 
 let S = {
   profile: null,
@@ -449,6 +496,12 @@ function statusClass(status){
   return "draft";
 }
 function postHasContent(post){ return Boolean(String(post.content || "").trim() || String(post.link_url || "").trim() || String(post.image_url || "").trim()); }
+function postMetadata(row){
+  const raw = row?.metadata;
+  if (!raw) return {};
+  if (typeof raw === "object") return raw;
+  try { return JSON.parse(raw); } catch { return {}; }
+}
 function postReviewSummary(post){
   const parts = [];
   if (post?.ai_status && post.ai_status !== "idle") parts.push(aiStatusLabel(post.ai_status));
@@ -636,6 +689,13 @@ function isQuizType(postTypeId){
   const rawName = String(typeName(postTypeId) || "").trim();
   return normalizeText(rawName) === "quiz";
 }
+function isHardQuizType(postTypeId){
+  const rawName = normalizeText(typeName(postTypeId));
+  return rawName.includes("hard quiz");
+}
+function isMondayMindsetType(postTypeId){
+  return normalizeText(typeName(postTypeId)).includes("monday mindset");
+}
 function renderQuizAnswerFields(){
   const count = Math.max(2, Math.min(4, Number($("quizAnswerCount").value || 4)));
   const labels = ["A", "B", "C", "D"];
@@ -648,8 +708,19 @@ function renderQuizAnswerFields(){
   `).join("");
 }
 function toggleQuizBuilder(){
-  const show = isQuizType($("postType").value);
-  $("quizBuilder").classList.toggle("show", show);
+  const postTypeId = $("postType").value;
+  const showQuiz = isQuizType(postTypeId);
+  const showHardQuiz = isHardQuizType(postTypeId);
+  const showMonday = isMondayMindsetType(postTypeId);
+  $("quizBuilder").classList.toggle("show", showQuiz);
+  $("hardQuizBuilder")?.classList.toggle("show", showHardQuiz);
+  $("mondayAnnouncementBuilder")?.classList.toggle("show", showMonday);
+  if (showHardQuiz && !$("hardQuizRules").value.trim()) {
+    $("hardQuizRules").value = buildHardQuizRules();
+  }
+  if (showMonday && !$("mondayAnnouncementText").value.trim()) {
+    $("mondayAnnouncementText").value = buildMondayAnnouncementText();
+  }
 }
 function getQuizData(){
   const question = $("quizQuestion").value.trim();
@@ -1046,6 +1117,161 @@ function buildQuizCaption(){
   body.push("", "Comment đáp án của em ở dưới bài viết nhé!", "", "#MindUp #Quiz #PhatTrienTuDuy");
   return body.join("\n");
 }
+function pageHashtagLocal(pageName = currentPage()?.page_name || ""){
+  const plain = normalizeText(pageName).replace(/mindup|tu duy/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+  const words = plain ? plain.split(/\s+/) : ["toan", "dien"];
+  const suffix = words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join("");
+  return `#${suffix || "MindUp"}`;
+}
+function formatMoney(value){
+  const n = Math.max(0, Number(value || 0));
+  return `${n.toLocaleString("vi-VN")}đ`;
+}
+function getHardQuizData(){
+  const question = $("hardQuizQuestion").value.trim();
+  if (!question) throw new Error("Vui lòng nhập đề bài Hỏi nhanh đớp trọn.");
+  const prizeAmount = Math.max(0, Number($("hardQuizPrizeAmount").value || 0));
+  return {
+    question,
+    correctAnswer: $("hardQuizCorrectAnswer").value.trim(),
+    solution: $("hardQuizSolution").value.trim(),
+    prizeAmount,
+    deadlineNote: $("hardQuizDeadlineNote").value.trim() || "trước giờ quay XSMB Chủ nhật tuần này",
+    resultRule: $("hardQuizResultRule").value.trim() || "gần nhất với 2 số cuối giải Đặc biệt XSMB Chủ nhật",
+    rules: $("hardQuizRules").value.trim() || buildHardQuizRules(),
+  };
+}
+function buildHardQuizRules(){
+  const prize = formatMoney($("hardQuizPrizeAmount")?.value || 50000);
+  const deadline = $("hardQuizDeadlineNote")?.value?.trim() || "trước giờ quay XSMB Chủ nhật tuần này";
+  const resultRule = $("hardQuizResultRule")?.value?.trim() || "gần nhất với 2 số cuối giải Đặc biệt XSMB Chủ nhật";
+  return [
+    "📌 Quy định chơi:",
+    "1. Like bài viết này.",
+    "2. Share bài viết ở chế độ công khai.",
+    "3. Comment đáp án đúng của câu hỏi.",
+    "4. Comment kèm 1 số dự đoán từ 00 đến 99.",
+    `5. Người thắng là người có đáp án đúng và dự đoán ${resultRule}.`,
+    "6. Nếu nhiều bạn cùng gần nhất, ưu tiên bạn comment sớm hơn.",
+    `7. Kết quả và phần thưởng ${prize} sẽ được công bố trong bài Monday Mindset thứ Hai tuần sau.`,
+    "",
+    `⏰ Hạn tham gia: ${deadline}.`,
+  ].join("\n");
+}
+function buildHardQuizCaption(){
+  const data = getHardQuizData();
+  return [
+    "🔥 HỎI NHANH ĐỚP TRỌN 🔥",
+    "",
+    "Giải đúng câu hỏi, dự đoán con số may mắn và rinh phần thưởng từ MindUp nhé!",
+    "",
+    `🎁 Phần thưởng: ${formatMoney(data.prizeAmount || 50000)}`,
+    "",
+    data.rules,
+    "",
+    "#HardQuiz #HoiNhanhDopTron #MindUp #PhatTrienTuDuy " + pageHashtagLocal(),
+  ].join("\n");
+}
+function buildMondayAnnouncementText(){
+  const winner = $("mondayWinnerName")?.value?.trim() || "[Tên người trúng thưởng]";
+  const answer = $("mondayCorrectAnswer")?.value?.trim() || "[Đáp án đúng]";
+  const xsmb = $("mondayXsmbResult")?.value?.trim() || "[Kết quả XSMB]";
+  const guess = $("mondayWinnerGuess")?.value?.trim() || "[Dự đoán/kết quả của người thắng]";
+  return [
+    "🏆 Công bố kết quả Hỏi nhanh đớp trọn",
+    "",
+    `Đáp án đúng: ${answer}`,
+    `Kết quả XSMB Chủ nhật: ${xsmb}`,
+    `Kết quả của người thắng: ${guess}`,
+    "",
+    `🎉 Chúc mừng ${winner} đã giành phần thưởng tuần này của MindUp!`,
+  ].join("\n");
+}
+function announcementMarker(){
+  return "🏆 Công bố kết quả Hỏi nhanh đớp trọn";
+}
+function upsertMondayAnnouncementIntoCaption(){
+  const enabled = $("mondayAnnounceHardQuiz").checked;
+  let content = $("postContent").value.trim();
+  const text = buildMondayAnnouncementText().trim();
+  const marker = announcementMarker();
+  const idx = content.indexOf(marker);
+  if (!enabled) {
+    if (idx >= 0) content = content.slice(0, idx).trim();
+    $("postContent").value = content;
+    $("postCharCount").textContent = String(content.length);
+    return content;
+  }
+  if (idx >= 0) content = content.slice(0, idx).trim();
+  content = [content, text].filter(Boolean).join("\n\n");
+  $("postContent").value = content;
+  $("postCharCount").textContent = String(content.length);
+  $("mondayAnnouncementText").value = text;
+  return content;
+}
+async function buildHardQuizImageDataUrl(){
+  await ensureQuizFontLoaded();
+  const { question } = getHardQuizData();
+  const img = await loadImage(HARD_QUIZ_TEMPLATE);
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth || 1536;
+  canvas.height = img.naturalHeight || 864;
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  const sx = canvas.width / 1536;
+  const sy = canvas.height / 864;
+  const box = {
+    x: 105 * sx,
+    y: 330 * sy,
+    w: 1325 * sx,
+    h: 270 * sy,
+  };
+  await drawBigQuizText(ctx, question, box, {
+    size: 64 * sx,
+    minSize: 34 * sx,
+    maxLines: 5,
+    color: "#082c68",
+  });
+  return canvas.toDataURL("image/png");
+}
+async function previewHardQuizImage(){
+  try {
+    const dataUrl = await buildHardQuizImageDataUrl();
+    $("hardQuizImagePreview").src = dataUrl;
+    $("hardQuizImagePreview").classList.add("show");
+    showPostStatus("ok", "Đã tạo ảnh xem thử Hỏi nhanh đớp trọn.");
+  } catch (error) {
+    showPostStatus("err", error.message || String(error));
+  }
+}
+async function generateHardQuizPost(){
+  try {
+    showPostStatus("info", "Đang tạo ảnh Hỏi nhanh đớp trọn...");
+    $("hardQuizRules").value = buildHardQuizRules();
+    const dataUrl = await buildHardQuizImageDataUrl();
+    $("hardQuizImagePreview").src = dataUrl;
+    $("hardQuizImagePreview").classList.add("show");
+    showPostStatus("info", "Đang upload ảnh Hỏi nhanh đớp trọn lên Drive...");
+    const uploaded = await window.MindupImageUpload.uploadDataUrl(dataUrl, { kind: "post", folder: "facebook-hard-quiz", fileName: `mindup-hard-quiz-${Date.now()}.png` });
+    const url = window.MindupImageUpload.getDisplayUrl(uploaded);
+    if (!url) throw new Error("Upload xong nhưng không lấy được URL ảnh Hỏi nhanh đớp trọn.");
+    $("postImageUrl").value = url;
+    $("postContent").value = buildHardQuizCaption();
+    const data = getHardQuizData();
+    const notes = [];
+    if (data.correctAnswer) notes.push(`Đáp án đúng Hỏi nhanh đớp trọn: ${data.correctAnswer}`);
+    if (data.solution) notes.push(`Lời giải/ghi chú: ${data.solution}`);
+    const currentNote = $("postInternalNote").value.trim();
+    $("postInternalNote").value = [currentNote, ...notes.filter(note => !currentNote.includes(note))].filter(Boolean).join("\n");
+    $("postCharCount").textContent = String($("postContent").value.length);
+    updateImagePreview();
+    showPostStatus("ok", "Đã tạo ảnh và caption Hỏi nhanh đớp trọn. Luật chơi đã có yêu cầu like + share.");
+  } catch (error) {
+    showPostStatus("err", error.message || String(error));
+  }
+}
 function currentPostTypeName(){
   return typeName($("postType")?.value || "");
 }
@@ -1278,6 +1504,24 @@ function openPostModal(id="", defaults={}){
   clearQuizQuestionImage();
   $("quizImagePreview").src = "";
   $("quizImagePreview").classList.remove("show");
+  const meta = postMetadata(row);
+  const hardQuiz = meta.hard_quiz || {};
+  $("hardQuizQuestion").value = hardQuiz.question || "";
+  $("hardQuizCorrectAnswer").value = hardQuiz.correct_answer || "";
+  $("hardQuizPrizeAmount").value = hardQuiz.prize_amount || 50000;
+  $("hardQuizDeadlineNote").value = hardQuiz.deadline_note || "trước giờ quay XSMB Chủ nhật tuần này";
+  $("hardQuizResultRule").value = hardQuiz.result_rule || "gần nhất với 2 số cuối giải Đặc biệt XSMB Chủ nhật";
+  $("hardQuizSolution").value = hardQuiz.solution || "";
+  $("hardQuizRules").value = hardQuiz.rules || buildHardQuizRules();
+  $("hardQuizImagePreview").src = "";
+  $("hardQuizImagePreview").classList.remove("show");
+  const mondayAnnouncement = meta.monday_mindset?.hard_quiz_announcement || {};
+  $("mondayAnnounceHardQuiz").checked = Boolean(mondayAnnouncement.enabled);
+  $("mondayWinnerName").value = mondayAnnouncement.winner_name || "";
+  $("mondayCorrectAnswer").value = mondayAnnouncement.correct_answer || "";
+  $("mondayXsmbResult").value = mondayAnnouncement.xsmb_result || "";
+  $("mondayWinnerGuess").value = mondayAnnouncement.winner_guess || "";
+  $("mondayAnnouncementText").value = mondayAnnouncement.text || buildMondayAnnouncementText();
   toggleQuizBuilder();
   updateImagePreview();
   $("deletePostBtn").style.display = row ? "" : "none";
@@ -1332,6 +1576,47 @@ function updateImagePreview(){
   if (url) { img.src = url; img.classList.add("show"); $("imageDropzone").classList.add("has-image"); }
   else { img.src = ""; img.classList.remove("show"); $("imageDropzone").classList.remove("has-image"); }
 }
+function buildPostMetadata(){
+  const id = $("postId").value;
+  const existing = postMetadata(S.posts.find(p => String(p.id) === String(id)));
+  const metadata = { ...existing };
+  const postTypeId = $("postType").value;
+  if (isHardQuizType(postTypeId)) {
+    const data = getHardQuizData();
+    metadata.hard_quiz = {
+      enabled: true,
+      title: "Hỏi nhanh đớp trọn",
+      question: data.question,
+      correct_answer: data.correctAnswer,
+      solution: data.solution,
+      prize_amount: data.prizeAmount,
+      deadline_note: data.deadlineNote,
+      result_rule: data.resultRule,
+      rules: data.rules,
+      require_like: true,
+      require_share: true,
+      xsmb_source: "XSMB Chủ nhật",
+      announce_in: "Monday Mindset thứ Hai tuần sau",
+      updated_at: new Date().toISOString(),
+    };
+  }
+  if (isMondayMindsetType(postTypeId)) {
+    if ($("mondayAnnounceHardQuiz").checked) upsertMondayAnnouncementIntoCaption();
+    metadata.monday_mindset = {
+      ...(metadata.monday_mindset || {}),
+      hard_quiz_announcement: {
+        enabled: $("mondayAnnounceHardQuiz").checked,
+        winner_name: $("mondayWinnerName").value.trim(),
+        correct_answer: $("mondayCorrectAnswer").value.trim(),
+        xsmb_result: $("mondayXsmbResult").value.trim(),
+        winner_guess: $("mondayWinnerGuess").value.trim(),
+        text: $("mondayAnnouncementText").value.trim() || buildMondayAnnouncementText(),
+        updated_at: new Date().toISOString(),
+      },
+    };
+  }
+  return metadata;
+}
 function getPostPayload(extra={}){
   const d = fromDateTimeLocal($("postScheduledAt").value);
   if (!d) throw new Error("Thời gian đăng không hợp lệ.");
@@ -1344,6 +1629,7 @@ function getPostPayload(extra={}){
     link_url: $("postLinkUrl").value.trim() || null,
     image_url: $("postImageUrl").value.trim() || null,
     internal_note: $("postInternalNote").value.trim() || null,
+    metadata: buildPostMetadata(),
     created_by: S.profile.id,
     ...extra,
   };
@@ -1717,6 +2003,17 @@ function bindEvents(){
   $("removeQuizQuestionImageBtn").addEventListener("click", clearQuizQuestionImage);
   $("previewQuizImageBtn").addEventListener("click", previewQuizImage);
   $("generateQuizImageBtn").addEventListener("click", generateQuizImage);
+  ["hardQuizPrizeAmount","hardQuizDeadlineNote","hardQuizResultRule"].forEach(id => $(id)?.addEventListener("input", () => $("hardQuizRules").value = buildHardQuizRules()));
+  $("previewHardQuizImageBtn").addEventListener("click", previewHardQuizImage);
+  $("generateHardQuizPostBtn").addEventListener("click", generateHardQuizPost);
+  ["mondayWinnerName","mondayCorrectAnswer","mondayXsmbResult","mondayWinnerGuess"].forEach(id => $(id)?.addEventListener("input", () => {
+    if ($("mondayAnnounceHardQuiz").checked) $("mondayAnnouncementText").value = buildMondayAnnouncementText();
+  }));
+  $("insertMondayAnnouncementBtn").addEventListener("click", () => {
+    $("mondayAnnounceHardQuiz").checked = true;
+    upsertMondayAnnouncementIntoCaption();
+    showPostStatus("ok", "Đã chèn/cập nhật phần công bố Hỏi nhanh đớp trọn vào caption Monday Mindset.");
+  });
   $("templateType").addEventListener("change", () => {
     if (!$("templateId").value && !$("templateTaskRequirements").value.trim()) {
       $("templateTaskRequirements").value = defaultRequirementsForType(typeName($("templateType").value)).join("\n");

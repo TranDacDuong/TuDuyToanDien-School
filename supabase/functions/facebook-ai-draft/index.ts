@@ -244,6 +244,10 @@ function isMondayMindset(typeName: string) {
   return String(typeName || "").trim().toLowerCase() === "monday mindset";
 }
 
+function isHardQuizWithPrize(typeName: string) {
+  return String(typeName || "").trim().toLowerCase().includes("hard quiz");
+}
+
 function isoWeekNumber(dateInput: string | Date) {
   const date = dateInput instanceof Date ? new Date(dateInput) : new Date(dateInput);
   if (Number.isNaN(date.getTime())) return 1;
@@ -371,6 +375,54 @@ function buildGeminiPrompt(args: {
       "- Không viết sai tiếng Việt.",
       "- Nếu có quote tiếng Anh thì chỉ để nhỏ, quote tiếng Việt là chính.",
     ].join("\n");
+  }
+
+  if (isHardQuizWithPrize(args.typeName)) {
+    const fanpageTag = pageHashtag(args.pageName);
+    return [
+      "Bạn là trợ lý nội dung cho MindUp - Tư Duy Toàn Diện.",
+      "Nhiệm vụ: tạo bài Facebook cho chương trình Hard Quiz with Prize, tên hiển thị là HỎI NHANH ĐỚP TRỌN.",
+      "",
+      "Thông tin bài đăng:",
+      `- Fanpage: ${args.pageName}`,
+      `- Hashtag fanpage bắt buộc: ${fanpageTag}`,
+      `- Thời gian đăng: ${args.scheduledAt}`,
+      args.existingContent ? `- Nội dung nháp/câu hỏi hiện có: ${args.existingContent}` : "",
+      args.internalNote ? `- Ghi chú nội bộ/đáp án/lời giải nếu có: ${args.internalNote}` : "",
+      "",
+      "Yêu cầu cực kỳ quan trọng:",
+      "- Caption KHÔNG được lộ đáp án đúng.",
+      "- Caption phải ghi rõ luật chơi yêu cầu người tham gia LIKE bài viết và SHARE bài viết ở chế độ công khai.",
+      "- Người thắng: trả lời đúng câu hỏi và dự đoán số từ 00-99 gần nhất với 2 số cuối giải Đặc biệt XSMB Chủ nhật.",
+      "- Nếu nhiều người cùng gần nhất thì ưu tiên người comment sớm hơn.",
+      "- Kết quả được công bố trong bài Monday Mindset thứ Hai tuần sau.",
+      "- Phần thưởng mặc định 50.000đ nếu không có ghi chú khác.",
+      "",
+      "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
+      JSON.stringify({
+        caption: [
+          "🔥 HỎI NHANH ĐỚP TRỌN 🔥",
+          "",
+          "Caption tiếng Việt ngắn, vui, kích thích tương tác nhưng không lộ đáp án.",
+          "",
+          "🎁 Phần thưởng: 50.000đ",
+          "",
+          "📌 Quy định chơi:",
+          "1. Like bài viết này.",
+          "2. Share bài viết ở chế độ công khai.",
+          "3. Comment đáp án đúng của câu hỏi.",
+          "4. Comment kèm 1 số dự đoán từ 00 đến 99.",
+          "5. Người thắng là người có đáp án đúng và dự đoán gần nhất với 2 số cuối giải Đặc biệt XSMB Chủ nhật.",
+          "6. Nếu nhiều bạn cùng gần nhất, ưu tiên bạn comment sớm hơn.",
+          "7. Kết quả sẽ được công bố trong bài Monday Mindset thứ Hai tuần sau.",
+          "",
+          "#HardQuiz #HoiNhanhDopTron #MindUp #PhatTrienTuDuy " + fanpageTag,
+        ].join("\n"),
+        hashtags: ["#HardQuiz", "#HoiNhanhDopTron", "#MindUp", "#PhatTrienTuDuy", fanpageTag],
+        image_prompt: "Prompt tiếng Anh để tạo ảnh theo template Hỏi nhanh đớp trọn của MindUp: nền xanh, logo MindUp, headline Hỏi nhanh đớp trọn, vùng trắng lớn chỉ chứa đề bài, phần thưởng 50.000đ, typography rõ, dễ đọc trên điện thoại.",
+        internal_note: "Ghi đáp án đúng/lời giải nội bộ nếu có, không đưa vào caption.",
+      }, null, 2),
+    ].filter(Boolean).join("\n");
   }
 
   const defaultPrompt = [
