@@ -218,16 +218,72 @@ async function uploadBytesToDrive(bytes: Uint8Array, filename: string, mimeType:
   };
 }
 
+function escapeControlCharsInsideJsonStrings(value: string) {
+  let output = "";
+  let inString = false;
+  let escaped = false;
+  for (const ch of String(value || "")) {
+    if (!inString) {
+      output += ch;
+      if (ch === "\"") inString = true;
+      continue;
+    }
+    if (escaped) {
+      output += ch;
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\") {
+      output += ch;
+      escaped = true;
+      continue;
+    }
+    if (ch === "\"") {
+      output += ch;
+      inString = false;
+      continue;
+    }
+    if (ch === "\n") {
+      output += "\\n";
+      continue;
+    }
+    if (ch === "\r") {
+      output += "\\r";
+      continue;
+    }
+    if (ch === "\t") {
+      output += "\\t";
+      continue;
+    }
+    const code = ch.charCodeAt(0);
+    output += code < 32 ? " " : ch;
+  }
+  return output;
+}
+
+function parseGeminiJsonCandidate(value: string) {
+  try {
+    return JSON.parse(value);
+  } catch (firstError) {
+    const repaired = escapeControlCharsInsideJsonStrings(value);
+    try {
+      return JSON.parse(repaired);
+    } catch (_) {
+      throw firstError;
+    }
+  }
+}
+
 function tryParseJson(text: string) {
   const cleaned = String(text || "").trim()
     .replace(/^```(?:json)?/i, "")
     .replace(/```$/i, "")
     .trim();
   try {
-    return JSON.parse(cleaned);
+    return parseGeminiJsonCandidate(cleaned);
   } catch (_) {
     const match = cleaned.match(/\{[\s\S]*\}/);
-    if (match) return JSON.parse(match[0]);
+    if (match) return parseGeminiJsonCandidate(match[0]);
     throw new Error("Gemini trả về nội dung không đúng JSON.");
   }
 }
@@ -249,7 +305,8 @@ function isHardQuizWithPrize(typeName: string) {
 }
 
 function isProblemType(typeName: string) {
-  return String(typeName || "").trim().toLowerCase() === "problem";
+  const normalized = String(typeName || "").trim().toLowerCase();
+  return normalized === "problem" || normalized === "teaching philosophy";
 }
 
 function isLearningMethod(typeName: string) {
