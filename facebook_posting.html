@@ -61,14 +61,14 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 .day-drop-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:12px}
 .day-drop-card{min-height:112px;border:1px dashed rgba(29,107,209,.35);border-radius:16px;background:#f8fbff;padding:12px;color:#64748b;display:grid;align-content:center;gap:6px;text-align:center;cursor:pointer}
 .day-drop-card.drag-over{background:#fff7e6;border-color:#c8962a;color:#10284f}
-.post-pill{display:grid;gap:4px;border-radius:13px;padding:8px 9px;margin-bottom:7px;background:#fff7e6;border:1px solid rgba(200,150,42,.28);box-shadow:0 6px 16px rgba(15,23,42,.05)}
+.post-pill{display:grid;gap:4px;border-radius:13px;padding:8px 9px;margin-bottom:7px;background:#fef2f2;border:1px solid rgba(239,68,68,.30);box-shadow:0 6px 16px rgba(15,23,42,.05)}
 .post-pill[draggable="true"],.type-row[draggable="true"]{cursor:grab}
 .post-pill.dragging,.type-row.dragging{opacity:.55}
 .post-pill strong{font-size:.83rem;color:#10284f}
 .post-pill span{font-size:.75rem;color:#64748b}
-.post-pill.draft{background:#f8fafc;border-color:#dbe5f3}
-.post-pill.scheduled{background:#ecfdf5;border-color:rgba(16,185,129,.28)}
-.post-pill.published{background:#eff6ff;border-color:rgba(29,107,209,.25)}
+.post-pill.missing_content{background:#fef2f2;border-color:rgba(239,68,68,.32)}
+.post-pill.draft{background:#fff7e6;border-color:rgba(200,150,42,.36)}
+.post-pill.scheduled,.post-pill.published{background:#ecfdf5;border-color:rgba(16,185,129,.30)}
 .post-pill.error{background:#fef2f2;border-color:rgba(239,68,68,.25)}
 .type-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:999px;border:1px solid rgba(39,58,91,.10);font-size:.78rem;font-weight:900;color:#10284f;background:#fff}
 .type-list,.page-list{display:grid;gap:9px}
@@ -504,6 +504,7 @@ let quizQuestionImageDataUrl = "";
 function $(id){ return document.getElementById(id); }
 function esc(v){ return String(v ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
 function showStatus(type, msg){ const box=$("statusBox"); box.className=`status ${type} show`; box.textContent=msg; }
+function hideStatus(){ const box=$("statusBox"); if (!box) return; box.className="status"; box.textContent=""; }
 function showPostStatus(type, msg){ const box=$("postStatusBox"); box.className=`status ${type} show`; box.textContent=msg; }
 function pad(n){ return String(n).padStart(2,"0"); }
 function dateKey(date){ return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`; }
@@ -530,29 +531,20 @@ function statusLabel(status){
 function aiStatusLabel(status){
   return { idle:"Chưa tạo bằng AI", generating:"Đang tạo bằng AI", drafted:"AI đã tạo draft", error:"AI lỗi" }[status] || "Chưa tạo bằng AI";
 }
-function approvalStatusLabel(status){
-  return { pending:"Chờ kiểm tra", approved:"Đã xác nhận", rejected:"Cần sửa lại" }[status] || "Chờ kiểm tra";
-}
-function statusClass(status){
-  if (status === "scheduled") return "scheduled";
-  if (status === "published") return "published";
-  if (status === "error") return "error";
-  return "draft";
-}
 function postHasContent(post){ return Boolean(String(post.content || "").trim() || String(post.link_url || "").trim() || String(post.image_url || "").trim()); }
+function postCardClass(post){
+  const status = String(post?.status || "");
+  if (status === "scheduled" || status === "published") return "scheduled";
+  if (status === "error") return "error";
+  if (postHasContent(post) || status === "draft") return "draft";
+  return "missing_content";
+}
 function postMetadata(row){
   const raw = row?.metadata;
   if (!raw) return {};
   if (typeof raw === "object") return raw;
   try { return JSON.parse(raw); } catch { return {}; }
 }
-function postReviewSummary(post){
-  const parts = [];
-  if (post?.ai_status && post.ai_status !== "idle") parts.push(aiStatusLabel(post.ai_status));
-  if (post?.approval_status) parts.push(approvalStatusLabel(post.approval_status));
-  return parts.length ? `<div class="task-meta"><span class="task-badge">${esc(parts.join(" • "))}</span></div>` : "";
-}
-
 function isFacebookPostingTaskLike(task){
   const text = [
     task?.task_type,
@@ -682,7 +674,7 @@ function renderAll(){
   renderTemplateCalendar();
   renderWeeklyCalendar();
   renderTodo();
-  showStatus("ok", "Đã tải lịch đăng bài.");
+  hideStatus();
 }
 function renderTabs(){
   $("pageTabs").innerHTML = S.pages.map(p => `<button type="button" class="tab ${p.page_id===S.activePageId?"active":""}" data-page-id="${esc(p.page_id)}">${esc(p.page_name)}</button>`).join("");
@@ -1467,7 +1459,7 @@ function renderWeeklyCalendar(){
           ${dates.map(date => {
             const rows = postsInCell(time, date);
             return `<td class="slot-cell ${rows.length?"":"empty"}" data-post-time="${time}" data-post-date="${dateKey(date)}">
-              ${rows.map(p => `<div class="post-pill ${statusClass(p.status)}" draggable="true" data-post-id="${esc(p.id)}"><strong>${esc(typeName(p.post_type_id))}</strong><span>${esc(statusLabel(p.status))}${postHasContent(p) ? " • Có nội dung" : " • Thiếu nội dung"}</span>${postReviewSummary(p)}${p.task_id ? `<div class="task-meta"><span class="task-badge">Đã tạo công việc</span></div>` : ""}</div>`).join("")}
+              ${rows.map(p => `<div class="post-pill ${postCardClass(p)}" draggable="true" data-post-id="${esc(p.id)}"><strong>${esc(typeName(p.post_type_id))}</strong><span>${esc(statusLabel(p.status))}</span></div>`).join("")}
             </td>`;
           }).join("")}
         </tr>`).join("")}</tbody>
@@ -1705,7 +1697,7 @@ function openPostModal(id="", defaults={}){
   $("postImageUrl").value = row?.image_url || "";
   $("postInternalNote").value = row?.internal_note || "";
   const aiText = row
-    ? `${aiStatusLabel(row.ai_status || "idle")} • ${approvalStatusLabel(row.approval_status || "pending")}${row.ai_error ? ` • Lỗi: ${row.ai_error}` : ""}`
+    ? `${aiStatusLabel(row.ai_status || "idle")}${row.ai_error ? ` • Lỗi: ${row.ai_error}` : ""}`
     : "Chưa tạo bằng AI.";
   $("aiDraftStatus").textContent = aiText;
   $("postCharCount").textContent = String(($("postContent").value || "").length);
@@ -2042,7 +2034,7 @@ async function generateGeminiDraft(){
     $("postImageUrl").value = post.image_url || data.image_url || "";
     $("postInternalNote").value = post.internal_note || "";
     $("postStatus").value = statusLabel(post.status || "draft");
-    $("aiDraftStatus").textContent = `${aiStatusLabel(post.ai_status || "drafted")} • ${approvalStatusLabel(post.approval_status || "pending")}`;
+    $("aiDraftStatus").textContent = aiStatusLabel(post.ai_status || "drafted");
     $("postCharCount").textContent = String(($("postContent").value || "").length);
     updateImagePreview();
     const pairedText = data.related_post
@@ -2070,7 +2062,7 @@ async function approveCurrentPost(){
     btn.textContent = "Đang xác nhận...";
     const { data, error } = await sb.rpc("approve_facebook_scheduled_post", { p_post_id: id });
     if (error) throw error;
-    $("aiDraftStatus").textContent = `${aiStatusLabel(data?.ai_status || "drafted")} • ${approvalStatusLabel(data?.approval_status || "approved")}`;
+    $("aiDraftStatus").textContent = aiStatusLabel(data?.ai_status || "drafted");
     btn.textContent = "Đã xác nhận";
     showPostStatus("ok", "Đã xác nhận bài ổn. Công việc kiểm tra bài đăng đã được đánh dấu hoàn thành.");
     await syncMarketingTaskCompletion().catch(()=>{});
