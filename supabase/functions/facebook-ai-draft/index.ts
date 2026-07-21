@@ -285,16 +285,29 @@ function pageHashtag(pageName: string) {
   return suffix ? `#MindUp${suffix}` : "#MindUpTuDuyToanDien";
 }
 
-function mondayMindsetTopic(scheduledAt: string) {
+function mondayMindsetOffset(pageName: string) {
+  const clean = stripVietnameseForTag(pageName).toLowerCase();
+  if (clean.includes("toan hoc")) return 10;
+  if (clean.includes("vat ly")) return 20;
+  if (clean.includes("hoa hoc")) return 30;
+  if (clean.includes("sinh hoc")) return 40;
+  return 0;
+}
+
+function mondayMindsetTopic(scheduledAt: string, pageName: string) {
   const week = isoWeekNumber(scheduledAt);
   const year = yearFromDate(scheduledAt);
-  const topic = MONDAY_MINDSET_ITEMS[week - 1] || "";
-  if (topic) {
+  const offset = mondayMindsetOffset(pageName);
+  const contentIndex = ((week - 1 - offset) % MONDAY_MINDSET_ITEMS.length + MONDAY_MINDSET_ITEMS.length) % MONDAY_MINDSET_ITEMS.length;
+  const topic = MONDAY_MINDSET_ITEMS[contentIndex] || "";
+  if (week <= MONDAY_MINDSET_ITEMS.length && topic) {
     return {
       week,
       year,
       mode: "jon_gordon" as const,
       topic,
+      contentNumber: contentIndex + 1,
+      offset,
       countdownWeeks: 0,
     };
   }
@@ -302,7 +315,9 @@ function mondayMindsetTopic(scheduledAt: string) {
     week,
     year,
     mode: "year_countdown" as const,
-    topic: `Đếm ngược hết năm ${year}: còn khoảng ${weeksLeftInYear(scheduledAt)} tuần để kết thúc năm. Hãy chọn một việc quan trọng để hoàn thiện trước khi năm mới bắt đầu.`,
+    topic: `Đếm ngược hết năm ${year} cho fanpage ${pageName}: còn khoảng ${weeksLeftInYear(scheduledAt)} tuần để kết thúc năm. Hãy chọn một việc quan trọng theo tinh thần của fanpage để hoàn thiện trước khi năm mới bắt đầu.`,
+    contentNumber: 0,
+    offset,
     countdownWeeks: weeksLeftInYear(scheduledAt),
   };
 }
@@ -316,7 +331,7 @@ function buildGeminiPrompt(args: {
   internalNote: string;
 }) {
   if (isMondayMindset(args.typeName)) {
-    const monday = mondayMindsetTopic(args.scheduledAt);
+    const monday = mondayMindsetTopic(args.scheduledAt, args.pageName);
     const fanpageTag = pageHashtag(args.pageName);
     const isCountdown = monday.mode === "year_countdown";
     return [
@@ -327,6 +342,8 @@ function buildGeminiPrompt(args: {
       `- Fanpage: ${args.pageName}`,
       `- Hashtag fanpage bắt buộc: ${fanpageTag}`,
       `- Tuần ISO trong năm: ${monday.week}/${monday.year}`,
+      `- Offset nội dung theo fanpage: ${monday.offset}`,
+      monday.contentNumber ? `- Số thứ tự nội dung Jon Gordon dùng cho fanpage này: ${monday.contentNumber}/50` : "",
       `- Chủ đề: ${monday.topic}`,
       "",
       isCountdown
@@ -345,7 +362,7 @@ function buildGeminiPrompt(args: {
         quote_vi: "Bản dịch tiếng Việt thật hay của quote.",
         quote_source: isCountdown ? "MindUp" : "Jon Gordon / Jon Gordon-inspired",
         image_prompt: "Prompt tiếng Anh để tạo ảnh Facebook 16:9 hoặc 1:1 phong cách Monday Mindset: nền xanh MindUp, logo MindUp, quote tiếng Việt lớn ở vùng trống, tên tác giả nhỏ bên dưới, typography đẹp, dễ đọc trên điện thoại.",
-        internal_note: `Monday Mindset tuần ${monday.week}/${monday.year}: ${monday.topic}`,
+        internal_note: `Monday Mindset tuần ${monday.week}/${monday.year}; fanpage ${args.pageName}; offset ${monday.offset}; content ${monday.contentNumber || "countdown"}: ${monday.topic}`,
       }, null, 2),
       "",
       "Yêu cầu ảnh:",

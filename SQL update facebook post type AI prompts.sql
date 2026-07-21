@@ -35,8 +35,14 @@ update public.facebook_post_types
 set ai_prompt = $prompt$
 Loại bài Monday Mindset dùng workflow riêng:
 - Hệ thống tự xác định tuần ISO trong năm.
-- Tuần 1-50: lấy nội dung Jon Gordon tương ứng với số tuần.
-- Tuần 51-53: chuyển sang chủ đề đếm ngược hết năm.
+- Tuần 1-50: lấy nội dung Jon Gordon theo số tuần và offset từng fanpage:
+  + MindUp - Tư Duy Toàn Diện: offset 0.
+  + MindUp - Tư duy Toán học: offset 10.
+  + MindUp - Tư Duy Vật Lý: offset 20.
+  + MindUp - Tư duy Hóa Học: offset 30.
+  + MindUp - Tư Duy Sinh Học: offset 40.
+- Công thức: ((số tuần - 1 - offset) mod 50) + 1.
+- Tuần 51-53: chuyển sang chủ đề đếm ngược hết năm, cá nhân hóa theo fanpage.
 - Gemini chỉ cần tìm/khôi phục quote tiếng Anh phù hợp, dịch sang tiếng Việt thật hay và tạo prompt ảnh quote-card.
 - Không viết caption phân tích dài.
 - Caption cuối cùng chỉ gồm hashtag: #MondayMindset #MindUp #TênFanpage.
@@ -52,8 +58,14 @@ select
   $prompt$
 Loại bài Monday Mindset dùng workflow riêng:
 - Hệ thống tự xác định tuần ISO trong năm.
-- Tuần 1-50: lấy nội dung Jon Gordon tương ứng với số tuần.
-- Tuần 51-53: chuyển sang chủ đề đếm ngược hết năm.
+- Tuần 1-50: lấy nội dung Jon Gordon theo số tuần và offset từng fanpage:
+  + MindUp - Tư Duy Toàn Diện: offset 0.
+  + MindUp - Tư duy Toán học: offset 10.
+  + MindUp - Tư Duy Vật Lý: offset 20.
+  + MindUp - Tư duy Hóa Học: offset 30.
+  + MindUp - Tư Duy Sinh Học: offset 40.
+- Công thức: ((số tuần - 1 - offset) mod 50) + 1.
+- Tuần 51-53: chuyển sang chủ đề đếm ngược hết năm, cá nhân hóa theo fanpage.
 - Gemini chỉ cần tìm/khôi phục quote tiếng Anh phù hợp, dịch sang tiếng Việt thật hay và tạo prompt ảnh quote-card.
 - Không viết caption phân tích dài.
 - Caption cuối cùng chỉ gồm hashtag: #MondayMindset #MindUp #TênFanpage.
