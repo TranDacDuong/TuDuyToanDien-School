@@ -611,7 +611,7 @@ async function loadPostBundle(postId: string) {
 }
 
 async function assertCanUsePost(userId: string, role: string, post: { task_id?: string | null }) {
-  if (["admin", "assistant"].includes(role)) return;
+  if (canAccessByRole(role)) return;
   if (!post.task_id) throw new Error("Bạn chưa được giao công việc kiểm tra bài đăng này.");
   const rows = await fetchJson<Array<{ id: string }>>(
     `task_assignments?task_id=eq.${encodeURIComponent(post.task_id)}&user_id=eq.${encodeURIComponent(userId)}&select=id&limit=1`,

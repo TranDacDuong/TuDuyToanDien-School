@@ -501,8 +501,6 @@ async function loadProfile(){
   const { data, error } = await sb.from("users").select("id,role,full_name,email").eq("id", user.id).maybeSingle();
   if (error) throw error;
   if (!data || !ALLOWED_ROLES.has(String(data.role || ""))) throw new Error("Tài khoản này chưa có quyền quản lý đăng bài Facebook.");
-  const allowedByWork = await hasAssignedFacebookPostingWork(data);
-  if (!allowedByWork) throw new Error("Tài khoản này chưa được giao công việc Đăng bài Facebook.");
   S.profile = data;
 }
 

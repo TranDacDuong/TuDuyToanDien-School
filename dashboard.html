@@ -1285,8 +1285,7 @@ function isFacebookPostingTaskLike(task){
 async function userHasFacebookPostingWork(profile){
   if(!profile?.id) return false;
   const role = String(profile.role || "");
-  if(["admin", "assistant"].includes(role)) return true;
-  if(!["teacher", "marketing", "accountant"].includes(role)) return false;
+  if(["admin", "teacher", "assistant", "marketing", "accountant"].includes(role)) return true;
   try{
     const [{ data: templates }, { data: assignments }] = await Promise.all([
       sb.from("facebook_post_schedule_templates")
