@@ -368,6 +368,16 @@ const DEFAULT_TYPES = [
   "Learning Method", "Monday Mindset", "Hard Quiz with Prize", "Q&A", "Meme",
   "Teaching Philosophy", "Enrollment", "Quiz", "Bài hay", "Lỗi sai thường gặp"
 ];
+const DEFAULT_TYPE_PROMPTS = {
+  "Monday Mindset": `Loại bài Monday Mindset dùng workflow riêng:
+- Hệ thống tự xác định tuần ISO trong năm.
+- Tuần 1-50: lấy nội dung Jon Gordon tương ứng với số tuần.
+- Tuần 51-53: chuyển sang chủ đề đếm ngược hết năm.
+- Gemini chỉ cần tìm/khôi phục quote tiếng Anh phù hợp, dịch sang tiếng Việt thật hay và tạo prompt ảnh quote-card.
+- Không viết caption phân tích dài.
+- Caption cuối cùng chỉ gồm hashtag: #MondayMindset #MindUp #TênFanpage.
+- Ảnh cần tập trung vào câu quote tiếng Việt, có nguồn nhỏ bên dưới, phong cách MindUp xanh sáng, dễ đọc trên điện thoại.`
+};
 const QUIZ_TEMPLATES = {
   2: "Ảnh Quiz/2.png",
   3: "Ảnh Quiz/6.png",
@@ -494,10 +504,17 @@ async function ensureDefaultRows(){
     await sb.from("facebook_post_types").insert(DEFAULT_TYPES.map((name, i) => ({
       name,
       description: "",
+      ai_prompt: DEFAULT_TYPE_PROMPTS[name] || null,
       color: ["#c8962a","#2563eb","#16a34a","#dc2626","#9333ea"][i % 5],
       is_active: true,
       created_by: S.profile.id
     })));
+  } else if (S.profile?.role === "admin") {
+    const mondayType = (types || []).find(row => String(row.name || "").trim().toLowerCase() === "monday mindset");
+    const mondayPrompt = DEFAULT_TYPE_PROMPTS["Monday Mindset"];
+    if (mondayType?.id && String(mondayType.ai_prompt || "").trim() !== mondayPrompt.trim()) {
+      await sb.from("facebook_post_types").update({ ai_prompt: mondayPrompt }).eq("id", mondayType.id);
+    }
   }
 }
 

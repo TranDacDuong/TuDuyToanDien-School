@@ -45,6 +45,26 @@ $prompt$,
 updated_at = now()
 where name = 'Monday Mindset';
 
+insert into public.facebook_post_types (name, description, ai_prompt, color, is_active)
+select
+  'Monday Mindset',
+  '',
+  $prompt$
+Loại bài Monday Mindset dùng workflow riêng:
+- Hệ thống tự xác định tuần ISO trong năm.
+- Tuần 1-50: lấy nội dung Jon Gordon tương ứng với số tuần.
+- Tuần 51-53: chuyển sang chủ đề đếm ngược hết năm.
+- Gemini chỉ cần tìm/khôi phục quote tiếng Anh phù hợp, dịch sang tiếng Việt thật hay và tạo prompt ảnh quote-card.
+- Không viết caption phân tích dài.
+- Caption cuối cùng chỉ gồm hashtag: #MondayMindset #MindUp #TênFanpage.
+- Ảnh cần tập trung vào câu quote tiếng Việt, có nguồn nhỏ bên dưới, phong cách MindUp xanh sáng, dễ đọc trên điện thoại.
+$prompt$,
+  '#c8962a',
+  true
+where not exists (
+  select 1 from public.facebook_post_types where name = 'Monday Mindset'
+);
+
 update public.facebook_post_types
 set ai_prompt = $prompt$
 Bạn là chuyên gia phương pháp học tập cho MindUp - Tư Duy Toàn Diện.
