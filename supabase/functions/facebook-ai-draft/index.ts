@@ -448,7 +448,7 @@ function buildGeminiPrompt(args: {
       isCountdown
         ? "Vì bộ nội dung Jon Gordon chỉ có 50 tuần, tuần này hãy tạo quote tiếng Anh ngắn về việc đếm ngược hết năm, hoàn thiện mục tiêu, kết thúc năm thật mạnh mẽ. Quote không cần gán tác giả Jon Gordon."
         : "Hãy tìm/khôi phục một câu nói tiếng Anh ngắn, đúng tinh thần Jon Gordon, phù hợp nhất với chủ đề trên. Nếu không chắc nguyên văn 100%, hãy viết một câu quote tiếng Anh tự nhiên theo phong cách Jon Gordon và ghi nguồn là Jon Gordon-inspired, không bịa là trích dẫn nguyên văn.",
-      "Sau đó dịch câu quote sang tiếng Việt thật hay, giàu cảm hứng, tự nhiên, không dịch máy móc.",
+      "Sau đó chuyển ngữ quote sang tiếng Việt theo bối cảnh học tập của học sinh Việt Nam. Không dịch sát từng chữ nếu câu bị chung chung; hãy giữ tinh thần gốc nhưng diễn đạt thành thông điệp phù hợp với việc học, tư duy học tập, hiểu sâu, nỗ lực, kỷ luật, sự tập trung, kết nối giữa học sinh - thầy cô - phụ huynh. Câu tiếng Việt dùng trên ảnh phải ngắn, tự nhiên, truyền cảm hứng, có chất học thuật nhẹ và dễ nhớ.",
       "",
       "Caption chỉ được là hashtag, không thêm mô tả:",
       `#MondayMindset #MindUp ${fanpageTag}`,
@@ -458,17 +458,17 @@ function buildGeminiPrompt(args: {
         caption: `#MondayMindset #MindUp ${fanpageTag}`,
         hashtags: ["#MondayMindset", "#MindUp", fanpageTag],
         quote_en: isCountdown ? "Short English countdown quote." : "English Jon Gordon quote or Jon Gordon-inspired quote.",
-        quote_vi: "Bản dịch tiếng Việt thật hay của quote.",
+        quote_vi: "Câu chuyển ngữ tiếng Việt theo bối cảnh học tập, ngắn, hay, dễ nhớ, không dịch sát máy móc.",
         quote_source: isCountdown ? "MindUp" : "Jon Gordon / Jon Gordon-inspired",
-        image_prompt: "Prompt tiếng Anh để tạo ảnh Facebook 16:9 hoặc 1:1 phong cách Monday Mindset: nền xanh MindUp, logo MindUp, quote tiếng Việt lớn ở vùng trống, tên tác giả nhỏ bên dưới, typography đẹp, dễ đọc trên điện thoại.",
+        image_prompt: "Prompt tiếng Anh để tạo ảnh Facebook 16:9 phong cách Monday Mindset: nền xanh MindUp, logo MindUp, quote tiếng Việt lớn ở vùng trống, typography đẹp, dễ đọc trên điện thoại. Không thêm tên tác giả trên ảnh.",
         internal_note: `Monday Mindset tuần ${monday.week}/${monday.year}; fanpage ${args.pageName}; offset ${monday.offset}; content ${monday.contentNumber || "countdown"}: ${monday.topic}`,
       }, null, 2),
       "",
       "Yêu cầu ảnh:",
-      "- Ảnh phải tập trung vào quote tiếng Việt.",
+      "- Ảnh phải tập trung vào quote tiếng Việt đã chuyển ngữ theo bối cảnh học tập.",
       "- Nền xanh sáng, giáo dục, hiện đại, có logo hoặc chữ MindUp - Tư Duy Toàn Diện.",
       "- Không viết sai tiếng Việt.",
-      "- Nếu có quote tiếng Anh thì chỉ để nhỏ, quote tiếng Việt là chính.",
+      "- Không đưa quote tiếng Anh hoặc tên nguồn lên ảnh; nếu cần thì chỉ lưu trong internal_note.",
     ].join("\n");
   }
 
