@@ -1280,14 +1280,8 @@ function extractMondayQuoteFromPost(post){
   const note = String(post?.internal_note || "");
   const quoteVi = (note.match(/(?:^|\n)Quote VI:\s*(.+)/i)?.[1] || "").trim();
   const quoteEn = (note.match(/(?:^|\n)Quote EN:\s*(.+)/i)?.[1] || "").trim();
-  const source = (
-    note.match(/(?:^|\n)(?:Nguồn|Nguá»“n|Source):\s*(.+)/i)?.[1]
-    || note.match(/Jon Gordon(?:-inspired)?/i)?.[0]
-    || ""
-  ).trim();
   return {
     quote: quoteVi || quoteEn || String(post?.content || "").replace(/#\S+/g, "").trim(),
-    source: source || "Jon Gordon",
   };
 }
 function wrapCanvasLines(ctx, text, maxWidth){
@@ -1308,11 +1302,11 @@ function wrapCanvasLines(ctx, text, maxWidth){
 }
 function drawMondayMultilineText(ctx, text, box){
   const quote = String(text || "").trim();
-  let fontSize = 54;
+  let fontSize = 58;
   let lines = [];
-  let lineHeight = 66;
+  let lineHeight = 70;
   while (fontSize >= 34) {
-    ctx.font = `800 ${fontSize}px Arial, Helvetica, sans-serif`;
+    ctx.font = `800 ${fontSize}px "Segoe UI", Arial, Helvetica, sans-serif`;
     lineHeight = Math.round(fontSize * 1.22);
     lines = wrapCanvasLines(ctx, quote, box.w);
     if (lines.length * lineHeight <= box.h) break;
@@ -1332,7 +1326,7 @@ function drawMondayMultilineText(ctx, text, box){
   ctx.shadowBlur = 0;
 }
 async function buildMondayMindsetImageDataUrl(post){
-  const { quote, source } = extractMondayQuoteFromPost(post);
+  const { quote } = extractMondayQuoteFromPost(post);
   if (!quote) throw new Error("Gemini chưa trả về quote Monday Mindset để chèn vào ảnh.");
   const bg = await loadImage(MONDAY_MINDSET_TEMPLATE);
   const canvas = document.createElement("canvas");
@@ -1344,21 +1338,8 @@ async function buildMondayMindsetImageDataUrl(post){
   ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
   const sx = canvas.width / 1667;
   const sy = canvas.height / 937;
-  const box = { x: 110 * sx, y: 250 * sy, w: 760 * sx, h: 390 * sy };
-  ctx.fillStyle = "#c8962a";
-  ctx.font = `900 ${Math.round(34 * sx)}px Arial, Helvetica, sans-serif`;
-  ctx.textAlign = "left";
-  ctx.fillText("MONDAY MINDSET", box.x, 190 * sy);
-  ctx.fillStyle = "#0f2f66";
-  ctx.font = `900 ${Math.round(78 * sx)}px Georgia, serif`;
-  ctx.fillText("“", box.x, 245 * sy);
-  ctx.textAlign = "right";
-  ctx.fillText("”", box.x + box.w, 680 * sy);
+  const box = { x: 100 * sx, y: 215 * sy, w: 760 * sx, h: 430 * sy };
   drawMondayMultilineText(ctx, quote, box);
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#315b92";
-  ctx.font = `700 ${Math.round(24 * sx)}px Arial, Helvetica, sans-serif`;
-  ctx.fillText(`— ${source || "Jon Gordon"} —`, box.x + box.w / 2, 710 * sy);
   return canvas.toDataURL("image/png");
 }
 async function replaceMondayMindsetImageWithTemplate(post){
