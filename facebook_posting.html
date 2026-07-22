@@ -535,6 +535,7 @@ let S = {
   templates: [],
   posts: [],
   extraTimes: [],
+  deletingPostIds: new Set(),
   activePageId: "",
   weekStart: startOfWeek(new Date()),
 };
@@ -1695,16 +1696,24 @@ async function createPostFromTypeDrop(typeId, scheduledDate, publishTime=""){
   await loadData();
 }
 async function deletePostById(id){
-  const row = S.posts.find(p => String(p.id) === String(id));
+  const key = String(id || "");
+  if (!key || S.deletingPostIds.has(key)) return;
+  const row = S.posts.find(p => String(p.id) === key);
   if (!row) return;
   if (!confirm(`Xóa bài ${typeName(row.post_type_id)} lúc ${formatDateTime(new Date(row.scheduled_at))}?`)) return;
-  if (row.facebook_post_id) {
-    try { await facebookDelete(row.page_id, row.facebook_post_id); } catch (e) { console.warn(e); }
+  S.deletingPostIds.add(key);
+  try {
+    if (row.facebook_post_id) {
+      try { await facebookDelete(row.page_id, row.facebook_post_id); } catch (e) { console.warn(e); }
+    }
+    const { error } = await sb.from("facebook_scheduled_posts").delete().eq("id", key);
+    if (error) return alert("Không xóa được bài: " + error.message);
+    await loadData();
+  } finally {
+    S.deletingPostIds.delete(key);
   }
-  const { error } = await sb.from("facebook_scheduled_posts").delete().eq("id", id);
-  if (error) return alert("Không xóa được bài: " + error.message);
-  await loadData();
 }
+
 function bindCalendarDrops(){
   const targets = $("weeklyCalendar").querySelectorAll("[data-post-date]");
   targets.forEach(target => {
@@ -1724,18 +1733,19 @@ function bindCalendarDrops(){
   });
   const trash = $("postTrashZone");
   if (trash) {
-    trash.addEventListener("dragover", ev => {
+    trash.ondragover = ev => {
       if (!ev.dataTransfer?.types?.includes("text/plain")) return;
       ev.preventDefault();
       trash.classList.add("drag-over");
-    });
-    trash.addEventListener("dragleave", () => trash.classList.remove("drag-over"));
-    trash.addEventListener("drop", async ev => {
+    };
+    trash.ondragleave = () => trash.classList.remove("drag-over");
+    trash.ondrop = async ev => {
       ev.preventDefault();
+      ev.stopPropagation();
       trash.classList.remove("drag-over");
       const raw = ev.dataTransfer.getData("text/plain") || "";
       if (raw.startsWith("post:")) await deletePostById(raw.slice(5));
-    });
+    };
   }
 }
 async function copyPreviousWeekSchedule({ silent=false } = {}){
