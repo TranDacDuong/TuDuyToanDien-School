@@ -787,6 +787,13 @@ function isHardQuizType(postTypeId){
   const rawName = normalizeText(typeName(postTypeId));
   return rawName.includes("hard quiz");
 }
+function isPairStarterType(postTypeId){
+  const rawName = normalizeText(typeName(postTypeId));
+  return rawName === "problem" || rawName === "teaching philosophy";
+}
+function isLearningMethodType(postTypeId){
+  return normalizeText(typeName(postTypeId)) === "learning method";
+}
 function isMondayMindsetType(postTypeId){
   return normalizeText(typeName(postTypeId)).includes("monday mindset");
 }
@@ -2274,15 +2281,19 @@ async function generateWeekDrafts(){
   const oldText = btn.textContent;
   const weekStart = dateKey(S.weekStart);
   const weekEnd = dateKey(addDays(S.weekStart, 6));
-  const initialTargets = S.posts
-    .filter(post =>
+  const isGeneratablePost = post =>
       post.page_id === S.activePageId
       && post.scheduled_date >= weekStart
       && post.scheduled_date <= weekEnd
       && !["scheduled", "published", "cancelled"].includes(String(post.status || ""))
-      && !postHasContent(post)
-    )
-    .sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
+      && !postHasContent(post);
+  const initialTargets = S.posts
+    .filter(post => isGeneratablePost(post))
+    .sort((a, b) => {
+      const ap = isPairStarterType(a.post_type_id) ? 0 : isLearningMethodType(a.post_type_id) ? 2 : 1;
+      const bp = isPairStarterType(b.post_type_id) ? 0 : isLearningMethodType(b.post_type_id) ? 2 : 1;
+      return ap - bp || new Date(a.scheduled_at) - new Date(b.scheduled_at);
+    });
   if (!initialTargets.length) {
     showStatus("info", "Tuần này không còn bài đăng trống nào cần Gemini tạo nội dung.");
     return;

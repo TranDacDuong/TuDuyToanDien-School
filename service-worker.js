@@ -1,4 +1,4 @@
-const CACHE_VERSION = "mindup-pwa-v49";
+const CACHE_VERSION = "mindup-pwa-v50";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const PUSH_RECEIPT_CACHE = `${CACHE_VERSION}-push-receipts`;
@@ -22,7 +22,6 @@ const APP_SHELL = [
 ];
 
 const CACHEABLE_DESTINATIONS = new Set([
-  "document",
   "script",
   "style",
   "image",
@@ -59,6 +58,11 @@ self.addEventListener("fetch", event => {
 
   if (request.mode === "navigate") {
     event.respondWith(networkFirstNavigation(request));
+    return;
+  }
+
+  if (url.pathname.endsWith(".html")) {
+    event.respondWith(networkFirstAsset(request));
     return;
   }
 

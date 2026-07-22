@@ -1103,7 +1103,14 @@ function parseMetadata(value: unknown): JsonRecord {
   }
 }
 
-async function findNextLearningMethodPost(problemPost: {
+function addDaysIso(dateValue: string, days: number) {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return new Date().toISOString();
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString();
+}
+
+async function findPairedLearningMethodPost(starterPost: {
   id: string;
   page_id: string;
   scheduled_at: string;
@@ -1117,21 +1124,32 @@ async function findNextLearningMethodPost(problemPost: {
     image_url?: string | null;
     internal_note: string | null;
     task_id: string | null;
+    status?: string | null;
     metadata?: JsonRecord | string | null;
     page?: { page_name?: string } | null;
     type?: { name?: string; description?: string | null; ai_prompt?: string | null } | null;
   }>>(
     [
       "facebook_scheduled_posts",
-      `page_id=eq.${encodeURIComponent(problemPost.page_id)}`,
-      `scheduled_at=gt.${encodeURIComponent(problemPost.scheduled_at)}`,
-      "select=id,page_id,post_type_id,scheduled_at,content,image_url,internal_note,task_id,metadata,page:facebook_pages(page_name),type:facebook_post_types!inner(name,description,ai_prompt)",
+      `page_id=eq.${encodeURIComponent(starterPost.page_id)}`,
+      `scheduled_at=gte.${encodeURIComponent(addDaysIso(starterPost.scheduled_at, -7))}`,
+      `scheduled_at=lte.${encodeURIComponent(addDaysIso(starterPost.scheduled_at, 14))}`,
+      "select=id,page_id,post_type_id,scheduled_at,content,image_url,internal_note,task_id,status,metadata,page:facebook_pages(page_name),type:facebook_post_types!inner(name,description,ai_prompt)",
       "type.name=eq.Learning%20Method",
       "order=scheduled_at.asc",
-      "limit=1",
     ].join("&").replace("facebook_scheduled_posts&", "facebook_scheduled_posts?"),
   );
-  return rows[0] || null;
+  const starterTime = new Date(starterPost.scheduled_at).getTime();
+  const candidates = rows
+    .filter(row => String(row.id) !== String(starterPost.id))
+    .filter(row => !["scheduled", "published", "cancelled"].includes(String(row.status || "")));
+  const after = candidates
+    .filter(row => new Date(row.scheduled_at).getTime() >= starterTime)
+    .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+  if (after[0]) return after[0];
+  return candidates
+    .filter(row => new Date(row.scheduled_at).getTime() < starterTime)
+    .sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime())[0] || null;
 }
 
 async function generateImageWithFallback(args: {
@@ -1217,9 +1235,9 @@ Deno.serve(async (req) => {
     });
 
     if (isProblemType(post.type?.name || "")) {
-      const linkedPost = await findNextLearningMethodPost(post);
+      const linkedPost = await findPairedLearningMethodPost(post);
       if (!linkedPost?.id) {
-        throw new Error("Chưa có bài Learning Method nào sau bài Problem này trong cùng fanpage. Hãy tạo lịch Learning Method trước, rồi bấm Gemini lại.");
+        throw new Error("Chưa có bài Learning Method phù hợp trong khoảng gần bài mở chuỗi này cùng fanpage. Hãy tạo lịch Learning Method trước/sau bài này, rồi bấm Gemini lại.");
       }
       linkedPostId = linkedPost.id;
       const selectedLearningMethod = learningMethodTopic(
@@ -1229,7 +1247,7 @@ Deno.serve(async (req) => {
       const pairTextPrompt = [
         textPrompt,
         "",
-        "Thông tin bài Learning Method được ghép sau bài Problem:",
+        "Thông tin bài Learning Method được ghép với bài mở chuỗi:",
         `- Thời gian đăng Learning Method: ${linkedPost.scheduled_at}`,
         learningMethodPromptBlock(selectedLearningMethod),
       ].join("\n");
