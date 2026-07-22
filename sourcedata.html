@@ -277,12 +277,15 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 .trial-modal-box { width:min(96vw,760px); max-height:90vh; overflow:auto; }
 .trial-form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .trial-form-grid .full { grid-column:1/-1; }
+.trial-name-search { display:flex; gap:8px; align-items:center; }
+.trial-name-search input { flex:1; min-width:0; }
+.trial-name-search .btn { white-space:nowrap; }
 .trial-selected-student { display:none; margin-top:8px; padding:8px 10px; border-radius:10px; background:#ecfdf5; color:#047857; font-size:.82rem; font-weight:700; }
 .trial-selected-student.show { display:block; }
 .trial-student-results { margin-top:8px; display:grid; gap:6px; }
 .trial-student-result { display:flex; justify-content:space-between; gap:10px; align-items:center; border:1px solid var(--border); border-radius:10px; padding:8px 10px; background:#fff; }
 .trial-action-stack { display:flex; gap:6px; flex-wrap:wrap; }
-@media (max-width: 720px) { .trial-form-grid { grid-template-columns:1fr; } .trial-modal-box { width:100%; border-radius:22px 22px 0 0; } }
+@media (max-width: 720px) { .trial-form-grid { grid-template-columns:1fr; } .trial-modal-box { width:100%; border-radius:22px 22px 0 0; } .trial-name-search { align-items:stretch; } }
 .theme-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:12px; }
 .theme-card { border:2px solid transparent; border-radius:16px; background:#fff; box-shadow:0 10px 24px rgba(15,31,61,.07); padding:14px; cursor:pointer; text-align:left; transition:.18s; }
 .theme-card:hover { transform:translateY(-2px); box-shadow:0 14px 28px rgba(15,31,61,.11); }
@@ -764,7 +767,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
     <input type="hidden" id="trialEditId">
     <input type="hidden" id="trialStudentId">
     <div class="trial-form-grid">
-      <div class="fg"><label>Họ tên học sinh</label><input id="trialStudentName" placeholder="VD: Nguyễn Văn A"></div>
+      <div class="fg"><label>Họ tên học sinh</label><div class="trial-name-search"><input id="trialStudentName" placeholder="VD: Nguyễn Văn A"><button class="btn btn-outline btn-sm" id="trialStudentNameSearchBtn" type="button" onclick="searchTrialStudentsFromName()">Tìm</button></div></div>
       <div class="fg"><label>SĐT học sinh</label><input id="trialPhone" placeholder="SĐT học sinh"></div>
       <div class="fg"><label>Trường học sinh</label><input id="trialSchool" placeholder="VD: THCS/THPT..."></div>
       <div class="fg"><label>Họ tên phụ huynh</label><input id="trialParentName" placeholder="VD: Nguyễn Thị B"></div>
@@ -772,7 +775,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <div class="fg"><label>Khối</label><select id="trialGradeText" onchange="renderTrialSubjectOptions();populateTrialClassSelect();loadTrialClassSchedules()"><option value="">-- Chọn khối --</option></select></div>
       <div class="fg"><label>Môn</label><select id="trialSubjectText" onchange="populateTrialClassSelect();loadTrialClassSchedules()"><option value="">-- Chọn môn --</option></select></div>
       <div class="fg full">
-        <label>Link tài khoản học sinh hiện có</label>
+        <label>Kết quả tìm kiếm học sinh có sẵn</label>
         <div style="display:flex;gap:8px;align-items:center">
           <input id="trialStudentSearch" placeholder="Tìm theo tên, email hoặc SĐT" style="flex:1">
           <button class="btn btn-outline btn-sm" type="button" onclick="searchTrialStudents()">Tìm</button>
@@ -3097,23 +3100,52 @@ async function searchTrialStudents(){
         <div style="font-weight:800;color:var(--navy)">${esc(s.full_name || 'Học sinh')}</div>
         <div style="font-size:.74rem;color:var(--ink-light)">${esc(s.email || '')}${s.phone ? ' • '+esc(s.phone) : ''}</div>
       </div>
-      <button class="btn btn-primary btn-sm" type="button" onclick="selectTrialStudent('${s.id}')">Link</button>
+      <button class="btn btn-primary btn-sm" type="button" onclick="selectTrialStudent('${s.id}')">Chọn</button>
     </div>
   `).join('');
   data.forEach(s => { _trialStudentMap[s.id] = s; });
 }
 
-function selectTrialStudent(id){
+function searchTrialStudentsFromName(){
+  const name = (document.getElementById('trialStudentName')?.value || '').trim();
+  const search = document.getElementById('trialStudentSearch');
+  if(search) search.value = name;
+  return searchTrialStudents();
+}
+
+async function loadTrialLinkedParentForStudent(studentId){
+  if(!studentId) return null;
+  const { data: link, error: linkError } = await sb.from('parent_students')
+    .select('parent_id')
+    .eq('student_id', studentId)
+    .is('revoked_at', null)
+    .order('created_at', { ascending:false })
+    .limit(1)
+    .maybeSingle();
+  if(linkError || !link?.parent_id) return null;
+  const { data: parent } = await sb.from('users')
+    .select('id,full_name,email,phone')
+    .eq('id', link.parent_id)
+    .eq('role', 'parent')
+    .maybeSingle();
+  return parent || null;
+}
+
+async function selectTrialStudent(id){
   const student = _trialStudentMap[id];
   document.getElementById('trialStudentId').value = id;
   renderTrialLinkedStudent(student || { id });
   document.getElementById('trialStudentResults').innerHTML = '';
   if(student){
-    if(!document.getElementById('trialStudentName').value) document.getElementById('trialStudentName').value = student.full_name || '';
-    if(!document.getElementById('trialPhone').value) document.getElementById('trialPhone').value = student.phone || '';
-    if(!document.getElementById('trialSchool')?.value) document.getElementById('trialSchool').value = student.school || '';
-    if(!document.getElementById('trialParentName').value) document.getElementById('trialParentName').value = student.parent_full_name || '';
-    if(!document.getElementById('trialParentPhone').value) document.getElementById('trialParentPhone').value = student.parent_phone || '';
+    document.getElementById('trialStudentName').value = student.full_name || '';
+    document.getElementById('trialPhone').value = student.phone || '';
+    if(document.getElementById('trialSchool')) document.getElementById('trialSchool').value = student.school || '';
+    const parent = await loadTrialLinkedParentForStudent(id);
+    document.getElementById('trialParentName').value = parent?.full_name || student.parent_full_name || '';
+    document.getElementById('trialParentPhone').value = parent?.phone || student.parent_phone || '';
+    const search = document.getElementById('trialStudentSearch');
+    if(search) search.value = student.full_name || student.email || student.phone || '';
+    toast('Đã điền thông tin học sinh có sẵn');
   }
 }
 
@@ -3507,6 +3539,11 @@ document.getElementById('trialRequestGradeFilter')?.addEventListener('change', (
   renderTrialRequests();
 });
 document.getElementById('trialRequestSubjectFilter')?.addEventListener('change', renderTrialRequests);
+document.getElementById('trialStudentName')?.addEventListener('keydown', event => {
+  if(event.key !== 'Enter') return;
+  event.preventDefault();
+  searchTrialStudentsFromName();
+});
 
 /* ──────────────────────────────
    NHẬT KÝ ADMIN
