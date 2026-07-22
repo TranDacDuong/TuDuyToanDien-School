@@ -52,6 +52,9 @@ tbody tr:hover td{background:#fff7ed}
 .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .field{display:grid;gap:7px}.full{grid-column:1/-1}
 .actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px}
+.name-search{display:flex;gap:8px;align-items:center}
+.name-search .input{flex:1;min-width:0}
+.name-search .btn{white-space:nowrap}
 .selected-student{display:none;margin-top:8px;padding:8px 10px;border-radius:10px;background:#ecfdf5;color:#047857;font-size:.82rem;font-weight:700}
 .selected-student.show{display:block}
 .account-info{display:none;padding:10px 12px;border-radius:14px;border:1px solid #bbf7d0;background:#ecfdf5;color:#047857;font-size:.82rem;font-weight:700;line-height:1.55}
@@ -71,7 +74,7 @@ tbody tr:hover td{background:#fff7ed}
 .student-results{margin-top:8px;display:grid;gap:6px}
 .student-result{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid rgba(39,58,91,.12);border-radius:12px;padding:8px 10px;background:#fff}
 .empty{padding:28px;text-align:center;color:var(--ink-light)}
-@media(max-width:900px){.page{padding:16px 12px 32px}.toolbar,.form-grid{grid-template-columns:1fr}.hero,.toolbar,.card,.modal-card{border-radius:20px}.modal{padding:10px;align-items:flex-end}.modal-card{border-radius:22px 22px 0 0}}
+@media(max-width:900px){.page{padding:16px 12px 32px}.toolbar,.form-grid{grid-template-columns:1fr}.hero,.toolbar,.card,.modal-card{border-radius:20px}.modal{padding:10px;align-items:flex-end}.modal-card{border-radius:22px 22px 0 0}.name-search{align-items:stretch}}
 </style>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0f1f3d">
@@ -140,9 +143,13 @@ tbody tr:hover td{background:#fff7ed}
       <input type="hidden" id="studentId">
       <input type="hidden" id="parentId">
       <div class="form-grid">
-        <div class="field"><label>Họ tên học sinh</label><input id="studentName" class="input" placeholder="VD: Nguyễn Văn A"></div>
+        <div class="field"><label>Họ tên học sinh</label><div class="name-search"><input id="studentName" class="input" placeholder="VD: Nguyễn Văn A"><button class="btn btn-outline btn-sm" id="studentNameSearchBtn" type="button" onclick="searchStudentsFromName()">Tìm</button></div></div>
         <div class="field"><label>SĐT học sinh</label><input id="studentPhone" class="input" placeholder="SĐT học sinh"></div>
         <div class="field"><label>Trường học sinh</label><input id="studentSchool" class="input" placeholder="VD: THCS/THPT..."></div>
+        <div class="field full">
+          <div id="selectedStudent" class="selected-student"></div>
+          <div id="studentResults" class="student-results"></div>
+        </div>
         <div class="field full"><div id="studentAccountInfo" class="account-info"></div></div>
         <div class="field"><label>Họ tên phụ huynh</label><input id="parentName" class="input" placeholder="VD: Nguyễn Thị B"></div>
         <div class="field"><label>SĐT phụ huynh</label><input id="parentPhone" class="input" placeholder="SĐT phụ huynh"></div>
@@ -517,6 +524,134 @@ async function syncStatuses(){
 }
 function copyPhone(phone){ if(!phone) return; navigator.clipboard?.writeText(phone); toast("Đã sao chép SĐT"); }
 
+function renderSelectedStudent(student){
+  const box = document.getElementById("selectedStudent");
+  if(!box) return;
+  if(!student?.id){
+    box.classList.remove("show");
+    box.innerHTML = "";
+    return;
+  }
+  box.classList.add("show");
+  box.innerHTML = `
+    Đã chọn học sinh: ${esc(student.full_name || "—")}
+    ${student.phone ? ` • ${esc(student.phone)}` : ""}
+    ${student.email ? ` • ${esc(student.email)}` : ""}
+    <button class="account-action-btn" type="button" onclick="clearSelectedStudent()">Bỏ chọn</button>`;
+}
+
+function clearSelectedStudent(){
+  document.getElementById("studentId").value = "";
+  renderSelectedStudent(null);
+}
+
+async function searchStudentsByText(query){
+  const q = String(query || "").trim();
+  if(!q) return [];
+  const digits = phoneDigits(q);
+  const select = "id,full_name,email,phone,parent_full_name,parent_phone,school,account_password,role";
+  const filters = [
+    `full_name.ilike.%${q}%`,
+    `email.ilike.%${q}%`
+  ];
+  if(digits) filters.push(`phone.ilike.%${digits}%`);
+  const { data, error } = await sb.from("users")
+    .select(select)
+    .eq("role", "student")
+    .or(filters.join(","))
+    .order("full_name", { ascending:true })
+    .limit(12);
+  if(error) throw error;
+  return data || [];
+}
+
+async function searchStudentsFromName(){
+  const name = (document.getElementById("studentName")?.value || "").trim();
+  const phone = (document.getElementById("studentPhone")?.value || "").trim();
+  const results = document.getElementById("studentResults");
+  const btn = document.getElementById("studentNameSearchBtn");
+  const q = name || phone;
+  if(!results) return;
+  if(!q){
+    results.innerHTML = '<div class="empty" style="padding:10px">Nhập tên hoặc SĐT học sinh để tìm.</div>';
+    return;
+  }
+  const oldText = btn?.textContent || "Tìm";
+  if(btn){ btn.disabled = true; btn.textContent = "Đang tìm..."; }
+  results.innerHTML = '<div class="empty" style="padding:10px">Đang tìm học sinh...</div>';
+  try{
+    const data = await searchStudentsByText(q);
+    data.forEach(student => { S.studentMap[student.id] = student; });
+    if(!data.length){
+      results.innerHTML = '<div class="empty" style="padding:10px">Không tìm thấy học sinh có sẵn.</div>';
+      return;
+    }
+    results.innerHTML = data.map(student => `
+      <div class="student-result">
+        <div>
+          <b style="color:var(--navy)">${esc(student.full_name || "—")}</b>
+          <div style="font-size:.76rem;color:var(--ink-mid);line-height:1.5">${esc(student.phone || "Chưa có SĐT")} • ${esc(student.email || "Chưa có email")}</div>
+          <div style="font-size:.72rem;color:var(--ink-light)">Trường: ${esc(student.school || "—")}</div>
+        </div>
+        <button class="btn btn-primary btn-sm" type="button" onclick="selectSearchedStudent('${escAttr(student.id)}')">Chọn</button>
+      </div>`).join("");
+  }catch(error){
+    results.innerHTML = `<div class="empty" style="padding:10px">${esc(error.message || "Không tìm được học sinh.")}</div>`;
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = oldText; }
+  }
+}
+
+async function loadLinkedParentForStudent(studentId){
+  if(!studentId) return null;
+  const embedded = await sb.from("parent_students")
+    .select("parent:users!parent_students_parent_id_fkey(id,full_name,email,phone,role,account_password)")
+    .eq("student_id", studentId)
+    .is("revoked_at", null)
+    .limit(1);
+  if(!embedded.error && embedded.data?.[0]?.parent?.id) return embedded.data[0].parent;
+  const link = await sb.from("parent_students")
+    .select("parent_id")
+    .eq("student_id", studentId)
+    .is("revoked_at", null)
+    .limit(1)
+    .maybeSingle();
+  const parentId = link.data?.parent_id;
+  if(!parentId) return null;
+  const { data } = await sb.from("users")
+    .select("id,full_name,email,phone,role,account_password")
+    .eq("id", parentId)
+    .maybeSingle();
+  return data || null;
+}
+
+async function selectSearchedStudent(id){
+  const student = S.studentMap[id];
+  if(!student){
+    alert("Không tìm thấy thông tin học sinh đã chọn.");
+    return;
+  }
+  document.getElementById("studentId").value = id;
+  document.getElementById("studentName").value = student.full_name || "";
+  document.getElementById("studentPhone").value = student.phone || "";
+  document.getElementById("studentSchool").value = student.school || "";
+  renderSelectedStudent(student);
+  document.getElementById("studentResults").innerHTML = "";
+  setAccountInfo("student", editableAccountHtml("student", "Đã liên kết với tài khoản học sinh", student.email || "", student.account_password || "", newAccountButtonHtml("student")));
+  const parent = await loadLinkedParentForStudent(id);
+  if(parent?.id){
+    document.getElementById("parentId").value = parent.id;
+    document.getElementById("parentName").value = parent.full_name || student.parent_full_name || "";
+    document.getElementById("parentPhone").value = parent.phone || student.parent_phone || "";
+    setAccountInfo("parent", editableAccountHtml("parent", "Đã liên kết với tài khoản phụ huynh", parent.email || "", parent.account_password || "", newAccountButtonHtml("parent")));
+  }else{
+    if(!document.getElementById("parentName").value) document.getElementById("parentName").value = student.parent_full_name || "";
+    if(!document.getElementById("parentPhone").value) document.getElementById("parentPhone").value = student.parent_phone || "";
+    scheduleAccountCheck("parent");
+  }
+  scheduleAccountCheck("student");
+}
+
 function newAccountButtonHtml(kind) {
   return `<div class="account-action-row"><button class="account-action-btn" type="button" onclick="useNewAccount('${kind}')">+ Tạo tài khoản mới</button></div>`;
 }
@@ -846,6 +981,8 @@ function openTrialModal(id){
   document.getElementById("studentSchool").value = item?.school || item?.linkedStudent?.school || "";
   document.getElementById("parentName").value = item?.parent_full_name || "";
   document.getElementById("parentPhone").value = item?.parent_phone || "";
+  document.getElementById("studentResults").innerHTML = "";
+  renderSelectedStudent(item?.linkedStudent || null);
   renderGradeOptions(item?.grade || "");
   renderSubjectOptions(item?.subject || "");
   document.getElementById("note").value = item?.note || "";
@@ -1028,6 +1165,11 @@ async function addTrialToClassFromModal(){
 document.getElementById("statusFilter").addEventListener("change",renderRequests);
 document.getElementById("gradeFilter").addEventListener("change",()=>{ renderSubjectFilter(); renderRequests(); });
 document.getElementById("subjectFilter").addEventListener("change",renderRequests);
+document.getElementById("studentName")?.addEventListener("keydown", event => {
+  if(event.key !== "Enter") return;
+  event.preventDefault();
+  searchStudentsFromName();
+});
 ["studentName","studentPhone"].forEach(id=>{
   const el = document.getElementById(id);
   el?.addEventListener("blur",()=>scheduleAccountCheck("student"));
