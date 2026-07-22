@@ -363,6 +363,68 @@ function mondayMindsetOffset(pageName: string) {
   return 0;
 }
 
+function pageSubjectContext(pageName: string) {
+  const clean = stripVietnameseForTag(pageName).toLowerCase();
+  if (clean.includes("sinh hoc")) {
+    return {
+      subject: "Sinh h\u1ecdc",
+      example: "H\u1ecdc sinh A h\u1ecdc v\u1ec1 c\u1ea5u t\u1ea1o t\u1ebf b\u00e0o. Thay v\u00ec h\u1ecdc thu\u1ed9c, A gi\u1ea3i th\u00edch cho em g\u00e1i t\u1eebng b\u00e0o quan v\u00e0 ch\u1ee9c n\u0103ng c\u1ee7a ch\u00fang, r\u1ed3i v\u1ebd s\u01a1 \u0111\u1ed3. Khi em h\u1ecfi ti th\u1ec3 \u0111\u1ec3 l\u00e0m g\u00ec, A ph\u1ea3i \u0111\u00e0o s\u00e2u \u0111\u1ec3 tr\u1ea3 l\u1eddi b\u1eb1ng ng\u00f4n ng\u1eef c\u1ee7a m\u00ecnh.",
+      background: "soft biology classroom background, abstract cells, microscope shapes, green-blue light, no text",
+    };
+  }
+  if (clean.includes("hoa hoc")) {
+    return {
+      subject: "H\u00f3a h\u1ecdc",
+      example: "H\u1ecdc sinh A h\u1ecdc v\u1ec1 ph\u1ea3n \u1ee9ng axit - baz\u01a1. Thay v\u00ec ch\u00e9p \u0111\u1ecbnh ngh\u0129a, A t\u1ef1 gi\u1ea3i th\u00edch v\u00ec sao n\u01b0\u1edbc chanh c\u00f3 v\u1ecb chua, x\u00e0 ph\u00f2ng l\u1ea1i tr\u01a1n v\u00e0 th\u1eed v\u1ebd s\u01a1 \u0111\u1ed3 ion H+ / OH- \u0111\u1ec3 hi\u1ec3u b\u1ea3n ch\u1ea5t.",
+      background: "soft chemistry lab background, abstract beakers, molecules, blue-gold light, no text",
+    };
+  }
+  if (clean.includes("vat ly")) {
+    return {
+      subject: "V\u1eadt l\u00fd",
+      example: "H\u1ecdc sinh A h\u1ecdc v\u1ec1 l\u1ef1c ma s\u00e1t. Thay v\u00ec ch\u1ec9 nh\u1edb c\u00f4ng th\u1ee9c, A quan s\u00e1t d\u00e9p tr\u01b0\u1ee3t tr\u00ean n\u1ec1n \u0111\u1ea5t, xe \u0111\u1ea1p phanh g\u1ea5p v\u00e0 t\u1ef1 gi\u1ea3i th\u00edch v\u00ec sao c\u00f9ng m\u1ed9t l\u1ef1c k\u00e9o nh\u01b0ng v\u1eadt c\u00f3 th\u1ec3 chuy\u1ec3n \u0111\u1ed9ng kh\u00e1c nhau.",
+      background: "soft physics learning background, abstract motion lines, light bulb, waves, blue light, no text",
+    };
+  }
+  if (clean.includes("toan hoc")) {
+    return {
+      subject: "To\u00e1n h\u1ecdc",
+      example: "H\u1ecdc sinh A h\u1ecdc v\u1ec1 h\u00e0m s\u1ed1 b\u1eadc nh\u1ea5t. Thay v\u00ec thu\u1ed9c c\u00f4ng th\u1ee9c, A t\u1ef1 l\u1ea5y v\u00ed d\u1ee5 ti\u1ec1n taxi g\u1ed3m ph\u00ed m\u1edf c\u1eeda v\u00e0 ti\u1ec1n theo km, r\u1ed3i gi\u1ea3i th\u00edch v\u00ec sao \u0111\u1ed3 th\u1ecb l\u00e0 m\u1ed9t \u0111\u01b0\u1eddng th\u1eb3ng.",
+      background: "soft mathematics study background, abstract graphs, geometric shapes, blue-gold light, no text",
+    };
+  }
+  if (clean.includes("ngu van") || clean.includes("van hoc")) {
+    return {
+      subject: "Ng\u1eef v\u0103n",
+      example: "H\u1ecdc sinh A h\u1ecdc m\u1ed9t \u0111o\u1ea1n th\u01a1. Thay v\u00ec h\u1ecdc thu\u1ed9c b\u00e0i ph\u00e2n t\u00edch, A t\u1ef1 h\u1ecfi h\u00ecnh \u1ea3nh n\u00e0o l\u00e0m m\u00ecnh nh\u1edb nh\u1ea5t, v\u00ec sao t\u00e1c gi\u1ea3 ch\u1ecdn t\u1eeb \u0111\u00f3, r\u1ed3i k\u1ec3 l\u1ea1i \u00fd hi\u1ec3u b\u1eb1ng l\u1eddi c\u1ee7a m\u00ecnh.",
+      background: "soft literature study background, abstract open books, warm notebook shapes, blue-gold light, no text",
+    };
+  }
+  if (clean.includes("tieng anh") || clean.includes("english")) {
+    return {
+      subject: "Ti\u1ebfng Anh",
+      example: "H\u1ecdc sinh A h\u1ecdc th\u00ec hi\u1ec7n t\u1ea1i ho\u00e0n th\u00e0nh. Thay v\u00ec nh\u1edb m\u00e1y m\u00f3c have/has + V3, A t\u1ef1 k\u1ec3 nh\u1eefng vi\u1ec7c m\u00ecnh \u0111\u00e3 l\u00e0m trong tu\u1ea7n v\u00e0 so s\u00e1nh v\u1edbi vi\u1ec7c x\u1ea3y ra h\u00f4m qua.",
+      background: "soft English learning background, abstract conversation bubbles and notebooks, blue-gold light, no text",
+    };
+  }
+  return {
+    subject: "T\u01b0 duy h\u1ecdc t\u1eadp",
+    example: "H\u1ecdc sinh A h\u1ecdc m\u1ed9t ki\u1ebfn th\u1ee9c m\u1edbi. Thay v\u00ec ch\u1ec9 \u0111\u1ecdc l\u1ea1i v\u1edf, A t\u1ef1 gi\u1ea3i th\u00edch cho ng\u01b0\u1eddi kh\u00e1c, t\u1ef1 \u0111\u1eb7t c\u00e2u h\u1ecfi ng\u01b0\u1ee3c v\u00e0 s\u1eeda l\u1ea1i ph\u1ea7n m\u00ecnh ch\u01b0a n\u00f3i r\u00f5.",
+    background: "soft modern learning background, abstract classroom, light bulb, notebooks, blue-gold light, no text",
+  };
+}
+
+function subjectContextPromptBlock(pageName: string) {
+  const ctx = pageSubjectContext(pageName);
+  return [
+    "B\u1ed1i c\u1ea3nh m\u00f4n h\u1ecdc c\u1ee7a fanpage:",
+    `- M\u00f4n/tr\u1ee5c n\u1ed9i dung: ${ctx.subject}`,
+    `- V\u00ed d\u1ee5 th\u1ef1c t\u1ebf b\u1eaft bu\u1ed9c ph\u1ea3i c\u00f9ng tinh th\u1ea7n v\u00e0 li\u00ean quan \u0111\u1ebfn m\u00f4n n\u00e0y: ${ctx.example}`,
+    "- Trong b\u00e0i Learning Method, ph\u1ea3i c\u00f3 m\u1ed9t v\u00ed d\u1ee5 th\u1ef1c t\u1ebf c\u1ee5 th\u1ec3 li\u00ean quan \u0111\u1ebfn fanpage/m\u00f4n h\u1ecdc, kh\u00f4ng vi\u1ebft v\u00ed d\u1ee5 chung chung.",
+    "- N\u1ebfu fanpage l\u00e0 MindUp t\u1ed5ng, v\u00ed d\u1ee5 c\u00f3 th\u1ec3 li\u00ean m\u00f4n nh\u01b0ng v\u1eabn ph\u1ea3i g\u1eafn v\u1edbi m\u1ed9t t\u00ecnh hu\u1ed1ng h\u1ecdc th\u1eadt.",
+  ].join("\n");
+}
+
 const LEARNING_METHOD_ITEMS = [
   { name: "Active Recall", group: "Nhớ lâu" },
   { name: "Spaced Repetition", group: "Nhớ lâu" },
@@ -721,17 +783,23 @@ function buildGeminiPrompt(args: {
       "",
       learningMethodPromptBlock(method),
       "",
+      subjectContextPromptBlock(args.pageName),
+      "",
       "Yêu cầu nội dung:",
       "- Viết bằng tiếng Việt tự nhiên, thân thiện với học sinh/phụ huynh.",
       "- Có thể tham khảo insight/quy tắc học tập phổ biến từ nguồn tiếng Anh, nhưng phải viết lại thành bài gốc theo giọng MindUp; không copy nguyên văn.",
       "- Bài cần có: vấn đề thường gặp, tên phương pháp, vì sao hiệu quả, cách áp dụng 3-5 bước, ví dụ cụ thể.",
+      "- Ví dụ thực tế bắt buộc phải liên quan đến môn/trục nội dung của fanpage.",
       "- Nếu có bài Problem liên quan trước đó thì hãy viết như một bài giải đáp tiếp nối.",
+      "- Ảnh: Gemini chỉ mô tả nền ảnh liên quan đến bài viết, mờ phía sau, không có chữ và không có logo. Hệ thống sẽ tự chèn logo MindUp phía trên giữa ảnh và chữ tóm tắt khoảng 20 từ ở chính giữa.",
       "",
       "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
       JSON.stringify({
         caption: "Caption bài Learning Method bằng tiếng Việt, giải thích phương pháp học cụ thể và cách áp dụng.",
         hashtags: ["#MindUp", "#LearningMethod", "#PhuongPhapHocTap", "#PhatTrienTuDuy", fanpageTag],
-        image_prompt: "Prompt tiếng Anh tạo ảnh 1:1 cho bài Learning Method, có logo/text MindUp, minh họa phương pháp học rõ ràng, hiện đại, ít chữ, dễ đọc trên điện thoại.",
+        image_prompt: "Prompt tiếng Anh tạo ảnh nền 1:1 cho bài Learning Method, không chữ, không logo, liên quan đến phương pháp học và môn học của fanpage.",
+        image_background_prompt: "Prompt tiếng Anh cho ảnh nền mờ, không chữ, không logo.",
+        image_overlay_text: "Một câu tóm tắt tiếng Việt khoảng 20 từ để hệ thống đặt ở giữa ảnh.",
         internal_note: `Learning Method tuần ${method.week}/${method.year}; fanpage ${args.pageName}; offset ${method.offset}; method ${method.methodNumber}/${method.totalMethods}: ${method.name} (${method.group})`,
       }, null, 2),
     ].filter(Boolean).join("\n");
@@ -756,11 +824,15 @@ function buildGeminiPrompt(args: {
       args.existingContent ? `- Nội dung nháp/vấn đề admin nhập: ${args.existingContent}` : "",
       args.internalNote ? `- Ghi chú nội bộ: ${args.internalNote}` : "",
       "",
+      subjectContextPromptBlock(args.pageName),
+      "",
       "Yêu cầu nội dung:",
       "- Không copy nguyên văn bài nước ngoài. Có thể tham khảo insight/phương pháp học phổ biến bằng tiếng Anh, rồi viết lại thành bài gốc tiếng Việt theo giọng MindUp.",
       "- Problem: đồng cảm, chạm nỗi đau, ví dụ đời thường, không giải pháp quá sâu, hẹn bài Learning Method.",
       "- Learning Method: nhắc lại vấn đề, nêu phương pháp học, vì sao hiệu quả, cách áp dụng 3-5 bước, ví dụ cụ thể cho học sinh/phụ huynh.",
+      "- Ví dụ trong Learning Method bắt buộc phải liên quan đến môn/trục nội dung của fanpage.",
       "- Hệ thống sẽ bổ sung riêng phương pháp học bắt buộc cho bài Learning Method theo tuần và offset fanpage. Không tự chọn ngẫu nhiên nếu đã có phương pháp bắt buộc.",
+      "- Ảnh của cả Problem và Learning Method: Gemini chỉ mô tả nền ảnh liên quan đến bài viết, mờ phía sau, không có chữ và không có logo. Hệ thống sẽ tự chèn logo MindUp phía trên giữa ảnh và chữ tóm tắt vấn đề khoảng 20 từ ở chính giữa.",
       "",
       "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
       JSON.stringify({
@@ -773,13 +845,17 @@ function buildGeminiPrompt(args: {
         problem_post: {
           caption: "Caption bài Problem bằng tiếng Việt, có CTA và hẹn bài Learning Method sau đó.",
           hashtags: ["#MindUp", "#VanDeHocTap", fanpageTag],
-          image_prompt: "Prompt tiếng Anh tạo ảnh 1:1 cho bài Problem, có logo/text MindUp, thể hiện nỗi đau học tập/phụ huynh, không nhiều chữ.",
+          image_prompt: "Prompt tiếng Anh tạo ảnh nền 1:1 cho bài Problem, không chữ, không logo, thể hiện nỗi đau học tập/phụ huynh và liên quan đến môn học fanpage.",
+          image_background_prompt: "Prompt tiếng Anh cho ảnh nền mờ, không chữ, không logo.",
+          image_overlay_text: "Một câu tóm tắt vấn đề bằng tiếng Việt khoảng 20 từ để hệ thống đặt ở giữa ảnh.",
           internal_note: "Ghi chú nội bộ cho người kiểm tra bài Problem.",
         },
         learning_method_post: {
           caption: "Caption bài Learning Method bằng tiếng Việt, giải đáp vấn đề bằng phương pháp học cụ thể.",
           hashtags: ["#MindUp", "#LearningMethod", "#PhuongPhapHocTap", "#PhatTrienTuDuy", fanpageTag],
-          image_prompt: "Prompt tiếng Anh tạo ảnh 1:1 cho bài Learning Method, có logo/text MindUp, minh họa phương pháp học rõ ràng, hiện đại.",
+          image_prompt: "Prompt tiếng Anh tạo ảnh nền 1:1 cho bài Learning Method, không chữ, không logo, liên quan đến phương pháp học và môn học fanpage.",
+          image_background_prompt: "Prompt tiếng Anh cho ảnh nền mờ, không chữ, không logo.",
+          image_overlay_text: "Một câu tóm tắt vấn đề đã nêu trong bài Problem bằng tiếng Việt khoảng 20 từ để hệ thống đặt ở giữa ảnh.",
           internal_note: "Ghi chú nội bộ cho người kiểm tra bài Learning Method.",
         },
       }, null, 2),
@@ -896,6 +972,8 @@ async function generateTextDraft(prompt: string) {
     quoteVi: String(parsed?.quote_vi || "").trim(),
     quoteSource: String(parsed?.quote_source || "").trim(),
     imagePrompt: String(parsed?.image_prompt || "").trim(),
+    imageBackgroundPrompt: String(parsed?.image_background_prompt || parsed?.image_prompt || "").trim(),
+    imageOverlayText: String(parsed?.image_overlay_text || "").trim(),
     internalNote: String(parsed?.internal_note || "").trim(),
   };
 }
@@ -911,6 +989,8 @@ function normalizeDraftPart(value: unknown, fallbackTags: string[] = []) {
     caption: String(record.caption || "").trim(),
     hashtags,
     imagePrompt: String(record.image_prompt || "").trim(),
+    imageBackgroundPrompt: String(record.image_background_prompt || record.image_prompt || "").trim(),
+    imageOverlayText: String(record.image_overlay_text || "").trim(),
     internalNote: String(record.internal_note || "").trim(),
   };
 }
@@ -1053,6 +1133,95 @@ function buildFallbackImage(args: {
   };
 }
 
+function summarizeOverlayText(value: string, maxWords = 20) {
+  const clean = String(value || "")
+    .replace(/#[\p{L}\p{N}_]+/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const sentence = clean.split(/[.!?…]\s+/)[0] || clean;
+  const words = sentence.split(/\s+/).filter(Boolean).slice(0, maxWords);
+  return words.join(" ") || "Học đúng cách để hiểu sâu hơn mỗi ngày";
+}
+
+function subjectVisualTheme(pageName: string) {
+  const clean = stripVietnameseForTag(pageName).toLowerCase();
+  if (clean.includes("sinh hoc")) return {
+    c1: "#dffbea", c2: "#48b98f", c3: "#0e7c68",
+    motifs: `<circle cx="210" cy="250" r="70" fill="#ffffff" opacity=".28"/><circle cx="238" cy="250" r="24" fill="#0e7c68" opacity=".18"/><circle cx="855" cy="760" r="92" fill="#ffffff" opacity=".22"/><path d="M760 230 C825 170 910 185 948 260 C875 286 808 282 760 230Z" fill="#ffffff" opacity=".22"/>`,
+  };
+  if (clean.includes("hoa hoc")) return {
+    c1: "#e8fbff", c2: "#52b8ff", c3: "#0066b8",
+    motifs: `<circle cx="235" cy="265" r="26" fill="#ffffff" opacity=".30"/><circle cx="315" cy="330" r="42" fill="#ffffff" opacity=".22"/><circle cx="825" cy="220" r="34" fill="#ffffff" opacity=".28"/><path d="M765 720 L865 720 L920 900 L710 900 Z" fill="#ffffff" opacity=".16"/>`,
+  };
+  if (clean.includes("vat ly")) return {
+    c1: "#eaf3ff", c2: "#5ca8ff", c3: "#1246a0",
+    motifs: `<path d="M170 320 C310 210 450 210 600 320 S890 430 990 300" fill="none" stroke="#ffffff" stroke-width="28" opacity=".18"/><circle cx="820" cy="285" r="70" fill="#ffffff" opacity=".22"/><path d="M818 220 L858 292 L805 292 L842 370" fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" opacity=".30"/>`,
+  };
+  if (clean.includes("toan hoc")) return {
+    c1: "#eef7ff", c2: "#6bb7ff", c3: "#0f4aa6",
+    motifs: `<circle cx="220" cy="260" r="82" fill="none" stroke="#ffffff" stroke-width="22" opacity=".24"/><path d="M740 250 L930 250 L835 410 Z" fill="#ffffff" opacity=".18"/><path d="M130 840 C300 650 470 920 650 720 S880 650 970 780" fill="none" stroke="#ffffff" stroke-width="24" opacity=".18"/>`,
+  };
+  return {
+    c1: "#e9f8ff", c2: "#66bfff", c3: "#0d4ca6",
+    motifs: `<circle cx="220" cy="250" r="96" fill="#ffffff" opacity=".18"/><circle cx="880" cy="760" r="130" fill="#ffffff" opacity=".16"/><path d="M690 230 C735 155 845 155 890 230 C830 270 755 270 690 230Z" fill="#ffffff" opacity=".18"/>`,
+  };
+}
+
+function buildProblemLearningImage(args: {
+  pageName: string;
+  typeName: string;
+  caption: string;
+  imagePrompt: string;
+  overlayText?: string;
+}) {
+  const theme = subjectVisualTheme(args.pageName);
+  const logoUrl = env("MINDUP_LOGO_URL") || "https://www.mindup.edu.vn/pwa-icon-512.png";
+  const overlay = summarizeOverlayText(args.overlayText || args.caption, 20);
+  const titleLines = wrapSvgText(overlay, 24, 4);
+  const yStart = titleLines.length <= 2 ? 500 : 440;
+  const titleTspans = titleLines
+    .map((line, index) => `<tspan x="540" y="${yStart + index * 70}">${escapeXml(line)}</tspan>`)
+    .join("");
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="${theme.c1}"/>
+      <stop offset=".52" stop-color="${theme.c2}"/>
+      <stop offset="1" stop-color="${theme.c3}"/>
+    </linearGradient>
+    <filter id="blurLayer"><feGaussianBlur stdDeviation="8"/></filter>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#041a3d" flood-opacity=".28"/>
+    </filter>
+    <clipPath id="logoClip"><circle cx="540" cy="150" r="82"/></clipPath>
+  </defs>
+  <rect width="1080" height="1080" rx="54" fill="url(#bg)"/>
+  <g filter="url(#blurLayer)" opacity=".82">
+    <circle cx="130" cy="900" r="320" fill="#ffffff" opacity=".12"/>
+    <circle cx="980" cy="80" r="280" fill="#ffffff" opacity=".14"/>
+    <path d="M0 210 C170 125 335 200 520 135 C720 65 890 86 1080 30 L1080 0 L0 0 Z" fill="#ffffff" opacity=".22"/>
+    ${theme.motifs}
+  </g>
+  <rect width="1080" height="1080" rx="54" fill="#061b3e" opacity=".22"/>
+  <circle cx="540" cy="150" r="82" fill="#063579" filter="url(#shadow)"/>
+  <image href="${escapeXml(logoUrl)}" x="458" y="68" width="164" height="164" preserveAspectRatio="xMidYMid meet" clip-path="url(#logoClip)"/>
+  <text text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="900" fill="#ffffff" filter="url(#shadow)">${titleTspans}</text>
+  <rect x="220" y="820" width="640" height="72" rx="36" fill="#ffffff" opacity=".18"/>
+  <text x="540" y="866" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="900" letter-spacing="6" fill="#ffffff">HIỂU BẢN CHẤT - ĐIỂM BỨT PHÁ</text>
+</svg>`;
+  return {
+    model: "mindup-problem-learning-svg",
+    imagePrompt: [
+      args.imagePrompt,
+      `Overlay text: ${overlay}`,
+      `Layout: blurred related background, MindUp logo top center, bold centered Vietnamese summary.`,
+    ].filter(Boolean).join("\n"),
+    bytes: new TextEncoder().encode(svg),
+    mimeType: "image/svg+xml",
+  };
+}
+
 async function loadPostBundle(postId: string) {
   const rows = await fetchJson<Array<{
     id: string;
@@ -1158,15 +1327,27 @@ async function generateImageWithFallback(args: {
   caption: string;
   imagePrompt: string;
   textPrompt: string;
+  backgroundPrompt?: string;
+  overlayText?: string;
 }) {
   const imageWarning = "";
-  const image = buildFallbackImage({
-    pageName: args.pageName,
-    typeName: args.typeName,
-    caption: args.caption,
-    imagePrompt: args.imagePrompt || args.textPrompt,
-    imageError: "",
-  });
+  const typeKey = stripVietnameseForTag(args.typeName || "").toLowerCase();
+  const shouldUseProblemLearningVisual = isProblemType(args.typeName) || typeKey.includes("problem") || typeKey.includes("learning method");
+  const image = shouldUseProblemLearningVisual
+    ? buildProblemLearningImage({
+      pageName: args.pageName,
+      typeName: args.typeName,
+      caption: args.caption,
+      imagePrompt: args.backgroundPrompt || args.imagePrompt || args.textPrompt,
+      overlayText: args.overlayText,
+    })
+    : buildFallbackImage({
+      pageName: args.pageName,
+      typeName: args.typeName,
+      caption: args.caption,
+      imagePrompt: args.imagePrompt || args.textPrompt,
+      imageError: "",
+    });
   const uploaded = await uploadBytesToDrive(
     image.bytes,
     "mindup-facebook-template.svg",
@@ -1250,6 +1431,8 @@ Deno.serve(async (req) => {
         "Thông tin bài Learning Method được ghép với bài mở chuỗi:",
         `- Thời gian đăng Learning Method: ${linkedPost.scheduled_at}`,
         learningMethodPromptBlock(selectedLearningMethod),
+        "",
+        subjectContextPromptBlock(linkedPost.page?.page_name || post.page?.page_name || linkedPost.page_id),
       ].join("\n");
       await patchJson(`facebook_scheduled_posts?id=eq.${encodeURIComponent(linkedPost.id)}`, {
         ai_status: "generating",
@@ -1275,6 +1458,8 @@ Deno.serve(async (req) => {
           caption: problemContent,
           imagePrompt: pairDraft.problemPost.imagePrompt,
           textPrompt: pairTextPrompt,
+          backgroundPrompt: pairDraft.problemPost.imageBackgroundPrompt,
+          overlayText: pairDraft.problemPost.imageOverlayText || pairDraft.series.problem,
         }),
         generateImageWithFallback({
           pageName: linkedPost.page?.page_name || post.page?.page_name || linkedPost.page_id,
@@ -1282,6 +1467,8 @@ Deno.serve(async (req) => {
           caption: learningContent,
           imagePrompt: pairDraft.learningPost.imagePrompt,
           textPrompt: pairTextPrompt,
+          backgroundPrompt: pairDraft.learningPost.imageBackgroundPrompt,
+          overlayText: pairDraft.learningPost.imageOverlayText || pairDraft.problemPost.imageOverlayText || pairDraft.series.problem,
         }),
       ]);
 
@@ -1368,13 +1555,23 @@ Deno.serve(async (req) => {
       ? `${draft.quoteVi}${draft.quoteSource ? ` — ${draft.quoteSource}` : ""}`
       : draft.caption;
     const imageWarning = "";
-    const image = buildFallbackImage({
-      pageName: post.page?.page_name || post.page_id,
-      typeName: post.type?.name || "Facebook",
-      caption: mondayDisplayText,
-      imagePrompt: draft.imagePrompt || textPrompt,
-      imageError: "",
-    });
+    const typeName = post.type?.name || "Facebook";
+    const typeKey = stripVietnameseForTag(typeName).toLowerCase();
+    const image = (isProblemType(typeName) || typeKey.includes("problem") || typeKey.includes("learning method"))
+      ? buildProblemLearningImage({
+        pageName: post.page?.page_name || post.page_id,
+        typeName,
+        caption: mondayDisplayText,
+        imagePrompt: draft.imageBackgroundPrompt || draft.imagePrompt || textPrompt,
+        overlayText: draft.imageOverlayText || mondayDisplayText,
+      })
+      : buildFallbackImage({
+        pageName: post.page?.page_name || post.page_id,
+        typeName,
+        caption: mondayDisplayText,
+        imagePrompt: draft.imagePrompt || textPrompt,
+        imageError: "",
+      });
     const uploaded = await uploadBytesToDrive(
       image.bytes,
       "mindup-facebook-template.svg",
