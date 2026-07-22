@@ -420,6 +420,7 @@ function subjectContextPromptBlock(pageName: string) {
     "B\u1ed1i c\u1ea3nh m\u00f4n h\u1ecdc c\u1ee7a fanpage:",
     `- M\u00f4n/tr\u1ee5c n\u1ed9i dung: ${ctx.subject}`,
     `- V\u00ed d\u1ee5 th\u1ef1c t\u1ebf b\u1eaft bu\u1ed9c ph\u1ea3i c\u00f9ng tinh th\u1ea7n v\u00e0 li\u00ean quan \u0111\u1ebfn m\u00f4n n\u00e0y: ${ctx.example}`,
+    `- Gợi ý ảnh nền không chữ cho môn này: ${ctx.background}`,
     "- Trong b\u00e0i Learning Method, ph\u1ea3i c\u00f3 m\u1ed9t v\u00ed d\u1ee5 th\u1ef1c t\u1ebf c\u1ee5 th\u1ec3 li\u00ean quan \u0111\u1ebfn fanpage/m\u00f4n h\u1ecdc, kh\u00f4ng vi\u1ebft v\u00ed d\u1ee5 chung chung.",
     "- N\u1ebfu fanpage l\u00e0 MindUp t\u1ed5ng, v\u00ed d\u1ee5 c\u00f3 th\u1ec3 li\u00ean m\u00f4n nh\u01b0ng v\u1eabn ph\u1ea3i g\u1eafn v\u1edbi m\u1ed9t t\u00ecnh hu\u1ed1ng h\u1ecdc th\u1eadt.",
   ].join("\n");
@@ -1038,6 +1039,50 @@ async function generateProblemLearningPairDraft(prompt: string) {
   };
 }
 
+async function generateGeminiBackgroundImage(prompt: string) {
+  const apiKey = env("GEMINI_API_KEY");
+  if (!apiKey) throw new Error("Thiếu Supabase secret GEMINI_API_KEY.");
+
+  const model = env("GEMINI_IMAGE_MODEL") || "gemini-3.1-flash-image";
+  const imagePrompt = [
+    prompt,
+    "",
+    "Create a square 1:1 Facebook post background image only.",
+    "Important constraints: no text, no words, no letters, no logo, no watermark-like visible brand text.",
+    "The image must be directly related to the post topic and the fanpage subject.",
+    "Use a clean modern education/learning visual style, soft depth, slightly blurred/defocused background, with enough empty center space for a Vietnamese headline overlay.",
+  ].filter(Boolean).join("\n");
+
+  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+    method: "POST",
+    headers: {
+      "x-goog-api-key": apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      input: [{ type: "text", text: imagePrompt }],
+      response_format: {
+        type: "image",
+        mime_type: "image/png",
+        aspect_ratio: "1:1",
+        image_size: "1K",
+      },
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error?.message || "Gemini image generation failed");
+  const outputImage = data?.output_image || data?.outputImage;
+  const base64 = String(outputImage?.data || "").trim();
+  if (!base64) throw new Error("Gemini không trả về ảnh nền.");
+  return {
+    model,
+    prompt: imagePrompt,
+    data: base64,
+    mimeType: String(outputImage?.mime_type || outputImage?.mimeType || "image/png"),
+  };
+}
+
 function escapeXml(value: string) {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -1173,6 +1218,8 @@ function buildProblemLearningImage(args: {
   caption: string;
   imagePrompt: string;
   overlayText?: string;
+  backgroundImage?: { data: string; mimeType: string; model: string; prompt: string } | null;
+  imageError?: string;
 }) {
   const theme = subjectVisualTheme(args.pageName);
   const logoUrl = env("MINDUP_LOGO_URL") || "https://www.mindup.edu.vn/pwa-icon-512.png";
@@ -1182,6 +1229,18 @@ function buildProblemLearningImage(args: {
   const titleTspans = titleLines
     .map((line, index) => `<tspan x="540" y="${yStart + index * 70}">${escapeXml(line)}</tspan>`)
     .join("");
+  const backgroundLayer = args.backgroundImage?.data
+    ? `<image href="data:${escapeXml(args.backgroundImage.mimeType || "image/png")};base64,${args.backgroundImage.data}" x="0" y="0" width="1080" height="1080" preserveAspectRatio="xMidYMid slice" filter="url(#softBlur)"/>
+  <rect width="1080" height="1080" rx="54" fill="#061b3e" opacity=".24"/>
+  <rect width="1080" height="1080" rx="54" fill="url(#centerGlow)" opacity=".72"/>`
+    : `<rect width="1080" height="1080" rx="54" fill="url(#bg)"/>
+  <g filter="url(#softBlur)" opacity=".82">
+    <circle cx="130" cy="900" r="320" fill="#ffffff" opacity=".12"/>
+    <circle cx="980" cy="80" r="280" fill="#ffffff" opacity=".14"/>
+    <path d="M0 210 C170 125 335 200 520 135 C720 65 890 86 1080 30 L1080 0 L0 0 Z" fill="#ffffff" opacity=".22"/>
+    ${theme.motifs}
+  </g>
+  <rect width="1080" height="1080" rx="54" fill="#061b3e" opacity=".22"/>`;
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
   <defs>
@@ -1190,32 +1249,36 @@ function buildProblemLearningImage(args: {
       <stop offset=".52" stop-color="${theme.c2}"/>
       <stop offset="1" stop-color="${theme.c3}"/>
     </linearGradient>
-    <filter id="blurLayer"><feGaussianBlur stdDeviation="8"/></filter>
+    <radialGradient id="centerGlow" cx="50%" cy="52%" r="55%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".64"/>
+      <stop offset=".58" stop-color="#ffffff" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softBlur"><feGaussianBlur stdDeviation="7"/></filter>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#041a3d" flood-opacity=".28"/>
     </filter>
+    <filter id="textShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#001a44" flood-opacity=".45"/>
+    </filter>
     <clipPath id="logoClip"><circle cx="540" cy="150" r="82"/></clipPath>
   </defs>
-  <rect width="1080" height="1080" rx="54" fill="url(#bg)"/>
-  <g filter="url(#blurLayer)" opacity=".82">
-    <circle cx="130" cy="900" r="320" fill="#ffffff" opacity=".12"/>
-    <circle cx="980" cy="80" r="280" fill="#ffffff" opacity=".14"/>
-    <path d="M0 210 C170 125 335 200 520 135 C720 65 890 86 1080 30 L1080 0 L0 0 Z" fill="#ffffff" opacity=".22"/>
-    ${theme.motifs}
-  </g>
-  <rect width="1080" height="1080" rx="54" fill="#061b3e" opacity=".22"/>
+  ${backgroundLayer}
   <circle cx="540" cy="150" r="82" fill="#063579" filter="url(#shadow)"/>
   <image href="${escapeXml(logoUrl)}" x="458" y="68" width="164" height="164" preserveAspectRatio="xMidYMid meet" clip-path="url(#logoClip)"/>
-  <text text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="900" fill="#ffffff" filter="url(#shadow)">${titleTspans}</text>
-  <rect x="220" y="820" width="640" height="72" rx="36" fill="#ffffff" opacity=".18"/>
+  <rect x="108" y="${yStart - 58}" width="864" height="${Math.max(180, titleLines.length * 78 + 68)}" rx="46" fill="#061b3e" opacity=".38"/>
+  <text text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="900" fill="#ffffff" filter="url(#textShadow)">${titleTspans}</text>
+  <rect x="220" y="820" width="640" height="72" rx="36" fill="#061b3e" opacity=".38"/>
   <text x="540" y="866" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="900" letter-spacing="6" fill="#ffffff">HIỂU BẢN CHẤT - ĐIỂM BỨT PHÁ</text>
 </svg>`;
   return {
-    model: "mindup-problem-learning-svg",
+    model: args.backgroundImage?.model ? `mindup-overlay-svg; ${args.backgroundImage.model}` : "mindup-problem-learning-svg",
     imagePrompt: [
       args.imagePrompt,
+      args.backgroundImage?.prompt ? `Gemini background prompt: ${args.backgroundImage.prompt}` : "",
       `Overlay text: ${overlay}`,
       `Layout: blurred related background, MindUp logo top center, bold centered Vietnamese summary.`,
+      args.imageError ? `Fallback reason: ${args.imageError}` : "",
     ].filter(Boolean).join("\n"),
     bytes: new TextEncoder().encode(svg),
     mimeType: "image/svg+xml",
@@ -1330,9 +1393,18 @@ async function generateImageWithFallback(args: {
   backgroundPrompt?: string;
   overlayText?: string;
 }) {
-  const imageWarning = "";
+  let imageWarning = "";
   const typeKey = stripVietnameseForTag(args.typeName || "").toLowerCase();
   const shouldUseProblemLearningVisual = isProblemType(args.typeName) || typeKey.includes("problem") || typeKey.includes("learning method");
+  let backgroundImage: Awaited<ReturnType<typeof generateGeminiBackgroundImage>> | null = null;
+  if (shouldUseProblemLearningVisual) {
+    try {
+      backgroundImage = await generateGeminiBackgroundImage(args.backgroundPrompt || args.imagePrompt || args.textPrompt);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      imageWarning = `Gemini Image lỗi, đã dùng nền fallback MindUp: ${message}`;
+    }
+  }
   const image = shouldUseProblemLearningVisual
     ? buildProblemLearningImage({
       pageName: args.pageName,
@@ -1340,6 +1412,8 @@ async function generateImageWithFallback(args: {
       caption: args.caption,
       imagePrompt: args.backgroundPrompt || args.imagePrompt || args.textPrompt,
       overlayText: args.overlayText,
+      backgroundImage,
+      imageError: imageWarning,
     })
     : buildFallbackImage({
       pageName: args.pageName,
@@ -1554,16 +1628,28 @@ Deno.serve(async (req) => {
     const mondayDisplayText = isMondayMindset(post.type?.name || "") && draft.quoteVi
       ? `${draft.quoteVi}${draft.quoteSource ? ` — ${draft.quoteSource}` : ""}`
       : draft.caption;
-    const imageWarning = "";
+    let imageWarning = "";
     const typeName = post.type?.name || "Facebook";
     const typeKey = stripVietnameseForTag(typeName).toLowerCase();
-    const image = (isProblemType(typeName) || typeKey.includes("problem") || typeKey.includes("learning method"))
+    const shouldUseProblemLearningVisual = isProblemType(typeName) || typeKey.includes("problem") || typeKey.includes("learning method");
+    let backgroundImage: Awaited<ReturnType<typeof generateGeminiBackgroundImage>> | null = null;
+    if (shouldUseProblemLearningVisual) {
+      try {
+        backgroundImage = await generateGeminiBackgroundImage(draft.imageBackgroundPrompt || draft.imagePrompt || textPrompt);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        imageWarning = `Gemini Image lỗi, đã dùng nền fallback MindUp: ${message}`;
+      }
+    }
+    const image = shouldUseProblemLearningVisual
       ? buildProblemLearningImage({
         pageName: post.page?.page_name || post.page_id,
         typeName,
         caption: mondayDisplayText,
         imagePrompt: draft.imageBackgroundPrompt || draft.imagePrompt || textPrompt,
         overlayText: draft.imageOverlayText || mondayDisplayText,
+        backgroundImage,
+        imageError: imageWarning,
       })
       : buildFallbackImage({
         pageName: post.page?.page_name || post.page_id,
