@@ -91,6 +91,10 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 .image-preview.show{display:block}
 .token-wrap{position:relative}.token-wrap .input{padding-right:48px}.token-toggle{position:absolute;right:7px;top:7px;width:34px;height:34px;border:0;border-radius:11px;background:#eef4ff;color:#123c78;cursor:pointer}
 .week-title{font-weight:900;color:#10284f}
+.calendar-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px}
+.calendar-title-row h3{margin:0}
+.time-slot-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.time-slot-tools .input{width:118px;padding:9px 11px}
 .quick-list{display:grid;gap:8px;max-height:360px;overflow:auto;padding-right:4px}
 .divider{height:1px;background:rgba(39,58,91,.10);margin:10px 0}
 .auto-task-box{border:1px solid rgba(18,60,120,.12);background:#f8fbff;border-radius:18px;padding:14px;display:grid;gap:12px}
@@ -188,7 +192,13 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 
         <div class="status info show" id="statusBox">Đang tải lịch đăng bài...</div>
 
-        <h3>Lịch bài đăng tuần</h3>
+        <div class="calendar-title-row">
+          <h3>Lịch bài đăng tuần</h3>
+          <div class="time-slot-tools">
+            <input class="input" id="newWeekTimeInput" type="time" value="20:00" aria-label="Khung giờ mới">
+            <button class="btn btn-outline btn-sm" id="addWeekTimeBtn" type="button">+ Thêm khung giờ</button>
+          </div>
+        </div>
         <div class="calendar-wrap" id="weeklyCalendar"></div>
         <div class="trash-zone" id="postTrashZone">Kéo bài đăng vào đây để xóa khỏi tuần này</div>
         <div class="divider" style="display:none"></div>
@@ -369,7 +379,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
       <div class="status info" id="postStatusBox"></div>
     </div>
     <div class="modal-foot">
-      <button class="btn btn-danger" id="deletePostBtn" type="button">Xóa bài</button>
+      <button class="btn btn-danger" id="deletePostBtn" type="button">Xóa nháp</button>
       <button class="btn btn-outline" id="saveDraftBtn" type="button">Lưu nháp</button>
       <button class="btn btn-primary" id="schedulePostBtn" type="button">Hẹn lịch Facebook</button>
     </div>
@@ -524,6 +534,7 @@ let S = {
   staff: [],
   templates: [],
   posts: [],
+  extraTimes: [],
   activePageId: "",
   weekStart: startOfWeek(new Date()),
 };
@@ -1558,11 +1569,53 @@ function dueWeekdayShort(value){
 }
 function usedTimes(){
   const set = new Set();
+  getExtraTimes().forEach(time => set.add(time));
   S.posts.filter(x => x.page_id === S.activePageId).forEach(x => {
     const raw = x.publish_time || (x.scheduled_at ? new Date(x.scheduled_at).toTimeString().slice(0,5) : "");
     if (raw) set.add(raw.slice(0,5));
   });
   return [...set].sort();
+}
+function extraTimesStorageKey(){
+  return `mindup_facebook_extra_times_${S.activePageId || "all"}_${dateKey(S.weekStart)}`;
+}
+function getExtraTimes(){
+  const key = extraTimesStorageKey();
+  if (S.extraTimes?.key === key) return S.extraTimes.values || [];
+  let values = [];
+  try {
+    values = JSON.parse(localStorage.getItem(key) || "[]");
+  } catch {
+    values = [];
+  }
+  values = Array.from(new Set((values || []).map(time => String(time || "").slice(0,5)).filter(isValidPublishTime))).sort();
+  S.extraTimes = { key, values };
+  return values;
+}
+function saveExtraTimes(values){
+  const key = extraTimesStorageKey();
+  const clean = Array.from(new Set((values || []).map(time => String(time || "").slice(0,5)).filter(isValidPublishTime))).sort();
+  S.extraTimes = { key, values: clean };
+  localStorage.setItem(key, JSON.stringify(clean));
+}
+function isValidPublishTime(time){
+  if (!/^\d{1,2}:\d{2}$/.test(String(time || "").trim())) return false;
+  const [hour, minute] = String(time).split(":").map(Number);
+  return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+}
+function normalizePublishTime(time){
+  const [hour, minute] = String(time || "").trim().split(":").map(Number);
+  return `${pad(hour)}:${pad(minute)}`;
+}
+function addWeekTimeSlot(){
+  const input = $("newWeekTimeInput");
+  const raw = input?.value || "";
+  if (!isValidPublishTime(raw)) return alert("Giờ đăng không hợp lệ. Ví dụ đúng: 20:00");
+  const time = normalizePublishTime(raw);
+  const times = getExtraTimes();
+  if (!times.includes(time)) saveExtraTimes([...times, time]);
+  renderWeeklyCalendar();
+  showStatus("ok", `Đã thêm khung giờ ${time} vào lịch tuần này.`);
 }
 function templateInCell(time, weekday){
   return S.templates.filter(t => t.page_id === S.activePageId && Number(t.weekday) === Number(weekday) && String(t.publish_time || "").slice(0,5) === time);
@@ -1989,16 +2042,37 @@ async function savePostDraft(extra={}){
 }
 async function deletePost(){
   const id = $("postId").value;
-  if (!id || !confirm("Xóa bài đăng này? Nếu đã hẹn trên Facebook, hệ thống sẽ cố gắng hủy trên Facebook trước.")) return;
+  if (!id || !confirm("Xóa nội dung đã nháp của bài này? Lịch bài đăng vẫn được giữ nguyên trong tuần.")) return;
   const row = S.posts.find(p => p.id === id);
-  if (row?.facebook_post_id) {
-    try { await facebookDelete(row.page_id, row.facebook_post_id); } catch (e) { console.warn(e); }
+  if (!row) return;
+  if (row.status === "scheduled" || row.facebook_post_id) {
+    alert("Bài này đã hẹn lịch trên Facebook. Nếu muốn xóa lịch đăng thật, hãy kéo bài ra vùng xóa khỏi tuần.");
+    return;
   }
-  const { error } = await sb.from("facebook_scheduled_posts").delete().eq("id", id);
-  if (error) return alert("Không xóa được bài: " + error.message);
-  closePostModal();
+  const { error } = await sb.from("facebook_scheduled_posts").update({
+    content: "",
+    link_url: null,
+    image_url: null,
+    internal_note: null,
+    metadata: {},
+    status: "missing_content",
+    content_status: "missing_content",
+    approval_status: "pending",
+    ai_status: null,
+    ai_error: null,
+    ai_generated_at: null,
+    ai_model: null,
+    ai_prompt: null,
+    ai_image_prompt: null,
+    ai_image_url: null,
+    updated_at: new Date().toISOString(),
+  }).eq("id", id);
+  if (error) return alert("Không xóa được nội dung nháp: " + error.message);
+  showPostStatus("ok", "Đã xóa nội dung nháp, lịch bài đăng vẫn được giữ nguyên.");
   await loadData();
+  openPostModal(id);
 }
+
 async function uploadFile(file){
   if (!file) return;
   showPostStatus("info", "Đang upload ảnh lên Drive...");
@@ -2461,6 +2535,12 @@ function bindEvents(){
   $("prevWeekBtn").addEventListener("click", () => { S.weekStart = addDays(S.weekStart, -7); loadData(); });
   $("nextWeekBtn").addEventListener("click", () => { S.weekStart = addDays(S.weekStart, 7); loadData(); });
   $("weekStartInput").addEventListener("change", () => { const d = new Date($("weekStartInput").value); if(!Number.isNaN(d)) { S.weekStart = startOfWeek(d); loadData(); }});
+  $("addWeekTimeBtn").addEventListener("click", addWeekTimeSlot);
+  $("newWeekTimeInput").addEventListener("keydown", ev => {
+    if (ev.key !== "Enter") return;
+    ev.preventDefault();
+    addWeekTimeSlot();
+  });
   $("openPageBtn").addEventListener("click", () => window.open(currentPage().page_url || `https://www.facebook.com/${currentPage().page_id}`, "_blank", "noopener"));
   $("copyPrevWeekBtn").addEventListener("click", () => copyPreviousWeekSchedule({ silent:false }).catch(error => alert(error.message || String(error))));
   $("generateWeekDraftsBtn").addEventListener("click", () => generateWeekDrafts().catch(error => showStatus("err", error.message || String(error))));
