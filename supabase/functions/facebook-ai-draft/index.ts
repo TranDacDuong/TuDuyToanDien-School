@@ -1043,7 +1043,7 @@ async function generateGeminiBackgroundImage(prompt: string) {
   const apiKey = env("GEMINI_API_KEY");
   if (!apiKey) throw new Error("Thiếu Supabase secret GEMINI_API_KEY.");
 
-  const model = env("GEMINI_IMAGE_MODEL") || "gemini-3.1-flash-image";
+  const model = env("GEMINI_IMAGE_MODEL") || "gemini-2.5-flash-image-preview";
   const imagePrompt = [
     prompt,
     "",
@@ -1053,33 +1053,31 @@ async function generateGeminiBackgroundImage(prompt: string) {
     "Use a clean modern education/learning visual style, soft depth, slightly blurred/defocused background, with enough empty center space for a Vietnamese headline overlay.",
   ].filter(Boolean).join("\n");
 
-  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const res = await fetch(url, {
     method: "POST",
     headers: {
-      "x-goog-api-key": apiKey,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model,
-      input: [{ type: "text", text: imagePrompt }],
-      response_format: {
-        type: "image",
-        mime_type: "image/png",
-        aspect_ratio: "1:1",
-        image_size: "1K",
+      contents: [{ parts: [{ text: imagePrompt }] }],
+      generationConfig: {
+        responseModalities: ["IMAGE"],
       },
     }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error?.message || "Gemini image generation failed");
-  const outputImage = data?.output_image || data?.outputImage;
-  const base64 = String(outputImage?.data || "").trim();
+  const parts = data?.candidates?.[0]?.content?.parts || [];
+  const imagePart = parts.find((part: JsonRecord) => part?.inlineData?.data || part?.inline_data?.data);
+  const inlineData = imagePart?.inlineData || imagePart?.inline_data || {};
+  const base64 = String(inlineData?.data || "").trim();
   if (!base64) throw new Error("Gemini không trả về ảnh nền.");
   return {
     model,
     prompt: imagePrompt,
     data: base64,
-    mimeType: String(outputImage?.mime_type || outputImage?.mimeType || "image/png"),
+    mimeType: String(inlineData?.mimeType || inlineData?.mime_type || "image/png"),
   };
 }
 
@@ -1222,7 +1220,7 @@ function buildProblemLearningImage(args: {
   imageError?: string;
 }) {
   const theme = subjectVisualTheme(args.pageName);
-  const logoUrl = env("MINDUP_LOGO_URL") || "https://www.mindup.edu.vn/pwa-icon-512.png";
+  const logoUrl = env("MINDUP_LOGO_URL") || "https://www.mindup.edu.vn/assets/mindup-logo-round.png";
   const overlay = summarizeOverlayText(args.overlayText || args.caption, 20);
   const titleLines = wrapSvgText(overlay, 24, 4);
   const yStart = titleLines.length <= 2 ? 500 : 440;
@@ -1398,11 +1396,23 @@ async function generateImageWithFallback(args: {
   const shouldUseProblemLearningVisual = isProblemType(args.typeName) || typeKey.includes("problem") || typeKey.includes("learning method");
   let backgroundImage: Awaited<ReturnType<typeof generateGeminiBackgroundImage>> | null = null;
   if (shouldUseProblemLearningVisual) {
+    const overlayText = String(args.overlayText || "").trim();
+    if (!overlayText) {
+      return {
+        image: null,
+        imageWarning: "Chưa tạo được ảnh: Gemini chưa trả dòng tóm tắt ảnh khoảng 20 từ.",
+        imageUrl: null,
+      };
+    }
     try {
       backgroundImage = await generateGeminiBackgroundImage(args.backgroundPrompt || args.imagePrompt || args.textPrompt);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      imageWarning = `Gemini Image lỗi, đã dùng nền fallback MindUp: ${message}`;
+      return {
+        image: null,
+        imageWarning: `Chưa tạo được ảnh nền bằng Gemini Image: ${message}`,
+        imageUrl: null,
+      };
     }
   }
   const image = shouldUseProblemLearningVisual
@@ -1580,9 +1590,9 @@ Deno.serve(async (req) => {
           approval_status: "pending",
           ai_status: "drafted",
           ai_generated_at: new Date().toISOString(),
-          ai_model: `${pairDraft.model}; ${problemImage.image.model}`,
+          ai_model: [pairDraft.model, problemImage.image?.model].filter(Boolean).join("; "),
           ai_prompt: pairTextPrompt,
-          ai_image_prompt: problemImage.image.imagePrompt,
+          ai_image_prompt: problemImage.image?.imagePrompt || pairDraft.problemPost.imageBackgroundPrompt || pairDraft.problemPost.imagePrompt || null,
           ai_image_url: problemImage.imageUrl,
           ai_error: problemImage.imageWarning || null,
           updated_at: new Date().toISOString(),
@@ -1603,9 +1613,9 @@ Deno.serve(async (req) => {
           approval_status: "pending",
           ai_status: "drafted",
           ai_generated_at: new Date().toISOString(),
-          ai_model: `${pairDraft.model}; ${learningImage.image.model}`,
+          ai_model: [pairDraft.model, learningImage.image?.model].filter(Boolean).join("; "),
           ai_prompt: pairTextPrompt,
-          ai_image_prompt: learningImage.image.imagePrompt,
+          ai_image_prompt: learningImage.image?.imagePrompt || pairDraft.learningPost.imageBackgroundPrompt || pairDraft.learningPost.imagePrompt || null,
           ai_image_url: learningImage.imageUrl,
           ai_error: learningImage.imageWarning || null,
           updated_at: new Date().toISOString(),
@@ -1628,41 +1638,16 @@ Deno.serve(async (req) => {
     const mondayDisplayText = isMondayMindset(post.type?.name || "") && draft.quoteVi
       ? `${draft.quoteVi}${draft.quoteSource ? ` — ${draft.quoteSource}` : ""}`
       : draft.caption;
-    let imageWarning = "";
     const typeName = post.type?.name || "Facebook";
-    const typeKey = stripVietnameseForTag(typeName).toLowerCase();
-    const shouldUseProblemLearningVisual = isProblemType(typeName) || typeKey.includes("problem") || typeKey.includes("learning method");
-    let backgroundImage: Awaited<ReturnType<typeof generateGeminiBackgroundImage>> | null = null;
-    if (shouldUseProblemLearningVisual) {
-      try {
-        backgroundImage = await generateGeminiBackgroundImage(draft.imageBackgroundPrompt || draft.imagePrompt || textPrompt);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        imageWarning = `Gemini Image lỗi, đã dùng nền fallback MindUp: ${message}`;
-      }
-    }
-    const image = shouldUseProblemLearningVisual
-      ? buildProblemLearningImage({
-        pageName: post.page?.page_name || post.page_id,
-        typeName,
-        caption: mondayDisplayText,
-        imagePrompt: draft.imageBackgroundPrompt || draft.imagePrompt || textPrompt,
-        overlayText: draft.imageOverlayText || mondayDisplayText,
-        backgroundImage,
-        imageError: imageWarning,
-      })
-      : buildFallbackImage({
-        pageName: post.page?.page_name || post.page_id,
-        typeName,
-        caption: mondayDisplayText,
-        imagePrompt: draft.imagePrompt || textPrompt,
-        imageError: "",
-      });
-    const uploaded = await uploadBytesToDrive(
-      image.bytes,
-      "mindup-facebook-template.svg",
-      image.mimeType,
-    );
+    const generatedImage = await generateImageWithFallback({
+      pageName: post.page?.page_name || post.page_id,
+      typeName,
+      caption: mondayDisplayText,
+      imagePrompt: draft.imagePrompt || textPrompt,
+      backgroundPrompt: draft.imageBackgroundPrompt || draft.imagePrompt || textPrompt,
+      overlayText: draft.imageOverlayText,
+      textPrompt,
+    });
     const finalContent = mergeCaptionAndHashtags(draft.caption, draft.hashtags);
     const finalNote = [
       draft.quoteEn ? `Quote EN: ${draft.quoteEn}` : "",
@@ -1674,27 +1659,27 @@ Deno.serve(async (req) => {
 
     const rows = await patchJson<Array<JsonRecord>>(`facebook_scheduled_posts?id=eq.${encodeURIComponent(postId)}`, {
       content: finalContent,
-      image_url: uploaded.lh3Url || uploaded.url,
+      image_url: generatedImage.imageUrl,
       internal_note: finalNote,
       status: "draft",
       content_status: "submitted",
       approval_status: "pending",
       ai_status: "drafted",
       ai_generated_at: new Date().toISOString(),
-      ai_model: `${draft.model}; ${image.model}`,
+      ai_model: [draft.model, generatedImage.image?.model].filter(Boolean).join("; "),
       ai_prompt: textPrompt,
-      ai_image_prompt: image.imagePrompt,
-      ai_image_url: uploaded.lh3Url || uploaded.url,
-      ai_error: imageWarning || null,
+      ai_image_prompt: generatedImage.image?.imagePrompt || draft.imageBackgroundPrompt || draft.imagePrompt || null,
+      ai_image_url: generatedImage.imageUrl,
+      ai_error: generatedImage.imageWarning || null,
       updated_at: new Date().toISOString(),
     });
 
     return jsonResponse({
       ok: true,
       post: rows?.[0] || null,
-      image_url: uploaded.lh3Url || uploaded.url,
-      image_fallback: Boolean(imageWarning),
-      image_warning: imageWarning,
+      image_url: generatedImage.imageUrl,
+      image_fallback: Boolean(generatedImage.imageWarning),
+      image_warning: generatedImage.imageWarning,
     });
   } catch (error) {
     console.error(error);
