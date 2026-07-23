@@ -1043,7 +1043,7 @@ async function generateGeminiBackgroundImage(prompt: string) {
   const apiKey = env("GEMINI_API_KEY");
   if (!apiKey) throw new Error("Thiếu Supabase secret GEMINI_API_KEY.");
 
-  const model = env("GEMINI_IMAGE_MODEL") || "gemini-2.5-flash-image-preview";
+  const model = env("GEMINI_IMAGE_MODEL") || "gemini-3.1-flash-image";
   const imagePrompt = [
     prompt,
     "",
@@ -1053,31 +1053,33 @@ async function generateGeminiBackgroundImage(prompt: string) {
     "Use a clean modern education/learning visual style, soft depth, slightly blurred/defocused background, with enough empty center space for a Vietnamese headline overlay.",
   ].filter(Boolean).join("\n");
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const res = await fetch(url, {
+  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
     method: "POST",
     headers: {
+      "x-goog-api-key": apiKey,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: imagePrompt }] }],
-      generationConfig: {
-        responseModalities: ["IMAGE"],
+      model,
+      input: [{ type: "text", text: imagePrompt }],
+      response_format: {
+        type: "image",
+        mime_type: "image/png",
+        aspect_ratio: "1:1",
+        image_size: "1K",
       },
     }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error?.message || "Gemini image generation failed");
-  const parts = data?.candidates?.[0]?.content?.parts || [];
-  const imagePart = parts.find((part: JsonRecord) => part?.inlineData?.data || part?.inline_data?.data);
-  const inlineData = imagePart?.inlineData || imagePart?.inline_data || {};
-  const base64 = String(inlineData?.data || "").trim();
+  const outputImage = data?.output_image || data?.outputImage;
+  const base64 = String(outputImage?.data || "").trim();
   if (!base64) throw new Error("Gemini không trả về ảnh nền.");
   return {
     model,
     prompt: imagePrompt,
     data: base64,
-    mimeType: String(inlineData?.mimeType || inlineData?.mime_type || "image/png"),
+    mimeType: String(outputImage?.mime_type || outputImage?.mimeType || "image/png"),
   };
 }
 

@@ -806,6 +806,9 @@ function isPairStarterType(postTypeId){
 function isLearningMethodType(postTypeId){
   return normalizeText(typeName(postTypeId)) === "learning method";
 }
+function isProblemLearningVisualType(postTypeId){
+  return isPairStarterType(postTypeId) || isLearningMethodType(postTypeId);
+}
 function isMondayMindsetType(postTypeId){
   return normalizeText(typeName(postTypeId)).includes("monday mindset");
 }
@@ -1896,10 +1899,13 @@ function openPostModal(id="", defaults={}){
   $("postStatus").value = statusLabel(row?.status || "missing_content");
   $("postContent").value = row?.content || "";
   $("postLinkUrl").value = row?.link_url || "";
-  $("postImageUrl").value = row?.image_url || "";
+  const oldProblemLearningFallbackImage = row
+    && isProblemLearningVisualType(row.post_type_id)
+    && String(row.ai_model || "").includes("mindup-problem-learning-svg");
+  $("postImageUrl").value = oldProblemLearningFallbackImage ? "" : (row?.image_url || "");
   $("postInternalNote").value = row?.internal_note || "";
   const aiText = row
-    ? `${aiStatusLabel(row.ai_status || "idle")}${row.ai_error ? ` • Lỗi: ${row.ai_error}` : ""}`
+    ? `${aiStatusLabel(row.ai_status || "idle")}${oldProblemLearningFallbackImage ? " • Ảnh cũ không đúng chuẩn đã được ẩn, hãy tạo lại ảnh bằng Gemini." : ""}${row.ai_error ? ` • Lỗi: ${row.ai_error}` : ""}`
     : "Chưa tạo bằng AI.";
   $("aiDraftStatus").textContent = aiText;
   $("postCharCount").textContent = String(($("postContent").value || "").length);
@@ -2309,7 +2315,9 @@ async function generateGeminiDraft(){
     const pairedText = data.related_post
       ? ` Gemini cũng đã tạo luôn bài Learning Method đi kèm: ${data.related_post.scheduled_at ? formatDateTime(new Date(data.related_post.scheduled_at)) : ""}.`
       : "";
-    showPostStatus("ok", `Gemini đã tạo nội dung và ảnh, nhưng chưa lưu vào hệ thống.${pairedText} Nếu đã ổn, hãy bấm Lưu nháp.`);
+    const imageWarningText = data.image_warning ? ` Tuy nhiên ảnh chưa đạt/tạo chưa được: ${data.image_warning}` : "";
+    const imageText = $("postImageUrl").value.trim() ? "nội dung và ảnh" : "nội dung";
+    showPostStatus(data.image_warning ? "err" : "ok", `Gemini đã tạo ${imageText}, nhưng chưa lưu vào hệ thống.${pairedText}${imageWarningText} Nếu đã ổn, hãy bấm Lưu nháp.`);
   } catch (error) {
     if (generatedPost || $("postId").value !== originalId) {
       await undoTemporaryGeminiSave({ originalId, originalRow, generatedPost }).catch(()=>{});
