@@ -1257,9 +1257,9 @@ function buildProblemLearningImage(args: {
     .map((line, index) => `<tspan x="540" y="${yStart + index * 70}">${escapeXml(line)}</tspan>`)
     .join("");
   const backgroundLayer = args.backgroundImage?.data
-    ? `<image href="data:${escapeXml(args.backgroundImage.mimeType || "image/png")};base64,${args.backgroundImage.data}" x="0" y="0" width="1080" height="1080" preserveAspectRatio="xMidYMid slice" filter="url(#softBlur)"/>
-  <rect width="1080" height="1080" rx="54" fill="#061b3e" opacity=".24"/>
-  <rect width="1080" height="1080" rx="54" fill="url(#centerGlow)" opacity=".72"/>`
+    ? `<image href="data:${escapeXml(args.backgroundImage.mimeType || "image/png")};base64,${args.backgroundImage.data}" x="0" y="0" width="1080" height="1080" preserveAspectRatio="xMidYMid slice"/>
+  <rect width="1080" height="1080" rx="54" fill="#061b3e" opacity=".26"/>
+  <rect width="1080" height="1080" rx="54" fill="url(#centerGlow)" opacity=".28"/>`
     : `<rect width="1080" height="1080" rx="54" fill="url(#bg)"/>
   <g filter="url(#softBlur)" opacity=".82">
     <circle cx="130" cy="900" r="320" fill="#ffffff" opacity=".12"/>
