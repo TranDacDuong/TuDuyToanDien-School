@@ -331,10 +331,10 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
           <div class="field"><label>Cách chốt kết quả</label><input class="input" id="hardQuizResultRule" placeholder="Ví dụ: gần nhất với 2 số cuối giải Đặc biệt XSMB Chủ nhật"></div>
         </div>
         <div class="field"><label>Lời giải/ghi chú nội bộ</label><textarea class="textarea" id="hardQuizSolution" style="min-height:80px" placeholder="Không đưa vào caption nếu không cần."></textarea></div>
-        <div class="field"><label>Luật chơi sẽ đưa vào caption</label><textarea class="textarea" id="hardQuizRules" style="min-height:150px"></textarea></div>
+        <textarea id="hardQuizRules" style="display:none"></textarea>
         <div class="toolbar" style="margin-bottom:0">
           <div class="toolbar-left">
-            <button class="btn btn-gold" type="button" id="generateHardQuizPostBtn">Tạo ảnh + luật chơi</button>
+            <button class="btn btn-gold" type="button" id="generateHardQuizPostBtn">Tạo ảnh + caption</button>
             <button class="btn btn-outline" type="button" id="previewHardQuizImageBtn">Xem thử ảnh</button>
           </div>
           <img id="hardQuizImagePreview" class="quiz-preview" alt="Xem trước ảnh Hỏi nhanh đớp trọn">
@@ -1492,6 +1492,24 @@ async function generateHardQuizPost(){
     showPostStatus("err", error.message || String(error));
   }
 }
+function setHardQuizFormFromDraft(hardQuiz = {}){
+  const question = String(hardQuiz.question || "").trim();
+  if (!question) throw new Error("Gemini chưa trả về đề bài Hard Quiz.");
+  $("hardQuizQuestion").value = question;
+  $("hardQuizCorrectAnswer").value = String(hardQuiz.correctAnswer || hardQuiz.correct_answer || "").trim();
+  $("hardQuizSolution").value = String(hardQuiz.solution || hardQuiz.explanation || "").trim();
+  if (hardQuiz.prizeAmount || hardQuiz.prize_amount) $("hardQuizPrizeAmount").value = String(hardQuiz.prizeAmount || hardQuiz.prize_amount);
+  $("hardQuizRules").value = buildHardQuizRules();
+}
+async function applyGeminiHardQuizDraft(post, data){
+  const hardQuiz = data?.hard_quiz || postMetadata(post).hard_quiz || {};
+  setHardQuizFormFromDraft(hardQuiz);
+  $("postContent").value = buildHardQuizCaption();
+  await generateHardQuizPost();
+  if (!$("postImageUrl").value.trim()) throw new Error("Chưa tạo được ảnh Hard Quiz từ template MindUp.");
+  $("postCharCount").textContent = String(($("postContent").value || "").length);
+  updateImagePreview();
+}
 function currentPostTypeName(){
   return typeName($("postType")?.value || "");
 }
@@ -2363,6 +2381,15 @@ async function generateGeminiDraft(){
       showPostStatus("ok", "Gemini Ä‘Ã£ táº¡o cÃ¢u há»i Quiz vÃ  áº£nh theo template MindUp, nhÆ°ng chÆ°a lÆ°u vÃ o há»‡ thá»‘ng. Náº¿u Ä‘Ã£ á»•n, hÃ£y báº¥m LÆ°u nhÃ¡p.");
       return;
     }
+    if (isHardQuizType(post.post_type_id)) {
+      generatedPost = post;
+      await applyGeminiHardQuizDraft(post, data);
+      $("postStatus").value = originalId ? statusLabel(originalRow?.status || "draft") : statusLabel("draft");
+      $("aiDraftStatus").textContent = aiStatusLabel(post.ai_status || "drafted");
+      await undoTemporaryGeminiSave({ originalId, originalRow, generatedPost: post });
+      showPostStatus("ok", "Gemini Ä‘Ã£ táº¡o Ä‘á» bÃ i Hard Quiz, áº£nh theo template vÃ  caption luáº­t chÆ¡i cá»‘ Ä‘á»‹nh, nhÆ°ng chÆ°a lÆ°u vÃ o há»‡ thá»‘ng. Náº¿u Ä‘Ã£ á»•n, hÃ£y báº¥m LÆ°u nhÃ¡p.");
+      return;
+    }
     generatedPost = post;
     const isMondayPost = isMondayMindsetType(post.post_type_id);
     $("postContent").value = isMondayPost ? buildMondayMindsetCaption() : (post.content || "");
@@ -2442,6 +2469,44 @@ async function finalizeGeneratedPostForBatch(post, data){
           question: $("quizQuestion").value.trim(),
           answers: Array.from($("quizAnswerFields").querySelectorAll("input")).map(input => input.value.trim()).filter(Boolean),
           correct_answer: $("quizCorrectAnswer").value.trim(),
+          updated_at: new Date().toISOString(),
+        },
+      },
+      status: "draft",
+      content_status: "submitted",
+      approval_status: "pending",
+      updated_at: new Date().toISOString(),
+    };
+    const { data: saved, error } = await sb.from("facebook_scheduled_posts")
+      .update(payload)
+      .eq("id", row.id)
+      .select("*")
+      .single();
+    if (error) throw error;
+    row = saved || { ...row, ...payload };
+  }
+  if (isHardQuizType(row?.post_type_id)) {
+    const hardQuiz = data?.hard_quiz || postMetadata(row).hard_quiz || {};
+    setHardQuizFormFromDraft(hardQuiz);
+    await generateHardQuizPost();
+    const imageUrl = $("postImageUrl").value.trim();
+    if (!imageUrl) throw new Error("ChÆ°a táº¡o Ä‘Æ°á»£c áº£nh Hard Quiz tá»« template MindUp.");
+    const payload = {
+      content: $("postContent").value.trim(),
+      image_url: imageUrl,
+      internal_note: $("postInternalNote").value.trim() || row.internal_note || null,
+      metadata: {
+        ...postMetadata(row),
+        hard_quiz: {
+          ...(postMetadata(row).hard_quiz || {}),
+          enabled: true,
+          question: $("hardQuizQuestion").value.trim(),
+          correct_answer: $("hardQuizCorrectAnswer").value.trim(),
+          solution: $("hardQuizSolution").value.trim(),
+          prize_amount: Math.max(0, Number($("hardQuizPrizeAmount").value || 0)),
+          deadline_note: $("hardQuizDeadlineNote").value.trim() || "trÆ°á»›c giá» quay XSMB Chá»§ nháº­t tuáº§n nÃ y",
+          result_rule: $("hardQuizResultRule").value.trim() || "gáº§n nháº¥t vá»›i 2 sá»‘ cuá»‘i giáº£i Äáº·c biá»‡t XSMB Chá»§ nháº­t",
+          rules: buildHardQuizRules(),
           updated_at: new Date().toISOString(),
         },
       },

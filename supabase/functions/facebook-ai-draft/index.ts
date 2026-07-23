@@ -261,6 +261,12 @@ function escapeControlCharsInsideJsonStrings(value: string) {
   return output;
 }
 
+function isEscaped(value: string, index: number) {
+  let count = 0;
+  for (let i = index - 1; i >= 0 && value[i] === "\\"; i -= 1) count += 1;
+  return count % 2 === 1;
+}
+
 function parseGeminiJsonCandidate(value: string) {
   try {
     return JSON.parse(value);
@@ -269,9 +275,37 @@ function parseGeminiJsonCandidate(value: string) {
     try {
       return JSON.parse(repaired);
     } catch (_) {
-      throw firstError;
+      const latexBackslashRepaired = escapeInvalidJsonBackslashes(repaired);
+      try {
+        return JSON.parse(latexBackslashRepaired);
+      } catch (_) {
+        throw firstError;
+      }
     }
   }
+}
+
+function escapeInvalidJsonBackslashes(value: string) {
+  let output = "";
+  let inString = false;
+  for (let i = 0; i < value.length; i += 1) {
+    const char = value[i];
+    if (char === '"' && !isEscaped(value, i)) {
+      inString = !inString;
+      output += char;
+      continue;
+    }
+    if (inString && char === "\\") {
+      const next = value[i + 1] || "";
+      const nextFour = value.slice(i + 2, i + 6);
+      const validSimple = ['"', "\\", "/", "b", "f", "n", "r", "t"].includes(next);
+      const validUnicode = next === "u" && /^[0-9a-fA-F]{4}$/.test(nextFour);
+      output += validSimple || validUnicode ? "\\" : "\\\\";
+      continue;
+    }
+    output += char;
+  }
+  return output;
 }
 
 function tryParseJson(text: string) {
@@ -826,6 +860,12 @@ function buildGeminiPrompt(args: {
   if (isHardQuizWithPrize(args.typeName)) {
     const fanpageTag = pageHashtag(args.pageName);
     return [
+      "IMPORTANT HARD QUIZ FLOW: Gemini only creates the hard quiz question data. Do not create an image.",
+      "The website already has the MindUp Hard Quiz image template and will place hard_quiz.question into that template.",
+      "The website will automatically generate the caption with fixed game rules, like/share requirements, XSMB prediction rule, prize, and hashtags. Do not write game rules yourself.",
+      "Return a hard_quiz object with question, correct_answer, solution, prize_amount.",
+      "Caption must not reveal the correct answer. Correct answer and solution must only appear in internal_note and hard_quiz fields.",
+      "Use inline LaTeX between single dollar signs for every formula or math/chemistry notation, for example $x^2+1=0$, $\\sqrt{x+1}$, $H_2SO_4$.",
       "Bạn là trợ lý nội dung cho MindUp - Tư Duy Toàn Diện.",
       "Nhiệm vụ: tạo bài Facebook cho chương trình Hard Quiz with Prize, tên hiển thị là HỎI NHANH ĐỚP TRỌN.",
       "",
@@ -869,6 +909,12 @@ function buildGeminiPrompt(args: {
           "#HardQuiz #HoiNhanhDopTron #MindUp #PhatTrienTuDuy " + fanpageTag,
         ].join("\n"),
         hashtags: ["#HardQuiz", "#HoiNhanhDopTron", "#MindUp", "#PhatTrienTuDuy", fanpageTag],
+        hard_quiz: {
+          question: "?? b?i Hard Quiz m?c v?n d?ng, c? th? c?n 10 d?ng gi?i. C?ng th?c n?u c? vi?t d?ng $x^2+1=0$.",
+          correct_answer: "??p ?n ??ng, kh?ng ??a v?o caption. C?ng th?c n?u c? vi?t d?ng $...$.",
+          solution: "L?i gi?i/ghi ch? n?i b? ng?n g?n. C?ng th?c n?u c? vi?t d?ng $...$.",
+          prize_amount: 50000,
+        },
         image_prompt: "Prompt tiếng Anh để tạo ảnh theo template Hỏi nhanh đớp trọn của MindUp: nền xanh, logo MindUp, headline Hỏi nhanh đớp trọn, vùng trắng lớn chỉ chứa đề bài, phần thưởng 50.000đ, typography rõ, dễ đọc trên điện thoại.",
         internal_note: "Ghi đáp án đúng/lời giải nội bộ nếu có, không đưa vào caption.",
       }, null, 2),
@@ -1079,6 +1125,7 @@ async function generateTextDraft(prompt: string) {
   const quizAnswers = Array.isArray(quizRecord.answers)
     ? quizRecord.answers.map((answer: unknown) => String(answer || "").trim()).filter(Boolean).slice(0, 4)
     : [];
+  const hardQuizRecord = (parsed?.hard_quiz && typeof parsed.hard_quiz === "object" ? parsed.hard_quiz : {}) as JsonRecord;
   return {
     model,
     caption: String(parsed?.caption || "").trim(),
@@ -1100,6 +1147,12 @@ async function generateTextDraft(prompt: string) {
       correctAnswer: String(quizRecord.correct_answer || parsed?.correct_answer || "").trim(),
       trap: String(quizRecord.trap || "").trim(),
       explanation: String(quizRecord.explanation || "").trim(),
+    },
+    hardQuiz: {
+      question: String(hardQuizRecord.question || "").trim(),
+      correctAnswer: String(hardQuizRecord.correct_answer || "").trim(),
+      solution: String(hardQuizRecord.solution || hardQuizRecord.explanation || "").trim(),
+      prizeAmount: Number(hardQuizRecord.prize_amount || 0) || 50000,
     },
   };
 }
@@ -1843,6 +1896,52 @@ Deno.serve(async (req) => {
         ok: true,
         post: rows?.[0] || null,
         quiz,
+        image_url: null,
+        image_fallback: false,
+        image_warning: "",
+      });
+    }
+    if (isHardQuizWithPrize(postTypeNameForQuiz)) {
+      const hardQuiz = draft.hardQuiz || {};
+      const hardQuizNote = [
+        draft.internalNote,
+        hardQuiz.question ? `Đề bài: ${hardQuiz.question}` : "",
+        hardQuiz.correctAnswer ? `Đáp án đúng: ${hardQuiz.correctAnswer}` : "",
+        hardQuiz.solution ? `Lời giải/ghi chú: ${hardQuiz.solution}` : "",
+        hardQuiz.prizeAmount ? `Phần thưởng: ${hardQuiz.prizeAmount}` : "",
+        post.internal_note,
+      ].filter(Boolean).join("\n");
+      const rows = await patchJson<Array<JsonRecord>>(`facebook_scheduled_posts?id=eq.${encodeURIComponent(postId)}`, {
+        content: "",
+        image_url: null,
+        internal_note: hardQuizNote || null,
+        metadata: {
+          ...parseMetadata(post.metadata),
+          hard_quiz: {
+            enabled: true,
+            question: hardQuiz.question,
+            correct_answer: hardQuiz.correctAnswer,
+            solution: hardQuiz.solution,
+            prize_amount: hardQuiz.prizeAmount || 50000,
+            updated_at: new Date().toISOString(),
+          },
+        },
+        status: "draft",
+        content_status: "submitted",
+        approval_status: "pending",
+        ai_status: "drafted",
+        ai_generated_at: new Date().toISOString(),
+        ai_model: draft.model,
+        ai_prompt: textPrompt,
+        ai_image_prompt: "MindUp Hard Quiz template",
+        ai_image_url: null,
+        ai_error: null,
+        updated_at: new Date().toISOString(),
+      });
+      return jsonResponse({
+        ok: true,
+        post: rows?.[0] || null,
+        hard_quiz: hardQuiz,
         image_url: null,
         image_fallback: false,
         image_warning: "",
