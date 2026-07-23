@@ -1530,6 +1530,40 @@ async function generateQuizImage(){
     showPostStatus("err", error.message || String(error));
   }
 }
+function setQuizFormFromDraft(quiz = {}){
+  const answers = Array.isArray(quiz.answers)
+    ? quiz.answers.map(answer => String(answer || "").trim()).filter(Boolean).slice(0, 4)
+    : [];
+  const question = String(quiz.question || "").trim();
+  if (!question) throw new Error("Gemini chÆ°a tráº£ vá» cÃ¢u há»i Quiz.");
+  if (answers.length < 2) throw new Error("Gemini chÆ°a tráº£ vá» tá»‘i thiá»ƒu 2 Ä‘Ã¡p Ã¡n Quiz.");
+  $("quizQuestion").value = question;
+  $("quizAnswerCount").value = String(Math.max(2, Math.min(4, answers.length)));
+  renderQuizAnswerFields();
+  Array.from($("quizAnswerFields").querySelectorAll("input")).forEach((input, index) => {
+    input.value = answers[index] || "";
+  });
+  $("quizCorrectAnswer").value = String(quiz.correctAnswer || quiz.correct_answer || "").trim();
+}
+async function applyGeminiQuizDraft(post, data){
+  const quiz = data?.quiz || postMetadata(post).quiz || {};
+  setQuizFormFromDraft(quiz);
+  $("postContent").value = post.content || buildQuizCaption();
+  const noteLines = [
+    post.internal_note || "",
+    quiz.grade ? `Lá»›p: ${quiz.grade}` : "",
+    quiz.subject ? `MÃ´n: ${quiz.subject}` : "",
+    quiz.curriculumTopic || quiz.curriculum_topic ? `Chá»§ Ä‘á»: ${quiz.curriculumTopic || quiz.curriculum_topic}` : "",
+    quiz.correctAnswer || quiz.correct_answer ? `ÄÃ¡p Ã¡n Ä‘Ãºng Quiz: ${quiz.correctAnswer || quiz.correct_answer}` : "",
+    quiz.trap ? `Báº«y nhá»: ${quiz.trap}` : "",
+    quiz.explanation ? `Giáº£i thÃ­ch: ${quiz.explanation}` : "",
+  ].filter(Boolean);
+  $("postInternalNote").value = Array.from(new Set(noteLines)).join("\n");
+  await generateQuizImage();
+  if (!$("postImageUrl").value.trim()) throw new Error("ChÆ°a táº¡o Ä‘Æ°á»£c áº£nh Quiz tá»« template MindUp.");
+  $("postCharCount").textContent = String(($("postContent").value || "").length);
+  updateImagePreview();
+}
 function renderTemplateAssignees(selectedIds=[]){
   const selected = new Set((selectedIds || []).map(String));
   const rows = S.staff.filter(u => u.role !== "admin");
@@ -1917,6 +1951,17 @@ function openPostModal(id="", defaults={}){
   $("quizImagePreview").src = "";
   $("quizImagePreview").classList.remove("show");
   const meta = postMetadata(row);
+  const quiz = meta.quiz || {};
+  if (quiz.question) {
+    $("quizQuestion").value = quiz.question || "";
+    const quizAnswers = Array.isArray(quiz.answers) ? quiz.answers.filter(Boolean).slice(0, 4) : [];
+    $("quizAnswerCount").value = String(Math.max(2, Math.min(4, quizAnswers.length || 4)));
+    renderQuizAnswerFields();
+    Array.from($("quizAnswerFields").querySelectorAll("input")).forEach((input, index) => {
+      input.value = quizAnswers[index] || "";
+    });
+    $("quizCorrectAnswer").value = quiz.correct_answer || quiz.correctAnswer || "";
+  }
   const hardQuiz = meta.hard_quiz || {};
   $("hardQuizQuestion").value = hardQuiz.question || "";
   $("hardQuizCorrectAnswer").value = hardQuiz.correct_answer || "";
@@ -2025,6 +2070,19 @@ function buildPostMetadata(){
       announce_in: "Monday Mindset thứ Hai tuần sau",
       updated_at: new Date().toISOString(),
     };
+  }
+  if (isQuizType(postTypeId)) {
+    try {
+      const data = getQuizData();
+      metadata.quiz = {
+        ...(metadata.quiz || {}),
+        enabled: true,
+        question: data.question,
+        answers: data.answers,
+        correct_answer: data.correctAnswer,
+        updated_at: new Date().toISOString(),
+      };
+    } catch (_) {}
   }
   return metadata;
 }
@@ -2296,6 +2354,15 @@ async function generateGeminiDraft(){
         data.image_url = templatedPost.image_url || data.image_url;
       }
     }
+    if (isQuizType(post.post_type_id)) {
+      generatedPost = post;
+      await applyGeminiQuizDraft(post, data);
+      $("postStatus").value = originalId ? statusLabel(originalRow?.status || "draft") : statusLabel("draft");
+      $("aiDraftStatus").textContent = aiStatusLabel(post.ai_status || "drafted");
+      await undoTemporaryGeminiSave({ originalId, originalRow, generatedPost: post });
+      showPostStatus("ok", "Gemini Ä‘Ã£ táº¡o cÃ¢u há»i Quiz vÃ  áº£nh theo template MindUp, nhÆ°ng chÆ°a lÆ°u vÃ o há»‡ thá»‘ng. Náº¿u Ä‘Ã£ á»•n, hÃ£y báº¥m LÆ°u nhÃ¡p.");
+      return;
+    }
     generatedPost = post;
     const isMondayPost = isMondayMindsetType(post.post_type_id);
     $("postContent").value = isMondayPost ? buildMondayMindsetCaption() : (post.content || "");
@@ -2354,6 +2421,42 @@ async function finalizeGeneratedPostForBatch(post, data){
       .single();
     if (error) throw error;
     row = saved || { ...row, content: mondayContent, status: "draft" };
+  }
+  if (isQuizType(row?.post_type_id)) {
+    const quiz = data?.quiz || postMetadata(row).quiz || {};
+    setQuizFormFromDraft(quiz);
+    $("postContent").value = row.content || buildQuizCaption();
+    $("postInternalNote").value = row.internal_note || "";
+    await generateQuizImage();
+    const imageUrl = $("postImageUrl").value.trim();
+    if (!imageUrl) throw new Error("ChÆ°a táº¡o Ä‘Æ°á»£c áº£nh Quiz tá»« template MindUp.");
+    const payload = {
+      content: $("postContent").value.trim(),
+      image_url: imageUrl,
+      internal_note: $("postInternalNote").value.trim() || row.internal_note || null,
+      metadata: {
+        ...postMetadata(row),
+        quiz: {
+          ...(postMetadata(row).quiz || {}),
+          enabled: true,
+          question: $("quizQuestion").value.trim(),
+          answers: Array.from($("quizAnswerFields").querySelectorAll("input")).map(input => input.value.trim()).filter(Boolean),
+          correct_answer: $("quizCorrectAnswer").value.trim(),
+          updated_at: new Date().toISOString(),
+        },
+      },
+      status: "draft",
+      content_status: "submitted",
+      approval_status: "pending",
+      updated_at: new Date().toISOString(),
+    };
+    const { data: saved, error } = await sb.from("facebook_scheduled_posts")
+      .update(payload)
+      .eq("id", row.id)
+      .select("*")
+      .single();
+    if (error) throw error;
+    row = saved || { ...row, ...payload };
   }
   return row;
 }

@@ -313,6 +313,92 @@ function isLearningMethod(typeName: string) {
   return String(typeName || "").trim().toLowerCase() === "learning method";
 }
 
+function isQuizTypeName(typeName: string) {
+  return String(typeName || "").trim().toLowerCase() === "quiz";
+}
+
+const QUIZ_WEEKDAY_GRADES = [12, 6, 7, 8, 9, 10, 11]; // JS Sunday=0, Monday=1.
+
+const QUIZ_CURRICULUM_TOPICS: Record<string, Record<number, string>> = {
+  "Toán học": {
+    6: "số tự nhiên, phân số, số thập phân, hình học trực quan",
+    7: "số hữu tỉ, tỉ lệ thức, biểu thức đại số, góc và tam giác",
+    8: "đa thức, hằng đẳng thức, phương trình bậc nhất, tứ giác",
+    9: "căn bậc hai, hàm số bậc nhất, hệ phương trình, đường tròn",
+    10: "mệnh đề - tập hợp, hàm số, phương trình, hệ thức lượng",
+    11: "lượng giác, dãy số, giới hạn, đạo hàm cơ bản",
+    12: "hàm số, mũ - logarit, nguyên hàm - tích phân, hình học Oxyz",
+  },
+  "Vật lý": {
+    6: "đo lường, lực, khối lượng, nhiệt độ",
+    7: "tốc độ, âm thanh, ánh sáng, nam châm",
+    8: "áp suất, lực đẩy Archimedes, cơ năng, nhiệt học",
+    9: "điện học, điện trở, công suất điện, điện từ",
+    10: "động học, động lực học, công - năng lượng, động lượng",
+    11: "điện trường, dòng điện, từ trường, cảm ứng điện từ",
+    12: "dao động, sóng, điện xoay chiều, quang học, hạt nhân",
+  },
+  "Hóa học": {
+    6: "chất, thể của chất, hỗn hợp, tách chất",
+    7: "nguyên tử, nguyên tố hóa học, phân tử, liên kết hóa học",
+    8: "phản ứng hóa học, mol, dung dịch, oxit - axit - bazơ",
+    9: "kim loại, phi kim, hydrocarbon, polymer cơ bản",
+    10: "cấu tạo nguyên tử, bảng tuần hoàn, liên kết hóa học, phản ứng oxi hóa khử",
+    11: "cân bằng hóa học, acid-base, nitrogen-sulfur, hydrocarbon",
+    12: "ester-lipid, carbohydrate, amine-amino acid-protein, polymer, kim loại",
+  },
+  "Sinh học": {
+    6: "tế bào, cơ thể sống, đa dạng thế giới sống, vi sinh vật",
+    7: "trao đổi chất, cảm ứng, sinh trưởng, sinh sản ở sinh vật",
+    8: "cơ thể người, dinh dưỡng, tuần hoàn, hô hấp, thần kinh",
+    9: "di truyền, nhiễm sắc thể, DNA, biến dị, sinh thái",
+    10: "sinh học tế bào, chuyển hóa vật chất, phân bào, vi sinh vật",
+    11: "chuyển hóa, cảm ứng, sinh trưởng, sinh sản ở thực vật và động vật",
+    12: "di truyền học, tiến hóa, sinh thái học",
+  },
+  "Ngữ văn": {
+    6: "truyện, thơ, ký, tiếng Việt và viết đoạn văn",
+    7: "văn bản tự sự, biểu cảm, nghị luận, biện pháp tu từ",
+    8: "truyện ký, thơ, nghị luận xã hội, câu ghép",
+    9: "truyện hiện đại, thơ, nghị luận văn học, tổng kết ngữ pháp",
+    10: "văn học dân gian, thơ trung đại, nghị luận xã hội",
+    11: "văn học trung đại và hiện đại, thao tác lập luận, đọc hiểu",
+    12: "văn học hiện đại, nghị luận văn học, nghị luận xã hội, đọc hiểu",
+  },
+  "Tiếng Anh": {
+    6: "present simple, adverbs of frequency, rooms, school topics",
+    7: "past simple, present perfect basics, hobbies, community service",
+    8: "comparatives, future forms, conditional type 1, teen topics",
+    9: "relative clauses, reported speech, passive voice, environment",
+    10: "tenses review, passive voice, gerunds, communication topics",
+    11: "conditionals, clauses, perfect tenses, social issues",
+    12: "tense review, articles, modal verbs, reading inference",
+  },
+  "Tư duy học tập": {
+    6: "đọc kỹ đề, kiểm tra dữ kiện, tính nhẩm đơn giản",
+    7: "nhận diện bẫy ngôn ngữ, so sánh lựa chọn, suy luận nhanh",
+    8: "phân tích điều kiện, tránh đáp án nghe có vẻ đúng",
+    9: "đọc hiểu yêu cầu, loại trừ phương án, kiểm tra đơn vị",
+    10: "mô hình hóa tình huống, phát hiện dữ kiện thừa",
+    11: "suy luận logic, phản biện giả định, kiểm tra điều kiện",
+    12: "tư duy chiến lược khi làm bài, phát hiện bẫy đề thi",
+  },
+};
+
+function quizCurriculumFor(scheduledAt: string, pageName: string) {
+  const date = new Date(scheduledAt);
+  const day = Number.isNaN(date.getTime()) ? 1 : date.getUTCDay();
+  const grade = QUIZ_WEEKDAY_GRADES[day] || 6;
+  const subject = pageSubjectContext(pageName).subject;
+  const topicByGrade = QUIZ_CURRICULUM_TOPICS[subject] || QUIZ_CURRICULUM_TOPICS["Tư duy học tập"];
+  return {
+    grade,
+    subject,
+    topic: topicByGrade[grade] || topicByGrade[6],
+    weekdayRule: "Thứ 2 lớp 6, thứ 3 lớp 7, thứ 4 lớp 8, thứ 5 lớp 9, thứ 6 lớp 10, thứ 7 lớp 11, chủ nhật lớp 12.",
+  };
+}
+
 function isoWeekNumber(dateInput: string | Date) {
   const date = dateInput instanceof Date ? new Date(dateInput) : new Date(dateInput);
   if (Number.isNaN(date.getTime())) return 1;
@@ -693,7 +779,15 @@ function buildGeminiPrompt(args: {
 
   if (scheduledTopic.key === "quiz") {
     const fanpageTag = pageHashtag(args.pageName);
+    const curriculum = quizCurriculumFor(args.scheduledAt, args.pageName);
     return [
+      "IMPORTANT QUIZ FLOW: Gemini only creates quiz text data. Do not create an image. The website will place the question and answers into MindUp's Quiz image template.",
+      `Mandatory weekday-grade plan: ${curriculum.weekdayRule}`,
+      `This post must target grade ${curriculum.grade}, subject ${curriculum.subject}.`,
+      `Current curriculum area to use: ${curriculum.topic}.`,
+      "Return a quiz object with grade, subject, curriculum_topic, question, answers, correct_answer, trap, explanation.",
+      "Caption must not reveal the correct answer. Correct answer and explanation must only appear in internal_note and quiz fields.",
+      "Do not ask Gemini to create the image. The website will create the image from MindUp Quiz template.",
       "Bạn là giáo viên ra câu hỏi tương tác nhanh cho MindUp - Tư Duy Toàn Diện.",
       "Nhiệm vụ: tạo bài Quiz cực nhanh, học sinh có thể làm trong 10-30 giây, nhưng có một bẫy nhỏ khiến học sinh dễ sai nếu đọc vội.",
       "",
@@ -710,6 +804,16 @@ function buildGeminiPrompt(args: {
       JSON.stringify({
         caption: "Caption Quiz ngắn bằng tiếng Việt, kêu gọi comment đáp án, không lộ đáp án.",
         hashtags: ["#MindUp", "#Quiz", "#PhatTrienTuDuy", fanpageTag],
+        quiz: {
+          grade: curriculum.grade,
+          subject: curriculum.subject,
+          curriculum_topic: curriculum.topic,
+          question: "Câu hỏi ngắn, dễ đọc, có bẫy nhỏ.",
+          answers: ["Đáp án 1", "Đáp án 2", "Đáp án 3"],
+          correct_answer: "Nội dung đáp án đúng, không chỉ ghi A/B/C/D.",
+          trap: "Mô tả bẫy nhỏ.",
+          explanation: "Giải thích ngắn 2-3 câu.",
+        },
         image_prompt: "Template Quiz MindUp: nền xanh, logo MindUp, vùng câu hỏi lớn, 2-4 ô đáp án ngắn, font lớn, dễ đọc trên điện thoại.",
         internal_note: "Câu hỏi; các đáp án; đáp án đúng; bẫy nằm ở đâu; giải thích 2-3 câu.",
       }, null, 2),
@@ -968,6 +1072,10 @@ async function generateTextDraft(prompt: string) {
   const hashtags = normalizeHashtags(parsed?.hashtags);
   if (!hashtags.includes("#MindUp")) hashtags.unshift("#MindUp");
   if (!hashtags.includes("#MondayMindset") && !hashtags.includes("#PhatTrienTuDuy")) hashtags.push("#PhatTrienTuDuy");
+  const quizRecord = (parsed?.quiz && typeof parsed.quiz === "object" ? parsed.quiz : {}) as JsonRecord;
+  const quizAnswers = Array.isArray(quizRecord.answers)
+    ? quizRecord.answers.map((answer: unknown) => String(answer || "").trim()).filter(Boolean).slice(0, 4)
+    : [];
   return {
     model,
     caption: String(parsed?.caption || "").trim(),
@@ -980,6 +1088,16 @@ async function generateTextDraft(prompt: string) {
     imageBackgroundPrompt: String(parsed?.image_background_prompt || parsed?.image_prompt || "").trim(),
     imageOverlayText: String(parsed?.image_overlay_text || "").trim(),
     internalNote: String(parsed?.internal_note || "").trim(),
+    quiz: {
+      grade: Number(quizRecord.grade || 0) || null,
+      subject: String(quizRecord.subject || "").trim(),
+      curriculumTopic: String(quizRecord.curriculum_topic || "").trim(),
+      question: String(quizRecord.question || parsed?.question || "").trim(),
+      answers: quizAnswers,
+      correctAnswer: String(quizRecord.correct_answer || parsed?.correct_answer || "").trim(),
+      trap: String(quizRecord.trap || "").trim(),
+      explanation: String(quizRecord.explanation || "").trim(),
+    },
   };
 }
 
@@ -1672,6 +1790,61 @@ Deno.serve(async (req) => {
     }
 
     const draft = await generateTextDraft(textPrompt);
+    const postTypeNameForQuiz = post.type?.name || "Facebook";
+    if (isQuizTypeName(postTypeNameForQuiz)) {
+      const quiz = draft.quiz || {};
+      const quizNote = [
+        draft.internalNote,
+        quiz.grade ? `Lớp: ${quiz.grade}` : "",
+        quiz.subject ? `Môn: ${quiz.subject}` : "",
+        quiz.curriculumTopic ? `Chủ đề: ${quiz.curriculumTopic}` : "",
+        quiz.question ? `Câu hỏi: ${quiz.question}` : "",
+        Array.isArray(quiz.answers) && quiz.answers.length ? `Đáp án: ${quiz.answers.join(" | ")}` : "",
+        quiz.correctAnswer ? `Đáp án đúng: ${quiz.correctAnswer}` : "",
+        quiz.trap ? `Bẫy: ${quiz.trap}` : "",
+        quiz.explanation ? `Giải thích: ${quiz.explanation}` : "",
+        post.internal_note,
+      ].filter(Boolean).join("\n");
+      const rows = await patchJson<Array<JsonRecord>>(`facebook_scheduled_posts?id=eq.${encodeURIComponent(postId)}`, {
+        content: mergeCaptionAndHashtags(draft.caption, draft.hashtags),
+        image_url: null,
+        internal_note: quizNote || null,
+        metadata: {
+          ...parseMetadata(post.metadata),
+          quiz: {
+            enabled: true,
+            grade: quiz.grade,
+            subject: quiz.subject,
+            curriculum_topic: quiz.curriculumTopic,
+            question: quiz.question,
+            answers: quiz.answers,
+            correct_answer: quiz.correctAnswer,
+            trap: quiz.trap,
+            explanation: quiz.explanation,
+            updated_at: new Date().toISOString(),
+          },
+        },
+        status: "draft",
+        content_status: "submitted",
+        approval_status: "pending",
+        ai_status: "drafted",
+        ai_generated_at: new Date().toISOString(),
+        ai_model: draft.model,
+        ai_prompt: textPrompt,
+        ai_image_prompt: "MindUp Quiz template",
+        ai_image_url: null,
+        ai_error: null,
+        updated_at: new Date().toISOString(),
+      });
+      return jsonResponse({
+        ok: true,
+        post: rows?.[0] || null,
+        quiz,
+        image_url: null,
+        image_fallback: false,
+        image_warning: "",
+      });
+    }
     const mondayDisplayText = isMondayMindset(post.type?.name || "") && draft.quoteVi
       ? `${draft.quoteVi}${draft.quoteSource ? ` — ${draft.quoteSource}` : ""}`
       : draft.caption;
