@@ -1093,6 +1093,22 @@ async function generatePexelsBackgroundImage(query: string) {
   };
 }
 
+let mindupLogoDataUriPromise: Promise<string> | null = null;
+
+async function loadMindupLogoDataUri() {
+  if (!mindupLogoDataUriPromise) {
+    mindupLogoDataUriPromise = (async () => {
+      const logoUrl = env("MINDUP_LOGO_URL") || "https://www.mindup.edu.vn/assets/mindup-logo-round.png";
+      const res = await fetch(logoUrl);
+      if (!res.ok) throw new Error(`Could not download MindUp logo: ${res.status} ${res.statusText}`);
+      const contentType = res.headers.get("content-type") || "image/png";
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      return `data:${contentType.includes("image/") ? contentType : "image/png"};base64,${bytesToBase64(bytes)}`;
+    })();
+  }
+  return mindupLogoDataUriPromise;
+}
+
 function escapeXml(value: string) {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -1228,11 +1244,12 @@ function buildProblemLearningImage(args: {
   caption: string;
   imagePrompt: string;
   overlayText?: string;
+  logoDataUri?: string;
   backgroundImage?: { data: string; mimeType: string; model: string; prompt: string } | null;
   imageError?: string;
 }) {
   const theme = subjectVisualTheme(args.pageName);
-  const logoUrl = env("MINDUP_LOGO_URL") || "https://www.mindup.edu.vn/assets/mindup-logo-round.png";
+  const logoHref = args.logoDataUri || env("MINDUP_LOGO_URL") || "https://www.mindup.edu.vn/assets/mindup-logo-round.png";
   const overlay = summarizeOverlayText(args.overlayText || args.caption, 20);
   const titleLines = wrapSvgText(overlay, 24, 4);
   const yStart = titleLines.length <= 2 ? 500 : 440;
@@ -1275,7 +1292,7 @@ function buildProblemLearningImage(args: {
   </defs>
   ${backgroundLayer}
   <circle cx="540" cy="150" r="82" fill="#063579" filter="url(#shadow)"/>
-  <image href="${escapeXml(logoUrl)}" x="458" y="68" width="164" height="164" preserveAspectRatio="xMidYMid meet" clip-path="url(#logoClip)"/>
+  <image href="${escapeXml(logoHref)}" x="458" y="68" width="164" height="164" preserveAspectRatio="xMidYMid meet" clip-path="url(#logoClip)"/>
   <rect x="108" y="${yStart - 58}" width="864" height="${Math.max(180, titleLines.length * 78 + 68)}" rx="46" fill="#061b3e" opacity=".38"/>
   <text text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="900" fill="#ffffff" filter="url(#textShadow)">${titleTspans}</text>
   <rect x="220" y="820" width="640" height="72" rx="36" fill="#061b3e" opacity=".38"/>
@@ -1408,6 +1425,7 @@ async function generateImageWithFallback(args: {
   const typeKey = stripVietnameseForTag(args.typeName || "").toLowerCase();
   const shouldUseProblemLearningVisual = isProblemType(args.typeName) || typeKey.includes("problem") || typeKey.includes("learning method");
   let backgroundImage: Awaited<ReturnType<typeof generatePexelsBackgroundImage>> | null = null;
+  let logoDataUri = "";
   if (shouldUseProblemLearningVisual) {
     const overlayText = String(args.overlayText || "").trim();
     if (!overlayText) {
@@ -1418,7 +1436,10 @@ async function generateImageWithFallback(args: {
       };
     }
     try {
-      backgroundImage = await generatePexelsBackgroundImage(args.searchKeywords || args.backgroundPrompt || args.imagePrompt || args.textPrompt);
+      [backgroundImage, logoDataUri] = await Promise.all([
+        generatePexelsBackgroundImage(args.searchKeywords || args.backgroundPrompt || args.imagePrompt || args.textPrompt),
+        loadMindupLogoDataUri(),
+      ]);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return {
@@ -1435,6 +1456,7 @@ async function generateImageWithFallback(args: {
       caption: args.caption,
       imagePrompt: args.backgroundPrompt || args.imagePrompt || args.textPrompt,
       overlayText: args.overlayText,
+      logoDataUri,
       backgroundImage,
       imageError: imageWarning,
     })
