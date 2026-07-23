@@ -799,7 +799,8 @@ function buildGeminiPrompt(args: {
         caption: "Caption bài Learning Method bằng tiếng Việt, giải thích phương pháp học cụ thể và cách áp dụng.",
         hashtags: ["#MindUp", "#LearningMethod", "#PhuongPhapHocTap", "#PhatTrienTuDuy", fanpageTag],
         image_prompt: "Prompt tiếng Anh tạo ảnh nền 1:1 cho bài Learning Method, không chữ, không logo, liên quan đến phương pháp học và môn học của fanpage.",
-        image_background_prompt: "Prompt tiếng Anh cho ảnh nền mờ, không chữ, không logo.",
+        image_search_keywords: "Từ khóa tiếng Anh để tìm ảnh nền phù hợp trên Pexels, không chữ, liên quan đến bài viết và môn học.",
+        image_background_prompt: "Prompt/từ khóa tiếng Anh cho ảnh nền mờ, không chữ, không logo.",
         image_overlay_text: "Một câu tóm tắt tiếng Việt khoảng 20 từ để hệ thống đặt ở giữa ảnh.",
         internal_note: `Learning Method tuần ${method.week}/${method.year}; fanpage ${args.pageName}; offset ${method.offset}; method ${method.methodNumber}/${method.totalMethods}: ${method.name} (${method.group})`,
       }, null, 2),
@@ -847,7 +848,8 @@ function buildGeminiPrompt(args: {
           caption: "Caption bài Problem bằng tiếng Việt, có CTA và hẹn bài Learning Method sau đó.",
           hashtags: ["#MindUp", "#VanDeHocTap", fanpageTag],
           image_prompt: "Prompt tiếng Anh tạo ảnh nền 1:1 cho bài Problem, không chữ, không logo, thể hiện nỗi đau học tập/phụ huynh và liên quan đến môn học fanpage.",
-          image_background_prompt: "Prompt tiếng Anh cho ảnh nền mờ, không chữ, không logo.",
+          image_search_keywords: "Từ khóa tiếng Anh để tìm ảnh nền phù hợp trên Pexels, không chữ, liên quan đến vấn đề và môn học.",
+          image_background_prompt: "Prompt/từ khóa tiếng Anh cho ảnh nền mờ, không chữ, không logo.",
           image_overlay_text: "Một câu tóm tắt vấn đề bằng tiếng Việt khoảng 20 từ để hệ thống đặt ở giữa ảnh.",
           internal_note: "Ghi chú nội bộ cho người kiểm tra bài Problem.",
         },
@@ -855,7 +857,8 @@ function buildGeminiPrompt(args: {
           caption: "Caption bài Learning Method bằng tiếng Việt, giải đáp vấn đề bằng phương pháp học cụ thể.",
           hashtags: ["#MindUp", "#LearningMethod", "#PhuongPhapHocTap", "#PhatTrienTuDuy", fanpageTag],
           image_prompt: "Prompt tiếng Anh tạo ảnh nền 1:1 cho bài Learning Method, không chữ, không logo, liên quan đến phương pháp học và môn học fanpage.",
-          image_background_prompt: "Prompt tiếng Anh cho ảnh nền mờ, không chữ, không logo.",
+          image_search_keywords: "Từ khóa tiếng Anh để tìm ảnh nền phù hợp trên Pexels, không chữ, liên quan đến phương pháp học và môn học.",
+          image_background_prompt: "Prompt/từ khóa tiếng Anh cho ảnh nền mờ, không chữ, không logo.",
           image_overlay_text: "Một câu tóm tắt vấn đề đã nêu trong bài Problem bằng tiếng Việt khoảng 20 từ để hệ thống đặt ở giữa ảnh.",
           internal_note: "Ghi chú nội bộ cho người kiểm tra bài Learning Method.",
         },
@@ -973,6 +976,7 @@ async function generateTextDraft(prompt: string) {
     quoteVi: String(parsed?.quote_vi || "").trim(),
     quoteSource: String(parsed?.quote_source || "").trim(),
     imagePrompt: String(parsed?.image_prompt || "").trim(),
+    imageSearchKeywords: String(parsed?.image_search_keywords || "").trim(),
     imageBackgroundPrompt: String(parsed?.image_background_prompt || parsed?.image_prompt || "").trim(),
     imageOverlayText: String(parsed?.image_overlay_text || "").trim(),
     internalNote: String(parsed?.internal_note || "").trim(),
@@ -990,6 +994,7 @@ function normalizeDraftPart(value: unknown, fallbackTags: string[] = []) {
     caption: String(record.caption || "").trim(),
     hashtags,
     imagePrompt: String(record.image_prompt || "").trim(),
+    imageSearchKeywords: String(record.image_search_keywords || "").trim(),
     imageBackgroundPrompt: String(record.image_background_prompt || record.image_prompt || "").trim(),
     imageOverlayText: String(record.image_overlay_text || "").trim(),
     internalNote: String(record.internal_note || "").trim(),
@@ -1039,47 +1044,48 @@ async function generateProblemLearningPairDraft(prompt: string) {
   };
 }
 
-async function generateGeminiBackgroundImage(prompt: string) {
-  const apiKey = env("GEMINI_API_KEY");
-  if (!apiKey) throw new Error("Thiếu Supabase secret GEMINI_API_KEY.");
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
 
-  const model = env("GEMINI_IMAGE_MODEL") || "gemini-3.1-flash-image";
-  const imagePrompt = [
-    prompt,
-    "",
-    "Create a square 1:1 Facebook post background image only.",
-    "Important constraints: no text, no words, no letters, no logo, no watermark-like visible brand text.",
-    "The image must be directly related to the post topic and the fanpage subject.",
-    "Use a clean modern education/learning visual style, soft depth, slightly blurred/defocused background, with enough empty center space for a Vietnamese headline overlay.",
-  ].filter(Boolean).join("\n");
+async function generatePexelsBackgroundImage(query: string) {
+  const apiKey = env("PEXELS_API_KEY");
+  if (!apiKey) throw new Error("Thiếu Supabase secret PEXELS_API_KEY.");
+  const cleanQuery = String(query || "").trim();
+  if (!cleanQuery) throw new Error("Gemini chưa trả từ khóa tìm ảnh Pexels.");
 
-  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
-    method: "POST",
-    headers: {
-      "x-goog-api-key": apiKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      input: [{ type: "text", text: imagePrompt }],
-      response_format: {
-        type: "image",
-        mime_type: "image/png",
-        aspect_ratio: "1:1",
-        image_size: "1K",
-      },
-    }),
+  const searchUrl = new URL("https://api.pexels.com/v1/search");
+  searchUrl.searchParams.set("query", `${cleanQuery}, education, no text`);
+  searchUrl.searchParams.set("orientation", "square");
+  searchUrl.searchParams.set("per_page", "8");
+  searchUrl.searchParams.set("page", "1");
+  const searchRes = await fetch(searchUrl.toString(), {
+    headers: { Authorization: apiKey },
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error?.message || "Gemini image generation failed");
-  const outputImage = data?.output_image || data?.outputImage;
-  const base64 = String(outputImage?.data || "").trim();
-  if (!base64) throw new Error("Gemini không trả về ảnh nền.");
+  const searchData = await searchRes.json().catch(() => ({}));
+  if (!searchRes.ok) throw new Error(searchData?.error || searchData?.message || "Pexels search failed");
+  const photos = Array.isArray(searchData?.photos) ? searchData.photos : [];
+  const photo = photos.find((item: JsonRecord) => item?.src?.large2x || item?.src?.large || item?.src?.original);
+  if (!photo) throw new Error(`Pexels không tìm thấy ảnh phù hợp cho từ khóa: ${cleanQuery}`);
+  const src = photo.src || {};
+  const imageUrl = String(src.large2x || src.large || src.original || "").trim();
+  if (!imageUrl) throw new Error("Pexels không trả URL ảnh hợp lệ.");
+
+  const imageRes = await fetch(imageUrl);
+  if (!imageRes.ok) throw new Error(`Không tải được ảnh Pexels: ${imageRes.status} ${imageRes.statusText}`);
+  const contentType = imageRes.headers.get("content-type") || "image/jpeg";
+  const bytes = new Uint8Array(await imageRes.arrayBuffer());
   return {
-    model,
-    prompt: imagePrompt,
-    data: base64,
-    mimeType: String(outputImage?.mime_type || outputImage?.mimeType || "image/png"),
+    model: "pexels-search",
+    prompt: `Pexels query: ${cleanQuery}\nPexels photo: ${photo.url || imageUrl}\nPhotographer: ${photo.photographer || ""}`,
+    data: bytesToBase64(bytes),
+    mimeType: contentType.includes("image/") ? contentType : "image/jpeg",
   };
 }
 
@@ -1275,7 +1281,7 @@ function buildProblemLearningImage(args: {
     model: args.backgroundImage?.model ? `mindup-overlay-svg; ${args.backgroundImage.model}` : "mindup-problem-learning-svg",
     imagePrompt: [
       args.imagePrompt,
-      args.backgroundImage?.prompt ? `Gemini background prompt: ${args.backgroundImage.prompt}` : "",
+      args.backgroundImage?.prompt ? `Background source: ${args.backgroundImage.prompt}` : "",
       `Overlay text: ${overlay}`,
       `Layout: blurred related background, MindUp logo top center, bold centered Vietnamese summary.`,
       args.imageError ? `Fallback reason: ${args.imageError}` : "",
@@ -1391,12 +1397,13 @@ async function generateImageWithFallback(args: {
   imagePrompt: string;
   textPrompt: string;
   backgroundPrompt?: string;
+  searchKeywords?: string;
   overlayText?: string;
 }) {
   let imageWarning = "";
   const typeKey = stripVietnameseForTag(args.typeName || "").toLowerCase();
   const shouldUseProblemLearningVisual = isProblemType(args.typeName) || typeKey.includes("problem") || typeKey.includes("learning method");
-  let backgroundImage: Awaited<ReturnType<typeof generateGeminiBackgroundImage>> | null = null;
+  let backgroundImage: Awaited<ReturnType<typeof generatePexelsBackgroundImage>> | null = null;
   if (shouldUseProblemLearningVisual) {
     const overlayText = String(args.overlayText || "").trim();
     if (!overlayText) {
@@ -1407,12 +1414,12 @@ async function generateImageWithFallback(args: {
       };
     }
     try {
-      backgroundImage = await generateGeminiBackgroundImage(args.backgroundPrompt || args.imagePrompt || args.textPrompt);
+      backgroundImage = await generatePexelsBackgroundImage(args.searchKeywords || args.backgroundPrompt || args.imagePrompt || args.textPrompt);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return {
         image: null,
-        imageWarning: `Chưa tạo được ảnh nền bằng Gemini Image: ${message}`,
+        imageWarning: `Chưa tạo được ảnh nền bằng Pexels: ${message}`,
         imageUrl: null,
       };
     }
@@ -1545,6 +1552,7 @@ Deno.serve(async (req) => {
           imagePrompt: pairDraft.problemPost.imagePrompt,
           textPrompt: pairTextPrompt,
           backgroundPrompt: pairDraft.problemPost.imageBackgroundPrompt,
+          searchKeywords: pairDraft.problemPost.imageSearchKeywords,
           overlayText: pairDraft.problemPost.imageOverlayText || pairDraft.series.problem,
         }),
         generateImageWithFallback({
@@ -1554,6 +1562,7 @@ Deno.serve(async (req) => {
           imagePrompt: pairDraft.learningPost.imagePrompt,
           textPrompt: pairTextPrompt,
           backgroundPrompt: pairDraft.learningPost.imageBackgroundPrompt,
+          searchKeywords: pairDraft.learningPost.imageSearchKeywords,
           overlayText: pairDraft.learningPost.imageOverlayText || pairDraft.problemPost.imageOverlayText || pairDraft.series.problem,
         }),
       ]);
@@ -1594,7 +1603,7 @@ Deno.serve(async (req) => {
           ai_generated_at: new Date().toISOString(),
           ai_model: [pairDraft.model, problemImage.image?.model].filter(Boolean).join("; "),
           ai_prompt: pairTextPrompt,
-          ai_image_prompt: problemImage.image?.imagePrompt || pairDraft.problemPost.imageBackgroundPrompt || pairDraft.problemPost.imagePrompt || null,
+          ai_image_prompt: problemImage.image?.imagePrompt || pairDraft.problemPost.imageSearchKeywords || pairDraft.problemPost.imageBackgroundPrompt || pairDraft.problemPost.imagePrompt || null,
           ai_image_url: problemImage.imageUrl,
           ai_error: problemImage.imageWarning || null,
           updated_at: new Date().toISOString(),
@@ -1617,7 +1626,7 @@ Deno.serve(async (req) => {
           ai_generated_at: new Date().toISOString(),
           ai_model: [pairDraft.model, learningImage.image?.model].filter(Boolean).join("; "),
           ai_prompt: pairTextPrompt,
-          ai_image_prompt: learningImage.image?.imagePrompt || pairDraft.learningPost.imageBackgroundPrompt || pairDraft.learningPost.imagePrompt || null,
+          ai_image_prompt: learningImage.image?.imagePrompt || pairDraft.learningPost.imageSearchKeywords || pairDraft.learningPost.imageBackgroundPrompt || pairDraft.learningPost.imagePrompt || null,
           ai_image_url: learningImage.imageUrl,
           ai_error: learningImage.imageWarning || null,
           updated_at: new Date().toISOString(),
@@ -1647,6 +1656,7 @@ Deno.serve(async (req) => {
       caption: mondayDisplayText,
       imagePrompt: draft.imagePrompt || textPrompt,
       backgroundPrompt: draft.imageBackgroundPrompt || draft.imagePrompt || textPrompt,
+      searchKeywords: draft.imageSearchKeywords,
       overlayText: draft.imageOverlayText,
       textPrompt,
     });
@@ -1670,7 +1680,7 @@ Deno.serve(async (req) => {
       ai_generated_at: new Date().toISOString(),
       ai_model: [draft.model, generatedImage.image?.model].filter(Boolean).join("; "),
       ai_prompt: textPrompt,
-      ai_image_prompt: generatedImage.image?.imagePrompt || draft.imageBackgroundPrompt || draft.imagePrompt || null,
+      ai_image_prompt: generatedImage.image?.imagePrompt || draft.imageSearchKeywords || draft.imageBackgroundPrompt || draft.imagePrompt || null,
       ai_image_url: generatedImage.imageUrl,
       ai_error: generatedImage.imageWarning || null,
       updated_at: new Date().toISOString(),
