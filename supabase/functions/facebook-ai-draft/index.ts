@@ -1071,9 +1071,13 @@ async function generatePexelsBackgroundImage(query: string) {
   const searchData = await searchRes.json().catch(() => ({}));
   if (!searchRes.ok) throw new Error(searchData?.error || searchData?.message || "Pexels search failed");
   const photos = Array.isArray(searchData?.photos) ? searchData.photos : [];
-  const photo = photos.find((item: JsonRecord) => item?.src?.large2x || item?.src?.large || item?.src?.original);
+  const photo = photos.find((item: unknown) => {
+    const record = item && typeof item === "object" ? item as JsonRecord : null;
+    const src = record?.src && typeof record.src === "object" ? record.src as JsonRecord : null;
+    return src?.large2x || src?.large || src?.original;
+  }) as JsonRecord | undefined;
   if (!photo) throw new Error(`Pexels không tìm thấy ảnh phù hợp cho từ khóa: ${cleanQuery}`);
-  const src = photo.src || {};
+  const src = photo.src && typeof photo.src === "object" ? photo.src as JsonRecord : {};
   const imageUrl = String(src.large2x || src.large || src.original || "").trim();
   if (!imageUrl) throw new Error("Pexels không trả URL ảnh hợp lệ.");
 
