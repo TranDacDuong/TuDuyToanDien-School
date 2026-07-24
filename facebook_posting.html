@@ -1100,8 +1100,17 @@ function quizAnswerTextBox(rawBox, canvasWidth, canvasHeight){
   const box = scaleQuizBox(rawBox, canvasWidth, canvasHeight);
   const scale = quizCanvasScale(canvasWidth);
   const isThreeAnswerLayout = rawBox.w <= 430;
-  const iconSpace = (isThreeAnswerLayout ? 112 : 68) * scale;
-  const rightPadding = (isThreeAnswerLayout ? 20 : 42) * scale;
+  if (isThreeAnswerLayout) {
+    const padding = 34 * scale;
+    return {
+      x: box.x + padding,
+      y: box.y,
+      w: Math.max(80 * scale, box.w - padding * 2),
+      h: box.h,
+    };
+  }
+  const iconSpace = 68 * scale;
+  const rightPadding = 42 * scale;
   return {
     x: box.x + iconSpace,
     y: box.y,
