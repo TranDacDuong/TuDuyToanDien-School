@@ -2071,23 +2071,25 @@ function buildPostMetadata(){
   const metadata = { ...existing };
   const postTypeId = $("postType").value;
   if (isHardQuizType(postTypeId)) {
-    const data = getHardQuizData();
-    metadata.hard_quiz = {
-      enabled: true,
-      title: "Hỏi nhanh đớp trọn",
-      question: data.question,
-      correct_answer: data.correctAnswer,
-      solution: data.solution,
-      prize_amount: data.prizeAmount,
-      deadline_note: data.deadlineNote,
-      result_rule: data.resultRule,
-      rules: data.rules,
-      require_like: true,
-      require_share: true,
-      xsmb_source: "XSMB Chủ nhật",
-      announce_in: "Monday Mindset thứ Hai tuần sau",
-      updated_at: new Date().toISOString(),
-    };
+    try {
+      const data = getHardQuizData();
+      metadata.hard_quiz = {
+        enabled: true,
+        title: "Hỏi nhanh đớp trọn",
+        question: data.question,
+        correct_answer: data.correctAnswer,
+        solution: data.solution,
+        prize_amount: data.prizeAmount,
+        deadline_note: data.deadlineNote,
+        result_rule: data.resultRule,
+        rules: data.rules,
+        require_like: true,
+        require_share: true,
+        xsmb_source: "XSMB Chủ nhật",
+        announce_in: "Monday Mindset thứ Hai tuần sau",
+        updated_at: new Date().toISOString(),
+      };
+    } catch (_) {}
   }
   if (isQuizType(postTypeId)) {
     try {
