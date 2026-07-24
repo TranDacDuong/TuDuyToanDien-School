@@ -187,6 +187,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
             <button class="btn btn-ghost" id="nextWeekBtn" type="button">Tuần sau →</button>
           </div>
           <div class="toolbar-right">
+            <button class="btn btn-danger hidden" id="deleteWeekPostsBtn" type="button">Xóa toàn bộ tuần này</button>
             <span class="week-title" id="weekTitle"></span>
           </div>
         </div>
@@ -705,6 +706,7 @@ async function loadData(){
 function renderAll(){
   renderTabs();
   renderWeekHeader();
+  renderAdminControls();
   renderSelects();
   renderTypes();
   renderTemplateCalendar();
@@ -712,6 +714,11 @@ function renderAll(){
   renderTodo();
   hideStatus();
 }
+
+function renderAdminControls(){
+  $("deleteWeekPostsBtn")?.classList.toggle("hidden", S.profile?.role !== "admin");
+}
+
 function renderTabs(){
   $("pageTabs").innerHTML = S.pages.map(p => `<button type="button" class="tab ${p.page_id===S.activePageId?"active":""}" data-page-id="${esc(p.page_id)}">${esc(p.page_name)}</button>`).join("");
   $("pageTabs").querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", async () => {
@@ -1795,6 +1802,67 @@ async function deletePostById(id){
   }
 }
 
+function currentWeekPostsForActivePage(){
+  const weekStart = dateKey(S.weekStart);
+  const weekEnd = dateKey(addDays(S.weekStart, 6));
+  return S.posts.filter(post =>
+    String(post.page_id || "") === String(S.activePageId || "")
+    && String(post.scheduled_date || "") >= weekStart
+    && String(post.scheduled_date || "") <= weekEnd
+    && String(post.status || "") !== "cancelled"
+  );
+}
+
+async function deleteCurrentWeekPosts(){
+  if (S.profile?.role !== "admin") {
+    alert("Chỉ admin mới được xóa toàn bộ lịch bài đăng trong tuần.");
+    return;
+  }
+  const rows = currentWeekPostsForActivePage();
+  if (!rows.length) {
+    showStatus("info", "Tuần này chưa có bài đăng/lịch đăng nào để xóa.");
+    return;
+  }
+  const page = currentPage();
+  const scheduledRows = rows.filter(row => row.facebook_post_id && String(row.status || "") === "scheduled");
+  const publishedRows = rows.filter(row => row.facebook_post_id && String(row.status || "") === "published");
+  const message = [
+    `Xóa toàn bộ ${rows.length} bài/lịch đăng của fanpage "${page.page_name}" trong tuần ${$("weekTitle")?.textContent || ""}?`,
+    scheduledRows.length ? `Có ${scheduledRows.length} bài đã hẹn lịch trên Facebook sẽ được hủy lịch trước khi xóa.` : "",
+    publishedRows.length ? `Lưu ý: ${publishedRows.length} bài đã đăng công khai sẽ chỉ bị xóa khỏi hệ thống, không xóa bản đã đăng trên Facebook.` : "",
+    "Hành động này không thể hoàn tác."
+  ].filter(Boolean).join("\n");
+  if (!confirm(message)) return;
+
+  const btn = $("deleteWeekPostsBtn");
+  if (btn) btn.disabled = true;
+  showStatus("info", `Đang xóa ${rows.length} bài/lịch đăng trong tuần...`);
+  try {
+    for (const row of scheduledRows) {
+      await facebookDelete(row.page_id, row.facebook_post_id);
+    }
+    const ids = rows.map(row => row.id).filter(Boolean);
+    const taskIds = rows.map(row => row.task_id).filter(Boolean);
+    if (ids.length) {
+      const { error } = await sb.from("facebook_scheduled_posts").delete().in("id", ids);
+      if (error) throw error;
+    }
+    if (taskIds.length) {
+      try { await sb.from("daily_tasks").delete().in("id", taskIds); } catch (error) { console.warn("[FacebookPosting] Không xóa được task marketing liên quan:", error); }
+    }
+    const deletedIds = new Set(ids.map(String));
+    S.posts = S.posts.filter(post => !deletedIds.has(String(post.id)));
+    renderWeeklyCalendar();
+    renderTodo();
+    showStatus("ok", `Đã xóa ${rows.length} bài/lịch đăng trong tuần của fanpage ${page.page_name}.`);
+  } catch (error) {
+    showStatus("err", "Không xóa được toàn bộ tuần: " + (error.message || String(error)));
+    await loadData();
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 function bindCalendarDrops(){
   const targets = $("weeklyCalendar").querySelectorAll("[data-post-date]");
   targets.forEach(target => {
@@ -2768,6 +2836,7 @@ function bindEvents(){
   $("openPageBtn").addEventListener("click", () => window.open(currentPage().page_url || `https://www.facebook.com/${currentPage().page_id}`, "_blank", "noopener"));
   $("copyPrevWeekBtn").addEventListener("click", () => copyPreviousWeekSchedule({ silent:false }).catch(error => alert(error.message || String(error))));
   $("generateWeekDraftsBtn").addEventListener("click", () => generateWeekDrafts().catch(error => showStatus("err", error.message || String(error))));
+  $("deleteWeekPostsBtn").addEventListener("click", () => deleteCurrentWeekPosts().catch(error => showStatus("err", error.message || String(error))));
   $("closeTemplateModalBtn")?.addEventListener("click", closeTemplateModal);
   $("saveTemplateBtn")?.addEventListener("click", saveTemplate);
   $("deleteTemplateBtn")?.addEventListener("click", deleteTemplate);
