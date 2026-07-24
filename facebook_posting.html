@@ -1429,6 +1429,32 @@ async function replaceMondayMindsetImageWithTemplate(post){
   if (error) throw error;
   return data || { ...post, image_url: url, ai_image_url: url };
 }
+function hardQuizQuestionFit(ctx, question, box){
+  const text = latexToCanvasTextSafe(question);
+  const padding = Math.max(16, box.w * 0.035);
+  const maxWidth = Math.max(20, box.w - padding * 2);
+  const maxLines = 4;
+  const lineHeightRatio = 1.08;
+  const startSize = Math.max(42, box.w * 0.044);
+  const minSize = Math.max(32, box.w * 0.031);
+  for (let size = startSize; size >= minSize; size -= 2) {
+    ctx.font = `900 ${size}px "DM Sans", Arial, sans-serif`;
+    const lines = wrapTextLines(ctx, text, maxWidth);
+    if (lines.length <= maxLines && lines.length * size * lineHeightRatio <= box.h * 0.88) {
+      return { ok: true, size, lines: lines.length };
+    }
+  }
+  ctx.font = `900 ${minSize}px "DM Sans", Arial, sans-serif`;
+  return { ok: false, size: minSize, lines: wrapTextLines(ctx, text, maxWidth).length };
+}
+function validateHardQuizQuestionFits(ctx, question, box){
+  const plain = latexToCanvasTextSafe(question);
+  const words = plain.split(/\s+/).filter(Boolean);
+  const fit = hardQuizQuestionFit(ctx, question, box);
+  if (!fit.ok || words.length > 70 || plain.length > 380) {
+    throw new Error(`Đề bài Hỏi nhanh đớp trọn đang quá dài để hiển thị đẹp trên ảnh (${words.length} từ, khoảng ${fit.lines} dòng). Hãy rút gọn đề còn khoảng 45-60 từ hoặc bấm Gemini tạo lại đề ngắn hơn.`);
+  }
+}
 async function buildHardQuizImageDataUrl(){
   await ensureQuizFontLoaded();
   const { question } = getHardQuizData();
@@ -1448,9 +1474,10 @@ async function buildHardQuizImageDataUrl(){
     w: 1305 * sx,
     h: 235 * sy,
   };
+  validateHardQuizQuestionFits(ctx, question, box);
   await drawBigQuizText(ctx, question, box, {
     size: 58 * sx,
-    minSize: 30 * sx,
+    minSize: 40 * sx,
     maxLines: 4,
     color: "#082c68",
   });
