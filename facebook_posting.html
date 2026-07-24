@@ -79,6 +79,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 .icon-small{border:0;border-radius:10px;background:#eef4ff;color:#123c78;width:32px;height:32px;cursor:pointer}
 .modal{position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:50;display:none;align-items:flex-start;justify-content:center;padding:24px 12px;overflow:auto}
 .modal.show{display:flex}
+.hidden{display:none!important}
 .modal-card{width:min(880px,100%);background:#fff;border-radius:24px;box-shadow:0 24px 70px rgba(15,23,42,.24);border:1px solid rgba(255,255,255,.8);overflow:hidden}
 .modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;background:#10284f;color:#fff}
 .modal-head h2{margin:0;font-size:1.18rem;color:#fff}
@@ -318,26 +319,21 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
       </div>
       <div class="workflow-box" id="hardQuizBuilder">
         <div>
-          <strong>Hỏi nhanh đớp trọn</strong>
-          <div class="hint">Nhập đề bài để tạo ảnh Hard Quiz. Caption sẽ tự thêm luật chơi: trả lời đúng, dự đoán XSMB, like và share bài viết.</div>
+          <strong>H&#7887;i nhanh &#273;&#7899;p tr&#7885;n</strong>
+          <div class="hint">Nh&#7853;p &#273;&#7873; b&#224;i t&#7889;i &#273;a 80 t&#7915; &#273;&#7875; t&#7841;o &#7843;nh Hard Quiz theo m&#7851;u MindUp. Caption s&#7869; t&#7921; th&#234;m lu&#7853;t ch&#417;i m&#7863;c &#273;&#7883;nh: tr&#7843; l&#7901;i &#273;&#250;ng, d&#7921; &#273;o&#225;n XSMB, like v&#224; share b&#224;i vi&#7871;t.</div>
         </div>
-        <div class="field"><label>Đề bài điền vào ảnh</label><textarea class="textarea" id="hardQuizQuestion" style="min-height:120px" placeholder="Nhập câu hỏi Hard Quiz... Có thể dùng LaTeX: $x^2+1$"></textarea></div>
-        <div class="grid2">
-          <div class="field"><label>Đáp án đúng</label><input class="input" id="hardQuizCorrectAnswer" placeholder="Ví dụ: 42 hoặc x = 1"></div>
-          <div class="field"><label>Phần thưởng</label><input class="input" id="hardQuizPrizeAmount" type="number" min="0" step="1000" value="50000"></div>
-        </div>
-        <div class="grid2">
-          <div class="field"><label>Hạn tham gia</label><input class="input" id="hardQuizDeadlineNote" placeholder="Ví dụ: trước giờ quay XSMB Chủ nhật"></div>
-          <div class="field"><label>Cách chốt kết quả</label><input class="input" id="hardQuizResultRule" placeholder="Ví dụ: gần nhất với 2 số cuối giải Đặc biệt XSMB Chủ nhật"></div>
-        </div>
-        <div class="field"><label>Lời giải/ghi chú nội bộ</label><textarea class="textarea" id="hardQuizSolution" style="min-height:80px" placeholder="Không đưa vào caption nếu không cần."></textarea></div>
+        <div class="field"><label>&#272;&#7873; b&#224;i &#273;i&#7873;n v&#224;o &#7843;nh</label><textarea class="textarea" id="hardQuizQuestion" style="min-height:120px" placeholder="Nh&#7853;p c&#226;u h&#7887;i Hard Quiz t&#7889;i &#273;a 80 t&#7915;... C&#243; th&#7875; d&#249;ng LaTeX: $x^2+1$"></textarea></div>
+        <input id="hardQuizCorrectAnswer" type="hidden">
+        <input id="hardQuizPrizeAmount" type="hidden" value="50000">
+        <input id="hardQuizDeadlineNote" type="hidden" value="tr&#432;&#7899;c gi&#7901; quay XSMB Ch&#7911; nh&#7853;t tu&#7847;n n&#224;y">
+        <input id="hardQuizResultRule" type="hidden" value="g&#7847;n nh&#7845;t v&#7899;i 2 s&#7889; cu&#7889;i gi&#7843;i &#272;&#7863;c bi&#7879;t XSMB Ch&#7911; nh&#7853;t">
+        <textarea id="hardQuizSolution" style="display:none"></textarea>
         <textarea id="hardQuizRules" style="display:none"></textarea>
         <div class="toolbar" style="margin-bottom:0">
           <div class="toolbar-left">
-            <button class="btn btn-gold" type="button" id="generateHardQuizPostBtn">Tạo ảnh + caption</button>
-            <button class="btn btn-outline" type="button" id="previewHardQuizImageBtn">Xem thử ảnh</button>
+            <button class="btn btn-gold" type="button" id="generateHardQuizPostBtn">T&#7841;o/xem &#7843;nh + caption</button>
           </div>
-          <img id="hardQuizImagePreview" class="quiz-preview" alt="Xem trước ảnh Hỏi nhanh đớp trọn">
+          <img id="hardQuizImagePreview" class="quiz-preview" alt="Xem tr&#432;&#7899;c &#7843;nh H&#7887;i nhanh &#273;&#7899;p tr&#7885;n">
         </div>
       </div>
       <div id="mondayAnnouncementBuilder" style="display:none">
@@ -362,7 +358,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
           </div>
           <div class="meta-ai-actions">
             <button class="btn btn-gold" id="generateGeminiDraftBtn" type="button">Tạo bài bằng Gemini</button>
-            <button class="btn btn-primary" id="approvePostBtn" type="button">Xác nhận bài ổn</button>
+
           </div>
         </div>
         <div class="hint" id="aiDraftStatus">Chưa tạo bằng AI.</div>
@@ -403,7 +399,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
           <input id="typeAutoTask" type="checkbox" checked>
           <span>
             <strong>Tự giao công việc khi kéo loại bài này vào lịch tuần</strong>
-            <div class="hint">Nhân viên được giao chỉ cần vào tab Đăng bài Facebook, kiểm tra/sửa bài và bấm “Xác nhận bài viết ổn”.</div>
+            <div class="hint">Nh&#226;n vi&#234;n &#273;&#432;&#7907;c giao ch&#7881; c&#7847;n v&#224;o tab &#272;&#259;ng b&#224;i Facebook, ki&#7875;m tra/s&#7917;a b&#224;i; n&#7871;u &#7893;n th&#236; h&#7865;n l&#7883;ch Facebook lu&#244;n.</div>
           </span>
         </label>
         <div class="field">
@@ -831,6 +827,7 @@ function toggleQuizBuilder(){
   $("quizBuilder").classList.toggle("show", showQuiz);
   $("hardQuizBuilder")?.classList.toggle("show", showHardQuiz);
   $("mondayAnnouncementBuilder")?.classList.toggle("show", showMonday);
+  $("imageDropzone")?.classList.toggle("hidden", showHardQuiz);
   if (showHardQuiz && !$("hardQuizRules").value.trim()) {
     $("hardQuizRules").value = buildHardQuizRules();
   }
@@ -1433,10 +1430,10 @@ function hardQuizQuestionFit(ctx, question, box){
   const text = latexToCanvasTextSafe(question);
   const padding = Math.max(16, box.w * 0.035);
   const maxWidth = Math.max(20, box.w - padding * 2);
-  const maxLines = 4;
-  const lineHeightRatio = 1.08;
+  const maxLines = 6;
+  const lineHeightRatio = 1.02;
   const startSize = Math.max(42, box.w * 0.044);
-  const minSize = Math.max(32, box.w * 0.031);
+  const minSize = Math.max(30, box.w * 0.023);
   for (let size = startSize; size >= minSize; size -= 2) {
     ctx.font = `900 ${size}px "DM Sans", Arial, sans-serif`;
     const lines = wrapTextLines(ctx, text, maxWidth);
@@ -1451,7 +1448,7 @@ function validateHardQuizQuestionFits(ctx, question, box){
   const plain = latexToCanvasTextSafe(question);
   const words = plain.split(/\s+/).filter(Boolean);
   const fit = hardQuizQuestionFit(ctx, question, box);
-  if (!fit.ok || words.length > 70 || plain.length > 380) {
+  if (!fit.ok || words.length > 80 || plain.length > 520) {
     throw new Error(`Đề bài Hỏi nhanh đớp trọn đang quá dài để hiển thị đẹp trên ảnh (${words.length} từ, khoảng ${fit.lines} dòng). Hãy rút gọn đề còn khoảng 45-60 từ hoặc bấm Gemini tạo lại đề ngắn hơn.`);
   }
 }
@@ -1477,8 +1474,8 @@ async function buildHardQuizImageDataUrl(){
   validateHardQuizQuestionFits(ctx, question, box);
   await drawBigQuizText(ctx, question, box, {
     size: 58 * sx,
-    minSize: 40 * sx,
-    maxLines: 4,
+    minSize: 30 * sx,
+    maxLines: 6,
     color: "#082c68",
   });
   return canvas.toDataURL("image/png");
@@ -2031,9 +2028,11 @@ function openPostModal(id="", defaults={}){
   toggleQuizBuilder();
   updateImagePreview();
   $("deletePostBtn").style.display = row ? "" : "none";
-  $("approvePostBtn").style.display = row ? "" : "none";
-  $("approvePostBtn").disabled = row?.approval_status === "approved";
-  $("approvePostBtn").textContent = row?.approval_status === "approved" ? "Đã xác nhận" : "Xác nhận bài ổn";
+  if ($("approvePostBtn")) {
+    $("approvePostBtn").style.display = row ? "" : "none";
+    $("approvePostBtn").disabled = row?.approval_status === "approved";
+    $("approvePostBtn").textContent = row?.approval_status === "approved" ? "?? x?c nh?n" : "X?c nh?n b?i ?n";
+  }
   showPostStatus("info", row?.facebook_post_id ? `Facebook ID: ${row.facebook_post_id}` : "Lưu nháp trước hoặc hẹn lịch trực tiếp.");
   $("postModal").classList.add("show");
 }
@@ -2071,6 +2070,7 @@ function clipboardImageFile(ev){
     ?.getAsFile?.() || null;
 }
 function handlePostImagePaste(ev){
+  if (isHardQuizType($("postType")?.value || "")) return;
   const file = clipboardImageFile(ev);
   if (!file) return;
   ev.preventDefault();
@@ -2771,7 +2771,7 @@ function bindEvents(){
   $("schedulePostBtn").addEventListener("click", () => schedulePost("schedule"));
   $("deletePostBtn").addEventListener("click", deletePost);
   $("generateGeminiDraftBtn").addEventListener("click", generateGeminiDraft);
-  $("approvePostBtn").addEventListener("click", approveCurrentPost);
+  $("approvePostBtn")?.addEventListener("click", approveCurrentPost);
   $("postContent").addEventListener("input", () => $("postCharCount").textContent = String($("postContent").value.length));
   $("postType").addEventListener("change", toggleQuizBuilder);
   $("postContent").addEventListener("paste", handlePostImagePaste);
@@ -2783,7 +2783,7 @@ function bindEvents(){
   $("previewQuizImageBtn").addEventListener("click", previewQuizImage);
   $("generateQuizImageBtn").addEventListener("click", generateQuizImage);
   ["hardQuizPrizeAmount","hardQuizDeadlineNote","hardQuizResultRule"].forEach(id => $(id)?.addEventListener("input", () => $("hardQuizRules").value = buildHardQuizRules()));
-  $("previewHardQuizImageBtn").addEventListener("click", previewHardQuizImage);
+  $("previewHardQuizImageBtn")?.addEventListener("click", previewHardQuizImage);
   $("generateHardQuizPostBtn").addEventListener("click", generateHardQuizPost);
   ["mondayWinnerName","mondayCorrectAnswer","mondayXsmbResult","mondayWinnerGuess"].forEach(id => $(id)?.addEventListener("input", () => {
     if ($("mondayAnnounceHardQuiz").checked) $("mondayAnnouncementText").value = buildMondayAnnouncementText();
