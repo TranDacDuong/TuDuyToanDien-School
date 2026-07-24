@@ -1511,7 +1511,6 @@ async function generateHardQuizPost(options = {}){
     const currentNote = $("postInternalNote").value.trim();
     $("postInternalNote").value = [currentNote, ...notes.filter(note => !currentNote.includes(note))].filter(Boolean).join("\n");
     $("postCharCount").textContent = String($("postContent").value.length);
-    updateImagePreview();
     showPostStatus("ok", "Đã tạo ảnh và caption Hỏi nhanh đớp trọn. Luật chơi đã có yêu cầu like + share.");
     return url;
   } catch (error) {
@@ -1536,7 +1535,6 @@ async function applyGeminiHardQuizDraft(post, data){
   await generateHardQuizPost({ throwOnError: true });
   if (!$("postImageUrl").value.trim()) throw new Error("Chưa tạo được ảnh Hard Quiz từ template MindUp.");
   $("postCharCount").textContent = String(($("postContent").value || "").length);
-  updateImagePreview();
 }
 function currentPostTypeName(){
   return typeName($("postType")?.value || "");
@@ -2079,6 +2077,12 @@ function handlePostImagePaste(ev){
 function updateImagePreview(){
   const url = $("postImageUrl").value.trim();
   const img = $("imagePreview");
+  if (isHardQuizType($("postType")?.value || "") || $("imageDropzone")?.classList.contains("hidden")) {
+    img.src = "";
+    img.classList.remove("show");
+    $("imageDropzone").classList.remove("has-image");
+    return;
+  }
   img.onload = null;
   img.onerror = null;
   if (url) {
@@ -2089,6 +2093,7 @@ function updateImagePreview(){
     img.onerror = () => {
       img.classList.remove("show");
       $("imageDropzone").classList.remove("has-image");
+      if (isHardQuizType($("postType")?.value || "") || $("imageDropzone")?.classList.contains("hidden")) return;
       showPostStatus("err", "Không tải được ảnh xem trước. URL ảnh vẫn được giữ ngầm, bạn có thể thử upload/tạo ảnh lại.");
     };
     img.src = "";
