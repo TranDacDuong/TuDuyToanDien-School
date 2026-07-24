@@ -311,8 +311,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
         <div class="quiz-answer-grid" id="quizAnswerFields"></div>
         <div class="toolbar" style="margin-bottom:0">
           <div class="toolbar-left">
-            <button class="btn btn-gold" type="button" id="generateQuizImageBtn">Tạo ảnh Quiz</button>
-            <button class="btn btn-outline" type="button" id="previewQuizImageBtn">Xem thử ảnh</button>
+            <button class="btn btn-gold" type="button" id="generateQuizImageBtn">Tạo/xem ảnh Quiz</button>
           </div>
           <img id="quizImagePreview" class="quiz-preview" alt="Xem trước ảnh Quiz">
         </div>
@@ -829,7 +828,7 @@ function toggleQuizBuilder(){
   $("quizBuilder").classList.toggle("show", showQuiz);
   $("hardQuizBuilder")?.classList.toggle("show", showHardQuiz);
   $("mondayAnnouncementBuilder")?.classList.toggle("show", showMonday);
-  $("imageDropzone")?.classList.toggle("hidden", showHardQuiz);
+  $("imageDropzone")?.classList.toggle("hidden", showQuiz || showHardQuiz);
   if (showHardQuiz && !$("hardQuizRules").value.trim()) {
     $("hardQuizRules").value = buildHardQuizRules();
   }
@@ -2186,7 +2185,8 @@ function clipboardImageFile(ev){
     ?.getAsFile?.() || null;
 }
 function handlePostImagePaste(ev){
-  if (isHardQuizType($("postType")?.value || "")) return;
+  const postTypeId = $("postType")?.value || "";
+  if (isQuizType(postTypeId) || isHardQuizType(postTypeId)) return;
   const file = clipboardImageFile(ev);
   if (!file) return;
   ev.preventDefault();
@@ -2195,7 +2195,8 @@ function handlePostImagePaste(ev){
 function updateImagePreview(){
   const url = $("postImageUrl").value.trim();
   const img = $("imagePreview");
-  if (isHardQuizType($("postType")?.value || "") || $("imageDropzone")?.classList.contains("hidden")) {
+  const postTypeId = $("postType")?.value || "";
+  if (isQuizType(postTypeId) || isHardQuizType(postTypeId) || $("imageDropzone")?.classList.contains("hidden")) {
     img.src = "";
     img.classList.remove("show");
     $("imageDropzone").classList.remove("has-image");
@@ -2211,7 +2212,8 @@ function updateImagePreview(){
     img.onerror = () => {
       img.classList.remove("show");
       $("imageDropzone").classList.remove("has-image");
-      if (isHardQuizType($("postType")?.value || "") || $("imageDropzone")?.classList.contains("hidden")) return;
+      const currentPostTypeId = $("postType")?.value || "";
+      if (isQuizType(currentPostTypeId) || isHardQuizType(currentPostTypeId) || $("imageDropzone")?.classList.contains("hidden")) return;
       showPostStatus("err", "Không tải được ảnh xem trước. URL ảnh vẫn được giữ ngầm, bạn có thể thử upload/tạo ảnh lại.");
     };
     img.src = "";
@@ -2905,7 +2907,6 @@ function bindEvents(){
   $("quizAnswerCount").addEventListener("change", renderQuizAnswerFields);
   $("quizQuestion").addEventListener("paste", handleQuizQuestionPaste);
   $("removeQuizQuestionImageBtn").addEventListener("click", clearQuizQuestionImage);
-  $("previewQuizImageBtn").addEventListener("click", previewQuizImage);
   $("generateQuizImageBtn").addEventListener("click", generateQuizImage);
   ["hardQuizPrizeAmount","hardQuizDeadlineNote","hardQuizResultRule"].forEach(id => $(id)?.addEventListener("input", () => $("hardQuizRules").value = buildHardQuizRules()));
   $("previewHardQuizImageBtn")?.addEventListener("click", previewHardQuizImage);
