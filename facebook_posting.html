@@ -1493,9 +1493,10 @@ async function previewHardQuizImage(){
     showPostStatus("err", error.message || String(error));
   }
 }
-async function generateHardQuizPost(){
+async function generateHardQuizPost(options = {}){
   try {
     showPostStatus("info", "Đang tạo ảnh Hỏi nhanh đớp trọn...");
+    $("postImageUrl").value = "";
     $("hardQuizRules").value = buildHardQuizRules();
     const dataUrl = await buildHardQuizImageDataUrl();
     $("hardQuizImagePreview").src = dataUrl;
@@ -1515,8 +1516,11 @@ async function generateHardQuizPost(){
     $("postCharCount").textContent = String($("postContent").value.length);
     updateImagePreview();
     showPostStatus("ok", "Đã tạo ảnh và caption Hỏi nhanh đớp trọn. Luật chơi đã có yêu cầu like + share.");
+    return url;
   } catch (error) {
     showPostStatus("err", error.message || String(error));
+    if (options.throwOnError) throw error;
+    return "";
   }
 }
 function setHardQuizFormFromDraft(hardQuiz = {}){
@@ -1532,7 +1536,7 @@ async function applyGeminiHardQuizDraft(post, data){
   const hardQuiz = data?.hard_quiz || postMetadata(post).hard_quiz || {};
   setHardQuizFormFromDraft(hardQuiz);
   $("postContent").value = buildHardQuizCaption();
-  await generateHardQuizPost();
+  await generateHardQuizPost({ throwOnError: true });
   if (!$("postImageUrl").value.trim()) throw new Error("Chưa tạo được ảnh Hard Quiz từ template MindUp.");
   $("postCharCount").textContent = String(($("postContent").value || "").length);
   updateImagePreview();
@@ -2517,7 +2521,7 @@ async function finalizeGeneratedPostForBatch(post, data){
   if (isHardQuizType(row?.post_type_id)) {
     const hardQuiz = data?.hard_quiz || postMetadata(row).hard_quiz || {};
     setHardQuizFormFromDraft(hardQuiz);
-    await generateHardQuizPost();
+    await generateHardQuizPost({ throwOnError: true });
     const imageUrl = $("postImageUrl").value.trim();
     if (!imageUrl) throw new Error("ChÆ°a táº¡o Ä‘Æ°á»£c áº£nh Hard Quiz tá»« template MindUp.");
     const payload = {
