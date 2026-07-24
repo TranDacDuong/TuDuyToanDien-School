@@ -175,8 +175,8 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
           </div>
           <div class="toolbar-right">
             <button class="btn btn-outline" id="openPageBtn" type="button">Mở fanpage</button>
-            <button class="btn btn-gold" id="copyPrevWeekBtn" type="button">Tạo giống tuần trước</button>
             <button class="btn btn-gold" id="generateWeekDraftsBtn" type="button">Tạo nội dung bài đăng cho tuần này</button>
+            <button class="btn btn-outline" id="clearWeekDraftsBtn" type="button">Xóa nội dung đã lưu trong tuần này</button>
           </div>
         </div>
 
@@ -187,7 +187,6 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
             <button class="btn btn-ghost" id="nextWeekBtn" type="button">Tuần sau →</button>
           </div>
           <div class="toolbar-right">
-            <button class="btn btn-danger hidden" id="deleteWeekPostsBtn" type="button">Xóa toàn bộ tuần này</button>
             <span class="week-title" id="weekTitle"></span>
           </div>
         </div>
@@ -699,6 +698,7 @@ async function loadData(){
   S.templates = templatesRes.data || [];
   S.posts = postsRes.data || [];
   if (!S.activePageId || !S.pages.some(p => p.page_id === S.activePageId)) S.activePageId = S.pages[0]?.page_id || DEFAULT_PAGES[0].page_id;
+  await ensureRollingMonthSchedule();
   await ensureCurrentWeekPosts();
   renderAll();
 }
@@ -706,17 +706,12 @@ async function loadData(){
 function renderAll(){
   renderTabs();
   renderWeekHeader();
-  renderAdminControls();
   renderSelects();
   renderTypes();
   renderTemplateCalendar();
   renderWeeklyCalendar();
   renderTodo();
   hideStatus();
-}
-
-function renderAdminControls(){
-  $("deleteWeekPostsBtn")?.classList.toggle("hidden", S.profile?.role !== "admin");
 }
 
 function renderTabs(){
@@ -1721,7 +1716,7 @@ function renderWeeklyCalendar(){
   const dates = weekDates();
   if (!times.length) {
     $("weeklyCalendar").innerHTML = `
-      <div class="empty-box">Tuần này chưa có lịch bài đăng. Kéo một loại bài đăng ở bên phải vào ngày cần đăng, hoặc bấm <strong>Tạo giống tuần trước</strong>.</div>
+      <div class="empty-box">Tuần này chưa có lịch bài đăng. Hãy kéo một loại bài đăng ở bên phải vào ngày cần đăng; các tuần sau sẽ tự tạo theo tuần gần nhất phía trước.</div>
       <div class="day-drop-grid">
         ${dates.map((date,i)=>`<div class="day-drop-card" data-post-date="${dateKey(date)}">
           <strong>${WEEKDAYS[i].short} • ${formatDate(date)}</strong>
@@ -1781,6 +1776,7 @@ async function createPostFromTypeDrop(typeId, scheduledDate, publishTime=""){
   const { error } = await sb.from("facebook_scheduled_posts").insert(payload);
   if (error) return alert("Không tạo được bài đăng: " + error.message);
   await materializeMarketingTasks();
+  await refreshFutureAutoSchedulesFromWeek(S.activePageId, startOfWeek(d));
   await loadData();
 }
 async function deletePostById(id){
@@ -1796,6 +1792,7 @@ async function deletePostById(id){
     }
     const { error } = await sb.from("facebook_scheduled_posts").delete().eq("id", key);
     if (error) return alert("Không xóa được bài: " + error.message);
+    await refreshFutureAutoSchedulesFromWeek(row.page_id, startOfWeek(new Date(row.scheduled_at)));
     await loadData();
   } finally {
     S.deletingPostIds.delete(key);
@@ -1813,50 +1810,59 @@ function currentWeekPostsForActivePage(){
   );
 }
 
-async function deleteCurrentWeekPosts(){
-  if (S.profile?.role !== "admin") {
-    alert("Chỉ admin mới được xóa toàn bộ lịch bài đăng trong tuần.");
-    return;
-  }
+async function clearCurrentWeekDraftContent(){
   const rows = currentWeekPostsForActivePage();
-  if (!rows.length) {
-    showStatus("info", "Tuần này chưa có bài đăng/lịch đăng nào để xóa.");
+  const clearableRows = rows.filter(row =>
+    !row.facebook_post_id
+    && !["scheduled", "published", "cancelled"].includes(String(row.status || ""))
+    && postHasContent(row)
+  );
+  const lockedRows = rows.filter(row =>
+    row.facebook_post_id || ["scheduled", "published"].includes(String(row.status || ""))
+  );
+  if (!clearableRows.length) {
+    const extra = lockedRows.length ? ` Có ${lockedRows.length} bài đã hẹn/đã đăng nên không thể xóa nội dung bằng nút này.` : "";
+    showStatus("info", "Tuần này chưa có nội dung nháp/đã lưu nào cần xóa." + extra);
     return;
   }
-  const page = currentPage();
-  const scheduledRows = rows.filter(row => row.facebook_post_id && String(row.status || "") === "scheduled");
-  const publishedRows = rows.filter(row => row.facebook_post_id && String(row.status || "") === "published");
   const message = [
-    `Xóa toàn bộ ${rows.length} bài/lịch đăng của fanpage "${page.page_name}" trong tuần ${$("weekTitle")?.textContent || ""}?`,
-    scheduledRows.length ? `Có ${scheduledRows.length} bài đã hẹn lịch trên Facebook sẽ được hủy lịch trước khi xóa.` : "",
-    publishedRows.length ? `Lưu ý: ${publishedRows.length} bài đã đăng công khai sẽ chỉ bị xóa khỏi hệ thống, không xóa bản đã đăng trên Facebook.` : "",
-    "Hành động này không thể hoàn tác."
+    `Xóa nội dung đã lưu của ${clearableRows.length} bài trong tuần ${$("weekTitle")?.textContent || ""}?`,
+    "Lịch đăng, loại bài và khung giờ vẫn được giữ nguyên.",
+    lockedRows.length ? `${lockedRows.length} bài đã hẹn/đã đăng sẽ được giữ nguyên, không bị tác động.` : "",
   ].filter(Boolean).join("\n");
   if (!confirm(message)) return;
 
-  const btn = $("deleteWeekPostsBtn");
+  const btn = $("clearWeekDraftsBtn");
   if (btn) btn.disabled = true;
-  showStatus("info", `Đang xóa ${rows.length} bài/lịch đăng trong tuần...`);
+  showStatus("info", `Đang xóa nội dung đã lưu của ${clearableRows.length} bài trong tuần...`);
   try {
-    for (const row of scheduledRows) {
-      await facebookDelete(row.page_id, row.facebook_post_id);
-    }
-    const ids = rows.map(row => row.id).filter(Boolean);
-    const taskIds = rows.map(row => row.task_id).filter(Boolean);
+    const ids = clearableRows.map(row => row.id).filter(Boolean);
     if (ids.length) {
-      const { error } = await sb.from("facebook_scheduled_posts").delete().in("id", ids);
+      const { error } = await sb.from("facebook_scheduled_posts").update({
+        content: "",
+        link_url: null,
+        image_url: null,
+        internal_note: null,
+        metadata: {},
+        status: "missing_content",
+        content_status: "missing_content",
+        approval_status: "pending",
+        ai_status: "idle",
+        ai_error: null,
+        ai_generated_at: null,
+        ai_model: null,
+        ai_prompt: null,
+        ai_image_prompt: null,
+        ai_image_url: null,
+        last_error: null,
+        updated_at: new Date().toISOString(),
+      }).in("id", ids);
       if (error) throw error;
     }
-    if (taskIds.length) {
-      try { await sb.from("daily_tasks").delete().in("id", taskIds); } catch (error) { console.warn("[FacebookPosting] Không xóa được task marketing liên quan:", error); }
-    }
-    const deletedIds = new Set(ids.map(String));
-    S.posts = S.posts.filter(post => !deletedIds.has(String(post.id)));
-    renderWeeklyCalendar();
-    renderTodo();
-    showStatus("ok", `Đã xóa ${rows.length} bài/lịch đăng trong tuần của fanpage ${page.page_name}.`);
+    await loadData();
+    showStatus("ok", `Đã xóa nội dung đã lưu của ${clearableRows.length} bài trong tuần. Lịch đăng vẫn được giữ nguyên.`);
   } catch (error) {
-    showStatus("err", "Không xóa được toàn bộ tuần: " + (error.message || String(error)));
+    showStatus("err", "Không xóa được nội dung đã lưu trong tuần: " + (error.message || String(error)));
     await loadData();
   } finally {
     if (btn) btn.disabled = false;
@@ -1897,54 +1903,98 @@ function bindCalendarDrops(){
     };
   }
 }
-async function copyPreviousWeekSchedule({ silent=false } = {}){
-  if (!S.activePageId) return;
-  const currentWeekStart = dateKey(S.weekStart);
-  const currentWeekEnd = dateKey(addDays(S.weekStart, 6));
-  const currentRows = S.posts.filter(p => p.page_id === S.activePageId && p.scheduled_date >= currentWeekStart && p.scheduled_date <= currentWeekEnd);
-  if (currentRows.length) {
-    if (!silent) alert("Tuần này đã có lịch bài đăng rồi. Nếu muốn sửa thì kéo thả/xóa trực tiếp từng bài trong tuần này.");
-    return;
-  }
-  const prevStart = dateKey(addDays(S.weekStart, -7));
-  const prevEnd = dateKey(addDays(S.weekStart, -1));
-  const { data: prevRows, error } = await sb.from("facebook_scheduled_posts")
+function isUntouchedSchedulePost(row){
+  return !row.facebook_post_id
+    && !postHasContent(row)
+    && ["", "missing_content"].includes(String(row.status || ""));
+}
+
+function cloneSchedulePostToWeek(post, sourceWeekStart, targetWeekStart){
+  const oldDate = new Date(post.scheduled_at);
+  const sourceStart = new Date(sourceWeekStart);
+  const targetStart = new Date(targetWeekStart);
+  const nextDate = new Date(oldDate.getTime() + (targetStart.getTime() - sourceStart.getTime()));
+  return {
+    page_id: post.page_id,
+    post_type_id: post.post_type_id,
+    scheduled_at: nextDate.toISOString(),
+    scheduled_date: dateKey(nextDate),
+    content: "",
+    link_url: null,
+    image_url: null,
+    internal_note: post.internal_note || null,
+    status: "missing_content",
+    content_status: "missing_content",
+    approval_status: "pending",
+    ai_status: "idle",
+    created_by: S.profile.id,
+    metadata: {
+      auto_copied_from_post_id: post.id,
+      auto_copied_from_week_start: dateKey(sourceStart),
+      auto_copied_at: new Date().toISOString(),
+    },
+  };
+}
+
+async function fetchWeekPosts(pageId, weekStartDate){
+  const weekStart = dateKey(weekStartDate);
+  const weekEnd = dateKey(addDays(weekStartDate, 6));
+  const { data, error } = await sb.from("facebook_scheduled_posts")
     .select("*")
-    .eq("page_id", S.activePageId)
-    .gte("scheduled_date", prevStart)
-    .lte("scheduled_date", prevEnd)
+    .eq("page_id", pageId)
+    .gte("scheduled_date", weekStart)
+    .lte("scheduled_date", weekEnd)
     .order("scheduled_at");
   if (error) throw error;
-  const sourceRows = (prevRows || []).filter(p => !["cancelled"].includes(p.status));
-  if (!sourceRows.length) {
-    if (!silent) alert("Tuần trước chưa có lịch để sao chép. Hãy kéo loại bài đăng vào lịch tuần này.");
-    return;
+  return data || [];
+}
+
+async function copyWeekScheduleFromPrevious(pageId, targetWeekStart, { replaceUntouched=false } = {}){
+  if (!S.profile?.id || !pageId) return false;
+  const currentRows = await fetchWeekPosts(pageId, targetWeekStart);
+  if (currentRows.length) {
+    if (!replaceUntouched || !currentRows.every(isUntouchedSchedulePost)) return false;
+    const taskIds = currentRows.map(row => row.task_id).filter(Boolean);
+    const { error: deleteError } = await sb.from("facebook_scheduled_posts")
+      .delete()
+      .in("id", currentRows.map(row => row.id));
+    if (deleteError) throw deleteError;
+    if (taskIds.length) {
+      try { await sb.from("daily_tasks").delete().in("id", taskIds); } catch (error) { console.warn("[FacebookPosting] Không xóa được task marketing cũ khi tái tạo lịch tuần:", error); }
+    }
   }
-  const rowsToInsert = sourceRows.map(p => {
-    const oldDate = new Date(p.scheduled_at);
-    const nextDate = addDays(oldDate, 7);
-    return {
-      page_id: p.page_id,
-      post_type_id: p.post_type_id,
-      scheduled_at: nextDate.toISOString(),
-      scheduled_date: dateKey(nextDate),
-      content: "",
-      link_url: null,
-      image_url: null,
-      internal_note: p.internal_note || null,
-      status: "missing_content",
-      content_status: "missing_content",
-      approval_status: "pending",
-      created_by: S.profile.id,
-      metadata: { copied_from_post_id: p.id, copied_from_week_start: prevStart },
-    };
-  });
+  const sourceWeekStart = addDays(targetWeekStart, -7);
+  const sourceRows = (await fetchWeekPosts(pageId, sourceWeekStart)).filter(p => !["cancelled"].includes(p.status));
+  if (!sourceRows.length) return false;
+  const rowsToInsert = sourceRows.map(p => cloneSchedulePostToWeek(p, sourceWeekStart, targetWeekStart));
   const { error: insertError } = await sb.from("facebook_scheduled_posts").insert(rowsToInsert);
   if (insertError) throw insertError;
-  await materializeMarketingTasks();
-  if (silent) return;
-  if (!silent) showStatus("ok", "Đã tạo lịch tuần này giống tuần trước. Các chỉnh sửa tại đây không ảnh hưởng tuần trước.");
-  await loadData();
+  await materializeMarketingTasks(dateKey(targetWeekStart), dateKey(addDays(targetWeekStart, 6)));
+  return true;
+}
+
+async function ensureRollingMonthSchedule({ baseWeekStart=startOfWeek(new Date()) } = {}){
+  if (!S.profile?.id || !S.pages.length) return;
+  const todayWeekStart = startOfWeek(new Date());
+  const horizonEnd = addDays(todayWeekStart, 21);
+  const selectedEnd = addDays(S.weekStart, 21);
+  const end = selectedEnd > horizonEnd ? selectedEnd : horizonEnd;
+  const starts = [];
+  for (let d = new Date(baseWeekStart); d <= end; d = addDays(d, 7)) starts.push(new Date(d));
+  for (const page of S.pages) {
+    for (const weekStart of starts) {
+      await copyWeekScheduleFromPrevious(page.page_id, weekStart, { replaceUntouched: false });
+    }
+  }
+}
+
+async function refreshFutureAutoSchedulesFromWeek(pageId, sourceWeekStart){
+  if (!S.profile?.id || !pageId) return;
+  const todayWeekStart = startOfWeek(new Date());
+  const horizonEnd = addDays(todayWeekStart, 21);
+  for (let target = addDays(sourceWeekStart, 7); target <= horizonEnd; target = addDays(target, 7)) {
+    await copyWeekScheduleFromPrevious(pageId, target, { replaceUntouched: true });
+  }
 }
 function renderTypes(){
   $("postTypesBox").innerHTML = S.types.length ? S.types.map(t => `
@@ -2669,7 +2719,7 @@ async function generateWeekDrafts(){
   let skipped = 0;
   try {
     btn.disabled = true;
-    $("copyPrevWeekBtn").disabled = true;
+    $("clearWeekDraftsBtn").disabled = true;
     showStatus("info", `Bắt đầu tạo ${initialTargets.length} bài đăng bằng Gemini. Hệ thống sẽ chạy từng bài một và tự lưu nháp.`);
     for (const target of initialTargets) {
       const current = S.posts.find(post => String(post.id) === String(target.id)) || target;
@@ -2705,7 +2755,7 @@ async function generateWeekDrafts(){
     }
   } finally {
     btn.disabled = false;
-    $("copyPrevWeekBtn").disabled = false;
+    $("clearWeekDraftsBtn").disabled = false;
     btn.textContent = oldText;
   }
 }
@@ -2740,9 +2790,11 @@ async function ensureCurrentWeekPosts(){
   if (!S.profile?.id || !S.activePageId) return;
   const weekStart = dateKey(S.weekStart);
   const weekEnd = dateKey(addDays(S.weekStart, 6));
-  const hasCurrentPosts = S.posts.some(p => p.page_id === S.activePageId && p.scheduled_date >= weekStart && p.scheduled_date <= weekEnd);
+  const currentRows = await fetchWeekPosts(S.activePageId, S.weekStart);
+  const hasCurrentPosts = currentRows.length > 0;
   if (!hasCurrentPosts) {
-    await copyPreviousWeekSchedule({ silent: true }).catch(error => console.warn("Không tự copy lịch tuần trước:", error));
+    await copyWeekScheduleFromPrevious(S.activePageId, S.weekStart, { replaceUntouched: false })
+      .catch(error => console.warn("Không tự tạo lịch theo tuần trước:", error));
   }
   await materializeMarketingTasks();
   const postsRes = await sb.from("facebook_scheduled_posts")
@@ -2755,9 +2807,9 @@ async function ensureCurrentWeekPosts(){
   await syncFacebookScheduledStatus();
   await syncMarketingTaskCompletion();
 }
-async function materializeMarketingTasks(){
-  const weekStart = dateKey(S.weekStart);
-  const weekEnd = dateKey(addDays(S.weekStart, 6));
+async function materializeMarketingTasks(fromDate=null, toDate=null){
+  const weekStart = fromDate || dateKey(S.weekStart);
+  const weekEnd = toDate || dateKey(addDays(S.weekStart, 6));
   const { error } = await sb.rpc("materialize_facebook_marketing_tasks", {
     p_from: weekStart,
     p_to: weekEnd,
@@ -2834,9 +2886,8 @@ function bindEvents(){
     addWeekTimeSlot();
   });
   $("openPageBtn").addEventListener("click", () => window.open(currentPage().page_url || `https://www.facebook.com/${currentPage().page_id}`, "_blank", "noopener"));
-  $("copyPrevWeekBtn").addEventListener("click", () => copyPreviousWeekSchedule({ silent:false }).catch(error => alert(error.message || String(error))));
   $("generateWeekDraftsBtn").addEventListener("click", () => generateWeekDrafts().catch(error => showStatus("err", error.message || String(error))));
-  $("deleteWeekPostsBtn").addEventListener("click", () => deleteCurrentWeekPosts().catch(error => showStatus("err", error.message || String(error))));
+  $("clearWeekDraftsBtn").addEventListener("click", () => clearCurrentWeekDraftContent().catch(error => showStatus("err", error.message || String(error))));
   $("closeTemplateModalBtn")?.addEventListener("click", closeTemplateModal);
   $("saveTemplateBtn")?.addEventListener("click", saveTemplate);
   $("deleteTemplateBtn")?.addEventListener("click", deleteTemplate);
