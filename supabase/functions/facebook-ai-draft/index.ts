@@ -70,6 +70,61 @@ function env(name: string) {
   return Deno.env.get(name) || "";
 }
 
+function geminiApiKeys() {
+  const keys = [
+    ...env("GEMINI_API_KEYS").split(/[\n,;]+/),
+    env("GEMINI_API_KEY"),
+  ].map((key) => key.trim()).filter(Boolean);
+  return Array.from(new Set(keys));
+}
+
+function isRetryableGeminiError(status: number, message: string) {
+  const lower = message.toLowerCase();
+  return status === 429
+    || status === 503
+    || lower.includes("high demand")
+    || lower.includes("quota")
+    || lower.includes("rate limit")
+    || lower.includes("resource exhausted")
+    || lower.includes("try again later");
+}
+
+async function postGeminiGenerateContent(args: {
+  prompt: string;
+  temperature: number;
+}) {
+  const keys = geminiApiKeys();
+  if (!keys.length) throw new Error("Thiếu Supabase secret GEMINI_API_KEYS hoặc GEMINI_API_KEY.");
+
+  const model = env("GEMINI_TEXT_MODEL") || "gemini-2.5-pro";
+  const errors: string[] = [];
+  for (let index = 0; index < keys.length; index += 1) {
+    const apiKey = keys[index];
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: args.prompt }] }],
+        generationConfig: {
+          temperature: args.temperature,
+          response_mime_type: "application/json",
+        },
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) return { model, data };
+
+    const message = data?.error?.message || "Gemini text generation failed";
+    errors.push(`Key ${index + 1}: ${message}`);
+    if (!isRetryableGeminiError(res.status, message) && res.status !== 400 && res.status !== 403) {
+      throw new Error(message);
+    }
+  }
+
+  throw new Error(errors.join(" | ") || "Gemini text generation failed");
+}
+
 function restHeaders(serviceRole = false, accessToken = "") {
   const key = serviceRole ? env("SUPABASE_SERVICE_ROLE_KEY") : env("SUPABASE_ANON_KEY");
   return {
@@ -1096,26 +1151,7 @@ function buildGeminiPrompt(args: {
 }
 
 async function generateTextDraft(prompt: string) {
-  const apiKey = env("GEMINI_API_KEY");
-  if (!apiKey) throw new Error("Thiếu Supabase secret GEMINI_API_KEY.");
-
-  const model = env("GEMINI_TEXT_MODEL") || "gemini-2.5-pro";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.8,
-        response_mime_type: "application/json",
-      },
-    }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data?.error?.message || "Gemini text generation failed");
-  }
+  const { model, data } = await postGeminiGenerateContent({ prompt, temperature: 0.8 });
   const text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("\n") || "";
   const parsed = tryParseJson(text);
   const hashtags = normalizeHashtags(parsed?.hashtags);
@@ -1176,24 +1212,7 @@ function normalizeDraftPart(value: unknown, fallbackTags: string[] = []) {
 }
 
 async function generateProblemLearningPairDraft(prompt: string) {
-  const apiKey = env("GEMINI_API_KEY");
-  if (!apiKey) throw new Error("Thiếu Supabase secret GEMINI_API_KEY.");
-
-  const model = env("GEMINI_TEXT_MODEL") || "gemini-2.5-pro";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.82,
-        response_mime_type: "application/json",
-      },
-    }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error?.message || "Gemini text generation failed");
+  const { model, data } = await postGeminiGenerateContent({ prompt, temperature: 0.82 });
 
   const text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("\n") || "";
   const parsed = tryParseJson(text) as JsonRecord;
