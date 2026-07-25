@@ -395,7 +395,7 @@ function isHardQuizWithPrize(typeName: string) {
 
 function isProblemType(typeName: string) {
   const normalized = String(typeName || "").trim().toLowerCase();
-  return normalized === "problem" || normalized === "teaching philosophy";
+  return normalized === "teaching philosophy";
 }
 
 function isLearningMethod(typeName: string) {
@@ -987,7 +987,7 @@ function buildGeminiPrompt(args: {
     const method = learningMethodTopic(args.scheduledAt, args.pageName);
     return [
       "Bạn là chuyên gia content marketing giáo dục cho MindUp - Tư Duy Toàn Diện.",
-      "Nhiệm vụ: tạo bài Learning Method chia sẻ một phương pháp học tập cụ thể, dễ hiểu, có thể áp dụng ngay.",
+      "Nhiệm vụ: tạo một bài Learning Method độc lập: mở đầu bằng một khó khăn học tập/phụ huynh rất thật, sau đó giải bằng một phương pháp học tập cụ thể, dễ hiểu, có thể áp dụng ngay.",
       "",
       "Thông tin bài đăng:",
       `- Fanpage: ${args.pageName}`,
@@ -1003,19 +1003,20 @@ function buildGeminiPrompt(args: {
       "Yêu cầu nội dung:",
       "- Viết bằng tiếng Việt tự nhiên, thân thiện với học sinh/phụ huynh.",
       "- Có thể tham khảo insight/quy tắc học tập phổ biến từ nguồn tiếng Anh, nhưng phải viết lại thành bài gốc theo giọng MindUp; không copy nguyên văn.",
-      "- Bài cần có: vấn đề thường gặp, tên phương pháp, vì sao hiệu quả, cách áp dụng 3-5 bước, ví dụ cụ thể.",
+      "- Mở bài bằng vấn đề/nỗi đau rõ ràng: học mãi không nhớ, học thuộc nhưng không hiểu, mất tập trung, làm bài sai do đọc vội, phụ huynh kèm con bị căng thẳng... Chọn vấn đề phù hợp với phương pháp học được giao.",
+      "- Sau đó chuyển tự nhiên sang phương pháp học: tên phương pháp, vì sao hiệu quả, cách áp dụng 3-5 bước, ví dụ cụ thể.",
       "- Ví dụ thực tế bắt buộc phải liên quan đến môn/trục nội dung của fanpage.",
-      "- Nếu có bài Problem liên quan trước đó thì hãy viết như một bài giải đáp tiếp nối.",
-      "- Ảnh: Gemini chỉ mô tả nền ảnh liên quan đến bài viết, mờ phía sau, không có chữ và không có logo. Hệ thống sẽ tự chèn logo MindUp phía trên giữa ảnh và chữ tóm tắt khoảng 20 từ ở chính giữa.",
+      "- Không nhắc rằng đây là bài tiếp nối Problem. Không hẹn sang bài Learning Method khác.",
+      "- Ảnh: Gemini chỉ trả về từ khóa/prompt tìm ảnh nền liên quan đến bài viết, không chữ, không logo. Hệ thống sẽ tự lấy ảnh nền, chèn logo MindUp phía trên giữa ảnh và chữ tóm tắt khoảng 15-20 từ ở chính giữa.",
       "",
       "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
       JSON.stringify({
-        caption: "Caption bài Learning Method bằng tiếng Việt, giải thích phương pháp học cụ thể và cách áp dụng.",
+        caption: "Caption bài Learning Method bằng tiếng Việt: nêu vấn đề học tập/phụ huynh, giải bằng phương pháp học cụ thể, có ví dụ theo môn fanpage và CTA nhẹ.",
         hashtags: ["#MindUp", "#LearningMethod", "#PhuongPhapHocTap", "#PhatTrienTuDuy", fanpageTag],
         image_prompt: "Prompt tiếng Anh tạo ảnh nền 1:1 cho bài Learning Method, không chữ, không logo, liên quan đến phương pháp học và môn học của fanpage.",
         image_search_keywords: "Từ khóa tiếng Anh để tìm ảnh nền phù hợp trên Pexels, không chữ, liên quan đến bài viết và môn học.",
-        image_background_prompt: "Prompt/từ khóa tiếng Anh cho ảnh nền mờ, không chữ, không logo.",
-        image_overlay_text: "Một câu tóm tắt tiếng Việt khoảng 20 từ để hệ thống đặt ở giữa ảnh.",
+        image_background_prompt: "Prompt/từ khóa tiếng Anh cho ảnh nền liên quan bài viết, không chữ, không logo.",
+        image_overlay_text: "Một câu tóm tắt tiếng Việt khoảng 15-20 từ, nêu vấn đề hoặc lời hứa phương pháp học, để hệ thống đặt ở giữa ảnh.",
         internal_note: `Learning Method tuần ${method.week}/${method.year}; fanpage ${args.pageName}; offset ${method.offset}; method ${method.methodNumber}/${method.totalMethods}: ${method.name} (${method.group})`,
       }, null, 2),
     ].filter(Boolean).join("\n");

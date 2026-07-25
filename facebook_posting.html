@@ -439,7 +439,7 @@ const DEFAULT_PAGES = [
   { page_id: "1163066643562080", page_name: "MindUp - Tư Duy Sinh Học", page_url: "https://www.facebook.com/1163066643562080" },
 ];
 const DEFAULT_TYPES = [
-  "Problem", "Learning Method", "Monday Mindset", "Hard Quiz with Prize", "Q&A", "Meme",
+  "Learning Method", "Monday Mindset", "Hard Quiz with Prize", "Q&A", "Meme",
   "Teaching Philosophy", "Enrollment", "Quiz", "Bài hay", "Lỗi sai thường gặp"
 ];
 const DEFAULT_TYPE_PROMPTS = {
@@ -486,8 +486,10 @@ const DEFAULT_TYPE_PROMPTS = {
 - Kh?ng cam k?t t?ng ?i?m phi th?c t?, kh?ng d?ng ng?n t? g?y ?p l?c qu? m?c.
 - ?nh d?ng template Enrollment c?a MindUp, kh?ng ?? Gemini t? t?o ?nh.
 - Hashtag g?i ?: #MindUp #HocThu #DangKyHocThu #PhatTrienTuDuy.`,
-  "Learning Method": `Loại bài Learning Method dùng để giải đáp một bài Problem trước đó.
-- Chia sẻ một phương pháp học tập khớp với vấn đề đã nêu.
+  "Learning Method": `Loại bài Learning Method dùng để đi thẳng vào một khó khăn học tập/phụ huynh đang gặp, rồi giải bằng một phương pháp học cụ thể.
+- Không cần tạo bài Problem riêng trước đó.
+- Mở bài bằng một vấn đề rất thật của học sinh/phụ huynh: học mãi không nhớ, học thuộc nhưng không hiểu, mất tập trung, làm bài sai do đọc vội, phụ huynh kèm con bị căng thẳng...
+- Sau đó chuyển tự nhiên sang phương pháp học được chọn, giải thích vì sao phương pháp này xử lý đúng vấn đề vừa nêu.
 - Hệ thống tự xác định tuần ISO trong năm và chọn 1 trong 53 phương pháp học theo offset từng fanpage:
   + MindUp - Tư Duy Toàn Diện: offset 0.
   + MindUp - Tư duy Toán học: offset 10.
@@ -495,9 +497,11 @@ const DEFAULT_TYPE_PROMPTS = {
   + MindUp - Tư duy Hóa Học: offset 30.
   + MindUp - Tư Duy Sinh Học: offset 40.
 - Công thức: ((số tuần - 1 - offset) mod 53) + 1.
-- Khi bấm Gemini trực tiếp vào Learning Method hoặc bấm Gemini ở Problem để tạo cặp bài, bài Learning Method phải dùng đúng phương pháp học đã được chọn theo tuần/fanpage.
+- Khi bấm Gemini trực tiếp vào Learning Method, bài phải dùng đúng phương pháp học đã được chọn theo tuần/fanpage.
 - Nên tham khảo các ý tưởng/quy tắc học tập phổ biến từ nguồn tiếng Anh, nhưng viết lại thành bài gốc bằng tiếng Việt theo giọng MindUp; không copy nguyên văn.
 - Bài cần có: vấn đề, phương pháp, vì sao hiệu quả, cách áp dụng 3-5 bước, ví dụ cụ thể.
+- Ví dụ thực tế bắt buộc phải liên quan đến môn/trục nội dung của fanpage. Ví dụ fanpage Sinh học thì ví dụ nên gắn với tế bào, di truyền, hệ cơ quan, sinh thái...; fanpage Toán thì gắn với phương trình, hình học, xác suất...
+- Ảnh của Learning Method: Gemini chỉ trả về từ khóa/prompt tìm ảnh nền liên quan đến bài viết, không chữ, không logo. Hệ thống sẽ tự lấy ảnh nền, chèn logo MindUp phía trên giữa ảnh và đặt một câu tóm tắt vấn đề/phương pháp khoảng 15-20 từ ở giữa ảnh.
 - Hashtag gợi ý: #MindUp #LearningMethod #PhuongPhapHocTap #PhatTrienTuDuy.`,
   "Monday Mindset": `Loại bài Monday Mindset dùng workflow riêng:
 - Hệ thống tự xác định tuần ISO trong năm.
@@ -739,7 +743,7 @@ function renderSelects(){
     .filter(d => d.value !== 0)
     .map(d => `<option value="${d.value}">${d.label} tuần trước</option>`)
     .join("") + `<option value="7">Chủ nhật tuần trước</option>`;
-  const typeOptions = S.types.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join("");
+  const typeOptions = usableTypes().map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join("");
   $("templateType").innerHTML = typeOptions;
   $("postType").innerHTML = typeOptions;
   renderTemplateAssignees();
@@ -788,6 +792,12 @@ function defaultRequirementsForType(typeNameValue){
 function normalizeText(value){
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
+function isDeprecatedProblemTypeName(name){
+  return normalizeText(name).trim() === "problem";
+}
+function usableTypes(){
+  return S.types.filter(t => !isDeprecatedProblemTypeName(t.name));
+}
 function isQuizType(postTypeId){
   const rawName = String(typeName(postTypeId) || "").trim();
   return normalizeText(rawName) === "quiz";
@@ -798,7 +808,7 @@ function isHardQuizType(postTypeId){
 }
 function isPairStarterType(postTypeId){
   const rawName = normalizeText(typeName(postTypeId));
-  return rawName === "problem" || rawName === "teaching philosophy";
+  return rawName === "teaching philosophy";
 }
 function isLearningMethodType(postTypeId){
   return normalizeText(typeName(postTypeId)) === "learning method";
@@ -1954,7 +1964,7 @@ async function fetchWeekPosts(pageId, weekStartDate){
     .lte("scheduled_date", weekEnd)
     .order("scheduled_at");
   if (error) throw error;
-  return data || [];
+  return (data || []).filter(row => !isDeprecatedProblemTypeName(typeName(row.post_type_id)));
 }
 
 async function copyWeekScheduleFromPrevious(pageId, targetWeekStart, { replaceUntouched=false } = {}){
@@ -2005,7 +2015,8 @@ async function refreshFutureAutoSchedulesFromWeek(pageId, sourceWeekStart){
   }
 }
 function renderTypes(){
-  $("postTypesBox").innerHTML = S.types.length ? S.types.map(t => `
+  const types = usableTypes();
+  $("postTypesBox").innerHTML = types.length ? types.map(t => `
     <div class="type-row" draggable="true" data-drag-type-id="${esc(t.id)}" title="Kéo vào lịch tuần để tạo bài đăng">
       <span class="type-chip"><span style="width:10px;height:10px;border-radius:999px;background:${esc(t.color || "#c8962a")}"></span>${esc(t.name)}</span>
       <span class="hint">${esc(typeTaskSummary(t))}</span>
@@ -2038,7 +2049,7 @@ function openTemplateModal(id="", defaults={}){
   $("templateId").value = row?.id || "";
   $("templateWeekday").value = row?.weekday ?? defaults.weekday ?? 1;
   $("templateTime").value = String(row?.publish_time || defaults.publish_time || "20:00").slice(0,5);
-  $("templateType").value = row?.post_type_id || S.types[0]?.id || "";
+  $("templateType").value = row?.post_type_id || usableTypes()[0]?.id || "";
   $("templateNote").value = row?.note || "";
   $("templateAutoTask").checked = row ? row.auto_create_task !== false : true;
   renderTemplateAssignees(assigneeIdsFromTemplate(row));
@@ -2099,7 +2110,7 @@ function openPostModal(id="", defaults={}){
   $("postId").value = row?.id || "";
   $("postPageName").value = page.page_name;
   $("postScheduledAt").value = toLocalInputValue(scheduledAt);
-  $("postType").value = row?.post_type_id || S.types[0]?.id || "";
+  $("postType").value = row?.post_type_id || usableTypes()[0]?.id || "";
   $("postStatus").value = statusLabel(row?.status || "missing_content");
   $("postContent").value = row?.content || "";
   $("postLinkUrl").value = row?.link_url || "";
@@ -2713,6 +2724,7 @@ async function generateWeekDrafts(){
       && post.scheduled_date >= weekStart
       && post.scheduled_date <= weekEnd
       && !["scheduled", "published", "cancelled"].includes(String(post.status || ""))
+      && !isDeprecatedProblemTypeName(typeName(post.post_type_id))
       && !postHasContent(post);
   const initialTargets = S.posts
     .filter(post => isGeneratablePost(post))
