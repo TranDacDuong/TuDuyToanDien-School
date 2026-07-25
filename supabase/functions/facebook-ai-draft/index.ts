@@ -1003,15 +1003,17 @@ function buildGeminiPrompt(args: {
       "Yêu cầu nội dung:",
       "- Viết bằng tiếng Việt tự nhiên, thân thiện với học sinh/phụ huynh.",
       "- Có thể tham khảo insight/quy tắc học tập phổ biến từ nguồn tiếng Anh, nhưng phải viết lại thành bài gốc theo giọng MindUp; không copy nguyên văn.",
-      "- Mở bài bằng vấn đề/nỗi đau rõ ràng: học mãi không nhớ, học thuộc nhưng không hiểu, mất tập trung, làm bài sai do đọc vội, phụ huynh kèm con bị căng thẳng... Chọn vấn đề phù hợp với phương pháp học được giao.",
+      "- Mở bài bằng chính vấn đề/nỗi đau ngay trong bài này, không nhắc đến một bài Problem/bài tuần trước. Ví dụ mở kiểu: 'Nhiều học sinh gặp tình trạng...', 'Không ít phụ huynh thấy con...', 'Có một khó khăn rất phổ biến khi học...'.",
+      "- Vấn đề/nỗi đau cần rõ ràng: học mãi không nhớ, học thuộc nhưng không hiểu, mất tập trung, làm bài sai do đọc vội, phụ huynh kèm con bị căng thẳng... Chọn vấn đề phù hợp với phương pháp học được giao.",
       "- Sau đó chuyển tự nhiên sang phương pháp học: tên phương pháp, vì sao hiệu quả, cách áp dụng 3-5 bước, ví dụ cụ thể.",
       "- Ví dụ thực tế bắt buộc phải liên quan đến môn/trục nội dung của fanpage.",
+      "- TUYỆT ĐỐI KHÔNG dùng các cụm: 'tuần trước', 'bài trước', 'hôm trước', 'lần trước', 'chúng ta đã cùng trò chuyện', 'như đã nói ở bài trước', 'tiếp nối bài Problem'. Nếu nội dung nháp cũ có các cụm này thì phải viết lại thành vấn đề trực tiếp trong bài.",
       "- Không nhắc rằng đây là bài tiếp nối Problem. Không hẹn sang bài Learning Method khác.",
       "- Ảnh: Gemini chỉ trả về từ khóa/prompt tìm ảnh nền liên quan đến bài viết, không chữ, không logo. Hệ thống sẽ tự lấy ảnh nền, chèn logo MindUp phía trên giữa ảnh và chữ tóm tắt tối đa 20 từ ở chính giữa.",
       "",
       "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
       JSON.stringify({
-        caption: "Caption bài Learning Method bằng tiếng Việt: nêu vấn đề học tập/phụ huynh, giải bằng phương pháp học cụ thể, có ví dụ theo môn fanpage và CTA nhẹ.",
+        caption: "Caption bài Learning Method bằng tiếng Việt: bắt đầu bằng vấn đề trực tiếp trong bài, không nhắc tuần trước/bài trước, giải bằng phương pháp học cụ thể, có ví dụ theo môn fanpage và CTA nhẹ.",
         hashtags: ["#MindUp", "#LearningMethod", "#PhuongPhapHocTap", "#PhatTrienTuDuy", fanpageTag],
         image_prompt: "Prompt tiếng Anh tạo ảnh nền 1:1 cho bài Learning Method, không chữ, không logo, liên quan đến phương pháp học và môn học của fanpage.",
         image_search_keywords: "Từ khóa tiếng Anh để tìm ảnh nền phù hợp trên Pexels, không chữ, liên quan đến bài viết và môn học.",
@@ -1157,7 +1159,7 @@ function buildGeminiPrompt(args: {
   ].filter(Boolean).join("\n");
 }
 
-async function generateTextDraft(prompt: string) {
+async function generateTextDraft(prompt: string, typeName = "") {
   const { model, data } = await postGeminiGenerateContent({ prompt, temperature: 0.8 });
   const text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("\n") || "";
   const parsed = tryParseJson(text);
@@ -1169,9 +1171,11 @@ async function generateTextDraft(prompt: string) {
     ? quizRecord.answers.map((answer: unknown) => String(answer || "").trim()).filter(Boolean).slice(0, 4)
     : [];
   const hardQuizRecord = (parsed?.hard_quiz && typeof parsed.hard_quiz === "object" ? parsed.hard_quiz : {}) as JsonRecord;
+  const rawCaption = String(parsed?.caption || "").trim();
+  const isStandaloneLearning = isLearningMethod(typeName);
   return {
     model,
-    caption: String(parsed?.caption || "").trim(),
+    caption: isStandaloneLearning ? sanitizeStandaloneLearningMethodCaption(rawCaption) : rawCaption,
     hashtags,
     quoteEn: String(parsed?.quote_en || "").trim(),
     quoteVi: String(parsed?.quote_vi || "").trim(),
@@ -1472,6 +1476,20 @@ function summarizeOverlayText(value: string, maxWords = 20) {
   const sentence = clean.split(/[.!?…]\s+/)[0] || clean;
   const words = sentence.split(/\s+/).filter(Boolean).slice(0, maxWords);
   return words.join(" ") || "Học đúng cách để hiểu sâu hơn mỗi ngày";
+}
+
+function sanitizeStandaloneLearningMethodCaption(value: string) {
+  const caption = String(value || "").trim();
+  if (!caption) return caption;
+  const introPattern = /^(?:tuần trước|bài trước|hôm trước|lần trước|trong bài trước|như bài trước|như đã nói ở bài trước|chúng ta đã cùng trò chuyện|tuần vừa rồi)[\s\S]{0,420}?(?:\n\s*\n|(?<=[.!?…])\s+)/i;
+  const sanitized = caption.replace(introPattern, "").trim();
+  if (sanitized && sanitized !== caption) return sanitized;
+  return caption
+    .replace(/Tuần trước,\s*chúng ta đã cùng trò chuyện về\s*/i, "Một vấn đề rất phổ biến là ")
+    .replace(/Tuần trước,\s*/i, "")
+    .replace(/Bài trước,\s*/i, "")
+    .replace(/Hôm trước,\s*/i, "")
+    .trim();
 }
 
 function subjectVisualTheme(pageName: string) {
@@ -1940,7 +1958,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const draft = await generateTextDraft(textPrompt);
+    const draft = await generateTextDraft(textPrompt, post.type?.name || "");
     const postTypeNameForQuiz = post.type?.name || "Facebook";
     if (isQuizTypeName(postTypeNameForQuiz)) {
       const quiz = draft.quiz || {};
