@@ -1352,21 +1352,23 @@ function wrapSvgTextWithMeta(text: string, maxChars: number, maxLines: number) {
   const words = stripMarkdown(text).split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let line = "";
-  let usedWords = 0;
-  for (const word of words) {
+  let truncated = false;
+  for (let index = 0; index < words.length; index += 1) {
+    const word = words[index];
     const next = line ? `${line} ${word}` : word;
     if (next.length <= maxChars || !line) {
       line = next;
-      usedWords += 1;
       continue;
     }
     lines.push(line);
+    if (lines.length >= maxLines) {
+      truncated = true;
+      line = "";
+      break;
+    }
     line = word;
-    usedWords += 1;
-    if (lines.length >= maxLines) break;
   }
   if (line && lines.length < maxLines) lines.push(line);
-  const truncated = usedWords < words.length;
   if (truncated && lines.length) {
     const last = lines[lines.length - 1].replace(/[.…]+$/g, "").trim();
     lines[lines.length - 1] = `${last}…`;
@@ -1391,9 +1393,10 @@ function fitOverlaySvgText(text: string, options: {
   const maxFontSize = options.maxFontSize || 58;
   const minFontSize = options.minFontSize || 34;
   const lineHeightRatio = options.lineHeightRatio || 1.18;
+  const averageCharWidthRatio = 0.72;
   const clean = stripMarkdown(text);
   for (let fontSize = maxFontSize; fontSize >= minFontSize; fontSize -= 2) {
-    const maxChars = Math.max(16, Math.floor(boxWidth / (fontSize * 0.54)));
+    const maxChars = Math.max(14, Math.floor(boxWidth / (fontSize * averageCharWidthRatio)));
     const { lines, truncated } = wrapSvgTextWithMeta(clean, maxChars, maxLines);
     const lineHeight = Math.round(fontSize * lineHeightRatio);
     const totalHeight = lines.length * lineHeight;
@@ -1402,7 +1405,7 @@ function fitOverlaySvgText(text: string, options: {
     }
   }
   const fontSize = minFontSize;
-  const maxChars = Math.max(16, Math.floor(boxWidth / (fontSize * 0.54)));
+  const maxChars = Math.max(14, Math.floor(boxWidth / (fontSize * averageCharWidthRatio)));
   const { lines, truncated } = wrapSvgTextWithMeta(clean, maxChars, maxLines);
   const lineHeight = Math.round(fontSize * lineHeightRatio);
   return { lines, fontSize, lineHeight, totalHeight: lines.length * lineHeight, truncated };
@@ -1530,16 +1533,16 @@ function buildProblemLearningImage(args: {
   const logoHref = args.logoDataUri || env("MINDUP_LOGO_URL") || "https://www.mindup.edu.vn/assets/mindup-logo-round.png";
   const overlay = summarizeOverlayText(args.overlayText || args.caption, 20);
   const fittedTitle = fitOverlaySvgText(overlay, {
-    boxWidth: 820,
-    boxHeight: 350,
+    boxWidth: 760,
+    boxHeight: 380,
     maxLines: 5,
-    maxFontSize: 58,
-    minFontSize: 34,
+    maxFontSize: 52,
+    minFontSize: 30,
   });
   const titleLines = fittedTitle.lines;
   const yStart = Math.round(540 - ((titleLines.length - 1) * fittedTitle.lineHeight) / 2);
-  const boxHeight = Math.max(190, fittedTitle.totalHeight + 96);
-  const boxY = Math.round(yStart - fittedTitle.lineHeight * 0.82 - 42);
+  const boxHeight = Math.max(210, fittedTitle.totalHeight + 118);
+  const boxY = Math.round(yStart - fittedTitle.lineHeight * 0.82 - 54);
   const titleTspans = titleLines
     .map((line, index) => `<tspan x="540" y="${yStart + index * fittedTitle.lineHeight}">${escapeXml(line)}</tspan>`)
     .join("");
