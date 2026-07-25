@@ -1007,7 +1007,7 @@ function buildGeminiPrompt(args: {
       "- Sau đó chuyển tự nhiên sang phương pháp học: tên phương pháp, vì sao hiệu quả, cách áp dụng 3-5 bước, ví dụ cụ thể.",
       "- Ví dụ thực tế bắt buộc phải liên quan đến môn/trục nội dung của fanpage.",
       "- Không nhắc rằng đây là bài tiếp nối Problem. Không hẹn sang bài Learning Method khác.",
-      "- Ảnh: Gemini chỉ trả về từ khóa/prompt tìm ảnh nền liên quan đến bài viết, không chữ, không logo. Hệ thống sẽ tự lấy ảnh nền, chèn logo MindUp phía trên giữa ảnh và chữ tóm tắt khoảng 15-20 từ ở chính giữa.",
+      "- Ảnh: Gemini chỉ trả về từ khóa/prompt tìm ảnh nền liên quan đến bài viết, không chữ, không logo. Hệ thống sẽ tự lấy ảnh nền, chèn logo MindUp phía trên giữa ảnh và chữ tóm tắt tối đa 20 từ ở chính giữa.",
       "",
       "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
       JSON.stringify({
@@ -1016,7 +1016,7 @@ function buildGeminiPrompt(args: {
         image_prompt: "Prompt tiếng Anh tạo ảnh nền 1:1 cho bài Learning Method, không chữ, không logo, liên quan đến phương pháp học và môn học của fanpage.",
         image_search_keywords: "Từ khóa tiếng Anh để tìm ảnh nền phù hợp trên Pexels, không chữ, liên quan đến bài viết và môn học.",
         image_background_prompt: "Prompt/từ khóa tiếng Anh cho ảnh nền liên quan bài viết, không chữ, không logo.",
-        image_overlay_text: "Một câu tóm tắt tiếng Việt khoảng 15-20 từ, nêu vấn đề hoặc lời hứa phương pháp học, để hệ thống đặt ở giữa ảnh.",
+        image_overlay_text: "Một câu tóm tắt tiếng Việt tối đa 20 từ, nêu vấn đề hoặc lời hứa phương pháp học, để hệ thống đặt ở giữa ảnh.",
         internal_note: `Learning Method tuần ${method.week}/${method.year}; fanpage ${args.pageName}; offset ${method.offset}; method ${method.methodNumber}/${method.totalMethods}: ${method.name} (${method.group})`,
       }, null, 2),
     ].filter(Boolean).join("\n");
@@ -1049,7 +1049,7 @@ function buildGeminiPrompt(args: {
       "- Learning Method: nhắc lại vấn đề, nêu phương pháp học, vì sao hiệu quả, cách áp dụng 3-5 bước, ví dụ cụ thể cho học sinh/phụ huynh.",
       "- Ví dụ trong Learning Method bắt buộc phải liên quan đến môn/trục nội dung của fanpage.",
       "- Hệ thống sẽ bổ sung riêng phương pháp học bắt buộc cho bài Learning Method theo tuần và offset fanpage. Không tự chọn ngẫu nhiên nếu đã có phương pháp bắt buộc.",
-      "- Ảnh của cả Problem và Learning Method: Gemini chỉ mô tả nền ảnh liên quan đến bài viết, mờ phía sau, không có chữ và không có logo. Hệ thống sẽ tự chèn logo MindUp phía trên giữa ảnh và chữ tóm tắt vấn đề khoảng 20 từ ở chính giữa.",
+      "- Ảnh của cả Problem và Learning Method: Gemini chỉ mô tả nền ảnh liên quan đến bài viết, không chữ và không có logo. Hệ thống sẽ tự chèn logo MindUp phía trên giữa ảnh và chữ tóm tắt vấn đề tối đa 20 từ ở chính giữa.",
       "",
       "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
       JSON.stringify({
@@ -1065,7 +1065,7 @@ function buildGeminiPrompt(args: {
           image_prompt: "Prompt tiếng Anh tạo ảnh nền 1:1 cho bài Problem, không chữ, không logo, thể hiện nỗi đau học tập/phụ huynh và liên quan đến môn học fanpage.",
           image_search_keywords: "Từ khóa tiếng Anh để tìm ảnh nền phù hợp trên Pexels, không chữ, liên quan đến vấn đề và môn học.",
           image_background_prompt: "Prompt/từ khóa tiếng Anh cho ảnh nền mờ, không chữ, không logo.",
-          image_overlay_text: "Một câu tóm tắt vấn đề bằng tiếng Việt khoảng 20 từ để hệ thống đặt ở giữa ảnh.",
+          image_overlay_text: "Một câu tóm tắt vấn đề bằng tiếng Việt tối đa 20 từ để hệ thống đặt ở giữa ảnh.",
           internal_note: "Ghi chú nội bộ cho người kiểm tra bài Problem.",
         },
         learning_method_post: {
@@ -1074,7 +1074,7 @@ function buildGeminiPrompt(args: {
           image_prompt: "Prompt tiếng Anh tạo ảnh nền 1:1 cho bài Learning Method, không chữ, không logo, liên quan đến phương pháp học và môn học fanpage.",
           image_search_keywords: "Từ khóa tiếng Anh để tìm ảnh nền phù hợp trên Pexels, không chữ, liên quan đến phương pháp học và môn học.",
           image_background_prompt: "Prompt/từ khóa tiếng Anh cho ảnh nền mờ, không chữ, không logo.",
-          image_overlay_text: "Một câu tóm tắt vấn đề đã nêu trong bài Problem bằng tiếng Việt khoảng 20 từ để hệ thống đặt ở giữa ảnh.",
+          image_overlay_text: "Một câu tóm tắt vấn đề đã nêu trong bài Problem bằng tiếng Việt tối đa 20 từ để hệ thống đặt ở giữa ảnh.",
           internal_note: "Ghi chú nội bộ cho người kiểm tra bài Learning Method.",
         },
       }, null, 2),
@@ -1344,6 +1344,66 @@ function wrapSvgText(text: string, maxChars: number, maxLines: number) {
   return lines.length ? lines : ["MindUp - Tư Duy Toàn Diện"];
 }
 
+function wrapSvgTextWithMeta(text: string, maxChars: number, maxLines: number) {
+  const words = stripMarkdown(text).split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let line = "";
+  let usedWords = 0;
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word;
+    if (next.length <= maxChars || !line) {
+      line = next;
+      usedWords += 1;
+      continue;
+    }
+    lines.push(line);
+    line = word;
+    usedWords += 1;
+    if (lines.length >= maxLines) break;
+  }
+  if (line && lines.length < maxLines) lines.push(line);
+  const truncated = usedWords < words.length;
+  if (truncated && lines.length) {
+    const last = lines[lines.length - 1].replace(/[.…]+$/g, "").trim();
+    lines[lines.length - 1] = `${last}…`;
+  }
+  return {
+    lines: lines.length ? lines : ["MindUp - Tư Duy Toàn Diện"],
+    truncated,
+  };
+}
+
+function fitOverlaySvgText(text: string, options: {
+  boxWidth?: number;
+  boxHeight?: number;
+  maxLines?: number;
+  maxFontSize?: number;
+  minFontSize?: number;
+  lineHeightRatio?: number;
+} = {}) {
+  const boxWidth = options.boxWidth || 820;
+  const boxHeight = options.boxHeight || 350;
+  const maxLines = options.maxLines || 5;
+  const maxFontSize = options.maxFontSize || 58;
+  const minFontSize = options.minFontSize || 34;
+  const lineHeightRatio = options.lineHeightRatio || 1.18;
+  const clean = stripMarkdown(text);
+  for (let fontSize = maxFontSize; fontSize >= minFontSize; fontSize -= 2) {
+    const maxChars = Math.max(16, Math.floor(boxWidth / (fontSize * 0.54)));
+    const { lines, truncated } = wrapSvgTextWithMeta(clean, maxChars, maxLines);
+    const lineHeight = Math.round(fontSize * lineHeightRatio);
+    const totalHeight = lines.length * lineHeight;
+    if (!truncated && totalHeight <= boxHeight) {
+      return { lines, fontSize, lineHeight, totalHeight, truncated: false };
+    }
+  }
+  const fontSize = minFontSize;
+  const maxChars = Math.max(16, Math.floor(boxWidth / (fontSize * 0.54)));
+  const { lines, truncated } = wrapSvgTextWithMeta(clean, maxChars, maxLines);
+  const lineHeight = Math.round(fontSize * lineHeightRatio);
+  return { lines, fontSize, lineHeight, totalHeight: lines.length * lineHeight, truncated };
+}
+
 function buildFallbackImage(args: {
   pageName: string;
   typeName: string;
@@ -1451,10 +1511,19 @@ function buildProblemLearningImage(args: {
   const theme = subjectVisualTheme(args.pageName);
   const logoHref = args.logoDataUri || env("MINDUP_LOGO_URL") || "https://www.mindup.edu.vn/assets/mindup-logo-round.png";
   const overlay = summarizeOverlayText(args.overlayText || args.caption, 20);
-  const titleLines = wrapSvgText(overlay, 24, 4);
-  const yStart = titleLines.length <= 2 ? 500 : 440;
+  const fittedTitle = fitOverlaySvgText(overlay, {
+    boxWidth: 820,
+    boxHeight: 350,
+    maxLines: 5,
+    maxFontSize: 58,
+    minFontSize: 34,
+  });
+  const titleLines = fittedTitle.lines;
+  const yStart = Math.round(540 - ((titleLines.length - 1) * fittedTitle.lineHeight) / 2);
+  const boxHeight = Math.max(190, fittedTitle.totalHeight + 96);
+  const boxY = Math.round(yStart - fittedTitle.lineHeight * 0.82 - 42);
   const titleTspans = titleLines
-    .map((line, index) => `<tspan x="540" y="${yStart + index * 70}">${escapeXml(line)}</tspan>`)
+    .map((line, index) => `<tspan x="540" y="${yStart + index * fittedTitle.lineHeight}">${escapeXml(line)}</tspan>`)
     .join("");
   const backgroundLayer = args.backgroundImage?.data
     ? `<image href="data:${escapeXml(args.backgroundImage.mimeType || "image/png")};base64,${args.backgroundImage.data}" x="0" y="0" width="1080" height="1080" preserveAspectRatio="xMidYMid slice"/>
@@ -1493,8 +1562,8 @@ function buildProblemLearningImage(args: {
   ${backgroundLayer}
   <circle cx="540" cy="150" r="82" fill="#063579" filter="url(#shadow)"/>
   <image href="${escapeXml(logoHref)}" x="458" y="68" width="164" height="164" preserveAspectRatio="xMidYMid meet" clip-path="url(#logoClip)"/>
-  <rect x="108" y="${yStart - 58}" width="864" height="${Math.max(180, titleLines.length * 78 + 68)}" rx="46" fill="#061b3e" opacity=".38"/>
-  <text text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="900" fill="#ffffff" filter="url(#textShadow)">${titleTspans}</text>
+  <rect x="108" y="${boxY}" width="864" height="${boxHeight}" rx="46" fill="#061b3e" opacity=".38"/>
+  <text text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${fittedTitle.fontSize}" font-weight="900" fill="#ffffff" filter="url(#textShadow)">${titleTspans}</text>
   <rect x="220" y="820" width="640" height="72" rx="36" fill="#061b3e" opacity=".38"/>
   <text x="540" y="866" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="900" letter-spacing="6" fill="#ffffff">HIỂU BẢN CHẤT - ĐIỂM BỨT PHÁ</text>
 </svg>`;
@@ -1631,7 +1700,7 @@ async function generateImageWithFallback(args: {
     if (!overlayText) {
       return {
         image: null,
-        imageWarning: "Chưa tạo được ảnh: Gemini chưa trả dòng tóm tắt ảnh khoảng 20 từ.",
+        imageWarning: "Chưa tạo được ảnh: Gemini chưa trả dòng tóm tắt ảnh tối đa 20 từ.",
         imageUrl: null,
       };
     }
