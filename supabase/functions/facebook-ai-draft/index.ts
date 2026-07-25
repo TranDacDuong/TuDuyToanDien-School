@@ -1369,6 +1369,18 @@ function wrapSvgTextWithMeta(text: string, maxChars: number, maxLines: number) {
     line = word;
   }
   if (line && lines.length < maxLines) lines.push(line);
+  if (!truncated && lines.length > 1) {
+    const lastWords = lines[lines.length - 1].split(/\s+/).filter(Boolean);
+    const prevWords = lines[lines.length - 2].split(/\s+/).filter(Boolean);
+    if (lastWords.length === 1 && prevWords.length > 1) {
+      const moved = prevWords.pop() || "";
+      const rebalancedLast = `${moved} ${lastWords[0]}`.trim();
+      if (rebalancedLast.length <= maxChars) {
+        lines[lines.length - 2] = prevWords.join(" ");
+        lines[lines.length - 1] = rebalancedLast;
+      }
+    }
+  }
   if (truncated && lines.length) {
     const last = lines[lines.length - 1].replace(/[.…]+$/g, "").trim();
     lines[lines.length - 1] = `${last}…`;
@@ -1393,7 +1405,7 @@ function fitOverlaySvgText(text: string, options: {
   const maxFontSize = options.maxFontSize || 58;
   const minFontSize = options.minFontSize || 34;
   const lineHeightRatio = options.lineHeightRatio || 1.18;
-  const averageCharWidthRatio = 0.72;
+  const averageCharWidthRatio = 0.78;
   const clean = stripMarkdown(text);
   for (let fontSize = maxFontSize; fontSize >= minFontSize; fontSize -= 2) {
     const maxChars = Math.max(14, Math.floor(boxWidth / (fontSize * averageCharWidthRatio)));
@@ -1533,11 +1545,11 @@ function buildProblemLearningImage(args: {
   const logoHref = args.logoDataUri || env("MINDUP_LOGO_URL") || "https://www.mindup.edu.vn/assets/mindup-logo-round.png";
   const overlay = summarizeOverlayText(args.overlayText || args.caption, 20);
   const fittedTitle = fitOverlaySvgText(overlay, {
-    boxWidth: 760,
-    boxHeight: 380,
-    maxLines: 5,
-    maxFontSize: 52,
-    minFontSize: 30,
+    boxWidth: 730,
+    boxHeight: 430,
+    maxLines: 6,
+    maxFontSize: 48,
+    minFontSize: 28,
   });
   const titleLines = fittedTitle.lines;
   const yStart = Math.round(540 - ((titleLines.length - 1) * fittedTitle.lineHeight) / 2);
