@@ -1489,8 +1489,10 @@ function summarizeOverlayText(value: string, maxWords = 20) {
     .replace(/\s+/g, " ")
     .trim();
   const sentence = clean.split(/[.!?…]\s+/)[0] || clean;
-  const words = sentence.split(/\s+/).filter(Boolean).slice(0, maxWords);
-  return words.join(" ") || "Học đúng cách để hiểu sâu hơn mỗi ngày";
+  const words = sentence.split(/\s+/).filter(Boolean);
+  const limitedWords = words.slice(0, Math.max(1, maxWords));
+  const text = limitedWords.join(" ");
+  return text || "Học đúng cách để hiểu sâu hơn mỗi ngày";
 }
 
 function sanitizeStandaloneLearningMethodCaption(value: string) {
