@@ -1548,10 +1548,10 @@ function buildProblemLearningImage(args: {
   const overlay = summarizeOverlayText(args.overlayText || args.caption, 20);
   const fittedTitle = fitOverlaySvgText(overlay, {
     boxWidth: 730,
-    boxHeight: 430,
-    maxLines: 6,
+    boxHeight: 560,
+    maxLines: 20,
     maxFontSize: 48,
-    minFontSize: 28,
+    minFontSize: 22,
   });
   const titleLines = fittedTitle.lines;
   const yStart = Math.round(540 - ((titleLines.length - 1) * fittedTitle.lineHeight) / 2);
