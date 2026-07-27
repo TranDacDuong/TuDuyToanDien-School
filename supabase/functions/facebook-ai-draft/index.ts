@@ -1483,11 +1483,15 @@ function buildFallbackImage(args: {
   };
 }
 
-function summarizeOverlayText(value: string, maxWords = 20) {
-  const clean = String(value || "")
+function cleanOverlayText(value: string) {
+  return String(value || "")
     .replace(/#[\p{L}\p{N}_]+/gu, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function summarizeCaptionForOverlay(value: string, maxWords = 20) {
+  const clean = cleanOverlayText(value);
   const sentence = clean.split(/[.!?…]\s+/)[0] || clean;
   const words = sentence.split(/\s+/).filter(Boolean);
   const limitedWords = words.slice(0, Math.max(1, maxWords));
@@ -1545,7 +1549,7 @@ function buildProblemLearningImage(args: {
 }) {
   const theme = subjectVisualTheme(args.pageName);
   const logoHref = args.logoDataUri || env("MINDUP_LOGO_URL") || "https://www.mindup.edu.vn/assets/mindup-logo-round.png";
-  const overlay = summarizeOverlayText(args.overlayText || args.caption, 20);
+  const overlay = cleanOverlayText(args.overlayText) || summarizeCaptionForOverlay(args.caption, 20);
   const fittedTitle = fitOverlaySvgText(overlay, {
     boxWidth: 730,
     boxHeight: 560,
