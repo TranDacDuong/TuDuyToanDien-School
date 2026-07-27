@@ -78,6 +78,20 @@ function geminiApiKeys() {
   return Array.from(new Set(keys));
 }
 
+function llamaApiKeys() {
+  const keys = [
+    ...env("LLAMA_API_KEYS").split(/[\n,;]+/),
+    env("LLAMA_API_KEY"),
+  ].map((key) => key.trim()).filter(Boolean);
+  return Array.from(new Set(keys));
+}
+
+function preferredTextAiProvider() {
+  const explicit = (env("FACEBOOK_AI_TEXT_PROVIDER") || env("AI_TEXT_PROVIDER") || "").trim().toLowerCase();
+  if (explicit) return explicit;
+  return llamaApiKeys().length ? "llama" : "gemini";
+}
+
 function isRetryableGeminiError(status: number, message: string) {
   const lower = message.toLowerCase();
   return status === 429
@@ -123,6 +137,75 @@ async function postGeminiGenerateContent(args: {
   }
 
   throw new Error(errors.join(" | ") || "Gemini text generation failed");
+}
+
+async function postLlamaGenerateContent(args: {
+  prompt: string;
+  temperature: number;
+}) {
+  const keys = llamaApiKeys();
+  if (!keys.length) throw new Error("Thiếu Supabase secret LLAMA_API_KEYS hoặc LLAMA_API_KEY.");
+
+  const baseUrl = (env("LLAMA_API_BASE_URL") || env("OPENAI_COMPATIBLE_API_BASE_URL") || "https://api.groq.com/openai/v1").replace(/\/+$/g, "");
+  const model = env("LLAMA_TEXT_MODEL") || "llama-3.3-70b-versatile";
+  const errors: string[] = [];
+  for (let index = 0; index < keys.length; index += 1) {
+    const apiKey = keys[index];
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: "system",
+            content: [
+              "You create high-performing Vietnamese Facebook educational content for MindUp.",
+              "Return only valid JSON. Do not wrap JSON in markdown.",
+              "Write naturally, emotionally, and with strong Facebook hooks.",
+            ].join(" "),
+          },
+          { role: "user", content: args.prompt },
+        ],
+        temperature: args.temperature,
+        response_format: { type: "json_object" },
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    const text = data?.choices?.[0]?.message?.content || "";
+    if (res.ok && text) {
+      return {
+        model: `llama:${model}`,
+        data: {
+          candidates: [{ content: { parts: [{ text }] } }],
+        },
+      };
+    }
+    const message = data?.error?.message || data?.message || `Llama text generation failed (${res.status})`;
+    errors.push(`Key ${index + 1}: ${message}`);
+  }
+  throw new Error(errors.join(" | ") || "Llama text generation failed");
+}
+
+async function postAiGenerateContent(args: {
+  prompt: string;
+  temperature: number;
+}) {
+  const provider = preferredTextAiProvider();
+  if (provider.includes("llama")) {
+    try {
+      return await postLlamaGenerateContent(args);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!geminiApiKeys().length) throw error;
+      console.warn("[Facebook AI Draft] Llama failed, falling back to Gemini:", message);
+      return await postGeminiGenerateContent(args);
+    }
+  }
+  return await postGeminiGenerateContent(args);
 }
 
 function restHeaders(serviceRole = false, accessToken = "") {
@@ -760,6 +843,54 @@ function contentTopicBlock(topic: ReturnType<typeof contentTopicFor>) {
   ].join("\n");
 }
 
+function viralFacebookPromptBlock(typeName: string) {
+  const cleanType = stripVietnameseForTag(typeName).toLowerCase();
+  const common = [
+    "Phong cách viết ưu tiên theo Llama/Meta AI:",
+    "- Viết như một người làm content Facebook giỏi, không viết như văn mẫu AI.",
+    "- Mục tiêu: người đọc dừng lướt, thấy đúng vấn đề của mình, muốn comment/lưu/share.",
+    "- 1-2 dòng đầu phải là hook mạnh, đánh vào nỗi đau, sai lầm phổ biến, tình huống đời thường hoặc một sự thật khiến người xem tò mò.",
+    "- Câu ngắn, nhịp nhanh, dễ đọc trên điện thoại; mỗi đoạn chỉ 1-3 dòng.",
+    "- Có cảm xúc, có ví dụ đời thường, có sự đồng cảm; nhưng vẫn có ích thật, không giật tít rỗng.",
+    "- Tránh mở bài sáo rỗng kiểu: 'Trong thời đại hiện nay', 'Hãy cùng khám phá', 'Bạn có bao giờ tự hỏi'.",
+    "- Không quảng cáo lộ liễu, không hứa hẹn phi thực tế, không làm quá sự thật.",
+    "- Có thể dùng emoji vừa phải để tăng nhịp đọc, không lạm dụng.",
+    "- Có thể dùng **in đậm** cho 1-3 ý chính.",
+    "- Kết bài nên có CTA nhẹ: hỏi ý kiến, rủ comment, lưu bài hoặc chia sẻ cho phụ huynh/học sinh khác.",
+  ];
+  if (cleanType.includes("quiz")) {
+    return [
+      ...common,
+      "- Với Quiz/Hard Quiz: caption phải tạo cảm giác thử thách, kích thích comment, tuyệt đối không lộ đáp án/lời giải.",
+    ];
+  }
+  if (cleanType.includes("meme")) {
+    return [
+      ...common,
+      "- Với Meme: ưu tiên vui, đời, trúng tâm lý học sinh/phụ huynh; ngắn, gọn, có chất 'đúng quá'.",
+    ];
+  }
+  if (cleanType.includes("enrollment")) {
+    return [
+      ...common,
+      "- Với Enrollment: mở bằng nỗi lo thật của phụ huynh/học sinh, CTA học thử rõ nhưng không sales thô.",
+    ];
+  }
+  if (cleanType.includes("learning method")) {
+    return [
+      ...common,
+      "- Với Learning Method: mở bằng một nỗi đau học sai rất cụ thể, sau đó đưa phương pháp như một lời giải dễ áp dụng.",
+    ];
+  }
+  if (cleanType === "q a" || cleanType === "qa" || cleanType.includes("q a") || cleanType.includes("tim hieu")) {
+    return [
+      ...common,
+      "- Với Q&A/Tìm hiểu thực tế: mở bằng một câu hỏi đời sống khiến người đọc tò mò 'Ủa tại sao lại thế?'.",
+    ];
+  }
+  return common;
+}
+
 function mondayMindsetTopic(scheduledAt: string, pageName: string) {
   const week = isoWeekNumber(scheduledAt);
   const year = yearFromDate(scheduledAt);
@@ -803,6 +934,7 @@ function buildGeminiPrompt(args: {
     return [
       "Bạn là trợ lý nội dung cho MindUp - Tư Duy Toàn Diện.",
       "Nhiệm vụ: tạo bài Monday Mindset dạng quote-card, không viết caption phân tích dài.",
+      "Quote tiếng Việt phải ngắn, chạm cảm xúc học tập, dễ share trên Facebook, đọc một lần là nhớ; không dùng giọng văn mẫu AI.",
       "",
       "Thông tin:",
       `- Fanpage: ${args.pageName}`,
@@ -847,6 +979,8 @@ function buildGeminiPrompt(args: {
       "Bạn là chuyên gia content giáo dục cho MindUp - Tư Duy Toàn Diện.",
       "Nhiệm vụ: tạo bài Q&A/Tìm hiểu kiến thức môn học trong thực tế. Bài phải làm người đọc thấy: hóa ra kiến thức trên lớp có thật trong đời sống.",
       "",
+      ...viralFacebookPromptBlock(args.typeName),
+      "",
       contentTopicBlock(scheduledTopic),
       "",
       "Yêu cầu nội dung:",
@@ -882,6 +1016,8 @@ function buildGeminiPrompt(args: {
       "Do not ask Gemini to create the image. The website will create the image from MindUp Quiz template.",
       "Bạn là giáo viên ra câu hỏi tương tác nhanh cho MindUp - Tư Duy Toàn Diện.",
       "Nhiệm vụ: tạo bài Quiz cực nhanh, học sinh có thể làm trong 10-30 giây, nhưng có một bẫy nhỏ khiến học sinh dễ sai nếu đọc vội.",
+      "",
+      ...viralFacebookPromptBlock(args.typeName),
       "",
       contentTopicBlock(scheduledTopic),
       "",
@@ -927,6 +1063,8 @@ function buildGeminiPrompt(args: {
       "The question can still require about 10 lines of solution, but the visible problem statement must be short and easy to read on a phone.",
       "Bạn là trợ lý nội dung cho MindUp - Tư Duy Toàn Diện.",
       "Nhiệm vụ: tạo bài Facebook cho chương trình Hard Quiz with Prize, tên hiển thị là HỎI NHANH ĐỚP TRỌN.",
+      "",
+      ...viralFacebookPromptBlock(args.typeName),
       "",
       contentTopicBlock(scheduledTopic),
       "",
@@ -988,6 +1126,8 @@ function buildGeminiPrompt(args: {
     return [
       "Bạn là chuyên gia content marketing giáo dục cho MindUp - Tư Duy Toàn Diện.",
       "Nhiệm vụ: tạo một bài Learning Method độc lập: mở đầu bằng một khó khăn học tập/phụ huynh rất thật, sau đó giải bằng một phương pháp học tập cụ thể, dễ hiểu, có thể áp dụng ngay.",
+      "",
+      ...viralFacebookPromptBlock(args.typeName),
       "",
       "Thông tin bài đăng:",
       `- Fanpage: ${args.pageName}`,
@@ -1089,6 +1229,8 @@ function buildGeminiPrompt(args: {
       "Bạn là người viết meme giáo dục cho MindUp - Tư Duy Toàn Diện.",
       "Nhiệm vụ: tạo bài Meme vui liên quan đến học tập, khiến học sinh thấy quen, phụ huynh thấy đáng yêu, không tiêu cực độc hại.",
       "",
+      ...viralFacebookPromptBlock(args.typeName),
+      "",
       contentTopicBlock(scheduledTopic),
       "",
       "Yêu cầu nội dung:",
@@ -1112,6 +1254,8 @@ function buildGeminiPrompt(args: {
     return [
       "Bạn là chuyên gia content tuyển sinh cho trung tâm MindUp - Tư Duy Toàn Diện.",
       "Nhiệm vụ: tạo bài Enrollment/gạ học sinh đăng ký học thử, nhưng không viết kiểu quảng cáo lố. Bài phải đánh trúng vấn đề thật và mời học thử nhẹ nhàng.",
+      "",
+      ...viralFacebookPromptBlock(args.typeName),
       "",
       contentTopicBlock(scheduledTopic),
       "",
@@ -1139,6 +1283,8 @@ function buildGeminiPrompt(args: {
   return [
     args.typePrompt || defaultPrompt,
     "",
+    ...viralFacebookPromptBlock(args.typeName),
+    "",
     "Thông tin bài đăng:",
     `- Fanpage: ${args.pageName}`,
     `- Loại bài: ${args.typeName}`,
@@ -1160,7 +1306,7 @@ function buildGeminiPrompt(args: {
 }
 
 async function generateTextDraft(prompt: string, typeName = "") {
-  const { model, data } = await postGeminiGenerateContent({ prompt, temperature: 0.8 });
+  const { model, data } = await postAiGenerateContent({ prompt, temperature: 0.8 });
   const text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("\n") || "";
   const parsed = tryParseJson(text);
   const hashtags = normalizeHashtags(parsed?.hashtags);
@@ -1223,7 +1369,7 @@ function normalizeDraftPart(value: unknown, fallbackTags: string[] = []) {
 }
 
 async function generateProblemLearningPairDraft(prompt: string) {
-  const { model, data } = await postGeminiGenerateContent({ prompt, temperature: 0.82 });
+  const { model, data } = await postAiGenerateContent({ prompt, temperature: 0.82 });
 
   const text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("\n") || "";
   const parsed = tryParseJson(text) as JsonRecord;
