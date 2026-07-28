@@ -363,6 +363,30 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
         </div>
         <div class="hint" id="aiDraftStatus">Chưa tạo bằng AI.</div>
       </div>
+      <div class="meta-ai-box" id="reelVoiceBox" style="display:none">
+        <div class="meta-ai-head">
+          <div>
+            <strong>Giọng đọc Reels</strong>
+            <div class="meta-ai-small">Tạo giọng đọc tiếng Việt từ phần voice-over trong kịch bản reels. Audio sẽ được lưu lên Drive và dùng cho bước dựng video sau.</div>
+          </div>
+          <div class="meta-ai-actions">
+            <button class="btn btn-outline" id="reloadTtsVoicesBtn" type="button">Tải voice</button>
+            <button class="btn btn-primary" id="generateReelVoiceBtn" type="button">Tạo giọng đọc</button>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="field">
+            <label>Voice ElevenLabs</label>
+            <select class="select" id="ttsVoiceSelect"></select>
+          </div>
+          <div class="field">
+            <label>Trạng thái audio</label>
+            <input class="input" id="ttsStatus" disabled value="Chưa tạo giọng đọc">
+          </div>
+        </div>
+        <audio id="ttsAudioPreview" controls style="display:none;width:100%;margin-top:8px"></audio>
+        <div class="hint" id="ttsHint">Hãy tạo nội dung bằng AI trước để có kịch bản reels/voice-over.</div>
+      </div>
       <input id="postLinkUrl" type="hidden">
       <input id="postImageUrl" type="hidden">
       <div class="dropzone" id="imageDropzone" tabindex="0">
@@ -551,6 +575,8 @@ let S = {
   weekStart: startOfWeek(new Date()),
 };
 let quizQuestionImageDataUrl = "";
+let TTS_VOICES = [];
+let TTS_VOICES_LOADING = false;
 
 function $(id){ return document.getElementById(id); }
 function esc(v){ return String(v ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
@@ -832,6 +858,9 @@ function isProblemLearningVisualType(postTypeId){
 function isMondayMindsetType(postTypeId){
   return normalizeText(typeName(postTypeId)).includes("monday mindset");
 }
+function isApplyingKnowledgeType(postTypeId){
+  return normalizeText(typeName(postTypeId)).includes("applying knowledge");
+}
 function renderQuizAnswerFields(){
   const count = Math.max(2, Math.min(4, Number($("quizAnswerCount").value || 4)));
   const labels = ["A", "B", "C", "D"];
@@ -848,10 +877,14 @@ function toggleQuizBuilder(){
   const showQuiz = isQuizType(postTypeId);
   const showHardQuiz = isHardQuizType(postTypeId);
   const showMonday = isMondayMindsetType(postTypeId);
+  const showVoice = isApplyingKnowledgeType(postTypeId);
   $("quizBuilder").classList.toggle("show", showQuiz);
   $("hardQuizBuilder")?.classList.toggle("show", showHardQuiz);
   $("mondayAnnouncementBuilder")?.classList.toggle("show", showMonday);
+  $("reelVoiceBox")?.classList.toggle("show", showVoice);
+  if ($("reelVoiceBox")) $("reelVoiceBox").style.display = showVoice ? "" : "none";
   $("imageDropzone")?.classList.toggle("hidden", showQuiz || showHardQuiz);
+  if (showVoice && !TTS_VOICES.length && !TTS_VOICES_LOADING) loadTtsVoices().catch(error => showPostStatus("err", error.message || String(error)));
   if (showHardQuiz && !$("hardQuizRules").value.trim()) {
     $("hardQuizRules").value = buildHardQuizRules();
   }
@@ -2174,6 +2207,7 @@ function openPostModal(id="", defaults={}){
   $("mondayWinnerGuess").value = mondayAnnouncement.winner_guess || "";
   $("mondayAnnouncementText").value = mondayAnnouncement.text || buildMondayAnnouncementText();
   toggleQuizBuilder();
+  renderTtsAudioFromPost(row);
   updateImagePreview();
   $("deletePostBtn").style.display = row ? "" : "none";
   if ($("approvePostBtn")) {
@@ -2419,6 +2453,158 @@ async function callFacebookAiDraftFunction(payload){
   }
   return data;
 }
+async function callFacebookTtsFunction(payload){
+  const sessionRes = await sb.auth.getSession();
+  const accessToken = sessionRes.data?.session?.access_token;
+  if (!accessToken) throw new Error("Vui lòng đăng nhập lại trước khi tạo giọng đọc.");
+  let res;
+  try {
+    res = await fetch(`${window.SUPABASE_URL}/functions/v1/facebook-tts`, {
+      method: "POST",
+      headers: {
+        apikey: window.SUPABASE_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    throw new Error("Không gọi được Edge Function facebook-tts. Hãy deploy function facebook-tts và set secret ELEVENLABS_API_KEY rồi thử lại.");
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) {
+    const detail = data.error || data.message || data.code || "Edge Function tạo giọng đọc bị lỗi.";
+    if (res.status === 404 || data.code === "NOT_FOUND") {
+      throw new Error("Chưa deploy Edge Function facebook-tts trên Supabase. Hãy deploy function rồi thử lại.");
+    }
+    throw new Error(detail);
+  }
+  return data;
+}
+function preferredVoiceIndex(voices){
+  const rows = Array.isArray(voices) ? voices : [];
+  const idx = rows.findIndex(voice => {
+    const text = normalizeText([
+      voice?.name,
+      voice?.description,
+      Object.values(voice?.labels || {}).join(" "),
+    ].join(" "));
+    return text.includes("vietnam") || text.includes("viet") || text.includes("vi ");
+  });
+  return idx >= 0 ? idx : 0;
+}
+function populateTtsVoices(voices){
+  const select = $("ttsVoiceSelect");
+  if (!select) return;
+  const rows = Array.isArray(voices) ? voices : [];
+  if (!rows.length) {
+    select.innerHTML = `<option value="">Không tải được voice</option>`;
+    return;
+  }
+  const selected = select.value;
+  select.innerHTML = rows.map(voice => {
+    const labelValues = Object.values(voice.labels || {}).filter(Boolean).slice(0, 2).join(" • ");
+    const label = `${voice.name || "Voice"}${labelValues ? ` — ${labelValues}` : ""}`;
+    return `<option value="${esc(voice.voice_id)}">${esc(label)}</option>`;
+  }).join("");
+  select.value = rows.some(voice => String(voice.voice_id) === String(selected))
+    ? selected
+    : rows[preferredVoiceIndex(rows)]?.voice_id || rows[0].voice_id;
+}
+async function loadTtsVoices(force=false){
+  if (TTS_VOICES_LOADING) return TTS_VOICES;
+  if (TTS_VOICES.length && !force) {
+    populateTtsVoices(TTS_VOICES);
+    return TTS_VOICES;
+  }
+  TTS_VOICES_LOADING = true;
+  const oldStatus = $("ttsStatus")?.value || "";
+  if ($("ttsStatus")) $("ttsStatus").value = "Đang tải danh sách voice...";
+  try {
+    const data = await callFacebookTtsFunction({ action: "voices" });
+    TTS_VOICES = Array.isArray(data.voices) ? data.voices : [];
+    populateTtsVoices(TTS_VOICES);
+    if ($("ttsStatus")) $("ttsStatus").value = TTS_VOICES.length ? "Đã tải voice" : "Chưa có voice";
+    return TTS_VOICES;
+  } finally {
+    TTS_VOICES_LOADING = false;
+    if ($("ttsStatus") && !TTS_VOICES.length) $("ttsStatus").value = oldStatus || "Chưa tải voice";
+  }
+}
+function renderTtsAudioFromPost(row){
+  const box = $("reelVoiceBox");
+  const audioEl = $("ttsAudioPreview");
+  const statusEl = $("ttsStatus");
+  const hintEl = $("ttsHint");
+  if (!box || !audioEl || !statusEl || !hintEl) return;
+  const audio = postMetadata(row).applying_knowledge?.audio || null;
+  const url = audio?.preview_url || audio?.url || "";
+  if (url) {
+    audioEl.src = url;
+    audioEl.style.display = "";
+    statusEl.value = `Đã tạo${audio.voice_name ? `: ${audio.voice_name}` : ""}`;
+    hintEl.textContent = "Audio đã được lưu lên Drive. Bước dựng video sau sẽ dùng file này.";
+  } else {
+    audioEl.removeAttribute("src");
+    audioEl.style.display = "none";
+    statusEl.value = "Chưa tạo giọng đọc";
+    hintEl.textContent = "Hãy tạo nội dung bằng AI trước để có kịch bản reels/voice-over.";
+  }
+}
+function currentPostRow(){
+  const id = $("postId")?.value || "";
+  return id ? S.posts.find(p => String(p.id) === String(id)) || null : null;
+}
+async function generateReelVoice(){
+  const postTypeId = $("postType")?.value || "";
+  if (!isApplyingKnowledgeType(postTypeId)) {
+    showPostStatus("err", "Giọng đọc chỉ dùng cho bài Applying Knowledge to Practice.");
+    return;
+  }
+  const btn = $("generateReelVoiceBtn");
+  const oldText = btn?.textContent || "";
+  try {
+    if (!TTS_VOICES.length) await loadTtsVoices(true);
+    const voiceId = $("ttsVoiceSelect")?.value || "";
+    if (!voiceId) throw new Error("Vui lòng chọn voice ElevenLabs.");
+    const voiceName = $("ttsVoiceSelect")?.selectedOptions?.[0]?.textContent?.trim() || "";
+    if (btn) { btn.disabled = true; btn.textContent = "Đang tạo..."; }
+    if ($("ttsStatus")) $("ttsStatus").value = "Đang lưu nháp...";
+    const draft = await savePostDraft({ status: "draft", content_status: "submitted" });
+    if ($("ttsStatus")) $("ttsStatus").value = "Đang tạo giọng đọc...";
+    const data = await callFacebookTtsFunction({
+      action: "generate",
+      post_id: draft.id,
+      voice_id: voiceId,
+      voice_name: voiceName,
+    });
+    if (data.post?.id) {
+      const exists = S.posts.some(p => String(p.id) === String(data.post.id));
+      S.posts = exists
+        ? S.posts.map(p => String(p.id) === String(data.post.id) ? { ...p, ...data.post } : p)
+        : [...S.posts, data.post];
+      renderTtsAudioFromPost(data.post);
+    } else {
+      renderTtsAudioFromPost({
+        ...draft,
+        metadata: {
+          ...postMetadata(draft),
+          applying_knowledge: {
+            ...(postMetadata(draft).applying_knowledge || {}),
+            audio: data.audio || null,
+          },
+        },
+      });
+    }
+    showPostStatus("ok", "Đã tạo giọng đọc và lưu audio lên Drive.");
+    await loadData();
+  } catch (error) {
+    if ($("ttsStatus")) $("ttsStatus").value = "Tạo giọng đọc lỗi";
+    showPostStatus("err", error.message || String(error));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = oldText || "Tạo giọng đọc"; }
+  }
+}
 async function facebookDelete(pageId, facebookId){
   return callFacebookPostingFunction({ action: "delete", page_id: pageId, facebook_post_id: facebookId });
 }
@@ -2617,6 +2803,7 @@ async function generateAiDraft(provider = "gemini"){
     $("aiDraftStatus").textContent = aiStatusLabel(post.ai_status || "drafted");
     $("postCharCount").textContent = String(($("postContent").value || "").length);
     updateImagePreview();
+    renderTtsAudioFromPost(post);
     await undoTemporaryGeminiSave({ originalId, originalRow, generatedPost: post });
     const pairedText = data.related_post
       ? ` Gemini cũng đã tạo luôn bài Learning Method đi kèm: ${data.related_post.scheduled_at ? formatDateTime(new Date(data.related_post.scheduled_at)) : ""}.`
@@ -2954,6 +3141,8 @@ function bindEvents(){
   $("deletePostBtn").addEventListener("click", deletePost);
   $("generateGeminiDraftBtn").addEventListener("click", () => generateAiDraft("gemini"));
   $("generateLlamaDraftBtn").addEventListener("click", () => generateAiDraft("llama"));
+  $("reloadTtsVoicesBtn")?.addEventListener("click", () => loadTtsVoices(true).catch(error => showPostStatus("err", error.message || String(error))));
+  $("generateReelVoiceBtn")?.addEventListener("click", () => generateReelVoice().catch(error => showPostStatus("err", error.message || String(error))));
   $("approvePostBtn")?.addEventListener("click", approveCurrentPost);
   $("postContent").addEventListener("input", () => $("postCharCount").textContent = String($("postContent").value.length));
   $("postType").addEventListener("change", toggleQuizBuilder);
