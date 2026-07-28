@@ -510,6 +510,11 @@ function isLearningMethod(typeName: string) {
   return String(typeName || "").trim().toLowerCase() === "learning method";
 }
 
+function isApplyingKnowledge(typeName: string) {
+  const normalized = stripVietnameseForTag(typeName || "").toLowerCase();
+  return normalized === "applying knowledge to practice" || normalized.includes("applying knowledge");
+}
+
 function isQuizTypeName(typeName: string) {
   return String(typeName || "").trim().toLowerCase() === "quiz";
 }
@@ -798,6 +803,61 @@ function learningMethodPromptBlock(method: ReturnType<typeof learningMethodTopic
 
 
 const CONTENT_TOPIC_POOLS: Record<string, string[]> = {
+  applying_knowledge: [
+    "Personal finance decisions need percentages, ratios, and critical reading",
+    "Reading weather forecasts requires graphs, probability, and physics",
+    "Healthy eating labels combine chemistry, biology, and data literacy",
+    "AI tools need math, language, logic, and ethical judgement",
+    "Sports performance combines force, energy, biology, and measurement",
+    "Cooking is chemistry, heat transfer, ratios, and experimentation",
+    "Choosing a phone plan uses functions, averages, and hidden conditions",
+    "Understanding medicine dosage needs ratios, body biology, and careful units",
+    "Traffic jams show systems thinking, speed, probability, and behavior",
+    "Online shopping discounts test percentage thinking and consumer judgment",
+    "Electric bills connect physics, habits, graphs, and household budgeting",
+    "Reading news charts needs statistics and skepticism",
+    "Urban flooding connects biology, chemistry, geography, and data",
+    "Sleep quality affects memory, hormones, focus, and learning outcomes",
+    "A viral claim online needs source checking, logic, and scientific thinking",
+    "Budgeting a family trip uses estimation, optimization, and trade-offs",
+    "Air pollution connects chemistry, biology, physics, and public health",
+    "Fitness trackers use sensors, statistics, and biology",
+    "Packaging design uses geometry, materials, chemistry, and persuasion",
+    "Plant care combines biology, light, water, and experimental thinking",
+    "A cup of coffee involves chemistry, heat, biology, and habit design",
+    "Music and headphones connect waves, biology, and engineering",
+    "Maps and delivery apps use coordinates, optimization, and estimation",
+    "Saving time in studying needs data, habits, and feedback loops",
+    "Choosing food safely uses biology, chemistry, and probability",
+    "Household cleaning requires chemistry and safety thinking",
+    "Designing a classroom uses psychology, attention, and environment design",
+    "A simple game can teach probability, strategy, and feedback",
+    "Photography uses light, geometry, chemistry history, and perception",
+    "Managing screen time combines biology, psychology, and self-regulation",
+    "A broken appliance becomes a lesson in systems and cause-effect thinking",
+    "Public health campaigns use biology, statistics, and communication",
+    "Learning from mistakes requires evidence, reflection, and iteration",
+    "A supermarket receipt can become a math and decision-making lesson",
+    "Climate stories require data literacy, chemistry, and systems thinking",
+    "Medicine side effects need biology, chemistry, and risk comparison",
+    "Planning exam revision uses memory science, scheduling, and feedback",
+    "A bridge or building reveals geometry, force, and material science",
+    "A garden reveals ecology, chemistry, and patience",
+    "Digital privacy needs logic, systems thinking, and careful reading",
+    "A school score report needs statistics and growth mindset",
+    "A recipe scale-up uses ratios, units, heat, and chemistry",
+    "Electric vehicles connect energy, chemistry, physics, and environment",
+    "Understanding ads requires language, psychology, statistics, and skepticism",
+    "Water quality connects chemistry, biology, and community decisions",
+    "A football curve shows motion, pressure, and observation",
+    "Studying a language uses memory, pattern recognition, and feedback",
+    "A bank loan requires compound interest and long-term thinking",
+    "Household waste sorting connects chemistry, biology, and civic habits",
+    "A medical test result needs statistics and careful interpretation",
+    "Building a habit is a real-world experiment",
+    "A science fair project teaches variables, evidence, and communication",
+    "Real learning means using knowledge to make better decisions",
+  ],
   qna: [
     "Math in GPS and map coordinates", "Probability in lucky draws and giveaways", "Compound interest in saving money", "Optimization in delivery routes", "Scale and ratio in maps", "Matrices behind QR codes", "Statistics in weather forecasts", "Graphs in electricity bills", "Derivatives for finding maximum profit", "Logarithms in pH and sound levels",
     "Physics of helmets and road safety", "Why elevators make us feel heavier or lighter", "Why rainbows have colors", "Why air conditioners are placed high", "Why footballs can curve", "How noise cancelling headphones work", "Why objects float better in seawater", "Why high voltage wires are dangerous", "Why LED bulbs save energy", "Heat transfer in cooking",
@@ -837,6 +897,7 @@ const CONTENT_TOPIC_POOLS: Record<string, string[]> = {
 
 function contentPoolKey(typeName: string) {
   const clean = stripVietnameseForTag(typeName).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (clean.includes("applying knowledge")) return "applying_knowledge";
   if (clean === "q a" || clean === "qa" || clean.includes("q a")) return "qna";
   if (clean === "quiz") return "quiz";
   if (clean.includes("hard quiz")) return "hard_quiz";
@@ -866,6 +927,49 @@ function contentTopicBlock(topic: ReturnType<typeof contentTopicFor>) {
     `- Topic: ${topic.topic}`,
     "- Do not choose a different topic unless the admin draft explicitly requires it.",
   ].join("\n");
+}
+
+function applyingKnowledgeReferenceFor(pageName: string) {
+  const ctx = pageSubjectContext(pageName);
+  const clean = stripVietnameseForTag(pageName).toLowerCase();
+  if (clean.includes("toan hoc")) {
+    return {
+      subject: ctx.subject,
+      sourceName: "Real World Math",
+      sourceUrl: "https://www.realworldmath.org/",
+      sourceGuidance: "Use real-world math situations such as maps, money, scale, optimization, data, graphs, and measurement.",
+    };
+  }
+  if (clean.includes("vat ly")) {
+    return {
+      subject: ctx.subject,
+      sourceName: "Real World Physics Problems",
+      sourceUrl: "https://www.real-world-physics-problems.com/",
+      sourceGuidance: "Use real physics situations such as motion, forces, sports, elevators, electricity, waves, pressure, heat, and energy.",
+    };
+  }
+  if (clean.includes("hoa hoc")) {
+    return {
+      subject: ctx.subject,
+      sourceName: "Compound Interest / RSC Education",
+      sourceUrl: "https://www.compoundchem.com/",
+      sourceGuidance: "Use everyday chemistry such as food, soap, batteries, materials, smell, pH, color, medicine, and cleaning safety.",
+    };
+  }
+  if (clean.includes("sinh hoc")) {
+    return {
+      subject: ctx.subject,
+      sourceName: "HHMI BioInteractive",
+      sourceUrl: "https://www.biointeractive.org/",
+      sourceGuidance: "Use biology in real life such as sleep, immunity, genetics, health, cells, ecology, evolution, plants, and human body systems.",
+    };
+  }
+  return {
+    subject: ctx.subject,
+    sourceName: "JASON Learning / PhET Interactive Simulations / real-world STEM examples",
+    sourceUrl: "https://jason.org/",
+    sourceGuidance: "Use interdisciplinary STEM situations: data literacy, AI, personal finance, health, environment, technology, media literacy, and everyday decisions.",
+  };
 }
 
 const TEACHING_PHILOSOPHY_ITEMS = [
@@ -998,6 +1102,14 @@ function viralFacebookPromptBlock(typeName: string) {
       ...common,
       "- With Teaching Philosophy: open with a sharp educational belief, connect it to a real learning problem, then make the idea practical for teachers, parents, and students.",
       "- Do not write abstract slogans only. The post must feel wise, human, and useful in a real classroom.",
+    ];
+  }
+  if (cleanType.includes("applying knowledge")) {
+    return [
+      ...common,
+      "- With Applying Knowledge to Practice: the first line must answer the reader's hidden question: 'Why do I need to learn this?'",
+      "- Use one concrete real-life situation, then reveal the school knowledge behind it. Make the subject feel useful, surprising, and close to daily life.",
+      "- Avoid generic lines like 'knowledge is important'. Show the application through a specific story, object, habit, problem, or decision.",
     ];
   }
   if (cleanType === "q a" || cleanType === "qa" || cleanType.includes("q a") || cleanType.includes("tim hieu")) {
@@ -1329,6 +1441,80 @@ function buildGeminiPrompt(args: {
     ].filter(Boolean).join("\n");
   }
 
+  if (isApplyingKnowledge(args.typeName)) {
+    const fanpageTag = pageHashtag(args.pageName);
+    const topic = contentTopicFor(args.typeName, args.scheduledAt, args.pageName);
+    const curriculum = quizCurriculumFor(args.scheduledAt, args.pageName);
+    const reference = applyingKnowledgeReferenceFor(args.pageName);
+    return [
+      "You are a senior Facebook education content creator for MindUp - Tu Duy Toan Dien.",
+      "Task: create an Applying Knowledge to Practice post in Vietnamese.",
+      "Goal: make students and parents feel that school knowledge is useful in real life.",
+      "",
+      ...viralFacebookPromptBlock(args.typeName),
+      "",
+      "Post information:",
+      `- Fanpage: ${args.pageName}`,
+      `- Fanpage subject/axis: ${reference.subject}`,
+      `- Required fanpage hashtag: ${fanpageTag}`,
+      `- Scheduled time: ${args.scheduledAt}`,
+      `- Suggested grade by weekday: grade ${curriculum.grade}`,
+      `- Current curriculum area: ${curriculum.topic}`,
+      `- Reference inspiration source: ${reference.sourceName} (${reference.sourceUrl})`,
+      `- Source guidance: ${reference.sourceGuidance}`,
+      args.existingContent ? `- Existing draft/admin note: ${args.existingContent}` : "",
+      args.internalNote ? `- Internal note: ${args.internalNote}` : "",
+      "",
+      contentTopicBlock(topic),
+      "",
+      subjectContextPromptBlock(args.pageName),
+      "",
+      "Content requirements:",
+      "- Write a complete Facebook post in Vietnamese, 300-650 words.",
+      "- Do not copy from the reference source. Use it only as inspiration, then write original MindUp content.",
+      "- Start with a real situation or surprising question from daily life.",
+      "- Connect that situation clearly to the selected subject and current curriculum area.",
+      "- Explain the knowledge simply enough for students and parents.",
+      "- Include one mini example that a student can imagine or try safely.",
+      "- End with a light CTA: ask readers to comment a real-life situation they want MindUp to explain next.",
+      "- For the main MindUp page, make it interdisciplinary instead of focusing on only one subject.",
+      "",
+      "Image requirements:",
+      "- AI must NOT generate an image. Return Pexels-friendly English search keywords and one Vietnamese overlay sentence.",
+      "- image_overlay_text should be a complete Vietnamese sentence, memorable and readable on an image, around 10-22 words.",
+      "",
+      "Reel draft requirements:",
+      "- Also create a short reel script using stock footage, no filming required.",
+      "- Reel duration: 20-40 seconds.",
+      "- Include hook_3s, voice_over, scene list, overlay text per scene, and stock video search keywords.",
+      "- The reel should work even without voice-over: overlay text must be clear.",
+      "",
+      "Return ONLY valid JSON, no markdown, using this schema:",
+      JSON.stringify({
+        caption: "Vietnamese Applying Knowledge to Practice post, 300-650 words, with real-life hook, school knowledge explanation, mini example, and CTA.",
+        hashtags: ["#MindUp", "#UngDungKienThuc", "#HocDeHieuTheGioi", "#PhatTrienTuDuy", fanpageTag],
+        image_prompt: "English prompt for a square 1:1 real-life educational background related to the application and subject, no text, no logo.",
+        image_search_keywords: "English Pexels search keywords for a relevant real-life background/video frame, no text.",
+        image_background_prompt: "English background prompt/keywords, no text, no logo.",
+        image_overlay_text: "Vietnamese summary sentence for the image, around 10-22 words.",
+        reel: {
+          hook_3s: "A strong first 3 seconds hook in Vietnamese.",
+          duration_seconds: 30,
+          voice_over: "Vietnamese voice-over script for 20-40 seconds.",
+          scenes: [
+            { seconds: "0-3", stock_video_keywords: "English keywords", overlay_text: "Vietnamese overlay text" },
+            { seconds: "3-10", stock_video_keywords: "English keywords", overlay_text: "Vietnamese overlay text" },
+            { seconds: "10-25", stock_video_keywords: "English keywords", overlay_text: "Vietnamese overlay text" },
+            { seconds: "25-35", stock_video_keywords: "English keywords", overlay_text: "Vietnamese CTA overlay text" }
+          ],
+          caption: "Short Vietnamese reel caption.",
+          hashtags: ["#MindUp", "#UngDungKienThuc", "#ReelsHocTap", fanpageTag]
+        },
+        internal_note: `Applying Knowledge to Practice week ${topic.week}/${topic.year}; fanpage ${args.pageName}; offset ${topic.offset}; topic ${topic.number}/${topic.total}: ${topic.topic}; grade ${curriculum.grade}; curriculum ${curriculum.topic}; source ${reference.sourceName} ${reference.sourceUrl}`,
+      }, null, 2),
+    ].filter(Boolean).join("\n");
+  }
+
   if (isLearningMethod(args.typeName)) {
     const fanpageTag = pageHashtag(args.pageName);
     const method = learningMethodTopic(args.scheduledAt, args.pageName);
@@ -1526,8 +1712,10 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
   let parsed = tryParseJson(text);
   const isStandaloneLearning = isLearningMethod(typeName);
   const isStandaloneTeaching = isTeachingPhilosophy(typeName);
+  const isApplyingKnowledgePost = isApplyingKnowledge(typeName);
   const isLlamaLearning = isStandaloneLearning && normalizeTextAiProvider(provider) === "llama";
   const isLlamaTeaching = isStandaloneTeaching && normalizeTextAiProvider(provider) === "llama";
+  const isLlamaApplyingKnowledge = isApplyingKnowledgePost && normalizeTextAiProvider(provider) === "llama";
   let rawCaption = String(parsed?.caption || "").trim();
   if ((isLlamaLearning || isLlamaTeaching) && stripMarkdown(rawCaption).split(/\s+/).filter(Boolean).length < 400) {
     const retry = await postAiGenerateContent({
@@ -1555,6 +1743,57 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
     parsed = tryParseJson(text);
     rawCaption = String(parsed?.caption || "").trim();
   }
+  if (isLlamaApplyingKnowledge && stripMarkdown(rawCaption).split(/\s+/).filter(Boolean).length < 300) {
+    const retry = await postAiGenerateContent({
+      prompt: [
+        prompt,
+        "",
+        "THE PREVIOUS CAPTION WAS TOO SHORT FOR APPLYING KNOWLEDGE TO PRACTICE.",
+        "Rewrite the caption in Vietnamese with more depth and a stronger Facebook hook.",
+        "Required: 300-650 Vietnamese words, at least 5 mobile-friendly paragraphs.",
+        "Must include: real-life hook, school knowledge behind the situation, simple explanation, one concrete mini example, and a comment CTA.",
+        "Keep the reel JSON fields too. Return only valid JSON with the same schema.",
+        "",
+        "Short caption to expand:",
+        rawCaption,
+      ].join("\n"),
+      temperature: 0.82,
+      provider,
+    });
+    model = retry.model;
+    data = retry.data;
+    text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("\n") || "";
+    parsed = tryParseJson(text);
+    rawCaption = String(parsed?.caption || "").trim();
+  }
+  if (isLlamaApplyingKnowledge && stripMarkdown(rawCaption).split(/\s+/).filter(Boolean).length < 300) {
+    const retry = await postAiGenerateContent({
+      prompt: [
+        prompt,
+        "",
+        "EXPAND THE APPLYING KNOWLEDGE TO PRACTICE POST AGAIN.",
+        "The current answer is still too short. Return only valid JSON with the same schema.",
+        "Caption must be 320-650 Vietnamese words and at least 6 paragraphs.",
+        "Add more depth by including:",
+        "- one vivid real-life situation;",
+        "- a clear explanation of the school concept;",
+        "- one step-by-step mini example;",
+        "- why this matters for students/parents;",
+        "- a closing question that invites comments.",
+        "Do not shorten the reel fields.",
+        "",
+        "Current caption to expand:",
+        rawCaption,
+      ].join("\n"),
+      temperature: 0.82,
+      provider,
+    });
+    model = retry.model;
+    data = retry.data;
+    text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("\n") || "";
+    parsed = tryParseJson(text);
+    rawCaption = String(parsed?.caption || "").trim();
+  }
   const hashtags = normalizeHashtags(parsed?.hashtags);
   if (!hashtags.includes("#MindUp")) hashtags.unshift("#MindUp");
   if (!hashtags.includes("#MondayMindset") && !hashtags.includes("#PhatTrienTuDuy")) hashtags.push("#PhatTrienTuDuy");
@@ -1563,6 +1802,7 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
     ? quizRecord.answers.map((answer: unknown) => String(answer || "").trim()).filter(Boolean).slice(0, 4)
     : [];
   const hardQuizRecord = (parsed?.hard_quiz && typeof parsed.hard_quiz === "object" ? parsed.hard_quiz : {}) as JsonRecord;
+  const reelRecord = (parsed?.reel && typeof parsed.reel === "object" ? parsed.reel : {}) as JsonRecord;
   return {
     model,
     caption: isStandaloneLearning ? sanitizeStandaloneLearningMethodCaption(rawCaption) : rawCaption,
@@ -1590,6 +1830,14 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
       correctAnswer: String(hardQuizRecord.correct_answer || "").trim(),
       solution: String(hardQuizRecord.solution || hardQuizRecord.explanation || "").trim(),
       prizeAmount: Number(hardQuizRecord.prize_amount || 0) || 50000,
+    },
+    reel: {
+      hook3s: String(reelRecord.hook_3s || "").trim(),
+      durationSeconds: Number(reelRecord.duration_seconds || 0) || null,
+      voiceOver: String(reelRecord.voice_over || "").trim(),
+      scenes: Array.isArray(reelRecord.scenes) ? reelRecord.scenes.slice(0, 8) : [],
+      caption: String(reelRecord.caption || "").trim(),
+      hashtags: normalizeHashtags(reelRecord.hashtags),
     },
   };
 }
@@ -2121,7 +2369,7 @@ async function generateImageWithFallback(args: {
 }) {
   let imageWarning = "";
   const typeKey = stripVietnameseForTag(args.typeName || "").toLowerCase();
-  const shouldUseProblemLearningVisual = isProblemType(args.typeName) || isTeachingPhilosophy(args.typeName) || typeKey.includes("problem") || typeKey.includes("learning method") || typeKey.includes("teaching philosophy");
+  const shouldUseProblemLearningVisual = isProblemType(args.typeName) || isTeachingPhilosophy(args.typeName) || isApplyingKnowledge(args.typeName) || typeKey.includes("problem") || typeKey.includes("learning method") || typeKey.includes("teaching philosophy") || typeKey.includes("applying knowledge");
   let backgroundImage: Awaited<ReturnType<typeof generatePexelsBackgroundImage>> | null = null;
   let logoDataUri = "";
   if (shouldUseProblemLearningVisual) {
@@ -2488,11 +2736,29 @@ Deno.serve(async (req) => {
       textPrompt,
     });
     const finalContent = mergeCaptionAndHashtags(draft.caption, draft.hashtags);
+    const isApplyingKnowledgePost = isApplyingKnowledge(typeName);
+    const reelNote = isApplyingKnowledgePost && draft.reel
+      ? [
+        "Reel draft:",
+        draft.reel.hook3s ? `Hook 3s: ${draft.reel.hook3s}` : "",
+        draft.reel.durationSeconds ? `Thời lượng gợi ý: ${draft.reel.durationSeconds}s` : "",
+        draft.reel.voiceOver ? `Voice-over:\n${draft.reel.voiceOver}` : "",
+        Array.isArray(draft.reel.scenes) && draft.reel.scenes.length
+          ? `Scenes:\n${draft.reel.scenes.map((scene: unknown, index: number) => {
+            const record = (scene && typeof scene === "object" ? scene : {}) as JsonRecord;
+            return `${index + 1}. ${record.seconds || ""} | ${record.stock_video_keywords || ""} | ${record.overlay_text || ""}`;
+          }).join("\n")}`
+          : "",
+        draft.reel.caption ? `Reel caption:\n${draft.reel.caption}` : "",
+        draft.reel.hashtags?.length ? `Reel hashtags: ${draft.reel.hashtags.join(" ")}` : "",
+      ].filter(Boolean).join("\n")
+      : "";
     const finalNote = [
       draft.quoteEn ? `Quote EN: ${draft.quoteEn}` : "",
       draft.quoteVi ? `Quote VI: ${draft.quoteVi}` : "",
       draft.quoteSource ? `Nguồn: ${draft.quoteSource}` : "",
       draft.internalNote,
+      reelNote,
       post.internal_note,
     ].filter(Boolean).join("\n\n").trim() || null;
 
@@ -2500,6 +2766,16 @@ Deno.serve(async (req) => {
       content: finalContent,
       image_url: generatedImage.imageUrl,
       internal_note: finalNote,
+      metadata: isApplyingKnowledgePost
+        ? {
+          ...parseMetadata(post.metadata),
+          applying_knowledge: {
+            enabled: true,
+            reel: draft.reel,
+            updated_at: new Date().toISOString(),
+          },
+        }
+        : post.metadata,
       status: "draft",
       content_status: "submitted",
       approval_status: "pending",

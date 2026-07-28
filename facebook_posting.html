@@ -441,7 +441,7 @@ const DEFAULT_PAGES = [
 ];
 const DEFAULT_TYPES = [
   "Learning Method", "Monday Mindset", "Hard Quiz with Prize", "Q&A", "Meme",
-  "Teaching Philosophy", "Enrollment", "Quiz", "Bài hay", "Lỗi sai thường gặp"
+  "Teaching Philosophy", "Applying Knowledge to Practice", "Enrollment", "Quiz", "Bài hay", "Lỗi sai thường gặp"
 ];
 const DEFAULT_TYPE_PROMPTS = {
   "Problem": `Loại bài Problem dùng để mở đầu chuỗi Problem → Learning Method.
@@ -459,6 +459,14 @@ const DEFAULT_TYPE_PROMPTS = {
 - Không tạo cặp Problem → Learning Method, không hẹn bài Learning Method phía sau.
 - Ảnh tạo tương tự Learning Method: lấy ảnh nền phù hợp, chèn logo MindUp phía trên giữa ảnh và dòng tóm tắt ở giữa ảnh.
 - Hashtag gợi ý: #MindUp #TeachingPhilosophy #TrietLyGiaoDuc #PhatTrienTuDuy.`,
+  "Applying Knowledge to Practice": `Loại bài Applying Knowledge to Practice dùng để biến kiến thức trên lớp thành ứng dụng thực tế.
+- Hệ thống tự chọn chủ đề theo fanpage, ngày đăng, khối lớp gợi ý và phần chương trình đang học.
+- Toán tham khảo Real World Math; Vật lý tham khảo Real World Physics Problems; Hóa tham khảo Compound Interest/RSC; Sinh tham khảo HHMI BioInteractive; page chính dùng hướng STEM liên môn/đời sống.
+- AI không copy nguồn, chỉ dùng làm cảm hứng rồi viết lại thành bài gốc theo giọng MindUp.
+- Caption cần có hook đời sống, kiến thức đứng sau hiện tượng, ví dụ dễ hiểu và câu hỏi gợi bình luận.
+- Ảnh tạo như Learning Method: lấy ảnh nền phù hợp, chèn logo MindUp và dòng tóm tắt ở giữa.
+- Đồng thời AI tạo kịch bản reels ngắn 20-40 giây bằng stock video, lưu trong ghi chú nội bộ để nhân viên duyệt/dựng/hẹn đăng.
+- Hashtag gợi ý: #MindUp #UngDungKienThuc #HocDeHieuTheGioi #PhatTrienTuDuy.`,
   "Q&A": `Lo?i b?i Q&A/T?m hi?u th?c t? d?ng ?? gi?i th?ch ki?n th?c m?n h?c trong ??i s?ng.
 - H? th?ng t? ch?n 1 trong 53 ch? ?? theo tu?n ISO v? offset fanpage 0/10/20/30/40 ?? tr?nh tr?ng n?i dung gi?a 5 fanpage.
 - B?i m? ??u b?ng m?t c?u h?i ??i s?ng g?n g?i, sau ?? gi?i th?ch b?ng ki?n th?c m?n h?c theo c?ch d? hi?u.
@@ -790,6 +798,7 @@ function textToRequirements(text){
 function defaultRequirementsForType(typeNameValue){
   const name = normalizeText(typeNameValue);
   if (name.includes("quiz")) return ["Câu hỏi", "Đáp án", "Lời giải", "Ảnh minh họa", "Caption bài đăng"];
+  if (name.includes("applying knowledge")) return ["Bài ứng dụng thực tế", "Ảnh minh họa", "Kịch bản reels", "Caption/hashtag"];
   if (name.includes("enrollment") || name.includes("tuyen sinh")) return ["Nội dung tuyển sinh", "Ảnh/video", "Link/form đăng ký", "CTA chốt đăng ký"];
   return ["Nội dung bài đăng", "Ảnh/video", "Link đính kèm nếu có", "Ghi chú thiết kế nếu có"];
 }
