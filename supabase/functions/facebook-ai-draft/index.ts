@@ -160,41 +160,50 @@ async function postLlamaGenerateContent(args: {
   const errors: string[] = [];
   for (let index = 0; index < keys.length; index += 1) {
     const apiKey = keys[index];
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: "system",
-            content: [
-              "You create high-performing Vietnamese Facebook educational content for MindUp.",
-              "Return only valid JSON. Do not wrap JSON in markdown.",
-              "Write naturally, emotionally, and with strong Facebook hooks.",
-            ].join(" "),
-          },
-          { role: "user", content: args.prompt },
-        ],
-        temperature: args.temperature,
-        response_format: { type: "json_object" },
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    const text = data?.choices?.[0]?.message?.content || "";
-    if (res.ok && text) {
+    const callLlama = async (useJsonMode: boolean) => {
+      const res = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            {
+              role: "system",
+              content: [
+                "You create high-performing Vietnamese Facebook educational content for MindUp.",
+                "Return only valid JSON. Do not wrap JSON in markdown.",
+                "Use JSON string values with escaped newlines if needed. Do not include raw control characters.",
+                "Write naturally, emotionally, and with strong Facebook hooks.",
+              ].join(" "),
+            },
+            { role: "user", content: args.prompt },
+          ],
+          temperature: args.temperature,
+          ...(useJsonMode ? { response_format: { type: "json_object" } } : {}),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      const text = data?.choices?.[0]?.message?.content || "";
+      const message = data?.error?.message || data?.message || `Llama text generation failed (${res.status})`;
+      return { res, data, text, message };
+    };
+
+    let result = await callLlama(true);
+    if (!result.res.ok && String(result.message || "").toLowerCase().includes("failed to generate json")) {
+      result = await callLlama(false);
+    }
+    if (result.res.ok && result.text) {
       return {
         model: `llama:${model}`,
         data: {
-          candidates: [{ content: { parts: [{ text }] } }],
+          candidates: [{ content: { parts: [{ text: result.text }] } }],
         },
       };
     }
-    const message = data?.error?.message || data?.message || `Llama text generation failed (${res.status})`;
-    errors.push(`Key ${index + 1}: ${message}`);
+    errors.push(`Key ${index + 1}: ${result.message}`);
   }
   throw new Error(errors.join(" | ") || "Llama text generation failed");
 }
@@ -903,6 +912,26 @@ function viralFacebookPromptBlock(typeName: string) {
   return common;
 }
 
+function llamaLearningMethodDepthPromptBlock() {
+  return [
+    "Yêu cầu RIÊNG khi dùng Llama AI cho Learning Method:",
+    "- Đây KHÔNG phải caption ngắn/slogan/quảng cáo. Phải viết thành một bài Facebook có giá trị thật, đọc xong áp dụng được ngay.",
+    "- Độ dài bắt buộc: 450-800 từ. Nếu caption dưới 350 từ hoặc chỉ gồm vài câu ngắn thì coi là sai.",
+    "- Bài phải có ít nhất 6 đoạn rõ ràng, mỗi đoạn 1-3 dòng để dễ đọc trên điện thoại.",
+    "- Cấu trúc bắt buộc:",
+    "  1) Hook 2-3 dòng đánh trúng nỗi đau học sai rất cụ thể.",
+    "  2) Phân tích vì sao học sinh/phụ huynh gặp vấn đề đó.",
+    "  3) Giới thiệu đúng phương pháp học được giao như một lời giải.",
+    "  4) Giải thích vì sao phương pháp này hiệu quả, dễ hiểu nhưng có chiều sâu.",
+    "  5) Mục 'Cách áp dụng' gồm 3-5 bước cụ thể.",
+    "  6) Ví dụ thực tế liên quan trực tiếp đến môn/trục nội dung của fanpage.",
+    "  7) Kết luận ngắn + CTA nhẹ: rủ lưu bài, thử áp dụng, hoặc comment trải nghiệm.",
+    "- Không chỉ nói 'hãy dùng phương pháp X'. Phải hướng dẫn cách dùng phương pháp đó trong một tình huống học tập cụ thể.",
+    "- Giọng văn: gần gũi, cuốn hút, có nhịp Facebook, nhưng vẫn có chất chuyên môn giáo dục.",
+    "- Không viết thành danh sách khô cứng từ đầu đến cuối; cần có chuyển ý tự nhiên và ví dụ sống.",
+  ];
+}
+
 function mondayMindsetTopic(scheduledAt: string, pageName: string) {
   const week = isoWeekNumber(scheduledAt);
   const year = yearFromDate(scheduledAt);
@@ -938,6 +967,7 @@ function buildGeminiPrompt(args: {
   typePrompt: string;
   existingContent: string;
   internalNote: string;
+  provider?: string;
 }) {
   if (isMondayMindset(args.typeName)) {
     const monday = mondayMindsetTopic(args.scheduledAt, args.pageName);
@@ -1140,6 +1170,10 @@ function buildGeminiPrompt(args: {
       "Nhiệm vụ: tạo một bài Learning Method độc lập: mở đầu bằng một khó khăn học tập/phụ huynh rất thật, sau đó giải bằng một phương pháp học tập cụ thể, dễ hiểu, có thể áp dụng ngay.",
       "",
       ...viralFacebookPromptBlock(args.typeName),
+      ...(normalizeTextAiProvider(args.provider) === "llama" ? [
+        "",
+        ...llamaLearningMethodDepthPromptBlock(),
+      ] : []),
       "",
       "Thông tin bài đăng:",
       `- Fanpage: ${args.pageName}`,
@@ -1165,7 +1199,9 @@ function buildGeminiPrompt(args: {
       "",
       "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
       JSON.stringify({
-        caption: "Caption bài Learning Method bằng tiếng Việt: bắt đầu bằng vấn đề trực tiếp trong bài, không nhắc tuần trước/bài trước, giải bằng phương pháp học cụ thể, có ví dụ theo môn fanpage và CTA nhẹ.",
+        caption: normalizeTextAiProvider(args.provider) === "llama"
+          ? "Bài Facebook Learning Method hoàn chỉnh 450-800 từ, tối thiểu 6 đoạn, có hook, phân tích vấn đề, giới thiệu phương pháp, giải thích vì sao hiệu quả, mục Cách áp dụng 3-5 bước, ví dụ theo môn fanpage và CTA nhẹ. Không được viết ngắn kiểu slogan/quảng cáo."
+          : "Caption bài Learning Method bằng tiếng Việt: bắt đầu bằng vấn đề trực tiếp trong bài, không nhắc tuần trước/bài trước, giải bằng phương pháp học cụ thể, có ví dụ theo môn fanpage và CTA nhẹ.",
         hashtags: ["#MindUp", "#LearningMethod", "#PhuongPhapHocTap", "#PhatTrienTuDuy", fanpageTag],
         image_prompt: "Prompt tiếng Anh tạo ảnh nền 1:1 cho bài Learning Method, không chữ, không logo, liên quan đến phương pháp học và môn học của fanpage.",
         image_search_keywords: "Từ khóa tiếng Anh để tìm ảnh nền phù hợp trên Pexels, không chữ, liên quan đến bài viết và môn học.",
@@ -1318,9 +1354,34 @@ function buildGeminiPrompt(args: {
 }
 
 async function generateTextDraft(prompt: string, typeName = "", provider = "") {
-  const { model, data } = await postAiGenerateContent({ prompt, temperature: 0.8, provider });
-  const text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("\n") || "";
-  const parsed = tryParseJson(text);
+  let { model, data } = await postAiGenerateContent({ prompt, temperature: 0.8, provider });
+  let text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("\n") || "";
+  let parsed = tryParseJson(text);
+  const isStandaloneLearning = isLearningMethod(typeName);
+  const isLlamaLearning = isStandaloneLearning && normalizeTextAiProvider(provider) === "llama";
+  let rawCaption = String(parsed?.caption || "").trim();
+  if (isLlamaLearning && stripMarkdown(rawCaption).split(/\s+/).filter(Boolean).length < 400) {
+    const retry = await postAiGenerateContent({
+      prompt: [
+        prompt,
+        "",
+        "BẢN VỪA TẠO QUÁ NGẮN, KHÔNG ĐẠT YÊU CẦU LEARNING METHOD.",
+        "Hãy viết lại caption dài hơn, sâu hơn, đúng cấu trúc đã yêu cầu.",
+        "Bắt buộc caption 450-800 từ, tối thiểu 6 đoạn, có mục 'Cách áp dụng' 3-5 bước và ví dụ theo môn fanpage.",
+        "Không được chỉ tóm tắt vài dòng. Không được viết kiểu slogan/quảng cáo.",
+        "",
+        "Bản caption ngắn cần mở rộng:",
+        rawCaption,
+      ].join("\n"),
+      temperature: 0.82,
+      provider,
+    });
+    model = retry.model;
+    data = retry.data;
+    text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("\n") || "";
+    parsed = tryParseJson(text);
+    rawCaption = String(parsed?.caption || "").trim();
+  }
   const hashtags = normalizeHashtags(parsed?.hashtags);
   if (!hashtags.includes("#MindUp")) hashtags.unshift("#MindUp");
   if (!hashtags.includes("#MondayMindset") && !hashtags.includes("#PhatTrienTuDuy")) hashtags.push("#PhatTrienTuDuy");
@@ -1329,8 +1390,6 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
     ? quizRecord.answers.map((answer: unknown) => String(answer || "").trim()).filter(Boolean).slice(0, 4)
     : [];
   const hardQuizRecord = (parsed?.hard_quiz && typeof parsed.hard_quiz === "object" ? parsed.hard_quiz : {}) as JsonRecord;
-  const rawCaption = String(parsed?.caption || "").trim();
-  const isStandaloneLearning = isLearningMethod(typeName);
   return {
     model,
     caption: isStandaloneLearning ? sanitizeStandaloneLearningMethodCaption(rawCaption) : rawCaption,
@@ -1999,6 +2058,7 @@ Deno.serve(async (req) => {
       typePrompt: post.type?.ai_prompt || post.type?.description || "",
       existingContent: post.content || "",
       internalNote: post.internal_note || "",
+      provider,
     });
 
     if (isProblemType(post.type?.name || "")) {
