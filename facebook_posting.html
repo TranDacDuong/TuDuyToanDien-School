@@ -375,7 +375,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
         </div>
         <div class="grid2">
           <div class="field">
-            <label>Giọng đọc ElevenLabs (ưu tiên tiếng Việt)</label>
+              <label>Giọng đọc tiếng Việt</label>
             <select class="select" id="ttsVoiceSelect"></select>
           </div>
           <div class="field">
@@ -2529,7 +2529,7 @@ async function callFacebookTtsFunction(payload){
       body: JSON.stringify(payload),
     });
   } catch (error) {
-    throw new Error("Không gọi được Edge Function facebook-tts. Hãy deploy function facebook-tts và set secret ELEVENLABS_API_KEY rồi thử lại.");
+    throw new Error("Không gọi được Edge Function facebook-tts. Hãy deploy function facebook-tts và set secret TTS API rồi thử lại.");
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.error) {
@@ -2619,7 +2619,7 @@ function populateTtsVoices(voices){
   if ($("ttsHint") && hasVietnameseVoice) {
     $("ttsHint").textContent = `Đang ưu tiên giọng tiếng Việt: ${preferredVoice?.name || "voice phù hợp nhất"}.`;
   } else if ($("ttsHint") && !hasVietnameseVoice) {
-    $("ttsHint").textContent = "Tài khoản ElevenLabs hiện chưa có voice gắn nhãn tiếng Việt; hệ thống dùng model multilingual để đọc tiếng Việt bằng voice phù hợp nhất.";
+      $("ttsHint").textContent = "Chưa có voice gắn nhãn tiếng Việt; hệ thống sẽ dùng voice phù hợp nhất hiện có.";
   }
 }
 async function loadTtsVoices(force=false){
@@ -3067,7 +3067,7 @@ async function ensureReelVoice(existingDraft=null){
   if (!TTS_VOICES.length) await loadTtsVoices(true);
   const voice = selectedOrPreferredTtsVoice();
   const voiceId = voice?.voice_id || "";
-  if (!voiceId) throw new Error("Không tìm thấy voice ElevenLabs để tạo Reel.");
+  if (!voiceId) throw new Error("Không tìm thấy voice để tạo Reel.");
   if ($("ttsVoiceSelect")) $("ttsVoiceSelect").value = voiceId;
   const voiceName = voice?.name || $("ttsVoiceSelect")?.selectedOptions?.[0]?.textContent?.trim() || "";
   const draft = existingDraft?.id ? existingDraft : await savePostDraft({ status: "draft", content_status: "submitted" });

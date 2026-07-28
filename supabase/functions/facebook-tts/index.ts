@@ -33,6 +33,17 @@ const FALLBACK_ELEVENLABS_VOICES = [
   },
 ];
 
+const FPT_TTS_VOICES = [
+  { voice_id: "fpt:banmai", name: "Ban Mai (Nữ miền Bắc)", labels: { provider: "fpt", language: "vi", locale: "vi-VN", accent: "northern", gender: "female" } },
+  { voice_id: "fpt:thuminh", name: "Thu Minh (Nữ miền Bắc)", labels: { provider: "fpt", language: "vi", locale: "vi-VN", accent: "northern", gender: "female" } },
+  { voice_id: "fpt:leminh", name: "Lê Minh (Nam miền Bắc)", labels: { provider: "fpt", language: "vi", locale: "vi-VN", accent: "northern", gender: "male" } },
+  { voice_id: "fpt:lannhi", name: "Lan Nhi (Nữ miền Nam)", labels: { provider: "fpt", language: "vi", locale: "vi-VN", accent: "southern", gender: "female" } },
+  { voice_id: "fpt:linhsan", name: "Linh San (Nữ miền Nam)", labels: { provider: "fpt", language: "vi", locale: "vi-VN", accent: "southern", gender: "female" } },
+  { voice_id: "fpt:myan", name: "Mỹ An (Nữ miền Trung)", labels: { provider: "fpt", language: "vi", locale: "vi-VN", accent: "central", gender: "female" } },
+  { voice_id: "fpt:giahuy", name: "Gia Huy (Nam miền Trung)", labels: { provider: "fpt", language: "vi", locale: "vi-VN", accent: "central", gender: "male" } },
+  { voice_id: "fpt:ngoclam", name: "Ngọc Lam (Nữ miền Trung)", labels: { provider: "fpt", language: "vi", locale: "vi-VN", accent: "central", gender: "female" } },
+];
+
 function env(name: string) {
   return Deno.env.get(name) || "";
 }
@@ -229,6 +240,62 @@ async function listElevenLabsVoices() {
   })).filter((voice: { voice_id: string }) => voice.voice_id);
 }
 
+function listFptVoices() {
+  return FPT_TTS_VOICES.map((voice) => ({
+    ...voice,
+    category: "fpt",
+    description: "FPT.AI Vietnamese Text to Speech",
+    preview_url: "",
+  }));
+}
+
+function resolveFptVoiceId(voiceId: string) {
+  const clean = String(voiceId || "").trim();
+  if (!clean) return "thuminh";
+  return clean.replace(/^fpt:/i, "") || "thuminh";
+}
+
+async function waitForFptAudio(asyncUrl: string) {
+  const cleanUrl = String(asyncUrl || "").trim();
+  if (!cleanUrl) throw new Error("FPT.AI không trả về link audio.");
+  let lastStatus = 0;
+  for (let attempt = 0; attempt < 18; attempt += 1) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, attempt < 5 ? 3000 : 5000));
+    const res = await fetch(cleanUrl);
+    lastStatus = res.status;
+    const contentType = res.headers.get("Content-Type") || "";
+    if (res.ok && (contentType.includes("audio") || cleanUrl.toLowerCase().endsWith(".mp3"))) {
+      return new Uint8Array(await res.arrayBuffer());
+    }
+  }
+  throw new Error(`FPT.AI đã nhận request nhưng file audio chưa sẵn sàng (HTTP ${lastStatus || "timeout"}). Hãy thử tạo lại sau ít phút.`);
+}
+
+async function generateFptSpeech(text: string, voiceId: string) {
+  const apiKey = env("FPT_AI_API_KEY");
+  if (!apiKey) throw new Error("Thiếu Supabase secret FPT_AI_API_KEY.");
+  const cleanText = String(text || "").replace(/\s+/g, " ").trim();
+  if (!cleanText) throw new Error("Chưa có nội dung voice-over để tạo giọng đọc.");
+  if (cleanText.length > 5000) throw new Error("Voice-over quá dài. FPT.AI chỉ nhận tối đa 5000 ký tự mỗi request.");
+  const fptVoice = resolveFptVoiceId(voiceId);
+  const res = await fetch("https://api.fpt.ai/hmi/tts/v5", {
+    method: "POST",
+    headers: {
+      "api-key": apiKey,
+      "voice": fptVoice,
+      "speed": "",
+      "format": "mp3",
+      "Content-Type": "text/plain; charset=utf-8",
+    },
+    body: cleanText,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || Number(data?.error || 0) !== 0) {
+    throw new Error(data?.message || "Không tạo được giọng đọc FPT.AI.");
+  }
+  return waitForFptAudio(String(data?.async || ""));
+}
+
 async function generateElevenLabsSpeech(text: string, voiceId: string) {
   const apiKey = env("ELEVENLABS_API_KEY");
   if (!apiKey) throw new Error("Thiếu Supabase secret ELEVENLABS_API_KEY.");
@@ -306,7 +373,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action || "generate").trim().toLowerCase();
     if (action === "voices") {
-      const voices = await listElevenLabsVoices();
+      const voices = env("FPT_AI_API_KEY") ? listFptVoices() : await listElevenLabsVoices();
       return jsonResponse({ ok: true, voices });
     }
 
@@ -316,15 +383,16 @@ Deno.serve(async (req) => {
     const voiceId = String(body?.voice_id || "").trim();
     const voiceName = String(body?.voice_name || "").trim();
     const text = extractVoiceOver(post, String(body?.text || ""));
-    const audioBytes = await generateElevenLabsSpeech(text, voiceId);
+    const useFpt = env("FPT_AI_API_KEY") && (!voiceId || voiceId.startsWith("fpt:") || !env("ELEVENLABS_API_KEY"));
+    const audioBytes = useFpt ? await generateFptSpeech(text, voiceId) : await generateElevenLabsSpeech(text, voiceId);
     const uploaded = await uploadBytesToDrive(audioBytes, `mindup-reel-voice-${postId}.mp3`, "audio/mpeg");
 
     const metadata = parseMetadata(post.metadata);
     const applying = (metadata.applying_knowledge && typeof metadata.applying_knowledge === "object" ? metadata.applying_knowledge : {}) as JsonRecord;
     const audio = {
-      provider: "elevenlabs",
-      voice_id: voiceId,
-      voice_name: voiceName,
+      provider: useFpt ? "fpt-ai" : "elevenlabs",
+      voice_id: useFpt ? `fpt:${resolveFptVoiceId(voiceId)}` : voiceId,
+      voice_name: voiceName || (useFpt ? FPT_TTS_VOICES.find((voice) => voice.voice_id === `fpt:${resolveFptVoiceId(voiceId)}`)?.name || resolveFptVoiceId(voiceId) : ""),
       text,
       file_id: uploaded.fileId,
       url: uploaded.downloadUrl || uploaded.url,
