@@ -2543,14 +2543,7 @@ async function callFacebookTtsFunction(payload){
 }
 function preferredVoiceIndex(voices){
   const rows = Array.isArray(voices) ? voices : [];
-  const idx = rows.findIndex(voice => {
-    const text = normalizeText([
-      voice?.name,
-      voice?.description,
-      Object.values(voice?.labels || {}).join(" "),
-    ].join(" "));
-    return text.includes("vietnam") || text.includes("viet") || text.includes("vi ");
-  });
+  const idx = rows.findIndex(voice => isVietnameseTtsVoice(voice));
   if (idx >= 0) return idx;
   const educationalFemale = rows.findIndex(voice => {
     const labels = voice?.labels || {};
@@ -2561,6 +2554,47 @@ function preferredVoiceIndex(voices){
   const social = rows.findIndex(voice => normalizeText([voice?.name, voice?.labels?.use_case].join(" ")).includes("social_media"));
   return social >= 0 ? social : 0;
 }
+function isVietnameseTtsVoice(voice){
+  if (!voice) return false;
+  const labels = voice.labels || {};
+  const text = normalizeText([
+    voice.name,
+    voice.description,
+    labels.language,
+    labels.locale,
+    labels.accent,
+    Object.values(labels).join(" "),
+  ].filter(Boolean).join(" "));
+  return labels.language === "vi"
+    || labels.locale === "vi-VN"
+    || text.includes("vi-vn")
+    || text.includes("vietnam")
+    || text.includes("viet")
+    || text.includes("tiếng việt")
+    || text.includes("tieng viet");
+}
+function preferredTtsVoice(){
+  const rows = Array.isArray(TTS_VOICES) ? TTS_VOICES : [];
+  return rows[preferredVoiceIndex(rows)] || rows[0] || null;
+}
+function currentSelectedTtsVoice(){
+  const selectedId = $("ttsVoiceSelect")?.value || "";
+  return TTS_VOICES.find(voice => String(voice.voice_id) === String(selectedId)) || null;
+}
+function selectedOrPreferredTtsVoice(){
+  const preferred = preferredTtsVoice();
+  const selected = currentSelectedTtsVoice();
+  return preferred && isVietnameseTtsVoice(preferred) && !isVietnameseTtsVoice(selected)
+    ? preferred
+    : selected || preferred;
+}
+function postAudioNeedsVietnameseRefresh(row){
+  const preferred = preferredTtsVoice();
+  if (!preferred || !isVietnameseTtsVoice(preferred)) return false;
+  const audio = postMetadata(row).applying_knowledge?.audio || {};
+  if (!audio?.voice_id) return true;
+  return String(audio.voice_id) !== String(preferred.voice_id);
+}
 function populateTtsVoices(voices){
   const select = $("ttsVoiceSelect");
   if (!select) return;
@@ -2570,19 +2604,21 @@ function populateTtsVoices(voices){
     return;
   }
   const selected = select.value;
-  const hasVietnameseVoice = rows.some(voice => {
-    const text = normalizeText([voice?.name, voice?.description, Object.values(voice?.labels || {}).join(" ")].join(" "));
-    return text.includes("vietnam") || text.includes("viet") || text.includes("vi ");
-  });
+  const selectedVoice = rows.find(voice => String(voice.voice_id) === String(selected));
+  const preferredVoice = rows[preferredVoiceIndex(rows)] || rows[0];
+  const hasVietnameseVoice = rows.some(voice => isVietnameseTtsVoice(voice));
   select.innerHTML = rows.map(voice => {
     const labelValues = Object.values(voice.labels || {}).filter(Boolean).slice(0, 2).join(" • ");
     const label = `${voice.name || "Voice"}${labelValues ? ` — ${labelValues}` : ""}`;
     return `<option value="${esc(voice.voice_id)}">${esc(label)}</option>`;
   }).join("");
-  select.value = rows.some(voice => String(voice.voice_id) === String(selected))
+  const shouldSwitchToVietnamese = hasVietnameseVoice && isVietnameseTtsVoice(preferredVoice) && !isVietnameseTtsVoice(selectedVoice);
+  select.value = selectedVoice && !shouldSwitchToVietnamese
     ? selected
-    : rows[preferredVoiceIndex(rows)]?.voice_id || rows[0].voice_id;
-  if ($("ttsHint") && !hasVietnameseVoice) {
+    : preferredVoice?.voice_id || rows[0].voice_id;
+  if ($("ttsHint") && hasVietnameseVoice) {
+    $("ttsHint").textContent = `Đang ưu tiên giọng tiếng Việt: ${preferredVoice?.name || "voice phù hợp nhất"}.`;
+  } else if ($("ttsHint") && !hasVietnameseVoice) {
     $("ttsHint").textContent = "Tài khoản ElevenLabs hiện chưa có voice gắn nhãn tiếng Việt; hệ thống dùng model multilingual để đọc tiếng Việt bằng voice phù hợp nhất.";
   }
 }
@@ -2954,9 +2990,13 @@ async function generateReelVideo(){
   try {
     if (btn) { btn.disabled = true; btn.textContent = "Đang tạo Reel..."; }
     showPostStatus("info", "Đang chuẩn bị bài đăng và kiểm tra giọng đọc...");
+    await loadTtsVoices(true);
     let draft = await savePostDraft({ status: "draft", content_status: "submitted" });
     let row = currentPostRow() || draft;
-    if (!postMetadata(row).applying_knowledge?.audio?.preview_url && !postMetadata(row).applying_knowledge?.audio?.url) {
+    const existingAudio = postMetadata(row).applying_knowledge?.audio || {};
+    const hasExistingAudio = Boolean(existingAudio.preview_url || existingAudio.url);
+    const needsVietnameseRefresh = hasExistingAudio && postAudioNeedsVietnameseRefresh(row);
+    if (!hasExistingAudio || needsVietnameseRefresh) {
       if ($("ttsStatus")) $("ttsStatus").value = "Đang tự tạo giọng đọc...";
       showPostStatus("info", "Chưa có giọng đọc, hệ thống đang tự tạo voice-over trước...");
       row = await ensureReelVoice(draft);
@@ -3025,9 +3065,11 @@ async function generateReelVideo(){
 }
 async function ensureReelVoice(existingDraft=null){
   if (!TTS_VOICES.length) await loadTtsVoices(true);
-  const voiceId = $("ttsVoiceSelect")?.value || TTS_VOICES[0]?.voice_id || "";
+  const voice = selectedOrPreferredTtsVoice();
+  const voiceId = voice?.voice_id || "";
   if (!voiceId) throw new Error("Không tìm thấy voice ElevenLabs để tạo Reel.");
-  const voiceName = $("ttsVoiceSelect")?.selectedOptions?.[0]?.textContent?.trim() || TTS_VOICES.find(v => String(v.voice_id) === String(voiceId))?.name || "";
+  if ($("ttsVoiceSelect")) $("ttsVoiceSelect").value = voiceId;
+  const voiceName = voice?.name || $("ttsVoiceSelect")?.selectedOptions?.[0]?.textContent?.trim() || "";
   const draft = existingDraft?.id ? existingDraft : await savePostDraft({ status: "draft", content_status: "submitted" });
   const data = await callFacebookTtsFunction({
     action: "generate",
