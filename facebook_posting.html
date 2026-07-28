@@ -375,7 +375,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
         </div>
         <div class="grid2">
           <div class="field">
-            <label>Voice ElevenLabs</label>
+            <label>Giọng đọc ElevenLabs (ưu tiên tiếng Việt)</label>
             <select class="select" id="ttsVoiceSelect"></select>
           </div>
           <div class="field">
@@ -2420,6 +2420,46 @@ async function uploadDriveFile(file, folder="facebook-reels"){
   if (!res.ok || data?.error) throw new Error(data?.error || "Không upload được video lên Drive.");
   return data;
 }
+async function callMediaProxyJson(payload){
+  const sessionRes = await sb.auth.getSession();
+  const accessToken = sessionRes.data?.session?.access_token;
+  if (!accessToken) throw new Error("Vui lòng đăng nhập lại trước khi tải media Reel.");
+  const res = await fetch(`${window.SUPABASE_URL}/functions/v1/media-proxy`, {
+    method: "POST",
+    headers: {
+      apikey: window.SUPABASE_KEY,
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data?.error) throw new Error(data?.error || "Không gọi được media proxy.");
+  return data;
+}
+async function fetchMediaBlob(url){
+  const sessionRes = await sb.auth.getSession();
+  const accessToken = sessionRes.data?.session?.access_token;
+  if (!accessToken) throw new Error("Vui lòng đăng nhập lại trước khi tải media Reel.");
+  const res = await fetch(`${window.SUPABASE_URL}/functions/v1/media-proxy`, {
+    method: "POST",
+    headers: {
+      apikey: window.SUPABASE_KEY,
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ action: "fetch", url }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data?.error || "Không tải được media Reel.");
+  }
+  return await res.blob();
+}
+async function proxiedObjectUrl(url){
+  const blob = await fetchMediaBlob(url);
+  return URL.createObjectURL(blob);
+}
 
 function facebookPostUrl(id){ return id ? `https://www.facebook.com/${String(id)}` : ""; }
 async function callFacebookPostingFunction(payload){
@@ -2511,7 +2551,15 @@ function preferredVoiceIndex(voices){
     ].join(" "));
     return text.includes("vietnam") || text.includes("viet") || text.includes("vi ");
   });
-  return idx >= 0 ? idx : 0;
+  if (idx >= 0) return idx;
+  const educationalFemale = rows.findIndex(voice => {
+    const labels = voice?.labels || {};
+    const text = normalizeText([voice?.name, labels.use_case, labels.gender, voice?.description].join(" "));
+    return text.includes("informative") && text.includes("female");
+  });
+  if (educationalFemale >= 0) return educationalFemale;
+  const social = rows.findIndex(voice => normalizeText([voice?.name, voice?.labels?.use_case].join(" ")).includes("social_media"));
+  return social >= 0 ? social : 0;
 }
 function populateTtsVoices(voices){
   const select = $("ttsVoiceSelect");
@@ -2522,6 +2570,10 @@ function populateTtsVoices(voices){
     return;
   }
   const selected = select.value;
+  const hasVietnameseVoice = rows.some(voice => {
+    const text = normalizeText([voice?.name, voice?.description, Object.values(voice?.labels || {}).join(" ")].join(" "));
+    return text.includes("vietnam") || text.includes("viet") || text.includes("vi ");
+  });
   select.innerHTML = rows.map(voice => {
     const labelValues = Object.values(voice.labels || {}).filter(Boolean).slice(0, 2).join(" • ");
     const label = `${voice.name || "Voice"}${labelValues ? ` — ${labelValues}` : ""}`;
@@ -2530,6 +2582,9 @@ function populateTtsVoices(voices){
   select.value = rows.some(voice => String(voice.voice_id) === String(selected))
     ? selected
     : rows[preferredVoiceIndex(rows)]?.voice_id || rows[0].voice_id;
+  if ($("ttsHint") && !hasVietnameseVoice) {
+    $("ttsHint").textContent = "Tài khoản ElevenLabs hiện chưa có voice gắn nhãn tiếng Việt; hệ thống dùng model multilingual để đọc tiếng Việt bằng voice phù hợp nhất.";
+  }
 }
 async function loadTtsVoices(force=false){
   if (TTS_VOICES_LOADING) return TTS_VOICES;
@@ -2628,6 +2683,10 @@ function normalizeReelScenes(meta){
 function activeReelScene(scenes, t){
   return scenes.find(scene => t >= scene.start && t < scene.end) || scenes[scenes.length - 1] || scenes[0];
 }
+function sceneProgress(scene, t){
+  const total = Math.max(0.1, Number(scene?.end || 0) - Number(scene?.start || 0));
+  return Math.max(0, Math.min(1, (t - Number(scene?.start || 0)) / total));
+}
 function loadCanvasImage(src){
   return new Promise(resolve => {
     if (!src) return resolve(null);
@@ -2638,13 +2697,55 @@ function loadCanvasImage(src){
     img.src = src;
   });
 }
-function drawCoverImage(ctx, img, x, y, w, h){
+async function loadCanvasImageSafe(src){
+  if (!src) return null;
+  let objectUrl = "";
+  try {
+    objectUrl = await proxiedObjectUrl(src);
+    const image = await loadCanvasImage(objectUrl);
+    if (image) image.__objectUrl = objectUrl;
+    else if (objectUrl) URL.revokeObjectURL(objectUrl);
+    return image;
+  } catch (error) {
+    console.warn("Cannot proxy image", error);
+    return await loadCanvasImage(src);
+  }
+}
+function cleanupCanvasImages(images){
+  (images || []).forEach(image => {
+    if (image?.__objectUrl) URL.revokeObjectURL(image.__objectUrl);
+  });
+}
+async function findSceneImageUrl(scene, fallbackQuery="education learning"){
+  const query = String(scene?.stock_video_keywords || scene?.overlay_text || fallbackQuery || "").trim();
+  if (!query) return "";
+  try {
+    const data = await callMediaProxyJson({ action: "pexels_image", query });
+    return data?.image?.url || "";
+  } catch (error) {
+    console.warn("Pexels scene image failed", error);
+    return "";
+  }
+}
+async function loadSceneImages(scenes, fallbackImageUrl){
+  const out = [];
+  for (const scene of scenes) {
+    const pexelsUrl = await findSceneImageUrl(scene);
+    const image = await loadCanvasImageSafe(pexelsUrl || fallbackImageUrl);
+    out.push(image);
+  }
+  return out;
+}
+function drawCoverImage(ctx, img, x, y, w, h, motion=0, sceneIndex=0){
   if (!img?.width || !img?.height) return false;
-  const scale = Math.max(w / img.width, h / img.height);
+  const zoom = 1.08 + Math.min(0.12, Math.max(0, motion) * 0.12);
+  const scale = Math.max(w / img.width, h / img.height) * zoom;
   const sw = w / scale;
   const sh = h / scale;
-  const sx = (img.width - sw) / 2;
-  const sy = (img.height - sh) / 2;
+  const panX = Math.sin((motion + sceneIndex * 0.37) * Math.PI) * (img.width - sw) * 0.18;
+  const panY = Math.cos((motion + sceneIndex * 0.23) * Math.PI) * (img.height - sh) * 0.14;
+  const sx = Math.max(0, Math.min(img.width - sw, (img.width - sw) / 2 + panX));
+  const sy = Math.max(0, Math.min(img.height - sh, (img.height - sh) / 2 + panY));
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
   return true;
 }
@@ -2700,9 +2801,9 @@ function drawCenteredTextBox(ctx, text, cx, cy, boxWidth, maxBoxHeight){
   ctx.restore();
 }
 function drawReelFrame(ctx, config){
-  const { width, height, background, logo, scene, progress, caption } = config;
+  const { width, height, background, logo, scene, progress, caption, sceneProgress=0, sceneIndex=0 } = config;
   ctx.clearRect(0, 0, width, height);
-  const hasBg = drawCoverImage(ctx, background, 0, 0, width, height);
+  const hasBg = drawCoverImage(ctx, background, 0, 0, width, height, sceneProgress, sceneIndex);
   if (!hasBg) {
     const gradient = ctx.createLinearGradient(0, 0, width, height);
     gradient.addColorStop(0, "#bfeaff");
@@ -2711,7 +2812,8 @@ function drawReelFrame(ctx, config){
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
   }
-  ctx.fillStyle = "rgba(3, 16, 38, .34)";
+  const fade = Math.min(1, sceneProgress * 5, (1 - sceneProgress) * 5 + 0.15);
+  ctx.fillStyle = `rgba(3, 16, 38, ${0.28 + (1 - fade) * 0.18})`;
   ctx.fillRect(0, 0, width, height);
   const glow = ctx.createRadialGradient(width * .5, height * .25, 80, width * .5, height * .25, height * .72);
   glow.addColorStop(0, "rgba(255,255,255,.16)");
@@ -2776,25 +2878,30 @@ async function recordReelVideo({ row, draft }){
   canvas.height = height;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Trình duyệt không hỗ trợ Canvas để dựng Reels.");
-  const background = await loadCanvasImage($("postImageUrl").value.trim() || draft.image_url || row?.image_url || "");
+  const fallbackImageUrl = $("postImageUrl").value.trim() || draft.image_url || row?.image_url || "";
   const logo = await loadCanvasImage("assets/mindup-logo-round.png");
-  const audioEl = new Audio();
-  audioEl.crossOrigin = "anonymous";
-  audioEl.preload = "auto";
-  audioEl.src = audioUrl;
-  let audioStream = null;
+  const sceneImages = await loadSceneImages(scenes, fallbackImageUrl);
+  let audioContext = null;
+  let audioSource = null;
+  let audioDestination = null;
   let duration = sceneDuration;
   try {
-    await waitForMediaReady(audioEl);
-    if (Number.isFinite(audioEl.duration) && audioEl.duration > 1) duration = Math.min(60, Math.max(sceneDuration, audioEl.duration));
-    const capture = audioEl.captureStream || audioEl.mozCaptureStream;
-    if (capture) audioStream = capture.call(audioEl);
+    const audioBlob = await fetchMediaBlob(audioUrl);
+    const audioBufferBytes = await audioBlob.arrayBuffer();
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const audioBuffer = await audioContext.decodeAudioData(audioBufferBytes.slice(0));
+    duration = Math.min(60, Math.max(sceneDuration, audioBuffer.duration || 0));
+    audioDestination = audioContext.createMediaStreamDestination();
+    audioSource = audioContext.createBufferSource();
+    audioSource.buffer = audioBuffer;
+    audioSource.connect(audioDestination);
   } catch (error) {
-    console.warn("Cannot attach reel audio", error);
+    console.warn("Cannot decode reel audio", error);
   }
   duration = Math.max(8, Math.min(60, duration));
   const canvasStream = canvas.captureStream(30);
-  const tracks = [...canvasStream.getVideoTracks(), ...(audioStream?.getAudioTracks?.() || [])];
+  const audioTracks = audioDestination?.stream?.getAudioTracks?.() || [];
+  const tracks = [...canvasStream.getVideoTracks(), ...audioTracks];
   const stream = new MediaStream(tracks);
   const mimeType = chooseRecorderMimeType();
   const recorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 2500000 } : { videoBitsPerSecond: 2500000 });
@@ -2802,35 +2909,39 @@ async function recordReelVideo({ row, draft }){
   recorder.ondataavailable = ev => { if (ev.data?.size) chunks.push(ev.data); };
   const stopped = new Promise(resolve => recorder.onstop = resolve);
   recorder.start(500);
-  audioEl.currentTime = 0;
-  audioEl.play().catch(() => {});
+  try { audioSource?.start(0); } catch (_) {}
   const started = performance.now();
   await new Promise(resolve => {
     const tick = () => {
       const t = (performance.now() - started) / 1000;
       const scene = activeReelScene(scenes, t);
+      const index = Math.max(0, scenes.indexOf(scene));
       drawReelFrame(ctx, {
         width,
         height,
-        background,
+        background: sceneImages[index] || sceneImages[0],
         logo,
         scene,
         caption: reel.caption || draft.content || "",
         progress: t / duration,
+        sceneProgress: sceneProgress(scene, t),
+        sceneIndex: index,
       });
       if (t < duration) requestAnimationFrame(tick);
       else resolve();
     };
     tick();
   });
-  audioEl.pause();
+  try { audioSource?.stop(); } catch (_) {}
   recorder.stop();
   await stopped;
   stream.getTracks().forEach(track => track.stop());
+  await audioContext?.close?.().catch(()=>{});
+  cleanupCanvasImages([logo, ...sceneImages]);
   const finalType = recorder.mimeType || mimeType || "video/webm";
   const blob = new Blob(chunks, { type: finalType });
   if (!blob.size) throw new Error("Không tạo được dữ liệu video Reels.");
-  return { blob, mimeType: finalType, duration, hasAudio: Boolean(audioStream?.getAudioTracks?.().length) };
+  return { blob, mimeType: finalType, duration, hasAudio: Boolean(audioTracks.length), sceneImageCount: sceneImages.filter(Boolean).length };
 }
 async function generateReelVideo(){
   const postTypeId = $("postType")?.value || "";
@@ -2870,6 +2981,7 @@ async function generateReelVideo(){
       size: uploaded.size || file.size,
       duration_seconds: Math.round(result.duration),
       has_audio_track: result.hasAudio,
+      scene_image_count: result.sceneImageCount,
       created_at: new Date().toISOString(),
     };
     const updatedMetadata = {
@@ -2902,7 +3014,7 @@ async function generateReelVideo(){
         : [...S.posts, saved];
     }
     showPostStatus(result.hasAudio ? "ok" : "err", result.hasAudio
-      ? "Đã tạo Reels hoàn chỉnh, có voice-over và đã lưu lên Drive."
+      ? `Đã tạo Reel hoàn chỉnh, có voice-over, ${result.sceneImageCount || 1} cảnh ảnh và đã lưu lên Drive.`
       : "Đã tạo video Reels và lưu lên Drive, nhưng trình duyệt không ghép được audio vào video. Audio vẫn đang lưu riêng trong bài.");
     await loadData();
   } catch (error) {
