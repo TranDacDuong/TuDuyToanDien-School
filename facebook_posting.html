@@ -366,13 +366,11 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
       <div class="meta-ai-box" id="reelVoiceBox" style="display:none">
         <div class="meta-ai-head">
           <div>
-            <strong>Giọng đọc Reels</strong>
-            <div class="meta-ai-small">Tạo giọng đọc tiếng Việt từ phần voice-over trong kịch bản reels. Audio sẽ được lưu lên Drive và dùng cho bước dựng video sau.</div>
+            <strong>Reel tự động</strong>
+            <div class="meta-ai-small">Bấm một lần để tạo giọng đọc, dựng video dọc, upload lên Drive và xem trước Reel.</div>
           </div>
           <div class="meta-ai-actions">
-            <button class="btn btn-outline" id="reloadTtsVoicesBtn" type="button">Tải voice</button>
-            <button class="btn btn-primary" id="generateReelVoiceBtn" type="button">Tạo giọng đọc</button>
-            <button class="btn btn-gold" id="generateReelVideoBtn" type="button">Tạo Reels</button>
+            <button class="btn btn-gold" id="generateReelVideoBtn" type="button">Tạo Reel</button>
           </div>
         </div>
         <div class="grid2">
@@ -2768,7 +2766,7 @@ async function recordReelVideo({ row, draft }){
   const reel = applying.reel || {};
   const audio = applying.audio || {};
   const audioUrl = audio.preview_url || audio.url || "";
-  if (!audioUrl) throw new Error("Chưa có giọng đọc. Hãy bấm Tạo giọng đọc trước khi tạo Reels.");
+  if (!audioUrl) throw new Error("Chưa tạo được giọng đọc để ghép vào Reel.");
   const scenes = normalizeReelScenes(meta);
   const sceneDuration = Math.max(...scenes.map(s => s.end), Number(reel.durationSeconds || 0) || 30);
   const canvas = document.createElement("canvas");
@@ -2843,10 +2841,18 @@ async function generateReelVideo(){
   const btn = $("generateReelVideoBtn");
   const oldText = btn?.textContent || "";
   try {
-    if (btn) { btn.disabled = true; btn.textContent = "Đang dựng..."; }
-    showPostStatus("info", "Đang lưu nháp và dựng video Reels trong trình duyệt...");
-    const draft = await savePostDraft({ status: "draft", content_status: "submitted" });
-    const row = currentPostRow() || draft;
+    if (btn) { btn.disabled = true; btn.textContent = "Đang tạo Reel..."; }
+    showPostStatus("info", "Đang chuẩn bị bài đăng và kiểm tra giọng đọc...");
+    let draft = await savePostDraft({ status: "draft", content_status: "submitted" });
+    let row = currentPostRow() || draft;
+    if (!postMetadata(row).applying_knowledge?.audio?.preview_url && !postMetadata(row).applying_knowledge?.audio?.url) {
+      if ($("ttsStatus")) $("ttsStatus").value = "Đang tự tạo giọng đọc...";
+      showPostStatus("info", "Chưa có giọng đọc, hệ thống đang tự tạo voice-over trước...");
+      row = await ensureReelVoice(draft);
+      draft = { ...draft, ...row };
+    }
+    renderTtsAudioFromPost(row);
+    showPostStatus("info", "Đã có giọng đọc, đang dựng video Reels trong trình duyệt...");
     const result = await recordReelVideo({ row, draft });
     const ext = result.mimeType.includes("mp4") ? "mp4" : "webm";
     const file = new File([result.blob], `mindup-reel-${draft.id}.${ext}`, { type: result.mimeType, lastModified: Date.now() });
@@ -2902,58 +2908,40 @@ async function generateReelVideo(){
   } catch (error) {
     showPostStatus("err", error.message || String(error));
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = oldText || "Tạo Reels"; }
+    if (btn) { btn.disabled = false; btn.textContent = oldText || "Tạo Reel"; }
   }
 }
-async function generateReelVoice(){
-  const postTypeId = $("postType")?.value || "";
-  if (!isApplyingKnowledgeType(postTypeId)) {
-    showPostStatus("err", "Giọng đọc chỉ dùng cho bài Applying Knowledge to Practice.");
-    return;
-  }
-  const btn = $("generateReelVoiceBtn");
-  const oldText = btn?.textContent || "";
-  try {
-    if (!TTS_VOICES.length) await loadTtsVoices(true);
-    const voiceId = $("ttsVoiceSelect")?.value || "";
-    if (!voiceId) throw new Error("Vui lòng chọn voice ElevenLabs.");
-    const voiceName = $("ttsVoiceSelect")?.selectedOptions?.[0]?.textContent?.trim() || "";
-    if (btn) { btn.disabled = true; btn.textContent = "Đang tạo..."; }
-    if ($("ttsStatus")) $("ttsStatus").value = "Đang lưu nháp...";
-    const draft = await savePostDraft({ status: "draft", content_status: "submitted" });
-    if ($("ttsStatus")) $("ttsStatus").value = "Đang tạo giọng đọc...";
-    const data = await callFacebookTtsFunction({
-      action: "generate",
-      post_id: draft.id,
-      voice_id: voiceId,
-      voice_name: voiceName,
-    });
-    if (data.post?.id) {
-      const exists = S.posts.some(p => String(p.id) === String(data.post.id));
-      S.posts = exists
-        ? S.posts.map(p => String(p.id) === String(data.post.id) ? { ...p, ...data.post } : p)
-        : [...S.posts, data.post];
-      renderTtsAudioFromPost(data.post);
-    } else {
-      renderTtsAudioFromPost({
-        ...draft,
-        metadata: {
-          ...postMetadata(draft),
-          applying_knowledge: {
-            ...(postMetadata(draft).applying_knowledge || {}),
-            audio: data.audio || null,
-          },
+async function ensureReelVoice(existingDraft=null){
+  if (!TTS_VOICES.length) await loadTtsVoices(true);
+  const voiceId = $("ttsVoiceSelect")?.value || TTS_VOICES[0]?.voice_id || "";
+  if (!voiceId) throw new Error("Không tìm thấy voice ElevenLabs để tạo Reel.");
+  const voiceName = $("ttsVoiceSelect")?.selectedOptions?.[0]?.textContent?.trim() || TTS_VOICES.find(v => String(v.voice_id) === String(voiceId))?.name || "";
+  const draft = existingDraft?.id ? existingDraft : await savePostDraft({ status: "draft", content_status: "submitted" });
+  const data = await callFacebookTtsFunction({
+    action: "generate",
+    post_id: draft.id,
+    voice_id: voiceId,
+    voice_name: voiceName,
+  });
+  const row = data.post?.id
+    ? data.post
+    : {
+      ...draft,
+      metadata: {
+        ...postMetadata(draft),
+        applying_knowledge: {
+          ...(postMetadata(draft).applying_knowledge || {}),
+          audio: data.audio || null,
         },
-      });
-    }
-    showPostStatus("ok", "Đã tạo giọng đọc và lưu audio lên Drive.");
-    await loadData();
-  } catch (error) {
-    if ($("ttsStatus")) $("ttsStatus").value = "Tạo giọng đọc lỗi";
-    showPostStatus("err", error.message || String(error));
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = oldText || "Tạo giọng đọc"; }
+      },
+    };
+  if (row?.id) {
+    const exists = S.posts.some(p => String(p.id) === String(row.id));
+    S.posts = exists
+      ? S.posts.map(p => String(p.id) === String(row.id) ? { ...p, ...row } : p)
+      : [...S.posts, row];
   }
+  return row;
 }
 async function facebookDelete(pageId, facebookId){
   return callFacebookPostingFunction({ action: "delete", page_id: pageId, facebook_post_id: facebookId });
@@ -3491,8 +3479,6 @@ function bindEvents(){
   $("deletePostBtn").addEventListener("click", deletePost);
   $("generateGeminiDraftBtn").addEventListener("click", () => generateAiDraft("gemini"));
   $("generateLlamaDraftBtn").addEventListener("click", () => generateAiDraft("llama"));
-  $("reloadTtsVoicesBtn")?.addEventListener("click", () => loadTtsVoices(true).catch(error => showPostStatus("err", error.message || String(error))));
-  $("generateReelVoiceBtn")?.addEventListener("click", () => generateReelVoice().catch(error => showPostStatus("err", error.message || String(error))));
   $("generateReelVideoBtn")?.addEventListener("click", () => generateReelVideo().catch(error => showPostStatus("err", error.message || String(error))));
   $("approvePostBtn")?.addEventListener("click", approveCurrentPost);
   $("postContent").addEventListener("input", () => $("postCharCount").textContent = String($("postContent").value.length));
