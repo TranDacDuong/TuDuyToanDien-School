@@ -352,11 +352,12 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
       <div class="meta-ai-box">
         <div class="meta-ai-head">
           <div>
-            <strong>Gemini AI tự tạo bài đăng</strong>
-            <div class="meta-ai-small">Tạo nội dung bài viết, hashtag và ảnh phù hợp theo prompt của Loại bài đăng. Ảnh sẽ được upload lên Drive để hẹn lịch Facebook.</div>
+            <strong>AI tự tạo bài đăng</strong>
+            <div class="meta-ai-small">Tạo nội dung bài viết, hashtag và ảnh phù hợp theo prompt của Loại bài đăng. Chọn Gemini hoặc Llama AI để so sánh chất lượng nội dung.</div>
           </div>
           <div class="meta-ai-actions">
             <button class="btn btn-gold" id="generateGeminiDraftBtn" type="button">Tạo bài bằng Gemini</button>
+            <button class="btn btn-primary" id="generateLlamaDraftBtn" type="button">Tạo bài bằng Llama AI</button>
 
           </div>
         </div>
@@ -2529,23 +2530,44 @@ async function schedulePost(mode="schedule"){
   }
 }
 
-async function generateGeminiDraft(){
-  const btn = $("generateGeminiDraftBtn");
+function aiProviderLabel(provider = "gemini"){
+  return String(provider || "").toLowerCase().includes("llama") ? "Llama AI" : "Gemini";
+}
+function setAiDraftButtonsBusy(busy, activeBtn = null, activeText = "Đang tạo..."){
+  ["generateGeminiDraftBtn", "generateLlamaDraftBtn"].forEach(id => {
+    const btn = $(id);
+    if (!btn) return;
+    if (busy) {
+      btn.dataset.oldText = btn.textContent || "";
+      btn.disabled = true;
+      if (btn === activeBtn) btn.textContent = activeText;
+    } else {
+      btn.disabled = false;
+      if (btn.dataset.oldText) {
+        btn.textContent = btn.dataset.oldText;
+        delete btn.dataset.oldText;
+      }
+    }
+  });
+}
+async function generateAiDraft(provider = "gemini"){
+  provider = String(provider || "gemini").toLowerCase().includes("llama") ? "llama" : "gemini";
+  const providerName = aiProviderLabel(provider);
+  const btn = provider === "llama" ? $("generateLlamaDraftBtn") : $("generateGeminiDraftBtn");
   const oldText = btn.textContent;
   const originalId = $("postId").value;
   const originalRow = originalId ? S.posts.find(p => String(p.id) === String(originalId)) : null;
   let generatedPost = null;
   try {
-    btn.disabled = true;
-    btn.textContent = "Đang tạo...";
-    showPostStatus("info", "Đang tạo nội dung/hashtag/ảnh bằng Gemini. Nội dung sẽ chỉ lưu khi bạn bấm Lưu nháp.");
+    setAiDraftButtonsBusy(true, btn, "Đang tạo...");
+    showPostStatus("info", `Đang tạo nội dung/hashtag/ảnh bằng ${providerName}. Nội dung sẽ chỉ lưu khi bạn bấm Lưu nháp.`);
     const draft = await savePostDraft({ approval_status: "pending", content_status: "missing_content" });
     $("postId").value = draft.id;
-    $("aiDraftStatus").textContent = "Đang tạo bằng AI...";
-    const data = await callFacebookAiDraftFunction({ post_id: draft.id });
+    $("aiDraftStatus").textContent = `Đang tạo bằng ${providerName}...`;
+    const data = await callFacebookAiDraftFunction({ post_id: draft.id, provider });
     let post = data.post || {};
     if (isMondayMindsetType(post.post_type_id)) {
-      showPostStatus("info", "Gemini đã tạo quote. Đang chèn vào đúng nền Monday Mindset và upload ảnh...");
+      showPostStatus("info", `${providerName} đã tạo quote. Đang chèn vào đúng nền Monday Mindset và upload ảnh...`);
       const templatedPost = await replaceMondayMindsetImageWithTemplate(post);
       if (templatedPost) {
         post = templatedPost;
@@ -2596,11 +2618,11 @@ async function generateGeminiDraft(){
     if (generatedPost || $("postId").value !== originalId) {
       await undoTemporaryGeminiSave({ originalId, originalRow, generatedPost }).catch(()=>{});
     }
-    $("aiDraftStatus").textContent = `AI lỗi: ${error.message || String(error)}`;
+    $("aiDraftStatus").textContent = `${providerName} lỗi: ${error.message || String(error)}`;
     showPostStatus("err", error.message || String(error));
   } finally {
-    btn.disabled = false;
-    btn.textContent = oldText;
+    setAiDraftButtonsBusy(false);
+    if (btn) btn.textContent = oldText;
   }
 }
 
@@ -2920,7 +2942,8 @@ function bindEvents(){
   $("saveDraftBtn").addEventListener("click", async () => { try { await savePostDraft(); showPostStatus("ok","Đã lưu nháp."); await loadData(); } catch(e){ showPostStatus("err", e.message || String(e)); }});
   $("schedulePostBtn").addEventListener("click", () => schedulePost("schedule"));
   $("deletePostBtn").addEventListener("click", deletePost);
-  $("generateGeminiDraftBtn").addEventListener("click", generateGeminiDraft);
+  $("generateGeminiDraftBtn").addEventListener("click", () => generateAiDraft("gemini"));
+  $("generateLlamaDraftBtn").addEventListener("click", () => generateAiDraft("llama"));
   $("approvePostBtn")?.addEventListener("click", approveCurrentPost);
   $("postContent").addEventListener("input", () => $("postCharCount").textContent = String($("postContent").value.length));
   $("postType").addEventListener("change", toggleQuizBuilder);

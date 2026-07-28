@@ -86,8 +86,17 @@ function llamaApiKeys() {
   return Array.from(new Set(keys));
 }
 
-function preferredTextAiProvider() {
-  const explicit = (env("FACEBOOK_AI_TEXT_PROVIDER") || env("AI_TEXT_PROVIDER") || "").trim().toLowerCase();
+function normalizeTextAiProvider(value: unknown) {
+  const provider = String(value || "").trim().toLowerCase();
+  if (provider.includes("llama") || provider.includes("groq")) return "llama";
+  if (provider.includes("gemini") || provider.includes("google")) return "gemini";
+  return "";
+}
+
+function preferredTextAiProvider(providerOverride: unknown = "") {
+  const override = normalizeTextAiProvider(providerOverride);
+  if (override) return override;
+  const explicit = normalizeTextAiProvider(env("FACEBOOK_AI_TEXT_PROVIDER") || env("AI_TEXT_PROVIDER"));
   if (explicit) return explicit;
   return llamaApiKeys().length ? "llama" : "gemini";
 }
@@ -193,12 +202,15 @@ async function postLlamaGenerateContent(args: {
 async function postAiGenerateContent(args: {
   prompt: string;
   temperature: number;
+  provider?: string;
 }) {
-  const provider = preferredTextAiProvider();
+  const explicitProvider = normalizeTextAiProvider(args.provider);
+  const provider = preferredTextAiProvider(args.provider);
   if (provider.includes("llama")) {
     try {
       return await postLlamaGenerateContent(args);
     } catch (error) {
+      if (explicitProvider) throw error;
       const message = error instanceof Error ? error.message : String(error);
       if (!geminiApiKeys().length) throw error;
       console.warn("[Facebook AI Draft] Llama failed, falling back to Gemini:", message);
@@ -1305,8 +1317,8 @@ function buildGeminiPrompt(args: {
   ].filter(Boolean).join("\n");
 }
 
-async function generateTextDraft(prompt: string, typeName = "") {
-  const { model, data } = await postAiGenerateContent({ prompt, temperature: 0.8 });
+async function generateTextDraft(prompt: string, typeName = "", provider = "") {
+  const { model, data } = await postAiGenerateContent({ prompt, temperature: 0.8, provider });
   const text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("\n") || "";
   const parsed = tryParseJson(text);
   const hashtags = normalizeHashtags(parsed?.hashtags);
@@ -1368,8 +1380,8 @@ function normalizeDraftPart(value: unknown, fallbackTags: string[] = []) {
   };
 }
 
-async function generateProblemLearningPairDraft(prompt: string) {
-  const { model, data } = await postAiGenerateContent({ prompt, temperature: 0.82 });
+async function generateProblemLearningPairDraft(prompt: string, provider = "") {
+  const { model, data } = await postAiGenerateContent({ prompt, temperature: 0.82, provider });
 
   const text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("\n") || "";
   const parsed = tryParseJson(text) as JsonRecord;
@@ -1970,6 +1982,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     postId = String(body?.post_id || "").trim();
     if (!postId) throw new Error("Thiếu post_id.");
+    const provider = normalizeTextAiProvider(body?.provider);
 
     const post = await loadPostBundle(postId);
     await assertCanUsePost(user.id, role, post);
@@ -2013,7 +2026,7 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString(),
       });
 
-      const pairDraft = await generateProblemLearningPairDraft(pairTextPrompt);
+      const pairDraft = await generateProblemLearningPairDraft(pairTextPrompt, provider);
       if (!pairDraft.series.method || stripVietnameseForTag(pairDraft.series.method).toLowerCase() !== stripVietnameseForTag(selectedLearningMethod.name).toLowerCase()) {
         pairDraft.series.method = selectedLearningMethod.name;
       }
@@ -2125,7 +2138,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const draft = await generateTextDraft(textPrompt, post.type?.name || "");
+    const draft = await generateTextDraft(textPrompt, post.type?.name || "", provider);
     const postTypeNameForQuiz = post.type?.name || "Facebook";
     if (isQuizTypeName(postTypeNameForQuiz)) {
       const quiz = draft.quiz || {};
