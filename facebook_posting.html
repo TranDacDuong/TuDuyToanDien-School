@@ -676,8 +676,8 @@ async function ensureDefaultRows(){
     }
     for (const [name, prompt] of Object.entries(DEFAULT_TYPE_PROMPTS)) {
       const row = (types || []).find(item => String(item.name || "").trim().toLowerCase() === name.trim().toLowerCase());
-      if (row?.id && String(row.ai_prompt || "").trim() !== prompt.trim()) {
-        await sb.from("facebook_post_types").update({ ai_prompt: prompt }).eq("id", row.id);
+      if (row?.id && (String(row.ai_prompt || "").trim() !== prompt.trim() || row.is_active === false)) {
+        await sb.from("facebook_post_types").update({ ai_prompt: prompt, is_active: true }).eq("id", row.id);
       }
     }
   }
