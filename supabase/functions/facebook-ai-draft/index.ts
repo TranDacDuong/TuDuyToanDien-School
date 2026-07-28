@@ -499,7 +499,11 @@ function isHardQuizWithPrize(typeName: string) {
 
 function isProblemType(typeName: string) {
   const normalized = String(typeName || "").trim().toLowerCase();
-  return normalized === "teaching philosophy";
+  return normalized === "problem";
+}
+
+function isTeachingPhilosophy(typeName: string) {
+  return String(typeName || "").trim().toLowerCase() === "teaching philosophy";
 }
 
 function isLearningMethod(typeName: string) {
@@ -864,6 +868,92 @@ function contentTopicBlock(topic: ReturnType<typeof contentTopicFor>) {
   ].join("\n");
 }
 
+const TEACHING_PHILOSOPHY_ITEMS = [
+  "Điểm số không phải mục tiêu của giáo dục.",
+  "Giáo dục là giúp học sinh biết tự học.",
+  "Một người biết tư duy sẽ học nhanh hơn một người chỉ biết ghi nhớ.",
+  "Học không phải để thi, mà để hiểu thế giới.",
+  "Giáo dục tốt phải làm học sinh bớt phụ thuộc vào giáo viên.",
+  "Một tiết học thành công là khi học sinh nghĩ nhiều hơn giáo viên nói.",
+  "Điều quý nhất sau mỗi buổi học không phải là một công thức mới, mà là một cách suy nghĩ mới.",
+  "Hiểu luôn quan trọng hơn nhớ.",
+  "Nếu chỉ nhớ, kiến thức sẽ mất đi. Nếu hiểu, kiến thức sẽ ở lại.",
+  "Học thuộc không phải là hiểu.",
+  "Muốn nhớ lâu, hãy hiểu trước.",
+  "Kiến thức phải được tự xây dựng, không thể truyền nguyên vẹn.",
+  "Người học phải tự tạo ra kết nối giữa các kiến thức.",
+  "Mỗi lần \"À, ra là vậy!\" giá trị hơn mười lần chép bài.",
+  "Một câu hỏi hay đáng giá hơn một đáp án nhanh.",
+  "Điều quan trọng không phải em nghĩ gì, mà là em nghĩ như thế nào.",
+  "Tư duy là kỹ năng có thể rèn luyện.",
+  "Không có tư duy đúng nếu thiếu lập luận.",
+  "Mọi kết luận đều cần lý do.",
+  "Biết phản biện chính mình là dấu hiệu của người học tốt.",
+  "Khả năng đặt câu hỏi quyết định khả năng học tập.",
+  "Muốn giải quyết vấn đề, hãy hiểu bản chất trước.",
+  "Đừng học công thức, hãy học cách công thức được tạo ra.",
+  "Sai lầm không phải thất bại, mà là dữ liệu để học.",
+  "Một lỗi sai được hiểu rõ có giá trị hơn mười câu đúng do may mắn.",
+  "Đừng vội sửa lỗi cho học sinh, hãy để các em tự phát hiện.",
+  "Điều đáng sợ không phải làm sai, mà là không biết mình sai ở đâu.",
+  "Một lớp học tốt phải là nơi học sinh dám sai.",
+  "Người thầy không phải người có nhiều đáp án nhất.",
+  "Vai trò của giáo viên là khơi mở tư duy.",
+  "Dạy học không phải truyền đạt, mà là dẫn dắt.",
+  "Một câu hỏi đúng lúc có thể thay đổi cả tiết học.",
+  "Giảng ít hơn chưa chắc dạy ít hơn.",
+  "Giáo viên giỏi không tạo ra học sinh phụ thuộc.",
+  "Người thầy nên tò mò trước khi yêu cầu học sinh tò mò.",
+  "Lớp học nên là nơi được phép suy nghĩ thành tiếng.",
+  "Không khí học tập quan trọng không kém nội dung học.",
+  "Mỗi học sinh nên có cơ hội giải thích suy nghĩ của mình.",
+  "Tranh luận học thuật tốt hơn đồng ý một cách thụ động.",
+  "Một lớp học yên lặng chưa chắc là một lớp học đang tư duy.",
+  "Không phải mọi sự im lặng đều là tập trung.",
+  "Không có học sinh kém, chỉ có tốc độ tiến bộ khác nhau.",
+  "Mỗi học sinh đều có khả năng phát triển.",
+  "Tự tin được xây từ sự hiểu biết, không phải lời khen.",
+  "So sánh với chính mình tốt hơn so sánh với người khác.",
+  "Điều quan trọng nhất là học sinh tin rằng mình có thể tiến bộ.",
+  "Kiến thức chỉ có giá trị khi được vận dụng.",
+  "Một kiến thức tốt phải trả lời được câu hỏi \"Vì sao?\"",
+  "Muốn học nhanh, hãy học chậm ở những điều cốt lõi.",
+  "Hiểu bản chất giúp giải quyết vô số bài toán.",
+  "Một nguyên lý tốt đáng giá hơn hàng chục mẹo.",
+  "Điều học sinh cần mang theo sau kỳ thi không chỉ là điểm số, mà là cách tư duy.",
+  "Giáo dục không kết thúc khi học sinh rời khỏi lớp; nó tiếp tục trong cách các em suy nghĩ mỗi ngày.",
+].map((name) => ({ name, angle: name }));
+
+function teachingPhilosophyTopic(scheduledAt: string, pageName: string) {
+  const week = isoWeekNumber(scheduledAt);
+  const year = yearFromDate(scheduledAt);
+  const offset = mondayMindsetOffset(pageName);
+  const index = ((week - 1 - offset) % TEACHING_PHILOSOPHY_ITEMS.length + TEACHING_PHILOSOPHY_ITEMS.length) % TEACHING_PHILOSOPHY_ITEMS.length;
+  const item = TEACHING_PHILOSOPHY_ITEMS[index] || TEACHING_PHILOSOPHY_ITEMS[0];
+  return {
+    week,
+    year,
+    offset,
+    topicNumber: index + 1,
+    totalTopics: TEACHING_PHILOSOPHY_ITEMS.length,
+    name: item.name,
+    angle: item.angle,
+  };
+}
+
+function teachingPhilosophyPromptBlock(topic: ReturnType<typeof teachingPhilosophyTopic>) {
+  return [
+    "Required weekly/page Teaching Philosophy topic:",
+    `- ISO week: ${topic.week}/${topic.year}`,
+    `- Fanpage offset: ${topic.offset}`,
+    `- Formula: ((week - 1 - offset) mod ${topic.totalTopics}) + 1`,
+    `- Topic number: ${topic.topicNumber}/${topic.totalTopics}`,
+    `- Topic: ${topic.name}`,
+    `- Angle: ${topic.angle}`,
+    "- Use this exact topic as the main idea. Do not randomly choose another teaching philosophy.",
+  ].join("\n");
+}
+
 function viralFacebookPromptBlock(typeName: string) {
   const cleanType = stripVietnameseForTag(typeName).toLowerCase();
   const common = [
@@ -903,6 +993,13 @@ function viralFacebookPromptBlock(typeName: string) {
       "- Với Learning Method: mở bằng một nỗi đau học sai rất cụ thể, sau đó đưa phương pháp như một lời giải dễ áp dụng.",
     ];
   }
+  if (cleanType.includes("teaching philosophy")) {
+    return [
+      ...common,
+      "- With Teaching Philosophy: open with a sharp educational belief, connect it to a real learning problem, then make the idea practical for teachers, parents, and students.",
+      "- Do not write abstract slogans only. The post must feel wise, human, and useful in a real classroom.",
+    ];
+  }
   if (cleanType === "q a" || cleanType === "qa" || cleanType.includes("q a") || cleanType.includes("tim hieu")) {
     return [
       ...common,
@@ -929,6 +1026,25 @@ function llamaLearningMethodDepthPromptBlock() {
     "- Không chỉ nói 'hãy dùng phương pháp X'. Phải hướng dẫn cách dùng phương pháp đó trong một tình huống học tập cụ thể.",
     "- Giọng văn: gần gũi, cuốn hút, có nhịp Facebook, nhưng vẫn có chất chuyên môn giáo dục.",
     "- Không viết thành danh sách khô cứng từ đầu đến cuối; cần có chuyển ý tự nhiên và ví dụ sống.",
+  ];
+}
+
+function llamaTeachingPhilosophyDepthPromptBlock() {
+  return [
+    "Extra requirements when using Llama AI for Teaching Philosophy:",
+    "- This is NOT a short quote, slogan, or ad. Write a complete Facebook post with real educational value.",
+    "- Required length: 450-800 Vietnamese words. If the caption is under 350 words or only a few short lines, it is wrong.",
+    "- The post must have at least 6 clear paragraphs, each 1-3 mobile-friendly lines.",
+    "- Mandatory structure:",
+    "  1) A strong hook about a common learning/teaching misconception.",
+    "  2) Explain the philosophy in plain Vietnamese.",
+    "  3) Show why this philosophy matters for students' thinking habits.",
+    "  4) Connect it to parents/teachers: what adults should change in the way they support students.",
+    "  5) Give a subject-specific classroom example based on the fanpage subject.",
+    "  6) Give 3-5 practical actions MindUp/teachers/parents/students can try immediately.",
+    "  7) End with a gentle CTA: ask readers to comment, save, or share the idea.",
+    "- Tone: thoughtful, warm, premium education brand, viral-friendly on Facebook, not academic jargon.",
+    "- Avoid generic statements. Use concrete situations, mini examples, and memorable sentences.",
   ];
 }
 
@@ -1162,6 +1278,57 @@ function buildGeminiPrompt(args: {
     ].filter(Boolean).join("\n");
   }
 
+  if (isTeachingPhilosophy(args.typeName)) {
+    const fanpageTag = pageHashtag(args.pageName);
+    const topic = teachingPhilosophyTopic(args.scheduledAt, args.pageName);
+    return [
+      "You are a senior education content strategist for MindUp - Tu Duy Toan Dien.",
+      "Task: create a standalone Teaching Philosophy Facebook post in Vietnamese.",
+      "The post must communicate one deep but practical education belief, then connect it to how students learn better.",
+      "",
+      ...viralFacebookPromptBlock(args.typeName),
+      ...(normalizeTextAiProvider(args.provider) === "llama" ? [
+        "",
+        ...llamaTeachingPhilosophyDepthPromptBlock(),
+      ] : []),
+      "",
+      "Post information:",
+      `- Fanpage: ${args.pageName}`,
+      `- Required fanpage hashtag: ${fanpageTag}`,
+      `- Scheduled time: ${args.scheduledAt}`,
+      args.existingContent ? `- Existing draft/admin note: ${args.existingContent}` : "",
+      args.internalNote ? `- Internal note: ${args.internalNote}` : "",
+      "",
+      teachingPhilosophyPromptBlock(topic),
+      "",
+      subjectContextPromptBlock(args.pageName),
+      "",
+      "Content requirements:",
+      "- Write in natural Vietnamese, warm and premium, suitable for parents, students, and teachers.",
+      "- Start with a concrete misconception or real classroom/parenting situation, not with a generic slogan.",
+      "- Explain the teaching philosophy clearly: what it means, why it matters, and how it changes the way MindUp teaches.",
+      "- Include one concrete example related to the fanpage subject. For the general MindUp page, use an interdisciplinary learning example.",
+      "- Include 3-5 practical actions that teachers/parents/students can try immediately.",
+      "- Do not mention Learning Method, Problem series, previous week, or a linked post. This post is standalone.",
+      "- Do not over-sell classes. The CTA should be soft: comment, save, share, or reflect.",
+      "- Image: AI only returns background search keywords/prompt and one overlay sentence. The system will fetch a background image, place the MindUp logo at top center, and place the overlay sentence in the center.",
+      "- image_overlay_text should be Vietnamese, memorable, and short enough for the image; aim around 10-20 words, but do not omit the key meaning.",
+      "",
+      "Return ONLY valid JSON, no markdown, using this schema:",
+      JSON.stringify({
+        caption: normalizeTextAiProvider(args.provider) === "llama"
+          ? "Complete Teaching Philosophy Facebook post in Vietnamese, 450-800 words, at least 6 paragraphs, with hook, philosophy explanation, why it matters, subject-specific example, 3-5 practical actions, and soft CTA."
+          : "Teaching Philosophy Facebook post in Vietnamese, thoughtful and useful, with hook, philosophy explanation, subject-specific example, practical actions, and soft CTA.",
+        hashtags: ["#MindUp", "#TeachingPhilosophy", "#TrietLyGiaoDuc", "#PhatTrienTuDuy", fanpageTag],
+        image_prompt: "English prompt for a square 1:1 educational background photo/illustration related to the teaching philosophy and fanpage subject, no text, no logo.",
+        image_search_keywords: "English Pexels search keywords for a background image related to the philosophy and fanpage subject, no text.",
+        image_background_prompt: "English background prompt/keywords, no text, no logo.",
+        image_overlay_text: "Vietnamese summary sentence for the image, about 10-20 words, memorable and complete.",
+        internal_note: `Teaching Philosophy week ${topic.week}/${topic.year}; fanpage ${args.pageName}; offset ${topic.offset}; topic ${topic.topicNumber}/${topic.totalTopics}: ${topic.name} | ${topic.angle}`,
+      }, null, 2),
+    ].filter(Boolean).join("\n");
+  }
+
   if (isLearningMethod(args.typeName)) {
     const fanpageTag = pageHashtag(args.pageName);
     const method = learningMethodTopic(args.scheduledAt, args.pageName);
@@ -1358,16 +1525,22 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
   let text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("\n") || "";
   let parsed = tryParseJson(text);
   const isStandaloneLearning = isLearningMethod(typeName);
+  const isStandaloneTeaching = isTeachingPhilosophy(typeName);
   const isLlamaLearning = isStandaloneLearning && normalizeTextAiProvider(provider) === "llama";
+  const isLlamaTeaching = isStandaloneTeaching && normalizeTextAiProvider(provider) === "llama";
   let rawCaption = String(parsed?.caption || "").trim();
-  if (isLlamaLearning && stripMarkdown(rawCaption).split(/\s+/).filter(Boolean).length < 400) {
+  if ((isLlamaLearning || isLlamaTeaching) && stripMarkdown(rawCaption).split(/\s+/).filter(Boolean).length < 400) {
     const retry = await postAiGenerateContent({
       prompt: [
         prompt,
         "",
-        "BẢN VỪA TẠO QUÁ NGẮN, KHÔNG ĐẠT YÊU CẦU LEARNING METHOD.",
+        isLlamaTeaching
+          ? "BẢN VỪA TẠO QUÁ NGẮN, KHÔNG ĐẠT YÊU CẦU TEACHING PHILOSOPHY."
+          : "BẢN VỪA TẠO QUÁ NGẮN, KHÔNG ĐẠT YÊU CẦU LEARNING METHOD.",
         "Hãy viết lại caption dài hơn, sâu hơn, đúng cấu trúc đã yêu cầu.",
-        "Bắt buộc caption 450-800 từ, tối thiểu 6 đoạn, có mục 'Cách áp dụng' 3-5 bước và ví dụ theo môn fanpage.",
+        isLlamaTeaching
+          ? "Bắt buộc caption 450-800 từ, tối thiểu 6 đoạn, có hook, giải thích triết lý giáo dục, ví dụ theo môn fanpage, 3-5 hành động thực tế và CTA nhẹ."
+          : "Bắt buộc caption 450-800 từ, tối thiểu 6 đoạn, có mục 'Cách áp dụng' 3-5 bước và ví dụ theo môn fanpage.",
         "Không được chỉ tóm tắt vài dòng. Không được viết kiểu slogan/quảng cáo.",
         "",
         "Bản caption ngắn cần mở rộng:",
@@ -1948,7 +2121,7 @@ async function generateImageWithFallback(args: {
 }) {
   let imageWarning = "";
   const typeKey = stripVietnameseForTag(args.typeName || "").toLowerCase();
-  const shouldUseProblemLearningVisual = isProblemType(args.typeName) || typeKey.includes("problem") || typeKey.includes("learning method");
+  const shouldUseProblemLearningVisual = isProblemType(args.typeName) || isTeachingPhilosophy(args.typeName) || typeKey.includes("problem") || typeKey.includes("learning method") || typeKey.includes("teaching philosophy");
   let backgroundImage: Awaited<ReturnType<typeof generatePexelsBackgroundImage>> | null = null;
   let logoDataUri = "";
   if (shouldUseProblemLearningVisual) {
