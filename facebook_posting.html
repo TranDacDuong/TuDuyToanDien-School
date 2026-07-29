@@ -2720,6 +2720,8 @@ function normalizeReelScenes(meta){
       end: Math.max(0.5, Math.min(duration, end)),
       overlay_text: scene.overlay_text || scene.text || scene.title || "",
       stock_video_keywords: scene.stock_video_keywords || "",
+      voice_text: scene.voice_text || scene.voiceText || scene.voice_over || "",
+      visual_type: scene.visual_type || scene.visualType || "",
     };
   }).sort((a,b) => a.start - b.start);
 }

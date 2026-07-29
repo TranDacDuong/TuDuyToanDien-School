@@ -1484,10 +1484,17 @@ function buildGeminiPrompt(args: {
       "- image_overlay_text should be a complete Vietnamese sentence, memorable and readable on an image, around 10-22 words.",
       "",
       "Reel draft requirements:",
-      "- Also create a short reel script using stock footage, no filming required.",
-      "- Reel duration: 20-40 seconds.",
-      "- Include hook_3s, voice_over, scene list, overlay text per scene, and stock video search keywords.",
-      "- The reel should work even without voice-over: overlay text must be clear.",
+      "- Also create a complete short Reel plan using stock footage/images, no filming required.",
+      "- Reel duration: 24-45 seconds. AI must design the timing naturally; do NOT force equal scene lengths.",
+      "- Create 5-7 scenes. Each scene must have: seconds, voice_text, overlay_text, stock_video_keywords, visual_type.",
+      "- seconds must be a continuous timeline like 0-4, 4-10, 10-15, 15-23, ... ending exactly at duration_seconds.",
+      "- voice_text is the exact Vietnamese narration spoken during that scene. Keep each scene voice_text short enough for its duration.",
+      "- voice_over must be the full narration made by joining all scene voice_text in order. Do not add content outside the scenes.",
+      "- overlay_text must be very short, 3-9 Vietnamese words, readable on mobile.",
+      "- stock_video_keywords must be English Pexels-friendly search keywords matching that scene.",
+      "- visual_type must be either image or video. Prefer video for hook/practical scenes and image for explanation scenes.",
+      "- The Reel must have a clear rhythm: hook -> problem/context -> knowledge explanation -> real-life example -> CTA.",
+      "- The Reel should work even without voice-over: overlay text must still tell the story.",
       "",
       "Return ONLY valid JSON, no markdown, using this schema:",
       JSON.stringify({
@@ -1499,13 +1506,14 @@ function buildGeminiPrompt(args: {
         image_overlay_text: "Vietnamese summary sentence for the image, around 10-22 words.",
         reel: {
           hook_3s: "A strong first 3 seconds hook in Vietnamese.",
-          duration_seconds: 30,
-          voice_over: "Vietnamese voice-over script for 20-40 seconds.",
+          duration_seconds: 34,
+          voice_over: "Full Vietnamese narration created by joining scene voice_text in order.",
           scenes: [
-            { seconds: "0-3", stock_video_keywords: "English keywords", overlay_text: "Vietnamese overlay text" },
-            { seconds: "3-10", stock_video_keywords: "English keywords", overlay_text: "Vietnamese overlay text" },
-            { seconds: "10-25", stock_video_keywords: "English keywords", overlay_text: "Vietnamese overlay text" },
-            { seconds: "25-35", stock_video_keywords: "English keywords", overlay_text: "Vietnamese CTA overlay text" }
+            { seconds: "0-4", visual_type: "video", stock_video_keywords: "English keywords", overlay_text: "Vietnamese hook overlay", voice_text: "Vietnamese narration for scene 1." },
+            { seconds: "4-10", visual_type: "video", stock_video_keywords: "English keywords", overlay_text: "Vietnamese problem overlay", voice_text: "Vietnamese narration for scene 2." },
+            { seconds: "10-16", visual_type: "image", stock_video_keywords: "English keywords", overlay_text: "Vietnamese knowledge overlay", voice_text: "Vietnamese narration for scene 3." },
+            { seconds: "16-26", visual_type: "video", stock_video_keywords: "English keywords", overlay_text: "Vietnamese example overlay", voice_text: "Vietnamese narration for scene 4." },
+            { seconds: "26-34", visual_type: "image", stock_video_keywords: "English keywords", overlay_text: "Vietnamese CTA overlay", voice_text: "Vietnamese narration for scene 5." }
           ],
           caption: "Short Vietnamese reel caption.",
           hashtags: ["#MindUp", "#UngDungKienThuc", "#ReelsHocTap", fanpageTag]
@@ -1803,6 +1811,11 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
     : [];
   const hardQuizRecord = (parsed?.hard_quiz && typeof parsed.hard_quiz === "object" ? parsed.hard_quiz : {}) as JsonRecord;
   const reelRecord = (parsed?.reel && typeof parsed.reel === "object" ? parsed.reel : {}) as JsonRecord;
+  const reelScenes = Array.isArray(reelRecord.scenes) ? reelRecord.scenes.slice(0, 8) : [];
+  const sceneVoiceOver = reelScenes.map((scene: unknown) => {
+    const record = (scene && typeof scene === "object" ? scene : {}) as JsonRecord;
+    return String(record.voice_text || record.voiceText || record.voice_over || "").trim();
+  }).filter(Boolean).join(" ");
   return {
     model,
     caption: isStandaloneLearning ? sanitizeStandaloneLearningMethodCaption(rawCaption) : rawCaption,
@@ -1834,8 +1847,8 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
     reel: {
       hook3s: String(reelRecord.hook_3s || "").trim(),
       durationSeconds: Number(reelRecord.duration_seconds || 0) || null,
-      voiceOver: String(reelRecord.voice_over || "").trim(),
-      scenes: Array.isArray(reelRecord.scenes) ? reelRecord.scenes.slice(0, 8) : [],
+      voiceOver: String(reelRecord.voice_over || sceneVoiceOver || "").trim(),
+      scenes: reelScenes,
       caption: String(reelRecord.caption || "").trim(),
       hashtags: normalizeHashtags(reelRecord.hashtags),
     },
@@ -2746,7 +2759,8 @@ Deno.serve(async (req) => {
         Array.isArray(draft.reel.scenes) && draft.reel.scenes.length
           ? `Scenes:\n${draft.reel.scenes.map((scene: unknown, index: number) => {
             const record = (scene && typeof scene === "object" ? scene : {}) as JsonRecord;
-            return `${index + 1}. ${record.seconds || ""} | ${record.stock_video_keywords || ""} | ${record.overlay_text || ""}`;
+            const voiceText = String(record.voice_text || record.voiceText || record.voice_over || "").trim();
+            return `${index + 1}. ${record.seconds || ""} | ${record.visual_type || "image/video"} | ${record.stock_video_keywords || ""} | ${record.overlay_text || ""}${voiceText ? ` | Voice: ${voiceText}` : ""}`;
           }).join("\n")}`
           : "",
         draft.reel.caption ? `Reel caption:\n${draft.reel.caption}` : "",
