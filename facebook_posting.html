@@ -376,7 +376,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
         <div class="grid2">
           <div class="field">
               <label>Giọng đọc tiếng Việt</label>
-            <select class="select" id="ttsVoiceSelect"></select>
+            <input class="input" id="ttsVoiceIdInput" value="pNInz6obpgDQGcFmaJgB" placeholder="pNInz6obpgDQGcFmaJgB">
           </div>
           <div class="field">
             <label>Trạng thái audio</label>
@@ -577,6 +577,7 @@ let S = {
 let quizQuestionImageDataUrl = "";
 let TTS_VOICES = [];
 let TTS_VOICES_LOADING = false;
+const DEFAULT_ELEVENLABS_VOICE_ID = "pNInz6obpgDQGcFmaJgB";
 
 function $(id){ return document.getElementById(id); }
 function esc(v){ return String(v ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
@@ -2578,24 +2579,30 @@ function preferredTtsVoice(){
   return rows[preferredVoiceIndex(rows)] || rows[0] || null;
 }
 function currentSelectedTtsVoice(){
-  const selectedId = $("ttsVoiceSelect")?.value || "";
+  const selectedId = $("ttsVoiceIdInput")?.value?.trim() || DEFAULT_ELEVENLABS_VOICE_ID;
   return TTS_VOICES.find(voice => String(voice.voice_id) === String(selectedId)) || null;
 }
 function selectedOrPreferredTtsVoice(){
-  const preferred = preferredTtsVoice();
-  const selected = currentSelectedTtsVoice();
-  return preferred && isVietnameseTtsVoice(preferred) && !isVietnameseTtsVoice(selected)
-    ? preferred
-    : selected || preferred;
+  const voiceId = $("ttsVoiceIdInput")?.value?.trim() || DEFAULT_ELEVENLABS_VOICE_ID;
+  return currentSelectedTtsVoice() || {
+    voice_id: voiceId,
+    name: voiceId === DEFAULT_ELEVENLABS_VOICE_ID ? "ElevenLabs Adam" : `ElevenLabs ${voiceId}`,
+    labels: { provider: "elevenlabs" },
+  };
 }
 function postAudioNeedsVietnameseRefresh(row){
-  const preferred = preferredTtsVoice();
-  if (!preferred || !isVietnameseTtsVoice(preferred)) return false;
+  const preferred = selectedOrPreferredTtsVoice();
+  if (!preferred?.voice_id) return false;
   const audio = postMetadata(row).applying_knowledge?.audio || {};
   if (!audio?.voice_id) return true;
   return String(audio.voice_id) !== String(preferred.voice_id);
 }
 function populateTtsVoices(voices){
+  const input = $("ttsVoiceIdInput");
+  if (!input) return;
+  if (!input.value.trim()) input.value = DEFAULT_ELEVENLABS_VOICE_ID;
+  if ($("ttsHint")) $("ttsHint").textContent = "Reel sẽ dùng ElevenLabs V3 với Voice ID trong ô trên.";
+  return;
   const select = $("ttsVoiceSelect");
   if (!select) return;
   const rows = Array.isArray(voices) ? voices : [];
@@ -3068,8 +3075,8 @@ async function ensureReelVoice(existingDraft=null){
   const voice = selectedOrPreferredTtsVoice();
   const voiceId = voice?.voice_id || "";
   if (!voiceId) throw new Error("Không tìm thấy voice để tạo Reel.");
-  if ($("ttsVoiceSelect")) $("ttsVoiceSelect").value = voiceId;
-  const voiceName = voice?.name || $("ttsVoiceSelect")?.selectedOptions?.[0]?.textContent?.trim() || "";
+  if ($("ttsVoiceIdInput")) $("ttsVoiceIdInput").value = voiceId;
+  const voiceName = voice?.name || `ElevenLabs ${voiceId}`;
   const draft = existingDraft?.id ? existingDraft : await savePostDraft({ status: "draft", content_status: "submitted" });
   const data = await callFacebookTtsFunction({
     action: "generate",

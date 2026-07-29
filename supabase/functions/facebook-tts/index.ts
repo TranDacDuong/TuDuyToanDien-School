@@ -6,6 +6,9 @@ const corsHeaders = {
 
 type JsonRecord = Record<string, unknown>;
 
+const DEFAULT_ELEVENLABS_VOICE_ID = "pNInz6obpgDQGcFmaJgB";
+const DEFAULT_ELEVENLABS_MODEL_ID = "eleven_v3";
+
 const FALLBACK_ELEVENLABS_VOICES = [
   {
     voice_id: "21m00Tcm4TlvDq8ikWAM",
@@ -240,6 +243,17 @@ async function listElevenLabsVoices() {
   })).filter((voice: { voice_id: string }) => voice.voice_id);
 }
 
+function defaultElevenLabsVoice() {
+  return {
+    voice_id: DEFAULT_ELEVENLABS_VOICE_ID,
+    name: "ElevenLabs Adam",
+    category: "default",
+    description: "Default ElevenLabs voice for MindUp reels",
+    labels: { provider: "elevenlabs", model: DEFAULT_ELEVENLABS_MODEL_ID },
+    preview_url: "",
+  };
+}
+
 function listFptVoices() {
   return FPT_TTS_VOICES.map((voice) => ({
     ...voice,
@@ -299,11 +313,11 @@ async function generateFptSpeech(text: string, voiceId: string) {
 async function generateElevenLabsSpeech(text: string, voiceId: string) {
   const apiKey = env("ELEVENLABS_API_KEY");
   if (!apiKey) throw new Error("Thiếu Supabase secret ELEVENLABS_API_KEY.");
-  const modelId = env("ELEVENLABS_MODEL_ID") || "eleven_multilingual_v2";
+  const modelId = DEFAULT_ELEVENLABS_MODEL_ID;
   const cleanText = String(text || "").replace(/\s+/g, " ").trim();
   if (!cleanText) throw new Error("Chưa có nội dung voice-over để tạo giọng đọc.");
   if (cleanText.length > 4500) throw new Error("Voice-over quá dài. Hãy rút gọn dưới 4500 ký tự.");
-  const cleanVoiceId = String(voiceId || "").trim();
+  const cleanVoiceId = String(voiceId || DEFAULT_ELEVENLABS_VOICE_ID).trim();
   if (!cleanVoiceId) throw new Error("Chưa chọn voice ElevenLabs.");
 
   const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(cleanVoiceId)}?output_format=mp3_44100_128`, {
@@ -373,17 +387,17 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action || "generate").trim().toLowerCase();
     if (action === "voices") {
-      const voices = env("FPT_AI_API_KEY") ? listFptVoices() : await listElevenLabsVoices();
+      const voices = [defaultElevenLabsVoice()];
       return jsonResponse({ ok: true, voices });
     }
 
     postId = String(body?.post_id || "").trim();
     if (!postId) throw new Error("Thiếu post_id.");
     const post = await loadPost(postId);
-    const voiceId = String(body?.voice_id || "").trim();
+    const voiceId = String(body?.voice_id || DEFAULT_ELEVENLABS_VOICE_ID).trim();
     const voiceName = String(body?.voice_name || "").trim();
     const text = extractVoiceOver(post, String(body?.text || ""));
-    const useFpt = env("FPT_AI_API_KEY") && (!voiceId || voiceId.startsWith("fpt:") || !env("ELEVENLABS_API_KEY"));
+    const useFpt = voiceId.startsWith("fpt:");
     const audioBytes = useFpt ? await generateFptSpeech(text, voiceId) : await generateElevenLabsSpeech(text, voiceId);
     const uploaded = await uploadBytesToDrive(audioBytes, `mindup-reel-voice-${postId}.mp3`, "audio/mpeg");
 
