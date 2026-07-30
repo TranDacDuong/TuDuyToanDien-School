@@ -2330,6 +2330,25 @@ function buildPostMetadata(){
   }
   return metadata;
 }
+function mergePostMetadata(base={}, patch={}){
+  const output = { ...(base || {}), ...(patch || {}) };
+  if (base?.applying_knowledge || patch?.applying_knowledge) {
+    output.applying_knowledge = {
+      ...(base?.applying_knowledge || {}),
+      ...(patch?.applying_knowledge || {}),
+    };
+    if (base?.applying_knowledge?.reel && !patch?.applying_knowledge?.reel) {
+      output.applying_knowledge.reel = base.applying_knowledge.reel;
+    }
+    if (base?.applying_knowledge?.audio && !patch?.applying_knowledge?.audio) {
+      output.applying_knowledge.audio = base.applying_knowledge.audio;
+    }
+    if (base?.applying_knowledge?.video && !patch?.applying_knowledge?.video) {
+      output.applying_knowledge.video = base.applying_knowledge.video;
+    }
+  }
+  return output;
+}
 function getPostPayload(extra={}){
   const d = fromDateTimeLocal($("postScheduledAt").value);
   if (!d) throw new Error("Thời gian đăng không hợp lệ.");
@@ -2351,6 +2370,10 @@ async function savePostDraft(extra={}){
   const basePayload = getPostPayload();
   const payload = { ...basePayload, status: postHasContent(basePayload) ? "draft" : "missing_content", ...extra };
   const id = $("postId").value;
+  if (id) {
+    const { data: latestRow } = await sb.from("facebook_scheduled_posts").select("metadata").eq("id", id).single();
+    if (latestRow?.metadata) payload.metadata = mergePostMetadata(postMetadata(latestRow), payload.metadata || {});
+  }
   const res = id
     ? await sb.from("facebook_scheduled_posts").update(payload).eq("id", id).select("*").single()
     : await sb.from("facebook_scheduled_posts").insert(payload).select("*").single();
@@ -2728,6 +2751,53 @@ function normalizeReelScenes(meta){
 function activeReelScene(scenes, t){
   return scenes.find(scene => t >= scene.start && t < scene.end) || scenes[scenes.length - 1] || scenes[0];
 }
+function parseSceneSecondsSafe(value){
+  const text = String(value || "");
+  const match = text.match(/(\d+(?:[.,]\d+)?)\s*(?:-|–|—|â€“|đến|to)\s*(\d+(?:[.,]\d+)?)/i);
+  if (!match) return null;
+  const start = Number(match[1].replace(",", "."));
+  const end = Number(match[2].replace(",", "."));
+  return Number.isFinite(start) && Number.isFinite(end) && end > start ? { start, end } : null;
+}
+function parseReelScenesFromNote(note){
+  const text = String(note || "");
+  const marker = text.match(/Scenes:\s*([\s\S]*?)(?:\nReel caption:|\nReel hashtags:|\n\n|$)/i);
+  const block = marker?.[1] || "";
+  return block.split(/\n+/).map(line => {
+    const clean = line.replace(/^\s*\d+\.\s*/, "").trim();
+    if (!clean) return null;
+    const parts = clean.split("|").map(part => part.trim());
+    const seconds = parts[0] || "";
+    if (!parseSceneSecondsSafe(seconds)) return null;
+    const voicePart = parts.find(part => /^voice\s*:/i.test(part)) || "";
+    return {
+      seconds,
+      visual_type: parts[1] || "",
+      stock_video_keywords: parts[2] || "",
+      overlay_text: parts[3] || "",
+      voice_text: voicePart.replace(/^voice\s*:\s*/i, "").trim(),
+    };
+  }).filter(Boolean);
+}
+function normalizeReelScenesSafe(meta, note=""){
+  const reel = meta?.applying_knowledge?.reel || {};
+  const rawScenes = Array.isArray(reel.scenes) && reel.scenes.length ? reel.scenes : parseReelScenesFromNote(note);
+  const duration = Math.max(8, Math.min(60, Number(reel.durationSeconds || reel.duration_seconds || 0) || 30));
+  if (!rawScenes.length) return normalizeReelScenes(meta);
+  return rawScenes.map((scene, index) => {
+    const parsed = parseSceneSecondsSafe(scene.seconds);
+    const start = parsed?.start ?? Math.round(index * duration / rawScenes.length);
+    const end = parsed?.end ?? Math.round((index + 1) * duration / rawScenes.length);
+    return {
+      start: Math.max(0, Math.min(duration, start)),
+      end: Math.max(0.5, Math.min(duration, end)),
+      overlay_text: scene.overlay_text || scene.text || scene.title || "",
+      stock_video_keywords: scene.stock_video_keywords || "",
+      voice_text: scene.voice_text || scene.voiceText || scene.voice_over || "",
+      visual_type: scene.visual_type || scene.visualType || "",
+    };
+  }).sort((a,b) => a.start - b.start);
+}
 function sceneProgress(scene, t){
   const total = Math.max(0.1, Number(scene?.end || 0) - Number(scene?.start || 0));
   return Math.max(0, Math.min(1, (t - Number(scene?.start || 0)) / total));
@@ -2914,7 +2984,7 @@ async function recordReelVideo({ row, draft }){
   const audio = applying.audio || {};
   const audioUrl = audio.preview_url || audio.url || "";
   if (!audioUrl) throw new Error("Chưa tạo được giọng đọc để ghép vào Reel.");
-  const scenes = normalizeReelScenes(meta);
+  const scenes = normalizeReelScenesSafe(meta, draft.internal_note || row.internal_note || "");
   const sceneDuration = Math.max(...scenes.map(s => s.end), Number(reel.durationSeconds || 0) || 30);
   const canvas = document.createElement("canvas");
   const width = 720;
