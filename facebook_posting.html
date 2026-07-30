@@ -3342,6 +3342,257 @@ async function ensureReelVoice(existingDraft=null){
   }
   return row;
 }
+function normalizeExplainerScenes(meta){
+  const video = meta?.applying_knowledge?.explainer_video || {};
+  const rawScenes = Array.isArray(video.scenes) && video.scenes.length ? video.scenes : [];
+  const duration = Math.max(180, Math.min(330, Number(video.durationSeconds || video.duration_seconds || 0) || 240));
+  if (!rawScenes.length) {
+    return [{ start: 0, end: duration, overlay_text: video.title || "MindUp - Học để hiểu thế giới", visual_objects: ["brain", "book", "arrow"], animation_notes: "" }];
+  }
+  const parsedScenes = rawScenes.map(scene => parseSceneSecondsSafe(scene.seconds));
+  const sourceEnd = Math.max(...parsedScenes.map(item => Number(item?.end || 0)), 0);
+  const scale = sourceEnd > 0 && sourceEnd < 180 ? duration / sourceEnd : 1;
+  return rawScenes.map((scene, index) => {
+    const parsed = parseSceneSecondsSafe(scene.seconds);
+    const start = parsed ? parsed.start * scale : Math.round(index * duration / rawScenes.length);
+    const end = parsed ? parsed.end * scale : Math.round((index + 1) * duration / rawScenes.length);
+    return {
+      start: Math.max(0, Math.min(duration, start)),
+      end: Math.max(1, Math.min(duration, end)),
+      overlay_text: scene.overlay_text || scene.title || "",
+      visual_objects: Array.isArray(scene.visual_objects) ? scene.visual_objects : String(scene.visual_objects || "").split(/[,|]/).map(s => s.trim()).filter(Boolean),
+      animation_notes: scene.animation_notes || "",
+      stock_video_keywords: scene.stock_video_keywords || "",
+      voice_text: scene.voice_text || scene.voiceText || scene.voice_over || "",
+    };
+  }).sort((a,b) => a.start - b.start);
+}
+function drawExplainerIcon(ctx, name, x, y, size, color){
+  const clean = normalizeText(name);
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = "rgba(29,107,209,.08)";
+  ctx.lineWidth = Math.max(4, size * .06);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  if (clean.includes("brain")) {
+    ctx.beginPath(); ctx.ellipse(x, y, size * .45, size * .32, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - size * .18, y - size * .2); ctx.quadraticCurveTo(x, y, x - size * .1, y + size * .2); ctx.stroke();
+  } else if (clean.includes("cell")) {
+    ctx.beginPath(); ctx.arc(x, y, size * .38, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x + size * .08, y - size * .03, size * .14, 0, Math.PI * 2); ctx.stroke();
+  } else if (clean.includes("dna")) {
+    ctx.beginPath();
+    for (let i=0;i<8;i++){ const yy=y-size*.4+i*size*.11; ctx.moveTo(x-size*.22,yy); ctx.lineTo(x+size*.22,yy+size*.06); }
+    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x-size*.24,y-size*.42); ctx.bezierCurveTo(x+size*.34,y-size*.16,x-size*.34,y+size*.16,x+size*.24,y+size*.42); ctx.stroke();
+  } else if (clean.includes("clock")) {
+    ctx.beginPath(); ctx.arc(x, y, size * .34, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - size * .2); ctx.moveTo(x, y); ctx.lineTo(x + size * .18, y + size * .08); ctx.stroke();
+  } else if (clean.includes("graph") || clean.includes("chart")) {
+    ctx.beginPath(); ctx.moveTo(x-size*.4,y+size*.3); ctx.lineTo(x-size*.4,y-size*.3); ctx.moveTo(x-size*.4,y+size*.3); ctx.lineTo(x+size*.42,y+size*.3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x-size*.32,y+size*.18); ctx.lineTo(x-size*.08,y); ctx.lineTo(x+size*.12,y+size*.06); ctx.lineTo(x+size*.34,y-size*.22); ctx.stroke();
+  } else if (clean.includes("arrow")) {
+    ctx.beginPath(); ctx.moveTo(x-size*.38,y); ctx.lineTo(x+size*.32,y); ctx.lineTo(x+size*.16,y-size*.15); ctx.moveTo(x+size*.32,y); ctx.lineTo(x+size*.16,y+size*.15); ctx.stroke();
+  } else {
+    roundRectPath(ctx, x - size * .34, y - size * .28, size * .68, size * .56, size * .1);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawExplainerFrame(ctx, config){
+  const { width, height, scene, progress, sceneProgress=0, sceneIndex=0, title="" } = config;
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = "#f8fbff";
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = "#ffffff";
+  roundRectPath(ctx, 42, 34, width - 84, height - 68, 28);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(18,60,120,.12)";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.fillStyle = "#123c78";
+  ctx.font = "800 24px Inter, Arial, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("MindUp", 72, 76);
+  ctx.fillStyle = "#c8962a";
+  ctx.fillText("Animated Explainer", 174, 76);
+  const objects = Array.isArray(scene?.visual_objects) && scene.visual_objects.length ? scene.visual_objects.slice(0, 5) : ["brain", "book", "arrow"];
+  const visibleCount = Math.max(1, Math.min(objects.length, Math.ceil(sceneProgress * (objects.length + 1))));
+  objects.slice(0, visibleCount).forEach((obj, index) => {
+    const x = 190 + index * 220;
+    const y = 260 + Math.sin((sceneProgress + index * .18) * Math.PI) * 18;
+    drawExplainerIcon(ctx, obj, x, y, 150, index % 2 ? "#c8962a" : "#1d6bd1");
+  });
+  drawCenteredTextBox(ctx, scene?.overlay_text || title || "Học để hiểu thế giới", width / 2, height * .62, width - 220, height * .28);
+  ctx.fillStyle = "rgba(18,60,120,.14)";
+  roundRectPath(ctx, 82, height - 64, width - 164, 10, 5);
+  ctx.fill();
+  ctx.fillStyle = "#c8962a";
+  roundRectPath(ctx, 82, height - 64, (width - 164) * Math.max(0, Math.min(1, progress)), 10, 5);
+  ctx.fill();
+}
+async function ensureLongExplainerVoice(existingDraft=null){
+  if (!TTS_VOICES.length) await loadTtsVoices(true);
+  const voice = selectedOrPreferredTtsVoice();
+  const voiceId = voice?.voice_id || "";
+  if (!voiceId) throw new Error("Không tìm thấy voice để tạo video dài.");
+  const draft = existingDraft?.id ? existingDraft : await savePostDraft({ status: "draft", content_status: "submitted" });
+  const meta = postMetadata(draft);
+  const explainer = meta.applying_knowledge?.explainer_video || {};
+  const scenesText = Array.isArray(explainer.scenes)
+    ? explainer.scenes.map(scene => String(scene?.voice_text || scene?.voiceText || "").trim()).filter(Boolean).join(" ")
+    : "";
+  const text = String(explainer.voiceOver || explainer.voice_over || scenesText || draft.content || "").trim();
+  if (reelVoiceWordCount(text) < 220) throw new Error("Chưa có kịch bản video dài đủ nội dung. Hãy tạo lại bài bằng AI trước.");
+  const data = await callFacebookTtsFunction({
+    action: "generate",
+    post_id: draft.id,
+    voice_id: voiceId,
+    voice_name: voice?.name || `Voice ${voiceId}`,
+    audio_key: "explainer_audio",
+    text,
+  });
+  if (data.post?.id) {
+    S.posts = S.posts.some(p => String(p.id) === String(data.post.id))
+      ? S.posts.map(p => String(p.id) === String(data.post.id) ? { ...p, ...data.post } : p)
+      : [...S.posts, data.post];
+    return data.post;
+  }
+  return draft;
+}
+async function recordLongExplainerVideo({ row, draft }){
+  const meta = postMetadata(row || draft);
+  const applying = meta.applying_knowledge || {};
+  const explainer = applying.explainer_video || {};
+  const audio = applying.explainer_audio || {};
+  const audioUrl = audio.preview_url || audio.url || "";
+  if (!audioUrl) throw new Error("Chưa có giọng đọc cho video dài.");
+  const scenes = normalizeExplainerScenes(meta);
+  const sceneDuration = Math.max(...scenes.map(s => s.end), Number(explainer.durationSeconds || explainer.duration_seconds || 0) || 240);
+  const canvas = document.createElement("canvas");
+  const width = 1280, height = 720;
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Trình duyệt không hỗ trợ Canvas để dựng video dài.");
+  const audioBlob = await fetchMediaBlob(audioUrl);
+  const audioBufferBytes = await audioBlob.arrayBuffer();
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const audioBuffer = await audioContext.decodeAudioData(audioBufferBytes.slice(0));
+  const duration = Math.max(180, Math.min(330, Math.max(sceneDuration, audioBuffer.duration || 0)));
+  const audioDestination = audioContext.createMediaStreamDestination();
+  const audioSource = audioContext.createBufferSource();
+  audioSource.buffer = audioBuffer;
+  audioSource.connect(audioDestination);
+  const silentGain = audioContext.createGain();
+  silentGain.gain.value = 0.00001;
+  silentGain.connect(audioDestination);
+  const silent = audioContext.createConstantSource ? audioContext.createConstantSource() : audioContext.createOscillator();
+  silent.connect(silentGain);
+  const stream = new MediaStream([...canvas.captureStream(30).getVideoTracks(), ...audioDestination.stream.getAudioTracks()]);
+  const mimeType = chooseRecorderMimeType();
+  const recorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 2800000 } : { videoBitsPerSecond: 2800000 });
+  const chunks = [];
+  recorder.ondataavailable = ev => { if (ev.data?.size) chunks.push(ev.data); };
+  const stopped = new Promise(resolve => recorder.onstop = resolve);
+  recorder.start(500);
+  try { silent.start(0); } catch (_) {}
+  try { audioSource.start(0); } catch (_) {}
+  const started = performance.now();
+  await new Promise(resolve => {
+    const tick = () => {
+      const t = (performance.now() - started) / 1000;
+      const scene = activeReelScene(scenes, t);
+      const index = Math.max(0, scenes.indexOf(scene));
+      drawExplainerFrame(ctx, { width, height, scene, progress: t / duration, sceneProgress: sceneProgress(scene, t), sceneIndex: index, title: explainer.title || "" });
+      if (t < duration) requestAnimationFrame(tick);
+      else resolve();
+    };
+    tick();
+  });
+  try { audioSource.stop(); } catch (_) {}
+  try { silent.stop(); } catch (_) {}
+  recorder.stop();
+  await stopped;
+  stream.getTracks().forEach(track => track.stop());
+  await audioContext.close().catch(()=>{});
+  const finalType = recorder.mimeType || mimeType || "video/webm";
+  const blob = new Blob(chunks, { type: finalType });
+  if (!blob.size) throw new Error("Không tạo được dữ liệu video dài.");
+  return { blob, mimeType: finalType, duration, sceneCount: scenes.length };
+}
+async function generateLongExplainerVideo(){
+  const postTypeId = $("postType")?.value || "";
+  if (!isApplyingKnowledgeType(postTypeId)) {
+    showPostStatus("err", "Video dài tự động hiện chỉ dùng cho bài Applying Knowledge to Practice.");
+    return;
+  }
+  const btn = $("generateLongExplainerVideoBtn");
+  const oldText = btn?.textContent || "";
+  try {
+    if (btn) { btn.disabled = true; btn.textContent = "Đang tạo video dài..."; }
+    showPostStatus("info", "Đang lưu nháp và chuẩn bị giọng đọc cho video dài...");
+    let draft = await savePostDraft({ status: "draft", content_status: "submitted" });
+    let row = currentPostRow() || draft;
+    const meta = postMetadata(row);
+    const explainer = meta.applying_knowledge?.explainer_video || {};
+    if (!explainer?.scenes?.length) throw new Error("Chưa có storyboard video dài. Hãy bấm tạo bài bằng AI trước.");
+    const existingAudio = meta.applying_knowledge?.explainer_audio || {};
+    if (!(existingAudio.preview_url || existingAudio.url)) {
+      row = await ensureLongExplainerVoice(draft);
+      draft = { ...draft, ...row };
+    }
+    showPostStatus("info", "Đã có voice-over, đang dựng video dài dạng whiteboard...");
+    const result = await recordLongExplainerVideo({ row, draft });
+    const ext = result.mimeType.includes("mp4") ? "mp4" : "webm";
+    const file = new File([result.blob], `mindup-explainer-${draft.id}.${ext}`, { type: result.mimeType, lastModified: Date.now() });
+    showPostStatus("info", "Đã dựng video dài, đang upload lên Drive...");
+    const uploaded = await uploadDriveFile(file, "facebook-long-explainers");
+    const latestMeta = postMetadata(row || draft);
+    const applying = latestMeta.applying_knowledge || {};
+    const longVideo = {
+      provider: "browser_whiteboard_mediarecorder",
+      file_id: uploaded.fileId,
+      url: uploaded.downloadUrl || uploaded.url,
+      preview_url: uploaded.downloadUrl || uploaded.url,
+      web_view_link: uploaded.webViewLink,
+      mime_type: uploaded.mimeType || result.mimeType,
+      size: uploaded.size || file.size,
+      duration_seconds: Math.round(result.duration),
+      scene_count: result.sceneCount,
+      created_at: new Date().toISOString(),
+    };
+    const updatedMetadata = { ...latestMeta, applying_knowledge: { ...applying, enabled: true, long_video: longVideo, updated_at: new Date().toISOString() } };
+    const currentNote = $("postInternalNote").value.trim();
+    const videoLine = `Long explainer video: ${longVideo.preview_url}`;
+    const finalNote = currentNote.includes(videoLine) ? currentNote : [currentNote, videoLine].filter(Boolean).join("\n\n");
+    const { data: saved, error } = await sb.from("facebook_scheduled_posts")
+      .update({ metadata: updatedMetadata, internal_note: finalNote, updated_at: new Date().toISOString() })
+      .eq("id", draft.id)
+      .select("*")
+      .single();
+    if (error) throw error;
+    $("postInternalNote").value = finalNote;
+    let videoEl = $("longExplainerVideoPreview");
+    if (!videoEl) {
+      videoEl = document.createElement("video");
+      videoEl.id = "longExplainerVideoPreview";
+      videoEl.controls = true;
+      videoEl.playsInline = true;
+      videoEl.style.cssText = "display:none;width:100%;max-height:420px;margin-top:10px;border-radius:18px;background:#f8fbff";
+      $("reelVideoPreview")?.insertAdjacentElement("afterend", videoEl);
+    }
+    videoEl.src = URL.createObjectURL(result.blob);
+    videoEl.style.display = "";
+    if (saved?.id) S.posts = S.posts.some(p => String(p.id) === String(saved.id)) ? S.posts.map(p => String(p.id) === String(saved.id) ? { ...p, ...saved } : p) : [...S.posts, saved];
+    showPostStatus("ok", `Đã tạo video dài dạng whiteboard khoảng ${Math.round(result.duration)}s, gồm ${result.sceneCount} cảnh và đã lưu lên Drive.`);
+    await loadData();
+  } catch (error) {
+    showPostStatus("err", error.message || String(error));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = oldText || "Tạo video dài"; }
+  }
+}
 async function facebookDelete(pageId, facebookId){
   return callFacebookPostingFunction({ action: "delete", page_id: pageId, facebook_post_id: facebookId });
 }
@@ -3879,6 +4130,15 @@ function bindEvents(){
   $("generateGeminiDraftBtn").addEventListener("click", () => generateAiDraft("gemini"));
   $("generateLlamaDraftBtn").addEventListener("click", () => generateAiDraft("llama"));
   $("generateReelVideoBtn")?.addEventListener("click", () => generateReelVideo().catch(error => showPostStatus("err", error.message || String(error))));
+  if ($("generateReelVideoBtn") && !$("generateLongExplainerVideoBtn")) {
+    const btn = document.createElement("button");
+    btn.className = "btn btn-primary";
+    btn.id = "generateLongExplainerVideoBtn";
+    btn.type = "button";
+    btn.textContent = "Tạo video dài";
+    btn.addEventListener("click", () => generateLongExplainerVideo().catch(error => showPostStatus("err", error.message || String(error))));
+    $("generateReelVideoBtn").insertAdjacentElement("afterend", btn);
+  }
   $("approvePostBtn")?.addEventListener("click", approveCurrentPost);
   $("postContent").addEventListener("input", () => $("postCharCount").textContent = String($("postContent").value.length));
   $("postType").addEventListener("change", toggleQuizBuilder);

@@ -415,6 +415,7 @@ Deno.serve(async (req) => {
     const post = await loadPost(postId);
     const voiceId = String(body?.voice_id || DEFAULT_ELEVENLABS_VOICE_ID).trim();
     const voiceName = String(body?.voice_name || "").trim();
+    const audioKey = String(body?.audio_key || "audio").trim() === "explainer_audio" ? "explainer_audio" : "audio";
     const text = extractVoiceOver(post, String(body?.text || ""));
     const useFpt = voiceId.startsWith("fpt:");
     const audioBytes = useFpt ? await generateFptSpeech(text, voiceId) : await generateElevenLabsSpeech(text, voiceId);
@@ -440,11 +441,11 @@ Deno.serve(async (req) => {
       applying_knowledge: {
         ...applying,
         enabled: true,
-        audio,
+        [audioKey]: audio,
         updated_at: new Date().toISOString(),
       },
     };
-    const noteLine = `Voice audio: ${audio.preview_url}`;
+    const noteLine = `${audioKey === "explainer_audio" ? "Long explainer voice audio" : "Voice audio"}: ${audio.preview_url}`;
     const currentNote = String(post.internal_note || "").trim();
     const finalNote = currentNote.includes(noteLine) ? currentNote : [currentNote, noteLine].filter(Boolean).join("\n\n");
     const rows = await patchJson<Array<JsonRecord>>(`facebook_scheduled_posts?id=eq.${encodeURIComponent(postId)}`, {

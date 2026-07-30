@@ -984,6 +984,58 @@ function applyingKnowledgeReferenceFor(pageName: string) {
   };
 }
 
+function applyingKnowledgeVideoInspirationFor(pageName: string) {
+  const clean = stripVietnameseForTag(pageName).toLowerCase();
+  if (clean.includes("toan hoc")) {
+    return {
+      sourceName: "3Blue1Brown",
+      sourceUrl: "https://www.3blue1brown.com/",
+      sourceChannelUrl: "https://www.youtube.com/c/3blue1brown",
+      sourceStyle: "visual math explanations that make one core idea intuitive through diagrams, motion, and discovery.",
+      topicGuidance: "Pick one visual mathematical idea with a real-life entry point: probability, geometry, graphs, optimization, growth, scale, or patterns.",
+      visualGuidance: "Use clean diagrams, coordinate grids, geometric shapes, simple charts, arrows, and step-by-step transformations instead of generic classroom footage.",
+    };
+  }
+  if (clean.includes("vat ly")) {
+    return {
+      sourceName: "MinutePhysics",
+      sourceUrl: "https://www.minutephysics.com/",
+      sourceChannelUrl: "https://www.youtube.com/user/minutephysics",
+      sourceStyle: "short whiteboard physics explainers that turn a surprising everyday question into a simple model.",
+      topicGuidance: "Pick one physics phenomenon students can see: motion, force, light, sound, electricity, heat, pressure, waves, magnets, or energy transfer.",
+      visualGuidance: "Use whiteboard motion diagrams, force arrows, waves, meters, simple apparatus, and real-world objects moving or interacting.",
+    };
+  }
+  if (clean.includes("hoa hoc")) {
+    return {
+      sourceName: "NileRed / ACS Reactions",
+      sourceUrl: "https://www.youtube.com/@NileRed",
+      sourceChannelUrl: "https://www.youtube.com/user/ACSReactions",
+      sourceStyle: "chemistry explainers grounded in visible substances, reactions, color changes, food, materials, and safe lab observations.",
+      topicGuidance: "Pick one everyday chemistry question: pH, soap, batteries, food chemistry, smell, color, materials, cleaning, oxidation, or solubility.",
+      visualGuidance: "Use beakers, safe lab glassware, molecules, pH scales, material close-ups, food, color change diagrams, and reaction arrows.",
+    };
+  }
+  if (clean.includes("sinh hoc")) {
+    return {
+      sourceName: "AsapSCIENCE",
+      sourceUrl: "https://www.youtube.com/user/AsapSCIENCE",
+      sourceChannelUrl: "https://www.youtube.com/user/AsapSCIENCE",
+      sourceStyle: "whiteboard science explainers about the human body, health, psychology, and everyday biology, using doodles plus clear voice-over.",
+      topicGuidance: "Pick one biology-in-life question: sleep and memory, stress and learning, sugar and energy, exercise and focus, immunity, hormones, brain, cells, genetics, nutrition, or senses.",
+      visualGuidance: "Use whiteboard-style body diagrams, brain icons, cells, organs, microscope/lab visuals, timelines, comparison panels, and simple cause-effect arrows.",
+    };
+  }
+  return {
+    sourceName: "Kurzgesagt / TED-Ed / SciShow",
+    sourceUrl: "https://kurzgesagt.org/",
+    sourceChannelUrl: "https://www.youtube.com/teded",
+    sourceStyle: "research-based animated science storytelling that turns complex topics into memorable, structured explanations.",
+    topicGuidance: "Pick one interdisciplinary STEM topic connecting science, technology, data, daily decisions, health, environment, or learning.",
+    visualGuidance: "Use animated explainer scenes: diagrams, icons, simple systems, cause-effect arrows, charts, and a few concrete real-world stock clips only when they clarify the idea.",
+  };
+}
+
 const TEACHING_PHILOSOPHY_ITEMS = [
   "Điểm số không phải mục tiêu của giáo dục.",
   "Giáo dục là giúp học sinh biết tự học.",
@@ -1459,6 +1511,7 @@ function buildGeminiPrompt(args: {
     const topic = contentTopicFor(args.typeName, args.scheduledAt, args.pageName);
     const curriculum = quizCurriculumFor(args.scheduledAt, args.pageName);
     const reference = applyingKnowledgeReferenceFor(args.pageName);
+    const videoInspiration = applyingKnowledgeVideoInspirationFor(args.pageName);
     return [
       "You are a senior Facebook education content creator for MindUp - Tu Duy Toan Dien.",
       "Task: create an Applying Knowledge to Practice post in Vietnamese.",
@@ -1475,6 +1528,11 @@ function buildGeminiPrompt(args: {
       `- Current curriculum area: ${curriculum.topic}`,
       `- Reference inspiration source: ${reference.sourceName} (${reference.sourceUrl})`,
       `- Source guidance: ${reference.sourceGuidance}`,
+      `- Video inspiration source: ${videoInspiration.sourceName} (${videoInspiration.sourceUrl})`,
+      `- Video channel/source URL: ${videoInspiration.sourceChannelUrl}`,
+      `- Inspiration style: ${videoInspiration.sourceStyle}`,
+      `- Topic selection guidance: ${videoInspiration.topicGuidance}`,
+      `- Visual guidance: ${videoInspiration.visualGuidance}`,
       args.existingContent ? `- Existing draft/admin note: ${args.existingContent}` : "",
       args.internalNote ? `- Internal note: ${args.internalNote}` : "",
       "",
@@ -1485,7 +1543,8 @@ function buildGeminiPrompt(args: {
       "",
       "Content requirements:",
       "- Write a complete Facebook post in Vietnamese, 300-650 words.",
-      "- Do not copy from the reference source. Use it only as inspiration, then write original MindUp content.",
+      "- Do not copy, translate, summarize, or imitate any specific source video. Use the sources only to choose a topic style and level of clarity, then create original MindUp content.",
+      "- If a source/channel inspires the topic, mention it only in internal_note, never in the public caption.",
       "- The post must teach ONE concrete piece of school knowledge, not only a general life skill or consumer advice.",
       `- For this fanpage, the concrete knowledge must belong to ${reference.subject} and connect to: ${curriculum.topic}.`,
       "- Do NOT write a generic article about advertising, motivation, study habits, consumer behavior, or media literacy unless that exact topic is explicitly part of the fanpage subject and curriculum.",
@@ -1523,6 +1582,19 @@ function buildGeminiPrompt(args: {
       "- The Reel must have a clear rhythm: hook -> problem/context -> knowledge explanation -> real-life example -> CTA.",
       "- The Reel should work even without voice-over: overlay text must still tell the story.",
       "",
+      "Long animated explainer requirements:",
+      "- Also create a 3-5 minute animated explainer video plan for the same topic. This is for an automated whiteboard/diagram video, not a copy of the inspiration source.",
+      "- Target duration: 210-300 seconds.",
+      "- Voice-over target: 520-780 Vietnamese words total.",
+      "- Create 18-28 scenes. Each scene must have: seconds, voice_text, overlay_text, visual_type, visual_objects, animation_notes, stock_video_keywords.",
+      "- Prefer diagram/whiteboard scenes as the backbone. Use stock video only when it clarifies a real object/action; do not make a 5-minute stock montage.",
+      "- Include a structure: hook -> why it matters -> core concept -> mechanism -> student example -> safe/practical application -> recap -> CTA.",
+      "- visual_objects should be simple renderer-friendly objects such as brain, cell, dna, microscope, clock, book, graph, arrow, molecule, battery, wave, ruler, calculator, student, heart, lungs, plant, beaker, label, comparison_panel.",
+      "",
+      "Reel series requirements:",
+      "- Also create 3 short reels cut from the long explainer idea. Each reel should focus on one sub-idea and be 45-75 seconds.",
+      "- The first reel should match the reel field above. The other reels are follow-up drafts for later posts.",
+      "",
       "Return ONLY valid JSON, no markdown, using this schema:",
       JSON.stringify({
         caption: "Vietnamese Applying Knowledge to Practice post, 300-650 words, with real-life hook, school knowledge explanation, mini example, and CTA.",
@@ -1548,6 +1620,37 @@ function buildGeminiPrompt(args: {
           caption: "Short Vietnamese reel caption.",
           hashtags: ["#MindUp", "#UngDungKienThuc", "#ReelsHocTap", fanpageTag]
         },
+        explainer_video: {
+          title: "Vietnamese title for a 3-5 minute animated explainer.",
+          duration_seconds: 240,
+          voice_over: "Full Vietnamese narration for the long animated explainer, 520-780 words.",
+          scenes: [
+            {
+              seconds: "0-8",
+              visual_type: "whiteboard",
+              visual_objects: ["brain", "clock", "book", "arrow"],
+              animation_notes: "What appears, moves, highlights, or transforms.",
+              stock_video_keywords: "English keywords only if a stock clip is useful",
+              overlay_text: "Short Vietnamese overlay",
+              voice_text: "Vietnamese narration for this scene."
+            }
+          ],
+          chapters: ["Hook", "Core concept", "Mechanism", "Example", "Application", "Recap"],
+          thumbnail_text: "Short Vietnamese thumbnail text"
+        },
+        reel_series: [
+          {
+            title: "Vietnamese reel title",
+            duration_seconds: 60,
+            focus: "One sub-idea from the long explainer",
+            voice_over: "Vietnamese narration for this reel",
+            scenes: [
+              { seconds: "0-5", visual_type: "whiteboard", visual_objects: ["icon"], animation_notes: "Animation notes", stock_video_keywords: "English keywords", overlay_text: "Vietnamese overlay", voice_text: "Vietnamese narration" }
+            ],
+            caption: "Short Vietnamese reel caption.",
+            hashtags: ["#MindUp", "#UngDungKienThuc", "#ReelsHocTap", fanpageTag]
+          }
+        ],
         internal_note: `Applying Knowledge to Practice week ${topic.week}/${topic.year}; fanpage ${args.pageName}; offset ${topic.offset}; topic ${topic.number}/${topic.total}: ${topic.topic}; grade ${curriculum.grade}; curriculum ${curriculum.topic}; source ${reference.sourceName} ${reference.sourceUrl}`,
       }, null, 2),
     ].filter(Boolean).join("\n");
@@ -1850,6 +1953,33 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
   const reelVoiceWordCount = reelVoiceOver.split(/\s+/).filter(Boolean).length;
   const captionVoiceFallback = rawCaption.split(/\s+/).filter(Boolean).slice(0, 155).join(" ");
   const normalizedReelDuration = Math.max(55, Math.min(65, Number(reelRecord.duration_seconds || 0) || 60));
+  const explainerRecord = (parsed?.explainer_video && typeof parsed.explainer_video === "object" ? parsed.explainer_video : {}) as JsonRecord;
+  const explainerScenes = Array.isArray(explainerRecord.scenes) ? explainerRecord.scenes.slice(0, 28) : [];
+  const explainerSceneVoiceOver = explainerScenes.map((scene: unknown) => {
+    const record = (scene && typeof scene === "object" ? scene : {}) as JsonRecord;
+    return String(record.voice_text || record.voiceText || record.voice_over || "").trim();
+  }).filter(Boolean).join(" ");
+  const explainerVoiceOver = String(explainerRecord.voice_over || explainerSceneVoiceOver || "").trim();
+  const normalizedExplainerDuration = Math.max(210, Math.min(300, Number(explainerRecord.duration_seconds || 0) || 240));
+  const reelSeries = Array.isArray(parsed?.reel_series)
+    ? parsed.reel_series.slice(0, 5).map((item: unknown) => {
+      const record = (item && typeof item === "object" ? item : {}) as JsonRecord;
+      const scenes = Array.isArray(record.scenes) ? record.scenes.slice(0, 10) : [];
+      const seriesSceneVoiceOver = scenes.map((scene: unknown) => {
+        const sceneRecord = (scene && typeof scene === "object" ? scene : {}) as JsonRecord;
+        return String(sceneRecord.voice_text || sceneRecord.voiceText || sceneRecord.voice_over || "").trim();
+      }).filter(Boolean).join(" ");
+      return {
+        title: String(record.title || "").trim(),
+        focus: String(record.focus || "").trim(),
+        durationSeconds: Math.max(45, Math.min(75, Number(record.duration_seconds || 0) || 60)),
+        voiceOver: String(record.voice_over || seriesSceneVoiceOver || "").trim(),
+        scenes,
+        caption: String(record.caption || "").trim(),
+        hashtags: normalizeHashtags(record.hashtags),
+      };
+    })
+    : [];
   return {
     model,
     caption: isStandaloneLearning ? sanitizeStandaloneLearningMethodCaption(rawCaption) : rawCaption,
@@ -1886,6 +2016,15 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
       caption: String(reelRecord.caption || "").trim(),
       hashtags: normalizeHashtags(reelRecord.hashtags),
     },
+    explainerVideo: {
+      title: String(explainerRecord.title || "").trim(),
+      durationSeconds: normalizedExplainerDuration,
+      voiceOver: explainerVoiceOver,
+      scenes: explainerScenes,
+      chapters: Array.isArray(explainerRecord.chapters) ? explainerRecord.chapters.map((item: unknown) => String(item || "").trim()).filter(Boolean).slice(0, 8) : [],
+      thumbnailText: String(explainerRecord.thumbnail_text || "").trim(),
+    },
+    reelSeries,
   };
 }
 
@@ -2801,12 +2940,41 @@ Deno.serve(async (req) => {
         draft.reel.hashtags?.length ? `Reel hashtags: ${draft.reel.hashtags.join(" ")}` : "",
       ].filter(Boolean).join("\n")
       : "";
+    const explainerNote = isApplyingKnowledgePost && draft.explainerVideo?.scenes?.length
+      ? [
+        "Long explainer video draft:",
+        draft.explainerVideo.title ? `Title: ${draft.explainerVideo.title}` : "",
+        draft.explainerVideo.durationSeconds ? `Suggested duration: ${draft.explainerVideo.durationSeconds}s` : "",
+        draft.explainerVideo.thumbnailText ? `Thumbnail text: ${draft.explainerVideo.thumbnailText}` : "",
+        draft.explainerVideo.chapters?.length ? `Chapters: ${draft.explainerVideo.chapters.join(" | ")}` : "",
+        draft.explainerVideo.voiceOver ? `Voice-over:\n${draft.explainerVideo.voiceOver}` : "",
+        `Scenes:\n${draft.explainerVideo.scenes.map((scene: unknown, index: number) => {
+          const record = (scene && typeof scene === "object" ? scene : {}) as JsonRecord;
+          const voiceText = String(record.voice_text || record.voiceText || record.voice_over || "").trim();
+          const objects = Array.isArray(record.visual_objects) ? record.visual_objects.join(", ") : String(record.visual_objects || "");
+          return `${index + 1}. ${record.seconds || ""} | ${record.visual_type || "whiteboard"} | ${objects} | ${record.overlay_text || ""} | ${record.animation_notes || ""}${voiceText ? ` | Voice: ${voiceText}` : ""}`;
+        }).join("\n")}`,
+      ].filter(Boolean).join("\n")
+      : "";
+    const reelSeriesNote = isApplyingKnowledgePost && Array.isArray(draft.reelSeries) && draft.reelSeries.length
+      ? [
+        "Follow-up reel series drafts:",
+        ...draft.reelSeries.map((item: JsonRecord, index: number) => [
+          `${index + 1}. ${item.title || "Untitled reel"}${item.durationSeconds ? ` (${item.durationSeconds}s)` : ""}`,
+          item.focus ? `Focus: ${item.focus}` : "",
+          item.caption ? `Caption: ${item.caption}` : "",
+          item.hashtags?.length ? `Hashtags: ${item.hashtags.join(" ")}` : "",
+        ].filter(Boolean).join("\n")),
+      ].join("\n\n")
+      : "";
     const finalNote = [
       draft.quoteEn ? `Quote EN: ${draft.quoteEn}` : "",
       draft.quoteVi ? `Quote VI: ${draft.quoteVi}` : "",
       draft.quoteSource ? `Nguồn: ${draft.quoteSource}` : "",
       draft.internalNote,
       reelNote,
+      explainerNote,
+      reelSeriesNote,
       post.internal_note,
     ].filter(Boolean).join("\n\n").trim() || null;
 
@@ -2820,6 +2988,8 @@ Deno.serve(async (req) => {
           applying_knowledge: {
             enabled: true,
             reel: draft.reel,
+            explainer_video: draft.explainerVideo,
+            reel_series: draft.reelSeries,
             image_search_keywords: draft.imageSearchKeywords,
             image_background_prompt: draft.imageBackgroundPrompt,
             image_overlay_text: draft.imageOverlayText,
