@@ -1504,8 +1504,8 @@ function buildGeminiPrompt(args: {
       "",
       "Reel draft requirements:",
       "- Also create a complete short Reel plan using stock footage/images, no filming required.",
-      "- Reel duration: 24-45 seconds. AI must design the timing naturally; do NOT force equal scene lengths.",
-      "- Create 5-7 scenes. Each scene must have: seconds, voice_text, overlay_text, stock_video_keywords, visual_type.",
+      "- Reel duration: 55-65 seconds, ideally about 60 seconds. AI must design the timing naturally; do NOT force equal scene lengths.",
+      "- Create 8-10 scenes. Each scene must have: seconds, voice_text, overlay_text, stock_video_keywords, visual_type.",
       "- seconds must be a continuous timeline like 0-4, 4-10, 10-15, 15-23, ... ending exactly at duration_seconds.",
       "- voice_text is the exact Vietnamese narration spoken during that scene. Keep each scene voice_text short enough for its duration.",
       "- voice_over must be the full narration made by joining all scene voice_text in order. Do not add content outside the scenes.",
@@ -1517,7 +1517,8 @@ function buildGeminiPrompt(args: {
       "- For Math pages, prefer visuals like geometry, graphs, measurement, maps, finance, architecture, calculator, notebook, classroom problem solving.",
       "- For Physics pages, prefer visuals like electricity, light, motion, force, magnets, waves, experiment, engineering.",
       "- For Chemistry pages, prefer visuals like molecules, reactions, pH, solution, lab glassware, periodic table, safe experiment.",
-      "- visual_type must be either image or video. Prefer video for hook/practical scenes and image for explanation scenes.",
+      "- visual_type must be either image or video. Prefer video for almost every scene; use image only if a still diagram is truly better.",
+      "- stock_video_keywords should be suitable for short stock video clips with obvious movement: hands writing, experiment, student using microscope, graph animation, measuring object, pouring liquid, classroom discussion, etc.",
       "- The Reel must have a clear rhythm: hook -> problem/context -> knowledge explanation -> real-life example -> CTA.",
       "- The Reel should work even without voice-over: overlay text must still tell the story.",
       "",
@@ -1531,14 +1532,17 @@ function buildGeminiPrompt(args: {
         image_overlay_text: "Vietnamese summary sentence for the image, around 10-22 words.",
         reel: {
           hook_3s: "A strong first 3 seconds hook in Vietnamese.",
-          duration_seconds: 34,
+          duration_seconds: 60,
           voice_over: "Full Vietnamese narration created by joining scene voice_text in order.",
           scenes: [
             { seconds: "0-4", visual_type: "video", stock_video_keywords: "English keywords", overlay_text: "Vietnamese hook overlay", voice_text: "Vietnamese narration for scene 1." },
-            { seconds: "4-10", visual_type: "video", stock_video_keywords: "English keywords", overlay_text: "Vietnamese problem overlay", voice_text: "Vietnamese narration for scene 2." },
-            { seconds: "10-16", visual_type: "image", stock_video_keywords: "English keywords", overlay_text: "Vietnamese knowledge overlay", voice_text: "Vietnamese narration for scene 3." },
-            { seconds: "16-26", visual_type: "video", stock_video_keywords: "English keywords", overlay_text: "Vietnamese example overlay", voice_text: "Vietnamese narration for scene 4." },
-            { seconds: "26-34", visual_type: "image", stock_video_keywords: "English keywords", overlay_text: "Vietnamese CTA overlay", voice_text: "Vietnamese narration for scene 5." }
+            { seconds: "4-11", visual_type: "video", stock_video_keywords: "English keywords", overlay_text: "Vietnamese problem overlay", voice_text: "Vietnamese narration for scene 2." },
+            { seconds: "11-18", visual_type: "video", stock_video_keywords: "English keywords", overlay_text: "Vietnamese knowledge overlay", voice_text: "Vietnamese narration for scene 3." },
+            { seconds: "18-26", visual_type: "video", stock_video_keywords: "English keywords", overlay_text: "Vietnamese example overlay", voice_text: "Vietnamese narration for scene 4." },
+            { seconds: "26-34", visual_type: "video", stock_video_keywords: "English keywords", overlay_text: "Vietnamese detail overlay", voice_text: "Vietnamese narration for scene 5." },
+            { seconds: "34-43", visual_type: "video", stock_video_keywords: "English keywords", overlay_text: "Vietnamese practical overlay", voice_text: "Vietnamese narration for scene 6." },
+            { seconds: "43-52", visual_type: "video", stock_video_keywords: "English keywords", overlay_text: "Vietnamese recap overlay", voice_text: "Vietnamese narration for scene 7." },
+            { seconds: "52-60", visual_type: "video", stock_video_keywords: "English keywords", overlay_text: "Vietnamese CTA overlay", voice_text: "Vietnamese narration for scene 8." }
           ],
           caption: "Short Vietnamese reel caption.",
           hashtags: ["#MindUp", "#UngDungKienThuc", "#ReelsHocTap", fanpageTag]

@@ -2730,14 +2730,17 @@ function parseSceneSeconds(value){
 function normalizeReelScenes(meta){
   const reel = meta?.applying_knowledge?.reel || {};
   const rawScenes = Array.isArray(reel.scenes) ? reel.scenes : [];
-  const duration = Math.max(8, Math.min(60, Number(reel.durationSeconds || 0) || 30));
+  const duration = Math.max(8, Math.min(75, Number(reel.durationSeconds || reel.duration_seconds || 0) || 60));
   if (!rawScenes.length) {
     return [{ start: 0, end: duration, overlay_text: reel.hook3s || "MindUp - Học để hiểu thế giới" }];
   }
+  const parsedScenes = rawScenes.map(scene => parseSceneSeconds(scene.seconds));
+  const sourceEnd = Math.max(...parsedScenes.map(item => Number(item?.end || 0)), 0);
+  const scale = sourceEnd > 0 && sourceEnd < 55 ? duration / sourceEnd : 1;
   return rawScenes.map((scene, index) => {
     const parsed = parseSceneSeconds(scene.seconds);
-    const start = parsed?.start ?? Math.round(index * duration / rawScenes.length);
-    const end = parsed?.end ?? Math.round((index + 1) * duration / rawScenes.length);
+    const start = parsed ? parsed.start * scale : Math.round(index * duration / rawScenes.length);
+    const end = parsed ? parsed.end * scale : Math.round((index + 1) * duration / rawScenes.length);
     return {
       start: Math.max(0, Math.min(duration, start)),
       end: Math.max(0.5, Math.min(duration, end)),
@@ -2782,12 +2785,15 @@ function parseReelScenesFromNote(note){
 function normalizeReelScenesSafe(meta, note=""){
   const reel = meta?.applying_knowledge?.reel || {};
   const rawScenes = Array.isArray(reel.scenes) && reel.scenes.length ? reel.scenes : parseReelScenesFromNote(note);
-  const duration = Math.max(8, Math.min(60, Number(reel.durationSeconds || reel.duration_seconds || 0) || 30));
+  const duration = Math.max(8, Math.min(75, Number(reel.durationSeconds || reel.duration_seconds || 0) || 60));
   if (!rawScenes.length) return normalizeReelScenes(meta);
+  const parsedScenes = rawScenes.map(scene => parseSceneSecondsSafe(scene.seconds));
+  const sourceEnd = Math.max(...parsedScenes.map(item => Number(item?.end || 0)), 0);
+  const scale = sourceEnd > 0 && sourceEnd < 55 ? duration / sourceEnd : 1;
   return rawScenes.map((scene, index) => {
     const parsed = parseSceneSecondsSafe(scene.seconds);
-    const start = parsed?.start ?? Math.round(index * duration / rawScenes.length);
-    const end = parsed?.end ?? Math.round((index + 1) * duration / rawScenes.length);
+    const start = parsed ? parsed.start * scale : Math.round(index * duration / rawScenes.length);
+    const end = parsed ? parsed.end * scale : Math.round((index + 1) * duration / rawScenes.length);
     return {
       start: Math.max(0, Math.min(duration, start)),
       end: Math.max(0.5, Math.min(duration, end)),
@@ -2826,9 +2832,58 @@ async function loadCanvasImageSafe(src){
     return await loadCanvasImage(src);
   }
 }
+function loadCanvasVideo(src){
+  return new Promise(resolve => {
+    if (!src) return resolve(null);
+    const video = document.createElement("video");
+    video.muted = true;
+    video.loop = true;
+    video.playsInline = true;
+    video.preload = "auto";
+    video.crossOrigin = "anonymous";
+    const cleanup = () => {
+      video.removeEventListener("loadedmetadata", done);
+      video.removeEventListener("canplay", done);
+      video.removeEventListener("error", fail);
+    };
+    const done = async () => {
+      cleanup();
+      try {
+        video.currentTime = 0;
+        await video.play().catch(()=>{});
+      } catch (_) {}
+      resolve(video);
+    };
+    const fail = () => { cleanup(); resolve(null); };
+    video.addEventListener("loadedmetadata", done, { once: true });
+    video.addEventListener("canplay", done, { once: true });
+    video.addEventListener("error", fail, { once: true });
+    video.src = src;
+  });
+}
+async function loadCanvasVideoSafe(src){
+  if (!src) return null;
+  let objectUrl = "";
+  try {
+    objectUrl = await proxiedObjectUrl(src);
+    const video = await loadCanvasVideo(objectUrl);
+    if (video) video.__objectUrl = objectUrl;
+    else if (objectUrl) URL.revokeObjectURL(objectUrl);
+    return video;
+  } catch (error) {
+    console.warn("Cannot proxy video", error);
+    return await loadCanvasVideo(src);
+  }
+}
 function cleanupCanvasImages(images){
   (images || []).forEach(image => {
     if (image?.__objectUrl) URL.revokeObjectURL(image.__objectUrl);
+  });
+}
+function cleanupCanvasMedia(items){
+  (items || []).forEach(item => {
+    try { item?.pause?.(); } catch (_) {}
+    if (item?.__objectUrl) URL.revokeObjectURL(item.__objectUrl);
   });
 }
 function uniqueNonEmpty(values){
@@ -2856,6 +2911,28 @@ async function findSceneImageUrl(scene, fallbackQuery="education learning"){
   }
   return "";
 }
+async function findSceneVideoUrl(scene, fallbackQuery="education learning"){
+  const sceneQuery = String(scene?.stock_video_keywords || "").trim();
+  const overlay = String(scene?.overlay_text || "").trim();
+  const fallback = String(fallbackQuery || "education learning").trim();
+  const queries = uniqueNonEmpty([
+    sceneQuery,
+    sceneQuery && fallback ? `${sceneQuery} ${fallback}` : "",
+    fallback,
+    overlay && fallback ? `${overlay} ${fallback}` : "",
+  ]).slice(0, 4);
+  if (!queries.length) return "";
+  try {
+    for (const query of queries) {
+      const data = await callMediaProxyJson({ action: "pexels_video", query });
+      const url = data?.video?.url || "";
+      if (url) return url;
+    }
+  } catch (error) {
+    console.warn("Pexels scene video failed", error);
+  }
+  return "";
+}
 async function loadSceneImages(scenes, fallbackImageUrl, fallbackQuery="education learning"){
   const out = [];
   for (const scene of scenes) {
@@ -2865,19 +2942,38 @@ async function loadSceneImages(scenes, fallbackImageUrl, fallbackQuery="educatio
   }
   return out;
 }
-function drawCoverImage(ctx, img, x, y, w, h, motion=0, sceneIndex=0){
-  if (!img?.width || !img?.height) return false;
+async function loadSceneMedia(scenes, fallbackImageUrl, fallbackQuery="education learning"){
+  const out = [];
+  for (const scene of scenes) {
+    let video = null;
+    const videoUrl = await findSceneVideoUrl(scene, fallbackQuery);
+    video = await loadCanvasVideoSafe(videoUrl);
+    if (video) {
+      out.push({ type: "video", media: video });
+      continue;
+    }
+    const pexelsUrl = await findSceneImageUrl(scene, fallbackQuery);
+    const image = await loadCanvasImageSafe(pexelsUrl || fallbackImageUrl);
+    out.push({ type: "image", media: image });
+  }
+  return out;
+}
+function drawCoverMedia(ctx, media, x, y, w, h, motion=0, sceneIndex=0){
+  const mw = media?.videoWidth || media?.naturalWidth || media?.width || 0;
+  const mh = media?.videoHeight || media?.naturalHeight || media?.height || 0;
+  if (!mw || !mh) return false;
   const zoom = 1.08 + Math.min(0.12, Math.max(0, motion) * 0.12);
-  const scale = Math.max(w / img.width, h / img.height) * zoom;
+  const scale = Math.max(w / mw, h / mh) * zoom;
   const sw = w / scale;
   const sh = h / scale;
-  const panX = Math.sin((motion + sceneIndex * 0.37) * Math.PI) * (img.width - sw) * 0.18;
-  const panY = Math.cos((motion + sceneIndex * 0.23) * Math.PI) * (img.height - sh) * 0.14;
-  const sx = Math.max(0, Math.min(img.width - sw, (img.width - sw) / 2 + panX));
-  const sy = Math.max(0, Math.min(img.height - sh, (img.height - sh) / 2 + panY));
-  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+  const panX = Math.sin((motion + sceneIndex * 0.37) * Math.PI) * (mw - sw) * 0.18;
+  const panY = Math.cos((motion + sceneIndex * 0.23) * Math.PI) * (mh - sh) * 0.14;
+  const sx = Math.max(0, Math.min(mw - sw, (mw - sw) / 2 + panX));
+  const sy = Math.max(0, Math.min(mh - sh, (mh - sh) / 2 + panY));
+  ctx.drawImage(media, sx, sy, sw, sh, x, y, w, h);
   return true;
 }
+const drawCoverImage = drawCoverMedia;
 function roundRectPath(ctx, x, y, w, h, r){
   const radius = Math.min(r, w / 2, h / 2);
   ctx.beginPath();
@@ -2932,7 +3028,7 @@ function drawCenteredTextBox(ctx, text, cx, cy, boxWidth, maxBoxHeight){
 function drawReelFrame(ctx, config){
   const { width, height, background, logo, scene, progress, caption, sceneProgress=0, sceneIndex=0 } = config;
   ctx.clearRect(0, 0, width, height);
-  const hasBg = drawCoverImage(ctx, background, 0, 0, width, height, sceneProgress, sceneIndex);
+  const hasBg = drawCoverMedia(ctx, background, 0, 0, width, height, sceneProgress, sceneIndex);
   if (!hasBg) {
     const gradient = ctx.createLinearGradient(0, 0, width, height);
     gradient.addColorStop(0, "#bfeaff");
@@ -3015,17 +3111,17 @@ async function recordReelVideo({ row, draft }){
     draft.content || row?.content,
   ].filter(Boolean).join(" ").slice(0, 180) || "students science classroom experiment";
   const logo = await loadCanvasImage("assets/mindup-logo-round.png");
-  const sceneImages = await loadSceneImages(scenes, fallbackImageUrl, fallbackQuery);
+  const sceneMedia = await loadSceneMedia(scenes, fallbackImageUrl, fallbackQuery);
   let audioContext = null;
   let audioSource = null;
   let audioDestination = null;
-  let duration = sceneDuration;
+  let duration = Math.max(55, sceneDuration);
   try {
     const audioBlob = await fetchMediaBlob(audioUrl);
     const audioBufferBytes = await audioBlob.arrayBuffer();
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const audioBuffer = await audioContext.decodeAudioData(audioBufferBytes.slice(0));
-    duration = Math.min(60, Math.max(sceneDuration, audioBuffer.duration || 0));
+    duration = Math.min(75, Math.max(55, sceneDuration, audioBuffer.duration || 0));
     audioDestination = audioContext.createMediaStreamDestination();
     audioSource = audioContext.createBufferSource();
     audioSource.buffer = audioBuffer;
@@ -3033,7 +3129,7 @@ async function recordReelVideo({ row, draft }){
   } catch (error) {
     console.warn("Cannot decode reel audio", error);
   }
-  duration = Math.max(8, Math.min(60, duration));
+  duration = Math.max(55, Math.min(75, duration));
   const canvasStream = canvas.captureStream(30);
   const audioTracks = audioDestination?.stream?.getAudioTracks?.() || [];
   const tracks = [...canvasStream.getVideoTracks(), ...audioTracks];
@@ -3054,7 +3150,7 @@ async function recordReelVideo({ row, draft }){
       drawReelFrame(ctx, {
         width,
         height,
-        background: sceneImages[index] || sceneImages[0],
+        background: sceneMedia[index]?.media || sceneMedia[0]?.media,
         logo,
         scene,
         caption: reel.caption || draft.content || "",
@@ -3072,11 +3168,19 @@ async function recordReelVideo({ row, draft }){
   await stopped;
   stream.getTracks().forEach(track => track.stop());
   await audioContext?.close?.().catch(()=>{});
-  cleanupCanvasImages([logo, ...sceneImages]);
+  cleanupCanvasImages([logo]);
+  cleanupCanvasMedia(sceneMedia.map(item => item.media));
   const finalType = recorder.mimeType || mimeType || "video/webm";
   const blob = new Blob(chunks, { type: finalType });
   if (!blob.size) throw new Error("Không tạo được dữ liệu video Reels.");
-  return { blob, mimeType: finalType, duration, hasAudio: Boolean(audioTracks.length), sceneImageCount: sceneImages.filter(Boolean).length };
+  return {
+    blob,
+    mimeType: finalType,
+    duration,
+    hasAudio: Boolean(audioTracks.length),
+    sceneImageCount: sceneMedia.filter(item => item?.media).length,
+    sceneVideoCount: sceneMedia.filter(item => item?.type === "video" && item?.media).length,
+  };
 }
 async function generateReelVideo(){
   const postTypeId = $("postType")?.value || "";
@@ -3121,6 +3225,7 @@ async function generateReelVideo(){
       duration_seconds: Math.round(result.duration),
       has_audio_track: result.hasAudio,
       scene_image_count: result.sceneImageCount,
+      scene_video_count: result.sceneVideoCount,
       created_at: new Date().toISOString(),
     };
     const updatedMetadata = {
@@ -3153,7 +3258,7 @@ async function generateReelVideo(){
         : [...S.posts, saved];
     }
     showPostStatus(result.hasAudio ? "ok" : "err", result.hasAudio
-      ? `Đã tạo Reel hoàn chỉnh, có voice-over, ${result.sceneImageCount || 1} cảnh ảnh và đã lưu lên Drive.`
+      ? `?? t?o Reel ho?n ch?nh, c? voice-over, ${result.sceneVideoCount || 0} c?nh video, ${Math.max(0, (result.sceneImageCount || 0) - (result.sceneVideoCount || 0))} c?nh ?nh v? ?? l?u l?n Drive.`
       : "Đã tạo video Reels và lưu lên Drive, nhưng trình duyệt không ghép được audio vào video. Audio vẫn đang lưu riêng trong bài.");
     await loadData();
   } catch (error) {

@@ -94,6 +94,56 @@ async function searchPexelsImage(query: string) {
   };
 }
 
+async function searchPexelsVideo(query: string) {
+  const apiKey = env("PEXELS_API_KEY");
+  if (!apiKey) throw new Error("Thiếu Supabase secret PEXELS_API_KEY.");
+  const cleanQuery = String(query || "").replace(/\s+/g, " ").trim();
+  if (!cleanQuery) throw new Error("Thiếu từ khóa tìm video scene.");
+  const searchUrl = new URL("https://api.pexels.com/videos/search");
+  searchUrl.searchParams.set("query", `${cleanQuery}, education`);
+  searchUrl.searchParams.set("orientation", "portrait");
+  searchUrl.searchParams.set("per_page", "6");
+  searchUrl.searchParams.set("page", "1");
+  const res = await fetch(searchUrl.toString(), {
+    headers: { Authorization: apiKey },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || data?.message || "Pexels video search failed");
+  const videos = Array.isArray(data?.videos) ? data.videos : [];
+  for (const item of videos) {
+    const record = item && typeof item === "object" ? item as Record<string, unknown> : null;
+    const files = Array.isArray(record?.video_files) ? record.video_files as Array<Record<string, unknown>> : [];
+    const candidates = files
+      .filter(file => String(file.file_type || "").includes("mp4") && String(file.link || ""))
+      .map(file => ({
+        link: String(file.link || ""),
+        width: Number(file.width || 0),
+        height: Number(file.height || 0),
+        quality: String(file.quality || ""),
+      }))
+      .sort((a, b) => {
+        const portraitA = a.height >= a.width ? 0 : 1;
+        const portraitB = b.height >= b.width ? 0 : 1;
+        if (portraitA !== portraitB) return portraitA - portraitB;
+        const scoreA = Math.abs(a.height - 1280) + Math.abs(a.width - 720);
+        const scoreB = Math.abs(b.height - 1280) + Math.abs(b.width - 720);
+        return scoreA - scoreB;
+      });
+    const best = candidates[0];
+    if (best?.link) {
+      return {
+        url: best.link,
+        width: best.width,
+        height: best.height,
+        quality: best.quality,
+        duration: Number(record?.duration || 0),
+        page_url: String(record?.url || ""),
+      };
+    }
+  }
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
@@ -105,6 +155,10 @@ Deno.serve(async (req) => {
     if (action === "pexels_image") {
       const image = await searchPexelsImage(String(body?.query || ""));
       return jsonResponse({ ok: true, image });
+    }
+    if (action === "pexels_video") {
+      const video = await searchPexelsVideo(String(body?.query || ""));
+      return jsonResponse({ ok: true, video });
     }
     const url = String(body?.url || "").trim();
     const { bytes, contentType } = await fetchBinary(url);
