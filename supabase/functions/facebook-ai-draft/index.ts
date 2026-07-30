@@ -1555,6 +1555,7 @@ function buildGeminiPrompt(args: {
       "- Include a short 'Bài học rút ra' sentence that states what the reader now understands.",
       "- End with a light CTA: ask readers to comment a real-life situation they want MindUp to explain next.",
       "- For the main MindUp page, make it interdisciplinary instead of focusing on only one subject.",
+      "- Add 3-6 tasteful emoji/icons in the public caption to improve scanability and warmth. Place them mostly at the hook, section lead-ins, key takeaway, and CTA. Choose icons that match the topic, such as 🧠, 🔬, 🧬, ⚗️, 📐, ⚡, 🌱, 💡, ✅, 👇. Do not put emoji inside every sentence or in the middle of technical explanations.",
       "",
       "Image requirements:",
       "- AI must NOT generate an image. Return Pexels-friendly English search keywords and one Vietnamese overlay sentence.",
@@ -1597,7 +1598,7 @@ function buildGeminiPrompt(args: {
       "",
       "Return ONLY valid JSON, no markdown, using this schema:",
       JSON.stringify({
-        caption: "Vietnamese Applying Knowledge to Practice post, 300-650 words, with real-life hook, school knowledge explanation, mini example, and CTA.",
+        caption: "Vietnamese Applying Knowledge to Practice post, 300-650 words, with real-life hook, school knowledge explanation, mini example, CTA, and 3-6 tasteful topic-matching emoji/icons.",
         hashtags: ["#MindUp", "#UngDungKienThuc", "#HocDeHieuTheGioi", "#PhatTrienTuDuy", fanpageTag],
         image_prompt: "English prompt for a square 1:1 real-life educational background related to the application and subject, no text, no logo.",
         image_search_keywords: "English Pexels search keywords for a relevant real-life background/video frame, no text.",
