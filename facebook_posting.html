@@ -2889,6 +2889,21 @@ function cleanupCanvasMedia(items){
 function uniqueNonEmpty(values){
   return [...new Set(values.map(value => String(value || "").trim()).filter(Boolean))];
 }
+function reelVoiceWordCount(value){
+  return String(value || "").trim().split(/\s+/).filter(Boolean).length;
+}
+function reelVoiceTextFromPost(row){
+  const meta = postMetadata(row);
+  const applying = meta.applying_knowledge || {};
+  const reel = applying.reel || {};
+  const fromMeta = String(reel.voiceOver || reel.voice_over || "").trim();
+  const sceneVoice = Array.isArray(reel.scenes)
+    ? reel.scenes.map(scene => String(scene?.voice_text || scene?.voiceText || scene?.voice_over || "").trim()).filter(Boolean).join(" ")
+    : "";
+  const audioText = String(applying.audio?.text || "").trim();
+  return [audioText, fromMeta, sceneVoice].find(text => reelVoiceWordCount(text) >= 90)
+    || [audioText, fromMeta, sceneVoice].filter(Boolean).join(" ").trim();
+}
 async function findSceneImageUrl(scene, fallbackQuery="education learning"){
   const sceneQuery = String(scene?.stock_video_keywords || "").trim();
   const overlay = String(scene?.overlay_text || "").trim();
@@ -3114,18 +3129,34 @@ async function recordReelVideo({ row, draft }){
   const sceneMedia = await loadSceneMedia(scenes, fallbackImageUrl, fallbackQuery);
   let audioContext = null;
   let audioSource = null;
+  let silentAudioSource = null;
+  let silentAudioGain = null;
   let audioDestination = null;
+  let audioDuration = 0;
   let duration = Math.max(55, sceneDuration);
   try {
     const audioBlob = await fetchMediaBlob(audioUrl);
     const audioBufferBytes = await audioBlob.arrayBuffer();
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const audioBuffer = await audioContext.decodeAudioData(audioBufferBytes.slice(0));
+    audioDuration = audioBuffer.duration || 0;
     duration = Math.min(75, Math.max(55, sceneDuration, audioBuffer.duration || 0));
     audioDestination = audioContext.createMediaStreamDestination();
     audioSource = audioContext.createBufferSource();
     audioSource.buffer = audioBuffer;
     audioSource.connect(audioDestination);
+    silentAudioGain = audioContext.createGain();
+    silentAudioGain.gain.value = 0.00001;
+    silentAudioGain.connect(audioDestination);
+    if (audioContext.createConstantSource) {
+      silentAudioSource = audioContext.createConstantSource();
+      silentAudioSource.offset.value = 0;
+      silentAudioSource.connect(silentAudioGain);
+    } else {
+      silentAudioSource = audioContext.createOscillator();
+      silentAudioSource.frequency.value = 20;
+      silentAudioSource.connect(silentAudioGain);
+    }
   } catch (error) {
     console.warn("Cannot decode reel audio", error);
   }
@@ -3140,6 +3171,7 @@ async function recordReelVideo({ row, draft }){
   recorder.ondataavailable = ev => { if (ev.data?.size) chunks.push(ev.data); };
   const stopped = new Promise(resolve => recorder.onstop = resolve);
   recorder.start(500);
+  try { silentAudioSource?.start(0); } catch (_) {}
   try { audioSource?.start(0); } catch (_) {}
   const started = performance.now();
   await new Promise(resolve => {
@@ -3164,6 +3196,7 @@ async function recordReelVideo({ row, draft }){
     tick();
   });
   try { audioSource?.stop(); } catch (_) {}
+  try { silentAudioSource?.stop(); } catch (_) {}
   recorder.stop();
   await stopped;
   stream.getTracks().forEach(track => track.stop());
@@ -3177,6 +3210,7 @@ async function recordReelVideo({ row, draft }){
     blob,
     mimeType: finalType,
     duration,
+    audioDuration,
     hasAudio: Boolean(audioTracks.length),
     sceneImageCount: sceneMedia.filter(item => item?.media).length,
     sceneVideoCount: sceneMedia.filter(item => item?.type === "video" && item?.media).length,
@@ -3199,7 +3233,8 @@ async function generateReelVideo(){
     const existingAudio = postMetadata(row).applying_knowledge?.audio || {};
     const hasExistingAudio = Boolean(existingAudio.preview_url || existingAudio.url);
     const needsVietnameseRefresh = hasExistingAudio && postAudioNeedsVietnameseRefresh(row);
-    if (!hasExistingAudio || needsVietnameseRefresh) {
+    const needsLongVoiceRefresh = hasExistingAudio && reelVoiceWordCount(reelVoiceTextFromPost(row)) < 90;
+    if (!hasExistingAudio || needsVietnameseRefresh || needsLongVoiceRefresh) {
       if ($("ttsStatus")) $("ttsStatus").value = "Đang tự tạo giọng đọc...";
       showPostStatus("info", "Chưa có giọng đọc, hệ thống đang tự tạo voice-over trước...");
       row = await ensureReelVoice(draft);
@@ -3259,6 +3294,12 @@ async function generateReelVideo(){
     }
     showPostStatus(result.hasAudio ? "ok" : "err", result.hasAudio
       ? `?? t?o Reel ho?n ch?nh, c? voice-over, ${result.sceneVideoCount || 0} c?nh video, ${Math.max(0, (result.sceneImageCount || 0) - (result.sceneVideoCount || 0))} c?nh ?nh v? ?? l?u l?n Drive.`
+      : "Đã tạo video Reels và lưu lên Drive, nhưng trình duyệt không ghép được audio vào video. Audio vẫn đang lưu riêng trong bài.");
+    const shortAudioNote = result.audioDuration && result.audioDuration < 45
+      ? ` Voice-over hiện dài khoảng ${Math.round(result.audioDuration)}s; video vẫn được giữ đủ ${Math.round(result.duration)}s.`
+      : "";
+    showPostStatus(result.hasAudio ? "ok" : "err", result.hasAudio
+      ? `Đã tạo Reel hoàn chỉnh, có voice-over, ${result.sceneVideoCount || 0} cảnh video, ${Math.max(0, (result.sceneImageCount || 0) - (result.sceneVideoCount || 0))} cảnh ảnh và đã lưu lên Drive.${shortAudioNote}`
       : "Đã tạo video Reels và lưu lên Drive, nhưng trình duyệt không ghép được audio vào video. Audio vẫn đang lưu riêng trong bài.");
     await loadData();
   } catch (error) {

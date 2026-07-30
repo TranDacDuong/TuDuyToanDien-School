@@ -1505,9 +1505,10 @@ function buildGeminiPrompt(args: {
       "Reel draft requirements:",
       "- Also create a complete short Reel plan using stock footage/images, no filming required.",
       "- Reel duration: 55-65 seconds, ideally about 60 seconds. AI must design the timing naturally; do NOT force equal scene lengths.",
-      "- Create 8-10 scenes. Each scene must have: seconds, voice_text, overlay_text, stock_video_keywords, visual_type.",
+      "- The full voice_over must be long enough for about 55-65 seconds of Vietnamese speech: target 135-170 Vietnamese words total.",
+      "- Create 9-10 scenes. Each scene must have: seconds, voice_text, overlay_text, stock_video_keywords, visual_type.",
       "- seconds must be a continuous timeline like 0-4, 4-10, 10-15, 15-23, ... ending exactly at duration_seconds.",
-      "- voice_text is the exact Vietnamese narration spoken during that scene. Keep each scene voice_text short enough for its duration.",
+      "- voice_text is the exact Vietnamese narration spoken during that scene. Each scene should normally have 14-22 Vietnamese words, adjusted to its duration.",
       "- voice_over must be the full narration made by joining all scene voice_text in order. Do not add content outside the scenes.",
       "- overlay_text must be very short, 3-9 Vietnamese words, readable on mobile.",
       "- stock_video_keywords must be English Pexels-friendly search keywords matching that scene and must describe visible objects/actions, not abstract ideas.",
@@ -1840,11 +1841,15 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
     : [];
   const hardQuizRecord = (parsed?.hard_quiz && typeof parsed.hard_quiz === "object" ? parsed.hard_quiz : {}) as JsonRecord;
   const reelRecord = (parsed?.reel && typeof parsed.reel === "object" ? parsed.reel : {}) as JsonRecord;
-  const reelScenes = Array.isArray(reelRecord.scenes) ? reelRecord.scenes.slice(0, 8) : [];
+  const reelScenes = Array.isArray(reelRecord.scenes) ? reelRecord.scenes.slice(0, 10) : [];
   const sceneVoiceOver = reelScenes.map((scene: unknown) => {
     const record = (scene && typeof scene === "object" ? scene : {}) as JsonRecord;
     return String(record.voice_text || record.voiceText || record.voice_over || "").trim();
   }).filter(Boolean).join(" ");
+  const reelVoiceOver = String(reelRecord.voice_over || sceneVoiceOver || "").trim();
+  const reelVoiceWordCount = reelVoiceOver.split(/\s+/).filter(Boolean).length;
+  const captionVoiceFallback = rawCaption.split(/\s+/).filter(Boolean).slice(0, 155).join(" ");
+  const normalizedReelDuration = Math.max(55, Math.min(65, Number(reelRecord.duration_seconds || 0) || 60));
   return {
     model,
     caption: isStandaloneLearning ? sanitizeStandaloneLearningMethodCaption(rawCaption) : rawCaption,
@@ -1875,8 +1880,8 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
     },
     reel: {
       hook3s: String(reelRecord.hook_3s || "").trim(),
-      durationSeconds: Number(reelRecord.duration_seconds || 0) || null,
-      voiceOver: String(reelRecord.voice_over || sceneVoiceOver || "").trim(),
+      durationSeconds: normalizedReelDuration,
+      voiceOver: reelVoiceWordCount >= 90 ? reelVoiceOver : [sceneVoiceOver, captionVoiceFallback].filter(Boolean).join(" ").trim(),
       scenes: reelScenes,
       caption: String(reelRecord.caption || "").trim(),
       hashtags: normalizeHashtags(reelRecord.hashtags),

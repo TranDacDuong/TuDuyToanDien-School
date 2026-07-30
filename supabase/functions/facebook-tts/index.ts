@@ -368,11 +368,30 @@ function extractVoiceOver(post: Awaited<ReturnType<typeof loadPost>>, fallbackTe
   const applying = (metadata.applying_knowledge && typeof metadata.applying_knowledge === "object" ? metadata.applying_knowledge : {}) as JsonRecord;
   const reel = (applying.reel && typeof applying.reel === "object" ? applying.reel : {}) as JsonRecord;
   const fromMetadata = String(reel.voiceOver || reel.voice_over || "").trim();
-  if (fromMetadata) return fromMetadata;
-  if (fallbackText.trim()) return fallbackText.trim();
+  const wordCount = (value: string) => value.split(/\s+/).filter(Boolean).length;
   const note = String(post.internal_note || "");
-  const match = note.match(/Voice-over:\s*([\s\S]*?)(?:\nScenes:|\nReel caption:|\nReel hashtags:|$)/i);
-  return String(match?.[1] || "").trim();
+  const sceneVoiceOver = Array.isArray(reel.scenes)
+    ? reel.scenes.map((scene: unknown) => {
+      const record = (scene && typeof scene === "object" ? scene : {}) as JsonRecord;
+      return String(record.voice_text || record.voiceText || record.voice_over || "").trim();
+    }).filter(Boolean).join(" ")
+    : "";
+  const noteVoiceMatch = note.match(/Voice-over:\s*([\s\S]*?)(?:\nScenes:|\nReel caption:|\nReel hashtags:|$)/i);
+  const fromNote = String(noteVoiceMatch?.[1] || "").trim();
+  const captionFallback = String(post.content || "")
+    .replace(/#\S+/g, "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 155)
+    .join(" ");
+  const candidates = [fallbackText, fromMetadata, sceneVoiceOver, fromNote]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  const longCandidate = candidates.find((value) => wordCount(value) >= 90);
+  if (longCandidate) return longCandidate;
+  const joined = [...candidates, captionFallback].filter(Boolean).join(" ").trim();
+  if (joined) return joined;
+  return "";
 }
 
 Deno.serve(async (req) => {
