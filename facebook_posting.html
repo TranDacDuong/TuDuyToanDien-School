@@ -2719,6 +2719,15 @@ function chooseRecorderMimeType(){
   ];
   return candidates.find(type => window.MediaRecorder?.isTypeSupported?.(type)) || "";
 }
+const REEL_RENDER_WIDTH = 540;
+const REEL_RENDER_HEIGHT = 960;
+const REEL_RENDER_FPS = 15;
+const REEL_VIDEO_BITRATE = 900000;
+const REEL_USE_EXTERNAL_MEDIA = false;
+const EXPLAINER_RENDER_WIDTH = 960;
+const EXPLAINER_RENDER_HEIGHT = 540;
+const EXPLAINER_RENDER_FPS = 15;
+const EXPLAINER_VIDEO_BITRATE = 1200000;
 function parseSceneSeconds(value){
   const text = String(value || "");
   const match = text.match(/(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)/);
@@ -3076,17 +3085,130 @@ function drawCenteredTextBox(ctx, text, cx, cy, boxWidth, maxBoxHeight){
   lines.forEach((line, index) => ctx.fillText(line, cx, startY + index * lineHeight));
   ctx.restore();
 }
+function drawReelWhiteboardBackground(ctx, width, height, scene, sceneProgress=0, sceneIndex=0){
+  ctx.fillStyle = "#f7fbff";
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.save();
+  ctx.globalAlpha = 0.18;
+  ctx.strokeStyle = "#7aa7c7";
+  ctx.lineWidth = 1;
+  const grid = 36;
+  const offset = (sceneProgress * grid * 0.7) % grid;
+  for (let x = -grid + offset; x < width + grid; x += grid) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
+    ctx.stroke();
+  }
+  for (let y = -grid + offset; y < height + grid; y += grid) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  const palette = ["#2f80ed", "#f2b705", "#25a18e", "#f45b69", "#673ab7"];
+  const color = palette[sceneIndex % palette.length];
+  const accent = palette[(sceneIndex + 2) % palette.length];
+  const bob = Math.sin(sceneProgress * Math.PI * 2) * 10;
+  const reveal = Math.min(1, sceneProgress * 2.4);
+
+  ctx.save();
+  ctx.translate(width * 0.5, height * 0.28 + bob);
+  ctx.globalAlpha = 0.95;
+  ctx.strokeStyle = color;
+  ctx.fillStyle = "rgba(255,255,255,.9)";
+  ctx.lineWidth = 8;
+  roundRectPath(ctx, -150, -86, 300, 172, 28);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.lineCap = "round";
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 10;
+  const key = `${scene?.visual_type || ""} ${scene?.stock_video_keywords || ""} ${scene?.overlay_text || ""}`.toLowerCase();
+  if (/math|toan|logic|number|formula|equation/.test(key)) {
+    ctx.beginPath();
+    ctx.moveTo(-92, 34);
+    ctx.lineTo(-24, -44);
+    ctx.lineTo(28, 26);
+    ctx.lineTo(94, -52);
+    ctx.stroke();
+    ctx.fillStyle = color;
+    [-92, -24, 28, 94].forEach((x, i) => {
+      ctx.beginPath();
+      ctx.arc(x, [34, -44, 26, -52][i], 11, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  } else if (/chem|hoa|molecule|atom|reaction/.test(key)) {
+    const atoms = [[-70, 0, 26], [18, -42, 22], [68, 28, 18], [8, 42, 20]];
+    ctx.beginPath();
+    ctx.moveTo(-70, 0);
+    ctx.lineTo(18, -42);
+    ctx.lineTo(68, 28);
+    ctx.lineTo(8, 42);
+    ctx.lineTo(-70, 0);
+    ctx.stroke();
+    ctx.fillStyle = color;
+    atoms.forEach(([x,y,r]) => {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  } else if (/bio|sinh|cell|dna|brain|body/.test(key)) {
+    ctx.beginPath();
+    for (let i = 0; i < 12; i += 1) {
+      const y = -62 + i * 12;
+      const x1 = Math.sin(i * 0.95 + sceneProgress * 2) * 45;
+      const x2 = -x1;
+      ctx.moveTo(x1, y);
+      ctx.lineTo(x2, y + 8);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    for (let i = 0; i < 70; i += 1) {
+      const y = -70 + i * 2;
+      const x = Math.sin(i * 0.18 + sceneProgress * 2) * 48;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.arc(-48, -16, 42, Math.PI * .1, Math.PI * 1.9);
+    ctx.arc(42, 16, 54, Math.PI * 1.15, Math.PI * 3.15);
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(-48, -16, 12 + reveal * 8, 0, Math.PI * 2);
+    ctx.arc(42, 16, 14 + reveal * 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = 0.25 + reveal * 0.22;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 5;
+  for (let i = 0; i < 4; i += 1) {
+    const y = height * (0.66 + i * 0.05);
+    ctx.beginPath();
+    ctx.moveTo(width * 0.16, y);
+    ctx.lineTo(width * (0.44 + reveal * 0.34), y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
 function drawReelFrame(ctx, config){
   const { width, height, background, logo, scene, progress, caption, sceneProgress=0, sceneIndex=0 } = config;
   ctx.clearRect(0, 0, width, height);
   const hasBg = drawCoverMedia(ctx, background, 0, 0, width, height, sceneProgress, sceneIndex);
   if (!hasBg) {
-    const gradient = ctx.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, "#bfeaff");
-    gradient.addColorStop(0.55, "#3aa8ff");
-    gradient.addColorStop(1, "#073b91");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
+    drawReelWhiteboardBackground(ctx, width, height, scene, sceneProgress, sceneIndex);
   }
   const fade = Math.min(1, sceneProgress * 5, (1 - sceneProgress) * 5 + 0.15);
   ctx.fillStyle = `rgba(3, 16, 38, ${0.28 + (1 - fade) * 0.18})`;
@@ -3097,29 +3219,31 @@ function drawReelFrame(ctx, config){
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, width, height);
   if (logo) {
-    const size = 150;
+    const size = Math.max(92, Math.min(150, width * 0.2));
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,.28)";
     ctx.shadowBlur = 18;
-    ctx.drawImage(logo, width / 2 - size / 2, 52, size, size);
+    ctx.drawImage(logo, width / 2 - size / 2, height * 0.04, size, size);
     ctx.restore();
   }
   drawCenteredTextBox(ctx, scene?.overlay_text || caption || "MindUp - Học để hiểu thế giới", width / 2, height * .48, width - 96, height * .33);
   ctx.fillStyle = "rgba(7, 26, 58, .68)";
-  roundRectPath(ctx, 86, height - 184, width - 172, 74, 37);
+  const tagX = Math.max(42, width * 0.12);
+  const tagW = width - tagX * 2;
+  roundRectPath(ctx, tagX, height - 152, tagW, 58, 29);
   ctx.fill();
   ctx.fillStyle = "#ffffff";
-  ctx.font = "800 24px Inter, Arial, sans-serif";
-  ctx.letterSpacing = "5px";
+  ctx.font = `800 ${Math.max(17, Math.min(24, width * 0.035))}px Inter, Arial, sans-serif`;
+  ctx.letterSpacing = "3px";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("HIỂU BẢN CHẤT - ĐIỂM BỨT PHÁ", width / 2, height - 147);
+  ctx.fillText("HIỂU BẢN CHẤT - ĐIỂM BỨT PHÁ", width / 2, height - 123);
   ctx.letterSpacing = "0px";
   ctx.fillStyle = "rgba(255,255,255,.86)";
-  roundRectPath(ctx, 74, height - 78, width - 148, 12, 6);
+  roundRectPath(ctx, tagX, height - 58, tagW, 10, 5);
   ctx.fill();
   ctx.fillStyle = "#f4b81f";
-  roundRectPath(ctx, 74, height - 78, (width - 148) * Math.max(0, Math.min(1, progress)), 12, 6);
+  roundRectPath(ctx, tagX, height - 58, tagW * Math.max(0, Math.min(1, progress)), 10, 5);
   ctx.fill();
 }
 async function waitForMediaReady(el){
@@ -3163,8 +3287,8 @@ async function recordReelVideo({ row, draft }){
   const scenes = normalizeReelScenesSafe(meta, draft.internal_note || row.internal_note || "");
   const sceneDuration = Math.max(...scenes.map(s => s.end), Number(reel.durationSeconds || 0) || 30);
   const canvas = document.createElement("canvas");
-  const width = 720;
-  const height = 1280;
+  const width = REEL_RENDER_WIDTH;
+  const height = REEL_RENDER_HEIGHT;
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
@@ -3177,7 +3301,9 @@ async function recordReelVideo({ row, draft }){
     draft.content || row?.content,
   ].filter(Boolean).join(" ").slice(0, 180) || "students science classroom experiment";
   const logo = await loadCanvasImage("assets/mindup-logo-round.png");
-  const sceneMedia = await loadSceneMedia(scenes, fallbackImageUrl, fallbackQuery);
+  const sceneMedia = REEL_USE_EXTERNAL_MEDIA
+    ? await loadSceneMedia(scenes, fallbackImageUrl, fallbackQuery)
+    : scenes.map(() => ({ type: "whiteboard", media: null }));
   let audioContext = null;
   let audioSource = null;
   let silentAudioSource = null;
@@ -3227,23 +3353,23 @@ async function recordReelVideo({ row, draft }){
   let frameTrack = canvasStream.getVideoTracks()[0] || null;
   if (!frameTrack?.requestFrame) {
     canvasStream.getTracks().forEach(track => track.stop());
-    canvasStream = canvas.captureStream(20);
+    canvasStream = canvas.captureStream(REEL_RENDER_FPS);
     frameTrack = null;
   }
   const audioTracks = audioDestination?.stream?.getAudioTracks?.() || [];
   const tracks = [...canvasStream.getVideoTracks(), ...audioTracks];
   const stream = new MediaStream(tracks);
   const mimeType = chooseRecorderMimeType();
-  const recorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 1800000 } : { videoBitsPerSecond: 1800000 });
+  const recorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: REEL_VIDEO_BITRATE } : { videoBitsPerSecond: REEL_VIDEO_BITRATE });
   const chunks = [];
   recorder.ondataavailable = ev => { if (ev.data?.size) chunks.push(ev.data); };
   const stopped = new Promise(resolve => recorder.onstop = resolve);
-  recorder.start(500);
+  recorder.start(1000);
   try { silentAudioSource?.start(0); } catch (_) {}
   try { audioSource?.start(0); } catch (_) {}
   await runFixedFrameRenderer({
     duration,
-    fps: 20,
+    fps: REEL_RENDER_FPS,
     frameTrack,
     drawFrame: (t) => {
       const scene = activeReelScene(scenes, t);
@@ -3537,7 +3663,7 @@ async function recordLongExplainerVideo({ row, draft }){
   const scenes = normalizeExplainerScenes(meta);
   const sceneDuration = Math.max(...scenes.map(s => s.end), Number(explainer.durationSeconds || explainer.duration_seconds || 0) || 240);
   const canvas = document.createElement("canvas");
-  const width = 1280, height = 720;
+  const width = EXPLAINER_RENDER_WIDTH, height = EXPLAINER_RENDER_HEIGHT;
   canvas.width = width; canvas.height = height;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Trình duyệt không hỗ trợ Canvas để dựng video dài.");
@@ -3560,21 +3686,21 @@ async function recordLongExplainerVideo({ row, draft }){
   let frameTrack = canvasStream.getVideoTracks()[0] || null;
   if (!frameTrack?.requestFrame) {
     canvasStream.getTracks().forEach(track => track.stop());
-    canvasStream = canvas.captureStream(20);
+    canvasStream = canvas.captureStream(EXPLAINER_RENDER_FPS);
     frameTrack = null;
   }
   const stream = new MediaStream([...canvasStream.getVideoTracks(), ...audioDestination.stream.getAudioTracks()]);
   const mimeType = chooseRecorderMimeType();
-  const recorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 2000000 } : { videoBitsPerSecond: 2000000 });
+  const recorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: EXPLAINER_VIDEO_BITRATE } : { videoBitsPerSecond: EXPLAINER_VIDEO_BITRATE });
   const chunks = [];
   recorder.ondataavailable = ev => { if (ev.data?.size) chunks.push(ev.data); };
   const stopped = new Promise(resolve => recorder.onstop = resolve);
-  recorder.start(500);
+  recorder.start(1000);
   try { silent.start(0); } catch (_) {}
   try { audioSource.start(0); } catch (_) {}
   await runFixedFrameRenderer({
     duration,
-    fps: 20,
+    fps: EXPLAINER_RENDER_FPS,
     frameTrack,
     drawFrame: (t) => {
       const scene = activeReelScene(scenes, t);
