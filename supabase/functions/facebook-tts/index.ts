@@ -51,6 +51,14 @@ function env(name: string) {
   return Deno.env.get(name) || "";
 }
 
+function elevenLabsApiKeys() {
+  const keys = [
+    ...env("ELEVENLABS_API_KEYS").split(/[\n,;]+/),
+    env("ELEVENLABS_API_KEY"),
+  ].map((key) => key.trim()).filter(Boolean);
+  return Array.from(new Set(keys));
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -221,28 +229,31 @@ async function uploadBytesToDrive(bytes: Uint8Array, filename: string, mimeType:
 }
 
 async function listElevenLabsVoices() {
-  const apiKey = env("ELEVENLABS_API_KEY");
-  if (!apiKey) throw new Error("Thiếu Supabase secret ELEVENLABS_API_KEY.");
-  const res = await fetch("https://api.elevenlabs.io/v2/voices?page_size=100", {
-    headers: { "xi-api-key": apiKey },
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const message = data?.detail?.message || data?.message || "Không tải được danh sách voice ElevenLabs.";
+  const apiKeys = elevenLabsApiKeys();
+  if (!apiKeys.length) return FPT_TTS_VOICES;
+  const errors: string[] = [];
+  for (const apiKey of apiKeys) {
+    const res = await fetch("https://api.elevenlabs.io/v2/voices?page_size=100", {
+      headers: { "xi-api-key": apiKey },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      const voices = Array.isArray(data?.voices) ? data.voices : [];
+      return voices.map((voice: JsonRecord) => ({
+        voice_id: String(voice.voice_id || ""),
+        name: String(voice.name || "Voice"),
+        category: String(voice.category || ""),
+        description: String(voice.description || ""),
+        labels: voice.labels && typeof voice.labels === "object" ? voice.labels : {},
+        preview_url: String(voice.preview_url || ""),
+      })).filter((voice: { voice_id: string }) => voice.voice_id);
+    }
+    const message = data?.detail?.message || data?.message || "Kh�ng t?i du?c danh s�ch voice ElevenLabs.";
     if (String(message).includes("voices_read")) return FALLBACK_ELEVENLABS_VOICES;
-    throw new Error(message);
+    errors.push(message);
   }
-  const voices = Array.isArray(data?.voices) ? data.voices : [];
-  return voices.map((voice: JsonRecord) => ({
-    voice_id: String(voice.voice_id || ""),
-    name: String(voice.name || "Voice"),
-    category: String(voice.category || ""),
-    description: String(voice.description || ""),
-    labels: voice.labels && typeof voice.labels === "object" ? voice.labels : {},
-    preview_url: String(voice.preview_url || ""),
-  })).filter((voice: { voice_id: string }) => voice.voice_id);
+  throw new Error(errors[0] || "Kh�ng t?i du?c danh s�ch voice ElevenLabs.");
 }
-
 function defaultElevenLabsVoice() {
   return {
     voice_id: DEFAULT_ELEVENLABS_VOICE_ID,
@@ -311,41 +322,42 @@ async function generateFptSpeech(text: string, voiceId: string) {
 }
 
 async function generateElevenLabsSpeech(text: string, voiceId: string) {
-  const apiKey = env("ELEVENLABS_API_KEY");
-  if (!apiKey) throw new Error("Thiếu Supabase secret ELEVENLABS_API_KEY.");
+  const apiKeys = elevenLabsApiKeys();
+  if (!apiKeys.length) throw new Error("Missing Supabase secret ELEVENLABS_API_KEYS or ELEVENLABS_API_KEY.");
   const modelId = DEFAULT_ELEVENLABS_MODEL_ID;
   const cleanText = String(text || "").replace(/\s+/g, " ").trim();
-  if (!cleanText) throw new Error("Chưa có nội dung voice-over để tạo giọng đọc.");
-  if (cleanText.length > 4500) throw new Error("Voice-over quá dài. Hãy rút gọn dưới 4500 ký tự.");
+  if (!cleanText) throw new Error("Chua c� n?i dung voice-over d? t?o gi?ng d?c.");
+  if (cleanText.length > 4500) throw new Error("Voice-over qu� d�i. H�y r�t g?n du?i 4500 k� t?.");
   const cleanVoiceId = String(voiceId || DEFAULT_ELEVENLABS_VOICE_ID).trim();
-  if (!cleanVoiceId) throw new Error("Chưa chọn voice ElevenLabs.");
+  if (!cleanVoiceId) throw new Error("Chua ch?n voice ElevenLabs.");
 
-  const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(cleanVoiceId)}?output_format=mp3_44100_128`, {
-    method: "POST",
-    headers: {
-      "xi-api-key": apiKey,
-      "Content-Type": "application/json",
-      "Accept": "audio/mpeg",
-    },
-    body: JSON.stringify({
-      text: cleanText,
-      model_id: modelId,
-      voice_settings: {
-        stability: 0.46,
-        similarity_boost: 0.82,
-        style: 0.18,
-        use_speaker_boost: true,
+  const errors: string[] = [];
+  for (const apiKey of apiKeys) {
+    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(cleanVoiceId)}?output_format=mp3_44100_128`, {
+      method: "POST",
+      headers: {
+        "xi-api-key": apiKey,
+        "Content-Type": "application/json",
+        "Accept": "audio/mpeg",
       },
-    }),
-  });
-  const contentType = res.headers.get("Content-Type") || "";
-  if (!res.ok || !contentType.includes("audio")) {
+      body: JSON.stringify({
+        text: cleanText,
+        model_id: modelId,
+        voice_settings: {
+          stability: 0.46,
+          similarity_boost: 0.82,
+          style: 0.18,
+          use_speaker_boost: true,
+        },
+      }),
+    });
+    const contentType = res.headers.get("Content-Type") || "";
+    if (res.ok && contentType.includes("audio")) return new Uint8Array(await res.arrayBuffer());
     const data = await res.json().catch(() => ({}));
-    throw new Error(data?.detail?.message || data?.message || "Không tạo được giọng đọc ElevenLabs.");
+    errors.push(data?.detail?.message || data?.message || "Kh�ng t?o du?c gi?ng d?c ElevenLabs.");
   }
-  return new Uint8Array(await res.arrayBuffer());
+  throw new Error(errors[0] || "Kh�ng t?o du?c gi?ng d?c ElevenLabs.");
 }
-
 async function loadPost(postId: string) {
   const rows = await fetchJson<Array<{
     id: string;
