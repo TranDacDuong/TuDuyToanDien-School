@@ -1951,7 +1951,6 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
   }).filter(Boolean).join(" ");
   const reelVoiceOver = String(reelRecord.voice_over || sceneVoiceOver || "").trim();
   const reelVoiceWordCount = reelVoiceOver.split(/\s+/).filter(Boolean).length;
-  const captionVoiceFallback = rawCaption.split(/\s+/).filter(Boolean).slice(0, 155).join(" ");
   const normalizedReelDuration = Math.max(55, Math.min(65, Number(reelRecord.duration_seconds || 0) || 60));
   const explainerRecord = (parsed?.explainer_video && typeof parsed.explainer_video === "object" ? parsed.explainer_video : {}) as JsonRecord;
   const explainerScenes = Array.isArray(explainerRecord.scenes) ? explainerRecord.scenes.slice(0, 28) : [];
@@ -2011,7 +2010,7 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
     reel: {
       hook3s: String(reelRecord.hook_3s || "").trim(),
       durationSeconds: normalizedReelDuration,
-      voiceOver: reelVoiceWordCount >= 90 ? reelVoiceOver : [sceneVoiceOver, captionVoiceFallback].filter(Boolean).join(" ").trim(),
+      voiceOver: reelVoiceWordCount >= 90 ? reelVoiceOver : (sceneVoiceOver || reelVoiceOver),
       scenes: reelScenes,
       caption: String(reelRecord.caption || "").trim(),
       hashtags: normalizeHashtags(reelRecord.hashtags),

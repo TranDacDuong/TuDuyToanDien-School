@@ -2927,7 +2927,8 @@ function reelVoiceTextFromPost(row){
     : "";
   const audioText = String(applying.audio?.text || "").trim();
   return [audioText, fromMeta, sceneVoice].find(text => reelVoiceWordCount(text) >= 90)
-    || [audioText, fromMeta, sceneVoice].filter(Boolean).join(" ").trim();
+    || [sceneVoice, fromMeta, audioText].filter(Boolean).sort((a, b) => reelVoiceWordCount(b) - reelVoiceWordCount(a))[0]
+    || "";
 }
 async function findSceneImageUrl(scene, fallbackQuery="education learning"){
   const sceneQuery = String(scene?.stock_video_keywords || "").trim();
@@ -3136,7 +3137,7 @@ async function waitForMediaReady(el){
     el.addEventListener("error", fail, { once: true });
   });
 }
-async function runFixedFrameRenderer({ duration, fps=20, drawFrame }){
+async function runFixedFrameRenderer({ duration, fps=20, drawFrame, frameTrack=null }){
   const frameMs = 1000 / fps;
   const start = performance.now();
   let frame = 0;
@@ -3144,6 +3145,7 @@ async function runFixedFrameRenderer({ duration, fps=20, drawFrame }){
     const elapsed = (performance.now() - start) / 1000;
     const t = Math.min(duration, elapsed);
     drawFrame(t);
+    try { frameTrack?.requestFrame?.(); } catch (_) {}
     if (t >= duration) break;
     frame += 1;
     const nextDue = start + frame * frameMs;
@@ -3210,7 +3212,24 @@ async function recordReelVideo({ row, draft }){
     console.warn("Cannot decode reel audio", error);
   }
   duration = Math.max(55, Math.min(75, duration));
-  const canvasStream = canvas.captureStream(20);
+  drawReelFrame(ctx, {
+    width,
+    height,
+    background: sceneMedia[0]?.media,
+    logo,
+    scene: scenes[0],
+    caption: reel.caption || draft.content || "",
+    progress: 0,
+    sceneProgress: 0,
+    sceneIndex: 0,
+  });
+  let canvasStream = canvas.captureStream(0);
+  let frameTrack = canvasStream.getVideoTracks()[0] || null;
+  if (!frameTrack?.requestFrame) {
+    canvasStream.getTracks().forEach(track => track.stop());
+    canvasStream = canvas.captureStream(20);
+    frameTrack = null;
+  }
   const audioTracks = audioDestination?.stream?.getAudioTracks?.() || [];
   const tracks = [...canvasStream.getVideoTracks(), ...audioTracks];
   const stream = new MediaStream(tracks);
@@ -3225,6 +3244,7 @@ async function recordReelVideo({ row, draft }){
   await runFixedFrameRenderer({
     duration,
     fps: 20,
+    frameTrack,
     drawFrame: (t) => {
       const scene = activeReelScene(scenes, t);
       const index = Math.max(0, scenes.indexOf(scene));
@@ -3535,7 +3555,15 @@ async function recordLongExplainerVideo({ row, draft }){
   silentGain.connect(audioDestination);
   const silent = audioContext.createConstantSource ? audioContext.createConstantSource() : audioContext.createOscillator();
   silent.connect(silentGain);
-  const stream = new MediaStream([...canvas.captureStream(20).getVideoTracks(), ...audioDestination.stream.getAudioTracks()]);
+  drawExplainerFrame(ctx, { width, height, scene: scenes[0], progress: 0, sceneProgress: 0, sceneIndex: 0, title: explainer.title || "" });
+  let canvasStream = canvas.captureStream(0);
+  let frameTrack = canvasStream.getVideoTracks()[0] || null;
+  if (!frameTrack?.requestFrame) {
+    canvasStream.getTracks().forEach(track => track.stop());
+    canvasStream = canvas.captureStream(20);
+    frameTrack = null;
+  }
+  const stream = new MediaStream([...canvasStream.getVideoTracks(), ...audioDestination.stream.getAudioTracks()]);
   const mimeType = chooseRecorderMimeType();
   const recorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 2000000 } : { videoBitsPerSecond: 2000000 });
   const chunks = [];
@@ -3547,6 +3575,7 @@ async function recordLongExplainerVideo({ row, draft }){
   await runFixedFrameRenderer({
     duration,
     fps: 20,
+    frameTrack,
     drawFrame: (t) => {
       const scene = activeReelScene(scenes, t);
       const index = Math.max(0, scenes.indexOf(scene));

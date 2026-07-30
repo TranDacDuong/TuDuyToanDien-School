@@ -369,6 +369,8 @@ function extractVoiceOver(post: Awaited<ReturnType<typeof loadPost>>, fallbackTe
   const reel = (applying.reel && typeof applying.reel === "object" ? applying.reel : {}) as JsonRecord;
   const fromMetadata = String(reel.voiceOver || reel.voice_over || "").trim();
   const wordCount = (value: string) => value.split(/\s+/).filter(Boolean).length;
+  const directText = String(fallbackText || "").trim();
+  if (directText) return directText;
   const note = String(post.internal_note || "");
   const sceneVoiceOver = Array.isArray(reel.scenes)
     ? reel.scenes.map((scene: unknown) => {
@@ -389,8 +391,10 @@ function extractVoiceOver(post: Awaited<ReturnType<typeof loadPost>>, fallbackTe
     .filter(Boolean);
   const longCandidate = candidates.find((value) => wordCount(value) >= 90);
   if (longCandidate) return longCandidate;
-  const joined = [...candidates, captionFallback].filter(Boolean).join(" ").trim();
-  if (joined) return joined;
+  const bestCandidate = candidates
+    .sort((a, b) => wordCount(b) - wordCount(a))[0];
+  if (bestCandidate) return bestCandidate;
+  if (captionFallback) return captionFallback;
   return "";
 }
 
