@@ -426,6 +426,13 @@ function isEscaped(value: string, index: number) {
   return count % 2 === 1;
 }
 
+function insertMissingCommasBetweenJsonProperties(value: string) {
+  return String(value || "")
+    .replace(/"\s+(?="[\w-]+"\s*:)/g, '",')
+    .replace(/([}\]])\s+(?="[\w-]+"\s*:)/g, "$1,")
+    .replace(/(true|false|null|-?\d+(?:\.\d+)?)\s+(?="[\w-]+"\s*:)/g, "$1,");
+}
+
 function parseGeminiJsonCandidate(value: string) {
   try {
     return JSON.parse(value);
@@ -438,7 +445,12 @@ function parseGeminiJsonCandidate(value: string) {
       try {
         return JSON.parse(latexBackslashRepaired);
       } catch (_) {
-        throw firstError;
+        const commaRepaired = insertMissingCommasBetweenJsonProperties(latexBackslashRepaired);
+        try {
+          return JSON.parse(commaRepaired);
+        } catch (_) {
+          throw firstError;
+        }
       }
     }
   }
@@ -1427,6 +1439,7 @@ function buildGeminiPrompt(args: {
       "- image_overlay_text should be Vietnamese, memorable, and short enough for the image; aim around 10-20 words, but do not omit the key meaning.",
       "",
       "Return ONLY valid JSON, no markdown, using this schema:",
+      "JSON safety rules: every property must be separated by a comma; all multiline text must use \\n escapes; do not put raw line breaks inside string values.",
       JSON.stringify({
         caption: normalizeTextAiProvider(args.provider) === "llama"
           ? "Complete Teaching Philosophy Facebook post in Vietnamese, 450-800 words, at least 6 paragraphs, with hook, philosophy explanation, why it matters, subject-specific example, 3-5 practical actions, and soft CTA."
