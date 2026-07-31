@@ -2939,6 +2939,45 @@ function reelVoiceTextFromPost(row){
     || [sceneVoice, fromMeta, audioText].filter(Boolean).sort((a, b) => reelVoiceWordCount(b) - reelVoiceWordCount(a))[0]
     || "";
 }
+function splitSubtitleUnits(text){
+  const clean = String(text || "")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([,.!?;:])/g, "$1")
+    .trim();
+  if (!clean) return [];
+  const sentences = clean.match(/[^.!?。！？]+[.!?。！？]?/g) || [clean];
+  const units = [];
+  for (const sentence of sentences) {
+    const words = sentence.trim().split(/\s+/).filter(Boolean);
+    if (!words.length) continue;
+    for (let i = 0; i < words.length; i += 11) {
+      units.push(words.slice(i, i + 11).join(" "));
+    }
+  }
+  return units;
+}
+function buildSubtitleCues(text, duration){
+  const units = splitSubtitleUnits(text);
+  if (!units.length || !Number.isFinite(duration) || duration <= 0) return [];
+  const weights = units.map(unit => Math.max(3, reelVoiceWordCount(unit)));
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0) || units.length;
+  const minCue = 1.35;
+  const maxCue = 4.2;
+  const cues = [];
+  let cursor = 0;
+  units.forEach((unit, index) => {
+    const isLast = index === units.length - 1;
+    const rawLength = duration * (weights[index] / totalWeight);
+    const cueLength = isLast ? Math.max(0.8, duration - cursor) : Math.max(minCue, Math.min(maxCue, rawLength));
+    const end = isLast ? duration : Math.min(duration, cursor + cueLength);
+    cues.push({ start: cursor, end, text: unit });
+    cursor = end;
+  });
+  return cues.filter(cue => cue.end - cue.start > 0.2);
+}
+function activeSubtitleCue(cues, t){
+  return (cues || []).find(cue => t >= cue.start && t < cue.end) || null;
+}
 async function findSceneImageUrl(scene, fallbackQuery="education learning"){
   const sceneQuery = String(scene?.stock_video_keywords || "").trim();
   const overlay = String(scene?.overlay_text || "").trim();
@@ -3085,6 +3124,39 @@ function drawCenteredTextBox(ctx, text, cx, cy, boxWidth, maxBoxHeight){
   lines.forEach((line, index) => ctx.fillText(line, cx, startY + index * lineHeight));
   ctx.restore();
 }
+function drawSubtitleBox(ctx, text, width, height){
+  const clean = String(text || "").trim();
+  if (!clean) return;
+  const boxWidth = width - 64;
+  let fontSize = Math.max(28, Math.min(38, width * 0.062));
+  let lines = [];
+  do {
+    ctx.font = `800 ${fontSize}px Inter, Arial, sans-serif`;
+    lines = wrapCanvasText(ctx, clean, boxWidth - 44);
+    if (lines.length <= 2) break;
+    fontSize -= 2;
+  } while (fontSize >= 22);
+  lines = lines.slice(0, 2);
+  const lineHeight = fontSize * 1.22;
+  const boxHeight = Math.max(82, lines.length * lineHeight + 34);
+  const x = (width - boxWidth) / 2;
+  const y = height - 260;
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,.22)";
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 8;
+  roundRectPath(ctx, x, y, boxWidth, boxHeight, 22);
+  ctx.fillStyle = "rgba(4, 17, 34, .82)";
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `800 ${fontSize}px Inter, Arial, sans-serif`;
+  const startY = y + boxHeight / 2 - ((lines.length - 1) * lineHeight / 2);
+  lines.forEach((line, index) => ctx.fillText(line, width / 2, startY + index * lineHeight));
+  ctx.restore();
+}
 function drawReelWhiteboardBackground(ctx, width, height, scene, sceneProgress=0, sceneIndex=0){
   ctx.fillStyle = "#f7fbff";
   ctx.fillRect(0, 0, width, height);
@@ -3204,7 +3276,7 @@ function drawReelWhiteboardBackground(ctx, width, height, scene, sceneProgress=0
   ctx.restore();
 }
 function drawReelFrame(ctx, config){
-  const { width, height, background, logo, scene, progress, caption, sceneProgress=0, sceneIndex=0 } = config;
+  const { width, height, background, logo, scene, progress, caption, subtitle="", titleMode="full", sceneProgress=0, sceneIndex=0 } = config;
   ctx.clearRect(0, 0, width, height);
   const hasBg = drawCoverMedia(ctx, background, 0, 0, width, height, sceneProgress, sceneIndex);
   if (!hasBg) {
@@ -3226,7 +3298,16 @@ function drawReelFrame(ctx, config){
     ctx.drawImage(logo, width / 2 - size / 2, height * 0.04, size, size);
     ctx.restore();
   }
-  drawCenteredTextBox(ctx, scene?.overlay_text || caption || "MindUp - Học để hiểu thế giới", width / 2, height * .48, width - 96, height * .33);
+  const titleAlpha = titleMode === "subtitle"
+    ? Math.max(0, Math.min(1, 1 - Math.max(0, sceneProgress - 0.14) / 0.16))
+    : 1;
+  if (titleAlpha > 0.03) {
+    ctx.save();
+    ctx.globalAlpha = titleAlpha;
+    drawCenteredTextBox(ctx, scene?.overlay_text || caption || "MindUp - Học để hiểu thế giới", width / 2, height * .48, width - 96, height * .28);
+    ctx.restore();
+  }
+  drawSubtitleBox(ctx, subtitle, width, height);
   ctx.fillStyle = "rgba(7, 26, 58, .68)";
   const tagX = Math.max(42, width * 0.12);
   const tagW = width - tagX * 2;
@@ -3338,6 +3419,8 @@ async function recordReelVideo({ row, draft }){
     console.warn("Cannot decode reel audio", error);
   }
   duration = Math.max(55, Math.min(75, duration));
+  const subtitleText = reelVoiceTextFromPost(row || draft) || String(audio.text || reel.voiceOver || reel.voice_over || "").trim();
+  const subtitleCues = buildSubtitleCues(subtitleText, duration);
   drawReelFrame(ctx, {
     width,
     height,
@@ -3345,6 +3428,8 @@ async function recordReelVideo({ row, draft }){
     logo,
     scene: scenes[0],
     caption: reel.caption || draft.content || "",
+    subtitle: activeSubtitleCue(subtitleCues, 0)?.text || "",
+    titleMode: "subtitle",
     progress: 0,
     sceneProgress: 0,
     sceneIndex: 0,
@@ -3381,6 +3466,8 @@ async function recordReelVideo({ row, draft }){
         logo,
         scene,
         caption: reel.caption || draft.content || "",
+        subtitle: activeSubtitleCue(subtitleCues, t)?.text || "",
+        titleMode: "subtitle",
         progress: t / duration,
         sceneProgress: sceneProgress(scene, t),
         sceneIndex: index,
