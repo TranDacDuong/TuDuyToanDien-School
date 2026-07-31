@@ -2337,15 +2337,11 @@ function mergePostMetadata(base={}, patch={}){
       ...(base?.applying_knowledge || {}),
       ...(patch?.applying_knowledge || {}),
     };
-    if (base?.applying_knowledge?.reel && !patch?.applying_knowledge?.reel) {
-      output.applying_knowledge.reel = base.applying_knowledge.reel;
-    }
-    if (base?.applying_knowledge?.audio && !patch?.applying_knowledge?.audio) {
-      output.applying_knowledge.audio = base.applying_knowledge.audio;
-    }
-    if (base?.applying_knowledge?.video && !patch?.applying_knowledge?.video) {
-      output.applying_knowledge.video = base.applying_knowledge.video;
-    }
+    ["reel", "audio", "video", "explainer_video", "explainer_audio", "long_video"].forEach(key => {
+      if (base?.applying_knowledge?.[key] && !patch?.applying_knowledge?.[key]) {
+        output.applying_knowledge[key] = base.applying_knowledge[key];
+      }
+    });
   }
   return output;
 }
@@ -2483,6 +2479,38 @@ async function fetchMediaBlob(url){
 async function proxiedObjectUrl(url){
   const blob = await fetchMediaBlob(url);
   return URL.createObjectURL(blob);
+}
+const MEDIA_PREVIEW_OBJECT_URLS = new Map();
+function isDriveMediaUrl(url){
+  try { return new URL(String(url || "")).hostname.toLowerCase() === "drive.google.com"; }
+  catch (_) { return false; }
+}
+function setPreviewMediaSource(el, url, cacheKey, mimeType=""){
+  if (!el) return;
+  const previous = MEDIA_PREVIEW_OBJECT_URLS.get(cacheKey);
+  if (previous) {
+    URL.revokeObjectURL(previous);
+    MEDIA_PREVIEW_OBJECT_URLS.delete(cacheKey);
+  }
+  if (!url) {
+    el.removeAttribute("src");
+    el.style.display = "none";
+    return;
+  }
+  el.src = url;
+  el.style.display = "";
+  if (!isDriveMediaUrl(url)) return;
+  fetchMediaBlob(url).then(blob => {
+    const typedBlob = mimeType && blob.type !== mimeType ? new Blob([blob], { type: mimeType }) : blob;
+    const objectUrl = URL.createObjectURL(typedBlob);
+    const latest = MEDIA_PREVIEW_OBJECT_URLS.get(cacheKey);
+    if (latest) URL.revokeObjectURL(latest);
+    MEDIA_PREVIEW_OBJECT_URLS.set(cacheKey, objectUrl);
+    el.src = objectUrl;
+    el.load?.();
+  }).catch(error => {
+    console.warn("Cannot proxy stored media preview", error);
+  });
 }
 
 function facebookPostUrl(id){ return id ? `https://www.facebook.com/${String(id)}` : ""; }
@@ -2684,25 +2712,21 @@ function renderTtsAudioFromPost(row){
   const video = applying.video || null;
   const url = audio?.preview_url || audio?.url || "";
   if (url) {
-    audioEl.src = url;
-    audioEl.style.display = "";
+    setPreviewMediaSource(audioEl, url, `audio:${row?.id || url}`, audio.mime_type || "audio/mpeg");
     statusEl.value = `Đã tạo${audio.voice_name ? `: ${audio.voice_name}` : ""}`;
     hintEl.textContent = "Audio đã được lưu lên Drive. Bước dựng video sau sẽ dùng file này.";
   } else {
-    audioEl.removeAttribute("src");
-    audioEl.style.display = "none";
+    setPreviewMediaSource(audioEl, "", `audio:${row?.id || "empty"}`);
     statusEl.value = "Chưa tạo giọng đọc";
     hintEl.textContent = "Hãy tạo nội dung bằng AI trước để có kịch bản reels/voice-over.";
   }
   const videoUrl = video?.preview_url || video?.url || "";
   if (videoEl) {
     if (videoUrl) {
-      videoEl.src = videoUrl;
-      videoEl.style.display = "";
+      setPreviewMediaSource(videoEl, videoUrl, `reel-video:${row?.id || videoUrl}`, video.mime_type || "video/webm");
       hintEl.textContent = `Reels đã tạo${video.mime_type ? ` (${video.mime_type})` : ""} và lưu lên Drive.`;
     } else {
-      videoEl.removeAttribute("src");
-      videoEl.style.display = "none";
+      setPreviewMediaSource(videoEl, "", `reel-video:${row?.id || "empty"}`);
     }
   }
 }
@@ -2977,6 +3001,62 @@ function buildSubtitleCues(text, duration){
 }
 function activeSubtitleCue(cues, t){
   return (cues || []).find(cue => t >= cue.start && t < cue.end) || null;
+}
+function distributeSubtitleUnitsAcrossScenes(units, scenes){
+  if (!units.length) return scenes.map(() => "");
+  const sceneWeights = scenes.map(scene => Math.max(1, Number(scene?.end || 0) - Number(scene?.start || 0)));
+  const totalWeight = sceneWeights.reduce((sum, weight) => sum + weight, 0) || scenes.length;
+  const out = scenes.map(() => []);
+  let cursor = 0;
+  scenes.forEach((scene, index) => {
+    const remainingUnits = units.length - cursor;
+    const remainingScenes = scenes.length - index;
+    if (remainingUnits <= 0) return;
+    const rawCount = units.length * (sceneWeights[index] / totalWeight);
+    const count = index === scenes.length - 1
+      ? remainingUnits
+      : Math.max(1, Math.min(remainingUnits - remainingScenes + 1, Math.round(rawCount)));
+    out[index] = units.slice(cursor, cursor + count);
+    cursor += count;
+  });
+  return out.map(parts => parts.join(" "));
+}
+function buildSegmentedReelTimeline(scenes, duration, voiceText){
+  const safeScenes = (Array.isArray(scenes) && scenes.length ? scenes : [{ start: 0, end: duration, overlay_text: "" }])
+    .map(scene => ({ ...scene }));
+  const fullVoice = String(voiceText || "").trim();
+  const sceneTexts = safeScenes.map(scene => String(scene.voice_text || scene.voiceText || scene.voice_over || "").trim());
+  const sceneWordTotal = sceneTexts.reduce((sum, text) => sum + reelVoiceWordCount(text), 0);
+  const fullWordTotal = reelVoiceWordCount(fullVoice);
+  const useSceneTexts = sceneWordTotal >= Math.max(12, fullWordTotal * 0.5);
+  const distributedTexts = useSceneTexts
+    ? sceneTexts
+    : distributeSubtitleUnitsAcrossScenes(splitSubtitleUnits(fullVoice), safeScenes);
+  const weights = safeScenes.map((scene, index) => {
+    const textWeight = reelVoiceWordCount(distributedTexts[index]);
+    const sceneWeight = Math.max(1, Number(scene?.end || 0) - Number(scene?.start || 0));
+    return Math.max(1, textWeight || sceneWeight);
+  });
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0) || safeScenes.length;
+  let cursor = 0;
+  const segments = safeScenes.map((scene, index) => {
+    const isLast = index === safeScenes.length - 1;
+    const segmentDuration = isLast ? Math.max(0.5, duration - cursor) : Math.max(1.8, duration * (weights[index] / totalWeight));
+    const start = cursor;
+    const end = isLast ? duration : Math.min(duration, cursor + segmentDuration);
+    cursor = end;
+    return {
+      ...scene,
+      start,
+      end,
+      subtitle_text: distributedTexts[index] || scene.overlay_text || "",
+    };
+  });
+  const cues = segments.flatMap(segment =>
+    buildSubtitleCues(segment.subtitle_text, Math.max(0.5, segment.end - segment.start))
+      .map(cue => ({ ...cue, start: cue.start + segment.start, end: Math.min(segment.end, cue.end + segment.start) }))
+  );
+  return { segments, cues };
 }
 async function findSceneImageUrl(scene, fallbackQuery="education learning"){
   const sceneQuery = String(scene?.stock_video_keywords || "").trim();
@@ -3420,13 +3500,15 @@ async function recordReelVideo({ row, draft }){
   }
   duration = Math.max(55, Math.min(75, duration));
   const subtitleText = reelVoiceTextFromPost(row || draft) || String(audio.text || reel.voiceOver || reel.voice_over || "").trim();
-  const subtitleCues = buildSubtitleCues(subtitleText, duration);
+  const timeline = buildSegmentedReelTimeline(scenes, duration, subtitleText);
+  const renderScenes = timeline.segments;
+  const subtitleCues = timeline.cues;
   drawReelFrame(ctx, {
     width,
     height,
     background: sceneMedia[0]?.media,
     logo,
-    scene: scenes[0],
+    scene: renderScenes[0],
     caption: reel.caption || draft.content || "",
     subtitle: activeSubtitleCue(subtitleCues, 0)?.text || "",
     titleMode: "subtitle",
@@ -3457,8 +3539,8 @@ async function recordReelVideo({ row, draft }){
     fps: REEL_RENDER_FPS,
     frameTrack,
     drawFrame: (t) => {
-      const scene = activeReelScene(scenes, t);
-      const index = Math.max(0, scenes.indexOf(scene));
+      const scene = activeReelScene(renderScenes, t);
+      const index = Math.max(0, renderScenes.indexOf(scene));
       drawReelFrame(ctx, {
         width,
         height,
@@ -3491,6 +3573,7 @@ async function recordReelVideo({ row, draft }){
     duration,
     audioDuration,
     hasAudio: Boolean(audioTracks.length),
+    segmentCount: renderScenes.length,
     sceneImageCount: sceneMedia.filter(item => item?.media && item?.type !== "video_poster").length,
     sceneVideoCount: sceneMedia.filter(item => item?.type === "video_poster" && item?.media).length,
   };
@@ -3529,7 +3612,7 @@ async function generateReelVideo(){
     const meta = postMetadata(row || draft);
     const applying = meta.applying_knowledge || {};
     const video = {
-      provider: "browser_mediarecorder",
+      provider: "browser_segmented_canvas",
       file_id: uploaded.fileId,
       url: uploaded.downloadUrl || uploaded.url,
       preview_url: uploaded.downloadUrl || uploaded.url,
@@ -3538,6 +3621,8 @@ async function generateReelVideo(){
       size: uploaded.size || file.size,
       duration_seconds: Math.round(result.duration),
       has_audio_track: result.hasAudio,
+      segment_count: result.segmentCount || 0,
+      sync_strategy: "scene_segments_weighted_by_voice",
       scene_image_count: result.sceneImageCount,
       scene_video_count: result.sceneVideoCount,
       created_at: new Date().toISOString(),
