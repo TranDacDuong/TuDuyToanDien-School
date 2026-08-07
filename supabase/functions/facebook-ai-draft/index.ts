@@ -810,6 +810,7 @@ function learningMethodPromptBlock(method: ReturnType<typeof learningMethodTopic
     `- Tên phương pháp: ${method.name}`,
     "",
     "Yêu cầu: bài Learning Method phải dùng đúng phương pháp trên. Không tự chọn phương pháp khác, trừ khi nội dung Problem đã nhập quá đặc thù; nếu phải điều chỉnh thì vẫn phải nhắc phương pháp bắt buộc là trục chính.",
+    "Nguồn cảm hứng: hãy dựa trên tinh thần của một bài viết/nguồn nước ngoài uy tín về phương pháp học này, sau đó viết lại thành bài gốc bằng tiếng Việt tự nhiên. Không dịch sát từng câu, không copy nguyên văn, không làm giọng văn AI.",
   ].join("\n");
 }
 
@@ -1190,6 +1191,7 @@ function llamaLearningMethodDepthPromptBlock() {
     "Yêu cầu RIÊNG khi dùng Llama AI cho Learning Method:",
     "- Đây KHÔNG phải caption ngắn/slogan/quảng cáo. Phải viết thành một bài Facebook có giá trị thật, đọc xong áp dụng được ngay.",
     "- Độ dài bắt buộc: 450-800 từ. Nếu caption dưới 350 từ hoặc chỉ gồm vài câu ngắn thì coi là sai.",
+    "- Phải dựa trên ý chính từ một bài viết/nguồn nước ngoài uy tín về phương pháp học được giao, rồi chuyển hóa thành bài tiếng Việt tự nhiên. Không dịch sát, không copy nguyên văn.",
     "- Bài phải có ít nhất 6 đoạn rõ ràng, mỗi đoạn 1-3 dòng để dễ đọc trên điện thoại.",
     "- Cấu trúc bắt buộc:",
     "  1) Hook 2-3 dòng đánh trúng nỗi đau học sai rất cụ thể.",
@@ -1201,6 +1203,7 @@ function llamaLearningMethodDepthPromptBlock() {
     "  7) Kết luận ngắn + CTA nhẹ: rủ lưu bài, thử áp dụng, hoặc comment trải nghiệm.",
     "- Không chỉ nói 'hãy dùng phương pháp X'. Phải hướng dẫn cách dùng phương pháp đó trong một tình huống học tập cụ thể.",
     "- Giọng văn: gần gũi, cuốn hút, có nhịp Facebook, nhưng vẫn có chất chuyên môn giáo dục.",
+    "- Tránh văn AI sáo rỗng: không dùng các cụm 'trong thời đại ngày nay', 'vô cùng quan trọng', 'chìa khóa thành công', 'hành trang vững chắc' nếu không thật cần.",
     "- Không viết thành danh sách khô cứng từ đầu đến cuối; cần có chuyển ý tự nhiên và ví dụ sống.",
   ];
 }
@@ -1683,11 +1686,14 @@ function buildGeminiPrompt(args: {
       "",
       "Yêu cầu nội dung:",
       "- Viết bằng tiếng Việt tự nhiên, thân thiện với học sinh/phụ huynh.",
-      "- Có thể tham khảo insight/quy tắc học tập phổ biến từ nguồn tiếng Anh, nhưng phải viết lại thành bài gốc theo giọng MindUp; không copy nguyên văn.",
+      "- Trước khi viết, hãy chọn một bài viết/nguồn nước ngoài đáng tin về phương pháp học được giao làm nguồn cảm hứng nội dung. Có thể là bài từ blog/trang giáo dục/tâm lý học học tập bằng tiếng Anh.",
+      "- Sử dụng ý chính của nguồn đó để viết lại thành bài gốc bằng tiếng Việt tự nhiên, gần với học sinh/phụ huynh Việt Nam. Không dịch máy móc, không dịch sát từng câu, không copy nguyên văn.",
+      "- Có thể nhắc nguồn cảm hứng rất ngắn trong internal_note, nhưng caption không cần viết kiểu học thuật 'theo bài viết X...' trừ khi thật tự nhiên.",
       "- Mở bài bằng chính vấn đề/nỗi đau ngay trong bài này, không nhắc đến một bài Problem/bài tuần trước. Ví dụ mở kiểu: 'Nhiều học sinh gặp tình trạng...', 'Không ít phụ huynh thấy con...', 'Có một khó khăn rất phổ biến khi học...'.",
       "- Vấn đề/nỗi đau cần rõ ràng: học mãi không nhớ, học thuộc nhưng không hiểu, mất tập trung, làm bài sai do đọc vội, phụ huynh kèm con bị căng thẳng... Chọn vấn đề phù hợp với phương pháp học được giao.",
       "- Sau đó chuyển tự nhiên sang phương pháp học: tên phương pháp, vì sao hiệu quả, cách áp dụng 3-5 bước, ví dụ cụ thể.",
-      "- Ví dụ thực tế bắt buộc phải liên quan đến môn/trục nội dung của fanpage.",
+      "- Ví dụ thực tế bắt buộc phải liên quan đến môn/trục nội dung của fanpage. Ví dụ không được chung chung; phải giống một tình huống học thật trong Toán/Lý/Hóa/Sinh/page chính.",
+      "- Giọng văn phải giống một người tư vấn học tập đang viết cho phụ huynh/học sinh: có nhịp, có trải nghiệm, có câu ngắn dài tự nhiên; tránh các câu AI sáo rỗng như 'trong thời đại ngày nay', 'đóng vai trò vô cùng quan trọng', 'chìa khóa thành công'.",
       "- TUYỆT ĐỐI KHÔNG dùng các cụm: 'tuần trước', 'bài trước', 'hôm trước', 'lần trước', 'chúng ta đã cùng trò chuyện', 'như đã nói ở bài trước', 'tiếp nối bài Problem'. Nếu nội dung nháp cũ có các cụm này thì phải viết lại thành vấn đề trực tiếp trong bài.",
       "- Không nhắc rằng đây là bài tiếp nối Problem. Không hẹn sang bài Learning Method khác.",
       "- Ảnh: Gemini chỉ trả về từ khóa/prompt tìm ảnh nền liên quan đến bài viết, không chữ, không logo. Hệ thống sẽ tự lấy ảnh nền, chèn logo MindUp phía trên giữa ảnh và chữ tóm tắt tối đa 20 từ ở chính giữa.",
@@ -1695,14 +1701,16 @@ function buildGeminiPrompt(args: {
       "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
       JSON.stringify({
         caption: normalizeTextAiProvider(args.provider) === "llama"
-          ? "Bài Facebook Learning Method hoàn chỉnh 450-800 từ, tối thiểu 6 đoạn, có hook, phân tích vấn đề, giới thiệu phương pháp, giải thích vì sao hiệu quả, mục Cách áp dụng 3-5 bước, ví dụ theo môn fanpage và CTA nhẹ. Không được viết ngắn kiểu slogan/quảng cáo."
-          : "Caption bài Learning Method bằng tiếng Việt: bắt đầu bằng vấn đề trực tiếp trong bài, không nhắc tuần trước/bài trước, giải bằng phương pháp học cụ thể, có ví dụ theo môn fanpage và CTA nhẹ.",
+          ? "Bài Facebook Learning Method hoàn chỉnh 450-800 từ, tối thiểu 6 đoạn, lấy ý từ một nguồn/bài viết nước ngoài uy tín rồi viết lại tự nhiên bằng tiếng Việt, có hook, phân tích vấn đề, giới thiệu phương pháp, giải thích vì sao hiệu quả, mục Cách áp dụng 3-5 bước, ví dụ theo môn fanpage và CTA nhẹ. Không được viết ngắn kiểu slogan/quảng cáo."
+          : "Caption bài Learning Method bằng tiếng Việt: lấy ý từ một nguồn/bài viết nước ngoài uy tín rồi viết lại tự nhiên, bắt đầu bằng vấn đề trực tiếp trong bài, không nhắc tuần trước/bài trước, giải bằng phương pháp học cụ thể, có ví dụ theo môn fanpage và CTA nhẹ.",
         hashtags: ["#MindUp", "#LearningMethod", "#PhuongPhapHocTap", "#PhatTrienTuDuy", fanpageTag],
         image_prompt: "Prompt tiếng Anh tạo ảnh nền 1:1 cho bài Learning Method, không chữ, không logo, liên quan đến phương pháp học và môn học của fanpage.",
         image_search_keywords: "Từ khóa tiếng Anh để tìm ảnh nền phù hợp trên Pexels, không chữ, liên quan đến bài viết và môn học.",
         image_background_prompt: "Prompt/từ khóa tiếng Anh cho ảnh nền liên quan bài viết, không chữ, không logo.",
         image_overlay_text: "Một câu tóm tắt tiếng Việt tối đa 20 từ, nêu vấn đề hoặc lời hứa phương pháp học, để hệ thống đặt ở giữa ảnh.",
-        internal_note: `Learning Method tuần ${method.week}/${method.year}; fanpage ${args.pageName}; offset ${method.offset}; method ${method.methodNumber}/${method.totalMethods}: ${method.name} (${method.group})`,
+        source_inspiration: "Tên/URL hoặc mô tả ngắn nguồn nước ngoài đã dùng làm cảm hứng, nếu biết. Không bịa URL cụ thể nếu không chắc.",
+        core_idea: "Ý chính đã rút ra từ nguồn cảm hứng và chuyển hóa cho bài viết.",
+        internal_note: `Learning Method tuần ${method.week}/${method.year}; fanpage ${args.pageName}; offset ${method.offset}; method ${method.methodNumber}/${method.totalMethods}: ${method.name} (${method.group}); ghi thêm source inspiration nếu có`,
       }, null, 2),
     ].filter(Boolean).join("\n");
   }
@@ -1729,7 +1737,8 @@ function buildGeminiPrompt(args: {
       subjectContextPromptBlock(args.pageName),
       "",
       "Yêu cầu nội dung:",
-      "- Không copy nguyên văn bài nước ngoài. Có thể tham khảo insight/phương pháp học phổ biến bằng tiếng Anh, rồi viết lại thành bài gốc tiếng Việt theo giọng MindUp.",
+      "- Với Learning Method: chọn/đọc một bài viết hoặc nguồn nước ngoài đáng tin về phương pháp học, rút ra ý chính rồi viết lại thành bài gốc tiếng Việt theo giọng MindUp.",
+      "- Không dịch sát từng câu, không copy nguyên văn bài nước ngoài, không viết giọng AI.",
       "- Problem: đồng cảm, chạm nỗi đau, ví dụ đời thường, không giải pháp quá sâu, hẹn bài Learning Method.",
       "- Learning Method: nhắc lại vấn đề, nêu phương pháp học, vì sao hiệu quả, cách áp dụng 3-5 bước, ví dụ cụ thể cho học sinh/phụ huynh.",
       "- Ví dụ trong Learning Method bắt buộc phải liên quan đến môn/trục nội dung của fanpage.",
@@ -1760,6 +1769,8 @@ function buildGeminiPrompt(args: {
           image_search_keywords: "Từ khóa tiếng Anh để tìm ảnh nền phù hợp trên Pexels, không chữ, liên quan đến phương pháp học và môn học.",
           image_background_prompt: "Prompt/từ khóa tiếng Anh cho ảnh nền mờ, không chữ, không logo.",
           image_overlay_text: "Một câu tóm tắt vấn đề đã nêu trong bài Problem bằng tiếng Việt tối đa 20 từ để hệ thống đặt ở giữa ảnh.",
+          source_inspiration: "Tên/URL hoặc mô tả ngắn nguồn nước ngoài đã dùng làm cảm hứng cho Learning Method, nếu biết. Không bịa URL cụ thể nếu không chắc.",
+          core_idea: "Ý chính đã rút ra từ nguồn cảm hứng và chuyển hóa cho Learning Method.",
           internal_note: "Ghi chú nội bộ cho người kiểm tra bài Learning Method.",
         },
       }, null, 2),
@@ -1980,6 +1991,13 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
       };
     })
     : [];
+  const sourceInspiration = String(parsed?.source_inspiration || "").trim();
+  const coreIdea = String(parsed?.core_idea || "").trim();
+  const internalNoteParts = [
+    String(parsed?.internal_note || "").trim(),
+    sourceInspiration ? `Source inspiration: ${sourceInspiration}` : "",
+    coreIdea ? `Core idea: ${coreIdea}` : "",
+  ].filter(Boolean);
   return {
     model,
     caption: isStandaloneLearning ? sanitizeStandaloneLearningMethodCaption(rawCaption) : rawCaption,
@@ -1991,7 +2009,7 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
     imageSearchKeywords: String(parsed?.image_search_keywords || "").trim(),
     imageBackgroundPrompt: String(parsed?.image_background_prompt || parsed?.image_prompt || "").trim(),
     imageOverlayText: String(parsed?.image_overlay_text || "").trim(),
-    internalNote: String(parsed?.internal_note || "").trim(),
+    internalNote: internalNoteParts.join("\n"),
     quiz: {
       grade: Number(quizRecord.grade || 0) || null,
       subject: String(quizRecord.subject || "").trim(),
@@ -2035,6 +2053,13 @@ function normalizeDraftPart(value: unknown, fallbackTags: string[] = []) {
     if (tag && !hashtags.includes(tag)) hashtags.push(tag);
   }
   if (!hashtags.includes("#MindUp")) hashtags.unshift("#MindUp");
+  const sourceInspiration = String(record.source_inspiration || "").trim();
+  const coreIdea = String(record.core_idea || "").trim();
+  const internalNoteParts = [
+    String(record.internal_note || "").trim(),
+    sourceInspiration ? `Source inspiration: ${sourceInspiration}` : "",
+    coreIdea ? `Core idea: ${coreIdea}` : "",
+  ].filter(Boolean);
   return {
     caption: String(record.caption || "").trim(),
     hashtags,
@@ -2042,7 +2067,7 @@ function normalizeDraftPart(value: unknown, fallbackTags: string[] = []) {
     imageSearchKeywords: String(record.image_search_keywords || "").trim(),
     imageBackgroundPrompt: String(record.image_background_prompt || record.image_prompt || "").trim(),
     imageOverlayText: String(record.image_overlay_text || "").trim(),
-    internalNote: String(record.internal_note || "").trim(),
+    internalNote: internalNoteParts.join("\n"),
   };
 }
 
