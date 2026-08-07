@@ -1390,6 +1390,7 @@ function buildGeminiPrompt(args: {
 
   if (isHardQuizWithPrize(args.typeName)) {
     const fanpageTag = pageHashtag(args.pageName);
+    const curriculum = quizCurriculumFor(args.scheduledAt, args.pageName);
     return [
       "IMPORTANT HARD QUIZ FLOW: Gemini only creates the hard quiz question data. Do not create an image.",
       "The website already has the MindUp Hard Quiz image template and will place hard_quiz.question into that template.",
@@ -1406,16 +1407,24 @@ function buildGeminiPrompt(args: {
       "",
       ...viralFacebookPromptBlock(args.typeName),
       "",
-      contentTopicBlock(scheduledTopic),
-      "",
       "Thông tin bài đăng:",
       `- Fanpage: ${args.pageName}`,
       `- Hashtag fanpage bắt buộc: ${fanpageTag}`,
       `- Thời gian đăng: ${args.scheduledAt}`,
+      `- Kế hoạch lớp theo ngày đăng: ${curriculum.weekdayRule}`,
+      `- Lớp bắt buộc: lớp ${curriculum.grade}`,
+      `- Môn bắt buộc theo fanpage: ${curriculum.subject}`,
+      `- Chương/mảng kiến thức hiện tại bắt buộc dùng: ${curriculum.topic}`,
       args.existingContent ? `- Nội dung nháp/câu hỏi hiện có: ${args.existingContent}` : "",
       args.internalNote ? `- Ghi chú nội bộ/đáp án/lời giải nếu có: ${args.internalNote}` : "",
       "",
+      subjectContextPromptBlock(args.pageName),
+      "",
       "Yêu cầu cực kỳ quan trọng:",
+      `- Câu hỏi BẮT BUỘC đúng môn ${curriculum.subject}, đúng lớp ${curriculum.grade}, và nằm trong chương/mảng kiến thức: ${curriculum.topic}.`,
+      "- Không được tạo câu hỏi thuộc môn khác, chương khác, hoặc kiểu tư duy chung nếu fanpage là Toán/Lý/Hóa/Sinh.",
+      "- Nếu nội dung nháp/admin note mâu thuẫn với môn/chương bắt buộc, hãy ưu tiên môn/chương bắt buộc và chỉ dùng nháp như gợi ý phụ.",
+      "- Đề bài, đáp án và lời giải phải sử dụng đúng kiến thức trong chương/mảng hiện tại; internal_note phải ghi rõ lớp, môn, chương.",
       "- Câu hỏi phải ở mức vận dụng, hơi khó, học sinh bắt buộc phải đặt bút viết khoảng 10 dòng mới giải chắc được.",
       "- Không tạo câu hỏi mẹo quá ngắn; phải có dữ kiện đủ rõ để giải bằng kiến thức môn học.",
       "- Hard Quiz question image limit: write the visible question in maximum 80 Vietnamese words or 520 characters.",
@@ -1449,6 +1458,9 @@ function buildGeminiPrompt(args: {
         ].join("\n"),
         hashtags: ["#HardQuiz", "#HoiNhanhDopTron", "#MindUp", "#PhatTrienTuDuy", fanpageTag],
         hard_quiz: {
+          grade: curriculum.grade,
+          subject: curriculum.subject,
+          curriculum_topic: curriculum.topic,
           question: "Hard Quiz question concise, maximum 80 Vietnamese words/520 characters, application-level, may require about 10 lines to solve. Formulas must use $x^2+1=0$ format.",
           correct_answer: "??p ?n ??ng, kh?ng ??a v?o caption. C?ng th?c n?u c? vi?t d?ng $...$.",
           solution: "L?i gi?i/ghi ch? n?i b? ng?n g?n. C?ng th?c n?u c? vi?t d?ng $...$.",
@@ -2030,6 +2042,9 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
       explanation: String(quizRecord.explanation || "").trim(),
     },
     hardQuiz: {
+      grade: Number(hardQuizRecord.grade || 0) || null,
+      subject: String(hardQuizRecord.subject || "").trim(),
+      curriculumTopic: String(hardQuizRecord.curriculum_topic || "").trim(),
       question: String(hardQuizRecord.question || "").trim(),
       correctAnswer: String(hardQuizRecord.correct_answer || "").trim(),
       solution: String(hardQuizRecord.solution || hardQuizRecord.explanation || "").trim(),
@@ -2899,6 +2914,9 @@ Deno.serve(async (req) => {
       const hardQuiz = draft.hardQuiz || {};
       const hardQuizNote = [
         draft.internalNote,
+        hardQuiz.grade ? `Lớp: ${hardQuiz.grade}` : "",
+        hardQuiz.subject ? `Môn: ${hardQuiz.subject}` : "",
+        hardQuiz.curriculumTopic ? `Chủ đề: ${hardQuiz.curriculumTopic}` : "",
         hardQuiz.question ? `Đề bài: ${hardQuiz.question}` : "",
         hardQuiz.correctAnswer ? `Đáp án đúng: ${hardQuiz.correctAnswer}` : "",
         hardQuiz.solution ? `Lời giải/ghi chú: ${hardQuiz.solution}` : "",
@@ -2913,6 +2931,9 @@ Deno.serve(async (req) => {
           ...parseMetadata(post.metadata),
           hard_quiz: {
             enabled: true,
+            grade: hardQuiz.grade,
+            subject: hardQuiz.subject,
+            curriculum_topic: hardQuiz.curriculumTopic,
             question: hardQuiz.question,
             correct_answer: hardQuiz.correctAnswer,
             solution: hardQuiz.solution,
