@@ -1120,6 +1120,7 @@ function teachingPhilosophyPromptBlock(topic: ReturnType<typeof teachingPhilosop
     `- Topic: ${topic.name}`,
     `- Angle: ${topic.angle}`,
     "- Use this exact topic as the main idea. Do not randomly choose another teaching philosophy.",
+    "- Source inspiration: base the idea on a credible foreign article/source about education, teaching, learning science, classroom culture, or parenting support. Then rewrite it as an original Vietnamese MindUp post. Do not translate sentence-by-sentence and do not copy.",
   ].join("\n");
 }
 
@@ -1213,6 +1214,7 @@ function llamaTeachingPhilosophyDepthPromptBlock() {
     "Extra requirements when using Llama AI for Teaching Philosophy:",
     "- This is NOT a short quote, slogan, or ad. Write a complete Facebook post with real educational value.",
     "- Required length: 450-800 Vietnamese words. If the caption is under 350 words or only a few short lines, it is wrong.",
+    "- The core idea must be inspired by a credible foreign article/source about education or learning, then rewritten naturally for Vietnamese parents/students/teachers. Do not translate closely and do not copy.",
     "- The post must have at least 6 clear paragraphs, each 1-3 mobile-friendly lines.",
     "- Mandatory structure:",
     "  1) A strong hook about a common learning/teaching misconception.",
@@ -1224,6 +1226,7 @@ function llamaTeachingPhilosophyDepthPromptBlock() {
     "  7) End with a gentle CTA: ask readers to comment, save, or share the idea.",
     "- Tone: thoughtful, warm, premium education brand, viral-friendly on Facebook, not academic jargon.",
     "- Avoid generic statements. Use concrete situations, mini examples, and memorable sentences.",
+    "- Avoid AI-sounding phrases such as 'trong thời đại ngày nay', 'vô cùng quan trọng', 'chìa khóa thành công', or 'hành trang vững chắc' unless truly necessary.",
   ];
 }
 
@@ -1484,10 +1487,14 @@ function buildGeminiPrompt(args: {
       "",
       "Content requirements:",
       "- Write in natural Vietnamese, warm and premium, suitable for parents, students, and teachers.",
+      "- Before writing, choose a credible foreign article/source about education, teaching philosophy, learning science, classroom culture, or parenting support as the source inspiration.",
+      "- Use the core idea from that source to write an original Vietnamese post for MindUp. Do not translate mechanically, do not translate sentence-by-sentence, and do not copy the source.",
+      "- You may mention the source inspiration briefly in internal_note, but the public caption should not sound academic or like a literature review.",
       "- Start with a concrete misconception or real classroom/parenting situation, not with a generic slogan.",
       "- Explain the teaching philosophy clearly: what it means, why it matters, and how it changes the way MindUp teaches.",
       "- Include one concrete example related to the fanpage subject. For the general MindUp page, use an interdisciplinary learning example.",
       "- Include 3-5 practical actions that teachers/parents/students can try immediately.",
+      "- The voice must sound like a thoughtful education practitioner writing from real classroom experience. Avoid AI-sounding generic lines and empty slogans.",
       "- Do not mention Learning Method, Problem series, previous week, or a linked post. This post is standalone.",
       "- Do not over-sell classes. The CTA should be soft: comment, save, share, or reflect.",
       "- Image: AI only returns background search keywords/prompt and one overlay sentence. The system will fetch a background image, place the MindUp logo at top center, and place the overlay sentence in the center.",
@@ -1497,14 +1504,16 @@ function buildGeminiPrompt(args: {
       "JSON safety rules: every property must be separated by a comma; all multiline text must use \\n escapes; do not put raw line breaks inside string values.",
       JSON.stringify({
         caption: normalizeTextAiProvider(args.provider) === "llama"
-          ? "Complete Teaching Philosophy Facebook post in Vietnamese, 450-800 words, at least 6 paragraphs, with hook, philosophy explanation, why it matters, subject-specific example, 3-5 practical actions, and soft CTA."
-          : "Teaching Philosophy Facebook post in Vietnamese, thoughtful and useful, with hook, philosophy explanation, subject-specific example, practical actions, and soft CTA.",
+          ? "Complete Teaching Philosophy Facebook post in Vietnamese, 450-800 words, at least 6 paragraphs, inspired by a credible foreign education article/source and rewritten naturally for MindUp, with hook, philosophy explanation, why it matters, subject-specific example, 3-5 practical actions, and soft CTA."
+          : "Teaching Philosophy Facebook post in Vietnamese, inspired by a credible foreign education article/source and rewritten naturally for MindUp, thoughtful and useful, with hook, philosophy explanation, subject-specific example, practical actions, and soft CTA.",
         hashtags: ["#MindUp", "#TeachingPhilosophy", "#TrietLyGiaoDuc", "#PhatTrienTuDuy", fanpageTag],
         image_prompt: "English prompt for a square 1:1 educational background photo/illustration related to the teaching philosophy and fanpage subject, no text, no logo.",
         image_search_keywords: "English Pexels search keywords for a background image related to the philosophy and fanpage subject, no text.",
         image_background_prompt: "English background prompt/keywords, no text, no logo.",
         image_overlay_text: "Vietnamese summary sentence for the image, about 10-20 words, memorable and complete.",
-        internal_note: `Teaching Philosophy week ${topic.week}/${topic.year}; fanpage ${args.pageName}; offset ${topic.offset}; topic ${topic.topicNumber}/${topic.totalTopics}: ${topic.name} | ${topic.angle}`,
+        source_inspiration: "Name/URL or short description of the foreign source used as inspiration, if known. Do not invent a specific URL if unsure.",
+        core_idea: "Core idea taken from the source inspiration and adapted for MindUp.",
+        internal_note: `Teaching Philosophy week ${topic.week}/${topic.year}; fanpage ${args.pageName}; offset ${topic.offset}; topic ${topic.topicNumber}/${topic.totalTopics}: ${topic.name} | ${topic.angle}; add source inspiration if available`,
       }, null, 2),
     ].filter(Boolean).join("\n");
   }
