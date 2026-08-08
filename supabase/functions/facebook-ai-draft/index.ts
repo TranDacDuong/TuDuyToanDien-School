@@ -527,6 +527,21 @@ function isApplyingKnowledge(typeName: string) {
   return normalized === "applying knowledge to practice" || normalized.includes("applying knowledge");
 }
 
+function isInterestingQuestion(typeName: string) {
+  const normalized = stripVietnameseForTag(typeName || "").toLowerCase();
+  return normalized.includes("interesting question")
+    || normalized.includes("cau hoi thu vi")
+    || normalized.includes("cau hoi hay");
+}
+
+function isRealWorldPhenomenon(typeName: string) {
+  const normalized = stripVietnameseForTag(typeName || "").toLowerCase();
+  return normalized.includes("real world phenomenon")
+    || normalized.includes("real-world phenomenon")
+    || normalized.includes("hien tuong thuc te")
+    || normalized.includes("phenomenon");
+}
+
 function isQuizTypeName(typeName: string) {
   return String(typeName || "").trim().toLowerCase() === "quiz";
 }
@@ -911,6 +926,8 @@ const CONTENT_TOPIC_POOLS: Record<string, string[]> = {
 function contentPoolKey(typeName: string) {
   const clean = stripVietnameseForTag(typeName).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   if (clean.includes("applying knowledge")) return "applying_knowledge";
+  if (clean.includes("interesting question") || clean.includes("cau hoi thu vi") || clean.includes("cau hoi hay")) return "interesting_question";
+  if (clean.includes("real world phenomenon") || clean.includes("hien tuong thuc te") || clean.includes("phenomenon")) return "real_world_phenomenon";
   if (clean === "q a" || clean === "qa" || clean.includes("q a")) return "qna";
   if (clean === "quiz") return "quiz";
   if (clean.includes("hard quiz")) return "hard_quiz";
@@ -1034,6 +1051,96 @@ function applyingKnowledgeVideoInspirationFor(pageName: string) {
     sourceStyle: "research-based animated science storytelling that turns complex topics into memorable, structured explanations.",
     topicGuidance: "Pick one interdisciplinary STEM topic connecting science, technology, data, daily decisions, health, environment, or learning.",
     visualGuidance: "Use animated explainer scenes: diagrams, icons, simple systems, cause-effect arrows, charts, and a few concrete real-world stock clips only when they clarify the idea.",
+  };
+}
+
+function interestingQuestionReferenceFor(pageName: string) {
+  const ctx = pageSubjectContext(pageName);
+  const clean = stripVietnameseForTag(pageName).toLowerCase();
+  if (clean.includes("toan hoc")) {
+    return {
+      subject: ctx.subject,
+      sourceName: "Plus Magazine Puzzles",
+      sourceUrl: "https://plus.maths.org/puzzles",
+      sourceGuidance: "Choose one surprising mathematical puzzle or question, then rewrite it naturally in Vietnamese for students. Keep the answer out of the public caption.",
+    };
+  }
+  if (clean.includes("vat ly")) {
+    return {
+      subject: ctx.subject,
+      sourceName: "The Physics Classroom / Physics World puzzles",
+      sourceUrl: "https://www.physicsclassroom.com/",
+      secondaryUrl: "https://www.physicsworld.com/c/puzzles/",
+      sourceGuidance: "Choose one physics reasoning question about motion, forces, waves, light, electricity, pressure, heat, or energy.",
+    };
+  }
+  if (clean.includes("hoa hoc")) {
+    return {
+      subject: ctx.subject,
+      sourceName: "AACT Chemistry Puzzles and Games",
+      sourceUrl: "https://teachchemistry.org/classroom-resources/topics/games-puzzles",
+      sourceGuidance: "Choose one chemistry puzzle or question involving substances, reactions, pH, mixtures, atoms, molecules, materials, food, or lab observations.",
+    };
+  }
+  if (clean.includes("sinh hoc")) {
+    return {
+      subject: ctx.subject,
+      sourceName: "Ask A Biologist Puzzles",
+      sourceUrl: "https://askabiologist.asu.edu/activities/puzzles",
+      sourceGuidance: "Choose one biology question involving cells, body systems, genetics, ecology, plants, evolution, health, or animal/human observations.",
+    };
+  }
+  return {
+    subject: ctx.subject,
+    sourceName: "Plus Magazine Puzzles / The Physics Classroom / AACT / Ask A Biologist",
+    sourceUrl: "https://plus.maths.org/puzzles",
+    sourceGuidance: "Choose one interdisciplinary STEM question suitable for a curious student and rewrite it for MindUp.",
+  };
+}
+
+function realWorldPhenomenonReferenceFor(pageName: string) {
+  const ctx = pageSubjectContext(pageName);
+  const clean = stripVietnameseForTag(pageName).toLowerCase();
+  if (clean.includes("toan hoc")) {
+    return {
+      subject: ctx.subject,
+      sourceName: "Plus Magazine Maths Minute",
+      sourceUrl: "https://plus.maths.org/tags/maths-minute",
+      sourceGuidance: "Explain a real-world mathematical phenomenon through one core idea, with a concrete everyday example.",
+    };
+  }
+  if (clean.includes("vat ly")) {
+    return {
+      subject: ctx.subject,
+      sourceName: "The Physics Classroom / Physics World Everyday Science",
+      sourceUrl: "https://www.physicsclassroom.com/",
+      secondaryUrl: "https://www.physicsworld.com/",
+      sourceGuidance: "Explain one everyday physics phenomenon using simple models, cause-effect reasoning, and one visual example.",
+    };
+  }
+  if (clean.includes("hoa hoc")) {
+    return {
+      subject: ctx.subject,
+      sourceName: "Compound Interest / RSC Education",
+      sourceUrl: "https://www.compoundchem.com/",
+      secondaryUrl: "https://edu.rsc.org/resources/collections/compound-interest",
+      sourceGuidance: "Explain one everyday chemistry phenomenon involving food, smell, color, cleaning, pH, batteries, materials, medicine, or safety.",
+    };
+  }
+  if (clean.includes("sinh hoc")) {
+    return {
+      subject: ctx.subject,
+      sourceName: "HHMI BioInteractive / Science Journal for Kids",
+      sourceUrl: "https://www.biointeractive.org/",
+      secondaryUrl: "https://www.sciencejournalforkids.org/articles/biology/",
+      sourceGuidance: "Explain one biology-in-life phenomenon involving the body, sleep, memory, immunity, genetics, ecology, plants, microbes, nutrition, or senses.",
+    };
+  }
+  return {
+    subject: ctx.subject,
+    sourceName: "Science Journal for Kids / Frontiers for Young Minds / STEM explainers",
+    sourceUrl: "https://www.sciencejournalforkids.org/",
+    sourceGuidance: "Explain one real-world STEM phenomenon in a practical, student-friendly way.",
   };
 }
 
@@ -1266,6 +1373,7 @@ function buildGeminiPrompt(args: {
   existingContent: string;
   internalNote: string;
   provider?: string;
+  sourceHistory?: string;
 }) {
   if (isMondayMindset(args.typeName)) {
     const monday = mondayMindsetTopic(args.scheduledAt, args.pageName);
@@ -1312,6 +1420,113 @@ function buildGeminiPrompt(args: {
   }
 
   const scheduledTopic = contentTopicFor(args.typeName, args.scheduledAt, args.pageName);
+
+  if (isInterestingQuestion(args.typeName)) {
+    const fanpageTag = pageHashtag(args.pageName);
+    const reference = interestingQuestionReferenceFor(args.pageName);
+    return [
+      "You are a MindUp educational content editor.",
+      "Task: create an Interesting Question Facebook post in Vietnamese.",
+      "",
+      ...viralFacebookPromptBlock(args.typeName),
+      "",
+      "Source research requirement:",
+      `- Subject/page: ${reference.subject}`,
+      `- Primary source: ${reference.sourceName} (${reference.sourceUrl})`,
+      reference.secondaryUrl ? `- Secondary source if useful: ${reference.secondaryUrl}` : "",
+      `- Guidance: ${reference.sourceGuidance}`,
+      "- Search/read the source style and choose ONE interesting question suitable for Vietnamese students.",
+      "- Do not copy a full copyrighted question verbatim. Keep the core idea, then rewrite/adapt it naturally in Vietnamese.",
+      "- If the original question has a specific source page, return source_title and source_url. Do not invent a URL if unsure.",
+      args.sourceHistory ? ["", "Recently used questions/sources to avoid:", args.sourceHistory].join("\n") : "",
+      "",
+      "Non-duplication rules:",
+      "- Do not reuse any source_url, source_title, question_fingerprint, or near-identical question from the avoid list.",
+      "- If the most obvious source item was already used, choose another one from the same source family.",
+      "- Return question_fingerprint as a short lowercase English/Vietnamese slug summarizing the unique idea, not a random UUID.",
+      "",
+      "Content requirements:",
+      "- Public caption must show the question clearly and invite comments.",
+      "- Do not reveal the answer in the caption.",
+      "- Put answer/explanation only in internal_note and interesting_question.",
+      "- Make it feel like a curious Facebook challenge, not an exam.",
+      "- Add 3-6 tasteful emoji/icons in the caption.",
+      "- Image prompt should create a clean 1:1 educational visual with the question mood, no answer text.",
+      "",
+      "Return only valid JSON, no markdown, with this schema:",
+      JSON.stringify({
+        caption: "Vietnamese Interesting Question caption. Includes the question, curiosity hook, CTA to comment, no answer.",
+        hashtags: ["#MindUp", "#CauHoiThuVi", "#PhatTrienTuDuy", fanpageTag],
+        image_prompt: "English prompt for a clean 1:1 educational background, no answer text, no logo.",
+        image_search_keywords: "English keywords for a relevant background image.",
+        interesting_question: {
+          subject: reference.subject,
+          source_name: reference.sourceName,
+          source_title: "Title/name of selected source item if known",
+          source_url: "URL of selected source item if known",
+          question_fingerprint: "short unique slug of the question idea",
+          question: "Vietnamese rewritten/adapted question",
+          answer: "Correct answer, not for public caption",
+          explanation: "Short explanation for staff/internal note",
+        },
+        internal_note: "Include source, answer, explanation, and why this question was selected.",
+      }, null, 2),
+    ].filter(Boolean).join("\n");
+  }
+
+  if (isRealWorldPhenomenon(args.typeName)) {
+    const fanpageTag = pageHashtag(args.pageName);
+    const reference = realWorldPhenomenonReferenceFor(args.pageName);
+    return [
+      "You are a MindUp educational content editor.",
+      "Task: create a Real-world Phenomenon Facebook post in Vietnamese.",
+      "",
+      ...viralFacebookPromptBlock(args.typeName),
+      "",
+      "Source research requirement:",
+      `- Subject/page: ${reference.subject}`,
+      `- Primary source: ${reference.sourceName} (${reference.sourceUrl})`,
+      reference.secondaryUrl ? `- Secondary source if useful: ${reference.secondaryUrl}` : "",
+      `- Guidance: ${reference.sourceGuidance}`,
+      "- Choose ONE real-world phenomenon/article idea from the source family, then write an original Vietnamese post for MindUp.",
+      "- Do not translate sentence-by-sentence and do not copy the source. Use the source only for the core idea and factual direction.",
+      "- If the source has a specific page/article, return source_title and source_url. Do not invent a URL if unsure.",
+      args.sourceHistory ? ["", "Recently used phenomena/sources to avoid:", args.sourceHistory].join("\n") : "",
+      "",
+      "Non-duplication rules:",
+      "- Do not reuse any source_url, source_title, phenomenon_fingerprint, or near-identical phenomenon from the avoid list.",
+      "- Return phenomenon_fingerprint as a short lowercase English/Vietnamese slug summarizing the unique idea, not a random UUID.",
+      "",
+      "Content requirements:",
+      "- Open with a real-life hook: something students/parents can see, touch, measure, taste, hear, or experience.",
+      "- Explain the school concept behind the phenomenon in simple language.",
+      "- Include one concrete mini example related to the fanpage subject.",
+      "- Keep the post practical and shareable, similar in spirit to Maths Minute but written as original MindUp content.",
+      "- Add 3-6 tasteful emoji/icons in the caption.",
+      "- Image prompt should stay like current visual flow: relevant background, no text, no logo; the system can overlay branding.",
+      "",
+      "Return only valid JSON, no markdown, with this schema:",
+      JSON.stringify({
+        caption: "Vietnamese Real-world Phenomenon post, 300-650 words, with hook, explanation, mini example, and CTA.",
+        hashtags: ["#MindUp", "#HienTuongThucTe", "#HocDeHieuTheGioi", fanpageTag],
+        image_prompt: "English prompt for a relevant 1:1 background image, no text, no logo.",
+        image_search_keywords: "English keywords for a relevant background image.",
+        image_overlay_text: "Vietnamese summary up to 20 words for image overlay.",
+        real_world_phenomenon: {
+          subject: reference.subject,
+          source_name: reference.sourceName,
+          source_title: "Title/name of selected source item if known",
+          source_url: "URL of selected source item if known",
+          phenomenon_fingerprint: "short unique slug of the phenomenon idea",
+          phenomenon: "Short Vietnamese name of the phenomenon",
+          core_idea: "Main concept adapted from the source",
+        },
+        source_inspiration: "Source name/URL if known",
+        core_idea: "Core idea adapted for MindUp",
+        internal_note: "Include source, selected phenomenon, and adaptation note.",
+      }, null, 2),
+    ].filter(Boolean).join("\n");
+  }
 
   if (scheduledTopic.key === "qna") {
     const fanpageTag = pageHashtag(args.pageName);
@@ -1980,6 +2195,8 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
     ? quizRecord.answers.map((answer: unknown) => String(answer || "").trim()).filter(Boolean).slice(0, 4)
     : [];
   const hardQuizRecord = (parsed?.hard_quiz && typeof parsed.hard_quiz === "object" ? parsed.hard_quiz : {}) as JsonRecord;
+  const interestingQuestionRecord = (parsed?.interesting_question && typeof parsed.interesting_question === "object" ? parsed.interesting_question : {}) as JsonRecord;
+  const realWorldPhenomenonRecord = (parsed?.real_world_phenomenon && typeof parsed.real_world_phenomenon === "object" ? parsed.real_world_phenomenon : {}) as JsonRecord;
   const reelRecord = (parsed?.reel && typeof parsed.reel === "object" ? parsed.reel : {}) as JsonRecord;
   const reelScenes = Array.isArray(reelRecord.scenes) ? reelRecord.scenes.slice(0, 10) : [];
   const sceneVoiceOver = reelScenes.map((scene: unknown) => {
@@ -2053,6 +2270,25 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
       correctAnswer: String(hardQuizRecord.correct_answer || "").trim(),
       solution: String(hardQuizRecord.solution || hardQuizRecord.explanation || "").trim(),
       prizeAmount: Number(hardQuizRecord.prize_amount || 0) || 50000,
+    },
+    interestingQuestion: {
+      subject: String(interestingQuestionRecord.subject || "").trim(),
+      sourceName: String(interestingQuestionRecord.source_name || "").trim(),
+      sourceTitle: String(interestingQuestionRecord.source_title || "").trim(),
+      sourceUrl: String(interestingQuestionRecord.source_url || "").trim(),
+      questionFingerprint: String(interestingQuestionRecord.question_fingerprint || interestingQuestionRecord.fingerprint || "").trim(),
+      question: String(interestingQuestionRecord.question || parsed?.question || "").trim(),
+      answer: String(interestingQuestionRecord.answer || parsed?.answer || "").trim(),
+      explanation: String(interestingQuestionRecord.explanation || "").trim(),
+    },
+    realWorldPhenomenon: {
+      subject: String(realWorldPhenomenonRecord.subject || "").trim(),
+      sourceName: String(realWorldPhenomenonRecord.source_name || "").trim(),
+      sourceTitle: String(realWorldPhenomenonRecord.source_title || "").trim(),
+      sourceUrl: String(realWorldPhenomenonRecord.source_url || "").trim(),
+      phenomenonFingerprint: String(realWorldPhenomenonRecord.phenomenon_fingerprint || realWorldPhenomenonRecord.fingerprint || "").trim(),
+      phenomenon: String(realWorldPhenomenonRecord.phenomenon || "").trim(),
+      coreIdea: String(realWorldPhenomenonRecord.core_idea || coreIdea || "").trim(),
     },
     reel: {
       hook3s: String(reelRecord.hook_3s || "").trim(),
@@ -2547,6 +2783,73 @@ function parseMetadata(value: unknown): JsonRecord {
   }
 }
 
+function sourceHistoryEntryFromMetadata(metadataValue: unknown, typeName: string) {
+  const metadata = parseMetadata(metadataValue);
+  const record = isInterestingQuestion(typeName)
+    ? parseMetadata(metadata.interesting_question)
+    : isRealWorldPhenomenon(typeName)
+      ? parseMetadata(metadata.real_world_phenomenon)
+      : {};
+  const title = String(record.source_title || record.sourceTitle || record.question || record.phenomenon || "").trim();
+  const url = String(record.source_url || record.sourceUrl || "").trim();
+  const fingerprint = String(record.question_fingerprint || record.phenomenon_fingerprint || record.fingerprint || "").trim();
+  return { title, url, fingerprint };
+}
+
+async function loadSourceHistoryForPost(post: {
+  id: string;
+  page_id: string;
+  scheduled_at: string;
+  type?: { name?: string } | null;
+}) {
+  const typeName = post.type?.name || "";
+  if (!isInterestingQuestion(typeName) && !isRealWorldPhenomenon(typeName)) return "";
+  const since = addDaysIso(post.scheduled_at || new Date().toISOString(), -180);
+  const rows = await fetchJson<Array<{
+    id: string;
+    scheduled_at: string;
+    content?: string | null;
+    internal_note?: string | null;
+    metadata?: JsonRecord | string | null;
+    type?: { name?: string } | null;
+  }>>(
+    [
+      "facebook_scheduled_posts",
+      `page_id=eq.${encodeURIComponent(post.page_id)}`,
+      `scheduled_at=gte.${encodeURIComponent(since)}`,
+      `scheduled_at=lte.${encodeURIComponent(addDaysIso(post.scheduled_at || new Date().toISOString(), 1))}`,
+      "select=id,scheduled_at,content,internal_note,metadata,type:facebook_post_types!inner(name)",
+      `type.name=eq.${encodeURIComponent(typeName)}`,
+      "order=scheduled_at.desc",
+      "limit=30",
+    ].join("&").replace("facebook_scheduled_posts&", "facebook_scheduled_posts?"),
+  ).catch((error) => {
+    console.warn("[Facebook AI Draft] Cannot load source history:", error instanceof Error ? error.message : String(error));
+    return [];
+  });
+  const entries = rows
+    .filter(row => String(row.id) !== String(post.id))
+    .map(row => {
+      const entry = sourceHistoryEntryFromMetadata(row.metadata, typeName);
+      const fallback = String(row.internal_note || row.content || "").replace(/\s+/g, " ").trim().slice(0, 180);
+      return {
+        title: entry.title || fallback,
+        url: entry.url,
+        fingerprint: entry.fingerprint,
+        scheduledAt: row.scheduled_at,
+      };
+    })
+    .filter(entry => entry.title || entry.url || entry.fingerprint)
+    .slice(0, 12);
+  return entries.map((entry, index) => [
+    `${index + 1}.`,
+    entry.scheduledAt ? `date=${entry.scheduledAt}` : "",
+    entry.fingerprint ? `fingerprint=${entry.fingerprint}` : "",
+    entry.title ? `title=${entry.title}` : "",
+    entry.url ? `url=${entry.url}` : "",
+  ].filter(Boolean).join(" ")).join("\n");
+}
+
 function addDaysIso(dateValue: string, days: number) {
   const date = new Date(dateValue);
   if (Number.isNaN(date.getTime())) return new Date().toISOString();
@@ -2711,6 +3014,7 @@ Deno.serve(async (req) => {
       updated_at: new Date().toISOString(),
     });
 
+    const sourceHistory = await loadSourceHistoryForPost(post);
     const textPrompt = buildGeminiPrompt({
       pageName: post.page?.page_name || post.page_id,
       typeName: post.type?.name || "Facebook",
@@ -2719,6 +3023,7 @@ Deno.serve(async (req) => {
       existingContent: post.content || "",
       internalNote: post.internal_note || "",
       provider,
+      sourceHistory,
     });
 
     if (isProblemType(post.type?.name || "")) {
@@ -2982,6 +3287,8 @@ Deno.serve(async (req) => {
     });
     const finalContent = mergeCaptionAndHashtags(draft.caption, draft.hashtags);
     const isApplyingKnowledgePost = isApplyingKnowledge(typeName);
+    const isInterestingQuestionPost = isInterestingQuestion(typeName);
+    const isRealWorldPhenomenonPost = isRealWorldPhenomenon(typeName);
     const reelNote = isApplyingKnowledgePost && draft.reel
       ? [
         "Reel draft:",
@@ -3026,6 +3333,29 @@ Deno.serve(async (req) => {
         ].filter(Boolean).join("\n")),
       ].join("\n\n")
       : "";
+    const interestingQuestionNote = isInterestingQuestionPost && draft.interestingQuestion
+      ? [
+        "Interesting Question:",
+        draft.interestingQuestion.sourceName ? `Source: ${draft.interestingQuestion.sourceName}` : "",
+        draft.interestingQuestion.sourceTitle ? `Source title: ${draft.interestingQuestion.sourceTitle}` : "",
+        draft.interestingQuestion.sourceUrl ? `Source URL: ${draft.interestingQuestion.sourceUrl}` : "",
+        draft.interestingQuestion.questionFingerprint ? `Fingerprint: ${draft.interestingQuestion.questionFingerprint}` : "",
+        draft.interestingQuestion.question ? `Question: ${draft.interestingQuestion.question}` : "",
+        draft.interestingQuestion.answer ? `Answer: ${draft.interestingQuestion.answer}` : "",
+        draft.interestingQuestion.explanation ? `Explanation: ${draft.interestingQuestion.explanation}` : "",
+      ].filter(Boolean).join("\n")
+      : "";
+    const realWorldPhenomenonNote = isRealWorldPhenomenonPost && draft.realWorldPhenomenon
+      ? [
+        "Real-world Phenomenon:",
+        draft.realWorldPhenomenon.sourceName ? `Source: ${draft.realWorldPhenomenon.sourceName}` : "",
+        draft.realWorldPhenomenon.sourceTitle ? `Source title: ${draft.realWorldPhenomenon.sourceTitle}` : "",
+        draft.realWorldPhenomenon.sourceUrl ? `Source URL: ${draft.realWorldPhenomenon.sourceUrl}` : "",
+        draft.realWorldPhenomenon.phenomenonFingerprint ? `Fingerprint: ${draft.realWorldPhenomenon.phenomenonFingerprint}` : "",
+        draft.realWorldPhenomenon.phenomenon ? `Phenomenon: ${draft.realWorldPhenomenon.phenomenon}` : "",
+        draft.realWorldPhenomenon.coreIdea ? `Core idea: ${draft.realWorldPhenomenon.coreIdea}` : "",
+      ].filter(Boolean).join("\n")
+      : "";
     const finalNote = [
       draft.quoteEn ? `Quote EN: ${draft.quoteEn}` : "",
       draft.quoteVi ? `Quote VI: ${draft.quoteVi}` : "",
@@ -3034,6 +3364,8 @@ Deno.serve(async (req) => {
       reelNote,
       explainerNote,
       reelSeriesNote,
+      interestingQuestionNote,
+      realWorldPhenomenonNote,
       post.internal_note,
     ].filter(Boolean).join("\n\n").trim() || null;
 
@@ -3041,19 +3373,49 @@ Deno.serve(async (req) => {
       content: finalContent,
       image_url: generatedImage.imageUrl,
       internal_note: finalNote,
-      metadata: isApplyingKnowledgePost
+      metadata: isApplyingKnowledgePost || isInterestingQuestionPost || isRealWorldPhenomenonPost
         ? {
           ...parseMetadata(post.metadata),
-          applying_knowledge: {
-            enabled: true,
-            reel: draft.reel,
-            explainer_video: draft.explainerVideo,
-            reel_series: draft.reelSeries,
-            image_search_keywords: draft.imageSearchKeywords,
-            image_background_prompt: draft.imageBackgroundPrompt,
-            image_overlay_text: draft.imageOverlayText,
-            updated_at: new Date().toISOString(),
-          },
+          ...(isApplyingKnowledgePost
+            ? {
+              applying_knowledge: {
+                enabled: true,
+                reel: draft.reel,
+                explainer_video: draft.explainerVideo,
+                reel_series: draft.reelSeries,
+                image_search_keywords: draft.imageSearchKeywords,
+                image_background_prompt: draft.imageBackgroundPrompt,
+                image_overlay_text: draft.imageOverlayText,
+                updated_at: new Date().toISOString(),
+              },
+            }
+            : {}),
+          ...(isInterestingQuestionPost
+            ? {
+              interesting_question: {
+                enabled: true,
+                ...draft.interestingQuestion,
+                source_name: draft.interestingQuestion?.sourceName || "",
+                source_title: draft.interestingQuestion?.sourceTitle || "",
+                source_url: draft.interestingQuestion?.sourceUrl || "",
+                question_fingerprint: draft.interestingQuestion?.questionFingerprint || "",
+                updated_at: new Date().toISOString(),
+              },
+            }
+            : {}),
+          ...(isRealWorldPhenomenonPost
+            ? {
+              real_world_phenomenon: {
+                enabled: true,
+                ...draft.realWorldPhenomenon,
+                source_name: draft.realWorldPhenomenon?.sourceName || "",
+                source_title: draft.realWorldPhenomenon?.sourceTitle || "",
+                source_url: draft.realWorldPhenomenon?.sourceUrl || "",
+                phenomenon_fingerprint: draft.realWorldPhenomenon?.phenomenonFingerprint || "",
+                updated_at: new Date().toISOString(),
+              },
+            }
+            : {}),
         }
         : post.metadata,
       status: "draft",

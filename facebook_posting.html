@@ -464,7 +464,7 @@ const DEFAULT_PAGES = [
   { page_id: "1163066643562080", page_name: "MindUp - Tư Duy Sinh Học", page_url: "https://www.facebook.com/1163066643562080" },
 ];
 const DEFAULT_TYPES = [
-  "Learning Method", "Monday Mindset", "Hard Quiz with Prize", "Q&A", "Meme",
+  "Learning Method", "Monday Mindset", "Interesting Question", "Real-world Phenomenon", "Hard Quiz with Prize", "Q&A", "Meme",
   "Teaching Philosophy", "Applying Knowledge to Practice", "Enrollment", "Quiz", "Bài hay", "Lỗi sai thường gặp"
 ];
 const DEFAULT_TYPE_PROMPTS = {
@@ -475,6 +475,22 @@ const DEFAULT_TYPE_PROMPTS = {
 - Khi bấm Gemini ở bài Problem, hệ thống sẽ tự tìm bài Learning Method gần nhất sau bài này của cùng fanpage và tạo cả 2 bài cùng lúc.
 - Caption Problem cần có CTA hỏi phụ huynh/học sinh có đang gặp tình trạng này không.
 - Hashtag gợi ý: #MindUp #VanDeHocTap #PhuHuynh #HocSinh.`,
+
+  "Interesting Question": `Loai bai Interesting Question dung de lay cam hung tu cac trang cau hoi khoa hoc/toan hoc nuoc ngoai.
+- AI chon 1 cau hoi hay tu nguon theo tung mon: Toan dung Plus Magazine Puzzles; Ly dung The Physics Classroom/Physics World puzzles; Hoa dung AACT Chemistry Puzzles and Games; Sinh dung Ask A Biologist Puzzles.
+- AI khong copy nguyen van; giu y tuong cot loi roi viet lai tu nhien bang tieng Viet cho hoc sinh/phu huynh MindUp.
+- Caption chi dua cau hoi va keu goi comment, khong lo dap an.
+- Dap an, giai thich, source_url/source_title va fingerprint se duoc luu trong ghi chu noi bo/metadata de tranh trung lan sau.
+- Anh giu workflow hien tai: nen lien quan, khong can de dap an len anh.
+- Hashtag goi y: #MindUp #CauHoiThuVi #PhatTrienTuDuy.`,
+
+  "Real-world Phenomenon": `Loai bai Real-world Phenomenon dung de giai thich mot hien tuong thuc te bang kien thuc mon hoc.
+- AI chon 1 y tuong tu nguon theo tung mon: Toan dung Plus Magazine Maths Minute; Ly dung The Physics Classroom/Physics World; Hoa dung Compound Interest/RSC; Sinh dung HHMI BioInteractive/Science Journal for Kids.
+- AI khong dich sat/copy; chi lay core idea va viet thanh bai goc bang tieng Viet tu nhien theo giong MindUp.
+- Bai can co hook doi song, giai thich kien thuc dung sau hien tuong, vi du cu the theo fanpage mon hoc va CTA nhe.
+- He thong luu source_title/source_url/fingerprint trong metadata de cac bai sau tranh lap hien tuong.
+- Anh van nhu hien tai: lay anh nen phu hop, co the chen logo/overlay text ngan.
+- Hashtag goi y: #MindUp #HienTuongThucTe #HocDeHieuTheGioi.`,
 
   "Teaching Philosophy": `Loại bài Teaching Philosophy dùng để chia sẻ triết lý giáo dục độc lập theo từng tuần.
 - Hệ thống tự chọn 1 trong 53 chủ đề Teaching Philosophy theo tuần ISO và offset fanpage 0/10/20/30/40 để tránh trùng nội dung giữa 5 fanpage.
