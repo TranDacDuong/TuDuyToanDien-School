@@ -2270,7 +2270,16 @@ function updateImagePreview(){
   const url = $("postImageUrl").value.trim();
   const img = $("imagePreview");
   const postTypeId = $("postType")?.value || "";
+  const previewKey = `image-preview:${$("postId")?.value || url || "empty"}`;
+  const releasePreviewObjectUrl = () => {
+    const previous = MEDIA_PREVIEW_OBJECT_URLS.get(previewKey);
+    if (previous) {
+      URL.revokeObjectURL(previous);
+      MEDIA_PREVIEW_OBJECT_URLS.delete(previewKey);
+    }
+  };
   if (isQuizType(postTypeId) || isHardQuizType(postTypeId) || $("imageDropzone")?.classList.contains("hidden")) {
+    releasePreviewObjectUrl();
     img.src = "";
     img.classList.remove("show");
     $("imageDropzone").classList.remove("has-image");
@@ -2279,21 +2288,39 @@ function updateImagePreview(){
   img.onload = null;
   img.onerror = null;
   if (url) {
+    releasePreviewObjectUrl();
     img.onload = () => {
       img.classList.add("show");
       $("imageDropzone").classList.add("has-image");
     };
-    img.onerror = () => {
+    img.onerror = async () => {
       img.classList.remove("show");
       $("imageDropzone").classList.remove("has-image");
       const currentPostTypeId = $("postType")?.value || "";
       if (isQuizType(currentPostTypeId) || isHardQuizType(currentPostTypeId) || $("imageDropzone")?.classList.contains("hidden")) return;
+      if (isDriveMediaUrl(url)) {
+        try {
+          const objectUrl = await proxiedObjectUrl(url);
+          const latest = MEDIA_PREVIEW_OBJECT_URLS.get(previewKey);
+          if (latest) URL.revokeObjectURL(latest);
+          MEDIA_PREVIEW_OBJECT_URLS.set(previewKey, objectUrl);
+          img.onload = () => {
+            img.classList.add("show");
+            $("imageDropzone").classList.add("has-image");
+          };
+          img.onerror = null;
+          img.src = objectUrl;
+          return;
+        } catch (error) {
+          console.warn("Cannot proxy image preview", error);
+        }
+      }
       showPostStatus("err", "Không tải được ảnh xem trước. URL ảnh vẫn được giữ ngầm, bạn có thể thử upload/tạo ảnh lại.");
     };
     img.src = "";
     requestAnimationFrame(() => { img.src = url; });
   }
-  else { img.src = ""; img.classList.remove("show"); $("imageDropzone").classList.remove("has-image"); }
+  else { releasePreviewObjectUrl(); img.src = ""; img.classList.remove("show"); $("imageDropzone").classList.remove("has-image"); }
 }
 function buildPostMetadata(){
   const id = $("postId").value;
