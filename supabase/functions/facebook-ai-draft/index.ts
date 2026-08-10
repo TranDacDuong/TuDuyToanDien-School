@@ -3484,6 +3484,31 @@ Deno.serve(async (req) => {
         image_warning: "",
       });
     }
+    if (String(postTypeNameForQuiz || "").toLowerCase().includes("enrollment")) {
+      const rows = await patchJson<Array<JsonRecord>>(`facebook_scheduled_posts?id=eq.${encodeURIComponent(postId)}`, {
+        content: mergeCaptionAndHashtags(draft.caption, draft.hashtags),
+        image_url: null,
+        internal_note: draft.internalNote || post.internal_note || null,
+        status: "draft",
+        content_status: "submitted",
+        approval_status: "pending",
+        ai_status: "drafted",
+        ai_generated_at: new Date().toISOString(),
+        ai_model: draft.model,
+        ai_prompt: textPrompt,
+        ai_image_prompt: null,
+        ai_image_url: null,
+        ai_error: null,
+        updated_at: new Date().toISOString(),
+      });
+      return jsonResponse({
+        ok: true,
+        post: rows?.[0] || null,
+        image_url: null,
+        image_fallback: false,
+        image_warning: "",
+      });
+    }
     const mondayDisplayText = isMondayMindset(post.type?.name || "") && draft.quoteVi
       ? `${draft.quoteVi}${draft.quoteSource ? ` — ${draft.quoteSource}` : ""}`
       : draft.caption;

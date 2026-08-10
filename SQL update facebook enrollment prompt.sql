@@ -1,4 +1,4 @@
--- SQL cập nhật Prompt AI cho Loại bài Enrollment (Tuyển sinh) hỗ trợ linh hoạt cả 5 Fanpage (Toán, Lý, Hóa, Sinh, Toàn diện) và Thầy/Cô giáo MindUp.
+-- SQL cập nhật Prompt AI cho Loại bài Enrollment (Tuyển sinh) - thuần chữ, không tạo ảnh.
 -- Chạy script này trong Supabase SQL Editor để áp dụng prompt mới cho database.
 
 UPDATE public.facebook_post_types
@@ -20,6 +20,7 @@ SET ai_prompt = 'Loại bài Enrollment dùng để giới thiệu các buổi H
   + Nhấn mạnh lợi ích học thử 2 buổi: Trải nghiệm phương pháp học tư duy, kiểm tra lực học, xem Thầy/Cô giảng có dễ hiểu không trước khi vào khóa chính.
   + Đưa ra gợi ý khung giờ học thử cụ thể trong tuần tới (ví dụ: Tối Thứ 3 & Thứ 5 lúc 19h30 - 21h00), kèm quà tặng bộ tài liệu ôn tập/sổ tay công thức cho 30 bạn đăng ký sớm.
   + Kêu gọi hành động (CTA): Nhẹ nhàng – "Inbox cho Thầy/Cô hoặc Fanpage ngay hôm nay để giữ chỗ học thử tuần tới nhé!".
-- HASHTAG GỢI Ý: #MindUp #HocThuMienPhi #KhungTuanToi #PhuongPhapTuDuy #MienPhi2Buoi.',
+- HASHTAG GỢI Ý: #MindUp #HocThuMienPhi #KhungTuanToi #PhuongPhapTuDuy #MienPhi2Buoi.
+- HÌNH ẢNH: Bài viết Enrollment là dạng bài viết thuần chữ + link/form đăng ký, KHÔNG CẦN TẠO ẢNH, không tạo ảnh tự động.',
     updated_at = NOW()
 WHERE LOWER(TRIM(name)) = 'enrollment';
