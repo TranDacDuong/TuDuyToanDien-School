@@ -2436,6 +2436,55 @@ async function downloadRemoteImageAsBackground(url: string) {
   };
 }
 
+function absolutizeUrl(value: string, baseUrl: string) {
+  const clean = String(value || "").trim();
+  if (!clean) return "";
+  try {
+    return new URL(clean, baseUrl).toString();
+  } catch {
+    return "";
+  }
+}
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values.map(value => String(value || "").trim()).filter(Boolean)));
+}
+
+function extractImageUrlsFromHtml(html: string, pageUrl: string) {
+  const candidates: string[] = [];
+  const patterns = [
+    /<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']/gi,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image(?::secure_url)?["']/gi,
+    /<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/gi,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image(?::src)?["']/gi,
+    /<img[^>]+(?:src|data-src|data-original)=["']([^"']+)["'][^>]*>/gi,
+  ];
+  for (const pattern of patterns) {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(html))) {
+      const url = absolutizeUrl(match[1] || "", pageUrl);
+      if (url && !/\.(?:gif|svg)(?:[?#].*)?$/i.test(url)) candidates.push(url);
+    }
+  }
+  return uniqueStrings(candidates).slice(0, 8);
+}
+
+async function discoverSourcePageImageUrls(pageUrl: string) {
+  const cleanUrl = String(pageUrl || "").trim();
+  if (!/^https?:\/\//i.test(cleanUrl)) return [];
+  const res = await fetch(cleanUrl, {
+    headers: {
+      "User-Agent": "MindUpContentBot/1.0",
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    },
+  });
+  if (!res.ok) throw new Error(`Could not read source page for images: ${res.status} ${res.statusText}`);
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("text/html")) return [];
+  const html = await res.text();
+  return extractImageUrlsFromHtml(html, cleanUrl);
+}
+
 let mindupLogoDataUriPromise: Promise<string> | null = null;
 
 async function loadMindupLogoDataUri() {
@@ -2982,6 +3031,7 @@ async function generateImageWithFallback(args: {
   searchKeywords?: string;
   overlayText?: string;
   sourceImageUrl?: string;
+  sourcePageUrl?: string;
 }) {
   let imageWarning = "";
   const typeKey = stripVietnameseForTag(args.typeName || "").toLowerCase();
@@ -2989,17 +3039,44 @@ async function generateImageWithFallback(args: {
   const shouldUseProblemLearningVisual = isProblemType(args.typeName) || isTeachingPhilosophy(args.typeName) || isApplyingKnowledge(args.typeName) || typeKey.includes("problem") || typeKey.includes("learning method") || typeKey.includes("teaching philosophy") || typeKey.includes("applying knowledge");
   let backgroundImage: Awaited<ReturnType<typeof generatePexelsBackgroundImage>> | null = null;
   let logoDataUri = "";
-  if (shouldUseInterestingQuestionVisual && String(args.sourceImageUrl || "").trim()) {
+  if (shouldUseInterestingQuestionVisual) {
+    const discoveredUrls = await discoverSourcePageImageUrls(args.sourcePageUrl || "").catch((error) => {
+      console.warn("[Facebook AI Draft] Cannot discover source page images:", error instanceof Error ? error.message : String(error));
+      return [];
+    });
+    const sourceImageUrls = uniqueStrings([args.sourceImageUrl || "", ...discoveredUrls]);
+    const loadedLogo = await loadMindupLogoDataUri().catch(() => "");
+    const sourceErrors: string[] = [];
+    for (const imageUrl of sourceImageUrls) {
+      try {
+        const sourceImage = await downloadRemoteImageAsBackground(imageUrl);
+        const image = buildInterestingQuestionImage({
+          pageName: args.pageName,
+          caption: args.caption,
+          sourceImage,
+          logoDataUri: loadedLogo || undefined,
+        });
+        const uploaded = await uploadBytesToDrive(
+          image.bytes,
+          "mindup-interesting-question.svg",
+          image.mimeType,
+        );
+        return {
+          image,
+          imageWarning,
+          imageUrl: uploaded.lh3Url || uploaded.url,
+        };
+      } catch (error) {
+        sourceErrors.push(error instanceof Error ? error.message : String(error));
+      }
+    }
     try {
-      const [sourceImage, loadedLogo] = await Promise.all([
-        downloadRemoteImageAsBackground(args.sourceImageUrl || ""),
-        loadMindupLogoDataUri(),
-      ]);
+      const sourceImage = await generatePexelsBackgroundImage(args.searchKeywords || args.backgroundPrompt || args.imagePrompt || args.textPrompt);
       const image = buildInterestingQuestionImage({
         pageName: args.pageName,
         caption: args.caption,
         sourceImage,
-        logoDataUri: loadedLogo,
+        logoDataUri: loadedLogo || undefined,
       });
       const uploaded = await uploadBytesToDrive(
         image.bytes,
@@ -3013,7 +3090,10 @@ async function generateImageWithFallback(args: {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      imageWarning = `KhÃ´ng dÃ¹ng Ä‘Æ°á»£c áº£nh nguá»“n, Ä‘Ã£ táº¡o áº£nh fallback: ${message}`;
+      imageWarning = [
+        sourceErrors.length ? `Source image failed: ${sourceErrors.slice(0, 2).join(" | ")}` : "",
+        `Pexels fallback failed: ${message}`,
+      ].filter(Boolean).join("\n");
     }
   }
   if (shouldUseProblemLearningVisual) {
@@ -3386,6 +3466,7 @@ Deno.serve(async (req) => {
       searchKeywords: draft.imageSearchKeywords,
       overlayText: draft.imageOverlayText,
       sourceImageUrl: draft.interestingQuestion?.sourceImageUrl || "",
+      sourcePageUrl: draft.interestingQuestion?.sourceUrl || "",
       textPrompt,
     });
     const finalContent = mergeCaptionAndHashtags(draft.caption, draft.hashtags);
