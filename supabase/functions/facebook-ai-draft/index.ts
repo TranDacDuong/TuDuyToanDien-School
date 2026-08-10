@@ -1493,6 +1493,7 @@ function buildGeminiPrompt(args: {
       "- Choose ONE real-world phenomenon/article idea from the source family, then write an original Vietnamese post for MindUp.",
       "- Do not translate sentence-by-sentence and do not copy the source. Use the source only for the core idea and factual direction.",
       "- If the source has a specific page/article, return source_title and source_url. Do not invent a URL if unsure.",
+      "- If the source page includes a relevant image/illustration for the selected phenomenon, return its direct source_image_url. Prefer a real source image over generic images. Do not invent an image URL.",
       args.sourceHistory ? ["", "Recently used phenomena/sources to avoid:", args.sourceHistory].join("\n") : "",
       "",
       "Non-duplication rules:",
@@ -1505,7 +1506,7 @@ function buildGeminiPrompt(args: {
       "- Include one concrete mini example related to the fanpage subject.",
       "- Keep the post practical and shareable, similar in spirit to Maths Minute but written as original MindUp content.",
       "- Add 3-6 tasteful emoji/icons in the caption.",
-      "- Image prompt should stay like current visual flow: relevant background, no text, no logo; the system can overlay branding.",
+      "- Image rule: the system will download source_image_url when available, then add the MindUp logo and the short image_overlay_text. If no source image is available, provide fallback image_prompt/image_search_keywords.",
       "",
       "Return only valid JSON, no markdown, with this schema:",
       JSON.stringify({
@@ -1519,6 +1520,7 @@ function buildGeminiPrompt(args: {
           source_name: reference.sourceName,
           source_title: "Title/name of selected source item if known",
           source_url: "URL of selected source item if known",
+          source_image_url: "Direct URL of the source page image/illustration if known",
           phenomenon_fingerprint: "short unique slug of the phenomenon idea",
           phenomenon: "Short Vietnamese name of the phenomenon",
           core_idea: "Main concept adapted from the source",
@@ -2289,6 +2291,7 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
       sourceName: String(realWorldPhenomenonRecord.source_name || "").trim(),
       sourceTitle: String(realWorldPhenomenonRecord.source_title || "").trim(),
       sourceUrl: String(realWorldPhenomenonRecord.source_url || "").trim(),
+      sourceImageUrl: String(realWorldPhenomenonRecord.source_image_url || realWorldPhenomenonRecord.image_url || "").trim(),
       phenomenonFingerprint: String(realWorldPhenomenonRecord.phenomenon_fingerprint || realWorldPhenomenonRecord.fingerprint || "").trim(),
       phenomenon: String(realWorldPhenomenonRecord.phenomenon || "").trim(),
       coreIdea: String(realWorldPhenomenonRecord.core_idea || coreIdea || "").trim(),
@@ -2813,8 +2816,30 @@ function buildInterestingQuestionImage(args: {
   caption: string;
   sourceImage: { data: string; mimeType: string; model: string; prompt: string };
   logoDataUri?: string;
+  overlayText?: string;
+  mode?: "question" | "phenomenon";
 }) {
   const logoHref = args.logoDataUri || env("MINDUP_LOGO_URL") || "https://www.mindup.edu.vn/assets/mindup-logo-round.png";
+  const mode = args.mode || "question";
+  const overlay = cleanOverlayText(args.overlayText || "") || summarizeCaptionForOverlay(args.caption, mode === "phenomenon" ? 16 : 18);
+  const fittedOverlay = fitOverlaySvgText(overlay, {
+    boxWidth: 720,
+    boxHeight: 280,
+    maxLines: 4,
+    maxFontSize: 50,
+    minFontSize: 26,
+  });
+  const overlayY = Math.round(560 - ((fittedOverlay.lines.length - 1) * fittedOverlay.lineHeight) / 2);
+  const overlayTspans = fittedOverlay.lines
+    .map((line, index) => `<tspan x="540" y="${overlayY + index * fittedOverlay.lineHeight}">${escapeXml(line)}</tspan>`)
+    .join("");
+  const centerContent = mode === "phenomenon"
+    ? `<rect x="116" y="398" width="848" height="320" rx="46" fill="#063579" opacity=".76" filter="url(#shadow)"/>
+  <text text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${fittedOverlay.fontSize}" font-weight="900" fill="#ffffff" filter="url(#questionShadow)">${overlayTspans}</text>`
+    : `<circle cx="540" cy="548" r="178" fill="#ffffff" opacity=".80" filter="url(#shadow)"/>
+  <circle cx="540" cy="548" r="154" fill="#063579" opacity=".92"/>
+  <text x="540" y="635" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="265" font-weight="900" fill="#ffffff" filter="url(#questionShadow)">?</text>`;
+  const label = mode === "phenomenon" ? "MINDUP - HIỂU HIỆN TƯỢNG" : "MINDUP - CÂU HỎI THÚ VỊ";
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
   <defs>
@@ -2837,18 +2862,18 @@ function buildInterestingQuestionImage(args: {
   <rect width="1080" height="1080" fill="url(#centerGlow)" opacity=".95"/>
   <circle cx="540" cy="142" r="84" fill="#063579" opacity=".95" filter="url(#shadow)"/>
   <image href="${escapeXml(logoHref)}" x="462" y="64" width="156" height="156" preserveAspectRatio="xMidYMid meet" clip-path="url(#logoClip)"/>
-  <circle cx="540" cy="548" r="178" fill="#ffffff" opacity=".80" filter="url(#shadow)"/>
-  <circle cx="540" cy="548" r="154" fill="#063579" opacity=".92"/>
-  <text x="540" y="635" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="265" font-weight="900" fill="#ffffff" filter="url(#questionShadow)">?</text>
+  ${centerContent}
   <rect x="226" y="858" width="628" height="70" rx="35" fill="#063579" opacity=".76"/>
-  <text x="540" y="903" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="900" letter-spacing="5" fill="#ffffff">MINDUP - CÂU HỎI THÚ VỊ</text>
+  <text x="540" y="903" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="900" letter-spacing="5" fill="#ffffff">${label}</text>
 </svg>`;
   return {
-    model: `mindup-interesting-question-svg; ${args.sourceImage.model}`,
+    model: `mindup-${mode === "phenomenon" ? "phenomenon" : "interesting-question"}-svg; ${args.sourceImage.model}`,
     imagePrompt: [
       args.sourceImage.prompt,
-      `Layout: source page image background, MindUp logo top center, large question mark in the center.`,
-      `Caption context: ${summarizeCaptionForOverlay(args.caption, 18)}`,
+      mode === "phenomenon"
+        ? `Layout: source page image background, MindUp logo top center, short Vietnamese overlay text in the center.`
+        : `Layout: source page image background, MindUp logo top center, large question mark in the center.`,
+      `Caption context: ${overlay}`,
     ].filter(Boolean).join("\n"),
     bytes: new TextEncoder().encode(svg),
     mimeType: "image/svg+xml",
@@ -3036,10 +3061,11 @@ async function generateImageWithFallback(args: {
   let imageWarning = "";
   const typeKey = stripVietnameseForTag(args.typeName || "").toLowerCase();
   const shouldUseInterestingQuestionVisual = isInterestingQuestion(args.typeName);
+  const shouldUsePhenomenonSourceVisual = isRealWorldPhenomenon(args.typeName);
   const shouldUseProblemLearningVisual = isProblemType(args.typeName) || isTeachingPhilosophy(args.typeName) || isApplyingKnowledge(args.typeName) || typeKey.includes("problem") || typeKey.includes("learning method") || typeKey.includes("teaching philosophy") || typeKey.includes("applying knowledge");
   let backgroundImage: Awaited<ReturnType<typeof generatePexelsBackgroundImage>> | null = null;
   let logoDataUri = "";
-  if (shouldUseInterestingQuestionVisual) {
+  if (shouldUseInterestingQuestionVisual || shouldUsePhenomenonSourceVisual) {
     const discoveredUrls = await discoverSourcePageImageUrls(args.sourcePageUrl || "").catch((error) => {
       console.warn("[Facebook AI Draft] Cannot discover source page images:", error instanceof Error ? error.message : String(error));
       return [];
@@ -3047,6 +3073,7 @@ async function generateImageWithFallback(args: {
     const sourceImageUrls = uniqueStrings([args.sourceImageUrl || "", ...discoveredUrls]);
     const loadedLogo = await loadMindupLogoDataUri().catch(() => "");
     const sourceErrors: string[] = [];
+    const sourceVisualMode = shouldUsePhenomenonSourceVisual ? "phenomenon" : "question";
     for (const imageUrl of sourceImageUrls) {
       try {
         const sourceImage = await downloadRemoteImageAsBackground(imageUrl);
@@ -3055,10 +3082,12 @@ async function generateImageWithFallback(args: {
           caption: args.caption,
           sourceImage,
           logoDataUri: loadedLogo || undefined,
+          overlayText: args.overlayText,
+          mode: sourceVisualMode,
         });
         const uploaded = await uploadBytesToDrive(
           image.bytes,
-          "mindup-interesting-question.svg",
+          shouldUsePhenomenonSourceVisual ? "mindup-real-world-phenomenon.svg" : "mindup-interesting-question.svg",
           image.mimeType,
         );
         return {
@@ -3077,10 +3106,12 @@ async function generateImageWithFallback(args: {
         caption: args.caption,
         sourceImage,
         logoDataUri: loadedLogo || undefined,
+        overlayText: args.overlayText,
+        mode: sourceVisualMode,
       });
       const uploaded = await uploadBytesToDrive(
         image.bytes,
-        "mindup-interesting-question.svg",
+        shouldUsePhenomenonSourceVisual ? "mindup-real-world-phenomenon.svg" : "mindup-interesting-question.svg",
         image.mimeType,
       );
       return {
@@ -3465,8 +3496,8 @@ Deno.serve(async (req) => {
       backgroundPrompt: draft.imageBackgroundPrompt || draft.imagePrompt || textPrompt,
       searchKeywords: draft.imageSearchKeywords,
       overlayText: draft.imageOverlayText,
-      sourceImageUrl: draft.interestingQuestion?.sourceImageUrl || "",
-      sourcePageUrl: draft.interestingQuestion?.sourceUrl || "",
+      sourceImageUrl: draft.interestingQuestion?.sourceImageUrl || draft.realWorldPhenomenon?.sourceImageUrl || "",
+      sourcePageUrl: draft.interestingQuestion?.sourceUrl || draft.realWorldPhenomenon?.sourceUrl || "",
       textPrompt,
     });
     const finalContent = mergeCaptionAndHashtags(draft.caption, draft.hashtags);
@@ -3536,6 +3567,7 @@ Deno.serve(async (req) => {
         draft.realWorldPhenomenon.sourceName ? `Source: ${draft.realWorldPhenomenon.sourceName}` : "",
         draft.realWorldPhenomenon.sourceTitle ? `Source title: ${draft.realWorldPhenomenon.sourceTitle}` : "",
         draft.realWorldPhenomenon.sourceUrl ? `Source URL: ${draft.realWorldPhenomenon.sourceUrl}` : "",
+        draft.realWorldPhenomenon.sourceImageUrl ? `Source image URL: ${draft.realWorldPhenomenon.sourceImageUrl}` : "",
         draft.realWorldPhenomenon.phenomenonFingerprint ? `Fingerprint: ${draft.realWorldPhenomenon.phenomenonFingerprint}` : "",
         draft.realWorldPhenomenon.phenomenon ? `Phenomenon: ${draft.realWorldPhenomenon.phenomenon}` : "",
         draft.realWorldPhenomenon.coreIdea ? `Core idea: ${draft.realWorldPhenomenon.coreIdea}` : "",
@@ -3597,6 +3629,7 @@ Deno.serve(async (req) => {
                 source_name: draft.realWorldPhenomenon?.sourceName || "",
                 source_title: draft.realWorldPhenomenon?.sourceTitle || "",
                 source_url: draft.realWorldPhenomenon?.sourceUrl || "",
+                source_image_url: draft.realWorldPhenomenon?.sourceImageUrl || "",
                 phenomenon_fingerprint: draft.realWorldPhenomenon?.phenomenonFingerprint || "",
                 updated_at: new Date().toISOString(),
               },
