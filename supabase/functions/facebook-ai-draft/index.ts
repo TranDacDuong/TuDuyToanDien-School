@@ -1438,6 +1438,7 @@ function buildGeminiPrompt(args: {
       "- Search/read the source style and choose ONE interesting question suitable for Vietnamese students.",
       "- Do not copy a full copyrighted question verbatim. Keep the core idea, then rewrite/adapt it naturally in Vietnamese.",
       "- If the original question has a specific source page, return source_title and source_url. Do not invent a URL if unsure.",
+      "- If the source page includes a relevant image/illustration for the selected question, return its direct source_image_url. Prefer a real image from the source page over generic images. Do not invent an image URL.",
       args.sourceHistory ? ["", "Recently used questions/sources to avoid:", args.sourceHistory].join("\n") : "",
       "",
       "Non-duplication rules:",
@@ -1451,7 +1452,7 @@ function buildGeminiPrompt(args: {
       "- Put answer/explanation only in internal_note and interesting_question.",
       "- Make it feel like a curious Facebook challenge, not an exam.",
       "- Add 3-6 tasteful emoji/icons in the caption.",
-      "- Image prompt should create a clean 1:1 educational visual with the question mood, no answer text.",
+      "- Image rule: the system will download source_image_url when available, then add the MindUp logo and a large question mark in the center. If no source image is available, provide fallback image_prompt/image_search_keywords.",
       "",
       "Return only valid JSON, no markdown, with this schema:",
       JSON.stringify({
@@ -1464,6 +1465,7 @@ function buildGeminiPrompt(args: {
           source_name: reference.sourceName,
           source_title: "Title/name of selected source item if known",
           source_url: "URL of selected source item if known",
+          source_image_url: "Direct URL of the source page image/illustration if known",
           question_fingerprint: "short unique slug of the question idea",
           question: "Vietnamese rewritten/adapted question",
           answer: "Correct answer, not for public caption",
@@ -2276,6 +2278,7 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
       sourceName: String(interestingQuestionRecord.source_name || "").trim(),
       sourceTitle: String(interestingQuestionRecord.source_title || "").trim(),
       sourceUrl: String(interestingQuestionRecord.source_url || "").trim(),
+      sourceImageUrl: String(interestingQuestionRecord.source_image_url || interestingQuestionRecord.image_url || "").trim(),
       questionFingerprint: String(interestingQuestionRecord.question_fingerprint || interestingQuestionRecord.fingerprint || "").trim(),
       question: String(interestingQuestionRecord.question || parsed?.question || "").trim(),
       answer: String(interestingQuestionRecord.answer || parsed?.answer || "").trim(),
@@ -2407,6 +2410,29 @@ async function generatePexelsBackgroundImage(query: string) {
     prompt: `Pexels query: ${cleanQuery}\nPexels photo: ${photo.url || imageUrl}\nPhotographer: ${photo.photographer || ""}`,
     data: bytesToBase64(bytes),
     mimeType: contentType.includes("image/") ? contentType : "image/jpeg",
+  };
+}
+
+async function downloadRemoteImageAsBackground(url: string) {
+  const cleanUrl = String(url || "").trim();
+  if (!/^https?:\/\//i.test(cleanUrl)) throw new Error("source_image_url khÃ´ng pháº£i URL http/https há»£p lá»‡.");
+  const res = await fetch(cleanUrl, {
+    headers: {
+      "User-Agent": "MindUpContentBot/1.0",
+      Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+    },
+  });
+  if (!res.ok) throw new Error(`KhÃ´ng táº£i Ä‘Æ°á»£c áº£nh nguá»“n: ${res.status} ${res.statusText}`);
+  const contentType = (res.headers.get("content-type") || "image/jpeg").split(";")[0].trim().toLowerCase();
+  if (!contentType.startsWith("image/")) throw new Error(`URL nguá»“n khÃ´ng tráº£ vá» áº£nh: ${contentType || "unknown"}`);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (!bytes.length) throw new Error("áº¢nh nguá»“n rá»—ng.");
+  if (bytes.length > 8 * 1024 * 1024) throw new Error("áº¢nh nguá»“n quÃ¡ lá»›n Ä‘á»ƒ nhÃºng vÃ o template.");
+  return {
+    model: "source-page-image",
+    prompt: `Source image: ${cleanUrl}`,
+    data: bytesToBase64(bytes),
+    mimeType: contentType,
   };
 }
 
@@ -2733,6 +2759,53 @@ function buildProblemLearningImage(args: {
   };
 }
 
+function buildInterestingQuestionImage(args: {
+  pageName: string;
+  caption: string;
+  sourceImage: { data: string; mimeType: string; model: string; prompt: string };
+  logoDataUri?: string;
+}) {
+  const logoHref = args.logoDataUri || env("MINDUP_LOGO_URL") || "https://www.mindup.edu.vn/assets/mindup-logo-round.png";
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+  <defs>
+    <radialGradient id="centerGlow" cx="50%" cy="51%" r="45%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".78"/>
+      <stop offset=".54" stop-color="#ffffff" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#041a3d" flood-opacity=".34"/>
+    </filter>
+    <filter id="questionShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#001a44" flood-opacity=".42"/>
+    </filter>
+    <clipPath id="logoClip"><circle cx="540" cy="142" r="78"/></clipPath>
+  </defs>
+  <rect width="1080" height="1080" fill="#e8f5ff"/>
+  <image href="data:${escapeXml(args.sourceImage.mimeType || "image/jpeg")};base64,${args.sourceImage.data}" x="0" y="0" width="1080" height="1080" preserveAspectRatio="xMidYMid slice"/>
+  <rect width="1080" height="1080" fill="#061b3e" opacity=".22"/>
+  <rect width="1080" height="1080" fill="url(#centerGlow)" opacity=".95"/>
+  <circle cx="540" cy="142" r="84" fill="#063579" opacity=".95" filter="url(#shadow)"/>
+  <image href="${escapeXml(logoHref)}" x="462" y="64" width="156" height="156" preserveAspectRatio="xMidYMid meet" clip-path="url(#logoClip)"/>
+  <circle cx="540" cy="548" r="178" fill="#ffffff" opacity=".80" filter="url(#shadow)"/>
+  <circle cx="540" cy="548" r="154" fill="#063579" opacity=".92"/>
+  <text x="540" y="635" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="265" font-weight="900" fill="#ffffff" filter="url(#questionShadow)">?</text>
+  <rect x="226" y="858" width="628" height="70" rx="35" fill="#063579" opacity=".76"/>
+  <text x="540" y="903" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="900" letter-spacing="5" fill="#ffffff">MINDUP - CÂU HỎI THÚ VỊ</text>
+</svg>`;
+  return {
+    model: `mindup-interesting-question-svg; ${args.sourceImage.model}`,
+    imagePrompt: [
+      args.sourceImage.prompt,
+      `Layout: source page image background, MindUp logo top center, large question mark in the center.`,
+      `Caption context: ${summarizeCaptionForOverlay(args.caption, 18)}`,
+    ].filter(Boolean).join("\n"),
+    bytes: new TextEncoder().encode(svg),
+    mimeType: "image/svg+xml",
+  };
+}
+
 async function loadPostBundle(postId: string) {
   const rows = await fetchJson<Array<{
     id: string;
@@ -2908,12 +2981,41 @@ async function generateImageWithFallback(args: {
   backgroundPrompt?: string;
   searchKeywords?: string;
   overlayText?: string;
+  sourceImageUrl?: string;
 }) {
   let imageWarning = "";
   const typeKey = stripVietnameseForTag(args.typeName || "").toLowerCase();
+  const shouldUseInterestingQuestionVisual = isInterestingQuestion(args.typeName);
   const shouldUseProblemLearningVisual = isProblemType(args.typeName) || isTeachingPhilosophy(args.typeName) || isApplyingKnowledge(args.typeName) || typeKey.includes("problem") || typeKey.includes("learning method") || typeKey.includes("teaching philosophy") || typeKey.includes("applying knowledge");
   let backgroundImage: Awaited<ReturnType<typeof generatePexelsBackgroundImage>> | null = null;
   let logoDataUri = "";
+  if (shouldUseInterestingQuestionVisual && String(args.sourceImageUrl || "").trim()) {
+    try {
+      const [sourceImage, loadedLogo] = await Promise.all([
+        downloadRemoteImageAsBackground(args.sourceImageUrl || ""),
+        loadMindupLogoDataUri(),
+      ]);
+      const image = buildInterestingQuestionImage({
+        pageName: args.pageName,
+        caption: args.caption,
+        sourceImage,
+        logoDataUri: loadedLogo,
+      });
+      const uploaded = await uploadBytesToDrive(
+        image.bytes,
+        "mindup-interesting-question.svg",
+        image.mimeType,
+      );
+      return {
+        image,
+        imageWarning,
+        imageUrl: uploaded.lh3Url || uploaded.url,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      imageWarning = `KhÃ´ng dÃ¹ng Ä‘Æ°á»£c áº£nh nguá»“n, Ä‘Ã£ táº¡o áº£nh fallback: ${message}`;
+    }
+  }
   if (shouldUseProblemLearningVisual) {
     const overlayText = String(args.overlayText || "").trim();
     if (!overlayText) {
@@ -2953,7 +3055,7 @@ async function generateImageWithFallback(args: {
       typeName: args.typeName,
       caption: args.caption,
       imagePrompt: args.imagePrompt || args.textPrompt,
-      imageError: "",
+      imageError: imageWarning,
     });
   const uploaded = await uploadBytesToDrive(
     image.bytes,
@@ -3283,6 +3385,7 @@ Deno.serve(async (req) => {
       backgroundPrompt: draft.imageBackgroundPrompt || draft.imagePrompt || textPrompt,
       searchKeywords: draft.imageSearchKeywords,
       overlayText: draft.imageOverlayText,
+      sourceImageUrl: draft.interestingQuestion?.sourceImageUrl || "",
       textPrompt,
     });
     const finalContent = mergeCaptionAndHashtags(draft.caption, draft.hashtags);
@@ -3339,6 +3442,7 @@ Deno.serve(async (req) => {
         draft.interestingQuestion.sourceName ? `Source: ${draft.interestingQuestion.sourceName}` : "",
         draft.interestingQuestion.sourceTitle ? `Source title: ${draft.interestingQuestion.sourceTitle}` : "",
         draft.interestingQuestion.sourceUrl ? `Source URL: ${draft.interestingQuestion.sourceUrl}` : "",
+        draft.interestingQuestion.sourceImageUrl ? `Source image URL: ${draft.interestingQuestion.sourceImageUrl}` : "",
         draft.interestingQuestion.questionFingerprint ? `Fingerprint: ${draft.interestingQuestion.questionFingerprint}` : "",
         draft.interestingQuestion.question ? `Question: ${draft.interestingQuestion.question}` : "",
         draft.interestingQuestion.answer ? `Answer: ${draft.interestingQuestion.answer}` : "",
@@ -3398,6 +3502,7 @@ Deno.serve(async (req) => {
                 source_name: draft.interestingQuestion?.sourceName || "",
                 source_title: draft.interestingQuestion?.sourceTitle || "",
                 source_url: draft.interestingQuestion?.sourceUrl || "",
+                source_image_url: draft.interestingQuestion?.sourceImageUrl || "",
                 question_fingerprint: draft.interestingQuestion?.questionFingerprint || "",
                 updated_at: new Date().toISOString(),
               },
