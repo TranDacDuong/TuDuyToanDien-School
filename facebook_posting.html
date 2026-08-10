@@ -516,12 +516,14 @@ const DEFAULT_TYPE_PROMPTS = {
 - Kh?ng copy nguy?n v?n; d?ng insight ph? bi?n r?i vi?t l?i theo gi?ng MindUp.
 - ?nh d?ng template Q&A c?a MindUp, kh?ng ?? Gemini t? t?o ?nh.
 - Hashtag g?i ?: #MindUp #TimHieuThucTe #KienThucDoiSong.`,
-  "Quiz": `Lo?i b?i Quiz d?ng cho c?u h?i nhanh 10-30 gi?y.
-- H? th?ng t? ch?n 1 trong 53 b?y/ch? ?? theo tu?n ISO v? offset fanpage 0/10/20/30/40.
-- C?u h?i ng?n, d? ??c, c? 2-4 ??p ?n, c? b?y nh? khi?n h?c sinh d? sai n?u ??c v?i.
-- Caption kh?ng ???c l? ??p ?n; ??p ?n/gi?i th?ch ?? trong ghi ch? n?i b?.
-- ?nh d?ng template Quiz c?a MindUp, kh?ng ?? Gemini t? t?o ?nh.
-- Hashtag g?i ?: #MindUp #Quiz #PhatTrienTuDuy.`,
+  "Quiz": `Loại bài Quiz dùng cho câu hỏi nhanh 10-30 giây.
+- Hệ thống tự chọn 1 trong 53 bẫy/chủ đề theo tuần ISO và offset fanpage 0/10/20/30/40.
+- Kế hoạch khối lớp theo ngày đăng: Thứ 2 lớp 6, Thứ 3 lớp 7, Thứ 4 lớp 8, Thứ 5 lớp 9, Thứ 6 lớp 10, Thứ 7 lớp 11, Chủ nhật lớp 12.
+- Câu hỏi ngắn, dễ đọc, có 2-4 đáp án, có bẫy nhỏ khiến học sinh dễ sai nếu đọc vội.
+- Công thức toán/hóa phải dùng định dạng LaTeX giữa 2 dấu $ (ví dụ $x^2+1=0$).
+- Caption không được lộ đáp án; đáp án/giải thích để trong ghi chú nội bộ.
+- Ảnh tự động dựng theo template Quiz của MindUp (tự chèn câu hỏi + 2-4 ô đáp án), không để Gemini tự tạo ảnh.
+- Hashtag gợi ý: #MindUp #Quiz #PhatTrienTuDuy.`,
   "Hard Quiz with Prize": `Loại bài Hard Quiz with Prize hiển thị là Hỏi nhanh đớp trọn.
 - Câu hỏi phải đúng môn theo fanpage và đúng lớp/chương theo ngày đăng: thứ 2 lớp 6, thứ 3 lớp 7, thứ 4 lớp 8, thứ 5 lớp 9, thứ 6 lớp 10, thứ 7 lớp 11, chủ nhật lớp 12.
 - Không dùng chủ đề xoay vòng chung nếu làm lệch môn hoặc lệch chương đang học.
