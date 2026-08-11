@@ -33,27 +33,24 @@
       .trim();
   }
 
-  function buildTransferContent(studentName, ym, paymentId = "") {
-    const shortId = paymentId ? String(paymentId).split("-")[0].toUpperCase() : "";
-    const cleanName = toAscii(studentName).replace(/\s+/g, "").slice(0, 15).toUpperCase();
-    if (shortId) {
-      return `HP${shortId} ${cleanName}`.trim();
-    }
-    const [year, month] = String(ym || "").split("-");
-    const cleanMonth = [month, year].filter(Boolean).join("");
-    return `HP${cleanMonth} ${cleanName}`.trim();
+  function buildTransferContent(studentName, ym, studentId = "", paymentId = "") {
+    const shortStudentId = studentId ? String(studentId).split("-")[0].toUpperCase() : "";
+    const shortPaymentId = paymentId ? String(paymentId).split("-")[0].toUpperCase() : "";
+    const code = shortStudentId ? `HPHS${shortStudentId}` : (shortPaymentId ? `HP${shortPaymentId}` : "HP");
+    const cleanName = toAscii(studentName).replace(/\s+/g, "").slice(0, 12).toUpperCase();
+    return `${code} ${cleanName}`.trim();
   }
 
   const STATIC_BANK_INFO = {
-    bankCode: "CTG",
+    bankCode: "vietinbank",
     bankName: "VietinBank",
     account: "105870682948",
   };
 
-  function buildPaymentQrUrl(studentName, ym, amount, paymentId = "") {
+  function buildPaymentQrUrl(studentName, ym, amount, studentId = "", paymentId = "") {
     const finalAmount = Math.max(0, Math.round(Number(amount) || 0));
     if (!finalAmount) return "";
-    const addInfo = buildTransferContent(studentName, ym, paymentId);
+    const addInfo = buildTransferContent(studentName, ym, studentId, paymentId);
     return `https://img.vietqr.io/image/${STATIC_BANK_INFO.bankCode}-${STATIC_BANK_INFO.account}-compact2.png?amount=${encodeURIComponent(finalAmount)}&addInfo=${encodeURIComponent(addInfo)}`;
   }
 
@@ -63,8 +60,8 @@
       return `<div class="qr-payment-card"><div class="qr-payment-text"><div class="qr-payment-title">Mã QR thanh toán</div><div class="qr-payment-note">Học phí đã được thanh toán đủ nên không cần tạo mã QR.</div></div></div>`;
     }
 
-    const qrUrl = buildPaymentQrUrl(studentName, ym, finalAmount, paymentId);
-    const transferContent = buildTransferContent(studentName, ym, paymentId);
+    const qrUrl = buildPaymentQrUrl(studentName, ym, finalAmount, studentId, paymentId);
+    const transferContent = buildTransferContent(studentName, ym, studentId, paymentId);
     return `
       <div class="qr-payment-card">
         <div class="qr-payment-media">

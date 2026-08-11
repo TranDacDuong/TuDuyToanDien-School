@@ -80,6 +80,15 @@ function extractTuitionIdOrCodes(content: string): string[] {
   const clean = stripVietnamese(content);
   const codes: string[] = [];
 
+  // Match HPHS followed by Student ID shortcode (e.g. HPHS3F9A128B)
+  const hphsMatches = clean.match(/HPHS\s*[-_]?\s*([A-Z0-9]{4,36})/gi);
+  if (hphsMatches) {
+    hphsMatches.forEach(m => {
+      const code = m.replace(/^HPHS\s*[-_]?\s*/i, "").trim();
+      if (code) codes.push(code);
+    });
+  }
+
   // Match HP followed by UUID or alphanumeric (e.g. HP123456 or HP-ABC123)
   const hpMatches = clean.match(/HP\s*[-_]?\s*([A-Z0-9]{4,36})/gi);
   if (hpMatches) {
@@ -183,11 +192,12 @@ serve(async (req: Request) => {
       const extractedCodes = extractTuitionIdOrCodes(item.content);
       let matchedTuition: any = null;
 
-      // 1. Try matching by tuition payment ID or short code
-      for (const code of extractedCodes) {
-        if (code.length >= 8) {
+      // 1. Try matching by tuition payment ID or student ID short code (e.g. HPHS3F9A128B -> 3F9A128B)
+      for (const rawCode of extractedCodes) {
+        const code = rawCode.replace(/^HS/i, "").toLowerCase();
+        if (code.length >= 6) {
           const payments = await fetchJson<Array<any>>(
-            `tuition_payments?id=ilike.${encodeURIComponent(code)}*&limit=1`
+            `tuition_payments?or=(id.ilike.${encodeURIComponent(code)}*,student_id.ilike.${encodeURIComponent(code)}*)&amount_due=gt.0&order=created_at.desc&limit=1`
           ).catch(() => []);
           if (payments.length) {
             matchedTuition = payments[0];
