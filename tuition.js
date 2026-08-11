@@ -37,8 +37,8 @@
     const shortStudentId = studentId ? String(studentId).split("-")[0].toUpperCase() : "";
     const shortPaymentId = paymentId ? String(paymentId).split("-")[0].toUpperCase() : "";
     const code = shortStudentId ? `HPHS${shortStudentId}` : (shortPaymentId ? `HP${shortPaymentId}` : "HP");
-    const cleanName = toAscii(studentName).replace(/\s+/g, "").slice(0, 12).toUpperCase();
-    return `${code} ${cleanName}`.trim();
+    const cleanName = toAscii(studentName).replace(/\s+/g, "").slice(0, 10).toUpperCase();
+    return `SEVQR ${code} ${cleanName}`.trim();
   }
 
   const STATIC_BANK_INFO = {
