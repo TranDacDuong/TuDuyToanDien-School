@@ -41,13 +41,13 @@
     }
     const [year, month] = String(ym || "").split("-");
     const cleanMonth = [month, year].filter(Boolean).join("");
-    return `HP ${cleanName} ${cleanMonth}`.trim();
+    return `HP${cleanMonth} ${cleanName}`.trim();
   }
 
   const STATIC_BANK_INFO = {
-    bankCode: "TCB",
-    bankName: "Techcombank",
-    account: "220406022268",
+    bankCode: "CTG",
+    bankName: "VietinBank",
+    account: "105870682948",
   };
 
   function buildPaymentQrUrl(studentName, ym, amount, paymentId = "") {
