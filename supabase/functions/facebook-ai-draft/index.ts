@@ -546,15 +546,6 @@ function isQuizTypeName(typeName: string) {
   return String(typeName || "").trim().toLowerCase() === "quiz";
 }
 
-function isNewsType(typeName: string) {
-  const normalized = stripVietnameseForTag(typeName || "").toLowerCase();
-  return normalized.includes("news")
-    || normalized.includes("tin tuc")
-    || normalized.includes("thoi su")
-    || normalized.includes("giao duc")
-    || normalized === "tin tức";
-}
-
 const QUIZ_WEEKDAY_GRADES = [12, 9, 10, 11, 12, 10, 11]; // JS Sunday=0, Monday=1, Tuesday=2, Wednesday=3, Thursday=4, Friday=5, Saturday=6.
 
 const QUIZ_CURRICULUM_TOPICS: Record<string, Record<number, string>> = {
@@ -1469,47 +1460,7 @@ function buildGeminiPrompt(args: {
     ].join("\n");
   }
 
-  if (isNewsType(args.typeName)) {
-    const fanpageTag = pageHashtag(args.pageName);
-    return [
-      "You are a MindUp senior educational news editor for Facebook content.",
-      "Task: create an Education News Facebook post in Vietnamese based on recent educational news from today or yesterday.",
-      "",
-      ...viralFacebookPromptBlock(args.typeName),
-      "",
-      "Primary Source Guidance:",
-      "- Target news websites: Báo Giáo dục & Thời đại (giaoducthoidai.vn) or VnExpress Giáo dục (vnexpress.net/giao-duc).",
-      "- Select ONE recent educational news story (today or yesterday) relevant to students/parents (e.g., exam regulations, school start dates, textbook updates, benchmark scores, MOET policies).",
-      "- Extract the exact source_title, source_url, and direct source_image_url (image/illustration from the news article) if available.",
-      args.sourceHistory ? ["", "Recently used news articles to avoid:", args.sourceHistory].join("\n") : "",
-      "",
-      "Content requirements:",
-      "- Hook: Catchy, urgent headline with 1-2 emojis (🚨, 📌, 📰, ⏰).",
-      "- News Summary: 3-4 clear bullet points (🔹) summarizing the key points of the news concisely.",
-      "- MindUp Insight & Actionable Advice: Provide 2-3 practical tips for students/parents on how to adapt or prepare.",
-      "- CTA: Ask an open question to invite comments or shares.",
-      "- Voice: Professional, timely, helpful, trustworthy education brand.",
-      "",
-      "Return ONLY valid JSON, no markdown, with this schema:",
-      JSON.stringify({
-        caption: "Vietnamese Education News post with hook, 3-4 bullet summary points, MindUp advice, CTA, and 3-6 emojis.",
-        hashtags: ["#TinTucGiaoDuc", "#GiaoDucThoiDai", "#TuDuyToanDien", "#MindUp", fanpageTag],
-        image_prompt: "English prompt for 16:9 modern educational news graphic, no text, no logo.",
-        image_search_keywords: "education news classroom student Vietnam",
-        image_overlay_text: "Short Vietnamese news title summary up to 20 words.",
-        news: {
-          source_name: "GiaoDucThoiDai.vn / VnExpress.net",
-          source_title: "Title of selected news article",
-          source_url: "URL of selected news article",
-          source_image_url: "Direct URL of the image/illustration from the news article if available",
-          news_summary: "Short 2-3 sentence summary of news",
-          mindup_insight: "Actionable advice for students and parents",
-        },
-        source_inspiration: "Giaoducthoidai.vn / VnExpress.net",
-        internal_note: "Education news source, article title, and summary note.",
-      }, null, 2),
-    ].filter(Boolean).join("\n");
-  }
+  const scheduledTopic = contentTopicFor(args.typeName, args.scheduledAt, args.pageName);
 
   if (isInterestingQuestion(args.typeName)) {
     const fanpageTag = pageHashtag(args.pageName);
@@ -1660,8 +1611,8 @@ function buildGeminiPrompt(args: {
     return [
       "IMPORTANT QUIZ FLOW: Gemini only creates quiz text data. Do not create an image. The website will place the question and answers into MindUp's Quiz image template.",
       `Mandatory textbook curriculum standard: Bộ sách Kết nối tri thức với cuộc sống (KNTT) - Bộ GD&ĐT Việt Nam.`,
-      `Target subject: ${curriculum.subject}`,
-      `Target grade: Lớp ${curriculum.grade}`,
+      `Mandatory weekday-grade plan: ${curriculum.weekdayRule}`,
+      `This post must target grade ${curriculum.grade}, subject ${curriculum.subject}.`,
       `Scheduled date: ${args.scheduledAt}. ${lessonTopicContext}`,
       "MANDATORY QUESTION TYPE: THIS MUST BE A TRICK / TRAP QUESTION (CÂU HỎI BẪY / CÂU HỎI LỪA KHẾN HỌC SINH RẤT DỄ SAI).",
       "The question must target classic misconceptions, misreading traps, unit/sign traps, boundary conditions, or language traps in the KNTT curriculum that cause 90% of students to pick the wrong option if they solve quickly or read carelessly.",
@@ -1731,6 +1682,7 @@ function buildGeminiPrompt(args: {
       `- Fanpage: ${args.pageName}`,
       `- Hashtag fanpage bắt buộc: ${fanpageTag}`,
       `- Thời gian đăng: ${args.scheduledAt}`,
+      `- Kế hoạch lớp theo ngày đăng: ${curriculum.weekdayRule}`,
       `- Lớp bắt buộc: lớp ${curriculum.grade}`,
       `- Môn bắt buộc theo fanpage: ${curriculum.subject}`,
       `- Chương/mảng kiến thức hiện tại bắt buộc dùng: ${curriculum.topic}`,
