@@ -546,7 +546,7 @@ function isQuizTypeName(typeName: string) {
   return String(typeName || "").trim().toLowerCase() === "quiz";
 }
 
-const QUIZ_WEEKDAY_GRADES = [12, 6, 7, 8, 9, 10, 11]; // JS Sunday=0, Monday=1.
+const QUIZ_WEEKDAY_GRADES = [12, 9, 10, 11, 12, 10, 11]; // JS Sunday=0, Monday=1, Tuesday=2, Wednesday=3, Thursday=4, Friday=5, Saturday=6.
 
 const QUIZ_CURRICULUM_TOPICS: Record<string, Record<number, string>> = {
   "Toán học": {
@@ -614,17 +614,58 @@ const QUIZ_CURRICULUM_TOPICS: Record<string, Record<number, string>> = {
   },
 };
 
+async function fetchRecentLessonsForSubjectAndGrade(subjectName: string, gradeNum: number): Promise<string[]> {
+  try {
+    const classes = await fetchJson<Array<{ id: string; class_name: string; subjects?: { name?: string }; grades?: { name?: string } }>>(
+      "classes?select=id,class_name,subjects(name),grades(name)&limit=100"
+    ).catch(() => []);
+    if (!Array.isArray(classes) || !classes.length) return [];
+
+    const normSubject = stripVietnameseForTag(subjectName).toLowerCase();
+    const targetGradeStr = String(gradeNum);
+
+    const matchingClassIds = classes.filter(c => {
+      const className = String(c.class_name || "").toLowerCase();
+      const sName = stripVietnameseForTag(c?.subjects?.name || "").toLowerCase();
+      const gName = String(c?.grades?.name || "");
+
+      const matchesGrade = gName.includes(targetGradeStr) || className.includes(targetGradeStr);
+      const matchesSubject = !normSubject || sName.includes(normSubject) || className.includes(normSubject.slice(0, 4));
+      return matchesGrade && matchesSubject;
+    }).map(c => c.id);
+
+    if (!matchingClassIds.length) return [];
+
+    const sessions = await fetchJson<Array<{ session_date: string; lessons?: { name?: string } | null; lesson_id?: string }>>(
+      `class_sessions?class_id=in.(${matchingClassIds.map(encodeURIComponent).join(",")})&select=session_date,lesson_id,lessons(name)&order=session_date.desc&limit=20`
+    ).catch(() => []);
+
+    if (!Array.isArray(sessions) || !sessions.length) return [];
+
+    const lessonNames = Array.from(new Set(
+      sessions
+        .map(s => String(s.lessons?.name || "").trim())
+        .filter(Boolean)
+    )).slice(0, 5);
+
+    return lessonNames;
+  } catch (err) {
+    console.error("fetchRecentLessonsForSubjectAndGrade error:", err);
+    return [];
+  }
+}
+
 function quizCurriculumFor(scheduledAt: string, pageName: string) {
   const date = new Date(scheduledAt);
   const day = Number.isNaN(date.getTime()) ? 1 : date.getUTCDay();
-  const grade = QUIZ_WEEKDAY_GRADES[day] || 6;
+  const grade = QUIZ_WEEKDAY_GRADES[day] || 10;
   const subject = pageSubjectContext(pageName).subject;
   const topicByGrade = QUIZ_CURRICULUM_TOPICS[subject] || QUIZ_CURRICULUM_TOPICS["Tư duy học tập"];
   return {
     grade,
     subject,
-    topic: topicByGrade[grade] || topicByGrade[6],
-    weekdayRule: "Thứ 2 lớp 6, thứ 3 lớp 7, thứ 4 lớp 8, thứ 5 lớp 9, thứ 6 lớp 10, thứ 7 lớp 11, chủ nhật lớp 12.",
+    topic: topicByGrade[grade] || topicByGrade[10],
+    weekdayRule: "Thứ 2 lớp 9, thứ 3 lớp 10, thứ 4 lớp 11, thứ 5 lớp 12, thứ 6 lớp 10, thứ 7 lớp 11, chủ nhật lớp 12.",
   };
 }
 
@@ -1365,7 +1406,7 @@ function mondayMindsetTopic(scheduledAt: string, pageName: string) {
   };
 }
 
-function buildGeminiPrompt(args: {
+async function buildGeminiPrompt(args: {
   pageName: string;
   typeName: string;
   scheduledAt: string;
@@ -1562,30 +1603,40 @@ function buildGeminiPrompt(args: {
   if (scheduledTopic.key === "quiz") {
     const fanpageTag = pageHashtag(args.pageName);
     const curriculum = quizCurriculumFor(args.scheduledAt, args.pageName);
+    const realLessons = await fetchRecentLessonsForSubjectAndGrade(curriculum.subject, curriculum.grade);
+    const lessonTopicContext = realLessons.length
+      ? `BÀI HỌC THỰC TẾ GẦN ĐÂY CỦA CÁC LỚP ${curriculum.subject.toUpperCase()} ${curriculum.grade} TẠI MINDUP: ${realLessons.join(" | ")}. BẮT BUỘC RA CÂU HỎI BẪY XOAY QUANH CÁC BÀI HỌC NÀY.`
+      : `Chủ đề bài học theo phân phối chương trình bộ sách KNTT cho tháng này: ${curriculum.topic}.`;
+
     return [
       "IMPORTANT QUIZ FLOW: Gemini only creates quiz text data. Do not create an image. The website will place the question and answers into MindUp's Quiz image template.",
-      `Mandatory weekday-grade plan: ${curriculum.weekdayRule}`,
-      `This post must target grade ${curriculum.grade}, subject ${curriculum.subject}.`,
-      `Current curriculum area to use: ${curriculum.topic}.`,
+      `Mandatory textbook curriculum standard: Bộ sách Kết nối tri thức với cuộc sống (KNTT) - Bộ GD&ĐT Việt Nam.`,
+      `Target subject: ${curriculum.subject}`,
+      `Target grade: Lớp ${curriculum.grade}`,
+      `Scheduled date: ${args.scheduledAt}. ${lessonTopicContext}`,
+      "MANDATORY QUESTION TYPE: THIS MUST BE A TRICK / TRAP QUESTION (CÂU HỎI BẪY / CÂU HỎI LỪA KHẾN HỌC SINH RẤT DỄ SAI).",
+      "The question must target classic misconceptions, misreading traps, unit/sign traps, boundary conditions, or language traps in the KNTT curriculum that cause 90% of students to pick the wrong option if they solve quickly or read carelessly.",
       "Return a quiz object with grade, subject, curriculum_topic, question, answers, correct_answer, trap, explanation.",
       "Math formatting rule: every mathematical expression, variable, formula, equation, inequality, fraction, exponent, radical, logarithm, geometry notation, chemistry equation, or unit expression that appears inside quiz.question, quiz.answers, quiz.correct_answer, quiz.trap, or quiz.explanation must be written as inline LaTeX between single dollar signs, for example $x^2+1=0$, $\\sqrt{x+1}$, $\\log_2 8$, $H_2SO_4$, $\\Delta H<0$.",
       "Do not put normal Vietnamese words inside $...$. Only wrap the mathematical/chemical symbols or formulas.",
       "Keep inline LaTeX on one line. Never split a formula across lines.",
       "Caption must not reveal the correct answer. Correct answer and explanation must only appear in internal_note and quiz fields.",
       "Do not ask Gemini to create the image. The website will create the image from MindUp Quiz template.",
-      "Bạn là giáo viên ra câu hỏi tương tác nhanh cho MindUp - Tư Duy Toàn Diện.",
-      "Nhiệm vụ: tạo bài Quiz cực nhanh, học sinh có thể làm trong 10-30 giây, nhưng có một bẫy nhỏ khiến học sinh dễ sai nếu đọc vội.",
+      "Bạn là giáo viên chuyên ra câu hỏi bẫy/câu hỏi lừa cho MindUp - Tư Duy Toàn Diện.",
+      `Nhiệm vụ: tạo một câu hỏi bẫy/câu hỏi lừa bám sát đúng bài đang học trên lớp của bộ sách KẾT NỐI TRI THỨC VỚI CUỘC SỐNG (${realLessons.length ? "Bài học thực tế: " + realLessons.join(", ") : "Theo chương trình tháng"}). Học sinh làm 10-30 giây nhưng RẤT DỄ SAI nếu đọc lướt.`,
       "",
       ...viralFacebookPromptBlock(args.typeName),
       "",
       contentTopicBlock(scheduledTopic),
       "",
       "Yêu cầu câu hỏi:",
-      "- Câu hỏi ngắn, rõ, không cần tính toán dài.",
-      "- Có 2-4 đáp án, không ghi A/B/C/D trong nội dung đáp án.",
-      "- Có một bẫy tư duy/đọc đề/đơn vị/dấu/điều kiện.",
-      "- Caption không được lộ đáp án.",
-      "- Internal note phải ghi đáp án đúng và giải thích ngắn để nhân viên kiểm tra.",
+      realLessons.length
+        ? `- ƯU TIÊN HÀNG ĐẦU: Bắt buộc ra câu hỏi bẫy thuộc các bài học lớp học thực tế vừa dạy gần đây tại MindUp: ${realLessons.join(", ")}.`
+        : "- Bắt buộc dùng kiến thức đúng bài/chương đang học trên lớp theo bộ sách KẾT NỐI TRI THỨC VỚI CUỘC SỐNG.",
+      "- Câu hỏi ngắn, rõ, có bẫy lừa tinh vi (đọc lướt, thiếu điều kiện nghiệm, nhầm đơn vị, nhầm dấu, bẫy định nghĩa).",
+      "- Có 2-4 đáp án ngắn, đáp án lừa phải là kết quả của lỗi sai kinh điển nhất mà học sinh hay mắc.",
+      "- Caption không được lộ đáp án; kích thích học sinh comment tranh luận.",
+      "- Internal note phải ghi rõ đáp án đúng, phân tích bẫy lừa nằm ở đâu và giải thích ngắn gọn.",
       "",
       "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
       JSON.stringify({
@@ -3228,7 +3279,7 @@ Deno.serve(async (req) => {
     });
 
     const sourceHistory = await loadSourceHistoryForPost(post);
-    const textPrompt = buildGeminiPrompt({
+    const textPrompt = await buildGeminiPrompt({
       pageName: post.page?.page_name || post.page_id,
       typeName: post.type?.name || "Facebook",
       scheduledAt: post.scheduled_at,
