@@ -71,18 +71,36 @@ function env(name: string) {
 }
 
 function geminiApiKeys() {
-  const keys = [
+  const envObj = typeof Deno !== "undefined" && Deno.env?.toObject ? Deno.env.toObject() : {};
+  const foundKeys: string[] = [];
+  for (const [k, v] of Object.entries(envObj)) {
+    const keyNameUpper = k.toUpperCase();
+    if (keyNameUpper.includes("GEMINI") && keyNameUpper.includes("KEY") && v) {
+      foundKeys.push(...String(v).split(/[\n,;]+/));
+    }
+  }
+  const direct = [
     ...env("GEMINI_API_KEYS").split(/[\n,;]+/),
     env("GEMINI_API_KEY"),
-  ].map((key) => key.trim()).filter(Boolean);
+  ];
+  const keys = [...foundKeys, ...direct].map((key) => key.trim()).filter(Boolean);
   return Array.from(new Set(keys));
 }
 
 function llamaApiKeys() {
-  const keys = [
+  const envObj = typeof Deno !== "undefined" && Deno.env?.toObject ? Deno.env.toObject() : {};
+  const foundKeys: string[] = [];
+  for (const [k, v] of Object.entries(envObj)) {
+    const keyNameUpper = k.toUpperCase();
+    if (keyNameUpper.includes("LLAMA") && keyNameUpper.includes("KEY") && v) {
+      foundKeys.push(...String(v).split(/[\n,;]+/));
+    }
+  }
+  const direct = [
     ...env("LLAMA_API_KEYS").split(/[\n,;]+/),
     env("LLAMA_API_KEY"),
-  ].map((key) => key.trim()).filter(Boolean);
+  ];
+  const keys = [...foundKeys, ...direct].map((key) => key.trim()).filter(Boolean);
   return Array.from(new Set(keys));
 }
 

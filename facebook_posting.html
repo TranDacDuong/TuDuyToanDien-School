@@ -2630,7 +2630,8 @@ async function callFacebookAiDraftFunction(payload){
       body: JSON.stringify(payload),
     });
   } catch (error) {
-    throw new Error("Không gọi được Edge Function facebook-ai-draft. Khả năng cao function chưa được deploy lên Supabase hoặc bị CORS/mạng chặn. Hãy deploy function facebook-ai-draft và set secret GEMINI_API_KEY rồi thử lại.");
+    const origMsg = error instanceof Error ? error.message : String(error || "");
+    throw new Error(`Không gọi được Edge Function facebook-ai-draft (${origMsg}). Khả năng cao function chưa được deploy lên Supabase hoặc bị CORS/mạng chặn.`);
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.error) {
