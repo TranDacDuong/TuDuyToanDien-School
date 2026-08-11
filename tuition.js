@@ -33,11 +33,15 @@
       .trim();
   }
 
-  function buildTransferContent(studentName, ym) {
+  function buildTransferContent(studentName, ym, paymentId = "") {
+    const shortId = paymentId ? String(paymentId).split("-")[0].toUpperCase() : "";
+    const cleanName = toAscii(studentName).replace(/\s+/g, "").slice(0, 15).toUpperCase();
+    if (shortId) {
+      return `HP${shortId} ${cleanName}`.trim();
+    }
     const [year, month] = String(ym || "").split("-");
-    const cleanName = toAscii(studentName).replace(/\s+/g, " ").toUpperCase();
-    const cleanMonth = [month, year].filter(Boolean).join(" ").trim();
-    return `${cleanName} NOP TIEN HOC THANG ${cleanMonth}`.trim();
+    const cleanMonth = [month, year].filter(Boolean).join("");
+    return `HP ${cleanName} ${cleanMonth}`.trim();
   }
 
   const STATIC_BANK_INFO = {
@@ -46,33 +50,33 @@
     account: "220406022268",
   };
 
-  function buildPaymentQrUrl(studentName, ym, amount) {
+  function buildPaymentQrUrl(studentName, ym, amount, paymentId = "") {
     const finalAmount = Math.max(0, Math.round(Number(amount) || 0));
     if (!finalAmount) return "";
-    const addInfo = buildTransferContent(studentName, ym);
+    const addInfo = buildTransferContent(studentName, ym, paymentId);
     return `https://img.vietqr.io/image/${STATIC_BANK_INFO.bankCode}-${STATIC_BANK_INFO.account}-compact2.png?amount=${encodeURIComponent(finalAmount)}&addInfo=${encodeURIComponent(addInfo)}`;
   }
 
-  function buildPaymentQrBlock(studentName, ym, amount, studentId) {
+  function buildPaymentQrBlock(studentName, ym, amount, studentId, paymentId = "") {
     const finalAmount = Math.max(0, Math.round(Number(amount) || 0));
     if (!finalAmount) {
       return `<div class="qr-payment-card"><div class="qr-payment-text"><div class="qr-payment-title">Mã QR thanh toán</div><div class="qr-payment-note">Học phí đã được thanh toán đủ nên không cần tạo mã QR.</div></div></div>`;
     }
 
-    const qrUrl = buildPaymentQrUrl(studentName, ym, finalAmount);
-    const transferContent = buildTransferContent(studentName, ym);
+    const qrUrl = buildPaymentQrUrl(studentName, ym, finalAmount, paymentId);
+    const transferContent = buildTransferContent(studentName, ym, paymentId);
     return `
       <div class="qr-payment-card">
         <div class="qr-payment-media">
           <img class="qr-payment-image" src="${qrUrl}" alt="QR thanh toán học phí" referrerpolicy="no-referrer">
         </div>
         <div class="qr-payment-text">
-          <div class="qr-payment-title">Quét mã để thanh toán học phí</div>
+          <div class="qr-payment-title">Quét mã để thanh toán học phí (Tự động gạch nợ)</div>
           <div class="qr-payment-line"><span>Ngân hàng:</span><b>${STATIC_BANK_INFO.bankName}</b></div>
           <div class="qr-payment-line"><span>Số tài khoản:</span><b>${STATIC_BANK_INFO.account}</b></div>
           <div class="qr-payment-line"><span>Số tiền:</span><b>${fmt(finalAmount)}đ</b></div>
           <div class="qr-payment-line"><span>Nội dung CK:</span><b>${transferContent}</b></div>
-          <div class="qr-payment-note">Khi quét QR, ứng dụng ngân hàng sẽ tự điền sẵn số tiền và nội dung chuyển khoản.</div>
+          <div class="qr-payment-note">Khi quét QR, ứng dụng ngân hàng sẽ tự điền sẵn số tiền và mã chuyển khoản để hệ thống tự động gạch nợ 24/7 trong vài giây.</div>
         </div>
       </div>
     `;
@@ -417,7 +421,7 @@
             <div class="tuition-payment-number"><span>Ngày thu gần nhất</span><b>${fmtDate(payment?.paid_at)}</b></div>
           </div>
           <div>
-            ${buildPaymentQrBlock(group.studentName, group.ym, qrAmount, group.studentId)}
+            ${buildPaymentQrBlock(group.studentName, group.ym, qrAmount, group.studentId, payment?.id || "")}
             ${payment?.note ? `<div class="invoice-note" style="margin-top:12px">${payment.note}</div>` : ""}
           </div>
         </div>
@@ -1628,7 +1632,7 @@ Nhập số tiền hoàn lại (>0):`,
           </div>
 
           <div style="margin-top:18px">
-            ${buildPaymentQrBlock(g.studentName, g.ym, remaining > 0 ? remaining : 0, g.studentId)}
+            ${buildPaymentQrBlock(g.studentName, g.ym, remaining > 0 ? remaining : 0, g.studentId, payment?.id || "")}
           </div>
         </section>
       `;
