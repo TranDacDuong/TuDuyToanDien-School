@@ -194,57 +194,63 @@ serve(async (req: Request) => {
 
       // 1. Try matching by tuition payment ID or student ID short code (e.g. HPHS3F9A128B -> 3F9A128B)
       for (const rawCode of extractedCodes) {
-        const code = rawCode.replace(/^HS/i, "").toLowerCase();
-        if (code.length >= 6) {
-          const payments = await fetchJson<Array<any>>(
-            `tuition_payments?or=(id.ilike.${encodeURIComponent(code)}*,student_id.ilike.${encodeURIComponent(code)}*)&order=created_at.desc&limit=1`
+        const cleanCode = rawCode.replace(/^HS/i, "").replace(/[^a-f0-9]/gi, "").toLowerCase();
+        if (cleanCode.length >= 4) {
+          // Fetch tuition_payments and match in memory to avoid PostgreSQL UUID ilike operator errors
+          const allPayments = await fetchJson<Array<any>>(
+            `tuition_payments?order=created_at.desc&limit=100`
           ).catch(() => []);
-          if (payments && payments.length) {
-            matchedTuition = payments[0];
-            break;
+
+          if (Array.isArray(allPayments)) {
+            matchedTuition = allPayments.find(p => {
+              const sid = String(p.student_id || "").replace(/-/g, "").toLowerCase();
+              const pid = String(p.id || "").replace(/-/g, "").toLowerCase();
+              return sid.startsWith(cleanCode) || pid.startsWith(cleanCode);
+            });
           }
 
-          // If no existing tuition_payments row, search user by student_id prefix
-          const students = await fetchJson<Array<any>>(
-            `users?id=ilike.${encodeURIComponent(code)}*&limit=1`
+          if (matchedTuition) break;
+
+          // If not found in tuition_payments, search users table by student_id prefix
+          const allStudents = await fetchJson<Array<any>>(
+            `users?role=eq.student&select=id,full_name,phone&limit=200`
           ).catch(() => []);
-          if (students && students.length) {
-            const studentId = students[0].id;
-            const currentMonth = new Date().toISOString().slice(0, 7) + "-01";
 
-            // Check if payment row already exists for current month
-            const existingMonthPayment = await fetchJson<Array<any>>(
-              `tuition_payments?student_id=eq.${encodeURIComponent(studentId)}&month=eq.${encodeURIComponent(currentMonth)}&limit=1`
-            ).catch(() => []);
+          if (Array.isArray(allStudents)) {
+            const student = allStudents.find(u => {
+              const uid = String(u.id || "").replace(/-/g, "").toLowerCase();
+              return uid.startsWith(cleanCode);
+            });
 
-            if (existingMonthPayment && existingMonthPayment.length) {
-              matchedTuition = existingMonthPayment[0];
-              break;
-            } else {
-              // Create new payment row for current month
-              const created = await fetchJson<Array<any>>("tuition_payments", {
-                method: "POST",
-                headers: { Prefer: "return=representation" },
-                body: JSON.stringify({
-                  student_id: studentId,
-                  month: currentMonth,
-                  amount_due: 0,
-                  amount_paid: item.amount,
-                  paid_at: new Date().toISOString(),
-                  payment_method: "bank_auto",
-                  transaction_ref: item.txId,
-                  auto_reconciled: true,
-                  note: `Tự động gạch nợ ${new Intl.NumberFormat("vi-VN").format(item.amount)}đ qua ngân hàng (Mã GD: ${item.txId})`,
-                }),
-              }).catch(err => {
-                console.error("Failed to create tuition_payments row:", err);
-                return [];
-              });
+            if (student) {
+              const currentMonth = new Date().toISOString().slice(0, 7) + "-01";
+              const monthPayments = await fetchJson<Array<any>>(
+                `tuition_payments?student_id=eq.${student.id}&month=eq.${currentMonth}&limit=1`
+              ).catch(() => []);
 
-              if (created && created.length) {
-                matchedTuition = created[0];
-                // Mark status directly as success since we already set amount_paid
+              if (monthPayments && monthPayments.length) {
+                matchedTuition = monthPayments[0];
                 break;
+              } else {
+                const created = await fetchJson<Array<any>>("tuition_payments", {
+                  method: "POST",
+                  headers: { Prefer: "return=representation" },
+                  body: JSON.stringify({
+                    student_id: student.id,
+                    month: currentMonth,
+                    amount_due: 0,
+                    amount_paid: 0,
+                    paid_at: null,
+                    payment_method: "bank_auto",
+                    transaction_ref: item.txId,
+                    auto_reconciled: true,
+                  }),
+                }).catch(() => []);
+
+                if (created && created.length) {
+                  matchedTuition = created[0];
+                  break;
+                }
               }
             }
           }
