@@ -1605,7 +1605,7 @@ async function buildGeminiPrompt(args: {
     const curriculum = quizCurriculumFor(args.scheduledAt, args.pageName);
     const realLessons = await fetchRecentLessonsForSubjectAndGrade(curriculum.subject, curriculum.grade);
     const lessonTopicContext = realLessons.length
-      ? `BÀI HỌC THỰC TẾ GẦN ĐÂY CỦA CÁC LỚP ${curriculum.subject.toUpperCase()} ${curriculum.grade} TẠI MINDUP: ${realLessons.join(" | ")}. BẮT BUỘC RA CÂU HỎI BẪY XOAY QUANH CÁC BÀI HỌC NÀY.`
+      ? `BÀI HỌC THỰC TẾ GẦN ĐÂY CỦA CÁC LỚP ${curriculum.subject.toUpperCase()} ${curriculum.grade} TẠI MINDUP: ${realLessons.join(" | ")}. BẮT BUỘC NÊU CÂU HỎI TRẮC NGHIỆM NHANH LIÊN QUAN ĐẾN CÁC BÀI NÀY.`
       : `Chủ đề bài học theo phân phối chương trình bộ sách KNTT cho tháng này: ${curriculum.topic}.`;
 
     return [
@@ -1614,16 +1614,17 @@ async function buildGeminiPrompt(args: {
       `Target subject: ${curriculum.subject}`,
       `Target grade: Lớp ${curriculum.grade}`,
       `Scheduled date: ${args.scheduledAt}. ${lessonTopicContext}`,
-      "MANDATORY QUESTION TYPE: THIS MUST BE A TRICK / TRAP QUESTION (CÂU HỎI BẪY / CÂU HỎI LỪA KHẾN HỌC SINH RẤT DỄ SAI).",
-      "The question must target classic misconceptions, misreading traps, unit/sign traps, boundary conditions, or language traps in the KNTT curriculum that cause 90% of students to pick the wrong option if they solve quickly or read carelessly.",
+      "MANDATORY QUIZ NATURE: THIS IS A QUICK 10-30 SECOND INTERACTION QUIZ (CÂU HỎI INTERACTION NHANH 10-30 GIÂY).",
+      "CRITICAL REQUIREMENT FOR DIFFICULTY: DO NOT CREATE LONG, MULTI-STEP, OR COMPLICATED MATHEMATICAL/PHYSICS/CHEMISTRY PROBLEMS. THE QUESTION MUST BE SHORT (UNDER 25 WORDS), CLEAR, AND SOLVABLE WITHIN 30 SECONDS BY A STUDENT SCROLLING FACEBOOK.",
+      "The question can test a fundamental concept, a quick mental calculation, or a common misconception/subtle trap, but IT MUST NOT BE ADVANCED OR TIME-CONSUMING.",
       "Return a quiz object with grade, subject, curriculum_topic, question, answers, correct_answer, trap, explanation.",
       "Math formatting rule: every mathematical expression, variable, formula, equation, inequality, fraction, exponent, radical, logarithm, geometry notation, chemistry equation, or unit expression that appears inside quiz.question, quiz.answers, quiz.correct_answer, quiz.trap, or quiz.explanation must be written as inline LaTeX between single dollar signs, for example $x^2+1=0$, $\\sqrt{x+1}$, $\\log_2 8$, $H_2SO_4$, $\\Delta H<0$.",
       "Do not put normal Vietnamese words inside $...$. Only wrap the mathematical/chemical symbols or formulas.",
       "Keep inline LaTeX on one line. Never split a formula across lines.",
       "Caption must not reveal the correct answer. Correct answer and explanation must only appear in internal_note and quiz fields.",
       "Do not ask Gemini to create the image. The website will create the image from MindUp Quiz template.",
-      "Bạn là giáo viên chuyên ra câu hỏi bẫy/câu hỏi lừa cho MindUp - Tư Duy Toàn Diện.",
-      `Nhiệm vụ: tạo một câu hỏi bẫy/câu hỏi lừa bám sát đúng bài đang học trên lớp của bộ sách KẾT NỐI TRI THỨC VỚI CUỘC SỐNG (${realLessons.length ? "Bài học thực tế: " + realLessons.join(", ") : "Theo chương trình tháng"}). Học sinh làm 10-30 giây nhưng RẤT DỄ SAI nếu đọc lướt.`,
+      "Bạn là giáo viên ra câu hỏi tương tác nhanh 10-30 giây cho MindUp - Tư Duy Toàn Diện.",
+      `Nhiệm vụ: tạo một câu hỏi Quiz ngắn gọn, thú vị, đúng bài đang học (${realLessons.length ? "Bài học thực tế: " + realLessons.join(", ") : "Theo chương trình tháng"}). Học sinh lướt Facebook có thể đọc hiểu và chọn ngay đáp án trong vòng 10 đến 30 giây. KHÔNG ra đề tính toán nhiều bước hay phức tạp rườm rà.`,
       "",
       ...viralFacebookPromptBlock(args.typeName),
       "",
@@ -1631,12 +1632,14 @@ async function buildGeminiPrompt(args: {
       "",
       "Yêu cầu câu hỏi:",
       realLessons.length
-        ? `- ƯU TIÊN HÀNG ĐẦU: Bắt buộc ra câu hỏi bẫy thuộc các bài học lớp học thực tế vừa dạy gần đây tại MindUp: ${realLessons.join(", ")}.`
+        ? `- ƯU TIÊN HÀNG ĐẦU: Bắt buộc ra câu hỏi trắc nghiệm nhanh thuộc các bài học vừa dạy gần đây: ${realLessons.join(", ")}.`
         : "- Bắt buộc dùng kiến thức đúng bài/chương đang học trên lớp theo bộ sách KẾT NỐI TRI THỨC VỚI CUỘC SỐNG.",
-      "- Câu hỏi ngắn, rõ, có bẫy lừa tinh vi (đọc lướt, thiếu điều kiện nghiệm, nhầm đơn vị, nhầm dấu, bẫy định nghĩa).",
-      "- Có 2-4 đáp án ngắn, đáp án lừa phải là kết quả của lỗi sai kinh điển nhất mà học sinh hay mắc.",
-      "- Caption không được lộ đáp án; kích thích học sinh comment tranh luận.",
-      "- Internal note phải ghi rõ đáp án đúng, phân tích bẫy lừa nằm ở đâu và giải thích ngắn gọn.",
+      "- CỰC KỲ NGHĨA VỤ: Đề bài ngắn gọn (dưới 25 từ), dễ hiểu, làm nhanh trong 10-30 giây.",
+      "- KHÔNG bắt tính toán cồng kềnh, không giải phương trình phức tạp, không biến đổi dài dòng.",
+      "- Có một chi tiết bẫy nhẹ hoặc nhầm lẫn phổ biến để học sinh thấy thú vị khi bấm chọn đáp án.",
+      "- Có 2-4 đáp án ngắn gọn, rõ ràng.",
+      "- Caption ngắn, không tiết lộ đáp án, kêu gọi học sinh comment chọn đáp án.",
+      "- Internal note giải thích ngắn gọn đáp án đúng và phân tích bẫy nhầm lẫn.",
       "",
       "Hãy trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
       JSON.stringify({
@@ -1646,14 +1649,14 @@ async function buildGeminiPrompt(args: {
           grade: curriculum.grade,
           subject: curriculum.subject,
           curriculum_topic: curriculum.topic,
-          question: "Câu hỏi ngắn, dễ đọc, có bẫy nhỏ. Nếu có công thức thì viết dạng $x^2+1=0$.",
+          question: "Câu hỏi cực ngắn, dễ hiểu, làm xong trong 10-30 giây. Nếu có công thức thì viết dạng $x^2+1=0$.",
           answers: ["Đáp án 1 có thể chứa $\\sqrt{x+1}$", "Đáp án 2", "Đáp án 3"],
           correct_answer: "Nội dung đáp án đúng, không chỉ ghi A/B/C/D; công thức phải ở dạng $...$.",
-          trap: "Mô tả bẫy nhỏ; công thức/ký hiệu nếu có phải ở dạng $...$.",
-          explanation: "Giải thích ngắn 2-3 câu; công thức/ký hiệu nếu có phải ở dạng $...$.",
+          trap: "Mô tả nhầm lẫn phổ biến hoặc bẫy nhỏ; công thức/ký hiệu nếu có phải ở dạng $...$.",
+          explanation: "Giải thích ngắn 1-2 câu; công thức/ký hiệu nếu có phải ở dạng $...$.",
         },
         image_prompt: "Template Quiz MindUp: nền xanh, logo MindUp, vùng câu hỏi lớn, 2-4 ô đáp án ngắn, font lớn, dễ đọc trên điện thoại.",
-        internal_note: "Câu hỏi; các đáp án; đáp án đúng; bẫy nằm ở đâu; giải thích 2-3 câu.",
+        internal_note: "Câu hỏi; các đáp án; đáp án đúng; bẫy nằm ở đâu; giải thích ngắn.",
       }, null, 2),
     ].filter(Boolean).join("\n");
   }
