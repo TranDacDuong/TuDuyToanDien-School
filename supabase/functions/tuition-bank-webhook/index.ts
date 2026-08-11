@@ -197,11 +197,56 @@ serve(async (req: Request) => {
         const code = rawCode.replace(/^HS/i, "").toLowerCase();
         if (code.length >= 6) {
           const payments = await fetchJson<Array<any>>(
-            `tuition_payments?or=(id.ilike.${encodeURIComponent(code)}*,student_id.ilike.${encodeURIComponent(code)}*)&amount_due=gt.0&order=created_at.desc&limit=1`
+            `tuition_payments?or=(id.ilike.${encodeURIComponent(code)}*,student_id.ilike.${encodeURIComponent(code)}*)&order=created_at.desc&limit=1`
           ).catch(() => []);
-          if (payments.length) {
+          if (payments && payments.length) {
             matchedTuition = payments[0];
             break;
+          }
+
+          // If no existing tuition_payments row, search user by student_id prefix
+          const students = await fetchJson<Array<any>>(
+            `users?id=ilike.${encodeURIComponent(code)}*&limit=1`
+          ).catch(() => []);
+          if (students && students.length) {
+            const studentId = students[0].id;
+            const currentMonth = new Date().toISOString().slice(0, 7) + "-01";
+
+            // Check if payment row already exists for current month
+            const existingMonthPayment = await fetchJson<Array<any>>(
+              `tuition_payments?student_id=eq.${encodeURIComponent(studentId)}&month=eq.${encodeURIComponent(currentMonth)}&limit=1`
+            ).catch(() => []);
+
+            if (existingMonthPayment && existingMonthPayment.length) {
+              matchedTuition = existingMonthPayment[0];
+              break;
+            } else {
+              // Create new payment row for current month
+              const created = await fetchJson<Array<any>>("tuition_payments", {
+                method: "POST",
+                headers: { Prefer: "return=representation" },
+                body: JSON.stringify({
+                  student_id: studentId,
+                  month: currentMonth,
+                  amount_due: 0,
+                  amount_paid: item.amount,
+                  paid_at: new Date().toISOString(),
+                  payment_method: "bank_auto",
+                  transaction_ref: item.txId,
+                  auto_reconciled: true,
+                  note: `Tự động gạch nợ ${new Intl.NumberFormat("vi-VN").format(item.amount)}đ qua ngân hàng (Mã GD: ${item.txId})`,
+                }),
+              }).catch(err => {
+                console.error("Failed to create tuition_payments row:", err);
+                return [];
+              });
+
+              if (created && created.length) {
+                matchedTuition = created[0];
+                // Mark status directly as success since we already set amount_paid
+                break;
+              }
+            }
           }
         }
       }
