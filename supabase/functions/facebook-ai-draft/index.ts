@@ -1660,8 +1660,8 @@ function buildGeminiPrompt(args: {
     return [
       "IMPORTANT QUIZ FLOW: Gemini only creates quiz text data. Do not create an image. The website will place the question and answers into MindUp's Quiz image template.",
       `Mandatory textbook curriculum standard: Bộ sách Kết nối tri thức với cuộc sống (KNTT) - Bộ GD&ĐT Việt Nam.`,
-      `Mandatory weekday-grade plan: ${curriculum.weekdayRule}`,
-      `This post must target grade ${curriculum.grade}, subject ${curriculum.subject}.`,
+      `Target subject: ${curriculum.subject}`,
+      `Target grade: Lớp ${curriculum.grade}`,
       `Scheduled date: ${args.scheduledAt}. ${lessonTopicContext}`,
       "MANDATORY QUESTION TYPE: THIS MUST BE A TRICK / TRAP QUESTION (CÂU HỎI BẪY / CÂU HỎI LỪA KHẾN HỌC SINH RẤT DỄ SAI).",
       "The question must target classic misconceptions, misreading traps, unit/sign traps, boundary conditions, or language traps in the KNTT curriculum that cause 90% of students to pick the wrong option if they solve quickly or read carelessly.",
@@ -1731,7 +1731,6 @@ function buildGeminiPrompt(args: {
       `- Fanpage: ${args.pageName}`,
       `- Hashtag fanpage bắt buộc: ${fanpageTag}`,
       `- Thời gian đăng: ${args.scheduledAt}`,
-      `- Kế hoạch lớp theo ngày đăng: ${curriculum.weekdayRule}`,
       `- Lớp bắt buộc: lớp ${curriculum.grade}`,
       `- Môn bắt buộc theo fanpage: ${curriculum.subject}`,
       `- Chương/mảng kiến thức hiện tại bắt buộc dùng: ${curriculum.topic}`,
