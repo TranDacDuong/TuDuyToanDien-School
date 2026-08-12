@@ -55,9 +55,9 @@ for all using (
   )
 );
 
--- 3. Table facebook_post_templates
-drop policy if exists facebook_templates_select_staff on public.facebook_post_templates;
-create policy facebook_templates_select_staff on public.facebook_post_templates
+-- 3. Table facebook_post_schedule_templates
+drop policy if exists facebook_templates_select_staff on public.facebook_post_schedule_templates;
+create policy facebook_templates_select_staff on public.facebook_post_schedule_templates
 for select using (
   exists (
     select 1 from public.users u
@@ -66,8 +66,8 @@ for select using (
   )
 );
 
-drop policy if exists facebook_templates_write_staff on public.facebook_post_templates;
-create policy facebook_templates_write_staff on public.facebook_post_templates
+drop policy if exists facebook_templates_write_staff on public.facebook_post_schedule_templates;
+create policy facebook_templates_write_staff on public.facebook_post_schedule_templates
 for all using (
   exists (
     select 1 from public.users u
