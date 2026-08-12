@@ -723,7 +723,7 @@
     </div>
 
     <div class="admin-profit-panel" id="adminProfitPanel" style="display:none;">
-      <h3 class="panel-title">Tổng quan thu nhập Admin</h3>
+      <h3 class="panel-title">Tổng quan Tiền lãi trung tâm</h3>
       <div class="admin-profit-grid">
         <div class="profit-metric">
           <span>Tổng doanh thu thực thu</span>
@@ -738,7 +738,7 @@
           <b id="adminExpenseTotal">0đ</b>
         </div>
         <div class="profit-metric">
-          <span>Thu nhập Admin</span>
+          <span>Tiền lãi trung tâm</span>
           <b id="adminNetIncome">0đ</b>
         </div>
         <div class="profit-metric">
@@ -750,19 +750,19 @@
           <b id="adminProjectedStaffSalary">0đ</b>
         </div>
         <div class="profit-metric">
-          <span>Thu nhập Admin ước tính</span>
+          <span>Tiền lãi trung tâm ước tính</span>
           <b id="adminProjectedNetIncome">0đ</b>
         </div>
       </div>
 
       <div class="admin-staff-income">
         <div class="details-card">
-          <h4>Thu nhập giáo viên</h4>
+          <h4>Thu nhập Giáo viên & Admin</h4>
           <div class="table-responsive">
             <table class="report-table">
               <thead>
                 <tr>
-                  <th>Giáo viên</th>
+                  <th>Giáo viên / Admin</th>
                   <th class="text-right">Doanh thu thực tế</th>
                   <th class="text-right">Thu nhập thực tế</th>
                   <th class="text-right">Doanh thu dự kiến</th>
@@ -971,7 +971,7 @@
   };
   let lastTeacherRevenueForProjection = 0;
   const INCOME_SELECTABLE_ROLES = new Set(["admin", "teacher", "assistant", "marketing"]);
-  const INCOME_PAYROLL_ROLES = new Set(["teacher", "assistant", "marketing"]);
+  const INCOME_PAYROLL_ROLES = new Set(["admin", "teacher", "assistant", "marketing"]);
 
   function getSb() {
     if (window.sb) return window.sb;
@@ -999,25 +999,25 @@
   }
 
   function ensureSelectedTeacherId() {
+    if (selectedTeacherId === "OVERVIEW") return "OVERVIEW";
     selectedTeacherId = normalizeUuid(selectedTeacherId);
     if (selectedTeacherId) return selectedTeacherId;
 
     const select = document.getElementById("teacherSelect");
-    const selectValue = normalizeUuid(select?.value);
+    const selectValue = select?.value;
     if (selectValue) {
       selectedTeacherId = selectValue;
       return selectedTeacherId;
     }
 
-    const firstStaff = (teachersList || []).find(item => normalizeUuid(item?.id));
-    if (firstStaff) {
-      selectedTeacherId = firstStaff.id;
-      if (select) select.value = selectedTeacherId;
+    if (viewerProfile?.role === "admin") {
+      selectedTeacherId = "OVERVIEW";
+      if (select) select.value = "OVERVIEW";
       return selectedTeacherId;
     }
 
     const currentUserId = normalizeUuid(currentUser?.id);
-    if (viewerProfile?.role === "admin" && currentUserId) {
+    if (currentUserId) {
       selectedTeacherId = currentUserId;
       return selectedTeacherId;
     }
@@ -1031,12 +1031,17 @@
       || (normalizeUuid(currentUser?.id) === id ? viewerProfile : null);
   }
 
-  function isSelectedAdminStaff() {
-    return viewerProfile?.role === "admin" && String(selectedStaffProfile()?.role || "") === "admin";
+  function isSelectedAdminOverview() {
+    return viewerProfile?.role === "admin" && (selectedTeacherId === "OVERVIEW" || !selectedTeacherId);
+  }
+
+  function isTeacherStaffRole(role) {
+    return String(role || "") === "teacher" || String(role || "") === "admin";
   }
 
   function isSelectedTeacherStaff() {
-    return String(selectedStaffProfile()?.role || "") === "teacher";
+    if (selectedTeacherId === "OVERVIEW") return false;
+    return isTeacherStaffRole(selectedStaffProfile()?.role);
   }
 
   function isFixedSalaryStaffRole(role) {
@@ -1048,17 +1053,17 @@
   }
 
   function syncIncomeModePanels() {
-    const adminMode = isSelectedAdminStaff();
+    const adminOverviewMode = isSelectedAdminOverview();
     const fixedStaffSelfMode = viewerProfile?.role !== "admin" && isFixedSalaryStaffRole(viewerProfile?.role);
     const adminPanel = document.getElementById("adminProfitPanel");
     const staffSelfPanel = document.getElementById("staffSelfIncomePanel");
     const teacherSections = document.getElementById("teacherIncomeSections");
     const adminConfig = document.getElementById("adminConfigCard");
-    if (adminPanel) adminPanel.style.display = adminMode ? "block" : "none";
+    if (adminPanel) adminPanel.style.display = adminOverviewMode ? "block" : "none";
     if (staffSelfPanel) staffSelfPanel.style.display = fixedStaffSelfMode ? "block" : "none";
-    if (teacherSections) teacherSections.style.display = (adminMode || fixedStaffSelfMode) ? "none" : "flex";
+    if (teacherSections) teacherSections.style.display = (adminOverviewMode || fixedStaffSelfMode) ? "none" : "flex";
     if (adminConfig && viewerProfile?.role === "admin") {
-      adminConfig.style.display = (!adminMode && !isDbFallback) ? "block" : "none";
+      adminConfig.style.display = (!adminOverviewMode && !isDbFallback) ? "block" : "none";
     }
   }
 
@@ -1452,13 +1457,17 @@
       }];
     }
     const select = document.getElementById("teacherSelect");
-    select.innerHTML = teachersList.length
-      ? teachersList.map(t => `<option value="${t.id}">${esc(t.full_name || t.email || "Nhân viên")} (${t.role === "admin" ? "Admin" : t.role === "assistant" ? "Trợ giảng" : t.role === "marketing" ? "Marketing" : "Giáo viên"})</option>`).join("")
-      : `<option value="">Không tải được danh sách nhân viên</option>`;
+    const overviewOption = viewerProfile?.role === "admin" ? `<option value="OVERVIEW">📊 Tổng quan Tiền lãi trung tâm</option>` : "";
+    select.innerHTML = overviewOption + (teachersList.length
+      ? teachersList.map(t => `<option value="${t.id}">${esc(t.full_name || t.email || "Nhân viên")} (${t.role === "admin" ? "Admin / Giáo viên" : t.role === "assistant" ? "Trợ giảng" : t.role === "marketing" ? "Marketing" : "Giáo viên"})</option>`).join("")
+      : `<option value="">Không tải được danh sách nhân viên</option>`);
     select.style.display = "block";
     
-    // Choose selected or first teacher in list
-    if (teachersList.length) {
+    // Choose selected or OVERVIEW
+    if (viewerProfile?.role === "admin") {
+      selectedTeacherId = selectedTeacherId || "OVERVIEW";
+      select.value = selectedTeacherId;
+    } else if (teachersList.length) {
       selectedTeacherId = normalizeUuid(selectedTeacherId) || teachersList[0].id;
       select.value = selectedTeacherId;
     }
@@ -1834,18 +1843,18 @@
     const otherBody = document.getElementById("adminOtherStaffIncomeBody");
     if (!teacherBody || !otherBody) return;
 
-    const teacherRows = (rows || []).filter(row => row.role === "teacher");
-    const otherRows = (rows || []).filter(row => row.role !== "teacher");
+    const teacherRows = (rows || []).filter(row => row.role === "teacher" || row.role === "admin");
+    const otherRows = (rows || []).filter(row => row.role !== "teacher" && row.role !== "admin");
 
     teacherBody.innerHTML = teacherRows.length ? teacherRows.map(row => `
       <tr>
-        <td><b>${esc(row.name)}</b></td>
+        <td><b>${esc(row.name)}</b> ${row.role === "admin" ? '<span style="font-size:0.75rem;color:var(--gold);font-weight:700;">(Admin)</span>' : ''}</td>
         <td class="text-right">${fmt(row.actualRevenue)}đ</td>
         <td class="text-right" style="font-weight:700;color:var(--green)">${fmt(row.actualIncome)}đ</td>
         <td class="text-right">${fmt(row.projectedRevenue)}đ</td>
         <td class="text-right" style="font-weight:700;color:#be185d">${fmt(row.projectedIncome)}đ</td>
       </tr>
-    `).join("") : `<tr><td colspan="5" class="empty-state">Chưa có giáo viên nào trong bảng lương tháng này.</td></tr>`;
+    `).join("") : `<tr><td colspan="5" class="empty-state">Chưa có giáo viên / admin nào trong bảng lương tháng này.</td></tr>`;
 
     otherBody.innerHTML = otherRows.length ? otherRows.map(row => `
       <tr>
@@ -1913,7 +1922,7 @@
       const context = buildIncomeContext({ classesData, allClassStudents, allAttendance, allPayments, chosenSchedules, courseEnrollments, coursesData });
       const staffIds = (staff || []).map(item => item.id);
       const salaryConfigs = await loadSalaryConfigMap(staffIds);
-      const nonTeacherStaffIds = (staff || []).filter(item => item.role !== "teacher").map(item => item.id);
+      const nonTeacherStaffIds = (staff || []).filter(item => item.role !== "teacher" && item.role !== "admin").map(item => item.id);
       const monthlySalaryMap = await loadStaffMonthlySalaryMap(nonTeacherStaffIds, ym);
       const classMapByStaff = {};
       const courseMapByStaff = {};
@@ -1947,7 +1956,7 @@
           mStart,
           mEnd,
         });
-        const isTeacher = person.role === "teacher";
+        const isTeacher = person.role === "teacher" || person.role === "admin";
         const monthlySalary = monthlySalaryMap[person.id] || { base_salary: 0, bonus_amount: 0 };
         const salary = isTeacher
           ? calculateSalaryBreakdown(staffRevenue.actualRevenue, Number(cfg.base_salary || 0), Number(cfg.base_tier_percent || 0))
@@ -2102,16 +2111,16 @@
       return;
     }
 
-    if (isSelectedAdminStaff()) {
+    if (isSelectedAdminOverview()) {
       try {
         await withTimeout(
           calculateAdminIncome(ym),
           20000,
-          "Phần thu nhập admin tải quá lâu. Vui lòng kiểm tra lại dữ liệu học phí/lương/chi phí hoặc thử tải lại trang."
+          "Phần tiền lãi trung tâm tải quá lâu. Vui lòng kiểm tra lại dữ liệu học phí/lương/chi phí hoặc thử tải lại trang."
         );
       } catch (adminErr) {
-        console.error("Lỗi tính thu nhập admin:", adminErr);
-        document.getElementById("expenseList").innerHTML = `<div class="empty-state">Không tải được dữ liệu thu nhập admin: ${adminErr.message}</div>`;
+        console.error("Lỗi tính tiền lãi trung tâm:", adminErr);
+        document.getElementById("expenseList").innerHTML = `<div class="empty-state">Không tải được dữ liệu tiền lãi trung tâm: ${adminErr.message}</div>`;
       }
       loader.style.display = "none";
       dataBlock.style.display = "flex";
