@@ -683,7 +683,7 @@
       "id,class_name,tuition_fee,tuition_type,makeup_fee,sessions_per_week",
       "grades(name),subjects(name)",
       "class_schedules(id,session_no,weekday,start_time,end_time,effective_from,rooms:rooms(room_name,capacity))",
-      "students:class_students!fk_class(id,student_id,joined_at,left_at,user:users!fk_student(id,full_name))"
+      "students:class_students!fk_class(id,student_id,joined_at,left_at,user:users!fk_student(id,full_name,school))"
     ].join(",")).eq("id",_classId).single();
 
     if(error){
@@ -1099,15 +1099,17 @@
       const label = (t.test_date ? String(t.test_date).slice(8,10)+"/"+String(t.test_date).slice(5,7)+"/"+String(t.test_date).slice(0,4)+" · " : "") + (t.title || "Đề kiểm tra");
       return '<option value="'+t.id+'">'+esc(label)+'</option>';
     }).join("");
-    const studentRows = students.map(s => (
+    const studentRows = students.map((s, idx) => (
       '<tr>'+
+        '<td style="padding:9px 8px;text-align:center;color:var(--ink-light);font-size:.82rem">'+(idx+1)+'</td>'+
         '<td style="padding:9px 10px;font-weight:700;color:var(--navy)">'+esc(s.user?.full_name || "Học sinh")+'</td>'+
+        '<td style="padding:9px 10px;color:var(--ink-mid);font-size:.82rem">'+esc(s.user?.school || "—")+'</td>'+
         '<td style="padding:7px 8px;text-align:center;width:112px"><input class="cvOfflineScoreInput" data-student-id="'+s.student_id+'" type="number" min="0" step="0.25" value="" style="width:86px;padding:7px 8px;border:1px solid var(--border);border-radius:8px;text-align:center"></td>'+
         '<td style="padding:7px 8px"><input class="cvOfflineScoreNote" data-student-id="'+s.student_id+'" type="text" value="" placeholder="Ghi chú..." style="width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:8px"></td>'+
       '</tr>'
     )).join("");
     modal.innerHTML =
-      '<div style="background:var(--white);border-radius:16px;width:min(96vw,900px);max-height:90vh;overflow:hidden;box-shadow:var(--shadow-lg);display:flex;flex-direction:column">'+
+      '<div style="background:var(--white);border-radius:16px;width:min(96vw,960px);max-height:90vh;overflow:hidden;box-shadow:var(--shadow-lg);display:flex;flex-direction:column">'+
         '<div style="padding:16px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:12px;align-items:flex-start">'+
           '<div><h3 style="margin:0;color:var(--navy);font-family:var(--font-display);font-size:1.05rem">Thêm điểm đề kiểm tra</h3>'+
           '<div style="font-size:.82rem;color:var(--ink-mid);margin-top:5px;line-height:1.5">Điểm kiểm tra offline tách riêng khỏi BTVN/Đề luyện tập theo buổi.</div></div>'+
@@ -1122,12 +1124,15 @@
         '</div>'+
         '<div style="overflow:auto;padding:0 18px 16px">'+
           '<table class="table" style="font-size:.84rem;margin-top:12px">'+
-            '<thead><tr><th style="text-align:left">Học sinh</th><th class="center">Điểm</th><th style="text-align:left">Ghi chú</th></tr></thead>'+
+            '<thead><tr><th style="text-align:center;width:48px">STT</th><th style="text-align:left">Học sinh</th><th style="text-align:left">Trường</th><th class="center" style="width:112px">Điểm</th><th style="text-align:left">Ghi chú</th></tr></thead>'+
             '<tbody>'+studentRows+'</tbody>'+
           '</table>'+
         '</div>'+
         '<div style="padding:13px 18px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">'+
-          '<button type="button" onclick="cvClearOfflineTestForm()" class="btn btn-outline">Tạo đợt mới</button>'+
+          '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+            '<button type="button" onclick="cvClearOfflineTestForm()" class="btn btn-outline">Tạo đợt mới</button>'+
+            '<button type="button" onclick="cvExportOfflineTestScoresExcel()" class="btn btn-outline" style="border-color:#16a34a;color:#16a34a;font-weight:600">📥 Xuất file Excel</button>'+
+          '</div>'+
           '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">'+
             '<button type="button" onclick="cvCloseOfflineTestScoreModal()" class="btn btn-outline">Hủy</button>'+
             '<button type="button" onclick="cvSaveOfflineTestScores()" class="btn btn-primary">Lưu điểm kiểm tra</button>'+
@@ -1135,6 +1140,74 @@
         '</div>'+
       '</div>';
     document.body.appendChild(modal);
+  };
+
+  async function ensureXlsxLibrary(){
+    if (typeof XLSX !== "undefined") return true;
+    return new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.head.appendChild(script);
+    });
+  }
+
+  window.cvExportOfflineTestScoresExcel = async function(){
+    const students = getOfflineTestStudents();
+    if(!students.length){
+      alert("Lớp chưa có học sinh để xuất bảng điểm.");
+      return;
+    }
+    const testTitle = document.getElementById("cvOfflineTestTitle")?.value?.trim() || "De_kiem_tra";
+    const testDate = document.getElementById("cvOfflineTestDate")?.value || todayValue();
+    const className = _className || _cachedClass?.class_name || "Lop_hoc";
+
+    const rows = students.map((s, index) => {
+      const studentId = s.student_id;
+      const scoreInput = document.querySelector('.cvOfflineScoreInput[data-student-id="'+studentId+'"]');
+      const noteInput = document.querySelector('.cvOfflineScoreNote[data-student-id="'+studentId+'"]');
+      const rawScore = scoreInput ? scoreInput.value.trim() : "";
+      const noteVal = noteInput ? noteInput.value.trim() : "";
+
+      return {
+        "STT": index + 1,
+        "Học sinh": s.user?.full_name || "Học sinh",
+        "Trường": s.user?.school || "—",
+        "Điểm": rawScore !== "" ? Number(rawScore) : "",
+        "Ghi chú": noteVal
+      };
+    });
+
+    const loaded = await ensureXlsxLibrary();
+    const safeClassName = className.replace(/[^a-zA-Z0-9_àáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđĐ\s-]/g, "_").trim();
+    const safeTitle = testTitle.replace(/[^a-zA-Z0-9_àáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđĐ\s-]/g, "_").trim();
+    const fileName = `Bang_diem_${safeClassName}_${safeTitle}_${testDate}.xlsx`;
+
+    if(loaded && typeof XLSX !== "undefined"){
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = [
+        { wch: 6 },  // STT
+        { wch: 26 }, // Học sinh
+        { wch: 32 }, // Trường
+        { wch: 10 }, // Điểm
+        { wch: 32 }  // Ghi chú
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Bảng điểm");
+      XLSX.writeFile(wb, fileName);
+    } else {
+      const headerHtml = `<tr><th>STT</th><th>Học sinh</th><th>Trường</th><th>Điểm</th><th>Ghi chú</th></tr>`;
+      const rowsHtml = rows.map(r => `<tr><td>${r["STT"]}</td><td>${esc(r["Học sinh"])}</td><td>${esc(r["Trường"])}</td><td>${r["Điểm"]}</td><td>${esc(r["Ghi chú"])}</td></tr>`).join("");
+      const tableHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"/></head><body><table>${headerHtml}${rowsHtml}</table></body></html>`;
+      const blob = new Blob(["\uFEFF", tableHtml], { type: "application/vnd.ms-excel;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName.replace(/\.xlsx$/, ".xls");
+      a.click();
+      URL.revokeObjectURL(url);
+    }
   };
 
   window.cvClearOfflineTestForm = function(){
