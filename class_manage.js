@@ -1163,21 +1163,37 @@
     const testDate = document.getElementById("cvOfflineTestDate")?.value || todayValue();
     const className = _className || _cachedClass?.class_name || "Lop_hoc";
 
-    const rows = students.map((s, index) => {
+    const rawData = students.map(s => {
       const studentId = s.student_id;
       const scoreInput = document.querySelector('.cvOfflineScoreInput[data-student-id="'+studentId+'"]');
       const noteInput = document.querySelector('.cvOfflineScoreNote[data-student-id="'+studentId+'"]');
       const rawScore = scoreInput ? scoreInput.value.trim() : "";
       const noteVal = noteInput ? noteInput.value.trim() : "";
+      const scoreNum = (rawScore !== "" && !isNaN(Number(rawScore))) ? Number(rawScore) : null;
 
       return {
-        "STT": index + 1,
-        "Học sinh": s.user?.full_name || "Học sinh",
-        "Trường": s.user?.school || "—",
-        "Điểm": rawScore !== "" ? Number(rawScore) : "",
-        "Ghi chú": noteVal
+        name: s.user?.full_name || "Học sinh",
+        school: s.user?.school || "—",
+        score: scoreNum,
+        note: noteVal
       };
     });
+
+    // Sort descending by score; un-scored students at bottom sorted alphabetically
+    rawData.sort((a, b) => {
+      if (a.score !== null && b.score !== null) return b.score - a.score;
+      if (a.score !== null && b.score === null) return -1;
+      if (a.score === null && b.score !== null) return 1;
+      return String(a.name).localeCompare(String(b.name), "vi");
+    });
+
+    const rows = rawData.map((item, index) => ({
+      "STT": index + 1,
+      "Học sinh": item.name,
+      "Trường": item.school,
+      "Điểm": item.score !== null ? item.score : "",
+      "Ghi chú": item.note
+    }));
 
     const loaded = await ensureXlsxLibrary();
     const safeClassName = className.replace(/[^a-zA-Z0-9_àáảãạâầấẩẫậăằắẳẵặèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđĐ\s-]/g, "_").trim();
