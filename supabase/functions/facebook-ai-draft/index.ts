@@ -1615,7 +1615,10 @@ async function buildGeminiPrompt(args: {
       `Target grade: Lớp ${curriculum.grade}`,
       `Scheduled date: ${args.scheduledAt}. ${lessonTopicContext}`,
       "MANDATORY QUIZ NATURE: THIS IS A QUICK 10-30 SECOND INTERACTION QUIZ (CÂU HỎI INTERACTION NHANH 10-30 GIÂY).",
-      "CRITICAL REQUIREMENT FOR DIFFICULTY: DO NOT CREATE LONG, MULTI-STEP, OR COMPLICATED MATHEMATICAL/PHYSICS/CHEMISTRY PROBLEMS. THE QUESTION MUST BE SHORT (UNDER 25 WORDS), CLEAR, AND SOLVABLE WITHIN 30 SECONDS BY A STUDENT SCROLLING FACEBOOK.",
+      "CRITICAL REQUIREMENT: BẮT BUỘC ĐẠT ĐỦ 3 YÊU CẦU DƯỚI ĐÂY:",
+      "1. NGẮN: Đề bài cực kỳ ngắn gọn (dưới 20 từ), học sinh lướt Facebook đọc hiểu ngay trong 5-10 giây.",
+      "2. DỄ: Kiến thức cơ bản, nền tảng môn học; KHÔNG bắt tính toán cồng kềnh, không giải phương trình phức tạp hay biến đổi nhiều bước.",
+      "3. DỄ SAI (BẪY NHẸ): Có 1 chi tiết bẫy nhỏ hoặc nhầm lẫn phổ biến (common misconception) khiến học sinh khoanh vội dễ chọn sai, tạo cảm giác thú vị và bất ngờ khi bấm chọn và xem đáp án.",
       "The question can test a fundamental concept, a quick mental calculation, or a common misconception/subtle trap, but IT MUST NOT BE ADVANCED OR TIME-CONSUMING.",
       "Return a quiz object with grade, subject, curriculum_topic, question, answers, correct_answer, trap, explanation.",
       "Math formatting rule: every mathematical expression, variable, formula, equation, inequality, fraction, exponent, radical, logarithm, geometry notation, chemistry equation, or unit expression that appears inside quiz.question, quiz.answers, quiz.correct_answer, quiz.trap, or quiz.explanation must be written as inline LaTeX between single dollar signs, for example $x^2+1=0$, $\\sqrt{x+1}$, $\\log_2 8$, $H_2SO_4$, $\\Delta H<0$.",
@@ -1624,7 +1627,7 @@ async function buildGeminiPrompt(args: {
       "Caption must not reveal the correct answer. Correct answer and explanation must only appear in internal_note and quiz fields.",
       "Do not ask Gemini to create the image. The website will create the image from MindUp Quiz template.",
       "Bạn là giáo viên ra câu hỏi tương tác nhanh 10-30 giây cho MindUp - Tư Duy Toàn Diện.",
-      `Nhiệm vụ: tạo một câu hỏi Quiz ngắn gọn, thú vị, đúng bài đang học (${realLessons.length ? "Bài học thực tế: " + realLessons.join(", ") : "Theo chương trình tháng"}). Học sinh lướt Facebook có thể đọc hiểu và chọn ngay đáp án trong vòng 10 đến 30 giây. KHÔNG ra đề tính toán nhiều bước hay phức tạp rườm rà.`,
+      `Nhiệm vụ: tạo một câu hỏi Quiz thỏa mãn đúng 3 tiêu chí NGẮN - DỄ - DỄ SAI, đúng bài đang học (${realLessons.length ? "Bài học thực tế: " + realLessons.join(", ") : "Theo chương trình tháng"}). Học sinh lướt Facebook có thể đọc hiểu trong 5-10 giây, chọn ngay đáp án trong 10-30 giây. KHÔNG ra đề tính toán nhiều bước hay phức tạp rườm rà.`,
       "",
       ...viralFacebookPromptBlock(args.typeName),
       "",
@@ -1634,7 +1637,7 @@ async function buildGeminiPrompt(args: {
       realLessons.length
         ? `- ƯU TIÊN HÀNG ĐẦU: Bắt buộc ra câu hỏi trắc nghiệm nhanh thuộc các bài học vừa dạy gần đây: ${realLessons.join(", ")}.`
         : "- Bắt buộc dùng kiến thức đúng bài/chương đang học trên lớp theo bộ sách KẾT NỐI TRI THỨC VỚI CUỘC SỐNG.",
-      "- CỰC KỲ NGHĨA VỤ: Đề bài ngắn gọn (dưới 25 từ), dễ hiểu, làm nhanh trong 10-30 giây.",
+      "- CỰC KỲ BẮT BUỘC ĐỦ 3 TIÊU CHÍ: NGẮN (dưới 20 từ) - DỄ (kiến thức cơ bản, không tính toán nhiều bước) - DỄ SAI (có bẫy nhẹ / nhầm lẫn phổ biến).",
       "- KHÔNG bắt tính toán cồng kềnh, không giải phương trình phức tạp, không biến đổi dài dòng.",
       "- Có một chi tiết bẫy nhẹ hoặc nhầm lẫn phổ biến để học sinh thấy thú vị khi bấm chọn đáp án.",
       "- Có 2-4 đáp án ngắn gọn, rõ ràng.",
@@ -1696,6 +1699,8 @@ async function buildGeminiPrompt(args: {
       "",
       "Yêu cầu cực kỳ quan trọng:",
       `- Câu hỏi BẮT BUỘC đúng môn ${curriculum.subject}, đúng lớp ${curriculum.grade}, và nằm trong chương/mảng kiến thức: ${curriculum.topic}.`,
+      "- CỰC KỲ QUAN TRỌNG: Câu hỏi BẮT BUỘC phải HAY, THÚ VỊ, ĐỘC ĐÁO và mang tính VẬN DỤNG THỰC TẾ cao.",
+      "- Tránh các bài toán khô khan, tính toán nhàm chán hoặc thuần lý thuyết giáo khoa. Bối cảnh phải thông minh, kích thích trí tò mò của học sinh.",
       "- Không được tạo câu hỏi thuộc môn khác, chương khác, hoặc kiểu tư duy chung nếu fanpage là Toán/Lý/Hóa/Sinh.",
       "- Nếu nội dung nháp/admin note mâu thuẫn với môn/chương bắt buộc, hãy ưu tiên môn/chương bắt buộc và chỉ dùng nháp như gợi ý phụ.",
       "- Đề bài, đáp án và lời giải phải sử dụng đúng kiến thức trong chương/mảng hiện tại; internal_note phải ghi rõ lớp, môn, chương.",
@@ -2164,25 +2169,26 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
   const isStandaloneLearning = isLearningMethod(typeName);
   const isStandaloneTeaching = isTeachingPhilosophy(typeName);
   const isApplyingKnowledgePost = isApplyingKnowledge(typeName);
-  const isLlamaLearning = isStandaloneLearning && normalizeTextAiProvider(provider) === "llama";
-  const isLlamaTeaching = isStandaloneTeaching && normalizeTextAiProvider(provider) === "llama";
-  const isLlamaApplyingKnowledge = isApplyingKnowledgePost && normalizeTextAiProvider(provider) === "llama";
+  const isPhenomenonPost = isRealWorldPhenomenon(typeName);
   let rawCaption = String(parsed?.caption || "").trim();
-  if ((isLlamaLearning || isLlamaTeaching) && stripMarkdown(rawCaption).split(/\s+/).filter(Boolean).length < 400) {
+
+  // Enforce word count check for ALL AI providers (Gemini & Llama)
+  if ((isStandaloneLearning || isStandaloneTeaching) && stripMarkdown(rawCaption).split(/\s+/).filter(Boolean).length < 350) {
+    console.log(`Caption for ${typeName} was too short (${stripMarkdown(rawCaption).split(/\s+/).filter(Boolean).length} words). Retrying for depth...`);
     const retry = await postAiGenerateContent({
       prompt: [
         prompt,
         "",
-        isLlamaTeaching
-          ? "BẢN VỪA TẠO QUÁ NGẮN, KHÔNG ĐẠT YÊU CẦU TEACHING PHILOSOPHY."
-          : "BẢN VỪA TẠO QUÁ NGẮN, KHÔNG ĐẠT YÊU CẦU LEARNING METHOD.",
-        "Hãy viết lại caption dài hơn, sâu hơn, đúng cấu trúc đã yêu cầu.",
-        isLlamaTeaching
-          ? "Bắt buộc caption 450-800 từ, tối thiểu 6 đoạn, có hook, giải thích triết lý giáo dục, ví dụ theo môn fanpage, 3-5 hành động thực tế và CTA nhẹ."
-          : "Bắt buộc caption 450-800 từ, tối thiểu 6 đoạn, có mục 'Cách áp dụng' 3-5 bước và ví dụ theo môn fanpage.",
-        "Không được chỉ tóm tắt vài dòng. Không được viết kiểu slogan/quảng cáo.",
+        isStandaloneTeaching
+          ? "BẢN VỪA TẠO QUÁ NGẮN, THIẾU CHIỀU SÂU CHO BÀI TRIẾT LÝ GIÁO DỤC."
+          : "BẢN VỪA TẠO QUÁ NGẮN (CHỈ CÓ VÀI DÒNG), THIẾU CHIỀU SÂU CHO BÀI PHƯƠNG PHÁP HỌC TẬP.",
+        "YÊU CẦU CỰC KỲ BẮT BUỘC:",
+        "- Bài viết phải DÀI VÀ CÓ CHIỀU SÂU (450-800 TỪ), tối thiểu 6-8 đoạn văn hoàn chỉnh.",
+        "- Hãy lấy ý tưởng/nguồn cảm hứng từ bài viết nước ngoài uy tín về phương pháp/nghiên cứu học tập.",
+        "- Phân tích sâu sắc vấn đề, giải thích vì sao phương pháp hiệu quả, hướng dẫn áp dụng 3-5 bước chi tiết và ví dụ thực tế môn học cụ thể.",
+        "- KHÔNG ĐƯỢC CHỈ TÓM TẮT VÀI DÒNG SÁO RỖNG HOẶC VIẾT KIỂU SLOGAN QUẢNG CÁO.",
         "",
-        "Bản caption ngắn cần mở rộng:",
+        "Bản ngắn vừa tạo cần được mở rộng bài viết chi tiết, sâu sắc:",
         rawCaption,
       ].join("\n"),
       temperature: 0.82,
@@ -2194,18 +2200,18 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
     parsed = tryParseJson(text);
     rawCaption = String(parsed?.caption || "").trim();
   }
-  if (isLlamaApplyingKnowledge && stripMarkdown(rawCaption).split(/\s+/).filter(Boolean).length < 300) {
+
+  if ((isApplyingKnowledgePost || isPhenomenonPost) && stripMarkdown(rawCaption).split(/\s+/).filter(Boolean).length < 280) {
+    console.log(`Caption for ${typeName} was too short (${stripMarkdown(rawCaption).split(/\s+/).filter(Boolean).length} words). Retrying for depth...`);
     const retry = await postAiGenerateContent({
       prompt: [
         prompt,
         "",
-        "THE PREVIOUS CAPTION WAS TOO SHORT FOR APPLYING KNOWLEDGE TO PRACTICE.",
-        "Rewrite the caption in Vietnamese with more depth and a stronger Facebook hook.",
-        "Required: 300-650 Vietnamese words, at least 5 mobile-friendly paragraphs.",
-        "Must include: real-life hook, school knowledge behind the situation, simple explanation, one concrete mini example, and a comment CTA.",
-        "Keep the reel JSON fields too. Return only valid JSON with the same schema.",
+        "BẢN VỪA TẠO QUÁ NGẮN CHO BÀI NỘI DUNG THỰC TẾ.",
+        "Yêu cầu bài viết phải dài 350-650 từ, giàu chiều sâu, phân tích kỹ tình huống/hiện tượng thực tế, cơ chế môn học đằng sau và ví dụ cụ thể.",
+        "Trả về duy nhất JSON hợp lệ theo đúng schema.",
         "",
-        "Short caption to expand:",
+        "Bản ngắn vừa tạo cần mở rộng bài viết sâu sắc:",
         rawCaption,
       ].join("\n"),
       temperature: 0.82,
