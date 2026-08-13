@@ -2223,7 +2223,7 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
     parsed = tryParseJson(text);
     rawCaption = String(parsed?.caption || "").trim();
   }
-  if (isLlamaApplyingKnowledge && stripMarkdown(rawCaption).split(/\s+/).filter(Boolean).length < 300) {
+  if (isApplyingKnowledgePost && stripMarkdown(rawCaption).split(/\s+/).filter(Boolean).length < 300) {
     const retry = await postAiGenerateContent({
       prompt: [
         prompt,
