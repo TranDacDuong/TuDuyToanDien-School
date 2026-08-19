@@ -1,0 +1,36 @@
+-- SQL Seed 31 Session Evaluation Templates for Normal/Steady Students
+-- MindUp - Tư Duy Toàn Diện
+
+INSERT INTO public.evaluation_message_templates (section_type, status_id, content, weight, active)
+VALUES
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} học tập rất ngoan, chú ý nghe giảng và theo kịp bài giảng của thầy cô. Con hoàn thành tốt các bài tập trên lớp theo đúng tiến độ.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, thầy/cô gửi nhận xét buổi học môn {mon_hoc} ngày {ngay_hoc}: Em {ten_hoc_sinh} tiếp thu bài ổn định, tự giác làm bài tập và nắm chắc các kiến thức trọng tâm trong buổi học hôm nay.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, buổi học môn {mon_hoc} ngày {ngay_hoc} ghi nhận em {ten_hoc_sinh} có thái độ học tập nghiêm túc, tập trung lắng nghe hướng dẫn và ghi chép bài đầy đủ.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} theo sát bài học, hiểu bài tốt và thực hành các dạng bài tập cẩn thận.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} duy trì phong độ học tập tốt, hoàn thành đầy đủ các bài tập được giao trên lớp và hiểu rõ kiến thức mới.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, thầy/cô gửi thông tin buổi học môn {mon_hoc} ngày {ngay_hoc}: Em {ten_hoc_sinh} học tập chăm chỉ, hợp tác tốt với thầy cô và các bạn trong lớp, nắm vững nội dung bài học.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} chủ động làm bài, theo kịp tiến độ bài giảng của lớp và hoàn thành bài tập đạt yêu cầu.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, buổi học môn {mon_hoc} ngày {ngay_hoc} của em {ten_hoc_sinh} diễn ra rất thuận lợi. Con nắm vững các lý thuyết và dạng bài cơ bản của buổi học.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} tập trung cao độ, chịu khó tư duy và hoàn thành tốt phần luyện tập tại lớp.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, thầy/cô ghi nhận em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} có ý thức học tập tốt, tiếp thu bài đều đặn và thao tác làm bài ngày càng vững vàng.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} lắng nghe giảng bài chu đáo, khi gặp dạng bài mới con chủ động theo dõi ví dụ mẫu và vận dụng làm bài rất ổn định.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, buổi học môn {mon_hoc} ngày {ngay_hoc} ghi nhận em {ten_hoc_sinh} học tập nghiêm túc, làm bài tập thực hành đạt kết quả tốt và hiểu rõ phương pháp giải.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} có thái độ tích cực, tập trung làm bài và nắm trọn vẹn các ý chính của bài học.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, thầy/cô đánh giá em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} giữ nhịp độ học tập ổn định, nghe giảng tốt và áp dụng kiến thức vào bài tập thành thạo.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} ghi chép bài cẩn thận, làm đủ các bài tập tự luyện và tiếp thu nội dung bài mới rất tự nhiên.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, buổi học môn {mon_hoc} ngày {ngay_hoc} của em {ten_hoc_sinh} diễn ra tích cực. Con tiếp thu kiến thức nhanh, hoàn thành bài tập nhẹ nhàng và chính xác.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} chấp hành tốt nội quy lớp học, tập trung nghe thầy cô chữa bài và nắm chắc các bước giải.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, thầy/cô ghi nhận em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} học tập cẩn thận, luôn kiên nhẫn hoàn thành đầy đủ các câu hỏi trong phiếu bài tập.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} tiếp thu bài đều đặn, tích cực lắng nghe bài giảng và thực hành đúng yêu cầu của giáo viên.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} nắm chắc phương pháp bài học, trình bày cẩn thận và hoàn thành bài tập đúng thời gian.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, thầy/cô phản hồi buổi học môn {mon_hoc} ngày {ngay_hoc}: Em {ten_hoc_sinh} tự tin làm bài, đạt đầy đủ các mục tiêu kiến thức của buổi học hôm nay.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} tập trung chú ý, duy trì thói quen làm bài cẩn thận và tiếp thu kiến thức khá tốt.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, buổi học môn {mon_hoc} ngày {ngay_hoc} của em {ten_hoc_sinh} diễn ra ổn định. Con chăm chú nghe giảng và giải các bài tập luyện tập tại lớp suôn sẻ.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} theo sát mạch bài giảng, nắm được các quy tắc/công thức chính và vận dụng vào bài tập chuẩn xác.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, thầy/cô gửi nhận xét em {ten_hoc_sinh} buổi học môn {mon_hoc} ngày {ngay_hoc}: Con đi học đúng giờ, tập trung trong suốt giờ học và hoàn thành tốt phần luyện tập tại lớp.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} tiếp thu tốt nội dung cốt lõi của bài học, thái độ học tập ngoan và rất hợp tác.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, buổi học môn {mon_hoc} ngày {ngay_hoc} ghi nhận em {ten_hoc_sinh} theo dõi kỹ phần giáo viên chữa bài, chữa lại các lỗi sai nhỏ và nắm chắc kiến thức.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} tiếp tục duy trì phong độ học tập đều đặn, nghe giảng chú ý và làm bài tập đầy đủ.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, thầy/cô đánh giá em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} tiếp thu lý thuyết nhanh và vận dụng giải các câu hỏi trên lớp mượt mà.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} học tập tích cực, tập trung làm xong các phiếu bài tập và có tinh thần tự giác cao.', 1, true),
+  ('auto_normal', NULL, 'Kính gửi {ten_phu_huynh}, buổi học môn {mon_hoc} ngày {ngay_hoc} của em {ten_hoc_sinh} diễn ra trọn vẹn và hiệu quả. Con nắm vững toàn bộ kiến thức trọng tâm của buổi học.', 1, true);

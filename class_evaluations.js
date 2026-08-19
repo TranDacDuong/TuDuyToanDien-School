@@ -302,13 +302,14 @@
   function studentCard(student) {
     const evaluation = state.evaluations.get(student.id);
     const sent = evaluation.state === "sent";
+    const isAuto = Boolean(evaluation.template_selection?.auto_generated);
     const hasMessage = Boolean(evaluation.message);
-    const stateLabel = sent ? "Đã gửi" : evaluation.state === "failed" ? "Gửi lỗi" : evaluation.id ? "Bản nháp" : "Chưa đánh giá";
+    const stateLabel = sent ? (isAuto ? "Đã gửi (Tự động 23h)" : "Đã gửi") : evaluation.state === "failed" ? "Gửi lỗi" : evaluation.id ? "Bản nháp" : "Chưa đánh giá";
     return `
       <article class="se-card" id="se-card-${student.id}">
         <div class="se-card-head">
           <div class="se-name">${esc(student.full_name || student.email)}</div>
-          <span class="se-state ${esc(evaluation.state)}" id="se-state-${student.id}">${stateLabel}</span>
+          <span class="se-state ${esc(evaluation.state)} ${isAuto ? "auto" : ""}" id="se-state-${student.id}">${stateLabel}</span>
         </div>
         <div class="se-status-groups">
           ${statusGroup("Điểm tích cực", state.statuses.filter(status => status.category !== "needs_attention"), evaluation, student, sent)}
