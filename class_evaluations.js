@@ -531,7 +531,7 @@
     if (!evaluation) throw new Error("Không tìm thấy đánh giá.");
     if (evaluation.state === "sent") throw new Error("Nhận xét này đã được gửi.");
     const textarea = document.getElementById(`se-message-${studentId}`);
-    if (textarea) evaluation.message = textarea.value.trim();
+    if (textarea && textarea.value.trim()) evaluation.message = textarea.value.trim();
     if (!evaluation.message && evaluation.statusIds.size) window.generateSessionEvaluationMessage(studentId);
     if (!evaluation.message) throw new Error("Chưa có nội dung nhận xét.");
 
@@ -597,6 +597,10 @@
           evaluation.message = generateAutoNormalMessageForStudent(student);
           evaluation.template_selection = { auto_generated: true, format_version: "auto" };
         }
+        const editor = document.getElementById(`se-editor-${student.id}`);
+        const textarea = document.getElementById(`se-message-${student.id}`);
+        if (editor) editor.classList.add("open");
+        if (textarea) textarea.value = evaluation.message;
 
         const saved = await persist(student.id, "sent");
         const parentIds = [...new Set(state.parentIds.get(student.id) || [])];
