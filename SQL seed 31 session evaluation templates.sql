@@ -1,6 +1,23 @@
 -- SQL Seed 31 Session Evaluation Templates for Normal/Steady Students
 -- MindUp - Tư Duy Toàn Diện
 
+-- 1. Cập nhật check constraint để hỗ trợ 'auto_normal'
+ALTER TABLE public.evaluation_message_templates
+  DROP CONSTRAINT IF EXISTS evaluation_message_templates_section_type_check,
+  DROP CONSTRAINT IF EXISTS evaluation_template_status_shape;
+
+ALTER TABLE public.evaluation_message_templates
+  ADD CONSTRAINT evaluation_message_templates_section_type_check
+  CHECK (section_type IN ('opening', 'status', 'expectation', 'closing', 'auto_normal'));
+
+ALTER TABLE public.evaluation_message_templates
+  ADD CONSTRAINT evaluation_template_status_shape
+  CHECK (
+    (section_type IN ('opening', 'closing', 'auto_normal') AND status_id IS NULL)
+    OR (section_type IN ('status', 'expectation') AND status_id IS NOT NULL)
+  );
+
+-- 2. Insert 31 mẫu câu đánh giá học sinh bình thường
 INSERT INTO public.evaluation_message_templates (section_type, status_id, content, weight, active)
 VALUES
   ('auto_normal', NULL, 'Kính gửi anh/chị {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} học tập rất ngoan, chú ý nghe giảng và theo kịp bài giảng của thầy cô. Con hoàn thành tốt các bài tập trên lớp theo đúng tiến độ.', 1, true),

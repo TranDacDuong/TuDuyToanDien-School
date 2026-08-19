@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS public.evaluation_statuses (
 
 CREATE TABLE IF NOT EXISTS public.evaluation_message_templates (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  section_type text NOT NULL CHECK (section_type IN ('opening', 'status', 'expectation', 'closing')),
+  section_type text NOT NULL CHECK (section_type IN ('opening', 'status', 'expectation', 'closing', 'auto_normal')),
   status_id uuid REFERENCES public.evaluation_statuses(id) ON DELETE CASCADE,
   content text NOT NULL,
   active boolean NOT NULL DEFAULT true,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS public.evaluation_message_templates (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT evaluation_template_status_shape CHECK (
-    (section_type IN ('opening', 'closing') AND status_id IS NULL)
+    (section_type IN ('opening', 'closing', 'auto_normal') AND status_id IS NULL)
     OR (section_type IN ('status', 'expectation') AND status_id IS NOT NULL)
   )
 );
