@@ -190,6 +190,8 @@
     } finally {
       if (button) { button.disabled = false; button.textContent = "Đồng bộ mẫu mặc định"; }
     }
+  };
+
   window.sync31AutoNormalTemplates = async function () {
     if (!confirm("Bổ sung 31 mẫu đánh giá tự động vào cơ sở dữ liệu Supabase?")) return;
     const button = document.getElementById("seed31AutoTemplatesBtn");
