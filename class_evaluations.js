@@ -71,7 +71,10 @@
           </header>
           <div class="se-toolbar">
             <span class="se-progress" id="sessionEvaluationProgress">Đang tải...</span>
-            <button class="se-btn" type="button" id="sessionEvaluationSaveAll" onclick="saveAllSessionEvaluationDrafts()">Lưu tất cả bản nháp</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="se-btn" type="button" id="sessionEvaluationSaveAll" onclick="saveAllSessionEvaluationDrafts()">Lưu tất cả bản nháp</button>
+              <button class="se-btn send" type="button" id="sessionEvaluationAutoSendAll" onclick="autoEvaluateAndSendAllRemainingStudents()" style="background:#15803d;border-color:#15803d;color:#fff;font-weight:800">⚡ Tự động đánh giá buổi học</button>
+            </div>
           </div>
           <div class="se-list" id="sessionEvaluationList"><div class="se-loading">Đang tải danh sách học sinh...</div></div>
         </section>`;
@@ -474,14 +477,62 @@
     if (textarea) textarea.value = evaluation.message;
   };
 
+  const DEFAULT_31_TEMPLATES = [
+    "Kính gửi {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} học tập rất ngoan, chú ý nghe giảng và theo kịp bài giảng của thầy cô. Con hoàn thành tốt các bài tập trên lớp theo đúng tiến độ.",
+    "Kính gửi {ten_phu_huynh}, thầy/cô gửi nhận xét buổi học môn {mon_hoc} ngày {ngay_hoc}: Em {ten_hoc_sinh} tiếp thu bài ổn định, tự giác làm bài tập và nắm chắc các kiến thức trọng tâm trong buổi học hôm nay.",
+    "Kính gửi {ten_phu_huynh}, buổi học môn {mon_hoc} ngày {ngay_hoc} ghi nhận em {ten_hoc_sinh} có thái độ học tập nghiêm túc, tập trung lắng nghe hướng dẫn và ghi chép bài đầy đủ.",
+    "Kính gửi {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} theo sát bài học, hiểu bài tốt và thực hành các dạng bài tập cẩn thận.",
+    "Kính gửi {ten_phu_huynh}, em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} duy trì phong độ học tập tốt, hoàn thành đầy đủ các bài tập được giao trên lớp và hiểu rõ kiến thức mới.",
+    "Kính gửi {ten_phu_huynh}, thầy/cô gửi thông tin buổi học môn {mon_hoc} ngày {ngay_hoc}: Em {ten_hoc_sinh} học tập chăm chỉ, hợp tác tốt với thầy cô và các bạn trong lớp, nắm vững nội dung bài học.",
+    "Kính gửi {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} chủ động làm bài, theo kịp tiến độ bài giảng của lớp và hoàn thành bài tập đạt yêu cầu.",
+    "Kính gửi {ten_phu_huynh}, buổi học môn {mon_hoc} ngày {ngay_hoc} của em {ten_hoc_sinh} diễn ra rất thuận lợi. Con nắm vững các lý thuyết và dạng bài cơ bản của buổi học.",
+    "Kính gửi {ten_phu_huynh}, em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} tập trung cao độ, chịu khó tư duy và hoàn thành tốt phần luyện tập tại lớp.",
+    "Kính gửi {ten_phu_huynh}, thầy/cô ghi nhận em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} có ý thức học tập tốt, tiếp thu bài đều đặn và thao tác làm bài ngày càng vững vàng.",
+    "Kính gửi {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} lắng nghe giảng bài chu đáo, khi gặp dạng bài mới con chủ động theo dõi ví dụ mẫu và vận dụng làm bài rất ổn định.",
+    "Kính gửi {ten_phu_huynh}, buổi học môn {mon_hoc} ngày {ngay_hoc} ghi nhận em {ten_hoc_sinh} học tập nghiêm túc, làm bài tập thực hành đạt kết quả tốt và hiểu rõ phương pháp giải.",
+    "Kính gửi {ten_phu_huynh}, em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} có thái độ tích cực, tập trung làm bài và nắm trọn vẹn các ý chính của bài học.",
+    "Kính gửi {ten_phu_huynh}, thầy/cô đánh giá em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} giữ nhịp độ học tập ổn định, nghe giảng tốt và áp dụng kiến thức vào bài tập thành thạo.",
+    "Kính gửi {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} ghi chép bài cẩn thận, làm đủ các bài tập tự luyện và tiếp thu nội dung bài mới rất tự nhiên.",
+    "Kính gửi {ten_phu_huynh}, buổi học môn {mon_hoc} ngày {ngay_hoc} của em {ten_hoc_sinh} diễn ra tích cực. Con tiếp thu kiến thức nhanh, hoàn thành bài tập nhẹ nhàng và chính xác.",
+    "Kính gửi {ten_phu_huynh}, em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} chấp hành tốt nội quy lớp học, tập trung nghe thầy cô chữa bài và nắm chắc các bước giải.",
+    "Kính gửi {ten_phu_huynh}, thầy/cô ghi nhận em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} học tập cẩn thận, luôn kiên nhẫn hoàn thành đầy đủ các câu hỏi trong phiếu bài tập.",
+    "Kính gửi {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} tiếp thu bài đều đặn, tích cực lắng nghe bài giảng và thực hành đúng yêu cầu của giáo viên.",
+    "Kính gửi {ten_phu_huynh}, em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} nắm chắc phương pháp bài học, trình bày cẩn thận và hoàn thành bài tập đúng thời gian.",
+    "Kính gửi {ten_phu_huynh}, thầy/cô phản hồi buổi học môn {mon_hoc} ngày {ngay_hoc}: Em {ten_hoc_sinh} tự tin làm bài, đạt đầy đủ các mục tiêu kiến thức của buổi học hôm nay.",
+    "Kính gửi {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} tập trung chú ý, duy trì thói quen làm bài cẩn thận và tiếp thu kiến thức khá tốt.",
+    "Kính gửi {ten_phu_huynh}, buổi học môn {mon_hoc} ngày {ngay_hoc} của em {ten_hoc_sinh} diễn ra ổn định. Con chăm chú nghe giảng và giải các bài tập luyện tập tại lớp suôn sẻ.",
+    "Kính gửi {ten_phu_huynh}, em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} theo sát mạch bài giảng, nắm được các quy tắc/công thức chính và vận dụng vào bài tập chuẩn xác.",
+    "Kính gửi {ten_phu_huynh}, thầy/cô gửi nhận xét em {ten_hoc_sinh} buổi học môn {mon_hoc} ngày {ngay_hoc}: Con đi học đúng giờ, tập trung trong suốt giờ học và hoàn thành tốt phần luyện tập tại lớp.",
+    "Kính gửi {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} tiếp thu tốt nội dung cốt lõi của bài học, thái độ học tập ngoan và rất hợp tác.",
+    "Kính gửi {ten_phu_huynh}, buổi học môn {mon_hoc} ngày {ngay_hoc} ghi nhận em {ten_hoc_sinh} theo dõi kỹ phần giáo viên chữa bài, chữa lại các lỗi sai nhỏ và nắm chắc kiến thức.",
+    "Kính gửi {ten_phu_huynh}, em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} tiếp tục duy trì phong độ học tập đều đặn, nghe giảng chú ý và làm bài tập đầy đủ.",
+    "Kính gửi {ten_phu_huynh}, thầy/cô đánh giá em {ten_hoc_sinh} trong buổi học môn {mon_hoc} ngày {ngay_hoc} tiếp thu lý thuyết nhanh và vận dụng giải các câu hỏi trên lớp mượt mà.",
+    "Kính gửi {ten_phu_huynh}, trong buổi học môn {mon_hoc} ngày {ngay_hoc}, em {ten_hoc_sinh} học tập tích cực, tập trung làm xong các phiếu bài tập và có tinh thần tự giác cao.",
+    "Kính gửi {ten_phu_huynh}, buổi học môn {mon_hoc} ngày {ngay_hoc} của em {ten_hoc_sinh} diễn ra trọn vẹn và hiệu quả. Con nắm vững toàn bộ kiến thức trọng tâm của buổi học."
+  ];
+
+  function generateAutoNormalMessageForStudent(student) {
+    const sessionDate = state.session?.session_date || "";
+    const pool = (state.templates || []).filter(item => item.section_type === "auto_normal" && item.active);
+    const contentList = pool.length ? pool.map(item => item.content) : DEFAULT_31_TEMPLATES;
+
+    let hash = 0;
+    const str = `${student.id}_${sessionDate}`;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash |= 0;
+    }
+    const idx = Math.abs(hash) % contentList.length;
+    return applyVariables(contentList[idx], student);
+  }
+
   async function persist(studentId, nextState) {
     const evaluation = state.evaluations.get(studentId);
     if (!evaluation) throw new Error("Không tìm thấy đánh giá.");
     if (evaluation.state === "sent") throw new Error("Nhận xét này đã được gửi.");
-    if (!evaluation.statusIds.size) throw new Error("Hãy chọn ít nhất một trạng thái.");
     const textarea = document.getElementById(`se-message-${studentId}`);
     if (textarea) evaluation.message = textarea.value.trim();
-    if (!evaluation.message) window.generateSessionEvaluationMessage(studentId);
+    if (!evaluation.message && evaluation.statusIds.size) window.generateSessionEvaluationMessage(studentId);
     if (!evaluation.message) throw new Error("Chưa có nội dung nhận xét.");
 
     const client = getSb();
@@ -507,15 +558,83 @@
       .delete()
       .eq("evaluation_id", data.id);
     if (deleteError) throw deleteError;
-    const statusRows = [...evaluation.statusIds].map(statusId => ({
-      evaluation_id: data.id,
-      status_id: statusId,
-    }));
-    const { error: statusError } = await client.from("session_student_evaluation_statuses").insert(statusRows);
-    if (statusError) throw statusError;
+    if (evaluation.statusIds.size) {
+      const statusRows = [...evaluation.statusIds].map(statusId => ({
+        evaluation_id: data.id,
+        status_id: statusId,
+      }));
+      const { error: statusError } = await client.from("session_student_evaluation_statuses").insert(statusRows);
+      if (statusError) throw statusError;
+    }
     Object.assign(evaluation, data, { message: data.final_message, statusIds: new Set(evaluation.statusIds) });
     return data;
   }
+
+  window.autoEvaluateAndSendAllRemainingStudents = async function () {
+    const unsentStudents = state.students.filter(student => {
+      const evaluation = state.evaluations.get(student.id);
+      return evaluation.state !== "sent";
+    });
+
+    if (!unsentStudents.length) {
+      alert("Tất cả học sinh trong buổi học này đã được gửi đánh giá.");
+      return;
+    }
+
+    if (!confirm(`Tự động tạo nội dung và gửi nhận xét cho ${unsentStudents.length} học sinh chưa được đánh giá?`)) {
+      return;
+    }
+
+    const button = document.getElementById("sessionEvaluationAutoSendAll");
+    if (button) button.disabled = true;
+
+    let count = 0;
+    for (const student of unsentStudents) {
+      try {
+        setBusy(student.id, true);
+        const evaluation = state.evaluations.get(student.id);
+        if (!evaluation.message) {
+          evaluation.message = generateAutoNormalMessageForStudent(student);
+          evaluation.template_selection = { auto_generated: true, format_version: "auto" };
+        }
+
+        const saved = await persist(student.id, "sent");
+        const parentIds = [...new Set(state.parentIds.get(student.id) || [])];
+        if (parentIds.length) {
+          await window.NotificationHelper.createBulkNotifications(parentIds.map(parentId => ({
+            userId: parentId,
+            type: "session_evaluation",
+            title: "MindUp - Tư duy Toàn Diện",
+            message: evaluation.message,
+            refId: saved.id,
+            targetUrl: `class.html?openClassId=${encodeURIComponent(state.session.class_id)}&className=${encodeURIComponent(state.classInfo?.class_name || "Lớp học")}`,
+            meta: {
+              student_id: student.id,
+              class_id: state.session.class_id,
+              class_session_id: state.sessionId,
+              evaluation_id: saved.id,
+              session_date: state.session.session_date,
+              auto_generated: true,
+              sender_name: "MindUp - Tư duy Toàn Diện",
+              sender_avatar: "pwa-icon-192.png",
+              branded_sender: true,
+            },
+          })));
+        }
+        evaluation.state = "sent";
+        evaluation.sent_at = saved.sent_at;
+        document.getElementById(`se-card-${student.id}`).outerHTML = studentCard(student);
+        count += 1;
+      } catch (error) {
+        console.error(`Lỗi tự động gửi cho ${student.full_name}:`, error);
+        setBusy(student.id, false);
+      }
+    }
+
+    if (button) button.disabled = false;
+    updateProgress();
+    alert(`Đã tự động tạo nội dung và gửi nhận xét cho ${count}/${unsentStudents.length} học sinh thành công!`);
+  };
 
   function setBusy(studentId, busy) {
     const card = document.getElementById(`se-card-${studentId}`);
