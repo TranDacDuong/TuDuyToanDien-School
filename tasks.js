@@ -84,8 +84,10 @@
   function isFacebookMarketingTask(item) {
     const task = item?.task || item || {};
     const meta = task.metadata || {};
-    return task.source_type === "facebook_marketing"
-      || Boolean(meta.facebook_post_id || meta.facebook_template_id || meta.facebook_scheduled_at);
+    return task.task_type === "facebook_posting"
+      || task.source_type === "facebook_fanpage"
+      || task.source_type === "facebook_marketing"
+      || Boolean(meta.facebook_post_id || meta.facebook_template_id || meta.facebook_scheduled_at || meta.page_id);
   }
 
   function localDate(value = new Date()) {

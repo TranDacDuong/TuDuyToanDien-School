@@ -487,6 +487,20 @@ function buildCandidates(userTasks: Assignment[], clock: { date: string; time: s
     });
   }
 
+  const fbPostingTasks = userTasks.filter(item => item.task.task_type === "facebook_posting" && item.status !== "completed");
+  if (fbPostingTasks.length && (force || isWithinWindow(clock.time, "09:00") || isWithinWindow(clock.time, "20:00"))) {
+    const hour = clock.time.slice(0, 2);
+    for (const item of fbPostingTasks) {
+      candidates.push({
+        kind: `fb_posting_reminder_${item.task.id}_${hour}`,
+        type: "task_due_reminder",
+        message: `📌 Nhắc nhở Đăng bài Facebook: ${item.task.title}. ${item.task.description || "Vui lòng kiểm tra và lên lịch đủ chỉ tiêu tuần này!"}`,
+        task: item.task,
+        targetUrl: item.task.action_url || "facebook_posting.html",
+      });
+    }
+  }
+
   return candidates;
 }
 
@@ -767,6 +781,9 @@ Deno.serve(async req => {
     }
 
     await rest("rpc/refresh_daily_tasks", { method: "POST", body: JSON.stringify({ p_user_id: null }) });
+    try {
+      await rest("rpc/sync_facebook_fanpage_weekly_tasks", { method: "POST", body: JSON.stringify({ p_week_date: null }) });
+    } catch (_) {}
     const [preferences, assignments, subscriptions] = await Promise.all([
       rest<Preference[]>("task_preferences?select=user_id,timezone"),
       rest<Assignment[]>("task_assignments?status=in.(open,in_progress)&select=id,user_id,status,assignee:users!task_assignments_user_id_fkey(id,role,full_name,email),task:daily_tasks(id,title,description,task_type,priority,due_at,action_url,available_on,source_id,source_type,metadata)"),

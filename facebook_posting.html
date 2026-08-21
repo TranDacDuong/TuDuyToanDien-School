@@ -224,6 +224,13 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 
       <section class="card">
         <div class="toolbar">
+          <h2>Phân công Fanpage</h2>
+        </div>
+        <div id="fanpageAssignmentBox"></div>
+      </section>
+
+      <section class="card">
+        <div class="toolbar">
           <h2>Loại bài đăng</h2>
           <button class="btn btn-outline" id="addTypeBtn" type="button">Thêm loại</button>
         </div>
@@ -684,28 +691,17 @@ async function hasAssignedFacebookPostingWork(profile){
   const role = String(profile.role || "");
   if (["admin", "assistant"].includes(role)) return true;
   try {
-    const [{ data: types }, { data: templates }, { data: assignments }] = await Promise.all([
-      sb.from("facebook_post_types")
-        .select("id,task_assignee_ids,is_active")
-        .eq("is_active", true),
-      sb.from("facebook_post_schedule_templates")
-        .select("id,task_assignee_ids,is_active")
+    const [{ data: pages }, { data: assignments }] = await Promise.all([
+      sb.from("facebook_pages")
+        .select("id,assigned_staff_id,is_active")
         .eq("is_active", true),
       sb.from("task_assignments")
         .select("id,task:daily_tasks(id,title,description,task_type,source_type,source_key,action_url,metadata)")
         .eq("user_id", profile.id)
         .limit(100)
     ]);
-    const assignedByType = (types || []).some(row =>
-      Array.isArray(row.task_assignee_ids)
-        && row.task_assignee_ids.map(String).includes(String(profile.id))
-    );
-    if (assignedByType) return true;
-    const assignedByTemplate = (templates || []).some(row =>
-      Array.isArray(row.task_assignee_ids)
-        && row.task_assignee_ids.map(String).includes(String(profile.id))
-    );
-    if (assignedByTemplate) return true;
+    const assignedByFanpage = (pages || []).some(row => String(row.assigned_staff_id || "") === String(profile.id));
+    if (assignedByFanpage) return true;
     return (assignments || []).some(row => isFacebookPostingTaskLike(row.task || {}));
   } catch (error) {
     console.warn("[FacebookPosting] Không kiểm tra được công việc được giao:", error);
@@ -766,7 +762,7 @@ async function loadData(){
   const weekStart = dateKey(S.weekStart);
   const weekEnd = dateKey(addDays(S.weekStart, 6));
   const [pagesRes, typesRes, staffRes, templatesRes, postsRes] = await Promise.all([
-    sb.from("facebook_pages").select("id,page_id,page_name,page_url,display_order,is_active,created_at,updated_at").eq("is_active", true).order("display_order"),
+    sb.from("facebook_pages").select("id,page_id,page_name,page_url,display_order,is_active,assigned_staff_id,target_posts_per_week,created_at,updated_at").eq("is_active", true).order("display_order"),
     sb.from("facebook_post_types").select("*").eq("is_active", true).order("name"),
     sb.from("users").select("id,full_name,email,role").order("role").order("full_name"),
     sb.from("facebook_post_schedule_templates").select("*").eq("is_active", true).order("publish_time"),
@@ -783,6 +779,7 @@ async function loadData(){
   S.templates = templatesRes.data || [];
   S.posts = postsRes.data || [];
   if (!S.activePageId || !S.pages.some(p => p.page_id === S.activePageId)) S.activePageId = S.pages[0]?.page_id || DEFAULT_PAGES[0].page_id;
+  try { await sb.rpc("sync_facebook_fanpage_weekly_tasks"); } catch (_) {}
   await ensureCurrentWeekPosts();
   renderAll();
 }
@@ -791,11 +788,97 @@ function renderAll(){
   renderTabs();
   renderWeekHeader();
   renderSelects();
+  renderFanpageAssignments();
   renderTypes();
   renderTemplateCalendar();
   renderWeeklyCalendar();
   renderTodo();
   hideStatus();
+}
+
+function renderFanpageAssignments(){
+  const box = $("fanpageAssignmentBox");
+  if (!box) return;
+  const isAdmin = S.profile?.role === "admin";
+  const weekStart = dateKey(S.weekStart);
+  const weekEnd = dateKey(addDays(S.weekStart, 6));
+
+  box.innerHTML = S.pages.map(page => {
+    const staffId = page.assigned_staff_id || "";
+    const targetPosts = Number(page.target_posts_per_week || 5);
+    const pagePostsCount = S.posts.filter(p =>
+      p.page_id === page.page_id &&
+      p.scheduled_date >= weekStart &&
+      p.scheduled_date <= weekEnd &&
+      !["cancelled"].includes(String(p.status || ""))
+    ).length;
+
+    const percent = Math.min(100, Math.floor((pagePostsCount / targetPosts) * 100));
+    const isCompleted = pagePostsCount >= targetPosts;
+    const assignedStaff = S.staff.find(u => String(u.id) === String(staffId));
+    const staffLabel = assignedStaff ? (assignedStaff.full_name || assignedStaff.email) : "Chưa phân công";
+
+    const staffOptions = `<option value="">-- Chưa chọn người --</option>` + S.staff.map(user =>
+      `<option value="${esc(user.id)}" ${String(user.id) === String(staffId) ? "selected" : ""}>${esc(user.full_name || user.email)} (${roleLabel(user.role)})</option>`
+    ).join("");
+
+    return `
+      <div style="margin-bottom:12px;padding:12px;background:#f8fbff;border:1px solid rgba(18,60,120,.12);border-radius:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="color:#10284f;font-size:.9rem">${esc(page.page_name)}</strong>
+          <span class="task-badge" style="background:${isCompleted ? "#dcfce7;color:#15803d" : "#eff6ff;color:#1d4ed8"}">
+            ${isCompleted ? "✓ Đạt chỉ tiêu" : `${pagePostsCount}/${targetPosts} bài (${percent}%)`}
+          </span>
+        </div>
+        
+        <div style="width:100%;height:6px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin-bottom:10px">
+          <div style="width:${percent}%;height:100%;background:${isCompleted ? "#22c55e" : "#2563eb"};transition:width .3s"></div>
+        </div>
+
+        ${isAdmin ? `
+          <div style="display:grid;gap:8px">
+            <div class="field" style="margin:0">
+              <label style="font-size:.78rem">Nhân viên phụ trách</label>
+              <select class="select" id="pageStaff_${esc(page.id)}" style="padding:6px 10px;font-size:.85rem">
+                ${staffOptions}
+              </select>
+            </div>
+            <div class="field" style="margin:0">
+              <label style="font-size:.78rem">Chỉ tiêu (bài/tuần)</label>
+              <input class="input" type="number" min="1" max="50" id="pageTarget_${esc(page.id)}" value="${targetPosts}" style="padding:6px 10px;font-size:.85rem">
+            </div>
+            <button class="btn btn-outline btn-sm" type="button" onclick="saveFanpageAssignment('${esc(page.id)}')" style="margin-top:4px;width:100%">Lưu phân công</button>
+          </div>
+        ` : `
+          <div style="font-size:.82rem;color:#64748b">
+            <strong>Phụ trách:</strong> ${esc(staffLabel)}
+          </div>
+        `}
+      </div>
+    `;
+  }).join("");
+}
+
+async function saveFanpageAssignment(pageTableId){
+  const staffId = document.getElementById(`pageStaff_${pageTableId}`)?.value || null;
+  const targetPosts = Math.max(1, Number(document.getElementById(`pageTarget_${pageTableId}`)?.value || 5));
+  
+  const { error } = await sb.from("facebook_pages").update({
+    assigned_staff_id: staffId,
+    target_posts_per_week: targetPosts,
+    updated_at: new Date().toISOString()
+  }).eq("id", pageTableId);
+
+  if (error) return alert("Không lưu được phân công Fanpage: " + error.message);
+  
+  try {
+    await sb.rpc("sync_facebook_fanpage_weekly_tasks");
+  } catch (err) {
+    console.warn("sync_facebook_fanpage_weekly_tasks error:", err);
+  }
+
+  showStatus("ok", "Đã cập nhật phân công Fanpage và chỉ tiêu bài/tuần.");
+  await loadData();
 }
 
 function renderTabs(){
