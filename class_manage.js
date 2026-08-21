@@ -1131,6 +1131,7 @@
         '<div style="padding:13px 18px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">'+
           '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
             '<button type="button" onclick="cvClearOfflineTestForm()" class="btn btn-outline">Tạo đợt mới</button>'+
+            '<button type="button" id="cvDeleteOfflineTestBtn" onclick="cvDeleteOfflineTest()" class="btn btn-outline" style="border-color:#ef4444;color:#ef4444;font-weight:600;display:none">🗑️ Xóa đợt kiểm tra</button>'+
             '<button type="button" onclick="cvExportOfflineTestScoresExcel()" class="btn btn-outline" style="border-color:#16a34a;color:#16a34a;font-weight:600">📥 Xuất file Excel</button>'+
           '</div>'+
           '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">'+
@@ -1239,6 +1240,8 @@
     if(note) note.value = "";
     document.querySelectorAll(".cvOfflineScoreInput").forEach(input => input.value = "");
     document.querySelectorAll(".cvOfflineScoreNote").forEach(input => input.value = "");
+    const delBtn = document.getElementById("cvDeleteOfflineTestBtn");
+    if(delBtn) delBtn.style.display = "none";
   };
 
   window.cvLoadOfflineTestScores = async function(testId){
@@ -1246,6 +1249,8 @@
       window.cvClearOfflineTestForm();
       return;
     }
+    const delBtn = document.getElementById("cvDeleteOfflineTestBtn");
+    if(delBtn) delBtn.style.display = "inline-flex";
     const sb = getSb();
     const [{ data: test, error: testError }, { data: scores, error: scoreError }] = await Promise.all([
       sb.from("class_offline_tests").select("id,title,test_date,max_score,note").eq("id", testId).single(),
@@ -1272,6 +1277,40 @@
       const row = scoreMap.get(input.dataset.studentId);
       input.value = row?.note || "";
     });
+  };
+
+  window.cvDeleteOfflineTest = async function(){
+    if(!canEvaluateClassSession(_role)) return;
+    const testSelect = document.getElementById("cvOfflineTestSelect");
+    const testId = testSelect?.value;
+    if(!testId){
+      alert("Hãy chọn đợt kiểm tra cần xóa.");
+      return;
+    }
+    const testTitle = document.getElementById("cvOfflineTestTitle")?.value?.trim() || "đợt kiểm tra này";
+    if(!confirm('Bạn có chắc chắn muốn xóa đợt kiểm tra "' + testTitle + '" không?\nTất cả điểm số của học sinh trong đợt kiểm tra này cũng sẽ bị xóa vĩnh viễn.')){
+      return;
+    }
+    const delBtn = document.getElementById("cvDeleteOfflineTestBtn");
+    if(delBtn) delBtn.disabled = true;
+    const sb = getSb();
+    const { error } = await sb.from("class_offline_tests").delete().eq("id", testId);
+    if(delBtn) delBtn.disabled = false;
+    if(error){
+      alert("Không thể xóa đợt kiểm tra: " + error.message);
+      return;
+    }
+    window.AppAdminTools?.recordAudit?.("offline_test_deleted", {
+      target_type: "class_offline_test",
+      target_id: testId,
+      class_id: _classId,
+      class_name: _className || null,
+      test_title: testTitle
+    });
+    const option = testSelect.querySelector('option[value="'+testId+'"]');
+    if(option) option.remove();
+    window.cvClearOfflineTestForm();
+    alert('Đã xóa đợt kiểm tra "' + testTitle + '" thành công.');
   };
 
   window.cvSaveOfflineTestScores = async function(){
