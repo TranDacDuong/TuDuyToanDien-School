@@ -63,12 +63,12 @@ DECLARE
   v_desc text;
   v_due_at timestamptz;
 BEGIN
-  -- Xác định tuần hiện tại (khi nhân viên đang làm việc)
+  -- Bắt đầu và kết thúc của tuần hiện tại (khi nhân viên đang làm việc)
   v_current_week_start := date_trunc('week', v_ref_date::timestamp)::date;
   v_current_week_end := v_current_week_start + 6;
   v_due_at := (v_current_week_end::text || ' 23:59:59')::timestamptz;
 
-  -- Xác định tuần tới (tuần chứa các bài viết cần lên lịch)
+  -- Bắt đầu và kết thúc của tuần tới (khi các bài đăng xuất bản)
   v_next_week_start := v_current_week_start + 7;
   v_next_week_end := v_current_week_start + 13;
 
@@ -108,8 +108,6 @@ BEGIN
       source_key,
       action_url,
       verification_mode,
-      verification_config,
-      status,
       created_by,
       due_at,
       metadata
@@ -122,8 +120,6 @@ BEGIN
       v_source_key,
       'facebook_posting.html',
       'facebook_schedule',
-      jsonb_build_object('page_id', r.page_id, 'target_posts', r.target_posts),
-      v_status,
       r.assigned_staff_id,
       v_due_at,
       jsonb_build_object(
@@ -141,16 +137,17 @@ BEGIN
     ON CONFLICT (source_key) DO UPDATE SET
       title = EXCLUDED.title,
       description = EXCLUDED.description,
-      status = EXCLUDED.status,
       due_at = EXCLUDED.due_at,
       metadata = EXCLUDED.metadata,
       updated_at = now()
     RETURNING id INTO v_task_id;
 
     -- Upsert phân công công việc cho nhân viên
-    INSERT INTO public.task_assignments (task_id, user_id, assigned_by)
-    VALUES (v_task_id, r.assigned_staff_id, r.assigned_staff_id)
-    ON CONFLICT (task_id, user_id) DO NOTHING;
+    INSERT INTO public.task_assignments (task_id, user_id, assigned_by, status)
+    VALUES (v_task_id, r.assigned_staff_id, r.assigned_staff_id, v_status)
+    ON CONFLICT (task_id, user_id) DO UPDATE SET
+      status = EXCLUDED.status,
+      updated_at = now();
 
     v_count := v_count + 1;
   END LOOP;
