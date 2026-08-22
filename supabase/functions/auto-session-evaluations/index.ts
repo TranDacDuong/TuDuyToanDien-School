@@ -144,6 +144,12 @@ Deno.serve(async (req) => {
     let totalNotifications = 0;
     const sessionSummaries: Array<{ sessionId: string; classId: string; evaluated: number }> = [];
 
+    // Query default evaluator ID (Admin)
+    const adminUsers = await fetchJson<Array<{ id: string }>>(
+      `users?role=eq.admin&select=id&limit=1`,
+    ).catch(() => []);
+    const defaultEvaluatorId = adminUsers[0]?.id || "00000000-0000-0000-0000-000000000000";
+
     for (const session of sessions) {
       const classId = session.class_id;
       const sessionId = session.id;
@@ -232,6 +238,7 @@ Deno.serve(async (req) => {
           class_session_id: sessionId,
           class_id: classId,
           student_id: studentId,
+          evaluator_id: defaultEvaluatorId,
           generated_message: formattedMsg,
           final_message: formattedMsg,
           template_selection: { auto_generated: true, template_index: templateIdx },
@@ -246,7 +253,10 @@ Deno.serve(async (req) => {
             headers: { Prefer: "resolution=merge-duplicates,return=representation" },
             body: JSON.stringify([evalPayload]),
           },
-        ).catch(() => []);
+        ).catch(err => {
+          console.error(`[AutoEval] Upsert evaluation error for student ${studentId}:`, err);
+          return [];
+        });
 
         const evalId = upsertRes[0]?.id || null;
         sessionEvaluated += 1;
@@ -256,6 +266,7 @@ Deno.serve(async (req) => {
         if (studentParentIds.length) {
           const notifications = studentParentIds.map(parentId => ({
             user_id: parentId,
+            actor_id: defaultEvaluatorId,
             type: "session_evaluation",
             title: "MindUp - Tư duy Toàn Diện",
             message: formattedMsg,
@@ -278,7 +289,9 @@ Deno.serve(async (req) => {
             body: JSON.stringify(notifications),
           }).then(() => {
             totalNotifications += notifications.length;
-          }).catch(() => {});
+          }).catch(err => {
+            console.error(`[AutoEval] Insert notifications error:`, err);
+          });
         }
       }
 
