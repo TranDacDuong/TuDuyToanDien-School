@@ -760,7 +760,7 @@ async function ensureDefaultRows(){
 async function loadData(){
   await ensureDefaultRows();
   const weekStart = dateKey(S.weekStart);
-  const weekEnd = dateKey(addDays(S.weekStart, 6));
+  const weekEnd = dateKey(addDays(S.weekStart, 13));
   const [pagesRes, typesRes, staffRes, templatesRes, postsRes] = await Promise.all([
     sb.from("facebook_pages").select("id,page_id,page_name,page_url,display_order,is_active,assigned_staff_id,target_posts_per_week,created_at,updated_at").eq("is_active", true).order("display_order"),
     sb.from("facebook_post_types").select("*").eq("is_active", true).order("name"),
@@ -800,16 +800,16 @@ function renderFanpageAssignments(){
   const box = $("fanpageAssignmentBox");
   if (!box) return;
   const isAdmin = S.profile?.role === "admin";
-  const weekStart = dateKey(S.weekStart);
-  const weekEnd = dateKey(addDays(S.weekStart, 6));
+  const targetWeekStart = dateKey(addDays(S.weekStart, 7));
+  const targetWeekEnd = dateKey(addDays(S.weekStart, 13));
 
   box.innerHTML = S.pages.map(page => {
     const staffId = page.assigned_staff_id || "";
     const targetPosts = Number(page.target_posts_per_week || 5);
     const pagePostsCount = S.posts.filter(p =>
       p.page_id === page.page_id &&
-      p.scheduled_date >= weekStart &&
-      p.scheduled_date <= weekEnd &&
+      p.scheduled_date >= targetWeekStart &&
+      p.scheduled_date <= targetWeekEnd &&
       !["cancelled"].includes(String(p.status || ""))
     ).length;
 

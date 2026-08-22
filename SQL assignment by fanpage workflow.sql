@@ -1,5 +1,6 @@
--- SQL Migration: Facebook Fanpage Assignment & Weekly Task Sync Workflow
--- MindUp - Tư Duy Toàn Diện
+-- =========================================================
+-- WORKFLOW PHÂN CÔNG ĐĂNG BÀI FACEBOOK THEO FANPAGE & CHỈ TIÊU TUẦN TỚI
+-- =========================================================
 
 -- 1. Bổ sung các cột phân công Fanpage vào bảng facebook_pages
 ALTER TABLE public.facebook_pages
@@ -36,7 +37,7 @@ CREATE POLICY facebook_pages_write_staff ON public.facebook_pages
     )
   );
 
--- 3. Hàm tự động tính toán tiến độ & đồng bộ Công việc tuần cho Nhân viên phụ trách Fanpage
+-- 3. Hàm tự động tính toán tiến độ & đồng bộ Công việc cho Tuần Hiện Tại (Soạn bài cho Tuần Tới)
 CREATE OR REPLACE FUNCTION public.sync_facebook_fanpage_weekly_tasks(
   p_week_date date DEFAULT CURRENT_DATE
 )
@@ -47,8 +48,10 @@ SET search_path = public
 AS $$
 DECLARE
   v_ref_date date := COALESCE(p_week_date, CURRENT_DATE);
-  v_week_start date;
-  v_week_end date;
+  v_current_week_start date;
+  v_current_week_end date;
+  v_next_week_start date;
+  v_next_week_end date;
   v_count integer := 0;
   r RECORD;
   v_scheduled_count integer;
@@ -60,10 +63,14 @@ DECLARE
   v_desc text;
   v_due_at timestamptz;
 BEGIN
-  -- Xác định thứ Hai (bắt đầu tuần) và Chủ Nhật (kết thúc tuần)
-  v_week_start := date_trunc('week', v_ref_date::timestamp)::date;
-  v_week_end := v_week_start + 6;
-  v_due_at := (v_week_end::text || ' 23:59:59')::timestamptz;
+  -- Xác định tuần hiện tại (khi nhân viên đang làm việc)
+  v_current_week_start := date_trunc('week', v_ref_date::timestamp)::date;
+  v_current_week_end := v_current_week_start + 6;
+  v_due_at := (v_current_week_end::text || ' 23:59:59')::timestamptz;
+
+  -- Xác định tuần tới (tuần chứa các bài viết cần lên lịch)
+  v_next_week_start := v_current_week_start + 7;
+  v_next_week_end := v_current_week_start + 13;
 
   FOR r IN
     SELECT
@@ -76,20 +83,21 @@ BEGIN
     WHERE is_active = true
       AND assigned_staff_id IS NOT NULL
   LOOP
-    -- Đếm số bài đã hẹn lịch / đã duyệt / đã đăng trong tuần hiện tại
+    -- Đếm số bài đã hẹn lịch cho TUẦN TỚI (v_next_week_start đến v_next_week_end)
     SELECT COUNT(*)
     INTO v_scheduled_count
     FROM public.facebook_scheduled_posts
     WHERE page_id = r.page_id
-      AND scheduled_date BETWEEN v_week_start AND v_week_end
+      AND scheduled_date BETWEEN v_next_week_start AND v_next_week_end
       AND status NOT IN ('cancelled');
 
     -- Tính % tiến độ
     v_progress := LEAST(100, FLOOR((v_scheduled_count::numeric / r.target_posts::numeric) * 100));
     v_status := CASE WHEN v_scheduled_count >= r.target_posts THEN 'completed' ELSE 'in_progress' END;
-    v_source_key := 'fb_fanpage_weekly:' || r.page_id || ':' || to_char(v_week_start, 'YYYY-MM-DD');
-    v_title := '📣 Đăng bài & Lên lịch Fanpage: ' || r.page_name;
-    v_desc := 'Chỉ tiêu: ' || r.target_posts || ' bài/tuần. Hiện tại đã lên lịch ' || v_scheduled_count || '/' || r.target_posts || ' bài (' || v_progress || '%).';
+    v_source_key := 'fb_fanpage_weekly:' || r.page_id || ':' || to_char(v_current_week_start, 'YYYY-MM-DD');
+
+    v_title := '📣 Đăng bài & Lên lịch Fanpage (Tuần tới ' || to_char(v_next_week_start, 'DD/MM') || ' - ' || to_char(v_next_week_end, 'DD/MM') || '): ' || r.page_name;
+    v_desc := 'Chỉ tiêu: Lên lịch ' || r.target_posts || ' bài/tuần cho tuần tới (' || to_char(v_next_week_start, 'DD/MM') || ' - ' || to_char(v_next_week_end, 'DD/MM') || '). Hiện đã lên lịch ' || v_scheduled_count || '/' || r.target_posts || ' bài (' || v_progress || '%).';
 
     -- Upsert vào bảng daily_tasks
     INSERT INTO public.daily_tasks (
@@ -124,8 +132,10 @@ BEGIN
         'target_posts', r.target_posts,
         'scheduled_count', v_scheduled_count,
         'progress_percent', v_progress,
-        'week_start', to_char(v_week_start, 'YYYY-MM-DD'),
-        'week_end', to_char(v_week_end, 'YYYY-MM-DD')
+        'week_start', to_char(v_current_week_start, 'YYYY-MM-DD'),
+        'week_end', to_char(v_current_week_end, 'YYYY-MM-DD'),
+        'target_week_start', to_char(v_next_week_start, 'YYYY-MM-DD'),
+        'target_week_end', to_char(v_next_week_end, 'YYYY-MM-DD')
       )
     )
     ON CONFLICT (source_key) DO UPDATE SET
@@ -149,7 +159,7 @@ BEGIN
 END;
 $$;
 
--- Trigger tự động đồng bộ khi thay đổi bài đăng facebook_scheduled_posts
+-- Trigger tự động đồng bộ khi bài đăng thay đổi
 CREATE OR REPLACE FUNCTION public.trg_sync_facebook_fanpage_tasks_on_post()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -168,5 +178,4 @@ CREATE TRIGGER trg_facebook_posts_sync_fanpage_tasks
   FOR EACH ROW
   EXECUTE FUNCTION public.trg_sync_facebook_fanpage_tasks_on_post();
 
--- Chạy thử hàm đồng bộ cho tuần này
 SELECT public.sync_facebook_fanpage_weekly_tasks();
