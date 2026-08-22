@@ -535,11 +535,15 @@
 
   function taskStartDay(item) {
     const task = item.task || {};
+    const meta = task.metadata || {};
+    if (meta.week_start) return meta.week_start;
     return String(task.available_on || item.created_at || task.created_at || localDate()).slice(0, 10);
   }
 
   function taskEndDay(item) {
     const task = item.task || {};
+    const meta = task.metadata || {};
+    if (meta.week_end) return meta.week_end;
     return task.due_at ? localDate(new Date(task.due_at)) : taskStartDay(item);
   }
 
@@ -554,7 +558,7 @@
   }
 
   function isLongRunningTask(item) {
-    return isManualAssignedTask(item) && taskStartDay(item) < taskEndDay(item);
+    return (isManualAssignedTask(item) || item.task?.source_type === "facebook_fanpage") && taskStartDay(item) < taskEndDay(item);
   }
 
   function taskDisplayDay(item) {
@@ -666,6 +670,7 @@
   }
 
   function isAdminActionTask(item) {
+    if (item.task?.source_type === "facebook_fanpage" || item.task?.task_type === "facebook_posting") return true;
     return !isReminderTask(item)
       && (Number(item.task?.progress?.total || 0) > 0 || isManualAssignedTask(item));
   }
@@ -934,8 +939,9 @@
   function isFacebookReviewTask(item) {
     const task = item?.task || {};
     const meta = task.metadata || {};
+    if (task.source_type === "facebook_fanpage") return false;
     return task.source_type === "facebook_marketing"
-      || task.verification_mode === "facebook_schedule"
+      || (task.verification_mode === "facebook_schedule" && Boolean(meta.facebook_post_id))
       || meta.facebook_review_required === true
       || Boolean(meta.facebook_post_id);
   }
@@ -1499,6 +1505,12 @@
     rows.forEach(item => {
       const task = item.task || {};
       const meta = task.metadata || {};
+      if (task.source_type === "facebook_fanpage" || meta.target_posts) {
+        const total = Number(meta.target_posts || 5);
+        const current = Number(meta.scheduled_count || 0);
+        task.progress = { current, total, label: "Số bài lên lịch tuần này" };
+        return;
+      }
       const session = sessionById.get(String(meta.session_id || ""));
       const classId = meta.class_id || session?.class_id;
       const dateText = String(meta.session_date || session?.session_date || task.available_on || taskDay(item)).slice(0, 10);
@@ -1560,6 +1572,7 @@
 
   async function loadTasks({ refresh = false } = {}) {
     E.list.innerHTML = '<div class="task-empty">Đang tổng hợp công việc...</div>';
+    try { await sb.rpc("sync_facebook_fanpage_weekly_tasks"); } catch (_) {}
     if (S.profile?.role) {
       const activeRange = activeViewRange();
       const start = activeRange.start;
