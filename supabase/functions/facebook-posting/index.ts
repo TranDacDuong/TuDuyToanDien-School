@@ -129,10 +129,13 @@ async function graphFetch(path: string, params: Record<string, string>, token: s
   return json;
 }
 
-async function graphFetchForm(path: string, form: FormData, token: string) {
+async function graphFetchForm(path: string, form: FormData, token: string, queryParams: Record<string, string> = {}) {
   const version = env("FACEBOOK_GRAPH_VERSION") || "v25.0";
   const url = new URL(`https://graph.facebook.com/${version}/${path.replace(/^\//, "")}`);
-  form.set("access_token", token);
+  url.searchParams.set("access_token", token);
+  Object.entries(queryParams).forEach(([k, v]) => {
+    if (v !== "") url.searchParams.set(k, v);
+  });
 
   const res = await fetch(url, { method: "POST", body: form });
   const json = await res.json().catch(() => ({}));
@@ -140,7 +143,7 @@ async function graphFetchForm(path: string, form: FormData, token: string) {
     const err = json?.error || {};
     const parts = [
       err.message || "Facebook API error",
-      err.code ? `MÃ£ lá»—i: ${err.code}` : "",
+      err.code ? `Mã lỗi: ${err.code}` : "",
       err.error_subcode ? `Subcode: ${err.error_subcode}` : "",
     ].filter(Boolean);
     throw new Error(parts.join("\n"));
@@ -179,17 +182,17 @@ async function graphFetchWithPageToken(path: string, params: Record<string, stri
   }
 }
 
-async function graphFetchFormWithPageToken(path: string, form: FormData, pageId: string) {
+async function graphFetchFormWithPageToken(path: string, form: FormData, pageId: string, queryParams: Record<string, string> = {}) {
   const staticToken = await getPageToken(pageId);
   try {
-    return await graphFetchForm(path, form, staticToken);
+    return await graphFetchForm(path, form, staticToken, queryParams);
   } catch (error) {
     if (!isExpiredFacebookTokenError(error)) throw error;
     const dynamicToken = await getPageTokenFromUserToken(pageId);
     if (dynamicToken && dynamicToken !== staticToken) {
-      return await graphFetchForm(path, form, dynamicToken);
+      return await graphFetchForm(path, form, dynamicToken, queryParams);
     }
-    throw new Error("Facebook token Ä‘Ã£ háº¿t háº¡n. HÃ£y cáº­p nháº­t token dÃ i háº¡n/System User token cho chá»©c nÄƒng Ä‘Äƒng bÃ i Facebook.");
+    throw new Error("Facebook token đã hết hạn. Hãy cập nhật token dài hạn/System User token cho chức năng đăng bài Facebook.");
   }
 }
 
@@ -444,9 +447,12 @@ async function createFacebookPost(postInput: unknown, mode: string) {
     const image = await fetchImageAsBlobForFacebook(post.image_url || "");
     const photoForm = new FormData();
     photoForm.set("source", image.blob, image.filename);
-    photoForm.set("published", "false");
-
-    const photoJson = await graphFetchFormWithPageToken(`/${post.page_id}/photos`, photoForm, post.page_id);
+    const photoJson = await graphFetchFormWithPageToken(
+      `/${post.page_id}/photos`,
+      photoForm,
+      post.page_id,
+      { published: "false" }
+    );
     const photoId = String(photoJson.id || photoJson.post_id || "").trim();
     if (!photoId) throw new Error("Không khởi tạo được ảnh trên Facebook Page.");
 
