@@ -971,6 +971,64 @@ function isHardQuizType(postTypeId){
   const rawName = normalizeText(typeName(postTypeId));
   return rawName.includes("hard quiz");
 }
+function isEnrollmentType(postTypeId){
+  const rawName = normalizeText(typeName(postTypeId));
+  return rawName.includes("enrollment") || rawName.includes("tuyen sinh");
+}
+
+const ENROLLMENT_ASSET_IMAGES = {
+  poster: "assets/enrollment/poster_3_teachers.png",
+  math: "assets/enrollment/schedule_math.png",
+  physics: "assets/enrollment/schedule_physics.jpg",
+  chemistry: "assets/enrollment/schedule_chemistry.png",
+};
+
+function getEnrollmentImageUrls(pageNameOrId = ""){
+  const page = S.pages.find(p => p.page_id === pageNameOrId) || currentPage();
+  const name = normalizeText(page?.page_name || "");
+
+  // Page chính: MindUp - Tư Duy Toàn Diện (Đăng cả 4 ảnh: Poster + 3 Lịch học Toán, Lý, Hóa)
+  if (name.includes("toan dien") || name.includes("main") || !name || (name.includes("mindup") && !name.includes("toan") && !name.includes("vat ly") && !name.includes("ly") && !name.includes("hoa") && !name.includes("sinh"))) {
+    return [
+      ENROLLMENT_ASSET_IMAGES.poster,
+      ENROLLMENT_ASSET_IMAGES.math,
+      ENROLLMENT_ASSET_IMAGES.physics,
+      ENROLLMENT_ASSET_IMAGES.chemistry,
+    ];
+  }
+  // Fanpage Toán (Poster 3 GV + Lịch Toán)
+  if (name.includes("toan")) {
+    return [
+      ENROLLMENT_ASSET_IMAGES.poster,
+      ENROLLMENT_ASSET_IMAGES.math,
+    ];
+  }
+  // Fanpage Vật Lý (Poster 3 GV + Lịch Lý)
+  if (name.includes("vat ly") || name.includes("vat li") || name.includes("ly")) {
+    return [
+      ENROLLMENT_ASSET_IMAGES.poster,
+      ENROLLMENT_ASSET_IMAGES.physics,
+    ];
+  }
+  // Fanpage Hóa Học (Poster 3 GV + Lịch Hóa)
+  if (name.includes("hoa")) {
+    return [
+      ENROLLMENT_ASSET_IMAGES.poster,
+      ENROLLMENT_ASSET_IMAGES.chemistry,
+    ];
+  }
+  // Fanpage Sinh Học (Chỉ có poster 3 giáo viên)
+  if (name.includes("sinh")) {
+    return [
+      ENROLLMENT_ASSET_IMAGES.poster,
+    ];
+  }
+
+  // Mặc định
+  return [
+    ENROLLMENT_ASSET_IMAGES.poster,
+  ];
+}
 function isPairStarterType(postTypeId){
   const rawName = normalizeText(typeName(postTypeId));
   return rawName === "problem";
@@ -4270,7 +4328,13 @@ async function schedulePost(mode="schedule"){
       try { await facebookDelete(existingRow.page_id, existingRow.facebook_post_id); } catch (e) { console.warn(e); }
     }
     const createPayload = { ...draft };
-    if (createPayload.image_url && !createPayload.image_url.startsWith("data:image/")) {
+    if (isEnrollmentType(draft.post_type_id)) {
+      const urls = getEnrollmentImageUrls(draft.page_id);
+      showPostStatus("info", `Đang đính kèm ${urls.length} ảnh Tuyển sinh theo Fanpage...`);
+      const dataUrls = await Promise.all(urls.map(convertImageUrlToDataUrl));
+      createPayload.image_urls = dataUrls.filter(Boolean);
+      createPayload.image_url = createPayload.image_urls[0] || null;
+    } else if (createPayload.image_url && !createPayload.image_url.startsWith("data:image/")) {
       showPostStatus("info", "Đang xử lý chuẩn hóa ảnh theo định dạng bài Quiz...");
       const dataUrl = await convertImageUrlToDataUrl(createPayload.image_url);
       if (dataUrl) createPayload.image_url = dataUrl;

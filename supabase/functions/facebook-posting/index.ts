@@ -11,6 +11,7 @@ type FacebookPostPayload = {
   content?: string;
   link_url?: string | null;
   image_url?: string | null;
+  image_urls?: string[] | null;
   scheduled_at?: string;
 };
 
@@ -459,8 +460,12 @@ function normalizePost(input: unknown): Required<FacebookPostPayload> {
 }
 
 async function createFacebookPost(postInput: unknown, mode: string) {
+  const rawInput = (postInput || {}) as FacebookPostPayload;
   const post = normalizePost(postInput);
-  if (!post.content && !post.link_url && !post.image_url) {
+  const rawUrls = Array.isArray(rawInput.image_urls) ? rawInput.image_urls.filter(Boolean) : [];
+  const imageUrls = rawUrls.length ? rawUrls : (post.image_url ? [post.image_url] : []);
+
+  if (!post.content && !post.link_url && !imageUrls.length) {
     throw new Error("Vui lòng nhập nội dung, link hoặc ảnh trước khi hẹn/đăng.");
   }
 
@@ -473,32 +478,36 @@ async function createFacebookPost(postInput: unknown, mode: string) {
     }
   }
 
-  const hasImage = Boolean(post.image_url);
+  if (imageUrls.length > 0) {
+    const photoIds: string[] = [];
+    for (const url of imageUrls) {
+      const image = await fetchImageAsBlobForFacebook(url);
+      const photoForm = new FormData();
+      photoForm.set("source", image.blob, image.filename);
 
-  if (hasImage) {
-    const image = await fetchImageAsBlobForFacebook(post.image_url || "");
-    const photoForm = new FormData();
-    photoForm.set("source", image.blob, image.filename);
-    const photoJson = await graphFetchFormWithPageToken(
-      `/${post.page_id}/photos`,
-      photoForm,
-      post.page_id,
-      { published: "false" }
-    );
-    const photoId = String(photoJson.id || photoJson.post_id || "").trim();
-    if (!photoId) throw new Error("Không khởi tạo được ảnh trên Facebook Page.");
-
-    const feedParams: Record<string, string> = {
-      attached_media: JSON.stringify([{ media_fbid: photoId }]),
-    };
-    if (post.content) feedParams.message = post.content;
-    if (isScheduled && scheduledDate) {
-      feedParams.published = "false";
-      feedParams.scheduled_publish_time = String(Math.floor(scheduledDate.getTime() / 1000));
+      const photoJson = await graphFetchFormWithPageToken(
+        `/${post.page_id}/photos`,
+        photoForm,
+        post.page_id,
+        { published: "false" }
+      );
+      const photoId = String(photoJson.id || photoJson.post_id || "").trim();
+      if (photoId) photoIds.push(photoId);
     }
 
-    const feedJson = await graphFetchWithPageToken(`/${post.page_id}/feed`, feedParams, post.page_id, "POST");
-    return { facebook_post_id: feedJson.id || feedJson.post_id || photoId };
+    if (photoIds.length > 0) {
+      const feedParams: Record<string, string> = {
+        attached_media: JSON.stringify(photoIds.map(id => ({ media_fbid: id }))),
+      };
+      if (post.content) feedParams.message = post.content;
+      if (isScheduled && scheduledDate) {
+        feedParams.published = "false";
+        feedParams.scheduled_publish_time = String(Math.floor(scheduledDate.getTime() / 1000));
+      }
+
+      const feedJson = await graphFetchWithPageToken(`/${post.page_id}/feed`, feedParams, post.page_id, "POST");
+      return { facebook_post_id: feedJson.id || feedJson.post_id || photoIds[0] };
+    }
   }
 
   const params: Record<string, string> = {};
