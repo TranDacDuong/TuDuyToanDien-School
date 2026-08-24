@@ -16,6 +16,7 @@
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="supabaseClient.js"></script>
 <script src="image_upload.js"></script>
+<script src="assets/enrollment/enrollment_images.js"></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gradient(circle at top left,rgba(200,150,42,.12),transparent 24%),linear-gradient(180deg,#f4efe4 0%,#f8f5ef 30%,#f7faff 100%);color:var(--ink,#17233d)}
@@ -402,6 +403,11 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
         <div class="hint">Chọn file hoặc Ctrl+V ảnh vào khu vực này. Ảnh sẽ upload lên Drive rồi dùng URL công khai để đăng Facebook.</div>
         <input id="postImageFile" type="file" accept="image/*" style="margin-top:10px">
         <img id="imagePreview" class="image-preview" alt="Xem trước ảnh">
+      </div>
+      <div class="workflow-box" id="enrollmentImagesPreviewBox" style="display:none;margin-top:12px;padding:14px;background:#0d2342;border:1px solid rgba(59,130,246,0.3);border-radius:16px;color:#fff">
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px;color:#60a5fa">📌 Bộ ảnh Tuyển sinh tự động theo Fanpage</div>
+        <div class="hint" style="margin-bottom:10px;color:rgba(255,255,255,0.85)">Bài đăng này sẽ tự động đính kèm các ảnh đã thiết kế sẵn dưới đây khi Hẹn lịch Facebook:</div>
+        <div id="enrollmentImagesGallery" style="display:flex;gap:12px;flex-wrap:wrap"></div>
       </div>
       <textarea id="postInternalNote" style="display:none"></textarea>
       <div class="status info" id="postStatusBox"></div>
@@ -986,48 +992,49 @@ const ENROLLMENT_ASSET_IMAGES = {
 function getEnrollmentImageUrls(pageNameOrId = ""){
   const page = S.pages.find(p => p.page_id === pageNameOrId) || currentPage();
   const name = normalizeText(page?.page_name || "");
+  const imgs = typeof ENROLLMENT_BASE64_IMAGES !== "undefined" ? ENROLLMENT_BASE64_IMAGES : {};
 
   // Page chính: MindUp - Tư Duy Toàn Diện (Đăng cả 4 ảnh: Poster + 3 Lịch học Toán, Lý, Hóa)
   if (name.includes("toan dien") || name.includes("main") || !name || (name.includes("mindup") && !name.includes("toan") && !name.includes("vat ly") && !name.includes("ly") && !name.includes("hoa") && !name.includes("sinh"))) {
     return [
-      ENROLLMENT_ASSET_IMAGES.poster,
-      ENROLLMENT_ASSET_IMAGES.math,
-      ENROLLMENT_ASSET_IMAGES.physics,
-      ENROLLMENT_ASSET_IMAGES.chemistry,
-    ];
+      imgs.poster,
+      imgs.math,
+      imgs.physics,
+      imgs.chemistry,
+    ].filter(Boolean);
   }
   // Fanpage Toán (Poster 3 GV + Lịch Toán)
   if (name.includes("toan")) {
     return [
-      ENROLLMENT_ASSET_IMAGES.poster,
-      ENROLLMENT_ASSET_IMAGES.math,
-    ];
+      imgs.poster,
+      imgs.math,
+    ].filter(Boolean);
   }
   // Fanpage Vật Lý (Poster 3 GV + Lịch Lý)
   if (name.includes("vat ly") || name.includes("vat li") || name.includes("ly")) {
     return [
-      ENROLLMENT_ASSET_IMAGES.poster,
-      ENROLLMENT_ASSET_IMAGES.physics,
-    ];
+      imgs.poster,
+      imgs.physics,
+    ].filter(Boolean);
   }
   // Fanpage Hóa Học (Poster 3 GV + Lịch Hóa)
   if (name.includes("hoa")) {
     return [
-      ENROLLMENT_ASSET_IMAGES.poster,
-      ENROLLMENT_ASSET_IMAGES.chemistry,
-    ];
+      imgs.poster,
+      imgs.chemistry,
+    ].filter(Boolean);
   }
   // Fanpage Sinh Học (Chỉ có poster 3 giáo viên)
   if (name.includes("sinh")) {
     return [
-      ENROLLMENT_ASSET_IMAGES.poster,
-    ];
+      imgs.poster,
+    ].filter(Boolean);
   }
 
   // Mặc định
   return [
-    ENROLLMENT_ASSET_IMAGES.poster,
-  ];
+    imgs.poster,
+  ].filter(Boolean);
 }
 function isPairStarterType(postTypeId){
   const rawName = normalizeText(typeName(postTypeId));
@@ -2459,6 +2466,33 @@ function updateImagePreview(){
       MEDIA_PREVIEW_OBJECT_URLS.delete(previewKey);
     }
   };
+  const isEnrollment = isEnrollmentType(postTypeId);
+  const enrollmentBox = $("enrollmentImagesPreviewBox");
+  const gallery = $("enrollmentImagesGallery");
+
+  if (isEnrollment) {
+    const urls = getEnrollmentImageUrls(S.activePageId);
+    if (enrollmentBox && gallery) {
+      enrollmentBox.style.display = "";
+      gallery.innerHTML = urls.map((u, i) => `
+        <div style="text-align:center">
+          <img src="${u}" style="height:140px;max-width:180px;border-radius:10px;object-fit:cover;border:2px solid #3b82f6;box-shadow:0 4px 12px rgba(0,0,0,0.15)">
+          <div style="font-size:11px;margin-top:4px;color:rgba(255,255,255,0.85)">Ảnh ${i + 1}</div>
+        </div>
+      `).join("");
+      const hint = enrollmentBox.querySelector(".hint");
+      if (hint) hint.textContent = `Bài đăng này sẽ tự động đăng kèm ${urls.length} ảnh thiết kế sẵn dưới đây lên Facebook:`;
+    }
+    if ($("imageDropzone")) $("imageDropzone").style.display = "none";
+    releasePreviewObjectUrl();
+    img.src = "";
+    img.classList.remove("show");
+    return;
+  } else {
+    if (enrollmentBox) enrollmentBox.style.display = "none";
+    if ($("imageDropzone")) $("imageDropzone").style.display = "";
+  }
+
   if (isQuizType(postTypeId) || isHardQuizType(postTypeId) || $("imageDropzone")?.classList.contains("hidden")) {
     releasePreviewObjectUrl();
     img.src = "";
@@ -4331,9 +4365,8 @@ async function schedulePost(mode="schedule"){
     if (isEnrollmentType(draft.post_type_id)) {
       const urls = getEnrollmentImageUrls(draft.page_id);
       showPostStatus("info", `Đang đính kèm ${urls.length} ảnh Tuyển sinh theo Fanpage...`);
-      const dataUrls = await Promise.all(urls.map(convertImageUrlToDataUrl));
-      createPayload.image_urls = dataUrls.filter(Boolean);
-      createPayload.image_url = createPayload.image_urls[0] || null;
+      createPayload.image_urls = urls;
+      createPayload.image_url = urls[0] || null;
     } else if (createPayload.image_url && !createPayload.image_url.startsWith("data:image/")) {
       showPostStatus("info", "Đang xử lý chuẩn hóa ảnh theo định dạng bài Quiz...");
       const dataUrl = await convertImageUrlToDataUrl(createPayload.image_url);
