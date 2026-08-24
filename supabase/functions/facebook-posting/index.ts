@@ -61,11 +61,15 @@ async function fetchJson<T>(path: string, init: RequestInit = {}) {
   return data as T;
 }
 
-async function getUserRole(userId: string) {
-  const rows = await fetchJson<Array<{ role: string }>>(
-    `users?id=eq.${encodeURIComponent(userId)}&select=role&limit=1`,
-  );
-  return rows[0]?.role || "";
+async function getUserRole(user: any) {
+  try {
+    const rows = await fetchJson<Array<{ role: string }>>(
+      `users?id=eq.${encodeURIComponent(user.id)}&select=role&limit=1`,
+    );
+    if (rows[0]?.role) return rows[0].role;
+  } catch (_) {}
+  const metaRole = user?.user_metadata?.role || user?.raw_user_meta_data?.role;
+  return metaRole || "";
 }
 
 function assertAllowedRole(role: string) {
@@ -481,7 +485,7 @@ Deno.serve(async (req) => {
 
   try {
     const { user } = await requireAuthenticatedUser(req);
-    const role = await getUserRole(user.id);
+    const role = await getUserRole(user);
     assertAllowedRole(role);
 
     const body = await req.json().catch(() => ({}));
