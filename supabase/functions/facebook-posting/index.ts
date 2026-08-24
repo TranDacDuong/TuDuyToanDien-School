@@ -444,29 +444,33 @@ async function createFacebookPost(postInput: unknown, mode: string) {
   const hasImage = Boolean(post.image_url);
 
   if (hasImage) {
-    const image = await fetchImageAsBlobForFacebook(post.image_url || "");
-    const photoForm = new FormData();
-    photoForm.set("source", image.blob, image.filename);
-    const photoJson = await graphFetchFormWithPageToken(
-      `/${post.page_id}/photos`,
-      photoForm,
-      post.page_id,
-      { published: "false" }
-    );
-    const photoId = String(photoJson.id || photoJson.post_id || "").trim();
-    if (!photoId) throw new Error("Không khởi tạo được ảnh trên Facebook Page.");
+    try {
+      const image = await fetchImageAsBlobForFacebook(post.image_url || "");
+      const photoForm = new FormData();
+      photoForm.set("source", image.blob, image.filename);
+      const photoJson = await graphFetchFormWithPageToken(
+        `/${post.page_id}/photos`,
+        photoForm,
+        post.page_id,
+        { published: "false" }
+      );
+      const photoId = String(photoJson.id || photoJson.post_id || "").trim();
+      if (photoId) {
+        const feedParams: Record<string, string> = {
+          attached_media: JSON.stringify([{ media_fbid: photoId }]),
+        };
+        if (post.content) feedParams.message = post.content;
+        if (isScheduled && scheduledDate) {
+          feedParams.published = "false";
+          feedParams.scheduled_publish_time = String(Math.floor(scheduledDate.getTime() / 1000));
+        }
 
-    const feedParams: Record<string, string> = {
-      attached_media: JSON.stringify([{ media_fbid: photoId }]),
-    };
-    if (post.content) feedParams.message = post.content;
-    if (isScheduled && scheduledDate) {
-      feedParams.published = "false";
-      feedParams.scheduled_publish_time = String(Math.floor(scheduledDate.getTime() / 1000));
+        const feedJson = await graphFetchWithPageToken(`/${post.page_id}/feed`, feedParams, post.page_id, "POST");
+        return { facebook_post_id: feedJson.id || feedJson.post_id || photoId };
+      }
+    } catch (photoError) {
+      console.warn("Facebook photo schedule error, falling back to Feed post (Quiz style):", photoError);
     }
-
-    const feedJson = await graphFetchWithPageToken(`/${post.page_id}/feed`, feedParams, post.page_id, "POST");
-    return { facebook_post_id: feedJson.id || feedJson.post_id || photoId };
   }
 
   const params: Record<string, string> = {};
