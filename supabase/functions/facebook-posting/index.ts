@@ -70,7 +70,7 @@ async function getUserRole(userId: string) {
 
 function assertAllowedRole(role: string) {
   const normRole = String(role || "").trim().toLowerCase();
-  if (!["admin", "assistant", "teacher", "marketing", "accountant"].includes(normRole)) {
+  if (normRole === "student" || normRole === "parent") {
     throw new Error("Tài khoản này chưa có quyền quản lý bài đăng Facebook.");
   }
 }
