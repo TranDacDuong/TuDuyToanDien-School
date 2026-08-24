@@ -2673,6 +2673,53 @@ function setPreviewMediaSource(el, url, cacheKey, mimeType=""){
   });
 }
 
+function blobToDataUrl(blob){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function imageElementToDataUrl(img, mimeType = "image/jpeg", quality = 0.85){
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth || img.width || 1200;
+    canvas.height = img.naturalHeight || img.height || 1200;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL(mimeType, quality);
+  } catch (e) {
+    console.warn("Cannot convert image element to data URL", e);
+    return "";
+  }
+}
+
+async function convertImageUrlToDataUrl(url){
+  const cleanUrl = String(url || "").trim();
+  if (!cleanUrl) return "";
+  if (cleanUrl.startsWith("data:image/")) return cleanUrl;
+
+  const imgEl = $("postImagePreview");
+  if (imgEl && imgEl.classList.contains("show") && imgEl.naturalWidth > 0) {
+    const dataUrl = imageElementToDataUrl(imgEl);
+    if (dataUrl && dataUrl.length > 200) return dataUrl;
+  }
+
+  try {
+    const blob = await fetchMediaBlob(cleanUrl);
+    if (blob) {
+      const dataUrl = await blobToDataUrl(blob);
+      if (dataUrl && dataUrl.length > 200) return dataUrl;
+    }
+  } catch (err) {
+    console.warn("Convert image URL to Data URL failed", err);
+  }
+
+  return cleanUrl;
+}
+
 function facebookPostUrl(id){ return id ? `https://www.facebook.com/${String(id)}` : ""; }
 async function callFacebookPostingFunction(payload){
   const sessionRes = await sb.auth.getSession();
@@ -4222,7 +4269,13 @@ async function schedulePost(mode="schedule"){
     if (existingRow?.facebook_post_id && existingRow.status === "scheduled") {
       try { await facebookDelete(existingRow.page_id, existingRow.facebook_post_id); } catch (e) { console.warn(e); }
     }
-    const fbId = await facebookCreate(draft, mode);
+    const createPayload = { ...draft };
+    if (createPayload.image_url && !createPayload.image_url.startsWith("data:image/")) {
+      showPostStatus("info", "Đang xử lý chuẩn hóa ảnh theo định dạng bài Quiz...");
+      const dataUrl = await convertImageUrlToDataUrl(createPayload.image_url);
+      if (dataUrl) createPayload.image_url = dataUrl;
+    }
+    const fbId = await facebookCreate(createPayload, mode);
     const update = {
       status: mode === "schedule" ? "scheduled" : "published",
       facebook_post_id: fbId,
