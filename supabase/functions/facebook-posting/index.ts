@@ -252,7 +252,8 @@ function getDriveFileIdFromUrl(url: URL) {
     const match = url.pathname.match(/^\/file\/d\/([\w-]+)/);
     if (match) return match[1];
   }
-  return "";
+  const generalMatch = url.href.match(/(?:lh3\.googleusercontent\.com\/d\/|drive\.google\.com\/(?:uc\?[^#]*\bid=|file\/d\/))([\w-]+)/i);
+  return generalMatch ? generalMatch[1] : "";
 }
 
 function buildImageFetchUrls(inputUrl: string) {
@@ -260,6 +261,8 @@ function buildImageFetchUrls(inputUrl: string) {
   const urls = [parsed.toString()];
   const driveFileId = getDriveFileIdFromUrl(parsed);
   if (driveFileId) {
+    urls.push(`https://drive.google.com/thumbnail?id=${encodeURIComponent(driveFileId)}&sz=w2000`);
+    urls.push(`https://lh3.googleusercontent.com/d/${encodeURIComponent(driveFileId)}=s2000`);
     urls.push(`https://drive.google.com/uc?export=download&id=${encodeURIComponent(driveFileId)}`);
     urls.push(`https://drive.usercontent.google.com/download?id=${encodeURIComponent(driveFileId)}&export=download`);
   }
@@ -275,7 +278,7 @@ function detectImageMime(bytes: Uint8Array, contentType = "") {
     bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46
     && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
   ) return "image/webp";
-  if (normalized === "image/svg+xml") return normalized;
+  if (normalized.startsWith("image/")) return normalized;
   return "";
 }
 
@@ -311,7 +314,7 @@ async function fetchDriveImageAsBlobForFacebook(fileId: string) {
       redirect: "follow",
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        "User-Agent": "MindUpFacebookPosting/1.0",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
       },
       signal: controller.signal,
     });
@@ -320,7 +323,7 @@ async function fetchDriveImageAsBlobForFacebook(fileId: string) {
     const bytes = new Uint8Array(await res.arrayBuffer());
     const mimeType = detectImageMime(bytes, res.headers.get("content-type") || "");
     if (!mimeType || !bytes.byteLength) return null;
-    if (bytes.byteLength > 8 * 1024 * 1024) throw new Error("Image is too large for Facebook upload. Please keep it under 8MB.");
+    if (bytes.byteLength > 8 * 1024 * 1024) throw new Error("Ảnh quá lớn để đăng Facebook. Vui lòng nén ảnh nhỏ hơn 8MB.");
 
     return {
       blob: new Blob([bytes], { type: mimeType }),
@@ -331,15 +334,34 @@ async function fetchDriveImageAsBlobForFacebook(fileId: string) {
   }
 }
 
+function parseDataUrlImage(dataUrl: string) {
+  const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/);
+  if (!match) return null;
+  const mimeType = match[1];
+  const binary = atob(match[2]);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return {
+    blob: new Blob([bytes], { type: mimeType }),
+    filename: `mindup-facebook-image.${getExtensionFromContentType(mimeType)}`,
+  };
+}
+
 async function fetchImageAsBlobForFacebook(imageUrl: string) {
+  const cleanUrl = String(imageUrl || "").trim();
+  if (cleanUrl.startsWith("data:image/")) {
+    const parsedDataUrl = parseDataUrlImage(cleanUrl);
+    if (parsedDataUrl) return parsedDataUrl;
+  }
+
   let parsed: URL;
   try {
-    parsed = new URL(imageUrl);
+    parsed = new URL(cleanUrl);
   } catch (_) {
-    throw new Error("Invalid image URL.");
+    throw new Error("URL ảnh không hợp lệ.");
   }
   if (!["http:", "https:"].includes(parsed.protocol)) {
-    throw new Error("Image URL must start with http or https.");
+    throw new Error("URL ảnh phải bắt đầu bằng http hoặc https.");
   }
 
   const driveFileId = getDriveFileIdFromUrl(parsed);
@@ -349,40 +371,43 @@ async function fetchImageAsBlobForFacebook(imageUrl: string) {
   }
 
   let lastError = "";
-  for (const url of buildImageFetchUrls(imageUrl)) {
+  for (const url of buildImageFetchUrls(cleanUrl)) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 25_000);
     try {
       const res = await fetch(url, {
         redirect: "follow",
-        headers: { "User-Agent": "MindUpFacebookPosting/1.0" },
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+          "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        },
         signal: controller.signal,
       });
       if (!res.ok) {
-        lastError = `Cannot download image (${res.status}).`;
+        lastError = `Không tải được ảnh (${res.status}).`;
         continue;
       }
 
       const bytes = new Uint8Array(await res.arrayBuffer());
       const mimeType = detectImageMime(bytes, res.headers.get("content-type") || "");
       if (!mimeType) {
-        lastError = "Image URL did not return a valid image file.";
+        lastError = "URL ảnh không trả về file ảnh hợp lệ.";
         continue;
       }
-      if (!bytes.byteLength) throw new Error("Downloaded image is empty.");
-      if (bytes.byteLength > 8 * 1024 * 1024) throw new Error("Image is too large for Facebook upload. Please keep it under 8MB.");
+      if (!bytes.byteLength) throw new Error("File ảnh tải về bị rỗng.");
+      if (bytes.byteLength > 8 * 1024 * 1024) throw new Error("Ảnh quá lớn để đăng Facebook. Vui lòng nén ảnh nhỏ hơn 8MB.");
 
       return {
         blob: new Blob([bytes], { type: mimeType }),
         filename: `mindup-facebook-image.${getExtensionFromContentType(mimeType)}`,
       };
     } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error || "Cannot download image.");
+      lastError = error instanceof Error ? error.message : String(error || "Không tải được ảnh.");
     } finally {
       clearTimeout(timeout);
     }
   }
-  throw new Error(lastError || "Cannot download image. Please check that the image URL is public.");
+  throw new Error(lastError || "Không tải được file ảnh từ Drive để đẩy lên Facebook. Hãy kiểm tra URL hoặc quyền xem của ảnh.");
 }
 
 function normalizePost(input: unknown): Required<FacebookPostPayload> {
@@ -409,7 +434,7 @@ async function createFacebookPost(postInput: unknown, mode: string) {
   if (isScheduled) {
     if (!scheduledDate || Number.isNaN(scheduledDate.getTime())) throw new Error("Thời gian hẹn lịch không hợp lệ.");
     if (scheduledDate.getTime() < Date.now() + 10 * 60 * 1000) {
-      throw new Error("Facebook yêu cầu thời gian hẹn lịch sau hiện tại ít nhất khoảng 10 phút.");
+      throw new Error("Facebook yêu cầu thời gian hẹn lịch sau hiện tại ít nhất 10-15 phút.");
     }
   }
 
@@ -419,7 +444,10 @@ async function createFacebookPost(postInput: unknown, mode: string) {
     const params = new FormData();
     const image = await fetchImageAsBlobForFacebook(post.image_url || "");
     params.set("source", image.blob, image.filename);
-    if (post.content) params.set("caption", post.content);
+    if (post.content) {
+      params.set("caption", post.content);
+      params.set("message", post.content);
+    }
     if (isScheduled && scheduledDate) {
       params.set("published", "false");
       params.set("scheduled_publish_time", String(Math.floor(scheduledDate.getTime() / 1000)));
