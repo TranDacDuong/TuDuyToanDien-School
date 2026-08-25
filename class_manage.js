@@ -610,6 +610,10 @@
     let actionBtns = "";
     if(canManageClassContent(role)){
       actionBtns =
+        '<button onclick="cvOpenSupplementarySessionModal()" style="'+
+        'background:#c8962a;color:#fff;border:none;padding:6px 14px;'+
+        'border-radius:7px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">'+
+        '+ Thêm buổi dạy bổ sung</button>'+
         '<button onclick="cvEditClass()" style="'+
         'background:var(--gold);color:var(--navy);border:none;padding:6px 14px;'+
         'border-radius:7px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">'+
@@ -3246,16 +3250,37 @@
     if (!canManageClassSessions(_role)) return;
     const sb = getSb();
 
-    const [{ data: classStudents }, { data: rooms }, { data: cls }] = await Promise.all([
-      sb.from("class_students")
-        .select("student:users!student_id(id, full_name, phone)")
+    let students = [];
+    if (_cachedClass && _cachedClass.students && _cachedClass.students.length) {
+      students = _cachedClass.students
+        .filter(s => !s.left_at)
+        .map(s => ({
+          id: s.student_id || s.user?.id,
+          full_name: s.user?.full_name || "Học sinh",
+          phone: s.user?.phone || "",
+        }))
+        .filter(st => st.id);
+    }
+
+    if (!students.length) {
+      const { data: csRows } = await sb
+        .from("class_students")
+        .select("student_id, left_at, user:users!fk_student(id, full_name, phone)")
         .eq("class_id", _classId)
-        .is("left_at", null),
+        .is("left_at", null);
+
+      students = (csRows || []).map(r => ({
+        id: r.student_id || r.user?.id,
+        full_name: r.user?.full_name || "Học sinh",
+        phone: r.user?.phone || "",
+      })).filter(st => st.id);
+    }
+
+    const [{ data: rooms }, { data: cls }] = await Promise.all([
       sb.from("rooms").select("id, room_name, location").order("room_name"),
       sb.from("classes").select("teacher_id, class_name").eq("id", _classId).single(),
     ]);
 
-    const students = (classStudents || []).map(cs => cs.student).filter(Boolean);
     if (!students.length) {
       alert("Lớp học này hiện chưa có học sinh nào.");
       return;
@@ -3400,17 +3425,22 @@
 
   window.cvOpenSupplementaryAttendanceModal = async function(sessionId) {
     const sb = getSb();
-    const [{ data: session }, { data: students }] = await Promise.all([
+    const [{ data: session }, { data: suppStudents }, { data: allUsers }] = await Promise.all([
       sb.from("supplementary_sessions").select("*, parent_class:classes(class_name)").eq("id", sessionId).single(),
-      sb.from("supplementary_session_students")
-        .select("*, student:users!student_id(id, full_name, phone)")
-        .eq("session_id", sessionId),
+      sb.from("supplementary_session_students").select("*").eq("session_id", sessionId),
+      sb.from("users").select("id, full_name, phone"),
     ]);
 
     if (!session) {
       alert("Không tìm thấy buổi học bổ sung.");
       return;
     }
+
+    const userMap = Object.fromEntries((allUsers || []).map(u => [u.id, u]));
+    const students = (suppStudents || []).map(st => ({
+      ...st,
+      student: userMap[st.student_id] || { full_name: "Học sinh" }
+    }));
 
     const rowsHtml = (students || []).map(st => `
       <tr data-student-id="${st.student_id}">
