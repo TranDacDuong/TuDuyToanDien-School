@@ -370,6 +370,34 @@ async function loadSchedule() {
 
     if (schedError) throw schedError;
 
+    // 2b. Fetch supplementary sessions for student
+    let suppSchedules = [];
+    try {
+      const { data: suppRows } = await sb
+        .from("supplementary_session_students")
+        .select("session_id, student_id, supplementary_sessions!inner(id, topic, session_date, starts_at, ends_at, status, room_id, rooms(id, room_name), parent_class_id)")
+        .eq("student_id", selectedStudentId)
+        .eq("supplementary_sessions.status", "scheduled");
+
+      suppSchedules = (suppRows || []).map(r => {
+        const s = r.supplementary_sessions;
+        const dParts = String(s.session_date || "").split("-");
+        const dateObj = new Date(Number(dParts[0]), Number(dParts[1]) - 1, Number(dParts[2]));
+        const weekdayNo = dateObj.getDay() === 0 ? 7 : dateObj.getDay();
+        return {
+          id: s.id,
+          is_supplementary: true,
+          topic: s.topic,
+          class_id: s.parent_class_id,
+          weekday: weekdayNo,
+          session_date: s.session_date,
+          start_time: s.starts_at,
+          end_time: s.ends_at,
+          rooms: s.rooms,
+        };
+      });
+    } catch (_) {}
+
     // 3. Fetch custom student schedule choices (opt-in/opt-out)
     const { data: customSchedules, error: customError } = await sb
       .from("class_student_schedules")
@@ -434,6 +462,7 @@ async function loadSchedule() {
     });
 
     // 7. Render week days
+    activeSchedules.push(...suppSchedules);
     renderWeekGrid(weekDates, activeSchedules, enrollmentMap, attMap);
 
   } catch (err) {
@@ -483,6 +512,7 @@ function renderWeekGrid(weekDates, activeSchedules, enrollmentMap, attMap) {
 
     // Filter by student enrollment period for this specific date
     const daySessions = daySchedules.filter(s => {
+      if (s.is_supplementary) return s.session_date === dateStr;
       const enrollment = enrollmentMap[s.class_id];
       if (!enrollment) return false;
       const joined = enrollment.joined_at ? enrollment.joined_at.slice(0, 10) : "0000-00-00";
@@ -499,8 +529,8 @@ function renderWeekGrid(weekDates, activeSchedules, enrollmentMap, attMap) {
     } else {
       bodyContent = daySessions.map(s => {
         const enrollment = enrollmentMap[s.class_id];
-        const className = enrollment.class?.class_name || "Lớp học";
-        const subjectName = enrollment.class?.subjects?.name || "Khác";
+        const className = s.is_supplementary ? s.topic : (enrollment?.class?.class_name || "Lớp học");
+        const subjectName = s.is_supplementary ? "Bổ sung" : (enrollment?.class?.subjects?.name || "Khác");
         const roomName = s.rooms?.room_name || "Chưa xếp phòng";
         const start = s.start_time ? s.start_time.slice(0, 5) : "--:--";
         const end = s.end_time ? s.end_time.slice(0, 5) : "--:--";

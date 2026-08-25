@@ -2598,6 +2598,7 @@
     const actionsHtml = canManageClassSessions(role)
       ? '<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">'+
           '<button onclick="cvOpenAddClassSession()" class="btn btn-primary btn-sm">+ Thêm buổi học</button>'+
+          '<button onclick="cvOpenSupplementarySessionModal()" class="btn btn-sm" style="background:#c8962a;color:#fff;font-weight:700;border:none;border-radius:8px;padding:6px 12px;cursor:pointer">+ Thêm buổi dạy bổ sung</button>'+
         '</div>'
       : "";
     const sessionHint = sessionTableMissing
@@ -3238,6 +3239,249 @@
     })) return;
 
     tc.innerHTML = '<p style="color:var(--red)">Không tải được giao diện xem lại bài.</p>';
+  };
+
+  /* ── 5. BÀI DẠY BỔ SUNG 1 LẦN (SUPPLEMENTARY SESSIONS) ── */
+  window.cvOpenSupplementarySessionModal = async function() {
+    if (!canManageClassSessions(_role)) return;
+    const sb = getSb();
+
+    const [{ data: classStudents }, { data: rooms }, { data: cls }] = await Promise.all([
+      sb.from("class_students")
+        .select("student:users!student_id(id, full_name, phone)")
+        .eq("class_id", _classId)
+        .is("left_at", null),
+      sb.from("rooms").select("id, room_name, location").order("room_name"),
+      sb.from("classes").select("teacher_id, class_name").eq("id", _classId).single(),
+    ]);
+
+    const students = (classStudents || []).map(cs => cs.student).filter(Boolean);
+    if (!students.length) {
+      alert("Lớp học này hiện chưa có học sinh nào.");
+      return;
+    }
+
+    const roomOptions = (rooms || []).map(r => `<option value="${r.id}">${esc(r.room_name || r.name)}${r.location ? ` (${esc(r.location)})` : ""}</option>`).join("");
+    const studentCheckboxes = students.map(st => `
+      <label style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface,#f8fafc);border:1px solid #cbd5e1;border-radius:8px;cursor:pointer">
+        <input type="checkbox" class="cvSuppStudentCheck" value="${st.id}" checked>
+        <span style="font-weight:600;font-size:0.85rem">${esc(st.full_name)}</span>
+        ${st.phone ? `<span style="font-size:0.75rem;color:var(--ink-mid);margin-left:auto">${esc(st.phone)}</span>` : ""}
+      </label>
+    `).join("");
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    const modal = document.createElement("div");
+    modal.id = "cvSuppSessionModal";
+    modal.style.cssText = "position:fixed;inset:0;background:rgba(10,20,40,.5);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px";
+    modal.innerHTML = `
+      <div style="background:#fff;border-radius:18px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 50px rgba(0,0,0,0.25);padding:22px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <h3 style="margin:0;font-family:var(--font-display);font-size:1.1rem;color:var(--navy)">Thêm buổi dạy bổ sung (Lớp 1 lần)</h3>
+          <button onclick="document.getElementById('cvSuppSessionModal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">&times;</button>
+        </div>
+
+        <div style="display:grid;gap:14px">
+          <div>
+            <label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;display:block;margin-bottom:4px">Tên / Chủ đề buổi học (Tên hiển thị lớp)</label>
+            <input class="input" id="cvSuppTopic" placeholder="Ví dụ: Bổ sung Cân bằng phương trình Hóa 10" style="width:100%">
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div>
+              <label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;display:block;margin-bottom:4px">Ngày học</label>
+              <input class="input" type="date" id="cvSuppDate" value="${todayStr}" style="width:100%">
+            </div>
+            <div>
+              <label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;display:block;margin-bottom:4px">Phòng học</label>
+              <select class="select" id="cvSuppRoomId" style="width:100%">
+                <option value="">-- Chọn phòng học --</option>
+                ${roomOptions}
+              </select>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div>
+              <label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;display:block;margin-bottom:4px">Giờ bắt đầu</label>
+              <input class="input" type="time" id="cvSuppStartsAt" value="18:00" style="width:100%">
+            </div>
+            <div>
+              <label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;display:block;margin-bottom:4px">Giờ kết thúc</label>
+              <input class="input" type="time" id="cvSuppEndsAt" value="19:30" style="width:100%">
+            </div>
+          </div>
+
+          <div>
+            <label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;display:block;margin-bottom:4px">Đơn giá học phí / học sinh (VNĐ)</label>
+            <input class="input" type="number" id="cvSuppFeePerStudent" value="100000" step="10000" style="width:100%" placeholder="100000">
+          </div>
+
+          <div>
+            <label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;display:block;margin-bottom:6px">Tích chọn học sinh tham gia (${students.length} HS trong lớp)</label>
+            <div style="display:grid;gap:6px;max-height:180px;overflow-y:auto;padding:8px;border:1px solid #cbd5e1;border-radius:10px;background:#fff">
+              ${studentCheckboxes}
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px">
+          <button onclick="document.getElementById('cvSuppSessionModal').remove()" class="btn btn-outline">Hủy</button>
+          <button onclick="cvSaveSupplementarySession('${cls?.teacher_id || ""}')" class="btn btn-primary">Lưu buổi dạy bổ sung</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  };
+
+  window.cvSaveSupplementarySession = async function(teacherId = "") {
+    const sb = getSb();
+    const topic = (document.getElementById("cvSuppTopic")?.value || "").trim();
+    const sessionDate = document.getElementById("cvSuppDate")?.value || "";
+    const startsAt = document.getElementById("cvSuppStartsAt")?.value || "";
+    const endsAt = document.getElementById("cvSuppEndsAt")?.value || "";
+    const roomId = document.getElementById("cvSuppRoomId")?.value || null;
+    const feePerStudent = Number(document.getElementById("cvSuppFeePerStudent")?.value || 0);
+
+    const selectedStudentIds = Array.from(document.querySelectorAll(".cvSuppStudentCheck:checked")).map(cb => cb.value);
+
+    if (!topic) {
+      alert("Vui lòng nhập tên/chủ đề buổi học bổ sung.");
+      return;
+    }
+    if (!sessionDate || !startsAt || !endsAt) {
+      alert("Vui lòng nhập ngày và giờ học.");
+      return;
+    }
+    if (!selectedStudentIds.length) {
+      alert("Vui lòng chọn ít nhất 1 học sinh tham gia.");
+      return;
+    }
+
+    const { data: sessionRow, error: sessionErr } = await sb
+      .from("supplementary_sessions")
+      .insert({
+        parent_class_id: _classId,
+        teacher_id: teacherId || (window._currentUserId || null),
+        topic,
+        session_date: sessionDate,
+        starts_at: startsAt,
+        ends_at: endsAt,
+        room_id: roomId,
+        fee_per_student: feePerStudent,
+        status: "scheduled",
+      })
+      .select("*")
+      .single();
+
+    if (sessionErr) {
+      alert("Không thể lưu buổi dạy bổ sung: " + sessionErr.message);
+      return;
+    }
+
+    const studentRows = selectedStudentIds.map(stId => ({
+      session_id: sessionRow.id,
+      student_id: stId,
+      attendance_status: "present",
+      tuition_fee: feePerStudent,
+      tuition_charged: false,
+    }));
+
+    const { error: studentErr } = await sb.from("supplementary_session_students").insert(studentRows);
+    if (studentErr) {
+      alert("Đã tạo buổi học nhưng lỗi chọn học sinh: " + studentErr.message);
+    }
+
+    document.getElementById("cvSuppSessionModal")?.remove();
+    alert("Đã lưu buổi dạy bổ sung thành công!");
+    await cvSwitchTab(_activeTab);
+  };
+
+  window.cvOpenSupplementaryAttendanceModal = async function(sessionId) {
+    const sb = getSb();
+    const [{ data: session }, { data: students }] = await Promise.all([
+      sb.from("supplementary_sessions").select("*, parent_class:classes(class_name)").eq("id", sessionId).single(),
+      sb.from("supplementary_session_students")
+        .select("*, student:users!student_id(id, full_name, phone)")
+        .eq("session_id", sessionId),
+    ]);
+
+    if (!session) {
+      alert("Không tìm thấy buổi học bổ sung.");
+      return;
+    }
+
+    const rowsHtml = (students || []).map(st => `
+      <tr data-student-id="${st.student_id}">
+        <td style="padding:10px;font-weight:600">${esc(st.student?.full_name)}</td>
+        <td style="padding:10px">
+          <select class="select cvSuppAttStatus" style="padding:4px 8px;font-size:0.85rem">
+            <option value="present" ${st.attendance_status === "present" ? "selected" : ""}>Có mặt</option>
+            <option value="absent" ${st.attendance_status === "absent" ? "selected" : ""}>Vắng mặt</option>
+            <option value="late" ${st.attendance_status === "late" ? "selected" : ""}>Muộn</option>
+          </select>
+        </td>
+        <td style="padding:10px;font-weight:700;color:var(--navy)">${Number(st.tuition_fee || session.fee_per_student).toLocaleString("vi-VN")}đ</td>
+      </tr>
+    `).join("");
+
+    const modal = document.createElement("div");
+    modal.id = "cvSuppAttModal";
+    modal.style.cssText = "position:fixed;inset:0;background:rgba(10,20,40,.5);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px";
+    modal.innerHTML = `
+      <div style="background:#fff;border-radius:18px;width:100%;max-width:540px;box-shadow:0 20px 50px rgba(0,0,0,0.25);padding:22px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <h3 style="margin:0;font-family:var(--font-display);font-size:1.1rem;color:var(--navy)">Điểm danh buổi bổ sung: ${esc(session.topic)}</h3>
+          <button onclick="document.getElementById('cvSuppAttModal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">&times;</button>
+        </div>
+        <div style="font-size:0.85rem;color:var(--ink-mid);margin-bottom:14px">
+          Ngày: <strong>${esc(session.session_date)}</strong> (${esc(session.starts_at)} - ${esc(session.ends_at)}) • Lớp gốc: ${esc(session.parent_class?.class_name)}
+        </div>
+
+        <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+          <thead>
+            <tr style="background:#f1f5f9;text-align:left;font-size:0.8rem;text-transform:uppercase;color:var(--ink-mid)">
+              <th style="padding:8px 10px">Học sinh</th>
+              <th style="padding:8px 10px">Điểm danh</th>
+              <th style="padding:8px 10px">Học phí</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+
+        <div style="display:flex;justify-content:flex-end;gap:10px">
+          <button onclick="document.getElementById('cvSuppAttModal').remove()" class="btn btn-outline">Hủy</button>
+          <button onclick="cvCompleteSupplementarySession('${session.id}')" class="btn btn-primary">Lưu & Hoàn thành buổi học</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  };
+
+  window.cvCompleteSupplementarySession = async function(sessionId) {
+    const sb = getSb();
+    const rows = Array.from(document.querySelectorAll("#cvSuppAttModal tbody tr"));
+    const attendancePayload = rows.map(tr => ({
+      student_id: tr.dataset.studentId,
+      attendance_status: tr.querySelector(".cvSuppAttStatus")?.value || "present",
+    }));
+
+    const { data: res, error } = await sb.rpc("complete_supplementary_session", {
+      p_session_id: sessionId,
+      p_attendance: attendancePayload,
+    });
+
+    if (error) {
+      alert("Không thể hoàn thành buổi học bổ sung: " + error.message);
+      return;
+    }
+
+    document.getElementById("cvSuppAttModal")?.remove();
+    alert("Đã lưu điểm danh, tự động cộng học phí và hoàn tất buổi học bổ sung!");
+    await cvSwitchTab(_activeTab);
   };
 
 })();

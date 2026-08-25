@@ -214,11 +214,13 @@ function renderLessonCell(schedules, weekday, slot){
   if(!items.length) return '<div class="lesson-list"></div>';
   return `<div class="lesson-list">${items.map(item => {
     const cls = STATE.classById[item.class_id] || {};
+    const className = item.is_supplementary ? `📌 ${esc(item.topic)}` : esc(cls.class_name || "Lớp học");
     const rosterCount = STATE.rosterCountByClass[item.class_id] || 0;
+    const metaStr = item.is_supplementary ? `Lớp 1 lần` : `Buổi ${esc(item.session_no || 1)} • Sĩ số ${esc(rosterCount)}`;
     return `
-      <div class="lesson">
-        <div class="lesson-class">${esc(cls.class_name || "Lớp học")}</div>
-        <div class="lesson-meta">Buổi ${esc(item.session_no || 1)} • Sĩ số ${esc(rosterCount)}</div>
+      <div class="lesson" ${item.is_supplementary ? 'style="border-left:4px solid #c8962a;background:#fffdfa"' : ''}>
+        <div class="lesson-class">${className}</div>
+        <div class="lesson-meta">${metaStr}</div>
       </div>
     `;
   }).join("")}</div>`;
@@ -255,10 +257,38 @@ async function loadPageData(){
     roomSchedules.innerHTML = `<div class="empty card">${esc(firstError.message || "Không tải được dữ liệu.")}</div>`;
     return;
   }
+
+  let suppSchedules = [];
+  try {
+    const { data: suppData } = await sb
+      .from("supplementary_sessions")
+      .select("id, parent_class_id, teacher_id, topic, session_date, starts_at, ends_at, room_id, rooms(id, room_name), status")
+      .eq("status", "scheduled");
+
+    suppSchedules = (suppData || []).map(s => {
+      const dParts = String(s.session_date || "").split("-");
+      const dateObj = new Date(Number(dParts[0]), Number(dParts[1]) - 1, Number(dParts[2]));
+      const weekdayNo = dateObj.getDay() === 0 ? 7 : dateObj.getDay();
+      return {
+        id: s.id,
+        is_supplementary: true,
+        topic: s.topic,
+        class_id: s.parent_class_id,
+        weekday: weekdayNo,
+        session_no: "Bổ sung",
+        start_time: s.starts_at,
+        end_time: s.ends_at,
+        room_id: s.room_id,
+        rooms: s.rooms,
+        teacher_id: s.teacher_id,
+      };
+    });
+  } catch (_) {}
+
   STATE.teachers = teachers || [];
   STATE.rooms = rooms || [];
   STATE.classes = classes || [];
-  STATE.schedules = schedules || [];
+  STATE.schedules = [...(schedules || []), ...suppSchedules];
   STATE.classTeachers = classTeachers || [];
   STATE.classStudents = classStudents || [];
   STATE.teacherById = Object.fromEntries(STATE.teachers.map(t => [t.id, t]));
