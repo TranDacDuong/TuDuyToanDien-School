@@ -3288,8 +3288,8 @@
 
     const roomOptions = (rooms || []).map(r => `<option value="${r.id}">${esc(r.room_name || r.name)}${r.location ? ` (${esc(r.location)})` : ""}</option>`).join("");
     const studentCheckboxes = students.map(st => `
-      <label style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface,#f8fafc);border:1px solid #cbd5e1;border-radius:8px;cursor:pointer">
-        <input type="checkbox" class="cvSuppStudentCheck" value="${st.id}" checked>
+      <label class="cvSuppStudentLabel" data-search="${esc((st.full_name + " " + (st.phone || "")).toLowerCase())}" style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface,#f8fafc);border:1px solid #cbd5e1;border-radius:8px;cursor:pointer">
+        <input type="checkbox" class="cvSuppStudentCheck" value="${st.id}">
         <span style="font-weight:600;font-size:0.85rem">${esc(st.full_name)}</span>
         ${st.phone ? `<span style="font-size:0.75rem;color:var(--ink-mid);margin-left:auto">${esc(st.phone)}</span>` : ""}
       </label>
@@ -3344,7 +3344,14 @@
           </div>
 
           <div>
-            <label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase;display:block;margin-bottom:6px">Tích chọn học sinh tham gia (${students.length} HS trong lớp)</label>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase">Tích chọn học sinh tham gia (${students.length} HS trong lớp)</label>
+              <div style="display:flex;gap:10px">
+                <button type="button" onclick="cvToggleAllSuppStudents(true)" style="background:none;border:none;color:var(--navy);font-size:0.78rem;font-weight:700;cursor:pointer;padding:0">☑ Chọn tất cả</button>
+                <button type="button" onclick="cvToggleAllSuppStudents(false)" style="background:none;border:none;color:var(--ink-mid);font-size:0.78rem;font-weight:600;cursor:pointer;padding:0">☐ Bỏ chọn tất cả</button>
+              </div>
+            </div>
+            <input class="input" id="cvSuppStudentSearch" placeholder="🔍 Tìm kiếm học sinh theo tên hoặc SĐT..." oninput="cvFilterSuppStudents()" style="width:100%;margin-bottom:8px;font-size:0.85rem;padding:6px 10px">
             <div style="display:grid;gap:6px;max-height:180px;overflow-y:auto;padding:8px;border:1px solid #cbd5e1;border-radius:10px;background:#fff">
               ${studentCheckboxes}
             </div>
@@ -3358,6 +3365,29 @@
       </div>
     `;
     document.body.appendChild(modal);
+  };
+
+  window.cvFilterSuppStudents = function() {
+    const q = (document.getElementById("cvSuppStudentSearch")?.value || "").toLowerCase().trim();
+    const labels = document.querySelectorAll(".cvSuppStudentLabel");
+    labels.forEach(lbl => {
+      const searchData = lbl.dataset.search || "";
+      if (!q || searchData.includes(q)) {
+        lbl.style.display = "flex";
+      } else {
+        lbl.style.display = "none";
+      }
+    });
+  };
+
+  window.cvToggleAllSuppStudents = function(select = true) {
+    const checkboxes = document.querySelectorAll(".cvSuppStudentCheck");
+    checkboxes.forEach(cb => {
+      const parentLabel = cb.closest(".cvSuppStudentLabel");
+      if (!parentLabel || parentLabel.style.display !== "none") {
+        cb.checked = select;
+      }
+    });
   };
 
   window.cvSaveSupplementarySession = async function(teacherId = "") {
