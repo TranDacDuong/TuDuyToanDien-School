@@ -51,7 +51,7 @@ CREATE POLICY supp_sessions_staff_all ON public.supplementary_sessions
         EXISTS (
             SELECT 1 FROM public.users u
             WHERE u.id = auth.uid()
-            AND u.role IN ('admin', 'assistant', 'teacher', 'staff', 'employee', 'marketing', 'accountant')
+            AND u.role::text NOT IN ('student', 'parent')
         )
     );
 
@@ -66,7 +66,7 @@ CREATE POLICY supp_students_staff_all ON public.supplementary_session_students
         EXISTS (
             SELECT 1 FROM public.users u
             WHERE u.id = auth.uid()
-            AND u.role IN ('admin', 'assistant', 'teacher', 'staff', 'employee', 'marketing', 'accountant')
+            AND u.role::text NOT IN ('student', 'parent')
         )
     );
 
