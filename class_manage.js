@@ -3287,13 +3287,21 @@
     }
 
     const roomOptions = (rooms || []).map(r => `<option value="${r.id}">${esc(r.room_name || r.name)}${r.location ? ` (${esc(r.location)})` : ""}</option>`).join("");
-    const studentCheckboxes = students.map(st => `
-      <label class="cvSuppStudentLabel" data-search="${esc((st.full_name + " " + (st.phone || "")).toLowerCase())}" style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface,#f8fafc);border:1px solid #cbd5e1;border-radius:8px;cursor:pointer">
-        <input type="checkbox" class="cvSuppStudentCheck" value="${st.id}">
-        <span style="font-weight:600;font-size:0.85rem">${esc(st.full_name)}</span>
-        ${st.phone ? `<span style="font-size:0.75rem;color:var(--ink-mid);margin-left:auto">${esc(st.phone)}</span>` : ""}
-      </label>
-    `).join("");
+    const studentCheckboxes = students.map(st => {
+      const initials = (st.full_name || "HS").split(" ").map(p => p[0]).join("").slice(-2).toUpperCase();
+      return `
+        <label class="cvSuppStudentLabel" data-search="${esc((st.full_name + " " + (st.phone || "")).toLowerCase())}" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;cursor:pointer;transition:all .15s ease;user-select:none">
+          <input type="checkbox" class="cvSuppStudentCheck" value="${st.id}" onchange="cvUpdateSuppStudentCount();this.closest('.cvSuppStudentLabel').style.borderColor=this.checked?'#3b82f6':'#e2e8f0';this.closest('.cvSuppStudentLabel').style.background=this.checked?'#eff6ff':'#fff'" style="width:16px;height:16px;accent-color:#2563eb;cursor:pointer">
+          <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg, #e0e7ff, #c7d2fe);color:#3730a3;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.75rem;flex-shrink:0">
+            ${esc(initials)}
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:0.84rem;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(st.full_name)}</div>
+            <div style="font-size:0.72rem;color:var(--ink-mid)">${st.phone ? `📞 ${esc(st.phone)}` : "Chưa có SĐT"}</div>
+          </div>
+        </label>
+      `;
+    }).join("");
 
     const todayStr = new Date().toISOString().slice(0, 10);
 
@@ -3301,7 +3309,7 @@
     modal.id = "cvSuppSessionModal";
     modal.style.cssText = "position:fixed;inset:0;background:rgba(10,20,40,.5);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px";
     modal.innerHTML = `
-      <div style="background:#fff;border-radius:18px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 50px rgba(0,0,0,0.25);padding:22px">
+      <div style="background:#fff;border-radius:18px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 50px rgba(0,0,0,0.25);padding:22px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
           <h3 style="margin:0;font-family:var(--font-display);font-size:1.1rem;color:var(--navy)">Thêm buổi dạy bổ sung (Lớp 1 lần)</h3>
           <button onclick="document.getElementById('cvSuppSessionModal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">&times;</button>
@@ -3343,16 +3351,23 @@
             <input class="input" type="number" id="cvSuppFeePerStudent" value="100000" step="10000" style="width:100%" placeholder="100000">
           </div>
 
-          <div>
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-              <label style="font-size:.75rem;font-weight:700;color:var(--ink-mid);text-transform:uppercase">Tích chọn học sinh tham gia (${students.length} HS trong lớp)</label>
-              <div style="display:flex;gap:10px">
-                <button type="button" onclick="cvToggleAllSuppStudents(true)" style="background:none;border:none;color:var(--navy);font-size:0.78rem;font-weight:700;cursor:pointer;padding:0">☑ Chọn tất cả</button>
-                <button type="button" onclick="cvToggleAllSuppStudents(false)" style="background:none;border:none;color:var(--ink-mid);font-size:0.78rem;font-weight:600;cursor:pointer;padding:0">☐ Bỏ chọn tất cả</button>
-              </div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <span style="font-size:.8rem;font-weight:700;color:var(--navy);display:flex;align-items:center;gap:6px">
+                🎓 Học sinh phụ đạo
+              </span>
+              <span id="cvSuppSelectedBadge" style="font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:999px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1">
+                Đã chọn: 0/${students.length}
+              </span>
             </div>
-            <input class="input" id="cvSuppStudentSearch" placeholder="🔍 Tìm kiếm học sinh theo tên hoặc SĐT..." oninput="cvFilterSuppStudents()" style="width:100%;margin-bottom:8px;font-size:0.85rem;padding:6px 10px">
-            <div style="display:grid;gap:6px;max-height:180px;overflow-y:auto;padding:8px;border:1px solid #cbd5e1;border-radius:10px;background:#fff">
+
+            <div style="display:flex;gap:8px;margin-bottom:10px">
+              <input class="input" id="cvSuppStudentSearch" placeholder="🔍 Tìm theo tên hoặc SĐT..." oninput="cvFilterSuppStudents()" style="flex:1;font-size:0.83rem;padding:6px 12px;background:#fff;border-radius:8px">
+              <button type="button" onclick="cvToggleAllSuppStudents(true)" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;padding:5px 10px;border-radius:8px;font-size:0.76rem;font-weight:700;cursor:pointer">☑ Tất cả</button>
+              <button type="button" onclick="cvToggleAllSuppStudents(false)" style="background:#fff;color:#64748b;border:1px solid #cbd5e1;padding:5px 10px;border-radius:8px;font-size:0.76rem;font-weight:600;cursor:pointer">☐ Bỏ chọn</button>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:8px;max-height:210px;overflow-y:auto;padding-right:2px">
               ${studentCheckboxes}
             </div>
           </div>
@@ -3386,8 +3401,23 @@
       const parentLabel = cb.closest(".cvSuppStudentLabel");
       if (!parentLabel || parentLabel.style.display !== "none") {
         cb.checked = select;
+        parentLabel.style.borderColor = select ? '#3b82f6' : '#e2e8f0';
+        parentLabel.style.background = select ? '#eff6ff' : '#fff';
       }
     });
+    cvUpdateSuppStudentCount();
+  };
+
+  window.cvUpdateSuppStudentCount = function() {
+    const total = document.querySelectorAll(".cvSuppStudentCheck").length;
+    const selected = document.querySelectorAll(".cvSuppStudentCheck:checked").length;
+    const badge = document.getElementById("cvSuppSelectedBadge");
+    if (badge) {
+      badge.textContent = `Đã chọn: ${selected}/${total}`;
+      badge.style.background = selected > 0 ? '#eff6ff' : '#f1f5f9';
+      badge.style.color = selected > 0 ? '#1d4ed8' : '#475569';
+      badge.style.borderColor = selected > 0 ? '#bfdbfe' : '#cbd5e1';
+    }
   };
 
   window.cvSaveSupplementarySession = async function(teacherId = "") {
