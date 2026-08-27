@@ -120,7 +120,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 .quiz-question-image-box.show{display:flex}
 .quiz-question-image-box img{width:86px;height:64px;object-fit:cover;border-radius:10px;border:1px solid rgba(39,58,91,.12);background:#fff}
 .quiz-render-stage{position:fixed;left:-99999px;top:0;width:1100px;background:transparent;pointer-events:none;z-index:-1}
-.quiz-render-question{width:1100px;min-height:260px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;color:#082c68;font-family:"DM Sans",Arial,sans-serif;font-size:150px;font-weight:900;line-height:1.02;letter-spacing:-.035em}
+.quiz-render-question{width:1100px;min-height:260px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;color:#082c68;font-family:"Palatino Linotype","Palatino","Book Antiqua",Georgia,serif;font-size:150px;font-weight:700;line-height:1.05;letter-spacing:-.01em}
 .quiz-render-question>div,.quiz-render-answer>div{width:100%;max-width:100%;overflow-wrap:anywhere}
 .quiz-render-question .katex{font-size:1.14em}
 .quiz-render-question .katex,
@@ -1285,6 +1285,9 @@ function drawWrappedText(ctx, text, box, options={}){
 async function ensureQuizFontLoaded(){
   if (!document.fonts?.load) return;
   await Promise.all([
+    document.fonts.load('600 30px "Palatino Linotype"'),
+    document.fonts.load('700 42px "Palatino Linotype"'),
+    document.fonts.load('800 42px "Palatino Linotype"'),
     document.fonts.load('600 30px "DM Sans"'),
     document.fonts.load('700 42px "DM Sans"'),
     document.fonts.load('800 42px "DM Sans"'),
@@ -1692,13 +1695,13 @@ function hardQuizQuestionFit(ctx, question, box){
   const startSize = Math.max(42, box.w * 0.044);
   const minSize = Math.max(30, box.w * 0.023);
   for (let size = startSize; size >= minSize; size -= 2) {
-    ctx.font = `900 ${size}px "DM Sans", Arial, sans-serif`;
+    ctx.font = `700 ${size}px "Palatino Linotype", "Palatino", "Book Antiqua", Georgia, serif`;
     const lines = wrapTextLines(ctx, text, maxWidth);
     if (lines.length <= maxLines && lines.length * size * lineHeightRatio <= box.h * 0.88) {
       return { ok: true, size, lines: lines.length };
     }
   }
-  ctx.font = `900 ${minSize}px "DM Sans", Arial, sans-serif`;
+  ctx.font = `700 ${minSize}px "Palatino Linotype", "Palatino", "Book Antiqua", Georgia, serif`;
   return { ok: false, size: minSize, lines: wrapTextLines(ctx, text, maxWidth).length };
 }
 function validateHardQuizQuestionFits(ctx, question, box){
