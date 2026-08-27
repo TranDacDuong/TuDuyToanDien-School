@@ -76,35 +76,60 @@ function stripVietnamese(text: string): string {
     .toUpperCase();
 }
 
-function extractTuitionIdOrCodes(content: string): string[] {
-  const clean = stripVietnamese(content);
-  const codes: string[] = [];
+interface ParsedCodeInfo {
+  month?: string;
+  code: string;
+}
 
-  // Match HPHS followed by Student ID shortcode (e.g. HPHS3F9A128B)
-  const hphsMatches = clean.match(/HPHS\s*[-_]?\s*([A-Z0-9]{4,36})/gi);
-  if (hphsMatches) {
-    hphsMatches.forEach(m => {
-      const code = m.replace(/^HPHS\s*[-_]?\s*/i, "").trim();
-      if (code) codes.push(code);
+function extractTuitionParsedInfo(content: string): ParsedCodeInfo[] {
+  const clean = stripVietnamese(content);
+  const infos: ParsedCodeInfo[] = [];
+
+  // Match HPHS or HP followed by 4 digits (MMYY) and shortcode (e.g. HPHS082651DA1870 or HPHS0826 51DA1870)
+  const monthCodeMatches = clean.match(/(?:HPHS|HP)\s*[-_]?\s*(\d{4})\s*[-_]?\s*([A-Z0-9]{4,36})/gi);
+  if (monthCodeMatches) {
+    monthCodeMatches.forEach(m => {
+      const match = /(?:HPHS|HP)\s*[-_]?\s*(\d{2})(\d{2})\s*[-_]?\s*([A-Z0-9]{4,36})/i.exec(m);
+      if (match) {
+        const mm = match[1];
+        const yy = match[2];
+        const studentCode = match[3].toLowerCase();
+        const year = Number(yy) > 50 ? `19${yy}` : `20${yy}`;
+        const monthStr = `${year}-${mm}-01`;
+        infos.push({ month: monthStr, code: studentCode });
+      }
     });
   }
 
-  // Match HP followed by UUID or alphanumeric (e.g. HP123456 or HP-ABC123)
+  // Match HPHS without month (legacy format HPHS3F9A128B)
+  const hphsMatches = clean.match(/HPHS\s*[-_]?\s*([A-Z0-9]{4,36})/gi);
+  if (hphsMatches) {
+    hphsMatches.forEach(m => {
+      const raw = m.replace(/^HPHS\s*[-_]?\s*/i, "").trim().toLowerCase();
+      if (raw && !/^\d{4}/.test(raw)) {
+        infos.push({ code: raw });
+      }
+    });
+  }
+
+  // Match HP without month
   const hpMatches = clean.match(/HP\s*[-_]?\s*([A-Z0-9]{4,36})/gi);
   if (hpMatches) {
     hpMatches.forEach(m => {
-      const code = m.replace(/^HP\s*[-_]?\s*/i, "").trim();
-      if (code) codes.push(code);
+      const raw = m.replace(/^HP\s*[-_]?\s*/i, "").trim().toLowerCase();
+      if (raw && !/^\d{4}/.test(raw)) {
+        infos.push({ code: raw });
+      }
     });
   }
 
   // Match UUIDs inside text
   const uuidMatches = clean.match(/[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}/gi);
   if (uuidMatches) {
-    uuidMatches.forEach(id => codes.push(id.toLowerCase()));
+    uuidMatches.forEach(id => infos.push({ code: id.toLowerCase() }));
   }
 
-  return Array.from(new Set(codes));
+  return infos;
 }
 
 serve(async (req: Request) => {
@@ -189,43 +214,26 @@ serve(async (req: Request) => {
         continue;
       }
 
-      const extractedCodes = extractTuitionIdOrCodes(item.content);
+      const parsedInfos = extractTuitionParsedInfo(item.content);
       let matchedTuition: any = null;
 
-      // 1. Try matching by tuition payment ID or student ID short code (e.g. HPHS3F9A128B -> 3F9A128B)
-      for (const rawCode of extractedCodes) {
-        const cleanCode = rawCode.replace(/^HS/i, "").replace(/[^a-f0-9]/gi, "").toLowerCase();
+      // 1. Try matching by tuition payment ID or student ID short code with month
+      for (const info of parsedInfos) {
+        const cleanCode = info.code.replace(/[^a-f0-9]/gi, "").toLowerCase();
         if (cleanCode.length >= 4) {
-          // Fetch tuition_payments and match in memory to avoid PostgreSQL UUID ilike operator errors
-          const allPayments = await fetchJson<Array<any>>(
-            `tuition_payments?order=created_at.desc&limit=100`
-          ).catch(() => []);
+          if (info.month) {
+            const allStudents = await fetchJson<Array<any>>(
+              `users?role=eq.student&select=id,full_name,phone&limit=200`
+            ).catch(() => []);
 
-          if (Array.isArray(allPayments)) {
-            matchedTuition = allPayments.find(p => {
-              const sid = String(p.student_id || "").replace(/-/g, "").toLowerCase();
-              const pid = String(p.id || "").replace(/-/g, "").toLowerCase();
-              return sid.startsWith(cleanCode) || pid.startsWith(cleanCode);
-            });
-          }
-
-          if (matchedTuition) break;
-
-          // If not found in tuition_payments, search users table by student_id prefix
-          const allStudents = await fetchJson<Array<any>>(
-            `users?role=eq.student&select=id,full_name,phone&limit=200`
-          ).catch(() => []);
-
-          if (Array.isArray(allStudents)) {
-            const student = allStudents.find(u => {
+            const student = (allStudents || []).find(u => {
               const uid = String(u.id || "").replace(/-/g, "").toLowerCase();
               return uid.startsWith(cleanCode);
             });
 
             if (student) {
-              const currentMonth = new Date().toISOString().slice(0, 7) + "-01";
               const monthPayments = await fetchJson<Array<any>>(
-                `tuition_payments?student_id=eq.${student.id}&month=eq.${currentMonth}&limit=1`
+                `tuition_payments?student_id=eq.${student.id}&month=eq.${info.month}&limit=1`
               ).catch(() => []);
 
               if (monthPayments && monthPayments.length) {
@@ -237,7 +245,7 @@ serve(async (req: Request) => {
                   headers: { Prefer: "return=representation" },
                   body: JSON.stringify({
                     student_id: student.id,
-                    month: currentMonth,
+                    month: info.month,
                     amount_due: 0,
                     amount_paid: 0,
                     paid_at: null,
@@ -254,6 +262,21 @@ serve(async (req: Request) => {
               }
             }
           }
+
+          // Fallback: Fetch tuition_payments and match in memory to avoid PostgreSQL UUID ilike operator errors
+          const allPayments = await fetchJson<Array<any>>(
+            `tuition_payments?order=created_at.desc&limit=100`
+          ).catch(() => []);
+
+          if (Array.isArray(allPayments)) {
+            matchedTuition = allPayments.find(p => {
+              const sid = String(p.student_id || "").replace(/-/g, "").toLowerCase();
+              const pid = String(p.id || "").replace(/-/g, "").toLowerCase();
+              return sid.startsWith(cleanCode) || pid.startsWith(cleanCode);
+            });
+          }
+
+          if (matchedTuition) break;
         }
       }
 

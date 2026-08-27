@@ -36,7 +36,14 @@
   function buildTransferContent(studentName, ym, studentId = "", paymentId = "") {
     const shortStudentId = studentId ? String(studentId).split("-")[0].toUpperCase() : "";
     const shortPaymentId = paymentId ? String(paymentId).split("-")[0].toUpperCase() : "";
-    const code = shortStudentId ? `HPHS${shortStudentId}` : (shortPaymentId ? `HP${shortPaymentId}` : "HP");
+    let monthTag = "";
+    if (ym && String(ym).length >= 7) {
+      const parts = String(ym).slice(0, 7).split("-");
+      if (parts.length === 2) {
+        monthTag = `${parts[1]}${parts[0].slice(2)}`; // e.g. "0826" for 2026-08
+      }
+    }
+    const code = shortStudentId ? `HPHS${monthTag}${shortStudentId}` : (shortPaymentId ? `HP${monthTag}${shortPaymentId}` : `HP${monthTag}`);
     return `SEVQR ${code}`.trim();
   }
 
