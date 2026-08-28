@@ -560,6 +560,7 @@ label {
 .att-btn.present { background: var(--green); color: #fff; }
 .att-btn.absent  { background: var(--red);   color: #fff; }
 .att-btn.makeup  { background: var(--amber);  color: #fff; }
+.att-btn.trial   { background: #10b981;       color: #fff; }
 
 /* ── Responsive ── */
 /* -- Motion layer -- */

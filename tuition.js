@@ -474,7 +474,7 @@
     if (!items.length) {
       return `<div style="margin-top:12px;font-size:12px;color:var(--muted)">Chưa có buổi học/điểm danh trong tháng này.</div>`;
     }
-    const statusText = { present: "Có", absent: "Vắng", makeup: "Học bù", unknown: "Chưa rõ" };
+    const statusText = { present: "Có", absent: "Vắng", makeup: "Học bù", trial: "Học thử (Miễn phí)", unknown: "Chưa rõ" };
     const sortedItems = [...items].sort((a, b) =>
       String(a.date || "").localeCompare(String(b.date || ""))
       || Number(a.schedule_id || 0) - Number(b.schedule_id || 0)
@@ -888,11 +888,23 @@ Nhập số tiền hoàn lại (>0):`,
     if (currentValue && classMap[currentValue]) sel.value = currentValue;
   }
 
-  function buildRowsForMonth({ ym, classes, classStudents, attData, chosenSchedules }) {
+  function buildRowsForMonth({ ym, classes, classStudents, attData, chosenSchedules, trialReqs }) {
     const mStart = ymToDate(ym);
     const mEnd = monthEnd(ym);
     const classMap = {};
     (classes || []).forEach(c => { classMap[c.id] = c; });
+
+    const trialDateMap = {};
+    (trialReqs || []).forEach(tr => {
+      if (tr.student_id && tr.trial_class_id) {
+        if (tr.trial_session_1_at) {
+          trialDateMap[`${tr.student_id}_${tr.trial_class_id}_${tr.trial_session_1_at.slice(0, 10)}`] = true;
+        }
+        if (tr.trial_session_2_at) {
+          trialDateMap[`${tr.student_id}_${tr.trial_class_id}_${tr.trial_session_2_at.slice(0, 10)}`] = true;
+        }
+      }
+    });
 
     const attMap = {};
     const attRowsByStudentClass = {};
@@ -930,7 +942,8 @@ Nhập số tiền hoàn lại (>0):`,
         if (item.date > left) return false;
         if (item.date >= joined) return true;
         const actualStatus = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item);
-        return actualStatus === "present" || actualStatus === "makeup";
+        const isTrial = Boolean(trialDateMap[`${cs.student_id}_${cs.class_id}_${item.date}`]);
+        return actualStatus === "present" || actualStatus === "makeup" || actualStatus === "trial" || isTrial;
       });
       const occurrenceKeys = new Set(activeOccurrences.map(item => `${item.date}_${item.schedule_id || 0}`));
       (attRowsByStudentClass[`${cs.student_id}_${cs.class_id}`] || []).forEach(row => {
@@ -939,7 +952,8 @@ Nhập số tiền hoàn lại (>0):`,
         const scheduleId = Number(row.schedule_id || 0);
         const key = `${date}_${scheduleId}`;
         if (!date || occurrenceKeys.has(key) || date > left) return;
-        if (date < joined && status !== "present" && status !== "makeup") return;
+        const isTrial = Boolean(trialDateMap[`${cs.student_id}_${cs.class_id}_${date}`]);
+        if (date < joined && status !== "present" && status !== "makeup" && status !== "trial" && !isTrial) return;
         activeOccurrences.push({
           date,
           schedule_id: scheduleId,
@@ -953,23 +967,32 @@ Nhập số tiền hoàn lại (>0):`,
       const totalSessions = activeOccurrences.length;
 
       const daysMap = {1:"T2",2:"T3",3:"T4",4:"T5",5:"T6",6:"T7",7:"CN"};
-      let present = 0, absent = 0, makeup = 0;
+      let present = 0, absent = 0, makeup = 0, trialCount = 0;
       const attendanceDetails = activeOccurrences.map(item => {
-        const status = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item) || "present";
-        if (status === "present") present++;
+        const isTrial = Boolean(trialDateMap[`${cs.student_id}_${cs.class_id}_${item.date}`]);
+        let status = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item);
+        if (!status) status = isTrial ? "trial" : "present";
+
+        if (status === "trial" || isTrial) trialCount++;
+        else if (status === "present") present++;
         else if (status === "absent") absent++;
         else if (status === "makeup") makeup++;
+
         const s = item.schedule || null;
         const timeLabel = s?.start_time && s?.end_time
           ? `${String(s.start_time).slice(0,5)}–${String(s.end_time).slice(0,5)}`
           : "";
         const roomLabel = s?.rooms?.room_name ? ` • ${s.rooms.room_name}` : "";
-        const scheduleLabel = s
+        let scheduleLabel = s
           ? `Buổi ${s.session_no || item.session_no || 1}: ${daysMap[s.weekday] || ""} ${timeLabel}${roomLabel}`.trim()
           : (item.from_attendance_only ? "Điểm danh bổ sung" : `Buổi ${item.session_no || ""}`.trim());
+
+        if (status === "trial" || isTrial) {
+          scheduleLabel = `🌱 Buổi học thử (Miễn phí) • ${scheduleLabel}`;
+        }
         return {
           date: item.date,
-          status,
+          status: (status === "trial" || isTrial) ? "trial" : status,
           schedule_id: item.schedule_id,
           session_no: item.session_no,
           scheduleLabel,
@@ -980,7 +1003,7 @@ Nhập số tiền hoàn lại (>0):`,
         tuition_type: cls.tuition_type,
         tuition_fee: cls.tuition_fee,
         makeup_fee: cls.makeup_fee,
-        present, absent, makeup, totalSessions,
+        present, absent, makeup, totalSessions: Math.max(0, totalSessions - trialCount),
       });
 
       const studentSchedules = [...new Map(activeOccurrences
@@ -1054,6 +1077,7 @@ Nhập số tiền hoàn lại (>0):`,
         { data: attData,       error: e3 },
         { data: payments,      error: e4 },
         { data: chosenSchedules, error: e5 },
+        { data: trialReqs,     error: e6 },
       ] = await Promise.all([
         sb.from("classes")
           .select(`id, class_name, tuition_fee, tuition_type, makeup_fee,
@@ -1074,6 +1098,9 @@ Nhập số tiền hoàn lại (>0):`,
 
         sb.from("class_student_schedules")
           .select("class_id, student_id, schedule_id, effective_from"),
+
+        sb.from("trial_lesson_requests")
+          .select("student_id, trial_class_id, trial_session_1_at, trial_session_2_at"),
       ]);
 
       if (e1) throw e1;
@@ -1278,7 +1305,7 @@ Nhập số tiền hoàn lại (>0):`,
     const queryStart = ymToDate(queryStartYm);
 
     const studentIds = [...new Set(scopedClassStudents.map(row => row.student_id).filter(Boolean))];
-    const [{ data: attData, error: e4 }, { data: payments, error: e5 }] = await Promise.all([
+    const [{ data: attData, error: e4 }, { data: payments, error: e5 }, { data: trialReqs }] = await Promise.all([
       sb.from("attendance")
         .select("student_id, class_id, date, status, schedule_id")
         .in("student_id", studentIds)
@@ -1289,6 +1316,9 @@ Nhập số tiền hoàn lại (>0):`,
         .in("student_id", studentIds)
         .gte("month", queryStart)
         .lte("month", ymToDate(today)),
+      sb.from("trial_lesson_requests")
+        .select("student_id, trial_class_id, trial_session_1_at, trial_session_2_at")
+        .in("student_id", studentIds),
     ]);
     if (e4) throw e4;
     if (e5) throw e5;
@@ -1296,7 +1326,7 @@ Nhập số tiền hoàn lại (>0):`,
     const paymentByMonth = buildPaymentByMonth(payments || []);
     const groupedByMonth = {};
     allCandidateMonths.forEach(ym => {
-      const rows = buildRowsForMonth({ ym, classes, classStudents: scopedClassStudents, attData, chosenSchedules });
+      const rows = buildRowsForMonth({ ym, classes, classStudents: scopedClassStudents, attData, chosenSchedules, trialReqs });
       const groups = groupRows(rows).map(group => ({
         ...group,
         payment: paymentByMonth[ym]?.[group.studentId] || null,

@@ -414,12 +414,13 @@
   }
 
   /* â”€â”€ Attendance status â”€â”€ */
-  const statusCycle = ["present","absent","makeup"];
+  const statusCycle = ["present","absent","makeup","trial"];
   const statusMap = {
     unmarked:{ text:"—",      cls:""        },
     present:{ text:"Có",     cls:"present" },
     absent: { text:"Vắng",   cls:"absent"  },
     makeup: { text:"Học bù", cls:"makeup"  },
+    trial:  { text:"Học thử",cls:"trial"   },
   };
   const attendanceSessionColors = [
     { bg:"#eff6ff", border:"#bfdbfe", text:"#1d4ed8" },
@@ -856,6 +857,22 @@
     (attData||[]).forEach(a=>{ _attendanceMap[a.student_id+"_"+a.date+"_"+(a.schedule_id || 0)]=a.status; });
     const evaluationSessionMap = buildSessionMapByDate(evaluationSessions);
 
+    const { data: trialReqs } = await sb.from("trial_lesson_requests")
+      .select("student_id,trial_class_id,trial_session_1_at,trial_session_2_at")
+      .eq("trial_class_id", _classId);
+
+    const _trialDateMap = {};
+    (trialReqs || []).forEach(tr => {
+      if (tr.student_id) {
+        if (tr.trial_session_1_at) {
+          _trialDateMap[tr.student_id + "_" + tr.trial_session_1_at.slice(0, 10)] = true;
+        }
+        if (tr.trial_session_2_at) {
+          _trialDateMap[tr.student_id + "_" + tr.trial_session_2_at.slice(0, 10)] = true;
+        }
+      }
+    });
+
     if(role === "student"){
       const uid = window._currentUserId;
       let dateHeaders="";
@@ -882,7 +899,8 @@
           const sm=statusMap[status]||statusMap.absent;
           myCells+='<td class="center" style="'+cellStyle+'"><span class="att-btn '+sm.cls+'" style="cursor:default;font-weight:700">'+ sm.text+'</span></td>';
         } else {
-          const defaultStatus = d < joined ? "absent" : "present";
+          const isTrial = Boolean(_trialDateMap[me.student_id + "_" + d]);
+          const defaultStatus = isTrial ? "trial" : (d < joined ? "absent" : "present");
           const status=_attendanceMap[me.student_id+"_"+d+"_"+scheduleId]||_attendanceMap[me.student_id+"_"+d+"_0"]||defaultStatus;
           const sm=statusMap[status]||statusMap.present;
           myCells+='<td class="center" style="'+cellStyle+'"><span class="att-btn '+sm.cls+'" style="cursor:default;font-weight:700">'+ sm.text+'</span></td>';
@@ -971,7 +989,8 @@
               : '<span class="att-btn '+sm.cls+'" style="cursor:default;font-weight:700">'+sm.text+'</span>')+
             '</td>';
         } else {
-          const defaultStatus = d < joined ? "absent" : "present";
+          const isTrial = Boolean(_trialDateMap[s.student_id + "_" + d]);
+          const defaultStatus = isTrial ? "trial" : (d < joined ? "absent" : "present");
           const status=_attendanceMap[s.student_id+"_"+d+"_"+scheduleId]||_attendanceMap[s.student_id+"_"+d+"_0"]||defaultStatus;
           const key="cvatt_"+s.student_id+"_"+d+"_"+scheduleId;
           const sm=statusMap[status]||statusMap.present;
