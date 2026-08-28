@@ -3499,6 +3499,32 @@ async function addTrialStudentToClass(id){
       if(attendanceError) await sb.from('attendance').upsert(pastRows, { onConflict:'class_id,student_id,date' });
     }
   }
+  // Save trial attendance records in attendance table with status = 'trial'
+  const trialAttRows = [];
+  if (item.trial_session_1_at && item.trial_schedule_1_id) {
+    trialAttRows.push({
+      class_id: classId,
+      student_id: studentId,
+      date: String(item.trial_session_1_at).slice(0, 10),
+      schedule_id: Number(item.trial_schedule_1_id),
+      status: 'trial',
+    });
+  }
+  if (item.trial_session_2_at && item.trial_schedule_2_id) {
+    trialAttRows.push({
+      class_id: classId,
+      student_id: studentId,
+      date: String(item.trial_session_2_at).slice(0, 10),
+      schedule_id: Number(item.trial_schedule_2_id),
+      status: 'trial',
+    });
+  }
+  if (trialAttRows.length) {
+    await sb.from('attendance').upsert(trialAttRows, { onConflict: 'class_id,student_id,date,schedule_id' }).catch(err => {
+      console.warn('Lỗi lưu điểm danh học thử:', err);
+    });
+  }
+
   await window.AppAdminTools?.recordAudit?.('trial_student_enrolled_to_class', {
     target_type:'class_student',
     target_id:classId,
@@ -3506,13 +3532,11 @@ async function addTrialStudentToClass(id){
     student_id:studentId,
     joined_at: effectiveFrom
   });
-  const { data: deletedTrialRows, error: deleteTrialError } = await sb.from('trial_lesson_requests').delete().eq('id', id).select('id');
-  if(deleteTrialError){
-    alert('Đã thêm vào lớp nhưng chưa xóa được khỏi danh sách học thử: ' + deleteTrialError.message);
-  } else if(!deletedTrialRows?.length){
-    alert('Đã thêm vào lớp nhưng Supabase chưa xóa bản ghi học thử nào. Hãy chạy SQL policy DELETE mới.');
+  const { error: updateTrialError } = await sb.from('trial_lesson_requests').update({ status: 'enrolled', handled_at: new Date().toISOString() }).eq('id', id);
+  if(updateTrialError){
+    alert('Đã thêm vào lớp nhưng chưa cập nhật được trạng thái học thử: ' + updateTrialError.message);
   }
-  toast('Đã thêm học sinh học thử vào lớp');
+  toast('Đã thêm học sinh học thử vào lớp chính thức');
   closeTrialRequestModal();
   await loadTrialRequests();
 }
