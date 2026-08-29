@@ -457,6 +457,11 @@
               <div class="label">Học bù</div>
               <div class="value">${c.makeup}</div>
             </div>
+            ${c.trialCount ? `
+            <div class="detail-metric">
+              <div class="label">Học thử (0đ)</div>
+              <div class="value" style="color:#047857;font-weight:700">${c.trialCount}</div>
+            </div>` : ""}
           </div>
           ${c.noteCalc ? `<div style="margin-top:10px;font-size:12px;color:var(--muted)">${c.noteCalc}</div>` : ""}
           ${renderAttendanceDetails(c.attendanceDetails, group.studentName)}
@@ -492,6 +497,7 @@
             <span class="pill present">Có: ${counts.present || 0}</span>
             <span class="pill absent">Vắng: ${counts.absent || 0}</span>
             <span class="pill makeup">Học bù: ${counts.makeup || 0}</span>
+            ${counts.trial ? `<span class="pill trial" style="background:#d1fae5;color:#047857;font-weight:700">Học thử: ${counts.trial}</span>` : ""}
           </div>
         </div>
         <table class="attendance-detail-table">
@@ -896,12 +902,17 @@ Nhập số tiền hoàn lại (>0):`,
 
     const trialDateMap = {};
     (trialReqs || []).forEach(tr => {
-      if (tr.student_id && tr.trial_class_id) {
+      if (tr.student_id) {
+        const cId = tr.trial_class_id || "";
         if (tr.trial_session_1_at) {
-          trialDateMap[`${tr.student_id}_${tr.trial_class_id}_${tr.trial_session_1_at.slice(0, 10)}`] = true;
+          const d1 = tr.trial_session_1_at.slice(0, 10);
+          if (cId) trialDateMap[`${tr.student_id}_${cId}_${d1}`] = true;
+          trialDateMap[`${tr.student_id}_${d1}`] = true;
         }
         if (tr.trial_session_2_at) {
-          trialDateMap[`${tr.student_id}_${tr.trial_class_id}_${tr.trial_session_2_at.slice(0, 10)}`] = true;
+          const d2 = tr.trial_session_2_at.slice(0, 10);
+          if (cId) trialDateMap[`${tr.student_id}_${cId}_${d2}`] = true;
+          trialDateMap[`${tr.student_id}_${d2}`] = true;
         }
       }
     });
@@ -942,7 +953,10 @@ Nhập số tiền hoàn lại (>0):`,
         if (item.date > left) return false;
         if (item.date >= joined) return true;
         const actualStatus = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item);
-        const isTrial = Boolean(trialDateMap[`${cs.student_id}_${cs.class_id}_${item.date}`]);
+        const isTrial = Boolean(
+          trialDateMap[`${cs.student_id}_${cs.class_id}_${item.date}`] ||
+          trialDateMap[`${cs.student_id}_${item.date}`]
+        );
         return actualStatus === "present" || actualStatus === "makeup" || actualStatus === "trial" || isTrial;
       });
       const occurrenceKeys = new Set(activeOccurrences.map(item => `${item.date}_${item.schedule_id || 0}`));
@@ -952,7 +966,10 @@ Nhập số tiền hoàn lại (>0):`,
         const scheduleId = Number(row.schedule_id || 0);
         const key = `${date}_${scheduleId}`;
         if (!date || occurrenceKeys.has(key) || date > left) return;
-        const isTrial = Boolean(trialDateMap[`${cs.student_id}_${cs.class_id}_${date}`]);
+        const isTrial = Boolean(
+          trialDateMap[`${cs.student_id}_${cs.class_id}_${date}`] ||
+          trialDateMap[`${cs.student_id}_${date}`]
+        );
         if (date < joined && status !== "present" && status !== "makeup" && status !== "trial" && !isTrial) return;
         activeOccurrences.push({
           date,
@@ -969,11 +986,14 @@ Nhập số tiền hoàn lại (>0):`,
       const daysMap = {1:"T2",2:"T3",3:"T4",4:"T5",5:"T6",6:"T7",7:"CN"};
       let present = 0, absent = 0, makeup = 0, trialCount = 0;
       const attendanceDetails = activeOccurrences.map(item => {
-        const isTrial = Boolean(trialDateMap[`${cs.student_id}_${cs.class_id}_${item.date}`]);
-        let status = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item);
-        if (!status) status = isTrial ? "trial" : "present";
+        const isTrial = Boolean(
+          trialDateMap[`${cs.student_id}_${cs.class_id}_${item.date}`] ||
+          trialDateMap[`${cs.student_id}_${item.date}`]
+        );
+        let rawStatus = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item);
+        let status = (rawStatus === "trial" || isTrial) ? "trial" : (rawStatus || (item.date < joined ? "absent" : "present"));
 
-        if (status === "trial" || isTrial) trialCount++;
+        if (status === "trial") trialCount++;
         else if (status === "present") present++;
         else if (status === "absent") absent++;
         else if (status === "makeup") makeup++;
@@ -987,12 +1007,12 @@ Nhập số tiền hoàn lại (>0):`,
           ? `Buổi ${s.session_no || item.session_no || 1}: ${daysMap[s.weekday] || ""} ${timeLabel}${roomLabel}`.trim()
           : (item.from_attendance_only ? "Điểm danh bổ sung" : `Buổi ${item.session_no || ""}`.trim());
 
-        if (status === "trial" || isTrial) {
+        if (status === "trial") {
           scheduleLabel = `🌱 Buổi học thử (Miễn phí) • ${scheduleLabel}`;
         }
         return {
           date: item.date,
-          status: (status === "trial" || isTrial) ? "trial" : status,
+          status,
           schedule_id: item.schedule_id,
           session_no: item.session_no,
           scheduleLabel,
@@ -1026,7 +1046,7 @@ Nhập số tiền hoàn lại (>0):`,
         tuitionFee: cls.tuition_fee,
         makeupFee: cls.makeup_fee,
         scheduleLabel,
-        totalSessions, present, absent, makeup,
+        totalSessions, present, absent, makeup, trialCount,
         attendanceDetails,
         billableSessions, feePerSession, amount, noteCalc, ym,
       });
@@ -1147,7 +1167,7 @@ Nhập số tiền hoàn lại (>0):`,
       (payments || []).forEach(p => { paymentMap[p.student_id] = p; });
 
       // Tính chi tiết từng học sinh × lớp
-      allRows = buildRowsForMonth({ ym, classes, classStudents, attData, chosenSchedules });
+      allRows = buildRowsForMonth({ ym, classes, classStudents, attData, chosenSchedules, trialReqs });
 
       // Gộp theo studentId
       buildGrouped();
@@ -1646,7 +1666,7 @@ Nhập số tiền hoàn lại (>0):`,
                 <tr>
                   <td><b>${c.className}</b></td>
                   <td>${c.scheduleLabel || "—"}</td>
-                  <td>Có mặt: ${c.present}<br>Vắng: ${c.absent}<br>Học bù: ${c.makeup}</td>
+                  <td>Có mặt: ${c.present}<br>Vắng: ${c.absent}<br>Học bù: ${c.makeup}${c.trialCount ? `<br>Học thử (0đ): ${c.trialCount}` : ""}</td>
                   <td>${tuitionLabel[c.tuitionType] || c.tuitionType}${c.noteCalc ? `<br><span style="color:#64748b">${c.noteCalc}</span>` : ""}</td>
                   <td style="text-align:right;font-weight:700">${fmt(c.amount)}đ</td>
                 </tr>
