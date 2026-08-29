@@ -731,13 +731,14 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <div class="sg"><label>Môn</label><select id="trialRequestSubjectFilter"><option value="">Tất cả môn</option></select></div>
       <div class="sg"><label>Trạng thái</label>
         <select id="trialRequestStatusFilter">
-          <option value="">Tất cả</option>
+          <option value="">Đang học thử (chưa vào lớp)</option>
           <option value="pending_schedule">Chưa chốt lịch học thử</option>
           <option value="scheduled">Đã chốt lịch học thử</option>
           <option value="trial_1_done">Đã học thử buổi đầu tiên</option>
           <option value="trial_2_done">Đã học thử xong 2 buổi</option>
           <option value="enrolled">Đã thêm vào lớp</option>
           <option value="cancelled">Hủy</option>
+          <option value="all">Tất cả trạng thái (gồm đã vào lớp)</option>
         </select>
       </div>
     </div>
@@ -2950,10 +2951,18 @@ function renderTrialRequests(){
     const classInfo = _trialClassMap[item.trial_class_id] || {};
     const itemGrade = rmVN(item.grade || classInfo.grades?.name || classInfo.grade?.name || '');
     const itemSubject = rmVN(item.subject || classInfo.subjects?.name || classInfo.subject?.name || '');
+    let matchesStatus = true;
+    if (status === 'all') {
+      matchesStatus = true;
+    } else if (status) {
+      matchesStatus = (effectiveStatus === status);
+    } else {
+      matchesStatus = (effectiveStatus !== 'enrolled' && effectiveStatus !== 'cancelled' && effectiveStatus !== 'closed');
+    }
     return (!q || haystack.includes(q)) &&
       (!gradeFilter || itemGrade === gradeFilter) &&
       (!subjectFilter || itemSubject === subjectFilter) &&
-      (!status || effectiveStatus === status);
+      matchesStatus;
   }).sort((a,b) => {
     const aSoon = trialSoonInfo(a);
     const bSoon = trialSoonInfo(b);
@@ -3450,55 +3459,68 @@ async function addTrialStudentToClass(id){
     return;
   }
   if(trialComputedStatus(item) !== 'trial_2_done' && !confirm('Học sinh chưa hoàn thành đủ 2 buổi học thử. Bạn vẫn muốn thêm vào lớp?')) return;
+
   const classId = item.trial_class_id;
   const studentId = item.student_id;
-  const { data: existing } = await sb.from('class_students')
-    .select('id,left_at')
-    .eq('class_id', classId)
-    .eq('student_id', studentId)
-    .is('left_at', null)
-    .maybeSingle();
-  if(existing){
-    const { data: deletedExisting } = await sb.from('trial_lesson_requests').delete().eq('id', id).select('id');
-    if(!deletedExisting?.length) alert('Học sinh đã có trong lớp nhưng chưa xóa được khỏi danh sách học thử. Hãy chạy SQL policy DELETE mới.');
-    toast('Học sinh đã có trong lớp');
-    closeTrialRequestModal();
-    await loadTrialRequests();
-    return;
-  }
-  const effectiveFrom = askTrialClassJoinDate(String(item.trial_session_1_at || '').slice(0,10));
+  const defaultJoinDate = String(item.trial_session_1_at || '').slice(0,10) || new Date().toISOString().slice(0,10);
+  const effectiveFrom = askTrialClassJoinDate(defaultJoinDate);
   if(!effectiveFrom) return;
   const joinedAt = effectiveFrom + 'T12:00:00';
-  const { error: insertError } = await sb.from('class_students').insert({ class_id:classId, student_id:studentId, joined_at:joinedAt });
-  if(insertError){
-    alert('Không thể thêm học sinh vào lớp: ' + insertError.message);
-    return;
+
+  // Check if student already exists in class_students
+  const { data: existing, error: existingErr } = await sb.from('class_students')
+    .select('id,joined_at,left_at')
+    .eq('class_id', classId)
+    .eq('student_id', studentId)
+    .maybeSingle();
+
+  if(existingErr){
+    console.warn('Lỗi kiểm tra học sinh trong lớp:', existingErr);
   }
-  const selectedSchedules = [item.trial_schedule_1_id, item.trial_schedule_2_id]
-    .map(id => _trialScheduleMap[Number(id)])
-    .filter(Boolean);
-  if(selectedSchedules.length){
-    const bySession = new Map();
-    selectedSchedules.forEach(s => bySession.set(Number(s.session_no || 1), s));
-    const scheduleRows = [...bySession.values()].map(s => ({
-      class_id:classId,
-      student_id:studentId,
-      session_no:Number(s.session_no || 1),
-      schedule_id:Number(s.id),
-      effective_from: effectiveFrom
-    }));
-    const { error: scheduleError } = await sb.from('class_student_schedules').upsert(scheduleRows, { onConflict:'class_id,student_id,session_no,effective_from' });
-    if(scheduleError) alert('Đã thêm vào lớp nhưng chưa lưu được lịch học sinh: ' + scheduleError.message);
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-    const pastRows = trialGenerateOccurrences(selectedSchedules, now.getMonth(), now.getFullYear())
-      .filter(row => row.date >= effectiveFrom && row.date < today)
-      .map(row => ({ class_id:classId, student_id:studentId, date:row.date, status:'absent', schedule_id:row.schedule_id, session_no:row.session_no }));
-    if(pastRows.length){
-      const { error: attendanceError } = await sb.from('attendance').upsert(pastRows, { onConflict:'class_id,student_id,date,schedule_id' });
-      if(attendanceError) await sb.from('attendance').upsert(pastRows, { onConflict:'class_id,student_id,date' });
+
+  if(existing?.id){
+    const { error: updateCsErr } = await sb.from('class_students')
+      .update({ joined_at: joinedAt, left_at: null })
+      .eq('id', existing.id);
+    if(updateCsErr){
+      alert('Lỗi cập nhật học sinh trong lớp: ' + updateCsErr.message);
+      return;
+    }
+  } else {
+    const { error: insertCsErr } = await sb.from('class_students')
+      .insert([{ class_id: classId, student_id: studentId, joined_at: joinedAt, left_at: null }]);
+    if(insertCsErr){
+      alert('Không thể thêm học sinh vào lớp: ' + insertCsErr.message);
+      return;
     }
   }
+
+  // Populate student schedules in class_student_schedules
+  const classInfo = _trialClassMap[classId] || {};
+  const classSchedules = (classInfo.class_schedules || []).filter(s => !s.effective_from || s.effective_from <= effectiveFrom);
+  const fallbackSchedules = classSchedules.length ? classSchedules : (classInfo.class_schedules || []);
+
+  const selectedIds = [item.trial_schedule_1_id, item.trial_schedule_2_id].filter(Boolean);
+  const chosenSchedules = selectedIds.map(sid => _trialScheduleMap[Number(sid)]).filter(Boolean);
+  const schedulesToAssign = chosenSchedules.length ? chosenSchedules : fallbackSchedules;
+
+  if(schedulesToAssign.length){
+    const bySession = new Map();
+    fallbackSchedules.forEach(s => bySession.set(Number(s.session_no || 1), s));
+    chosenSchedules.forEach(s => bySession.set(Number(s.session_no || 1), s));
+
+    const scheduleRows = [...bySession.values()].map(s => ({
+      class_id: classId,
+      student_id: studentId,
+      session_no: Number(s.session_no || 1),
+      schedule_id: Number(s.id),
+      effective_from: effectiveFrom
+    }));
+    const { error: scheduleError } = await sb.from('class_student_schedules')
+      .upsert(scheduleRows, { onConflict:'class_id,student_id,session_no,effective_from' });
+    if(scheduleError) alert('Đã thêm vào lớp nhưng chưa lưu được lịch học sinh: ' + scheduleError.message);
+  }
+
   // Save trial attendance records in attendance table with status = 'trial'
   const trialAttRows = [];
   if (item.trial_session_1_at && item.trial_schedule_1_id) {
@@ -3536,7 +3558,7 @@ async function addTrialStudentToClass(id){
   if(updateTrialError){
     alert('Đã thêm vào lớp nhưng chưa cập nhật được trạng thái học thử: ' + updateTrialError.message);
   }
-  toast('Đã thêm học sinh học thử vào lớp chính thức');
+  toast('Đã thêm học sinh học thử vào lớp chính thức thành công');
   closeTrialRequestModal();
   await loadTrialRequests();
 }

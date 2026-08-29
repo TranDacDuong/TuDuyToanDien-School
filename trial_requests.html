@@ -99,13 +99,14 @@ tbody tr:hover td{background:#fff7ed}
     <select id="gradeFilter" class="select"><option value="">Tất cả khối</option></select>
     <select id="subjectFilter" class="select"><option value="">Tất cả môn</option></select>
     <select id="statusFilter" class="select">
-      <option value="">Tất cả trạng thái</option>
+      <option value="">Đang học thử (chưa vào lớp)</option>
       <option value="pending_schedule">Chưa chốt lịch học thử</option>
       <option value="scheduled">Đã chốt lịch học thử</option>
       <option value="trial_1_done">Đã học thử buổi đầu tiên</option>
       <option value="trial_2_done">Đã học thử xong 2 buổi</option>
       <option value="enrolled">Đã thêm vào lớp</option>
       <option value="cancelled">Hủy</option>
+      <option value="all">Tất cả trạng thái (gồm đã vào lớp)</option>
     </select>
     <button class="btn btn-primary" type="button" onclick="loadTrialRequests()">Tải lại</button>
   </section>
@@ -493,7 +494,15 @@ function renderRequests(){
     const cls = S.classMap[item.trial_class_id] || {};
     const itemGrade = rmVN(item.grade || cls.grades?.name || cls.grade?.name || "");
     const itemSubject = rmVN(item.subject || cls.subjects?.name || cls.subject?.name || "");
-    return (!q || haystack.includes(q)) && (!gradeFilter || itemGrade===gradeFilter) && (!subjectFilter || itemSubject===subjectFilter) && (!status || effective===status);
+    let matchesStatus = true;
+    if (status === "all") {
+      matchesStatus = true;
+    } else if (status) {
+      matchesStatus = (effective === status);
+    } else {
+      matchesStatus = (effective !== "enrolled" && effective !== "cancelled" && effective !== "closed");
+    }
+    return (!q || haystack.includes(q)) && (!gradeFilter || itemGrade===gradeFilter) && (!subjectFilter || itemSubject===subjectFilter) && matchesStatus;
   }).sort((a,b)=>{
     const as=soonInfo(a), bs=soonInfo(b);
     if(as && bs) return as.rank-bs.rank || as.time-bs.time;
@@ -1130,21 +1139,69 @@ async function addTrialToClass(id){
   if(!item.student_id){ alert("Hãy tạo hoặc link tài khoản học sinh trước khi thêm vào lớp."); return; }
   if(!item.trial_class_id){ alert("Chưa chọn lớp học thử."); return; }
   if(computedStatus(item)!=="trial_2_done" && !confirm("Học sinh chưa hoàn thành đủ 2 buổi học thử. Bạn vẫn muốn thêm vào lớp?")) return;
-  const existing = await sb.from("class_students").select("id").eq("class_id",item.trial_class_id).eq("student_id",item.student_id).maybeSingle();
-  if(!existing.data){
-    const effectiveFrom = askClassJoinDate(String(item.trial_session_1_at || "").slice(0,10));
-    if(!effectiveFrom) return;
-    const joinedAt = effectiveFrom + "T12:00:00";
-    const {error} = await sb.from("class_students").insert({class_id:item.trial_class_id,student_id:item.student_id,joined_at:joinedAt});
-    if(error){ alert("Không thể thêm học sinh vào lớp: "+error.message); return; }
-    const selectedScheduleRows = buildTrialStudentScheduleRows(item, effectiveFrom);
-    if(selectedScheduleRows.length){
-      const {error:scheduleError} = await sb.from("class_student_schedules").upsert(selectedScheduleRows, { onConflict:"class_id,student_id,session_no,effective_from" });
-      if(scheduleError){ alert("Đã thêm học sinh vào lớp nhưng chưa lưu được đúng lịch học thử: "+scheduleError.message); return; }
+
+  const defaultJoinDate = String(item.trial_session_1_at || "").slice(0,10) || new Date().toISOString().slice(0,10);
+  const effectiveFrom = askClassJoinDate(defaultJoinDate);
+  if(!effectiveFrom) return;
+  const joinedAt = effectiveFrom + "T12:00:00";
+
+  // Check if student already exists in class_students
+  const { data: existing, error: existingErr } = await sb.from("class_students")
+    .select("id,joined_at,left_at")
+    .eq("class_id", item.trial_class_id)
+    .eq("student_id", item.student_id)
+    .maybeSingle();
+
+  if(existingErr){
+    console.warn("Lỗi kiểm tra học sinh trong lớp:", existingErr);
+  }
+
+  if(existing?.id){
+    const { error: updateCsErr } = await sb.from("class_students")
+      .update({ joined_at: joinedAt, left_at: null })
+      .eq("id", existing.id);
+    if(updateCsErr){
+      alert("Lỗi cập nhật học sinh trong lớp: " + updateCsErr.message);
+      return;
+    }
+  } else {
+    const { error: insertCsErr } = await sb.from("class_students")
+      .insert([{ class_id: item.trial_class_id, student_id: item.student_id, joined_at: joinedAt, left_at: null }]);
+    if(insertCsErr){
+      alert("Không thể thêm học sinh vào lớp: " + insertCsErr.message);
+      return;
     }
   }
-  const {error:updateError} = await sb.from("trial_lesson_requests").update({ status: "enrolled", handled_at: new Date().toISOString() }).eq("id",id);
-  if(updateError) alert("Đã thêm vào lớp nhưng chưa cập nhật được trạng thái học thử: "+updateError.message);
+
+  // Populate student schedules in class_student_schedules
+  const classObj = S.classMap[item.trial_class_id] || {};
+  const classSchedules = (classObj.class_schedules || []).filter(s => !s.effective_from || s.effective_from <= effectiveFrom);
+  const fallbackSchedules = classSchedules.length ? classSchedules : (classObj.class_schedules || []);
+
+  const selectedIds = [item.trial_schedule_1_id, item.trial_schedule_2_id].filter(Boolean);
+  const chosenSchedules = selectedIds.map(sid => S.scheduleMap[Number(sid)]).filter(Boolean);
+  const schedulesToAssign = chosenSchedules.length ? chosenSchedules : fallbackSchedules;
+
+  if(schedulesToAssign.length){
+    const bySession = new Map();
+    fallbackSchedules.forEach(s => bySession.set(Number(s.session_no || 1), s));
+    chosenSchedules.forEach(s => bySession.set(Number(s.session_no || 1), s));
+
+    const scheduleRows = [...bySession.values()].map(s => ({
+      class_id: item.trial_class_id,
+      student_id: item.student_id,
+      session_no: Number(s.session_no || 1),
+      schedule_id: Number(s.id),
+      effective_from: effectiveFrom,
+    }));
+
+    const { error: scheduleError } = await sb.from("class_student_schedules")
+      .upsert(scheduleRows, { onConflict: "class_id,student_id,session_no,effective_from" });
+    if(scheduleError){
+      alert("Đã thêm học sinh vào lớp nhưng chưa lưu được lịch học sinh: " + scheduleError.message);
+      return;
+    }
+  }
 
   // Save trial attendance records in attendance table with status = 'trial'
   const trialAttRows = [];
@@ -1172,7 +1229,10 @@ async function addTrialToClass(id){
     });
   }
 
-  toast("Đã thêm học sinh học thử vào lớp chính thức");
+  const {error:updateError} = await sb.from("trial_lesson_requests").update({ status: "enrolled", handled_at: new Date().toISOString() }).eq("id",id);
+  if(updateError) alert("Đã thêm vào lớp nhưng chưa cập nhật được trạng thái học thử: "+updateError.message);
+
+  toast("Đã thêm học sinh vào lớp chính thức thành công");
   closeTrialModal();
   await loadTrialRequests();
 }
