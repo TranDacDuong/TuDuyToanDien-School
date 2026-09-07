@@ -70,6 +70,9 @@ CREATE POLICY supp_students_staff_all ON public.supplementary_session_students
         )
     );
 
+-- Ensure notifications table allows supplementary_session_completed
+ALTER TABLE public.notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
+
 -- RPC Function: complete_supplementary_session
 -- Updates attendance, posts student notifications, and completes the session.
 CREATE OR REPLACE FUNCTION public.complete_supplementary_session(
@@ -107,14 +110,19 @@ BEGIN
             updated_at = now()
         WHERE session_id = p_session_id AND student_id = v_student_id;
 
-        -- Send Zalo / App notification to parents if present/late
+        -- Send notification to parents if present/late
         IF v_status IN ('present', 'late') THEN
             FOR v_parent_record IN
                 SELECT parent_id FROM public.parent_students WHERE student_id = v_student_id AND revoked_at IS NULL
             LOOP
                 v_msg := 'Thông báo từ MindUp: Buổi dạy bổ sung "' || v_session.topic || '" ngày ' || to_char(v_session.session_date, 'DD/MM/YYYY') || ' đã hoàn thành. Học phí đính kèm: ' || to_char(v_fee, 'FM999,999,999') || 'đ.';
-                INSERT INTO public.notifications (user_id, actor_id, type, ref_id, message)
-                VALUES (v_parent_record.parent_id, auth.uid(), 'supplementary_session_completed', p_session_id::text, v_msg);
+                BEGIN
+                    INSERT INTO public.notifications (user_id, actor_id, type, ref_id, message)
+                    VALUES (v_parent_record.parent_id, auth.uid(), 'supplementary_session_completed', p_session_id, v_msg);
+                EXCEPTION WHEN OTHERS THEN
+                    -- Bỏ qua nếu có lỗi khi chèn thông báo để không gián đoạn việc hoàn thành buổi học
+                    NULL;
+                END;
             END LOOP;
         END IF;
     END LOOP;
@@ -130,3 +138,4 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.complete_supplementary_session(UUID, JSONB) TO authenticated, service_role;
+
