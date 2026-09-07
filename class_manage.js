@@ -2479,7 +2479,8 @@
       {data:classSessions,error:classSessionsError},
       {data:gameRooms,error:gameRoomsError},
       {data:gamePlayers,error:gamePlayersError},
-      reviewExamsResult
+      reviewExamsResult,
+      suppSessionsResult
     ] = await Promise.all([
       sb.from("class_sessions")
         .select("id,lesson_id,session_order,session_date,exam_id,pdf_exam_id,starts_at,ends_at,created_at")
@@ -2487,10 +2488,20 @@
         .order("session_order",{ascending:true}),
       sb.from("game_rooms").select("id,title,join_code,status,question_count,time_per_question,max_players,visibility,class_id,created_at").eq("class_id",_classId).order("created_at",{ascending:false}),
       sb.from("game_room_players").select("id,room_id,user_id,score,ready,joined_at"),
-      reviewExamsQuery ? reviewExamsQuery : Promise.resolve({data:[],error:null})
+      reviewExamsQuery ? reviewExamsQuery : Promise.resolve({data:[],error:null}),
+      sb.from("supplementary_sessions")
+        .select(`
+          id, topic, session_date, starts_at, ends_at, status, fee_per_student,
+          teacher:users!teacher_id(full_name),
+          room:rooms(room_name),
+          students:supplementary_session_students(student_id, attendance_status)
+        `)
+        .eq("parent_class_id", _classId)
+        .order("session_date", { ascending: false })
     ]);
 
     const reviewExams = reviewExamsResult?.data || [];
+    const suppSessions = suppSessionsResult?.data || [];
 
     const sessionTableMissing = !!classSessionsError && isMissingRelationError(classSessionsError);
     if((classSessionsError && !sessionTableMissing) || gameRoomsError || gamePlayersError){
@@ -2618,6 +2629,47 @@
       });
 
     const gameSectionHtml = buildClassGamesSection(role, gameRooms||[], gamePlayers||[]);
+    const suppSectionHtml = (suppSessions && suppSessions.length > 0)
+      ? '<div style="background:var(--white);border:1px solid rgba(217,119,6,.25);border-radius:14px;padding:16px 18px;margin-bottom:14px;box-shadow:0 6px 18px rgba(217,119,6,.06)">'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">'+
+            '<div><div style="font-weight:700;color:var(--navy)">⭐ Buổi dạy bổ sung của lớp (Phụ đạo)</div><div style="font-size:.78rem;color:var(--ink-mid);margin-top:2px">Bấm "Điểm danh & Hoàn thành" để chốt sĩ số và tự động tính học phí.</div></div>'+
+            '<span style="font-size:.78rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#fef3c7;color:#92400e">'+suppSessions.length+' buổi</span>'+
+          '</div>'+
+          '<div style="display:grid;gap:10px">'+
+            suppSessions.map(s => {
+              const isDone = s.status === "completed";
+              const stuCount = (s.students || []).length;
+              const feeStr = Number(s.fee_per_student || 0).toLocaleString("vi-VN") + "đ";
+              const timeStr = (s.starts_at ? s.starts_at.slice(0,5) : "") + (s.ends_at ? " - " + s.ends_at.slice(0,5) : "");
+              const roomStr = s.room?.room_name ? " • 🚪 " + esc(s.room.room_name) : "";
+              const dateParts = String(s.session_date || "").split("-");
+              const dateFormatted = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : s.session_date;
+              const attBtn = canManageClassSessions(role)
+                ? `<button onclick="cvOpenSupplementaryAttendanceModal('${s.id}')" class="btn btn-sm" style="background:${isDone ? '#10b981' : '#d97706'};color:#fff;font-weight:700;border:none;border-radius:8px;padding:6px 12px;cursor:pointer">${isDone ? '✓ Xem điểm danh' : '📝 Điểm danh & Hoàn thành'}</button>`
+                : '';
+              return `
+                <div style="background:#fff;border:1px solid rgba(217,119,6,.2);border-left:4px solid ${isDone ? '#10b981' : '#d97706'};border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+                  <div>
+                    <div style="font-weight:700;color:var(--navy);font-size:.92rem">⭐ ${esc(s.topic)}</div>
+                    <div style="font-size:.78rem;color:var(--ink-mid);margin-top:4px">
+                      📅 ${esc(dateFormatted)} (${esc(timeStr)})${roomStr}
+                      • 👨‍🏫 ${esc(s.teacher?.full_name || 'GV')}
+                      • 👥 ${stuCount} học sinh
+                      • 💰 ${feeStr}
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-size:.74rem;font-weight:700;padding:3px 8px;border-radius:6px;background:${isDone ? '#dcfce7' : '#eff6ff'};color:${isDone ? '#15803d' : '#1d4ed8'}">
+                      ${isDone ? 'Đã hoàn thành' : 'Chờ học'}
+                    </span>
+                    ${attBtn}
+                  </div>
+                </div>
+              `;
+            }).join("")+
+          '</div>'+
+        '</div>'
+      : "";
     const actionsHtml = canManageClassSessions(role)
       ? '<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">'+
           '<button onclick="cvOpenAddClassSession()" class="btn btn-primary btn-sm">+ Thêm buổi học</button>'+
@@ -2629,7 +2681,7 @@
       : "";
     const sessionEmpty = '<div style="padding:18px;border:1px dashed #cbd5e1;border-radius:14px;background:#fff"><strong style="display:block;color:var(--navy);margin-bottom:6px">Chưa có buổi học nào</strong><div style="font-size:.84rem;color:var(--ink-mid)">Giáo viên bấm Thêm buổi học để tạo buổi học thủ công cho lớp.</div></div>';
 
-    tc.innerHTML = gameSectionHtml +
+    tc.innerHTML = gameSectionHtml + suppSectionHtml +
       '<div style="background:var(--white);border:1px solid var(--border);border-radius:14px;padding:16px 18px">'+
         '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">'+
           '<div><div style="font-weight:700;color:var(--navy)">Các buổi học được tạo thủ công</div><div style="font-size:.78rem;color:var(--ink-mid);margin-top:2px">Buổi mới nhất nằm trên cùng, Buổi 1 nằm dưới cùng.</div></div>'+
@@ -3563,7 +3615,7 @@
 
         <div style="display:flex;justify-content:flex-end;gap:10px">
           <button onclick="document.getElementById('cvSuppAttModal').remove()" class="btn btn-outline">Hủy</button>
-          <button onclick="cvCompleteSupplementarySession('${session.id}')" class="btn btn-primary">Lưu & Hoàn thành buổi học</button>
+          <button onclick="cvCompleteSupplementarySession('${session.id}')" class="btn btn-primary">${session.status === 'completed' ? 'Cập nhật điểm danh' : 'Lưu & Hoàn thành buổi học'}</button>
         </div>
       </div>
     `;
@@ -3590,7 +3642,12 @@
 
     document.getElementById("cvSuppAttModal")?.remove();
     alert("Đã lưu điểm danh, tự động cộng học phí và hoàn tất buổi học bổ sung!");
-    await cvSwitchTab(_activeTab);
+    if (typeof _activeTab !== "undefined" && typeof cvSwitchTab === "function" && document.getElementById("classViewModal")) {
+      await cvSwitchTab(_activeTab);
+    }
+    if (typeof loadMyClasses === "function") {
+      loadMyClasses({ silent: true });
+    }
   };
 
 })();

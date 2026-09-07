@@ -472,6 +472,11 @@
               <div class="label">Học thử (0đ)</div>
               <div class="value" style="color:#047857;font-weight:700">${c.trialCount}</div>
             </div>` : ""}
+            ${c.suppCount ? `
+            <div class="detail-metric">
+              <div class="label">Dạy bổ sung (+${fmt(c.suppTotalFee)}đ)</div>
+              <div class="value" style="color:#d97706;font-weight:700">${c.suppCount} buổi</div>
+            </div>` : ""}
           </div>
           ${c.noteCalc ? `<div style="margin-top:10px;font-size:12px;color:var(--muted)">${c.noteCalc}</div>` : ""}
           ${renderAttendanceDetails(c.attendanceDetails, group.studentName)}
@@ -489,7 +494,7 @@
     if (!items.length) {
       return `<div style="margin-top:12px;font-size:12px;color:var(--muted)">Chưa có buổi học/điểm danh trong tháng này.</div>`;
     }
-    const statusText = { present: "Có", absent: "Vắng", makeup: "Học bù", trial: "Học thử (Miễn phí)", unknown: "Chưa rõ" };
+    const statusText = { present: "Có", absent: "Vắng", makeup: "Học bù", trial: "Học thử (Miễn phí)", supplementary: "Bổ sung", unknown: "Chưa rõ" };
     const sortedItems = [...items].sort((a, b) =>
       String(a.date || "").localeCompare(String(b.date || ""))
       || Number(a.schedule_id || 0) - Number(b.schedule_id || 0)
@@ -508,6 +513,7 @@
             <span class="pill absent">Vắng: ${counts.absent || 0}</span>
             <span class="pill makeup">Học bù: ${counts.makeup || 0}</span>
             ${counts.trial ? `<span class="pill trial" style="background:#d1fae5;color:#047857;font-weight:700">Học thử: ${counts.trial}</span>` : ""}
+            ${counts.supplementary ? `<span class="pill supplementary" style="background:#fef3c7;color:#92400e;font-weight:700">Bổ sung: ${counts.supplementary}</span>` : ""}
           </div>
         </div>
         <table class="attendance-detail-table">
@@ -971,7 +977,7 @@ Nhập số tiền hoàn lại (>0):`,
     if (currentValue && classMap[currentValue]) sel.value = currentValue;
   }
 
-  function buildRowsForMonth({ ym, classes, classStudents, attData, chosenSchedules, trialReqs }) {
+  function buildRowsForMonth({ ym, classes, classStudents, attData, chosenSchedules, trialReqs, suppSessions }) {
     const mStart = ymToDate(ym);
     const mEnd = monthEnd(ym);
     const classMap = {};
@@ -994,6 +1000,23 @@ Nhập số tiền hoàn lại (>0):`,
       }
     });
 
+    // Map buổi dạy bổ sung hoàn thành trong tháng theo student_id & parent_class_id
+    const suppMap = {};
+    (suppSessions || []).forEach(sess => {
+      const cId = sess.parent_class_id;
+      const sDate = sess.session_date ? String(sess.session_date).slice(0, 10) : "";
+      if (sDate < mStart || sDate > mEnd) return;
+      (sess.students || []).forEach(st => {
+        const key = `${st.student_id}_${cId}`;
+        if (!suppMap[key]) suppMap[key] = [];
+        suppMap[key].push({
+          session: sess,
+          student: st,
+          date: sDate,
+        });
+      });
+    });
+
     const attMap = {};
     const attRowsByStudentClass = {};
     (attData || []).forEach(a => {
@@ -1012,6 +1035,7 @@ Nhập số tiền hoàn lại (>0):`,
       chosenMap[key].push(row);
     });
 
+    const processedStudentClasses = new Set();
     const rows = [];
     (classStudents || []).forEach(cs => {
       if (currentRole === "student" && cs.student_id !== currentUserId) return;
@@ -1023,6 +1047,8 @@ Nhập số tiền hoàn lại (>0):`,
       const joined = cs.joined_at ? cs.joined_at.slice(0, 10) : "0000-00-00";
       const left = cs.left_at ? cs.left_at.slice(0, 10) : "9999-99-99";
       if (joined > mEnd || left < mStart) return;
+
+      processedStudentClasses.add(`${cs.student_id}_${cs.class_id}`);
 
       const schedules = cls.class_schedules || [];
       const chosenRows = chosenMap[`${cs.student_id}_${cs.class_id}`];
@@ -1096,12 +1122,46 @@ Nhập số tiền hoàn lại (>0):`,
         };
       });
 
-      const { billableSessions, feePerSession, amount, noteCalc } = calcTuition({
+      // Tích hợp buổi dạy bổ sung hoàn thành của lớp
+      const studentSupps = suppMap[`${cs.student_id}_${cs.class_id}`] || [];
+      let suppCount = 0;
+      let suppTotalFee = 0;
+
+      studentSupps.forEach(item => {
+        const sess = item.session;
+        const st = item.student;
+        const attStatus = st.attendance_status || "present";
+        const isCharged = ["present", "late"].includes(attStatus);
+        const fee = Number(st.tuition_fee ?? sess.fee_per_student ?? 0);
+
+        if (isCharged) {
+          suppCount++;
+          suppTotalFee += fee;
+        }
+
+        attendanceDetails.push({
+          date: item.date,
+          status: attStatus === "absent" ? "absent" : "supplementary",
+          schedule_id: 999000,
+          session_no: 0,
+          scheduleLabel: `⭐ Buổi dạy bổ sung: ${sess.topic}${attStatus === "absent" ? " (Vắng - 0đ)" : ` (+${fmt(fee)}đ)`}`,
+          isSupplementary: true,
+          fee: isCharged ? fee : 0,
+        });
+      });
+
+      const { billableSessions, feePerSession, amount: baseAmount, noteCalc: baseNote } = calcTuition({
         tuition_type: cls.tuition_type,
         tuition_fee: cls.tuition_fee,
         makeup_fee: cls.makeup_fee,
         present, absent, makeup, totalSessions: Math.max(0, totalSessions - trialCount),
       });
+
+      const finalAmount = baseAmount + suppTotalFee;
+      let noteCalc = baseNote;
+      if (suppTotalFee > 0) {
+        noteCalc = (noteCalc ? `${noteCalc} • ` : "") + `Dạy bổ sung (${suppCount} buổi): +${fmt(suppTotalFee)}đ`;
+      }
 
       const studentSchedules = [...new Map(activeOccurrences
         .map(item => item.schedule)
@@ -1124,10 +1184,72 @@ Nhập số tiền hoàn lại (>0):`,
         makeupFee: cls.makeup_fee,
         scheduleLabel,
         totalSessions, present, absent, makeup, trialCount,
+        suppCount, suppTotalFee,
         attendanceDetails,
-        billableSessions, feePerSession, amount, noteCalc, ym,
+        billableSessions, feePerSession, amount: finalAmount, noteCalc, ym,
       });
     });
+
+    // Thêm các học sinh tham gia buổi dạy bổ sung mà không có trong classStudents tháng này
+    Object.entries(suppMap).forEach(([key, items]) => {
+      if (processedStudentClasses.has(key)) return;
+      const [studentId, classId] = key.split("_");
+      if (currentRole === "student" && studentId !== currentUserId) return;
+      if (currentRole === "parent" && !parentStudentIds.has(studentId)) return;
+      if (currentRole === "assistant" && !assistantClassIds.has(classId)) return;
+
+      const cls = classMap[classId];
+      if (!cls) return;
+
+      let suppCount = 0;
+      let suppTotalFee = 0;
+      const attendanceDetails = [];
+
+      items.forEach(item => {
+        const sess = item.session;
+        const st = item.student;
+        const attStatus = st.attendance_status || "present";
+        const isCharged = ["present", "late"].includes(attStatus);
+        const fee = Number(st.tuition_fee ?? sess.fee_per_student ?? 0);
+
+        if (isCharged) {
+          suppCount++;
+          suppTotalFee += fee;
+        }
+
+        attendanceDetails.push({
+          date: item.date,
+          status: attStatus === "absent" ? "absent" : "supplementary",
+          schedule_id: 999000,
+          session_no: 0,
+          scheduleLabel: `⭐ Buổi dạy bổ sung: ${sess.topic}${attStatus === "absent" ? " (Vắng - 0đ)" : ` (+${fmt(fee)}đ)`}`,
+          isSupplementary: true,
+          fee: isCharged ? fee : 0,
+        });
+      });
+
+      if (!suppCount && !attendanceDetails.length) return;
+
+      rows.push({
+        studentId,
+        classId,
+        studentName: "Học sinh",
+        phone: "",
+        parentContacts: canViewStudentPhone() ? (parentContactMap[studentId] || []) : [],
+        className: cls.class_name,
+        tuitionType: "per_session",
+        tuitionFee: 0,
+        makeupFee: 0,
+        scheduleLabel: "Buổi dạy bổ sung",
+        totalSessions: 0, present: 0, absent: 0, makeup: 0, trialCount: 0,
+        suppCount, suppTotalFee,
+        attendanceDetails,
+        billableSessions: suppCount, feePerSession: 0, amount: suppTotalFee,
+        noteCalc: `Dạy bổ sung (${suppCount} buổi): +${fmt(suppTotalFee)}đ`,
+        ym,
+      });
+    });
+
     return rows;
   }
 
@@ -1175,6 +1297,7 @@ Nhập số tiền hoàn lại (>0):`,
         { data: payments,      error: e4 },
         { data: chosenSchedules, error: e5 },
         { data: trialReqs,     error: e6 },
+        { data: suppSessions,  error: e7 },
       ] = await Promise.all([
         sb.from("classes")
           .select(`id, class_name, tuition_fee, tuition_type, makeup_fee,
@@ -1198,6 +1321,17 @@ Nhập số tiền hoàn lại (>0):`,
 
         sb.from("trial_lesson_requests")
           .select("student_id, trial_class_id, trial_session_1_at, trial_session_2_at"),
+
+        sb.from("supplementary_sessions")
+          .select(`
+            id, parent_class_id, topic, session_date, starts_at, ends_at, fee_per_student, status,
+            students:supplementary_session_students(
+              student_id, attendance_status, tuition_fee, tuition_charged
+            )
+          `)
+          .eq("status", "completed")
+          .gte("session_date", mStart)
+          .lte("session_date", mEnd),
       ]);
 
       if (e1) throw e1;
@@ -1244,7 +1378,7 @@ Nhập số tiền hoàn lại (>0):`,
       (payments || []).forEach(p => { paymentMap[p.student_id] = p; });
 
       // Tính chi tiết từng học sinh × lớp
-      allRows = buildRowsForMonth({ ym, classes, classStudents, attData, chosenSchedules, trialReqs });
+      allRows = buildRowsForMonth({ ym, classes, classStudents, attData, chosenSchedules, trialReqs, suppSessions });
 
       // Gộp theo studentId
       buildGrouped();
@@ -1296,6 +1430,9 @@ Nhập số tiền hoàn lại (>0):`,
         present:          r.present,
         absent:           r.absent,
         makeup:           r.makeup,
+        trialCount:       r.trialCount || 0,
+        suppCount:        r.suppCount || 0,
+        suppTotalFee:     r.suppTotalFee || 0,
         attendanceDetails: r.attendanceDetails || [],
         billableSessions: r.billableSessions,
         feePerSession:    r.feePerSession,
@@ -1401,7 +1538,7 @@ Nhập số tiền hoàn lại (>0):`,
     const queryStart = ymToDate(queryStartYm);
 
     const studentIds = [...new Set(scopedClassStudents.map(row => row.student_id).filter(Boolean))];
-    const [{ data: attData, error: e4 }, { data: payments, error: e5 }, { data: trialReqs }] = await Promise.all([
+    const [{ data: attData, error: e4 }, { data: payments, error: e5 }, { data: trialReqs }, { data: suppSessions }] = await Promise.all([
       sb.from("attendance")
         .select("student_id, class_id, date, status, schedule_id")
         .in("student_id", studentIds)
@@ -1415,6 +1552,16 @@ Nhập số tiền hoàn lại (>0):`,
       sb.from("trial_lesson_requests")
         .select("student_id, trial_class_id, trial_session_1_at, trial_session_2_at")
         .in("student_id", studentIds),
+      sb.from("supplementary_sessions")
+        .select(`
+          id, parent_class_id, topic, session_date, starts_at, ends_at, fee_per_student, status,
+          students:supplementary_session_students(
+            student_id, attendance_status, tuition_fee, tuition_charged
+          )
+        `)
+        .eq("status", "completed")
+        .gte("session_date", queryStart)
+        .lte("session_date", todayEnd),
     ]);
     if (e4) throw e4;
     if (e5) throw e5;
@@ -1422,7 +1569,7 @@ Nhập số tiền hoàn lại (>0):`,
     const paymentByMonth = buildPaymentByMonth(payments || []);
     const groupedByMonth = {};
     allCandidateMonths.forEach(ym => {
-      const rows = buildRowsForMonth({ ym, classes, classStudents: scopedClassStudents, attData, chosenSchedules, trialReqs });
+      const rows = buildRowsForMonth({ ym, classes, classStudents: scopedClassStudents, attData, chosenSchedules, trialReqs, suppSessions });
       const groups = groupRows(rows).map(group => ({
         ...group,
         payment: paymentByMonth[ym]?.[group.studentId] || null,
@@ -1451,7 +1598,7 @@ Nhập số tiền hoàn lại (>0):`,
       .filter(ym => ym <= today)
       .sort()
       .map(ym => {
-        const rows = groupedByMonth[ym] || groupRows(buildRowsForMonth({ ym, classes, classStudents: scopedClassStudents, attData, chosenSchedules }));
+        const rows = groupedByMonth[ym] || groupRows(buildRowsForMonth({ ym, classes, classStudents: scopedClassStudents, attData, chosenSchedules, trialReqs, suppSessions }));
         const groups = rows.map(group => ({
           ...group,
           payment: paymentByMonth[ym]?.[group.studentId] || null,
@@ -1987,6 +2134,12 @@ Nhập số tiền hoàn lại (>0):`,
 
     if (window.MindupLiveUI?.watchTable) {
       realtimeChannel = window.MindupLiveUI.watchTable("tuition_payments", () => {
+        loadTuition();
+      });
+      window.MindupLiveUI.watchTable("supplementary_sessions", () => {
+        loadTuition();
+      });
+      window.MindupLiveUI.watchTable("supplementary_session_students", () => {
         loadTuition();
       });
     }

@@ -10,6 +10,7 @@
   }
 
   let _allClasses    = [];
+  let _suppSessions  = [];
   let _scheduleMap   = {};
   let _teacherMap    = {};
   let _studentCount  = {};
@@ -37,23 +38,16 @@
       }
 
       let classIds = null;
+      let parentStudentIds = [];
 
       if(role === "teacher" || role === "assistant"){
         const { data: myRows } = await getSb()
           .from("class_teachers").select("class_id").eq("teacher_id", uid);
         classIds = (myRows||[]).map(r => r.class_id);
-        if(!classIds.length){
-          container.innerHTML = '<div style="color:var(--ink-light);padding:20px">Bạn chưa phụ trách lớp nào.</div>';
-          return;
-        }
       } else if(role === "student"){
         const { data: myRows } = await getSb()
           .from("class_students").select("class_id").eq("student_id", uid).is("left_at", null);
         classIds = (myRows||[]).map(r => r.class_id);
-        if(!classIds.length){
-          container.innerHTML = '<div style="color:var(--ink-light);padding:20px">Bạn chưa tham gia lớp nào.</div>';
-          return;
-        }
       } else if(role === "parent"){
         const { data: links, error: linkError } = await getSb()
           .from("parent_students")
@@ -61,50 +55,105 @@
           .eq("parent_id", uid)
           .is("revoked_at", null);
         if(linkError) throw linkError;
-        const studentIds = [...new Set((links || []).map(row => row.student_id).filter(Boolean))];
-        if(!studentIds.length){
-          container.innerHTML = '<div style="color:var(--ink-light);padding:20px">Tài khoản phụ huynh chưa liên kết với học sinh nào.</div>';
-          return;
-        }
-        const { data: myRows, error: classLinkError } = await getSb()
-          .from("class_students")
-          .select("class_id")
-          .in("student_id", studentIds)
-          .is("left_at", null);
-        if(classLinkError) throw classLinkError;
-        classIds = [...new Set((myRows||[]).map(r => r.class_id).filter(Boolean))];
-        if(!classIds.length){
-          container.innerHTML = '<div style="color:var(--ink-light);padding:20px">Chưa có lớp học nào của học sinh được liên kết.</div>';
-          return;
+        parentStudentIds = [...new Set((links || []).map(row => row.student_id).filter(Boolean))];
+        if(parentStudentIds.length){
+          const { data: myRows, error: classLinkError } = await getSb()
+            .from("class_students")
+            .select("class_id")
+            .in("student_id", parentStudentIds)
+            .is("left_at", null);
+          if(classLinkError) throw classLinkError;
+          classIds = [...new Set((myRows||[]).map(r => r.class_id).filter(Boolean))];
+        } else {
+          classIds = [];
         }
       }
 
-      let classQuery = sb
-        .from("classes")
-        .select("id,class_name,tuition_fee,tuition_type,grade_id,subject_id,hidden,grades(name),subjects(name)")
-        .order("class_name", { ascending: true });
-      if(classIds !== null) classQuery = classQuery.in("id", classIds);
-      // Teacher và student chỉ thấy lớp không bị ẩn
-      if(role !== "admin" && role !== "accountant") classQuery = classQuery.eq("hidden", false);
+      // Tải danh sách buổi dạy bổ sung (phụ đạo 1 lần)
+      let suppQuery = sb
+        .from("supplementary_sessions")
+        .select(`
+          id, parent_class_id, teacher_id, topic, session_date, starts_at, ends_at, room_id, fee_per_student, status,
+          parent_class:classes(id, class_name),
+          teacher:users!teacher_id(id, full_name),
+          room:rooms(id, room_name),
+          students:supplementary_session_students(student_id, attendance_status, tuition_fee)
+        `)
+        .order("session_date", { ascending: false });
 
-      const [
-        { data: classes,  error: e1 },
-        { data: schedules, error: e2 },
-        { data: teachers },
-        { data: students },
-      ] = await Promise.all([
-        classQuery,
-        sb.from("class_schedules").select("*,rooms(room_name,capacity)")
-          .order("weekday",    { ascending: true })
-          .order("start_time", { ascending: true }),
-        sb.from("class_teachers").select("class_id,teacher_id"),
-        sb.from("class_students").select("class_id,student_id,left_at"),
-      ]);
+      _suppSessions = [];
+      try {
+        const { data: suppData, error: suppErr } = await suppQuery;
+        if (!suppErr && Array.isArray(suppData)) {
+          _suppSessions = suppData.filter(s => {
+            if (role === "admin" || role === "accountant") return true;
+            if (role === "teacher" || role === "assistant") {
+              return s.teacher_id === uid || (Array.isArray(classIds) && classIds.includes(s.parent_class_id));
+            }
+            if (role === "student") {
+              return (s.students || []).some(st => st.student_id === uid);
+            }
+            if (role === "parent") {
+              return (s.students || []).some(st => parentStudentIds.includes(st.student_id));
+            }
+            return false;
+          });
+        }
+      } catch (suppErr) {
+        console.warn("Lỗi tải buổi học bổ sung:", suppErr);
+      }
 
-      if(e1) throw e1;
-      if(e2) throw e2;
+      let classes = [];
+      let schedules = [];
+      let teachers = [];
+      let students = [];
 
-      _allClasses = classes || [];
+      if (classIds === null || classIds.length > 0) {
+        let classQuery = sb
+          .from("classes")
+          .select("id,class_name,tuition_fee,tuition_type,grade_id,subject_id,hidden,grades(name),subjects(name)")
+          .order("class_name", { ascending: true });
+        if(classIds !== null) classQuery = classQuery.in("id", classIds);
+        // Teacher và student chỉ thấy lớp không bị ẩn
+        if(role !== "admin" && role !== "accountant") classQuery = classQuery.eq("hidden", false);
+
+        const [
+          { data: resClasses,  error: e1 },
+          { data: resSchedules, error: e2 },
+          { data: resTeachers },
+          { data: resStudents },
+        ] = await Promise.all([
+          classQuery,
+          sb.from("class_schedules").select("*,rooms(room_name,capacity)")
+            .order("weekday",    { ascending: true })
+            .order("start_time", { ascending: true }),
+          sb.from("class_teachers").select("class_id,teacher_id"),
+          sb.from("class_students").select("class_id,student_id,left_at"),
+        ]);
+
+        if(e1) throw e1;
+        if(e2) throw e2;
+
+        classes = resClasses || [];
+        schedules = resSchedules || [];
+        teachers = resTeachers || [];
+        students = resStudents || [];
+      }
+
+      _allClasses = classes;
+
+      if(!_allClasses.length && !_suppSessions.length){
+        if(role === "teacher" || role === "assistant"){
+          container.innerHTML = '<div style="color:var(--ink-light);padding:20px">Bạn chưa phụ trách lớp nào.</div>';
+        } else if(role === "student"){
+          container.innerHTML = '<div style="color:var(--ink-light);padding:20px">Bạn chưa tham gia lớp nào.</div>';
+        } else if(role === "parent"){
+          container.innerHTML = '<div style="color:var(--ink-light);padding:20px">Chưa có lớp học nào của học sinh được liên kết.</div>';
+        } else {
+          container.innerHTML = '<div style="color:var(--ink-light);padding:20px">Chưa có lớp học nào.</div>';
+        }
+        return;
+      }
 
       _scheduleMap = {};
       (schedules||[]).forEach(s => {
@@ -350,12 +399,73 @@
       </section>`;
   }
 
+  function renderSupplementarySessions(sessions, role){
+    if(!sessions || !sessions.length) return "";
+    const canManage = ["admin","accountant","teacher","assistant"].includes(role);
+    const sorted = [...sessions].sort((a,b) => {
+      if(a.status === "scheduled" && b.status !== "scheduled") return -1;
+      if(a.status !== "scheduled" && b.status === "scheduled") return 1;
+      return String(b.session_date || "").localeCompare(String(a.session_date || "")) ||
+             String(b.starts_at || "").localeCompare(String(a.starts_at || ""));
+    });
+
+    const cards = sorted.map(s => {
+      const isCompleted = s.status === "completed";
+      const studentCount = (s.students || []).length;
+      const feeStr = new Intl.NumberFormat("vi-VN").format(s.fee_per_student || 0) + "đ";
+      const timeStr = (s.starts_at ? s.starts_at.slice(0, 5) : "") + (s.ends_at ? " - " + s.ends_at.slice(0, 5) : "");
+      const roomStr = s.room?.room_name ? ` • 🚪 ${esc(s.room.room_name)}` : "";
+      const dateParts = String(s.session_date || "").split("-");
+      const dateFormatted = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : s.session_date;
+
+      const clickAttr = canManage
+        ? `onclick="if(window.cvOpenSupplementaryAttendanceModal) window.cvOpenSupplementaryAttendanceModal('${s.id}')"`
+        : `onclick="alert('Buổi học bổ sung: ${jsArg(s.topic)}\\nLớp gốc: ${jsArg(s.parent_class?.class_name || '')}\\nNgày: ${dateFormatted} (${timeStr})')"`;
+
+      return `
+        <button class="supp-class-card ${isCompleted ? 'completed' : ''}" type="button" ${clickAttr} title="${canManage ? 'Bấm để điểm danh & hoàn thành buổi học' : 'Xem thông tin buổi bổ sung'}">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+            <span class="supp-class-badge ${s.status}">
+              ${isCompleted ? '✓ Đã hoàn thành' : '⏳ Chờ học'}
+            </span>
+            <span style="font-size:.72rem;color:var(--ink-light);font-weight:700">${esc(dateFormatted)}</span>
+          </div>
+          <strong>⭐ ${esc(s.topic || 'Dạy bổ sung')}</strong>
+          <div class="supp-class-meta">
+            <span>🏫 ${esc(s.parent_class?.class_name || 'Lớp học')}</span>
+          </div>
+          <div class="supp-class-meta">
+            <span>⏰ ${esc(timeStr)}${roomStr}</span>
+          </div>
+          <div class="supp-class-meta">
+            <span>👨‍🏫 ${esc(s.teacher?.full_name || 'Giáo viên')}</span>
+          </div>
+          <div class="supp-class-meta" style="font-weight:700;color:#92400e">
+            <span>👥 ${studentCount} học sinh</span>
+            <span>• 💰 ${feeStr}</span>
+          </div>
+        </button>`;
+    }).join("");
+
+    return `
+      <section class="supp-classes-panel">
+        <div class="supp-classes-head">
+          <div>
+            <h2>⭐ Buổi dạy bổ sung (Phụ đạo)</h2>
+            <p>Các buổi phụ đạo 1 lần. Bấm vào ô để điểm danh & hoàn thành buổi học.</p>
+          </div>
+          <span>${sessions.length} buổi</span>
+        </div>
+        <div class="supp-class-grid">${cards}</div>
+      </section>`;
+  }
+
   function renderClasses(classes){
     const role    = window._currentRole || "student";
     const countEl = document.getElementById("filterCount");
     if(countEl) countEl.textContent = classes.length + " lớp";
 
-    if(!classes.length){
+    if(!classes.length && !_suppSessions.length){
       container.innerHTML = `
         <div class="empty-state">
           <div class="icon">🔍</div>
@@ -372,7 +482,7 @@
     });
 
     const nextContainer = document.createElement("div");
-    nextContainer.innerHTML = renderTodayClassSessions(classes, role);
+    nextContainer.innerHTML = renderTodayClassSessions(classes, role) + renderSupplementarySessions(_suppSessions, role);
 
     gradeOrder.forEach(grade => {
       const block = document.createElement("div");
@@ -532,7 +642,7 @@
   };
 
   window.loadMyClasses = loadMyClasses;
-  ["classes","class_schedules","class_teachers","class_students"].forEach(table => {
+  ["classes","class_schedules","class_teachers","class_students","supplementary_sessions"].forEach(table => {
     window.MindupLiveUI?.watchTable?.(table, () => loadMyClasses({silent:true}));
   });
 
