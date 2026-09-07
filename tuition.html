@@ -956,6 +956,7 @@ tr.recalc-needed td:first-child { border-left: 3px solid #ef4444; }
     </div>
     <div class="toolbar-group actions">
       <button onclick="loadTuition()">Tải lại</button>
+      <button class="secondary" id="transferAllSurplusBtn" onclick="transferAllSurplusToNextMonth()" style="display:none;background:#e0f2fe;color:#0369a1;border-color:#bae6fd;font-weight:700">➡️ Chuyển dư tất cả</button>
       <button class="secondary" id="notifyTuitionBtn" onclick="notifyPendingTuition()" style="display:none">Thông báo học phí</button>
       <button class="secondary" onclick="printInvoices()">In hóa đơn</button>
       <button class="secondary" id="lockTuitionBtn" onclick="toggleTuitionLock()" style="display:none">🔒 Chốt học phí</button>

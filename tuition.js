@@ -420,7 +420,17 @@
             <div class="tuition-payment-number"><span>Tổng cần nộp</span><b>${fmt(group.amount)}đ</b></div>
             <div class="tuition-payment-number paid"><span>Đã nộp</span><b>${fmt(amountPaid)}đ</b></div>
             <div class="tuition-payment-number remaining"><span>Còn thiếu</span><b>${fmt(remaining)}đ</b></div>
-            ${overpaid > 0 ? `<div class="tuition-payment-number overpaid"><span>Nộp thừa</span><b>${fmt(overpaid)}đ</b></div>` : ""}
+            ${overpaid > 0 ? `
+            <div class="tuition-payment-number overpaid">
+              <span>Nộp thừa</span><b>${fmt(overpaid)}đ</b>
+              ${canManagePayments() ? `
+              <div style="margin-top:6px">
+                <button class="action-btn" type="button" style="background:#0284c7;color:#fff;font-weight:700;padding:4px 8px;font-size:11px"
+                  onclick="event.stopPropagation();transferSurplusToNextMonth('${group.studentId}','${group.ym}',${group.amount})">
+                  ➡️ Chuyển ${fmt(overpaid)}đ sang tháng sau
+                </button>
+              </div>` : ""}
+            </div>` : ""}
             <div class="tuition-payment-number"><span>Ngày thu gần nhất</span><b>${fmtDate(payment?.paid_at)}</b></div>
           </div>
           <div>
@@ -589,26 +599,101 @@
     }, existingNext);
   }
 
-  async function normalizeOverpaidPayments(rows, ym) {
-    if (!canManagePayments()) return false;
-    let changed = false;
-    for (const group of rows || []) {
-      const payment = paymentMap[group.studentId];
-      const paid = Number(payment?.amount_paid || 0);
-      const due = Math.max(0, Number(group.amount || 0));
-      if (!payment?.id || paid <= due) continue;
-      const surplus = paid - due;
-      const now = payment.paid_at || new Date().toISOString();
-      await upsertPayment(group.studentId, ym, {
+  /* ─────────────────────────────────────────────
+     CHUYỂN HỌC PHÍ THỪA THỦ CÔNG SANG THÁNG SAU
+  ───────────────────────────────────────────── */
+  window.transferSurplusToNextMonth = async function (studentId, ym, amountDue) {
+    if (!canManagePayments()) {
+      alert("Bạn không có quyền thực hiện thao tác này.");
+      return;
+    }
+    const existing = paymentMap[studentId];
+    const paid = Number(existing?.amount_paid || 0);
+    const due = Math.max(0, Number(amountDue || 0));
+    const surplus = paid - due;
+    if (surplus <= 0) {
+      alert("Học sinh này không có tiền học phí nộp thừa.");
+      return;
+    }
+    const nextYm = addMonths(ym, 1);
+    const studentGroup = getStudentGroup(studentId);
+    const studentName = studentGroup?.studentName || "Học sinh";
+
+    if (!confirm(`Học sinh: ${studentName}\nTháng hiện tại: ${ym}\nSố tiền nộp thừa: ${fmt(surplus)}đ\n\nBạn có chắc muốn chuyển số tiền thừa ${fmt(surplus)}đ này sang học phí tháng ${nextYm}?`)) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    try {
+      await upsertPayment(studentId, ym, {
         amount_due: due,
         amount_paid: due,
-        paid_at: now,
+        paid_at: existing?.paid_at || now,
       });
-      await carryOverTuitionPayment(group.studentId, ym, surplus, now);
-      changed = true;
+      const carryPayment = await carryOverTuitionPayment(studentId, ym, surplus, now);
+      await window.AppAdminTools?.recordAudit?.("tuition_surplus_transferred_manually", {
+        target_type: "tuition_payment",
+        target_id: existing?.id || null,
+        student_id: studentId,
+        source_month: ym,
+        target_month: nextYm,
+        surplus_amount: surplus,
+        carried_payment_id: carryPayment?.id || null,
+      });
+      alert(`Đã chuyển ${fmt(surplus)}đ tiền thừa của ${studentName} sang tháng ${nextYm} thành công.`);
+      await loadTuition();
+    } catch (err) {
+      alert("Lỗi khi chuyển tiền thừa: " + err.message);
     }
-    return changed;
-  }
+  };
+
+  window.transferAllSurplusToNextMonth = async function () {
+    if (!canManagePayments()) {
+      alert("Bạn không có quyền thực hiện thao tác này.");
+      return;
+    }
+    const ym = monthPicker?.value;
+    if (!ym) return;
+    const nextYm = addMonths(ym, 1);
+    const overpaidList = (currentRows || []).filter(r => {
+      const p = paymentMap[r.studentId];
+      const paid = Number(p?.amount_paid || 0);
+      return paid > r.amount;
+    });
+    if (!overpaidList.length) {
+      alert("Không có học sinh nào nộp thừa trong tháng " + ym);
+      return;
+    }
+    const totalSurplus = overpaidList.reduce((sum, r) => {
+      const p = paymentMap[r.studentId];
+      return sum + (Number(p?.amount_paid || 0) - r.amount);
+    }, 0);
+
+    if (!confirm(`Có ${overpaidList.length} học sinh nộp thừa trong tháng ${ym} với tổng số tiền ${fmt(totalSurplus)}đ.\n\nBạn có chắc muốn chuyển toàn bộ số tiền thừa này sang học phí tháng ${nextYm}?`)) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    let successCount = 0;
+    for (const r of overpaidList) {
+      try {
+        const p = paymentMap[r.studentId];
+        const surplus = Number(p?.amount_paid || 0) - r.amount;
+        if (surplus <= 0) continue;
+        await upsertPayment(r.studentId, ym, {
+          amount_due: r.amount,
+          amount_paid: r.amount,
+          paid_at: p?.paid_at || now,
+        });
+        await carryOverTuitionPayment(r.studentId, ym, surplus, now);
+        successCount++;
+      } catch (err) {
+        console.error("Lỗi chuyển thừa cho", r.studentName, err);
+      }
+    }
+    alert(`Đã chuyển thành công tiền thừa của ${successCount}/${overpaidList.length} học sinh sang tháng ${nextYm}.`);
+    await loadTuition();
+  };
 
   /* ─────────────────────────────────────────────
      THU TIỀN — nhập số tiền phụ huynh nộp
@@ -633,8 +718,7 @@ Nhập số tiền thu thêm lần này:`,
     if (isNaN(addAmount) || addAmount <= 0) { alert("Số tiền không hợp lệ"); return; }
 
     const totalPaidInput = alreadyPaid + addAmount;
-    const newPaid = Math.min(totalPaidInput, amountDue);
-    const carryOverAmount = Math.max(0, totalPaidInput - amountDue);
+    const newPaid = totalPaidInput;
     const now     = new Date().toISOString();
     const previousPayment = paymentMap[studentId] ? {...paymentMap[studentId]} : null;
     paymentMap[studentId] = {
@@ -653,10 +737,6 @@ Nhập số tiền thu thêm lần này:`,
         amount_paid: newPaid,
         paid_at:     now,
       });
-      let carryOverPayment = null;
-      if (carryOverAmount > 0) {
-        carryOverPayment = await carryOverTuitionPayment(studentId, ym, carryOverAmount, now);
-      }
       await window.AppAdminTools?.recordAudit?.("tuition_payment_collected", {
         target_type: "tuition_payment",
         target_id: paymentMap[studentId]?.id || null,
@@ -665,9 +745,6 @@ Nhập số tiền thu thêm lần này:`,
         amount_due: amountDue,
         added_amount: addAmount,
         amount_paid: newPaid,
-        carried_over_amount: carryOverAmount,
-        carried_over_to_month: carryOverAmount > 0 ? addMonths(ym, 1) : null,
-        carried_over_payment_id: carryOverPayment?.id || null,
       });
       // === MINDUP BOT: Xác nhận học phí (gửi khi đã đóng đủ) ===
       try {
@@ -693,8 +770,8 @@ Nhập số tiền thu thêm lần này:`,
         }
       } catch(botErr){ console.warn('[MindUpBot] Lỗi gửi tin nhắn xác nhận học phí:', botErr); }
       // === END MINDUP BOT ===
-      if (carryOverAmount > 0) {
-        alert(`Đã ghi nhận đủ học phí tháng ${ym} và chuyển ${fmt(carryOverAmount)}đ sang tháng ${addMonths(ym, 1)}.`);
+      if (newPaid > amountDue) {
+        alert(`Đã ghi nhận thu ${fmt(addAmount)}đ. Học sinh đang nộp thừa ${fmt(newPaid - amountDue)}đ (bạn có thể bấm nút "Chuyển dư" khi cần chuyển sang tháng sau).`);
       }
       renderRows();
     } catch (err) {
@@ -1171,7 +1248,6 @@ Nhập số tiền hoàn lại (>0):`,
 
       // Gộp theo studentId
       buildGrouped();
-      await normalizeOverpaidPayments(grouped, ym);
       syncClassFilterOptions();
       renderRows();
 
@@ -1510,6 +1586,11 @@ Nhập số tiền hoàn lại (>0):`,
                onclick="event.stopPropagation();collectPayment('${g.studentId}','${ym}',${g.amount})">
                 💵 Thu tiền
               </button>
+              ${overpaid > 0 ? `
+              <button class="action-btn" style="background:#0284c7;color:#fff;font-weight:700"
+               onclick="event.stopPropagation();transferSurplusToNextMonth('${g.studentId}','${ym}',${g.amount})">
+                ➡️ Chuyển dư (${fmt(overpaid)}đ)
+              </button>` : ""}
               <button class="action-btn refund"
                onclick="event.stopPropagation();refundPayment('${g.studentId}','${ym}',${g.amount})">
                 ↩ Hoàn tiền
@@ -1703,7 +1784,7 @@ Nhập số tiền hoàn lại (>0):`,
      SUMMARY
   ───────────────────────────────────────────── */
   function updateSummary(rows, ym) {
-    let total = 0, collected = 0, deficit = 0, surplus = 0;
+    let total = 0, collected = 0, deficit = 0, surplus = 0, overpaidCount = 0;
     rows.forEach(g => {
       const p       = paymentMap[g.studentId];
       const paid    = p?.amount_paid || 0;
@@ -1711,12 +1792,25 @@ Nhập số tiền hoàn lại (>0):`,
       total     += g.amount;
       collected += paid;
       if (status === "partial" || status === "unpaid") deficit  += (g.amount - paid);
-      if (status === "overpaid")                       surplus  += (paid - g.amount);
+      if (status === "overpaid") {
+        surplus  += (paid - g.amount);
+        overpaidCount++;
+      }
     });
     document.getElementById("sumTotal").textContent    = fmt(total)     + "đ";
     document.getElementById("sumPaid").textContent     = fmt(collected) + "đ";
     document.getElementById("sumUnpaid").textContent   = fmt(deficit)   + "đ";
     document.getElementById("sumOverpaid").textContent = surplus > 0 ? fmt(surplus) + "đ" : "—";
+
+    const transferAllBtn = document.getElementById("transferAllSurplusBtn");
+    if (transferAllBtn) {
+      if (canManagePayments() && overpaidCount > 0) {
+        transferAllBtn.style.display = "inline-flex";
+        transferAllBtn.textContent = `➡️ Chuyển dư (${overpaidCount} HS - ${fmt(surplus)}đ)`;
+      } else {
+        transferAllBtn.style.display = "none";
+      }
+    }
   }
 
   /* ─────────────────────────────────────────────
