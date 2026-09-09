@@ -2147,6 +2147,15 @@
       student_name: userData?.full_name || studentName || null,
       joined_at: joinedDate,
     });
+    try {
+      await sb.from("trial_lesson_requests")
+        .update({ status: "enrolled", handled_at: new Date().toISOString() })
+        .eq("trial_class_id", classId)
+        .eq("student_id", studentId)
+        .neq("status", "enrolled");
+    } catch(trialErr) {
+      console.warn("Lỗi đồng bộ trạng thái học thử:", trialErr);
+    }
     cvCloseAddStudent();
     await renderAttendanceTab();
   };

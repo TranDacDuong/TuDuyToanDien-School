@@ -2577,6 +2577,7 @@ function trialStatusKey(status){
 function trialComputedStatus(item){
   const stored = trialStatusKey(item?.status);
   if(['cancelled','enrolled','closed'].includes(stored)) return stored;
+  if(item?.isEnrolled || item?.enrolled_in_class) return 'enrolled';
   if(!item?.trial_class_id || !item?.trial_session_1_at || !item?.trial_session_2_at) return 'pending_schedule';
   const now = Date.now();
   const first = new Date(item.trial_session_1_at).getTime();
@@ -2906,6 +2907,7 @@ async function loadTrialRequests(){
   const teacherIds = [...new Set(rows.map(item => item.teacher_id).filter(Boolean))];
   const studentIds = [...new Set(rows.map(item => item.student_id).filter(Boolean))];
   const directParentIds = [...new Set(rows.map(item => item.parent_id).filter(Boolean))];
+  const classIds = [...new Set(rows.map(item => item.trial_class_id).filter(Boolean))];
   let teacherMap = {};
   let directParentMap = {};
   let parentMapByStudent = {};
@@ -2917,6 +2919,21 @@ async function loadTrialRequests(){
   if(directParentIds.length){
     const { data: parents } = await sb.from('users').select('id,full_name,email,phone,role,account_password').in('id', directParentIds);
     directParentMap = Object.fromEntries((parents || []).filter(parent => parent.role === 'parent').map(parent => [parent.id, parent]));
+  }
+  let enrolledStudentClassSet = new Set();
+  if(studentIds.length && classIds.length){
+    try {
+      const { data: enrolledStudents } = await sb.from('class_students')
+        .select('class_id,student_id')
+        .in('student_id', studentIds)
+        .in('class_id', classIds)
+        .is('left_at', null);
+      (enrolledStudents || []).forEach(cs => {
+        enrolledStudentClassSet.add(`${cs.student_id}_${cs.class_id}`);
+      });
+    } catch(err) {
+      console.warn('Lỗi kiểm tra học sinh đã vào lớp:', err);
+    }
   }
   if(studentIds.length){
     const { data: students } = await sb.from('users').select('id,full_name,email,phone,parent_full_name,parent_phone,school').in('id', studentIds);
@@ -2935,7 +2952,17 @@ async function loadTrialRequests(){
       if(!parentMapByStudent[link.student_id] && linkParentMap[link.parent_id]) parentMapByStudent[link.student_id] = linkParentMap[link.parent_id];
     });
   }
-  _trialRequests = rows.map(item => ({ ...item, teacher: teacherMap[item.teacher_id] || null, linkedStudent: _trialStudentMap[item.student_id] || null, linkedParent: directParentMap[item.parent_id] || parentMapByStudent[item.student_id] || null }));
+  _trialRequests = rows.map(item => {
+    const isEnrolled = !!(item.student_id && item.trial_class_id && enrolledStudentClassSet.has(`${item.student_id}_${item.trial_class_id}`));
+    return {
+      ...item,
+      isEnrolled,
+      status: (isEnrolled && item.status !== 'enrolled') ? 'enrolled' : item.status,
+      teacher: teacherMap[item.teacher_id] || null,
+      linkedStudent: _trialStudentMap[item.student_id] || null,
+      linkedParent: directParentMap[item.parent_id] || parentMapByStudent[item.student_id] || null
+    };
+  });
   syncTrialComputedStatuses();
   renderTrialRequests();
 }
@@ -3026,7 +3053,12 @@ function renderTrialRequests(){
 async function syncTrialComputedStatuses(){
   const updates = _trialRequests
     .map(item => ({ item, next: trialComputedStatus(item) }))
-    .filter(({ item, next }) => next !== trialStatusKey(item.status) && ['pending_schedule','scheduled','trial_1_done'].includes(trialStatusKey(item.status)));
+    .filter(({ item, next }) => {
+      const current = trialStatusKey(item.status);
+      if (next === current) return false;
+      if (next === 'enrolled') return current !== 'enrolled';
+      return ['pending_schedule','scheduled','trial_1_done'].includes(current);
+    });
   if(!updates.length) return;
   const user = await window.AppAuth?.getUser?.();
   await Promise.all(updates.map(({ item, next }) =>
@@ -3341,7 +3373,13 @@ async function saveTrialRequest(options = {}){
     alert('Thời gian học thử buổi 2 phải sau buổi 1.');
     return null;
   }
-  payload.status = trialComputedStatus({ ...payload, status: classId ? 'scheduled' : 'pending_schedule' });
+  const currentItem = id ? _trialRequests.find(r => String(r.id) === String(id)) : null;
+  const currentStatus = trialStatusKey(currentItem?.status);
+  if(['enrolled', 'cancelled', 'closed'].includes(currentStatus)){
+    payload.status = currentStatus;
+  } else {
+    payload.status = trialComputedStatus({ ...payload, status: classId ? 'scheduled' : 'pending_schedule' });
+  }
   const user = await window.AppAuth?.getUser?.();
   payload.handled_by = user?.id || null;
   payload.handled_at = new Date().toISOString();
@@ -3542,7 +3580,7 @@ async function addTrialStudentToClass(id){
     });
   }
   if (trialAttRows.length) {
-    await sb.from('attendance').upsert(trialAttRows, { onConflict: 'class_id,student_id,date,schedule_id' }).catch(err => {
+    await sb.from('attendance').upsert(trialAttRows, { onConflict: 'class_id,student_id,date' }).catch(err => {
       console.warn('Lỗi lưu điểm danh học thử:', err);
     });
   }
