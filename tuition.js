@@ -44,7 +44,7 @@
       }
     }
     const code = shortStudentId ? `HPHS${monthTag}${shortStudentId}` : (shortPaymentId ? `HP${monthTag}${shortPaymentId}` : `HP${monthTag}`);
-    return code.trim();
+    return `SEVQR ${code}`.trim();
   }
 
   const STATIC_BANK_INFO = {

@@ -33,60 +33,6 @@ interface CassoWebhookPayload {
   data?: CassoTransaction[];
 }
 
-interface PayOSWebhookData {
-  orderCode?: number | string;
-  amount?: number;
-  description?: string;
-  accountNumber?: string;
-  reference?: string;
-  transactionDateTime?: string;
-  paymentLinkId?: string;
-  currency?: string;
-  code?: string;
-  desc?: string;
-}
-
-interface PayOSWebhookPayload {
-  code?: string;
-  desc?: string;
-  success?: boolean;
-  data?: PayOSWebhookData;
-  signature?: string;
-}
-
-async function verifyPayOSSignature(
-  data: Record<string, any>,
-  signature: string,
-  checksumKey: string
-): Promise<boolean> {
-  if (!checksumKey || !signature) return false;
-  try {
-    const sortedKeys = Object.keys(data).sort();
-    const queryString = sortedKeys
-      .map((k) => `${k}=${data[k] === null || data[k] === undefined ? "" : data[k]}`)
-      .join("&");
-
-    const encoder = new TextEncoder();
-    const keyData = encoder.encode(checksumKey);
-    const msgData = encoder.encode(queryString);
-
-    const cryptoKey = await crypto.subtle.importKey(
-      "raw",
-      keyData,
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"]
-    );
-    const sigBuffer = await crypto.subtle.sign("HMAC", cryptoKey, msgData);
-    const hashArray = Array.from(new Uint8Array(sigBuffer));
-    const hexSignature = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-    return hexSignature.toLowerCase() === signature.toLowerCase();
-  } catch (err) {
-    console.error("[PayOS] Signature verification error:", err);
-    return false;
-  }
-}
-
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -191,10 +137,6 @@ serve(async (req: Request) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  if (req.method === "GET") {
-    return jsonResponse({ success: true, message: "Tuition bank webhook endpoint is active" });
-  }
-
   try {
     const url = new URL(req.url);
     const authHeader = req.headers.get("Authorization") || "";
@@ -247,35 +189,6 @@ serve(async (req: Request) => {
           content: String(tx.description || ""),
           raw: tx,
         });
-      });
-    } else if (rawJson.data && typeof rawJson.data === "object" && !Array.isArray(rawJson.data)) {
-      // Check PayOS format
-      const payosPayload = rawJson as PayOSWebhookPayload;
-      const tx = payosPayload.data || ({} as PayOSWebhookData);
-      const signature = payosPayload.signature || "";
-      const payosChecksumKey = env("PAYOS_CHECKSUM_KEY") || expectedSecret;
-
-      if (payosChecksumKey && signature) {
-        const isValid = await verifyPayOSSignature(tx as Record<string, any>, signature, payosChecksumKey);
-        if (!isValid) {
-          console.warn("[PayOS Webhook] Invalid signature verification!");
-          return jsonResponse({ success: false, message: "Invalid PayOS signature" }, 401);
-        }
-      }
-
-      // Check if PayOS test webhook ping
-      const descLower = String(tx.description || "").toLowerCase();
-      if (descLower.includes("webhook test") || descLower.includes("ma don hang")) {
-        console.log("[PayOS Webhook] Received PayOS test webhook confirmation.");
-      }
-
-      itemsToProcess.push({
-        gateway: "payos",
-        txId: String(tx.reference || tx.orderCode || Date.now()),
-        accountNo: String(tx.accountNumber || ""),
-        amount: Number(tx.amount || 0),
-        content: String(tx.description || ""),
-        raw: rawJson,
       });
     } else if (rawJson.amount && (rawJson.content || rawJson.description)) {
       // Generic bank format
