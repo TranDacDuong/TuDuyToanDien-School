@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS public.teacher_salaries (
   base_tier_percent numeric NOT NULL DEFAULT 30,
   special_class_id uuid REFERENCES public.classes(id) ON DELETE SET NULL,
   special_class_percent numeric DEFAULT 0,
+  special_classes jsonb DEFAULT '[]'::jsonb,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT teacher_salaries_pkey PRIMARY KEY (teacher_id),
@@ -14,7 +15,8 @@ CREATE TABLE IF NOT EXISTS public.teacher_salaries (
 -- Ensure columns exist if table already exists
 ALTER TABLE public.teacher_salaries
   ADD COLUMN IF NOT EXISTS special_class_id uuid REFERENCES public.classes(id) ON DELETE SET NULL,
-  ADD COLUMN IF NOT EXISTS special_class_percent numeric DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS special_class_percent numeric DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS special_classes jsonb DEFAULT '[]'::jsonb;
 
 
 -- Enable RLS

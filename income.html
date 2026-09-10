@@ -587,6 +587,14 @@
     color: var(--green);
   }
 
+  .report-table tr.special-tier {
+    background: rgba(245, 158, 11, 0.08);
+    font-weight: 600;
+  }
+  .report-table tr.special-tier td {
+    color: #b45309;
+  }
+
   .text-right { text-align: right; }
   .text-center { text-align: center; }
 
@@ -680,22 +688,12 @@
         <label id="configBonusLabel">Tỷ lệ thưởng Bậc 1 lớp cơ bản (%)</label>
         <input class="control-input" id="configBasePercent" type="number" min="0" max="100" placeholder="VD: 30" required>
       </div>
-      <div class="config-field" id="specialClassField">
-        <label>Lớp ôn thi đặc biệt</label>
-        <select class="control-input" id="configSpecialClass" style="background:#fff;">
-          <option value="">-- Không có lớp đặc biệt --</option>
-        </select>
-      </div>
-      <div class="config-field" id="specialPercentField">
-        <label>% Thưởng lớp đặc biệt</label>
-        <input class="control-input" id="configSpecialPercent" type="number" min="0" max="100" placeholder="VD: 40">
-      </div>
       <div>
         <button class="btn-save" type="submit" style="width:100%;">Lưu cấu hình</button>
       </div>
     </form>
-    <div id="specialClassNote" style="margin-top: 10px; font-size: 0.8rem; color: var(--gray-600); line-height: 1.4;">
-      💡 <i>Lớp ôn thi đặc biệt sẽ được tính % thưởng riêng trên doanh thu của lớp đó, và tách khỏi bảng tính thưởng lũy tiến của các lớp cơ bản (tính theo buổi).</i>
+    <div id="specialClassNote" style="margin-top: 10px; font-size: 0.82rem; color: var(--gray-600); line-height: 1.4;">
+      💡 <i>Để cấu hình các <b>Lớp ôn thi đặc biệt</b>, bạn có thể nhập % thưởng trực tiếp tại cột <b>"% Thưởng đặc biệt"</b> trong bảng <b>"Phân bổ doanh thu lớp học"</b> bên dưới rồi bấm <b>Lưu cấu hình</b>. Các lớp này sẽ được hưởng % thưởng riêng và tách khỏi biểu lũy tiến.</i>
     </div>
   </div>
 
@@ -927,10 +925,15 @@
                   <th>Lớp học</th>
                   <th class="text-center">Học sinh</th>
                   <th class="text-right">Doanh thu dự kiến</th>
+                  <th class="text-center" style="width: 170px;">% Thưởng đặc biệt</th>
                 </tr>
               </thead>
               <tbody id="classRevenueBody"></tbody>
             </table>
+          </div>
+          <div id="classTableSaveArea" style="margin-top: 12px; display: none; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <span style="font-size: 0.82rem; color: var(--gray-600);">💡 Nhập % thưởng cho các lớp đặc biệt (để 0 hoặc trống nếu là lớp cơ bản), sau đó bấm:</span>
+            <button class="btn-save" type="button" onclick="saveSalaryConfig(event)" style="font-size: 0.85rem; padding: 6px 14px;">💾 Lưu cấu hình thưởng</button>
           </div>
         </div>
       </div>
@@ -978,6 +981,7 @@
   let teacherSalaryConfig = {
     base_salary: DEFAULT_BASE_SALARY,
     base_tier_percent: DEFAULT_BASE_PERCENT,
+    special_classes: [],
     special_class_id: null,
     special_class_percent: 0
   };
@@ -1329,6 +1333,7 @@
       teacherSalaryConfig = {
         base_salary: DEFAULT_BASE_SALARY,
         base_tier_percent: DEFAULT_BASE_PERCENT,
+        special_classes: [],
         special_class_id: null,
         special_class_percent: 0
       };
@@ -1339,11 +1344,20 @@
     try {
       let { data, error } = await sb
         .from("teacher_salaries")
-        .select("base_salary, base_tier_percent, special_class_id, special_class_percent")
+        .select("base_salary, base_tier_percent, special_classes, special_class_id, special_class_percent")
         .eq("teacher_id", safeTeacherId)
         .maybeSingle();
 
-      // Graceful fallback if migration not run yet
+      // Graceful fallback if special_classes column not created yet
+      if (error && (error.message?.includes("special_classes") || error.code === "42703")) {
+        const fallbackRes = await sb
+          .from("teacher_salaries")
+          .select("base_salary, base_tier_percent, special_class_id, special_class_percent")
+          .eq("teacher_id", safeTeacherId)
+          .maybeSingle();
+        data = fallbackRes.data;
+        error = fallbackRes.error;
+      }
       if (error && (error.message?.includes("special_class") || error.code === "42703")) {
         const fallbackRes = await sb
           .from("teacher_salaries")
@@ -1357,17 +1371,22 @@
       if (error) throw error;
 
       if (data) {
+        let specialClasses = Array.isArray(data.special_classes) ? data.special_classes : [];
+        if (!specialClasses.length && data.special_class_id && Number(data.special_class_percent || 0) > 0) {
+          specialClasses = [{ class_id: data.special_class_id, percent: Number(data.special_class_percent) }];
+        }
         teacherSalaryConfig = {
           base_salary: Number(data.base_salary || DEFAULT_BASE_SALARY),
           base_tier_percent: Number(data.base_tier_percent || DEFAULT_BASE_PERCENT),
+          special_classes: specialClasses,
           special_class_id: data.special_class_id || null,
           special_class_percent: Number(data.special_class_percent || 0)
         };
       } else {
-        // Defaults if no config is customized yet
         teacherSalaryConfig = {
           base_salary: DEFAULT_BASE_SALARY,
           base_tier_percent: DEFAULT_BASE_PERCENT,
+          special_classes: [],
           special_class_id: null,
           special_class_percent: 0
         };
@@ -1377,6 +1396,7 @@
       teacherSalaryConfig = {
         base_salary: DEFAULT_BASE_SALARY,
         base_tier_percent: DEFAULT_BASE_PERCENT,
+        special_classes: [],
         special_class_id: null,
         special_class_percent: 0
       };
@@ -1385,18 +1405,14 @@
 
   // Save salary configuration (Admin only)
   async function saveSalaryConfig(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
     if (viewerProfile.role !== "admin" || isDbFallback) return;
 
     const baseSalaryInput = document.getElementById("configBaseSalary");
     const bonusInput = document.getElementById("configBasePercent");
-    const specialClassSelect = document.getElementById("configSpecialClass");
-    const specialPercentInput = document.getElementById("configSpecialPercent");
 
     const baseSalary = Number(baseSalaryInput?.value || 0);
     const bonusValue = Number(bonusInput?.value || 0);
-    const specialClassId = specialClassSelect ? (specialClassSelect.value || null) : null;
-    const specialPercent = specialPercentInput ? Number(specialPercentInput.value || 0) : 0;
     const safeStaffId = normalizeUuid(selectedTeacherId);
 
     if (!safeStaffId) {
@@ -1407,17 +1423,38 @@
       alert("Lương cứng và tỷ lệ thưởng phải hợp lệ.");
       return;
     }
-    if (isSelectedTeacherStaff()) {
-      if (bonusValue > 100 || specialPercent < 0 || specialPercent > 100) {
-        alert("Tỷ lệ % thưởng phải từ 0 đến 100.");
-        return;
-      }
+    if (isSelectedTeacherStaff() && bonusValue > 100) {
+      alert("Tỷ lệ % Bậc 1 lớp cơ bản phải từ 0 đến 100.");
+      return;
     }
 
+    // Collect special classes from inputs in the table
+    const specialClasses = [];
+    let hasInvalidPercent = false;
+    document.querySelectorAll(".special-class-rate-input").forEach(input => {
+      const classId = input.dataset.classId;
+      const val = (input.value || "").trim();
+      if (!val) return;
+      const pct = Number(val);
+      if (isNaN(pct) || pct < 0 || pct > 100) {
+        hasInvalidPercent = true;
+      } else if (pct > 0 && classId) {
+        specialClasses.push({ class_id: classId, percent: pct });
+      }
+    });
+
+    if (hasInvalidPercent) {
+      alert("Tỷ lệ % thưởng các lớp đặc biệt phải từ 0 đến 100.");
+      return;
+    }
+
+    let missingSpecialClassesCol = false;
     const sb = getSb();
-    const btn = event.target.querySelector("button");
-    btn.disabled = true;
-    btn.innerText = "Đang lưu...";
+    const btn = document.querySelector("#salaryConfigForm button[type='submit']") || (event?.target?.querySelector?.("button") || event?.target);
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = "Đang lưu...";
+    }
 
     try {
       if (isSelectedTeacherStaff()) {
@@ -1425,24 +1462,44 @@
           teacher_id: safeStaffId,
           base_salary: baseSalary,
           base_tier_percent: bonusValue,
-          special_class_id: specialClassId,
-          special_class_percent: specialClassId ? specialPercent : 0,
+          special_classes: specialClasses,
+          special_class_id: specialClasses[0]?.class_id || null,
+          special_class_percent: specialClasses[0]?.percent || 0,
           updated_at: new Date().toISOString()
         };
-        const { error } = await sb
+        let { error } = await sb
           .from("teacher_salaries")
           .upsert(payload, { onConflict: "teacher_id" });
+
+        if (error && (error.code === "42703" || error.message?.includes("special_classes"))) {
+          missingSpecialClassesCol = true;
+          const fallbackPayload = {
+            teacher_id: safeStaffId,
+            base_salary: baseSalary,
+            base_tier_percent: bonusValue,
+            special_class_id: specialClasses[0]?.class_id || null,
+            special_class_percent: specialClasses[0]?.percent || 0,
+            updated_at: new Date().toISOString()
+          };
+          const fallbackRes = await sb
+            .from("teacher_salaries")
+            .upsert(fallbackPayload, { onConflict: "teacher_id" });
+          error = fallbackRes.error;
+        }
+
         if (error) {
           if (error.code === "42703" || error.message?.includes("special_class")) {
-            throw new Error("Chưa chạy câu lệnh SQL bổ sung cột special_class_id và special_class_percent trong Supabase. Vui lòng chạy file SQL_create_teacher_salaries.sql.");
+            throw new Error("Chưa chạy câu lệnh SQL bổ sung cột vào bảng teacher_salaries trong Supabase. Vui lòng chạy file SQL_create_teacher_salaries.sql.");
           }
           throw error;
         }
+
         teacherSalaryConfig = {
           base_salary: baseSalary,
           base_tier_percent: bonusValue,
-          special_class_id: specialClassId,
-          special_class_percent: specialClassId ? specialPercent : 0
+          special_classes: specialClasses,
+          special_class_id: specialClasses[0]?.class_id || null,
+          special_class_percent: specialClasses[0]?.percent || 0
         };
       } else {
         const ym = document.getElementById("monthPicker").value;
@@ -1462,13 +1519,19 @@
         }
       }
 
-      alert("Đã cập nhật cấu hình lương thành công.");
+      if (typeof missingSpecialClassesCol !== 'undefined' && missingSpecialClassesCol && specialClasses.length > 1) {
+        alert("⚠️ Lưu ý: Database Supabase hiện chưa có cột 'special_classes' để lưu nhiều lớp ôn thi đặc biệt. Hệ thống tạm thời chỉ lưu được 1 lớp đầu tiên.\n\n👉 Vui lòng mở Supabase SQL Editor và chạy câu lệnh sau để lưu được nhiều lớp:\nALTER TABLE public.teacher_salaries ADD COLUMN IF NOT EXISTS special_classes jsonb DEFAULT '[]'::jsonb;");
+      } else {
+        alert("Đã cập nhật cấu hình lương và tỷ lệ thưởng các lớp thành công.");
+      }
       await calculateAndRender();
     } catch (err) {
       alert("Lỗi khi lưu cấu hình: " + err.message);
     } finally {
-      btn.disabled = false;
-      btn.innerText = "Lưu cấu hình";
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "Lưu cấu hình";
+      }
     }
   }
 
@@ -1618,11 +1681,18 @@
     return Number(snapClass?.amount || snapClass?.amount_due || 0);
   }
 
-  function calculateTeacherRevenueFromContext({ managedClassIds, managedCourseIds, context, ym, mStart, mEnd, specialClassId = null }) {
+  function calculateTeacherRevenueFromContext({ managedClassIds, managedCourseIds, context, ym, mStart, mEnd, specialClasses = [] }) {
     const teacherClassStudents = (context.allClassStudents || []).filter(cs => managedClassIds.includes(cs.class_id));
     const activeStudentIds = [...new Set(teacherClassStudents.map(cs => cs.student_id))];
     const studentClassExpectedMap = {};
     const studentTotalExpectedMap = {};
+
+    const specialMap = {};
+    (specialClasses || []).forEach(sc => {
+      if (sc && sc.class_id && Number(sc.percent) > 0) {
+        specialMap[sc.class_id] = Number(sc.percent);
+      }
+    });
 
     (context.allClassStudents || []).forEach(cs => {
       if (!activeStudentIds.includes(cs.student_id)) return;
@@ -1687,6 +1757,8 @@
     let totalProjectedClassRevenue = 0;
     let specialActualRevenue = 0;
     let specialProjectedRevenue = 0;
+    let specialBonusTotal = 0;
+    let specialProjectedBonusTotal = 0;
     let basicPerSessionActualRevenue = 0;
     let basicPerSessionProjectedRevenue = 0;
 
@@ -1705,12 +1777,15 @@
       totalProjectedClassRevenue += classExpected;
 
       const cls = context.classesMap[cs.class_id];
-      const isSpecial = specialClassId && String(cs.class_id) === String(specialClassId);
+      const specialPct = specialMap[cs.class_id] || 0;
+      const isSpecial = specialPct > 0;
       const isPerSession = (cls?.tuition_type || "per_session") === "per_session";
 
       if (isSpecial) {
         specialActualRevenue += studentClassRevenue;
         specialProjectedRevenue += classExpected;
+        specialBonusTotal += studentClassRevenue * (specialPct / 100);
+        specialProjectedBonusTotal += classExpected * (specialPct / 100);
       } else if (isPerSession) {
         basicPerSessionActualRevenue += studentClassRevenue;
         basicPerSessionProjectedRevenue += classExpected;
@@ -1729,6 +1804,8 @@
       projectedRevenue: totalProjectedClassRevenue + totalCourseRevenue,
       specialActualRevenue,
       specialProjectedRevenue,
+      specialBonusTotal,
+      specialProjectedBonusTotal,
       basicPerSessionActualRevenue,
       basicPerSessionProjectedRevenue,
     };
@@ -1804,6 +1881,7 @@
       map[id] = {
         base_salary: DEFAULT_BASE_SALARY,
         base_tier_percent: DEFAULT_BASE_PERCENT,
+        special_classes: [],
         special_class_id: null,
         special_class_percent: 0,
       };
@@ -1812,9 +1890,15 @@
     const sb = getSb();
     let queryRes = await sb
       .from("teacher_salaries")
-      .select("teacher_id, base_salary, base_tier_percent, special_class_id, special_class_percent")
+      .select("teacher_id, base_salary, base_tier_percent, special_classes, special_class_id, special_class_percent")
       .in("teacher_id", staffIds);
 
+    if (queryRes.error && (queryRes.error.message?.includes("special_classes") || queryRes.error.code === "42703")) {
+      queryRes = await sb
+        .from("teacher_salaries")
+        .select("teacher_id, base_salary, base_tier_percent, special_class_id, special_class_percent")
+        .in("teacher_id", staffIds);
+    }
     if (queryRes.error && (queryRes.error.message?.includes("special_class") || queryRes.error.code === "42703")) {
       queryRes = await sb
         .from("teacher_salaries")
@@ -1827,9 +1911,14 @@
       return map;
     }
     (queryRes.data || []).forEach(row => {
+      let specialClasses = Array.isArray(row.special_classes) ? row.special_classes : [];
+      if (!specialClasses.length && row.special_class_id && Number(row.special_class_percent || 0) > 0) {
+        specialClasses = [{ class_id: row.special_class_id, percent: Number(row.special_class_percent) }];
+      }
       map[row.teacher_id] = {
         base_salary: Number(row.base_salary || DEFAULT_BASE_SALARY),
         base_tier_percent: Number(row.base_tier_percent || DEFAULT_BASE_PERCENT),
+        special_classes: specialClasses,
         special_class_id: row.special_class_id || null,
         special_class_percent: Number(row.special_class_percent || 0),
       };
@@ -2027,6 +2116,7 @@
         const cfg = salaryConfigs[person.id] || {
           base_salary: DEFAULT_BASE_SALARY,
           base_tier_percent: DEFAULT_BASE_PERCENT,
+          special_classes: [],
           special_class_id: null,
           special_class_percent: 0,
         };
@@ -2037,14 +2127,14 @@
           ym,
           mStart,
           mEnd,
-          specialClassId: cfg.special_class_id,
+          specialClasses: cfg.special_classes || [],
         });
         const isTeacher = person.role === "teacher" || person.role === "admin";
         const monthlySalary = monthlySalaryMap[person.id] || { base_salary: 0, bonus_amount: 0 };
         let salary, projectedSalary;
         if (isTeacher) {
-          const specBonus = cfg.special_class_id ? Number(staffRevenue.specialActualRevenue || 0) * (Number(cfg.special_class_percent || 0) / 100) : 0;
-          const specProjBonus = cfg.special_class_id ? Number(staffRevenue.specialProjectedRevenue || 0) * (Number(cfg.special_class_percent || 0) / 100) : 0;
+          const specBonus = Number(staffRevenue.specialBonusTotal || 0);
+          const specProjBonus = Number(staffRevenue.specialProjectedBonusTotal || 0);
 
           const basicSal = calculateSalaryBreakdown(staffRevenue.basicPerSessionActualRevenue, Number(cfg.base_salary || 0), Number(cfg.base_tier_percent || 0));
           const basicProjSal = calculateSalaryBreakdown(staffRevenue.basicPerSessionProjectedRevenue, Number(cfg.base_salary || 0), Number(cfg.base_tier_percent || 0));
@@ -2235,10 +2325,8 @@
     if (viewerProfile.role === "admin" && !isDbFallback) {
       const bonusLabel = document.getElementById("configBonusLabel");
       const bonusInput = document.getElementById("configBasePercent");
-      const specialClassField = document.getElementById("specialClassField");
-      const specialPercentField = document.getElementById("specialPercentField");
       const specialClassNote = document.getElementById("specialClassNote");
-      const specialPercentInput = document.getElementById("configSpecialPercent");
+      const classTableSaveArea = document.getElementById("classTableSaveArea");
 
       document.getElementById("configBaseSalary").value = selectedIsTeacher ? teacherSalaryConfig.base_salary : 0;
       if (selectedIsTeacher) {
@@ -2248,10 +2336,8 @@
           bonusInput.placeholder = "VD: 30";
           bonusInput.value = teacherSalaryConfig.base_tier_percent;
         }
-        if (specialClassField) specialClassField.style.display = "block";
-        if (specialPercentField) specialPercentField.style.display = "block";
         if (specialClassNote) specialClassNote.style.display = "block";
-        if (specialPercentInput) specialPercentInput.value = teacherSalaryConfig.special_class_percent || 0;
+        if (classTableSaveArea) classTableSaveArea.style.display = "flex";
       } else {
         const staffSalary = await loadStaffMonthlySalaryConfig(safeSelectedTeacherId, ym);
         document.getElementById("configBaseSalary").value = Number(staffSalary.base_salary || 0);
@@ -2261,9 +2347,8 @@
           bonusInput.placeholder = "VD: 1000000";
           bonusInput.value = Number(staffSalary.bonus_amount || 0);
         }
-        if (specialClassField) specialClassField.style.display = "none";
-        if (specialPercentField) specialPercentField.style.display = "none";
         if (specialClassNote) specialClassNote.style.display = "none";
+        if (classTableSaveArea) classTableSaveArea.style.display = "none";
       }
     }
 
@@ -2313,16 +2398,6 @@
 
       const classesMap = {};
       (classesData || []).forEach(c => { classesMap[c.id] = c; });
-
-      // Populate special class dropdown for admin
-      if (viewerProfile.role === "admin" && !isDbFallback && selectedIsTeacher) {
-        const specialClassSelect = document.getElementById("configSpecialClass");
-        if (specialClassSelect) {
-          const teacherClasses = (classesData || []).filter(c => managedClassIds.includes(c.id));
-          specialClassSelect.innerHTML = `<option value="">-- Không có lớp đặc biệt --</option>` +
-            teacherClasses.map(c => `<option value="${c.id}" ${String(c.id) === String(teacherSalaryConfig.special_class_id) ? "selected" : ""}>${esc(c.class_name)}</option>`).join("");
-        }
-      }
 
       const coursesMap = {};
       (coursesData || []).forEach(c => { coursesMap[c.id] = c; });
@@ -2491,28 +2566,65 @@
         totalClassRevenueAllocated += studentClassRevenue;
       });
 
-      // Render class revenue rows (3 columns: Lớp học, Học sinh, Doanh thu dự kiến)
+      // Build lookup map for special classes: { [classId]: percent }
+      const specialClassRateMap = {};
+      (teacherSalaryConfig.special_classes || []).forEach(sc => {
+        if (sc && sc.class_id && Number(sc.percent) > 0) {
+          specialClassRateMap[sc.class_id] = Number(sc.percent);
+        }
+      });
+      if (teacherSalaryConfig.special_class_id && Number(teacherSalaryConfig.special_class_percent) > 0) {
+        if (!specialClassRateMap[teacherSalaryConfig.special_class_id]) {
+          specialClassRateMap[teacherSalaryConfig.special_class_id] = Number(teacherSalaryConfig.special_class_percent);
+        }
+      }
+
+      // Render class revenue rows (4 columns: Lớp học, Học sinh, Doanh thu dự kiến, % Thưởng đặc biệt)
+      const isAdminView = viewerProfile.role === "admin" && !isDbFallback && selectedIsTeacher;
       const classTbody = document.getElementById("classRevenueBody");
       const classListKeys = Object.keys(classSummaries);
       document.getElementById("classCountBadge").textContent = `${classListKeys.length} lớp`;
       if (classListKeys.length) {
         classTbody.innerHTML = classListKeys.map(key => {
           const s = classSummaries[key];
-          const isSpecial = String(key) === String(teacherSalaryConfig.special_class_id || "");
-          const specialPercent = Number(teacherSalaryConfig.special_class_percent || 0);
+          const specialPct = specialClassRateMap[key] || 0;
+          const isSpecial = specialPct > 0;
+
+          let specialColHtml = "";
+          if (isAdminView) {
+            specialColHtml = `
+              <div style="display:flex;align-items:center;justify-content:center;gap:4px;">
+                <input class="control-input text-center special-class-rate-input"
+                       data-class-id="${key}"
+                       type="number" min="0" max="100"
+                       placeholder="0"
+                       value="${isSpecial ? specialPct : ''}"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();saveSalaryConfig(event);}"
+                       style="width:65px;padding:5px 8px;text-align:center;font-weight:700;font-size:0.9rem;${isSpecial ? 'border-color:#d97706;background:#fffbeb;color:#b45309;' : ''}"
+                       title="Nhập % thưởng riêng cho lớp ôn thi đặc biệt này (để 0 hoặc trống nếu là lớp cơ bản)">
+                <span style="font-weight:700;font-size:0.85rem;color:${isSpecial ? '#b45309' : 'var(--gray-600)'};">%</span>
+              </div>
+            `;
+          } else {
+            specialColHtml = isSpecial
+              ? `<span class="badge" style="background:#fef3c7;color:#b45309;font-weight:700;padding:4px 8px;">⭐ ${specialPct}%</span>`
+              : `<span style="color:var(--gray-400);font-size:0.85rem;">Cơ bản</span>`;
+          }
+
           return `
-            <tr>
+            <tr style="${isSpecial ? 'background:rgba(254, 243, 199, 0.25);' : ''}">
               <td>
                 <b>${esc(s.className)}</b>
-                ${isSpecial ? `<span class="badge" style="background:#fef3c7;color:#b45309;font-weight:700;margin-left:6px;">⭐ Ôn thi đặc biệt (${specialPercent}%)</span>` : ''}
+                ${isSpecial ? `<span class="badge" style="background:#fef3c7;color:#b45309;font-weight:700;margin-left:6px;font-size:0.75rem;">⭐ Ôn thi đặc biệt (${specialPct}%)</span>` : ''}
               </td>
               <td class="text-center">${s.studentsCount}</td>
               <td class="text-right" style="font-weight:700;color:#be185d">${fmt(s.totalExpected)}đ</td>
+              <td class="text-center">${specialColHtml}</td>
             </tr>
           `;
         }).join("");
       } else {
-        classTbody.innerHTML = `<tr><td colspan="3" class="empty-state">Không có lớp học nào do giáo viên này quản lý trong tháng.</td></tr>`;
+        classTbody.innerHTML = `<tr><td colspan="4" class="empty-state">Không có lớp học nào do giáo viên này quản lý trong tháng.</td></tr>`;
       }
 
       // Calculate Course Revenue
@@ -2544,34 +2656,48 @@
         courseTbody.innerHTML = `<tr><td colspan="3" class="empty-state">Không có học sinh đăng ký học khóa học do GV quản lý trong tháng này.</td></tr>`;
       }
 
-      // Separate Special class vs Basic classes (per_session)
-      let specialActualRevenue = 0;
-      let specialProjectedRevenue = 0;
-      let specialClassName = "";
+      // Separate Special classes vs Basic classes (per_session)
+      let totalSpecialActualRevenue = 0;
+      let totalSpecialProjectedRevenue = 0;
+      let totalSpecialBonus = 0;
+      let totalSpecialProjectedBonus = 0;
+      const specialBreakdownItems = [];
+
       let basicPerSessionActualRevenue = 0;
       let basicPerSessionProjectedRevenue = 0;
-
-      const specialClassId = teacherSalaryConfig.special_class_id;
-      const specialPercent = Number(teacherSalaryConfig.special_class_percent || 0);
 
       Object.keys(classSummaries).forEach(cId => {
         const item = classSummaries[cId];
         const cls = classesMap[cId];
         const tuitionType = cls?.tuition_type || "per_session";
+        const specialPct = specialClassRateMap[cId] || 0;
+        const isSpecial = specialPct > 0;
 
-        if (specialClassId && String(cId) === String(specialClassId)) {
-          specialActualRevenue += Number(item.allocatedTeacherRevenue || 0);
-          specialProjectedRevenue += Number(item.projectedTeacherRevenue || 0);
-          specialClassName = item.className;
+        const classActualRev = Number(item.allocatedTeacherRevenue || 0);
+        const classProjRev = Number(item.projectedTeacherRevenue || 0);
+
+        if (isSpecial) {
+          totalSpecialActualRevenue += classActualRev;
+          totalSpecialProjectedRevenue += classProjRev;
+          const classBonus = classActualRev * (specialPct / 100);
+          const classProjBonus = classProjRev * (specialPct / 100);
+          totalSpecialBonus += classBonus;
+          totalSpecialProjectedBonus += classProjBonus;
+
+          specialBreakdownItems.push({
+            className: item.className,
+            classId: cId,
+            rate: specialPct,
+            revenue: classActualRev,
+            projectedRevenue: classProjRev,
+            bonus: classBonus,
+            projectedBonus: classProjBonus
+          });
         } else if (tuitionType === "per_session") {
-          basicPerSessionActualRevenue += Number(item.allocatedTeacherRevenue || 0);
-          basicPerSessionProjectedRevenue += Number(item.projectedTeacherRevenue || 0);
+          basicPerSessionActualRevenue += classActualRev;
+          basicPerSessionProjectedRevenue += classProjRev;
         }
       });
-
-      // Special Class Bonus (fixed % applied directly on special class revenue)
-      const specialBonus = specialClassId ? specialActualRevenue * (specialPercent / 100) : 0;
-      const specialProjectedBonus = specialClassId ? specialProjectedRevenue * (specialPercent / 100) : 0;
 
       // Basic Classes Progressive Breakdown (applies only to per-session basic classes)
       const basicSalaryDetails = calculateSalaryBreakdown(
@@ -2592,10 +2718,10 @@
       const totalProjectedRevenue = totalProjectedClassRevenue + totalCourseRevenue;
 
       // Total Bonus & Total Income
-      const totalBonus = basicSalaryDetails.totalBonus + specialBonus;
+      const totalBonus = basicSalaryDetails.totalBonus + totalSpecialBonus;
       const totalIncome = teacherSalaryConfig.base_salary + totalBonus;
 
-      const totalProjectedBonus = basicProjectedSalaryDetails.totalBonus + specialProjectedBonus;
+      const totalProjectedBonus = basicProjectedSalaryDetails.totalBonus + totalSpecialProjectedBonus;
       const totalProjectedIncome = teacherSalaryConfig.base_salary + totalProjectedBonus;
       lastTeacherRevenueForProjection = totalRevenue;
 
@@ -2608,12 +2734,14 @@
       
       const subParts = [];
       subParts.push(`Cơ bản: ${fmt(basicPerSessionActualRevenue)}đ`);
-      if (specialClassId) subParts.push(`Đặc biệt: ${fmt(specialActualRevenue)}đ`);
+      if (totalSpecialActualRevenue > 0) {
+        subParts.push(`Đặc biệt (${specialBreakdownItems.length} lớp): ${fmt(totalSpecialActualRevenue)}đ`);
+      }
       if (totalCourseRevenue > 0) subParts.push(`Khóa: ${fmt(totalCourseRevenue)}đ`);
       document.getElementById("kpiRevenueSub").innerHTML = subParts.join(" | ");
 
-      document.getElementById("kpiBonusSub").innerHTML = specialClassId
-        ? `Lớp cơ bản: +${fmt(basicSalaryDetails.totalBonus)}đ | Đặc biệt: +${fmt(specialBonus)}đ`
+      document.getElementById("kpiBonusSub").innerHTML = specialBreakdownItems.length > 0
+        ? `Lớp cơ bản: +${fmt(basicSalaryDetails.totalBonus)}đ | Đặc biệt (${specialBreakdownItems.length} lớp): +${fmt(totalSpecialBonus)}đ`
         : `Tính lũy tiến từng phần`;
 
       document.getElementById("kpiProjectedSub").innerHTML = `Doanh thu đủ: ${fmt(totalProjectedRevenue)}đ | Thưởng: ${fmt(totalProjectedBonus)}đ`;
@@ -2623,26 +2751,26 @@
 
       // Render breakdown table
       const breakdownRows = [...basicSalaryDetails.breakdown];
-      if (specialClassId && specialClassName) {
+      specialBreakdownItems.forEach(item => {
         breakdownRows.push({
-          tierName: `⭐ Lớp ôn thi đặc biệt (${esc(specialClassName)})`,
-          range: `Tính riêng (${specialPercent}%)`,
-          revenueInTier: specialActualRevenue,
-          rate: specialPercent,
-          bonus: specialBonus,
-          active: specialActualRevenue > 0,
+          tierName: `⭐ Lớp ôn thi đặc biệt (${esc(item.className)})`,
+          range: `Tính riêng (${item.rate}%)`,
+          revenueInTier: item.revenue,
+          rate: item.rate,
+          bonus: item.bonus,
+          active: item.revenue > 0,
           isSpecial: true
         });
-      }
+      });
 
       const breakdownTbody = document.getElementById("bonusBreakdownBody");
       breakdownTbody.innerHTML = breakdownRows.map(b => `
-        <tr class="${b.active && b.bonus > 0 ? 'active-tier' : ''}" style="${!b.active ? 'opacity: 0.5' : ''}">
+        <tr class="${b.isSpecial ? 'special-tier' : (b.active && b.bonus > 0 ? 'active-tier' : '')}" style="${!b.active ? 'opacity: 0.5' : ''}">
           <td><b>${b.tierName}</b></td>
           <td>${b.range}</td>
           <td class="text-right">${fmt(b.revenueInTier)}đ</td>
-          <td class="text-center">${b.rate}%</td>
-          <td class="text-right" style="font-weight:700;${b.isSpecial ? 'color:#b45309;' : ''}">${b.bonus > 0 ? '+' + fmt(b.bonus) + 'đ' : '0đ'}</td>
+          <td class="text-center font-bold">${b.rate}%</td>
+          <td class="text-right font-bold" style="${b.isSpecial ? 'color:#b45309;' : ''}">${b.bonus > 0 ? '+' + fmt(b.bonus) + 'đ' : '0đ'}</td>
         </tr>
       `).join("");
 
