@@ -3,11 +3,19 @@ CREATE TABLE IF NOT EXISTS public.teacher_salaries (
   teacher_id uuid NOT NULL,
   base_salary numeric NOT NULL DEFAULT 0,
   base_tier_percent numeric NOT NULL DEFAULT 30,
+  special_class_id uuid REFERENCES public.classes(id) ON DELETE SET NULL,
+  special_class_percent numeric DEFAULT 0,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT teacher_salaries_pkey PRIMARY KEY (teacher_id),
   CONSTRAINT teacher_salaries_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.users(id) ON DELETE CASCADE
 );
+
+-- Ensure columns exist if table already exists
+ALTER TABLE public.teacher_salaries
+  ADD COLUMN IF NOT EXISTS special_class_id uuid REFERENCES public.classes(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS special_class_percent numeric DEFAULT 0;
+
 
 -- Enable RLS
 ALTER TABLE public.teacher_salaries ENABLE ROW LEVEL SECURITY;
