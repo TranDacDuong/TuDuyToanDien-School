@@ -44,7 +44,7 @@
       }
     }
     const code = shortStudentId ? `HPHS${monthTag}${shortStudentId}` : (shortPaymentId ? `HP${monthTag}${shortPaymentId}` : `HP${monthTag}`);
-    return `SEVQR ${code}`.trim();
+    return code.trim();
   }
 
   const STATIC_BANK_INFO = {
@@ -561,20 +561,24 @@
 
   async function upsertPaymentRecord(studentId, ym, fields, existing = {}) {
     const sb = getSb();
+    const payload = {
+      student_id:      studentId,
+      class_id:        null,
+      month:           ymToDate(ym),
+      amount_due:      fields.amount_due       ?? existing.amount_due       ?? 0,
+      amount_paid:     fields.amount_paid      ?? existing.amount_paid      ?? 0,
+      paid_at:         fields.paid_at          !== undefined ? fields.paid_at         : (existing.paid_at         || null),
+      note:            fields.note             !== undefined ? fields.note            : (existing.note            || null),
+      locked_at:       fields.locked_at        !== undefined ? fields.locked_at       : (existing.locked_at       || null),
+      locked_by:       fields.locked_by        !== undefined ? fields.locked_by       : (existing.locked_by       || null),
+      locked_snapshot: fields.locked_snapshot  !== undefined ? fields.locked_snapshot : (existing.locked_snapshot || null),
+    };
+    if (existing?.id) {
+      payload.id = existing.id;
+    }
     const { data, error } = await sb
       .from("tuition_payments")
-      .upsert({
-        student_id:      studentId,
-        class_id:        null,
-        month:           ymToDate(ym),
-        amount_due:      fields.amount_due       ?? existing.amount_due       ?? 0,
-        amount_paid:     fields.amount_paid      ?? existing.amount_paid      ?? 0,
-        paid_at:         fields.paid_at          !== undefined ? fields.paid_at         : (existing.paid_at         || null),
-        note:            fields.note             !== undefined ? fields.note            : (existing.note            || null),
-        locked_at:       fields.locked_at        !== undefined ? fields.locked_at       : (existing.locked_at       || null),
-        locked_by:       fields.locked_by        !== undefined ? fields.locked_by       : (existing.locked_by       || null),
-        locked_snapshot: fields.locked_snapshot  !== undefined ? fields.locked_snapshot : (existing.locked_snapshot || null),
-      }, { onConflict: "student_id,month" })
+      .upsert(payload, { onConflict: "student_id,month" })
       .select().single();
     if (error) throw error;
     return data;
@@ -872,7 +876,8 @@ Nhập số tiền hoàn lại (>0):`,
   ───────────────────────────────────────────── */
   const monthPicker = document.getElementById("monthPicker");
   const monthQuery = new URLSearchParams(location.search).get("month");
-  monthPicker.value = /^\d{4}-\d{2}$/.test(monthQuery || "") ? monthQuery : todayYM();
+  const savedMonth = (() => { try { return localStorage.getItem("tuition_selected_month"); } catch (_) { return ""; } })();
+  monthPicker.value = /^\d{4}-\d{2}$/.test(monthQuery || "") ? monthQuery : (/^\d{4}-\d{2}$/.test(savedMonth || "") ? savedMonth : todayYM());
 
   async function loadViewerContext() {
     const sb = getSb();
@@ -1277,6 +1282,14 @@ Nhập số tiền hoàn lại (>0):`,
   window.loadTuition = async function () {
     const ym = monthPicker.value;
     if (!ym) return;
+    try {
+      localStorage.setItem("tuition_selected_month", ym);
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("month") !== ym) {
+        url.searchParams.set("month", ym);
+        window.history.replaceState(null, "", url.toString());
+      }
+    } catch (_) {}
 
     const tbody = document.getElementById("tuitionBody");
     tbody.innerHTML = `<tr><td colspan="8" class="loading">⏳ Đang tính học phí...</td></tr>`;
