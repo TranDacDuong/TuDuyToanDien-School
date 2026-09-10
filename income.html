@@ -210,6 +210,38 @@
     text-align: right;
   }
 
+  .bonus-form {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1.4fr auto;
+    gap: 10px;
+    align-items: end;
+    margin-top: 14px;
+  }
+
+  .bonus-row {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1.4fr auto;
+    gap: 10px;
+    align-items: center;
+    border: 1px solid rgba(16,185,129,0.2);
+    border-radius: 14px;
+    padding: 10px 14px;
+    background: #f0fdf4;
+    font-size: .88rem;
+  }
+
+  .bonus-row .bonus-amount {
+    font-weight: 800;
+    color: var(--green);
+    text-align: right;
+  }
+
+  @media (max-width: 768px) {
+    .bonus-form, .bonus-row {
+      grid-template-columns: 1fr;
+    }
+  }
+
   .btn-danger {
     border: 1px solid rgba(220,38,38,.24);
     background: #fff5f5;
@@ -595,6 +627,14 @@
     color: #b45309;
   }
 
+  .report-table tr.custom-tier {
+    background: rgba(124, 58, 237, 0.07);
+    font-weight: 600;
+  }
+  .report-table tr.custom-tier td {
+    color: #7c3aed;
+  }
+
   .text-right { text-align: right; }
   .text-center { text-align: center; }
 
@@ -729,6 +769,10 @@
           <label>Lương thưởng</label>
           <input class="control-input" id="staffSelfBonusInput" type="number" disabled>
         </div>
+      </div>
+      <div style="margin-top: 18px;">
+        <h4 style="margin: 0 0 10px 0; color: var(--navy); font-size: 0.95rem; font-weight: 700;">🎁 Các khoản thưởng thêm trong tháng:</h4>
+        <div class="expense-list" id="staffSelfBonusList"></div>
       </div>
       <div class="empty-state" style="margin-top:14px">Lương cứng và lương thưởng do Admin cập nhật theo từng tháng.</div>
     </div>
@@ -954,6 +998,35 @@
               <tbody id="courseRevenueBody"></tbody>
             </table>
           </div>
+        </div>
+
+        <!-- Custom Monthly Bonuses Card -->
+        <div class="details-card" id="customBonusCard">
+          <h3 class="details-title">
+            <span>🎁 Thưởng thêm theo nội dung <span class="badge" id="customBonusCountBadge">0 khoản</span></span>
+            <span id="customBonusTotalBadge" style="font-size: 0.95rem; font-weight: 800; color: var(--green);">+0đ</span>
+          </h3>
+          <p style="font-size: 0.82rem; color: var(--gray-600); margin: -8px 0 12px 0;">
+            Các khoản tiền thưởng bổ sung (làm sách, tuyển sinh,...) cộng thẳng vào lương tháng này.
+          </p>
+          <div class="expense-list" id="customBonusList"></div>
+
+          <!-- Form thêm thưởng (chỉ hiển thị với Admin) -->
+          <form class="bonus-form" id="customBonusForm" onsubmit="saveCustomBonus(event)" style="display: none;">
+            <div class="config-field">
+              <label>Nội dung thưởng</label>
+              <input class="control-input" id="bonusTitle" type="text" placeholder="VD: Thưởng làm sách, Tuyển sinh" required>
+            </div>
+            <div class="config-field">
+              <label>Số tiền (VNĐ)</label>
+              <input class="control-input" id="bonusAmount" type="number" min="0" placeholder="VD: 1000000" required>
+            </div>
+            <div class="config-field">
+              <label>Ghi chú</label>
+              <input class="control-input" id="bonusNote" type="text" placeholder="Không bắt buộc">
+            </div>
+            <button class="btn-save" type="submit" style="white-space: nowrap; padding: 10px 16px;">+ Thêm thưởng</button>
+          </form>
         </div>
       </div>
     </div>
@@ -1995,6 +2068,132 @@
     `).join("");
   }
 
+  // Load custom bonus records for a user in a month
+  async function loadCustomBonuses(userId, ym) {
+    const safeUserId = normalizeUuid(userId);
+    if (!safeUserId || !ym) return [];
+    const sb = getSb();
+    const { data, error } = await sb
+      .from("staff_bonus_records")
+      .select("id, user_id, bonus_month, title, amount, note, created_at")
+      .eq("user_id", safeUserId)
+      .eq("bonus_month", ymToDate(ym))
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      if (error.code === "42P01" || error.message?.includes("staff_bonus_records")) {
+        console.warn("Chưa có bảng staff_bonus_records trong Supabase. Vui lòng chạy file SQL_create_staff_bonus_records.sql.");
+        return [];
+      }
+      throw error;
+    }
+    return data || [];
+  }
+
+  // Render custom bonus list
+  function renderCustomBonusList(rows, isAdmin, targetElementId = "customBonusList") {
+    const wrap = document.getElementById(targetElementId);
+    if (!wrap) return;
+    if (!rows || !rows.length) {
+      wrap.innerHTML = `<div class="empty-state" style="padding:16px 12px;font-size:0.85rem;">Chưa có khoản thưởng thêm nào trong tháng này.</div>`;
+      return;
+    }
+    wrap.innerHTML = rows.map(row => `
+      <div class="bonus-row">
+        <div><b>${esc(row.title || "Thưởng thêm")}</b></div>
+        <div class="bonus-amount">+${fmt(row.amount)}đ</div>
+        <div style="color:var(--gray-600);font-size:0.82rem;">${esc(row.note || "")}</div>
+        ${isAdmin ? `<button class="btn-danger" type="button" onclick="deleteCustomBonus('${row.id}')" style="padding:4px 8px;font-size:0.75rem;">Xóa</button>` : '<div></div>'}
+      </div>
+    `).join("");
+  }
+
+  // Save a custom bonus (Admin only)
+  async function saveCustomBonus(event) {
+    if (event) event.preventDefault();
+    if (viewerProfile?.role !== "admin") return;
+
+    const safeUserId = normalizeUuid(selectedTeacherId);
+    if (!safeUserId || safeUserId === "OVERVIEW") {
+      alert("Vui lòng chọn giáo viên hoặc nhân sự cụ thể trước khi thêm khoản thưởng.");
+      return;
+    }
+
+    const ym = document.getElementById("monthPicker")?.value || todayYM();
+    const titleInput = document.getElementById("bonusTitle");
+    const amountInput = document.getElementById("bonusAmount");
+    const noteInput = document.getElementById("bonusNote");
+
+    const title = (titleInput?.value || "").trim();
+    const amount = Number(amountInput?.value || 0);
+    const note = (noteInput?.value || "").trim();
+
+    if (!title) {
+      alert("Vui lòng nhập nội dung khoản thưởng (VD: Thưởng làm sách, Thưởng tuyển sinh).");
+      return;
+    }
+    if (isNaN(amount) || amount <= 0) {
+      alert("Số tiền thưởng phải là số dương lớn hơn 0đ.");
+      return;
+    }
+
+    const sb = getSb();
+    const btn = event?.target?.querySelector("button[type='submit']") || event?.target;
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = "Đang lưu...";
+    }
+
+    try {
+      const { error } = await sb.from("staff_bonus_records").insert({
+        user_id: safeUserId,
+        bonus_month: ymToDate(ym),
+        title,
+        amount,
+        note,
+        created_by: currentUser?.id
+      });
+
+      if (error) {
+        if (error.code === "42P01" || error.message?.includes("staff_bonus_records")) {
+          throw new Error("Chưa tạo bảng staff_bonus_records trên Supabase. Vui lòng mở Supabase SQL Editor và chạy file SQL_create_staff_bonus_records.sql.");
+        }
+        throw error;
+      }
+
+      if (titleInput) titleInput.value = "";
+      if (amountInput) amountInput.value = "";
+      if (noteInput) noteInput.value = "";
+
+      await calculateAndRender();
+    } catch (err) {
+      alert("Lỗi khi thêm khoản thưởng: " + err.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "+ Thêm thưởng";
+      }
+    }
+  }
+
+  // Delete a custom bonus (Admin only)
+  async function deleteCustomBonus(id) {
+    if (viewerProfile?.role !== "admin") return;
+    if (!confirm("Bạn có chắc chắn muốn xóa khoản thưởng này không?")) return;
+
+    const sb = getSb();
+    try {
+      const { error } = await sb.from("staff_bonus_records").delete().eq("id", id);
+      if (error) throw error;
+      await calculateAndRender();
+    } catch (err) {
+      alert("Lỗi khi xóa khoản thưởng: " + err.message);
+    }
+  }
+
+  window.saveCustomBonus = saveCustomBonus;
+  window.deleteCustomBonus = deleteCustomBonus;
+
   function roleLabel(role) {
     return {
       admin: "Admin",
@@ -2014,7 +2213,10 @@
 
     teacherBody.innerHTML = teacherRows.length ? teacherRows.map(row => `
       <tr>
-        <td><b>${esc(row.name)}</b> ${row.role === "admin" ? '<span style="font-size:0.75rem;color:var(--gold);font-weight:700;">(Admin)</span>' : ''}</td>
+        <td>
+          <b>${esc(row.name)}</b> ${row.role === "admin" ? '<span style="font-size:0.75rem;color:var(--gold);font-weight:700;">(Admin)</span>' : ''}
+          ${row.customBonus > 0 ? `<span class="badge" style="background:#ede9fe;color:#6d28d9;font-size:0.72rem;margin-left:4px;" title="Gồm ${fmt(row.customBonus)}đ thưởng thêm">+${fmt(row.customBonus)}đ thưởng thêm</span>` : ''}
+        </td>
         <td class="text-right">${fmt(row.actualRevenue)}đ</td>
         <td class="text-right" style="font-weight:700;color:var(--green)">${fmt(row.actualIncome)}đ</td>
         <td class="text-right">${fmt(row.projectedRevenue)}đ</td>
@@ -2024,7 +2226,10 @@
 
     otherBody.innerHTML = otherRows.length ? otherRows.map(row => `
       <tr>
-        <td><b>${esc(row.name)}</b></td>
+        <td>
+          <b>${esc(row.name)}</b>
+          ${row.customBonus > 0 ? `<span class="badge" style="background:#ede9fe;color:#6d28d9;font-size:0.72rem;margin-left:4px;" title="Gồm ${fmt(row.customBonus)}đ thưởng thêm">+${fmt(row.customBonus)}đ thưởng thêm</span>` : ''}
+        </td>
         <td>${esc(roleLabel(row.role))}</td>
         <td class="text-right">
           <input class="control-input" id="staffBase_${esc(row.id)}" type="number" min="0" value="${Number(row.baseSalary || 0)}" style="max-width:130px;text-align:right">
@@ -2040,15 +2245,23 @@
 
   async function renderFixedStaffSelfIncome(ym) {
     const salary = await loadStaffMonthlySalaryConfig(currentUser?.id, ym);
+    const customBonuses = await loadCustomBonuses(currentUser?.id, ym);
+    const totalCustomBonus = customBonuses.reduce((sum, b) => sum + Number(b.amount || 0), 0);
+
     const base = Number(salary.base_salary || 0);
-    const bonus = Number(salary.bonus_amount || 0);
+    const baseBonus = Number(salary.bonus_amount || 0);
+    const totalBonus = baseBonus + totalCustomBonus;
+    const totalIncome = base + totalBonus;
+
     setText("staffSelfBaseSalary", fmt(base) + "đ");
-    setText("staffSelfBonus", fmt(bonus) + "đ");
-    setText("staffSelfTotalIncome", fmt(base + bonus) + "đ");
+    setText("staffSelfBonus", fmt(totalBonus) + "đ");
+    setText("staffSelfTotalIncome", fmt(totalIncome) + "đ");
     const baseInput = document.getElementById("staffSelfBaseInput");
     const bonusInput = document.getElementById("staffSelfBonusInput");
     if (baseInput) baseInput.value = base;
-    if (bonusInput) bonusInput.value = bonus;
+    if (bonusInput) bonusInput.value = totalBonus;
+
+    renderCustomBonusList(customBonuses, false, "staffSelfBonusList");
   }
 
   async function calculateAdminIncome(ym) {
@@ -2083,7 +2296,16 @@
         fetchAllRows(() => sb.from("course_enrollments").select("course_id, student_id, enrolled_at").gte("enrolled_at", mStart + "T00:00:00Z").lte("enrolled_at", mEnd + "T23:59:59Z")),
         fetchAllRows(() => sb.from("courses").select("id, name, tuition_fee")),
         loadOperatingExpenses(ym),
+        fetchAllRows(() => sb.from("staff_bonus_records").select("id, user_id, amount, title, bonus_month").eq("bonus_month", mStart)).catch(err => {
+          console.warn("Chưa có bảng staff_bonus_records:", err);
+          return [];
+        }),
       ]);
+
+      const customBonusMapByStaff = {};
+      (allCustomBonuses || []).forEach(row => {
+        customBonusMapByStaff[row.user_id] = (customBonusMapByStaff[row.user_id] || 0) + Number(row.amount || 0);
+      });
 
       const context = buildIncomeContext({ classesData, allClassStudents, allAttendance, allPayments, chosenSchedules, courseEnrollments, coursesData });
       const staffIds = (staff || []).map(item => item.id);
@@ -2131,6 +2353,7 @@
         });
         const isTeacher = person.role === "teacher" || person.role === "admin";
         const monthlySalary = monthlySalaryMap[person.id] || { base_salary: 0, bonus_amount: 0 };
+        const personCustomBonus = Number(customBonusMapByStaff[person.id] || 0);
         let salary, projectedSalary;
         if (isTeacher) {
           const specBonus = Number(staffRevenue.specialBonusTotal || 0);
@@ -2141,19 +2364,19 @@
 
           salary = {
             baseSalary: Number(cfg.base_salary || 0),
-            totalBonus: basicSal.totalBonus + specBonus,
-            totalIncome: Number(cfg.base_salary || 0) + basicSal.totalBonus + specBonus,
+            totalBonus: basicSal.totalBonus + specBonus + personCustomBonus,
+            totalIncome: Number(cfg.base_salary || 0) + basicSal.totalBonus + specBonus + personCustomBonus,
           };
           projectedSalary = {
             baseSalary: Number(cfg.base_salary || 0),
-            totalBonus: basicProjSal.totalBonus + specProjBonus,
-            totalIncome: Number(cfg.base_salary || 0) + basicProjSal.totalBonus + specProjBonus,
+            totalBonus: basicProjSal.totalBonus + specProjBonus + personCustomBonus,
+            totalIncome: Number(cfg.base_salary || 0) + basicProjSal.totalBonus + specProjBonus + personCustomBonus,
           };
         } else {
           salary = {
             baseSalary: Number(monthlySalary.base_salary || 0),
-            totalBonus: Number(monthlySalary.bonus_amount || 0),
-            totalIncome: Number(monthlySalary.base_salary || 0) + Number(monthlySalary.bonus_amount || 0),
+            totalBonus: Number(monthlySalary.bonus_amount || 0) + personCustomBonus,
+            totalIncome: Number(monthlySalary.base_salary || 0) + Number(monthlySalary.bonus_amount || 0) + personCustomBonus,
           };
           projectedSalary = salary;
         }
@@ -2169,6 +2392,7 @@
           bonusAmount: Number(salary.totalBonus || 0),
           actualIncome: Number(salary.totalIncome || 0),
           projectedIncome: Number(projectedSalary.totalIncome || 0),
+          customBonus: personCustomBonus,
         });
       });
 
@@ -2656,6 +2880,23 @@
         courseTbody.innerHTML = `<tr><td colspan="3" class="empty-state">Không có học sinh đăng ký học khóa học do GV quản lý trong tháng này.</td></tr>`;
       }
 
+      // Load custom bonus records for this teacher/staff
+      const customBonuses = await loadCustomBonuses(safeSelectedTeacherId, ym);
+      const totalCustomBonus = customBonuses.reduce((sum, b) => sum + Number(b.amount || 0), 0);
+
+      // Render custom bonus list and form
+      const isAdminViewMode = viewerProfile.role === "admin";
+      renderCustomBonusList(customBonuses, isAdminViewMode, "customBonusList");
+      const bonusCountBadge = document.getElementById("customBonusCountBadge");
+      if (bonusCountBadge) bonusCountBadge.textContent = `${customBonuses.length} khoản`;
+      const bonusTotalBadge = document.getElementById("customBonusTotalBadge");
+      if (bonusTotalBadge) bonusTotalBadge.textContent = `+${fmt(totalCustomBonus)}đ`;
+
+      const customBonusForm = document.getElementById("customBonusForm");
+      if (customBonusForm) {
+        customBonusForm.style.display = (isAdminViewMode && !isDbFallback) ? "grid" : "none";
+      }
+
       // Separate Special classes vs Basic classes (per_session)
       let totalSpecialActualRevenue = 0;
       let totalSpecialProjectedRevenue = 0;
@@ -2717,11 +2958,11 @@
         .reduce((sum, item) => sum + Number(item.projectedTeacherRevenue || 0), 0);
       const totalProjectedRevenue = totalProjectedClassRevenue + totalCourseRevenue;
 
-      // Total Bonus & Total Income
-      const totalBonus = basicSalaryDetails.totalBonus + totalSpecialBonus;
+      // Total Bonus & Total Income (inclusive of custom bonuses)
+      const totalBonus = basicSalaryDetails.totalBonus + totalSpecialBonus + totalCustomBonus;
       const totalIncome = teacherSalaryConfig.base_salary + totalBonus;
 
-      const totalProjectedBonus = basicProjectedSalaryDetails.totalBonus + totalSpecialProjectedBonus;
+      const totalProjectedBonus = basicProjectedSalaryDetails.totalBonus + totalSpecialProjectedBonus + totalCustomBonus;
       const totalProjectedIncome = teacherSalaryConfig.base_salary + totalProjectedBonus;
       lastTeacherRevenueForProjection = totalRevenue;
 
@@ -2740,9 +2981,13 @@
       if (totalCourseRevenue > 0) subParts.push(`Khóa: ${fmt(totalCourseRevenue)}đ`);
       document.getElementById("kpiRevenueSub").innerHTML = subParts.join(" | ");
 
-      document.getElementById("kpiBonusSub").innerHTML = specialBreakdownItems.length > 0
-        ? `Lớp cơ bản: +${fmt(basicSalaryDetails.totalBonus)}đ | Đặc biệt (${specialBreakdownItems.length} lớp): +${fmt(totalSpecialBonus)}đ`
-        : `Tính lũy tiến từng phần`;
+      const bonusSubParts = [];
+      if (basicSalaryDetails.totalBonus > 0) bonusSubParts.push(`Cơ bản: +${fmt(basicSalaryDetails.totalBonus)}đ`);
+      if (totalSpecialBonus > 0) bonusSubParts.push(`Đặc biệt: +${fmt(totalSpecialBonus)}đ`);
+      if (totalCustomBonus > 0) bonusSubParts.push(`Thưởng thêm: +${fmt(totalCustomBonus)}đ`);
+      document.getElementById("kpiBonusSub").innerHTML = bonusSubParts.length
+        ? bonusSubParts.join(" | ")
+        : (specialBreakdownItems.length > 0 ? "Theo lớp đặc biệt" : "Tính lũy tiến từng phần");
 
       document.getElementById("kpiProjectedSub").innerHTML = `Doanh thu đủ: ${fmt(totalProjectedRevenue)}đ | Thưởng: ${fmt(totalProjectedBonus)}đ`;
       const projectedInput = document.getElementById("projectedRevenueInput");
@@ -2762,15 +3007,26 @@
           isSpecial: true
         });
       });
+      customBonuses.forEach(item => {
+        breakdownRows.push({
+          tierName: `🎁 ${esc(item.title)}`,
+          range: esc(item.note || "Thưởng bổ sung"),
+          revenueInTier: Number(item.amount || 0),
+          rate: 100,
+          bonus: Number(item.amount || 0),
+          active: true,
+          isCustom: true
+        });
+      });
 
       const breakdownTbody = document.getElementById("bonusBreakdownBody");
       breakdownTbody.innerHTML = breakdownRows.map(b => `
-        <tr class="${b.isSpecial ? 'special-tier' : (b.active && b.bonus > 0 ? 'active-tier' : '')}" style="${!b.active ? 'opacity: 0.5' : ''}">
+        <tr class="${b.isCustom ? 'custom-tier' : (b.isSpecial ? 'special-tier' : (b.active && b.bonus > 0 ? 'active-tier' : ''))}" style="${!b.active ? 'opacity: 0.5' : ''}">
           <td><b>${b.tierName}</b></td>
           <td>${b.range}</td>
           <td class="text-right">${fmt(b.revenueInTier)}đ</td>
-          <td class="text-center font-bold">${b.rate}%</td>
-          <td class="text-right font-bold" style="${b.isSpecial ? 'color:#b45309;' : ''}">${b.bonus > 0 ? '+' + fmt(b.bonus) + 'đ' : '0đ'}</td>
+          <td class="text-center font-bold">${b.isCustom ? '-' : b.rate + '%'}</td>
+          <td class="text-right font-bold" style="${b.isCustom ? 'color:#7c3aed;' : (b.isSpecial ? 'color:#b45309;' : '')}">${b.bonus > 0 ? '+' + fmt(b.bonus) + 'đ' : '0đ'}</td>
         </tr>
       `).join("");
 
