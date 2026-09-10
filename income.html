@@ -779,6 +779,7 @@
 
     <div class="admin-profit-panel" id="adminProfitPanel" style="display:none;">
       <h3 class="panel-title">Tổng quan Tiền lãi trung tâm</h3>
+      <div id="adminOverviewErrorBanner" class="empty-state" style="display:none;color:var(--red);margin-bottom:15px;background:#fef2f2;border:1px solid #fca5a5;padding:10px 14px;border-radius:8px;"></div>
       <div class="admin-profit-grid">
         <div class="profit-metric">
           <span>Tổng doanh thu thực thu</span>
@@ -1449,8 +1450,8 @@
           specialClasses = [{ class_id: data.special_class_id, percent: Number(data.special_class_percent) }];
         }
         teacherSalaryConfig = {
-          base_salary: Number(data.base_salary || DEFAULT_BASE_SALARY),
-          base_tier_percent: Number(data.base_tier_percent || DEFAULT_BASE_PERCENT),
+          base_salary: (data.base_salary !== null && data.base_salary !== undefined) ? Number(data.base_salary) : DEFAULT_BASE_SALARY,
+          base_tier_percent: (data.base_tier_percent !== null && data.base_tier_percent !== undefined) ? Number(data.base_tier_percent) : DEFAULT_BASE_PERCENT,
           special_classes: specialClasses,
           special_class_id: data.special_class_id || null,
           special_class_percent: Number(data.special_class_percent || 0)
@@ -1677,6 +1678,15 @@
       if (!data || data.length < pageSize) break;
     }
     return rows;
+  }
+
+  async function safeFetchAllRows(buildQuery, pageSize = 1000) {
+    try {
+      return await fetchAllRows(buildQuery, pageSize);
+    } catch (err) {
+      console.warn("safeFetchAllRows caught error:", err);
+      return [];
+    }
   }
 
   function withTimeout(promise, timeoutMs, message) {
@@ -1989,8 +1999,8 @@
         specialClasses = [{ class_id: row.special_class_id, percent: Number(row.special_class_percent) }];
       }
       map[row.teacher_id] = {
-        base_salary: Number(row.base_salary || DEFAULT_BASE_SALARY),
-        base_tier_percent: Number(row.base_tier_percent || DEFAULT_BASE_PERCENT),
+        base_salary: (row.base_salary !== null && row.base_salary !== undefined) ? Number(row.base_salary) : DEFAULT_BASE_SALARY,
+        base_tier_percent: (row.base_tier_percent !== null && row.base_tier_percent !== undefined) ? Number(row.base_tier_percent) : DEFAULT_BASE_PERCENT,
         special_classes: specialClasses,
         special_class_id: row.special_class_id || null,
         special_class_percent: Number(row.special_class_percent || 0),
@@ -2203,6 +2213,16 @@
     }[String(role || "")] || "Nhân viên";
   }
 
+  function selectTeacherFromOverview(teacherId) {
+    const select = document.getElementById("teacherSelect");
+    if (select && teacherId) {
+      select.value = teacherId;
+      selectedTeacherId = teacherId;
+      calculateAndRender();
+    }
+  }
+  window.selectTeacherFromOverview = selectTeacherFromOverview;
+
   function renderAdminStaffIncomeBreakdown(rows) {
     const teacherBody = document.getElementById("adminTeacherIncomeBody");
     const otherBody = document.getElementById("adminOtherStaffIncomeBody");
@@ -2212,10 +2232,11 @@
     const otherRows = (rows || []).filter(row => row.role !== "teacher" && row.role !== "admin");
 
     teacherBody.innerHTML = teacherRows.length ? teacherRows.map(row => `
-      <tr>
+      <tr style="cursor:pointer;" onclick="selectTeacherFromOverview('${esc(row.id)}')" title="Nhấn để xem chi tiết lương giáo viên này">
         <td>
-          <b>${esc(row.name)}</b> ${row.role === "admin" ? '<span style="font-size:0.75rem;color:var(--gold);font-weight:700;">(Admin)</span>' : ''}
-          ${row.customBonus > 0 ? `<span class="badge" style="background:#ede9fe;color:#6d28d9;font-size:0.72rem;margin-left:4px;" title="Gồm ${fmt(row.customBonus)}đ thưởng thêm">+${fmt(row.customBonus)}đ thưởng thêm</span>` : ''}
+          <b style="color:var(--primary);">${esc(row.name)}</b> ${row.role === "admin" ? '<span style="font-size:0.75rem;color:var(--gold);font-weight:700;">(Admin)</span>' : ''}
+          ${row.customBonus > 0 ? `<span class="badge" style="background:#ede9fe;color:#6d28d9;font-size:0.72rem;margin-left:4px;" title="Gồm ${fmt(row.customBonus)}đ thưởng thêm">+${fmt(row.customBonus)}đ thưởng</span>` : ''}
+          <span style="font-size:0.75rem;color:var(--muted);margin-left:6px;" title="Xem chi tiết">👁️</span>
         </td>
         <td class="text-right">${fmt(row.actualRevenue)}đ</td>
         <td class="text-right" style="font-weight:700;color:var(--green)">${fmt(row.actualIncome)}đ</td>
@@ -2228,7 +2249,7 @@
       <tr>
         <td>
           <b>${esc(row.name)}</b>
-          ${row.customBonus > 0 ? `<span class="badge" style="background:#ede9fe;color:#6d28d9;font-size:0.72rem;margin-left:4px;" title="Gồm ${fmt(row.customBonus)}đ thưởng thêm">+${fmt(row.customBonus)}đ thưởng thêm</span>` : ''}
+          ${row.customBonus > 0 ? `<span class="badge" style="background:#ede9fe;color:#6d28d9;font-size:0.72rem;margin-left:4px;" title="Gồm ${fmt(row.customBonus)}đ thưởng thêm">+${fmt(row.customBonus)}đ thưởng</span>` : ''}
         </td>
         <td>${esc(roleLabel(row.role))}</td>
         <td class="text-right">
@@ -2269,6 +2290,11 @@
     const sb = getSb();
     const mStart = ymToDate(ym);
     const mEnd = monthEnd(ym);
+    const errBanner = document.getElementById("adminOverviewErrorBanner");
+    if (errBanner) {
+      errBanner.style.display = "none";
+      errBanner.textContent = "";
+    }
 
     try {
       const [
@@ -2282,21 +2308,22 @@
         chosenSchedules,
         courseEnrollments,
         coursesData,
-        expenses
+        expenses,
+        allCustomBonuses
       ] = await Promise.all([
-        fetchAllRows(() => sb.from("users").select("id, full_name, role"))
+        safeFetchAllRows(() => sb.from("users").select("id, full_name, role"))
           .then(rows => rows.filter(item => INCOME_PAYROLL_ROLES.has(String(item.role || "")))),
-        fetchAllRows(() => sb.from("class_teachers").select("teacher_id, class_id")),
-        fetchAllRows(() => sb.from("course_managers").select("teacher_id, course_id")),
-        fetchAllRows(() => sb.from("classes").select("id, class_name, tuition_fee, tuition_type, makeup_fee, class_schedules(id, session_no, weekday, start_time, end_time, effective_from)").eq("hidden", false)),
-        fetchAllRows(() => sb.from("class_students").select("class_id, student_id, joined_at, left_at")),
-        fetchAllRows(() => sb.from("attendance").select("student_id, class_id, date, status, schedule_id").gte("date", mStart).lte("date", mEnd)),
-        fetchAllRows(() => sb.from("tuition_payments").select("*").eq("month", mStart)),
-        fetchAllRows(() => sb.from("class_student_schedules").select("class_id, student_id, schedule_id, effective_from")),
-        fetchAllRows(() => sb.from("course_enrollments").select("course_id, student_id, enrolled_at").gte("enrolled_at", mStart + "T00:00:00Z").lte("enrolled_at", mEnd + "T23:59:59Z")),
-        fetchAllRows(() => sb.from("courses").select("id, name, tuition_fee")),
-        loadOperatingExpenses(ym),
-        fetchAllRows(() => sb.from("staff_bonus_records").select("id, user_id, amount, title, bonus_month").eq("bonus_month", mStart)).catch(err => {
+        safeFetchAllRows(() => sb.from("class_teachers").select("teacher_id, class_id")),
+        safeFetchAllRows(() => sb.from("course_managers").select("teacher_id, course_id")),
+        safeFetchAllRows(() => sb.from("classes").select("id, class_name, tuition_fee, tuition_type, makeup_fee, class_schedules(id, session_no, weekday, start_time, end_time, effective_from)").eq("hidden", false)),
+        safeFetchAllRows(() => sb.from("class_students").select("class_id, student_id, joined_at, left_at")),
+        safeFetchAllRows(() => sb.from("attendance").select("student_id, class_id, date, status, schedule_id").gte("date", mStart).lte("date", mEnd)),
+        safeFetchAllRows(() => sb.from("tuition_payments").select("*").eq("month", mStart)),
+        safeFetchAllRows(() => sb.from("class_student_schedules").select("class_id, student_id, schedule_id, effective_from")),
+        safeFetchAllRows(() => sb.from("course_enrollments").select("course_id, student_id, enrolled_at").gte("enrolled_at", mStart + "T00:00:00Z").lte("enrolled_at", mEnd + "T23:59:59Z")),
+        safeFetchAllRows(() => sb.from("courses").select("id, name, tuition_fee")),
+        loadOperatingExpenses(ym).catch(err => { console.warn("Lỗi tải chi phí:", err); return []; }),
+        safeFetchAllRows(() => sb.from("staff_bonus_records").select("id, user_id, amount, title, bonus_month").eq("bonus_month", mStart)).catch(err => {
           console.warn("Chưa có bảng staff_bonus_records:", err);
           return [];
         }),
@@ -2323,25 +2350,39 @@
         courseMapByStaff[row.teacher_id].push(row.course_id);
       });
 
-      const systemRevenue = (allPayments || []).reduce((sum, item) => sum + Number(item.amount_paid || 0), 0);
+      const totalCourseRevenue = (courseEnrollments || []).reduce((sum, row) => {
+        const crs = (coursesData || []).find(c => c.id === row.course_id);
+        return sum + Number(crs?.tuition_fee || 0);
+      }, 0);
+
+      const systemRevenue = (allPayments || []).reduce((sum, item) => sum + Number(item.amount_paid || 0), 0) + totalCourseRevenue;
       const paymentProjectedRevenue = (allPayments || []).reduce((sum, item) => {
         const due = Number(item.amount_due || 0);
         const paid = Number(item.amount_paid || 0);
         return sum + Math.max(due, paid);
-      }, 0);
+      }, 0) + totalCourseRevenue;
       const calculatedProjectedRevenue = calculateSystemProjectedRevenueFromContext({ context, ym, mStart, mEnd });
       const systemProjectedRevenue = Math.max(paymentProjectedRevenue, calculatedProjectedRevenue, systemRevenue);
+
       let staffSalaryTotal = 0;
       let projectedStaffSalaryTotal = 0;
       const staffIncomeRows = [];
       (staff || []).forEach(person => {
+        const hasClasses = Boolean(classMapByStaff[person.id]?.length || courseMapByStaff[person.id]?.length);
+        const isPureAdminNoClasses = person.role === "admin" && !hasClasses;
+        const defaultBase = isPureAdminNoClasses ? 0 : DEFAULT_BASE_SALARY;
+
         const cfg = salaryConfigs[person.id] || {
-          base_salary: DEFAULT_BASE_SALARY,
+          base_salary: defaultBase,
           base_tier_percent: DEFAULT_BASE_PERCENT,
           special_classes: [],
           special_class_id: null,
           special_class_percent: 0,
         };
+        const effectiveBaseSalary = (isPureAdminNoClasses && salaryConfigs[person.id]?.base_salary === undefined)
+          ? 0
+          : Number(cfg.base_salary ?? defaultBase);
+
         const staffRevenue = calculateTeacherRevenueFromContext({
           managedClassIds: classMapByStaff[person.id] || [],
           managedCourseIds: courseMapByStaff[person.id] || [],
@@ -2359,18 +2400,18 @@
           const specBonus = Number(staffRevenue.specialBonusTotal || 0);
           const specProjBonus = Number(staffRevenue.specialProjectedBonusTotal || 0);
 
-          const basicSal = calculateSalaryBreakdown(staffRevenue.basicPerSessionActualRevenue, Number(cfg.base_salary || 0), Number(cfg.base_tier_percent || 0));
-          const basicProjSal = calculateSalaryBreakdown(staffRevenue.basicPerSessionProjectedRevenue, Number(cfg.base_salary || 0), Number(cfg.base_tier_percent || 0));
+          const basicSal = calculateSalaryBreakdown(staffRevenue.basicPerSessionActualRevenue, effectiveBaseSalary, Number(cfg.base_tier_percent || 0));
+          const basicProjSal = calculateSalaryBreakdown(staffRevenue.basicPerSessionProjectedRevenue, effectiveBaseSalary, Number(cfg.base_tier_percent || 0));
 
           salary = {
-            baseSalary: Number(cfg.base_salary || 0),
+            baseSalary: effectiveBaseSalary,
             totalBonus: basicSal.totalBonus + specBonus + personCustomBonus,
-            totalIncome: Number(cfg.base_salary || 0) + basicSal.totalBonus + specBonus + personCustomBonus,
+            totalIncome: effectiveBaseSalary + basicSal.totalBonus + specBonus + personCustomBonus,
           };
           projectedSalary = {
-            baseSalary: Number(cfg.base_salary || 0),
+            baseSalary: effectiveBaseSalary,
             totalBonus: basicProjSal.totalBonus + specProjBonus + personCustomBonus,
-            totalIncome: Number(cfg.base_salary || 0) + basicProjSal.totalBonus + specProjBonus + personCustomBonus,
+            totalIncome: effectiveBaseSalary + basicProjSal.totalBonus + specProjBonus + personCustomBonus,
           };
         } else {
           salary = {
@@ -2399,6 +2440,7 @@
       const expenseTotal = (expenses || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
       const netIncome = systemRevenue - staffSalaryTotal - expenseTotal;
       const projectedNetIncome = systemProjectedRevenue - projectedStaffSalaryTotal - expenseTotal;
+
       setText("adminSystemRevenue", fmt(systemRevenue) + "đ");
       setText("adminStaffSalary", fmt(staffSalaryTotal) + "đ");
       setText("adminExpenseTotal", fmt(expenseTotal) + "đ");
@@ -2406,10 +2448,20 @@
       setText("adminProjectedRevenue", fmt(systemProjectedRevenue) + "đ");
       setText("adminProjectedStaffSalary", fmt(projectedStaffSalaryTotal) + "đ");
       setText("adminProjectedNetIncome", fmt(projectedNetIncome) + "đ");
+
+      const netEl = document.getElementById("adminNetIncome");
+      if (netEl) netEl.style.color = netIncome >= 0 ? "var(--green)" : "var(--red)";
+      const projNetEl = document.getElementById("adminProjectedNetIncome");
+      if (projNetEl) projNetEl.style.color = projectedNetIncome >= 0 ? "var(--green)" : "var(--red)";
+
       renderAdminStaffIncomeBreakdown(staffIncomeRows);
       renderOperatingExpenses(expenses);
     } catch (err) {
       console.error("Lỗi tính thu nhập admin:", err);
+      if (errBanner) {
+        errBanner.textContent = `Không tải được đầy đủ dữ liệu thu nhập admin: ${err.message}`;
+        errBanner.style.display = "block";
+      }
       document.getElementById("expenseList").innerHTML = `<div class="empty-state">Không tải được dữ liệu thu nhập admin: ${err.message}</div>`;
     }
   }
@@ -2431,7 +2483,7 @@
       title,
       amount,
       note,
-      created_by: currentUser.id,
+      created_by: currentUser?.id || null,
     });
     if (error) return alert("Lỗi lưu chi phí: " + error.message);
     event.target.reset();
@@ -2462,7 +2514,7 @@
       salary_month: ymToDate(ym),
       base_salary: baseSalary,
       bonus_amount: bonusAmount,
-      updated_by: currentUser.id,
+      updated_by: currentUser?.id || null,
       updated_at: new Date().toISOString(),
     }, { onConflict: "staff_id,salary_month" });
     if (error) {
@@ -2533,6 +2585,11 @@
         );
       } catch (adminErr) {
         console.error("Lỗi tính tiền lãi trung tâm:", adminErr);
+        const errBanner = document.getElementById("adminOverviewErrorBanner");
+        if (errBanner) {
+          errBanner.textContent = `Không tải được dữ liệu tiền lãi trung tâm: ${adminErr.message}`;
+          errBanner.style.display = "block";
+        }
         document.getElementById("expenseList").innerHTML = `<div class="empty-state">Không tải được dữ liệu tiền lãi trung tâm: ${adminErr.message}</div>`;
       }
       loader.style.display = "none";
