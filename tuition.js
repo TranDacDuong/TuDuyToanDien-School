@@ -2429,7 +2429,13 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "Lỗi khi gửi");
-      alert(`✓ Đã gửi thử thành công tới SĐT ${item.phone}!`);
+
+      if (data.result?.status === "friend_requested") {
+        alert(`⚠️ Phụ huynh em ${item.studentName} (${item.phone}) chưa kết bạn Zalo với bạn!\n\nBot đã thực hiện:\n1. Gửi Lời mời kết bạn Zalo.\n2. Gửi tin nhắn chào hỏi thân thiện.\n\n👉 Thầy/Cô hãy gọi điện thoại cho phụ huynh (SĐT: ${item.phone}) để nhắc phụ huynh bấm "Đồng ý" kết bạn nhé!`);
+      } else {
+        alert(`✓ Đã gửi tin nhắn học phí và mã QR thành công tới phụ huynh em ${item.studentName} (Đã là bạn bè)!`);
+      }
+      await checkZaloBotStatus();
     } catch (err) {
       alert("Lỗi khi gửi thử: " + err.message);
     }
@@ -2482,7 +2488,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
           <td style="padding:10px 8px">
             <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;color:#0369a1">${item.transferMemo}</code>
           </td>
-          <td style="padding:10px 8px;text-align:center">
+          <td id="zaloActionCell-${idx}" style="padding:10px 8px;text-align:center">
             <button onclick="sendSingleZaloTest(${idx})" title="Gửi thử tin nhắn Zalo tới phụ huynh này" style="background:#f8fafc;border:1px solid #cbd5e1;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;color:#0284c7">Gửi thử</button>
           </td>
         </tr>
@@ -2530,7 +2536,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
                 <th style="padding:8px">Người nhận (Phụ huynh / SĐT)</th>
                 <th style="padding:8px;text-align:right">Còn thiếu</th>
                 <th style="padding:8px">Mã CK SePay</th>
-                <th style="width:70px;padding:8px;text-align:center">Test</th>
+                <th style="min-width:140px;padding:8px;text-align:center">Trạng thái / Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -2634,21 +2640,36 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     if (isRunning || isPaused) {
       const total = progress.total || currentZaloCampaignItems.length || 1;
       const sent = progress.sent || 0;
+      const friendRequested = progress.friendRequested || 0;
       const failed = progress.failed || 0;
-      const percent = Math.min(100, Math.round(((sent + failed) / total) * 100));
+      const processed = sent + friendRequested + failed;
+      const percent = Math.min(100, Math.round((processed / total) * 100));
 
       liveProgressHtml = `
         <div style="background:linear-gradient(135deg, #1e293b 0%, #0f172a 100%);color:#fff;border-radius:16px;padding:16px 20px;margin-bottom:16px;box-shadow:0 10px 25px rgba(0,0,0,.15)">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
             <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px">
               <span>${isRunning ? "⏳ Đang gửi ngầm..." : "⏸ Đang tạm dừng"}</span>
-              <span style="font-size:12px;color:#94a3b8">(${sent}/${total} học sinh)</span>
+              <span style="font-size:12px;color:#94a3b8">(${processed}/${total} học sinh)</span>
             </div>
             <div style="font-size:13px;font-weight:700;color:#38bdf8">${percent}%</div>
           </div>
-          <div style="width:100%;height:10px;background:#334155;border-radius:999px;overflow:hidden;margin-bottom:12px">
+          <div style="width:100%;height:10px;background:#334155;border-radius:999px;overflow:hidden;margin-bottom:10px">
             <div style="width:${percent}%;height:100%;background:linear-gradient(90deg, #38bdf8 0%, #22c55e 100%);transition:width .4s ease"></div>
           </div>
+
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;margin-bottom:10px;padding:6px 12px;background:rgba(255,255,255,0.06);border-radius:8px">
+            <span style="color:#4ade80;font-weight:600">✓ Đã gửi (Bạn bè): <b>${sent}</b></span>
+            <span style="color:#fbbf24;font-weight:600">⚠️ Chưa kết bạn (Đã mời): <b>${friendRequested}</b></span>
+            <span style="color:#f87171;font-weight:600">✗ Lỗi: <b>${failed}</b></span>
+          </div>
+
+          ${friendRequested > 0 ? `
+            <div style="margin-bottom:10px;padding:8px 12px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);border-radius:8px;font-size:11px;color:#fde68a;display:flex;align-items:center;gap:6px">
+              <span>📞</span> Có <b>${friendRequested}</b> phụ huynh chưa kết bạn Zalo. Hệ thống đã gửi lời mời kết bạn & tin nhắn chào. Thầy/Cô hãy gọi điện thoại trực tiếp để nhắc phụ huynh bấm xác nhận.
+            </div>
+          ` : ""}
+
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:12px">
             <div style="color:#cbd5e1">
               ${progress.nextSendInSeconds > 0 ? `⏱ Gửi tiếp sau: <b style="color:#fbbf24;font-size:14px">${progress.nextSendInSeconds}s</b> cho PH em <b>${progress.currentStudent || ""}</b>` : "Đang chuẩn bị gói tin..."}
@@ -2661,6 +2682,51 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
         </div>
       `;
     }
+
+    if (liveProgressHtml !== lastRenderedProgressHtml) {
+      progressSection.innerHTML = liveProgressHtml;
+      lastRenderedProgressHtml = liveProgressHtml;
+    }
+
+    // Cập nhật trạng thái từng hàng học sinh trong bảng (KHÔNG làm reload bảng hay mất thanh cuộn)
+    const completedResults = campaign.completedResults || [];
+    const resultMap = new Map();
+    for (const r of completedResults) {
+      if (r.studentId) resultMap.set(String(r.studentId), r);
+      if (r.phone) resultMap.set(String(r.phone).replace(/\D/g, ""), r);
+    }
+
+    currentZaloCampaignItems.forEach((item, idx) => {
+      const cell = document.getElementById(`zaloActionCell-${idx}`);
+      if (!cell) return;
+
+      const cleanItemPhone = String(item.phone || "").replace(/\D/g, "");
+      const r = resultMap.get(String(item.studentId)) || (cleanItemPhone ? resultMap.get(cleanItemPhone) : null);
+
+      if (r) {
+        if (r.status === "sent") {
+          cell.innerHTML = `<span style="color:#16a34a;background:#dcfce7;border:1px solid #bbf7d0;padding:3px 8px;border-radius:999px;font-weight:700;font-size:11px;display:inline-block">✓ Đã gửi (Bạn bè)</span>`;
+        } else if (r.status === "friend_requested") {
+          cell.innerHTML = `
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+              <span style="color:#b45309;background:#fef3c7;border:1px solid #fde68a;padding:2px 8px;border-radius:999px;font-weight:700;font-size:11px;display:inline-block" title="${r.note || 'Chưa kết bạn Zalo'}">⚠️ Đã mời KB (Chưa là bạn)</span>
+              <a href="tel:${cleanItemPhone}" style="color:#c2410c;background:#ffedd5;border:1px solid #fdba74;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:3px" title="Bấm để gọi điện trực tiếp cho phụ huynh">
+                📞 Gọi điện: ${item.phone}
+              </a>
+            </div>
+          `;
+        } else if (r.status === "failed") {
+          cell.innerHTML = `
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+              <span style="color:#dc2626;background:#fee2e2;border:1px solid #fecaca;padding:2px 8px;border-radius:999px;font-weight:700;font-size:11px;display:inline-block">✗ Thất bại</span>
+              <span style="font-size:10px;color:#ef4444;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.error || ''}">${r.error || 'Lỗi gửi'}</span>
+            </div>
+          `;
+        }
+      } else if (isRunning && progress.currentPhone && cleanItemPhone === String(progress.currentPhone).replace(/\D/g, "")) {
+        cell.innerHTML = `<span style="color:#2563eb;background:#dbeafe;border:1px solid #bfdbfe;padding:3px 8px;border-radius:999px;font-weight:700;font-size:11px;display:inline-block">⏳ Đang gửi...</span>`;
+      }
+    });
 
     if (liveProgressHtml !== lastRenderedProgressHtml) {
       progressSection.innerHTML = liveProgressHtml;

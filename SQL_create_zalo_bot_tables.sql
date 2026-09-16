@@ -55,14 +55,21 @@ CREATE TABLE IF NOT EXISTS public.zalo_messages_queue (
     transfer_memo TEXT NOT NULL,               -- SEVQR HP0926 Dac Duong 5267
     message_text TEXT NOT NULL,
     qr_url TEXT,
-    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'sent', 'failed', 'cancelled', 'skipped')),
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'sent', 'failed', 'cancelled', 'skipped', 'friend_requested')),
     is_friend BOOLEAN DEFAULT false,           -- Đã là bạn bè Zalo hay chưa
+    note TEXT,                                 -- Ghi chú (ví dụ: Chưa kết bạn - Cần gọi điện trực tiếp)
     error_message TEXT,
     attempts INT DEFAULT 0,
     sent_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now())
 );
+
+-- Cập nhật cột note và check constraint nếu bảng đã tồn tại từ trước
+ALTER TABLE public.zalo_messages_queue ADD COLUMN IF NOT EXISTS note TEXT;
+ALTER TABLE public.zalo_messages_queue DROP CONSTRAINT IF EXISTS zalo_messages_queue_status_check;
+ALTER TABLE public.zalo_messages_queue ADD CONSTRAINT zalo_messages_queue_status_check
+    CHECK (status IN ('pending', 'processing', 'sent', 'failed', 'cancelled', 'skipped', 'friend_requested'));
 
 -- 3. Đánh index để truy vấn hàng đợi siêu nhanh
 CREATE INDEX IF NOT EXISTS idx_zalo_queue_status ON public.zalo_messages_queue (status, created_at);

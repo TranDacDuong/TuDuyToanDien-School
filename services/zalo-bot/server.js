@@ -24,6 +24,40 @@ let zaloInstance = null;
 let zaloApi = null;
 let isLoggingIn = false;
 
+let friendPhoneMap = new Map();
+let friendUserIdSet = new Set();
+let completedResults = [];
+
+async function syncFriendsList() {
+  if (!zaloApi || typeof zaloApi.getAllFriends !== 'function') return;
+  try {
+    console.log("[ZaloBot] Đang đồng bộ danh bạ bạn bè Zalo vào bộ nhớ cache...");
+    const res = await zaloApi.getAllFriends().catch(() => null);
+    const friends = (res && Array.isArray(res)) ? res : (res && res.data && Array.isArray(res.data)) ? res.data : [];
+
+    friendPhoneMap.clear();
+    friendUserIdSet.clear();
+
+    for (const f of friends) {
+      const uid = String(f.userId || f.uid || '');
+      if (uid) friendUserIdSet.add(uid);
+
+      const rawPhone = String(f.phoneNumber || f.phone || '').replace(/\D/g, '');
+      if (rawPhone) {
+        friendPhoneMap.set(rawPhone, f);
+        if (rawPhone.startsWith('84')) {
+          friendPhoneMap.set('0' + rawPhone.substring(2), f);
+        } else if (rawPhone.startsWith('0')) {
+          friendPhoneMap.set('84' + rawPhone.substring(1), f);
+        }
+      }
+    }
+    console.log(`[ZaloBot] ✓ Đã đồng bộ ${friendUserIdSet.size} bạn bè vào bộ nhớ cache!`);
+  } catch (err) {
+    console.warn("[ZaloBot] Lỗi khi đồng bộ danh bạ bạn bè:", err?.message || err);
+  }
+}
+
 // Campaign Queue State
 let campaignQueue = [];
 let campaignStatus = 'idle'; // 'idle' | 'running' | 'paused'
@@ -31,6 +65,7 @@ let isWorkerRunning = false;
 let currentProgress = {
   total: 0,
   sent: 0,
+  friendRequested: 0,
   failed: 0,
   skipped: 0,
   currentStudent: '',
@@ -143,6 +178,7 @@ async function initZaloClient(forceQr = false) {
             botStatus = 'connected';
             qrCodeDataUrl = null;
             console.log("[ZaloBot] ✓ Đăng nhập bằng session cũ thành công!");
+            syncFriendsList().catch(console.error);
             isLoggingIn = false;
             return;
           }
@@ -186,6 +222,7 @@ async function initZaloClient(forceQr = false) {
         botStatus = 'connected';
         qrCodeDataUrl = null;
         console.log("[ZaloBot] 🎉 Đăng nhập Zalo thành công! Bot đã sẵn sàng hoạt động.");
+        syncFriendsList().catch(console.error);
       }
     }).catch(err => {
       console.warn("[ZaloBot] Kết thúc lượt quét QR:", err?.message || err);
@@ -243,7 +280,7 @@ async function startCampaignWorker() {
 
     // Calculate human-like delay
     const delaySec = getRandomDelay(botConfig.minDelaySeconds, botConfig.maxDelaySeconds);
-    console.log(`[ZaloBot] Chuẩn bị gửi cho PH em ${item.studentName} (${item.phone}). Đợi ${delaySec}s để chống chặn...`);
+    console.log(`[ZaloBot] Chuẩn bị xử lý cho PH em ${item.studentName} (${item.phone}). Đợi ${delaySec}s để chống chặn...`);
 
     for (let s = delaySec; s > 0; s--) {
       if (campaignStatus !== 'running') break;
@@ -252,22 +289,49 @@ async function startCampaignWorker() {
     }
 
     if (campaignStatus !== 'running') {
-      // Put item back if paused during countdown
       campaignQueue.unshift(item);
       continue;
     }
 
-    // Execute Send
+    // Execute Send & Friendship check
     try {
-      await sendMessageToParent(item);
-      currentProgress.sent++;
+      const result = await sendMessageToParent(item);
       currentProgress.batchCount++;
-      item.status = 'sent';
-      console.log(`[ZaloBot] [✓ ĐÃ GỬI] PH em ${item.studentName} (${item.phone}) thành công.`);
+      if (result.status === 'friend_requested') {
+        currentProgress.friendRequested = (currentProgress.friendRequested || 0) + 1;
+        completedResults.push({
+          studentId: item.studentId,
+          phone: item.phone,
+          studentName: item.studentName,
+          status: 'friend_requested',
+          isFriend: false,
+          note: item.note
+        });
+        console.log(`[ZaloBot] [⚠️ CHƯA KẾT BẠN] Đã gửi lời mời & tin chào cho PH em ${item.studentName} (${item.phone}). Note: Cần gọi điện.`);
+      } else {
+        currentProgress.sent++;
+        completedResults.push({
+          studentId: item.studentId,
+          phone: item.phone,
+          studentName: item.studentName,
+          status: 'sent',
+          isFriend: true,
+          note: 'Đã gửi học phí (Bạn bè)'
+        });
+        console.log(`[ZaloBot] [✓ ĐÃ GỬI BẠN BÈ] PH em ${item.studentName} (${item.phone}) thành công.`);
+      }
     } catch (sendErr) {
       currentProgress.failed++;
       item.status = 'failed';
       item.error = sendErr?.message || String(sendErr);
+      completedResults.push({
+        studentId: item.studentId,
+        phone: item.phone,
+        studentName: item.studentName,
+        status: 'failed',
+        isFriend: false,
+        error: item.error
+      });
       console.error(`[ZaloBot] [✗ THẤT BẠI] Gửi PH em ${item.studentName} (${item.phone}):`, item.error);
     }
   }
@@ -275,7 +339,7 @@ async function startCampaignWorker() {
   isWorkerRunning = false;
   if (campaignStatus === 'running') {
     campaignStatus = 'idle';
-    console.log(`[ZaloBot] Hoàn thành chiến dịch! Gửi: ${currentProgress.sent}, Lỗi: ${currentProgress.failed}`);
+    console.log(`[ZaloBot] Hoàn thành chiến dịch! Gửi bạn bè: ${currentProgress.sent}, Chưa kết bạn (đã mời): ${currentProgress.friendRequested || 0}, Lỗi: ${currentProgress.failed}`);
   }
 }
 
@@ -285,55 +349,130 @@ async function sendMessageToParent(item) {
     throw new Error('Số điện thoại không hợp lệ: ' + item.phone);
   }
 
-  // Format phone to 84...
+  // Format phone to 84... and 0...
   let intlPhone = cleanPhone;
   if (intlPhone.startsWith('0')) {
     intlPhone = '84' + intlPhone.substring(1);
   }
+  let localPhone = cleanPhone;
+  if (localPhone.startsWith('84')) {
+    localPhone = '0' + localPhone.substring(2);
+  }
 
   if (zaloApi && typeof zaloApi.findUser === 'function') {
-    // 1. Tìm thông tin người dùng qua SĐT
-    const userResult = await zaloApi.findUser(intlPhone).catch(() => null);
-    if (!userResult || !userResult.uid) {
-      throw new Error(`Không tìm thấy tài khoản Zalo với SĐT ${item.phone}`);
+    // 1. Kiểm tra bạn bè trong cache danh bạ (Tiết kiệm 100% quota tìm kiếm Zalo)
+    const cachedFriend = friendPhoneMap.get(intlPhone) || friendPhoneMap.get(localPhone);
+    let threadId = cachedFriend ? String(cachedFriend.userId || cachedFriend.uid) : null;
+    let isFriend = !!cachedFriend;
+
+    // 2. Nếu chưa có trong cache, tìm kiếm qua SĐT
+    let userResult = null;
+    if (!threadId) {
+      userResult = await zaloApi.findUser(intlPhone).catch(() => null);
+      if (!userResult || !userResult.uid) {
+        throw new Error(`Không tìm thấy tài khoản Zalo với SĐT ${item.phone}`);
+      }
+      threadId = String(userResult.uid);
+      if (friendUserIdSet.has(threadId) || userResult.is_friend === 1 || userResult.is_friend === true) {
+        isFriend = true;
+      }
     }
 
-    const threadId = userResult.uid;
-
-    // 2. Gửi tin nhắn nội dung
-    if (typeof zaloApi.sendMessage === 'function') {
-      await zaloApi.sendMessage(item.messageText, threadId);
-    }
-
-    // 3. Gửi ảnh mã QR nếu có
-    if (item.qrUrl && typeof zaloApi.sendMessage === 'function') {
-      const tempDir = path.join(__dirname, 'temp');
-      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-      const tempQrFile = path.join(tempDir, `qr_${Date.now()}_${Math.floor(Math.random() * 10000)}.png`);
-
+    // A. Nếu chưa là bạn bè, thử gửi lời mời kết bạn trước
+    if (!isFriend) {
+      console.log(`[ZaloBot] ⚠️ Chưa kết bạn với PH em ${item.studentName} (${item.phone}). Bắt đầu gửi lời mời kết bạn & tin chào...`);
+      const friendReqMsg = `Dạ em chào anh/chị, em là giáo viên trung tâm MindUp dạy cháu ${item.studentName}. Anh/chị đồng ý kết bạn để em tiện gửi thông tin của con nhé ạ!`;
       try {
-        console.log(`[ZaloBot] Đang tải ảnh QR từ VietQR cho ${item.studentName}...`);
-        await downloadImage(item.qrUrl, tempQrFile);
-        console.log(`[ZaloBot] Đang gửi ảnh QR đính kèm qua Zalo cho ${item.studentName}...`);
-        await zaloApi.sendMessage({
-          msg: `Mã QR thanh toán học phí em ${item.studentName} (Quét để tự động điền thông tin):`,
-          attachments: [tempQrFile]
-        }, threadId);
-        console.log(`[ZaloBot] ✓ Đã gửi ảnh QR cho ${item.studentName} thành công!`);
-      } catch (imgErr) {
-        console.warn("[ZaloBot] Không gửi được ảnh QR đính kèm:", imgErr?.message || imgErr);
-      } finally {
-        if (fs.existsSync(tempQrFile)) {
-          try { fs.unlinkSync(tempQrFile); } catch (e) {}
+        if (typeof zaloApi.sendFriendRequest === 'function') {
+          await zaloApi.sendFriendRequest(friendReqMsg, threadId);
+          console.log(`[ZaloBot] ✓ Đã gửi Lời mời kết bạn tới PH em ${item.studentName} (${item.phone}).`);
+        }
+      } catch (reqErr) {
+        const errMsg = reqErr?.message || String(reqErr);
+        if (errMsg.includes('225') || errMsg.includes('already friends')) {
+          console.log(`[ZaloBot] Phụ huynh em ${item.studentName} thực tế đã là bạn bè (code 225).`);
+          isFriend = true;
+        } else if (errMsg.includes('222')) {
+          console.log(`[ZaloBot] Phụ huynh em ${item.studentName} đã gửi lời mời trước đó, kết bạn thành công (code 222).`);
+          isFriend = true;
+        } else {
+          console.warn(`[ZaloBot] Lời mời kết bạn cho PH em ${item.studentName}:`, errMsg);
         }
       }
     }
-    return true;
+
+    // ========================================================
+    // KỊCH BẢN 1: NẾU ĐÃ LÀ BẠN BÈ -> Gửi học phí + ảnh QR
+    // ========================================================
+    if (isFriend) {
+      friendUserIdSet.add(threadId);
+      if (userResult) {
+        friendPhoneMap.set(intlPhone, userResult);
+        friendPhoneMap.set(localPhone, userResult);
+      }
+
+      // Gửi tin nhắn nội dung học phí
+      if (typeof zaloApi.sendMessage === 'function') {
+        await zaloApi.sendMessage(item.messageText, threadId);
+      }
+
+      // Gửi ảnh mã QR đính kèm
+      if (item.qrUrl && typeof zaloApi.sendMessage === 'function') {
+        const tempDir = path.join(__dirname, 'temp');
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+        const tempQrFile = path.join(tempDir, `qr_${Date.now()}_${Math.floor(Math.random() * 10000)}.png`);
+
+        try {
+          console.log(`[ZaloBot] Đang tải ảnh QR từ VietQR cho ${item.studentName}...`);
+          await downloadImage(item.qrUrl, tempQrFile);
+          console.log(`[ZaloBot] Đang gửi ảnh QR đính kèm qua Zalo cho ${item.studentName}...`);
+          await zaloApi.sendMessage({
+            msg: `Mã QR thanh toán học phí em ${item.studentName} (Quét để tự động điền thông tin):`,
+            attachments: [tempQrFile]
+          }, threadId);
+          console.log(`[ZaloBot] ✓ Đã gửi ảnh QR cho ${item.studentName} thành công!`);
+        } catch (imgErr) {
+          console.warn("[ZaloBot] Không gửi được ảnh QR đính kèm:", imgErr?.message || imgErr);
+        } finally {
+          if (fs.existsSync(tempQrFile)) {
+            try { fs.unlinkSync(tempQrFile); } catch (e) {}
+          }
+        }
+      }
+
+      item.status = 'sent';
+      item.isFriend = true;
+      item.note = 'Đã gửi học phí (Bạn bè)';
+      return item;
+    }
+
+    // ========================================================
+    // KỊCH BẢN 2: VẪN CHƯA PHẢI BẠN BÈ
+    // -> Nhắn tin với lời chào thân thiện + Ghi chú cần gọi điện
+    // ========================================================
+    const friendlyGreeting = `Trung tâm MindUp xin chào Quý phụ huynh em ${item.studentName}! 🌸\n\nDạ em là giáo viên/phụ trách lớp của cháu ${item.studentName} tại trung tâm MindUp. Em vừa gửi lời mời kết bạn Zalo với anh/chị.\nAnh/chị vui lòng bấm "Đồng ý" kết bạn để trung tâm tiện gửi thông báo học tập và chi tiết học phí của con hàng tháng nhé ạ!\nTrung tâm xin chân thành cảm ơn Quý phụ huynh! ❤️`;
+    try {
+      if (typeof zaloApi.sendMessage === 'function') {
+        await zaloApi.sendMessage(friendlyGreeting, threadId);
+        console.log(`[ZaloBot] ✓ Đã gửi tin nhắn chào thân thiện tới PH em ${item.studentName} (${item.phone}).`);
+      }
+    } catch (msgErr) {
+      console.warn(`[ZaloBot] Phụ huynh có thể chặn tin nhắn từ người lạ (nhưng lời mời kết bạn vẫn đến):`, msgErr?.message || msgErr);
+    }
+
+    item.status = 'friend_requested';
+    item.isFriend = false;
+    item.note = 'Chưa kết bạn với phụ huynh này (Cần gọi điện thoại trực tiếp)';
+    return item;
+
   } else {
     // Chế độ mô phỏng kiểm thử (nếu chưa đăng nhập Zalo thật)
     console.log(`[SIMULATION MODE] Gửi tin đến SĐT ${intlPhone}:\n${item.messageText}`);
     await sleep(400);
-    return true;
+    item.status = 'sent';
+    item.isFriend = true;
+    item.note = 'Đã gửi (Mô phỏng)';
+    return item;
   }
 }
 
@@ -347,10 +486,12 @@ app.get('/api/status', (req, res) => {
     botStatus,
     hasQr: !!qrCodeDataUrl,
     userInfo,
+    friendsCount: friendUserIdSet.size,
     campaign: {
       status: campaignStatus,
       queueLength: campaignQueue.length,
-      progress: currentProgress
+      progress: currentProgress,
+      completedResults: completedResults.slice(-100)
     },
     config: botConfig
   });
@@ -420,9 +561,11 @@ app.post('/api/start-campaign', (req, res) => {
   }
 
   campaignQueue = [...items];
+  completedResults = [];
   currentProgress = {
     total: items.length,
     sent: 0,
+    friendRequested: 0,
     failed: 0,
     skipped: 0,
     currentStudent: '',
@@ -468,8 +611,8 @@ app.post('/api/test-send', async (req, res) => {
   }
 
   try {
-    await sendMessageToParent({ phone, studentName: studentName || 'Học sinh Test', messageText, qrUrl });
-    res.json({ success: true, message: `Đã gửi tin nhắn thử nghiệm tới ${phone}` });
+    const result = await sendMessageToParent({ phone, studentName: studentName || 'Học sinh Test', messageText, qrUrl });
+    res.json({ success: true, message: `Đã xử lý gửi tin nhắn tới ${phone}`, result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
