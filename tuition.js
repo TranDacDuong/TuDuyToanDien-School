@@ -2427,12 +2427,23 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
           qrUrl: item.qrUrl
         })
       });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "Lỗi khi gửi");
-
+      const cell = document.getElementById(`zaloActionCell-${idx}`);
       if (data.result?.status === "friend_requested") {
+        if (cell) {
+          cell.innerHTML = `
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+              <span style="color:#b45309;background:#fef3c7;border:1px solid #fde68a;padding:2px 8px;border-radius:999px;font-weight:700;font-size:11px;display:inline-block">⚠️ Chưa kết bạn (Đã mời)</span>
+              <a href="tel:${item.phone}" style="color:#c2410c;background:#ffedd5;border:1px solid #fdba74;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:3px" title="Bấm để gọi điện">
+                📞 Gọi điện: ${item.phone}
+              </a>
+            </div>
+          `;
+        }
         alert(`⚠️ Phụ huynh em ${item.studentName} (${item.phone}) chưa kết bạn Zalo với bạn!\n\nBot đã thực hiện:\n1. Gửi Lời mời kết bạn Zalo.\n2. Gửi tin nhắn chào hỏi thân thiện.\n\n👉 Thầy/Cô hãy gọi điện thoại cho phụ huynh (SĐT: ${item.phone}) để nhắc phụ huynh bấm "Đồng ý" kết bạn nhé!`);
       } else {
+        if (cell) {
+          cell.innerHTML = `<span style="color:#16a34a;background:#dcfce7;border:1px solid #bbf7d0;padding:3px 8px;border-radius:999px;font-weight:700;font-size:11px;display:inline-block">✓ Đã gửi (Bạn bè)</span>`;
+        }
         alert(`✓ Đã gửi tin nhắn học phí và mã QR thành công tới phụ huynh em ${item.studentName} (Đã là bạn bè)!`);
       }
       await checkZaloBotStatus();

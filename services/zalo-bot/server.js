@@ -360,44 +360,40 @@ async function sendMessageToParent(item) {
   }
 
   if (zaloApi && typeof zaloApi.findUser === 'function') {
-    // 1. Kiểm tra bạn bè trong cache danh bạ (Tiết kiệm 100% quota tìm kiếm Zalo)
+    // 1. Kiểm tra bạn bè trong cache danh bạ SĐT trước (nếu có để tiết kiệm quota)
     const cachedFriend = friendPhoneMap.get(intlPhone) || friendPhoneMap.get(localPhone);
     let threadId = cachedFriend ? String(cachedFriend.userId || cachedFriend.uid) : null;
-    let isFriend = !!cachedFriend;
 
-    // 2. Nếu chưa có trong cache, tìm kiếm qua SĐT
-    let userResult = null;
+    // 2. Nếu chưa có threadId, tìm kiếm qua SĐT
     if (!threadId) {
-      userResult = await zaloApi.findUser(intlPhone).catch(() => null);
+      console.log(`[ZaloBot] Tìm kiếm tài khoản Zalo qua SĐT ${item.phone}...`);
+      const userResult = await zaloApi.findUser(intlPhone).catch(() => null);
       if (!userResult || !userResult.uid) {
         throw new Error(`Không tìm thấy tài khoản Zalo với SĐT ${item.phone}`);
       }
       threadId = String(userResult.uid);
-      if (friendUserIdSet.has(threadId) || userResult.is_friend === 1 || userResult.is_friend === true) {
-        isFriend = true;
-      }
     }
 
-    // A. Nếu chưa là bạn bè, thử gửi lời mời kết bạn trước
-    if (!isFriend) {
-      console.log(`[ZaloBot] ⚠️ Chưa kết bạn với PH em ${item.studentName} (${item.phone}). Bắt đầu gửi lời mời kết bạn & tin chào...`);
-      const friendReqMsg = `Dạ em chào anh/chị, em là giáo viên trung tâm MindUp dạy cháu ${item.studentName}. Anh/chị đồng ý kết bạn để em tiện gửi thông tin của con nhé ạ!`;
+    // 3. XÁC THỰC QUAN HỆ BẠN BÈ THỜI GIAN THỰC TỪ SERVER ZALO (CHUẨN XÁC 100%)
+    let isFriend = false;
+    let isRequesting = false;
+    let isRequested = false;
+
+    if (typeof zaloApi.getFriendRequestStatus === 'function') {
       try {
-        if (typeof zaloApi.sendFriendRequest === 'function') {
-          await zaloApi.sendFriendRequest(friendReqMsg, threadId);
-          console.log(`[ZaloBot] ✓ Đã gửi Lời mời kết bạn tới PH em ${item.studentName} (${item.phone}).`);
+        const friendStatus = await zaloApi.getFriendRequestStatus(threadId);
+        console.log(`[ZaloBot] Trạng thái quan hệ với PH em ${item.studentName} (UID: ${threadId}):`, friendStatus);
+        if (friendStatus) {
+          isFriend = (friendStatus.is_friend === 1);
+          isRequesting = (friendStatus.is_requesting === 1);
+          isRequested = (friendStatus.is_requested === 1);
         }
-      } catch (reqErr) {
-        const errMsg = reqErr?.message || String(reqErr);
-        if (errMsg.includes('225') || errMsg.includes('already friends')) {
-          console.log(`[ZaloBot] Phụ huynh em ${item.studentName} thực tế đã là bạn bè (code 225).`);
-          isFriend = true;
-        } else if (errMsg.includes('222')) {
-          console.log(`[ZaloBot] Phụ huynh em ${item.studentName} đã gửi lời mời trước đó, kết bạn thành công (code 222).`);
-          isFriend = true;
-        } else {
-          console.warn(`[ZaloBot] Lời mời kết bạn cho PH em ${item.studentName}:`, errMsg);
-        }
+      } catch (stErr) {
+        console.warn(`[ZaloBot] Lỗi kiểm tra getFriendRequestStatus:`, stErr?.message || stErr);
+      }
+    } else {
+      if (friendUserIdSet.has(threadId)) {
+        isFriend = true;
       }
     }
 
@@ -405,11 +401,10 @@ async function sendMessageToParent(item) {
     // KỊCH BẢN 1: NẾU ĐÃ LÀ BẠN BÈ -> Gửi học phí + ảnh QR
     // ========================================================
     if (isFriend) {
+      console.log(`[ZaloBot] ✓ ĐÃ LÀ BẠN BÈ với PH em ${item.studentName} (${item.phone}). Bắt đầu gửi học phí + QR...`);
       friendUserIdSet.add(threadId);
-      if (userResult) {
-        friendPhoneMap.set(intlPhone, userResult);
-        friendPhoneMap.set(localPhone, userResult);
-      }
+      friendPhoneMap.set(intlPhone, { userId: threadId });
+      friendPhoneMap.set(localPhone, { userId: threadId });
 
       // Gửi tin nhắn nội dung học phí
       if (typeof zaloApi.sendMessage === 'function') {
@@ -447,9 +442,47 @@ async function sendMessageToParent(item) {
     }
 
     // ========================================================
-    // KỊCH BẢN 2: VẪN CHƯA PHẢI BẠN BÈ
-    // -> Nhắn tin với lời chào thân thiện + Ghi chú cần gọi điện
+    // KỊCH BẢN 2: CHƯA PHẢI BẠN BÈ
+    // -> Gửi lời mời kết bạn + Nhắn tin chào thân thiện + Ghi chú cần gọi điện
     // ========================================================
+    console.log(`[ZaloBot] ⚠️ CHƯA KẾT BẠN với PH em ${item.studentName} (${item.phone}). Bắt đầu gửi lời mời kết bạn & tin chào...`);
+    // Xóa khỏi cache nếu trước đây từng có (do mới hủy kết bạn)
+    friendUserIdSet.delete(threadId);
+    friendPhoneMap.delete(intlPhone);
+    friendPhoneMap.delete(localPhone);
+
+    // A. Xử lý Lời mời kết bạn
+    const friendReqMsg = `Dạ em chào anh/chị, em là giáo viên trung tâm MindUp dạy cháu ${item.studentName}. Anh/chị đồng ý kết bạn để em tiện gửi thông tin của con nhé ạ!`;
+
+    if (isRequested) {
+      console.log(`[ZaloBot] Phụ huynh em ${item.studentName} đã gửi lời mời trước đó. Tự động chấp nhận...`);
+      try {
+        if (typeof zaloApi.acceptFriendRequest === 'function') {
+          await zaloApi.acceptFriendRequest(threadId);
+        }
+      } catch (accErr) {
+        console.warn(`[ZaloBot] Lỗi chấp nhận kết bạn:`, accErr?.message || accErr);
+      }
+    } else if (!isRequesting) {
+      try {
+        if (typeof zaloApi.sendFriendRequest === 'function') {
+          await zaloApi.sendFriendRequest(friendReqMsg, threadId);
+          console.log(`[ZaloBot] ✓ Đã gửi Lời mời kết bạn tới PH em ${item.studentName} (${item.phone}).`);
+        }
+      } catch (reqErr) {
+        const errMsg = reqErr?.message || String(reqErr);
+        if (errMsg.includes('225') || errMsg.includes('already friends')) {
+          console.log(`[ZaloBot] Phụ huynh em ${item.studentName} thực tế đã là bạn bè.`);
+          isFriend = true;
+        } else {
+          console.warn(`[ZaloBot] Lời mời kết bạn cho PH em ${item.studentName}:`, errMsg);
+        }
+      }
+    } else {
+      console.log(`[ZaloBot] Đã gửi lời mời kết bạn từ trước đó cho PH em ${item.studentName}, đang chờ đồng ý.`);
+    }
+
+    // B. Nhắn tin với lời chào thân thiện (không gửi dồn dập bảng học phí)
     const friendlyGreeting = `Trung tâm MindUp xin chào Quý phụ huynh em ${item.studentName}! 🌸\n\nDạ em là giáo viên/phụ trách lớp của cháu ${item.studentName} tại trung tâm MindUp. Em vừa gửi lời mời kết bạn Zalo với anh/chị.\nAnh/chị vui lòng bấm "Đồng ý" kết bạn để trung tâm tiện gửi thông báo học tập và chi tiết học phí của con hàng tháng nhé ạ!\nTrung tâm xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     try {
       if (typeof zaloApi.sendMessage === 'function') {
