@@ -20,14 +20,14 @@ Trung tâm xin gửi thông báo chi tiết học phí tháng {Thang}/{Nam} củ
 • Hạn thanh toán: Trước ngày {HanDong}
 
 Quý phụ huynh có thể thanh toán nhanh bằng cách quét ảnh mã QR đính kèm hoặc chuyển khoản theo thông tin:
-• Ngân hàng: {TenNganHang} ({SoTaiKhoan}) - Chủ TK: {ChuTaiKhoan}
+• Ngân hàng: {TenNganHang}
+• Số tài khoản: {SoTaiKhoan}
 • Nội dung chuyển khoản: {NoiDungCK}
 
 (Lưu ý: Quý phụ huynh vui lòng giữ nguyên nội dung chuyển khoản trên để hệ thống tự động gạch nợ ngay khi nhận được tiền).
 Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️',
-    bank_name TEXT DEFAULT 'MBBank',
-    bank_account_no TEXT DEFAULT '0826568658',
-    bank_account_name TEXT DEFAULT 'TRAN DAC DUONG',
+    bank_name TEXT DEFAULT 'VietinBank',
+    bank_account_no TEXT DEFAULT '105870682948',
     bot_status TEXT DEFAULT 'disconnected',    -- 'disconnected', 'qr_ready', 'connected'
     bot_phone TEXT,
     bot_name TEXT,

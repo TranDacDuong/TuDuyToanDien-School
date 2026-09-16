@@ -47,6 +47,39 @@ let botConfig = {
   batchPauseMinutes: 30
 };
 
+const https = require('https');
+const http = require('http');
+
+// Helper: Download image to local file for Zalo attachment upload
+function downloadImage(url, destPath) {
+  return new Promise((resolve, reject) => {
+    const client = url.startsWith('https') ? https : http;
+    const req = client.get(url, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return downloadImage(res.headers.location, destPath).then(resolve).catch(reject);
+      }
+      if (res.statusCode !== 200) {
+        return reject(new Error(`HTTP ${res.statusCode} khi tải ảnh QR`));
+      }
+      const fileStream = fs.createWriteStream(destPath);
+      res.pipe(fileStream);
+      fileStream.on('finish', () => {
+        fileStream.close();
+        resolve(destPath);
+      });
+      fileStream.on('error', (err) => {
+        fs.unlink(destPath, () => {});
+        reject(err);
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(15000, () => {
+      req.destroy();
+      reject(new Error('Timeout khi tải ảnh QR từ VietQR'));
+    });
+  });
+}
+
 // Helper: Random Delay (Anti-Ban)
 function getRandomDelay(minSec, maxSec) {
   return Math.floor(Math.random() * (maxSec - minSec + 1) + minSec);
@@ -81,7 +114,21 @@ async function initZaloClient(forceQr = false) {
 
     zaloInstance = new Zalo({
       selfListen: false,
-      checkUpdate: false
+      checkUpdate: false,
+      imageMetadataGetter: async (filePath) => {
+        try {
+          const buf = Buffer.alloc(32);
+          const fd = fs.openSync(filePath, 'r');
+          fs.readSync(fd, buf, 0, 32, 0);
+          fs.closeSync(fd);
+          const width = buf.readUInt32BE(16) || 540;
+          const height = buf.readUInt32BE(20) || 640;
+          const size = fs.statSync(filePath).size;
+          return { width, height, size };
+        } catch (e) {
+          return { width: 540, height: 640, size: 100000 };
+        }
+      }
     });
 
     // 1. Try saved session if available and not forcing new QR
@@ -260,10 +307,25 @@ async function sendMessageToParent(item) {
 
     // 3. Gửi ảnh mã QR nếu có
     if (item.qrUrl && typeof zaloApi.sendMessage === 'function') {
+      const tempDir = path.join(__dirname, 'temp');
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+      const tempQrFile = path.join(tempDir, `qr_${Date.now()}_${Math.floor(Math.random() * 10000)}.png`);
+
       try {
-        await zaloApi.sendMessage({ msg: `Mã QR thanh toán học phí em ${item.studentName}:`, attachments: [item.qrUrl] }, threadId);
+        console.log(`[ZaloBot] Đang tải ảnh QR từ VietQR cho ${item.studentName}...`);
+        await downloadImage(item.qrUrl, tempQrFile);
+        console.log(`[ZaloBot] Đang gửi ảnh QR đính kèm qua Zalo cho ${item.studentName}...`);
+        await zaloApi.sendMessage({
+          msg: `Mã QR thanh toán học phí em ${item.studentName} (Quét để tự động điền thông tin):`,
+          attachments: [tempQrFile]
+        }, threadId);
+        console.log(`[ZaloBot] ✓ Đã gửi ảnh QR cho ${item.studentName} thành công!`);
       } catch (imgErr) {
-        console.warn("[ZaloBot] Không gửi được ảnh QR đính kèm:", imgErr?.message);
+        console.warn("[ZaloBot] Không gửi được ảnh QR đính kèm:", imgErr?.message || imgErr);
+      } finally {
+        if (fs.existsSync(tempQrFile)) {
+          try { fs.unlinkSync(tempQrFile); } catch (e) {}
+        }
       }
     }
     return true;
