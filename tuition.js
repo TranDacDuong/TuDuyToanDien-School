@@ -2427,6 +2427,9 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
           qrUrl: item.qrUrl
         })
       });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Lỗi khi gửi");
+
       const cell = document.getElementById(`zaloActionCell-${idx}`);
       if (data.result?.status === "friend_requested") {
         if (cell) {
