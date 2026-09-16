@@ -33,18 +33,35 @@
       .trim();
   }
 
-  function buildTransferContent(studentName, ym, studentId = "", paymentId = "") {
-    const shortStudentId = studentId ? String(studentId).split("-")[0].toUpperCase() : "";
-    const shortPaymentId = paymentId ? String(paymentId).split("-")[0].toUpperCase() : "";
+  function getLastTwoWordsUnaccented(name) {
+    if (!name || name === "—" || name === "-") return "Hoc Sinh";
+    const cleaned = toAscii(name)
+      .replace(/[^a-zA-Z0-9\s]/g, " ")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (!cleaned.length) return "Hoc Sinh";
+    const lastWords = cleaned.slice(-2);
+    return lastWords.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+  }
+
+  function buildTransferContent(studentName, ym, studentId = "", paymentId = "", phone = "") {
     let monthTag = "";
     if (ym && String(ym).length >= 7) {
       const parts = String(ym).slice(0, 7).split("-");
       if (parts.length === 2) {
-        monthTag = `${parts[1]}${parts[0].slice(2)}`; // e.g. "0826" for 2026-08
+        monthTag = `${parts[1]}${parts[0].slice(2)}`; // e.g. "0926" for 2026-09
       }
     }
-    const code = shortStudentId ? `HPHS${monthTag}${shortStudentId}` : (shortPaymentId ? `HP${monthTag}${shortPaymentId}` : `HP${monthTag}`);
-    return `SEVQR ${code}`.trim();
+    const twoWords = getLastTwoWordsUnaccented(studentName);
+    const cleanDigits = String(phone || "").replace(/\D/g, "");
+    let phoneTag = cleanDigits.length >= 4 ? cleanDigits.slice(-4) : "";
+    if (!phoneTag) {
+      const cleanUuid = String(studentId || paymentId || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+      phoneTag = cleanUuid.slice(0, 4) || "0000";
+    }
+
+    return `SEVQR HP${monthTag} ${twoWords} ${phoneTag}`.trim();
   }
 
   const STATIC_BANK_INFO = {
@@ -53,21 +70,21 @@
     account: "105870682948",
   };
 
-  function buildPaymentQrUrl(studentName, ym, amount, studentId = "", paymentId = "") {
+  function buildPaymentQrUrl(studentName, ym, amount, studentId = "", paymentId = "", phone = "") {
     const finalAmount = Math.max(0, Math.round(Number(amount) || 0));
     if (!finalAmount) return "";
-    const addInfo = buildTransferContent(studentName, ym, studentId, paymentId);
+    const addInfo = buildTransferContent(studentName, ym, studentId, paymentId, phone);
     return `https://img.vietqr.io/image/${STATIC_BANK_INFO.bankCode}-${STATIC_BANK_INFO.account}-compact2.png?amount=${encodeURIComponent(finalAmount)}&addInfo=${encodeURIComponent(addInfo)}`;
   }
 
-  function buildPaymentQrBlock(studentName, ym, amount, studentId, paymentId = "") {
+  function buildPaymentQrBlock(studentName, ym, amount, studentId, paymentId = "", phone = "") {
     const finalAmount = Math.max(0, Math.round(Number(amount) || 0));
     if (!finalAmount) {
       return `<div class="qr-payment-card"><div class="qr-payment-text"><div class="qr-payment-title">Mã QR thanh toán</div><div class="qr-payment-note">Học phí đã được thanh toán đủ nên không cần tạo mã QR.</div></div></div>`;
     }
 
-    const qrUrl = buildPaymentQrUrl(studentName, ym, finalAmount, studentId, paymentId);
-    const transferContent = buildTransferContent(studentName, ym, studentId, paymentId);
+    const qrUrl = buildPaymentQrUrl(studentName, ym, finalAmount, studentId, paymentId, phone);
+    const transferContent = buildTransferContent(studentName, ym, studentId, paymentId, phone);
     return `
       <div class="qr-payment-card">
         <div class="qr-payment-media">
@@ -434,7 +451,7 @@
             <div class="tuition-payment-number"><span>Ngày thu gần nhất</span><b>${fmtDate(payment?.paid_at)}</b></div>
           </div>
           <div>
-            ${buildPaymentQrBlock(group.studentName, group.ym, qrAmount, group.studentId, payment?.id || "")}
+            ${buildPaymentQrBlock(group.studentName, group.ym, qrAmount, group.studentId, payment?.id || "", group.phone || group.rawPhone || group.parentContacts?.[0]?.phone || "")}
             ${payment?.note ? `<div class="invoice-note" style="margin-top:12px">${payment.note}</div>` : ""}
           </div>
         </div>
@@ -1182,6 +1199,7 @@ Nhập số tiền hoàn lại (>0):`,
         classId: cs.class_id,
         studentName: cs.user?.full_name || "—",
         phone: canViewStudentPhone() ? (cs.user?.phone || "") : "",
+        rawPhone: cs.user?.phone || "",
         parentContacts: canViewStudentPhone() ? (parentContactMap[cs.student_id] || []) : [],
         className: cls.class_name,
         tuitionType: cls.tuition_type,
@@ -1319,7 +1337,7 @@ Nhập số tiền hoàn lại (>0):`,
 
         sb.from("class_students")
           .select(`id, class_id, student_id, joined_at, left_at,
-                   user:users!fk_student(id, full_name, email${canViewStudentPhone() ? ", phone" : ""})`),
+                   user:users!fk_student(id, full_name, email, phone)`),
 
         sb.from("attendance")
           .select("student_id, class_id, date, status, schedule_id")
@@ -1419,6 +1437,7 @@ Nhập số tiền hoàn lại (>0):`,
           studentId:   r.studentId,
           studentName: r.studentName,
           phone:       r.phone,
+          rawPhone:    r.rawPhone || r.phone || "",
           parentContacts: r.parentContacts || [],
           ym:          r.ym,
           classes:     [],           // chi tiết từng lớp
@@ -1654,7 +1673,7 @@ Nhập số tiền hoàn lại (>0):`,
       if (!map[r.studentId]) {
         map[r.studentId] = {
           studentId: r.studentId, studentName: r.studentName,
-          phone: r.phone, parentContacts: r.parentContacts || [], ym: r.ym,
+          phone: r.phone, rawPhone: r.rawPhone || r.phone || "", parentContacts: r.parentContacts || [], ym: r.ym,
           classes: [], totalSessions: 0,
           present: 0, absent: 0, makeup: 0, billableSessions: 0, amount: 0,
         };
@@ -1926,7 +1945,7 @@ Nhập số tiền hoàn lại (>0):`,
           </div>
 
           <div style="margin-top:18px">
-            ${buildPaymentQrBlock(g.studentName, g.ym, remaining > 0 ? remaining : 0, g.studentId, payment?.id || "")}
+            ${buildPaymentQrBlock(g.studentName, g.ym, remaining > 0 ? remaining : 0, g.studentId, payment?.id || "", g.phone || g.rawPhone || g.parentContacts?.[0]?.phone || "")}
           </div>
         </section>
       `;

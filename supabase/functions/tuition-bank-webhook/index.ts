@@ -78,12 +78,32 @@ function stripVietnamese(text: string): string {
 
 interface ParsedCodeInfo {
   month?: string;
-  code: string;
+  code?: string;
+  studentName?: string;
+  phoneSuffix?: string;
 }
 
 function extractTuitionParsedInfo(content: string): ParsedCodeInfo[] {
   const clean = stripVietnamese(content);
   const infos: ParsedCodeInfo[] = [];
+
+  // Match NEW format: SEVQR HP{MM}{YY} {2_words_name} {4_digits_phone}
+  // e.g. "SEVQR HP0926 Dac Duong 5267" or "HP0926 Dac Duong 5267"
+  const newFormatMatches = clean.match(/(?:SEVQR\s+)?HP\s*(\d{2})(\d{2})\s+([A-Za-z0-9\s]+?)\s+(\d{4})(?:\s|$|[^\w])/gi);
+  if (newFormatMatches) {
+    newFormatMatches.forEach(m => {
+      const match = /(?:SEVQR\s+)?HP\s*(\d{2})(\d{2})\s+([A-Za-z0-9\s]+?)\s+(\d{4})(?:\s|$|[^\w])/i.exec(m);
+      if (match) {
+        const mm = match[1];
+        const yy = match[2];
+        const studentName = match[3].trim().toLowerCase();
+        const phoneSuffix = match[4];
+        const year = Number(yy) > 50 ? `19${yy}` : `20${yy}`;
+        const monthStr = `${year}-${mm}-01`;
+        infos.push({ month: monthStr, studentName, phoneSuffix, code: phoneSuffix });
+      }
+    });
+  }
 
   // Match HPHS or HP followed by 4 digits (MMYY) and shortcode (e.g. HPHS082651DA1870 or HPHS0826 51DA1870)
   const monthCodeMatches = clean.match(/(?:HPHS|HP)\s*[-_]?\s*(\d{4})\s*[-_]?\s*([A-Z0-9]{4,36})/gi);
@@ -217,9 +237,72 @@ serve(async (req: Request) => {
       const parsedInfos = extractTuitionParsedInfo(item.content);
       let matchedTuition: any = null;
 
-      // 1. Try matching by tuition payment ID or student ID short code with month
+      // 1. Try matching by parsed info (new format: studentName + phoneSuffix + month, or legacy code)
       for (const info of parsedInfos) {
-        const cleanCode = info.code.replace(/[^a-f0-9]/gi, "").toLowerCase();
+        // A. Match by Name + Phone suffix + Month
+        if (info.studentName && info.phoneSuffix && info.month) {
+          const allStudents = await fetchJson<Array<any>>(
+            `users?role=eq.student&select=id,full_name,phone&limit=300`
+          ).catch(() => []);
+
+          const matchedStudents = (allStudents || []).filter(u => {
+            const studentPhone = String(u.phone || "").replace(/\D/g, "");
+            const nameAscii = stripVietnamese(u.full_name || "").toLowerCase();
+            const phoneMatch = studentPhone.endsWith(info.phoneSuffix!);
+            const nameMatch = nameAscii.includes(info.studentName!);
+            return phoneMatch && nameMatch;
+          });
+
+          let targetStudent = matchedStudents[0];
+          // Fallback: match by phone suffix only if name had slight spelling variation
+          if (!targetStudent) {
+            targetStudent = (allStudents || []).find(u => {
+              const studentPhone = String(u.phone || "").replace(/\D/g, "");
+              return studentPhone && studentPhone.endsWith(info.phoneSuffix!);
+            });
+          }
+          // Fallback: match by name only
+          if (!targetStudent) {
+            targetStudent = (allStudents || []).find(u => {
+              const nameAscii = stripVietnamese(u.full_name || "").toLowerCase();
+              return nameAscii && nameAscii.includes(info.studentName!);
+            });
+          }
+
+          if (targetStudent) {
+            const monthPayments = await fetchJson<Array<any>>(
+              `tuition_payments?student_id=eq.${targetStudent.id}&month=eq.${info.month}&limit=1`
+            ).catch(() => []);
+
+            if (monthPayments && monthPayments.length) {
+              matchedTuition = monthPayments[0];
+              break;
+            } else {
+              const created = await fetchJson<Array<any>>("tuition_payments", {
+                method: "POST",
+                headers: { Prefer: "return=representation" },
+                body: JSON.stringify({
+                  student_id: targetStudent.id,
+                  month: info.month,
+                  amount_due: 0,
+                  amount_paid: 0,
+                  paid_at: null,
+                  payment_method: "bank_auto",
+                  transaction_ref: item.txId,
+                  auto_reconciled: true,
+                }),
+              }).catch(() => []);
+
+              if (created && created.length) {
+                matchedTuition = created[0];
+                break;
+              }
+            }
+          }
+        }
+
+        // B. Match by short UUID code
+        const cleanCode = (info.code || "").replace(/[^a-f0-9]/gi, "").toLowerCase();
         if (cleanCode.length >= 4) {
           if (info.month) {
             const allStudents = await fetchJson<Array<any>>(
