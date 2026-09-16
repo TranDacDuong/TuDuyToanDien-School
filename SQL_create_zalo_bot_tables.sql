@@ -81,13 +81,13 @@ CREATE POLICY "Admin manage zalo_bot_config"
     USING (
         EXISTS (
             SELECT 1 FROM public.users
-            WHERE users.id = auth.uid() AND users.role IN ('admin', 'superadmin', 'manager')
+            WHERE users.id = auth.uid() AND users.role::text = 'admin'
         )
     )
     WITH CHECK (
         EXISTS (
             SELECT 1 FROM public.users
-            WHERE users.id = auth.uid() AND users.role IN ('admin', 'superadmin', 'manager')
+            WHERE users.id = auth.uid() AND users.role::text = 'admin'
         )
     );
 
@@ -98,13 +98,13 @@ CREATE POLICY "Admin manage zalo_messages_queue"
     USING (
         EXISTS (
             SELECT 1 FROM public.users
-            WHERE users.id = auth.uid() AND users.role IN ('admin', 'superadmin', 'manager')
+            WHERE users.id = auth.uid() AND users.role::text = 'admin'
         )
     )
     WITH CHECK (
         EXISTS (
             SELECT 1 FROM public.users
-            WHERE users.id = auth.uid() AND users.role IN ('admin', 'superadmin', 'manager')
+            WHERE users.id = auth.uid() AND users.role::text = 'admin'
         )
     );
 
