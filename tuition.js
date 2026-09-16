@@ -955,12 +955,15 @@ Nhập số tiền hoàn lại (>0):`,
     const reloadBtn = toolbarButtons.find(btn => btn.textContent.includes("Tải lại"));
     const printBtn = toolbarButtons.find(btn => btn.textContent.includes("In"));
 
+    const zaloReminderBtn = document.getElementById("zaloReminderBtn");
+
     if (currentRole === "student" || currentRole === "parent") {
       if (classFilter) classFilter.style.display = "none";
       if (paidFilter) paidFilter.style.display = "none";
       if (searchInput) searchInput.style.display = "none";
       if (monthInput) monthInput.style.display = "none";
       if (notifyBtn) notifyBtn.style.display = "none";
+      if (zaloReminderBtn) zaloReminderBtn.style.display = "none";
       if (lockBtn) lockBtn.style.display = "none";
       if (reloadBtn) reloadBtn.style.display = "none";
       if (printBtn) printBtn.style.display = "none";
@@ -980,6 +983,7 @@ Nhập số tiền hoàn lại (>0):`,
     if (reloadBtn) reloadBtn.style.display = "";
     if (printBtn) printBtn.style.display = "";
     if (notifyBtn) notifyBtn.style.display = canManagePayments() ? "" : "none";
+    if (zaloReminderBtn) zaloReminderBtn.style.display = canManagePayments() ? "" : "none";
     if (lockBtn) lockBtn.style.display = canManagePayments() ? "" : "none";
     if (studentDetailView) studentDetailView.classList.remove("show");
     if (paidFilter) paidFilter.style.display = canManagePayments() ? "" : "none";
@@ -2181,6 +2185,463 @@ Nhập số tiền hoàn lại (>0):`,
   window.loadTuition = loadTuition;
   monthPicker.addEventListener("change", loadTuition);
 
+  // ============================================================
+  // ZALO BOT AUTOMATION INTEGRATION (Anti-Ban Protocol)
+  // ============================================================
+  const ZALO_BOT_API = "http://localhost:3456/api";
+  let zaloBotStatus = { botStatus: "checking", hasQr: false, userInfo: null, campaign: null };
+  let zaloModalPollingTimer = null;
+  let currentZaloCampaignItems = [];
+
+  const DEFAULT_ZALO_TEMPLATE = `Trung tâm MindUp xin chào Quý phụ huynh em {TenHS}! 🌸
+
+Trung tâm xin gửi thông báo chi tiết học phí tháng {Thang}/{Nam} của con như sau:
+• Lớp học: {TenLop}
+• Số buổi học trong tháng: {SoBuoi} buổi
+• Số tiền cần thanh toán: {SoTien} VNĐ
+• Hạn thanh toán: Trước ngày {HanDong}
+
+Quý phụ huynh có thể thanh toán nhanh bằng cách quét ảnh mã QR đính kèm hoặc chuyển khoản theo thông tin:
+• Ngân hàng: {TenNganHang} ({SoTaiKhoan}) - Chủ TK: {ChuTaiKhoan}
+• Nội dung chuyển khoản: {NoiDungCK}
+
+(Lưu ý: Quý phụ huynh vui lòng giữ nguyên nội dung chuyển khoản trên để hệ thống tự động gạch nợ ngay khi nhận được tiền).
+Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
+
+  window.closeZaloReminderModal = function (e) {
+    if (e && e.target && e.target.id !== "zaloReminderModal" && !e.target.classList?.contains("modal-close")) return;
+    const modal = document.getElementById("zaloReminderModal");
+    if (modal) modal.style.display = "none";
+    if (zaloModalPollingTimer) {
+      clearInterval(zaloModalPollingTimer);
+      zaloModalPollingTimer = null;
+    }
+  };
+
+  window.openZaloReminderModal = async function () {
+    const modal = document.getElementById("zaloReminderModal");
+    if (!modal) return;
+    modal.style.display = "flex";
+    prepareZaloCampaignList();
+    renderZaloReminderView();
+    await checkZaloBotStatus();
+    if (!zaloModalPollingTimer) {
+      zaloModalPollingTimer = setInterval(checkZaloBotStatus, 2500);
+    }
+  };
+
+  function prepareZaloCampaignList() {
+    const ym = monthPicker?.value || "";
+    const pending = (currentRows || []).filter(group => {
+      const amountPaid = paymentMap[group.studentId]?.amount_paid || 0;
+      const status = getStatus(group.amount, amountPaid);
+      return status === "unpaid" || status === "partial";
+    });
+
+    currentZaloCampaignItems = pending.map(group => {
+      const amountPaid = paymentMap[group.studentId]?.amount_paid || 0;
+      const remaining = Math.max(0, Math.round(group.amount - amountPaid));
+      const hasParent = group.parentContacts && group.parentContacts.length > 0;
+      const parent = hasParent ? group.parentContacts[0] : null;
+
+      const parentName = parent?.full_name || "Quý phụ huynh";
+      const rawPhone = parent?.phone || group.rawPhone || group.phone || "";
+      const cleanPhone = String(rawPhone).replace(/\D/g, "");
+
+      const classNames = (group.classes || []).map(c => c.className).filter(Boolean).join(", ") || "Lớp học";
+      const sessionsCount = group.billableSessions || group.totalSessions || 0;
+
+      const transferMemo = buildTransferContent(
+        group.studentName,
+        group.ym,
+        group.studentId,
+        paymentMap[group.studentId]?.id || "",
+        cleanPhone
+      );
+
+      const qrUrl = buildPaymentQrUrl(
+        group.studentName,
+        group.ym,
+        remaining,
+        group.studentId,
+        paymentMap[group.studentId]?.id || "",
+        cleanPhone
+      );
+
+      return {
+        studentId: group.studentId,
+        studentName: group.studentName,
+        hasParent,
+        parentName,
+        phone: cleanPhone,
+        rawPhone,
+        className: classNames,
+        sessionsCount,
+        amount: group.amount,
+        remaining,
+        transferMemo,
+        qrUrl
+      };
+    });
+  }
+
+  async function checkZaloBotStatus() {
+    try {
+      const res = await fetch(`${ZALO_BOT_API}/status`, { signal: AbortSignal.timeout(2500) });
+      if (res.ok) {
+        zaloBotStatus = await res.json();
+      } else {
+        zaloBotStatus = { botStatus: "offline", error: "HTTP " + res.status };
+      }
+    } catch (err) {
+      zaloBotStatus = { botStatus: "offline", error: "Chưa kết nối bot" };
+    }
+    renderZaloReminderView();
+  }
+
+  window.requestZaloQr = async function () {
+    try {
+      await fetch(`${ZALO_BOT_API}/login-qr`, { method: "POST" });
+      await checkZaloBotStatus();
+    } catch (err) {
+      alert("Không thể yêu cầu mã QR: " + err.message);
+    }
+  };
+
+  window.logoutZalo = async function () {
+    if (!confirm("Bạn có chắc chắn muốn đăng xuất tài khoản Zalo khỏi dịch vụ bot?")) return;
+    try {
+      await fetch(`${ZALO_BOT_API}/logout`, { method: "POST" });
+      await checkZaloBotStatus();
+    } catch (err) {
+      alert("Không thể đăng xuất: " + err.message);
+    }
+  };
+
+  window.toggleSelectAllZalo = function (chkAll) {
+    const checkboxes = document.querySelectorAll(".zalo-item-chk");
+    checkboxes.forEach(cb => { cb.checked = chkAll.checked; });
+    updateZaloSelectedSummary();
+  };
+
+  window.updateZaloSelectedSummary = function () {
+    const checked = document.querySelectorAll(".zalo-item-chk:checked");
+    const countEl = document.getElementById("zaloSelectedCount");
+    if (countEl) countEl.textContent = `${checked.length}/${currentZaloCampaignItems.length} học sinh được chọn`;
+  };
+
+  window.startZaloCampaignAction = async function () {
+    if (zaloBotStatus.botStatus !== "connected") {
+      alert("Vui lòng kết nối tài khoản Zalo cá nhân trước khi bắt đầu chiến dịch.");
+      return;
+    }
+
+    const checkedBoxes = [...document.querySelectorAll(".zalo-item-chk:checked")];
+    if (!checkedBoxes.length) {
+      alert("Vui lòng chọn ít nhất 1 phụ huynh để gửi nhắc học phí.");
+      return;
+    }
+
+    const templateText = document.getElementById("zaloTemplateText")?.value || DEFAULT_ZALO_TEMPLATE;
+    const selectedIndices = checkedBoxes.map(cb => parseInt(cb.dataset.index, 10));
+    const itemsToSend = selectedIndices.map(idx => {
+      const item = currentZaloCampaignItems[idx];
+      const message = fillZaloTemplate(templateText, item);
+      return {
+        studentId: item.studentId,
+        studentName: item.studentName,
+        parentName: item.parentName,
+        phone: item.phone,
+        className: item.className,
+        sessionsCount: item.sessionsCount,
+        amount: item.amount,
+        remaining: item.remaining,
+        transferMemo: item.transferMemo,
+        qrUrl: item.qrUrl,
+        messageText: message
+      };
+    });
+
+    if (!confirm(`Xác nhận bắt đầu gửi tin nhắn Zalo cho ${itemsToSend.length} phụ huynh?\n\n(Chế độ Anti-ban sẽ tự động giãn cách ngẫu nhiên 45s - 90s mỗi tin để bảo vệ tài khoản Zalo của bạn)`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${ZALO_BOT_API}/start-campaign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: itemsToSend })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Lỗi khi bắt đầu chiến dịch");
+      await checkZaloBotStatus();
+    } catch (err) {
+      alert("Không thể khởi động chiến dịch: " + err.message);
+    }
+  };
+
+  window.pauseZaloCampaignAction = async function () {
+    await fetch(`${ZALO_BOT_API}/pause-campaign`, { method: "POST" }).catch(() => {});
+    await checkZaloBotStatus();
+  };
+
+  window.resumeZaloCampaignAction = async function () {
+    await fetch(`${ZALO_BOT_API}/resume-campaign`, { method: "POST" }).catch(() => {});
+    await checkZaloBotStatus();
+  };
+
+  window.stopZaloCampaignAction = async function () {
+    if (!confirm("Bạn có chắc chắn muốn dừng và hủy chiến dịch hiện tại?")) return;
+    await fetch(`${ZALO_BOT_API}/stop-campaign`, { method: "POST" }).catch(() => {});
+    await checkZaloBotStatus();
+  };
+
+  window.sendSingleZaloTest = async function (idx) {
+    const item = currentZaloCampaignItems[idx];
+    if (!item) return;
+    const templateText = document.getElementById("zaloTemplateText")?.value || DEFAULT_ZALO_TEMPLATE;
+    const message = fillZaloTemplate(templateText, item);
+
+    if (!confirm(`Gửi thử tin nhắn Zalo tới SĐT ${item.phone} (PH em ${item.studentName})?`)) return;
+
+    try {
+      const res = await fetch(`${ZALO_BOT_API}/test-send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: item.phone,
+          studentName: item.studentName,
+          messageText: message,
+          qrUrl: item.qrUrl
+        })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Lỗi khi gửi");
+      alert(`✓ Đã gửi thử thành công tới SĐT ${item.phone}!`);
+    } catch (err) {
+      alert("Lỗi khi gửi thử: " + err.message);
+    }
+  };
+
+  function fillZaloTemplate(template, item) {
+    const ym = monthPicker?.value || "";
+    const [year, month] = ym ? ym.split("-") : ["2026", "09"];
+    return template
+      .replaceAll("{TenHS}", item.studentName || "")
+      .replaceAll("{TenPH}", item.parentName || "Quý phụ huynh")
+      .replaceAll("{Thang}", month)
+      .replaceAll("{Nam}", year)
+      .replaceAll("{TenLop}", item.className || "")
+      .replaceAll("{SoBuoi}", String(item.sessionsCount || 0))
+      .replaceAll("{SoTien}", fmt(item.remaining))
+      .replaceAll("{HanDong}", `15/${month}/${year}`)
+      .replaceAll("{TenNganHang}", "MBBank")
+      .replaceAll("{SoTaiKhoan}", "0826568658")
+      .replaceAll("{ChuTaiKhoan}", "TRAN DAC DUONG")
+      .replaceAll("{NoiDungCK}", item.transferMemo || "");
+  }
+
+  function renderZaloReminderView() {
+    const container = document.getElementById("zaloReminderBody");
+    if (!container) return;
+
+    // Preserve active template edit if user typed in textarea
+    const existingTemplate = document.getElementById("zaloTemplateText")?.value;
+    const currentTemplate = existingTemplate || DEFAULT_ZALO_TEMPLATE;
+
+    const bot = zaloBotStatus;
+    const isOffline = bot.botStatus === "offline";
+    const isConnected = bot.botStatus === "connected";
+    const isQrReady = bot.botStatus === "qr_ready";
+    const campaign = bot.campaign || {};
+    const isRunning = campaign.status === "running";
+    const isPaused = campaign.status === "paused";
+    const progress = campaign.progress || {};
+
+    let statusCardHtml = "";
+    if (isOffline) {
+      statusCardHtml = `
+        <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:14px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="font-weight:700;color:#be123c;display:flex;align-items:center;gap:6px">
+              <span>⚠️</span> Dịch vụ Zalo Bot chưa khởi động trên máy tính
+            </div>
+            <div style="font-size:12px;color:#881337;margin-top:4px">
+              Vui lòng nhấp đúp chạy file <b>services/zalo-bot/start-bot.bat</b> trên máy tính để kích hoạt dịch vụ chạy ngầm.
+            </div>
+          </div>
+          <button onclick="checkZaloBotStatus()" style="background:#be123c;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:600">Thử lại</button>
+        </div>
+      `;
+    } else if (isConnected) {
+      const userTitle = bot.userInfo?.name ? ` (${bot.userInfo.name})` : "";
+      statusCardHtml = `
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:12px 18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="width:12px;height:12px;border-radius:50%;background:#16a34a;box-shadow:0 0 8px #16a34a"></div>
+            <div>
+              <span style="font-weight:700;color:#15803d">Zalo Cá Nhân: Đang kết nối</span>
+              <span style="font-size:12px;color:#166534">${userTitle}</span>
+              <div style="font-size:11px;color:#15803d;margin-top:2px">🛡️ Chế độ Anti-ban kích hoạt: Giãn cách 45s - 90s/tin</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button onclick="logoutZalo()" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">Đăng xuất</button>
+          </div>
+        </div>
+      `;
+    } else {
+      statusCardHtml = `
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:14px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="font-weight:700;color:#1d4ed8;display:flex;align-items:center;gap:6px">
+              <span>📱</span> Chưa kết nối tài khoản Zalo
+            </div>
+            <div style="font-size:12px;color:#1e40af;margin-top:4px">
+              Bấm "Quét mã QR" để kết nối Zalo cá nhân của bạn với hệ thống.
+            </div>
+          </div>
+          <button onclick="requestZaloQr()" style="background:#2563eb;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:600">Quét mã QR đăng nhập</button>
+        </div>
+      `;
+    }
+
+    // QR Image Card (if ready)
+    let qrBoxHtml = "";
+    if (isQrReady && bot.hasQr) {
+      qrBoxHtml = `
+        <div style="background:#f8fafc;border:1px dashed #94a3b8;border-radius:14px;padding:16px;margin-bottom:16px;text-align:center">
+          <div style="font-weight:700;margin-bottom:8px;color:#0f172a">Quét mã QR bằng Zalo trên điện thoại</div>
+          <div style="font-size:12px;color:#475569;margin-bottom:12px">Mở app Zalo > Chọn biểu tượng [Quét QR] góc trên bên phải > Xác nhận đăng nhập</div>
+          <img id="zaloQrImage" src="${ZALO_BOT_API}/qr?t=${Date.now()}" style="width:200px;height:200px;border-radius:10px;border:2px solid #e2e8f0;background:#fff" alt="QR Login" />
+          <div style="margin-top:10px">
+            <button onclick="requestZaloQr()" style="background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer">Tạo lại mã QR mới</button>
+          </div>
+        </div>
+      `;
+    }
+
+    // Live Campaign Progress Bar
+    let liveProgressHtml = "";
+    if (isRunning || isPaused) {
+      const total = progress.total || currentZaloCampaignItems.length || 1;
+      const sent = progress.sent || 0;
+      const failed = progress.failed || 0;
+      const percent = Math.min(100, Math.round(((sent + failed) / total) * 100));
+
+      liveProgressHtml = `
+        <div style="background:linear-gradient(135deg, #1e293b 0%, #0f172a 100%);color:#fff;border-radius:16px;padding:16px 20px;margin-bottom:16px;box-shadow:0 10px 25px rgba(0,0,0,.15)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px">
+              <span>${isRunning ? "⏳ Đang gửi ngầm..." : "⏸ Đang tạm dừng"}</span>
+              <span style="font-size:12px;color:#94a3b8">(${sent}/${total} học sinh)</span>
+            </div>
+            <div style="font-size:13px;font-weight:700;color:#38bdf8">${percent}%</div>
+          </div>
+          <div style="width:100%;height:10px;background:#334155;border-radius:999px;overflow:hidden;margin-bottom:12px">
+            <div style="width:${percent}%;height:100%;background:linear-gradient(90deg, #38bdf8 0%, #22c55e 100%);transition:width .4s ease"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:12px">
+            <div style="color:#cbd5e1">
+              ${progress.nextSendInSeconds > 0 ? `⏱ Gửi tiếp sau: <b style="color:#fbbf24;font-size:14px">${progress.nextSendInSeconds}s</b> cho PH em <b>${progress.currentStudent || ""}</b>` : "Đang chuẩn bị gói tin..."}
+            </div>
+            <div style="display:flex;gap:8px">
+              ${isRunning ? `<button onclick="pauseZaloCampaignAction()" style="background:#f59e0b;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600">⏸ Tạm dừng</button>` : `<button onclick="resumeZaloCampaignAction()" style="background:#16a34a;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600">▶ Tiếp tục</button>`}
+              <button onclick="stopZaloCampaignAction()" style="background:#dc2626;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600">⏹ Hủy chiến dịch</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Pending Table Rows
+    const rowsHtml = currentZaloCampaignItems.map((item, idx) => {
+      const parentBadge = item.hasParent
+        ? `<span style="color:#0f766e;background:#ccfbf1;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600">PH: ${item.parentName}</span>`
+        : `<span style="color:#b45309;background:#fef3c7;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600">Chưa liên kết PH (SĐT HS)</span>`;
+
+      return `
+        <tr style="border-bottom:1px solid #f1f5f9;font-size:12px">
+          <td style="text-align:center;padding:10px 8px">
+            <input type="checkbox" class="zalo-item-chk" data-index="${idx}" checked onchange="updateZaloSelectedSummary()" />
+          </td>
+          <td style="padding:10px 8px">
+            <div style="font-weight:700;color:#0f172a">${item.studentName}</div>
+            <div style="font-size:11px;color:#64748b">${item.className} (${item.sessionsCount} buổi)</div>
+          </td>
+          <td style="padding:10px 8px">
+            ${parentBadge}
+            <div style="font-family:monospace;font-weight:600;color:#334155;margin-top:3px">${item.phone || '<i style="color:#ef4444">Chưa có SĐT</i>'}</div>
+          </td>
+          <td style="padding:10px 8px;text-align:right">
+            <div style="font-weight:700;color:#be123c">${fmt(item.remaining)}đ</div>
+            <div style="font-size:10px;color:#94a3b8">Tổng: ${fmt(item.amount)}đ</div>
+          </td>
+          <td style="padding:10px 8px">
+            <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;color:#0369a1">${item.transferMemo}</code>
+          </td>
+          <td style="padding:10px 8px;text-align:center">
+            <button onclick="sendSingleZaloTest(${idx})" title="Gửi thử tin nhắn Zalo tới phụ huynh này" style="background:#f8fafc;border:1px solid #cbd5e1;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;color:#0284c7">Gửi thử</button>
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    container.innerHTML = `
+      ${statusCardHtml}
+      ${qrBoxHtml}
+      ${liveProgressHtml}
+
+      <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px 14px;margin-bottom:16px">
+        <summary style="font-weight:700;font-size:13px;color:#1e293b;cursor:pointer;display:flex;align-items:center;justify-content:space-between">
+          <span>📝 Xem & Chỉnh sửa Mẫu Tin Nhắn ({TenHS}, {TenPH}, {Thang}, {SoTien}, {NoiDungCK}...)</span>
+          <span style="font-size:11px;color:#64748b">Bấm để sửa</span>
+        </summary>
+        <div style="margin-top:10px">
+          <textarea id="zaloTemplateText" rows="7" style="width:100%;font-family:inherit;font-size:12px;padding:10px;border-radius:8px;border:1px solid #cbd5e1;resize:vertical;line-height:1.5">${currentTemplate}</textarea>
+          <div style="font-size:11px;color:#64748b;margin-top:4px">
+            Biến hỗ trợ: <code>{TenHS}</code>, <code>{TenPH}</code>, <code>{Thang}</code>, <code>{Nam}</code>, <code>{TenLop}</code>, <code>{SoBuoi}</code>, <code>{SoTien}</code>, <code>{HanDong}</code>, <code>{NoiDungCK}</code>, <code>{TenNganHang}</code>, <code>{SoTaiKhoan}</code>.
+          </div>
+        </div>
+      </details>
+
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden">
+        <div style="padding:12px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <div style="font-weight:700;font-size:13px;color:#0f172a">
+            Danh sách phụ huynh cần nhắc học phí (${currentZaloCampaignItems.length} em)
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span id="zaloSelectedCount" style="font-size:12px;color:#475569;font-weight:600">${currentZaloCampaignItems.length}/${currentZaloCampaignItems.length} được chọn</span>
+            ${!isRunning ? `
+              <button onclick="startZaloCampaignAction()" style="background:linear-gradient(135deg, #0068ff 0%, #0052cc 100%);color:#fff;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-weight:700;box-shadow:0 4px 12px rgba(0,104,255,.25);font-size:13px">
+                ▶ Bắt đầu gửi tự động (Safe Mode)
+              </button>
+            ` : ""}
+          </div>
+        </div>
+
+        <div style="max-height:360px;overflow-y:auto">
+          <table style="width:100%;border-collapse:collapse;text-align:left">
+            <thead>
+              <tr style="background:#f1f5f9;color:#475569;font-size:11px;text-transform:uppercase;letter-spacing:.5px">
+                <th style="width:36px;text-align:center;padding:8px"><input type="checkbox" checked onchange="toggleSelectAllZalo(this)" /></th>
+                <th style="padding:8px">Học sinh & Lớp</th>
+                <th style="padding:8px">Người nhận (Phụ huynh / SĐT)</th>
+                <th style="padding:8px;text-align:right">Còn thiếu</th>
+                <th style="padding:8px">Mã CK SePay</th>
+                <th style="width:70px;padding:8px;text-align:center">Test</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml || '<tr><td colspan="6" style="padding:24px;text-align:center;color:#64748b">Không có học sinh nào còn nợ học phí trong tháng này! 🎉</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
   init();
 
 })();
+

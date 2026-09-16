@@ -7,3 +7,7 @@ mindup-web-uploads-*.json
 google-service-account*.json
 supabase/.temp/
 .codex-tools/
+services/zalo-bot/node_modules/
+services/zalo-bot/session/
+session/
+*.session.json

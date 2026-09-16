@@ -959,6 +959,7 @@ tr.recalc-needed td:first-child { border-left: 3px solid #ef4444; }
       <button onclick="loadTuition()">Tải lại</button>
       <button class="secondary" id="transferAllSurplusBtn" onclick="transferAllSurplusToNextMonth()" style="display:none;background:#e0f2fe;color:#0369a1;border-color:#bae6fd;font-weight:700">➡️ Chuyển dư tất cả</button>
       <button class="secondary" id="notifyTuitionBtn" onclick="notifyPendingTuition()" style="display:none">Thông báo học phí</button>
+      <button class="secondary" id="zaloReminderBtn" onclick="openZaloReminderModal()" style="display:none;background:linear-gradient(135deg, #0068ff 0%, #0052cc 100%);color:#fff;border:none;font-weight:700">💬 Nhắc Zalo Tự Động</button>
       <button class="secondary" onclick="printInvoices()">In hóa đơn</button>
       <button class="secondary" id="lockTuitionBtn" onclick="toggleTuitionLock()" style="display:none">🔒 Chốt học phí</button>
     </div>
@@ -1015,6 +1016,24 @@ tr.recalc-needed td:first-child { border-left: 3px solid #ef4444; }
         <button class="modal-close" onclick="closeTuitionDetail()">✕</button>
       </div>
       <div class="modal-body" id="tuitionDetailBody"></div>
+    </div>
+  </div>
+
+  <div id="zaloReminderModal" class="modal-overlay" onclick="closeZaloReminderModal(event)" style="display:none">
+    <div class="modal-card" style="max-width:960px;width:96%;max-height:92vh;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+      <div class="modal-header" style="background:linear-gradient(135deg, #0068ff 0%, #004dc7 100%);color:#fff;padding:14px 20px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:22px">🤖</span>
+          <div>
+            <h3 style="margin:0;font-size:16px;font-weight:700;color:#fff">Nhắc Học Phí Qua Zalo Cá Nhân</h3>
+            <div style="font-size:11px;opacity:.9">Cơ chế Anti-Ban tự động: Giãn cách 45s - 90s, mô phỏng người thật</div>
+          </div>
+        </div>
+        <button class="modal-close" style="color:#fff" onclick="closeZaloReminderModal()">✕</button>
+      </div>
+      <div class="modal-body" id="zaloReminderBody" style="padding:16px;overflow-y:auto;flex:1">
+        <!-- Rendered by tuition.js -->
+      </div>
     </div>
   </div>
 
