@@ -290,6 +290,12 @@ function assertAllowedRole(role: string) {
   }
 }
 
+function isServiceRoleAutomation(req: Request) {
+  const expected = env("FACEBOOK_AUTOMATION_SECRET");
+  const received = req.headers.get("x-automation-secret") || "";
+  return Boolean(expected) && received === expected;
+}
+
 function safeFileName(name: string) {
   const clean = String(name || "image").replace(/[^\w.\-]+/g, "-").replace(/-+/g, "-");
   return clean.slice(0, 120) || "image";
@@ -2734,6 +2740,123 @@ function buildFallbackImage(args: {
   };
 }
 
+function buildAutomatedQuizImage(args: {
+  pageName: string;
+  question: string;
+  answers: string[];
+}) {
+  const questionFit = fitOverlaySvgText(cleanOverlayText(args.question), {
+    boxWidth: 820,
+    boxHeight: 300,
+    maxLines: 5,
+    maxFontSize: 54,
+    minFontSize: 28,
+  });
+  const questionStartY = 300 - ((questionFit.lines.length - 1) * questionFit.lineHeight) / 2;
+  const questionLines = questionFit.lines.map((line, index) =>
+    `<tspan x="540" y="${questionStartY + index * questionFit.lineHeight}">${escapeXml(line)}</tspan>`
+  ).join("");
+  const answers = args.answers.slice(0, 4);
+  const boxes = answers.map((answer, index) => {
+    const col = index % 2;
+    const row = Math.floor(index / 2);
+    const x = 92 + col * 470;
+    const y = 545 + row * 170;
+    const fit = fitOverlaySvgText(`${String.fromCharCode(65 + index)}. ${cleanOverlayText(answer)}`, {
+      boxWidth: 390,
+      boxHeight: 105,
+      maxLines: 3,
+      maxFontSize: 34,
+      minFontSize: 22,
+    });
+    const startY = y + 76 - ((fit.lines.length - 1) * fit.lineHeight) / 2;
+    const lines = fit.lines.map((line, lineIndex) =>
+      `<tspan x="${x + 213}" y="${startY + lineIndex * fit.lineHeight}">${escapeXml(line)}</tspan>`
+    ).join("");
+    return `<rect x="${x}" y="${y}" width="426" height="132" rx="30" fill="#ffffff" stroke="#7db8f5" stroke-width="5"/>
+      <text text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${fit.fontSize}" font-weight="800" fill="#10284f">${lines}</text>`;
+  }).join("\n");
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#edf8ff"/><stop offset="1" stop-color="#88c9ff"/></linearGradient></defs>
+  <rect width="1080" height="1080" fill="url(#bg)"/>
+  <rect x="66" y="54" width="948" height="948" rx="54" fill="#fafdff" stroke="#1d6bd1" stroke-width="7"/>
+  <rect x="288" y="88" width="504" height="82" rx="41" fill="#063579"/>
+  <text x="540" y="142" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="38" font-weight="900" fill="#ffffff">QUIZ NHANH CÙNG MINDUP</text>
+  <text text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${questionFit.fontSize}" font-weight="900" fill="#082c68">${questionLines}</text>
+  ${boxes}
+  <text x="540" y="958" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="800" fill="#315d91">${escapeXml(args.pageName)} • Comment đáp án của em nhé!</text>
+</svg>`;
+  return {
+    model: "mindup-automated-quiz-svg",
+    imagePrompt: "MindUp automated Quiz template",
+    bytes: new TextEncoder().encode(svg),
+    mimeType: "image/svg+xml",
+  };
+}
+
+function buildAutomatedHardQuizImage(args: {
+  pageName: string;
+  question: string;
+  prizeAmount: number;
+}) {
+  const questionFit = fitOverlaySvgText(cleanOverlayText(args.question), {
+    boxWidth: 1180,
+    boxHeight: 310,
+    maxLines: 6,
+    maxFontSize: 58,
+    minFontSize: 30,
+  });
+  const startY = 425 - ((questionFit.lines.length - 1) * questionFit.lineHeight) / 2;
+  const lines = questionFit.lines.map((line, index) =>
+    `<tspan x="768" y="${startY + index * questionFit.lineHeight}">${escapeXml(line)}</tspan>`
+  ).join("");
+  const prize = Math.max(0, Number(args.prizeAmount || 50000)).toLocaleString("vi-VN");
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="864" viewBox="0 0 1536 864">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e8f5ff"/><stop offset=".58" stop-color="#66b8ff"/><stop offset="1" stop-color="#164ca3"/></linearGradient></defs>
+  <rect width="1536" height="864" fill="url(#bg)"/>
+  <circle cx="130" cy="110" r="180" fill="#ffffff" opacity=".18"/><circle cx="1420" cy="760" r="240" fill="#ffffff" opacity=".14"/>
+  <rect x="118" y="72" width="1300" height="720" rx="54" fill="#ffffff" opacity=".96"/>
+  <text x="768" y="170" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="70" font-weight="900" fill="#063579">HỎI NHANH ĐỚP TRỌN</text>
+  <rect x="550" y="205" width="436" height="72" rx="36" fill="#f4b81f"/>
+  <text x="768" y="254" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="900" fill="#082c68">GIẢI THƯỞNG ${escapeXml(prize)}Đ</text>
+  <text text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${questionFit.fontSize}" font-weight="800" fill="#082c68">${lines}</text>
+  <rect x="390" y="680" width="756" height="68" rx="34" fill="#063579"/>
+  <text x="768" y="725" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="900" fill="#ffffff">${escapeXml(args.pageName)} • COMMENT ĐÁP ÁN + SỐ MAY MẮN</text>
+</svg>`;
+  return {
+    model: "mindup-automated-hard-quiz-svg",
+    imagePrompt: "MindUp automated Hard Quiz template",
+    bytes: new TextEncoder().encode(svg),
+    mimeType: "image/svg+xml",
+  };
+}
+
+function buildAutomatedHardQuizCaption(pageName: string, prizeAmount: number) {
+  const prize = Math.max(0, Number(prizeAmount || 50000)).toLocaleString("vi-VN");
+  return [
+    "🔥 HỎI NHANH ĐỚP TRỌN 🔥",
+    "",
+    "Giải đúng câu hỏi, dự đoán con số may mắn và rinh phần thưởng từ MindUp nhé!",
+    "",
+    `🎁 Phần thưởng: ${prize}đ`,
+    "",
+    "📌 Quy định chơi:",
+    "1. Like bài viết này.",
+    "2. Share bài viết ở chế độ công khai.",
+    "3. Comment đáp án đúng của câu hỏi.",
+    "4. Comment kèm 1 số dự đoán từ 00 đến 99.",
+    "5. Người thắng là người có đáp án đúng và dự đoán gần nhất với 2 số cuối giải Đặc biệt XSMB Chủ nhật.",
+    "6. Nếu nhiều bạn cùng gần nhất, ưu tiên bạn comment sớm hơn.",
+    `7. Kết quả và phần thưởng ${prize}đ sẽ được công bố trong bài Monday Mindset thứ Hai tuần sau.`,
+    "",
+    "⏰ Hạn tham gia: trước giờ quay XSMB Chủ nhật tuần này.",
+    "",
+    `#HardQuiz #HoiNhanhDopTron #MindUp #PhatTrienTuDuy ${pageHashtag(pageName)}`,
+  ].join("\n");
+}
+
 function cleanOverlayText(value: string) {
   return String(value || "")
     .replace(/#[\p{L}\p{N}_]+/gu, "")
@@ -3270,9 +3393,15 @@ Deno.serve(async (req) => {
   let postId = "";
   let linkedPostId = "";
   try {
-    const { user } = await requireAuthenticatedUser(req);
-    const role = await getUserRole(user.id);
-    assertAllowedRole(role);
+    const automationRequest = isServiceRoleAutomation(req);
+    let userId = "";
+    let role = "service_role";
+    if (!automationRequest) {
+      const { user } = await requireAuthenticatedUser(req);
+      userId = user.id;
+      role = await getUserRole(user.id);
+      assertAllowedRole(role);
+    }
 
     const body = await req.json().catch(() => ({}));
     postId = String(body?.post_id || "").trim();
@@ -3280,7 +3409,7 @@ Deno.serve(async (req) => {
     const provider = normalizeTextAiProvider(body?.provider);
 
     const post = await loadPostBundle(postId);
-    await assertCanUsePost(user.id, role, post);
+    if (!automationRequest) await assertCanUsePost(userId, role, post);
     await patchJson(`facebook_scheduled_posts?id=eq.${encodeURIComponent(postId)}`, {
       ai_status: "generating",
       ai_error: null,
@@ -3440,6 +3569,21 @@ Deno.serve(async (req) => {
     const postTypeNameForQuiz = post.type?.name || "Facebook";
     if (isQuizTypeName(postTypeNameForQuiz)) {
       const quiz = draft.quiz || {};
+      if (!quiz.question || !Array.isArray(quiz.answers) || quiz.answers.length < 2) {
+        throw new Error("Gemini chưa trả đủ câu hỏi và đáp án Quiz.");
+      }
+      const quizContent = mergeCaptionAndHashtags(draft.caption, draft.hashtags);
+      const quizImage = automationRequest
+        ? buildAutomatedQuizImage({
+          pageName: post.page?.page_name || post.page_id,
+          question: quiz.question,
+          answers: quiz.answers,
+        })
+        : null;
+      const uploadedQuizImage = quizImage
+        ? await uploadBytesToDrive(quizImage.bytes, "mindup-automated-quiz.svg", quizImage.mimeType)
+        : null;
+      const quizImageUrl = uploadedQuizImage?.lh3Url || uploadedQuizImage?.url || null;
       const quizNote = [
         draft.internalNote,
         quiz.grade ? `Lớp: ${quiz.grade}` : "",
@@ -3453,8 +3597,8 @@ Deno.serve(async (req) => {
         post.internal_note,
       ].filter(Boolean).join("\n");
       const rows = await patchJson<Array<JsonRecord>>(`facebook_scheduled_posts?id=eq.${encodeURIComponent(postId)}`, {
-        content: mergeCaptionAndHashtags(draft.caption, draft.hashtags),
-        image_url: null,
+        content: quizContent,
+        image_url: quizImageUrl,
         internal_note: quizNote || null,
         metadata: {
           ...parseMetadata(post.metadata),
@@ -3476,10 +3620,10 @@ Deno.serve(async (req) => {
         approval_status: "pending",
         ai_status: "drafted",
         ai_generated_at: new Date().toISOString(),
-        ai_model: draft.model,
+        ai_model: [draft.model, quizImage?.model].filter(Boolean).join("; "),
         ai_prompt: textPrompt,
-        ai_image_prompt: "MindUp Quiz template",
-        ai_image_url: null,
+        ai_image_prompt: quizImage?.imagePrompt || "MindUp Quiz template",
+        ai_image_url: quizImageUrl,
         ai_error: null,
         updated_at: new Date().toISOString(),
       });
@@ -3487,13 +3631,28 @@ Deno.serve(async (req) => {
         ok: true,
         post: rows?.[0] || null,
         quiz,
-        image_url: null,
+        image_url: quizImageUrl,
         image_fallback: false,
         image_warning: "",
       });
     }
     if (isHardQuizWithPrize(postTypeNameForQuiz)) {
       const hardQuiz = draft.hardQuiz || {};
+      if (!hardQuiz.question) throw new Error("Gemini chưa trả về đề bài Hard Quiz.");
+      const hardQuizContent = automationRequest
+        ? buildAutomatedHardQuizCaption(post.page?.page_name || post.page_id, hardQuiz.prizeAmount || 50000)
+        : "";
+      const hardQuizImage = automationRequest
+        ? buildAutomatedHardQuizImage({
+          pageName: post.page?.page_name || post.page_id,
+          question: hardQuiz.question,
+          prizeAmount: hardQuiz.prizeAmount || 50000,
+        })
+        : null;
+      const uploadedHardQuizImage = hardQuizImage
+        ? await uploadBytesToDrive(hardQuizImage.bytes, "mindup-automated-hard-quiz.svg", hardQuizImage.mimeType)
+        : null;
+      const hardQuizImageUrl = uploadedHardQuizImage?.lh3Url || uploadedHardQuizImage?.url || null;
       const hardQuizNote = [
         draft.internalNote,
         hardQuiz.grade ? `Lớp: ${hardQuiz.grade}` : "",
@@ -3506,8 +3665,8 @@ Deno.serve(async (req) => {
         post.internal_note,
       ].filter(Boolean).join("\n");
       const rows = await patchJson<Array<JsonRecord>>(`facebook_scheduled_posts?id=eq.${encodeURIComponent(postId)}`, {
-        content: "",
-        image_url: null,
+        content: hardQuizContent,
+        image_url: hardQuizImageUrl,
         internal_note: hardQuizNote || null,
         metadata: {
           ...parseMetadata(post.metadata),
@@ -3528,10 +3687,10 @@ Deno.serve(async (req) => {
         approval_status: "pending",
         ai_status: "drafted",
         ai_generated_at: new Date().toISOString(),
-        ai_model: draft.model,
+        ai_model: [draft.model, hardQuizImage?.model].filter(Boolean).join("; "),
         ai_prompt: textPrompt,
-        ai_image_prompt: "MindUp Hard Quiz template",
-        ai_image_url: null,
+        ai_image_prompt: hardQuizImage?.imagePrompt || "MindUp Hard Quiz template",
+        ai_image_url: hardQuizImageUrl,
         ai_error: null,
         updated_at: new Date().toISOString(),
       });
@@ -3539,7 +3698,7 @@ Deno.serve(async (req) => {
         ok: true,
         post: rows?.[0] || null,
         hard_quiz: hardQuiz,
-        image_url: null,
+        image_url: hardQuizImageUrl,
         image_fallback: false,
         image_warning: "",
       });
