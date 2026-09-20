@@ -135,14 +135,18 @@ Deno.serve(async (req) => {
       last_error: null,
       metadata: {
         ...(job.metadata || {}),
-        ai_model: result?.post?.ai_model || "gemini",
+        ai_model: result?.skipped ? "not_called" : (result?.post?.ai_model || "gemini"),
+        skipped: Boolean(result?.skipped),
+        skip_reason: result?.reason || null,
         generated_at: new Date().toISOString(),
       },
     });
 
     return jsonResponse({
       ok: true,
-      processed: true,
+      processed: !result?.skipped,
+      skipped: Boolean(result?.skipped),
+      reason: result?.reason || null,
       job_id: job.id,
       post_id: job.post_id,
       post_status: result?.post?.status || "draft",

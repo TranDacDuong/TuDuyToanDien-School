@@ -6,6 +6,20 @@ const corsHeaders = {
 
 type JsonRecord = Record<string, unknown>;
 
+type GiaoducNetArticle = {
+  title: string;
+  url: string;
+  publishedAt: string;
+  description: string;
+  body: string;
+  imageUrl: string;
+  author: string;
+  mostReadRank: number | null;
+  homepageRank: number;
+  interestScore: number;
+  sourceImage?: { data: string; mimeType: string; model: string; prompt: string };
+};
+
 const MONDAY_MINDSET_ITEMS = [
   "GET TO vs. HAVE TO: Thay đổi thái độ từ nghĩa vụ sang đặc ân.",
   "Talk to Yourself, Don't Listen to Yourself: Nói chuyện với chính mình bằng sự khích lệ thay vì ngồi nghe những suy nghĩ sợ hãi tự động.",
@@ -1412,6 +1426,51 @@ function mondayMindsetTopic(scheduledAt: string, pageName: string) {
   };
 }
 
+function buildGiaoducNetNewsPrompt(args: {
+  pageName: string;
+  scheduledAt: string;
+  article: GiaoducNetArticle;
+}) {
+  const fanpageTag = pageHashtag(args.pageName);
+  return [
+    "Bạn là biên tập viên nội dung Facebook của MindUp - Tư Duy Toàn Diện.",
+    "Nhiệm vụ: tóm tắt bài báo giáo dục được cung cấp bên dưới thành một bài Facebook tiếng Việt chính xác, tự nhiên và dễ được quan tâm.",
+    "Đây là nguồn duy nhất. Không tìm nguồn khác, không bổ sung dữ kiện, không suy đoán và không bịa thông tin ngoài nội dung bài báo.",
+    "",
+    "THÔNG TIN BÀI BÁO NGUỒN:",
+    `- Nguồn: Tạp chí điện tử Giáo dục Việt Nam (giaoduc.net.vn)`,
+    `- Tiêu đề: ${args.article.title}`,
+    `- URL: ${args.article.url}`,
+    `- Xuất bản: ${args.article.publishedAt}`,
+    args.article.author ? `- Tác giả: ${args.article.author}` : "",
+    `- Mô tả: ${args.article.description}`,
+    "",
+    "NỘI DUNG BÀI BÁO:",
+    args.article.body,
+    "",
+    "YÊU CẦU CAPTION:",
+    "- Dài khoảng 180-350 từ, chia đoạn ngắn để đọc tốt trên điện thoại.",
+    "- Mở đầu bằng một hook ngắn, đúng sự thật, có thể dùng 1-2 emoji phù hợp.",
+    "- Tóm tắt 3-5 thông tin quan trọng nhất của bài báo bằng ngôn ngữ tự nhiên; không copy nguyên đoạn dài.",
+    "- Có một đoạn ngắn nêu điều phụ huynh, học sinh hoặc giáo viên cần chú ý, nhưng chỉ được rút ra trực tiếp từ nội dung nguồn.",
+    "- Kết thúc bằng một câu hỏi nhẹ để mời người đọc bình luận.",
+    `- Dòng nguồn bắt buộc ở cuối caption, ngay trước hashtag: Nguồn: Tạp chí điện tử Giáo dục Việt Nam - ${args.article.url}`,
+    "- Không dùng giọng giật gân, không thay đổi ý nghĩa, không tự thêm số liệu hoặc trích dẫn.",
+    "- Không nói rằng AI đã đọc hoặc tóm tắt bài báo.",
+    "- Ảnh sẽ do hệ thống lấy trực tiếp từ bài báo; không yêu cầu tạo ảnh mới.",
+    "",
+    "Trả về duy nhất JSON hợp lệ, không markdown, theo schema:",
+    JSON.stringify({
+      caption: "Caption Tin tức hoàn chỉnh bằng tiếng Việt, gồm hook, phần tóm tắt, ý nghĩa với người đọc, CTA và dòng nguồn có URL.",
+      hashtags: ["#MindUp", "#TinTucGiaoDuc", "#GiaoDucVietNam", fanpageTag],
+      image_prompt: "Use the original article image supplied by the backend. Do not generate a replacement image.",
+      internal_note: `Nguồn báo bắt buộc: ${args.article.title} | ${args.article.url} | xuất bản ${args.article.publishedAt}`,
+    }, null, 2),
+    "",
+    `Thông tin lịch: fanpage ${args.pageName}; đăng lúc ${args.scheduledAt}.`,
+  ].filter(Boolean).join("\n");
+}
+
 async function buildGeminiPrompt(args: {
   pageName: string;
   typeName: string;
@@ -2176,6 +2235,7 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
   const isStandaloneTeaching = isTeachingPhilosophy(typeName);
   const isApplyingKnowledgePost = isApplyingKnowledge(typeName);
   const isPhenomenonPost = isRealWorldPhenomenon(typeName);
+  const isNewsPost = isNewsType(typeName);
   let rawCaption = String(parsed?.caption || "").trim();
 
   // Enforce word count check for ALL AI providers (Gemini & Llama)
@@ -2256,6 +2316,33 @@ async function generateTextDraft(prompt: string, typeName = "", provider = "") {
     text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("\n") || "";
     parsed = tryParseJson(text);
     rawCaption = String(parsed?.caption || "").trim();
+  }
+  const newsWordCount = stripMarkdown(rawCaption).split(/\s+/).filter(Boolean).length;
+  if (isNewsPost && (newsWordCount < 160 || newsWordCount > 350)) {
+    const retry = await postAiGenerateContent({
+      prompt: [
+        prompt,
+        "",
+        `BẢN VỪA TẠO CÓ ${newsWordCount} TỪ, KHÔNG ĐÚNG ĐỘ DÀI TÓM TẮT TIN TỨC.`,
+        "Viết lại caption trong khoảng 220-300 từ, tuyệt đối không quá 350 từ.",
+        "Giữ đủ: hook ngắn, 3-5 ý quan trọng, điều người đọc cần chú ý, một câu hỏi CTA và nguyên dòng nguồn kèm URL.",
+        "Không thêm bất kỳ dữ kiện nào ngoài bài báo nguồn. Trả về duy nhất JSON hợp lệ theo schema cũ.",
+        "",
+        "Bản cần rút gọn/điều chỉnh:",
+        rawCaption,
+      ].join("\n"),
+      temperature: 0.55,
+      provider,
+    });
+    model = retry.model;
+    data = retry.data;
+    text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("\n") || "";
+    parsed = tryParseJson(text);
+    rawCaption = String(parsed?.caption || "").trim();
+  }
+  const finalNewsWordCount = stripMarkdown(rawCaption).split(/\s+/).filter(Boolean).length;
+  if (isNewsPost && (finalNewsWordCount < 150 || finalNewsWordCount > 350)) {
+    throw new Error(`AI chưa tóm tắt Tin tức đúng độ dài 150-350 từ (hiện tại ${finalNewsWordCount} từ).`);
   }
   const hashtags = normalizeHashtags(parsed?.hashtags);
   if (!hashtags.includes("#MindUp")) hashtags.unshift("#MindUp");
@@ -2554,6 +2641,180 @@ async function discoverSourcePageImageUrls(pageUrl: string) {
   return extractImageUrlsFromHtml(html, cleanUrl);
 }
 
+const GIAODUC_NET_HOME = "https://giaoduc.net.vn/";
+const NEWS_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+function decodeHtmlEntities(value: string) {
+  const named: Record<string, string> = {
+    amp: "&", quot: '"', apos: "'", lt: "<", gt: ">", nbsp: " ", ndash: "-", mdash: "-", hellip: "...",
+  };
+  return String(value || "")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&([a-z]+);/gi, (match, name) => named[String(name).toLowerCase()] ?? match);
+}
+
+function htmlToPlainText(value: string) {
+  return decodeHtmlEntities(String(value || "")
+    .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[\s\S]*?<\/style>/gi, " ")
+    .replace(/<(?:br|\/p|\/h[1-6]|\/li|\/blockquote)>/gi, "\n")
+    .replace(/<[^>]+>/g, " "))
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function htmlAttributes(tag: string) {
+  const attrs: Record<string, string> = {};
+  const pattern = /([:\w-]+)\s*=\s*(["'])([\s\S]*?)\2/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(tag))) attrs[match[1].toLowerCase()] = decodeHtmlEntities(match[3]);
+  return attrs;
+}
+
+function htmlMetaContent(html: string, key: string) {
+  const expected = key.toLowerCase();
+  const tags = html.match(/<meta\b[^>]*>/gi) || [];
+  for (const tag of tags) {
+    const attrs = htmlAttributes(tag);
+    if (String(attrs.property || attrs.name || "").toLowerCase() === expected) return String(attrs.content || "").trim();
+  }
+  return "";
+}
+
+async function fetchNewsHtml(url: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12_000);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; MindUpNewsBot/1.0; +https://mindup.edu.vn)",
+        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+      },
+    });
+    if (!res.ok) throw new Error(`giaoduc.net.vn returned ${res.status} for ${url}`);
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().includes("text/html")) throw new Error(`Unexpected news content type: ${contentType}`);
+    return await res.text();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function giaoducNetStoryLinks(html: string) {
+  const links: Array<{ title: string; url: string }> = [];
+  const seen = new Set<string>();
+  const anchors = html.match(/<a\b[^>]*>[\s\S]*?<\/a>/gi) || [];
+  for (const anchor of anchors) {
+    const openTag = anchor.match(/^<a\b[^>]*>/i)?.[0] || "";
+    const attrs = htmlAttributes(openTag);
+    if (!String(attrs.class || "").split(/\s+/).includes("story__title")) continue;
+    const url = absolutizeUrl(attrs.href || "", GIAODUC_NET_HOME);
+    if (!/^https:\/\/giaoduc\.net\.vn\/[a-z0-9-]+-post\d+\.gd(?:[?#].*)?$/i.test(url) || seen.has(url)) continue;
+    const title = htmlToPlainText(attrs.title || anchor);
+    if (!title) continue;
+    seen.add(url);
+    links.push({ title, url });
+  }
+  return links;
+}
+
+function extractGiaoducNetBody(html: string) {
+  const startMatch = /<div\b[^>]*class=["'][^"']*details__content[^"']*["'][^>]*>/i.exec(html);
+  if (startMatch?.index == null) return "";
+  const start = startMatch.index + startMatch[0].length;
+  const footerIndex = html.slice(start).search(/<div\b[^>]*class=["'][^"']*details__footer/i);
+  const bodyHtml = html.slice(start, footerIndex >= 0 ? start + footerIndex : Math.min(html.length, start + 80_000));
+  return htmlToPlainText(bodyHtml).slice(0, 16_000);
+}
+
+function newsInterestScore(article: Omit<GiaoducNetArticle, "interestScore">, nowMs: number) {
+  const text = stripVietnameseForTag(`${article.title} ${article.description}`).toLowerCase();
+  const highInterest = [
+    "hoc sinh", "phu huynh", "giao vien", "thi", "tuyen sinh", "diem", "hoc phi", "sach giao khoa",
+    "bo gd", "truong hoc", "day them", "hoc them", "bua an", "an toan", "ai", "tri tue nhan tao",
+  ];
+  const lowerInterest = ["trao bang", "bo nhiem", "hoi thao", "ky niem", "doanh nghiep", "tai tro", "quang cao"];
+  const keywordScore = highInterest.reduce((score, keyword) => score + (text.includes(keyword) ? 18 : 0), 0)
+    - lowerInterest.reduce((score, keyword) => score + (text.includes(keyword) ? 22 : 0), 0);
+  const ageHours = Math.max(0, (nowMs - new Date(article.publishedAt).getTime()) / 3_600_000);
+  const recencyScore = Math.max(0, 96 - ageHours * 4);
+  const placementScore = article.mostReadRank
+    ? 1_000 - article.mostReadRank * 45
+    : Math.max(0, 260 - article.homepageRank * 5);
+  return Math.round(placementScore + recencyScore + keywordScore);
+}
+
+async function loadGiaoducNetArticle(
+  candidate: { title: string; url: string },
+  homepageRank: number,
+  mostReadRank: number | null,
+  nowMs: number,
+) {
+  const html = await fetchNewsHtml(candidate.url);
+  const canonicalUrl = absolutizeUrl(htmlMetaContent(html, "og:url") || candidate.url, candidate.url);
+  if (!canonicalUrl.startsWith("https://giaoduc.net.vn/")) throw new Error("News canonical URL is outside giaoduc.net.vn");
+  const publishedAt = htmlMetaContent(html, "article:published_time");
+  const publishedMs = new Date(publishedAt).getTime();
+  if (!Number.isFinite(publishedMs) || publishedMs > nowMs + 5 * 60_000 || nowMs - publishedMs > NEWS_WINDOW_MS) return null;
+  const articleWithoutScore = {
+    title: htmlToPlainText(htmlMetaContent(html, "og:title") || candidate.title).slice(0, 500),
+    url: canonicalUrl,
+    publishedAt: new Date(publishedMs).toISOString(),
+    description: htmlToPlainText(htmlMetaContent(html, "description") || htmlMetaContent(html, "og:description")).slice(0, 1_500),
+    body: extractGiaoducNetBody(html),
+    imageUrl: absolutizeUrl(htmlMetaContent(html, "og:image"), canonicalUrl),
+    author: htmlToPlainText(htmlMetaContent(html, "author")).slice(0, 200),
+    mostReadRank,
+    homepageRank,
+  };
+  if (!articleWithoutScore.title || articleWithoutScore.body.length < 250 || !articleWithoutScore.imageUrl) return null;
+  return {
+    ...articleWithoutScore,
+    interestScore: newsInterestScore(articleWithoutScore, nowMs),
+  } satisfies GiaoducNetArticle;
+}
+
+async function selectGiaoducNetArticleWithin24Hours(now = new Date()) {
+  const homepageHtml = await fetchNewsHtml(GIAODUC_NET_HOME);
+  const allLinks = giaoducNetStoryLinks(homepageHtml);
+  const popularStart = homepageHtml.search(/<div\b[^>]*class=["'][^"']*zone--popular[^"']*["'][^>]*>/i);
+  const popularHtml = popularStart >= 0 ? homepageHtml.slice(popularStart, popularStart + 60_000) : "";
+  const popularLinks = giaoducNetStoryLinks(popularHtml).slice(0, 10);
+  const popularRankByUrl = new Map(popularLinks.map((item, index) => [item.url, index + 1]));
+  const ordered = [...popularLinks, ...allLinks]
+    .filter((item, index, items) => items.findIndex(other => other.url === item.url) === index)
+    .slice(0, 24);
+  const settled: Array<PromiseSettledResult<GiaoducNetArticle | null>> = [];
+  for (let offset = 0; offset < ordered.length; offset += 12) {
+    const batch = ordered.slice(offset, offset + 12);
+    settled.push(...await Promise.allSettled(batch.map(candidate => loadGiaoducNetArticle(
+      candidate,
+      Math.max(1, allLinks.findIndex(item => item.url === candidate.url) + 1),
+      popularRankByUrl.get(candidate.url) || null,
+      now.getTime(),
+    ))));
+  }
+  const recent = settled
+    .filter((result): result is PromiseFulfilledResult<GiaoducNetArticle | null> => result.status === "fulfilled")
+    .map(result => result.value)
+    .filter((article): article is GiaoducNetArticle => Boolean(article))
+    .sort((a, b) => b.interestScore - a.interestScore || new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+  for (const article of recent) {
+    try {
+      const sourceImage = await downloadRemoteImageAsBackground(article.imageUrl);
+      return { ...article, sourceImage };
+    } catch (error) {
+      console.warn("[Facebook AI Draft] Cannot use giaoduc.net.vn article image:", article.imageUrl, error instanceof Error ? error.message : String(error));
+    }
+  }
+  return null;
+}
+
 let mindupLogoDataUriPromise: Promise<string> | null = null;
 
 async function loadMindupLogoDataUri() {
@@ -2738,6 +2999,11 @@ function buildFallbackImage(args: {
     bytes,
     mimeType: "image/svg+xml",
   };
+}
+
+function isNewsType(typeName: string) {
+  const normalized = stripVietnameseForTag(typeName || "").toLowerCase().trim();
+  return normalized === "tin tuc" || normalized === "news";
 }
 
 function buildAutomatedQuizImage(args: {
@@ -3063,6 +3329,45 @@ function buildInterestingQuestionImage(args: {
   };
 }
 
+function buildNewsSourceImage(args: {
+  pageName: string;
+  sourceImage: { data: string; mimeType: string; model: string; prompt: string };
+  logoDataUri?: string;
+  sourceUrl: string;
+}) {
+  const logoHref = args.logoDataUri || env("MINDUP_LOGO_URL") || "https://www.mindup.edu.vn/assets/mindup-logo-round.png";
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset=".55" stop-color="#061b3e" stop-opacity="0"/>
+      <stop offset="1" stop-color="#061b3e" stop-opacity=".82"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#00142f" flood-opacity=".45"/>
+    </filter>
+    <clipPath id="logoClip"><circle cx="88" cy="88" r="54"/></clipPath>
+  </defs>
+  <rect width="1200" height="630" fill="#e8f5ff"/>
+  <image href="data:${escapeXml(args.sourceImage.mimeType || "image/jpeg")};base64,${args.sourceImage.data}" x="0" y="0" width="1200" height="630" preserveAspectRatio="xMidYMid slice"/>
+  <rect width="1200" height="630" fill="url(#shade)"/>
+  <circle cx="88" cy="88" r="60" fill="#ffffff" opacity=".96" filter="url(#shadow)"/>
+  <image href="${escapeXml(logoHref)}" x="34" y="34" width="108" height="108" preserveAspectRatio="xMidYMid meet" clip-path="url(#logoClip)"/>
+  <text x="1160" y="570" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#ffffff">Nguồn ảnh: giaoduc.net.vn</text>
+  <text x="1160" y="606" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="600" fill="#d9ebff">${escapeXml(args.pageName)}</text>
+</svg>`;
+  return {
+    model: `mindup-news-source-svg; ${args.sourceImage.model}`,
+    imagePrompt: [
+      args.sourceImage.prompt,
+      `Source article: ${args.sourceUrl}`,
+      "Layout: original article image, small MindUp logo, source credit. No generated replacement image.",
+    ].join("\n"),
+    bytes: new TextEncoder().encode(svg),
+    mimeType: "image/svg+xml",
+  };
+}
+
 async function loadPostBundle(postId: string) {
   const rows = await fetchJson<Array<{
     id: string;
@@ -3240,9 +3545,26 @@ async function generateImageWithFallback(args: {
   overlayText?: string;
   sourceImageUrl?: string;
   sourcePageUrl?: string;
+  sourceImageData?: { data: string; mimeType: string; model: string; prompt: string };
 }) {
   let imageWarning = "";
   const typeKey = stripVietnameseForTag(args.typeName || "").toLowerCase();
+  if (isNewsType(args.typeName)) {
+    const sourceImage = args.sourceImageData || await downloadRemoteImageAsBackground(args.sourceImageUrl || "");
+    const logoDataUri = await loadMindupLogoDataUri().catch(() => "");
+    const image = buildNewsSourceImage({
+      pageName: args.pageName,
+      sourceImage,
+      logoDataUri: logoDataUri || undefined,
+      sourceUrl: args.sourcePageUrl || "https://giaoduc.net.vn/",
+    });
+    const uploaded = await uploadBytesToDrive(image.bytes, "mindup-giaoduc-net-news.svg", image.mimeType);
+    return {
+      image,
+      imageWarning,
+      imageUrl: uploaded.lh3Url || uploaded.url,
+    };
+  }
   const shouldUseInterestingQuestionVisual = isInterestingQuestion(args.typeName);
   const shouldUsePhenomenonSourceVisual = isRealWorldPhenomenon(args.typeName);
   const shouldUseProblemLearningVisual = isProblemType(args.typeName) || isTeachingPhilosophy(args.typeName) || isApplyingKnowledge(args.typeName) || typeKey.includes("problem") || typeKey.includes("learning method") || typeKey.includes("teaching philosophy") || typeKey.includes("applying knowledge");
@@ -3416,17 +3738,68 @@ Deno.serve(async (req) => {
       updated_at: new Date().toISOString(),
     });
 
+    const postTypeName = post.type?.name || "Facebook";
+    let selectedNewsArticle: GiaoducNetArticle | null = null;
+    if (isNewsType(postTypeName)) {
+      selectedNewsArticle = await selectGiaoducNetArticleWithin24Hours();
+      if (!selectedNewsArticle) {
+        const skippedAt = new Date().toISOString();
+        const skipReason = "Không có bài phù hợp trên giaoduc.net.vn được xuất bản trong 24 giờ gần nhất; không đăng bài Tin tức.";
+        const rows = await patchJson<Array<JsonRecord>>(`facebook_scheduled_posts?id=eq.${encodeURIComponent(postId)}`, {
+          content: "",
+          link_url: null,
+          image_url: null,
+          internal_note: [skipReason, post.internal_note].filter(Boolean).join("\n\n"),
+          metadata: {
+            ...parseMetadata(post.metadata),
+            education_news: {
+              source: "https://giaoduc.net.vn/",
+              window_hours: 24,
+              skipped: true,
+              reason: "no_recent_article_with_usable_image",
+              checked_at: skippedAt,
+            },
+          },
+          status: "cancelled",
+          content_status: "missing_content",
+          approval_status: "pending",
+          ai_status: "idle",
+          ai_generated_at: null,
+          ai_model: null,
+          ai_prompt: null,
+          ai_image_prompt: null,
+          ai_image_url: null,
+          ai_error: null,
+          last_error: null,
+          updated_at: skippedAt,
+        });
+        return jsonResponse({
+          ok: true,
+          skipped: true,
+          reason: "no_recent_news",
+          message: skipReason,
+          post: rows?.[0] || null,
+        });
+      }
+    }
+
     const sourceHistory = await loadSourceHistoryForPost(post);
-    const textPrompt = await buildGeminiPrompt({
-      pageName: post.page?.page_name || post.page_id,
-      typeName: post.type?.name || "Facebook",
-      scheduledAt: post.scheduled_at,
-      typePrompt: post.type?.ai_prompt || post.type?.description || "",
-      existingContent: post.content || "",
-      internalNote: post.internal_note || "",
-      provider,
-      sourceHistory,
-    });
+    const textPrompt = selectedNewsArticle
+      ? buildGiaoducNetNewsPrompt({
+        pageName: post.page?.page_name || post.page_id,
+        scheduledAt: post.scheduled_at,
+        article: selectedNewsArticle,
+      })
+      : await buildGeminiPrompt({
+        pageName: post.page?.page_name || post.page_id,
+        typeName: postTypeName,
+        scheduledAt: post.scheduled_at,
+        typePrompt: post.type?.ai_prompt || post.type?.description || "",
+        existingContent: post.content || "",
+        internalNote: post.internal_note || "",
+        provider,
+        sourceHistory,
+      });
 
     if (isProblemType(post.type?.name || "")) {
       const linkedPost = await findPairedLearningMethodPost(post);
@@ -3566,6 +3939,9 @@ Deno.serve(async (req) => {
     }
 
     const draft = await generateTextDraft(textPrompt, post.type?.name || "", provider);
+    if (selectedNewsArticle && !draft.caption.includes(selectedNewsArticle.url)) {
+      draft.caption = `${draft.caption.trim()}\n\nNguồn: Tạp chí điện tử Giáo dục Việt Nam - ${selectedNewsArticle.url}`;
+    }
     const postTypeNameForQuiz = post.type?.name || "Facebook";
     if (isQuizTypeName(postTypeNameForQuiz)) {
       const quiz = draft.quiz || {};
@@ -3715,14 +4091,16 @@ Deno.serve(async (req) => {
       backgroundPrompt: draft.imageBackgroundPrompt || draft.imagePrompt || textPrompt,
       searchKeywords: draft.imageSearchKeywords,
       overlayText: draft.imageOverlayText,
-      sourceImageUrl: draft.interestingQuestion?.sourceImageUrl || draft.realWorldPhenomenon?.sourceImageUrl || "",
-      sourcePageUrl: draft.interestingQuestion?.sourceUrl || draft.realWorldPhenomenon?.sourceUrl || "",
+      sourceImageUrl: selectedNewsArticle?.imageUrl || draft.interestingQuestion?.sourceImageUrl || draft.realWorldPhenomenon?.sourceImageUrl || "",
+      sourcePageUrl: selectedNewsArticle?.url || draft.interestingQuestion?.sourceUrl || draft.realWorldPhenomenon?.sourceUrl || "",
+      sourceImageData: selectedNewsArticle?.sourceImage,
       textPrompt,
     });
     const finalContent = mergeCaptionAndHashtags(draft.caption, draft.hashtags);
     const isApplyingKnowledgePost = isApplyingKnowledge(typeName);
     const isInterestingQuestionPost = isInterestingQuestion(typeName);
     const isRealWorldPhenomenonPost = isRealWorldPhenomenon(typeName);
+    const isNewsPost = isNewsType(typeName);
     const reelNote = isApplyingKnowledgePost && draft.reel
       ? [
         "Reel draft:",
@@ -3792,6 +4170,18 @@ Deno.serve(async (req) => {
         draft.realWorldPhenomenon.coreIdea ? `Core idea: ${draft.realWorldPhenomenon.coreIdea}` : "",
       ].filter(Boolean).join("\n")
       : "";
+    const newsNote = isNewsPost && selectedNewsArticle
+      ? [
+        "Tin tức Giáo dục Việt Nam:",
+        `Tiêu đề nguồn: ${selectedNewsArticle.title}`,
+        `URL nguồn: ${selectedNewsArticle.url}`,
+        `Xuất bản: ${selectedNewsArticle.publishedAt}`,
+        selectedNewsArticle.author ? `Tác giả: ${selectedNewsArticle.author}` : "",
+        `Ảnh nguồn: ${selectedNewsArticle.imageUrl}`,
+        selectedNewsArticle.mostReadRank ? `Xếp hạng Đọc nhiều: ${selectedNewsArticle.mostReadRank}` : "",
+        `Điểm quan tâm nội bộ: ${selectedNewsArticle.interestScore}`,
+      ].filter(Boolean).join("\n")
+      : "";
     const finalNote = [
       draft.quoteEn ? `Quote EN: ${draft.quoteEn}` : "",
       draft.quoteVi ? `Quote VI: ${draft.quoteVi}` : "",
@@ -3802,14 +4192,16 @@ Deno.serve(async (req) => {
       reelSeriesNote,
       interestingQuestionNote,
       realWorldPhenomenonNote,
+      newsNote,
       post.internal_note,
     ].filter(Boolean).join("\n\n").trim() || null;
 
     const rows = await patchJson<Array<JsonRecord>>(`facebook_scheduled_posts?id=eq.${encodeURIComponent(postId)}`, {
       content: finalContent,
+      ...(selectedNewsArticle ? { link_url: selectedNewsArticle.url } : {}),
       image_url: generatedImage.imageUrl,
       internal_note: finalNote,
-      metadata: isApplyingKnowledgePost || isInterestingQuestionPost || isRealWorldPhenomenonPost
+      metadata: isApplyingKnowledgePost || isInterestingQuestionPost || isRealWorldPhenomenonPost || isNewsPost
         ? {
           ...parseMetadata(post.metadata),
           ...(isApplyingKnowledgePost
@@ -3851,6 +4243,23 @@ Deno.serve(async (req) => {
                 source_image_url: draft.realWorldPhenomenon?.sourceImageUrl || "",
                 phenomenon_fingerprint: draft.realWorldPhenomenon?.phenomenonFingerprint || "",
                 updated_at: new Date().toISOString(),
+              },
+            }
+            : {}),
+          ...(isNewsPost && selectedNewsArticle
+            ? {
+              education_news: {
+                source_name: "Tạp chí điện tử Giáo dục Việt Nam",
+                source_url: selectedNewsArticle.url,
+                source_title: selectedNewsArticle.title,
+                source_image_url: selectedNewsArticle.imageUrl,
+                published_at: selectedNewsArticle.publishedAt,
+                author: selectedNewsArticle.author,
+                window_hours: 24,
+                most_read_rank: selectedNewsArticle.mostReadRank,
+                interest_score: selectedNewsArticle.interestScore,
+                skipped: false,
+                selected_at: new Date().toISOString(),
               },
             }
             : {}),
