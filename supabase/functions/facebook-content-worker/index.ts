@@ -73,6 +73,24 @@ async function updateJob(jobId: string, patch: JsonRecord) {
   });
 }
 
+async function markPostGenerationFailed(postId: string, message: string) {
+  const post = await loadPost(postId).catch(() => null);
+  const hasContent = Boolean(
+    String(post?.content || "").trim()
+    || String(post?.link_url || "").trim()
+    || String(post?.image_url || "").trim()
+  );
+  if (!post?.id || hasContent) return;
+  await restJson<JsonRecord[]>(`facebook_scheduled_posts?id=eq.${encodeURIComponent(postId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      ai_status: "error",
+      ai_error: message.slice(0, 4000),
+      updated_at: new Date().toISOString(),
+    }),
+  });
+}
+
 async function invokeGemini(postId: string) {
   const key = serviceRoleKey();
   const res = await fetch(`${env("SUPABASE_URL")}/functions/v1/facebook-ai-draft`, {
@@ -166,6 +184,9 @@ Deno.serve(async (req) => {
         locked_at: null,
         last_error: message.slice(0, 4000),
       }).catch(() => {});
+      if (terminal && job.post_id) {
+        await markPostGenerationFailed(String(job.post_id), message).catch(() => {});
+      }
     }
     console.error("[Facebook content worker]", message);
     return jsonResponse({ error: message, job_id: job?.id || null }, message.includes("Unauthorized") ? 401 : 500);

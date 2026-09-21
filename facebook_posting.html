@@ -4609,64 +4609,31 @@ async function generateWeekDrafts(){
   const btn = $("generateWeekDraftsBtn");
   const oldText = btn.textContent;
   const weekStart = dateKey(S.weekStart);
-  const weekEnd = dateKey(addDays(S.weekStart, 6));
-  const isGeneratablePost = post =>
-      post.page_id === S.activePageId
-      && post.scheduled_date >= weekStart
-      && post.scheduled_date <= weekEnd
-      && !["scheduled", "published", "cancelled"].includes(String(post.status || ""))
-      && !isDeprecatedProblemTypeName(typeName(post.post_type_id))
-      && !postHasContent(post);
-  const initialTargets = S.posts
-    .filter(post => isGeneratablePost(post))
-    .sort((a, b) => {
-      const ap = isPairStarterType(a.post_type_id) ? 0 : isLearningMethodType(a.post_type_id) ? 2 : 1;
-      const bp = isPairStarterType(b.post_type_id) ? 0 : isLearningMethodType(b.post_type_id) ? 2 : 1;
-      return ap - bp || new Date(a.scheduled_at) - new Date(b.scheduled_at);
-    });
-  if (!initialTargets.length) {
-    showStatus("info", "Tuần này không còn bài đăng trống nào cần Gemini tạo nội dung.");
+  if (!S.activePageId) {
+    showStatus("err", "Vui lòng chọn fanpage trước khi tạo nội dung tuần.");
     return;
   }
-  const errors = [];
-  let done = 0;
-  let skipped = 0;
   try {
     btn.disabled = true;
     $("clearWeekDraftsBtn").disabled = true;
-    showStatus("info", `Bắt đầu tạo ${initialTargets.length} bài đăng bằng Gemini. Hệ thống sẽ chạy từng bài một và tự lưu nháp.`);
-    for (const target of initialTargets) {
-      const current = S.posts.find(post => String(post.id) === String(target.id)) || target;
-      if (postHasContent(current) || ["scheduled", "published", "cancelled"].includes(String(current.status || ""))) {
-        skipped += 1;
-        continue;
-      }
-      done += 1;
-      const label = `${typeName(current.post_type_id)} • ${formatDateTime(new Date(current.scheduled_at))}`;
-      btn.textContent = `Đang tạo ${done}/${initialTargets.length}...`;
-      showStatus("info", `Đang tạo ${done}/${initialTargets.length}: ${label}`);
-      try {
-        const data = await generateDraftForExistingPost(current);
-        if (data?.related_post) {
-          showStatus("info", `Đã tạo ${done}/${initialTargets.length}: ${label}. Gemini cũng đã tạo bài Learning Method đi kèm.`);
-        }
-      } catch (error) {
-        errors.push(`${label}: ${error.message || String(error)}`);
-        await sb.from("facebook_scheduled_posts")
-          .update({ status: "error", ai_status: "error", ai_error: error.message || String(error), updated_at: new Date().toISOString() })
-          .eq("id", current.id);
-      }
-      renderWeeklyCalendar();
-      renderTodo();
-    }
+    btn.textContent = "Đang đưa vào hàng đợi...";
+    showStatus("info", "Đang gửi các bài trống của tuần lên máy chủ. Bạn có thể rời trang ngay sau khi nhận thông báo xác nhận.");
+    const { data, error } = await sb.rpc("enqueue_facebook_week_content", {
+      p_page_id: S.activePageId,
+      p_week_start: weekStart,
+    });
+    if (error) throw error;
     await loadData();
-    const successCount = done - errors.length;
-    const skippedText = skipped ? ` (${skipped} bài đã được tạo/cập nhật kèm bài khác nên bỏ qua).` : "";
-    if (errors.length) {
-      showStatus("err", `Đã tạo xong ${successCount}/${initialTargets.length} bài.${skippedText} Có ${errors.length} bài lỗi:\n${errors.slice(0, 5).join("\n")}${errors.length > 5 ? "\n..." : ""}`);
-    } else {
-      showStatus("ok", `Đã tạo và lưu nháp xong ${successCount}/${initialTargets.length} bài đăng cho tuần này.${skippedText}`);
+    const eligible = Number(data?.eligible_posts || 0);
+    const enqueued = Number(data?.newly_enqueued_posts || 0);
+    const pending = Number(data?.pending_posts || 0);
+    if (!eligible && !pending) {
+      showStatus("info", "Tuần này không còn bài đăng trống nào cần Gemini tạo nội dung. Bài Tin tức chỉ được tạo đúng ngày đăng.");
+      return;
     }
+    const alreadyQueued = Math.max(0, pending - enqueued);
+    const alreadyText = alreadyQueued ? ` ${alreadyQueued} bài đã nằm trong hàng đợi từ trước.` : "";
+    showStatus("ok", `Đã giao ${pending} bài cho máy chủ tạo và tự lưu nháp.${alreadyText} Bạn có thể đóng trang hoặc tắt máy; mở lại sau để xem kết quả. Bài Tin tức sẽ chỉ được tạo đúng ngày đăng.`);
   } finally {
     btn.disabled = false;
     $("clearWeekDraftsBtn").disabled = false;
