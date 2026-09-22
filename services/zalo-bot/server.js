@@ -139,17 +139,18 @@ async function checkQueuedParent(job) {
         result.invited = true;
         result.status = 'invited';
       }
-      if (result.status === 'invited' && !job.greeting_attempted_at
-        && (result.invited || job.invitation_sent_at)) {
-        await gatewayRequest({ action: 'markParentAttempt', parentId: job.parent_id,
-          phone: job.phone, kind: 'greeting' });
-        await zaloApi.sendMessage(buildParentGreeting(job.student_name, job.parent_id), result.uid);
-        result.greeted = true;
-      }
+    }
+    if (!job.greeting_attempted_at && (result.status === 'friend' ||
+      (result.status === 'invited' && (result.invited || job.invitation_sent_at)))) {
+      await gatewayRequest({ action: 'markParentAttempt', parentId: job.parent_id,
+        phone: job.phone, kind: 'greeting' });
+      await zaloApi.sendMessage(buildParentGreeting(job.student_name, job.parent_id), result.uid);
+      result.greeted = true;
     }
   } catch (error) {
     result.status = isZaloLimitError(error) ? 'rate_limited'
-      : (result.invited || job.invitation_sent_at ? 'invited' : 'error');
+      : (result.status === 'friend' ? 'friend'
+        : (result.invited || job.invitation_sent_at ? 'invited' : 'error'));
     result.error = String(error?.message || error);
     console.warn('[ZaloBot] Kiểm tra phụ huynh:', result.error);
   }

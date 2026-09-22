@@ -610,11 +610,13 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
         <div class="s-chip">Tổng: <b id="sStatTotal">0</b></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" id="sZaloBulkStart" type="button" onclick="sStartZaloBulkRun()">Kiểm tra & kết nối Zalo cho tất cả PH</button>
         <button class="btn btn-outline btn-sm" onclick="sDownloadImportTemplate()">🧾 Tải file mẫu</button>
         <button class="btn btn-primary btn-sm" onclick="sPickImportFile()">📤 Nhập Excel</button>
         <button class="btn btn-outline btn-sm" onclick="sExportExcel()">📥 Xuất Excel</button>
       </div>
     </div>
+    <div id="sZaloBulkStatus" aria-live="polite" style="margin-bottom:14px;font-size:.82rem"></div>
     <div id="sImportResult" class="s-import-result" style="margin-bottom:14px"></div>
     <input id="sImportFile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="sHandleImportFile(event)">
     <div class="s-search">
@@ -1703,6 +1705,7 @@ document.getElementById('tSMon').addEventListener('change', tApplyFilter);
    HỌC SINH
 ══════════════════════════════ */
 let _sAll=[], _sFilt=[], _sPage=1, _sSortF='full_name', _sSortD=1, _sEditId=null, _sLinkedParents={}, _sMobileStatus={}, _sZaloContacts={};
+let _sZaloBulkBusy=false, _sZaloBulkTimer=null;
 const S_PAGE=15;
 
 function sRmVN(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đĐ]/g,m=>m==='đ'?'d':'D').toLowerCase(); }
@@ -1844,8 +1847,59 @@ async function loadStudents(){
   await sLoadLinkedParentsForStudents(_sAll);
   await sLoadMobileStatusesForStudents(_sAll);
   await sLoadZaloContactsForStudents();
+  await sLoadZaloBulkStatus();
+  if(!_sZaloBulkTimer) _sZaloBulkTimer=setInterval(()=>{
+    if(document.getElementById('students')?.classList.contains('active')) sLoadZaloBulkStatus();
+  },15000);
   document.getElementById('sStatTotal').textContent = _sAll.length;
   sApplyFilter();
+}
+
+async function sLoadZaloBulkStatus(){
+  const box=document.getElementById('sZaloBulkStatus');
+  if(!box) return;
+  const {data:state,error}=await sb.from('zalo_automation_state')
+    .select('paused,reason,bulk_run_id,bulk_started_at,bulk_total').eq('id',1).maybeSingle();
+  if(error){box.textContent='Không tải được tiến độ Zalo: '+error.message;return;}
+  if(!state?.bulk_run_id){box.textContent='Chưa có đợt kiểm tra Zalo hàng loạt.';return;}
+  const {data:contacts,error:contactError}=await sb.from('zalo_parent_contacts')
+    .select('status,bulk_checked_at').eq('bulk_run_id',state.bulk_run_id);
+  if(contactError){box.textContent='Không tải được tiến độ Zalo: '+contactError.message;return;}
+  const completed=(contacts||[]).filter(row=>row.bulk_checked_at).length;
+  const counts=(contacts||[]).filter(row=>row.bulk_checked_at).reduce((acc,row)=>{
+    acc[row.status]=(acc[row.status]||0)+1; return acc;
+  },{});
+  const total=state.bulk_total||0;
+  const active=total>0 && completed<total;
+  const phase=state.paused && active?'Đang tạm dừng':active?'Đang chạy ngầm':'Đã hoàn thành';
+  box.innerHTML=`<div style="border:1px solid #cbd5e1;padding:10px;background:#f8fafc">
+    <strong>${phase}</strong> · Đã kiểm tra ${completed}/${total} phụ huynh
+    <span style="color:var(--ink-mid)"> · Đã kết bạn ${counts.friend||0} · Đã mời ${counts.invited||0} · Không tìm thấy ${counts.not_found||0} · Lỗi ${counts.error||0}</span>
+    ${state.paused&&active?`<span style="color:#b91c1c"> · ${esc(state.reason||'Đã tạm dừng')}</span>`:''}
+    ${active?`<button class="btn btn-outline btn-sm" type="button" onclick="sToggleZaloBulkRun(${state.paused?'false':'true'})" style="margin-left:8px">${state.paused?'Tiếp tục':'Tạm dừng'}</button>`:''}
+  </div>`;
+}
+
+async function sStartZaloBulkRun(){
+  if(_sZaloBulkBusy) return;
+  if(!confirm('Kiểm tra và kết nối Zalo cho tất cả phụ huynh đủ điều kiện? Bot sẽ chạy ngầm khi laptop online, theo nhịp giãn cách hiện có. Đóng trang web không làm dừng đợt xử lý.')) return;
+  _sZaloBulkBusy=true;
+  const button=document.getElementById('sZaloBulkStart');
+  if(button) button.disabled=true;
+  try{
+    const {data,error}=await sb.rpc('start_zalo_parent_bulk_run');
+    if(error) throw error;
+    await sLoadZaloBulkStatus();
+    toast(data?.already_running?'Đợt kiểm tra hiện tại vẫn đang chạy.':`Đã xếp hàng ${data?.total||0} phụ huynh. Có thể đóng web.` ,4000);
+  }catch(error){alert('Không bắt đầu được: '+error.message);}
+  finally{_sZaloBulkBusy=false;if(button) button.disabled=false;}
+}
+
+async function sToggleZaloBulkRun(pause){
+  const rpc=pause?'pause_zalo_parent_bulk_run':'resume_zalo_parent_automation';
+  const {error}=await sb.rpc(rpc);
+  if(error) return alert('Không đổi được trạng thái: '+error.message);
+  await sLoadZaloBulkStatus();
 }
 
 async function sLoadLinkedParentsForStudents(students){
