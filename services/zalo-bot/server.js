@@ -130,14 +130,21 @@ async function checkQueuedParent(job) {
       await zaloApi.acceptFriendRequest(result.uid);
       result.status = 'friend';
     } else {
-      result.status = relationship.is_requesting === 1 || job.invitation_sent_at ? 'invited' : 'not_friend';
+      result.status = relationship.is_requesting === 1 ? 'invited' : 'not_friend';
       if (result.status === 'not_friend' && !job.invitation_attempted_at) {
         await gatewayRequest({ action: 'markParentAttempt', parentId: job.parent_id,
           phone: job.phone, kind: 'invite' });
         await zaloApi.sendFriendRequest(
           `MindUp xin chào Quý phụ huynh${job.student_name ? ` của em ${job.student_name}` : ''}. Mong anh/chị đồng ý kết bạn để tiện trao đổi việc học của con.`, result.uid);
+        const confirmed = await zaloApi.getFriendRequestStatus(result.uid);
+        if (confirmed?.is_requesting !== 1 && confirmed?.is_friend !== 1) {
+          result.status = 'error';
+          throw new Error('Zalo chưa xác nhận lời mời sau khi API báo gửi; cần kiểm tra thủ công');
+        }
         result.invited = true;
-        result.status = 'invited';
+        result.status = confirmed.is_friend === 1 ? 'friend' : 'invited';
+      } else if (result.status === 'not_friend' && job.invitation_attempted_at) {
+        result.error = 'Lời mời từng được thử gửi nhưng Zalo không còn báo đang chờ; cần kiểm tra thủ công';
       }
     }
     if (!job.greeting_attempted_at && (result.status === 'friend' ||
@@ -149,8 +156,8 @@ async function checkQueuedParent(job) {
     }
   } catch (error) {
     result.status = isZaloLimitError(error) ? 'rate_limited'
-      : (result.status === 'friend' ? 'friend'
-        : (result.invited || job.invitation_sent_at ? 'invited' : 'error'));
+      : (result.status === 'friend' || result.status === 'invited' || result.status === 'not_friend'
+        ? result.status : 'error');
     result.error = String(error?.message || error);
     console.warn('[ZaloBot] Kiểm tra phụ huynh:', result.error);
   }
@@ -445,6 +452,7 @@ async function initZaloClient(forceQr = false) {
           if (api) {
             zaloApi = api;
             botStatus = 'connected';
+            userInfo = { uid: api.getOwnId() };
             qrCodeDataUrl = null;
             console.log("[ZaloBot] ✓ Đăng nhập bằng session cũ thành công!");
             syncFriendsList().catch(console.error);
@@ -490,6 +498,7 @@ async function initZaloClient(forceQr = false) {
       if (api) {
         zaloApi = api;
         botStatus = 'connected';
+        userInfo = { uid: api.getOwnId() };
         qrCodeDataUrl = null;
         console.log("[ZaloBot] 🎉 Đăng nhập Zalo thành công! Bot đã sẵn sàng hoạt động.");
         syncFriendsList().catch(console.error);
@@ -799,6 +808,23 @@ app.get('/api/status', (req, res) => {
     },
     config: botConfig
   });
+});
+
+app.get('/api/zalo-diagnostics', async (req, res) => {
+  if (!zaloApi || botStatus !== 'connected') return res.status(503).json({ error: 'Zalo offline' });
+  try {
+    const [requests, account] = await Promise.all([
+      zaloApi.getSentFriendRequest(), zaloApi.fetchAccountInfo()
+    ]);
+    const entries = Object.values(requests || {});
+    res.json({ accountId: zaloApi.getOwnId(), pendingFriendRequests: entries.length,
+      accountName: account?.profile?.displayName || account?.profile?.zaloName || null,
+      accountPhoneSuffix: String(account?.profile?.phoneNumber || '').slice(-4) || null,
+      latestRequestAt: entries.length ? Math.max(...entries.map(item => Number(item.fReqInfo?.time || 0))) : null });
+  } catch (error) {
+    if (error?.code === 112) return res.json({ accountId: zaloApi.getOwnId(), pendingFriendRequests: 0 });
+    res.status(502).json({ error: String(error?.message || error) });
+  }
 });
 
 // 2. Lấy mã QR đăng nhập

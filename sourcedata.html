@@ -1863,18 +1863,21 @@ async function sLoadZaloBulkStatus(){
   if(error){box.textContent='Không tải được tiến độ Zalo: '+error.message;return;}
   if(!state?.bulk_run_id){box.textContent='Chưa có đợt kiểm tra Zalo hàng loạt.';return;}
   const {data:contacts,error:contactError}=await sb.from('zalo_parent_contacts')
-    .select('status,bulk_checked_at').eq('bulk_run_id',state.bulk_run_id);
+    .select('status,bulk_checked_at,invitation_sent_at,greeting_sent_at').eq('bulk_run_id',state.bulk_run_id);
   if(contactError){box.textContent='Không tải được tiến độ Zalo: '+contactError.message;return;}
   const completed=(contacts||[]).filter(row=>row.bulk_checked_at).length;
   const counts=(contacts||[]).filter(row=>row.bulk_checked_at).reduce((acc,row)=>{
     acc[row.status]=(acc[row.status]||0)+1; return acc;
   },{});
   const total=state.bulk_total||0;
+  const startedAt=new Date(state.bulk_started_at).getTime();
+  const newInvites=(contacts||[]).filter(row=>row.invitation_sent_at && new Date(row.invitation_sent_at).getTime()>=startedAt).length;
+  const newGreetings=(contacts||[]).filter(row=>row.greeting_sent_at && new Date(row.greeting_sent_at).getTime()>=startedAt).length;
   const active=total>0 && completed<total;
   const phase=state.paused && active?'Đang tạm dừng':active?'Đang chạy ngầm':'Đã hoàn thành';
   box.innerHTML=`<div style="border:1px solid #cbd5e1;padding:10px;background:#f8fafc">
     <strong>${phase}</strong> · Đã kiểm tra ${completed}/${total} phụ huynh
-    <span style="color:var(--ink-mid)"> · Đã kết bạn ${counts.friend||0} · Đã mời ${counts.invited||0} · Không tìm thấy ${counts.not_found||0} · Lỗi ${counts.error||0}</span>
+    <span style="color:var(--ink-mid)"> · Mới gửi trong đợt: ${newInvites} lời mời, ${newGreetings} tin chào · Trạng thái hiện tại: ${counts.friend||0} đã kết bạn, ${counts.invited||0} đang chờ kết bạn, ${counts.not_found||0} không tìm thấy, ${counts.error||0} lỗi</span>
     ${state.paused&&active?`<span style="color:#b91c1c"> · ${esc(state.reason||'Đã tạm dừng')}</span>`:''}
     ${active?`<button class="btn btn-outline btn-sm" type="button" onclick="sToggleZaloBulkRun(${state.paused?'false':'true'})" style="margin-left:8px">${state.paused?'Tiếp tục':'Tạm dừng'}</button>`:''}
   </div>`;
