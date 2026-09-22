@@ -2,18 +2,141 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3456;
+const HOST = '127.0.0.1';
+const GATEWAY_URL = process.env.ZALO_GATEWAY_URL || '';
+const GATEWAY_TOKEN = process.env.ZALO_GATEWAY_TOKEN || '';
+const ALLOWED_ORIGINS = new Set([
+  'https://www.mindup.edu.vn',
+  'https://mindup.edu.vn',
+  'https://tuduytoandien.vercel.app',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000'
+]);
 
-app.use(cors());
+app.use(cors({ origin(origin, callback) {
+  callback(null, !origin || ALLOWED_ORIGINS.has(origin));
+} }));
+app.use((req, res, next) => {
+  if (!['127.0.0.1', 'localhost'].includes(String(req.headers.host || '').split(':')[0])) {
+    return res.status(403).json({ error: 'Local access only' });
+  }
+  next();
+});
 app.use(express.json());
+let gatewayBusy = false;
+let gatewayListening = false;
+let nextGatewaySendAt = 0;
+const pendingIncoming = new Map();
+let flushingIncoming = false;
+
+async function gatewayRequest(payload) {
+  if (!GATEWAY_URL || !GATEWAY_TOKEN) throw new Error('Zalo gateway is not configured');
+  const response = await fetch(GATEWAY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-zalo-gateway-token': GATEWAY_TOKEN },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(15000)
+  });
+  if (!response.ok) throw new Error(`Gateway HTTP ${response.status}`);
+  return response.json();
+}
+
+async function syncGatewayOutbox() {
+  if (gatewayBusy || !zaloApi || !GATEWAY_URL || !GATEWAY_TOKEN
+    || campaignStatus !== 'idle' || Date.now() < nextGatewaySendAt) return;
+  gatewayBusy = true;
+  try {
+    const { job } = await gatewayRequest({ action: 'claim' });
+    if (!job) return;
+    nextGatewaySendAt = Date.now() + getRandomDelay(botConfig.minDelaySeconds, botConfig.maxDelaySeconds) * 1000;
+    try {
+      await zaloApi.sendMessage(job.content, job.zalo_uid);
+      try {
+        await gatewayRequest({ action: 'finish', jobId: job.job_id, status: 'sent' });
+      } catch (ackError) {
+        // An unacknowledged send must never be retried automatically.
+        console.error('[ZaloBot] Tin đã gửi nhưng chưa xác nhận được:', ackError);
+      }
+    } catch (error) {
+      await gatewayRequest({ action: 'finish', jobId: job.job, status: 'uncertain', error: String(error?.message || error) });
+    }
+  } catch (error) {
+    console.warn('[ZaloBot] Không đồng bộ được hàng đợi:', error?.message || error);
+  } finally {
+    gatewayBusy = false;
+  }
+}
+
+async function flushIncoming() {
+  if (flushingIncoming || !GATEWAY_URL || !GATEWAY_TOKEN || !pendingIncoming.size) return;
+  flushingIncoming = true;
+  try {
+    for (const [key, payload] of pendingIncoming) {
+      try {
+        await gatewayRequest(payload);
+        pendingIncoming.delete(key);
+        persistIncoming();
+      } catch (error) {
+        console.warn('[ZaloBot] Chờ gửi lại tin nhận:', error?.message || error);
+        break;
+      }
+    }
+  } finally {
+    flushingIncoming = false;
+  }
+}
+
+function startGatewayListener() {
+  if (!zaloApi || gatewayListening || !GATEWAY_URL || !GATEWAY_TOKEN) return;
+  gatewayListening = true;
+  zaloApi.listener.on('message', (message) => {
+    if (message.isSelf || message.type !== 0) return;
+    const content = message.data?.content;
+    if (typeof content !== 'string' || !content.trim()) return;
+    const externalId = String(message.data?.msgId || message.data?.cliMsgId || '');
+    const zaloUid = String(message.threadId || '');
+    if (!externalId || !zaloUid) return;
+    const payload = {
+      action: 'incoming', externalId: `${zaloUid}:${externalId}`, zaloUid,
+      content, displayName: String(message.data?.dName || '')
+    };
+    if (pendingIncoming.size >= 1000) {
+      console.error('[ZaloBot] Hàng đợi tin nhận đầy, cần kiểm tra kết nối gateway');
+      return;
+    }
+    pendingIncoming.set(payload.externalId, payload);
+    try { persistIncoming(); } catch (error) {
+      console.error('[ZaloBot] Không lưu được tin nhận trên máy:', error);
+    }
+    flushIncoming().catch(console.error);
+  });
+  zaloApi.listener.on('error', error => console.warn('[ZaloBot] Zalo listener:', error));
+  zaloApi.listener.start({ retryOnClose: true });
+}
 
 // Session and Storage setup
 const SESSION_DIR = path.join(__dirname, 'session');
 const SESSION_FILE = path.join(SESSION_DIR, 'session.json');
+const INCOMING_FILE = path.join(SESSION_DIR, 'pending-incoming.json');
 if (!fs.existsSync(SESSION_DIR)) {
   fs.mkdirSync(SESSION_DIR, { recursive: true });
+}
+try {
+  for (const payload of JSON.parse(fs.readFileSync(INCOMING_FILE, 'utf8'))) {
+    if (payload?.externalId) pendingIncoming.set(payload.externalId, payload);
+  }
+} catch (error) {
+  if (error.code !== 'ENOENT') console.error('[ZaloBot] Không đọc được tin nhận đang chờ:', error);
+}
+
+function persistIncoming() {
+  const tempFile = `${INCOMING_FILE}.tmp`;
+  fs.writeFileSync(tempFile, JSON.stringify([...pendingIncoming.values()]), { mode: 0o600 });
+  fs.renameSync(tempFile, INCOMING_FILE);
 }
 
 // Bot State
@@ -179,6 +302,7 @@ async function initZaloClient(forceQr = false) {
             qrCodeDataUrl = null;
             console.log("[ZaloBot] ✓ Đăng nhập bằng session cũ thành công!");
             syncFriendsList().catch(console.error);
+            startGatewayListener();
             isLoggingIn = false;
             return;
           }
@@ -223,6 +347,7 @@ async function initZaloClient(forceQr = false) {
         qrCodeDataUrl = null;
         console.log("[ZaloBot] 🎉 Đăng nhập Zalo thành công! Bot đã sẵn sàng hoạt động.");
         syncFriendsList().catch(console.error);
+        startGatewayListener();
       }
     }).catch(err => {
       console.warn("[ZaloBot] Kết thúc lượt quét QR:", err?.message || err);
@@ -558,6 +683,8 @@ app.post('/api/login-qr', async (req, res) => {
 // 4. Đăng xuất Zalo
 app.post('/api/logout', (req, res) => {
   try {
+    try { zaloApi?.listener?.stop(); } catch (_) {}
+    gatewayListening = false;
     if (fs.existsSync(SESSION_FILE)) {
       fs.unlinkSync(SESSION_FILE);
     }
@@ -652,7 +779,7 @@ app.post('/api/test-send', async (req, res) => {
 });
 
 // Khởi động server
-app.listen(PORT, () => {
+app.listen(PORT, HOST, () => {
   console.log(`=======================================================`);
   console.log(`🤖 Dịch vụ Zalo Bot MindUp đang chạy tại: http://localhost:${PORT}`);
   console.log(`🛡️  Chế độ Anti-Ban: Giãn cách ngẫu nhiên ${botConfig.minDelaySeconds}s - ${botConfig.maxDelaySeconds}s/tin`);
@@ -660,4 +787,6 @@ app.listen(PORT, () => {
 
   // Tự động kiểm tra session Zalo khi khởi động
   initZaloClient().catch(console.error);
+  setInterval(syncGatewayOutbox, 12000).unref();
+  setInterval(flushIncoming, 10000).unref();
 });

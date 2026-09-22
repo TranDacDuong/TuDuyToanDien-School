@@ -1,0 +1,2 @@
+[functions.zalo-gateway]
+verify_jwt = false

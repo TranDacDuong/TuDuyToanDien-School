@@ -9,5 +9,6 @@ supabase/.temp/
 .codex-tools/
 services/zalo-bot/node_modules/
 services/zalo-bot/session/
+services/zalo-bot/.env
 session/
 *.session.json
