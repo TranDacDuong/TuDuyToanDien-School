@@ -2192,6 +2192,11 @@ Nhập số tiền hoàn lại (>0):`,
   let zaloBotStatus = { botStatus: "checking", hasQr: false, userInfo: null, campaign: null };
   let zaloModalPollingTimer = null;
   let currentZaloCampaignItems = [];
+  let zaloTuitionHistory = new Map();
+  let zaloParentContactStatus = new Map();
+  let zaloAutomationState = null;
+  let zaloHistoryFetchedAt = 0;
+  let zaloQueueBusy = false;
 
   const DEFAULT_ZALO_TEMPLATE = `Trung tâm MindUp xin chào Quý phụ huynh em {TenHS}! 🌸
 
@@ -2225,6 +2230,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     modal.style.display = "flex";
     prepareZaloCampaignList();
     renderZaloInitialLayout(); // Render khung và danh sách học sinh DUY NHẤT 1 LẦN
+    await loadZaloTuitionHistory();
     await checkZaloBotStatus();
     if (!zaloModalPollingTimer) {
       zaloModalPollingTimer = setInterval(checkZaloBotStatus, 2500);
@@ -2233,20 +2239,20 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
 
   function prepareZaloCampaignList() {
     const ym = monthPicker?.value || "";
-    const pending = (currentRows || []).filter(group => {
+    const rows = (currentRows || []).map(group => {
       const amountPaid = paymentMap[group.studentId]?.amount_paid || 0;
       const status = getStatus(group.amount, amountPaid);
-      return status === "unpaid" || status === "partial";
+      return { group, due: status === "unpaid" || status === "partial" };
     });
 
-    currentZaloCampaignItems = pending.map(group => {
+    currentZaloCampaignItems = rows.map(({ group, due }) => {
       const amountPaid = paymentMap[group.studentId]?.amount_paid || 0;
       const remaining = Math.max(0, Math.round(group.amount - amountPaid));
       const hasParent = group.parentContacts && group.parentContacts.length > 0;
       const parent = hasParent ? group.parentContacts[0] : null;
 
       const parentName = parent?.full_name || "Quý phụ huynh";
-      const rawPhone = parent?.phone || group.rawPhone || group.phone || "";
+      const rawPhone = parent?.phone || "";
       const cleanPhone = String(rawPhone).replace(/\D/g, "");
 
       const classNames = (group.classes || []).map(c => c.className).filter(Boolean).join(", ") || "Lớp học";
@@ -2271,6 +2277,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
 
       return {
         studentId: group.studentId,
+        parentId: parent?.id || null,
         studentName: group.studentName,
         hasParent,
         parentName,
@@ -2282,10 +2289,87 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
         remaining,
         transferMemo,
         qrUrl,
-        selected: true // Giữ trạng thái tích chọn riêng trong bộ nhớ
+        selected: due && Boolean(parent?.id && /^(0\d{9}|84\d{9})$/.test(cleanPhone) && paymentMap[group.studentId]?.id),
+        due
       };
     });
   }
+
+  function isZaloTuitionItemEligible(item) {
+    return Boolean(item?.due && item.parentId && /^(0\d{9}|84\d{9})$/.test(item.phone)
+      && paymentMap[item.studentId]?.id);
+  }
+
+  function zaloTuitionStatusLabel(status) {
+    return ({ queued: "Đang chờ bot", processing: "Đang gửi", not_found: "Không tìm thấy Zalo",
+      not_friend: "Chưa kết bạn", invited: "Đã gửi lời mời", greeted: "Đã gửi tin chào",
+      sent: "Đã gửi học phí", failed: "Gửi lỗi", uncertain: "Cần kiểm tra trên Zalo",
+      cancelled: "Đã hủy (đã thanh toán)" })[status] || "Đang đồng bộ";
+  }
+
+  function renderZaloTuitionHistoryCells() {
+    currentZaloCampaignItems.forEach((item, idx) => {
+      const cell = document.getElementById(`zaloActionCell-${idx}`);
+      if (!cell) return;
+      const history = zaloTuitionHistory.get(`${item.studentId}:${item.parentId}`) || [];
+      const contact = zaloParentContactStatus.get(item.parentId);
+      const contactLabel = contact ? ({ friend: "Đã kết bạn", invited: "Đã gửi lời mời",
+        not_found: "Không tìm thấy Zalo", not_friend: "Chưa kết bạn", error: "Cần kiểm tra lỗi",
+        rate_limited: "Zalo tạm giới hạn" })[contact.status] || "Đang đồng bộ" : "Đang đồng bộ";
+      const rows = history.map(entry => {
+        const time = entry.updated_at ? new Date(entry.updated_at).toLocaleString("vi-VN") : "";
+        const warning = entry.error_message ? ` · ${esc(entry.error_message)}` : "";
+        return `<div style="font-size:11px;color:#475569;line-height:1.45" title="${esc(entry.error_message || "")}">
+          Lần ${entry.attempt_no}: <b>${zaloTuitionStatusLabel(entry.status)}</b> · ${esc(time)}${warning}</div>`;
+      }).join("");
+      const action = isZaloTuitionItemEligible(item)
+        ? `<button type="button" onclick="sendSingleZaloTest(${idx})" style="margin-top:5px;border:1px solid #cbd5e1;background:#fff;padding:4px 8px;border-radius:6px;cursor:pointer">Xếp hàng</button>` : "";
+      cell.innerHTML = `<div style="font-size:11px;color:#64748b">PH: ${esc(contactLabel)}</div>${rows}${action}`;
+    });
+  }
+
+  async function loadZaloTuitionHistory() {
+    const ym = monthPicker?.value || "";
+    const studentIds = [...new Set(currentZaloCampaignItems.map(item => item.studentId).filter(Boolean))];
+    const parentIds = [...new Set(currentZaloCampaignItems.map(item => item.parentId).filter(Boolean))];
+    zaloTuitionHistory = new Map();
+    zaloParentContactStatus = new Map();
+    try {
+      if (studentIds.length && /^20\d{2}-(0[1-9]|1[0-2])$/.test(ym)) {
+        const { data, error } = await getSb().from("zalo_tuition_deliveries")
+          .select("student_id,parent_id,attempt_no,status,created_at,updated_at,error_message,qr_sent_at")
+          .in("student_id", studentIds).eq("month", `${ym}-01`).order("attempt_no");
+        if (error) throw error;
+        (data || []).forEach(row => {
+          const key = `${row.student_id}:${row.parent_id}`;
+          if (!zaloTuitionHistory.has(key)) zaloTuitionHistory.set(key, []);
+          zaloTuitionHistory.get(key).push(row);
+        });
+      }
+      if (parentIds.length) {
+        const { data, error } = await getSb().from("zalo_parent_contacts")
+          .select("parent_id,status,last_checked_at,greeting_sent_at")
+          .in("parent_id", parentIds);
+        if (error) throw error;
+        zaloParentContactStatus = new Map((data || []).map(row => [row.parent_id, row]));
+      }
+      const { data: state } = await getSb().from("zalo_automation_state")
+        .select("paused,reason,updated_at").eq("id", 1).maybeSingle();
+      zaloAutomationState = state || null;
+      zaloHistoryFetchedAt = Date.now();
+      renderZaloTuitionHistoryCells();
+      updateZaloDynamicStatus();
+    } catch (error) {
+      console.warn("Không tải được lịch sử Zalo học phí:", error);
+    }
+  }
+
+  window.resumeZaloParentAutomation = async function () {
+    if (!confirm("Tiếp tục kiểm tra/kết bạn Zalo tự động sau khi đã xem lại giới hạn tài khoản?")) return;
+    const { error } = await getSb().rpc("resume_zalo_parent_automation");
+    if (error) return alert("Không tiếp tục được: " + error.message);
+    await loadZaloTuitionHistory();
+  };
 
   async function checkZaloBotStatus() {
     try {
@@ -2299,6 +2383,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       zaloBotStatus = { botStatus: "offline", error: "Chưa kết nối bot" };
     }
     updateZaloDynamicStatus(); // CHỈ cập nhật thẻ trạng thái & tiến độ, KHÔNG chạm vào bảng
+    if (Date.now() - zaloHistoryFetchedAt > 15000) await loadZaloTuitionHistory();
   }
 
   window.requestZaloQr = async function () {
@@ -2322,9 +2407,11 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
 
   window.toggleSelectAllZalo = function (chkAll) {
     const isChecked = !!chkAll.checked;
-    currentZaloCampaignItems.forEach(item => { item.selected = isChecked; });
+    currentZaloCampaignItems.forEach(item => {
+      item.selected = isChecked && isZaloTuitionItemEligible(item);
+    });
     const checkboxes = document.querySelectorAll(".zalo-item-chk");
-    checkboxes.forEach(cb => { cb.checked = isChecked; });
+    checkboxes.forEach(cb => { cb.checked = isChecked && !cb.disabled; });
     updateZaloSelectedSummary();
   };
 
@@ -2332,7 +2419,8 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     if (currentZaloCampaignItems[idx]) {
       currentZaloCampaignItems[idx].selected = !!cb.checked;
     }
-    const allChecked = currentZaloCampaignItems.length > 0 && currentZaloCampaignItems.every(i => i.selected);
+    const eligible = currentZaloCampaignItems.filter(isZaloTuitionItemEligible);
+    const allChecked = eligible.length > 0 && eligible.every(i => i.selected);
     const chkAll = document.getElementById("zaloSelectAllChk");
     if (chkAll) chkAll.checked = allChecked;
     updateZaloSelectedSummary();
@@ -2345,52 +2433,43 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
   };
 
   window.startZaloCampaignAction = async function () {
-    if (zaloBotStatus.botStatus !== "connected") {
-      alert("Vui lòng kết nối tài khoản Zalo cá nhân trước khi bắt đầu chiến dịch.");
-      return;
-    }
-
     const selectedItems = currentZaloCampaignItems.filter(item => item.selected);
     if (!selectedItems.length) {
       alert("Vui lòng chọn ít nhất 1 phụ huynh để gửi nhắc học phí.");
       return;
     }
-
-    const templateText = document.getElementById("zaloTemplateText")?.value || DEFAULT_ZALO_TEMPLATE;
-    const itemsToSend = selectedItems.map(item => {
-      const message = fillZaloTemplate(templateText, item);
-      return {
-        studentId: item.studentId,
-        studentName: item.studentName,
-        parentName: item.parentName,
-        phone: item.phone,
-        className: item.className,
-        sessionsCount: item.sessionsCount,
-        amount: item.amount,
-        remaining: item.remaining,
-        transferMemo: item.transferMemo,
-        qrUrl: item.qrUrl,
-        messageText: message
-      };
-    });
-
-    if (!confirm(`Xác nhận bắt đầu gửi tin nhắn Zalo cho ${itemsToSend.length} phụ huynh?\n\n(Chế độ Anti-ban sẽ tự động giãn cách ngẫu nhiên 45s - 90s mỗi tin để bảo vệ tài khoản Zalo của bạn)`)) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`${ZALO_BOT_API}/start-campaign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: itemsToSend })
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "Lỗi khi bắt đầu chiến dịch");
-      await checkZaloBotStatus();
-    } catch (err) {
-      alert("Không thể khởi động chiến dịch: " + err.message);
-    }
+    await queueZaloTuitionItems(selectedItems);
   };
+
+  async function queueZaloTuitionItems(items) {
+    if (zaloQueueBusy) return;
+    const ym = monthPicker?.value || "";
+    if (!/^20\d{2}-(0[1-9]|1[0-2])$/.test(ym)) return alert("Tháng học phí không hợp lệ.");
+    if (items.some(item => !isZaloTuitionItemEligible(item))) {
+      return alert("Chỉ gửi cho PH đã liên kết và học phí còn nợ đã được lưu.");
+    }
+    const existing = items.filter(item => (zaloTuitionHistory.get(`${item.studentId}:${item.parentId}`) || []).length);
+    const repeatNote = existing.length ? `\n${existing.length} học sinh đã có lịch sử gửi trong tháng; lần này sẽ là lượt nhắc tiếp theo.` : "";
+    if (!confirm(`Xếp hàng gửi học phí tháng ${ym} cho ${items.length} học sinh?${repeatNote}\nBot sẽ xử lý khi laptop online.`)) return;
+    zaloQueueBusy = true;
+    try {
+      const template = document.getElementById("zaloTemplateText")?.value || DEFAULT_ZALO_TEMPLATE;
+      const payload = items.map(item => ({
+        request_key: crypto.randomUUID(), student_id: item.studentId, parent_id: item.parentId,
+        content: fillZaloTemplate(template, item), qr_url: item.qrUrl, remaining: item.remaining
+      }));
+      const { data, error } = await getSb().rpc("queue_zalo_tuition_deliveries_v2", {
+        p_month: ym, p_items: payload
+      });
+      if (error) throw error;
+      await loadZaloTuitionHistory();
+      alert(`Đã xếp hàng ${data || 0} thông báo học phí. Có thể đóng trang; tiến độ được lưu trên máy chủ.`);
+    } catch (error) {
+      alert("Không xếp hàng được: " + error.message);
+    } finally {
+      zaloQueueBusy = false;
+    }
+  }
 
   window.pauseZaloCampaignAction = async function () {
     await fetch(`${ZALO_BOT_API}/pause-campaign`, { method: "POST" }).catch(() => {});
@@ -2411,48 +2490,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
   window.sendSingleZaloTest = async function (idx) {
     const item = currentZaloCampaignItems[idx];
     if (!item) return;
-    const templateText = document.getElementById("zaloTemplateText")?.value || DEFAULT_ZALO_TEMPLATE;
-    const message = fillZaloTemplate(templateText, item);
-
-    if (!confirm(`Gửi thử tin nhắn Zalo tới SĐT ${item.phone} (PH em ${item.studentName})?`)) return;
-
-    try {
-      const res = await fetch(`${ZALO_BOT_API}/test-send`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phone: item.phone,
-          studentName: item.studentName,
-          messageText: message,
-          qrUrl: item.qrUrl
-        })
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "Lỗi khi gửi");
-
-      const cell = document.getElementById(`zaloActionCell-${idx}`);
-      if (data.result?.status === "friend_requested") {
-        if (cell) {
-          cell.innerHTML = `
-            <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
-              <span style="color:#b45309;background:#fef3c7;border:1px solid #fde68a;padding:2px 8px;border-radius:999px;font-weight:700;font-size:11px;display:inline-block">⚠️ Chưa kết bạn (Đã mời)</span>
-              <a href="tel:${item.phone}" style="color:#c2410c;background:#ffedd5;border:1px solid #fdba74;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:3px" title="Bấm để gọi điện">
-                📞 Gọi điện: ${item.phone}
-              </a>
-            </div>
-          `;
-        }
-        alert(`⚠️ Phụ huynh em ${item.studentName} (${item.phone}) chưa kết bạn Zalo với bạn!\n\nBot đã thực hiện:\n1. Gửi Lời mời kết bạn Zalo.\n2. Gửi tin nhắn chào hỏi thân thiện.\n\n👉 Thầy/Cô hãy gọi điện thoại cho phụ huynh (SĐT: ${item.phone}) để nhắc phụ huynh bấm "Đồng ý" kết bạn nhé!`);
-      } else {
-        if (cell) {
-          cell.innerHTML = `<span style="color:#16a34a;background:#dcfce7;border:1px solid #bbf7d0;padding:3px 8px;border-radius:999px;font-weight:700;font-size:11px;display:inline-block">✓ Đã gửi (Bạn bè)</span>`;
-        }
-        alert(`✓ Đã gửi tin nhắn học phí và mã QR thành công tới phụ huynh em ${item.studentName} (Đã là bạn bè)!`);
-      }
-      await checkZaloBotStatus();
-    } catch (err) {
-      alert("Lỗi khi gửi thử: " + err.message);
-    }
+    await queueZaloTuitionItems([item]);
   };
 
   function fillZaloTemplate(template, item) {
@@ -2479,31 +2517,31 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
 
     const rowsHtml = currentZaloCampaignItems.map((item, idx) => {
       const parentBadge = item.hasParent
-        ? `<span style="color:#0f766e;background:#ccfbf1;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600">PH: ${item.parentName}</span>`
-        : `<span style="color:#b45309;background:#fef3c7;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600">Chưa liên kết PH (SĐT HS)</span>`;
+        ? `<span style="color:#0f766e;background:#ccfbf1;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600">PH: ${esc(item.parentName)}</span>`
+        : `<span style="color:#b45309;background:#fef3c7;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600">Chưa liên kết tài khoản PH</span>`;
 
       return `
         <tr style="border-bottom:1px solid #f1f5f9;font-size:12px">
           <td style="text-align:center;padding:10px 8px">
-            <input type="checkbox" class="zalo-item-chk" data-index="${idx}" ${item.selected ? "checked" : ""} onchange="toggleSingleZaloItem(this, ${idx})" />
+            <input type="checkbox" class="zalo-item-chk" data-index="${idx}" ${item.selected ? "checked" : ""} ${!isZaloTuitionItemEligible(item) ? "disabled" : ""} onchange="toggleSingleZaloItem(this, ${idx})" />
           </td>
           <td style="padding:10px 8px">
-            <div style="font-weight:700;color:#0f172a">${item.studentName}</div>
-            <div style="font-size:11px;color:#64748b">${item.className} (${item.sessionsCount} buổi)</div>
+            <div style="font-weight:700;color:#0f172a">${esc(item.studentName)}</div>
+            <div style="font-size:11px;color:#64748b">${esc(item.className)} (${item.sessionsCount} buổi)</div>
           </td>
           <td style="padding:10px 8px">
             ${parentBadge}
-            <div style="font-family:monospace;font-weight:600;color:#334155;margin-top:3px">${item.phone || '<i style="color:#ef4444">Chưa có SĐT</i>'}</div>
+            <div style="font-family:monospace;font-weight:600;color:#334155;margin-top:3px">${esc(item.phone) || '<i style="color:#ef4444">Chưa có SĐT PH</i>'}</div>
           </td>
           <td style="padding:10px 8px;text-align:right">
             <div style="font-weight:700;color:#be123c">${fmt(item.remaining)}đ</div>
             <div style="font-size:10px;color:#94a3b8">Tổng: ${fmt(item.amount)}đ</div>
           </td>
           <td style="padding:10px 8px">
-            <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;color:#0369a1">${item.transferMemo}</code>
+            <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;color:#0369a1">${esc(item.transferMemo)}</code>
           </td>
           <td id="zaloActionCell-${idx}" style="padding:10px 8px;text-align:center">
-            <button onclick="sendSingleZaloTest(${idx})" title="Gửi thử tin nhắn Zalo tới phụ huynh này" style="background:#f8fafc;border:1px solid #cbd5e1;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;color:#0284c7">Gửi thử</button>
+            <button onclick="sendSingleZaloTest(${idx})" ${!isZaloTuitionItemEligible(item) ? "disabled" : ""} title="Xếp hàng nhắc học phí" style="background:#f8fafc;border:1px solid #cbd5e1;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;color:#0284c7">Xếp hàng</button>
           </td>
         </tr>
       `;
@@ -2529,13 +2567,13 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       <div id="zaloTableWrapper" style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden">
         <div style="padding:12px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
           <div style="font-weight:700;font-size:13px;color:#0f172a">
-            Danh sách phụ huynh cần nhắc học phí (${currentZaloCampaignItems.length} em)
+            Lịch sử Zalo học phí tháng ${esc(monthPicker?.value || "")} (${currentZaloCampaignItems.length} học sinh)
           </div>
           <div style="display:flex;align-items:center;gap:12px">
-            <span id="zaloSelectedCount" style="font-size:12px;color:#475569;font-weight:600">${currentZaloCampaignItems.length}/${currentZaloCampaignItems.length} học sinh được chọn</span>
+            <span id="zaloSelectedCount" style="font-size:12px;color:#475569;font-weight:600">${currentZaloCampaignItems.filter(item => item.selected).length}/${currentZaloCampaignItems.length} học sinh được chọn</span>
             <div id="zaloCampaignActionBtnWrap">
               <button onclick="startZaloCampaignAction()" style="background:linear-gradient(135deg, #0068ff 0%, #0052cc 100%);color:#fff;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-weight:700;box-shadow:0 4px 12px rgba(0,104,255,.25);font-size:13px">
-                ▶ Bắt đầu gửi tự động (Safe Mode)
+                Xếp hàng gửi học phí
               </button>
             </div>
           </div>
@@ -2545,7 +2583,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
           <table style="width:100%;border-collapse:collapse;text-align:left">
             <thead>
               <tr style="background:#f1f5f9;color:#475569;font-size:11px;text-transform:uppercase;letter-spacing:.5px">
-                <th style="width:36px;text-align:center;padding:8px"><input type="checkbox" id="zaloSelectAllChk" checked onchange="toggleSelectAllZalo(this)" /></th>
+                <th style="width:36px;text-align:center;padding:8px"><input type="checkbox" id="zaloSelectAllChk" onchange="toggleSelectAllZalo(this)" /></th>
                 <th style="padding:8px">Học sinh & Lớp</th>
                 <th style="padding:8px">Người nhận (Phụ huynh / SĐT)</th>
                 <th style="padding:8px;text-align:right">Còn thiếu</th>
@@ -2643,7 +2681,12 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       `;
     }
 
-    const newStatusHtml = statusCardHtml + qrBoxHtml;
+    const pauseHtml = zaloAutomationState?.paused
+      ? `<div style="border:1px solid #fca5a5;background:#fff1f2;padding:10px;margin-bottom:12px;color:#991b1b">
+          Zalo tạm dừng tự động: ${esc(zaloAutomationState.reason || "Đã chạm giới hạn")}
+          ${currentRole === "admin" ? '<button type="button" onclick="resumeZaloParentAutomation()">Tiếp tục sau khi kiểm tra</button>' : ""}
+        </div>` : "";
+    const newStatusHtml = statusCardHtml + qrBoxHtml + pauseHtml;
     if (newStatusHtml !== lastRenderedStatusHtml) {
       statusSection.innerHTML = newStatusHtml;
       lastRenderedStatusHtml = newStatusHtml;
@@ -2752,10 +2795,9 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     if (actionBtnWrap) {
       actionBtnWrap.style.display = isRunning ? "none" : "block";
     }
+    renderZaloTuitionHistoryCells();
   }
 
   init();
 
 })();
-
-

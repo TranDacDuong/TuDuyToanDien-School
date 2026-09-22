@@ -51,6 +51,60 @@ Deno.serve(async (request) => {
       const rows = await rpc("claim_mindup_zalo_message", {});
       return json({ job: rows?.[0] || null });
     }
+    if (payload.action === "claimParent") {
+      const rows = await rpc("claim_zalo_parent_check", {});
+      return json({ job: rows?.[0] || null });
+    }
+    if (payload.action === "pauseAutomation") {
+      await rpc("pause_zalo_parent_automation", {
+        p_reason: typeof payload.reason === "string" ? payload.reason.slice(0, 500) : null,
+      });
+      return json({ ok: true });
+    }
+    if (payload.action === "markParentAttempt") {
+      if (typeof payload.parentId !== "string" || typeof payload.phone !== "string" ||
+        !["invite", "greeting"].includes(payload.kind)) {
+        return json({ error: "Invalid contact action" }, 400);
+      }
+      await rpc("mark_zalo_parent_attempt", {
+        p_parent_id: payload.parentId, p_phone: payload.phone, p_action: payload.kind,
+      });
+      return json({ ok: true });
+    }
+    if (payload.action === "finishParent") {
+      if (typeof payload.parentId !== "string" || typeof payload.phone !== "string" ||
+        !["friend", "invited", "not_friend", "not_found", "rate_limited", "error"].includes(payload.status)) {
+        return json({ error: "Invalid contact result" }, 400);
+      }
+      await rpc("finish_zalo_parent_check", {
+        p_parent_id: payload.parentId,
+        p_phone: payload.phone,
+        p_uid: typeof payload.uid === "string" ? payload.uid : null,
+        p_status: payload.status,
+        p_invited: payload.invited === true,
+        p_greeted: payload.greeted === true,
+        p_error: typeof payload.error === "string" ? payload.error.slice(0, 500) : null,
+        p_invite_attempted: payload.inviteAttempted === true,
+        p_greeting_attempted: payload.greetingAttempted === true,
+      });
+      return json({ ok: true });
+    }
+    if (payload.action === "claimTuition") {
+      const rows = await rpc("claim_zalo_tuition_delivery", {});
+      return json({ job: rows?.[0] || null });
+    }
+    if (payload.action === "finishTuition") {
+      if (typeof payload.jobId !== "string" || !["sent", "failed", "uncertain"].includes(payload.status)) {
+        return json({ error: "Invalid tuition result" }, 400);
+      }
+      await rpc("finish_zalo_tuition_delivery", {
+        p_job_id: payload.jobId,
+        p_status: payload.status,
+        p_qr_sent: payload.qrSent === true,
+        p_error: typeof payload.error === "string" ? payload.error.slice(0, 500) : null,
+      });
+      return json({ ok: true });
+    }
     if (payload.action === "finish") {
       if (typeof payload.jobId !== "string" || !["sent", "failed", "uncertain"].includes(payload.status)) {
         return json({ error: "Invalid completion" }, 400);

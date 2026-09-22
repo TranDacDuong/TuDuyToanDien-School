@@ -1702,7 +1702,7 @@ document.getElementById('tSMon').addEventListener('change', tApplyFilter);
 /* ══════════════════════════════
    HỌC SINH
 ══════════════════════════════ */
-let _sAll=[], _sFilt=[], _sPage=1, _sSortF='full_name', _sSortD=1, _sEditId=null, _sLinkedParents={}, _sMobileStatus={};
+let _sAll=[], _sFilt=[], _sPage=1, _sSortF='full_name', _sSortD=1, _sEditId=null, _sLinkedParents={}, _sMobileStatus={}, _sZaloContacts={};
 const S_PAGE=15;
 
 function sRmVN(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đĐ]/g,m=>m==='đ'?'d':'D').toLowerCase(); }
@@ -1843,6 +1843,7 @@ async function loadStudents(){
   _sAll = data||[];
   await sLoadLinkedParentsForStudents(_sAll);
   await sLoadMobileStatusesForStudents(_sAll);
+  await sLoadZaloContactsForStudents();
   document.getElementById('sStatTotal').textContent = _sAll.length;
   sApplyFilter();
 }
@@ -1892,6 +1893,33 @@ async function sLoadMobileStatusesForStudents(students){
     return;
   }
   _sMobileStatus = Object.fromEntries((data || []).map(item => [item.user_id, item]));
+}
+
+async function sLoadZaloContactsForStudents(){
+  _sZaloContacts = {};
+  const parentIds = [...new Set(Object.values(_sLinkedParents).flat().map(parent => parent.id).filter(Boolean))];
+  if(!parentIds.length) return;
+  const {data,error} = await sb.from('zalo_parent_contacts')
+    .select('parent_id,status,last_checked_at,invitation_sent_at,greeting_sent_at,last_error')
+    .in('parent_id',parentIds);
+  if(error){ console.warn('Không tải được trạng thái Zalo PH:',error); return; }
+  _sZaloContacts = Object.fromEntries((data||[]).map(row => [row.parent_id,row]));
+}
+
+function sZaloParentStatusHtml(parents){
+  if(!parents.length) return '<div style="font-size:.72rem;color:var(--ink-light)">Chưa liên kết tài khoản PH</div>';
+  const labels = {friend:'Đã kết bạn',invited:'Đã gửi lời mời kết bạn',
+    not_friend:'Chưa kết bạn',not_found:'Không tìm thấy Zalo',
+    rate_limited:'Zalo tạm giới hạn',error:'Cần kiểm tra lỗi'};
+  return parents.map(parent => {
+    const row = _sZaloContacts[parent.id];
+    const label = !parent.phone ? 'Thiếu SĐT PH' : row ? (labels[row.status] || 'Đang đồng bộ') : 'Đang đồng bộ';
+    const checked = row?.last_checked_at
+      ? ` · ${new Date(row.last_checked_at).toLocaleString('vi-VN')}` : '';
+    const greeting = row?.greeting_sent_at ? ' · Đã gửi tin chào' : '';
+    const detail = `${parent.full_name || 'PH'} (${parent.phone || 'chưa có SĐT'}): `;
+    return `<div style="font-size:.72rem;color:var(--ink-mid);margin-top:3px" title="${esc(row?.last_error || '')}">${esc(detail)}Trạng thái: ${esc(label + greeting + checked)}</div>`;
+  }).join('');
 }
 
 function sMobileStatusPill(text, type){
@@ -1980,7 +2008,7 @@ function sRender(){
       <td><div style="display:flex;align-items:center;gap:8px">${av}<div><div style="font-weight:600;color:var(--navy);font-size:.85rem">${esc(s.full_name||'—')}</div><div style="font-size:.72rem;color:var(--ink-light)">${esc(s.email||'')}</div></div></div></td>
       <td>${s.phone?`<button style="background:none;border:none;color:var(--blue);font-size:.82rem;cursor:pointer;padding:0;font-family:var(--font-body);font-weight:500" onclick="sCopyPhone('${s.phone}')">📞 ${esc(s.phone)}</button>`:'<span style="color:var(--ink-light)">—</span>'}</td>
       <td><div style="font-weight:600;color:var(--navy)">${esc(parentName)}</div>${parentEmails ? `<div style="font-size:.72rem;color:var(--ink-light);margin-top:2px">${esc(parentEmails)}</div>` : ''}</td>
-      <td>${s.parent_phone?`<button style="background:none;border:none;color:var(--blue);font-size:.82rem;cursor:pointer;padding:0;font-family:var(--font-body);font-weight:500" onclick="sCopyPhone('${s.parent_phone}')">📞 ${esc(s.parent_phone)}</button>`:'<span style="color:var(--ink-light)">—</span>'}</td>
+      <td>${s.parent_phone?`<button style="background:none;border:none;color:var(--blue);font-size:.82rem;cursor:pointer;padding:0;font-family:var(--font-body);font-weight:500" onclick="sCopyPhone('${s.parent_phone}')">📞 ${esc(s.parent_phone)}</button>`:'<span style="color:var(--ink-light)">—</span>'}${sZaloParentStatusHtml(linkedParents)}</td>
       <td>${sStudentMobileStatusHtml(s, linkedParents)}</td>
       <td>${s.birth_year||'—'}</td>
       <td>${esc(s.province||'—')}</td>

@@ -30,6 +30,8 @@ app.use(express.json());
 let gatewayBusy = false;
 let gatewayListening = false;
 let nextGatewaySendAt = 0;
+let nextParentPollAt = 0;
+let gatewayBatchCount = 0;
 const pendingIncoming = new Map();
 let flushingIncoming = false;
 
@@ -52,7 +54,7 @@ async function syncGatewayOutbox() {
   try {
     const { job } = await gatewayRequest({ action: 'claim' });
     if (!job) return;
-    nextGatewaySendAt = Date.now() + getRandomDelay(botConfig.minDelaySeconds, botConfig.maxDelaySeconds) * 1000;
+    scheduleNextGatewayAction();
     try {
       await zaloApi.sendMessage(job.content, job.zalo_uid);
       try {
@@ -67,6 +69,138 @@ async function syncGatewayOutbox() {
   } catch (error) {
     console.warn('[ZaloBot] Không đồng bộ được hàng đợi:', error?.message || error);
   } finally {
+    gatewayBusy = false;
+  }
+}
+
+function scheduleNextGatewayAction() {
+  gatewayBatchCount++;
+  const pauseSeconds = gatewayBatchCount >= botConfig.batchSize
+    ? botConfig.batchPauseMinutes * 60 : 0;
+  if (pauseSeconds) gatewayBatchCount = 0;
+  nextGatewaySendAt = Date.now() + (pauseSeconds || getRandomDelay(
+    botConfig.minDelaySeconds, botConfig.maxDelaySeconds)) * 1000;
+}
+
+function isZaloLimitError(error) {
+  return /rate.?limit|quota|too many|429|giới hạn|thao tác quá nhiều|tạm khóa/i
+    .test(String(error?.message || error));
+}
+
+async function checkQueuedParent(job) {
+  const result = {
+    action: 'finishParent', parentId: job.parent_id, phone: job.phone,
+    uid: job.zalo_uid || null, status: 'error', invited: false, greeted: false,
+    error: null
+  };
+  try {
+    const phone = job.phone.startsWith('0') ? `84${job.phone.slice(1)}` : job.phone;
+    let uid = job.zalo_uid || friendPhoneMap.get(phone)?.userId || null;
+    if (!uid) {
+      const found = await zaloApi.findUser(phone);
+      if (!found?.uid) {
+        result.status = 'not_found';
+        await gatewayRequest(result);
+        return;
+      }
+      uid = String(found.uid);
+    }
+    result.uid = String(uid);
+    const relationship = await zaloApi.getFriendRequestStatus(result.uid);
+    if (!relationship) throw new Error('Không đọc được trạng thái kết bạn');
+    if (relationship.is_friend === 1) {
+      result.status = 'friend';
+    } else if (relationship.is_requested === 1) {
+      await zaloApi.acceptFriendRequest(result.uid);
+      result.status = 'friend';
+    } else {
+      result.status = relationship.is_requesting === 1 || job.invitation_sent_at ? 'invited' : 'not_friend';
+      if (result.status === 'not_friend' && !job.invitation_attempted_at) {
+        await gatewayRequest({ action: 'markParentAttempt', parentId: job.parent_id,
+          phone: job.phone, kind: 'invite' });
+        await zaloApi.sendFriendRequest(
+          `MindUp xin chào anh/chị, trung tâm đang phụ trách em ${job.student_name || 'học sinh'}. Mong anh/chị đồng ý kết bạn để nhận thông tin học tập.`, result.uid);
+        result.invited = true;
+        result.status = 'invited';
+      }
+      if (result.status === 'invited' && !job.greeting_attempted_at
+        && (result.invited || job.invitation_sent_at)) {
+        await gatewayRequest({ action: 'markParentAttempt', parentId: job.parent_id,
+          phone: job.phone, kind: 'greeting' });
+        await zaloApi.sendMessage(
+          'MindUp xin chào anh/chị. Trung tâm đã gửi lời mời kết bạn để tiện trao đổi thông tin học tập và học phí của con. Cảm ơn anh/chị!', result.uid);
+        result.greeted = true;
+      }
+    }
+  } catch (error) {
+    result.status = isZaloLimitError(error) ? 'rate_limited'
+      : (result.invited || job.invitation_sent_at ? 'invited' : 'error');
+    result.error = String(error?.message || error);
+    console.warn('[ZaloBot] Kiểm tra phụ huynh:', result.error);
+  }
+  await gatewayRequest(result);
+}
+
+async function sendQueuedTuition(job) {
+  let qrSent = false;
+  try {
+    await zaloApi.sendMessage(job.content, job.zalo_uid);
+  } catch (error) {
+    if (isZaloLimitError(error)) {
+      await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
+    }
+    await gatewayRequest({ action: 'finishTuition', jobId: job.job_id,
+      status: 'uncertain', error: String(error?.message || error) });
+    return;
+  }
+  let qrError = null;
+  if (job.qr_url) {
+    const tempFile = path.join(__dirname, 'temp', `tuition_${job.job_id}.png`);
+    try {
+      fs.mkdirSync(path.dirname(tempFile), { recursive: true });
+      await downloadImage(job.qr_url, tempFile);
+      await zaloApi.sendMessage({ msg: 'Mã QR thanh toán học phí MindUp', attachments: [tempFile] }, job.zalo_uid);
+      qrSent = true;
+    } catch (error) {
+      qrError = `Đã gửi nội dung, ảnh QR lỗi: ${error?.message || error}`;
+    } finally {
+      try { fs.unlinkSync(tempFile); } catch (_) {}
+    }
+  }
+  await gatewayRequest({ action: 'finishTuition', jobId: job.job_id,
+    status: 'sent', qrSent, error: qrError });
+}
+
+async function syncParentTuition() {
+  if (gatewayBusy || !zaloApi || !GATEWAY_URL || !GATEWAY_TOKEN ||
+    campaignStatus !== 'idle' || Date.now() < nextGatewaySendAt) return;
+  const hour = Number(new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', hourCycle: 'h23'
+  }).format(new Date()));
+  if (hour < 9 || hour >= 18) return;
+  gatewayBusy = true;
+  let processed = false;
+  try {
+    const { job: tuitionJob } = await gatewayRequest({ action: 'claimTuition' });
+    if (tuitionJob) {
+      processed = true;
+      await sendQueuedTuition(tuitionJob);
+      return;
+    }
+    if (Date.now() < nextParentPollAt) return;
+    nextParentPollAt = Date.now() + 5 * 60 * 1000;
+    const { job: parentJob } = await gatewayRequest({ action: 'claimParent' });
+    if (parentJob) {
+      processed = true;
+      await checkQueuedParent(parentJob);
+    }
+  } catch (error) {
+    console.warn('[ZaloBot] Đồng bộ phụ huynh/học phí:', error?.message || error);
+  } finally {
+    if (processed) {
+      scheduleNextGatewayAction();
+      nextParentPollAt = nextGatewaySendAt;
+    }
     gatewayBusy = false;
   }
 }
@@ -787,6 +921,9 @@ app.listen(PORT, HOST, () => {
 
   // Tự động kiểm tra session Zalo khi khởi động
   initZaloClient().catch(console.error);
-  setInterval(syncGatewayOutbox, 12000).unref();
+  setInterval(async () => {
+    await syncGatewayOutbox();
+    await syncParentTuition();
+  }, 12000).unref();
   setInterval(flushIncoming, 10000).unref();
 });
