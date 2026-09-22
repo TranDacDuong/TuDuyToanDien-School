@@ -190,10 +190,6 @@ async function sendQueuedTuition(job) {
 async function syncParentTuition() {
   if (gatewayBusy || !zaloApi || !GATEWAY_URL || !GATEWAY_TOKEN ||
     campaignStatus !== 'idle' || Date.now() < nextGatewaySendAt) return;
-  const hour = Number(new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', hourCycle: 'h23'
-  }).format(new Date()));
-  if (hour < 9 || hour >= 18) return;
   gatewayBusy = true;
   let processed = false;
   try {
