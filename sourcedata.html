@@ -1859,7 +1859,7 @@ async function sLoadZaloBulkStatus(){
   const box=document.getElementById('sZaloBulkStatus');
   if(!box) return;
   const {data:state,error}=await sb.from('zalo_automation_state')
-    .select('paused,reason,bulk_run_id,bulk_started_at,bulk_total').eq('id',1).maybeSingle();
+    .select('paused,reason,bulk_run_id,bulk_started_at,bulk_total,bulk_cancelled_at').eq('id',1).maybeSingle();
   if(error){box.textContent='Không tải được tiến độ Zalo: '+error.message;return;}
   if(!state?.bulk_run_id){box.textContent='Chưa có đợt kiểm tra Zalo hàng loạt.';return;}
   const {data:contacts,error:contactError}=await sb.from('zalo_parent_contacts')
@@ -1873,14 +1873,23 @@ async function sLoadZaloBulkStatus(){
   const startedAt=new Date(state.bulk_started_at).getTime();
   const newInvites=(contacts||[]).filter(row=>row.invitation_sent_at && new Date(row.invitation_sent_at).getTime()>=startedAt).length;
   const newGreetings=(contacts||[]).filter(row=>row.greeting_sent_at && new Date(row.greeting_sent_at).getTime()>=startedAt).length;
-  const active=total>0 && completed<total;
-  const phase=state.paused && active?'Đang tạm dừng':active?'Đang chạy ngầm':'Đã hoàn thành';
+  const active=total>0 && completed<total && !state.bulk_cancelled_at;
+  const phase=state.bulk_cancelled_at?'Đã hủy':state.paused && active?'Đang tạm dừng':active?'Đang chạy ngầm':'Đã hoàn thành';
   box.innerHTML=`<div style="border:1px solid #cbd5e1;padding:10px;background:#f8fafc">
     <strong>${phase}</strong> · Đã kiểm tra ${completed}/${total} phụ huynh
     <span style="color:var(--ink-mid)"> · Mới gửi trong đợt: ${newInvites} lời mời, ${newGreetings} tin chào · Trạng thái hiện tại: ${counts.friend||0} đã kết bạn, ${counts.invited||0} đang chờ kết bạn, ${counts.not_found||0} không tìm thấy, ${counts.error||0} lỗi</span>
     ${state.paused&&active?`<span style="color:#b91c1c"> · ${esc(state.reason||'Đã tạm dừng')}</span>`:''}
     ${active?`<button class="btn btn-outline btn-sm" type="button" onclick="sToggleZaloBulkRun(${state.paused?'false':'true'})" style="margin-left:8px">${state.paused?'Tiếp tục':'Tạm dừng'}</button>`:''}
+    ${active?'<button class="btn btn-outline btn-sm" type="button" onclick="sCancelZaloBulkRun()" style="margin-left:8px;color:#b91c1c">Hủy đợt</button>':''}
   </div>`;
+}
+
+async function sCancelZaloBulkRun(){
+  if(!confirm('Hủy đợt kiểm tra Zalo này? Các phụ huynh chưa xử lý sẽ rời hàng đợi của đợt; một lượt bot đã nhận có thể hoàn tất. Lịch kiểm tra tự động thường ngày không bị xóa.')) return;
+  const {error}=await sb.rpc('cancel_zalo_parent_bulk_run');
+  if(error) return alert('Không hủy được đợt: '+error.message);
+  await sLoadZaloBulkStatus();
+  toast('Đã hủy đợt kiểm tra Zalo.',4000);
 }
 
 async function sStartZaloBulkRun(){
