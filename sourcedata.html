@@ -1863,7 +1863,7 @@ async function sLoadZaloBulkStatus(){
   if(error){box.textContent='Không tải được tiến độ Zalo: '+error.message;return;}
   if(!state?.bulk_run_id){box.textContent='Chưa có đợt kiểm tra Zalo hàng loạt.';return;}
   const {data:contacts,error:contactError}=await sb.from('zalo_parent_contacts')
-    .select('status,bulk_checked_at,invitation_sent_at,greeting_sent_at').eq('bulk_run_id',state.bulk_run_id);
+    .select('status,bulk_checked_at,invitation_sent_at').eq('bulk_run_id',state.bulk_run_id);
   if(contactError){box.textContent='Không tải được tiến độ Zalo: '+contactError.message;return;}
   const completed=(contacts||[]).filter(row=>row.bulk_checked_at).length;
   const counts=(contacts||[]).filter(row=>row.bulk_checked_at).reduce((acc,row)=>{
@@ -1872,12 +1872,11 @@ async function sLoadZaloBulkStatus(){
   const total=state.bulk_total||0;
   const startedAt=new Date(state.bulk_started_at).getTime();
   const newInvites=(contacts||[]).filter(row=>row.invitation_sent_at && new Date(row.invitation_sent_at).getTime()>=startedAt).length;
-  const newGreetings=(contacts||[]).filter(row=>row.greeting_sent_at && new Date(row.greeting_sent_at).getTime()>=startedAt).length;
   const active=total>0 && completed<total && !state.bulk_cancelled_at;
   const phase=state.bulk_cancelled_at?'Đã hủy':state.paused && active?'Đang tạm dừng':active?'Đang chạy ngầm':'Đã hoàn thành';
   box.innerHTML=`<div style="border:1px solid #cbd5e1;padding:10px;background:#f8fafc">
     <strong>${phase}</strong> · Đã kiểm tra ${completed}/${total} phụ huynh
-    <span style="color:var(--ink-mid)"> · Mới gửi trong đợt: ${newInvites} lời mời, ${newGreetings} tin chào · Trạng thái hiện tại: ${counts.friend||0} đã kết bạn, ${counts.invited||0} đang chờ kết bạn, ${counts.not_found||0} không tìm thấy, ${counts.error||0} lỗi</span>
+    <span style="color:var(--ink-mid)"> · Mới gửi trong đợt: ${newInvites} lời mời · Trạng thái hiện tại: ${counts.friend||0} đã kết bạn, ${counts.invited||0} đang chờ kết bạn, ${counts.not_found||0} không tìm thấy, ${counts.error||0} lỗi</span>
     ${state.paused&&active?`<span style="color:#b91c1c"> · ${esc(state.reason||'Đã tạm dừng')}</span>`:''}
     ${active?`<button class="btn btn-outline btn-sm" type="button" onclick="sToggleZaloBulkRun(${state.paused?'false':'true'})" style="margin-left:8px">${state.paused?'Tiếp tục':'Tạm dừng'}</button>`:''}
     ${active?'<button class="btn btn-outline btn-sm" type="button" onclick="sCancelZaloBulkRun()" style="margin-left:8px;color:#b91c1c">Hủy đợt</button>':''}
@@ -1966,7 +1965,7 @@ async function sLoadZaloContactsForStudents(){
   const parentIds = [...new Set(Object.values(_sLinkedParents).flat().map(parent => parent.id).filter(Boolean))];
   if(!parentIds.length) return;
   const {data,error} = await sb.from('zalo_parent_contacts')
-    .select('parent_id,status,last_checked_at,invitation_sent_at,greeting_sent_at,last_error')
+    .select('parent_id,status,last_checked_at,last_error')
     .in('parent_id',parentIds);
   if(error){ console.warn('Không tải được trạng thái Zalo PH:',error); return; }
   _sZaloContacts = Object.fromEntries((data||[]).map(row => [row.parent_id,row]));
@@ -1982,9 +1981,8 @@ function sZaloParentStatusHtml(parents){
     const label = !parent.phone ? 'Thiếu SĐT PH' : row ? (labels[row.status] || 'Đang đồng bộ') : 'Đang đồng bộ';
     const checked = row?.last_checked_at
       ? ` · ${new Date(row.last_checked_at).toLocaleString('vi-VN')}` : '';
-    const greeting = row?.greeting_sent_at ? ' · Đã gửi tin chào' : '';
     const detail = `${parent.full_name || 'PH'} (${parent.phone || 'chưa có SĐT'}): `;
-    return `<div style="font-size:.72rem;color:var(--ink-mid);margin-top:3px" title="${esc(row?.last_error || '')}">${esc(detail)}Trạng thái: ${esc(label + greeting + checked)}</div>`;
+    return `<div style="font-size:.72rem;color:var(--ink-mid);margin-top:3px" title="${esc(row?.last_error || '')}">${esc(detail)}Trạng thái: ${esc(label + checked)}</div>`;
   }).join('');
 }
 

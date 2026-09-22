@@ -147,8 +147,7 @@ async function checkQueuedParent(job) {
         result.error = 'Lời mời từng được thử gửi nhưng Zalo không còn báo đang chờ; cần kiểm tra thủ công';
       }
     }
-    if (!job.greeting_attempted_at && (result.status === 'friend' ||
-      (result.status === 'invited' && (result.invited || job.invitation_sent_at)))) {
+    if (result.invited && !job.greeting_attempted_at) {
       await gatewayRequest({ action: 'markParentAttempt', parentId: job.parent_id,
         phone: job.phone, kind: 'greeting' });
       await zaloApi.sendMessage(buildParentGreeting(job.student_name, job.parent_id), result.uid);
@@ -734,6 +733,7 @@ async function sendMessageToParent(item) {
     // A. Xử lý Lời mời kết bạn
     const friendReqMsg = `Dạ em chào anh/chị, em là giáo viên trung tâm MindUp dạy cháu ${item.studentName}. Anh/chị đồng ý kết bạn để em tiện gửi thông tin của con nhé ạ!`;
 
+    let newlyRequested = false;
     if (isRequested) {
       console.log(`[ZaloBot] Phụ huynh em ${item.studentName} đã gửi lời mời trước đó. Tự động chấp nhận...`);
       try {
@@ -747,6 +747,7 @@ async function sendMessageToParent(item) {
       try {
         if (typeof zaloApi.sendFriendRequest === 'function') {
           await zaloApi.sendFriendRequest(friendReqMsg, threadId);
+          newlyRequested = true;
           console.log(`[ZaloBot] ✓ Đã gửi Lời mời kết bạn tới PH em ${item.studentName} (${item.phone}).`);
         }
       } catch (reqErr) {
@@ -763,14 +764,16 @@ async function sendMessageToParent(item) {
     }
 
     // B. Nhắn tin với lời chào thân thiện (không gửi dồn dập bảng học phí)
-    const friendlyGreeting = buildParentGreeting(item.studentName, item.phone);
-    try {
-      if (typeof zaloApi.sendMessage === 'function') {
-        await zaloApi.sendMessage(friendlyGreeting, threadId);
-        console.log(`[ZaloBot] ✓ Đã gửi tin nhắn chào thân thiện tới PH em ${item.studentName} (${item.phone}).`);
+    if (newlyRequested) {
+      const friendlyGreeting = buildParentGreeting(item.studentName, item.phone);
+      try {
+        if (typeof zaloApi.sendMessage === 'function') {
+          await zaloApi.sendMessage(friendlyGreeting, threadId);
+          console.log(`[ZaloBot] ✓ Đã gửi tin nhắn chào thân thiện tới PH em ${item.studentName} (${item.phone}).`);
+        }
+      } catch (msgErr) {
+        console.warn(`[ZaloBot] Phụ huynh có thể chặn tin nhắn từ người lạ (nhưng lời mời kết bạn vẫn đến):`, msgErr?.message || msgErr);
       }
-    } catch (msgErr) {
-      console.warn(`[ZaloBot] Phụ huynh có thể chặn tin nhắn từ người lạ (nhưng lời mời kết bạn vẫn đến):`, msgErr?.message || msgErr);
     }
 
     item.status = 'friend_requested';

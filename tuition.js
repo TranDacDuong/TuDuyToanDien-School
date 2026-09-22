@@ -2302,7 +2302,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
 
   function zaloTuitionStatusLabel(status) {
     return ({ queued: "Đang chờ bot", processing: "Đang gửi", not_found: "Không tìm thấy Zalo",
-      not_friend: "Chưa kết bạn", invited: "Đã gửi lời mời", greeted: "Đã gửi tin chào",
+      not_friend: "Chưa kết bạn", invited: "Đã gửi lời mời", greeted: "Chờ gửi học phí",
       sent: "Đã gửi học phí", failed: "Gửi lỗi", uncertain: "Cần kiểm tra trên Zalo",
       cancelled: "Đã hủy (đã thanh toán)" })[status] || "Đang đồng bộ";
   }
@@ -2348,7 +2348,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       }
       if (parentIds.length) {
         const { data, error } = await getSb().from("zalo_parent_contacts")
-          .select("parent_id,status,last_checked_at,greeting_sent_at")
+          .select("parent_id,status,last_checked_at")
           .in("parent_id", parentIds);
         if (error) throw error;
         zaloParentContactStatus = new Map((data || []).map(row => [row.parent_id, row]));
