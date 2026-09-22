@@ -87,6 +87,22 @@ function isZaloLimitError(error) {
     .test(String(error?.message || error));
 }
 
+function buildParentGreeting(studentName, recipientKey) {
+  const student = String(studentName || '').trim();
+  const child = student ? `em ${student}` : 'con';
+  const opening = student
+    ? `Trung tâm MindUp xin chào Quý phụ huynh của em ${student}!`
+    : 'Trung tâm MindUp xin chào Quý phụ huynh!';
+  const variants = [
+    `MindUp vừa gửi lời mời kết bạn Zalo tới anh/chị. Đây là kênh liên hệ của trung tâm để cập nhật lịch học, nhận xét học tập, kết quả kiểm tra và thông tin học phí của ${child}. Anh/chị vui lòng xác nhận lời mời; khi cần trao đổi, cứ nhắn tại đây để nhân sự phụ trách tiếp nhận và phản hồi. Cảm ơn anh/chị đã đồng hành cùng MindUp!`,
+    `Chúng tôi gửi lời mời kết bạn để việc trao đổi về ${child} được thuận tiện hơn. Qua cuộc trò chuyện này, MindUp sẽ thông báo lịch học, tình hình học tập, điểm kiểm tra và học phí; anh/chị cũng có thể nhắn lại mọi thắc mắc cho trung tâm. Mong anh/chị xác nhận lời mời kết bạn. MindUp cảm ơn anh/chị!`,
+    `MindUp rất vui được đồng hành cùng gia đình trong quá trình học tập của ${child}. Trung tâm vừa gửi lời mời kết bạn Zalo; sau khi anh/chị xác nhận, chúng tôi sẽ dùng kênh này để gửi lịch học, đánh giá học tập, kết quả kiểm tra và nhắc học phí khi cần. Nếu có điều gì muốn trao đổi, anh/chị hãy nhắn trực tiếp tại đây. Xin cảm ơn anh/chị!`,
+    `Để anh/chị tiện theo dõi việc học của ${child}, MindUp đã gửi lời mời kết bạn từ tài khoản trung tâm. Khi kết nối, các thông báo về lịch học, nhận xét, điểm kiểm tra và học phí sẽ được gửi qua cuộc trò chuyện này. Anh/chị có thể phản hồi ngay tại đây, nhân sự phụ trách sẽ hỗ trợ. Rất mong anh/chị xác nhận lời mời. MindUp xin cảm ơn!`
+  ];
+  const hash = [...String(recipientKey || student)].reduce((value, char) => value + char.charCodeAt(0), 0);
+  return `${opening}\n\n${variants[hash % variants.length]}`;
+}
+
 async function checkQueuedParent(job) {
   const result = {
     action: 'finishParent', parentId: job.parent_id, phone: job.phone,
@@ -119,7 +135,7 @@ async function checkQueuedParent(job) {
         await gatewayRequest({ action: 'markParentAttempt', parentId: job.parent_id,
           phone: job.phone, kind: 'invite' });
         await zaloApi.sendFriendRequest(
-          `MindUp xin chào anh/chị, trung tâm đang phụ trách em ${job.student_name || 'học sinh'}. Mong anh/chị đồng ý kết bạn để nhận thông tin học tập.`, result.uid);
+          `MindUp xin chào Quý phụ huynh${job.student_name ? ` của em ${job.student_name}` : ''}. Mong anh/chị đồng ý kết bạn để tiện trao đổi việc học của con.`, result.uid);
         result.invited = true;
         result.status = 'invited';
       }
@@ -127,8 +143,7 @@ async function checkQueuedParent(job) {
         && (result.invited || job.invitation_sent_at)) {
         await gatewayRequest({ action: 'markParentAttempt', parentId: job.parent_id,
           phone: job.phone, kind: 'greeting' });
-        await zaloApi.sendMessage(
-          'MindUp xin chào anh/chị. Trung tâm đã gửi lời mời kết bạn để tiện trao đổi thông tin học tập và học phí của con. Cảm ơn anh/chị!', result.uid);
+        await zaloApi.sendMessage(buildParentGreeting(job.student_name, job.parent_id), result.uid);
         result.greeted = true;
       }
     }
@@ -742,7 +757,7 @@ async function sendMessageToParent(item) {
     }
 
     // B. Nhắn tin với lời chào thân thiện (không gửi dồn dập bảng học phí)
-    const friendlyGreeting = `Trung tâm MindUp xin chào Quý phụ huynh em ${item.studentName}! 🌸\n\nDạ em là giáo viên/phụ trách lớp của cháu ${item.studentName} tại trung tâm MindUp. Em vừa gửi lời mời kết bạn Zalo với anh/chị.\nAnh/chị vui lòng bấm "Đồng ý" kết bạn để trung tâm tiện gửi thông báo học tập và chi tiết học phí của con hàng tháng nhé ạ!\nTrung tâm xin chân thành cảm ơn Quý phụ huynh! ❤️`;
+    const friendlyGreeting = buildParentGreeting(item.studentName, item.phone);
     try {
       if (typeof zaloApi.sendMessage === 'function') {
         await zaloApi.sendMessage(friendlyGreeting, threadId);
