@@ -118,7 +118,11 @@ async function checkQueuedParent(job) {
     const phone = job.phone.startsWith('0') ? `84${job.phone.slice(1)}` : job.phone;
     let uid = job.zalo_uid || friendPhoneMap.get(phone)?.userId || null;
     if (!uid) {
-      const found = await zaloApi.findUser(phone);
+      const found = await zaloApi.findUser(phone).catch(error => {
+        if (/không tìm thấy|user không hợp lệ|not found|invalid user/i
+          .test(String(error?.message || error))) return null;
+        throw error;
+      });
       if (!found?.uid) {
         result.status = 'not_found';
         await gatewayRequest(result);
@@ -140,13 +144,12 @@ async function checkQueuedParent(job) {
         await gatewayRequest({ action: 'markParentAttempt', parentId: job.parent_id,
           phone: job.phone, kind: 'invite' });
         await zaloApi.sendFriendRequest(buildFriendRequestGreeting(job.student_name), result.uid);
-        const confirmed = await zaloApi.getFriendRequestStatus(result.uid);
-        if (confirmed?.is_requesting !== 1 && confirmed?.is_friend !== 1) {
-          result.status = 'error';
-          throw new Error('Zalo chưa xác nhận lời mời sau khi API báo gửi; cần kiểm tra thủ công');
-        }
         result.invited = true;
-        result.status = confirmed.is_friend === 1 ? 'friend' : 'invited';
+        result.status = 'invited';
+        // Relationship state is eventually consistent. A successful send response is
+        // authoritative; only promote to friend when the immediate refresh already sees it.
+        const confirmed = await zaloApi.getFriendRequestStatus(result.uid).catch(() => null);
+        if (confirmed?.is_friend === 1) result.status = 'friend';
       } else if (result.status === 'not_friend' && job.invitation_attempted_at) {
         result.error = 'Lời mời từng được thử gửi nhưng Zalo không còn báo đang chờ; cần kiểm tra thủ công';
       }
@@ -154,7 +157,7 @@ async function checkQueuedParent(job) {
     // Zalo blocks ordinary chat messages while an outgoing friend request is pending.
     // The request itself contains a short greeting; send the full greeting after acceptance.
     if (result.status === 'friend' && !job.greeting_sent_at &&
-      (result.invited || job.invitation_sent_at)) {
+      (result.invited || job.invitation_sent_at || job.invitation_attempted_at)) {
       await gatewayRequest({ action: 'markParentAttempt', parentId: job.parent_id,
         phone: job.phone, kind: 'greeting' });
       await zaloApi.sendMessage(buildParentGreeting(job.student_name, job.parent_id), result.uid);
