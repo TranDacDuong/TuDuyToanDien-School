@@ -625,6 +625,14 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <div class="sg"><label>Năm sinh</label><input id="sSBirth" type="number" placeholder="VD: 2008"></div>
       <div class="sg"><label>Tỉnh</label><input id="sSProv"    placeholder="Tỉnh/thành..."></div>
       <div class="sg"><label>Trường</label><input id="sSSchool" placeholder="Tên trường..."></div>
+      <div class="sg"><label>Zalo PH</label>
+        <select id="sSZaloStatus">
+          <option value="">Tất cả trạng thái</option>
+          <option value="pending">Chưa kiểm tra / chưa gửi lời mời</option>
+          <option value="invited">Đã gửi lời mời</option>
+          <option value="friend">Đã kết bạn</option>
+        </select>
+      </div>
       <button class="btn btn-outline btn-sm" onclick="sClearSearch()" style="align-self:flex-end">✕ Xóa</button>
     </div>
     <div class="s-table-card">
@@ -2018,24 +2026,39 @@ function sStudentMobileStatusHtml(student, linkedParents){
   return `<div class="mobile-status-stack">${rows.join('')}</div>`;
 }
 
+function sMatchesZaloStatus(student, filter){
+  if(!filter) return true;
+  const parents = _sLinkedParents[student.id] || [];
+  if(filter === 'pending'){
+    if(!parents.length) return true;
+    return parents.some(parent => {
+      const contact = _sZaloContacts[parent.id];
+      return !parent.phone || !contact || !['invited','friend'].includes(contact.status);
+    });
+  }
+  return parents.some(parent => _sZaloContacts[parent.id]?.status === filter);
+}
+
 function sApplyFilter(){
   const n  = sRmVN(document.getElementById('sSName').value);
   const p  = (document.getElementById('sSPhone').value||'').trim();
   const b  = (document.getElementById('sSBirth').value||'').trim();
   const pv = sRmVN(document.getElementById('sSProv').value);
   const sc = sRmVN(document.getElementById('sSSchool').value);
+  const zs = document.getElementById('sSZaloStatus').value;
   _sFilt = _sAll.filter(s =>
     (!n  || sRmVN(s.full_name).includes(n)) &&
     (!p  || (s.phone||'').includes(p)) &&
     (!b  || String(s.birth_year)===b) &&
     (!pv || sRmVN(s.province).includes(pv)) &&
-    (!sc || sRmVN(s.school).includes(sc))
+    (!sc || sRmVN(s.school).includes(sc)) &&
+    sMatchesZaloStatus(s, zs)
   );
   sApplySort();
 }
 
 function sClearSearch(){
-  ['sSName','sSPhone','sSBirth','sSProv','sSSchool'].forEach(id=>document.getElementById(id).value='');
+  ['sSName','sSPhone','sSBirth','sSProv','sSSchool','sSZaloStatus'].forEach(id=>document.getElementById(id).value='');
   sApplyFilter();
 }
 
@@ -2386,6 +2409,7 @@ function sExportExcel(){
 
 // Bind search
 ['sSName','sSPhone','sSBirth','sSProv','sSSchool'].forEach(id=>{let t;document.getElementById(id).addEventListener('input',()=>{clearTimeout(t);t=setTimeout(()=>{_sPage=1;sApplyFilter();},200);});});
+document.getElementById('sSZaloStatus')?.addEventListener('change',()=>{_sPage=1;sApplyFilter();});
 document.getElementById('seParentN')?.addEventListener('input',()=>{
   clearTimeout(_sParentEmailTimer);
   if(!_sParentEmailTouched) _sParentEmailTimer = setTimeout(()=>sSuggestParentEmail(true), 250);
