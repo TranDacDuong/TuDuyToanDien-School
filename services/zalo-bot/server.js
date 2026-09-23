@@ -103,6 +103,11 @@ function buildParentGreeting(studentName, recipientKey) {
   return `${opening}\n\n${variants[hash % variants.length]}`;
 }
 
+function buildFriendRequestGreeting(studentName) {
+  const student = String(studentName || '').trim();
+  return `MindUp xin chào Quý phụ huynh${student ? ` của em ${student}` : ''}. Anh/chị vui lòng đồng ý kết bạn để trung tâm tiện trao đổi việc học của con. Cảm ơn anh/chị!`;
+}
+
 async function checkQueuedParent(job) {
   const result = {
     action: 'finishParent', parentId: job.parent_id, phone: job.phone,
@@ -134,8 +139,7 @@ async function checkQueuedParent(job) {
       if (result.status === 'not_friend' && !job.invitation_attempted_at) {
         await gatewayRequest({ action: 'markParentAttempt', parentId: job.parent_id,
           phone: job.phone, kind: 'invite' });
-        await zaloApi.sendFriendRequest(
-          `MindUp xin chào Quý phụ huynh${job.student_name ? ` của em ${job.student_name}` : ''}. Mong anh/chị đồng ý kết bạn để tiện trao đổi việc học của con.`, result.uid);
+        await zaloApi.sendFriendRequest(buildFriendRequestGreeting(job.student_name), result.uid);
         const confirmed = await zaloApi.getFriendRequestStatus(result.uid);
         if (confirmed?.is_requesting !== 1 && confirmed?.is_friend !== 1) {
           result.status = 'error';
@@ -147,7 +151,10 @@ async function checkQueuedParent(job) {
         result.error = 'Lời mời từng được thử gửi nhưng Zalo không còn báo đang chờ; cần kiểm tra thủ công';
       }
     }
-    if (result.invited && !job.greeting_attempted_at) {
+    // Zalo blocks ordinary chat messages while an outgoing friend request is pending.
+    // The request itself contains a short greeting; send the full greeting after acceptance.
+    if (result.status === 'friend' && !job.greeting_sent_at &&
+      (result.invited || job.invitation_sent_at)) {
       await gatewayRequest({ action: 'markParentAttempt', parentId: job.parent_id,
         phone: job.phone, kind: 'greeting' });
       await zaloApi.sendMessage(buildParentGreeting(job.student_name, job.parent_id), result.uid);
@@ -731,7 +738,7 @@ async function sendMessageToParent(item) {
     friendPhoneMap.delete(localPhone);
 
     // A. Xử lý Lời mời kết bạn
-    const friendReqMsg = `Dạ em chào anh/chị, em là giáo viên trung tâm MindUp dạy cháu ${item.studentName}. Anh/chị đồng ý kết bạn để em tiện gửi thông tin của con nhé ạ!`;
+    const friendReqMsg = buildFriendRequestGreeting(item.studentName);
 
     let newlyRequested = false;
     if (isRequested) {
@@ -763,18 +770,9 @@ async function sendMessageToParent(item) {
       console.log(`[ZaloBot] Đã gửi lời mời kết bạn từ trước đó cho PH em ${item.studentName}, đang chờ đồng ý.`);
     }
 
-    // B. Nhắn tin với lời chào thân thiện (không gửi dồn dập bảng học phí)
-    if (newlyRequested) {
-      const friendlyGreeting = buildParentGreeting(item.studentName, item.phone);
-      try {
-        if (typeof zaloApi.sendMessage === 'function') {
-          await zaloApi.sendMessage(friendlyGreeting, threadId);
-          console.log(`[ZaloBot] ✓ Đã gửi tin nhắn chào thân thiện tới PH em ${item.studentName} (${item.phone}).`);
-        }
-      } catch (msgErr) {
-        console.warn(`[ZaloBot] Phụ huynh có thể chặn tin nhắn từ người lạ (nhưng lời mời kết bạn vẫn đến):`, msgErr?.message || msgErr);
-      }
-    }
+    // Zalo will reject a normal chat until the parent accepts. The friend request
+    // already carries the short greeting; the queued checker sends the full one later.
+    if (newlyRequested) console.log(`[ZaloBot] Tin chào ngắn đã được đính kèm lời mời kết bạn.`);
 
     item.status = 'friend_requested';
     item.isFriend = false;
