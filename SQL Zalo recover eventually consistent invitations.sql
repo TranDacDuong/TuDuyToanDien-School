@@ -17,3 +17,14 @@ WHERE s.id = 1
   AND c.status = 'error'
   AND c.invitation_attempted_at IS NOT NULL
   AND c.last_error = 'Zalo chưa xác nhận lời mời sau khi API báo gửi; cần kiểm tra thủ công';
+
+-- Older bot versions surfaced lookup misses as generic errors. Keep the reason
+-- for operators, but classify them correctly in the progress counters.
+UPDATE public.zalo_parent_contacts c
+SET status = 'not_found',
+    updated_at = now()
+FROM public.zalo_automation_state s
+WHERE s.id = 1
+  AND c.bulk_run_id = s.bulk_run_id
+  AND c.status = 'error'
+  AND c.last_error IN ('Không tìm thấy', 'User không hợp lệ');
