@@ -2289,15 +2289,21 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
         remaining,
         transferMemo,
         qrUrl,
-        selected: due && Boolean(parent?.id && /^(0\d{9}|84\d{9})$/.test(cleanPhone) && paymentMap[group.studentId]?.id),
+        selected: due && Boolean(parent?.id && /^(0\d{9}|84\d{9})$/.test(cleanPhone)),
         due
       };
     });
   }
 
   function isZaloTuitionItemEligible(item) {
-    return Boolean(item?.due && item.parentId && /^(0\d{9}|84\d{9})$/.test(item.phone)
-      && paymentMap[item.studentId]?.id);
+    return Boolean(item?.due && item.parentId && /^(0\d{9}|84\d{9})$/.test(item.phone));
+  }
+
+  function zaloTuitionEligibilityReason(item) {
+    if (!item?.due) return "Đã thanh toán đủ";
+    if (!item.parentId) return "Chưa liên kết tài khoản phụ huynh";
+    if (!/^(0\d{9}|84\d{9})$/.test(item.phone || "")) return "SĐT phụ huynh chưa hợp lệ";
+    return "";
   }
 
   function zaloTuitionStatusLabel(status) {
@@ -2311,6 +2317,11 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     currentZaloCampaignItems.forEach((item, idx) => {
       const cell = document.getElementById(`zaloActionCell-${idx}`);
       if (!cell) return;
+      const ineligibleReason = zaloTuitionEligibilityReason(item);
+      if (ineligibleReason) {
+        cell.innerHTML = `<div style="font-size:11px;color:#b45309;line-height:1.4">${esc(ineligibleReason)}</div>`;
+        return;
+      }
       const history = zaloTuitionHistory.get(`${item.studentId}:${item.parentId}`) || [];
       const contact = zaloParentContactStatus.get(item.parentId);
       const contactLabel = contact ? ({ friend: "Đã kết bạn", invited: "Đã gửi lời mời",
@@ -2428,8 +2439,9 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
 
   window.updateZaloSelectedSummary = function () {
     const selectedCount = currentZaloCampaignItems.filter(i => i.selected).length;
+    const eligibleCount = currentZaloCampaignItems.filter(isZaloTuitionItemEligible).length;
     const countEl = document.getElementById("zaloSelectedCount");
-    if (countEl) countEl.textContent = `${selectedCount}/${currentZaloCampaignItems.length} học sinh được chọn`;
+    if (countEl) countEl.textContent = `${selectedCount}/${eligibleCount} đã chọn · ${eligibleCount}/${currentZaloCampaignItems.length} có thể gửi`;
   };
 
   window.startZaloCampaignAction = async function () {
@@ -2446,24 +2458,58 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     const ym = monthPicker?.value || "";
     if (!/^20\d{2}-(0[1-9]|1[0-2])$/.test(ym)) return alert("Tháng học phí không hợp lệ.");
     if (items.some(item => !isZaloTuitionItemEligible(item))) {
-      return alert("Chỉ gửi cho PH đã liên kết và học phí còn nợ đã được lưu.");
+      return alert("Chỉ gửi cho học sinh còn nợ, đã liên kết phụ huynh và có SĐT hợp lệ.");
     }
     const existing = items.filter(item => (zaloTuitionHistory.get(`${item.studentId}:${item.parentId}`) || []).length);
     const repeatNote = existing.length ? `\n${existing.length} học sinh đã có lịch sử gửi trong tháng; lần này sẽ là lượt nhắc tiếp theo.` : "";
     if (!confirm(`Xếp hàng gửi học phí tháng ${ym} cho ${items.length} học sinh?${repeatNote}\nBot sẽ xử lý khi laptop online.`)) return;
     zaloQueueBusy = true;
     try {
-      const template = document.getElementById("zaloTemplateText")?.value || DEFAULT_ZALO_TEMPLATE;
-      const payload = items.map(item => ({
-        request_key: crypto.randomUUID(), student_id: item.studentId, parent_id: item.parentId,
-        content: fillZaloTemplate(template, item), qr_url: item.qrUrl, remaining: item.remaining
-      }));
-      const { data, error } = await getSb().rpc("queue_zalo_tuition_deliveries_v2", {
-        p_month: ym, p_items: payload
+      const paymentRows = items.map(item => {
+        const existing = paymentMap[item.studentId] || {};
+        if (existing.locked_at && Math.abs(Number(existing.amount_due || 0) - Number(item.amount || 0)) > 1) {
+          throw new Error(`Học phí của ${item.studentName} đã chốt nhưng số tiền vừa thay đổi. Hãy bấm Tính lại trước khi gửi.`);
+        }
+        return {
+          student_id: item.studentId,
+          class_id: null,
+          month: ymToDate(ym),
+          amount_due: Math.round(Number(item.amount) || 0),
+          amount_paid: Number(existing.amount_paid) || 0,
+          paid_at: existing.paid_at || null,
+          note: existing.note || null,
+          locked_at: existing.locked_at || null,
+          locked_by: existing.locked_by || null,
+          locked_snapshot: existing.locked_snapshot || null,
+        };
       });
-      if (error) throw error;
+      const { data: savedPayments, error: saveError } = await getSb()
+        .from("tuition_payments")
+        .upsert(paymentRows, { onConflict: "student_id,month" })
+        .select();
+      if (saveError) throw saveError;
+      (savedPayments || []).forEach(payment => { paymentMap[payment.student_id] = payment; });
+
+      const template = document.getElementById("zaloTemplateText")?.value || DEFAULT_ZALO_TEMPLATE;
+      const payload = items.map(item => {
+        const paymentId = paymentMap[item.studentId]?.id || "";
+        item.transferMemo = buildTransferContent(item.studentName, ym, item.studentId, paymentId, item.phone);
+        item.qrUrl = buildPaymentQrUrl(item.studentName, ym, item.remaining, item.studentId, paymentId, item.phone);
+        return {
+          request_key: crypto.randomUUID(), student_id: item.studentId, parent_id: item.parentId,
+          content: fillZaloTemplate(template, item), qr_url: item.qrUrl, remaining: item.remaining
+        };
+      });
+      let queuedCount = 0;
+      for (let start = 0; start < payload.length; start += 100) {
+        const { data, error } = await getSb().rpc("queue_zalo_tuition_deliveries_v2", {
+          p_month: ym, p_items: payload.slice(start, start + 100)
+        });
+        if (error) throw error;
+        queuedCount += Number(data) || 0;
+      }
       await loadZaloTuitionHistory();
-      alert(`Đã xếp hàng ${data || 0} thông báo học phí. Có thể đóng trang; tiến độ được lưu trên máy chủ.`);
+      alert(`Đã xếp hàng ${queuedCount} thông báo học phí. Có thể đóng trang; tiến độ được lưu trên máy chủ.`);
     } catch (error) {
       alert("Không xếp hàng được: " + error.message);
     } finally {
@@ -2516,6 +2562,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     if (!container) return;
 
     const rowsHtml = currentZaloCampaignItems.map((item, idx) => {
+      const ineligibleReason = zaloTuitionEligibilityReason(item);
       const parentBadge = item.hasParent
         ? `<span style="color:#0f766e;background:#ccfbf1;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600">PH: ${esc(item.parentName)}</span>`
         : `<span style="color:#b45309;background:#fef3c7;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600">Chưa liên kết tài khoản PH</span>`;
@@ -2541,7 +2588,9 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
             <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;color:#0369a1">${esc(item.transferMemo)}</code>
           </td>
           <td id="zaloActionCell-${idx}" style="padding:10px 8px;text-align:center">
-            <button onclick="sendSingleZaloTest(${idx})" ${!isZaloTuitionItemEligible(item) ? "disabled" : ""} title="Xếp hàng nhắc học phí" style="background:#f8fafc;border:1px solid #cbd5e1;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;color:#0284c7">Xếp hàng</button>
+            ${ineligibleReason
+              ? `<div style="font-size:11px;color:#b45309;line-height:1.4">${esc(ineligibleReason)}</div>`
+              : `<button onclick="sendSingleZaloTest(${idx})" title="Xếp hàng nhắc học phí" style="background:#f8fafc;border:1px solid #cbd5e1;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;color:#0284c7">Xếp hàng</button>`}
           </td>
         </tr>
       `;
@@ -2570,7 +2619,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
             Lịch sử Zalo học phí tháng ${esc(monthPicker?.value || "")} (${currentZaloCampaignItems.length} học sinh)
           </div>
           <div style="display:flex;align-items:center;gap:12px">
-            <span id="zaloSelectedCount" style="font-size:12px;color:#475569;font-weight:600">${currentZaloCampaignItems.filter(item => item.selected).length}/${currentZaloCampaignItems.length} học sinh được chọn</span>
+            <span id="zaloSelectedCount" style="font-size:12px;color:#475569;font-weight:600">${currentZaloCampaignItems.filter(item => item.selected).length}/${currentZaloCampaignItems.filter(isZaloTuitionItemEligible).length} đã chọn · ${currentZaloCampaignItems.filter(isZaloTuitionItemEligible).length}/${currentZaloCampaignItems.length} có thể gửi</span>
             <div id="zaloCampaignActionBtnWrap">
               <button onclick="startZaloCampaignAction()" style="background:linear-gradient(135deg, #0068ff 0%, #0052cc 100%);color:#fff;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-weight:700;box-shadow:0 4px 12px rgba(0,104,255,.25);font-size:13px">
                 Xếp hàng gửi học phí
