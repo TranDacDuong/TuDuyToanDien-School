@@ -109,15 +109,19 @@ function buildFriendRequestGreeting(studentName) {
 }
 
 async function checkQueuedParent(job) {
+  const previousStatus = ['friend', 'invited', 'not_friend'].includes(job.status)
+    ? job.status : 'error';
+  let stage = 'Khởi tạo kiểm tra';
   const result = {
     action: 'finishParent', parentId: job.parent_id, phone: job.phone,
-    uid: job.zalo_uid || null, status: 'error', invited: false, greeted: false,
+    uid: job.zalo_uid || null, status: previousStatus, invited: false, greeted: false,
     error: null
   };
   try {
     const phone = job.phone.startsWith('0') ? `84${job.phone.slice(1)}` : job.phone;
     let uid = job.zalo_uid || friendPhoneMap.get(phone)?.userId || null;
     if (!uid) {
+      stage = 'Tìm tài khoản Zalo';
       const found = await zaloApi.findUser(phone).catch(error => {
         if (/không tìm thấy|user không hợp lệ|not found|invalid user/i
           .test(String(error?.message || error))) return null;
@@ -131,11 +135,13 @@ async function checkQueuedParent(job) {
       uid = String(found.uid);
     }
     result.uid = String(uid);
+    stage = 'Kiểm tra quan hệ Zalo';
     const relationship = await zaloApi.getFriendRequestStatus(result.uid);
     if (!relationship) throw new Error('Không đọc được trạng thái kết bạn');
     if (relationship.is_friend === 1) {
       result.status = 'friend';
     } else if (relationship.is_requested === 1) {
+      stage = 'Chấp nhận lời mời kết bạn';
       await zaloApi.acceptFriendRequest(result.uid);
       result.status = 'friend';
     } else {
@@ -143,6 +149,7 @@ async function checkQueuedParent(job) {
       if (result.status === 'not_friend' && !job.invitation_attempted_at) {
         await gatewayRequest({ action: 'markParentAttempt', parentId: job.parent_id,
           phone: job.phone, kind: 'invite' });
+        stage = 'Gửi lời mời kết bạn';
         await zaloApi.sendFriendRequest(buildFriendRequestGreeting(job.student_name), result.uid);
         result.invited = true;
         result.status = 'invited';
@@ -160,6 +167,7 @@ async function checkQueuedParent(job) {
       (result.invited || job.invitation_sent_at || job.invitation_attempted_at)) {
       await gatewayRequest({ action: 'markParentAttempt', parentId: job.parent_id,
         phone: job.phone, kind: 'greeting' });
+      stage = 'Gửi tin chào';
       await zaloApi.sendMessage(buildParentGreeting(job.student_name, job.parent_id), result.uid);
       result.greeted = true;
     }
@@ -167,7 +175,7 @@ async function checkQueuedParent(job) {
     result.status = isZaloLimitError(error) ? 'rate_limited'
       : (result.status === 'friend' || result.status === 'invited' || result.status === 'not_friend'
         ? result.status : 'error');
-    result.error = String(error?.message || error);
+    result.error = `${stage}: ${String(error?.message || error)}`;
     console.warn('[ZaloBot] Kiểm tra phụ huynh:', result.error);
   }
   await gatewayRequest(result);

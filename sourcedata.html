@@ -327,6 +327,15 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 .s-pg-btn:hover:not(:disabled) { border-color:var(--navy); color:var(--navy); }
 .s-pg-btn.active { background:var(--navy); color:var(--gold-light); border-color:var(--navy); }
 .s-pg-btn:disabled { opacity:.4; cursor:not-allowed; }
+.s-zalo-detail-box { width:min(96vw,1100px); max-height:90vh; overflow:auto; }
+.s-zalo-detail-tools { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
+.s-zalo-detail-tools input,.s-zalo-detail-tools select { min-width:210px; flex:1; padding:8px 10px; border:1.5px solid var(--border); border-radius:8px; background:var(--surface); font:inherit; }
+.s-zalo-status { display:inline-block; padding:3px 8px; border-radius:999px; font-size:.72rem; font-weight:700; white-space:nowrap; }
+.s-zalo-status.ok { background:var(--green-bg); color:var(--green); }
+.s-zalo-status.wait { background:var(--amber-bg); color:var(--amber); }
+.s-zalo-status.bad { background:var(--red-bg); color:var(--red); }
+.s-zalo-status.muted { background:var(--surface); color:var(--ink-mid); }
+.s-zalo-detail-meta { font-size:.72rem; color:var(--ink-light); line-height:1.45; }
 .s-ini { width:32px; height:32px; border-radius:50%; background:var(--navy); color:var(--gold-light); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.75rem; flex-shrink:0; }
 .s-av  { width:32px; height:32px; border-radius:50%; object-fit:cover; border:2px solid var(--gold-border); flex-shrink:0; }
 .pl-layout { display:grid; grid-template-columns:340px 1fr; gap:18px; align-items:start; }
@@ -659,6 +668,33 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
         <span class="s-pg-info" id="sPgInfo"></span>
         <div class="s-pg-btns" id="sPgBtns"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-ov" id="sZaloDetailModal" onclick="if(event.target===this)sCloseZaloBulkDetails()">
+  <div class="modal-box s-zalo-detail-box">
+    <div class="modal-mhd">
+      <div><h3>Chi tiết đợt kiểm tra Zalo</h3><div class="s-zalo-detail-meta" id="sZaloDetailSummary"></div></div>
+      <button class="modal-mclose" type="button" onclick="sCloseZaloBulkDetails()">✕</button>
+    </div>
+    <div class="s-zalo-detail-tools">
+      <input id="sZaloDetailSearch" placeholder="Tìm phụ huynh, học sinh hoặc SĐT..." oninput="sRenderZaloBulkDetails()">
+      <select id="sZaloDetailFilter" onchange="sRenderZaloBulkDetails()">
+        <option value="">Tất cả kết quả</option>
+        <option value="pending">Chưa xử lý</option>
+        <option value="friend">Đã kết bạn</option>
+        <option value="invited">Đã gửi lời mời</option>
+        <option value="not_friend">Chưa kết bạn</option>
+        <option value="not_found">Không tìm thấy Zalo</option>
+        <option value="error">Có lỗi</option>
+      </select>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Phụ huynh</th><th>Học sinh</th><th>Kết quả</th><th>Lời mời</th><th>Tin chào</th><th>Kiểm tra</th><th>Chi tiết</th></tr></thead>
+        <tbody id="sZaloDetailTable"><tr class="empty-row"><td colspan="7">Đang tải...</td></tr></tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -1713,7 +1749,7 @@ document.getElementById('tSMon').addEventListener('change', tApplyFilter);
    HỌC SINH
 ══════════════════════════════ */
 let _sAll=[], _sFilt=[], _sPage=1, _sSortF='full_name', _sSortD=1, _sEditId=null, _sLinkedParents={}, _sMobileStatus={}, _sZaloContacts={};
-let _sZaloBulkBusy=false, _sZaloBulkTimer=null;
+let _sZaloBulkBusy=false, _sZaloBulkTimer=null, _sZaloBulkRunId=null, _sZaloDetailRows=[];
 const S_PAGE=15;
 
 function sRmVN(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đĐ]/g,m=>m==='đ'?'d':'D').toLowerCase(); }
@@ -1870,26 +1906,102 @@ async function sLoadZaloBulkStatus(){
     .select('paused,reason,bulk_run_id,bulk_started_at,bulk_total,bulk_cancelled_at').eq('id',1).maybeSingle();
   if(error){box.textContent='Không tải được tiến độ Zalo: '+error.message;return;}
   if(!state?.bulk_run_id){box.textContent='Chưa có đợt kiểm tra Zalo hàng loạt.';return;}
+  _sZaloBulkRunId=state.bulk_run_id;
   const {data:contacts,error:contactError}=await sb.from('zalo_parent_contacts')
-    .select('status,bulk_checked_at,invitation_sent_at').eq('bulk_run_id',state.bulk_run_id);
+    .select('status,bulk_checked_at,invitation_sent_at,last_error').eq('bulk_run_id',state.bulk_run_id);
   if(contactError){box.textContent='Không tải được tiến độ Zalo: '+contactError.message;return;}
-  const completed=(contacts||[]).filter(row=>row.bulk_checked_at).length;
-  const counts=(contacts||[]).filter(row=>row.bulk_checked_at).reduce((acc,row)=>{
+  const checked=(contacts||[]).filter(row=>row.bulk_checked_at);
+  const completed=checked.length;
+  const counts=checked.reduce((acc,row)=>{
     acc[row.status]=(acc[row.status]||0)+1; return acc;
   },{});
+  const warnings=checked.filter(row=>row.last_error).length;
   const total=state.bulk_total||0;
   const startedAt=new Date(state.bulk_started_at).getTime();
   const newInvites=(contacts||[]).filter(row=>row.invitation_sent_at && new Date(row.invitation_sent_at).getTime()>=startedAt).length;
   const active=total>0 && completed<total && !state.bulk_cancelled_at;
   const phase=state.bulk_cancelled_at?'Đã hủy':state.paused && active?'Đang tạm dừng':active?'Đang chạy ngầm':'Đã hoàn thành';
   box.innerHTML=`<div style="border:1px solid #cbd5e1;padding:10px;background:#f8fafc">
-    <strong>${phase}</strong> · Đã kiểm tra ${completed}/${total} phụ huynh
-    <span style="color:var(--ink-mid)"> · Mới gửi trong đợt: ${newInvites} lời mời · Trạng thái hiện tại: ${counts.friend||0} đã kết bạn, ${counts.invited||0} đang chờ kết bạn, ${counts.not_found||0} không tìm thấy, ${counts.error||0} lỗi</span>
+    <strong>${phase}</strong> · Đã xử lý ${completed}/${total} phụ huynh
+    <span style="color:var(--ink-mid)"> · Kết quả: ${counts.friend||0} đã kết bạn, ${counts.invited||0} đã gửi lời mời, ${counts.not_friend||0} chưa kết bạn, ${counts.not_found||0} không tìm thấy, ${counts.error||0} lỗi${warnings?`, ${warnings} có cảnh báo`:''} · Mới gửi trong đợt: ${newInvites} lời mời</span>
+    <button class="btn btn-outline btn-sm" type="button" onclick="sOpenZaloBulkDetails()" style="margin-left:8px">Xem chi tiết</button>
     ${state.paused&&active?`<span style="color:#b91c1c"> · ${esc(state.reason||'Đã tạm dừng')}</span>`:''}
     ${active?`<button class="btn btn-outline btn-sm" type="button" onclick="sToggleZaloBulkRun(${state.paused?'false':'true'})" style="margin-left:8px">${state.paused?'Tiếp tục':'Tạm dừng'}</button>`:''}
     ${active?'<button class="btn btn-outline btn-sm" type="button" onclick="sCancelZaloBulkRun()" style="margin-left:8px;color:#b91c1c">Hủy đợt</button>':''}
   </div>`;
 }
+
+function sZaloDetailDate(value){
+  if(!value) return '—';
+  const date=new Date(value);
+  return Number.isNaN(date.getTime())?'—':date.toLocaleString('vi-VN');
+}
+
+function sZaloDetailResult(row){
+  if(!row.bulk_checked_at) return {key:'pending',label:'Chưa xử lý',type:'muted'};
+  return ({friend:{key:'friend',label:'Đã kết bạn',type:'ok'},
+    invited:{key:'invited',label:'Đã gửi lời mời',type:'wait'},
+    not_friend:{key:'not_friend',label:'Chưa kết bạn',type:'wait'},
+    not_found:{key:'not_found',label:'Không tìm thấy Zalo',type:'muted'},
+    rate_limited:{key:'error',label:'Zalo tạm giới hạn',type:'bad'},
+    error:{key:'error',label:'Có lỗi',type:'bad'}})[row.status] || {key:'error',label:'Chưa rõ',type:'bad'};
+}
+
+async function sOpenZaloBulkDetails(){
+  if(!_sZaloBulkRunId) return alert('Chưa có đợt kiểm tra Zalo để xem.');
+  const modal=document.getElementById('sZaloDetailModal');
+  const tbody=document.getElementById('sZaloDetailTable');
+  modal.classList.add('open');
+  tbody.innerHTML='<tr class="empty-row"><td colspan="7">Đang tải chi tiết...</td></tr>';
+  const {data,error}=await sb.from('zalo_parent_contacts')
+    .select('parent_id,phone,status,bulk_checked_at,last_checked_at,invitation_attempted_at,invitation_sent_at,greeting_attempted_at,greeting_sent_at,last_error')
+    .eq('bulk_run_id',_sZaloBulkRunId)
+    .order('bulk_checked_at',{ascending:false,nullsFirst:false});
+  if(error){tbody.innerHTML=`<tr class="empty-row"><td colspan="7">${esc(error.message)}</td></tr>`;return;}
+  const parentMap={};
+  const studentNames={};
+  Object.entries(_sLinkedParents).forEach(([studentId,parents])=>{
+    const student=_sAll.find(item=>item.id===studentId);
+    (parents||[]).forEach(parent=>{
+      parentMap[parent.id]=parent;
+      if(!studentNames[parent.id]) studentNames[parent.id]=[];
+      if(student?.full_name&&!studentNames[parent.id].includes(student.full_name)) studentNames[parent.id].push(student.full_name);
+    });
+  });
+  _sZaloDetailRows=(data||[]).map(row=>({...row,parent:parentMap[row.parent_id]||null,student_names:studentNames[row.parent_id]||[]}));
+  sRenderZaloBulkDetails();
+}
+
+function sRenderZaloBulkDetails(){
+  const tbody=document.getElementById('sZaloDetailTable');
+  if(!tbody) return;
+  const needle=sRmVN(document.getElementById('sZaloDetailSearch')?.value||'');
+  const filter=document.getElementById('sZaloDetailFilter')?.value||'';
+  const rows=_sZaloDetailRows.filter(row=>{
+    const result=sZaloDetailResult(row);
+    const haystack=sRmVN([row.parent?.full_name,row.phone,...row.student_names,row.last_error].filter(Boolean).join(' '));
+    return (!filter||result.key===filter)&&(!needle||haystack.includes(needle));
+  });
+  document.getElementById('sZaloDetailSummary').textContent=`Hiển thị ${rows.length}/${_sZaloDetailRows.length} phụ huynh trong đợt`;
+  if(!rows.length){tbody.innerHTML='<tr class="empty-row"><td colspan="7">Không có phụ huynh phù hợp</td></tr>';return;}
+  tbody.innerHTML=rows.map(row=>{
+    const result=sZaloDetailResult(row);
+    const invite=row.invitation_sent_at?`Đã gửi<div class="s-zalo-detail-meta">${esc(sZaloDetailDate(row.invitation_sent_at))}</div>`:
+      row.invitation_attempted_at?'Đã thử gửi':'Chưa gửi';
+    const greeting=row.greeting_sent_at?`Đã gửi<div class="s-zalo-detail-meta">${esc(sZaloDetailDate(row.greeting_sent_at))}</div>`:
+      row.greeting_attempted_at?'Đã thử, chưa xác nhận':'Chưa gửi';
+    return `<tr>
+      <td><b>${esc(row.parent?.full_name||'Phụ huynh')}</b><div class="s-zalo-detail-meta">${esc(row.phone||'Chưa có SĐT')}</div></td>
+      <td>${esc(row.student_names.join(', ')||'—')}</td>
+      <td><span class="s-zalo-status ${result.type}">${esc(result.label)}</span></td>
+      <td>${invite}</td><td>${greeting}</td>
+      <td>${esc(sZaloDetailDate(row.bulk_checked_at||row.last_checked_at))}</td>
+      <td style="max-width:260px;white-space:normal"><span class="s-zalo-detail-meta">${esc(row.last_error||'Không có lỗi')}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function sCloseZaloBulkDetails(){ document.getElementById('sZaloDetailModal')?.classList.remove('open'); }
 
 async function sCancelZaloBulkRun(){
   if(!confirm('Hủy đợt kiểm tra Zalo này? Các phụ huynh chưa xử lý sẽ rời hàng đợi của đợt; một lượt bot đã nhận có thể hoàn tất. Lịch kiểm tra tự động thường ngày không bị xóa.')) return;
