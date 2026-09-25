@@ -105,6 +105,21 @@ Deno.serve(async (request) => {
       });
       return json({ ok: true });
     }
+    if (payload.action === "claimTuitionReceipt") {
+      const rows = await rpc("claim_zalo_tuition_receipt", {});
+      return json({ job: rows?.[0] || null });
+    }
+    if (payload.action === "finishTuitionReceipt") {
+      if (typeof payload.jobId !== "string" || !["sent", "failed", "uncertain"].includes(payload.status)) {
+        return json({ error: "Invalid tuition receipt result" }, 400);
+      }
+      await rpc("finish_zalo_tuition_receipt", {
+        p_job_id: payload.jobId,
+        p_status: payload.status,
+        p_error: typeof payload.error === "string" ? payload.error.slice(0, 500) : null,
+      });
+      return json({ ok: true });
+    }
     if (payload.action === "finish") {
       if (typeof payload.jobId !== "string" || !["sent", "failed", "uncertain"].includes(payload.status)) {
         return json({ error: "Invalid completion" }, 400);

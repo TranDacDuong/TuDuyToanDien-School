@@ -211,12 +211,31 @@ async function sendQueuedTuition(job) {
     status: 'sent', qrSent, error: qrError });
 }
 
+async function sendQueuedTuitionReceipt(job) {
+  try {
+    await zaloApi.sendMessage(job.content, job.zalo_uid);
+    await gatewayRequest({ action: 'finishTuitionReceipt', jobId: job.job_id, status: 'sent' });
+  } catch (error) {
+    if (isZaloLimitError(error)) {
+      await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
+    }
+    await gatewayRequest({ action: 'finishTuitionReceipt', jobId: job.job_id,
+      status: 'uncertain', error: String(error?.message || error) });
+  }
+}
+
 async function syncParentTuition() {
   if (gatewayBusy || !zaloApi || !GATEWAY_URL || !GATEWAY_TOKEN ||
     campaignStatus !== 'idle' || Date.now() < nextGatewaySendAt) return;
   gatewayBusy = true;
   let processed = false;
   try {
+    const { job: receiptJob } = await gatewayRequest({ action: 'claimTuitionReceipt' });
+    if (receiptJob) {
+      processed = true;
+      await sendQueuedTuitionReceipt(receiptJob);
+      return;
+    }
     const { job: tuitionJob } = await gatewayRequest({ action: 'claimTuition' });
     if (tuitionJob) {
       processed = true;

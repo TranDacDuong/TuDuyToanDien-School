@@ -773,30 +773,36 @@ Nhập số tiền thu thêm lần này:`,
         added_amount: addAmount,
         amount_paid: newPaid,
       });
-      // === MINDUP BOT: Xác nhận học phí (gửi khi đã đóng đủ) ===
+      // Ghi nhận lời cảm ơn trên web và xếp hàng Zalo cho đúng lần thu này.
       try {
-        if(window.MindUpBot && amountDue > 0 && newPaid >= amountDue) {
-          const sb = getSb();
-          // Lấy thông tin học sinh + phụ huynh
-          const [{ data: studentInfo }, { data: parentLinks }] = await Promise.all([
-            sb.from('users').select('full_name').eq('id', studentId).maybeSingle(),
-            sb.from('parent_students').select('parent_id').eq('student_id', studentId).is('revoked_at', null)
-          ]);
-          const parentIds = [...new Set((parentLinks || []).map(item => item.parent_id).filter(Boolean))];
-          if(parentIds.length) {
-            const studentName = studentInfo?.full_name || 'học sinh';
-            const row = (allRows||[]).find(r=>r.studentId===studentId);
-            const className = row?.className || '';
-            // Format tháng
-            const [year, month] = ym.split('-');
-            const monthLabel = `${parseInt(month)}/${year}`;
-            await Promise.allSettled(parentIds.map(parentId =>
-              window.MindUpBot.sendTuitionConfirmMessage(parentId, { studentName, className, monthLabel, amount: newPaid })
-            ));
-          }
+        const sb = getSb();
+        const [{ data: studentInfo }, { data: parentLinks }] = await Promise.all([
+          sb.from("users").select("full_name").eq("id", studentId).maybeSingle(),
+          sb.from("parent_students").select("parent_id").eq("student_id", studentId).is("revoked_at", null)
+        ]);
+        const parentIds = [...new Set((parentLinks || []).map(item => item.parent_id).filter(Boolean))];
+        const studentName = studentInfo?.full_name || "học sinh";
+        const [year, month] = ym.split("-");
+        const monthLabel = `${parseInt(month, 10)}/${year}`;
+        if (window.MindUpBot && parentIds.length) {
+          await Promise.allSettled(parentIds.map(parentId =>
+            window.MindUpBot.sendTuitionConfirmMessage(parentId, {
+              studentName, className: "", monthLabel, amount: addAmount
+            })
+          ));
         }
-      } catch(botErr){ console.warn('[MindUpBot] Lỗi gửi tin nhắn xác nhận học phí:', botErr); }
-      // === END MINDUP BOT ===
+        const paymentId = paymentMap[studentId]?.id;
+        if (paymentId) {
+          const { error: receiptError } = await sb.rpc("enqueue_zalo_tuition_receipt", {
+            p_payment_id: paymentId,
+            p_received_amount: addAmount,
+            p_event_key: `manual:${crypto.randomUUID()}`,
+          });
+          if (receiptError) throw receiptError;
+        }
+      } catch (botErr) {
+        console.warn("[MindUpBot] Lỗi xếp hàng xác nhận học phí:", botErr);
+      }
       if (newPaid > amountDue) {
         alert(`Đã ghi nhận thu ${fmt(addAmount)}đ. Học sinh đang nộp thừa ${fmt(newPaid - amountDue)}đ (bạn có thể bấm nút "Chuyển dư" khi cần chuyển sang tháng sau).`);
       }
@@ -2254,6 +2260,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       const parentName = parent?.full_name || "Quý phụ huynh";
       const rawPhone = parent?.phone || "";
       const cleanPhone = String(rawPhone).replace(/\D/g, "");
+      const studentPhone = String(group.phone || group.rawPhone || "").replace(/\D/g, "");
 
       const classNames = (group.classes || []).map(c => c.className).filter(Boolean).join(", ") || "Lớp học";
       const sessionsCount = group.billableSessions || group.totalSessions || 0;
@@ -2263,7 +2270,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
         group.ym,
         group.studentId,
         paymentMap[group.studentId]?.id || "",
-        cleanPhone
+        studentPhone
       );
 
       const qrUrl = buildPaymentQrUrl(
@@ -2272,7 +2279,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
         remaining,
         group.studentId,
         paymentMap[group.studentId]?.id || "",
-        cleanPhone
+        studentPhone
       );
 
       return {
@@ -2282,6 +2289,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
         hasParent,
         parentName,
         phone: cleanPhone,
+        studentPhone,
         rawPhone,
         className: classNames,
         sessionsCount,
@@ -2493,8 +2501,8 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       const template = document.getElementById("zaloTemplateText")?.value || DEFAULT_ZALO_TEMPLATE;
       const payload = items.map(item => {
         const paymentId = paymentMap[item.studentId]?.id || "";
-        item.transferMemo = buildTransferContent(item.studentName, ym, item.studentId, paymentId, item.phone);
-        item.qrUrl = buildPaymentQrUrl(item.studentName, ym, item.remaining, item.studentId, paymentId, item.phone);
+        item.transferMemo = buildTransferContent(item.studentName, ym, item.studentId, paymentId, item.studentPhone);
+        item.qrUrl = buildPaymentQrUrl(item.studentName, ym, item.remaining, item.studentId, paymentId, item.studentPhone);
         return {
           request_key: crypto.randomUUID(), student_id: item.studentId, parent_id: item.parentId,
           content: fillZaloTemplate(template, item), qr_url: item.qrUrl, remaining: item.remaining

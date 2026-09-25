@@ -357,7 +357,7 @@
    */
   async function sendTuitionConfirmMessage(parentId, { studentName, className, monthLabel, amount }) {
     const defaultContent =
-      '✅ MindUp xác nhận đã nhận đủ học phí **tháng {{month_label}}** của học sinh **{{student_name}}** lớp **{{class_name}}** (số tiền: **{{amount}}đ**).\n\nCảm ơn quý phụ huynh đã luôn đồng hành cùng MindUp! 🙏\n\n__ACTION__{"type":"url","label":"🧾 Xem lịch sử học phí","url":"tuition.html"}';
+      'Trung tâm MindUp xin xác nhận đã nhận được học phí tháng **{{month_label}}** của em **{{student_name}}**, với số tiền **{{amount}}đ**.\n\nCảm ơn Quý phụ huynh đã tin tưởng và đồng hành cùng MindUp trong quá trình học tập của em. 💙\n\n__ACTION__{"type":"url","label":"🧾 Xem lịch sử học phí","url":"tuition.html"}';
 
     const tpl = await getTemplate('tuition_confirmed', defaultContent);
     if (!tpl) return null;

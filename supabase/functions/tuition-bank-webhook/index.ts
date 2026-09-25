@@ -234,6 +234,14 @@ serve(async (req: Request) => {
         continue;
       }
 
+      const duplicateLogs = await fetchJson<Array<any>>(
+        `bank_transaction_logs?gateway=eq.${encodeURIComponent(item.gateway)}&transaction_id=eq.${encodeURIComponent(item.txId)}&select=id&limit=1`
+      ).catch(() => []);
+      if (duplicateLogs.length) {
+        results.push({ txId: item.txId, status: "duplicate_ignored" });
+        continue;
+      }
+
       const parsedInfos = extractTuitionParsedInfo(item.content);
       let matchedTuition: any = null;
 
@@ -417,6 +425,15 @@ serve(async (req: Request) => {
 
         if (updated && updated.length) {
           status = "success";
+
+          await fetchJson("rpc/enqueue_zalo_tuition_receipt", {
+            method: "POST",
+            body: JSON.stringify({
+              p_payment_id: matchedTuition.id,
+              p_received_amount: item.amount,
+              p_event_key: `bank:${item.gateway}:${item.txId}`.slice(0, 200),
+            }),
+          }).catch(err => console.error("Failed to queue Zalo tuition receipt:", err));
 
           // Send notification to student / parent
           const studentId = matchedTuition.student_id;
