@@ -12,14 +12,20 @@ BEGIN
   END IF;
   UPDATE public.zalo_parent_contacts c SET
     zalo_uid = CASE WHEN p_status = 'not_found' THEN NULL ELSE COALESCE(nullif(p_uid,''), c.zalo_uid) END,
-    status = p_status,
+    status = CASE
+      WHEN p_status = 'friend' THEN 'friend'
+      WHEN p_status = 'invited' OR p_invited OR c.invitation_sent_at IS NOT NULL THEN 'invited'
+      ELSE p_status END,
     invitation_attempted_at = CASE WHEN p_invite_attempted THEN COALESCE(c.invitation_attempted_at, now()) ELSE c.invitation_attempted_at END,
     invitation_sent_at = CASE WHEN p_invited THEN COALESCE(c.invitation_sent_at, now()) ELSE c.invitation_sent_at END,
     greeting_attempted_at = CASE WHEN p_greeting_attempted THEN COALESCE(c.greeting_attempted_at, now()) ELSE c.greeting_attempted_at END,
     greeting_sent_at = CASE WHEN p_greeted THEN COALESCE(c.greeting_sent_at, now()) ELSE c.greeting_sent_at END,
     last_checked_at = now(), lease_until = NULL,
     next_check_at = now() + interval '1 day' + make_interval(secs => floor(random() * 21600)::int),
-    last_error = left(p_error,500), updated_at = now()
+    last_error = CASE
+      WHEN p_status <> 'friend' AND (p_status = 'invited' OR p_invited OR c.invitation_sent_at IS NOT NULL)
+        THEN NULL ELSE left(p_error,500) END,
+    updated_at = now()
   WHERE c.parent_id = p_parent_id AND c.phone = p_phone AND c.lease_until IS NOT NULL;
   IF NOT FOUND THEN RAISE EXCEPTION 'Contact check lease not found'; END IF;
   UPDATE public.zalo_tuition_deliveries d SET

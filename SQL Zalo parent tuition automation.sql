@@ -151,7 +151,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF auth.role() <> 'service_role' THEN RAISE EXCEPTION 'Service role required'; END IF;
   IF (SELECT paused FROM public.zalo_automation_state WHERE id = 1) THEN RETURN; END IF;
-  -- Only uniquely owned numbers are eligible for automatic contact.
+  -- One parent contact may serve any number of actively linked students.
   INSERT INTO public.zalo_parent_contacts(parent_id, phone)
   SELECT p.id, regexp_replace(p.phone, '[^0-9]', '', 'g')
   FROM public.users p
@@ -187,10 +187,10 @@ BEGIN
       c.invitation_sent_at, c.greeting_attempted_at, c.greeting_sent_at
   ) SELECT x.parent_id, x.phone, x.zalo_uid, x.status, x.invitation_attempted_at,
       x.invitation_sent_at, x.greeting_attempted_at, x.greeting_sent_at,
-      (SELECT u.full_name FROM public.parent_students ps
+      (SELECT string_agg(u.full_name, ', ' ORDER BY u.full_name) FROM public.parent_students ps
         JOIN public.users u ON u.id = ps.student_id
         WHERE ps.parent_id = x.parent_id AND ps.revoked_at IS NULL
-        ORDER BY u.full_name LIMIT 1)
+      )
     FROM claimed x;
 END;
 $$;
@@ -234,7 +234,10 @@ BEGIN
   END IF;
   UPDATE public.zalo_parent_contacts c SET
     zalo_uid = CASE WHEN p_status = 'not_found' THEN NULL ELSE COALESCE(nullif(p_uid,''), c.zalo_uid) END,
-    status = p_status,
+    status = CASE
+      WHEN p_status = 'friend' THEN 'friend'
+      WHEN p_status = 'invited' OR p_invited OR c.invitation_sent_at IS NOT NULL THEN 'invited'
+      ELSE p_status END,
     invitation_attempted_at = CASE WHEN p_invite_attempted THEN COALESCE(c.invitation_attempted_at, now()) ELSE c.invitation_attempted_at END,
     invitation_sent_at = CASE WHEN p_invited THEN COALESCE(c.invitation_sent_at, now()) ELSE c.invitation_sent_at END,
     greeting_attempted_at = CASE WHEN p_greeting_attempted THEN COALESCE(c.greeting_attempted_at, now()) ELSE c.greeting_attempted_at END,
@@ -242,7 +245,10 @@ BEGIN
     last_checked_at = now(), lease_until = NULL,
     next_check_at = ((timezone('Asia/Ho_Chi_Minh', now())::date + 1 + time '09:00')
       AT TIME ZONE 'Asia/Ho_Chi_Minh') + make_interval(secs => floor(random() * 32400)::int),
-    last_error = left(p_error,500), updated_at = now()
+    last_error = CASE
+      WHEN p_status <> 'friend' AND (p_status = 'invited' OR p_invited OR c.invitation_sent_at IS NOT NULL)
+        THEN NULL ELSE left(p_error,500) END,
+    updated_at = now()
   WHERE c.parent_id = p_parent_id AND c.phone = p_phone AND c.lease_until IS NOT NULL;
   IF NOT FOUND THEN RAISE EXCEPTION 'Contact check lease not found'; END IF;
   UPDATE public.zalo_tuition_deliveries d SET

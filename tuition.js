@@ -55,11 +55,8 @@
     }
     const twoWords = getLastTwoWordsUnaccented(studentName);
     const cleanDigits = String(phone || "").replace(/\D/g, "");
-    let phoneTag = cleanDigits.length >= 4 ? cleanDigits.slice(-4) : "";
-    if (!phoneTag) {
-      const cleanUuid = String(studentId || paymentId || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-      phoneTag = cleanUuid.slice(0, 4) || "0000";
-    }
+    if (!/^(0\d{9}|84\d{9})$/.test(cleanDigits)) return "";
+    const phoneTag = cleanDigits.slice(-4);
 
     return `SEVQR HP${monthTag} ${twoWords} ${phoneTag}`.trim();
   }
@@ -74,6 +71,7 @@
     const finalAmount = Math.max(0, Math.round(Number(amount) || 0));
     if (!finalAmount) return "";
     const addInfo = buildTransferContent(studentName, ym, studentId, paymentId, phone);
+    if (!addInfo) return "";
     return `https://img.vietqr.io/image/${STATIC_BANK_INFO.bankCode}-${STATIC_BANK_INFO.account}-compact2.png?amount=${encodeURIComponent(finalAmount)}&addInfo=${encodeURIComponent(addInfo)}`;
   }
 
@@ -85,6 +83,9 @@
 
     const qrUrl = buildPaymentQrUrl(studentName, ym, finalAmount, studentId, paymentId, phone);
     const transferContent = buildTransferContent(studentName, ym, studentId, paymentId, phone);
+    if (!qrUrl || !transferContent) {
+      return `<div class="qr-payment-card"><div class="qr-payment-text"><div class="qr-payment-title">Không thể tạo mã QR</div><div class="qr-payment-note">Học sinh đang thiếu SĐT hợp lệ. Vui lòng cập nhật SĐT học sinh trước khi gửi thông báo học phí.</div></div></div>`;
+    }
     return `
       <div class="qr-payment-card">
         <div class="qr-payment-media">
@@ -962,6 +963,7 @@ Nhập số tiền hoàn lại (>0):`,
     const printBtn = toolbarButtons.find(btn => btn.textContent.includes("In"));
 
     const zaloReminderBtn = document.getElementById("zaloReminderBtn");
+    const unmatchedBtn = document.getElementById("unmatchedBankBtn");
 
     if (currentRole === "student" || currentRole === "parent") {
       if (classFilter) classFilter.style.display = "none";
@@ -970,6 +972,7 @@ Nhập số tiền hoàn lại (>0):`,
       if (monthInput) monthInput.style.display = "none";
       if (notifyBtn) notifyBtn.style.display = "none";
       if (zaloReminderBtn) zaloReminderBtn.style.display = "none";
+      if (unmatchedBtn) unmatchedBtn.style.display = "none";
       if (lockBtn) lockBtn.style.display = "none";
       if (reloadBtn) reloadBtn.style.display = "none";
       if (printBtn) printBtn.style.display = "none";
@@ -990,10 +993,63 @@ Nhập số tiền hoàn lại (>0):`,
     if (printBtn) printBtn.style.display = "";
     if (notifyBtn) notifyBtn.style.display = canManagePayments() ? "" : "none";
     if (zaloReminderBtn) zaloReminderBtn.style.display = canManagePayments() ? "" : "none";
+    if (unmatchedBtn) unmatchedBtn.style.display = canManagePayments() ? "" : "none";
     if (lockBtn) lockBtn.style.display = canManagePayments() ? "" : "none";
     if (studentDetailView) studentDetailView.classList.remove("show");
     if (paidFilter) paidFilter.style.display = canManagePayments() ? "" : "none";
+    if (canManagePayments()) refreshUnmatchedBankCount();
   }
+
+  async function refreshUnmatchedBankCount() {
+    const countEl = document.getElementById("unmatchedBankCount");
+    if (!countEl) return;
+    try {
+      const { count, error } = await getSb().from("bank_transaction_logs")
+        .select("id", { count: "exact", head: true }).eq("status", "unmatched");
+      if (error) throw error;
+      countEl.textContent = count ? `(${count})` : "";
+    } catch (error) {
+      console.warn("Không tải được số giao dịch chưa khớp:", error);
+      countEl.textContent = "";
+    }
+  }
+
+  window.openUnmatchedBankModal = async function () {
+    const modal = document.getElementById("unmatchedBankModal");
+    const body = document.getElementById("unmatchedBankBody");
+    if (!modal || !body || !canManagePayments()) return;
+    modal.style.display = "flex";
+    body.innerHTML = `<div class="loading">Đang tải giao dịch chưa khớp...</div>`;
+    try {
+      const { data, error } = await getSb().from("bank_transaction_logs")
+        .select("id,gateway,transaction_id,account_number,amount,content,created_at")
+        .eq("status", "unmatched").order("created_at", { ascending: false }).limit(200);
+      if (error) throw error;
+      const rows = data || [];
+      if (!rows.length) {
+        body.innerHTML = `<div style="padding:24px;text-align:center;color:#64748b">Không có giao dịch nào cần đối chiếu.</div>`;
+      } else {
+        body.innerHTML = `<div style="overflow:auto"><table style="min-width:900px">
+          <thead><tr><th>Thời gian</th><th>Số tiền</th><th>Nội dung chuyển khoản</th><th>Tài khoản nhận</th><th>Cổng</th><th>Mã giao dịch</th></tr></thead>
+          <tbody>${rows.map(row => `<tr>
+            <td style="white-space:nowrap">${esc(new Date(row.created_at).toLocaleString("vi-VN"))}</td>
+            <td style="white-space:nowrap;font-weight:700;color:#b91c1c">${fmt(Number(row.amount) || 0)}đ</td>
+            <td style="min-width:260px;white-space:normal;word-break:break-word">${esc(row.content || "Không có nội dung")}</td>
+            <td>${esc(row.account_number || "—")}</td><td>${esc(row.gateway || "—")}</td>
+            <td style="word-break:break-all">${esc(row.transaction_id || "—")}</td>
+          </tr>`).join("")}</tbody></table></div>`;
+      }
+      await refreshUnmatchedBankCount();
+    } catch (error) {
+      body.innerHTML = `<div style="padding:20px;color:#b91c1c">Không tải được danh sách: ${esc(error.message)}</div>`;
+    }
+  };
+
+  window.closeUnmatchedBankModal = function (event) {
+    if (event && event.target?.id !== "unmatchedBankModal") return;
+    const modal = document.getElementById("unmatchedBankModal");
+    if (modal) modal.style.display = "none";
+  };
 
   function syncClassFilterOptions() {
     const sel = document.getElementById("classFilter");
@@ -2297,20 +2353,23 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
         remaining,
         transferMemo,
         qrUrl,
-        selected: due && Boolean(parent?.id && /^(0\d{9}|84\d{9})$/.test(cleanPhone)),
+        selected: due && Boolean(parent?.id && /^(0\d{9}|84\d{9})$/.test(cleanPhone)
+          && /^(0\d{9}|84\d{9})$/.test(studentPhone)),
         due
       };
     });
   }
 
   function isZaloTuitionItemEligible(item) {
-    return Boolean(item?.due && item.parentId && /^(0\d{9}|84\d{9})$/.test(item.phone));
+    return Boolean(item?.due && item.parentId && /^(0\d{9}|84\d{9})$/.test(item.phone)
+      && /^(0\d{9}|84\d{9})$/.test(item.studentPhone));
   }
 
   function zaloTuitionEligibilityReason(item) {
     if (!item?.due) return "Đã thanh toán đủ";
     if (!item.parentId) return "Chưa liên kết tài khoản phụ huynh";
     if (!/^(0\d{9}|84\d{9})$/.test(item.phone || "")) return "SĐT phụ huynh chưa hợp lệ";
+    if (!/^(0\d{9}|84\d{9})$/.test(item.studentPhone || "")) return "Thiếu SĐT học sinh - không thể tạo nội dung chuyển khoản";
     return "";
   }
 
@@ -2466,7 +2525,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     const ym = monthPicker?.value || "";
     if (!/^20\d{2}-(0[1-9]|1[0-2])$/.test(ym)) return alert("Tháng học phí không hợp lệ.");
     if (items.some(item => !isZaloTuitionItemEligible(item))) {
-      return alert("Chỉ gửi cho học sinh còn nợ, đã liên kết phụ huynh và có SĐT hợp lệ.");
+      return alert("Chỉ gửi khi học sinh còn nợ, đã liên kết phụ huynh, và cả SĐT học sinh lẫn SĐT phụ huynh đều hợp lệ.");
     }
     const existing = items.filter(item => (zaloTuitionHistory.get(`${item.studentId}:${item.parentId}`) || []).length);
     const repeatNote = existing.length ? `\n${existing.length} học sinh đã có lịch sử gửi trong tháng; lần này sẽ là lượt nhắc tiếp theo.` : "";

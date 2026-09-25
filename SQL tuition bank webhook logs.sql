@@ -21,7 +21,7 @@ ALTER TABLE public.tuition_payments
   ADD COLUMN IF NOT EXISTS auto_reconciled boolean DEFAULT false;
 
 -- Index giúp tìm kiếm đối soát nhanh chóng
-CREATE INDEX IF NOT EXISTS bank_tx_logs_gateway_tx_idx
+CREATE UNIQUE INDEX IF NOT EXISTS bank_tx_logs_gateway_tx_idx
   ON public.bank_transaction_logs (gateway, transaction_id);
 
 CREATE INDEX IF NOT EXISTS tuition_payments_auto_reconciled_idx

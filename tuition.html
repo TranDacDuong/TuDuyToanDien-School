@@ -960,6 +960,7 @@ tr.recalc-needed td:first-child { border-left: 3px solid #ef4444; }
       <button class="secondary" id="transferAllSurplusBtn" onclick="transferAllSurplusToNextMonth()" style="display:none;background:#e0f2fe;color:#0369a1;border-color:#bae6fd;font-weight:700">➡️ Chuyển dư tất cả</button>
       <button class="secondary" id="notifyTuitionBtn" onclick="notifyPendingTuition()" style="display:none">Thông báo học phí</button>
       <button class="secondary" id="zaloReminderBtn" onclick="openZaloReminderModal()" style="display:none;background:linear-gradient(135deg, #0068ff 0%, #0052cc 100%);color:#fff;border:none;font-weight:700">💬 Nhắc Zalo Tự Động</button>
+      <button class="secondary" id="unmatchedBankBtn" onclick="openUnmatchedBankModal()" style="display:none;background:#fff7ed;color:#9a3412;border-color:#fdba74;font-weight:700">Giao dịch chưa khớp <span id="unmatchedBankCount"></span></button>
       <button class="secondary" onclick="printInvoices()">In hóa đơn</button>
       <button class="secondary" id="lockTuitionBtn" onclick="toggleTuitionLock()" style="display:none">🔒 Chốt học phí</button>
     </div>
@@ -1037,9 +1038,22 @@ tr.recalc-needed td:first-child { border-left: 3px solid #ef4444; }
     </div>
   </div>
 
+  <div id="unmatchedBankModal" class="modal-overlay" onclick="closeUnmatchedBankModal(event)" style="display:none">
+    <div class="modal-card" style="max-width:1040px;width:96%;max-height:90vh;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3 style="margin:0">Giao dịch ngân hàng chưa khớp</h3>
+          <div style="font-size:12px;color:#64748b;margin-top:4px">Dùng số tiền và nội dung chuyển khoản để đối chiếu với học sinh.</div>
+        </div>
+        <button class="modal-close" onclick="closeUnmatchedBankModal()">✕</button>
+      </div>
+      <div class="modal-body" id="unmatchedBankBody" style="padding:16px;overflow:auto;flex:1"></div>
+    </div>
+  </div>
+
   <div id="printArea"></div>
 </div>
 
-<script src="./tuition.js?v=20260925-bank-account1"></script>
+<script src="./tuition.js?v=20260925-zalo-tuition-fixes1"></script>
 </body>
 </html>

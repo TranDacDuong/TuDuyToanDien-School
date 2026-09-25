@@ -158,13 +158,16 @@ async function checkQueuedParent(job) {
         const confirmed = await zaloApi.getFriendRequestStatus(result.uid).catch(() => null);
         if (confirmed?.is_friend === 1) result.status = 'friend';
       } else if (result.status === 'not_friend' && job.invitation_attempted_at) {
-        result.error = 'Lời mời từng được thử gửi nhưng Zalo không còn báo đang chờ; cần kiểm tra thủ công';
+        // A successful/recorded invitation remains authoritative. Zalo's relationship
+        // endpoint can temporarily stop reporting is_requesting while still pending.
+        result.status = 'invited';
+        result.error = null;
       }
     }
-    // Zalo blocks ordinary chat messages while an outgoing friend request is pending.
-    // The request itself contains a short greeting; send the full greeting after acceptance.
-    if (result.status === 'friend' && !job.greeting_sent_at &&
-      (result.invited || job.invitation_sent_at || job.invitation_attempted_at)) {
+    // Some Zalo accounts allow an ordinary message before friendship is accepted.
+    // A successful greeting is the capability check that unlocks the tuition notice.
+    if (['friend', 'invited'].includes(result.status) && !job.greeting_attempted_at &&
+      !job.greeting_sent_at && (result.invited || job.invitation_sent_at || job.invitation_attempted_at)) {
       await gatewayRequest({ action: 'markParentAttempt', parentId: job.parent_id,
         phone: job.phone, kind: 'greeting' });
       stage = 'Gửi tin chào';
@@ -226,19 +229,22 @@ async function sendQueuedTuitionReceipt(job) {
 
 async function syncParentTuition() {
   if (gatewayBusy || !zaloApi || !GATEWAY_URL || !GATEWAY_TOKEN ||
-    campaignStatus !== 'idle' || Date.now() < nextGatewaySendAt) return;
+    campaignStatus !== 'idle') return;
   gatewayBusy = true;
-  let processed = false;
+  let processedKind = null;
   try {
+    // Payment acknowledgements bypass the anti-ban reminder delay and are sent on
+    // the next 12-second poll. The durable row prevents loss while the bot is offline.
     const { job: receiptJob } = await gatewayRequest({ action: 'claimTuitionReceipt' });
     if (receiptJob) {
-      processed = true;
+      processedKind = 'receipt';
       await sendQueuedTuitionReceipt(receiptJob);
       return;
     }
+    if (Date.now() < nextGatewaySendAt) return;
     const { job: tuitionJob } = await gatewayRequest({ action: 'claimTuition' });
     if (tuitionJob) {
-      processed = true;
+      processedKind = 'tuition';
       await sendQueuedTuition(tuitionJob);
       return;
     }
@@ -246,13 +252,13 @@ async function syncParentTuition() {
     nextParentPollAt = Date.now() + 5 * 60 * 1000;
     const { job: parentJob } = await gatewayRequest({ action: 'claimParent' });
     if (parentJob) {
-      processed = true;
+      processedKind = 'parent';
       await checkQueuedParent(parentJob);
     }
   } catch (error) {
     console.warn('[ZaloBot] Đồng bộ phụ huynh/học phí:', error?.message || error);
   } finally {
-    if (processed) {
+    if (processedKind && processedKind !== 'receipt') {
       scheduleNextGatewayAction();
       nextParentPollAt = nextGatewaySendAt;
     }

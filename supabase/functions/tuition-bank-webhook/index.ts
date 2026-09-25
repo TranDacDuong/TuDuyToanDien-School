@@ -164,9 +164,14 @@ serve(async (req: Request) => {
     const sepayKeyHeader = req.headers.get("x-sepay-api-key") || "";
     const expectedSecret = env("BANK_WEBHOOK_SECRET") || env("SEPAY_API_KEY");
 
-    // If secret is set, verify authorization
-    if (expectedSecret && apiKeyQuery !== expectedSecret && !authHeader.includes(expectedSecret) && sepayKeyHeader !== expectedSecret) {
+    if (!expectedSecret) {
+      console.error("BANK_WEBHOOK_SECRET is not configured");
+      return jsonResponse({ success: false, message: "Webhook authentication is not configured" }, 503);
+    }
+    const authorizationSecret = authHeader.replace(/^(Bearer|Apikey)\s+/i, "").trim();
+    if (apiKeyQuery !== expectedSecret && authorizationSecret !== expectedSecret && sepayKeyHeader !== expectedSecret) {
       console.warn("Unauthorized bank webhook request");
+      return jsonResponse({ success: false, message: "Unauthorized" }, 401);
     }
 
     const bodyText = await req.text();
@@ -234,10 +239,32 @@ serve(async (req: Request) => {
         continue;
       }
 
-      const duplicateLogs = await fetchJson<Array<any>>(
-        `bank_transaction_logs?gateway=eq.${encodeURIComponent(item.gateway)}&transaction_id=eq.${encodeURIComponent(item.txId)}&select=id&limit=1`
-      ).catch(() => []);
-      if (duplicateLogs.length) {
+      // Atomically reserve the bank transaction before changing tuition. The unique
+      // constraint closes the race where two callbacks could both credit one payment.
+      const claimedLogs = await fetchJson<Array<any>>(
+        "bank_transaction_logs?on_conflict=gateway,transaction_id",
+        {
+          method: "POST",
+          headers: { Prefer: "return=representation,resolution=ignore-duplicates" },
+          body: JSON.stringify({
+            gateway: item.gateway,
+            transaction_id: item.txId,
+            account_number: item.accountNo,
+            amount: item.amount,
+            content: item.content,
+            raw_payload: item.raw,
+            status: "failed",
+          }),
+        }
+      ).catch(err => {
+        console.error("Failed to reserve bank transaction:", err);
+        return null;
+      });
+      if (!claimedLogs) {
+        results.push({ txId: item.txId, status: "log_reservation_failed" });
+        continue;
+      }
+      if (!claimedLogs.length) {
         results.push({ txId: item.txId, status: "duplicate_ignored" });
         continue;
       }
@@ -455,20 +482,15 @@ serve(async (req: Request) => {
         }
       }
 
-      // Log transaction into bank_transaction_logs
-      await fetchJson("bank_transaction_logs", {
-        method: "POST",
+      await fetchJson(
+        `bank_transaction_logs?gateway=eq.${encodeURIComponent(item.gateway)}&transaction_id=eq.${encodeURIComponent(item.txId)}`,
+        {
+        method: "PATCH",
         body: JSON.stringify({
-          gateway: item.gateway,
-          transaction_id: item.txId,
-          account_number: item.accountNo,
-          amount: item.amount,
-          content: item.content,
-          raw_payload: item.raw,
           matched_tuition_id: matchedId,
           status,
         }),
-      }).catch(err => console.error("Failed to insert bank_transaction_logs:", err));
+      }).catch(err => console.error("Failed to update bank_transaction_logs:", err));
 
       results.push({ txId: item.txId, matchedId, status, amount: item.amount });
     }
