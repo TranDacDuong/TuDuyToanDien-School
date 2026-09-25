@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS public.bank_transaction_logs (
   content text,
   raw_payload jsonb NOT NULL DEFAULT '{}'::jsonb,
   matched_tuition_id uuid REFERENCES public.tuition_payments(id) ON DELETE SET NULL,
-  status text NOT NULL DEFAULT 'success' CHECK (status IN ('success', 'unmatched', 'failed', 'duplicate')),
+  status text NOT NULL DEFAULT 'success' CHECK (status IN ('success', 'unmatched', 'failed', 'duplicate', 'resolved')),
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -39,3 +39,25 @@ FOR SELECT TO authenticated USING (
 DROP POLICY IF EXISTS bank_tx_logs_service_role_all ON public.bank_transaction_logs;
 CREATE POLICY bank_tx_logs_service_role_all ON public.bank_transaction_logs
 FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+CREATE OR REPLACE FUNCTION public.manage_unmatched_bank_transaction(p_id uuid, p_action text)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid()
+    AND u.role::text IN ('admin','accountant')) THEN
+    RAISE EXCEPTION 'Tuition admin or accountant required';
+  END IF;
+  IF p_action NOT IN ('resolve','delete') THEN RAISE EXCEPTION 'Invalid action'; END IF;
+  PERFORM 1 FROM public.bank_transaction_logs WHERE id = p_id AND status = 'unmatched' FOR UPDATE;
+  IF NOT FOUND THEN RETURN false; END IF;
+  IF p_action = 'resolve' THEN
+    UPDATE public.bank_transaction_logs SET status = 'resolved' WHERE id = p_id;
+  ELSE
+    DELETE FROM public.bank_transaction_logs WHERE id = p_id;
+  END IF;
+  RETURN true;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.manage_unmatched_bank_transaction(uuid,text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.manage_unmatched_bank_transaction(uuid,text) TO authenticated;

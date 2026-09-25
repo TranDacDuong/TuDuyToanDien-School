@@ -1030,13 +1030,17 @@ Nhập số tiền hoàn lại (>0):`,
         body.innerHTML = `<div style="padding:24px;text-align:center;color:#64748b">Không có giao dịch nào cần đối chiếu.</div>`;
       } else {
         body.innerHTML = `<div style="overflow:auto"><table style="min-width:900px">
-          <thead><tr><th>Thời gian</th><th>Số tiền</th><th>Nội dung chuyển khoản</th><th>Tài khoản nhận</th><th>Cổng</th><th>Mã giao dịch</th></tr></thead>
+          <thead><tr><th>Thời gian</th><th>Số tiền</th><th>Nội dung chuyển khoản</th><th>Tài khoản nhận</th><th>Cổng</th><th>Mã giao dịch</th><th>Thao tác</th></tr></thead>
           <tbody>${rows.map(row => `<tr>
             <td style="white-space:nowrap">${esc(new Date(row.created_at).toLocaleString("vi-VN"))}</td>
             <td style="white-space:nowrap;font-weight:700;color:#b91c1c">${fmt(Number(row.amount) || 0)}đ</td>
             <td style="min-width:260px;white-space:normal;word-break:break-word">${esc(row.content || "Không có nội dung")}</td>
             <td>${esc(row.account_number || "—")}</td><td>${esc(row.gateway || "—")}</td>
             <td style="word-break:break-all">${esc(row.transaction_id || "—")}</td>
+            <td style="white-space:nowrap">
+              <button type="button" onclick="manageUnmatchedBankTransaction('${row.id}','resolve',${Number(row.amount) || 0})" style="border:1px solid #86efac;background:#f0fdf4;color:#166534;padding:5px 8px;border-radius:6px;cursor:pointer;font-weight:600">✓ Đã xử lý</button>
+              <button type="button" onclick="manageUnmatchedBankTransaction('${row.id}','delete',${Number(row.amount) || 0})" style="border:1px solid #fca5a5;background:#fff1f2;color:#b91c1c;padding:5px 8px;border-radius:6px;cursor:pointer;margin-left:4px">Xóa</button>
+            </td>
           </tr>`).join("")}</tbody></table></div>`;
       }
       await refreshUnmatchedBankCount();
@@ -1049,6 +1053,22 @@ Nhập số tiền hoàn lại (>0):`,
     if (event && event.target?.id !== "unmatchedBankModal") return;
     const modal = document.getElementById("unmatchedBankModal");
     if (modal) modal.style.display = "none";
+  };
+
+  window.manageUnmatchedBankTransaction = async function (id, action, amount) {
+    if (!canManagePayments() || !["resolve", "delete"].includes(action)) return;
+    const label = action === "resolve" ? "đánh dấu đã xử lý" : "xóa vĩnh viễn";
+    if (!confirm(`Bạn có chắc muốn ${label} giao dịch ${fmt(Number(amount) || 0)}đ này?`)) return;
+    try {
+      const { data, error } = await getSb().rpc("manage_unmatched_bank_transaction", {
+        p_id: id, p_action: action
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Giao dịch không còn ở trạng thái chưa khớp.");
+      await openUnmatchedBankModal();
+    } catch (error) {
+      alert("Không cập nhật được giao dịch: " + error.message);
+    }
   };
 
   function syncClassFilterOptions() {
