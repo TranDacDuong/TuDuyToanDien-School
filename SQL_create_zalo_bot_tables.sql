@@ -27,7 +27,7 @@ Quý phụ huynh có thể thanh toán nhanh bằng cách quét ảnh mã QR đ�
 (Lưu ý: Quý phụ huynh vui lòng giữ nguyên nội dung chuyển khoản trên để hệ thống tự động gạch nợ ngay khi nhận được tiền).
 Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️',
     bank_name TEXT DEFAULT 'VietinBank',
-    bank_account_no TEXT DEFAULT '105870682948',
+    bank_account_no TEXT DEFAULT '104888332556',
     bot_status TEXT DEFAULT 'disconnected',    -- 'disconnected', 'qr_ready', 'connected'
     bot_phone TEXT,
     bot_name TEXT,

@@ -67,7 +67,7 @@
   const STATIC_BANK_INFO = {
     bankCode: "vietinbank",
     bankName: "VietinBank",
-    account: "105870682948",
+    account: "104888332556",
   };
 
   function buildPaymentQrUrl(studentName, ym, amount, studentId = "", paymentId = "", phone = "") {
