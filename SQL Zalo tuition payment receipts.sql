@@ -102,6 +102,13 @@ BEGIN
     error_message = 'Sender interrupted; check Zalo before another acknowledgement', updated_at = now()
   WHERE status = 'processing' AND lease_until < now();
 
+  UPDATE public.zalo_tuition_receipts r
+  SET status = 'failed', lease_until = NULL,
+    error_message = 'Không tìm thấy tài khoản Zalo của phụ huynh', updated_at = now()
+  FROM public.zalo_parent_contacts c
+  WHERE r.parent_id = c.parent_id AND r.status = 'pending'
+    AND c.status = 'not_found' AND c.zalo_uid IS NULL;
+
   RETURN QUERY
   WITH due AS (
     SELECT r.id
@@ -110,7 +117,7 @@ BEGIN
     JOIN public.users p ON p.id = r.parent_id
     WHERE r.status = 'pending'
       AND c.zalo_uid IS NOT NULL
-      AND (c.status = 'friend' OR c.greeting_sent_at IS NOT NULL)
+      AND (c.status IN ('friend','invited') OR c.greeting_sent_at IS NOT NULL)
       AND c.phone = regexp_replace(p.phone, '[^0-9]', '', 'g')
       AND EXISTS (
         SELECT 1 FROM public.parent_students ps

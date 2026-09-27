@@ -229,8 +229,10 @@ async function sendQueuedTuitionReceipt(job) {
     if (isZaloLimitError(error)) {
       await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
     }
+    const detail = String(error?.message || error);
     await gatewayRequest({ action: 'finishTuitionReceipt', jobId: job.job_id,
-      status: 'uncertain', error: String(error?.message || error) });
+      status: isUncertainSendError(error) ? 'uncertain' : 'failed',
+      error: `Chưa gửi được tin nhắn xác nhận học phí: ${detail}` });
   }
 }
 
