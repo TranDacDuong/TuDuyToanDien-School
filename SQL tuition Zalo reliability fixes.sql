@@ -28,6 +28,74 @@ $$;
 REVOKE ALL ON FUNCTION public.manage_unmatched_bank_transaction(uuid,text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.manage_unmatched_bank_transaction(uuid,text) TO authenticated;
 
+-- A duplicate active reminder is skipped per student instead of aborting the
+-- whole batch selected by the accountant.
+CREATE OR REPLACE FUNCTION public.queue_zalo_tuition_deliveries(p_month text, p_items jsonb)
+RETURNS integer LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_item jsonb; v_student uuid; v_parent uuid; v_request uuid; v_month date;
+  v_attempt integer; v_count integer := 0; v_phone text;
+  v_remaining numeric; v_due numeric; v_paid numeric;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid()
+    AND role::text IN ('admin','assistant','accountant')) THEN
+    RAISE EXCEPTION 'Tuition staff required';
+  END IF;
+  IF p_month !~ '^20[0-9]{2}-(0[1-9]|1[0-2])$' OR jsonb_typeof(p_items) <> 'array'
+    OR jsonb_array_length(p_items) NOT BETWEEN 1 AND 100 THEN
+    RAISE EXCEPTION 'Invalid month or batch size';
+  END IF;
+  v_month := (p_month || '-01')::date;
+  FOR v_item IN SELECT value FROM jsonb_array_elements(p_items) LOOP
+    v_student := (v_item->>'student_id')::uuid;
+    v_parent := (v_item->>'parent_id')::uuid;
+    v_request := (v_item->>'request_key')::uuid;
+    IF EXISTS (SELECT 1 FROM public.zalo_tuition_deliveries WHERE request_key = v_request) THEN CONTINUE; END IF;
+    IF length(trim(COALESCE(v_item->>'content',''))) NOT BETWEEN 1 AND 5000 THEN
+      RAISE EXCEPTION 'Invalid tuition message';
+    END IF;
+    IF nullif(v_item->>'qr_url','') IS NOT NULL AND
+      ((v_item->>'qr_url') NOT LIKE 'https://img.vietqr.io/image/%' OR length(v_item->>'qr_url') > 1000) THEN
+      RAISE EXCEPTION 'Invalid QR image URL';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM public.parent_students ps
+      WHERE ps.student_id = v_student AND ps.parent_id = v_parent AND ps.revoked_at IS NULL) THEN
+      RAISE EXCEPTION 'Parent is not linked to student';
+    END IF;
+    SELECT regexp_replace(phone, '[^0-9]', '', 'g') INTO v_phone
+    FROM public.users WHERE id = v_parent AND role::text = 'parent';
+    IF v_phone IS NULL OR v_phone !~ '^(0[0-9]{9}|84[0-9]{9})$' THEN
+      RAISE EXCEPTION 'Parent phone is missing or invalid';
+    END IF;
+    SELECT tp.amount_due, tp.amount_paid INTO v_due, v_paid
+    FROM public.tuition_payments tp WHERE tp.student_id = v_student AND tp.month = v_month;
+    v_remaining := (v_item->>'remaining')::numeric;
+    IF v_due IS NULL OR v_due <= 0 OR v_paid >= v_due OR v_remaining <> v_due - v_paid THEN
+      RAISE EXCEPTION 'No unpaid saved tuition for this student/month';
+    END IF;
+    PERFORM pg_advisory_xact_lock(hashtextextended(v_student::text || v_parent::text || p_month, 0));
+    IF EXISTS (SELECT 1 FROM public.zalo_tuition_deliveries
+      WHERE student_id = v_student AND parent_id = v_parent AND month = v_month
+        AND status IN ('queued','processing','not_found','not_friend','invited','greeted')) THEN
+      CONTINUE;
+    END IF;
+    SELECT COALESCE(max(attempt_no), 0) + 1 INTO v_attempt
+    FROM public.zalo_tuition_deliveries
+    WHERE student_id = v_student AND parent_id = v_parent AND month = v_month;
+    IF v_attempt > 3 THEN RAISE EXCEPTION 'Maximum three reminders per student/month'; END IF;
+    INSERT INTO public.zalo_tuition_deliveries
+      (request_key, student_id, parent_id, month, attempt_no, remaining_snapshot, content, qr_url, created_by)
+    VALUES (v_request, v_student, v_parent, v_month, v_attempt, v_remaining,
+      trim(v_item->>'content'), nullif(v_item->>'qr_url',''), auth.uid());
+    v_count := v_count + 1;
+  END LOOP;
+  RETURN v_count;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.queue_zalo_tuition_deliveries(text,jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.queue_zalo_tuition_deliveries(text,jsonb) TO authenticated;
+
 -- Keep one durable row per gateway transaction so concurrent callbacks cannot
 -- credit the same payment twice.
 DELETE FROM public.bank_transaction_logs newer

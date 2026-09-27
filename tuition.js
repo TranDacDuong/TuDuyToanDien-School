@@ -2382,7 +2382,15 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
 
   function isZaloTuitionItemEligible(item) {
     return Boolean(item?.due && item.parentId && /^(0\d{9}|84\d{9})$/.test(item.phone)
-      && /^(0\d{9}|84\d{9})$/.test(item.studentPhone));
+      && /^(0\d{9}|84\d{9})$/.test(item.studentPhone)
+      && !hasPendingZaloTuitionDelivery(item));
+  }
+
+  function hasPendingZaloTuitionDelivery(item) {
+    if (!item?.studentId || !item?.parentId) return false;
+    const active = new Set(["queued", "processing", "not_found", "not_friend", "invited", "greeted"]);
+    return (zaloTuitionHistory.get(`${item.studentId}:${item.parentId}`) || [])
+      .some(entry => active.has(entry.status));
   }
 
   function zaloTuitionEligibilityReason(item) {
@@ -2390,6 +2398,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     if (!item.parentId) return "Chưa liên kết tài khoản phụ huynh";
     if (!/^(0\d{9}|84\d{9})$/.test(item.phone || "")) return "SĐT phụ huynh chưa hợp lệ";
     if (!/^(0\d{9}|84\d{9})$/.test(item.studentPhone || "")) return "Thiếu SĐT học sinh - không thể tạo nội dung chuyển khoản";
+    if (hasPendingZaloTuitionDelivery(item)) return "Đã có lượt nhắc đang chờ bot xử lý";
     return "";
   }
 
@@ -2451,11 +2460,20 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
         if (error) throw error;
         zaloParentContactStatus = new Map((data || []).map(row => [row.parent_id, row]));
       }
+      currentZaloCampaignItems.forEach((item, idx) => {
+        if (!isZaloTuitionItemEligible(item)) item.selected = false;
+        const checkbox = document.querySelector(`.zalo-item-chk[data-index="${idx}"]`);
+        if (checkbox) {
+          checkbox.disabled = !isZaloTuitionItemEligible(item);
+          checkbox.checked = Boolean(item.selected);
+        }
+      });
       const { data: state } = await getSb().from("zalo_automation_state")
         .select("paused,reason,updated_at").eq("id", 1).maybeSingle();
       zaloAutomationState = state || null;
       zaloHistoryFetchedAt = Date.now();
       renderZaloTuitionHistoryCells();
+      updateZaloSelectedSummary();
       updateZaloDynamicStatus();
     } catch (error) {
       console.warn("Không tải được lịch sử Zalo học phí:", error);
@@ -2596,7 +2614,8 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
         queuedCount += Number(data) || 0;
       }
       await loadZaloTuitionHistory();
-      alert(`Đã xếp hàng ${queuedCount} thông báo học phí. Có thể đóng trang; tiến độ được lưu trên máy chủ.`);
+      const skippedCount = items.length - queuedCount;
+      alert(`Đã xếp hàng ${queuedCount} thông báo học phí.${skippedCount > 0 ? ` Bỏ qua ${skippedCount} lượt đã có trong hàng chờ.` : ""} Có thể đóng trang; tiến độ được lưu trên máy chủ.`);
     } catch (error) {
       alert("Không xếp hàng được: " + error.message);
     } finally {

@@ -128,7 +128,7 @@ BEGIN
     IF EXISTS (SELECT 1 FROM public.zalo_tuition_deliveries
       WHERE student_id = v_student AND parent_id = v_parent AND month = v_month
         AND status IN ('queued','processing','not_found','not_friend','invited','greeted')) THEN
-      RAISE EXCEPTION 'A reminder is already pending for this student/month';
+      CONTINUE;
     END IF;
     SELECT COALESCE(max(attempt_no), 0) + 1 INTO v_attempt FROM public.zalo_tuition_deliveries
       WHERE student_id = v_student AND parent_id = v_parent AND month = v_month;
