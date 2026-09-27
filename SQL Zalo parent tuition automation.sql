@@ -90,7 +90,7 @@ BEGIN
   IF p_month !~ '^20[0-9]{2}-(0[1-9]|1[0-2])$' OR jsonb_typeof(p_items) <> 'array' THEN
     RAISE EXCEPTION 'Invalid month or batch size';
   END IF;
-  IF jsonb_array_length(p_items) NOT BETWEEN 1 AND 100 THEN
+  IF jsonb_array_length(p_items) NOT BETWEEN 1 AND 300 THEN
     RAISE EXCEPTION 'Invalid batch size';
   END IF;
   v_month := (p_month || '-01')::date;
