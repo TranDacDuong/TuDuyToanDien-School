@@ -1628,7 +1628,7 @@ Nhập số tiền hoàn lại (>0):`,
         .eq("hidden", false),
       sb.from("class_students")
         .select(`id, class_id, student_id, joined_at, left_at,
-                 user:users!fk_student(id, full_name, email)`),
+                 user:users!fk_student(id, full_name, email, phone)`),
       sb.from("class_student_schedules")
         .select("class_id, student_id, schedule_id, effective_from"),
     ]);
