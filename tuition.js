@@ -2408,7 +2408,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
   function zaloTuitionStatusLabel(status) {
     return ({ queued: "Đang chờ bot", processing: "Đang gửi", not_found: "Không tìm thấy Zalo",
       not_friend: "Chưa kết bạn", invited: "Đã gửi lời mời", greeted: "Chờ gửi học phí",
-      sent: "Đã gửi học phí", failed: "Gửi lỗi", uncertain: "Cần kiểm tra trên Zalo",
+      sent: "Đã gửi học phí", failed: "Chưa gửi được tin nhắn", uncertain: "Chưa xác nhận gửi - cần kiểm tra Zalo",
       cancelled: "Đã hủy" })[status] || "Đang đồng bộ";
   }
 

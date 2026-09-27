@@ -87,6 +87,11 @@ function isZaloLimitError(error) {
     .test(String(error?.message || error));
 }
 
+function isUncertainSendError(error) {
+  return /timeout|timed out|network|fetch failed|econn|socket|connection|aborted|reset/i
+    .test(String(error?.message || error));
+}
+
 function buildParentGreeting(studentName, recipientKey) {
   const student = String(studentName || '').trim();
   const child = student ? `em ${student}` : 'con';
@@ -192,8 +197,10 @@ async function sendQueuedTuition(job) {
     if (isZaloLimitError(error)) {
       await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
     }
+    const detail = String(error?.message || error);
     await gatewayRequest({ action: 'finishTuition', jobId: job.job_id,
-      status: 'uncertain', error: String(error?.message || error) });
+      status: isUncertainSendError(error) ? 'uncertain' : 'failed',
+      error: `Chưa gửi được tin nhắn: ${detail}` });
     return;
   }
   let qrError = null;

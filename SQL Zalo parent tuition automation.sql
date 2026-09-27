@@ -245,9 +245,7 @@ BEGIN
     last_checked_at = now(), lease_until = NULL,
     next_check_at = ((timezone('Asia/Ho_Chi_Minh', now())::date + 1 + time '09:00')
       AT TIME ZONE 'Asia/Ho_Chi_Minh') + make_interval(secs => floor(random() * 32400)::int),
-    last_error = CASE
-      WHEN p_status <> 'friend' AND (p_status = 'invited' OR p_invited OR c.invitation_sent_at IS NOT NULL)
-        THEN NULL ELSE left(p_error,500) END,
+    last_error = left(p_error,500),
     updated_at = now()
   WHERE c.parent_id = p_parent_id AND c.phone = p_phone AND c.lease_until IS NOT NULL;
   IF NOT FOUND THEN RAISE EXCEPTION 'Contact check lease not found'; END IF;
@@ -259,6 +257,7 @@ BEGIN
       WHEN p_status = 'invited' THEN 'invited' ELSE 'not_friend' END,
     invitation_at = COALESCE(d.invitation_at, (SELECT invitation_sent_at FROM public.zalo_parent_contacts WHERE parent_id = p_parent_id)),
     greeting_at = COALESCE(d.greeting_at, (SELECT greeting_sent_at FROM public.zalo_parent_contacts WHERE parent_id = p_parent_id)),
+    error_message = left(p_error,500),
     updated_at = now()
   WHERE d.parent_id = p_parent_id AND d.status IN ('queued','not_found','not_friend','invited','greeted');
   IF p_status = 'rate_limited' THEN
@@ -290,7 +289,8 @@ BEGIN
     JOIN public.users p ON p.id = d.parent_id
     JOIN public.tuition_payments tp ON tp.student_id = d.student_id AND tp.month = d.month
     WHERE d.status IN ('queued','not_found','not_friend','invited','greeted')
-      AND c.zalo_uid IS NOT NULL AND (c.status = 'friend' OR c.greeting_sent_at IS NOT NULL)
+      AND c.zalo_uid IS NOT NULL
+      AND (c.status IN ('friend','invited') OR c.greeting_sent_at IS NOT NULL)
       AND c.phone = regexp_replace(p.phone, '[^0-9]', '', 'g')
       AND EXISTS (SELECT 1 FROM public.parent_students ps WHERE ps.parent_id = d.parent_id
         AND ps.student_id = d.student_id AND ps.revoked_at IS NULL)

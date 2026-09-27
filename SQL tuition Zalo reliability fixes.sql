@@ -259,7 +259,7 @@ BEGIN
     greeting_sent_at = CASE WHEN p_greeted THEN COALESCE(c.greeting_sent_at, now()) ELSE c.greeting_sent_at END,
     last_checked_at = now(), lease_until = NULL,
     next_check_at = now() + interval '1 day' + make_interval(secs => floor(random() * 21600)::int),
-    last_error = CASE WHEN v_effective_status = 'invited' THEN NULL ELSE left(p_error,500) END,
+    last_error = left(p_error,500),
     updated_at = now()
   WHERE c.parent_id = p_parent_id AND c.phone = p_phone AND c.lease_until IS NOT NULL;
 
@@ -273,6 +273,7 @@ BEGIN
       ELSE 'not_friend' END,
     invitation_at = COALESCE(d.invitation_at, (SELECT invitation_sent_at FROM public.zalo_parent_contacts WHERE parent_id = p_parent_id)),
     greeting_at = COALESCE(d.greeting_at, (SELECT greeting_sent_at FROM public.zalo_parent_contacts WHERE parent_id = p_parent_id)),
+    error_message = left(p_error,500),
     updated_at = now()
   WHERE d.parent_id = p_parent_id AND d.status IN ('queued','not_found','not_friend','invited','greeted');
 
@@ -287,3 +288,48 @@ REVOKE ALL ON FUNCTION public.claim_zalo_parent_check() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.finish_zalo_parent_check(uuid,text,text,text,boolean,boolean,text,boolean,boolean) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.claim_zalo_parent_check() TO service_role;
 GRANT EXECUTE ON FUNCTION public.finish_zalo_parent_check(uuid,text,text,text,boolean,boolean,text,boolean,boolean) TO service_role;
+
+-- A pending friend invitation does not block tuition delivery. Zalo may allow
+-- messages before the invitation is accepted; the bot records a clear failure
+-- when the account rejects that message.
+CREATE OR REPLACE FUNCTION public.claim_zalo_tuition_delivery()
+RETURNS TABLE(job_id uuid, zalo_uid text, content text, qr_url text)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF auth.role() <> 'service_role' THEN RAISE EXCEPTION 'Service role required'; END IF;
+  IF (SELECT paused FROM public.zalo_automation_state WHERE id = 1) THEN RETURN; END IF;
+  UPDATE public.zalo_tuition_deliveries SET status = 'uncertain', lease_until = NULL,
+    error_message = 'Sender interrupted; check Zalo before another reminder', updated_at = now()
+  WHERE status = 'processing' AND lease_until < now();
+  UPDATE public.zalo_tuition_deliveries d SET status = 'cancelled', updated_at = now(),
+    error_message = 'Tuition paid or amount changed; create a fresh reminder'
+  FROM public.tuition_payments tp
+  WHERE d.student_id = tp.student_id AND d.month = tp.month
+    AND (tp.amount_paid >= tp.amount_due OR tp.amount_due - tp.amount_paid <> d.remaining_snapshot)
+    AND d.status IN ('queued','not_found','not_friend','invited','greeted');
+  RETURN QUERY
+  WITH due AS (
+    SELECT d.id FROM public.zalo_tuition_deliveries d
+    JOIN public.zalo_parent_contacts c ON c.parent_id = d.parent_id
+    JOIN public.users p ON p.id = d.parent_id
+    JOIN public.tuition_payments tp ON tp.student_id = d.student_id AND tp.month = d.month
+    WHERE d.status IN ('queued','not_found','not_friend','invited','greeted')
+      AND c.zalo_uid IS NOT NULL
+      AND (c.status IN ('friend','invited') OR c.greeting_sent_at IS NOT NULL)
+      AND c.phone = regexp_replace(p.phone, '[^0-9]', '', 'g')
+      AND EXISTS (SELECT 1 FROM public.parent_students ps WHERE ps.parent_id = d.parent_id
+        AND ps.student_id = d.student_id AND ps.revoked_at IS NULL)
+      AND tp.amount_due > tp.amount_paid AND tp.amount_due > 0
+      AND tp.amount_due - tp.amount_paid = d.remaining_snapshot
+    ORDER BY d.created_at FOR UPDATE OF d SKIP LOCKED LIMIT 1
+  ), claimed AS (
+    UPDATE public.zalo_tuition_deliveries d SET status = 'processing',
+      lease_until = now() + interval '5 minutes', updated_at = now()
+    FROM due WHERE d.id = due.id RETURNING d.id, d.parent_id, d.content, d.qr_url
+  ) SELECT x.id, c.zalo_uid, x.content, x.qr_url
+    FROM claimed x JOIN public.zalo_parent_contacts c ON c.parent_id = x.parent_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.claim_zalo_tuition_delivery() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.claim_zalo_tuition_delivery() TO service_role;
