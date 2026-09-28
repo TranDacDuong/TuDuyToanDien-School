@@ -621,6 +621,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-outline btn-sm" id="sZaloBulkStart" type="button" onclick="sStartZaloBulkRun()">Kiểm tra & kết nối Zalo PH chưa kết bạn</button>
         <button class="btn btn-outline btn-sm" id="sZaloAliasStart" type="button" onclick="sStartZaloAliasSync()">Đồng bộ biệt danh Zalo PH</button>
+        <button class="btn btn-outline btn-sm" id="sZaloTemplateOpen" type="button" onclick="sOpenZaloLinkTemplate()">Mẫu tin liên kết Zalo</button>
         <button class="btn btn-outline btn-sm" onclick="sDownloadImportTemplate()">🧾 Tải file mẫu</button>
         <button class="btn btn-primary btn-sm" onclick="sPickImportFile()">📤 Nhập Excel</button>
         <button class="btn btn-outline btn-sm" onclick="sExportExcel()">📥 Xuất Excel</button>
@@ -670,6 +671,30 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
         <span class="s-pg-info" id="sPgInfo"></span>
         <div class="s-pg-btns" id="sPgBtns"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-ov" id="sZaloTemplateModal" onclick="if(event.target===this)sCloseZaloLinkTemplate()">
+  <div class="modal-box" style="width:min(96vw,720px);max-height:90vh;overflow:auto">
+    <div class="modal-mhd">
+      <div><h3>Mẫu tin liên kết Zalo</h3><div class="s-zalo-detail-meta">Chọn phụ huynh để tự điền tên học sinh và SĐT liên kết.</div></div>
+      <button class="modal-mclose" type="button" onclick="sCloseZaloLinkTemplate()">✕</button>
+    </div>
+    <div class="fg" style="margin-top:14px">
+      <label>Tìm phụ huynh hoặc học sinh</label>
+      <input id="sZaloTemplateSearch" placeholder="Nhập tên phụ huynh, SĐT hoặc tên học sinh..." oninput="sRenderZaloTemplateCandidates()" autocomplete="off">
+      <div class="pl-results" id="sZaloTemplateResults" style="max-height:220px;overflow:auto"></div>
+    </div>
+    <div class="pl-selected" id="sZaloTemplateSelected"></div>
+    <div class="fg">
+      <label>Nội dung gửi qua Zalo</label>
+      <textarea id="sZaloTemplateContent" style="width:100%;min-height:260px;resize:vertical" placeholder="Chọn một phụ huynh để tạo nội dung..."></textarea>
+      <div class="pl-note">Không xóa hoặc đặt nội dung sau dòng #lienket_SĐT_PH ở cuối tin nhắn.</div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-outline btn-sm" type="button" onclick="sCloseZaloLinkTemplate()">Đóng</button>
+      <button class="btn btn-primary btn-sm" id="sZaloTemplateCopy" type="button" onclick="sCopyZaloLinkTemplate()" disabled>Sao chép nội dung</button>
     </div>
   </div>
 </div>
@@ -1774,6 +1799,7 @@ document.getElementById('tSMon').addEventListener('change', tApplyFilter);
 let _sAll=[], _sFilt=[], _sPage=1, _sSortF='full_name', _sSortD=1, _sEditId=null, _sLinkedParents={}, _sMobileStatus={}, _sZaloContacts={};
 let _sZaloBulkBusy=false, _sZaloBulkTimer=null, _sZaloBulkRunId=null, _sZaloDetailRows=[];
 let _sZaloAliasBusy=false, _sZaloAliasRunId=null, _sZaloAliasRows=[];
+let _sZaloTemplateParents=[], _sZaloTemplateParent=null;
 const S_PAGE=15;
 
 function sRmVN(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đĐ]/g,m=>m==='đ'?'d':'D').toLowerCase(); }
@@ -2111,6 +2137,73 @@ async function sStartZaloAliasSync(){
     toast(data?.already_running?'Đợt đồng bộ biệt danh hiện tại vẫn đang chạy.':`Đã xếp hàng ${data?.total||0} phụ huynh để đổi biệt danh.`,4000);
   }catch(error){alert('Không bắt đầu được: '+error.message);}
   finally{_sZaloAliasBusy=false;if(button) button.disabled=false;}
+}
+
+function sBuildZaloTemplateParents(){
+  const parents={};
+  Object.entries(_sLinkedParents).forEach(([studentId,linkedParents])=>{
+    const student=_sAll.find(item=>item.id===studentId);
+    (linkedParents||[]).forEach(parent=>{
+      if(!parents[parent.id]) parents[parent.id]={...parent,student_names:[]};
+      if(student?.full_name&&!parents[parent.id].student_names.includes(student.full_name))
+        parents[parent.id].student_names.push(student.full_name);
+    });
+  });
+  _sZaloTemplateParents=Object.values(parents).filter(parent=>
+    /^(0\d{9}|84\d{9})$/.test(String(parent.phone||'').replace(/\D/g,''))
+  ).sort((a,b)=>String(a.full_name||'').localeCompare(String(b.full_name||''),'vi'));
+}
+
+function sOpenZaloLinkTemplate(){
+  sBuildZaloTemplateParents(); _sZaloTemplateParent=null;
+  document.getElementById('sZaloTemplateSearch').value='';
+  document.getElementById('sZaloTemplateContent').value='';
+  document.getElementById('sZaloTemplateSelected').classList.remove('show');
+  document.getElementById('sZaloTemplateCopy').disabled=true;
+  document.getElementById('sZaloTemplateModal').classList.add('open');
+  sRenderZaloTemplateCandidates();
+  setTimeout(()=>document.getElementById('sZaloTemplateSearch')?.focus(),50);
+}
+
+function sCloseZaloLinkTemplate(){document.getElementById('sZaloTemplateModal')?.classList.remove('open');}
+
+function sRenderZaloTemplateCandidates(){
+  const box=document.getElementById('sZaloTemplateResults'); if(!box) return;
+  const needle=sRmVN(document.getElementById('sZaloTemplateSearch')?.value||'');
+  const rows=_sZaloTemplateParents.filter(parent=>!needle||sRmVN([
+    parent.full_name,parent.phone,...parent.student_names].filter(Boolean).join(' ')).includes(needle)).slice(0,50);
+  if(!rows.length){box.innerHTML='<div class="pl-note">Không tìm thấy phụ huynh có SĐT hợp lệ.</div>';return;}
+  box.innerHTML=rows.map(parent=>`<button class="pl-result" type="button" onclick="sSelectZaloTemplateParent('${esc(parent.id)}')">
+    <div class="pl-result-title">${esc(parent.full_name||'Phụ huynh')} · ${esc(parent.phone||'')}</div>
+    <div class="pl-result-meta">Học sinh: ${esc(parent.student_names.join(', ')||'Chưa liên kết')}</div>
+  </button>`).join('');
+}
+
+function sVietnameseNameList(names){
+  if(names.length<=1) return names[0]||'học sinh';
+  return `${names.slice(0,-1).join(', ')} và ${names[names.length-1]}`;
+}
+
+function sSelectZaloTemplateParent(parentId){
+  const parent=_sZaloTemplateParents.find(item=>item.id===parentId); if(!parent) return;
+  _sZaloTemplateParent=parent;
+  const phone=String(parent.phone||'').replace(/\D/g,'');
+  const students=sVietnameseNameList(parent.student_names);
+  const childPhrase=parent.student_names.length>1?`các em ${students}`:`em ${students}`;
+  document.getElementById('sZaloTemplateSelected').innerHTML=`Đã chọn: ${esc(parent.full_name||'Phụ huynh')} · ${esc(phone)}<br>Học sinh: ${esc(students)}`;
+  document.getElementById('sZaloTemplateSelected').classList.add('show');
+  document.getElementById('sZaloTemplateContent').value=`Trung tâm MindUp xin chào Quý phụ huynh của ${childPhrase}.\n\nTừ nay, trung tâm sẽ sử dụng cuộc trò chuyện này để gửi thông báo về lịch học, tình hình học tập, kết quả kiểm tra và học phí. Khi cần trao đổi, Quý phụ huynh có thể nhắn trực tiếp tại đây để được hỗ trợ.\n\nCảm ơn Quý phụ huynh đã đồng hành cùng MindUp!\n\n#lienket_${phone}`;
+  document.getElementById('sZaloTemplateCopy').disabled=false;
+}
+
+async function sCopyZaloLinkTemplate(){
+  if(!_sZaloTemplateParent) return alert('Hãy chọn phụ huynh trước.');
+  const content=document.getElementById('sZaloTemplateContent').value.trim();
+  const phone=String(_sZaloTemplateParent.phone||'').replace(/\D/g,'');
+  const expected=`#lienket_${phone}`;
+  if(!content.endsWith(expected)) return alert(`Dòng cuối tin nhắn phải là ${expected}`);
+  try{await navigator.clipboard.writeText(content);toast('Đã sao chép mẫu tin liên kết Zalo.',4000);}
+  catch(error){alert('Không sao chép được tự động. Vui lòng chọn và sao chép nội dung trong ô.');}
 }
 
 async function sCancelZaloAliasSync(){
