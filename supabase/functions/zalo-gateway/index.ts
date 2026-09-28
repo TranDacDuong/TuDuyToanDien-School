@@ -144,6 +144,36 @@ Deno.serve(async (request) => {
       });
       return json({ result });
     }
+    if (payload.action === "linkParent") {
+      const { externalId, phone, zaloUid, isFriend } = payload;
+      if (typeof externalId !== "string" || externalId.length > 220 ||
+        typeof phone !== "string" || !/^(0\d{9}|84\d{9})$/.test(phone) ||
+        typeof zaloUid !== "string" || !zaloUid || zaloUid.length > 100 ||
+        typeof isFriend !== "boolean") {
+        return json({ error: "Invalid parent link command" }, 400);
+      }
+      const result = await rpc("link_zalo_parent_from_command", {
+        p_external_id: externalId,
+        p_phone: phone,
+        p_zalo_uid: zaloUid,
+        p_is_friend: isFriend,
+      });
+      return json({ result });
+    }
+    if (payload.action === "recordParentAlias") {
+      const { externalId, alias, error } = payload;
+      if (typeof externalId !== "string" || externalId.length > 220 ||
+        (alias !== null && typeof alias !== "string") ||
+        (error !== null && typeof error !== "string")) {
+        return json({ error: "Invalid parent alias result" }, 400);
+      }
+      await rpc("record_zalo_parent_alias", {
+        p_external_id: externalId,
+        p_alias: typeof alias === "string" ? alias.slice(0, 100) : null,
+        p_error: typeof error === "string" ? error.slice(0, 500) : null,
+      });
+      return json({ ok: true });
+    }
     return json({ error: "Unknown action" }, 400);
   } catch (error) {
     console.error("Zalo gateway operation failed", error);

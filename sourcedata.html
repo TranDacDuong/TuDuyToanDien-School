@@ -2085,7 +2085,7 @@ async function sLoadZaloContactsForStudents(){
   const parentIds = [...new Set(Object.values(_sLinkedParents).flat().map(parent => parent.id).filter(Boolean))];
   if(!parentIds.length) return;
   const {data,error} = await sb.from('zalo_parent_contacts')
-    .select('parent_id,status,last_checked_at,last_error')
+    .select('parent_id,status,last_checked_at,last_error,link_source,linked_at,zalo_alias,alias_error')
     .in('parent_id',parentIds);
   if(error){ console.warn('Không tải được trạng thái Zalo PH:',error); return; }
   _sZaloContacts = Object.fromEntries((data||[]).map(row => [row.parent_id,row]));
@@ -2098,11 +2098,14 @@ function sZaloParentStatusHtml(parents){
     rate_limited:'Zalo tạm giới hạn',error:'Cần kiểm tra lỗi'};
   return parents.map(parent => {
     const row = _sZaloContacts[parent.id];
-    const label = !parent.phone ? 'Thiếu SĐT PH' : row ? (labels[row.status] || 'Đang đồng bộ') : 'Đang đồng bộ';
+    const label = !parent.phone ? 'Thiếu SĐT PH' : row?.status === 'friend' && row.link_source === 'zalo_self_command'
+      ? 'Đã liên kết thủ công' : row ? (labels[row.status] || 'Đang đồng bộ') : 'Đang đồng bộ';
     const checked = row?.last_checked_at
       ? ` · ${new Date(row.last_checked_at).toLocaleString('vi-VN')}` : '';
     const detail = `${parent.full_name || 'PH'} (${parent.phone || 'chưa có SĐT'}): `;
-    return `<div style="font-size:.72rem;color:var(--ink-mid);margin-top:3px" title="${esc(row?.last_error || '')}">${esc(detail)}Trạng thái: ${esc(label + checked)}</div>`;
+    const alias = row?.zalo_alias ? ` · Biệt danh: ${row.zalo_alias}` : '';
+    const error = [row?.last_error,row?.alias_error].filter(Boolean).join(' · ');
+    return `<div style="font-size:.72rem;color:var(--ink-mid);margin-top:3px" title="${esc(error)}">${esc(detail)}Trạng thái: ${esc(label + checked + alias)}</div>`;
   }).join('');
 }
 

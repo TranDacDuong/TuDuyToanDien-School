@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const { buildParentAlias, parseParentLinkCommand } = require('./link-command');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -298,7 +299,13 @@ function startGatewayListener() {
   if (!zaloApi || gatewayListening || !GATEWAY_URL || !GATEWAY_TOKEN) return;
   gatewayListening = true;
   zaloApi.listener.on('message', (message) => {
-    if (message.isSelf || message.type !== 0) return;
+    if (message.isSelf) {
+      handleParentLinkCommand(message).catch(error => {
+        console.error('[ZaloBot] Không xử lý được lệnh liên kết phụ huynh:', error?.message || error);
+      });
+      return;
+    }
+    if (message.type !== 0) return;
     const content = message.data?.content;
     if (typeof content !== 'string' || !content.trim()) return;
     const externalId = String(message.data?.msgId || message.data?.cliMsgId || '');
@@ -320,6 +327,44 @@ function startGatewayListener() {
   });
   zaloApi.listener.on('error', error => console.warn('[ZaloBot] Zalo listener:', error));
   zaloApi.listener.start({ retryOnClose: true });
+}
+
+async function handleParentLinkCommand(message) {
+  if (message.type !== 0) return;
+  const command = parseParentLinkCommand(message.data?.content);
+  if (!command) return;
+  const zaloUid = String(message.threadId || '');
+  const messageId = String(message.data?.msgId || message.data?.cliMsgId || '');
+  if (!zaloUid || !messageId) {
+    console.warn('[ZaloBot] Bỏ qua lệnh liên kết thiếu UID hoặc mã tin nhắn');
+    return;
+  }
+  const externalId = `self-link:${zaloUid}:${messageId}`;
+  const relationship = await zaloApi.getFriendRequestStatus(zaloUid).catch(error => {
+    throw new Error(`Không kiểm tra được trạng thái kết bạn: ${error?.message || error}`);
+  });
+  const isFriend = relationship?.is_friend === 1;
+  const { result } = await gatewayRequest({
+    action: 'linkParent', externalId, phone: command.phone, zaloUid, isFriend
+  });
+  if (!result || !['linked', 'already_linked'].includes(result.status)) {
+    console.warn(`[ZaloBot] Lệnh liên kết ${command.phone} bị từ chối: ${result?.message || 'Không rõ lý do'}`);
+    return;
+  }
+
+  let alias = null;
+  let aliasError = null;
+  try {
+    alias = buildParentAlias(result.student_names, result.phone);
+    await zaloApi.changeFriendAlias(alias, zaloUid);
+    console.log(`[ZaloBot] Đã liên kết ${result.parent_name || command.phone} và đặt biệt danh "${alias}"`);
+  } catch (error) {
+    aliasError = String(error?.message || error);
+    alias = null;
+    console.warn('[ZaloBot] Đã liên kết phụ huynh nhưng chưa đổi được biệt danh:', aliasError);
+  }
+  await gatewayRequest({ action: 'recordParentAlias', externalId, alias, error: aliasError });
+  friendUserIdSet.add(zaloUid);
 }
 
 // Session and Storage setup
@@ -475,7 +520,7 @@ async function initZaloClient(forceQr = false) {
     }
 
     zaloInstance = new Zalo({
-      selfListen: false,
+      selfListen: true,
       checkUpdate: false,
       imageMetadataGetter: async (filePath) => {
         try {
