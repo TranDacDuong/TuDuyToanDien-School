@@ -2375,7 +2375,7 @@
       return;
     }
 
-    body.innerHTML = ledger.items.map(item => {
+    body.innerHTML = [...ledger.items].reverse().map(item => {
       if (item.kind === "gap") {
         const gapId = `gap_${currentLedgerGaps.size + 1}`;
         currentLedgerGaps.set(gapId, item);
