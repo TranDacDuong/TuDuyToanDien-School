@@ -620,12 +620,14 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-outline btn-sm" id="sZaloBulkStart" type="button" onclick="sStartZaloBulkRun()">Kiểm tra & kết nối Zalo PH chưa kết bạn</button>
+        <button class="btn btn-outline btn-sm" id="sZaloAliasStart" type="button" onclick="sStartZaloAliasSync()">Đồng bộ biệt danh Zalo PH</button>
         <button class="btn btn-outline btn-sm" onclick="sDownloadImportTemplate()">🧾 Tải file mẫu</button>
         <button class="btn btn-primary btn-sm" onclick="sPickImportFile()">📤 Nhập Excel</button>
         <button class="btn btn-outline btn-sm" onclick="sExportExcel()">📥 Xuất Excel</button>
       </div>
     </div>
     <div id="sZaloBulkStatus" aria-live="polite" style="margin-bottom:14px;font-size:.82rem"></div>
+    <div id="sZaloAliasStatus" aria-live="polite" style="margin-bottom:14px;font-size:.82rem"></div>
     <div id="sImportResult" class="s-import-result" style="margin-bottom:14px"></div>
     <input id="sImportFile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="sHandleImportFile(event)">
     <div class="s-search">
@@ -669,6 +671,27 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
         <div class="s-pg-btns" id="sPgBtns"></div>
       </div>
     </div>
+  </div>
+</div>
+
+<div class="modal-ov" id="sZaloAliasModal" onclick="if(event.target===this)sCloseZaloAliasDetails()">
+  <div class="modal-box s-zalo-detail-box">
+    <div class="modal-mhd">
+      <div><h3>Chi tiết đồng bộ biệt danh Zalo</h3><div class="s-zalo-detail-meta" id="sZaloAliasSummary"></div></div>
+      <button class="modal-mclose" type="button" onclick="sCloseZaloAliasDetails()">✕</button>
+    </div>
+    <div class="s-zalo-detail-tools">
+      <input id="sZaloAliasSearch" placeholder="Tìm phụ huynh, học sinh, SĐT hoặc biệt danh..." oninput="sRenderZaloAliasDetails()">
+      <select id="sZaloAliasFilter" onchange="sRenderZaloAliasDetails()">
+        <option value="">Tất cả kết quả</option><option value="pending">Chưa xử lý</option>
+        <option value="success">Thành công</option><option value="skipped">Bỏ qua</option>
+        <option value="failed">Có lỗi</option><option value="cancelled">Đã hủy</option>
+      </select>
+    </div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Phụ huynh</th><th>Học sinh</th><th>Biệt danh</th><th>Kết quả</th><th>Chi tiết</th></tr></thead>
+      <tbody id="sZaloAliasTable"><tr class="empty-row"><td colspan="5">Đang tải...</td></tr></tbody>
+    </table></div>
   </div>
 </div>
 
@@ -1750,6 +1773,7 @@ document.getElementById('tSMon').addEventListener('change', tApplyFilter);
 ══════════════════════════════ */
 let _sAll=[], _sFilt=[], _sPage=1, _sSortF='full_name', _sSortD=1, _sEditId=null, _sLinkedParents={}, _sMobileStatus={}, _sZaloContacts={};
 let _sZaloBulkBusy=false, _sZaloBulkTimer=null, _sZaloBulkRunId=null, _sZaloDetailRows=[];
+let _sZaloAliasBusy=false, _sZaloAliasRunId=null, _sZaloAliasRows=[];
 const S_PAGE=15;
 
 function sRmVN(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đĐ]/g,m=>m==='đ'?'d':'D').toLowerCase(); }
@@ -1892,8 +1916,11 @@ async function loadStudents(){
   await sLoadMobileStatusesForStudents(_sAll);
   await sLoadZaloContactsForStudents();
   await sLoadZaloBulkStatus();
+  await sLoadZaloAliasStatus();
   if(!_sZaloBulkTimer) _sZaloBulkTimer=setInterval(()=>{
-    if(document.getElementById('students')?.classList.contains('active')) sLoadZaloBulkStatus();
+    if(document.getElementById('students')?.classList.contains('active')){
+      sLoadZaloBulkStatus(); sLoadZaloAliasStatus();
+    }
   },15000);
   document.getElementById('sStatTotal').textContent = _sAll.length;
   sApplyFilter();
@@ -2024,6 +2051,97 @@ async function sStartZaloBulkRun(){
     toast(data?.already_running?'Đợt kiểm tra hiện tại vẫn đang chạy.':`Đã xếp hàng ${data?.total||0} phụ huynh chưa kết bạn. Có thể đóng web.` ,4000);
   }catch(error){alert('Không bắt đầu được: '+error.message);}
   finally{_sZaloBulkBusy=false;if(button) button.disabled=false;}
+}
+
+function sAliasRowMeta(row){
+  if(row.status==='processing') return {key:'pending',label:'Đang xử lý',type:'wait'};
+  return ({pending:{key:'pending',label:'Chưa xử lý',type:'muted'},
+    success:{key:'success',label:'Thành công',type:'ok'},
+    skipped:{key:'skipped',label:'Bỏ qua',type:'wait'},
+    failed:{key:'failed',label:'Có lỗi',type:'bad'},
+    cancelled:{key:'cancelled',label:'Đã hủy',type:'muted'}})[row.status]||{key:'failed',label:'Chưa rõ',type:'bad'};
+}
+
+function sEnrichAliasRows(rows){
+  const parentMap={},studentNames={};
+  Object.entries(_sLinkedParents).forEach(([studentId,parents])=>{
+    const student=_sAll.find(item=>item.id===studentId);
+    (parents||[]).forEach(parent=>{
+      parentMap[parent.id]=parent;
+      if(!studentNames[parent.id]) studentNames[parent.id]=[];
+      if(student?.full_name&&!studentNames[parent.id].includes(student.full_name)) studentNames[parent.id].push(student.full_name);
+    });
+  });
+  return (rows||[]).map(row=>({...row,parent:parentMap[row.parent_id]||null,student_names:studentNames[row.parent_id]||[]}));
+}
+
+async function sLoadZaloAliasStatus(){
+  const box=document.getElementById('sZaloAliasStatus');
+  if(!box) return;
+  const {data:run,error}=await sb.from('zalo_parent_alias_runs')
+    .select('id,status,total,created_at,completed_at,cancelled_at').order('created_at',{ascending:false}).limit(1).maybeSingle();
+  if(error){box.textContent='Không tải được tiến độ biệt danh Zalo: '+error.message;return;}
+  if(!run){box.textContent='Chưa có đợt đồng bộ biệt danh Zalo.';return;}
+  _sZaloAliasRunId=run.id;
+  const {data:jobs,error:jobError}=await sb.from('zalo_parent_alias_jobs')
+    .select('id,parent_id,phone,status,alias,error_message,updated_at').eq('run_id',run.id).order('created_at');
+  if(jobError){box.textContent='Không tải được tiến độ biệt danh Zalo: '+jobError.message;return;}
+  _sZaloAliasRows=sEnrichAliasRows(jobs);
+  const counts=(jobs||[]).reduce((acc,row)=>{acc[row.status]=(acc[row.status]||0)+1;return acc;},{});
+  const completed=(counts.success||0)+(counts.skipped||0)+(counts.failed||0)+(counts.cancelled||0);
+  const phase=run.status==='running'?'Đang chạy ngầm':run.status==='cancelled'?'Đã hủy':'Đã hoàn thành';
+  box.innerHTML=`<div style="border:1px solid #cbd5e1;padding:10px;background:#f8fafc">
+    <strong>Biệt danh Zalo: ${phase}</strong> · Đã xử lý ${completed}/${run.total} phụ huynh
+    <span style="color:var(--ink-mid)"> · ${counts.success||0} thành công, ${counts.skipped||0} bỏ qua, ${counts.failed||0} lỗi</span>
+    <button class="btn btn-outline btn-sm" type="button" onclick="sOpenZaloAliasDetails()" style="margin-left:8px">Xem chi tiết</button>
+    ${run.status==='running'?'<button class="btn btn-outline btn-sm" type="button" onclick="sCancelZaloAliasSync()" style="margin-left:8px;color:#b91c1c">Hủy đợt</button>':''}
+  </div>`;
+  if(document.getElementById('sZaloAliasModal')?.classList.contains('open')) sRenderZaloAliasDetails();
+}
+
+async function sStartZaloAliasSync(){
+  if(_sZaloAliasBusy) return;
+  if(!confirm('Đồng bộ biệt danh cho tất cả phụ huynh đang là bạn bè Zalo? Bot sẽ chạy ngầm và có thể đóng trang web.')) return;
+  _sZaloAliasBusy=true;
+  const button=document.getElementById('sZaloAliasStart'); if(button) button.disabled=true;
+  try{
+    const {data,error}=await sb.rpc('start_zalo_parent_alias_sync');
+    if(error) throw error;
+    await sLoadZaloAliasStatus();
+    toast(data?.already_running?'Đợt đồng bộ biệt danh hiện tại vẫn đang chạy.':`Đã xếp hàng ${data?.total||0} phụ huynh để đổi biệt danh.`,4000);
+  }catch(error){alert('Không bắt đầu được: '+error.message);}
+  finally{_sZaloAliasBusy=false;if(button) button.disabled=false;}
+}
+
+async function sCancelZaloAliasSync(){
+  if(!confirm('Hủy các biệt danh chưa xử lý trong đợt này? Biệt danh đã đổi sẽ được giữ nguyên.')) return;
+  const {error}=await sb.rpc('cancel_zalo_parent_alias_sync');
+  if(error) return alert('Không hủy được đợt: '+error.message);
+  await sLoadZaloAliasStatus(); toast('Đã hủy đợt đồng bộ biệt danh.',4000);
+}
+
+function sOpenZaloAliasDetails(){
+  if(!_sZaloAliasRunId) return alert('Chưa có đợt đồng bộ biệt danh.');
+  document.getElementById('sZaloAliasModal')?.classList.add('open'); sRenderZaloAliasDetails();
+}
+function sCloseZaloAliasDetails(){document.getElementById('sZaloAliasModal')?.classList.remove('open');}
+function sRenderZaloAliasDetails(){
+  const tbody=document.getElementById('sZaloAliasTable'); if(!tbody) return;
+  const needle=sRmVN(document.getElementById('sZaloAliasSearch')?.value||'');
+  const filter=document.getElementById('sZaloAliasFilter')?.value||'';
+  const rows=_sZaloAliasRows.filter(row=>{
+    const meta=sAliasRowMeta(row);
+    const haystack=sRmVN([row.parent?.full_name,row.phone,row.alias,...row.student_names,row.error_message].filter(Boolean).join(' '));
+    return (!filter||meta.key===filter)&&(!needle||haystack.includes(needle));
+  });
+  document.getElementById('sZaloAliasSummary').textContent=`Hiển thị ${rows.length}/${_sZaloAliasRows.length} phụ huynh trong đợt`;
+  if(!rows.length){tbody.innerHTML='<tr class="empty-row"><td colspan="5">Không có phụ huynh phù hợp</td></tr>';return;}
+  tbody.innerHTML=rows.map(row=>{const meta=sAliasRowMeta(row);return `<tr>
+    <td><b>${esc(row.parent?.full_name||'Phụ huynh')}</b><div class="s-zalo-detail-meta">${esc(row.phone||'—')}</div></td>
+    <td>${esc(row.student_names.join(', ')||'—')}</td><td>${esc(row.alias||'—')}</td>
+    <td><span class="s-zalo-status ${meta.type}">${esc(meta.label)}</span></td>
+    <td style="max-width:280px;white-space:normal"><span class="s-zalo-detail-meta">${esc(row.error_message||'Không có lỗi')}</span></td>
+  </tr>`;}).join('');
 }
 
 async function sToggleZaloBulkRun(pause){

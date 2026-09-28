@@ -32,6 +32,7 @@ let gatewayBusy = false;
 let gatewayListening = false;
 let nextGatewaySendAt = 0;
 let nextParentPollAt = 0;
+let nextAliasSyncAt = 0;
 let gatewayBatchCount = 0;
 const pendingIncoming = new Map();
 let flushingIncoming = false;
@@ -237,6 +238,28 @@ async function sendQueuedTuitionReceipt(job) {
   }
 }
 
+async function syncQueuedParentAlias(job) {
+  try {
+    const relationship = await zaloApi.getFriendRequestStatus(job.zalo_uid);
+    if (relationship?.is_friend !== 1) {
+      const relationshipStatus = relationship?.is_requesting === 1 ? 'invited' : 'not_friend';
+      await gatewayRequest({ action: 'finishParentAlias', jobId: job.job_id,
+        status: 'skipped', alias: null, relationshipStatus,
+        error: relationshipStatus === 'invited' ? 'Đang chờ phụ huynh chấp nhận kết bạn' : 'Không còn là bạn bè Zalo' });
+      return;
+    }
+    const alias = buildParentAlias(job.student_names, job.phone);
+    if (job.current_alias !== alias) await zaloApi.changeFriendAlias(alias, job.zalo_uid);
+    await gatewayRequest({ action: 'finishParentAlias', jobId: job.job_id,
+      status: 'success', alias, error: null, relationshipStatus: 'friend' });
+  } catch (error) {
+    if (isZaloLimitError(error)) nextAliasSyncAt = Date.now() + 30 * 60 * 1000;
+    await gatewayRequest({ action: 'finishParentAlias', jobId: job.job_id,
+      status: 'failed', alias: null, relationshipStatus: null,
+      error: `Không đổi được biệt danh: ${String(error?.message || error)}` });
+  }
+}
+
 async function syncParentTuition() {
   if (gatewayBusy || !zaloApi || !GATEWAY_URL || !GATEWAY_TOKEN ||
     campaignStatus !== 'idle') return;
@@ -264,6 +287,13 @@ async function syncParentTuition() {
     if (parentJob) {
       processedKind = 'parent';
       await checkQueuedParent(parentJob);
+      return;
+    }
+    if (Date.now() < nextAliasSyncAt) return;
+    const { job: aliasJob } = await gatewayRequest({ action: 'claimParentAlias' });
+    if (aliasJob) {
+      processedKind = 'alias';
+      await syncQueuedParentAlias(aliasJob);
     }
   } catch (error) {
     console.warn('[ZaloBot] Đồng bộ phụ huynh/học phí:', error?.message || error);

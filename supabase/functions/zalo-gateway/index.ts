@@ -174,6 +174,27 @@ Deno.serve(async (request) => {
       });
       return json({ ok: true });
     }
+    if (payload.action === "claimParentAlias") {
+      const rows = await rpc("claim_zalo_parent_alias_job", {});
+      return json({ job: rows?.[0] || null });
+    }
+    if (payload.action === "finishParentAlias") {
+      const { jobId, status, alias, error, relationshipStatus } = payload;
+      if (typeof jobId !== "string" || !["success", "skipped", "failed"].includes(status) ||
+        (alias !== null && typeof alias !== "string") ||
+        (error !== null && typeof error !== "string") ||
+        (relationshipStatus !== null && !["friend", "invited", "not_friend"].includes(relationshipStatus))) {
+        return json({ error: "Invalid parent alias completion" }, 400);
+      }
+      await rpc("finish_zalo_parent_alias_job", {
+        p_job_id: jobId,
+        p_status: status,
+        p_alias: typeof alias === "string" ? alias.slice(0, 100) : null,
+        p_error: typeof error === "string" ? error.slice(0, 500) : null,
+        p_relationship_status: typeof relationshipStatus === "string" ? relationshipStatus : null,
+      });
+      return json({ ok: true });
+    }
     return json({ error: "Unknown action" }, 400);
   } catch (error) {
     console.error("Zalo gateway operation failed", error);
