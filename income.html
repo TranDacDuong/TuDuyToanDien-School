@@ -2284,11 +2284,13 @@
       safeFetchAllRows(() => sb
         .from("bank_transaction_logs")
         .select("id,gateway,transaction_id,account_number,amount,content,direction,signed_amount,transaction_at,accumulative,business_description,entry_source,status,matched_tuition_id")
+        .eq("account_number", MINDUP_BANK_ACCOUNT)
         .lte("transaction_at", endIso)
         .order("transaction_at", { ascending: true })),
       safeFetchAllRows(() => sb
         .from("bank_balance_checkpoints")
         .select("id,account_number,checked_at,balance,note")
+        .eq("account_number", MINDUP_BANK_ACCOUNT)
         .lte("checked_at", endIso)
         .order("checked_at", { ascending: true })),
     ]);
