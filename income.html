@@ -635,6 +635,126 @@
     color: #7c3aed;
   }
 
+  .ledger-section {
+    margin-top: 22px;
+    border-top: 1px solid rgba(15,31,61,.08);
+    padding-top: 18px;
+  }
+
+  .ledger-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .ledger-toolbar h4 {
+    margin: 0;
+    color: var(--navy);
+    font-size: 1rem;
+  }
+
+  .ledger-toolbar-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .btn-secondary {
+    border: 1px solid rgba(15,31,61,.14);
+    background: #fff;
+    color: var(--navy);
+    border-radius: 10px;
+    padding: 9px 13px;
+    font: inherit;
+    font-size: .82rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .ledger-table { min-width: 920px; }
+  .ledger-table .ledger-amount { font-weight: 800; white-space: nowrap; }
+  .ledger-table .ledger-in { color: #047857; }
+  .ledger-table .ledger-out { color: #b91c1c; }
+  .ledger-table .ledger-balance { font-weight: 800; white-space: nowrap; }
+  .ledger-table .ledger-content { max-width: 260px; overflow-wrap: anywhere; }
+  .ledger-table .ledger-description { min-width: 240px; }
+  .ledger-actions { display: flex; gap: 6px; white-space: nowrap; }
+  .ledger-actions button { padding: 6px 9px; }
+
+  .ledger-gap-row td {
+    padding: 10px 14px;
+    background: #fff7ed;
+    color: #9a3412;
+    border-top: 1px solid #fed7aa;
+    border-bottom: 1px solid #fed7aa;
+  }
+
+  .ledger-gap-content {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .ledger-gap-content::before,
+  .ledger-gap-content::after {
+    content: "";
+    height: 1px;
+    background: #fdba74;
+  }
+
+  .ledger-gap-message {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: .82rem;
+    font-weight: 700;
+  }
+
+  .ledger-gap-add {
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%;
+    background: #c2410c;
+    color: #fff;
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .ledger-anchor-row td {
+    padding: 7px 14px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: .78rem;
+    text-align: center;
+  }
+
+  .ledger-dialog {
+    width: min(520px, calc(100vw - 32px));
+    border: 0;
+    border-radius: 16px;
+    padding: 0;
+    box-shadow: 0 24px 70px rgba(15,31,61,.28);
+  }
+
+  .ledger-dialog::backdrop { background: rgba(15,31,61,.52); }
+  .ledger-dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 18px;
+    border-bottom: 1px solid rgba(15,31,61,.08);
+  }
+  .ledger-dialog-header h3 { margin: 0; color: var(--navy); font-size: 1rem; }
+  .ledger-dialog-close { border: 0; background: transparent; font-size: 1.25rem; cursor: pointer; color: var(--ink-light); }
+  .ledger-dialog-form { display: grid; gap: 13px; padding: 18px; }
+  .ledger-dialog-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .ledger-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
   .text-right { text-align: right; }
   .text-center { text-align: center; }
 
@@ -850,22 +970,31 @@
         </div>
       </div>
 
-      <form class="expense-form" id="expenseForm" onsubmit="saveOperatingExpense(event)">
-        <div class="config-field">
-          <label>Tên chi phí</label>
-          <input class="control-input" id="expenseTitle" type="text" placeholder="VD: Tiền thuê nhà" required>
+      <section class="ledger-section">
+        <div class="ledger-toolbar">
+          <h4>Sổ thu chi tài khoản MINDUP</h4>
+          <div class="ledger-toolbar-actions">
+            <button class="btn-secondary" type="button" onclick="openManualLedgerDialog()">+ Thêm giao dịch</button>
+            <button class="btn-save" type="button" onclick="openBalanceCheckpointDialog()">Đối chiếu số dư hiện tại</button>
+          </div>
         </div>
-        <div class="config-field">
-          <label>Số tiền</label>
-          <input class="control-input" id="expenseAmount" type="number" min="0" placeholder="VD: 5000000" required>
+        <div id="bankLedgerSummary" class="empty-state" style="padding:10px 0;text-align:left"></div>
+        <div class="table-responsive">
+          <table class="report-table ledger-table">
+            <thead>
+              <tr>
+                <th>Thời gian</th>
+                <th class="text-right">Số tiền</th>
+                <th>Nội dung chuyển khoản</th>
+                <th>Mô tả chi tiết</th>
+                <th class="text-right">Số tiền cuối</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="bankLedgerBody"></tbody>
+          </table>
         </div>
-        <div class="config-field">
-          <label>Ghi chú</label>
-          <input class="control-input" id="expenseNote" type="text" placeholder="Không bắt buộc">
-        </div>
-        <button class="btn-save" type="submit">Thêm chi phí</button>
-      </form>
-      <div class="expense-list" id="expenseList"></div>
+      </section>
     </div>
 
     <div id="teacherIncomeSections" style="display:flex;flex-direction:column;gap:24px;">
@@ -1035,6 +1164,82 @@
   </div>
 
 </div>
+
+<dialog class="ledger-dialog" id="manualLedgerDialog">
+  <div class="ledger-dialog-header">
+    <h3>Bổ sung giao dịch thủ công</h3>
+    <button class="ledger-dialog-close" type="button" onclick="closeDialog('manualLedgerDialog')" aria-label="Đóng">×</button>
+  </div>
+  <form class="ledger-dialog-form" onsubmit="saveManualLedgerEntry(event)">
+    <div class="ledger-dialog-grid">
+      <div class="config-field">
+        <label>Thời gian</label>
+        <input class="control-input" id="manualLedgerAt" type="datetime-local" required>
+      </div>
+      <div class="config-field">
+        <label>Số tiền (+ thu, - chi)</label>
+        <input class="control-input" id="manualLedgerAmount" type="number" step="1" required>
+      </div>
+    </div>
+    <div class="config-field">
+      <label>Nội dung chuyển khoản</label>
+      <input class="control-input" id="manualLedgerContent" type="text" placeholder="Nội dung trên sao kê hoặc ghi chú nhận diện">
+    </div>
+    <div class="config-field">
+      <label>Mô tả chi tiết</label>
+      <input class="control-input" id="manualLedgerDescription" type="text" placeholder="Khoản tiền này dùng cho việc gì?" required>
+    </div>
+    <div class="ledger-dialog-actions">
+      <button class="btn-secondary" type="button" onclick="closeDialog('manualLedgerDialog')">Hủy</button>
+      <button class="btn-save" type="submit">Lưu giao dịch</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="ledger-dialog" id="balanceCheckpointDialog">
+  <div class="ledger-dialog-header">
+    <h3>Đối chiếu số dư ngân hàng</h3>
+    <button class="ledger-dialog-close" type="button" onclick="closeDialog('balanceCheckpointDialog')" aria-label="Đóng">×</button>
+  </div>
+  <form class="ledger-dialog-form" onsubmit="saveBalanceCheckpoint(event)">
+    <div class="ledger-dialog-grid">
+      <div class="config-field">
+        <label>Thời điểm kiểm tra</label>
+        <input class="control-input" id="balanceCheckpointAt" type="datetime-local" required>
+      </div>
+      <div class="config-field">
+        <label>Số dư thực tế</label>
+        <input class="control-input" id="balanceCheckpointAmount" type="number" min="0" step="1" required>
+      </div>
+    </div>
+    <div class="config-field">
+      <label>Ghi chú</label>
+      <input class="control-input" id="balanceCheckpointNote" type="text" placeholder="Không bắt buộc">
+    </div>
+    <div class="ledger-dialog-actions">
+      <button class="btn-secondary" type="button" onclick="closeDialog('balanceCheckpointDialog')">Hủy</button>
+      <button class="btn-save" type="submit">Đối chiếu</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="ledger-dialog" id="ledgerDescriptionDialog">
+  <div class="ledger-dialog-header">
+    <h3>Sửa mô tả giao dịch</h3>
+    <button class="ledger-dialog-close" type="button" onclick="closeDialog('ledgerDescriptionDialog')" aria-label="Đóng">×</button>
+  </div>
+  <form class="ledger-dialog-form" onsubmit="saveLedgerDescription(event)">
+    <input id="ledgerDescriptionId" type="hidden">
+    <div class="config-field">
+      <label>Mô tả chi tiết</label>
+      <input class="control-input" id="ledgerDescriptionText" type="text" required>
+    </div>
+    <div class="ledger-dialog-actions">
+      <button class="btn-secondary" type="button" onclick="closeDialog('ledgerDescriptionDialog')">Hủy</button>
+      <button class="btn-save" type="submit">Lưu mô tả</button>
+    </div>
+  </form>
+</dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
@@ -2044,38 +2249,153 @@
     return map[safeStaffId] || { base_salary: 0, bonus_amount: 0 };
   }
 
-  async function loadOperatingExpenses(ym) {
-    const sb = getSb();
-    const { data, error } = await sb
-      .from("operating_expenses")
-      .select("id, title, amount, note, expense_month")
-      .eq("expense_month", ymToDate(ym))
-      .order("created_at", { ascending: false });
-    if (error) {
-      if (error.code === "42P01" || error.message?.includes("operating_expenses")) {
-        document.getElementById("expenseList").innerHTML = `<div class="empty-state">Chưa có bảng chi phí. Hãy chạy SQL operating_expenses trước.</div>`;
-        return [];
-      }
-      throw error;
-    }
-    return data || [];
+  const MINDUP_BANK_ACCOUNT = "104888332556";
+  let currentLedgerGaps = new Map();
+  let currentLedgerRows = new Map();
+  let pendingManualLedgerAccount = MINDUP_BANK_ACCOUNT;
+
+  function ledgerMonthBounds(ym) {
+    const start = new Date(`${ym}-01T00:00:00+07:00`);
+    const [year, month] = ym.split("-").map(Number);
+    const end = new Date(new Date(year, month, 1).getTime() - 1);
+    return { start, end };
   }
 
-  function renderOperatingExpenses(rows) {
-    const wrap = document.getElementById("expenseList");
-    if (!wrap) return;
-    if (!rows.length) {
-      wrap.innerHTML = `<div class="empty-state">Chưa có chi phí nào trong tháng này.</div>`;
+  function toDateTimeLocal(value = new Date()) {
+    const date = value instanceof Date ? value : new Date(value);
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 16);
+  }
+
+  function displayLedgerTime(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+    return new Intl.DateTimeFormat("vi-VN", {
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    }).format(date);
+  }
+
+  async function loadBankLedger(ym) {
+    const sb = getSb();
+    const { end } = ledgerMonthBounds(ym);
+    const endIso = end.toISOString();
+    const [entries, checkpoints] = await Promise.all([
+      safeFetchAllRows(() => sb
+        .from("bank_transaction_logs")
+        .select("id,gateway,transaction_id,account_number,amount,content,direction,signed_amount,transaction_at,accumulative,business_description,entry_source,status,matched_tuition_id")
+        .lte("transaction_at", endIso)
+        .order("transaction_at", { ascending: true })),
+      safeFetchAllRows(() => sb
+        .from("bank_balance_checkpoints")
+        .select("id,account_number,checked_at,balance,note")
+        .lte("checked_at", endIso)
+        .order("checked_at", { ascending: true })),
+    ]);
+    return reconcileBankLedger(ym, entries || [], checkpoints || []);
+  }
+
+  function reconcileBankLedger(ym, entries, checkpoints) {
+    const { start, end } = ledgerMonthBounds(ym);
+    const events = [
+      ...entries.map(row => ({ kind: "entry", at: new Date(row.transaction_at), row })),
+      ...checkpoints.map(row => ({ kind: "checkpoint", at: new Date(row.checked_at), row })),
+    ].filter(event => !Number.isNaN(event.at.getTime()))
+      .sort((a, b) => a.at - b.at || (a.kind === "entry" ? -1 : 1));
+
+    const expectedBalances = new Map();
+    const previousTimes = new Map();
+    const timeline = [];
+    const allRows = [];
+    for (const event of events) {
+      if (event.kind === "entry") {
+        const row = event.row;
+        const accountNumber = String(row.account_number || MINDUP_BANK_ACCOUNT);
+        let expectedBalance = expectedBalances.has(accountNumber) ? expectedBalances.get(accountNumber) : null;
+        const previousAt = previousTimes.get(accountNumber) || null;
+        const signedAmount = Number(row.signed_amount ?? (row.direction === "out" ? -Math.abs(row.amount) : Math.abs(row.amount)));
+        const actualBalance = row.accumulative === null || row.accumulative === undefined ? null : Number(row.accumulative);
+        if (expectedBalance !== null) {
+          const predictedBalance = expectedBalance + signedAmount;
+          if (actualBalance !== null) {
+            const difference = actualBalance - predictedBalance;
+            if (accountNumber === MINDUP_BANK_ACCOUNT && Math.abs(difference) >= 1) {
+              timeline.push({ kind: "gap", at: event.at, amount: difference, beforeAt: previousAt, afterAt: event.at, accountNumber });
+            }
+            expectedBalance = actualBalance;
+          } else {
+            expectedBalance = predictedBalance;
+          }
+        } else if (actualBalance !== null) {
+          expectedBalance = actualBalance;
+        }
+        expectedBalances.set(accountNumber, expectedBalance);
+        previousTimes.set(accountNumber, event.at);
+        const normalized = { ...row, accountNumber, signedAmount, displayBalance: expectedBalance, at: event.at };
+        timeline.push({ kind: "entry", at: event.at, row: normalized });
+        allRows.push(normalized);
+      } else {
+        const accountNumber = String(event.row.account_number || MINDUP_BANK_ACCOUNT);
+        const expectedBalance = expectedBalances.has(accountNumber) ? expectedBalances.get(accountNumber) : null;
+        const previousAt = previousTimes.get(accountNumber) || null;
+        const checkpointBalance = Number(event.row.balance || 0);
+        if (expectedBalance !== null) {
+          const difference = checkpointBalance - expectedBalance;
+          if (accountNumber === MINDUP_BANK_ACCOUNT && Math.abs(difference) >= 1) {
+            timeline.push({ kind: "gap", at: event.at, amount: difference, beforeAt: previousAt, afterAt: event.at, accountNumber });
+          }
+        }
+        expectedBalances.set(accountNumber, checkpointBalance);
+        previousTimes.set(accountNumber, event.at);
+        timeline.push({ kind: "checkpoint", at: event.at, row: event.row, accountNumber, displayBalance: checkpointBalance });
+      }
+    }
+
+    const isInMonth = at => at >= start && at <= end;
+    const monthRows = allRows.filter(row => isInMonth(row.at));
+    return {
+      items: timeline.filter(item => isInMonth(item.at)),
+      monthRows,
+      incomingTotal: monthRows.reduce((sum, row) => sum + Math.max(0, row.signedAmount), 0),
+      outgoingTotal: monthRows.reduce((sum, row) => sum + Math.abs(Math.min(0, row.signedAmount)), 0),
+    };
+  }
+
+  function renderBankLedger(ledger) {
+    const body = document.getElementById("bankLedgerBody");
+    const summary = document.getElementById("bankLedgerSummary");
+    if (!body || !summary) return;
+    currentLedgerGaps = new Map();
+    currentLedgerRows = new Map();
+    summary.innerHTML = `Tiền vào <b style="color:#047857">${fmt(ledger.incomingTotal)}đ</b> · Tiền ra <b style="color:#b91c1c">${fmt(ledger.outgoingTotal)}đ</b> · Chênh lệch dòng tiền <b>${fmt(ledger.incomingTotal - ledger.outgoingTotal)}đ</b>`;
+    if (!ledger.items.length) {
+      body.innerHTML = `<tr><td colspan="6" class="empty-state">Chưa có giao dịch hoặc mốc đối chiếu trong tháng này.</td></tr>`;
       return;
     }
-    wrap.innerHTML = rows.map(row => `
-      <div class="expense-row">
-        <div><b>${esc(row.title || "Chi phí")}</b></div>
-        <div class="amount">${fmt(row.amount)}đ</div>
-        <div>${esc(row.note || "")}</div>
-        <button class="btn-danger" type="button" onclick="deleteOperatingExpense('${row.id}')">Xóa</button>
-      </div>
-    `).join("");
+
+    body.innerHTML = ledger.items.map(item => {
+      if (item.kind === "gap") {
+        const gapId = `gap_${currentLedgerGaps.size + 1}`;
+        currentLedgerGaps.set(gapId, item);
+        const directionText = item.amount > 0 ? "thiếu khoản tiền vào" : "thiếu khoản tiền ra";
+        return `<tr class="ledger-gap-row"><td colspan="6"><div class="ledger-gap-content"><span></span><div class="ledger-gap-message"><button class="ledger-gap-add" type="button" onclick="openManualLedgerDialog('${gapId}')" title="Bổ sung giao dịch">+</button> TK •${esc(item.accountNumber.slice(-4))} chênh ${fmt(Math.abs(item.amount))}đ · ${directionText}</div><span></span></div></td></tr>`;
+      }
+      if (item.kind === "checkpoint") {
+        return `<tr class="ledger-anchor-row"><td colspan="6">Đã đối chiếu số dư tài khoản •${esc(item.accountNumber.slice(-4))}: ${fmt(item.displayBalance)}đ lúc ${displayLedgerTime(item.at)}${item.row.note ? ` · ${esc(item.row.note)}` : ""}</td></tr>`;
+      }
+      const row = item.row;
+      currentLedgerRows.set(row.id, row);
+      const isIn = row.signedAmount >= 0;
+      const canDelete = row.entry_source === "manual_reconciliation";
+      return `<tr>
+        <td>${displayLedgerTime(row.at)}</td>
+        <td class="text-right ledger-amount ${isIn ? "ledger-in" : "ledger-out"}">${isIn ? "+" : "−"}${fmt(Math.abs(row.signedAmount))}đ</td>
+        <td class="ledger-content">${esc(row.content || "—")}<div style="margin-top:4px;color:var(--ink-light);font-size:.74rem">TK •${esc(row.accountNumber.slice(-4))}</div></td>
+        <td class="ledger-description">${esc(row.business_description || "Chưa có mô tả")}</td>
+        <td class="text-right ledger-balance">${row.displayBalance === null ? "—" : fmt(row.displayBalance) + "đ"}</td>
+        <td><div class="ledger-actions"><button class="btn-secondary" type="button" onclick="openLedgerDescriptionDialog('${row.id}')">Sửa</button>${canDelete ? `<button class="btn-danger" type="button" onclick="deleteManualLedgerEntry('${row.id}')">Xóa</button>` : ""}</div></td>
+      </tr>`;
+    }).join("");
   }
 
   // Load custom bonus records for a user in a month
@@ -2308,7 +2628,7 @@
         chosenSchedules,
         courseEnrollments,
         coursesData,
-        expenses,
+        bankLedger,
         allCustomBonuses
       ] = await Promise.all([
         safeFetchAllRows(() => sb.from("users").select("id, full_name, role"))
@@ -2322,7 +2642,7 @@
         safeFetchAllRows(() => sb.from("class_student_schedules").select("class_id, student_id, schedule_id, effective_from")),
         safeFetchAllRows(() => sb.from("course_enrollments").select("course_id, student_id, enrolled_at").gte("enrolled_at", mStart + "T00:00:00Z").lte("enrolled_at", mEnd + "T23:59:59Z")),
         safeFetchAllRows(() => sb.from("courses").select("id, name, tuition_fee")),
-        loadOperatingExpenses(ym).catch(err => { console.warn("Lỗi tải chi phí:", err); return []; }),
+        loadBankLedger(ym),
         safeFetchAllRows(() => sb.from("staff_bonus_records").select("id, user_id, amount, title, bonus_month").eq("bonus_month", mStart)).catch(err => {
           console.warn("Chưa có bảng staff_bonus_records:", err);
           return [];
@@ -2437,11 +2757,13 @@
         });
       });
 
-      const expenseTotal = (expenses || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
-      const netIncome = systemRevenue - staffSalaryTotal - expenseTotal;
-      const projectedNetIncome = systemProjectedRevenue - projectedStaffSalaryTotal - expenseTotal;
+      const cashRevenue = Number(bankLedger.incomingTotal || 0);
+      const expenseTotal = Number(bankLedger.outgoingTotal || 0);
+      const netIncome = cashRevenue - expenseTotal;
+      const nonPayrollExpenseEstimate = Math.max(0, expenseTotal - staffSalaryTotal);
+      const projectedNetIncome = systemProjectedRevenue - projectedStaffSalaryTotal - nonPayrollExpenseEstimate;
 
-      setText("adminSystemRevenue", fmt(systemRevenue) + "đ");
+      setText("adminSystemRevenue", fmt(cashRevenue) + "đ");
       setText("adminStaffSalary", fmt(staffSalaryTotal) + "đ");
       setText("adminExpenseTotal", fmt(expenseTotal) + "đ");
       setText("adminNetIncome", fmt(netIncome) + "đ");
@@ -2455,47 +2777,134 @@
       if (projNetEl) projNetEl.style.color = projectedNetIncome >= 0 ? "var(--green)" : "var(--red)";
 
       renderAdminStaffIncomeBreakdown(staffIncomeRows);
-      renderOperatingExpenses(expenses);
+      renderBankLedger(bankLedger);
     } catch (err) {
       console.error("Lỗi tính thu nhập admin:", err);
       if (errBanner) {
         errBanner.textContent = `Không tải được đầy đủ dữ liệu thu nhập admin: ${err.message}`;
         errBanner.style.display = "block";
       }
-      document.getElementById("expenseList").innerHTML = `<div class="empty-state">Không tải được dữ liệu thu nhập admin: ${err.message}</div>`;
+      document.getElementById("bankLedgerBody").innerHTML = `<tr><td colspan="6" class="empty-state">Không tải được sổ thu chi: ${esc(err.message)}</td></tr>`;
     }
   }
 
-  async function saveOperatingExpense(event) {
+  function closeDialog(id) {
+    const dialog = document.getElementById(id);
+    if (dialog?.open) dialog.close();
+  }
+
+  function openManualLedgerDialog(gapId = "") {
+    if (viewerProfile?.role !== "admin") return;
+    const gap = gapId ? currentLedgerGaps.get(gapId) : null;
+    pendingManualLedgerAccount = gap?.accountNumber || MINDUP_BANK_ACCOUNT;
+    const atInput = document.getElementById("manualLedgerAt");
+    const amountInput = document.getElementById("manualLedgerAmount");
+    const contentInput = document.getElementById("manualLedgerContent");
+    const descriptionInput = document.getElementById("manualLedgerDescription");
+    let suggestedAt = new Date();
+    if (gap?.afterAt) {
+      const lower = gap.beforeAt ? gap.beforeAt.getTime() : gap.afterAt.getTime() - 60000;
+      suggestedAt = new Date(lower + Math.max(1000, Math.floor((gap.afterAt.getTime() - lower) / 2)));
+    }
+    atInput.value = toDateTimeLocal(suggestedAt);
+    amountInput.value = gap ? String(Math.round(gap.amount)) : "";
+    contentInput.value = gap ? "Bổ sung giao dịch thiếu trên SePay" : "";
+    descriptionInput.value = "";
+    document.getElementById("manualLedgerDialog").showModal();
+    descriptionInput.focus();
+  }
+
+  async function saveManualLedgerEntry(event) {
     event.preventDefault();
     if (viewerProfile?.role !== "admin") return;
-    const title = document.getElementById("expenseTitle").value.trim();
-    const amount = Number(document.getElementById("expenseAmount").value || 0);
-    const note = document.getElementById("expenseNote").value.trim();
-    const ym = document.getElementById("monthPicker").value;
-    if (!title || !amount || amount < 0) {
-      alert("Vui lòng nhập tên chi phí và số tiền hợp lệ.");
+    const at = document.getElementById("manualLedgerAt").value;
+    const amount = Number(document.getElementById("manualLedgerAmount").value || 0);
+    const content = document.getElementById("manualLedgerContent").value.trim();
+    const description = document.getElementById("manualLedgerDescription").value.trim();
+    if (!at || !amount || description.length < 3) {
+      alert("Vui lòng nhập thời gian, số tiền khác 0 và mô tả chi tiết.");
       return;
     }
-    const sb = getSb();
-    const { error } = await sb.from("operating_expenses").insert({
-      expense_month: ymToDate(ym),
-      title,
-      amount,
-      note,
-      created_by: currentUser?.id || null,
+    const submit = event.submitter;
+    if (submit) submit.disabled = true;
+    const { error } = await getSb().rpc("create_manual_bank_ledger_entry", {
+      p_account_number: pendingManualLedgerAccount,
+      p_transaction_at: new Date(at).toISOString(),
+      p_signed_amount: amount,
+      p_content: content,
+      p_description: description,
     });
-    if (error) return alert("Lỗi lưu chi phí: " + error.message);
-    event.target.reset();
+    if (submit) submit.disabled = false;
+    if (error) return alert("Không lưu được giao dịch: " + error.message);
+    closeDialog("manualLedgerDialog");
     await calculateAndRender();
   }
 
-  async function deleteOperatingExpense(id) {
+  function openBalanceCheckpointDialog() {
     if (viewerProfile?.role !== "admin") return;
-    if (!confirm("Xóa khoản chi phí này?")) return;
-    const sb = getSb();
-    const { error } = await sb.from("operating_expenses").delete().eq("id", id);
-    if (error) return alert("Lỗi xóa chi phí: " + error.message);
+    document.getElementById("balanceCheckpointAt").value = toDateTimeLocal(new Date());
+    document.getElementById("balanceCheckpointAmount").value = "";
+    document.getElementById("balanceCheckpointNote").value = "";
+    document.getElementById("balanceCheckpointDialog").showModal();
+    document.getElementById("balanceCheckpointAmount").focus();
+  }
+
+  async function saveBalanceCheckpoint(event) {
+    event.preventDefault();
+    if (viewerProfile?.role !== "admin") return;
+    const at = document.getElementById("balanceCheckpointAt").value;
+    const balance = Number(document.getElementById("balanceCheckpointAmount").value);
+    const note = document.getElementById("balanceCheckpointNote").value.trim();
+    if (!at || !Number.isFinite(balance) || balance < 0) {
+      alert("Vui lòng nhập thời điểm và số dư hợp lệ.");
+      return;
+    }
+    const submit = event.submitter;
+    if (submit) submit.disabled = true;
+    const { error } = await getSb().rpc("create_bank_balance_checkpoint", {
+      p_account_number: MINDUP_BANK_ACCOUNT,
+      p_checked_at: new Date(at).toISOString(),
+      p_balance: balance,
+      p_note: note || null,
+    });
+    if (submit) submit.disabled = false;
+    if (error) return alert("Không lưu được số dư đối chiếu: " + error.message);
+    closeDialog("balanceCheckpointDialog");
+    await calculateAndRender();
+  }
+
+  function openLedgerDescriptionDialog(id) {
+    if (viewerProfile?.role !== "admin") return;
+    const row = currentLedgerRows.get(id);
+    if (!row) return;
+    document.getElementById("ledgerDescriptionId").value = id;
+    document.getElementById("ledgerDescriptionText").value = row.business_description || "";
+    document.getElementById("ledgerDescriptionDialog").showModal();
+    document.getElementById("ledgerDescriptionText").focus();
+  }
+
+  async function saveLedgerDescription(event) {
+    event.preventDefault();
+    if (viewerProfile?.role !== "admin") return;
+    const id = document.getElementById("ledgerDescriptionId").value;
+    const description = document.getElementById("ledgerDescriptionText").value.trim();
+    if (!id || description.length < 3) return alert("Vui lòng nhập mô tả chi tiết.");
+    const submit = event.submitter;
+    if (submit) submit.disabled = true;
+    const { error } = await getSb().rpc("update_bank_ledger_description", {
+      p_id: id,
+      p_description: description,
+    });
+    if (submit) submit.disabled = false;
+    if (error) return alert("Không lưu được mô tả: " + error.message);
+    closeDialog("ledgerDescriptionDialog");
+    await calculateAndRender();
+  }
+
+  async function deleteManualLedgerEntry(id) {
+    if (viewerProfile?.role !== "admin" || !confirm("Xóa giao dịch bổ sung thủ công này?")) return;
+    const { error } = await getSb().rpc("delete_manual_bank_ledger_entry", { p_id: id });
+    if (error) return alert("Không xóa được giao dịch: " + error.message);
     await calculateAndRender();
   }
 
@@ -2538,8 +2947,14 @@
     result.textContent = `Nếu doanh thu đạt ${fmt(value)}đ: thu nhập dự kiến ${fmt(details.totalIncome)}đ (lương cứng ${fmt(details.baseSalary)}đ + thưởng ${fmt(details.totalBonus)}đ).`;
   }
 
-  window.saveOperatingExpense = saveOperatingExpense;
-  window.deleteOperatingExpense = deleteOperatingExpense;
+  window.closeDialog = closeDialog;
+  window.openManualLedgerDialog = openManualLedgerDialog;
+  window.saveManualLedgerEntry = saveManualLedgerEntry;
+  window.openBalanceCheckpointDialog = openBalanceCheckpointDialog;
+  window.saveBalanceCheckpoint = saveBalanceCheckpoint;
+  window.openLedgerDescriptionDialog = openLedgerDescriptionDialog;
+  window.saveLedgerDescription = saveLedgerDescription;
+  window.deleteManualLedgerEntry = deleteManualLedgerEntry;
   window.saveStaffMonthlySalary = saveStaffMonthlySalary;
   window.calculateCustomProjection = calculateCustomProjection;
 
@@ -2590,7 +3005,7 @@
           errBanner.textContent = `Không tải được dữ liệu tiền lãi trung tâm: ${adminErr.message}`;
           errBanner.style.display = "block";
         }
-        document.getElementById("expenseList").innerHTML = `<div class="empty-state">Không tải được dữ liệu tiền lãi trung tâm: ${adminErr.message}</div>`;
+        document.getElementById("bankLedgerBody").innerHTML = `<tr><td colspan="6" class="empty-state">Không tải được dữ liệu tiền lãi trung tâm: ${esc(adminErr.message)}</td></tr>`;
       }
       loader.style.display = "none";
       dataBlock.style.display = "flex";
@@ -3240,7 +3655,7 @@
       loader.style.display = "none";
       dataBlock.style.display = "flex";
       if (profile.role === "admin") {
-        document.getElementById("expenseList").innerHTML = `<div class="empty-state">Chưa có nhân viên nào để tính thu nhập chi tiết.</div>`;
+        document.getElementById("bankLedgerBody").innerHTML = `<tr><td colspan="6" class="empty-state">Chưa có nhân viên nào để tính thu nhập chi tiết.</td></tr>`;
       }
     }
   }

@@ -1,2 +1,5 @@
 [functions.zalo-gateway]
 verify_jwt = false
+
+[functions.tuition-bank-webhook]
+verify_jwt = false

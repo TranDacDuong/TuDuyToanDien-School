@@ -10,11 +10,13 @@ interface SePayWebhookPayload {
   gateway?: string;
   transactionDate?: string;
   accountNo?: string;
+  accountNumber?: string;
   code?: string | null;
   content?: string;
   transferType?: string;
   transferAmount?: number;
   accumulative?: number;
+  accumulated?: number;
   referenceCode?: string;
   description?: string;
 }
@@ -74,6 +76,31 @@ function stripVietnamese(text: string): string {
     .replace(/\s+/g, " ")
     .trim()
     .toUpperCase();
+}
+
+function normalizeDirection(value: unknown, amount: number): "in" | "out" {
+  const clean = String(value || "").trim().toLowerCase();
+  if (["out", "withdraw", "withdrawal", "debit", "chi"].includes(clean)) return "out";
+  if (["in", "deposit", "credit", "thu"].includes(clean)) return "in";
+  return amount < 0 ? "out" : "in";
+}
+
+function normalizeTransactionAt(value: unknown): string {
+  const raw = String(value || "").trim();
+  if (!raw) return new Date().toISOString();
+  const withTimezone = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/.test(raw)
+    ? `${raw.replace(" ", "T")}+07:00`
+    : raw;
+  const parsed = new Date(withTimezone);
+  return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+}
+
+function tuitionDescription(studentName: string, monthValue: string): string {
+  const monthDate = new Date(`${String(monthValue || "").slice(0, 10)}T00:00:00+07:00`);
+  if (Number.isNaN(monthDate.getTime())) {
+    return `Học phí của em ${studentName || "học sinh"}`;
+  }
+  return `Học phí của em ${studentName || "học sinh"} tháng ${monthDate.getMonth() + 1} năm ${monthDate.getFullYear()}`;
 }
 
 interface ParsedCodeInfo {
@@ -187,6 +214,9 @@ serve(async (req: Request) => {
       txId: string;
       accountNo: string;
       amount: number;
+      direction: "in" | "out";
+      transactionAt: string;
+      accumulative: number | null;
       content: string;
       raw: any;
     }> = [];
@@ -194,11 +224,18 @@ serve(async (req: Request) => {
     // Check SePay format
     if (rawJson.transferAmount !== undefined || rawJson.content !== undefined) {
       const payload = rawJson as SePayWebhookPayload;
+      const rawAmount = Number(payload.transferAmount || 0);
       itemsToProcess.push({
         gateway: payload.gateway || "sepay",
         txId: String(payload.id || payload.referenceCode || Date.now()),
-        accountNo: String(payload.accountNo || ""),
-        amount: Number(payload.transferAmount || 0),
+        accountNo: String(payload.accountNo || payload.accountNumber || ""),
+        amount: Math.abs(rawAmount),
+        direction: normalizeDirection(payload.transferType, rawAmount),
+        transactionAt: normalizeTransactionAt(payload.transactionDate),
+        accumulative: (payload.accumulative !== undefined || payload.accumulated !== undefined)
+          && Number.isFinite(Number(payload.accumulative ?? payload.accumulated))
+          ? Number(payload.accumulative ?? payload.accumulated)
+          : null,
         content: String(payload.content || payload.description || ""),
         raw: payload,
       });
@@ -206,22 +243,32 @@ serve(async (req: Request) => {
       // Check Casso format
       const payload = rawJson as CassoWebhookPayload;
       (payload.data || []).forEach(tx => {
+        const rawAmount = Number(tx.amount || 0);
         itemsToProcess.push({
           gateway: "casso",
           txId: String(tx.id || tx.tid || Date.now()),
           accountNo: String(tx.bank_account_id || ""),
-          amount: Number(tx.amount || 0),
+          amount: Math.abs(rawAmount),
+          direction: normalizeDirection(undefined, rawAmount),
+          transactionAt: normalizeTransactionAt(tx.bookingDate),
+          accumulative: null,
           content: String(tx.description || ""),
           raw: tx,
         });
       });
     } else if (rawJson.amount && (rawJson.content || rawJson.description)) {
       // Generic bank format
+      const rawAmount = Number(rawJson.amount || rawJson.transferAmount || 0);
       itemsToProcess.push({
         gateway: rawJson.gateway || "custom_bank",
         txId: String(rawJson.id || rawJson.transaction_id || Date.now()),
         accountNo: String(rawJson.account_number || rawJson.accountNo || ""),
-        amount: Number(rawJson.amount || rawJson.transferAmount || 0),
+        amount: Math.abs(rawAmount),
+        direction: normalizeDirection(rawJson.direction || rawJson.transferType, rawAmount),
+        transactionAt: normalizeTransactionAt(rawJson.transaction_at || rawJson.transactionDate || rawJson.created_at),
+        accumulative: rawJson.accumulative !== undefined && rawJson.accumulative !== null && Number.isFinite(Number(rawJson.accumulative))
+          ? Number(rawJson.accumulative)
+          : null,
         content: String(rawJson.content || rawJson.description || ""),
         raw: rawJson,
       });
@@ -254,6 +301,11 @@ serve(async (req: Request) => {
             content: item.content,
             raw_payload: item.raw,
             status: "failed",
+            direction: item.direction,
+            signed_amount: item.direction === "out" ? -item.amount : item.amount,
+            transaction_at: item.transactionAt,
+            accumulative: item.accumulative,
+            entry_source: "bank",
           }),
         }
       ).catch(err => {
@@ -266,6 +318,19 @@ serve(async (req: Request) => {
       }
       if (!claimedLogs.length) {
         results.push({ txId: item.txId, status: "duplicate_ignored" });
+        continue;
+      }
+
+      // Outgoing transactions belong to the cash ledger but never pay tuition.
+      if (item.direction === "out") {
+        await fetchJson(
+          `bank_transaction_logs?gateway=eq.${encodeURIComponent(item.gateway)}&transaction_id=eq.${encodeURIComponent(item.txId)}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({ status: "resolved" }),
+          },
+        ).catch(err => console.error("Failed to finalize outgoing bank transaction:", err));
+        results.push({ txId: item.txId, status: "recorded_outgoing", amount: item.amount });
         continue;
       }
 
@@ -402,7 +467,7 @@ serve(async (req: Request) => {
       if (!matchedTuition && item.content.trim()) {
         const cleanContent = stripVietnamese(item.content);
         const unpaidPayments = await fetchJson<Array<any>>(
-          `tuition_payments?amount_due=gt.0&order=created_at.desc&limit=50&select=id,student_id,amount_due,amount_paid,users(full_name,phone)`
+          `tuition_payments?amount_due=gt.0&order=created_at.desc&limit=50&select=id,student_id,month,amount_due,amount_paid,users(full_name,phone)`
         ).catch(() => []);
 
         if (Array.isArray(unpaidPayments)) {
@@ -423,6 +488,7 @@ serve(async (req: Request) => {
 
       let status = "unmatched";
       let matchedId = null;
+      let businessDescription: string | null = null;
 
       if (matchedTuition) {
         matchedId = matchedTuition.id;
@@ -452,6 +518,14 @@ serve(async (req: Request) => {
 
         if (updated && updated.length) {
           status = "success";
+
+          const students = await fetchJson<Array<any>>(
+            `users?id=eq.${encodeURIComponent(matchedTuition.student_id)}&select=full_name&limit=1`,
+          ).catch(() => []);
+          businessDescription = tuitionDescription(
+            String(students?.[0]?.full_name || "học sinh"),
+            String(matchedTuition.month || ""),
+          );
 
           await fetchJson("rpc/enqueue_zalo_tuition_receipt", {
             method: "POST",
@@ -489,6 +563,7 @@ serve(async (req: Request) => {
         body: JSON.stringify({
           matched_tuition_id: matchedId,
           status,
+          business_description: businessDescription,
         }),
       }).catch(err => console.error("Failed to update bank_transaction_logs:", err));
 
