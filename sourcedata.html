@@ -336,6 +336,13 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 .s-zalo-status.bad { background:var(--red-bg); color:var(--red); }
 .s-zalo-status.muted { background:var(--surface); color:var(--ink-mid); }
 .s-zalo-detail-meta { font-size:.72rem; color:var(--ink-light); line-height:1.45; }
+.s-zalo-sync-options { display:grid; gap:10px; margin-top:8px; }
+.s-zalo-sync-option { width:100%; border:1.5px solid var(--border); border-radius:10px; background:var(--white); padding:13px 14px; text-align:left; cursor:pointer; font-family:var(--font-body); transition:.15s; }
+.s-zalo-sync-option:hover { border-color:var(--blue); background:#f8fbff; box-shadow:0 8px 18px rgba(15,31,61,.08); }
+.s-zalo-sync-option strong { display:block; color:var(--navy); font-size:.86rem; margin-bottom:4px; }
+.s-zalo-sync-option span { display:block; color:var(--ink-light); font-size:.75rem; line-height:1.5; }
+.s-zalo-sync-option.recommended { border-color:#93c5fd; background:#eff6ff; }
+.s-zalo-sync-badge { display:inline-block !important; width:auto; margin-left:5px; padding:2px 6px; border-radius:999px; background:#dbeafe; color:#1d4ed8 !important; font-size:.65rem !important; font-weight:800; vertical-align:middle; }
 .s-ini { width:32px; height:32px; border-radius:50%; background:var(--navy); color:var(--gold-light); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.75rem; flex-shrink:0; }
 .s-av  { width:32px; height:32px; border-radius:50%; object-fit:cover; border:2px solid var(--gold-border); flex-shrink:0; }
 .pl-layout { display:grid; grid-template-columns:340px 1fr; gap:18px; align-items:start; }
@@ -695,6 +702,28 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
       <button class="btn btn-outline btn-sm" type="button" onclick="sCloseZaloLinkTemplate()">Đóng</button>
       <button class="btn btn-primary btn-sm" id="sZaloTemplateCopy" type="button" onclick="sCopyZaloLinkTemplate()" disabled>Sao chép nội dung</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-ov" id="sZaloAliasChoiceModal" onclick="if(event.target===this)sCloseZaloAliasChoice()">
+  <div class="modal-box" style="width:min(95vw,500px)">
+    <div class="modal-mhd">
+      <div><h3>Đồng bộ biệt danh Zalo PH</h3><div class="s-zalo-detail-meta">Chọn phạm vi cho đợt đồng bộ chạy ngầm.</div></div>
+      <button class="modal-mclose" type="button" onclick="sCloseZaloAliasChoice()">✕</button>
+    </div>
+    <div class="s-zalo-sync-options">
+      <button class="s-zalo-sync-option recommended" type="button" onclick="sRunZaloAliasSync('remaining')">
+        <strong>Đồng bộ những phụ huynh còn lại <span class="s-zalo-sync-badge">Khuyên dùng</span></strong>
+        <span>Chỉ xử lý phụ huynh chưa từng đồng bộ biệt danh thành công hoặc lần trước bị lỗi.</span>
+      </button>
+      <button class="s-zalo-sync-option" type="button" onclick="sRunZaloAliasSync('all')">
+        <strong>Đồng bộ tất cả phụ huynh</strong>
+        <span>Làm mới biệt danh cho toàn bộ phụ huynh đã kết bạn, phù hợp khi thông tin học sinh vừa thay đổi.</span>
+      </button>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-outline btn-sm" type="button" onclick="sCloseZaloAliasChoice()">Đóng</button>
     </div>
   </div>
 </div>
@@ -2105,7 +2134,7 @@ async function sLoadZaloAliasStatus(){
   const box=document.getElementById('sZaloAliasStatus');
   if(!box) return;
   const {data:run,error}=await sb.from('zalo_parent_alias_runs')
-    .select('id,status,total,created_at,completed_at,cancelled_at').order('created_at',{ascending:false}).limit(1).maybeSingle();
+    .select('id,status,total,mode,created_at,completed_at,cancelled_at').order('created_at',{ascending:false}).limit(1).maybeSingle();
   if(error){box.textContent='Không tải được tiến độ biệt danh Zalo: '+error.message;return;}
   if(!run){box.textContent='Chưa có đợt đồng bộ biệt danh Zalo.';return;}
   _sZaloAliasRunId=run.id;
@@ -2116,8 +2145,9 @@ async function sLoadZaloAliasStatus(){
   const counts=(jobs||[]).reduce((acc,row)=>{acc[row.status]=(acc[row.status]||0)+1;return acc;},{});
   const completed=(counts.success||0)+(counts.skipped||0)+(counts.failed||0)+(counts.cancelled||0);
   const phase=run.status==='running'?'Đang chạy ngầm':run.status==='cancelled'?'Đã hủy':'Đã hoàn thành';
+  const scope=run.mode==='all'?'tất cả phụ huynh':'phụ huynh còn lại';
   box.innerHTML=`<div style="border:1px solid #cbd5e1;padding:10px;background:#f8fafc">
-    <strong>Biệt danh Zalo: ${phase}</strong> · Đã xử lý ${completed}/${run.total} phụ huynh
+    <strong>Biệt danh Zalo: ${phase}</strong> · Phạm vi: ${scope} · Đã xử lý ${completed}/${run.total} phụ huynh
     <span style="color:var(--ink-mid)"> · ${counts.success||0} thành công, ${counts.skipped||0} bỏ qua, ${counts.failed||0} lỗi</span>
     <button class="btn btn-outline btn-sm" type="button" onclick="sOpenZaloAliasDetails()" style="margin-left:8px">Xem chi tiết</button>
     ${run.status==='running'?'<button class="btn btn-outline btn-sm" type="button" onclick="sCancelZaloAliasSync()" style="margin-left:8px;color:#b91c1c">Hủy đợt</button>':''}
@@ -2127,14 +2157,23 @@ async function sLoadZaloAliasStatus(){
 
 async function sStartZaloAliasSync(){
   if(_sZaloAliasBusy) return;
-  if(!confirm('Đồng bộ biệt danh cho tất cả phụ huynh đang là bạn bè Zalo? Bot sẽ chạy ngầm và có thể đóng trang web.')) return;
+  document.getElementById('sZaloAliasChoiceModal')?.classList.add('open');
+}
+
+function sCloseZaloAliasChoice(){document.getElementById('sZaloAliasChoiceModal')?.classList.remove('open');}
+
+async function sRunZaloAliasSync(mode){
+  if(_sZaloAliasBusy) return;
+  if(!['remaining','all'].includes(mode)) return;
   _sZaloAliasBusy=true;
+  sCloseZaloAliasChoice();
   const button=document.getElementById('sZaloAliasStart'); if(button) button.disabled=true;
   try{
-    const {data,error}=await sb.rpc('start_zalo_parent_alias_sync');
+    const {data,error}=await sb.rpc('start_zalo_parent_alias_sync_v2',{p_mode:mode});
     if(error) throw error;
     await sLoadZaloAliasStatus();
-    toast(data?.already_running?'Đợt đồng bộ biệt danh hiện tại vẫn đang chạy.':`Đã xếp hàng ${data?.total||0} phụ huynh để đổi biệt danh.`,4000);
+    const scope=mode==='all'?'tất cả phụ huynh':'những phụ huynh còn lại';
+    toast(data?.already_running?'Đợt đồng bộ biệt danh hiện tại vẫn đang chạy.':`Đã xếp hàng ${data?.total||0} ${scope} để đổi biệt danh.`,4000);
   }catch(error){alert('Không bắt đầu được: '+error.message);}
   finally{_sZaloAliasBusy=false;if(button) button.disabled=false;}
 }
