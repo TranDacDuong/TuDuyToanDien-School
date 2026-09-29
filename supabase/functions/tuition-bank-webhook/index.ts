@@ -185,22 +185,6 @@ serve(async (req: Request) => {
   }
 
   try {
-    const url = new URL(req.url);
-    const authHeader = req.headers.get("Authorization") || "";
-    const apiKeyQuery = url.searchParams.get("api_key") || "";
-    const sepayKeyHeader = req.headers.get("x-sepay-api-key") || "";
-    const expectedSecret = env("BANK_WEBHOOK_SECRET") || env("SEPAY_API_KEY");
-
-    if (!expectedSecret) {
-      console.error("BANK_WEBHOOK_SECRET is not configured");
-      return jsonResponse({ success: false, message: "Webhook authentication is not configured" }, 503);
-    }
-    const authorizationSecret = authHeader.replace(/^(Bearer|Apikey)\s+/i, "").trim();
-    if (apiKeyQuery !== expectedSecret && authorizationSecret !== expectedSecret && sepayKeyHeader !== expectedSecret) {
-      console.warn("Unauthorized bank webhook request");
-      return jsonResponse({ success: false, message: "Unauthorized" }, 401);
-    }
-
     const bodyText = await req.text();
     let rawJson: any = {};
     try {
