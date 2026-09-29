@@ -2444,10 +2444,16 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       else counts.checking++;
     });
     const total = campaignRows.length;
-    const completed = counts.sent + counts.failed + counts.uncertain + counts.cancelled;
+    const finalized = counts.sent + counts.failed + counts.uncertain + counts.cancelled;
+    const reviewed = total - counts.checking;
+    const latestActivity = campaignRows.reduce((latest, row) => {
+      const value = new Date(row.updated_at || row.created_at || 0).getTime();
+      return Math.max(latest, Number.isFinite(value) ? value : 0);
+    }, 0);
     zaloDurableProgress = {
-      total, completed, percent: total ? Math.round(completed * 100 / total) : 0,
-      counts, startedAt: newest.created_at, batchId: newest.batch_id || null
+      total, finalized, reviewed, percent: total ? Math.round(reviewed * 100 / total) : 0,
+      counts, startedAt: newest.created_at, latestActivity,
+      batchId: newest.batch_id || null
     };
   }
 
@@ -2939,16 +2945,19 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     const durable = zaloDurableProgress;
     if (durable?.total) {
       const c = durable.counts;
-      const active = durable.completed < durable.total;
+      const active = durable.finalized < durable.total;
       const started = durable.startedAt ? new Date(durable.startedAt).toLocaleString("vi-VN") : "";
+      const latestActivity = durable.latestActivity
+        ? new Date(durable.latestActivity).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
+      const remainingMinutes = Math.ceil(c.checking * 67.5 / 60);
       liveProgressHtml = `
         <div style="background:#0f1f3d;color:#fff;border-radius:8px;padding:16px 18px;margin-bottom:16px;box-shadow:0 10px 24px rgba(15,31,61,.16)">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;flex-wrap:wrap">
             <div>
-              <div style="font-weight:800;font-size:14px">${active ? "Tiến độ gửi học phí trên máy chủ" : "Đợt gửi học phí gần nhất đã hoàn tất"}</div>
-              <div style="font-size:11px;color:#cbd5e1;margin-top:3px">Bắt đầu ${esc(started)} · Có thể đóng trang, tiến độ vẫn được lưu</div>
+              <div style="font-weight:800;font-size:14px">${active ? "Tiến độ xử lý đợt gửi học phí" : "Đợt gửi học phí gần nhất đã hoàn tất"}</div>
+              <div style="font-size:11px;color:#cbd5e1;margin-top:3px">Bắt đầu ${esc(started)}${latestActivity ? ` · Hoạt động gần nhất ${esc(latestActivity)}` : ""}</div>
             </div>
-            <div style="font-weight:800;color:#7dd3fc">${durable.completed}/${durable.total} · ${durable.percent}%</div>
+            <div style="font-weight:800;color:#7dd3fc">Đã kiểm tra ${durable.reviewed}/${durable.total} · ${durable.percent}%</div>
           </div>
           <div style="height:12px;background:#334155;border-radius:999px;overflow:hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${durable.percent}">
             <div style="width:${durable.percent}%;height:100%;background:#22c55e;transition:width .4s ease"></div>
@@ -2962,6 +2971,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
             <span style="color:#fca5a5">Lỗi: <b>${c.failed + c.uncertain}</b></span>
             ${c.cancelled ? `<span style="color:#cbd5e1">Đã hủy: <b>${c.cancelled}</b></span>` : ""}
           </div>
+          ${c.checking ? `<div style="font-size:11px;color:#cbd5e1;margin-top:10px">Còn ${c.checking} hồ sơ cần kiểm tra, dự kiến khoảng ${remainingMinutes} phút với nhịp chống chặn 45-90 giây.</div>` : ""}
         </div>`;
     } else if (isRunning || isPaused) {
       const total = progress.total || currentZaloCampaignItems.length || 1;
