@@ -2277,6 +2277,7 @@ Nhập số tiền hoàn lại (>0):`,
   let zaloTuitionHistory = new Map();
   let zaloParentContactStatus = new Map();
   let zaloAutomationState = null;
+  let zaloDurableProgress = null;
   let zaloHistoryFetchedAt = 0;
   let zaloQueueBusy = false;
 
@@ -2401,7 +2402,9 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     if (!item.parentId) return "Chưa liên kết tài khoản phụ huynh";
     if (!/^(0\d{9}|84\d{9})$/.test(item.phone || "")) return "SĐT phụ huynh chưa hợp lệ";
     if (!/^(0\d{9}|84\d{9})$/.test(item.studentPhone || "")) return "Thiếu SĐT học sinh - không thể tạo nội dung chuyển khoản";
-    if (hasPendingZaloTuitionDelivery(item)) return "Đã có lượt nhắc đang chờ bot xử lý";
+    if (hasPendingZaloTuitionDelivery(item)) {
+      return pendingZaloTuitionLabel(item) || "Đã có lượt nhắc đang chờ bot xử lý";
+    }
     return "";
   }
 
@@ -2410,6 +2413,66 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       not_friend: "Chưa kết bạn", invited: "Đã gửi lời mời", greeted: "Chờ gửi học phí",
       sent: "Đã gửi học phí", failed: "Chưa gửi được tin nhắn", uncertain: "Chưa xác nhận gửi - cần kiểm tra Zalo",
       cancelled: "Đã hủy" })[status] || "Đang đồng bộ";
+  }
+
+  function rebuildZaloDurableProgress(rows) {
+    const ordered = [...(rows || [])]
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    const newest = ordered[0];
+    if (!newest) {
+      zaloDurableProgress = null;
+      return;
+    }
+    const campaignRows = newest.batch_id
+      ? ordered.filter(row => row.batch_id === newest.batch_id)
+      : ordered.filter(row => row.created_at === newest.created_at);
+    const counts = { sent: 0, processing: 0, ready: 0, checking: 0, retry: 0,
+      failed: 0, uncertain: 0, cancelled: 0 };
+    const now = Date.now();
+    campaignRows.forEach(row => {
+      if (["sent", "processing", "failed", "uncertain", "cancelled"].includes(row.status)) {
+        counts[row.status]++;
+        return;
+      }
+      const contact = zaloParentContactStatus.get(row.parent_id);
+      if (!contact) counts.checking++;
+      else if (contact.lease_until && new Date(contact.lease_until).getTime() > now) counts.checking++;
+      else if (contact.next_check_at && new Date(contact.next_check_at).getTime() > now &&
+        ["error", "not_found", "not_friend", "pending"].includes(contact.status)) counts.retry++;
+      else if (contact.zalo_uid &&
+        (contact.status === "friend" || contact.status === "invited" || contact.greeting_sent_at)) counts.ready++;
+      else counts.checking++;
+    });
+    const total = campaignRows.length;
+    const completed = counts.sent + counts.failed + counts.uncertain + counts.cancelled;
+    zaloDurableProgress = {
+      total, completed, percent: total ? Math.round(completed * 100 / total) : 0,
+      counts, startedAt: newest.created_at, batchId: newest.batch_id || null
+    };
+  }
+
+  function pendingZaloTuitionLabel(item) {
+    const history = zaloTuitionHistory.get(`${item.studentId}:${item.parentId}`) || [];
+    const latest = history[history.length - 1];
+    if (!latest) return "";
+    if (latest.status === "processing") return "Bot đang gửi tin nhắn";
+    const contact = zaloParentContactStatus.get(item.parentId);
+    if (!contact) return "Đang chờ tạo kết nối Zalo";
+    if (contact.lease_until && new Date(contact.lease_until).getTime() > Date.now()) {
+      return "Bot đang kiểm tra Zalo";
+    }
+    if (contact.next_check_at && new Date(contact.next_check_at).getTime() > Date.now() &&
+      ["error", "not_found", "not_friend", "pending"].includes(contact.status)) {
+      const retryAt = new Date(contact.next_check_at).toLocaleTimeString("vi-VN", {
+        hour: "2-digit", minute: "2-digit"
+      });
+      return `Chờ thử lại lúc ${retryAt}`;
+    }
+    if (contact.zalo_uid &&
+      (contact.status === "friend" || contact.status === "invited" || contact.greeting_sent_at)) {
+      return "Sẵn sàng gửi - đang chờ lượt";
+    }
+    return "Đang chờ kiểm tra Zalo";
   }
 
   function renderZaloTuitionHistoryCells() {
@@ -2447,7 +2510,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     try {
       if (studentIds.length && /^20\d{2}-(0[1-9]|1[0-2])$/.test(ym)) {
         const { data, error } = await getSb().from("zalo_tuition_deliveries")
-          .select("student_id,parent_id,attempt_no,status,created_at,updated_at,error_message,qr_sent_at")
+          .select("student_id,parent_id,batch_id,attempt_no,status,created_at,updated_at,error_message,qr_sent_at")
           .in("student_id", studentIds).eq("month", `${ym}-01`).order("attempt_no");
         if (error) throw error;
         (data || []).forEach(row => {
@@ -2458,11 +2521,12 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       }
       if (parentIds.length) {
         const { data, error } = await getSb().from("zalo_parent_contacts")
-          .select("parent_id,status,last_checked_at")
+          .select("parent_id,status,zalo_uid,greeting_sent_at,last_checked_at,next_check_at,lease_until,last_error")
           .in("parent_id", parentIds);
         if (error) throw error;
         zaloParentContactStatus = new Map((data || []).map(row => [row.parent_id, row]));
       }
+      rebuildZaloDurableProgress([...zaloTuitionHistory.values()].flat());
       currentZaloCampaignItems.forEach((item, idx) => {
         if (!isZaloTuitionItemBaseEligible(item)) item.selected = false;
         const checkbox = document.querySelector(`.zalo-item-chk[data-index="${idx}"]`);
@@ -2603,12 +2667,14 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       (savedPayments || []).forEach(payment => { paymentMap[payment.student_id] = payment; });
 
       const template = document.getElementById("zaloTemplateText")?.value || DEFAULT_ZALO_TEMPLATE;
+      const batchId = crypto.randomUUID();
       const payload = items.map(item => {
         const paymentId = paymentMap[item.studentId]?.id || "";
         item.transferMemo = buildTransferContent(item.studentName, ym, item.studentId, paymentId, item.studentPhone);
         item.qrUrl = buildPaymentQrUrl(item.studentName, ym, item.remaining, item.studentId, paymentId, item.studentPhone);
         return {
-          request_key: crypto.randomUUID(), student_id: item.studentId, parent_id: item.parentId,
+          request_key: crypto.randomUUID(), batch_id: batchId,
+          student_id: item.studentId, parent_id: item.parentId,
           content: fillZaloTemplate(template, item), qr_url: item.qrUrl, remaining: item.remaining
         };
       });
@@ -2868,9 +2934,36 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       lastRenderedStatusHtml = newStatusHtml;
     }
 
-    // Live Campaign Progress Bar
+    // Durable queue progress remains visible after the page or bot is restarted.
     let liveProgressHtml = "";
-    if (isRunning || isPaused) {
+    const durable = zaloDurableProgress;
+    if (durable?.total) {
+      const c = durable.counts;
+      const active = durable.completed < durable.total;
+      const started = durable.startedAt ? new Date(durable.startedAt).toLocaleString("vi-VN") : "";
+      liveProgressHtml = `
+        <div style="background:#0f1f3d;color:#fff;border-radius:8px;padding:16px 18px;margin-bottom:16px;box-shadow:0 10px 24px rgba(15,31,61,.16)">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+            <div>
+              <div style="font-weight:800;font-size:14px">${active ? "Tiến độ gửi học phí trên máy chủ" : "Đợt gửi học phí gần nhất đã hoàn tất"}</div>
+              <div style="font-size:11px;color:#cbd5e1;margin-top:3px">Bắt đầu ${esc(started)} · Có thể đóng trang, tiến độ vẫn được lưu</div>
+            </div>
+            <div style="font-weight:800;color:#7dd3fc">${durable.completed}/${durable.total} · ${durable.percent}%</div>
+          </div>
+          <div style="height:12px;background:#334155;border-radius:999px;overflow:hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${durable.percent}">
+            <div style="width:${durable.percent}%;height:100%;background:#22c55e;transition:width .4s ease"></div>
+          </div>
+          <div style="display:flex;gap:8px 14px;flex-wrap:wrap;margin-top:12px;font-size:11px">
+            <span style="color:#86efac">Đã gửi: <b>${c.sent}</b></span>
+            <span style="color:#7dd3fc">Đang gửi: <b>${c.processing}</b></span>
+            <span style="color:#fde68a">Sẵn sàng: <b>${c.ready}</b></span>
+            <span style="color:#e2e8f0">Chờ kiểm tra Zalo: <b>${c.checking}</b></span>
+            <span style="color:#fdba74">Chờ thử lại: <b>${c.retry}</b></span>
+            <span style="color:#fca5a5">Lỗi: <b>${c.failed + c.uncertain}</b></span>
+            ${c.cancelled ? `<span style="color:#cbd5e1">Đã hủy: <b>${c.cancelled}</b></span>` : ""}
+          </div>
+        </div>`;
+    } else if (isRunning || isPaused) {
       const total = progress.total || currentZaloCampaignItems.length || 1;
       const sent = progress.sent || 0;
       const friendRequested = progress.friendRequested || 0;
