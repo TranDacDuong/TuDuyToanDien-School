@@ -235,7 +235,6 @@ p  { color: var(--ink-mid); }
 
 /* ── Buttons ── */
 .btn {
-  position: relative; overflow: hidden;
   display: inline-flex; align-items: center; gap: 6px;
   padding: 8px 18px; border: none; border-radius: var(--radius);
   font-family: var(--font-body); font-size: .875rem; font-weight: 600;
@@ -276,15 +275,6 @@ p  { color: var(--ink-mid); }
 .btn-lg { padding: 11px 24px; font-size: 1rem; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .btn:not(:disabled):active { transform: translateY(1px) scale(.98); }
-.mindup-ripple {
-  position: absolute; width: 12px; height: 12px; border-radius: 50%;
-  pointer-events: none; background: rgba(255,255,255,.48);
-  transform: translate(-50%, -50%) scale(0);
-  animation: mindupRipple .52s ease-out forwards;
-}
-@keyframes mindupRipple {
-  to { transform: translate(-50%, -50%) scale(18); opacity: 0; }
-}
 
 /* ── Cards ── */
 .card {
@@ -784,17 +774,6 @@ label {
     transform: translateY(-2px);
     box-shadow: 0 16px 34px rgba(15,31,61,.10);
   }
-  .home-tab-btn,
-  .mobile-quick-action,
-  .mobile-nav-item,
-  aside li,
-  .act-btn,
-  .teacher-card,
-  .course-card { transition: transform .2s ease, box-shadow .2s ease, background .2s ease, color .2s ease; }
-  .home-tab-btn:hover,
-  .mobile-quick-action:hover,
-  .mobile-nav-item:hover,
-  .act-btn:hover { transform: translateY(-2px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
