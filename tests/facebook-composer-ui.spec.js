@@ -18,6 +18,15 @@ async function showComposer(page){
 }
 
 test.describe("Facebook-like post composer", () => {
+  test("automatically refreshes and uploads edited Quiz artwork", async () => {
+    const source = fs.readFileSync(path.join(root, "facebook_posting.html"), "utf8");
+    expect(source).toContain("function queueAutomaticQuizPreview()");
+    expect(source).toContain("previewQuizImage({ silent:true })");
+    expect(source).toContain("await ensureQuizImageUploaded();");
+    expect(source).toContain('generateQuizImage({ throwOnError:true })');
+    expect(source).toContain('{ skipQuizImage:true }');
+  });
+
   test("keeps the post surface and tools in a two-column desktop layout", async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await showComposer(page);

@@ -691,6 +691,8 @@ let S = {
   weekStart: startOfWeek(new Date()),
 };
 let quizQuestionImageDataUrl = "";
+let quizPreviewTimer = 0;
+let quizImageDirty = false;
 let TTS_VOICES = [];
 let TTS_VOICES_LOADING = false;
 const DEFAULT_ELEVENLABS_VOICE_ID = "pNInz6obpgDQGcFmaJgB";
@@ -1122,6 +1124,22 @@ function renderQuizAnswerFields(){
       <input class="input quiz-answer-input" value="${esc(oldValues[index] || "")}" placeholder="Nhập đáp án ${label}">
     </div>
   `).join("");
+}
+function canRenderQuizImage(){
+  try {
+    getQuizData();
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+function queueAutomaticQuizPreview(){
+  if (!isQuizType($("postType")?.value || "")) return;
+  quizImageDirty = true;
+  clearTimeout(quizPreviewTimer);
+  quizPreviewTimer = setTimeout(() => {
+    if (canRenderQuizImage()) previewQuizImage({ silent:true });
+  }, 650);
 }
 function toggleQuizBuilder(){
   const postTypeId = $("postType").value;
@@ -1860,17 +1878,17 @@ async function applyGeminiHardQuizDraft(post, data){
 function currentPostTypeName(){
   return typeName($("postType")?.value || "");
 }
-async function previewQuizImage(){
+async function previewQuizImage(options = {}){
   try {
     const dataUrl = await buildQuizImageDataUrl();
     $("quizImagePreview").src = dataUrl;
     $("quizImagePreview").classList.add("show");
-    showPostStatus("ok", "Đã tạo ảnh xem thử. Nếu ổn, bấm Tạo ảnh Quiz để upload lên Drive.");
+    if (!options.silent) showPostStatus("ok", "Đã tạo ảnh xem thử. Ảnh mới sẽ tự được upload khi bạn lưu nháp hoặc hẹn lịch.");
   } catch (error) {
-    showPostStatus("err", error.message || String(error));
+    if (!options.silent) showPostStatus("err", error.message || String(error));
   }
 }
-async function generateQuizImage(){
+async function generateQuizImage(options = {}){
   try {
     showPostStatus("info", "Đang tạo ảnh Quiz...");
     const dataUrl = await buildQuizImageDataUrl();
@@ -1881,6 +1899,7 @@ async function generateQuizImage(){
     const url = window.MindupImageUpload.getDisplayUrl(uploaded);
     if (!url) throw new Error("Upload xong nhưng không lấy được URL ảnh Quiz.");
     $("postImageUrl").value = url;
+    quizImageDirty = false;
     if (!$("postContent").value.trim()) $("postContent").value = buildQuizCaption();
     const correctAnswer = $("quizCorrectAnswer").value.trim();
     if (correctAnswer) {
@@ -1891,9 +1910,17 @@ async function generateQuizImage(){
     $("postCharCount").textContent = String($("postContent").value.length);
     updateImagePreview();
     showPostStatus("ok", "Đã tạo và upload ảnh Quiz. Bạn có thể lưu nháp hoặc hẹn lịch Facebook.");
+    return url;
   } catch (error) {
     showPostStatus("err", error.message || String(error));
+    if (options.throwOnError) throw error;
+    return "";
   }
+}
+async function ensureQuizImageUploaded(){
+  if (!isQuizType($("postType")?.value || "") || !canRenderQuizImage()) return;
+  if (!quizImageDirty && $("postImageUrl").value.trim()) return;
+  await generateQuizImage({ throwOnError:true });
 }
 function setQuizFormFromDraft(quiz = {}){
   const answers = Array.isArray(quiz.answers)
@@ -2425,6 +2452,8 @@ function openPostModal(id="", defaults={}){
     && isProblemLearningVisualType(row.post_type_id)
     && String(row.ai_model || "").includes("mindup-problem-learning-svg");
   $("postImageUrl").value = oldProblemLearningFallbackImage ? "" : (row?.image_url || "");
+  quizImageDirty = false;
+  clearTimeout(quizPreviewTimer);
   $("postInternalNote").value = row?.internal_note || "";
   const aiText = row
     ? `${aiStatusLabel(row.ai_status || "idle")}${oldProblemLearningFallbackImage ? " • Ảnh cũ không đúng chuẩn đã được ẩn, hãy tạo lại ảnh bằng Gemini." : ""}${row.ai_error ? ` • Lỗi: ${row.ai_error}` : ""}`
@@ -2470,6 +2499,9 @@ function openPostModal(id="", defaults={}){
   toggleQuizBuilder();
   renderTtsAudioFromPost(row);
   updateImagePreview();
+  if (isQuizType($("postType").value) && !$("postImageUrl").value.trim() && canRenderQuizImage()) {
+    setTimeout(() => previewQuizImage({ silent:true }), 0);
+  }
   $("deletePostBtn").style.display = row ? "" : "none";
   if ($("approvePostBtn")) {
     $("approvePostBtn").style.display = row ? "" : "none";
@@ -2494,6 +2526,7 @@ function setQuizQuestionImage(file){
     quizQuestionImageDataUrl = String(reader.result || "");
     $("quizQuestionImagePreview").src = quizQuestionImageDataUrl;
     $("quizQuestionImageBox").classList.add("show");
+    queueAutomaticQuizPreview();
     showPostStatus("ok", "Đã dán ảnh vào câu hỏi Quiz.");
   };
   reader.onerror = () => showPostStatus("err", "Không đọc được ảnh vừa dán.");
@@ -2702,7 +2735,8 @@ function getPostPayload(extra={}){
     ...extra,
   };
 }
-async function savePostDraft(extra={}){
+async function savePostDraft(extra={}, options={}){
+  if (!options.skipQuizImage) await ensureQuizImageUploaded();
   const basePayload = getPostPayload();
   const payload = { ...basePayload, status: postHasContent(basePayload) ? "draft" : "missing_content", ...extra };
   const id = $("postId").value;
@@ -4511,7 +4545,7 @@ async function generateAiDraft(provider = "gemini"){
   try {
     setAiDraftButtonsBusy(true, btn, "Đang tạo...");
     showPostStatus("info", `Đang tạo nội dung/hashtag/ảnh bằng ${providerName}. Nội dung sẽ chỉ lưu khi bạn bấm Lưu nháp.`);
-    const draft = await savePostDraft({ approval_status: "pending", content_status: "missing_content" });
+    const draft = await savePostDraft({ approval_status: "pending", content_status: "missing_content" }, { skipQuizImage:true });
     $("postId").value = draft.id;
     $("aiDraftStatus").textContent = `Đang tạo bằng ${providerName}...`;
     const data = await callFacebookAiDraftFunction({ post_id: draft.id, provider });
@@ -4874,9 +4908,12 @@ function bindEvents(){
   $("postContent").addEventListener("paste", handlePostImagePaste);
   $("postImageUrl").addEventListener("input", updateImagePreview);
   $("postImageFile").addEventListener("change", ev => uploadFile(ev.target.files?.[0]).catch(e => showPostStatus("err", e.message || String(e))));
-  $("quizAnswerCount").addEventListener("change", renderQuizAnswerFields);
+  $("quizAnswerCount").addEventListener("change", () => { renderQuizAnswerFields(); queueAutomaticQuizPreview(); });
+  $("quizBuilder").addEventListener("input", event => {
+    if (event.target.matches("#quizQuestion, .quiz-answer-input")) queueAutomaticQuizPreview();
+  });
   $("quizQuestion").addEventListener("paste", handleQuizQuestionPaste);
-  $("removeQuizQuestionImageBtn").addEventListener("click", clearQuizQuestionImage);
+  $("removeQuizQuestionImageBtn").addEventListener("click", () => { clearQuizQuestionImage(); queueAutomaticQuizPreview(); });
   $("generateQuizImageBtn").addEventListener("click", generateQuizImage);
   ["hardQuizPrizeAmount","hardQuizDeadlineNote","hardQuizResultRule"].forEach(id => $(id)?.addEventListener("input", () => $("hardQuizRules").value = buildHardQuizRules()));
   $("previewHardQuizImageBtn")?.addEventListener("click", previewHardQuizImage);
