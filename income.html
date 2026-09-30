@@ -1293,6 +1293,13 @@
     return isValidUuid(text) ? text : null;
   }
 
+  function hasIncomePermission(key, fallback = false) {
+    return window.AppPermissions?.has?.(key, fallback) ?? fallback;
+  }
+  function canViewAllIncome() { return hasIncomePermission("income.all.view", viewerProfile?.role === "admin"); }
+  function canManageIncome() { return hasIncomePermission("income.manage", viewerProfile?.role === "admin"); }
+  function canManagePayroll() { return hasIncomePermission("income.payroll.manage", viewerProfile?.role === "admin"); }
+
   function ensureSelectedTeacherId() {
     if (selectedTeacherId === "OVERVIEW") return "OVERVIEW";
     selectedTeacherId = normalizeUuid(selectedTeacherId);
@@ -1305,7 +1312,7 @@
       return selectedTeacherId;
     }
 
-    if (viewerProfile?.role === "admin") {
+    if (canViewAllIncome()) {
       selectedTeacherId = "OVERVIEW";
       if (select) select.value = "OVERVIEW";
       return selectedTeacherId;
@@ -1327,7 +1334,7 @@
   }
 
   function isSelectedAdminOverview() {
-    return viewerProfile?.role === "admin" && (selectedTeacherId === "OVERVIEW" || !selectedTeacherId);
+    return canViewAllIncome() && (selectedTeacherId === "OVERVIEW" || !selectedTeacherId);
   }
 
   function isTeacherStaffRole(role) {
@@ -1685,7 +1692,7 @@
   // Save salary configuration (Admin only)
   async function saveSalaryConfig(event) {
     if (event) event.preventDefault();
-    if (viewerProfile.role !== "admin" || isDbFallback) return;
+    if (!canManagePayroll() || isDbFallback) return;
 
     const baseSalaryInput = document.getElementById("configBaseSalary");
     const bonusInput = document.getElementById("configBasePercent");
@@ -1824,7 +1831,7 @@
 
     if (error) {
       console.error("Lỗi tải danh sách giáo viên:", error);
-      if (viewerProfile?.role === "admin" && normalizeUuid(currentUser?.id)) {
+      if (canViewAllIncome() && normalizeUuid(currentUser?.id)) {
         teachersList = [{ id: currentUser.id, full_name: viewerProfile.full_name || "Admin", role: "admin" }];
         const select = document.getElementById("teacherSelect");
         select.innerHTML = `<option value="${currentUser.id}">${esc(viewerProfile.full_name || "Admin")} (Admin)</option>`;
@@ -1835,7 +1842,7 @@
     }
 
     teachersList = (data || []).filter(t => normalizeUuid(t.id) && INCOME_SELECTABLE_ROLES.has(String(t.role || "")));
-    if (!teachersList.length && viewerProfile?.role === "admin" && normalizeUuid(currentUser?.id)) {
+    if (!teachersList.length && canViewAllIncome() && normalizeUuid(currentUser?.id)) {
       teachersList = [{
         id: currentUser.id,
         full_name: viewerProfile.full_name || "Admin",
@@ -1843,14 +1850,14 @@
       }];
     }
     const select = document.getElementById("teacherSelect");
-    const overviewOption = viewerProfile?.role === "admin" ? `<option value="OVERVIEW">📊 Tổng quan Tiền lãi trung tâm</option>` : "";
+    const overviewOption = canViewAllIncome() ? `<option value="OVERVIEW">📊 Tổng quan Tiền lãi trung tâm</option>` : "";
     select.innerHTML = overviewOption + (teachersList.length
       ? teachersList.map(t => `<option value="${t.id}">${esc(t.full_name || t.email || "Nhân viên")} (${t.role === "admin" ? "Admin / Giáo viên" : t.role === "assistant" ? "Trợ giảng" : t.role === "marketing" ? "Marketing" : "Giáo viên"})</option>`).join("")
       : `<option value="">Không tải được danh sách nhân viên</option>`);
     select.style.display = "block";
     
     // Choose selected or OVERVIEW
-    if (viewerProfile?.role === "admin") {
+    if (canViewAllIncome()) {
       selectedTeacherId = selectedTeacherId || "OVERVIEW";
       select.value = selectedTeacherId;
     } else if (teachersList.length) {
@@ -2443,7 +2450,7 @@
   // Save a custom bonus (Admin only)
   async function saveCustomBonus(event) {
     if (event) event.preventDefault();
-    if (viewerProfile?.role !== "admin") return;
+    if (!canManagePayroll()) return;
 
     const safeUserId = normalizeUuid(selectedTeacherId);
     if (!safeUserId || safeUserId === "OVERVIEW") {
@@ -2510,7 +2517,7 @@
 
   // Delete a custom bonus (Admin only)
   async function deleteCustomBonus(id) {
-    if (viewerProfile?.role !== "admin") return;
+    if (!canManagePayroll()) return;
     if (!confirm("Bạn có chắc chắn muốn xóa khoản thưởng này không?")) return;
 
     const sb = getSb();
@@ -2608,7 +2615,7 @@
   }
 
   async function calculateAdminIncome(ym) {
-    if (viewerProfile?.role !== "admin") return;
+    if (!canViewAllIncome()) return;
     const sb = getSb();
     const mStart = ymToDate(ym);
     const mEnd = monthEnd(ym);
@@ -2796,7 +2803,7 @@
   }
 
   function openManualLedgerDialog(gapId = "") {
-    if (viewerProfile?.role !== "admin") return;
+    if (!canManageIncome()) return;
     const gap = gapId ? currentLedgerGaps.get(gapId) : null;
     pendingManualLedgerAccount = gap?.accountNumber || MINDUP_BANK_ACCOUNT;
     const atInput = document.getElementById("manualLedgerAt");
@@ -2818,7 +2825,7 @@
 
   async function saveManualLedgerEntry(event) {
     event.preventDefault();
-    if (viewerProfile?.role !== "admin") return;
+    if (!canManageIncome()) return;
     const at = document.getElementById("manualLedgerAt").value;
     const amount = Number(document.getElementById("manualLedgerAmount").value || 0);
     const content = document.getElementById("manualLedgerContent").value.trim();
@@ -2843,7 +2850,7 @@
   }
 
   function openBalanceCheckpointDialog() {
-    if (viewerProfile?.role !== "admin") return;
+    if (!canManageIncome()) return;
     document.getElementById("balanceCheckpointAt").value = toDateTimeLocal(new Date());
     document.getElementById("balanceCheckpointAmount").value = "";
     document.getElementById("balanceCheckpointNote").value = "";
@@ -2853,7 +2860,7 @@
 
   async function saveBalanceCheckpoint(event) {
     event.preventDefault();
-    if (viewerProfile?.role !== "admin") return;
+    if (!canManageIncome()) return;
     const at = document.getElementById("balanceCheckpointAt").value;
     const balance = Number(document.getElementById("balanceCheckpointAmount").value);
     const note = document.getElementById("balanceCheckpointNote").value.trim();
@@ -2876,7 +2883,7 @@
   }
 
   function openLedgerDescriptionDialog(id) {
-    if (viewerProfile?.role !== "admin") return;
+    if (!canManageIncome()) return;
     const row = currentLedgerRows.get(id);
     if (!row) return;
     document.getElementById("ledgerDescriptionId").value = id;
@@ -2904,14 +2911,14 @@
   }
 
   async function deleteManualLedgerEntry(id) {
-    if (viewerProfile?.role !== "admin" || !confirm("Xóa giao dịch bổ sung thủ công này?")) return;
+    if (!canManageIncome() || !confirm("Xóa giao dịch bổ sung thủ công này?")) return;
     const { error } = await getSb().rpc("delete_manual_bank_ledger_entry", { p_id: id });
     if (error) return alert("Không xóa được giao dịch: " + error.message);
     await calculateAndRender();
   }
 
   async function saveStaffMonthlySalary(staffId) {
-    if (viewerProfile?.role !== "admin") return;
+    if (!canManagePayroll()) return;
     const safeStaffId = normalizeUuid(staffId);
     if (!safeStaffId) return alert("Nhân viên không hợp lệ.");
     const ym = document.getElementById("monthPicker").value;
@@ -3020,7 +3027,7 @@
     syncIncomeModePanels();
 
     // Sync admin config inputs
-    if (viewerProfile.role === "admin" && !isDbFallback) {
+    if (canManagePayroll() && !isDbFallback) {
       const bonusLabel = document.getElementById("configBonusLabel");
       const bonusInput = document.getElementById("configBasePercent");
       const specialClassNote = document.getElementById("specialClassNote");
@@ -3278,7 +3285,7 @@
       }
 
       // Render class revenue rows (4 columns: Lớp học, Học sinh, Doanh thu dự kiến, % Thưởng đặc biệt)
-      const isAdminView = viewerProfile.role === "admin" && !isDbFallback && selectedIsTeacher;
+      const isAdminView = canManagePayroll() && !isDbFallback && selectedIsTeacher;
       const classTbody = document.getElementById("classRevenueBody");
       const classListKeys = Object.keys(classSummaries);
       document.getElementById("classCountBadge").textContent = `${classListKeys.length} lớp`;
@@ -3359,7 +3366,7 @@
       const totalCustomBonus = customBonuses.reduce((sum, b) => sum + Number(b.amount || 0), 0);
 
       // Render custom bonus list and form
-      const isAdminViewMode = viewerProfile.role === "admin";
+      const isAdminViewMode = canManagePayroll();
       renderCustomBonusList(customBonuses, isAdminViewMode, "customBonusList");
       const bonusCountBadge = document.getElementById("customBonusCountBadge");
       if (bonusCountBadge) bonusCountBadge.textContent = `${customBonuses.length} khoản`;
@@ -3621,10 +3628,16 @@
     }
 
     viewerProfile = profile;
+    await window.AppPermissions?.load?.(profile);
+    if (!hasIncomePermission("page.income", ["admin", "teacher", "assistant"].includes(profile.role))) {
+      window.location.href = "dashboard.html";
+      return;
+    }
+    window.AppPermissions?.applyToDom?.();
     await checkDatabaseSupport();
     document.getElementById("adminProfitPanel").style.display = "none";
 
-    if (profile.role === "admin") {
+    if (canViewAllIncome()) {
       await loadTeachers();
       syncIncomeModePanels();
     } else if (["teacher", "assistant", "marketing"].includes(profile.role)) {
@@ -3656,7 +3669,7 @@
       const dataBlock = document.getElementById("dataBlock");
       loader.style.display = "none";
       dataBlock.style.display = "flex";
-      if (profile.role === "admin") {
+      if (canViewAllIncome()) {
         document.getElementById("bankLedgerBody").innerHTML = `<tr><td colspan="6" class="empty-state">Chưa có nhân viên nào để tính thu nhập chi tiết.</td></tr>`;
       }
     }

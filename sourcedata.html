@@ -335,14 +335,32 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 .permission-editor-head h3 { margin:0 0 5px; color:var(--navy); }
 .permission-note { color:var(--ink-mid); font-size:.8rem; line-height:1.5; }
 .permission-group { background:#fff; border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:12px; }
-.permission-group h4 { margin:0; padding:12px 15px; background:#f5f8fc; color:var(--navy); border-bottom:1px solid var(--border); }
+.permission-group[open] { box-shadow:0 10px 26px rgba(15,31,61,.07); }
+.permission-group-summary { list-style:none; padding:13px 15px; background:#f5f8fc; color:var(--navy); cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.permission-group-summary::-webkit-details-marker { display:none; }
+.permission-group-title { display:flex; align-items:center; gap:9px; min-width:0; }
+.permission-group-title strong { font-size:.92rem; }
+.permission-group-title::before { content:'›'; font-size:1.25rem; line-height:1; transition:transform .16s ease; }
+.permission-group[open] .permission-group-title::before { transform:rotate(90deg); }
+.permission-group-count { padding:4px 9px; border-radius:999px; background:#e2e8f0; color:#475569; font-size:.72rem; font-weight:800; white-space:nowrap; }
+.permission-group-count.partial { background:#fff7ed; color:#b45309; }
+.permission-group-count.full { background:#ecfdf5; color:#047857; }
+.permission-group-toolbar { padding:10px 15px; border-top:1px solid var(--border); border-bottom:1px solid var(--border); display:flex; gap:7px; flex-wrap:wrap; background:#fbfdff; }
+.permission-preset { min-height:32px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#334155; padding:5px 9px; font:inherit; font-size:.73rem; font-weight:700; cursor:pointer; }
+.permission-preset:hover { border-color:#1d6bd1; color:#1d6bd1; }
+.permission-preset.primary { background:#0f274d; color:#fff; border-color:#0f274d; }
+.permission-preset.danger { color:#b42318; border-color:#fecaca; background:#fff7f7; }
+.permission-preset:disabled { opacity:.5; cursor:not-allowed; }
 .permission-row { display:grid; grid-template-columns:minmax(180px,1fr) minmax(180px,240px); gap:14px; align-items:center; padding:11px 15px; border-bottom:1px solid #edf1f6; }
 .permission-row:last-child { border-bottom:0; }
 .permission-row-title { font-weight:700; color:var(--navy); }
+.permission-risk { display:inline-flex; margin-left:7px; padding:2px 6px; border-radius:999px; background:#fff1f2; color:#be123c; font-size:.65rem; font-weight:800; vertical-align:middle; }
 .permission-row-copy { color:var(--ink-light); font-size:.75rem; margin-top:3px; }
 .permission-select { width:100%; min-height:38px; border:1px solid var(--border); border-radius:8px; background:#fff; padding:7px 10px; color:var(--ink); }
 .permission-select.override-allow { border-color:#22a06b; background:#effbf5; }
 .permission-select.override-deny { border-color:#dc5a5a; background:#fff3f3; }
+.permission-legend { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.permission-legend span { padding:4px 8px; border-radius:999px; background:#f1f5f9; color:#475569; font-size:.7rem; font-weight:700; }
 .permission-empty { background:#fff; border:1px dashed var(--border); border-radius:14px; padding:28px; text-align:center; color:var(--ink-light); }
 @media(max-width:820px){
   .permission-shell { grid-template-columns:1fr; }
@@ -452,17 +470,17 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 
 <!-- Tabs -->
 <div class="tabs surface-toolbar">
-  <button class="tab active" data-testid="system-tab-rooms" onclick="switchTab('rooms',this)">🏫 Phòng học</button>
-  <button class="tab" data-testid="system-tab-grades" onclick="switchTab('grades',this)">🏛 Khối</button>
-  <button class="tab" data-testid="system-tab-subjects" onclick="switchTab('subjects',this)">📚 Môn học</button>
-  <button class="tab" data-testid="system-tab-topics" onclick="switchTab('topics',this)">🏷️ Chủ đề</button>
-  <button class="tab" data-testid="system-tab-teachers" onclick="switchTab('teachers',this)">👨‍🏫 Giáo viên</button>
-  <button class="tab" data-testid="system-tab-students" onclick="switchTab('students',this)">👩‍🎓 Học sinh</button>
-  <button class="tab" data-testid="system-tab-evaluation-templates" onclick="switchTab('evaluationTemplates',this)">📝 Mẫu nhận xét</button>
-  <button class="tab" data-testid="system-tab-msg-templates" onclick="switchTab('msgTemplates',this)">💬 Tin nhắn tự động</button>
-  <button class="tab" data-testid="system-tab-logs" onclick="switchTab('adminLogs',this)">📋 Nhật ký vận hành</button>
-  <button class="tab" data-testid="system-tab-permissions" onclick="switchTab('permissions',this)">🔐 Phân quyền</button>
-  <button class="tab" data-testid="system-tab-appearance" onclick="switchTab('appearance',this)">🎨 Giao diện</button>
+  <button class="tab active" data-permission="system.catalogs.manage" data-testid="system-tab-rooms" onclick="switchTab('rooms',this)">🏫 Phòng học</button>
+  <button class="tab" data-permission="system.catalogs.manage" data-testid="system-tab-grades" onclick="switchTab('grades',this)">🏛 Khối</button>
+  <button class="tab" data-permission="system.catalogs.manage" data-testid="system-tab-subjects" onclick="switchTab('subjects',this)">📚 Môn học</button>
+  <button class="tab" data-permission="system.catalogs.manage" data-testid="system-tab-topics" onclick="switchTab('topics',this)">🏷️ Chủ đề</button>
+  <button class="tab" data-permission="system.staff.manage" data-testid="system-tab-teachers" onclick="switchTab('teachers',this)">👨‍🏫 Giáo viên</button>
+  <button class="tab" data-permission="system.students.manage" data-testid="system-tab-students" onclick="switchTab('students',this)">👩‍🎓 Học sinh</button>
+  <button class="tab" data-permission="system.templates.manage" data-testid="system-tab-evaluation-templates" onclick="switchTab('evaluationTemplates',this)">📝 Mẫu nhận xét</button>
+  <button class="tab" data-permission="system.templates.manage" data-testid="system-tab-msg-templates" onclick="switchTab('msgTemplates',this)">💬 Tin nhắn tự động</button>
+  <button class="tab" data-permission="system.logs.view" data-testid="system-tab-logs" onclick="switchTab('adminLogs',this)">📋 Nhật ký vận hành</button>
+  <button class="tab" data-permission="system.permissions.manage" data-testid="system-tab-permissions" onclick="switchTab('permissions',this)">🔐 Phân quyền</button>
+  <button class="tab" data-permission="system.appearance.manage" data-testid="system-tab-appearance" onclick="switchTab('appearance',this)">🎨 Giao diện</button>
 </div>
 
 <!-- ═══════ PHÒNG HỌC ═══════ -->
@@ -1156,6 +1174,17 @@ function toast(msg, dur=2000){
 
 /* ── Tab switch ── */
 function switchTab(id, btn){
+  const tabPermissions = {
+    rooms:'system.catalogs.manage', grades:'system.catalogs.manage', subjects:'system.catalogs.manage', topics:'system.catalogs.manage',
+    teachers:'system.staff.manage', students:'system.students.manage', evaluationTemplates:'system.templates.manage',
+    msgTemplates:'system.templates.manage', adminLogs:'system.logs.view', permissions:'system.permissions.manage',
+    appearance:'system.appearance.manage'
+  };
+  const requiredPermission = tabPermissions[id];
+  if(requiredPermission && !window.AppPermissions?.has?.(requiredPermission, false)){
+    toast('Bạn không có quyền mở khu vực này.', 3000);
+    return;
+  }
   document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
   document.getElementById(id).classList.add("active");
   document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
@@ -1213,7 +1242,7 @@ async function loadPermissionManagement(force = false){
   if(error){
     const missingMigration = /admin_get_permission_management|schema cache|does not exist|not found/i.test(error.message || '');
     const message = missingMigration
-      ? 'Chưa cài migration phân quyền trên Supabase. Hãy chạy file SQL staff granular permissions.sql.'
+      ? 'Chưa cài đầy đủ migration phân quyền trên Supabase. Hãy chạy lần lượt SQL staff granular permissions.sql và SQL detailed staff permissions.sql.'
       : `Không tải được phân quyền: ${error.message}`;
     list.innerHTML = '<div class="permission-empty">Chưa có dữ liệu</div>';
     editor.innerHTML = `<div class="permission-empty">${esc(message)}</div>`;
@@ -1266,13 +1295,34 @@ function renderPermissionEditor(){
   const overrides = user.overrides || {};
   const groups = new Map();
   (_permissionData.catalog || []).forEach(permission => {
-    if(!groups.has(permission.section)) groups.set(permission.section, []);
-    groups.get(permission.section).push(permission);
+    const groupKey = permission.group_key || (permission.permission_key.startsWith('page.') ? permission.permission_key : permission.section);
+    if(!groups.has(groupKey)) groups.set(groupKey, { label:permission.group_label || permission.section, permissions:[] });
+    groups.get(groupKey).permissions.push(permission);
   });
   const isAdmin = user.role === 'admin';
-  const groupHtml = [...groups.entries()].map(([section, permissions]) => `
-    <div class="permission-group">
-      <h4>${esc(section)}</h4>
+  const effectiveAllowed = permission => {
+    if(isAdmin) return true;
+    if(Object.prototype.hasOwnProperty.call(overrides, permission.permission_key)) return overrides[permission.permission_key] === true;
+    return defaults[permission.permission_key] === true;
+  };
+  const groupHtml = [...groups.entries()].map(([groupKey, group]) => {
+    const permissions = group.permissions;
+    const allowedCount = permissions.filter(effectiveAllowed).length;
+    const countClass = allowedCount === permissions.length ? 'full' : allowedCount > 0 ? 'partial' : '';
+    const shouldOpen = groupKey === 'page.tuition' || (allowedCount > 0 && allowedCount < permissions.length);
+    return `
+    <details class="permission-group" data-permission-group="${escAttr(groupKey)}" ${shouldOpen ? 'open' : ''}>
+      <summary class="permission-group-summary">
+        <span class="permission-group-title"><strong>${esc(group.label)}</strong></span>
+        <span class="permission-group-count ${countClass}">${allowedCount}/${permissions.length} quyền</span>
+      </summary>
+      <div class="permission-group-toolbar">
+        <button class="permission-preset" type="button" ${isAdmin ? 'disabled' : ''} onclick="applyPermissionPreset('${escAttr(user.id)}','${escAttr(groupKey)}','view',this)">Chỉ xem</button>
+        <button class="permission-preset" type="button" ${isAdmin ? 'disabled' : ''} onclick="applyPermissionPreset('${escAttr(user.id)}','${escAttr(groupKey)}','basic',this)">Quản lý cơ bản</button>
+        <button class="permission-preset primary" type="button" ${isAdmin ? 'disabled' : ''} onclick="applyPermissionPreset('${escAttr(user.id)}','${escAttr(groupKey)}','all',this)">Mở tất cả</button>
+        <button class="permission-preset" type="button" ${isAdmin ? 'disabled' : ''} onclick="applyPermissionPreset('${escAttr(user.id)}','${escAttr(groupKey)}','default',this)">Theo chức vụ</button>
+        <button class="permission-preset danger" type="button" ${isAdmin ? 'disabled' : ''} onclick="applyPermissionPreset('${escAttr(user.id)}','${escAttr(groupKey)}','none',this)">Bỏ tất cả</button>
+      </div>
       ${permissions.map(permission => {
         const hasOverride = Object.prototype.hasOwnProperty.call(overrides, permission.permission_key);
         const overrideValue = hasOverride ? String(overrides[permission.permission_key]) : 'default';
@@ -1281,19 +1331,19 @@ function renderPermissionEditor(){
         return `
           <div class="permission-row">
             <div>
-              <div class="permission-row-title">${esc(permission.label)}</div>
+              <div class="permission-row-title">${esc(permission.label)}${permission.is_sensitive ? '<span class="permission-risk">Nhạy cảm</span>' : ''}</div>
               <div class="permission-row-copy">${esc(permission.description || permission.permission_key)}</div>
             </div>
             <select class="permission-select ${selectClass}" data-previous-value="${overrideValue}" ${isAdmin ? 'disabled' : ''}
-              onchange="setStaffPermission('${escAttr(user.id)}','${escAttr(permission.permission_key)}',this)">
+              onchange="setStaffPermission('${escAttr(user.id)}','${escAttr(permission.permission_key)}','${escAttr(groupKey)}',this)">
               <option value="default" ${overrideValue === 'default' ? 'selected' : ''}>Theo chức vụ (${defaultAllowed ? 'Cho phép' : 'Không cho phép'})</option>
               <option value="true" ${overrideValue === 'true' ? 'selected' : ''}>Cho phép riêng</option>
               <option value="false" ${overrideValue === 'false' ? 'selected' : ''}>Không cho phép riêng</option>
             </select>
           </div>`;
       }).join('')}
-    </div>
-  `).join('');
+    </details>
+  `;}).join('');
   editor.innerHTML = `
     <div class="permission-editor-head">
       <h3>${esc(user.full_name || user.email || 'Nhân viên')}</h3>
@@ -1301,41 +1351,95 @@ function renderPermissionEditor(){
         ${esc(permissionRoleLabel(user.role))} · ${esc(user.email || 'Chưa có email')}<br>
         ${isAdmin
           ? 'Quản trị viên luôn có toàn quyền và không thể bị thu hồi quyền tại đây.'
-          : '“Theo chức vụ” dùng cấu hình mặc định. Lựa chọn riêng sẽ được ưu tiên hơn chức vụ.'}
+          : '“Theo chức vụ” dùng cấu hình mặc định. Quyền riêng được ưu tiên hơn chức vụ; quyền nhạy cảm cần cấp có chủ đích.'}
       </div>
+      <div class="permission-legend"><span>Chỉ xem</span><span>Quản lý cơ bản</span><span>Toàn quyền</span><span>Quyền nhạy cảm</span></div>
     </div>
     ${groupHtml || '<div class="permission-empty">Chưa có danh mục quyền.</div>'}
   `;
 }
 
-async function setStaffPermission(userId, permissionKey, select){
+function updateLocalPermissionOverrides(userId, changes){
+  const user = (_permissionData?.users || []).find(item => item.id === userId);
+  if(!user) return;
+  user.overrides = user.overrides || {};
+  changes.forEach(change => {
+    if(change.allowed === null) delete user.overrides[change.permission_key];
+    else user.overrides[change.permission_key] = change.allowed;
+  });
+}
+
+async function saveStaffPermissionChanges(userId, changes){
+  const { error } = await sb.rpc('admin_set_user_permissions', {
+    p_user_id: userId,
+    p_changes: changes
+  });
+  if(error) throw error;
+  updateLocalPermissionOverrides(userId, changes);
+  await window.AppAdminTools?.recordAudit?.('staff_permissions_updated', {
+    target_type:'staff_permission', target_id:userId, changes
+  });
+}
+
+async function applyPermissionPreset(userId, groupKey, preset, button){
+  const user = (_permissionData?.users || []).find(item => item.id === userId);
+  if(!user || user.role === 'admin') return;
+  const permissions = (_permissionData.catalog || []).filter(item => (item.group_key || item.section) === groupKey);
+  if(!permissions.length) return;
+  if(preset === 'none' && !confirm(`Thu hồi toàn bộ quyền trong tab “${permissions[0].group_label || permissions[0].section}”?`)) return;
+  const changes = permissions.map(permission => ({
+    permission_key: permission.permission_key,
+    allowed: preset === 'default' ? null
+      : preset === 'all' ? true
+      : preset === 'none' ? false
+      : preset === 'view' ? permission.access_level === 'view'
+      : ['view','basic'].includes(permission.access_level)
+  }));
+  const group = button?.closest?.('.permission-group');
+  group?.querySelectorAll?.('button,select').forEach(control => control.disabled = true);
+  try{
+    await saveStaffPermissionChanges(userId, changes);
+    toast('✅ Đã áp dụng gói quyền');
+    renderPermissionEditor();
+  }catch(error){
+    group?.querySelectorAll?.('button,select').forEach(control => control.disabled = false);
+    toast('❌ Không lưu được quyền: ' + error.message, 3500);
+  }
+}
+
+async function setStaffPermission(userId, permissionKey, groupKey, select){
   const previous = select.dataset.previousValue || 'default';
   const value = select.value;
   select.disabled = true;
   const allowed = value === 'default' ? null : value === 'true';
-  const { error } = await sb.rpc('admin_set_user_permission', {
-    p_user_id: userId,
-    p_permission_key: permissionKey,
-    p_allowed: allowed
-  });
-  select.disabled = false;
-  if(error){
+  const user = (_permissionData?.users || []).find(item => item.id === userId);
+  const defaults = _permissionData?.role_defaults?.[user?.role] || {};
+  const permissions = (_permissionData?.catalog || []).filter(item => (item.group_key || item.section) === groupKey);
+  let changes = [{ permission_key:permissionKey, allowed }];
+  if(permissionKey === groupKey && allowed === false){
+    const hasActiveChildren = permissions.some(item => item.permission_key !== groupKey && (
+      Object.prototype.hasOwnProperty.call(user?.overrides || {}, item.permission_key)
+        ? user.overrides[item.permission_key] === true
+        : defaults[item.permission_key] === true
+    ));
+    if(hasActiveChildren && !confirm('Tắt quyền truy cập tab sẽ thu hồi toàn bộ quyền trong tab này. Tiếp tục?')){
+      select.disabled = false;
+      select.value = previous;
+      return;
+    }
+    changes = permissions.map(item => ({ permission_key:item.permission_key, allowed:false }));
+  }else if(permissionKey !== groupKey && allowed === true){
+    const groupPermission = permissions.find(item => item.permission_key === groupKey);
+    if(groupPermission) changes.push({ permission_key:groupKey, allowed:true });
+  }
+  try{
+    await saveStaffPermissionChanges(userId, changes);
+  }catch(error){
+    select.disabled = false;
     select.value = previous;
     toast('❌ Không lưu được quyền: ' + error.message, 3500);
     return;
   }
-  const user = (_permissionData?.users || []).find(item => item.id === userId);
-  if(user){
-    user.overrides = user.overrides || {};
-    if(allowed === null) delete user.overrides[permissionKey];
-    else user.overrides[permissionKey] = allowed;
-  }
-  await window.AppAdminTools?.recordAudit?.('staff_permission_updated', {
-    target_type:'staff_permission',
-    target_id:userId,
-    permission_key:permissionKey,
-    allowed
-  });
   toast('✅ Đã cập nhật quyền');
   renderPermissionEditor();
 }
@@ -1721,23 +1825,31 @@ async function init(){
     location.href = "index.html";
     return;
   }
-  const { data: profile } = await sb.from('users').select('role').eq('id', user.id).single();
-  if(profile?.role !== 'admin'){
+  const { data: profile } = await sb.from('users').select('id,role').eq('id', user.id).single();
+  await window.AppPermissions?.load?.(profile);
+  if(!window.AppPermissions?.has?.('page.system', profile?.role === 'admin')){
     location.href = "dashboard.html";
     return;
   }
-  try { await loadDropdowns(); } catch (e) { console.error("loadDropdowns error:", e); }
+  const canCatalogs = window.AppPermissions?.has?.('system.catalogs.manage', profile?.role === 'admin');
+  const canStaff = window.AppPermissions?.has?.('system.staff.manage', profile?.role === 'admin');
+  const canStudents = window.AppPermissions?.has?.('system.students.manage', profile?.role === 'admin');
+  const canLogs = window.AppPermissions?.has?.('system.logs.view', profile?.role === 'admin');
+  if(canCatalogs || canStaff || canStudents){
+    try { await loadDropdowns(); } catch (e) { console.error("loadDropdowns error:", e); }
+  }
   
   const loaders = [
-    { name: "loadRooms", fn: loadRooms },
-    { name: "loadGrades", fn: loadGrades },
-    { name: "loadSubjects", fn: loadSubjects },
-    { name: "loadTopics", fn: loadTopics },
-    { name: "loadTeachers", fn: loadTeachers },
-    { name: "loadStudents", fn: loadStudents },
-    { name: "loadAdminLogs", fn: loadAdminLogs }
+    { name: "loadRooms", fn: loadRooms, allowed:canCatalogs },
+    { name: "loadGrades", fn: loadGrades, allowed:canCatalogs },
+    { name: "loadSubjects", fn: loadSubjects, allowed:canCatalogs },
+    { name: "loadTopics", fn: loadTopics, allowed:canCatalogs },
+    { name: "loadTeachers", fn: loadTeachers, allowed:canStaff },
+    { name: "loadStudents", fn: loadStudents, allowed:canStudents },
+    { name: "loadAdminLogs", fn: loadAdminLogs, allowed:canLogs }
   ];
   for (const l of loaders) {
+    if(!l.allowed) continue;
     try {
       await l.fn();
     } catch (e) {
@@ -1745,16 +1857,25 @@ async function init(){
     }
   }
 
-  window.MindupLiveUI?.watchTable?.('rooms', loadRooms);
-  window.MindupLiveUI?.watchTable?.('grades', loadGrades);
-  window.MindupLiveUI?.watchTable?.('subjects', loadSubjects);
-  window.MindupLiveUI?.watchTable?.('topics', loadTopics);
+  if(canCatalogs){
+    window.MindupLiveUI?.watchTable?.('rooms', loadRooms);
+    window.MindupLiveUI?.watchTable?.('grades', loadGrades);
+    window.MindupLiveUI?.watchTable?.('subjects', loadSubjects);
+    window.MindupLiveUI?.watchTable?.('topics', loadTopics);
+  }
   
   const tab = new URLSearchParams(window.location.search).get('tab');
   if(tab){
     const targetBtn = document.querySelector(`.tab[onclick*="'${tab}'"]`);
     const targetPanel = document.getElementById(tab);
     if(targetBtn && targetPanel) switchTab(tab, targetBtn);
+  }else{
+    const firstAllowedTab = [...document.querySelectorAll('.tab[data-permission]')]
+      .find(item => window.AppPermissions?.has?.(item.dataset.permission, false));
+    if(firstAllowedTab){
+      const match = firstAllowedTab.getAttribute('onclick')?.match(/'([^']+)'/);
+      if(match) switchTab(match[1], firstAllowedTab);
+    }
   }
 }
 init();

@@ -162,6 +162,7 @@ function isDriveUrl(url){return /^https?:\/\/(drive|docs)\.google\.com\//i.test(
 function getMaterialPreviewUrl(rawUrl){let url;try{url=new URL(rawUrl)}catch{return null}if(!['http:','https:'].includes(url.protocol))return null;const host=url.hostname.replace(/^www\./,'').toLowerCase();const driveMatch=url.pathname.match(/\/file\/d\/([^/]+)/);if(host==='drive.google.com'&&driveMatch)return `https://drive.google.com/file/d/${encodeURIComponent(driveMatch[1])}/preview`;const openId=host==='drive.google.com'&&url.searchParams.get('id');if(openId)return `https://drive.google.com/file/d/${encodeURIComponent(openId)}/preview`;if(host==='docs.google.com'){const parts=url.pathname.split('/').filter(Boolean),idIndex=parts.indexOf('d');if(idIndex>=0&&parts[idIndex+1])return `https://docs.google.com/${encodeURIComponent(parts[0])}/d/${encodeURIComponent(parts[idIndex+1])}/preview`}return url.href}
 function openMaterialViewer(rawUrl,title){const previewUrl=getMaterialPreviewUrl(rawUrl);if(!previewUrl)return alert('Không thể mở tài liệu này. Vui lòng kiểm tra lại đường dẫn.');E.materialViewerTitle.textContent=title||'Xem tài liệu';E.materialViewerExternal.href=rawUrl;E.materialViewerBody.innerHTML=`<iframe class="viewer-frame" src="${esc(previewUrl)}" title="${esc(E.materialViewerTitle.textContent)}" allow="autoplay" allowfullscreen></iframe>`;E.materialViewerModal.classList.add('show')}
 function closeMaterialViewer(){E.materialViewerModal.classList.remove('show');E.materialViewerBody.innerHTML=''}
+function canManageResources(){return window.AppPermissions?.has?.('resources.manage',S.role==='admin'||S.role==='teacher')??false}
 
 async function init(){
   const {data:{user}}=await sb.auth.getUser();
@@ -169,7 +170,9 @@ async function init(){
   S.user=user;
   const {data:profile}=await sb.from('users').select('role').eq('id',user.id).single();
   S.role=profile?.role||'student';
-  if(S.role==='admin'||S.role==='teacher') E.openCreateBtn.style.display='';
+  await window.AppPermissions?.load?.({id:user.id,role:S.role});
+  if(!window.AppPermissions?.has?.('page.resources',true)){location.href='dashboard.html';return;}
+  if(canManageResources()) E.openCreateBtn.style.display='';
   await Promise.all([loadBase(),loadData()]);
   window.MindupLiveUI?.watchTable?.('reference_materials',loadData);
 }
@@ -243,13 +246,14 @@ function renderMaterials(){
 function renderCard(item){
   const grade=S.grades.find(x=>x.id===item.grade_id)?.name||'Tất cả khối';
   const subject=S.subjects.find(x=>x.id===item.subject_id)?.name||'Tất cả môn';
-  const canManage=S.role==='admin'||S.role==='teacher';
+  const canManage=canManageResources();
   return `<article class="card" data-live-key="material-${item.id}"><div class="chips"><span class="pill">${esc(grade)}</span><span class="pill">${esc(subject)}</span>${item.visible===false?'<span class="pill">Đang ẩn</span>':''}</div><div><h3 style="margin:0 0 8px;color:var(--navy)">${esc(item.title||'Tài liệu')}</h3><p style="margin:0;color:#607089;line-height:1.65">${esc(item.description||'Tài liệu tham khảo dành cho học sinh.')}</p></div><div class="actions"><button class="btn btn-primary" type="button" data-material-viewer="${item.id}">Xem tài liệu</button>${canManage?`<button class="btn btn-outline" type="button" onclick="openEditMaterialModal('${item.id}')">Sửa</button><button class="btn btn-danger" type="button" onclick="deleteMaterial('${item.id}')">Xóa</button>`:''}</div></article>`;
 }
 
 function openMaterialViewerById(id){const item=S.materials.find(material=>material.id===id);if(item)openMaterialViewer(item.drive_url,item.title)}
 
 function openCreateMaterialModal(){
+  if(!canManageResources())return;
   S.editingId=null;
   E.materialModalTitle.textContent='Thêm tài liệu';
   E.materialForm.reset();
@@ -258,6 +262,7 @@ function openCreateMaterialModal(){
 }
 
 function openEditMaterialModal(id){
+  if(!canManageResources())return;
   const item=S.materials.find(x=>x.id===id);if(!item)return;
   S.editingId=id;
   E.materialModalTitle.textContent='Sửa tài liệu';
@@ -274,7 +279,7 @@ function closeMaterialModal(){E.materialModal.classList.remove('show')}
 
 async function submitMaterialForm(ev){
   ev.preventDefault();
-  if(!(S.role==='admin'||S.role==='teacher')) return;
+  if(!canManageResources()) return;
   const driveUrl=E.materialDriveUrl.value.trim();
   if(!isDriveUrl(driveUrl)){alert('Chỉ nhận link Google Drive hoặc Google Docs.');return;}
   const payload={title:E.materialTitle.value.trim(),description:E.materialDescription.value.trim()||null,grade_id:E.materialGrade.value||null,subject_id:E.materialSubject.value||null,drive_url:driveUrl,visible:true,created_by:S.user.id};
@@ -288,7 +293,7 @@ async function submitMaterialForm(ev){
 }
 
 async function deleteMaterial(id){
-  if(!(S.role==='admin'||S.role==='teacher')) return;
+  if(!canManageResources()) return;
   if(!confirm('Xóa tài liệu này?')) return;
   const {error}=await sb.from('reference_materials').delete().eq('id',id);
   if(error){alert('Không thể xóa tài liệu: '+error.message);return;}
@@ -299,7 +304,7 @@ window.openEditMaterialModal=openEditMaterialModal;
 window.openMaterialViewer=openMaterialViewer;
 window.closeMaterialViewer=closeMaterialViewer;
 deleteMaterial=async function(id){
-  if(!(S.role==='admin'||S.role==='teacher')) return;
+  if(!canManageResources()) return;
   if(!confirm('Xóa tài liệu này?')) return;
   const previous = S.materials.slice();
   S.materials = S.materials.filter(item => String(item.id) !== String(id));

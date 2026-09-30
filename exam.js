@@ -52,6 +52,10 @@
   let bankData      = [];
   let currentExamMode = "normal";
 
+  function canManageExams() {
+    return window.AppPermissions?.has?.("exam.manage", currentRole === "admin") ?? currentRole === "admin";
+  }
+
   function isOwnerLimitedRole(role = currentRole) {
     return role === "teacher" || role === "assistant";
   }
@@ -81,6 +85,7 @@
     if (normalBtn) normalBtn.classList.toggle("active", currentExamMode === "normal");
     if (pdfBtn) pdfBtn.classList.toggle("active", currentExamMode === "pdf");
     if (createBtn) {
+      createBtn.style.display = canManageExams() ? "" : "none";
       createBtn.textContent = currentExamMode === "pdf" ? "+ Tạo đề PDF" : "+ Tạo đề mới";
       createBtn.onclick = () => {
         if (currentExamMode === "pdf") openPdfExamModule("", "create");
@@ -129,7 +134,7 @@
 
       grid.innerHTML = "";
       data.forEach(e => {
-        const canEdit = currentRole === "admin" || e.created_by === currentUser.id;
+        const canEdit = canManageExams() && (currentRole === "admin" || e.created_by === currentUser.id);
         const card = document.createElement("div");
         card.className = "exam-card";
         card.innerHTML = `
@@ -166,7 +171,7 @@
 
     grid.innerHTML = "";
     data.forEach(e => {
-      const canEdit = currentRole === "admin" || e.created_by === currentUser.id;
+      const canEdit = canManageExams() && (currentRole === "admin" || e.created_by === currentUser.id);
       const card = document.createElement("div");
       card.className = "exam-card";
       card.innerHTML = `
@@ -193,6 +198,7 @@
   }
 
   window.deleteExam = async function (id) {
+    if (!canManageExams()) return alert("Bạn không có quyền xóa đề kiểm tra.");
     if (!confirm("Xóa đề này? Các lớp đang dùng đề này sẽ mất liên kết.")) return;
     const sb = getSb();
     const { data: exam } = await sb.from("exams").select("created_by").eq("id", id).single();
@@ -211,6 +217,7 @@
   };
 
   window.cloneExam = async function (id) {
+    if (!canManageExams()) return alert("Bạn không có quyền sao chép đề kiểm tra.");
     const sb = getSb();
     const { data: exam, error: examErr } = await sb.from("exams").select("*").eq("id", id).single();
     if (examErr || !exam) {
@@ -278,6 +285,7 @@
   };
 
   window.deletePdfExamFromExamPage = async function (id) {
+    if (!canManageExams()) return alert("Bạn không có quyền xóa đề PDF.");
     if (!confirm("Xóa đề PDF này?")) return;
     const sb = getSb();
     const { data: exam } = await sb.from("pdf_exams").select("created_by").eq("id", id).single();
@@ -301,6 +309,7 @@
      EDITOR
   ══════════════════════════════════════════════ */
   window.openEditor = async function (examId, readOnly = false) {
+    if (!readOnly && !canManageExams()) return alert("Bạn không có quyền tạo hoặc sửa đề kiểm tra.");
     editingExamId = examId || null;
     examItems = [];
     bankPage  = 0;
@@ -891,6 +900,7 @@
      SAVE — đề standalone, không gắn lớp
   ══════════════════════════════════════════════ */
   window.saveExam = async function () {
+    if (!canManageExams()) return alert("Bạn không có quyền lưu đề kiểm tra.");
     const title    = document.getElementById("fTitle").value.trim();
     const duration = parseInt(document.getElementById("fDuration").value) || 45;
     const total    = parseFloat(document.getElementById("fTotal").value) || 10;

@@ -493,19 +493,32 @@
   }
 
   function canTakeAttendance(role = _role){
-    return role === "admin" || role === "teacher" || role === "assistant";
+    return window.AppPermissions?.has?.("class.attendance", role === "admin" || role === "teacher" || role === "assistant")
+      ?? (role === "admin" || role === "teacher" || role === "assistant");
   }
 
   function canManageClassContent(role = _role){
-    return role === "admin" || role === "teacher";
+    return window.AppPermissions?.has?.("classes.manage", role === "admin" || role === "teacher")
+      ?? (role === "admin" || role === "teacher");
+  }
+
+  function canManageClassStudents(role = _role){
+    return window.AppPermissions?.has?.("class.students.manage", role === "admin" || role === "teacher")
+      ?? (role === "admin" || role === "teacher");
+  }
+
+  function canDeleteClasses(role = _role){
+    return window.AppPermissions?.has?.("classes.delete", role === "admin") ?? role === "admin";
   }
 
   function canManageClassSessions(role = _role){
-    return role === "admin" || role === "teacher" || role === "assistant";
+    return window.AppPermissions?.has?.("class.sessions.manage", role === "admin" || role === "teacher" || role === "assistant")
+      ?? (role === "admin" || role === "teacher" || role === "assistant");
   }
 
   function canEvaluateClassSession(role = _role){
-    return role === "admin" || role === "teacher" || role === "assistant";
+    return window.AppPermissions?.has?.("class.evaluations.manage", role === "admin" || role === "teacher" || role === "assistant")
+      ?? (role === "admin" || role === "teacher" || role === "assistant");
   }
 
   
@@ -621,7 +634,7 @@
         'background:var(--gold);color:var(--navy);border:none;padding:6px 14px;'+
         'border-radius:7px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">'+
         '✏ Sửa</button>'+
-        (canManageClassContent(role)
+        (canDeleteClasses(role)
           ? '<button onclick="cvDeleteClass()" style="'+
             'background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.3);'+
             'padding:6px 14px;border-radius:7px;font-size:.82rem;font-weight:700;'+
@@ -654,8 +667,9 @@
   };
 
   window.cvDeleteClass = async function(){
+    if(!canManageClassContent(_role) && !canDeleteClasses(_role)) return;
     const sb = getSb();
-    if(_role === "admin"){
+    if(canDeleteClasses(_role)){
       if(!confirm("Xóa hoàn toàn lớp \""+_className+"\"? Hành động không thể hoàn tác.")) return;
       const { error } = await sb.from("classes").delete().eq("id",_classId);
       if(error){ alert("Lỗi xóa: "+error.message); return; }

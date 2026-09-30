@@ -44,6 +44,12 @@
     "facebook"
   ];
   let taskStaffLoadWarned = false;
+  function hasTaskPermission(key, fallback = false) {
+    return window.AppPermissions?.has?.(key, fallback) ?? fallback;
+  }
+  function canManageTasks() { return hasTaskPermission("tasks.manage", S.profile?.role === "admin"); }
+  function canViewStaffTasks() { return hasTaskPermission("tasks.staff_overview", S.profile?.role === "admin"); }
+  function canManageTaskTemplates() { return hasTaskPermission("tasks.templates.manage", S.profile?.role === "admin"); }
   const esc = value => String(value || "")
     .replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -369,9 +375,9 @@
 
   function renderStaffAttendanceAdmin() {
     if (!E.attendanceAdminPanel) return;
-    const isAdmin = S.profile?.role === "admin";
-    E.attendanceAdminPanel.classList.toggle("show", isAdmin);
-    if (!isAdmin) return;
+    const canView = canViewStaffTasks();
+    E.attendanceAdminPanel.classList.toggle("show", canView);
+    if (!canView) return;
     E.attendanceAdminBody?.classList.toggle("show", S.attendanceAdminExpanded);
     if (E.attendanceAdminToggle) {
       E.attendanceAdminToggle.textContent = S.attendanceAdminExpanded ? "Thu danh sách" : "Mở danh sách";
@@ -425,7 +431,7 @@
   }
 
   async function loadStaffAttendanceAdmin() {
-    if (S.profile?.role !== "admin") return;
+    if (!canViewStaffTasks()) return;
     S.attendanceAdminDate = E.attendanceAdminDate?.value || S.attendanceAdminDate || localDate();
     if (E.attendanceAdminDate) E.attendanceAdminDate.value = S.attendanceAdminDate;
     const start = `${S.attendanceAdminDate}T00:00:00+07:00`;
@@ -656,7 +662,7 @@
   }
 
   function canDeleteAssignment(item) {
-    return S.profile?.role === "admin"
+    return canManageTasks()
       && !String(item.id || "").startsWith("schedule-fallback:")
       && isManualAssignedTask(item)
       && !item.task?.auto_generated;
@@ -713,8 +719,8 @@
     const selected = S.selectedDate || localDate();
     const { start, end } = activeViewRange();
     return S.assignments.filter(item => {
-      if (S.profile?.role === "admin" && S.selectedUserId !== "all" && item.user_id !== S.selectedUserId) return false;
-      if (S.profile?.role === "admin" && !isAdminActionTask(item)) return false;
+      if (canViewStaffTasks() && S.selectedUserId !== "all" && item.user_id !== S.selectedUserId) return false;
+      if (canViewStaffTasks() && !isAdminActionTask(item)) return false;
       return taskOverlapsRange(item, start, end);
     }).sort((a, b) => {
       const priority = { urgent: 0, important: 1, normal: 2 };
@@ -722,7 +728,7 @@
       const activeLongB = isLongRunningTask(b) && taskCoversDate(b, selected) && effectiveStatus(b) !== "completed";
       const longDiff = Number(activeLongB) - Number(activeLongA);
       if (longDiff) return longDiff;
-      if (S.profile?.role === "admin") {
+      if (canViewStaffTasks()) {
         const progressDiff = progressPercent(b) - progressPercent(a);
         if (progressDiff) return progressDiff;
       }
@@ -763,11 +769,11 @@
   }
 
   async function loadScheduleFallbackTasks(existingAssignments) {
-    if (S.profile.role === "admin") return [];
+    if (canViewStaffTasks()) return [];
     const today = localDate();
     const weekday = weekdayOf(today);
     let staffQuery = sb.from("class_teachers").select("class_id,teacher_id");
-    if (S.profile.role !== "admin") staffQuery = staffQuery.eq("teacher_id", S.user.id);
+    if (!canViewStaffTasks()) staffQuery = staffQuery.eq("teacher_id", S.user.id);
 
     const { data: staffRows, error: staffError } = await staffQuery;
     if (staffError || !(staffRows || []).length) {
@@ -1094,7 +1100,7 @@
   }
 
   function renderMonthDashboard(rows) {
-    const adminOnly = S.profile?.role === "admin";
+    const adminOnly = canViewStaffTasks();
     const actionRows = adminOnly
       ? rows.filter(isAdminActionTask).sort((a, b) => progressPercent(b) - progressPercent(a))
       : rows.filter(item => !isReminderTask(item));
@@ -1197,7 +1203,7 @@
 
   function renderStaffFilter() {
     if (!E.adminFilter || !E.staffFilter) return;
-    const isAdmin = S.profile?.role === "admin";
+    const isAdmin = canViewStaffTasks();
     E.adminFilter.classList.remove("show");
     if (!isAdmin) return;
     const selected = S.selectedUserId || "all";
@@ -1217,11 +1223,11 @@
     renderStaffAttendanceAdmin();
     syncDatebar();
     const rows = visibleAssignments();
-    if (S.profile?.role === "admin" && S.selectedUserId === "all") {
+    if (canViewStaffTasks() && S.selectedUserId === "all") {
       E.list.innerHTML = `<section class="task-admin-layout">${renderAdminTemplatePanel()}${renderCenterDashboard(rows)}</section>`;
       return;
     }
-    const selectedStaff = S.profile?.role === "admin" && S.selectedUserId !== "all"
+    const selectedStaff = canViewStaffTasks() && S.selectedUserId !== "all"
       ? mergedStaffUsers().find(user => String(user.id) === String(S.selectedUserId))
       : null;
     const detailHead = selectedStaff ? `<section class="task-staff-detail-head">
@@ -1259,7 +1265,7 @@
   }
 
   function renderAdminTemplatePanel() {
-    if (S.profile?.role !== "admin") return "";
+    if (!canManageTaskTemplates()) return "";
     const templates = (S.taskTemplates || []).filter(template => !isDeprecatedSocialTask(template));
     const rows = templates.length ? templates.map(template => {
       const requirements = Array.isArray(template.requirements) ? template.requirements : [];
@@ -1583,13 +1589,13 @@
     }
     if (refresh) {
       const { error: refreshError } = await sb.rpc("refresh_daily_tasks", {
-        p_user_id: S.profile.role === "admin" ? null : S.user.id,
+        p_user_id: canViewStaffTasks() ? null : S.user.id,
       });
       if (refreshError) console.warn("Task refresh:", refreshError);
     }
     if (refresh) {
       await sb.rpc("sync_verified_task_statuses", {
-        p_user_id: S.profile.role === "admin" ? null : S.user.id,
+        p_user_id: canViewStaffTasks() ? null : S.user.id,
       });
     }
     const { error: facebookSyncError } = await sb.rpc("sync_facebook_marketing_task_statuses", {
@@ -1600,7 +1606,7 @@
     let query = sb.from("task_assignments")
       .select("*,task:daily_tasks(*),assignee:users!task_assignments_user_id_fkey(id,full_name,email,role)")
       .order("created_at", { ascending: false });
-    if (S.profile.role !== "admin") query = query.eq("user_id", S.user.id);
+    if (!canViewStaffTasks()) query = query.eq("user_id", S.user.id);
     const { data, error } = await query;
     if (error) {
       E.list.innerHTML = `<div class="task-empty">Chưa tải được công việc: ${esc(error.message)}</div>`;
@@ -1614,7 +1620,7 @@
     await enrichTaskResultNotes(assignments);
     const scheduleFallbacks = (await loadScheduleFallbackTasks(assignments)).filter(item => !isDeprecatedSocialTask(item));
     S.assignments = [...assignments, ...scheduleFallbacks].filter(item => !isDeprecatedSocialTask(item));
-    if (S.profile.role === "admin") await loadInternalUsers();
+    if (canViewStaffTasks() || canManageTasks()) await loadInternalUsers();
     await loadTaskTemplates();
     await enrichTaskProgress(S.assignments);
     await syncProgressCompletedAssignments();
@@ -1877,7 +1883,7 @@
     const rows = oldStoredAssignments();
     if (!rows.length) return 0;
 
-    if (S.profile.role === "admin") {
+    if (canManageTasks()) {
       let deleted = 0;
       for (let i = 0; i < rows.length; i += 100) {
         const ids = rows.slice(i, i + 100).map(item => item.id);
@@ -1905,7 +1911,7 @@
     const ok = confirm("Xóa tất cả công việc trong các ngày trước hôm nay? Công việc hôm nay và tương lai sẽ được giữ lại.");
     if (!ok) return;
     const { data, error } = await sb.rpc("delete_old_task_assignments", {
-      p_user_id: S.profile.role === "admin" ? null : S.user.id,
+      p_user_id: canManageTasks() ? null : S.user.id,
     });
     let deleted = Number(data?.deleted_assignments || 0);
     if (error) {
@@ -2033,6 +2039,7 @@
   }
 
   async function openCreateModal(defaultRecurrence = "once") {
+    if (!canManageTasks()) return alert("Bạn không có quyền tạo và giao công việc.");
     await loadInternalUsers();
     S.editingTemplateId = null;
     setCreateModalMode("create");
@@ -2044,6 +2051,7 @@
   }
 
   async function openEditTemplateModal(templateId) {
+    if (!canManageTaskTemplates()) return alert("Bạn không có quyền sửa mẫu công việc.");
     const template = (S.taskTemplates || []).find(item => String(item.id) === String(templateId));
     if (!template) return alert("Không tìm thấy công việc tự động cần sửa.");
     await loadInternalUsers();
@@ -2056,7 +2064,7 @@
   }
 
   async function loadTaskTemplates() {
-    if (S.profile?.role !== "admin") {
+    if (!canManageTaskTemplates()) {
       S.taskTemplates = [];
       return;
     }
@@ -2559,6 +2567,11 @@
     const { data: profile, error } = await sb.from("users").select("id,full_name,role").eq("id", user.id).single();
     if (error) return E.list.innerHTML = `<div class="task-empty">${esc(error.message)}</div>`;
     S.profile = profile;
+    await window.AppPermissions?.load?.(profile);
+    if (!hasTaskPermission("page.tasks", true)) {
+      location.href = "dashboard.html";
+      return;
+    }
     if (!INTERNAL_ROLES.has(profile.role)) {
       if (window.parent && window.parent !== window && typeof window.parent.openDashboardPage === "function") {
         window.parent.openDashboardPage("messages.html", { syncMenu: false, syncMobile: false, replaceUrl: true });
@@ -2571,8 +2584,8 @@
     S.attendanceAdminDate = localDate();
     if (E.attendanceAdminDate) E.attendanceAdminDate.value = S.attendanceAdminDate;
     byId("taskGreeting").textContent = `${profile.full_name || "Bạn"}, đây là các việc cần chú ý hôm nay.`;
-    byId("taskCreateButton").style.display = profile.role === "admin" ? "grid" : "none";
-    if (profile.role === "admin") await loadInternalUsers();
+    byId("taskCreateButton").style.display = canManageTasks() ? "grid" : "none";
+    if (canViewStaffTasks() || canManageTasks()) await loadInternalUsers();
     renderStaffFilter();
     bindEvents();
     await loadStaffAttendance();

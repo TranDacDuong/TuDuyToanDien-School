@@ -226,8 +226,8 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
           </div>
           <div class="toolbar-right">
             <button class="btn btn-outline" id="openPageBtn" type="button">Mở fanpage</button>
-            <button class="btn btn-outline" id="copyPreviousWeekScheduleBtn" data-permission="facebook.manage" type="button">Tạo lịch giống tuần trước</button>
-            <button class="btn btn-gold" id="generateWeekDraftsBtn" data-permission="facebook.manage" type="button">Tạo nội dung bài đăng cho tuần này</button>
+            <button class="btn btn-outline" id="copyPreviousWeekScheduleBtn" data-permission="facebook.config.manage" type="button">Tạo lịch giống tuần trước</button>
+            <button class="btn btn-gold" id="generateWeekDraftsBtn" data-permission="facebook.generate" type="button">Tạo nội dung bài đăng cho tuần này</button>
             <button class="btn btn-outline" id="clearWeekDraftsBtn" data-permission="facebook.manage" type="button">Xóa nội dung đã lưu trong tuần này</button>
           </div>
         </div>
@@ -480,7 +480,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
     <div class="modal-foot">
       <button class="btn btn-danger" id="deletePostBtn" type="button">Xóa nháp</button>
       <button class="btn btn-outline" id="saveDraftBtn" data-permission="facebook.manage" type="button">Lưu nháp</button>
-      <button class="btn btn-primary" id="schedulePostBtn" data-permission="facebook.manage" type="button">Hẹn lịch Facebook</button>
+      <button class="btn btn-primary" id="schedulePostBtn" data-permission="facebook.schedule" type="button">Hẹn lịch Facebook</button>
     </div>
   </div>
 </div>
@@ -5009,15 +5009,27 @@ function bindEvents(){
     addWeekTimeSlot();
   });
   $("openPageBtn").addEventListener("click", () => window.open(currentPage().page_url || `https://www.facebook.com/${currentPage().page_id}`, "_blank", "noopener"));
-  $("copyPreviousWeekScheduleBtn")?.addEventListener("click", () => copyPreviousWeekSchedule().catch(error => showStatus("err", error.message || String(error))));
-  $("generateWeekDraftsBtn").addEventListener("click", () => generateWeekDrafts().catch(error => showStatus("err", error.message || String(error))));
-  $("clearWeekDraftsBtn").addEventListener("click", () => clearCurrentWeekDraftContent().catch(error => showStatus("err", error.message || String(error))));
+  $("copyPreviousWeekScheduleBtn")?.addEventListener("click", () => {
+    if (!window.AppPermissions?.require?.("facebook.config.manage")) return;
+    copyPreviousWeekSchedule().catch(error => showStatus("err", error.message || String(error)));
+  });
+  $("generateWeekDraftsBtn").addEventListener("click", () => {
+    if (!window.AppPermissions?.require?.("facebook.generate")) return;
+    generateWeekDrafts().catch(error => showStatus("err", error.message || String(error)));
+  });
+  $("clearWeekDraftsBtn").addEventListener("click", () => {
+    if (!window.AppPermissions?.require?.("facebook.manage")) return;
+    clearCurrentWeekDraftContent().catch(error => showStatus("err", error.message || String(error)));
+  });
   $("closeTemplateModalBtn")?.addEventListener("click", closeTemplateModal);
   $("saveTemplateBtn")?.addEventListener("click", saveTemplate);
   $("deleteTemplateBtn")?.addEventListener("click", deleteTemplate);
   $("closePostModalBtn").addEventListener("click", closePostModal);
-  $("saveDraftBtn").addEventListener("click", async () => { try { await savePostDraft(); showPostStatus("ok","Đã lưu nháp."); await loadData(); } catch(e){ showPostStatus("err", e.message || String(e)); }});
-  $("schedulePostBtn").addEventListener("click", () => schedulePost("schedule"));
+  $("saveDraftBtn").addEventListener("click", async () => { if(!window.AppPermissions?.require?.("facebook.manage")) return; try { await savePostDraft(); showPostStatus("ok","Đã lưu nháp."); await loadData(); } catch(e){ showPostStatus("err", e.message || String(e)); }});
+  $("schedulePostBtn").addEventListener("click", () => {
+    if (!window.AppPermissions?.require?.("facebook.schedule")) return;
+    schedulePost("schedule");
+  });
   $("deletePostBtn").addEventListener("click", deletePost);
   $("generateGeminiDraftBtn").addEventListener("click", () => generateAiDraft("gemini"));
   $("generateLlamaDraftBtn").addEventListener("click", () => generateAiDraft("llama"));

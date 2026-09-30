@@ -1643,7 +1643,8 @@ async function getUserRole() {
     window.location.href = "dashboard.html"
     return false
   }
-  isAdmin = currentRole === "admin"
+  isAdmin = window.AppPermissions?.has?.("question.delete_permanent", currentRole === "admin") ?? currentRole === "admin"
+  window.AppPermissions?.applyToDom?.()
   syncAdminQuestionUi()
   return true
 }

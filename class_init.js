@@ -38,10 +38,15 @@
 
       const role = profile?.role;
       await window.AppPermissions?.load?.({ id:user.id, role });
+      if(!window.AppPermissions?.has?.("page.classes", true)){
+        location.href = "dashboard.html";
+        return;
+      }
+      window.AppPermissions?.applyToDom?.();
       const canManageClasses = window.AppPermissions?.has?.("classes.manage", role === "admin" || role === "teacher")
         ?? (role === "admin" || role === "teacher");
 
-      if(role === "admin"){
+      if(role === "admin" || canManageClasses){
         /* Admin: hiện filter bar + nút tạo lớp */
         if(openBtn)   openBtn.style.display = canManageClasses ? "" : "none";
         if(filters)   filters.style.display = "contents";

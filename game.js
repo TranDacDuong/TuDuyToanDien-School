@@ -63,6 +63,14 @@
     autoStartTimer: null,
   };
 
+  function canManageGame() {
+    return window.AppPermissions?.has?.("game.manage", GAME.role === "admin") ?? GAME.role === "admin";
+  }
+
+  function canManageCompetition() {
+    return window.AppPermissions?.has?.("game.competition.manage", GAME.role === "admin") ?? GAME.role === "admin";
+  }
+
   const EL = {
     gradeFilter: document.getElementById("gameGradeFilter"),
     subjectFilter: document.getElementById("gameSubjectFilter"),
@@ -587,7 +595,7 @@
   }
 
   function getCreateRoomPolicy() {
-    if (GAME.role === "admin") {
+    if (canManageGame()) {
       return {
         visibility: "public",
         classRequired: false,
@@ -1679,7 +1687,7 @@
 
   async function submitGameConfig(event) {
     event.preventDefault();
-    if (GAME.role !== "admin") return;
+    if (!canManageGame()) return;
     const gradeId = EL.adminConfigGrade?.value || "";
     const subjectId = EL.adminConfigSubject?.value || "";
     const title = String(EL.adminConfigTitle?.value || "").trim() || "Bộ luyện tập Game";
@@ -1783,7 +1791,7 @@
 
   async function submitGameRound(event) {
     event.preventDefault();
-    if (GAME.role !== "admin") return;
+    if (!canManageGame()) return;
     const gradeId = EL.adminRoundGrade?.value || "";
     const subjectId = EL.adminRoundSubject?.value || "";
     const title = String(EL.adminRoundTitle?.value || "").trim();
@@ -1939,7 +1947,7 @@
   }
 
   window.applyGameConfigGroup = async function(encodedIds) {
-    if (GAME.role !== "admin") return;
+    if (!canManageGame()) return;
     const ids = decodeConfigGroupIds(encodedIds);
     const groupConfigs = (GAME.configs || []).filter((cfg) => ids.includes(cfg.id));
     const base = groupConfigs[0];
@@ -1957,7 +1965,7 @@
   };
 
   window.editGameConfigGroup = function(encodedIds) {
-    if (GAME.role !== "admin") return;
+    if (!canManageGame()) return;
     const ids = decodeConfigGroupIds(encodedIds);
     const groupConfigs = (GAME.configs || []).filter((cfg) => ids.includes(cfg.id));
     const base = groupConfigs[0];
@@ -1975,7 +1983,7 @@
   };
 
   window.deleteGameConfigGroup = async function(encodedIds) {
-    if (GAME.role !== "admin") return;
+    if (!canManageCompetition()) return;
     const ids = decodeConfigGroupIds(encodedIds);
     if (!ids.length || !confirm("Xóa cấu hình Chơi đơn / Đấu nhanh này?")) return;
     const { error } = await sb.from("game_configs").delete().in("id", ids);
@@ -1986,7 +1994,7 @@
   };
 
   window.deleteGameConfig = async function(configId) {
-    if (GAME.role !== "admin" || !confirm("Xóa cấu hình Game này?")) return;
+    if (!canManageGame() || !confirm("Xóa cấu hình Game này?")) return;
     const { error } = await sb.from("game_configs").delete().eq("id", configId);
     if (error) return alert("Không xóa được cấu hình: " + error.message);
     await loadGameCatalog();
@@ -1994,7 +2002,7 @@
   };
 
   window.editGameRound = function(roundId) {
-    if (GAME.role !== "admin") return;
+    if (!canManageCompetition()) return;
     const round = (GAME.rounds || []).find((item) => item.id === roundId);
     if (!round) return alert("Không tìm thấy Đấu đỉnh cao cần sửa.");
     GAME.editingRoundId = roundId;
@@ -2025,7 +2033,7 @@
   };
 
   window.deleteGameRound = async function(roundId) {
-    if (GAME.role !== "admin" || !confirm("Xóa Đấu đỉnh cao này?")) return;
+    if (!canManageCompetition() || !confirm("Xóa Đấu đỉnh cao này?")) return;
     const { error } = await sb.from("game_rounds").delete().eq("id", roundId);
     if (error) return alert("Không xóa được vòng: " + error.message);
     await loadGameCatalog();
@@ -2106,6 +2114,11 @@
 
     GAME.profile = profile || null;
     GAME.role = profile?.role || "student";
+    await window.AppPermissions?.load?.({ id:user.id, role:GAME.role });
+    if (!window.AppPermissions?.has?.("page.game", true)) {
+      location.href = "dashboard.html";
+      return;
+    }
     GAME.grades = grades || [];
     GAME.subjects = subjects || [];
     GAME.topics = topics || [];
@@ -2123,7 +2136,7 @@
     renderSubjectCards();
 
     bindEvents();
-    if (GAME.role === "admin") {
+    if (canManageGame()) {
       renderAdminGamePage();
       return;
     }
@@ -2358,7 +2371,7 @@
     if (mode === "solo") {
       return { visibility: "private", maxPlayers: 1, questionCount: 5, timePerQuestion: 60 };
     }
-    return { visibility: GAME.role === "admin" ? "public" : "private", maxPlayers: 8, questionCount: 5, timePerQuestion: 60 };
+    return { visibility: canManageGame() ? "public" : "private", maxPlayers: 8, questionCount: 5, timePerQuestion: 60 };
   }
 
   function applyModeDefaults(mode, force) {
@@ -2395,7 +2408,7 @@
 
   function canAccessClassRoom(room) {
     if (!room?.class_id) return true;
-    if (GAME.role === "admin") return true;
+    if (canManageGame()) return true;
     return (GAME.classIds || []).includes(room.class_id);
   }
 

@@ -313,7 +313,14 @@ document.getElementById("keyword").addEventListener("input", () => {
   renderRoomSchedules();
 });
 document.getElementById("roomFilter").addEventListener("change", renderRoomSchedules);
-loadPageData();
+(async()=>{
+  const user = await window.AppAuth?.getUser?.();
+  if(!user){ location.href = "index.html"; return; }
+  const {data:profile} = await sb.from("users").select("id,role").eq("id",user.id).maybeSingle();
+  await window.AppPermissions?.load?.(profile || {id:user.id,role:""});
+  if(!window.AppPermissions?.has?.("page.teacher_schedule", true)){ location.href = "dashboard.html"; return; }
+  await loadPageData();
+})();
 </script>
 </body>
 </html>

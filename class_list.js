@@ -9,6 +9,17 @@
     throw new Error("Supabase chua san");
   }
 
+  function canManageClasses(){
+    const role = window._currentRole;
+    return window.AppPermissions?.has?.("classes.manage", role === "admin" || role === "teacher")
+      ?? (role === "admin" || role === "teacher");
+  }
+
+  function canDeleteClasses(){
+    return window.AppPermissions?.has?.("classes.delete", window._currentRole === "admin")
+      ?? window._currentRole === "admin";
+  }
+
   let _allClasses    = [];
   let _suppSessions  = [];
   let _scheduleMap   = {};
@@ -520,7 +531,7 @@
           : "";
 
         const viewButtonHtml = `<button class="edit-btn" type="button" onclick="event.stopPropagation(); if(window.openClassView) window.openClassView('${cls.id}', '${String(cls.class_name || "").replace(/'/g, "\\'")}')">Xem chi tiết</button>`;
-        const actionHtml = role === "admin"
+        const actionHtml = canDeleteClasses()
           ? `<div class="class-actions">
               ${viewButtonHtml}
               <button class="edit-btn" type="button" onclick="event.stopPropagation(); if(window.openClassView) window.openClassView('${cls.id}', '${String(cls.class_name || "").replace(/'/g, "\\'")}')">✏ Sửa</button>
@@ -528,7 +539,7 @@
                 ? `<button class="edit-btn" type="button" onclick="event.stopPropagation(); window.restoreClass('${cls.id}')">↺ Khôi phục</button>`
                 : `<button class="delete-btn" type="button" onclick="event.stopPropagation(); window.deleteClass('${cls.id}','${role}')">🗑 Xóa</button>`}
             </div>`
-          : role === "teacher"
+          : canManageClasses()
             ? `<div class="class-actions">
                 ${viewButtonHtml}
                 ${cls.hidden
@@ -594,7 +605,7 @@
 
   window.deleteClass = async function(id, role){
     const sb = getSb();
-    if(role === "admin"){
+    if(canDeleteClasses()){
       if(!confirm("Xóa hoàn toàn lớp này? Hành động không thể hoàn tác.")) return;
       await sb.from("classes").delete().eq("id", id);
       await window.AppAdminTools?.recordAudit?.("class_deleted", {
@@ -625,7 +636,7 @@
   window.deleteClass = async function(id, role){
     const sb = getSb();
     const previous = _allClasses.slice();
-    if(role === "admin"){
+    if(canDeleteClasses()){
       if(!confirm("Xóa hoàn toàn lớp này? Hành động không thể hoàn tác.")) return;
       _allClasses = _allClasses.filter(cls => String(cls.id) !== String(id));
       renderClasses(_allClasses);

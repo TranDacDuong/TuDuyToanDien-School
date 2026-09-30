@@ -291,14 +291,18 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
         "page.home", "page.courses", "page.classes", "page.tasks", "page.teacher_schedule",
         "page.public_exam", "page.game", "page.income", "page.resources", "page.question_bank",
         "page.exam_editor", "page.trial_requests", "page.facebook", "class.sessions.manage",
-        "class.attendance", "tasks.manage", "question.manage", "exam.manage", "trial.manage",
-        "income.manage", "facebook.manage"
+        "class.attendance", "classes.manage", "courses.results.view", "tasks.manage", "question.manage", "exam.manage", "trial.manage",
+        "income.manage", "facebook.manage", "tasks.self_update", "class.evaluations.manage",
+        "class.students.manage", "public_exam.manage", "income.self.view", "resources.manage",
+        "question.import", "facebook.generate", "facebook.schedule", "facebook.publish"
       ],
       assistant: [
         "page.home", "page.courses", "page.classes", "page.tasks", "page.teacher_schedule",
         "page.resources", "page.question_bank", "page.exam_editor", "page.trial_requests",
         "page.facebook", "class.sessions.manage", "class.attendance", "tasks.manage",
-        "question.manage", "exam.manage", "trial.manage", "facebook.manage"
+        "question.manage", "exam.manage", "trial.manage", "facebook.manage", "tasks.self_update",
+        "class.evaluations.manage", "question.import", "facebook.generate", "facebook.schedule",
+        "facebook.publish"
       ],
       student: [
         "page.home", "page.courses", "page.classes", "page.personal_schedule", "page.public_exam",
@@ -361,14 +365,42 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
       return { ...permissions };
     }
 
+    function hasAny(permissionKeys, fallback = false) {
+      const keys = Array.isArray(permissionKeys) ? permissionKeys : [permissionKeys];
+      return keys.some((key) => has(key, fallback));
+    }
+
+    function hasAll(permissionKeys, fallback = false) {
+      const keys = Array.isArray(permissionKeys) ? permissionKeys : [permissionKeys];
+      return keys.every((key) => has(key, fallback));
+    }
+
+    function requirePermission(permissionKey, message = "Bạn không có quyền thực hiện thao tác này.") {
+      const allowed = has(permissionKey, false);
+      if (!allowed && message) window.alert?.(message);
+      return allowed;
+    }
+
     function applyToDom(root = document) {
       if (root?.matches?.("[data-permission]")) {
         const allowed = has(root.dataset.permission, false);
         root.hidden = !allowed;
         root.setAttribute("aria-hidden", String(!allowed));
       }
+      if (root?.matches?.("[data-permission-any]")) {
+        const keys = String(root.dataset.permissionAny || "").split(",").map((key) => key.trim()).filter(Boolean);
+        const allowed = hasAny(keys, false);
+        root.hidden = !allowed;
+        root.setAttribute("aria-hidden", String(!allowed));
+      }
       root.querySelectorAll?.("[data-permission]").forEach((element) => {
         const allowed = has(element.dataset.permission, false);
+        element.hidden = !allowed;
+        element.setAttribute("aria-hidden", String(!allowed));
+      });
+      root.querySelectorAll?.("[data-permission-any]").forEach((element) => {
+        const keys = String(element.dataset.permissionAny || "").split(",").map((key) => key.trim()).filter(Boolean);
+        const allowed = hasAny(keys, false);
         element.hidden = !allowed;
         element.setAttribute("aria-hidden", String(!allowed));
       });
@@ -411,6 +443,9 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
       load,
       refresh,
       has,
+      hasAny,
+      hasAll,
+      require: requirePermission,
       applyToDom,
       isLoaded: () => loaded,
       isRemoteAvailable: () => remoteAvailable,

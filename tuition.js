@@ -344,10 +344,25 @@
   let currentRole = "admin";
   let currentUserId = null;
   let parentStudentIds = new Set();
-  let assistantClassIds = new Set();
+  let staffClassIds = new Set();
+
+  function hasTuitionPermission(permissionKey, legacyFallback = false) {
+    if (currentRole === "admin") return true;
+    return window.AppPermissions?.has?.(permissionKey, legacyFallback) ?? legacyFallback;
+  }
+
+  function canViewAllTuition() {
+    return hasTuitionPermission("tuition.view_all", false);
+  }
+
+  function isStaffTuitionView() {
+    return ["admin", "teacher", "assistant"].includes(currentRole);
+  }
 
   function canViewStudentPhone() {
-    return currentRole === "admin" || currentRole === "assistant" || currentRole === "accountant";
+    return currentRole === "admin"
+      || hasTuitionPermission("tuition.view_assigned", currentRole === "assistant")
+      || canViewAllTuition();
   }
 
   function renderParentContacts(contacts = []) {
@@ -388,8 +403,8 @@
     );
   }
 
-  function canManagePayments() {
-    return currentRole === "admin" || currentRole === "accountant";
+  function canCollectPayments() {
+    return hasTuitionPermission("tuition.collect", false);
   }
 
   function fmtDate(iso) {
@@ -441,7 +456,7 @@
             ${overpaid > 0 ? `
             <div class="tuition-payment-number overpaid">
               <span>Nộp thừa</span><b>${fmt(overpaid)}đ</b>
-              ${canManagePayments() ? `
+              ${hasTuitionPermission("tuition.surplus.manage", false) ? `
               <div style="margin-top:6px">
                 <button class="action-btn" type="button" style="background:#0284c7;color:#fff;font-weight:700;padding:4px 8px;font-size:11px"
                   onclick="event.stopPropagation();transferSurplusToNextMonth('${group.studentId}','${group.ym}',${group.amount})">
@@ -631,7 +646,7 @@
      CHUYỂN HỌC PHÍ THỪA THỦ CÔNG SANG THÁNG SAU
   ───────────────────────────────────────────── */
   window.transferSurplusToNextMonth = async function (studentId, ym, amountDue) {
-    if (!canManagePayments()) {
+    if (!hasTuitionPermission("tuition.surplus.manage", false)) {
       alert("Bạn không có quyền thực hiện thao tác này.");
       return;
     }
@@ -676,7 +691,7 @@
   };
 
   window.transferAllSurplusToNextMonth = async function () {
-    if (!canManagePayments()) {
+    if (!hasTuitionPermission("tuition.surplus.manage", false)) {
       alert("Bạn không có quyền thực hiện thao tác này.");
       return;
     }
@@ -727,6 +742,10 @@
      THU TIỀN — nhập số tiền phụ huynh nộp
   ───────────────────────────────────────────── */
   window.collectPayment = async function (studentId, ym, amountDue) {
+    if (!canCollectPayments()) {
+      alert("Bạn không có quyền thu tiền học phí.");
+      return;
+    }
     const existing   = paymentMap[studentId];
     const alreadyPaid = existing?.amount_paid || 0;
     const remaining  = amountDue - alreadyPaid;
@@ -820,6 +839,10 @@ Nhập số tiền thu thêm lần này:`,
      HOÀN TIỀN — trừ vào amount_paid
   ───────────────────────────────────────────── */
   window.refundPayment = async function (studentId, ym, amountDue) {
+    if (!hasTuitionPermission("tuition.refund", false)) {
+      alert("Bạn không có quyền hoàn tiền học phí.");
+      return;
+    }
     const existing   = paymentMap[studentId];
     const alreadyPaid = existing?.amount_paid || 0;
     if (alreadyPaid <= 0) { alert("Chưa có tiền nào được thu"); return; }
@@ -879,6 +902,10 @@ Nhập số tiền hoàn lại (>0):`,
      GHI CHÚ
   ───────────────────────────────────────────── */
   window.editNote = async function (studentId, ym, amountDue) {
+    if (!hasTuitionPermission("tuition.notes.manage", false)) {
+      alert("Bạn không có quyền sửa ghi chú học phí.");
+      return;
+    }
     const existing = paymentMap[studentId];
     const newNote  = prompt("Ghi chú:", existing?.note || "");
     if (newNote === null) return;
@@ -926,11 +953,19 @@ Nhập số tiền hoàn lại (>0):`,
     currentRole = profile?.role || "student";
     await window.AppPermissions?.load?.({ id:user.id, role:currentRole });
     parentStudentIds = new Set();
-    assistantClassIds = new Set();
-    if ((currentRole === "teacher" || currentRole === "assistant")
-      && !window.AppPermissions?.has?.("page.tuition", false)) {
+    staffClassIds = new Set();
+    if (isStaffTuitionView() && !window.AppPermissions?.has?.("page.tuition", currentRole === "admin")) {
       location.href = "dashboard.html";
       return false;
+    }
+
+    if (isStaffTuitionView() && !canViewAllTuition() && currentRole !== "admin") {
+      const { data: classLinks, error: classLinkError } = await sb
+        .from("class_teachers")
+        .select("class_id")
+        .eq("teacher_id", currentUserId);
+      if (classLinkError) throw classLinkError;
+      staffClassIds = new Set((classLinks || []).map(row => row.class_id).filter(Boolean));
     }
 
     const titleEl = document.querySelector("h1");
@@ -993,13 +1028,13 @@ Nhập số tiền hoàn lại (>0):`,
     if (tableWrap) tableWrap.style.display = "";
     if (reloadBtn) reloadBtn.style.display = "";
     if (printBtn) printBtn.style.display = "";
-    if (notifyBtn) notifyBtn.style.display = canManagePayments() ? "" : "none";
-    if (zaloReminderBtn) zaloReminderBtn.style.display = canManagePayments() ? "" : "none";
-    if (unmatchedBtn) unmatchedBtn.style.display = canManagePayments() ? "" : "none";
-    if (lockBtn) lockBtn.style.display = canManagePayments() ? "" : "none";
+    if (notifyBtn) notifyBtn.style.display = hasTuitionPermission("tuition.notify", false) ? "" : "none";
+    if (zaloReminderBtn) zaloReminderBtn.style.display = hasTuitionPermission("tuition.zalo_queue.manage", false) ? "" : "none";
+    if (unmatchedBtn) unmatchedBtn.style.display = hasTuitionPermission("tuition.transactions.view", false) ? "" : "none";
+    if (lockBtn) lockBtn.style.display = hasTuitionPermission("tuition.lock", false) ? "" : "none";
     if (studentDetailView) studentDetailView.classList.remove("show");
-    if (paidFilter) paidFilter.style.display = canManagePayments() ? "" : "none";
-    if (canManagePayments()) refreshUnmatchedBankCount();
+    if (paidFilter) paidFilter.style.display = isStaffTuitionView() ? "" : "none";
+    if (hasTuitionPermission("tuition.transactions.view", false)) refreshUnmatchedBankCount();
   }
 
   async function refreshUnmatchedBankCount() {
@@ -1019,7 +1054,7 @@ Nhập số tiền hoàn lại (>0):`,
   window.openUnmatchedBankModal = async function () {
     const modal = document.getElementById("unmatchedBankModal");
     const body = document.getElementById("unmatchedBankBody");
-    if (!modal || !body || !canManagePayments()) return;
+    if (!modal || !body || !hasTuitionPermission("tuition.transactions.view", false)) return;
     modal.style.display = "flex";
     body.innerHTML = `<div class="loading">Đang tải giao dịch chưa khớp...</div>`;
     try {
@@ -1040,8 +1075,9 @@ Nhập số tiền hoàn lại (>0):`,
             <td>${esc(row.account_number || "—")}</td><td>${esc(row.gateway || "—")}</td>
             <td style="word-break:break-all">${esc(row.transaction_id || "—")}</td>
             <td style="white-space:nowrap">
+              ${hasTuitionPermission("tuition.transactions.manage", false) ? `
               <button type="button" onclick="manageUnmatchedBankTransaction('${row.id}','resolve',${Number(row.amount) || 0})" style="border:1px solid #86efac;background:#f0fdf4;color:#166534;padding:5px 8px;border-radius:6px;cursor:pointer;font-weight:600">✓ Đã xử lý</button>
-              <button type="button" onclick="manageUnmatchedBankTransaction('${row.id}','delete',${Number(row.amount) || 0})" style="border:1px solid #fca5a5;background:#fff1f2;color:#b91c1c;padding:5px 8px;border-radius:6px;cursor:pointer;margin-left:4px">Xóa</button>
+              <button type="button" onclick="manageUnmatchedBankTransaction('${row.id}','delete',${Number(row.amount) || 0})" style="border:1px solid #fca5a5;background:#fff1f2;color:#b91c1c;padding:5px 8px;border-radius:6px;cursor:pointer;margin-left:4px">Xóa</button>` : '<span style="color:#64748b">Chỉ xem</span>'}
             </td>
           </tr>`).join("")}</tbody></table></div>`;
       }
@@ -1058,7 +1094,7 @@ Nhập số tiền hoàn lại (>0):`,
   };
 
   window.manageUnmatchedBankTransaction = async function (id, action, amount) {
-    if (!canManagePayments() || !["resolve", "delete"].includes(action)) return;
+    if (!hasTuitionPermission("tuition.transactions.manage", false) || !["resolve", "delete"].includes(action)) return;
     const label = action === "resolve" ? "đánh dấu đã xử lý" : "xóa vĩnh viễn";
     if (!confirm(`Bạn có chắc muốn ${label} giao dịch ${fmt(Number(amount) || 0)}đ này?`)) return;
     try {
@@ -1150,7 +1186,7 @@ Nhập số tiền hoàn lại (>0):`,
     (classStudents || []).forEach(cs => {
       if (currentRole === "student" && cs.student_id !== currentUserId) return;
       if (currentRole === "parent" && !parentStudentIds.has(cs.student_id)) return;
-      if (currentRole === "assistant" && !assistantClassIds.has(cs.class_id)) return;
+      if (isStaffTuitionView() && currentRole !== "admin" && !canViewAllTuition() && !staffClassIds.has(cs.class_id)) return;
       const cls = classMap[cs.class_id];
       if (!cls) return;
 
@@ -1307,7 +1343,7 @@ Nhập số tiền hoàn lại (>0):`,
       const [studentId, classId] = key.split("_");
       if (currentRole === "student" && studentId !== currentUserId) return;
       if (currentRole === "parent" && !parentStudentIds.has(studentId)) return;
-      if (currentRole === "assistant" && !assistantClassIds.has(classId)) return;
+      if (isStaffTuitionView() && currentRole !== "admin" && !canViewAllTuition() && !staffClassIds.has(classId)) return;
 
       const cls = classMap[classId];
       if (!cls) return;
@@ -1368,7 +1404,7 @@ Nhập số tiền hoàn lại (>0):`,
      LOAD CLASS FILTER
   ───────────────────────────────────────────── */
   async function loadClassFilter() {
-    if (!canManagePayments()) {
+    if (!canViewAllTuition()) {
       syncClassFilterOptions();
       return;
     }
@@ -1409,55 +1445,84 @@ Nhập số tiền hoàn lại (>0):`,
         await loadPortalTuition();
         return;
       }
-      const [
-        { data: classes,       error: e1 },
-        { data: classStudents, error: e2 },
-        { data: attData,       error: e3 },
-        { data: payments,      error: e4 },
-        { data: chosenSchedules, error: e5 },
-        { data: trialReqs,     error: e6 },
-        { data: suppSessions,  error: e7 },
-      ] = await Promise.all([
-        sb.from("classes")
-          .select(`id, class_name, tuition_fee, tuition_type, makeup_fee,
-                   class_schedules(id, session_no, weekday, start_time, end_time, effective_from)`)
-          .eq("hidden", false),
+      const restrictedToAssignedClasses = isStaffTuitionView() && currentRole !== "admin" && !canViewAllTuition();
+      const scopedClassIds = [...staffClassIds];
+      if (restrictedToAssignedClasses && !scopedClassIds.length) {
+        allRows = [];
+        grouped = [];
+        paymentMap = {};
+        parentContactMap = {};
+        syncClassFilterOptions();
+        renderRows();
+        return;
+      }
 
-        sb.from("class_students")
-          .select(`id, class_id, student_id, joined_at, left_at,
-                   user:users!fk_student(id, full_name, email, phone)`),
+      let classesQuery = sb.from("classes")
+        .select(`id, class_name, tuition_fee, tuition_type, makeup_fee,
+                 class_schedules(id, session_no, weekday, start_time, end_time, effective_from)`)
+        .eq("hidden", false);
+      let studentsQuery = sb.from("class_students")
+        .select(`id, class_id, student_id, joined_at, left_at,
+                 user:users!fk_student(id, full_name, email, phone)`);
+      if (restrictedToAssignedClasses) {
+        classesQuery = classesQuery.in("id", scopedClassIds);
+        studentsQuery = studentsQuery.in("class_id", scopedClassIds);
+      }
 
-        sb.from("attendance")
-          .select("student_id, class_id, date, status, schedule_id")
-          .gte("date", mStart).lte("date", mEnd),
+      const [classesResult, studentsResult] = await Promise.all([classesQuery, studentsQuery]);
+      if (classesResult.error) throw classesResult.error;
+      if (studentsResult.error) throw studentsResult.error;
+      const classes = classesResult.data || [];
+      const classStudents = studentsResult.data || [];
+      const loadedClassIds = [...new Set(classes.map(row => row.id).filter(Boolean))];
+      const loadedStudentIds = [...new Set(classStudents.map(row => row.student_id).filter(Boolean))];
+      if (restrictedToAssignedClasses && !loadedClassIds.length) {
+        allRows = [];
+        grouped = [];
+        paymentMap = {};
+        parentContactMap = {};
+        syncClassFilterOptions();
+        renderRows();
+        return;
+      }
 
-        // payment theo student_id + month (không cần class_id nữa)
-        sb.from("tuition_payments")
-          .select("*").eq("month", mStart),
+      let attendanceQuery = sb.from("attendance")
+        .select("student_id, class_id, date, status, schedule_id")
+        .gte("date", mStart).lte("date", mEnd);
+      let paymentsQuery = sb.from("tuition_payments").select("*").eq("month", mStart);
+      let schedulesQuery = sb.from("class_student_schedules")
+        .select("class_id, student_id, schedule_id, effective_from");
+      let trialsQuery = sb.from("trial_lesson_requests")
+        .select("student_id, trial_class_id, trial_session_1_at, trial_session_2_at");
+      let supplementaryQuery = sb.from("supplementary_sessions")
+        .select(`
+          id, parent_class_id, topic, session_date, starts_at, ends_at, fee_per_student, status,
+          students:supplementary_session_students(
+            student_id, attendance_status, tuition_fee, tuition_charged
+          )
+        `)
+        .eq("status", "completed")
+        .gte("session_date", mStart)
+        .lte("session_date", mEnd);
+      if (restrictedToAssignedClasses) {
+        attendanceQuery = attendanceQuery.in("class_id", loadedClassIds);
+        schedulesQuery = schedulesQuery.in("class_id", loadedClassIds);
+        supplementaryQuery = supplementaryQuery.in("parent_class_id", loadedClassIds);
+        paymentsQuery = loadedStudentIds.length ? paymentsQuery.in("student_id", loadedStudentIds) : Promise.resolve({ data:[], error:null });
+        trialsQuery = loadedStudentIds.length ? trialsQuery.in("student_id", loadedStudentIds) : Promise.resolve({ data:[], error:null });
+      }
 
-        sb.from("class_student_schedules")
-          .select("class_id, student_id, schedule_id, effective_from"),
-
-        sb.from("trial_lesson_requests")
-          .select("student_id, trial_class_id, trial_session_1_at, trial_session_2_at"),
-
-        sb.from("supplementary_sessions")
-          .select(`
-            id, parent_class_id, topic, session_date, starts_at, ends_at, fee_per_student, status,
-            students:supplementary_session_students(
-              student_id, attendance_status, tuition_fee, tuition_charged
-            )
-          `)
-          .eq("status", "completed")
-          .gte("session_date", mStart)
-          .lte("session_date", mEnd),
+      const [attendanceResult, paymentsResult, schedulesResult, trialsResult, supplementaryResult] = await Promise.all([
+        attendanceQuery, paymentsQuery, schedulesQuery, trialsQuery, supplementaryQuery
       ]);
-
-      if (e1) throw e1;
-      if (e2) throw e2;
-      if (e3) throw e3;
-      if (e4) throw e4;
-      if (e5) throw e5;
+      if (attendanceResult.error) throw attendanceResult.error;
+      if (paymentsResult.error) throw paymentsResult.error;
+      if (schedulesResult.error) throw schedulesResult.error;
+      const attData = attendanceResult.data || [];
+      const payments = paymentsResult.data || [];
+      const chosenSchedules = schedulesResult.data || [];
+      const trialReqs = trialsResult.error ? [] : (trialsResult.data || []);
+      const suppSessions = supplementaryResult.error ? [] : (supplementaryResult.data || []);
 
       parentContactMap = {};
       if (canViewStudentPhone()) {
@@ -1847,30 +1912,30 @@ Nhập số tiền hoàn lại (>0):`,
              padding:4px 8px;border-radius:6px;border:1px solid #fde68a;
              white-space:pre-wrap;word-break:break-word">📝 ${note}</div>`
         : "";
-      const actionButtons = canManagePayments()
-        ? `<div style="display:flex;flex-direction:column;gap:5px;align-items:flex-start">
-              <button class="action-btn collect"
+      const actionItems = [];
+      if (canCollectPayments()) actionItems.push(`<button class="action-btn collect"
                onclick="event.stopPropagation();collectPayment('${g.studentId}','${ym}',${g.amount})">
                 💵 Thu tiền
-              </button>
-              ${overpaid > 0 ? `
+              </button>`);
+      if (overpaid > 0 && hasTuitionPermission("tuition.surplus.manage", false)) actionItems.push(`
               <button class="action-btn" style="background:#0284c7;color:#fff;font-weight:700"
                onclick="event.stopPropagation();transferSurplusToNextMonth('${g.studentId}','${ym}',${g.amount})">
                 ➡️ Chuyển dư (${fmt(overpaid)}đ)
-              </button>` : ""}
-              <button class="action-btn refund"
+              </button>`);
+      if (hasTuitionPermission("tuition.refund", false)) actionItems.push(`<button class="action-btn refund"
                onclick="event.stopPropagation();refundPayment('${g.studentId}','${ym}',${g.amount})">
                 ↩ Hoàn tiền
-              </button>
-              <button class="action-btn note ${note ? "has" : ""}"
+              </button>`);
+      if (hasTuitionPermission("tuition.notes.manage", false)) actionItems.push(`<button class="action-btn note ${note ? "has" : ""}"
                onclick="event.stopPropagation();editNote('${g.studentId}','${ym}',${g.amount})">
                 📝 ${note ? "Sửa ghi chú" : "Ghi chú"}
-              </button>
-              ${needRecalc ? `<button class="action-btn" style="background:#ef4444;color:#fff;margin-top:2px"
+              </button>`);
+      if (needRecalc && hasTuitionPermission("tuition.lock", false)) actionItems.push(`<button class="action-btn" style="background:#ef4444;color:#fff;margin-top:2px"
                onclick="event.stopPropagation();recalcOneTuition('${g.studentId}','${ym}')">
                 🔄 Tính lại
-              </button>` : ""}
-            </div>`
+              </button>`);
+      const actionButtons = actionItems.length
+        ? `<div style="display:flex;flex-direction:column;gap:5px;align-items:flex-start">${actionItems.join("")}</div>`
         : '<span style="color:var(--muted);font-size:12px">—</span>';
 
       let lockCell = "";
@@ -1977,6 +2042,10 @@ Nhập số tiền hoàn lại (>0):`,
   });
 
   window.printInvoices = function() {
+    if (!hasTuitionPermission("tuition.invoice", currentRole === "admin")) {
+      alert("Bạn không có quyền in hóa đơn học phí.");
+      return;
+    }
     const printArea = document.getElementById("printArea");
     if (!printArea) return;
     if (!currentRows.length) {
@@ -2081,7 +2150,7 @@ Nhập số tiền hoàn lại (>0):`,
 
     const transferAllBtn = document.getElementById("transferAllSurplusBtn");
     if (transferAllBtn) {
-      if (canManagePayments() && overpaidCount > 0) {
+      if (hasTuitionPermission("tuition.surplus.manage", false) && overpaidCount > 0) {
         transferAllBtn.style.display = "inline-flex";
         transferAllBtn.textContent = `➡️ Chuyển dư (${overpaidCount} HS - ${fmt(surplus)}đ)`;
       } else {
@@ -2094,7 +2163,7 @@ Nhập số tiền hoàn lại (>0):`,
      INIT
   ───────────────────────────────────────────── */
   window.notifyPendingTuition = async function () {
-    if (!canManagePayments()) {
+    if (!hasTuitionPermission("tuition.notify", false)) {
       alert("Bạn không có quyền gửi thông báo học phí.");
       return;
     }
@@ -2145,7 +2214,7 @@ Nhập số tiền hoàn lại (>0):`,
   /* Cập nhật tiêu đề nút chốt dựa vào trạng thái hiện tại */
   function updateLockButton() {
     const lockBtn = document.getElementById("lockTuitionBtn");
-    if (!lockBtn || !canManagePayments()) return;
+    if (!lockBtn || !hasTuitionPermission("tuition.lock", false)) return;
     const allLocked = currentRows.length > 0 && currentRows.every(g => paymentMap[g.studentId]?.locked_at);
     if (allLocked) {
       lockBtn.textContent = "🔓 Mở chốt";
@@ -2155,7 +2224,7 @@ Nhập số tiền hoàn lại (>0):`,
   }
 
   window.lockAllTuition = async function () {
-    if (!canManagePayments()) { alert("Bạn không có quyền chốt học phí."); return; }
+    if (!hasTuitionPermission("tuition.lock", false)) { alert("Bạn không có quyền chốt học phí."); return; }
     const ym = monthPicker.value;
     if (!currentRows.length) { alert("Không có học sinh nào để chốt."); return; }
     if (!confirm(`Chốt học phí tháng ${ym} cho ${currentRows.length} học sinh?\n\nSau khi chốt, nếu điểm danh thay đổi sẽ hiện cảnh báo ⚠️.`)) return;
@@ -2193,7 +2262,7 @@ Nhập số tiền hoàn lại (>0):`,
   };
 
   window.unlockAllTuition = async function () {
-    if (!canManagePayments()) { alert("Bạn không có quyền mở chốt."); return; }
+    if (!hasTuitionPermission("tuition.lock", false)) { alert("Bạn không có quyền mở chốt."); return; }
     const ym = monthPicker.value;
     if (!confirm(`Mở chốt học phí tháng ${ym}?\n\nHọc phí sẽ trở về tính động theo điểm danh thực tế.`)) return;
 
@@ -2227,6 +2296,10 @@ Nhập số tiền hoàn lại (>0):`,
   };
 
   window.recalcOneTuition = async function (studentId, ym) {
+    if (!hasTuitionPermission("tuition.lock", false)) {
+      alert("Bạn không có quyền tính lại/chốt học phí.");
+      return;
+    }
     const g = getStudentGroup(studentId);
     if (!g) return;
     if (!confirm(`Tính lại học phí cho ${g.studentName} theo điểm danh hiện tại?`)) return;
@@ -2320,6 +2393,10 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
   };
 
   window.openZaloReminderModal = async function () {
+    if (!hasTuitionPermission("tuition.zalo_queue.manage", false)) {
+      alert("Bạn không có quyền quản lý gửi học phí qua Zalo.");
+      return;
+    }
     const modal = document.getElementById("zaloReminderModal");
     if (!modal) return;
     modal.style.display = "flex";

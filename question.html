@@ -475,12 +475,12 @@ button {
   </div>
 
   <div class="quickOps">
-    <button class="quickOp" data-testid="question-quick-missing-answer" type="button" onclick="applyQuickQuestionAction('missing')">
+    <button class="quickOp" data-testid="question-quick-missing-answer" data-permission="question.manage" type="button" onclick="applyQuickQuestionAction('missing')">
       <div class="quickOp-title"><span class="quickOp-icon" aria-hidden="true">⚠</span><strong>Câu Thiếu Đáp Án</strong></div>
       <span>Mở ngay bộ lọc chỉ còn các câu chưa có đáp án để rà nhanh trước khi ra đề.</span>
       <span class="quickStat" id="quickMissingCount">0 câu</span>
     </button>
-    <button class="quickOp" data-testid="question-quick-duplicate-audit" type="button" onclick="runDuplicateAudit()">
+    <button class="quickOp" data-testid="question-quick-duplicate-audit" data-permission="question.manage" type="button" onclick="runDuplicateAudit()">
       <div class="quickOp-title"><span class="quickOp-icon" aria-hidden="true">⌕</span><strong>Kiểm tra câu trùng</strong></div>
       <span>Chạy kiểm tra và mở popup nhóm câu trùng để đối chiếu ngay trong một lượt.</span>
       <span class="quickStat" id="quickDuplicateCount">0 câu</span>
@@ -489,7 +489,7 @@ button {
       <div class="quickOp-title"><span class="quickOp-icon" aria-hidden="true">W</span><strong>Nhập Từ Word</strong></div>
       <span>Đưa file `.docx` vào popup tạo câu hỏi để giáo viên duyệt và lưu từng câu.</span>
       <div class="quickOp-actions">
-        <button class="quickOp-mini primary" type="button" onclick="document.getElementById('wordImportInput').click()">Chọn file Word</button>
+        <button class="quickOp-mini primary" data-permission="question.import" type="button" onclick="document.getElementById('wordImportInput').click()">Chọn file Word</button>
         <a class="quickOp-mini" href="question-word-template.docx" download>Tải file mẫu</a>
       </div>
     </div>
@@ -498,7 +498,7 @@ button {
       <span>Mở form tạo câu hỏi ngay để thêm câu mới mà không cần cuộn xuống bảng.</span>
       <span class="quickStat">Form</span>
     </button>
-    <button class="quickOp" data-testid="question-quick-ai-answer" type="button" onclick="fillMissingAnswersWithAI()">
+    <button class="quickOp" data-testid="question-quick-ai-answer" data-permission="question.manage" type="button" onclick="fillMissingAnswersWithAI()">
       <div class="quickOp-title"><span class="quickOp-icon" aria-hidden="true">✦</span><strong>Điền Đáp Án AI</strong></div>
       <span>Chạy AI theo từng lô cho các câu đang trống đáp án và gắn trạng thái Đáp án AI để giáo viên rà lại sau.</span>
       <span class="quickStat" id="quickAiAnswerCount">0 chờ xử lý</span>

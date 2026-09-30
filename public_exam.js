@@ -30,8 +30,8 @@
   let _essayReviewQueue = [];
 
   function requirePublicExamAdmin() {
-    if (_role === "admin") return true;
-    alert("Chỉ admin mới có quyền quản lý đề thi thử và đề thi thật.");
+    if (window.AppPermissions?.has?.("public_exam.manage", _role === "admin")) return true;
+    alert("Bạn không có quyền quản lý đề thi thử và đề thi thật.");
     return false;
   }
 
@@ -46,8 +46,13 @@
 
     const { data: profile } = await sb.from("users").select("role").eq("id", _uid).single();
     _role = profile?.role || "student";
+    await window.AppPermissions?.load?.({ id:_uid, role:_role });
+    if (!window.AppPermissions?.has?.("page.public_exam", true)) {
+      location.href = "dashboard.html";
+      return;
+    }
 
-    if (_role === "admin") {
+    if (window.AppPermissions?.has?.("public_exam.manage", _role === "admin")) {
       document.getElementById("adminToolbar").style.display = "";
     }
 
@@ -141,7 +146,7 @@
       const card       = document.createElement("div");
       card.className   = "exam-card" + (isOfficial ? " official" : "");
 
-      if (_role === "admin" || _role === "teacher") {
+      if (window.AppPermissions?.has?.("public_exam.results.manage", _role === "admin")) {
         card.style.cursor = "pointer";
         card.addEventListener("click", (e) => {
           if (e.target.tagName === "BUTTON" || e.target.closest("button")) return;
@@ -223,7 +228,7 @@
       }
 
       let adminHtml = "";
-      if (_role === "admin") {
+      if (window.AppPermissions?.has?.("public_exam.manage", _role === "admin")) {
         const pinBtn = pe.is_pinned
           ? `<button class="btn btn-outline btn-sm" onclick="togglePin('${pe.id}',false)">Bỏ ghim</button>`
           : `<button class="btn btn-outline btn-sm" onclick="togglePin('${pe.id}',true)">Ghim</button>`;
@@ -249,7 +254,7 @@
         </div>
         <div class="exam-actions">
           ${actionHtml || adminHtml}
-          ${actionHtml && _role === "admin" ? adminHtml : ""}
+          ${actionHtml && window.AppPermissions?.has?.("public_exam.manage", _role === "admin") ? adminHtml : ""}
         </div>`;
 
       return card;

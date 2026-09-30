@@ -983,12 +983,12 @@ tr.recalc-needed td:first-child { border-left: 3px solid #ef4444; }
     </div>
     <div class="toolbar-group actions">
       <button onclick="loadTuition()">Tải lại</button>
-      <button class="secondary" id="transferAllSurplusBtn" data-permission="tuition.manage" onclick="transferAllSurplusToNextMonth()" style="display:none;background:#e0f2fe;color:#0369a1;border-color:#bae6fd;font-weight:700">➡️ Chuyển dư tất cả</button>
-      <button class="secondary" id="notifyTuitionBtn" data-permission="tuition.manage" onclick="notifyPendingTuition()" style="display:none">Thông báo học phí</button>
-      <button class="secondary" id="zaloReminderBtn" data-permission="tuition.manage" onclick="openZaloReminderModal()" style="display:none;background:linear-gradient(135deg, #0068ff 0%, #0052cc 100%);color:#fff;border:none;font-weight:700">💬 Nhắc Zalo Tự Động</button>
-      <button class="secondary" id="unmatchedBankBtn" data-permission="tuition.manage" onclick="openUnmatchedBankModal()" style="display:none;background:#fff7ed;color:#9a3412;border-color:#fdba74;font-weight:700">Giao dịch chưa khớp <span id="unmatchedBankCount"></span></button>
-      <button class="secondary" onclick="printInvoices()">In hóa đơn</button>
-      <button class="secondary" id="lockTuitionBtn" data-permission="tuition.manage" onclick="toggleTuitionLock()" style="display:none">🔒 Chốt học phí</button>
+      <button class="secondary" id="transferAllSurplusBtn" data-permission="tuition.surplus.manage" onclick="transferAllSurplusToNextMonth()" style="display:none;background:#e0f2fe;color:#0369a1;border-color:#bae6fd;font-weight:700">➡️ Chuyển dư tất cả</button>
+      <button class="secondary" id="notifyTuitionBtn" data-permission="tuition.notify" onclick="notifyPendingTuition()" style="display:none">Thông báo học phí</button>
+      <button class="secondary" id="zaloReminderBtn" data-permission="tuition.zalo_queue.manage" onclick="openZaloReminderModal()" style="display:none;background:linear-gradient(135deg, #0068ff 0%, #0052cc 100%);color:#fff;border:none;font-weight:700">💬 Nhắc Zalo Tự Động</button>
+      <button class="secondary" id="unmatchedBankBtn" data-permission="tuition.transactions.view" onclick="openUnmatchedBankModal()" style="display:none;background:#fff7ed;color:#9a3412;border-color:#fdba74;font-weight:700">Giao dịch chưa khớp <span id="unmatchedBankCount"></span></button>
+      <button class="secondary" data-permission="tuition.invoice" onclick="printInvoices()">In hóa đơn</button>
+      <button class="secondary" id="lockTuitionBtn" data-permission="tuition.lock" onclick="toggleTuitionLock()" style="display:none">🔒 Chốt học phí</button>
     </div>
   </div>
 

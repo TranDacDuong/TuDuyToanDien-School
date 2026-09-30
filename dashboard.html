@@ -1551,8 +1551,9 @@ function applyRoleMenu(role){
     const isRoleAllowed = item.dataset.permission
       ? window.AppPermissions?.has?.(item.dataset.permission, !roles.length || roles.includes(role))
       : !roles.length || roles.includes(role);
-    item.style.display = isRoleAllowed && (!roleOrder.length || orderIndex >= 0) ? "flex" : "none";
-    item.style.order = orderIndex >= 0 ? String(orderIndex + 1) : "";
+    const explicitlyGrantedPage = Boolean(item.dataset.permission) && isRoleAllowed;
+    item.style.display = isRoleAllowed && (!roleOrder.length || orderIndex >= 0 || explicitlyGrantedPage) ? "flex" : "none";
+    item.style.order = orderIndex >= 0 ? String(orderIndex + 1) : explicitlyGrantedPage ? "99" : "";
   });
   document.getElementById("mobileQuickActions")?.style.removeProperty("display");
 }
