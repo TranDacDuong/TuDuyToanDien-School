@@ -79,6 +79,10 @@ test.describe("Class quick actions regression", () => {
         { id:"class-a", class_name:"Toán 10", is_today:true, today_times:[] },
         { id:"class-b", class_name:"Vật lý 11", is_today:false, today_times:[] }
       ];
+      window.__calls = [];
+      window.openClassView = async (id) => window.__calls.push(`open:${id}:inPlace=${window._openingClassFromUrl}`);
+      window.cvSwitchTab = async (tab) => window.__calls.push(`tab:${tab}`);
+      window.cvOpenAddClassSession = async (_id, options) => window.__calls.push(`form:${options.afterSave}`);
     });
     await page.addScriptTag({ path:path.join(root,"class_quick_actions.js") });
     await page.evaluate(() => window.postMessage({type:"class:open-quick-actions"},"*"));
@@ -87,5 +91,11 @@ test.describe("Class quick actions regression", () => {
     await expect(page.getByRole("heading", {name:"Tạo buổi học"})).toBeVisible();
     await expect(page.getByLabel("Lớp học")).toBeVisible();
     await expect(page.getByLabel("Lớp học").locator("option")).toHaveCount(3);
+    await page.getByLabel("Lớp học").selectOption("class-a");
+    await expect.poll(() => page.evaluate(() => window.__calls)).toEqual([
+      "open:class-a:inPlace=true",
+      "tab:exams",
+      "form:exams"
+    ]);
   });
 });

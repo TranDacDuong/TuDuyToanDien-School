@@ -128,14 +128,24 @@
 
   async function openAttendance(row){
     close();
-    await window.openClassView?.(row.id,row.class_name);
+    await openClassInPlace(row);
     await window.cvSwitchTab?.("attendance");
     setTimeout(() => window.cvFocusAttendanceDate?.(todayValue()), 120);
   }
 
+  async function openClassInPlace(row){
+    const previousState = window._openingClassFromUrl;
+    window._openingClassFromUrl = true;
+    try{
+      await window.openClassView?.(row.id,row.class_name);
+    } finally {
+      window._openingClassFromUrl = previousState;
+    }
+  }
+
   async function openSessionForm(row, returnToAttendance){
     close();
-    await window.openClassView?.(row.id,row.class_name);
+    await openClassInPlace(row);
     await window.cvSwitchTab?.("exams");
     await window.cvOpenAddClassSession?.("",{
       preselectedDate: row.is_today ? todayValue() : "",
