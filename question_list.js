@@ -1638,7 +1638,8 @@ async function getUserRole() {
   if (!user) return
   const { data } = await sb.from("users").select("role").eq("id", user.id).single()
   currentRole = data?.role || ""
-  if (!["admin", "teacher", "assistant"].includes(currentRole)) {
+  await window.AppPermissions?.load?.({ id:user.id, role:currentRole })
+  if (!window.AppPermissions?.has?.("page.question_bank", ["admin", "teacher", "assistant"].includes(currentRole))) {
     window.location.href = "dashboard.html"
     return false
   }

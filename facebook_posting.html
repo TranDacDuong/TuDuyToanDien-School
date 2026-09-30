@@ -226,9 +226,9 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
           </div>
           <div class="toolbar-right">
             <button class="btn btn-outline" id="openPageBtn" type="button">Mở fanpage</button>
-            <button class="btn btn-outline" id="copyPreviousWeekScheduleBtn" type="button">Tạo lịch giống tuần trước</button>
-            <button class="btn btn-gold" id="generateWeekDraftsBtn" type="button">Tạo nội dung bài đăng cho tuần này</button>
-            <button class="btn btn-outline" id="clearWeekDraftsBtn" type="button">Xóa nội dung đã lưu trong tuần này</button>
+            <button class="btn btn-outline" id="copyPreviousWeekScheduleBtn" data-permission="facebook.manage" type="button">Tạo lịch giống tuần trước</button>
+            <button class="btn btn-gold" id="generateWeekDraftsBtn" data-permission="facebook.manage" type="button">Tạo nội dung bài đăng cho tuần này</button>
+            <button class="btn btn-outline" id="clearWeekDraftsBtn" data-permission="facebook.manage" type="button">Xóa nội dung đã lưu trong tuần này</button>
           </div>
         </div>
 
@@ -479,8 +479,8 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
     </div>
     <div class="modal-foot">
       <button class="btn btn-danger" id="deletePostBtn" type="button">Xóa nháp</button>
-      <button class="btn btn-outline" id="saveDraftBtn" type="button">Lưu nháp</button>
-      <button class="btn btn-primary" id="schedulePostBtn" type="button">Hẹn lịch Facebook</button>
+      <button class="btn btn-outline" id="saveDraftBtn" data-permission="facebook.manage" type="button">Lưu nháp</button>
+      <button class="btn btn-primary" id="schedulePostBtn" data-permission="facebook.manage" type="button">Hẹn lịch Facebook</button>
     </div>
   </div>
 </div>
@@ -525,7 +525,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 <script>
 const GRAPH_VERSION = "v25.0";
 const TOKEN_KEY = "mindup_facebook_calendar_token_session";
-const ALLOWED_ROLES = new Set(["admin", "assistant", "teacher", "marketing", "accountant"]);
+const ALLOWED_ROLES = new Set(["admin", "assistant", "teacher"]);
 const WEEKDAYS = [
   { value: 1, label: "Thứ 2", short: "T2" },
   { value: 2, label: "Thứ 3", short: "T3" },
@@ -845,7 +845,10 @@ async function loadProfile(){
   if (!user) throw new Error("Vui lòng đăng nhập trước khi dùng chức năng Đăng bài Facebook.");
   const { data, error } = await sb.from("users").select("id,role,full_name,email").eq("id", user.id).maybeSingle();
   if (error) throw error;
-  if (!data || !ALLOWED_ROLES.has(String(data.role || ""))) throw new Error("Tài khoản này chưa có quyền quản lý đăng bài Facebook.");
+  if (!data) throw new Error("Không tìm thấy hồ sơ người dùng.");
+  await window.AppPermissions?.load?.(data);
+  const legacyAllowed = ALLOWED_ROLES.has(String(data.role || ""));
+  if (!window.AppPermissions?.has?.("page.facebook", legacyAllowed)) throw new Error("Tài khoản này chưa có quyền quản lý đăng bài Facebook.");
   S.profile = data;
 }
 

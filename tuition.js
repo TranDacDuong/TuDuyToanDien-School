@@ -924,9 +924,11 @@ Nhập số tiền hoàn lại (>0):`,
       if (parentLink) profile = { ...profile, role: "parent" };
     }
     currentRole = profile?.role || "student";
+    await window.AppPermissions?.load?.({ id:user.id, role:currentRole });
     parentStudentIds = new Set();
     assistantClassIds = new Set();
-    if (currentRole === "teacher" || currentRole === "assistant") {
+    if ((currentRole === "teacher" || currentRole === "assistant")
+      && !window.AppPermissions?.has?.("page.tuition", false)) {
       location.href = "dashboard.html";
       return false;
     }

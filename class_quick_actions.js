@@ -31,16 +31,17 @@
     setHeader("Bạn muốn sử dụng chức năng gì?", "Chọn thao tác để bắt đầu nhanh.");
     body.innerHTML = `
       <div class="class-quick-grid">
-        <button class="class-quick-action" type="button" data-quick-action="create">
+        <button class="class-quick-action" type="button" data-quick-action="create" data-permission="class.sessions.manage">
           <span class="class-quick-icon">＋</span><strong>Tạo buổi học</strong><span>Chọn lớp và mở ngay form tạo nội dung buổi học.</span>
         </button>
-        <button class="class-quick-action primary" type="button" data-quick-action="attendance">
+        <button class="class-quick-action primary" type="button" data-quick-action="attendance" data-permission="class.attendance">
           <span class="class-quick-icon">✓</span><strong>Điểm danh</strong><span>Ưu tiên lớp hôm nay và kiểm tra buổi học trước khi mở điểm danh.</span>
         </button>
         <button class="class-quick-action" type="button" data-quick-action="manage">
           <span class="class-quick-icon">☷</span><strong>Quản lý lớp học</strong><span>Mở giao diện đầy đủ như hiện tại.</span>
         </button>
       </div>`;
+    window.AppPermissions?.applyToDom?.(body);
     body.querySelector('[data-quick-action="create"]')?.addEventListener("click", () => renderClassPicker("create"));
     body.querySelector('[data-quick-action="attendance"]')?.addEventListener("click", () => renderClassPicker("attendance"));
     body.querySelector('[data-quick-action="manage"]')?.addEventListener("click", close);

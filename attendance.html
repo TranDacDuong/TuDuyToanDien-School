@@ -203,7 +203,8 @@ async function init() {
     return;
   }
   currentProfile = profile || {};
-  if (!["admin", "teacher", "assistant", "marketing", "accountant"].includes(currentProfile.role)) {
+  await window.AppPermissions?.load?.(currentProfile);
+  if (!window.AppPermissions?.has?.("class.attendance", ["admin", "teacher", "assistant"].includes(currentProfile.role))) {
     document.querySelector(".page").innerHTML = '<div class="card"><h1>Không có quyền truy cập</h1><p class="muted">Chỉ nhân viên MindUp mới sử dụng được phần điểm danh.</p></div>';
     return;
   }

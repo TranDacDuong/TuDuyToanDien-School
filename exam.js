@@ -64,7 +64,8 @@
     currentUser = user;
     const { data: profile } = await sb.from("users").select("role").eq("id", user.id).single();
     currentRole = String(profile?.role || "teacher");
-    if (!["admin", "teacher", "assistant"].includes(currentRole)) {
+    await window.AppPermissions?.load?.({ id:user.id, role:currentRole });
+    if (!window.AppPermissions?.has?.("page.exam_editor", ["admin", "teacher", "assistant"].includes(currentRole))) {
       location.href = "dashboard.html";
       return false;
     }

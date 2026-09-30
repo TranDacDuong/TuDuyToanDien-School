@@ -320,6 +320,35 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 .s-search .sg { flex:1; min-width:110px; }
 .s-table-card { background:linear-gradient(180deg, #ffffff 0%, #fbfdff 100%); border-radius:20px; box-shadow:0 18px 38px rgba(15,31,61,.08); border:1px solid rgba(15,31,61,.08); overflow:hidden; }
 .s-table-scroll { overflow-x:auto; }
+.permission-shell { display:grid; grid-template-columns:minmax(230px,300px) minmax(0,1fr); gap:16px; grid-column:1/-1; }
+.permission-staff { background:#fff; border:1px solid var(--border); border-radius:14px; overflow:hidden; align-self:start; }
+.permission-staff-head { padding:14px; border-bottom:1px solid var(--border); }
+.permission-staff-head input { width:100%; margin-top:9px; }
+.permission-staff-list { max-height:620px; overflow:auto; padding:6px; }
+.permission-person { width:100%; border:0; background:transparent; padding:10px; border-radius:9px; text-align:left; cursor:pointer; display:block; color:var(--ink); }
+.permission-person:hover { background:#f2f6fb; }
+.permission-person.active { background:#e8f2ff; box-shadow:inset 3px 0 #1967b3; }
+.permission-person strong,.permission-person span { display:block; }
+.permission-person span { color:var(--ink-light); font-size:.74rem; margin-top:3px; }
+.permission-editor { min-width:0; }
+.permission-editor-head { background:#fff; border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:12px; }
+.permission-editor-head h3 { margin:0 0 5px; color:var(--navy); }
+.permission-note { color:var(--ink-mid); font-size:.8rem; line-height:1.5; }
+.permission-group { background:#fff; border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:12px; }
+.permission-group h4 { margin:0; padding:12px 15px; background:#f5f8fc; color:var(--navy); border-bottom:1px solid var(--border); }
+.permission-row { display:grid; grid-template-columns:minmax(180px,1fr) minmax(180px,240px); gap:14px; align-items:center; padding:11px 15px; border-bottom:1px solid #edf1f6; }
+.permission-row:last-child { border-bottom:0; }
+.permission-row-title { font-weight:700; color:var(--navy); }
+.permission-row-copy { color:var(--ink-light); font-size:.75rem; margin-top:3px; }
+.permission-select { width:100%; min-height:38px; border:1px solid var(--border); border-radius:8px; background:#fff; padding:7px 10px; color:var(--ink); }
+.permission-select.override-allow { border-color:#22a06b; background:#effbf5; }
+.permission-select.override-deny { border-color:#dc5a5a; background:#fff3f3; }
+.permission-empty { background:#fff; border:1px dashed var(--border); border-radius:14px; padding:28px; text-align:center; color:var(--ink-light); }
+@media(max-width:820px){
+  .permission-shell { grid-template-columns:1fr; }
+  .permission-staff-list { max-height:260px; }
+  .permission-row { grid-template-columns:1fr; gap:8px; }
+}
 .s-pg { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-top:1px solid var(--surface); flex-wrap:wrap; gap:8px; }
 .s-pg-info { font-size:.78rem; color:var(--ink-light); }
 .s-pg-btns { display:flex; gap:3px; flex-wrap:wrap; }
@@ -432,6 +461,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   <button class="tab" data-testid="system-tab-evaluation-templates" onclick="switchTab('evaluationTemplates',this)">📝 Mẫu nhận xét</button>
   <button class="tab" data-testid="system-tab-msg-templates" onclick="switchTab('msgTemplates',this)">💬 Tin nhắn tự động</button>
   <button class="tab" data-testid="system-tab-logs" onclick="switchTab('adminLogs',this)">📋 Nhật ký vận hành</button>
+  <button class="tab" data-testid="system-tab-permissions" onclick="switchTab('permissions',this)">🔐 Phân quyền</button>
   <button class="tab" data-testid="system-tab-appearance" onclick="switchTab('appearance',this)">🎨 Giao diện</button>
 </div>
 
@@ -583,7 +613,6 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <select id="tRole">
         <option value="teacher">Giáo viên</option>
         <option value="assistant">Trợ giảng/Tư vấn viên</option>
-        <option value="accountant">Kế toán</option>
       </select>
     </div>
     <div id="tAddSection">
@@ -1066,6 +1095,23 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
   </div>
 </div>
 
+<div id="permissions" class="panel">
+  <div class="permission-shell">
+    <aside class="permission-staff">
+      <div class="permission-staff-head">
+        <strong>Nhân viên</strong>
+        <input id="permissionStaffSearch" type="search" placeholder="Tìm tên hoặc email..." oninput="renderPermissionStaffList()">
+      </div>
+      <div id="permissionStaffList" class="permission-staff-list">
+        <div class="permission-empty">Đang tải danh sách...</div>
+      </div>
+    </aside>
+    <section id="permissionEditor" class="permission-editor">
+      <div class="permission-empty">Chọn một nhân viên để xem và thay đổi quyền.</div>
+    </section>
+  </div>
+</div>
+
 <!-- Modal sửa học sinh -->
 <div class="modal-s" id="sModal">
   <div class="modal-s-box">
@@ -1136,6 +1182,162 @@ function switchTab(id, btn){
   if(id === 'evaluationTemplates') loadEvaluationTemplatesAdmin();
   if(id === 'topics') loadTopics();
   if(id === 'msgTemplates') loadMessageTemplatesAdmin();
+  if(id === 'permissions') loadPermissionManagement();
+}
+
+let _permissionData = null;
+let _permissionSelectedUserId = null;
+
+function permissionRoleLabel(role){
+  return ({
+    admin:'Quản trị viên',
+    teacher:'Giáo viên',
+    assistant:'Trợ giảng/Tư vấn viên',
+    marketing:'Marketing (vai trò cũ)',
+    accountant:'Kế toán (vai trò cũ)'
+  })[role] || role || 'Chưa xác định';
+}
+
+async function loadPermissionManagement(force = false){
+  const list = document.getElementById('permissionStaffList');
+  const editor = document.getElementById('permissionEditor');
+  if(!list || !editor) return;
+  if(_permissionData && !force){
+    renderPermissionStaffList();
+    renderPermissionEditor();
+    return;
+  }
+  list.innerHTML = '<div class="permission-empty">Đang tải danh sách...</div>';
+  editor.innerHTML = '<div class="permission-empty">Đang tải cấu hình quyền...</div>';
+  const { data, error } = await sb.rpc('admin_get_permission_management');
+  if(error){
+    const missingMigration = /admin_get_permission_management|schema cache|does not exist|not found/i.test(error.message || '');
+    const message = missingMigration
+      ? 'Chưa cài migration phân quyền trên Supabase. Hãy chạy file SQL staff granular permissions.sql.'
+      : `Không tải được phân quyền: ${error.message}`;
+    list.innerHTML = '<div class="permission-empty">Chưa có dữ liệu</div>';
+    editor.innerHTML = `<div class="permission-empty">${esc(message)}</div>`;
+    return;
+  }
+  _permissionData = data || { catalog:[], role_defaults:{}, users:[] };
+  if(!_permissionSelectedUserId || !(_permissionData.users || []).some(user => user.id === _permissionSelectedUserId)){
+    _permissionSelectedUserId = (_permissionData.users || []).find(user => user.role !== 'admin')?.id
+      || (_permissionData.users || [])[0]?.id
+      || null;
+  }
+  renderPermissionStaffList();
+  renderPermissionEditor();
+}
+
+function renderPermissionStaffList(){
+  const list = document.getElementById('permissionStaffList');
+  if(!list || !_permissionData) return;
+  const query = String(document.getElementById('permissionStaffSearch')?.value || '').trim().toLowerCase();
+  const users = (_permissionData.users || []).filter(user =>
+    !query || `${user.full_name || ''} ${user.email || ''} ${permissionRoleLabel(user.role)}`.toLowerCase().includes(query)
+  );
+  if(!users.length){
+    list.innerHTML = '<div class="permission-empty">Không tìm thấy nhân viên.</div>';
+    return;
+  }
+  list.innerHTML = users.map(user => `
+    <button class="permission-person ${user.id === _permissionSelectedUserId ? 'active' : ''}" type="button" onclick="selectPermissionUser('${escAttr(user.id)}')">
+      <strong>${esc(user.full_name || user.email || 'Chưa có tên')}</strong>
+      <span>${esc(permissionRoleLabel(user.role))} · ${esc(user.email || 'Chưa có email')}</span>
+    </button>
+  `).join('');
+}
+
+function selectPermissionUser(userId){
+  _permissionSelectedUserId = userId;
+  renderPermissionStaffList();
+  renderPermissionEditor();
+}
+
+function renderPermissionEditor(){
+  const editor = document.getElementById('permissionEditor');
+  if(!editor || !_permissionData) return;
+  const user = (_permissionData.users || []).find(item => item.id === _permissionSelectedUserId);
+  if(!user){
+    editor.innerHTML = '<div class="permission-empty">Chọn một nhân viên để xem và thay đổi quyền.</div>';
+    return;
+  }
+  const defaults = _permissionData.role_defaults?.[user.role] || {};
+  const overrides = user.overrides || {};
+  const groups = new Map();
+  (_permissionData.catalog || []).forEach(permission => {
+    if(!groups.has(permission.section)) groups.set(permission.section, []);
+    groups.get(permission.section).push(permission);
+  });
+  const isAdmin = user.role === 'admin';
+  const groupHtml = [...groups.entries()].map(([section, permissions]) => `
+    <div class="permission-group">
+      <h4>${esc(section)}</h4>
+      ${permissions.map(permission => {
+        const hasOverride = Object.prototype.hasOwnProperty.call(overrides, permission.permission_key);
+        const overrideValue = hasOverride ? String(overrides[permission.permission_key]) : 'default';
+        const defaultAllowed = defaults[permission.permission_key] === true || isAdmin;
+        const selectClass = overrideValue === 'true' ? 'override-allow' : overrideValue === 'false' ? 'override-deny' : '';
+        return `
+          <div class="permission-row">
+            <div>
+              <div class="permission-row-title">${esc(permission.label)}</div>
+              <div class="permission-row-copy">${esc(permission.description || permission.permission_key)}</div>
+            </div>
+            <select class="permission-select ${selectClass}" data-previous-value="${overrideValue}" ${isAdmin ? 'disabled' : ''}
+              onchange="setStaffPermission('${escAttr(user.id)}','${escAttr(permission.permission_key)}',this)">
+              <option value="default" ${overrideValue === 'default' ? 'selected' : ''}>Theo chức vụ (${defaultAllowed ? 'Cho phép' : 'Không cho phép'})</option>
+              <option value="true" ${overrideValue === 'true' ? 'selected' : ''}>Cho phép riêng</option>
+              <option value="false" ${overrideValue === 'false' ? 'selected' : ''}>Không cho phép riêng</option>
+            </select>
+          </div>`;
+      }).join('')}
+    </div>
+  `).join('');
+  editor.innerHTML = `
+    <div class="permission-editor-head">
+      <h3>${esc(user.full_name || user.email || 'Nhân viên')}</h3>
+      <div class="permission-note">
+        ${esc(permissionRoleLabel(user.role))} · ${esc(user.email || 'Chưa có email')}<br>
+        ${isAdmin
+          ? 'Quản trị viên luôn có toàn quyền và không thể bị thu hồi quyền tại đây.'
+          : '“Theo chức vụ” dùng cấu hình mặc định. Lựa chọn riêng sẽ được ưu tiên hơn chức vụ.'}
+      </div>
+    </div>
+    ${groupHtml || '<div class="permission-empty">Chưa có danh mục quyền.</div>'}
+  `;
+}
+
+async function setStaffPermission(userId, permissionKey, select){
+  const previous = select.dataset.previousValue || 'default';
+  const value = select.value;
+  select.disabled = true;
+  const allowed = value === 'default' ? null : value === 'true';
+  const { error } = await sb.rpc('admin_set_user_permission', {
+    p_user_id: userId,
+    p_permission_key: permissionKey,
+    p_allowed: allowed
+  });
+  select.disabled = false;
+  if(error){
+    select.value = previous;
+    toast('❌ Không lưu được quyền: ' + error.message, 3500);
+    return;
+  }
+  const user = (_permissionData?.users || []).find(item => item.id === userId);
+  if(user){
+    user.overrides = user.overrides || {};
+    if(allowed === null) delete user.overrides[permissionKey];
+    else user.overrides[permissionKey] = allowed;
+  }
+  await window.AppAdminTools?.recordAudit?.('staff_permission_updated', {
+    target_type:'staff_permission',
+    target_id:userId,
+    permission_key:permissionKey,
+    allowed
+  });
+  toast('✅ Đã cập nhật quyền');
+  renderPermissionEditor();
 }
 
 const SYSTEM_THEMES = [
@@ -1567,7 +1769,7 @@ function tPhone(p){ navigator.clipboard.writeText(p).then(()=>toast('📋 Đã s
 
 async function loadTeachers(){
   const [{ data: teachers }, { data: ct }, { data: cls }] = await Promise.all([
-    sb.from('users').select('id,full_name,email,phone,birth_year,subject,avatar_url,role,account_password').in('role',['teacher','assistant','accountant']).order('full_name'),
+    sb.from('users').select('id,full_name,email,phone,birth_year,subject,avatar_url,role,account_password').in('role',['teacher','assistant']).order('full_name'),
     sb.from('class_teachers').select('teacher_id,class_id'),
     sb.from('classes').select('id,class_name').eq('hidden',false),
   ]);
@@ -1614,7 +1816,7 @@ function renderTeacherGrid(){
     return `<div class="tc-card">
       <div class="tc-top">${av}<div class="tc-hd-info"><div class="tc-name">${esc(t.full_name||'—')}</div><div class="tc-email">${esc(t.email||'')}</div></div></div>
       <div class="tc-body">
-        <div class="tc-row">👤 <span class="tc-subject">${t.role === 'assistant' ? 'Trợ giảng/Tư vấn viên' : t.role === 'accountant' ? 'Kế toán' : 'Giáo viên'}</span></div>
+        <div class="tc-row">👤 <span class="tc-subject">${t.role === 'assistant' ? 'Trợ giảng/Tư vấn viên' : 'Giáo viên'}</span></div>
         <div class="tc-row">📚 ${t.subject ? `<span class="tc-subject">${esc(t.subject)}</span>` : '<span style="color:var(--ink-light)">Chưa có môn</span>'}</div>
         <div class="tc-row">📞 ${t.phone ? `<button style="background:none;border:none;color:var(--blue);font-size:.8rem;cursor:pointer;padding:0;font-family:var(--font-body);font-weight:500" onclick="tPhone('${t.phone}')">📞 ${esc(t.phone)}</button>` : '<span style="color:var(--ink-light)">Chưa có SĐT</span>'}</div>
         <div class="tc-row">🎂 <span style="font-weight:500;color:var(--ink)">${t.birth_year||'—'}</span></div>
@@ -1723,7 +1925,7 @@ async function updateManagedCredentials(userId, email, password){
 async function submitTeacher(){
   const subject    = document.getElementById('tSubject').value;
   const selectedRole = document.getElementById('tRole').value;
-  const staffRole  = ['teacher','assistant','accountant'].includes(selectedRole) ? selectedRole : 'teacher';
+  const staffRole  = ['teacher','assistant'].includes(selectedRole) ? selectedRole : 'teacher';
   const birth_year = parseInt(document.getElementById('tBirth').value)||null;
   const phone      = document.getElementById('tPhone').value.trim()||null;
   if(_tEditId){
@@ -1753,7 +1955,7 @@ async function submitTeacher(){
     const {data:u, error:ue} = await sb.from('users').select('*').eq('email',email).maybeSingle();
     if(ue){ alert(ue.message); return; }
     if(!u){ alert('Không tìm thấy tài khoản'); return; }
-    if(['teacher','assistant','accountant'].includes(u.role)){ alert('Tài khoản này đã là nhân sự của hệ thống'); return; }
+    if(['teacher','assistant','accountant','marketing'].includes(u.role)){ alert('Tài khoản này đã là nhân sự của hệ thống'); return; }
     if(u.role==='admin')  { alert('Không thể chuyển tài khoản admin'); return; }
     const outcome = await window.AppAdminTools?.runAdminAction?.({
       action: 'teacher_created',
@@ -1770,7 +1972,7 @@ async function submitTeacher(){
       operation: async () => sb.from('users').update({role:staffRole,subject,birth_year,phone}).eq('id',u.id),
     });
     if(outcome && !outcome.ok) return;
-    toast(staffRole === 'assistant' ? '✅ Đã thêm trợ giảng/tư vấn viên mới' : staffRole === 'accountant' ? '✅ Đã thêm kế toán mới' : '✅ Đã thêm giáo viên mới');
+    toast(staffRole === 'assistant' ? '✅ Đã thêm trợ giảng/tư vấn viên mới' : '✅ Đã thêm giáo viên mới');
   }
   closeTModal(); loadTeachers();
 }

@@ -284,6 +284,141 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
     };
   })();
 
+  window.AppPermissions = (function () {
+    const fallbackByRole = {
+      admin: ["*"],
+      teacher: [
+        "page.home", "page.courses", "page.classes", "page.tasks", "page.teacher_schedule",
+        "page.public_exam", "page.game", "page.income", "page.resources", "page.question_bank",
+        "page.exam_editor", "page.trial_requests", "page.facebook", "class.sessions.manage",
+        "class.attendance", "tasks.manage", "question.manage", "exam.manage", "trial.manage",
+        "income.manage", "facebook.manage"
+      ],
+      assistant: [
+        "page.home", "page.courses", "page.classes", "page.tasks", "page.teacher_schedule",
+        "page.resources", "page.question_bank", "page.exam_editor", "page.trial_requests",
+        "page.facebook", "class.sessions.manage", "class.attendance", "tasks.manage",
+        "question.manage", "exam.manage", "trial.manage", "facebook.manage"
+      ],
+      student: [
+        "page.home", "page.courses", "page.classes", "page.personal_schedule", "page.public_exam",
+        "page.game", "page.tuition", "page.resources"
+      ],
+      parent: [
+        "page.home", "page.courses", "page.classes", "page.teacher_schedule",
+        "page.personal_schedule", "page.public_exam", "page.tuition", "page.resources"
+      ]
+    };
+    let permissions = {};
+    let activeRole = "";
+    let loaded = false;
+    let remoteAvailable = false;
+    let loadPromise = null;
+
+    function fallbackPermissions(role) {
+      const values = fallbackByRole[String(role || "")] || [];
+      if (values.includes("*")) return { "*": true };
+      return Object.fromEntries(values.map((key) => [key, true]));
+    }
+
+    async function load(profile = null, options = {}) {
+      activeRole = String(profile?.role || activeRole || "");
+      if (loaded && !options.force) return permissions;
+      if (loadPromise && !options.force) return loadPromise;
+      loadPromise = (async () => {
+        permissions = fallbackPermissions(activeRole);
+        remoteAvailable = false;
+        try {
+          const { data, error } = await sb.rpc("get_my_permissions");
+          if (error) throw error;
+          if (data && typeof data === "object" && !Array.isArray(data)) {
+            permissions = { ...permissions, ...data };
+            remoteAvailable = true;
+          }
+        } catch (error) {
+          const message = String(error?.message || "");
+          if (!/get_my_permissions|schema cache|does not exist|not found/i.test(message)) {
+            console.warn("[Permissions] Không tải được quyền từ máy chủ:", error);
+          }
+        }
+        loaded = true;
+        loadPromise = null;
+        return permissions;
+      })();
+      return loadPromise;
+    }
+
+    function has(permissionKey, fallback = false) {
+      if (!permissionKey) return true;
+      if (permissions["*"] === true) return true;
+      if (Object.prototype.hasOwnProperty.call(permissions, permissionKey)) {
+        return permissions[permissionKey] === true;
+      }
+      return fallback;
+    }
+
+    function getAll() {
+      return { ...permissions };
+    }
+
+    function applyToDom(root = document) {
+      if (root?.matches?.("[data-permission]")) {
+        const allowed = has(root.dataset.permission, false);
+        root.hidden = !allowed;
+        root.setAttribute("aria-hidden", String(!allowed));
+      }
+      root.querySelectorAll?.("[data-permission]").forEach((element) => {
+        const allowed = has(element.dataset.permission, false);
+        element.hidden = !allowed;
+        element.setAttribute("aria-hidden", String(!allowed));
+      });
+    }
+
+    async function refresh(profile = null) {
+      loaded = false;
+      loadPromise = null;
+      return load(profile, { force: true });
+    }
+
+    async function bootstrap() {
+      try {
+        const authUser = await window.AppAuth?.getUser?.();
+        if (!authUser?.id) return;
+        const { data: profile } = await sb
+          .from("users")
+          .select("id,role")
+          .eq("id", authUser.id)
+          .maybeSingle();
+        if (!profile) return;
+        await load(profile);
+        applyToDom(document);
+        const observer = new MutationObserver((mutations) => {
+          mutations.forEach((mutation) => mutation.addedNodes.forEach((node) => {
+            if (node?.nodeType === 1) applyToDom(node);
+          }));
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        window.dispatchEvent(new CustomEvent("mindup:permissions-ready", { detail: getAll() }));
+      } catch (error) {
+        console.warn("[Permissions] Không thể khởi tạo quyền giao diện:", error);
+      }
+    }
+
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bootstrap, { once: true });
+    else setTimeout(bootstrap, 0);
+
+    return {
+      load,
+      refresh,
+      has,
+      applyToDom,
+      isLoaded: () => loaded,
+      isRemoteAvailable: () => remoteAvailable,
+      getAll,
+      getRole: () => activeRole,
+    };
+  })();
+
   window.QuestionAnswerFormat = (function () {
     function getTrueFalseCount(answer, fallback = 4) {
       const direct = String(answer || "").trim();
