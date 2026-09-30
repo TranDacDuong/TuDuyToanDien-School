@@ -41,7 +41,7 @@
           <span class="class-quick-icon">☷</span><strong>Quản lý lớp học</strong><span>Mở giao diện đầy đủ như hiện tại.</span>
         </button>
       </div>`;
-    body.querySelector('[data-quick-action="create"]')?.addEventListener("click", renderCreateLauncher);
+    body.querySelector('[data-quick-action="create"]')?.addEventListener("click", () => renderClassPicker("create"));
     body.querySelector('[data-quick-action="attendance"]')?.addEventListener("click", () => renderClassPicker("attendance"));
     body.querySelector('[data-quick-action="manage"]')?.addEventListener("click", close);
   }
@@ -77,39 +77,6 @@
     list.querySelectorAll("[data-class-id]").forEach(button => {
       button.addEventListener("click", () => selectClass(button.dataset.classId));
     });
-  }
-
-  function renderCreateLauncher(){
-    currentAction = "create";
-    const rows = classes();
-    setHeader("Tạo buổi học", "Chọn lớp học để tải đúng lịch và nội dung buổi.");
-    if(!rows.length){
-      body.innerHTML = '<button class="class-quick-back" type="button" id="classQuickBack">← Chọn chức năng khác</button><div class="class-quick-empty" style="margin-top:12px">Không có lớp học phù hợp để tạo buổi.</div>';
-      document.getElementById("classQuickBack")?.addEventListener("click", renderHome);
-      return;
-    }
-    body.innerHTML = `
-      <button class="class-quick-back" type="button" id="classQuickBack">← Chọn chức năng khác</button>
-      <div style="margin-top:14px">
-        <label for="classQuickCreateClass">Lớp học</label>
-        <select id="classQuickCreateClass" style="width:100%">
-          <option value="">Chọn lớp để tạo buổi học</option>
-          ${rows.map(row => `<option value="${esc(row.id)}">${esc(row.class_name)}${row.is_today ? " · Có lịch hôm nay" : ""}</option>`).join("")}
-        </select>
-        <div class="class-quick-empty" style="margin-top:12px;text-align:left">Sau khi chọn lớp, hệ thống sẽ mở ngay form Tạo buổi học và tự chọn ngày hôm nay nếu lớp có lịch.</div>
-      </div>`;
-    document.getElementById("classQuickBack")?.addEventListener("click", renderHome);
-    const select = document.getElementById("classQuickCreateClass");
-    select?.addEventListener("change", async event => {
-      const row = rows.find(item => String(item.id) === String(event.target.value));
-      if(row) await openSessionForm(row,false);
-    });
-    if(rows.length === 1){
-      select.value = String(rows[0].id);
-      setTimeout(() => openSessionForm(rows[0],false), 80);
-    } else {
-      setTimeout(() => select?.focus(), 50);
-    }
   }
 
   function renderClassPicker(action){

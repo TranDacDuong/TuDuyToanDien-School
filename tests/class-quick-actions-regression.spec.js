@@ -67,7 +67,7 @@ test.describe("Class quick actions regression", () => {
     await expect.poll(() => page.evaluate(() => window.__calls)).toEqual(["open:today-class","tab:attendance"]);
   });
 
-  test("create action opens the create interface with class as its first field", async ({ page }) => {
+  test("create action uses the visual class picker and opens the session form", async ({ page }) => {
     await page.setContent(`
       <style>.hidden{display:none}.popup-overlay{display:block}</style>
       <div id="classQuickOverlay" class="hidden popup-overlay">
@@ -89,9 +89,9 @@ test.describe("Class quick actions regression", () => {
     await page.getByRole("button", {name:/Tạo buổi học/}).click();
 
     await expect(page.getByRole("heading", {name:"Tạo buổi học"})).toBeVisible();
-    await expect(page.getByLabel("Lớp học")).toBeVisible();
-    await expect(page.getByLabel("Lớp học").locator("option")).toHaveCount(3);
-    await page.getByLabel("Lớp học").selectOption("class-a");
+    await expect(page.getByPlaceholder("Tìm tên lớp, môn hoặc khối...")).toBeVisible();
+    await expect(page.locator(".class-quick-class")).toHaveCount(2);
+    await page.locator('[data-class-id="class-a"]').click();
     await expect.poll(() => page.evaluate(() => window.__calls)).toEqual([
       "open:class-a:inPlace=true",
       "tab:exams",
