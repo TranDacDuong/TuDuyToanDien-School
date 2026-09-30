@@ -1,8 +1,7 @@
 (function () {
   const STORAGE_ENABLED = "mindup_effects_enabled";
   const STORAGE_THEME = "mindup_system_theme";
-  // Keep the first-load experience aligned with the MindUp navy brand.
-  const DEFAULT_THEME = "mindup";
+  const DEFAULT_THEME = "spring";
   const SEASON_THEMES = new Set(["spring", "summer", "autumn", "winter", "mindup"]);
   const storedTheme = localStorage.getItem(STORAGE_THEME);
   document.documentElement.dataset.mindupTheme = SEASON_THEMES.has(storedTheme) ? storedTheme : DEFAULT_THEME;
