@@ -32,6 +32,12 @@ test.describe("Facebook-like post composer", () => {
     expect(columns).toBe(2);
     const overflow = await page.locator(".facebook-composer-card").evaluate(element => element.scrollWidth - element.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
+    await expect(page.locator("#quizImagePreview")).not.toHaveClass(/show/);
+    const previewPlacement = await page.evaluate(() => ({
+      afterCaption: Boolean(document.getElementById("postContent").compareDocumentPosition(document.getElementById("quizImagePreview")) & Node.DOCUMENT_POSITION_FOLLOWING),
+      outsideBuilder: !document.getElementById("quizBuilder").contains(document.getElementById("quizImagePreview")),
+    }));
+    expect(previewPlacement).toEqual({ afterCaption:true, outsideBuilder:true });
     if(process.env.CAPTURE_COMPOSER) await page.screenshot({ path:testInfo.outputPath("composer-desktop.png"), fullPage:true });
   });
 

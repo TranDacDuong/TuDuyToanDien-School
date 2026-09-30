@@ -106,6 +106,8 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 .fb-content-field .textarea{border:0;border-radius:0;box-shadow:none!important;padding:8px 0 12px;min-height:230px;max-height:48vh;font-size:1.12rem;line-height:1.55;resize:vertical;color:#050505}
 .fb-content-field .textarea::placeholder{color:#65676b}
 .fb-content-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;color:#65676b;font-size:.75rem;margin-bottom:10px}
+.quiz-preview.fb-post-generated-image{display:none;width:100%;max-width:100%;max-height:520px;object-fit:contain;margin:0 0 10px;border:1px solid #ced0d4;border-radius:8px;background:#f7f8fa}
+.fb-post-generated-image.show{display:block}
 .fb-media-dropzone{border:1px solid #ced0d4;background:#fff;border-radius:8px;padding:8px;color:#050505}
 .fb-media-dropzone .fb-media-inner{min-height:126px;border-radius:6px;background:#f7f8fa;display:grid;place-items:center;text-align:center;padding:18px;cursor:pointer}
 .fb-media-dropzone .fb-media-icon{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:#e4e6eb;color:#050505;font-size:1.2rem;margin:0 auto 8px}
@@ -358,6 +360,8 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
               <textarea class="textarea" id="postContent" maxlength="6000" placeholder="Bạn đang nghĩ gì?"></textarea>
             </div>
             <div class="fb-content-meta"><span>Nội dung sẽ hiển thị như trên Facebook</span><span><span id="postCharCount">0</span>/6000</span></div>
+            <img id="quizImagePreview" class="quiz-preview fb-post-generated-image" alt="Xem trước ảnh Quiz trong bài đăng">
+            <img id="hardQuizImagePreview" class="quiz-preview fb-post-generated-image" alt="Xem trước ảnh Hỏi nhanh đớp trọn trong bài đăng">
             <input id="postLinkUrl" type="hidden">
             <input id="postImageUrl" type="hidden">
             <div class="dropzone fb-media-dropzone" id="imageDropzone" tabindex="0">
@@ -436,7 +440,6 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
           <div class="toolbar-left">
             <button class="btn btn-gold" type="button" id="generateQuizImageBtn">Tạo/xem ảnh Quiz</button>
           </div>
-          <img id="quizImagePreview" class="quiz-preview" alt="Xem trước ảnh Quiz">
         </div>
       </div>
       <div class="workflow-box" id="hardQuizBuilder">
@@ -455,7 +458,6 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
           <div class="toolbar-left">
             <button class="btn btn-gold" type="button" id="generateHardQuizPostBtn">T&#7841;o/xem &#7843;nh + caption</button>
           </div>
-          <img id="hardQuizImagePreview" class="quiz-preview" alt="Xem tr&#432;&#7899;c &#7843;nh H&#7887;i nhanh &#273;&#7899;p tr&#7885;n">
         </div>
       </div>
       <div id="mondayAnnouncementBuilder" style="display:none">
@@ -2521,6 +2523,8 @@ function handlePostImagePaste(ev){
 function updateImagePreview(){
   const url = $("postImageUrl").value.trim();
   const img = $("imagePreview");
+  const quizPreview = $("quizImagePreview");
+  const hardQuizPreview = $("hardQuizImagePreview");
   const postTypeId = $("postType")?.value || "";
   const previewKey = `image-preview:${$("postId")?.value || url || "empty"}`;
   const releasePreviewObjectUrl = () => {
@@ -2531,8 +2535,15 @@ function updateImagePreview(){
     }
   };
   const isEnrollment = isEnrollmentType(postTypeId);
+  const generatedPreview = isQuizType(postTypeId) ? quizPreview : (isHardQuizType(postTypeId) ? hardQuizPreview : null);
   const enrollmentBox = $("enrollmentImagesPreviewBox");
   const gallery = $("enrollmentImagesGallery");
+
+  [quizPreview, hardQuizPreview].forEach(preview => {
+    if (!preview || preview === generatedPreview) return;
+    preview.src = "";
+    preview.classList.remove("show");
+  });
 
   if (isEnrollment) {
     const urls = getEnrollmentImageUrls(S.activePageId);
@@ -2557,7 +2568,20 @@ function updateImagePreview(){
     if ($("imageDropzone")) $("imageDropzone").style.display = "";
   }
 
-  if (isQuizType(postTypeId) || isHardQuizType(postTypeId) || $("imageDropzone")?.classList.contains("hidden")) {
+  if (generatedPreview) {
+    releasePreviewObjectUrl();
+    img.src = "";
+    img.classList.remove("show");
+    $("imageDropzone").classList.remove("has-image");
+    generatedPreview.onload = () => generatedPreview.classList.add("show");
+    generatedPreview.onerror = () => generatedPreview.classList.remove("show");
+    generatedPreview.src = "";
+    if (url) requestAnimationFrame(() => { generatedPreview.src = url; });
+    else generatedPreview.classList.remove("show");
+    return;
+  }
+
+  if ($("imageDropzone")?.classList.contains("hidden")) {
     releasePreviewObjectUrl();
     img.src = "";
     img.classList.remove("show");
@@ -4846,7 +4870,7 @@ function bindEvents(){
   }
   $("approvePostBtn")?.addEventListener("click", approveCurrentPost);
   $("postContent").addEventListener("input", () => $("postCharCount").textContent = String($("postContent").value.length));
-  $("postType").addEventListener("change", toggleQuizBuilder);
+  $("postType").addEventListener("change", () => { toggleQuizBuilder(); updateImagePreview(); });
   $("postContent").addEventListener("paste", handlePostImagePaste);
   $("postImageUrl").addEventListener("input", updateImagePreview);
   $("postImageFile").addEventListener("change", ev => uploadFile(ev.target.files?.[0]).catch(e => showPostStatus("err", e.message || String(e))));
