@@ -10,13 +10,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="supabaseClient.js"></script>
-<script src="image_upload.js"></script>
-<script src="assets/enrollment/enrollment_images.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+<script src="supabaseClient.js" defer></script>
+<script src="image_upload.js" defer></script>
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gradient(circle at top left,rgba(200,150,42,.12),transparent 24%),linear-gradient(180deg,#f4efe4 0%,#f8f5ef 30%,#f7faff 100%);color:var(--ink,#17233d)}
@@ -546,6 +542,7 @@ const DEFAULT_PAGES = [
   { page_id: "480597338474296", page_name: "MindUp - Tư duy Hóa Học", page_url: "https://www.facebook.com/480597338474296" },
   { page_id: "1163066643562080", page_name: "MindUp - Tư Duy Sinh Học", page_url: "https://www.facebook.com/1163066643562080" },
 ];
+const MAIN_FACEBOOK_PAGE_ID = DEFAULT_PAGES[0].page_id;
 const DEFAULT_TYPES = [
   "Learning Method", "Monday Mindset", "Interesting Question", "Real-world Phenomenon", "Hard Quiz with Prize", "Q&A", "Meme",
   "Teaching Philosophy", "Applying Knowledge to Practice", "Enrollment", "Quiz", "Bài hay", "Lỗi sai thường gặp"
@@ -704,6 +701,10 @@ let quizPreviewTimer = 0;
 let quizImageDirty = false;
 let TTS_VOICES = [];
 let TTS_VOICES_LOADING = false;
+let initialPageSelected = false;
+let defaultRowsChecked = false;
+let backgroundMaintenanceRun = 0;
+const LAZY_ASSET_PROMISES = new Map();
 const DEFAULT_ELEVENLABS_VOICE_ID = "pNInz6obpgDQGcFmaJgB";
 
 function $(id){ return document.getElementById(id); }
@@ -739,6 +740,47 @@ function weekDates(){ return Array.from({length:7},(_,i)=>addDays(S.weekStart,i)
 function formatDate(d){ return d.toLocaleDateString("vi-VN", { day:"2-digit", month:"2-digit" }); }
 function formatDateTime(d){ return d ? d.toLocaleString("vi-VN", { dateStyle:"short", timeStyle:"short" }) : ""; }
 function currentPage(){ return S.pages.find(p => p.page_id === S.activePageId) || S.pages[0] || DEFAULT_PAGES[0]; }
+function preferredPageId(pages, profile){
+  const assigned = (pages || []).find(page => String(page.assigned_staff_id || "") === String(profile?.id || ""));
+  if (assigned?.page_id) return assigned.page_id;
+  return (pages || []).find(page => String(page.page_id || "") === MAIN_FACEBOOK_PAGE_ID)?.page_id
+    || pages?.[0]?.page_id
+    || MAIN_FACEBOOK_PAGE_ID;
+}
+function loadScriptOnce(src){
+  if (LAZY_ASSET_PROMISES.has(src)) return LAZY_ASSET_PROMISES.get(src);
+  const promise = new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[data-lazy-src="${src}"]`);
+    if (existing?.dataset.loaded === "true") return resolve();
+    const script = existing || document.createElement("script");
+    script.dataset.lazySrc = src;
+    script.src = src;
+    script.onload = () => { script.dataset.loaded = "true"; resolve(); };
+    script.onerror = () => reject(new Error(`Không tải được tài nguyên ${src}`));
+    if (!existing) document.head.appendChild(script);
+  });
+  LAZY_ASSET_PROMISES.set(src, promise);
+  return promise;
+}
+function loadStyleOnce(href){
+  if (document.querySelector(`link[data-lazy-href="${href}"]`)) return;
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = href;
+  link.dataset.lazyHref = href;
+  document.head.appendChild(link);
+}
+async function ensureQuizRenderingDependencies(){
+  loadStyleOnce("https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css");
+  await Promise.all([
+    window.katex ? Promise.resolve() : loadScriptOnce("https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"),
+    window.html2canvas ? Promise.resolve() : loadScriptOnce("https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"),
+  ]);
+}
+async function ensureEnrollmentAssetsLoaded(){
+  if (window.ENROLLMENT_BASE64_IMAGES) return;
+  await loadScriptOnce("assets/enrollment/enrollment_images.js");
+}
 function typeById(id){ return S.types.find(t => t.id === id); }
 function typeName(id){ return typeById(id)?.name || "Chưa chọn loại"; }
 function statusLabel(status){
@@ -847,9 +889,8 @@ async function ensureDefaultRows(){
 }
 
 async function loadData(){
-  await ensureDefaultRows();
   const weekStart = dateKey(S.weekStart);
-  const weekEnd = dateKey(addDays(S.weekStart, 13));
+  const weekEnd = dateKey(addDays(S.weekStart, 6));
   const [pagesRes, typesRes, staffRes, templatesRes, postsRes] = await Promise.all([
     sb.from("facebook_pages").select("id,page_id,page_name,page_url,display_order,is_active,assigned_staff_id,target_posts_per_week,created_at,updated_at").eq("is_active", true).order("display_order"),
     sb.from("facebook_post_types").select("*").eq("is_active", true).order("name"),
@@ -862,15 +903,45 @@ async function loadData(){
   if (staffRes.error) throw staffRes.error;
   if (templatesRes.error) throw templatesRes.error;
   if (postsRes.error) throw postsRes.error;
+  if (!defaultRowsChecked && S.profile?.role === "admin" && (!pagesRes.data?.length || !typesRes.data?.length)) {
+    defaultRowsChecked = true;
+    await ensureDefaultRows();
+    return loadData();
+  }
   S.pages = pagesRes.data?.length ? pagesRes.data : DEFAULT_PAGES.map((p,i)=>({ ...p, display_order:i+1, is_active:true }));
   S.types = typesRes.data || [];
   S.staff = (staffRes.data || []).filter(user => ALLOWED_ROLES.has(String(user.role || "")));
   S.templates = templatesRes.data || [];
   S.posts = postsRes.data || [];
-  if (!S.activePageId || !S.pages.some(p => p.page_id === S.activePageId)) S.activePageId = S.pages[0]?.page_id || DEFAULT_PAGES[0].page_id;
-  try { await sb.rpc("sync_facebook_fanpage_weekly_tasks"); } catch (_) {}
-  await ensureCurrentWeekPosts();
+  if (!initialPageSelected) {
+    S.activePageId = preferredPageId(S.pages, S.profile);
+    initialPageSelected = true;
+  } else if (!S.activePageId || !S.pages.some(p => p.page_id === S.activePageId)) {
+    S.activePageId = preferredPageId(S.pages, S.profile);
+  }
   renderAll();
+  window.setTimeout(() => runBackgroundMaintenance(), 0);
+}
+
+async function runBackgroundMaintenance(){
+  const runId = ++backgroundMaintenanceRun;
+  const pageId = S.activePageId;
+  const weekStartDate = new Date(S.weekStart);
+  const weekStart = dateKey(weekStartDate);
+  const weekEnd = dateKey(addDays(weekStartDate, 6));
+  const results = await Promise.allSettled([
+    sb.rpc("sync_facebook_fanpage_weekly_tasks"),
+    materializeMarketingTasks(weekStart, weekEnd),
+    syncMarketingTaskCompletion(weekStart, weekEnd),
+    syncFacebookScheduledStatus(pageId, weekStartDate),
+  ]);
+  results.forEach(result => {
+    if (result.status === "rejected") console.warn("[FacebookPosting] Đồng bộ nền không hoàn tất:", result.reason);
+  });
+  if (runId === backgroundMaintenanceRun && pageId === S.activePageId) {
+    renderWeeklyCalendar();
+    renderTodo();
+  }
 }
 
 function renderAll(){
@@ -972,14 +1043,10 @@ async function saveFanpageAssignment(pageTableId){
 
 function renderTabs(){
   $("pageTabs").innerHTML = S.pages.map(p => `<button type="button" class="tab ${p.page_id===S.activePageId?"active":""}" data-page-id="${esc(p.page_id)}">${esc(p.page_name)}</button>`).join("");
-  $("pageTabs").querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", async () => {
+  $("pageTabs").querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", () => {
     S.activePageId = btn.dataset.pageId;
-    try {
-      await ensureCurrentWeekPosts();
-      renderAll();
-    } catch (error) {
-      showStatus("err", error.message || String(error));
-    }
+    renderAll();
+    window.setTimeout(() => runBackgroundMaintenance(), 0);
   }));
   const page = currentPage();
   $("activePageTitle").textContent = `Lịch đăng bài: ${page.page_name}`;
@@ -1075,7 +1142,7 @@ const ENROLLMENT_ASSET_IMAGES = {
 function getEnrollmentImageUrls(pageNameOrId = ""){
   const page = S.pages.find(p => p.page_id === pageNameOrId) || currentPage();
   const name = normalizeText(page?.page_name || "");
-  const imgs = typeof ENROLLMENT_BASE64_IMAGES !== "undefined" ? ENROLLMENT_BASE64_IMAGES : {};
+  const imgs = window.ENROLLMENT_BASE64_IMAGES || {};
 
   // Page chính: MindUp - Tư Duy Toàn Diện (Đăng cả 4 ảnh: Poster + 3 Lịch học Toán, Lý, Hóa)
   if (name.includes("toan dien") || name.includes("main") || !name || (name.includes("mindup") && !name.includes("toan") && !name.includes("vat ly") && !name.includes("ly") && !name.includes("hoa") && !name.includes("sinh"))) {
@@ -1563,6 +1630,7 @@ async function drawQuizQuestion(ctx, question, canvasWidth, canvasHeight){
   }
 }
 async function buildQuizImageDataUrl(){
+  await ensureQuizRenderingDependencies();
   await ensureQuizFontLoaded();
   const { question, answers } = getQuizData();
   const count = answers.length;
@@ -1813,6 +1881,7 @@ function validateHardQuizQuestionFits(ctx, question, box){
   }
 }
 async function buildHardQuizImageDataUrl(){
+  await ensureQuizRenderingDependencies();
   await ensureQuizFontLoaded();
   const { question } = getHardQuizData();
   const img = await loadImage(HARD_QUIZ_TEMPLATE);
@@ -2608,6 +2677,17 @@ function updateImagePreview(){
   });
 
   if (isEnrollment) {
+    if (!window.ENROLLMENT_BASE64_IMAGES) {
+      if (enrollmentBox && gallery) {
+        enrollmentBox.style.display = "";
+        gallery.innerHTML = `<div class="hint">Đang tải bộ ảnh Tuyển sinh...</div>`;
+      }
+      ensureEnrollmentAssetsLoaded()
+        .then(() => updateImagePreview())
+        .catch(error => showPostStatus("err", error.message || String(error)));
+      if ($("imageDropzone")) $("imageDropzone").style.display = "none";
+      return;
+    }
     const urls = getEnrollmentImageUrls(S.activePageId);
     if (enrollmentBox && gallery) {
       enrollmentBox.style.display = "";
@@ -4455,25 +4535,25 @@ function sameScheduledMinute(a, b){
   if (!Number.isFinite(ams) || !Number.isFinite(bms)) return false;
   return Math.abs(ams - bms) < 60 * 1000;
 }
-async function syncFacebookScheduledStatus(){
-  if (!S.activePageId || !S.posts?.length) return;
-  const since = new Date(S.weekStart);
+async function syncFacebookScheduledStatus(pageId=S.activePageId, weekStartDate=S.weekStart){
+  if (!pageId || !S.posts?.length) return 0;
+  const since = new Date(weekStartDate);
   since.setHours(0,0,0,0);
   const until = addDays(since, 7);
   until.setMilliseconds(-1);
 
   let facebookRows = [];
   try {
-    facebookRows = await facebookListScheduled(S.activePageId, since.toISOString(), until.toISOString());
+    facebookRows = await facebookListScheduled(pageId, since.toISOString(), until.toISOString());
   } catch (error) {
     console.warn("Sync Facebook scheduled posts failed", error);
-    return;
+    return 0;
   }
-  if (!facebookRows.length) return;
+  if (!facebookRows.length) return 0;
 
   const updates = [];
   for (const post of S.posts) {
-    if (post.page_id !== S.activePageId || post.status === "published" || post.status === "cancelled") continue;
+    if (post.page_id !== pageId || post.status === "published" || post.status === "cancelled") continue;
     const matched = facebookRows.find(item => sameScheduledMinute(item.scheduled_at, post.scheduled_at));
     if (!matched) continue;
     if (post.status === "scheduled" && String(post.facebook_post_id || "") === String(matched.facebook_post_id || matched.id || "")) continue;
@@ -4485,7 +4565,7 @@ async function syncFacebookScheduledStatus(){
       updated_at: new Date().toISOString(),
     });
   }
-  if (!updates.length) return;
+  if (!updates.length) return 0;
 
   const results = await Promise.all(updates.map(row =>
     sb.from("facebook_scheduled_posts")
@@ -4501,6 +4581,7 @@ async function syncFacebookScheduledStatus(){
   if (failed?.error) throw failed.error;
   const updateById = new Map(updates.map(row => [String(row.id), row]));
   S.posts = S.posts.map(post => updateById.has(String(post.id)) ? { ...post, ...updateById.get(String(post.id)) } : post);
+  return updates.length;
 }
 async function schedulePost(mode="schedule"){
   const actionBtn = $("schedulePostBtn");
@@ -4524,6 +4605,7 @@ async function schedulePost(mode="schedule"){
     }
     const createPayload = { ...draft };
     if (isEnrollmentType(draft.post_type_id)) {
+      await ensureEnrollmentAssetsLoaded();
       const urls = getEnrollmentImageUrls(draft.page_id);
       showPostStatus("info", `Đang đính kèm ${urls.length} ảnh Tuyển sinh theo Fanpage...`);
       createPayload.image_urls = urls;
@@ -4855,9 +4937,9 @@ async function materializeMarketingTasks(fromDate=null, toDate=null){
   if (error && !String(error.message || "").includes("Could not find the function")) throw error;
 }
 
-async function syncMarketingTaskCompletion(){
-  const weekStart = dateKey(S.weekStart);
-  const weekEnd = dateKey(addDays(S.weekStart, 6));
+async function syncMarketingTaskCompletion(fromDate=null, toDate=null){
+  const weekStart = fromDate || dateKey(S.weekStart);
+  const weekEnd = toDate || dateKey(addDays(S.weekStart, 6));
   const { error } = await sb.rpc("sync_facebook_marketing_task_statuses", {
     p_from: weekStart,
     p_to: weekEnd,
