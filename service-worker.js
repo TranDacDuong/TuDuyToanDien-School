@@ -9,7 +9,7 @@ const APP_SHELL = [
   "tasks.html",
   "tasks.js",
   "offline.html",
-  "theme.css?v=20260615-ios1",
+  "theme.css?v=20260930-ui1",
   "supabaseClient.js",
   "pwa.js?v=20260721-android-install1",
   "push_debug.html",
