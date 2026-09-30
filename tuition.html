@@ -451,6 +451,32 @@ button.hint-link:hover { text-decoration: underline; }
   cursor: pointer;
 }
 .modal-body { padding: 18px 20px 20px; }
+#tuitionDetailModal .modal-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#tuitionDetailModal .modal-header {
+  flex: 0 0 auto;
+  position: relative;
+}
+#tuitionDetailModal .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+#tuitionDetailModal .modal-close {
+  flex: 0 0 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+body.tuition-modal-open {
+  overflow: hidden;
+}
 .detail-card {
   margin-top: 12px;
   padding: 16px;
@@ -1010,11 +1036,11 @@ tr.recalc-needed td:first-child { border-left: 3px solid #ef4444; }
     </table>
   </div>
 
-  <div id="tuitionDetailModal" class="modal-overlay" onclick="closeTuitionDetail(event)">
+  <div id="tuitionDetailModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="tuitionDetailTitle" onclick="closeTuitionDetail(event)">
     <div class="modal-card" onclick="event.stopPropagation()">
       <div class="modal-header">
         <h3 id="tuitionDetailTitle">Chi tiết học phí</h3>
-        <button class="modal-close" onclick="closeTuitionDetail()">✕</button>
+        <button class="modal-close" type="button" aria-label="Đóng chi tiết học phí" title="Đóng" onclick="closeTuitionDetail()">✕</button>
       </div>
       <div class="modal-body" id="tuitionDetailBody"></div>
     </div>

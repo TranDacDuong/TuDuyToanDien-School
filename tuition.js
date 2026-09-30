@@ -1958,13 +1958,23 @@ Nhập số tiền hoàn lại (>0):`,
 
     title.textContent = `Chi tiết học phí - ${group.studentName}`;
     body.innerHTML = buildTuitionDetailHtml(group);
+    body.scrollTop = 0;
     modal.classList.add("show");
+    document.body.classList.add("tuition-modal-open");
+    modal.querySelector(".modal-close")?.focus({ preventScroll: true });
   };
 
   window.closeTuitionDetail = function(evt) {
     if (evt && evt.target !== evt.currentTarget) return;
     document.getElementById("tuitionDetailModal")?.classList.remove("show");
+    document.body.classList.remove("tuition-modal-open");
   };
+
+  document.addEventListener("keydown", (evt) => {
+    if (evt.key !== "Escape") return;
+    const modal = document.getElementById("tuitionDetailModal");
+    if (modal?.classList.contains("show")) window.closeTuitionDetail();
+  });
 
   window.printInvoices = function() {
     const printArea = document.getElementById("printArea");
