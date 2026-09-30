@@ -66,4 +66,26 @@ test.describe("Class quick actions regression", () => {
     await page.getByRole("button", {name:"Bỏ qua"}).click();
     await expect.poll(() => page.evaluate(() => window.__calls)).toEqual(["open:today-class","tab:attendance"]);
   });
+
+  test("create action opens the create interface with class as its first field", async ({ page }) => {
+    await page.setContent(`
+      <style>.hidden{display:none}.popup-overlay{display:block}</style>
+      <div id="classQuickOverlay" class="hidden popup-overlay">
+        <div><h2 id="classQuickTitle"></h2><p id="classQuickSubtitle"></p><div id="classQuickBody"></div></div>
+      </div>`);
+    await page.evaluate(() => {
+      window._currentRole = "teacher";
+      window.getClassQuickActionData = () => [
+        { id:"class-a", class_name:"Toán 10", is_today:true, today_times:[] },
+        { id:"class-b", class_name:"Vật lý 11", is_today:false, today_times:[] }
+      ];
+    });
+    await page.addScriptTag({ path:path.join(root,"class_quick_actions.js") });
+    await page.evaluate(() => window.postMessage({type:"class:open-quick-actions"},"*"));
+    await page.getByRole("button", {name:/Tạo buổi học/}).click();
+
+    await expect(page.getByRole("heading", {name:"Tạo buổi học"})).toBeVisible();
+    await expect(page.getByLabel("Lớp học")).toBeVisible();
+    await expect(page.getByLabel("Lớp học").locator("option")).toHaveCount(3);
+  });
 });
