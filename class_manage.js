@@ -450,6 +450,8 @@
   let _activeTab      = "attendance";
   let _studentSearchPool = null;
   let _classSessionExamCatalog = { exam: [], pdf: [] };
+  let _classSessionAfterSave = "exams";
+  let _classSessionFocusDate = "";
   let _studentScheduleMap = {};
   let _studentScheduleHistory = {};
   let _studentScheduleLoadError = null;
@@ -524,14 +526,14 @@
     const label = d.slice(8,10)+"/"+d.slice(5,7);
     if(canEvaluateClassSession(role) && session?.id && d <= todayStr()){
       const scoreButton = '<button type="button" onclick="cvOpenSessionScoreModal(\''+session.id+'\',\''+d+'\',\''+(item.schedule_id || 0)+'\')" title="Nhập điểm BTVN / Đề luyện tập" aria-label="Nhập điểm ngày '+label+'" style="border:0;background:rgba(255,255,255,.16);color:inherit;border-radius:7px;padding:4px 6px;font:inherit;font-weight:800;cursor:pointer;line-height:1">📝</button>';
-      return '<th class="center" style="'+baseStyle+'">'+
+      return '<th class="center" data-attendance-date="'+d+'" style="'+baseStyle+'">'+
         '<button type="button" onclick="openSessionEvaluation(\''+session.id+'\')" title="Nhận xét buổi học" aria-label="Nhận xét buổi học ngày '+label+'" '+
           'style="border:0;background:rgba(255,255,255,.16);color:inherit;border-radius:8px;padding:5px 7px;font:inherit;font-weight:800;cursor:pointer;line-height:1;display:inline-flex;align-items:center;gap:4px">'+
           label+'<span aria-hidden="true" style="font-size:.78em;opacity:.9">✎</span>'+
         '</button>'+scoreButton+
       '</th>';
     }
-    return '<th class="center" style="'+baseStyle+'">'+label+'</th>';
+    return '<th class="center" data-attendance-date="'+d+'" style="'+baseStyle+'">'+label+'</th>';
   }
 
   async function getStudentSearchPool(){
@@ -793,6 +795,17 @@
     });
     if(tab==="attendance") await renderAttendanceTab();
     else await renderExamsTab();
+  };
+
+  window.cvFocusAttendanceDate = function(dateValue = todayStr()){
+    const header = document.querySelector('[data-attendance-date="'+String(dateValue).slice(0,10)+'"]');
+    if(!header) return false;
+    header.scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"});
+    const oldOutline = header.style.outline;
+    header.style.outline = "3px solid #f59e0b";
+    header.style.outlineOffset = "-3px";
+    setTimeout(() => { header.style.outline = oldOutline; header.style.outlineOffset = ""; }, 2200);
+    return true;
   };
 
   window.cvPrevMonth = async function(){
@@ -3000,7 +3013,7 @@
     if(choices) choices.innerHTML = buildSelectedClassSessionDatesHtml(dateValue);
   };
 
-  window.cvOpenAddClassSession = async function(sessionId = ""){
+  window.cvOpenAddClassSession = async function(sessionId = "", options = {}){
     if(!canManageClassSessions(_role)) return;
     const sb = getSb();
     const { error: probeError } = await sb.from("class_sessions").select("id").eq("class_id", _classId).limit(1);
@@ -3050,7 +3063,13 @@
       ? (sessions || []).filter(item => item.lesson_id === currentSession.lesson_id && Number(item.session_order || 0) === Number(currentSession.session_order || 0))
       : [];
     const selectedDateList = groupSessions.map(item => String(item.session_date || "").slice(0,10)).filter(Boolean).sort();
-    const baseSessionDate = selectedDateList[0] || "";
+    const preferredDate = !sessionId && /^\d{4}-\d{2}-\d{2}$/.test(options.preselectedDate || "")
+      ? options.preselectedDate
+      : "";
+    const preferredDateHasSchedule = preferredDate && getSchedulesForDate(preferredDate).length > 0;
+    const baseSessionDate = selectedDateList[0] || (preferredDateHasSchedule ? preferredDate : "");
+    _classSessionAfterSave = options.afterSave === "attendance" ? "attendance" : "exams";
+    _classSessionFocusDate = _classSessionAfterSave === "attendance" ? (preferredDate || todayStr()) : "";
     const calendarMonth = baseSessionDate
       ? baseSessionDate.slice(0,7)
       : _currentYear+"-"+String(_currentMonth+1).padStart(2,"0");
@@ -3262,7 +3281,14 @@
     }
 
     document.getElementById("cvClassSessionModal")?.remove();
-    await cvSwitchTab("exams");
+    const destination = _classSessionAfterSave;
+    const focusDate = _classSessionFocusDate;
+    _classSessionAfterSave = "exams";
+    _classSessionFocusDate = "";
+    await cvSwitchTab(destination);
+    if(destination === "attendance" && focusDate){
+      setTimeout(() => window.cvFocusAttendanceDate?.(focusDate), 120);
+    }
   };
 
   window.cvDeleteClassSession = async function(sessionId){

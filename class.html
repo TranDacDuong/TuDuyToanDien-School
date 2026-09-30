@@ -244,6 +244,45 @@ body { margin: 0; background: radial-gradient(circle at top left, rgba(200,150,4
 }
 .close-btn:hover { background: var(--red-bg); color: var(--red); }
 
+/* ── Quick actions shown whenever staff open the Classes tab ── */
+.class-quick-card { width:min(94vw,680px); border-top:0; padding:0; overflow:hidden; }
+.class-quick-head { padding:20px 22px 15px; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.class-quick-head h2 { margin:0; color:var(--navy); font-family:var(--font-display); font-size:1.22rem; }
+.class-quick-head p { margin:5px 0 0; color:var(--ink-light); font-size:.8rem; line-height:1.5; }
+.class-quick-body { padding:18px 22px 22px; }
+.class-quick-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.class-quick-action { min-height:132px; border:1.5px solid var(--border); border-radius:14px; background:#fff; padding:16px 14px; text-align:left; cursor:pointer; font:inherit; transition:.16s; }
+.class-quick-action:hover { transform:translateY(-2px); border-color:#93c5fd; box-shadow:0 12px 26px rgba(15,31,61,.1); }
+.class-quick-action.primary { background:#eff6ff; border-color:#93c5fd; }
+.class-quick-icon { display:flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:9px; background:var(--navy); color:#fff; font-size:1rem; margin-bottom:10px; }
+.class-quick-action strong { display:block; color:var(--navy); font-size:.88rem; margin-bottom:5px; }
+.class-quick-action span { display:block; color:var(--ink-light); font-size:.74rem; line-height:1.5; }
+.class-quick-back { border:0; background:transparent; color:var(--blue); font:inherit; font-size:.78rem; font-weight:800; cursor:pointer; padding:0; }
+.class-quick-search { width:100%; margin:12px 0 10px; }
+.class-quick-list { display:grid; gap:8px; max-height:52vh; overflow:auto; padding-right:3px; }
+.class-quick-class { width:100%; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:center; border:1px solid var(--border); border-radius:12px; background:#fff; padding:11px 12px; text-align:left; cursor:pointer; font:inherit; }
+.class-quick-class:hover { border-color:#93c5fd; background:#f8fbff; }
+.class-quick-class.today { border-left:4px solid var(--gold); background:#fffbeb; }
+.class-quick-class strong { display:block; color:var(--navy); font-size:.85rem; }
+.class-quick-class small { display:block; color:var(--ink-light); font-size:.72rem; margin-top:4px; line-height:1.4; }
+.class-quick-today { color:#92400e; background:#fef3c7; border-radius:999px; padding:3px 8px; font-size:.68rem; font-weight:800; white-space:nowrap; }
+.class-quick-empty { padding:18px; border:1px dashed var(--border); border-radius:12px; color:var(--ink-light); text-align:center; font-size:.82rem; }
+.class-quick-confirm { text-align:center; padding:8px 4px 2px; }
+.class-quick-confirm-icon { width:48px; height:48px; border-radius:50%; background:#fff7ed; color:#c2410c; display:flex; align-items:center; justify-content:center; margin:0 auto 12px; font-size:1.2rem; font-weight:900; }
+.class-quick-confirm h3 { margin:0; color:var(--navy); font-family:var(--font-display); font-size:1.08rem; }
+.class-quick-confirm p { color:var(--ink-mid); font-size:.82rem; line-height:1.6; margin:8px auto 16px; max-width:470px; }
+.class-quick-confirm-actions { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; }
+@media (max-width:640px) {
+  .class-quick-card { width:100%; max-height:88vh; border-radius:20px 20px 0 0; }
+  #classQuickOverlay { align-items:flex-end; }
+  .class-quick-head { padding:17px 16px 13px; }
+  .class-quick-body { padding:15px 16px calc(18px + env(safe-area-inset-bottom)); }
+  .class-quick-grid { grid-template-columns:1fr; }
+  .class-quick-action { min-height:0; display:grid; grid-template-columns:38px 1fr; column-gap:11px; align-items:center; padding:12px; }
+  .class-quick-icon { grid-row:1/3; margin:0; }
+  .class-quick-action strong { margin:0 0 2px; }
+}
+
 label { display: block; font-size: .78rem; font-weight: 700; color: var(--ink-mid); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .03em; }
 input, select {
   width: 100%; padding: 8px 10px; border: 1.5px solid var(--border);
@@ -524,6 +563,16 @@ input:focus, select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
   </div>
 </div>
 
+<div id="classQuickOverlay" class="hidden popup-overlay" role="dialog" aria-modal="true" aria-labelledby="classQuickTitle">
+  <div class="popup-card class-quick-card">
+    <div class="class-quick-head">
+      <div><h2 id="classQuickTitle">Bạn muốn sử dụng chức năng gì?</h2><p id="classQuickSubtitle">Chọn thao tác để bắt đầu nhanh.</p></div>
+      <button class="close-btn" type="button" onclick="ClassQuickActions.close()" aria-label="Đóng">✕</button>
+    </div>
+    <div class="class-quick-body" id="classQuickBody"></div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="./supabaseClient.js?v=20260713-optimistic1"></script>
@@ -532,13 +581,14 @@ input:focus, select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
 <script src="./learning_messages.js?v=20260720-offline-test-score1"></script>
 <script src="./class_init.js?v=20260617-open-class-once1"></script>
 <script src="./class_create.js?v=20260615-staff-pickers1"></script>
-<script src="./class_list.js?v=20260714-today-sessions1"></script>
+<script src="./class_list.js?v=20260930-class-quick-actions1"></script>
 <script src="./ai_solution.js"></script>
 <script src="./review_helper.js"></script>
 <script src="./exam_ui_helper.js?v=20260713-observer1"></script>
 <script src="./public_exam_support.js"></script>
-<script src="./class_manage.js?v=20260714-student-merged-tabs2"></script>
+<script src="./class_manage.js?v=20260930-class-quick-actions1"></script>
 <script src="./class_evaluations.js?v=20260703-evaluation-schedule-only1"></script>
 <script src="./class_student.js"></script>
+<script src="./class_quick_actions.js?v=20260930-class-quick-actions1"></script>
 </body>
 </html>

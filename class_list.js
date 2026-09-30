@@ -152,6 +152,7 @@
         } else {
           container.innerHTML = '<div style="color:var(--ink-light);padding:20px">Chưa có lớp học nào.</div>';
         }
+        window.dispatchEvent(new CustomEvent("mindup:classes-ready"));
         return;
       }
 
@@ -183,6 +184,7 @@
       }
 
       renderClasses(_allClasses);
+      window.dispatchEvent(new CustomEvent("mindup:classes-ready"));
 
     }catch(err){
       console.error(err);
@@ -563,6 +565,32 @@
       };
     });
   }
+
+  window.getClassQuickActionData = function(){
+    const dayNo = todayWeekday();
+    return _allClasses
+      .filter(cls => !cls.hidden)
+      .map(cls => {
+        const todaySchedules = getCurrentSchedules(_scheduleMap[cls.id] || [])
+          .filter(schedule => Number(schedule.weekday || 0) === dayNo)
+          .sort((a,b) => String(a.start_time || "").localeCompare(String(b.start_time || "")));
+        return {
+          id: cls.id,
+          class_name: cls.class_name || "Lớp học",
+          subject_name: cls.subjects?.name || "",
+          grade_name: cls.grades?.name || "",
+          is_today: todaySchedules.length > 0,
+          today_times: todaySchedules.map(schedule => ({
+            start_time: String(schedule.start_time || "").slice(0,5),
+            end_time: String(schedule.end_time || "").slice(0,5),
+            room_name: schedule.rooms?.room_name || ""
+          }))
+        };
+      })
+      .sort((a,b) => Number(b.is_today)-Number(a.is_today) ||
+        String(a.today_times[0]?.start_time || "99:99").localeCompare(String(b.today_times[0]?.start_time || "99:99")) ||
+        String(a.class_name).localeCompare(String(b.class_name),"vi"));
+  };
 
   window.deleteClass = async function(id, role){
     const sb = getSb();

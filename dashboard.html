@@ -1714,6 +1714,9 @@ function openDashboardPage(page, options = {}){
   opsHub?.classList.remove("show");
   contentWrap?.classList.remove("hidden");
   if(!forceReload && getFrameDashboardPage() === page){
+    if(page === "class.html" && ["admin","teacher","assistant"].includes(currentDashboardProfile?.role || "")){
+      contentFrame.contentWindow?.postMessage({ type: "class:open-quick-actions" }, "*");
+    }
     closeSidebar();
     return;
   }
@@ -1794,6 +1797,9 @@ contentFrame.addEventListener("load", () => {
   const framePage = getFrameDashboardPage();
   if(!framePage) return;
   syncSidebarPin(framePage);
+  if(framePage === "class.html" && ["admin","teacher","assistant"].includes(currentDashboardProfile?.role || "")){
+    contentFrame.contentWindow?.postMessage({ type: "class:open-quick-actions" }, "*");
+  }
   if(framePage.split("?")[0].split("#")[0] === "home.html" && pendingChatPopupPayload?.userId){
     contentFrame.contentWindow?.postMessage({
       type: "open-chat-popup",
