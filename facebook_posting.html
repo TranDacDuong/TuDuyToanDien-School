@@ -91,6 +91,11 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
 .facebook-composer-card .modal-head h2{color:#050505;font-family:inherit;font-size:1.25rem;font-weight:800}
 .facebook-composer-card .modal-head .fb-close{position:absolute;right:16px;top:10px;width:36px;height:36px;min-height:36px;padding:0;border:0;border-radius:50%;background:#e4e6eb;color:#050505;font-size:0;box-shadow:none}
 .facebook-composer-card .modal-head .fb-close::before{content:"\00d7";font-size:1.7rem;font-weight:400;line-height:1}
+.fb-action-notice{display:none;flex:0 0 auto;padding:10px 16px;border-bottom:1px solid transparent;font-size:.84rem;font-weight:700;line-height:1.45;white-space:pre-wrap}
+.fb-action-notice.show{display:block}
+.fb-action-notice.info{background:#e7f3ff;color:#0b57a4;border-color:#b9d8fb}
+.fb-action-notice.ok{background:#e9f8ef;color:#137333;border-color:#b7e2c5}
+.fb-action-notice.err{background:#fce8e6;color:#b3261e;border-color:#f3b7b2}
 .facebook-composer-body{overflow:auto;padding:16px!important;display:block!important}
 .fb-compose-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(310px,.85fr);gap:14px;align-items:start}
 .fb-compose-main,.fb-compose-side{display:grid;gap:12px;min-width:0}
@@ -343,6 +348,7 @@ body{margin:0;font-family:var(--font-body,Arial,sans-serif);background:radial-gr
       <h2 id="postModalTitle">Soạn bài đăng</h2>
       <button class="btn fb-close" type="button" id="closePostModalBtn" aria-label="Đóng"></button>
     </div>
+    <div class="fb-action-notice" id="postActionNotice" role="status" aria-live="polite"></div>
     <div class="modal-body facebook-composer-body">
       <input type="hidden" id="postId">
       <div class="fb-compose-layout">
@@ -701,7 +707,18 @@ function $(id){ return document.getElementById(id); }
 function esc(v){ return String(v ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
 function showStatus(type, msg){ const box=$("statusBox"); box.className=`status ${type} show`; box.textContent=msg; }
 function hideStatus(){ const box=$("statusBox"); if (!box) return; box.className="status"; box.textContent=""; }
-function showPostStatus(type, msg){ const box=$("postStatusBox"); box.className=`status ${type} show`; box.textContent=msg; }
+function showPostStatus(type, msg){
+  const box = $("postStatusBox");
+  if (box) {
+    box.className = `status ${type} show`;
+    box.textContent = msg;
+  }
+  const notice = $("postActionNotice");
+  if (notice) {
+    notice.className = `fb-action-notice ${type} show`;
+    notice.textContent = msg;
+  }
+}
 function pad(n){ return String(n).padStart(2,"0"); }
 function dateKey(date){ return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`; }
 function toLocalInputValue(date){ return `${dateKey(date)}T${pad(date.getHours())}:${pad(date.getMinutes())}`; }
@@ -4474,12 +4491,22 @@ async function syncFacebookScheduledStatus(){
   S.posts = S.posts.map(post => updateById.has(String(post.id)) ? { ...post, ...updateById.get(String(post.id)) } : post);
 }
 async function schedulePost(mode="schedule"){
+  const actionBtn = $("schedulePostBtn");
+  if (actionBtn?.disabled) return;
+  const oldButtonText = actionBtn?.textContent || "Hẹn lịch Facebook";
+  if (actionBtn) {
+    actionBtn.disabled = true;
+    actionBtn.textContent = mode === "schedule" ? "Đang hẹn lịch..." : "Đang đăng...";
+  }
+  showPostStatus("info", mode === "schedule"
+    ? "Đang lưu bài và chuẩn bị hẹn lịch Facebook..."
+    : "Đang lưu bài và chuẩn bị đăng lên Facebook...");
   try {
     const existingId = $("postId").value;
     const existingRow = existingId ? S.posts.find(p => p.id === existingId) : null;
     const draft = await savePostDraft({ status: "draft" });
     if (!postHasContent(draft)) throw new Error("Vui lòng nhập nội dung, link hoặc ảnh trước khi hẹn/đăng.");
-    showPostStatus("info", mode === "schedule" ? "Đang hẹn lịch lên Facebook..." : "Đang đăng lên Facebook...");
+    showPostStatus("info", mode === "schedule" ? "Đang gửi yêu cầu hẹn lịch lên Facebook..." : "Đang đăng bài lên Facebook...");
     if (existingRow?.facebook_post_id && existingRow.status === "scheduled") {
       try { await facebookDelete(existingRow.page_id, existingRow.facebook_post_id); } catch (e) { console.warn(e); }
     }
@@ -4511,6 +4538,11 @@ async function schedulePost(mode="schedule"){
     if (id) await sb.from("facebook_scheduled_posts").update({ status:"error", last_error: error.message || String(error) }).eq("id", id);
     showPostStatus("err", error.message || String(error));
     await loadData().catch(()=>{});
+  } finally {
+    if (actionBtn) {
+      actionBtn.disabled = false;
+      actionBtn.textContent = oldButtonText;
+    }
   }
 }
 
