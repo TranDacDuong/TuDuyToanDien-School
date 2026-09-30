@@ -340,6 +340,22 @@ aside li.active {
 main { flex: 1; display: flex; flex-direction: column; overflow: hidden; width: 100%; }
 .content { flex: 1; padding: 0; overflow: hidden; }
 iframe { width: 100%; height: 100%; border: none; background: var(--white); }
+#routeProgress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 4px;
+  z-index: 5000;
+  opacity: 0;
+  background: linear-gradient(90deg, var(--gold), #ffd36b 38%, var(--navy-light));
+  box-shadow: 0 0 16px rgba(239,141,34,.62);
+  transition: width .34s ease, opacity .2s ease;
+}
+#routeProgress.active { width: 82%; opacity: 1; }
+#routeProgress.complete { width: 100%; opacity: 0; transition: width .18s ease, opacity .34s ease .12s; }
+#contentFrame { opacity: 1; transform: translateY(0); transition: opacity .22s ease, transform .22s ease; }
+#contentFrame.is-transitioning { opacity: .24; transform: translateY(7px); }
 .mindup-entry-splash {
   position: fixed;
   inset: 0;
@@ -953,7 +969,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   .ops-link { width: 100%; min-height: 44px; }
 }
 </style>
-<script src="visual-effects.js?v=20260602-mindup1" defer></script>
+<script src="visual-effects.js?v=20260930-interactions1" defer></script>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0f1f3d">
 <meta name="mobile-web-app-capable" content="yes">
@@ -963,6 +979,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 <script src="pwa.js?v=20260721-android-install1" defer></script>
 </head>
 <body>
+<div id="routeProgress" aria-hidden="true"></div>
 <div id="mindupEntrySplash" class="mindup-entry-splash" aria-hidden="true">
   <div class="mindup-entry-splash-inner">
     <img src="apple-touch-icon.png" alt="">
@@ -1416,8 +1433,9 @@ function isHomeSidebarPinned() {
 }
 function syncSidebarPin(page) {
   const basePage = String(page || "").split("?")[0].split("#")[0];
-  document.body.classList.toggle("home-sidebar-pinned", basePage === "home.html");
-  if (basePage === "home.html") closeSidebar();
+  // Desktop follows the same persistent navigation pattern as the public landing page.
+  document.body.classList.toggle("home-sidebar-pinned", Boolean(basePage));
+  if (basePage) closeSidebar();
 }
 function openSidebar() {
   if (isHomeSidebarPinned()) return;
@@ -1698,6 +1716,10 @@ function openDashboardPage(page, options = {}){
       : "home.html";
   }
   if(updateUrl) syncDashboardUrl(page, replaceUrl);
+  const routeProgress = document.getElementById("routeProgress");
+  routeProgress?.classList.remove("complete");
+  routeProgress?.classList.add("active");
+  contentFrame.classList.add("is-transitioning");
   const opsHub = document.getElementById("opsHub");
   const contentWrap = document.querySelector(".content");
   syncSidebarPin(page);
@@ -1708,6 +1730,8 @@ function openDashboardPage(page, options = {}){
   setActiveMobileQuickActions(page);
   setMobileToolsState(page, { reset: true });
   if(page === "ops-center"){
+    contentFrame.classList.remove("is-transitioning");
+    routeProgress?.classList.add("complete");
     opsHub?.classList.add("show");
     contentWrap?.classList.add("hidden");
     closeSidebar();
@@ -1716,6 +1740,8 @@ function openDashboardPage(page, options = {}){
   opsHub?.classList.remove("show");
   contentWrap?.classList.remove("hidden");
   if(!forceReload && getFrameDashboardPage() === page){
+    contentFrame.classList.remove("is-transitioning");
+    routeProgress?.classList.add("complete");
     if(page === "class.html" && ["admin","teacher","assistant"].includes(currentDashboardProfile?.role || "")){
       contentFrame.contentWindow?.postMessage({ type: "class:open-quick-actions" }, "*");
     }
@@ -1796,6 +1822,8 @@ document.getElementById("authModal")?.addEventListener("keydown", (event) => {
 });
 
 contentFrame.addEventListener("load", () => {
+  contentFrame.classList.remove("is-transitioning");
+  document.getElementById("routeProgress")?.classList.add("complete");
   const framePage = getFrameDashboardPage();
   if(!framePage) return;
   syncSidebarPin(framePage);

@@ -162,6 +162,17 @@
     ensureSettings();
     applyTheme(activeTheme);
     setExamMode(examMode);
+    document.addEventListener("pointerdown", (event) => {
+      const target = event.target.closest("button, .btn, [role=button]");
+      if (!target || target.disabled || target.dataset.noRipple === "true") return;
+      const rect = target.getBoundingClientRect();
+      const ripple = document.createElement("span");
+      ripple.className = "mindup-ripple";
+      ripple.style.left = `${event.clientX - rect.left}px`;
+      ripple.style.top = `${event.clientY - rect.top}px`;
+      target.appendChild(ripple);
+      ripple.addEventListener("animationend", () => ripple.remove(), { once: true });
+    }, { passive: true });
     loadSystemTheme().catch(() => {});
   }
 
