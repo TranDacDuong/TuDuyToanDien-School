@@ -334,12 +334,14 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 .permission-editor-head { background:#fff; border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:12px; }
 .permission-editor-head h3 { margin:0 0 5px; color:var(--navy); }
 .permission-note { color:var(--ink-mid); font-size:.8rem; line-height:1.5; }
-.permission-group { background:#fff; border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:12px; }
-.permission-group[open] { box-shadow:0 10px 26px rgba(15,31,61,.07); }
-.permission-group-summary { list-style:none; padding:13px 15px; background:#f5f8fc; color:var(--navy); cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.permission-groups-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; align-items:start; }
+.permission-group { background:#fff; border:1px solid var(--border); border-radius:12px; overflow:hidden; min-width:0; }
+.permission-group[open] { grid-column:1/-1; box-shadow:0 10px 26px rgba(15,31,61,.07); border-color:#b9cbe0; }
+.permission-group-summary { list-style:none; min-height:56px; padding:11px 13px; background:#f8fafc; color:var(--navy); cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.permission-group-summary:hover { background:#f0f5fb; }
 .permission-group-summary::-webkit-details-marker { display:none; }
 .permission-group-title { display:flex; align-items:center; gap:9px; min-width:0; }
-.permission-group-title strong { font-size:.92rem; }
+.permission-group-title strong { font-size:.86rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .permission-group-title::before { content:'›'; font-size:1.25rem; line-height:1; transition:transform .16s ease; }
 .permission-group[open] .permission-group-title::before { transform:rotate(90deg); }
 .permission-group-count { padding:4px 9px; border-radius:999px; background:#e2e8f0; color:#475569; font-size:.72rem; font-weight:800; white-space:nowrap; }
@@ -361,10 +363,14 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 .permission-select.override-deny { border-color:#dc5a5a; background:#fff3f3; }
 .permission-legend { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
 .permission-legend span { padding:4px 8px; border-radius:999px; background:#f1f5f9; color:#475569; font-size:.7rem; font-weight:700; }
+.permission-editor-actions { display:flex; gap:7px; flex-wrap:wrap; margin-top:11px; }
+.permission-editor-actions button { min-height:32px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#334155; padding:5px 10px; font:inherit; font-size:.73rem; font-weight:700; cursor:pointer; }
+.permission-editor-actions button:hover { border-color:#1d6bd1; color:#1d6bd1; }
 .permission-empty { background:#fff; border:1px dashed var(--border); border-radius:14px; padding:28px; text-align:center; color:var(--ink-light); }
 @media(max-width:820px){
   .permission-shell { grid-template-columns:1fr; }
   .permission-staff-list { max-height:260px; }
+  .permission-groups-grid { grid-template-columns:1fr; }
   .permission-row { grid-template-columns:1fr; gap:8px; }
 }
 .s-pg { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-top:1px solid var(--surface); flex-wrap:wrap; gap:8px; }
@@ -1283,6 +1289,61 @@ function selectPermissionUser(userId){
   renderPermissionEditor();
 }
 
+const PERMISSION_GROUP_META = {
+  'page.ops_center':       { label:'Bảng điều hành' },
+  'page.home':             { label:'Trang chủ' },
+  'page.courses':          { label:'Khóa học' },
+  'page.classes':          { label:'Lớp học' },
+  'page.tasks':            { label:'Công việc' },
+  'page.teacher_schedule': { label:'Giáo viên và thời khóa biểu' },
+  'page.personal_schedule':{ label:'Lịch học cá nhân' },
+  'page.public_exam':      { label:'Đề thi' },
+  'page.game':             { label:'Game' },
+  'page.tuition':          { label:'Học phí' },
+  'page.income':           { label:'Thu nhập và thu chi' },
+  'page.resources':        { label:'Tài liệu tham khảo' },
+  'page.question_bank':    { label:'Ngân hàng câu hỏi' },
+  'page.exam_editor':      { label:'Đề kiểm tra' },
+  'page.trial_requests':   { label:'Đăng ký học thử' },
+  'page.push_debug':       { label:'Kiểm tra thông báo' },
+  'page.system':           { label:'Hệ thống' },
+  'page.facebook':         { label:'Đăng bài Facebook' }
+};
+
+function permissionFallbackGroupKey(permissionKey){
+  if(permissionKey.startsWith('page.')) return permissionKey;
+  if(permissionKey.startsWith('ops.')) return 'page.ops_center';
+  if(permissionKey.startsWith('courses.')) return 'page.courses';
+  if(permissionKey.startsWith('classes.') || permissionKey.startsWith('class.')) return 'page.classes';
+  if(permissionKey.startsWith('tasks.')) return 'page.tasks';
+  if(permissionKey.startsWith('teacher_schedule.')) return 'page.teacher_schedule';
+  if(permissionKey.startsWith('public_exam.')) return 'page.public_exam';
+  if(permissionKey.startsWith('game.')) return 'page.game';
+  if(permissionKey.startsWith('tuition.')) return 'page.tuition';
+  if(permissionKey.startsWith('income.')) return 'page.income';
+  if(permissionKey.startsWith('resources.')) return 'page.resources';
+  if(permissionKey.startsWith('question.')) return 'page.question_bank';
+  if(permissionKey.startsWith('exam.')) return 'page.exam_editor';
+  if(permissionKey.startsWith('trial.')) return 'page.trial_requests';
+  if(permissionKey.startsWith('system.')) return 'page.system';
+  if(permissionKey.startsWith('facebook.')) return 'page.facebook';
+  return permissionKey;
+}
+
+function permissionGroupKey(permission){
+  const stored = String(permission.group_key || '').trim();
+  if(stored && stored !== permission.section) return stored;
+  return permissionFallbackGroupKey(permission.permission_key);
+}
+
+function permissionGroupLabel(groupKey, permission){
+  return PERMISSION_GROUP_META[groupKey]?.label
+    || (permission.permission_key === groupKey ? permission.label : '')
+    || permission.group_label
+    || permission.section
+    || groupKey;
+}
+
 function renderPermissionEditor(){
   const editor = document.getElementById('permissionEditor');
   if(!editor || !_permissionData) return;
@@ -1295,8 +1356,8 @@ function renderPermissionEditor(){
   const overrides = user.overrides || {};
   const groups = new Map();
   (_permissionData.catalog || []).forEach(permission => {
-    const groupKey = permission.group_key || (permission.permission_key.startsWith('page.') ? permission.permission_key : permission.section);
-    if(!groups.has(groupKey)) groups.set(groupKey, { label:permission.group_label || permission.section, permissions:[] });
+    const groupKey = permissionGroupKey(permission);
+    if(!groups.has(groupKey)) groups.set(groupKey, { label:permissionGroupLabel(groupKey, permission), permissions:[] });
     groups.get(groupKey).permissions.push(permission);
   });
   const isAdmin = user.role === 'admin';
@@ -1309,7 +1370,7 @@ function renderPermissionEditor(){
     const permissions = group.permissions;
     const allowedCount = permissions.filter(effectiveAllowed).length;
     const countClass = allowedCount === permissions.length ? 'full' : allowedCount > 0 ? 'partial' : '';
-    const shouldOpen = groupKey === 'page.tuition' || (allowedCount > 0 && allowedCount < permissions.length);
+    const shouldOpen = false;
     return `
     <details class="permission-group" data-permission-group="${escAttr(groupKey)}" ${shouldOpen ? 'open' : ''}>
       <summary class="permission-group-summary">
@@ -1351,12 +1412,21 @@ function renderPermissionEditor(){
         ${esc(permissionRoleLabel(user.role))} · ${esc(user.email || 'Chưa có email')}<br>
         ${isAdmin
           ? 'Quản trị viên luôn có toàn quyền và không thể bị thu hồi quyền tại đây.'
-          : '“Theo chức vụ” dùng cấu hình mặc định. Quyền riêng được ưu tiên hơn chức vụ; quyền nhạy cảm cần cấp có chủ đích.'}
+          : 'Chọn một tab bên dưới để xem các quyền bên trong. “Theo chức vụ” dùng cấu hình mặc định; quyền riêng sẽ được ưu tiên hơn.'}
       </div>
-      <div class="permission-legend"><span>Chỉ xem</span><span>Quản lý cơ bản</span><span>Toàn quyền</span><span>Quyền nhạy cảm</span></div>
+      <div class="permission-editor-actions">
+        <button type="button" onclick="setPermissionGroupsOpen(true)">Mở tất cả nhóm</button>
+        <button type="button" onclick="setPermissionGroupsOpen(false)">Thu gọn tất cả</button>
+      </div>
     </div>
-    ${groupHtml || '<div class="permission-empty">Chưa có danh mục quyền.</div>'}
+    <div class="permission-groups-grid">${groupHtml || '<div class="permission-empty">Chưa có danh mục quyền.</div>'}</div>
   `;
+}
+
+function setPermissionGroupsOpen(open){
+  document.querySelectorAll('#permissionEditor .permission-group').forEach(group => {
+    group.open = Boolean(open);
+  });
 }
 
 function updateLocalPermissionOverrides(userId, changes){
@@ -1374,7 +1444,18 @@ async function saveStaffPermissionChanges(userId, changes){
     p_user_id: userId,
     p_changes: changes
   });
-  if(error) throw error;
+  if(error){
+    const bulkRpcMissing = /admin_set_user_permissions|schema cache|does not exist|not found/i.test(error.message || '');
+    if(!bulkRpcMissing) throw error;
+    for(const change of changes){
+      const { error:legacyError } = await sb.rpc('admin_set_user_permission', {
+        p_user_id:userId,
+        p_permission_key:change.permission_key,
+        p_allowed:change.allowed
+      });
+      if(legacyError) throw legacyError;
+    }
+  }
   updateLocalPermissionOverrides(userId, changes);
   await window.AppAdminTools?.recordAudit?.('staff_permissions_updated', {
     target_type:'staff_permission', target_id:userId, changes
@@ -1384,16 +1465,16 @@ async function saveStaffPermissionChanges(userId, changes){
 async function applyPermissionPreset(userId, groupKey, preset, button){
   const user = (_permissionData?.users || []).find(item => item.id === userId);
   if(!user || user.role === 'admin') return;
-  const permissions = (_permissionData.catalog || []).filter(item => (item.group_key || item.section) === groupKey);
+  const permissions = (_permissionData.catalog || []).filter(item => permissionGroupKey(item) === groupKey);
   if(!permissions.length) return;
-  if(preset === 'none' && !confirm(`Thu hồi toàn bộ quyền trong tab “${permissions[0].group_label || permissions[0].section}”?`)) return;
+  if(preset === 'none' && !confirm(`Thu hồi toàn bộ quyền trong tab “${permissionGroupLabel(groupKey, permissions[0])}”?`)) return;
   const changes = permissions.map(permission => ({
     permission_key: permission.permission_key,
     allowed: preset === 'default' ? null
       : preset === 'all' ? true
       : preset === 'none' ? false
-      : preset === 'view' ? permission.access_level === 'view'
-      : ['view','basic'].includes(permission.access_level)
+      : preset === 'view' ? (permission.access_level || (permission.permission_key.startsWith('page.') ? 'view' : 'basic')) === 'view'
+      : ['view','basic'].includes(permission.access_level || (permission.permission_key.startsWith('page.') ? 'view' : 'basic'))
   }));
   const group = button?.closest?.('.permission-group');
   group?.querySelectorAll?.('button,select').forEach(control => control.disabled = true);
@@ -1414,7 +1495,7 @@ async function setStaffPermission(userId, permissionKey, groupKey, select){
   const allowed = value === 'default' ? null : value === 'true';
   const user = (_permissionData?.users || []).find(item => item.id === userId);
   const defaults = _permissionData?.role_defaults?.[user?.role] || {};
-  const permissions = (_permissionData?.catalog || []).filter(item => (item.group_key || item.section) === groupKey);
+  const permissions = (_permissionData?.catalog || []).filter(item => permissionGroupKey(item) === groupKey);
   let changes = [{ permission_key:permissionKey, allowed }];
   if(permissionKey === groupKey && allowed === false){
     const hasActiveChildren = permissions.some(item => item.permission_key !== groupKey && (
