@@ -105,13 +105,9 @@ aside.open ~ #sidebarTab,
   color: var(--navy); margin-bottom: 20px; padding: 8px 8px 14px;
   display: flex; align-items: center; gap: 8px;
 }
-.logo::before {
-  content: 'M'; width: 34px; height: 34px;
-  display: grid; place-items: center;
-  background: linear-gradient(135deg,var(--navy-mid),var(--navy-light));
-  color: #fff; font-family: var(--font-body); font-size: .98rem;
-  border-radius: 10px; flex-shrink: 0;
-  box-shadow: 0 8px 18px rgba(21,95,147,.24);
+.logo-mark {
+  width: 38px; height: 38px; object-fit: contain; flex: 0 0 auto;
+  border-radius: 50%; filter: drop-shadow(0 8px 12px rgba(21,95,147,.22));
 }
 
 #userBox {
@@ -994,7 +990,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 <div id="sidebarOverlay" onclick="closeSidebar()"></div>
 
 <aside id="sidebar">
-  <div class="logo">Tư Duy Toàn Diện</div>
+  <div class="logo"><img class="logo-mark" src="assets/mindup-logo-round.png" alt="MindUp"> <span>MindUp</span></div>
 
   <div id="userBox">
     <img id="userAvatar" src="default-avatar.png">
