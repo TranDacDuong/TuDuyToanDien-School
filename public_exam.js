@@ -29,9 +29,13 @@
   let _examDraftNotice = "";
   let _essayReviewQueue = [];
 
-  function requirePublicExamAdmin() {
-    if (window.AppPermissions?.has?.("public_exam.manage", _role === "admin")) return true;
-    alert("Bạn không có quyền quản lý đề thi thử và đề thi thật.");
+  function hasPublicExamPermission(key) {
+    return window.AppPermissions?.has?.(key, _role === "admin") ?? _role === "admin";
+  }
+
+  function requirePublicExamPermission(key, message) {
+    if (hasPublicExamPermission(key)) return true;
+    alert(message || "Bạn không có quyền thực hiện thao tác này.");
     return false;
   }
 
@@ -52,7 +56,7 @@
       return;
     }
 
-    if (window.AppPermissions?.has?.("public_exam.manage", _role === "admin")) {
+    if (hasPublicExamPermission("public_exam.create")) {
       document.getElementById("adminToolbar").style.display = "";
     }
 
@@ -146,7 +150,7 @@
       const card       = document.createElement("div");
       card.className   = "exam-card" + (isOfficial ? " official" : "");
 
-      if (window.AppPermissions?.has?.("public_exam.results.manage", _role === "admin")) {
+      if (hasPublicExamPermission("public_exam.results.manage")) {
         card.style.cursor = "pointer";
         card.addEventListener("click", (e) => {
           if (e.target.tagName === "BUTTON" || e.target.closest("button")) return;
@@ -228,16 +232,19 @@
       }
 
       let adminHtml = "";
-      if (window.AppPermissions?.has?.("public_exam.manage", _role === "admin")) {
+      const canPublish = hasPublicExamPermission("public_exam.publish");
+      const canUpdate = hasPublicExamPermission("public_exam.update");
+      const canDelete = hasPublicExamPermission("public_exam.delete");
+      if (canPublish || canUpdate || canDelete) {
         const pinBtn = pe.is_pinned
           ? `<button class="btn btn-outline btn-sm" onclick="togglePin('${pe.id}',false)">Bỏ ghim</button>`
           : `<button class="btn btn-outline btn-sm" onclick="togglePin('${pe.id}',true)">Ghim</button>`;
         adminHtml = `
           <div class="admin-card-actions">
-            ${pinBtn}
-            <button class="btn btn-outline btn-sm" onclick="openEditExamModal('${pe.id}')">Sửa</button>
-            <button class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5"
-              onclick="deletePublicExam('${pe.id}','${ex.title.replace(/'/g,"\\'")}')">Xóa</button>
+            ${canPublish ? pinBtn : ""}
+            ${canUpdate ? `<button class="btn btn-outline btn-sm" onclick="openEditExamModal('${pe.id}')">Sửa</button>` : ""}
+            ${canDelete ? `<button class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5"
+              onclick="deletePublicExam('${pe.id}','${ex.title.replace(/'/g,"\\'")}')">Xóa</button>` : ""}
           </div>`;
       }
 
@@ -254,7 +261,7 @@
         </div>
         <div class="exam-actions">
           ${actionHtml || adminHtml}
-          ${actionHtml && window.AppPermissions?.has?.("public_exam.manage", _role === "admin") ? adminHtml : ""}
+          ${actionHtml && adminHtml ? adminHtml : ""}
         </div>`;
 
       return card;
@@ -276,7 +283,7 @@
   let _editingPeId = null;
 
   window.togglePin = async function(peId, pin) {
-    if (!requirePublicExamAdmin()) return;
+    if (!requirePublicExamPermission("public_exam.publish", "Bạn không có quyền ghim hoặc bỏ ghim đề thi.")) return;
     const sb = getSb();
     const { error } = await sb.from("public_exams").update({ is_pinned: pin }).eq("id", peId);
     if (error) { alert("Lỗi: " + error.message); return; }
@@ -284,7 +291,7 @@
   };
 
   window.openAddExamModal = async function() {
-    if (!requirePublicExamAdmin()) return;
+    if (!requirePublicExamPermission("public_exam.create", "Bạn không có quyền thêm đề thi.")) return;
     _editingPeId = null;
     document.querySelector("#addExamModal .modal-card h3").textContent = "Thêm đề thi công khai";
     document.getElementById("peExamId").value = "";
@@ -304,12 +311,25 @@
   };
 
   window.openEditExamModal = async function(peId) {
-    if (!requirePublicExamAdmin()) return;
+    if (!requirePublicExamPermission("public_exam.update", "Bạn không có quyền sửa đề thi.")) return;
     _editingPeId = peId;
     const pe = _allExams.find(p => p.id === peId);
     if (!pe) return;
 
-    await openAddExamModal();
+    const previousId = _editingPeId;
+    _editingPeId = null;
+    document.querySelector("#addExamModal .modal-card h3").textContent = "Sửa đề thi công khai";
+    document.getElementById("peExamId").value = "";
+    document.getElementById("peType").value = "trial";
+    document.getElementById("peStartsAt").value = "";
+    document.getElementById("peEndsAt").value = "";
+    const sb = getSb();
+    const { data } = await sb.from("exams").select("id,title,duration_minutes,total_points").order("created_at", { ascending: false });
+    const sel = document.getElementById("peExamId");
+    sel.innerHTML = '<option value="">-- Chọn đề --</option>';
+    (data || []).forEach(e => sel.appendChild(new Option(`${e.title} (${e.duration_minutes}p / ${e.total_points}đ)`, e.id)));
+    document.getElementById("addExamModal").classList.remove("hidden");
+    _editingPeId = previousId;
     _editingPeId = peId;
     document.getElementById("peExamId").value   = pe.exam.id;
     document.getElementById("peType").value      = pe.exam_type;
@@ -322,7 +342,8 @@
   };
 
   window.savePublicExam = async function() {
-    if (!requirePublicExamAdmin()) return;
+    const permission = _editingPeId ? "public_exam.update" : "public_exam.create";
+    if (!requirePublicExamPermission(permission, _editingPeId ? "Bạn không có quyền sửa đề thi." : "Bạn không có quyền thêm đề thi.")) return;
     const examId   = document.getElementById("peExamId").value;
     const examType = document.getElementById("peType").value;
     const startsAt = document.getElementById("peStartsAt").value || null;
@@ -355,7 +376,7 @@
   };
 
   window.deletePublicExam = async function(peId, title) {
-    if (!requirePublicExamAdmin()) return;
+    if (!requirePublicExamPermission("public_exam.delete", "Bạn không có quyền xóa đề thi.")) return;
     if (!confirm(`Xóa đề thi "${title}"? Toàn bộ kết quả liên quan sẽ bị xóa.`)) return;
     const sb = getSb();
     const { data: results } = await sb.from("exam_results").select("id").eq("public_exam_id", peId);

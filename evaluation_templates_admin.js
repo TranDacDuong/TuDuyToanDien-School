@@ -63,8 +63,8 @@
           <textarea id="evaluation-template-${item.id}" style="width:100%;min-height:78px;resize:vertical;border:1px solid var(--border);border-radius:7px;padding:9px 10px;font:inherit;line-height:1.5">${esc(item.content)}</textarea>
         </div>
         <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end">
-          <button class="btn btn-outline btn-sm" type="button" onclick="updateEvaluationTemplate('${item.id}')">Lưu</button>
-          <button class="btn btn-outline btn-sm" type="button" onclick="toggleEvaluationTemplate('${item.id}',${item.active ? "false" : "true"})">${item.active ? "Tạm ẩn" : "Bật lại"}</button>
+          <button class="btn btn-outline btn-sm" data-permission="system.evaluation_templates.update" type="button" onclick="updateEvaluationTemplate('${item.id}')">Lưu</button>
+          <button class="btn btn-outline btn-sm" data-permission="system.evaluation_templates.update" type="button" onclick="toggleEvaluationTemplate('${item.id}',${item.active ? "false" : "true"})">${item.active ? "Tạm ẩn" : "Bật lại"}</button>
         </div>
       </div>`).join("");
   }
@@ -90,6 +90,7 @@
   window.filterEvaluationTemplates = renderList;
   window.changeEvaluationTemplateSection = syncStatusVisibility;
   window.addEvaluationTemplate = async function () {
+    if (!window.AppPermissions?.require?.("system.evaluation_templates.create")) return;
     const section = document.getElementById("evaluationTemplateSection").value;
     const statusId = document.getElementById("evaluationTemplateStatus").value || null;
     const contentEl = document.getElementById("evaluationTemplateContent");
@@ -106,6 +107,7 @@
     window.toast?.("Đã thêm mẫu nhận xét.");
   };
   window.updateEvaluationTemplate = async function (id) {
+    if (!window.AppPermissions?.require?.("system.evaluation_templates.update")) return;
     const content = document.getElementById(`evaluation-template-${id}`)?.value.trim();
     if (!content) return alert("Nội dung mẫu không được để trống.");
     const { error } = await getSb().from("evaluation_message_templates").update({ content }).eq("id", id);
@@ -115,6 +117,7 @@
     window.toast?.("Đã lưu nội dung mẫu.");
   };
   window.toggleEvaluationTemplate = async function (id, active) {
+    if (!window.AppPermissions?.require?.("system.evaluation_templates.update")) return;
     const { error } = await getSb().from("evaluation_message_templates").update({ active }).eq("id", id);
     if (error) return alert(`Chưa cập nhật được: ${error.message}`);
     const item = templates.find(row => row.id === id);

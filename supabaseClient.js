@@ -313,6 +313,20 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
         "page.personal_schedule", "page.public_exam", "page.tuition", "page.resources"
       ]
     };
+    const fallbackExpansion = {
+      "tasks.manage": ["tasks.create", "tasks.assign", "tasks.update", "tasks.delete"],
+      "public_exam.manage": ["public_exam.create", "public_exam.update", "public_exam.delete", "public_exam.publish"],
+      "resources.manage": ["resources.create", "resources.update", "resources.delete"],
+      "question.manage": ["question.create", "question.update", "question.archive"],
+      "exam.manage": ["exam.create", "exam.update", "exam.clone", "exam.delete", "exam.questions.manage"],
+      "trial.manage": ["trial.create", "trial.update", "trial.delete", "trial.account.manage", "trial.class.assign"],
+      "system.catalogs.manage": [
+        "system.rooms.view", "system.rooms.create", "system.rooms.update", "system.rooms.delete",
+        "system.grades.view", "system.grades.create", "system.grades.update", "system.grades.delete",
+        "system.subjects.view", "system.subjects.create", "system.subjects.update", "system.subjects.delete",
+        "system.topics.view", "system.topics.create", "system.topics.update", "system.topics.delete"
+      ]
+    };
     let permissions = {};
     let activeRole = "";
     let loaded = false;
@@ -322,7 +336,9 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
     function fallbackPermissions(role) {
       const values = fallbackByRole[String(role || "")] || [];
       if (values.includes("*")) return { "*": true };
-      return Object.fromEntries(values.map((key) => [key, true]));
+      const expanded = new Set(values);
+      values.forEach((key) => (fallbackExpansion[key] || []).forEach((child) => expanded.add(child)));
+      return Object.fromEntries([...expanded].map((key) => [key, true]));
     }
 
     async function load(profile = null, options = {}) {

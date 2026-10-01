@@ -44,6 +44,10 @@ let questionIssueReports = []
 let questionIssueTableMissing = false
 const questionPageParams = new URLSearchParams(window.location.search)
 
+function hasQuestionPermission(key) {
+  return window.AppPermissions?.has?.(key, currentRole === "admin") ?? currentRole === "admin"
+}
+
 function resetToFirstPage() {
   currentPage = 1
 }
@@ -456,6 +460,7 @@ function getSelectedQuestions() {
 }
 
 async function hideSelectedQuestions() {
+  if (!hasQuestionPermission("question.archive")) return alert("Bạn không có quyền lưu trữ câu hỏi.")
   const selected = getSelectedQuestions().filter((q) => !q.hidden)
   if (!selected.length) {
     alert("Chưa có câu nào phù hợp để ẩn.")
@@ -480,6 +485,7 @@ async function hideSelectedQuestions() {
 }
 
 async function restoreSelectedQuestions() {
+  if (!hasQuestionPermission("question.archive")) return alert("Bạn không có quyền khôi phục câu hỏi.")
   const selected = getSelectedQuestions().filter((q) => q.hidden)
   if (!selected.length) {
     alert("Không có câu ẩn nào trong phần đã chọn để khôi phục.")
@@ -504,6 +510,9 @@ async function restoreSelectedQuestions() {
 }
 
 async function deleteSelectedQuestions() {
+  if (!hasQuestionPermission("question.archive") && !hasQuestionPermission("question.delete_permanent")) {
+    return alert("Bạn không có quyền xóa hoặc lưu trữ câu hỏi.")
+  }
   const selected = getSelectedQuestions()
   if (!selected.length) {
     alert("Chưa chọn câu nào để xóa.")
@@ -576,6 +585,7 @@ window.restoreSelectedQuestions = restoreSelectedQuestions
 window.deleteSelectedQuestions = deleteSelectedQuestions
 
 window.hideSelectedQuestions = async function () {
+  if (!hasQuestionPermission("question.archive")) return alert("Bạn không có quyền lưu trữ câu hỏi.")
   const selected = getSelectedQuestions().filter((q) => !q.hidden)
   if (!selected.length) return alert("Chưa có câu nào phù hợp để ẩn.")
   if (!confirm(`Ẩn ${selected.length} câu đã chọn?`)) return
@@ -601,6 +611,7 @@ window.hideSelectedQuestions = async function () {
 }
 
 window.restoreSelectedQuestions = async function () {
+  if (!hasQuestionPermission("question.archive")) return alert("Bạn không có quyền khôi phục câu hỏi.")
   const selected = getSelectedQuestions().filter((q) => q.hidden)
   if (!selected.length) return alert("Không có câu ẩn nào trong phần đã chọn để khôi phục.")
   if (!confirm(`Khôi phục ${selected.length} câu đã chọn?`)) return
@@ -1168,6 +1179,7 @@ function pushSuggestion(map, id, suggestion) {
 }
 
 async function runDuplicateAudit() {
+  if (!hasQuestionPermission("question.all.view")) return alert("Bạn không có quyền kiểm tra toàn bộ câu hỏi trùng.")
   const scopeQuestions = getBaseFilteredQuestions()
   const scopeKey = getScopeKey(scopeQuestions)
 
@@ -1364,6 +1376,7 @@ function normalizeAiAnswerValue(question, answerValue) {
 }
 
 async function fillMissingAnswersWithAI() {
+  if (!hasQuestionPermission("question.ai.generate")) return alert("Bạn không có quyền dùng AI để bổ sung đáp án.")
   const candidates = getBaseFilteredQuestions().filter(
     (q) => q.question_type !== "essay" && isAnswerMissing(q)
   )
@@ -1552,6 +1565,7 @@ function injectActionBtns(q) {
 }
 
 async function restoreQ(id) {
+  if (!hasQuestionPermission("question.archive")) return alert("Bạn không có quyền khôi phục câu hỏi.")
   if (!confirm("Khôi phục câu hỏi này?")) return
   const { error } = await sb.from("question_bank").update({ hidden: false }).eq("id", id)
   if (error) {
@@ -1567,6 +1581,9 @@ async function restoreQ(id) {
 }
 
 async function deleteQ(id) {
+  if (!hasQuestionPermission("question.archive") && !hasQuestionPermission("question.delete_permanent")) {
+    return alert("Bạn không có quyền xóa hoặc lưu trữ câu hỏi.")
+  }
   const question = questions.find((item) => item.id === id)
   if (!confirm("Xóa câu hỏi này?")) return
 

@@ -77,6 +77,11 @@ async function loadSelectData() {
    LƯU CÂU HỎI
 ========================= */
 async function saveQuestion(shouldClose = true) {
+  const requiredPermission = editingQuestionId ? "question.update" : "question.create";
+  if (!(window.AppPermissions?.has?.(requiredPermission, false))) {
+    alert(editingQuestionId ? "Bạn không có quyền sửa câu hỏi." : "Bạn không có quyền thêm câu hỏi.");
+    return;
+  }
   const { data: { user } } = await sb.auth.getUser();
   const userId = user?.id || null;
 

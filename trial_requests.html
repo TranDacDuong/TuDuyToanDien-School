@@ -91,7 +91,7 @@ tbody tr:hover td{background:#fff7ed}
       <h1>Đăng ký học thử</h1>
       <p>Quản lý học sinh đăng ký học thử, lịch học thử, tài khoản học sinh và thao tác thêm vào lớp.</p>
     </div>
-    <button class="btn btn-outline" data-permission="trial.manage" type="button" onclick="openTrialModal()">+ Thêm học sinh học thử</button>
+    <button class="btn btn-outline" data-permission="trial.create" type="button" onclick="openTrialModal()">+ Thêm học sinh học thử</button>
   </section>
 
   <section class="toolbar">
@@ -165,9 +165,9 @@ tbody tr:hover td{background:#fff7ed}
         <div class="field full"><label>Ghi chú</label><textarea id="note" class="input" placeholder="Nguồn thông tin, nhu cầu học, ghi chú khi gọi điện..."></textarea></div>
       </div>
       <div class="actions">
-        <button class="btn btn-outline" data-permission="trial.manage" type="button" onclick="saveTrialRequest()">Lưu học thử</button>
-        <button class="btn btn-outline" data-permission="trial.manage" type="button" onclick="deleteTrialFromModal()">Xóa học sinh học thử</button>
-        <button class="btn btn-primary" data-permission="trial.manage" type="button" onclick="addTrialToClassFromModal()">Thêm vào lớp</button>
+        <button class="btn btn-outline" data-permission-any="trial.create,trial.update" type="button" onclick="saveTrialRequest()">Lưu học thử</button>
+        <button class="btn btn-outline" data-permission="trial.delete" type="button" onclick="deleteTrialFromModal()">Xóa học sinh học thử</button>
+        <button class="btn btn-primary" data-permission="trial.class.assign" type="button" onclick="addTrialToClassFromModal()">Thêm vào lớp</button>
       </div>
     </div>
   </div>
@@ -178,7 +178,7 @@ tbody tr:hover td{background:#fff7ed}
 <script>
 const DAYS = {1:"T2",2:"T3",3:"T4",4:"T5",5:"T6",6:"T7",7:"CN"};
 let S = { requests:[], classes:[], grades:[], subjects:[], classMap:{}, scheduleMap:{}, studentMap:{}, parentMap:{}, accountCheckTimers:{}, newAccountMode:{student:false,parent:false} };
-function canManageTrials(){ return window.AppPermissions?.has?.("trial.manage", false) === true; }
+function canTrial(permission){ return window.AppPermissions?.has?.(permission, false) === true; }
 
 function esc(s){ return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function escAttr(s){ return esc(s).replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
@@ -1012,6 +1012,7 @@ function scheduleAccountCheck(kind) {
 }
 
 function openTrialModal(id){
+  if(!id && !canTrial('trial.create')){ alert('Bạn không có quyền thêm đăng ký học thử.'); return; }
   const item = id ? S.requests.find(row=>row.id===id) : null;
   S.newAccountMode = { student:false, parent:false };
   document.getElementById("modalTitle").textContent = item ? "Chi tiết học sinh học thử" : "Thêm học sinh học thử";
@@ -1073,8 +1074,8 @@ async function saveTrialPayload(id, payload){
   return result;
 }
 async function saveTrialRequest(options={}){
-  if(!canManageTrials()){ alert("Bạn không có quyền cập nhật đăng ký học thử."); return null; }
   const id = document.getElementById("editId").value;
+  if(!canTrial(id ? 'trial.update' : 'trial.create')){ alert("Bạn không có quyền cập nhật đăng ký học thử."); return null; }
   let payload = payloadFromForm();
   if(!payload.student_name || !payload.phone || !payload.school || !payload.parent_full_name || !payload.parent_phone || !payload.grade || !payload.subject){
     alert("Vui lòng nhập đủ họ tên học sinh, SĐT học sinh, trường học sinh, họ tên phụ huynh, SĐT phụ huynh, khối và môn.");
@@ -1087,6 +1088,10 @@ async function saveTrialRequest(options={}){
   if(payload._schedule1 && payload._date1 && !dateMatchesSchedule(payload._date1, payload._schedule1)){ alert("Ngày học thử buổi 1 phải đúng thứ của lịch đã chọn."); return null; }
   if(payload._schedule2 && payload._date2 && !dateMatchesSchedule(payload._date2, payload._schedule2)){ alert("Ngày học thử buổi 2 phải đúng thứ của lịch đã chọn."); return null; }
   if(payload.trial_session_1_at && payload.trial_session_2_at && new Date(payload.trial_session_2_at) <= new Date(payload.trial_session_1_at)){ alert("Thời gian học thử buổi 2 phải sau buổi 1."); return null; }
+  if((!payload.student_id || !payload.parent_id) && !canTrial('trial.account.manage')){
+    alert('Bạn chưa có quyền tạo hoặc liên kết tài khoản học sinh/phụ huynh.');
+    return null;
+  }
   try {
     const accounts = await ensureTrialAccounts({ create: true });
     if (!accounts.student?.id) return null;
@@ -1112,7 +1117,7 @@ async function saveTrialRequest(options={}){
   return true;
 }
 async function deleteTrial(id){
-  if(!canManageTrials()){ alert("Bạn không có quyền xóa đăng ký học thử."); return; }
+  if(!canTrial('trial.delete')){ alert("Bạn không có quyền xóa đăng ký học thử."); return; }
   if(!id) return;
   if(!confirm("Xóa học sinh này khỏi danh sách học thử? Chỉ xóa khỏi danh sách học thử, không xóa tài khoản học sinh nếu đã tạo.")) return;
   const {data,error} = await sb.from("trial_lesson_requests").delete().eq("id",id).select("id");
@@ -1124,7 +1129,7 @@ async function deleteTrial(id){
 }
 function deleteTrialFromModal(){ const id=document.getElementById("editId").value; if(!id){ closeTrialModal(); return; } deleteTrial(id); }
 async function deleteTrial(id){
-  if(!canManageTrials()){ alert("Bạn không có quyền xóa đăng ký học thử."); return; }
+  if(!canTrial('trial.delete')){ alert("Bạn không có quyền xóa đăng ký học thử."); return; }
   if(!id) return;
   if(!confirm("Xóa học sinh này khỏi danh sách học thử? Chỉ xóa khỏi danh sách học thử, không xóa tài khoản học sinh nếu đã tạo.")) return;
   const previous = S.requests.slice();
@@ -1176,7 +1181,7 @@ function buildTrialStudentScheduleRows(item, effectiveFrom){
   return [...rowsBySession.values()].sort((a,b)=>a.session_no-b.session_no);
 }
 async function addTrialToClass(id){
-  if(!canManageTrials()){ alert("Bạn không có quyền xử lý đăng ký học thử."); return; }
+  if(!canTrial('trial.class.assign')){ alert("Bạn không có quyền xếp học sinh vào lớp."); return; }
   const item = S.requests.find(row=>row.id===id);
   if(!item){ alert("Không tìm thấy học sinh học thử này."); return; }
   if(!item.student_id){ alert("Hãy tạo hoặc link tài khoản học sinh trước khi thêm vào lớp."); return; }

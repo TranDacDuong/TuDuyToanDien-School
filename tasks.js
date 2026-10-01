@@ -47,7 +47,14 @@
   function hasTaskPermission(key, fallback = false) {
     return window.AppPermissions?.has?.(key, fallback) ?? fallback;
   }
-  function canManageTasks() { return hasTaskPermission("tasks.manage", S.profile?.role === "admin"); }
+  function canManageTasks() {
+    return ["tasks.create", "tasks.assign", "tasks.update", "tasks.delete"]
+      .some(key => hasTaskPermission(key, S.profile?.role === "admin"));
+  }
+  function canCreateTasks() { return hasTaskPermission("tasks.create", S.profile?.role === "admin"); }
+  function canAssignTasks() { return hasTaskPermission("tasks.assign", S.profile?.role === "admin"); }
+  function canUpdateTasks() { return hasTaskPermission("tasks.update", S.profile?.role === "admin"); }
+  function canDeleteTasks() { return hasTaskPermission("tasks.delete", S.profile?.role === "admin"); }
   function canViewStaffTasks() { return hasTaskPermission("tasks.staff_overview", S.profile?.role === "admin"); }
   function canManageTaskTemplates() { return hasTaskPermission("tasks.templates.manage", S.profile?.role === "admin"); }
   const esc = value => String(value || "")
@@ -662,7 +669,7 @@
   }
 
   function canDeleteAssignment(item) {
-    return canManageTasks()
+    return canDeleteTasks()
       && !String(item.id || "").startsWith("schedule-fallback:")
       && isManualAssignedTask(item)
       && !item.task?.auto_generated;
@@ -1883,7 +1890,7 @@
     const rows = oldStoredAssignments();
     if (!rows.length) return 0;
 
-    if (canManageTasks()) {
+    if (canDeleteTasks()) {
       let deleted = 0;
       for (let i = 0; i < rows.length; i += 100) {
         const ids = rows.slice(i, i + 100).map(item => item.id);
@@ -1911,7 +1918,7 @@
     const ok = confirm("Xóa tất cả công việc trong các ngày trước hôm nay? Công việc hôm nay và tương lai sẽ được giữ lại.");
     if (!ok) return;
     const { data, error } = await sb.rpc("delete_old_task_assignments", {
-      p_user_id: canManageTasks() ? null : S.user.id,
+      p_user_id: canDeleteTasks() ? null : S.user.id,
     });
     let deleted = Number(data?.deleted_assignments || 0);
     if (error) {
@@ -2039,7 +2046,7 @@
   }
 
   async function openCreateModal(defaultRecurrence = "once") {
-    if (!canManageTasks()) return alert("Bạn không có quyền tạo và giao công việc.");
+    if (!canCreateTasks() || !canAssignTasks()) return alert("Bạn cần quyền tạo và giao công việc.");
     await loadInternalUsers();
     S.editingTemplateId = null;
     setCreateModalMode("create");
@@ -2098,6 +2105,7 @@
   }
 
   async function deleteTaskTemplate(templateId) {
+    if (!canManageTaskTemplates()) return alert("Bạn không có quyền xóa mẫu công việc.");
     const template = (S.taskTemplates || []).find(item => String(item.id) === String(templateId));
     if (!template) return;
     if (!confirm(`Xóa công việc tự động "${template.title}"?\n\nCác công việc đã sinh trong tương lai cũng sẽ được xóa.`)) return;
@@ -2109,6 +2117,11 @@
   }
 
   async function saveManualTask() {
+    if (S.editingTemplateId) {
+      if (!canManageTaskTemplates()) return alert("Bạn không có quyền sửa mẫu công việc.");
+    } else if (!canCreateTasks() || !canAssignTasks()) {
+      return alert("Bạn cần quyền tạo và giao công việc.");
+    }
     const assigneeBox = byId("manualTaskAssignees");
     const checkedIds = assigneeBox
       ? [...assigneeBox.querySelectorAll('input[type="checkbox"]:checked')].map(input => input.value)
@@ -2584,7 +2597,7 @@
     S.attendanceAdminDate = localDate();
     if (E.attendanceAdminDate) E.attendanceAdminDate.value = S.attendanceAdminDate;
     byId("taskGreeting").textContent = `${profile.full_name || "Bạn"}, đây là các việc cần chú ý hôm nay.`;
-    byId("taskCreateButton").style.display = canManageTasks() ? "grid" : "none";
+    byId("taskCreateButton").style.display = canCreateTasks() && canAssignTasks() ? "grid" : "none";
     if (canViewStaffTasks() || canManageTasks()) await loadInternalUsers();
     renderStaffFilter();
     bindEvents();

@@ -1,5 +1,9 @@
 (function () {
   async function convertModalWithAI() {
+    if (!(window.AppPermissions?.has?.("question.ai.generate", false))) {
+      alert("Bạn không có quyền sử dụng AI cho câu hỏi.");
+      return;
+    }
     const text = document.getElementById("questionText").value.trim();
     if (!text && !window._modalPastedImg) {
       alert("Nhap noi dung hoac paste anh truoc!");

@@ -348,6 +348,10 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 .permission-group-count.partial { background:#fff7ed; color:#b45309; }
 .permission-group-count.full { background:#ecfdf5; color:#047857; }
 .permission-group-toolbar { padding:10px 15px; border-top:1px solid var(--border); border-bottom:1px solid var(--border); display:flex; gap:7px; flex-wrap:wrap; background:#fbfdff; }
+.permission-subgroup { border-bottom:1px solid #e5eaf1; }
+.permission-subgroup:last-child { border-bottom:0; }
+.permission-subgroup-head { padding:10px 15px; background:#f3f7fb; color:var(--navy); font-size:.78rem; font-weight:800; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.permission-subgroup-head span:last-child { color:var(--ink-light); font-size:.68rem; font-weight:700; }
 .permission-preset { min-height:32px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#334155; padding:5px 9px; font:inherit; font-size:.73rem; font-weight:700; cursor:pointer; }
 .permission-preset:hover { border-color:#1d6bd1; color:#1d6bd1; }
 .permission-preset.primary { background:#0f274d; color:#fff; border-color:#0f274d; }
@@ -476,17 +480,17 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
 
 <!-- Tabs -->
 <div class="tabs surface-toolbar">
-  <button class="tab active" data-permission="system.catalogs.manage" data-testid="system-tab-rooms" onclick="switchTab('rooms',this)">🏫 Phòng học</button>
-  <button class="tab" data-permission="system.catalogs.manage" data-testid="system-tab-grades" onclick="switchTab('grades',this)">🏛 Khối</button>
-  <button class="tab" data-permission="system.catalogs.manage" data-testid="system-tab-subjects" onclick="switchTab('subjects',this)">📚 Môn học</button>
-  <button class="tab" data-permission="system.catalogs.manage" data-testid="system-tab-topics" onclick="switchTab('topics',this)">🏷️ Chủ đề</button>
-  <button class="tab" data-permission="system.staff.manage" data-testid="system-tab-teachers" onclick="switchTab('teachers',this)">👨‍🏫 Giáo viên</button>
-  <button class="tab" data-permission="system.students.manage" data-testid="system-tab-students" onclick="switchTab('students',this)">👩‍🎓 Học sinh</button>
-  <button class="tab" data-permission="system.templates.manage" data-testid="system-tab-evaluation-templates" onclick="switchTab('evaluationTemplates',this)">📝 Mẫu nhận xét</button>
-  <button class="tab" data-permission="system.templates.manage" data-testid="system-tab-msg-templates" onclick="switchTab('msgTemplates',this)">💬 Tin nhắn tự động</button>
+  <button class="tab active" data-permission="system.rooms.view" data-testid="system-tab-rooms" onclick="switchTab('rooms',this)">🏫 Phòng học</button>
+  <button class="tab" data-permission="system.grades.view" data-testid="system-tab-grades" onclick="switchTab('grades',this)">🏛 Khối</button>
+  <button class="tab" data-permission="system.subjects.view" data-testid="system-tab-subjects" onclick="switchTab('subjects',this)">📚 Môn học</button>
+  <button class="tab" data-permission="system.topics.view" data-testid="system-tab-topics" onclick="switchTab('topics',this)">🏷️ Chủ đề</button>
+  <button class="tab" data-permission="system.staff.view" data-testid="system-tab-teachers" onclick="switchTab('teachers',this)">👨‍🏫 Giáo viên</button>
+  <button class="tab" data-permission="system.students.view" data-testid="system-tab-students" onclick="switchTab('students',this)">👩‍🎓 Học sinh</button>
+  <button class="tab" data-permission="system.evaluation_templates.view" data-testid="system-tab-evaluation-templates" onclick="switchTab('evaluationTemplates',this)">📝 Mẫu nhận xét</button>
+  <button class="tab" data-permission="system.message_templates.view" data-testid="system-tab-msg-templates" onclick="switchTab('msgTemplates',this)">💬 Tin nhắn tự động</button>
   <button class="tab" data-permission="system.logs.view" data-testid="system-tab-logs" onclick="switchTab('adminLogs',this)">📋 Nhật ký vận hành</button>
-  <button class="tab" data-permission="system.permissions.manage" data-testid="system-tab-permissions" onclick="switchTab('permissions',this)">🔐 Phân quyền</button>
-  <button class="tab" data-permission="system.appearance.manage" data-testid="system-tab-appearance" onclick="switchTab('appearance',this)">🎨 Giao diện</button>
+  <button class="tab" data-permission="system.permissions.view" data-testid="system-tab-permissions" onclick="switchTab('permissions',this)">🔐 Phân quyền</button>
+  <button class="tab" data-permission="system.appearance.view" data-testid="system-tab-appearance" onclick="switchTab('appearance',this)">🎨 Giao diện</button>
 </div>
 
 <!-- ═══════ PHÒNG HỌC ═══════ -->
@@ -499,7 +503,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <div class="fg"><label>Sức chứa</label><input id="roomCapacity" type="number" placeholder="VD: 30"></div>
       <div class="fg"><label>Ghi chú</label><input id="roomNote" placeholder="Ghi chú (tùy chọn)"></div>
       <div class="form-btns">
-        <button class="btn btn-primary btn-sm" onclick="saveRoom()">💾 Lưu</button>
+        <button class="btn btn-primary btn-sm" data-permission-any="system.rooms.create,system.rooms.update" onclick="saveRoom()">💾 Lưu</button>
         <button class="btn btn-outline btn-sm" onclick="resetRoom()">↺ Làm mới</button>
       </div>
     </div>
@@ -526,7 +530,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <input type="hidden" id="gradeId">
       <div class="fg"><label>Tên khối</label><input id="gradeName" placeholder="VD: 10, 11, 12"></div>
       <div class="form-btns">
-        <button class="btn btn-primary btn-sm" onclick="saveGrade()">💾 Lưu</button>
+        <button class="btn btn-primary btn-sm" data-permission-any="system.grades.create,system.grades.update" onclick="saveGrade()">💾 Lưu</button>
         <button class="btn btn-outline btn-sm" onclick="resetGrade()">↺ Làm mới</button>
       </div>
     </div>
@@ -554,7 +558,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <div class="fg"><label>Khối</label><select id="subjectGrade"><option value="">-- Chọn khối --</option></select></div>
       <div class="fg"><label>Tên môn</label><input id="subjectName" placeholder="VD: Toán, Lý, Hóa..."></div>
       <div class="form-btns">
-        <button class="btn btn-primary btn-sm" onclick="saveSubject()">💾 Lưu</button>
+        <button class="btn btn-primary btn-sm" data-permission-any="system.subjects.create,system.subjects.update" onclick="saveSubject()">💾 Lưu</button>
         <button class="btn btn-outline btn-sm" onclick="resetSubject()">↺ Làm mới</button>
       </div>
     </div>
@@ -583,7 +587,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <div class="fg"><label>Môn học</label><select id="topicSubject"><option value="">-- Chọn môn trước --</option></select></div>
       <div class="fg"><label>Tên chủ đề</label><input id="topicName" placeholder="VD: Chủ đề 1: Đồng biến nghịch biến..."></div>
       <div class="form-btns">
-        <button class="btn btn-primary btn-sm" onclick="saveTopic()">💾 Lưu</button>
+        <button class="btn btn-primary btn-sm" data-permission-any="system.topics.create,system.topics.update" onclick="saveTopic()">💾 Lưu</button>
         <button class="btn btn-outline btn-sm" onclick="resetTopic()">↺ Làm mới</button>
       </div>
     </div>
@@ -617,7 +621,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
     </div>
     <div class="sg"><label>SĐT</label><input id="tSPhone" placeholder="SĐT..."></div>
     <button class="btn btn-outline btn-sm" onclick="tClearSearch()" style="align-self:flex-end">✕ Xóa</button>
-    <button class="btn btn-primary btn-sm" onclick="openAddTeacher()" style="align-self:flex-end;margin-left:auto">+ Thêm giáo viên</button>
+    <button class="btn btn-primary btn-sm" data-permission="system.staff.create" onclick="openAddTeacher()" style="align-self:flex-end;margin-left:auto">+ Thêm giáo viên</button>
   </div>
   <div class="t-grid" id="teacherGrid" style="grid-column:1/-1">
     <div style="color:var(--ink-light);padding:20px">Đang tải...</div>
@@ -663,8 +667,8 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
       <button class="btn btn-outline btn-sm" onclick="closeTModal()">Hủy</button>
-      <button class="btn btn-danger btn-sm" id="tResetPwdBtn" onclick="tResetTeacherPassword()">🔑 Reset mật khẩu</button>
-      <button class="btn btn-primary btn-sm" onclick="submitTeacher()">💾 Lưu</button>
+      <button class="btn btn-danger btn-sm" id="tResetPwdBtn" data-permission="system.staff.reset_password" onclick="tResetTeacherPassword()">🔑 Reset mật khẩu</button>
+      <button class="btn btn-primary btn-sm" data-permission-any="system.staff.create,system.staff.update" onclick="submitTeacher()">💾 Lưu</button>
     </div>
   </div>
 </div>
@@ -679,12 +683,12 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
         <div class="s-chip">Tổng: <b id="sStatTotal">0</b></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-outline btn-sm" id="sZaloBulkStart" type="button" onclick="sStartZaloBulkRun()">Kiểm tra & kết nối Zalo PH chưa kết bạn</button>
-        <button class="btn btn-outline btn-sm" id="sZaloAliasStart" type="button" onclick="sStartZaloAliasSync()">Đồng bộ biệt danh Zalo PH</button>
+        <button class="btn btn-outline btn-sm" data-permission="system.zalo.manage" id="sZaloBulkStart" type="button" onclick="sStartZaloBulkRun()">Kiểm tra & kết nối Zalo PH chưa kết bạn</button>
+        <button class="btn btn-outline btn-sm" data-permission="system.zalo.manage" id="sZaloAliasStart" type="button" onclick="sStartZaloAliasSync()">Đồng bộ biệt danh Zalo PH</button>
         <button class="btn btn-outline btn-sm" id="sZaloTemplateOpen" type="button" onclick="sOpenZaloLinkTemplate()">Mẫu tin liên kết Zalo</button>
         <button class="btn btn-outline btn-sm" onclick="sDownloadImportTemplate()">🧾 Tải file mẫu</button>
-        <button class="btn btn-primary btn-sm" onclick="sPickImportFile()">📤 Nhập Excel</button>
-        <button class="btn btn-outline btn-sm" onclick="sExportExcel()">📥 Xuất Excel</button>
+        <button class="btn btn-primary btn-sm" data-permission="system.students.import" onclick="sPickImportFile()">📤 Nhập Excel</button>
+        <button class="btn btn-outline btn-sm" data-permission="system.students.export" onclick="sExportExcel()">📥 Xuất Excel</button>
       </div>
     </div>
     <div id="sZaloBulkStatus" aria-live="polite" style="margin-bottom:14px;font-size:.82rem"></div>
@@ -858,7 +862,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
         <div class="fg" style="margin-top:12px"><label>Quan hệ</label><input id="plRelationship" placeholder="VD: Bố, mẹ, người giám hộ"></div>
         <div class="fg"><label>Ghi chú</label><input id="plNote" placeholder="Ghi chú nội bộ nếu cần"></div>
         <div class="form-btns">
-          <button class="btn btn-primary btn-sm" onclick="plLinkParentStudent()">💾 Liên kết</button>
+          <button class="btn btn-primary btn-sm" data-permission="system.parent_links.manage" onclick="plLinkParentStudent()">💾 Liên kết</button>
           <button class="btn btn-outline btn-sm" onclick="plClearForm()">↺ Làm mới</button>
         </div>
       </div>
@@ -1009,7 +1013,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <div class="fg"><label>Nội dung</label>
         <textarea id="evaluationTemplateContent" style="min-height:96px" placeholder="Dùng được {ten_hoc_sinh}, {ten_phu_huynh}, {ngay_hoc}, {mon_hoc}, {ten_lop}, {ten_giao_vien}"></textarea>
       </div>
-      <div class="form-btns"><button class="btn btn-primary btn-sm" type="button" onclick="addEvaluationTemplate()">Thêm mẫu</button></div>
+      <div class="form-btns"><button class="btn btn-primary btn-sm" data-permission="system.evaluation_templates.create" type="button" onclick="addEvaluationTemplate()">Thêm mẫu</button></div>
     </div>
   </div>
   <div class="table-card">
@@ -1034,7 +1038,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <span class="count-badge" id="adminLogCount">0</span>
         <button class="btn btn-outline btn-sm" type="button" onclick="toggleAllVisibleAdminLogs()">Chọn</button>
-        <button class="btn btn-outline btn-sm" type="button" onclick="deleteSelectedAdminLogs()">Xóa đã chọn</button>
+        <button class="btn btn-outline btn-sm" data-permission="system.logs.delete" type="button" onclick="deleteSelectedAdminLogs()">Xóa đã chọn</button>
         <button class="btn btn-outline btn-sm" type="button" onclick="loadAdminLogs()">↻ Làm mới</button>
       </div>
     </div>
@@ -1113,7 +1117,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
       <div id="themeGrid" class="theme-grid"></div>
       <div class="theme-actions">
         <span id="themeSaveStatus" style="font-size:.8rem;color:var(--ink-light)"></span>
-        <button class="btn btn-primary" type="button" onclick="saveSystemTheme()">Áp dụng cho toàn hệ thống</button>
+        <button class="btn btn-primary" data-permission="system.appearance.update" type="button" onclick="saveSystemTheme()">Áp dụng cho toàn hệ thống</button>
       </div>
     </div>
   </div>
@@ -1157,8 +1161,8 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
     <div class="fg"><label>Trường</label><input id="seSc" placeholder="Tên trường"></div>
     <div class="modal-s-actions">
       <button class="btn btn-outline btn-sm" onclick="sCloseModal()">Hủy</button>
-      <button class="btn btn-danger btn-sm" id="sResetPwdBtn" onclick="sResetStudentPassword()">🔑 Reset mật khẩu</button>
-      <button class="btn btn-primary btn-sm" onclick="sSaveStudent()">💾 Lưu</button>
+      <button class="btn btn-danger btn-sm" data-permission="system.students.reset_password" id="sResetPwdBtn" onclick="sResetStudentPassword()">🔑 Reset mật khẩu</button>
+      <button class="btn btn-primary btn-sm" data-permission="system.students.update" onclick="sSaveStudent()">💾 Lưu</button>
     </div>
   </div>
 </div>
@@ -1181,10 +1185,10 @@ function toast(msg, dur=2000){
 /* ── Tab switch ── */
 function switchTab(id, btn){
   const tabPermissions = {
-    rooms:'system.catalogs.manage', grades:'system.catalogs.manage', subjects:'system.catalogs.manage', topics:'system.catalogs.manage',
-    teachers:'system.staff.manage', students:'system.students.manage', evaluationTemplates:'system.templates.manage',
-    msgTemplates:'system.templates.manage', adminLogs:'system.logs.view', permissions:'system.permissions.manage',
-    appearance:'system.appearance.manage'
+    rooms:'system.rooms.view', grades:'system.grades.view', subjects:'system.subjects.view', topics:'system.topics.view',
+    teachers:'system.staff.view', students:'system.students.view', evaluationTemplates:'system.evaluation_templates.view',
+    msgTemplates:'system.message_templates.view', adminLogs:'system.logs.view', permissions:'system.permissions.view',
+    appearance:'system.appearance.view'
   };
   const requiredPermission = tabPermissions[id];
   if(requiredPermission && !window.AppPermissions?.has?.(requiredPermission, false)){
@@ -1344,6 +1348,14 @@ function permissionGroupLabel(groupKey, permission){
     || groupKey;
 }
 
+function permissionSubgroupKey(permission){
+  return String(permission.subgroup_key || permission.permission_key || '').trim();
+}
+
+function permissionSubgroupLabel(permission){
+  return String(permission.subgroup_label || permission.label || 'Chức năng').trim();
+}
+
 function renderPermissionEditor(){
   const editor = document.getElementById('permissionEditor');
   if(!editor || !_permissionData) return;
@@ -1384,7 +1396,17 @@ function renderPermissionEditor(){
         <button class="permission-preset" type="button" ${isAdmin ? 'disabled' : ''} onclick="applyPermissionPreset('${escAttr(user.id)}','${escAttr(groupKey)}','default',this)">Theo chức vụ</button>
         <button class="permission-preset danger" type="button" ${isAdmin ? 'disabled' : ''} onclick="applyPermissionPreset('${escAttr(user.id)}','${escAttr(groupKey)}','none',this)">Bỏ tất cả</button>
       </div>
-      ${permissions.map(permission => {
+      ${(() => {
+        const subgroups = new Map();
+        permissions.forEach(permission => {
+          const key = permissionSubgroupKey(permission);
+          if(!subgroups.has(key)) subgroups.set(key, { label:permissionSubgroupLabel(permission), permissions:[] });
+          subgroups.get(key).permissions.push(permission);
+        });
+        return [...subgroups.values()].map(subgroup => `
+          <section class="permission-subgroup">
+            <div class="permission-subgroup-head"><span>${esc(subgroup.label)}</span><span>${subgroup.permissions.length} quyền</span></div>
+            ${subgroup.permissions.map(permission => {
         const hasOverride = Object.prototype.hasOwnProperty.call(overrides, permission.permission_key);
         const overrideValue = hasOverride ? String(overrides[permission.permission_key]) : 'default';
         const defaultAllowed = defaults[permission.permission_key] === true || isAdmin;
@@ -1402,7 +1424,10 @@ function renderPermissionEditor(){
               <option value="false" ${overrideValue === 'false' ? 'selected' : ''}>Không cho phép riêng</option>
             </select>
           </div>`;
-      }).join('')}
+            }).join('')}
+          </section>
+        `).join('');
+      })()}
     </details>
   `;}).join('');
   editor.innerHTML = `
@@ -1569,6 +1594,7 @@ async function loadSystemTheme(){
 }
 
 async function saveSystemTheme(){
+  if(!window.AppPermissions?.require?.('system.appearance.update')) return;
   const user = await window.AppAuth?.getUser?.();
   if(!user) return alert('Vui lòng đăng nhập lại.');
   const status = document.getElementById('themeSaveStatus');
@@ -1602,8 +1628,8 @@ async function loadRooms(){
         <td>${r.capacity ? r.capacity + " chỗ" : "—"}</td>
         <td style="color:var(--ink-mid)">${esc(r.note||"—")}</td>
         <td><div class="act-wrap">
-          <button class="btn-edit-sm" onclick="editRoom('${r.id}','${esc(r.room_name)}','${r.capacity||""}','${esc(r.note||"")}')">✏</button>
-          <button class="btn-del-sm" type="button" title="Xóa phòng học" aria-label="Xóa phòng học" onclick="deleteRoom('${r.id}')">🗑</button>
+          <button class="btn-edit-sm" data-permission="system.rooms.update" onclick="editRoom('${r.id}','${esc(r.room_name)}','${r.capacity||""}','${esc(r.note||"")}')">✏</button>
+          <button class="btn-del-sm" data-permission="system.rooms.delete" type="button" title="Xóa phòng học" aria-label="Xóa phòng học" onclick="deleteRoom('${r.id}')">🗑</button>
         </div></td>
       </tr>`).join("")
     : `<tr class="empty-row" data-live-key="room-empty"><td colspan="4">Chưa có phòng nào</td></tr>`);
@@ -1611,6 +1637,7 @@ async function loadRooms(){
 
 async function saveRoom(){
   const id       = document.getElementById("roomId").value;
+  if(!window.AppPermissions?.require?.(id ? 'system.rooms.update' : 'system.rooms.create')) return;
   const room_name= document.getElementById("roomName").value.trim();
   const capacity = parseInt(document.getElementById("roomCapacity").value)||null;
   const note     = document.getElementById("roomNote").value.trim()||null;
@@ -1635,6 +1662,7 @@ async function saveRoom(){
   resetRoom(); loadRooms(); toast("✅ Đã lưu phòng học");
 }
 function editRoom(id,name,cap,note){
+  if(!window.AppPermissions?.require?.('system.rooms.update')) return;
   document.getElementById("roomId").value       = id;
   document.getElementById("roomName").value     = name;
   document.getElementById("roomCapacity").value = cap;
@@ -1644,6 +1672,7 @@ function resetRoom(){
   ["roomId","roomName","roomCapacity","roomNote"].forEach(id => document.getElementById(id).value="");
 }
 async function deleteRoom(id){
+  if(!window.AppPermissions?.require?.('system.rooms.delete')) return;
   if(!confirm("Xóa phòng này?")) return;
   const roomName = document.getElementById("roomName").value.trim() || null;
   const outcome = await window.AppAdminTools?.runAdminAction?.({
@@ -1671,14 +1700,15 @@ async function loadGrades(){
     ? sorted.map(g => `<tr data-live-key="grade-${g.id}">
         <td><span class="grade-badge">Khối ${esc(g.name)}</span></td>
         <td><div class="act-wrap">
-          <button class="btn-edit-sm" onclick="editGrade('${g.id}','${esc(g.name)}')">✏</button>
-          <button class="btn-del-sm" type="button" title="Xóa khối" aria-label="Xóa khối" onclick="deleteGrade('${g.id}')">🗑</button>
+          <button class="btn-edit-sm" data-permission="system.grades.update" onclick="editGrade('${g.id}','${esc(g.name)}')">✏</button>
+          <button class="btn-del-sm" data-permission="system.grades.delete" type="button" title="Xóa khối" aria-label="Xóa khối" onclick="deleteGrade('${g.id}')">🗑</button>
         </div></td>
       </tr>`).join("")
     : `<tr class="empty-row" data-live-key="grade-empty"><td colspan="2">Chưa có khối nào</td></tr>`);
 }
 async function saveGrade(){
   const id   = document.getElementById("gradeId").value;
+  if(!window.AppPermissions?.require?.(id ? 'system.grades.update' : 'system.grades.create')) return;
   const name = document.getElementById("gradeName").value.trim();
   if(!name){ alert("Vui lòng nhập tên khối"); return; }
   const outcome = await window.AppAdminTools?.runAdminAction?.({
@@ -1698,6 +1728,7 @@ async function saveGrade(){
   resetGrade(); loadGrades(); loadDropdowns(); toast("✅ Đã lưu khối");
 }
 function editGrade(id,name){
+  if(!window.AppPermissions?.require?.('system.grades.update')) return;
   document.getElementById("gradeId").value   = id;
   document.getElementById("gradeName").value = name;
 }
@@ -1706,6 +1737,7 @@ function resetGrade(){
   document.getElementById("gradeName").value = "";
 }
 async function deleteGrade(id){
+  if(!window.AppPermissions?.require?.('system.grades.delete')) return;
   if(!confirm("Xóa khối này? Các môn thuộc khối cũng bị ảnh hưởng.")) return;
   const gradeName = document.getElementById("gradeName").value.trim() || null;
   const outcome = await window.AppAdminTools?.runAdminAction?.({
@@ -1737,14 +1769,15 @@ async function loadSubjects(){
         <td><span class="grade-badge">Khối ${esc(s.grades?.name||"?")}</span></td>
         <td><span class="subject-badge">${esc(s.name)}</span></td>
         <td><div class="act-wrap">
-          <button class="btn-edit-sm" onclick="editSubject('${s.id}','${esc(s.name)}','${s.grade_id}')">✏</button>
-          <button class="btn-del-sm" type="button" title="Xóa môn học" aria-label="Xóa môn học" onclick="deleteSubject('${s.id}')">🗑</button>
+          <button class="btn-edit-sm" data-permission="system.subjects.update" onclick="editSubject('${s.id}','${esc(s.name)}','${s.grade_id}')">✏</button>
+          <button class="btn-del-sm" data-permission="system.subjects.delete" type="button" title="Xóa môn học" aria-label="Xóa môn học" onclick="deleteSubject('${s.id}')">🗑</button>
         </div></td>
       </tr>`).join("")
     : `<tr class="empty-row" data-live-key="subject-empty"><td colspan="3">Chưa có môn nào</td></tr>`);
 }
 async function saveSubject(){
   const id       = document.getElementById("subjectId").value;
+  if(!window.AppPermissions?.require?.(id ? 'system.subjects.update' : 'system.subjects.create')) return;
   const name     = document.getElementById("subjectName").value.trim();
   const grade_id = document.getElementById("subjectGrade").value;
   if(!name || !grade_id){ alert("Vui lòng điền đầy đủ"); return; }
@@ -1766,6 +1799,7 @@ async function saveSubject(){
   resetSubject(); loadSubjects(); loadDropdowns(); toast("✅ Đã lưu môn học");
 }
 function editSubject(id,name,gradeId){
+  if(!window.AppPermissions?.require?.('system.subjects.update')) return;
   document.getElementById("subjectId").value    = id;
   document.getElementById("subjectName").value  = name;
   document.getElementById("subjectGrade").value = gradeId;
@@ -1776,6 +1810,7 @@ function resetSubject(){
   document.getElementById("subjectGrade").value = "";
 }
 async function deleteSubject(id){
+  if(!window.AppPermissions?.require?.('system.subjects.delete')) return;
   if(!confirm("Xóa môn này?")) return;
   const subjectName = document.getElementById("subjectName").value.trim() || null;
   const outcome = await window.AppAdminTools?.runAdminAction?.({
@@ -1815,8 +1850,8 @@ async function loadTopics(){
         <td><span class="subject-badge">${esc(subject?.name||"?")}</span></td>
         <td><b>${esc(t.name)}</b></td>
         <td><div class="act-wrap">
-          <button class="btn-edit-sm" onclick="editTopic('${t.id}','${esc(t.name)}','${subject?.id || ""}','${subject?.grades?.id || ""}')">✏</button>
-          <button class="btn-del-sm" type="button" title="Xóa chủ đề" aria-label="Xóa chủ đề" onclick="deleteTopic('${t.id}')">🗑</button>
+          <button class="btn-edit-sm" data-permission="system.topics.update" onclick="editTopic('${t.id}','${esc(t.name)}','${subject?.id || ""}','${subject?.grades?.id || ""}')">✏</button>
+          <button class="btn-del-sm" data-permission="system.topics.delete" type="button" title="Xóa chủ đề" aria-label="Xóa chủ đề" onclick="deleteTopic('${t.id}')">🗑</button>
         </div></td>
       </tr>`;
     }).join("")
@@ -1824,6 +1859,7 @@ async function loadTopics(){
 }
 async function saveTopic(){
   const id         = document.getElementById("topicId").value;
+  if(!window.AppPermissions?.require?.(id ? 'system.topics.update' : 'system.topics.create')) return;
   const name       = document.getElementById("topicName").value.trim();
   const subject_id = document.getElementById("topicSubject").value;
   if(!name || !subject_id){ alert("Vui lòng điền đầy đủ"); return; }
@@ -1845,6 +1881,7 @@ async function saveTopic(){
   resetTopic(); loadTopics(); toast("✅ Đã lưu chủ đề");
 }
 async function editTopic(id,name,subjectId,gradeId){
+  if(!window.AppPermissions?.require?.('system.topics.update')) return;
   document.getElementById("topicId").value    = id;
   document.getElementById("topicName").value  = name;
   document.getElementById("topicGrade").value = gradeId;
@@ -1856,6 +1893,7 @@ function resetTopic(){
   document.getElementById("topicName").value  = "";
 }
 async function deleteTopic(id){
+  if(!window.AppPermissions?.require?.('system.topics.delete')) return;
   if(!confirm("Xóa chủ đề này?")) return;
   const topicName = document.getElementById("topicName").value.trim() || null;
   const outcome = await window.AppAdminTools?.runAdminAction?.({
@@ -1912,19 +1950,22 @@ async function init(){
     location.href = "dashboard.html";
     return;
   }
-  const canCatalogs = window.AppPermissions?.has?.('system.catalogs.manage', profile?.role === 'admin');
-  const canStaff = window.AppPermissions?.has?.('system.staff.manage', profile?.role === 'admin');
-  const canStudents = window.AppPermissions?.has?.('system.students.manage', profile?.role === 'admin');
+  const canRooms = window.AppPermissions?.has?.('system.rooms.view', profile?.role === 'admin');
+  const canGrades = window.AppPermissions?.has?.('system.grades.view', profile?.role === 'admin');
+  const canSubjects = window.AppPermissions?.has?.('system.subjects.view', profile?.role === 'admin');
+  const canTopics = window.AppPermissions?.has?.('system.topics.view', profile?.role === 'admin');
+  const canStaff = window.AppPermissions?.has?.('system.staff.view', profile?.role === 'admin');
+  const canStudents = window.AppPermissions?.has?.('system.students.view', profile?.role === 'admin');
   const canLogs = window.AppPermissions?.has?.('system.logs.view', profile?.role === 'admin');
-  if(canCatalogs || canStaff || canStudents){
+  if(canGrades || canSubjects || canTopics || canStaff || canStudents){
     try { await loadDropdowns(); } catch (e) { console.error("loadDropdowns error:", e); }
   }
   
   const loaders = [
-    { name: "loadRooms", fn: loadRooms, allowed:canCatalogs },
-    { name: "loadGrades", fn: loadGrades, allowed:canCatalogs },
-    { name: "loadSubjects", fn: loadSubjects, allowed:canCatalogs },
-    { name: "loadTopics", fn: loadTopics, allowed:canCatalogs },
+    { name: "loadRooms", fn: loadRooms, allowed:canRooms },
+    { name: "loadGrades", fn: loadGrades, allowed:canGrades },
+    { name: "loadSubjects", fn:loadSubjects, allowed:canSubjects },
+    { name: "loadTopics", fn:loadTopics, allowed:canTopics },
     { name: "loadTeachers", fn: loadTeachers, allowed:canStaff },
     { name: "loadStudents", fn: loadStudents, allowed:canStudents },
     { name: "loadAdminLogs", fn: loadAdminLogs, allowed:canLogs }
@@ -1938,26 +1979,30 @@ async function init(){
     }
   }
 
-  if(canCatalogs){
-    window.MindupLiveUI?.watchTable?.('rooms', loadRooms);
-    window.MindupLiveUI?.watchTable?.('grades', loadGrades);
-    window.MindupLiveUI?.watchTable?.('subjects', loadSubjects);
-    window.MindupLiveUI?.watchTable?.('topics', loadTopics);
-  }
+  if(canRooms) window.MindupLiveUI?.watchTable?.('rooms', loadRooms);
+  if(canGrades) window.MindupLiveUI?.watchTable?.('grades', loadGrades);
+  if(canSubjects) window.MindupLiveUI?.watchTable?.('subjects', loadSubjects);
+  if(canTopics) window.MindupLiveUI?.watchTable?.('topics', loadTopics);
   
   const tab = new URLSearchParams(window.location.search).get('tab');
   if(tab){
     const targetBtn = document.querySelector(`.tab[onclick*="'${tab}'"]`);
     const targetPanel = document.getElementById(tab);
-    if(targetBtn && targetPanel) switchTab(tab, targetBtn);
+    const allowed = targetBtn && window.AppPermissions?.has?.(targetBtn.dataset.permission, false);
+    if(targetBtn && targetPanel && allowed) switchTab(tab, targetBtn);
+    else selectFirstAllowedSystemTab();
   }else{
+    selectFirstAllowedSystemTab();
+  }
+}
+
+function selectFirstAllowedSystemTab(){
     const firstAllowedTab = [...document.querySelectorAll('.tab[data-permission]')]
       .find(item => window.AppPermissions?.has?.(item.dataset.permission, false));
     if(firstAllowedTab){
       const match = firstAllowedTab.getAttribute('onclick')?.match(/'([^']+)'/);
       if(match) switchTab(match[1], firstAllowedTab);
     }
-  }
 }
 init();
 
@@ -2025,14 +2070,15 @@ function renderTeacherGrid(){
         <div class="tc-row" style="flex-direction:column;align-items:flex-start;gap:4px"><span style="font-size:.7rem;font-weight:700;color:var(--ink-light);text-transform:uppercase">Lớp phụ trách</span>${clsHtml}</div>
       </div>
       <div class="tc-foot">
-        <button class="btn-tc-edit" onclick="openEditTeacher('${t.id}')">✏ Sửa</button>
-        <button class="btn-tc-down" onclick="downgradeT('${t.id}','${esc(t.full_name||'')}')">↩ Về học sinh</button>
+        <button class="btn-tc-edit" data-permission="system.staff.update" onclick="openEditTeacher('${t.id}')">✏ Sửa</button>
+        <button class="btn-tc-down" data-permission="system.staff.update" onclick="downgradeT('${t.id}','${esc(t.full_name||'')}')">↩ Về học sinh</button>
       </div>
     </div>`;
   }).join('');
 }
 
 function openAddTeacher(){
+  if(!window.AppPermissions?.require?.('system.staff.create')) return;
   _tEditId = null;
   document.getElementById('tModalTitle').textContent = 'Thêm giáo viên';
   document.getElementById('tAddSection').style.display = 'block';
@@ -2046,6 +2092,7 @@ function openAddTeacher(){
 }
 
 function openEditTeacher(id){
+  if(!window.AppPermissions?.require?.('system.staff.update')) return;
   _tEditId = id;
   const t = _teachers.find(x=>x.id===id); if(!t) return;
   document.getElementById('tModalTitle').textContent = 'Sửa thông tin giáo viên';
@@ -2064,6 +2111,7 @@ function openEditTeacher(id){
 }
 
 async function tResetTeacherPassword() {
+  if(!window.AppPermissions?.require?.('system.staff.reset_password')) return;
   if (!_tEditId) return;
   const t = _teachers.find(x => x.id === _tEditId);
   if (!t) {
@@ -2125,6 +2173,7 @@ async function updateManagedCredentials(userId, email, password){
 }
 
 async function submitTeacher(){
+  if(!window.AppPermissions?.require?.(_tEditId ? 'system.staff.update' : 'system.staff.create')) return;
   const subject    = document.getElementById('tSubject').value;
   const selectedRole = document.getElementById('tRole').value;
   const staffRole  = ['teacher','assistant'].includes(selectedRole) ? selectedRole : 'teacher';
@@ -2498,6 +2547,7 @@ async function sCancelZaloBulkRun(){
 }
 
 async function sStartZaloBulkRun(){
+  if(!window.AppPermissions?.require?.('system.zalo.manage')) return;
   if(_sZaloBulkBusy) return;
   if(!confirm('Kiểm tra và kết nối Zalo cho các phụ huynh chưa kết bạn? Phụ huynh đã kết bạn sẽ không được đưa vào đợt. Bot chạy ngầm khi laptop online; đóng trang web không làm dừng xử lý.')) return;
   _sZaloBulkBusy=true;
@@ -2560,6 +2610,7 @@ async function sLoadZaloAliasStatus(){
 }
 
 async function sStartZaloAliasSync(){
+  if(!window.AppPermissions?.require?.('system.zalo.manage')) return;
   if(_sZaloAliasBusy) return;
   document.getElementById('sZaloAliasChoiceModal')?.classList.add('open');
 }
@@ -2870,8 +2921,8 @@ function sRender(){
       <td>${esc(s.province||'—')}</td>
       <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s.school||'')}">${esc(s.school||'—')}</td>
       <td><div class="act-wrap" style="justify-content:center">
-        <button class="btn-edit-sm" onclick="sEditStudent('${s.id}')">✏</button>
-        <button class="btn-del-sm" type="button" title="Xóa học sinh" aria-label="Xóa học sinh" onclick="sDelStudent('${s.id}')">🗑</button>
+        <button class="btn-edit-sm" data-permission="system.students.update" onclick="sEditStudent('${s.id}')">✏</button>
+        <button class="btn-del-sm" data-permission="system.students.delete" type="button" title="Xóa học sinh" aria-label="Xóa học sinh" onclick="sDelStudent('${s.id}')">🗑</button>
       </div></td>
     </tr>`;
   }).join('');
@@ -3031,6 +3082,7 @@ async function sSyncParentAccountForStudent(studentId, payload){
 }
 
 async function sEditStudent(id){
+  if(!window.AppPermissions?.require?.('system.students.update')) return;
   const s=_sAll.find(x=>x.id===id); if(!s) return;
   _sEditId=id;
   _sParentEmailTouched = false;
@@ -3066,6 +3118,7 @@ async function sEditStudent(id){
 function sCloseModal(){ document.getElementById('sModal').classList.remove('open'); }
 
 async function sResetStudentPassword() {
+  if(!window.AppPermissions?.require?.('system.students.reset_password')) return;
   if (!_sEditId) return;
   const s = _sAll.find(x => x.id === _sEditId);
   if (!s) {
@@ -3111,6 +3164,7 @@ async function sResetStudentPassword() {
 }
 
 async function sSaveStudent(){
+  if(!window.AppPermissions?.require?.('system.students.update')) return;
   const payload = {
     full_name: document.getElementById('seN').value.trim(),
     phone:     document.getElementById('seP').value.trim(),
@@ -3144,6 +3198,7 @@ async function sSaveStudent(){
 }
 
 async function sDelStudent(id){
+  if(!window.AppPermissions?.require?.('system.students.delete')) return;
   if(!confirm('Xóa vĩnh viễn học sinh này và toàn bộ dữ liệu liên quan? Thao tác này không thể hoàn tác.')) return;
   const outcome = await window.AppAdminTools?.runAdminAction?.({
     action: 'student_delete_cascade',
@@ -3335,6 +3390,7 @@ function plRenderLinks(){
 }
 
 async function plLinkParentStudent(){
+  if(!window.AppPermissions?.require?.('system.parent_links.manage')) return;
   const email = document.getElementById('plParentEmail').value.trim().toLowerCase();
   const full_name = document.getElementById('plParentName').value.trim();
   const phone = document.getElementById('plParentPhone').value.trim();
@@ -3380,6 +3436,7 @@ async function plLinkParentStudent(){
 }
 
 async function plUnlink(id){
+  if(!window.AppPermissions?.require?.('system.parent_links.manage')) return;
   if(!confirm('Hủy liên kết phụ huynh với học sinh này?')) return;
   const item = _plLinks.find(row => row.id === id);
   const outcome = await window.AppAdminTools?.runAdminAction?.({
@@ -4628,6 +4685,7 @@ function toggleAllVisibleAdminLogs(force){
 }
 
 async function deleteSelectedAdminLogs(){
+  if(!window.AppPermissions?.require?.('system.logs.delete')) return;
   const ids = [..._selectedAdminLogIds];
   if(!ids.length){
     alert('Hãy chọn ít nhất một nhật ký cần xóa.');
@@ -4841,6 +4899,7 @@ async function loadMessageTemplatesAdmin(){
 }
 
 async function saveMsgTemplate(id, name) {
+  if(!window.AppPermissions?.require?.('system.message_templates.update')) return;
   const contentEl = document.getElementById('tplcontent_' + id);
   const enabledEl = document.getElementById('tplenabled_' + id);
   if(!contentEl) return;

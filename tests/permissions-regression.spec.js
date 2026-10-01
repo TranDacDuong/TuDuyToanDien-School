@@ -64,4 +64,48 @@ test.describe("Granular permissions regression", () => {
     expect(tasks).toContain("canViewStaffTasks()");
     expect(tasks).toContain("canManageTaskTemplates()");
   });
+
+  test("fine-grained migration separates subtabs and CRUD actions", () => {
+    const sql = fs.readFileSync(path.join(root, "SQL fine grained action permissions.sql"), "utf8");
+    const source = fs.readFileSync(path.join(root, "sourcedata.html"), "utf8");
+    const resources = fs.readFileSync(path.join(root, "resources.html"), "utf8");
+    const trials = fs.readFileSync(path.join(root, "trial_requests.html"), "utf8");
+
+    expect(sql).toContain("subgroup_key text");
+    expect(sql).toContain("action_key text");
+    expect(sql).toContain("'system.grades.view'");
+    expect(sql).toContain("'system.grades.create'");
+    expect(sql).toContain("'system.grades.update'");
+    expect(sql).toContain("'system.grades.delete'");
+    expect(sql).toContain("'facebook.assignments.manage'");
+    expect(sql).toContain("mindup_permission_map");
+    expect(source).toContain("permissionSubgroupKey");
+    expect(source).toContain('data-permission="system.grades.view"');
+    expect(source).toContain("require?.('system.grades.delete')");
+    expect(resources).toContain("canCreateResources");
+    expect(resources).toContain("canDeleteResources");
+    expect(trials).toContain('data-permission="trial.class.assign"');
+    expect(trials).not.toContain('data-permission="trial.manage"');
+  });
+
+  test("exam, question, public exam, and task actions enforce their dedicated permissions", () => {
+    const exam = fs.readFileSync(path.join(root, "exam.js"), "utf8");
+    const publicExam = fs.readFileSync(path.join(root, "public_exam.js"), "utf8");
+    const questions = fs.readFileSync(path.join(root, "question_list.js"), "utf8");
+    const questionCreate = fs.readFileSync(path.join(root, "question_create.js"), "utf8");
+    const tasks = fs.readFileSync(path.join(root, "tasks.js"), "utf8");
+
+    expect(exam).toContain('hasExamPermission("exam.create")');
+    expect(exam).toContain('hasExamPermission("exam.delete")');
+    expect(exam).toContain('hasExamPermission("exam.questions.manage")');
+    expect(exam).not.toContain('"exam.manage"');
+    expect(publicExam).toContain('"public_exam.publish"');
+    expect(publicExam).toContain('"public_exam.delete"');
+    expect(publicExam).not.toContain('"public_exam.manage"');
+    expect(questions).toContain('hasQuestionPermission("question.archive")');
+    expect(questions).toContain('hasQuestionPermission("question.ai.generate")');
+    expect(questionCreate).toContain('editingQuestionId ? "question.update" : "question.create"');
+    expect(tasks).toContain('hasTaskPermission("tasks.delete"');
+    expect(tasks).not.toContain('hasTaskPermission("tasks.manage"');
+  });
 });

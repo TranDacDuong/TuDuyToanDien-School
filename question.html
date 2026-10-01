@@ -475,12 +475,12 @@ button {
   </div>
 
   <div class="quickOps">
-    <button class="quickOp" data-testid="question-quick-missing-answer" data-permission="question.manage" type="button" onclick="applyQuickQuestionAction('missing')">
+    <button class="quickOp" data-testid="question-quick-missing-answer" data-permission="question.update" type="button" onclick="applyQuickQuestionAction('missing')">
       <div class="quickOp-title"><span class="quickOp-icon" aria-hidden="true">⚠</span><strong>Câu Thiếu Đáp Án</strong></div>
       <span>Mở ngay bộ lọc chỉ còn các câu chưa có đáp án để rà nhanh trước khi ra đề.</span>
       <span class="quickStat" id="quickMissingCount">0 câu</span>
     </button>
-    <button class="quickOp" data-testid="question-quick-duplicate-audit" data-permission="question.manage" type="button" onclick="runDuplicateAudit()">
+    <button class="quickOp" data-testid="question-quick-duplicate-audit" data-permission="question.all.view" type="button" onclick="runDuplicateAudit()">
       <div class="quickOp-title"><span class="quickOp-icon" aria-hidden="true">⌕</span><strong>Kiểm tra câu trùng</strong></div>
       <span>Chạy kiểm tra và mở popup nhóm câu trùng để đối chiếu ngay trong một lượt.</span>
       <span class="quickStat" id="quickDuplicateCount">0 câu</span>
@@ -493,12 +493,12 @@ button {
         <a class="quickOp-mini" href="question-word-template.docx" download>Tải file mẫu</a>
       </div>
     </div>
-    <button class="quickOp" data-testid="question-quick-create" data-permission="question.manage" type="button" onclick="openModal()">
+    <button class="quickOp" data-testid="question-quick-create" data-permission="question.create" type="button" onclick="openModal()">
       <div class="quickOp-title"><span class="quickOp-icon" aria-hidden="true">+</span><strong>Tạo Nhanh Câu Hỏi</strong></div>
       <span>Mở form tạo câu hỏi ngay để thêm câu mới mà không cần cuộn xuống bảng.</span>
       <span class="quickStat">Form</span>
     </button>
-    <button class="quickOp" data-testid="question-quick-ai-answer" data-permission="question.manage" type="button" onclick="fillMissingAnswersWithAI()">
+    <button class="quickOp" data-testid="question-quick-ai-answer" data-permission="question.ai.generate" type="button" onclick="fillMissingAnswersWithAI()">
       <div class="quickOp-title"><span class="quickOp-icon" aria-hidden="true">✦</span><strong>Điền Đáp Án AI</strong></div>
       <span>Chạy AI theo từng lô cho các câu đang trống đáp án và gắn trạng thái Đáp án AI để giáo viên rà lại sau.</span>
       <span class="quickStat" id="quickAiAnswerCount">0 chờ xử lý</span>
@@ -685,7 +685,7 @@ button {
         <div id="qPreview" style="padding:8px 10px;background:var(--surface);border-radius:8px;border:1px solid var(--border);font-size:.88rem;line-height:1.8;min-height:36px;color:var(--navy);white-space:pre-line;display:none"></div>
         <!-- Nút AI -->
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button type="button" onclick="convertModalWithAI()" id="qAiBtn"
+          <button type="button" data-permission="question.ai.generate" onclick="convertModalWithAI()" id="qAiBtn"
             style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border:none;border-radius:8px;background:linear-gradient(135deg,var(--navy),#1e3a5f);color:var(--gold-light);font-size:.82rem;font-weight:700;cursor:pointer;font-family:var(--font-body)">
             ✨ Chuyển đổi với AI
           </button>
