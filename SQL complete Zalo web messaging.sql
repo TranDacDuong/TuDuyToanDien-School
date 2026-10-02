@@ -289,6 +289,13 @@ BEGIN
     RAISE EXCEPTION 'Zalo image delivery is not supported yet';
   END IF;
 
+  SELECT zalo_uid INTO v_zalo_uid
+  FROM public.zalo_verified_links
+  WHERE audience_user_id = p_parent_id AND enabled;
+  IF v_zalo_uid IS NULL THEN
+    RAISE EXCEPTION 'Parent Zalo is not linked';
+  END IF;
+
   v_conversation_id := public.ensure_mindup_official_audience_conversation(p_parent_id);
   INSERT INTO public.messages (
     conversation_id, sender_id, content, real_sender_id, transport, context_student_id
@@ -301,17 +308,11 @@ BEGIN
     p_student_id
   ) RETURNING id INTO v_message_id;
 
-  SELECT zalo_uid INTO v_zalo_uid
-  FROM public.zalo_verified_links
-  WHERE audience_user_id = p_parent_id AND enabled;
-
-  IF v_zalo_uid IS NOT NULL THEN
-    INSERT INTO public.zalo_outbox (
-      message_id, conversation_id, audience_user_id, zalo_uid, content
-    ) VALUES (
-      v_message_id, v_conversation_id, p_parent_id, v_zalo_uid, p_content
-    ) ON CONFLICT (message_id) DO NOTHING;
-  END IF;
+  INSERT INTO public.zalo_outbox (
+    message_id, conversation_id, audience_user_id, zalo_uid, content
+  ) VALUES (
+    v_message_id, v_conversation_id, p_parent_id, v_zalo_uid, p_content
+  ) ON CONFLICT (message_id) DO NOTHING;
 
   RETURN v_message_id;
 END;

@@ -28,6 +28,7 @@ test('parent message is saved and queued for Zalo atomically', () => {
   expect(functionBody).toContain('INSERT INTO public.zalo_outbox');
   expect(functionBody).toContain('public.can_message_parent_for_student');
   expect(functionBody).toContain('p_student_id');
+  expect(functionBody).toContain("RAISE EXCEPTION 'Parent Zalo is not linked'");
 });
 
 test('message UI uses scoped parent inbox and automatic Zalo delivery', () => {

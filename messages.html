@@ -1455,6 +1455,7 @@ async function refreshZaloSendMode() {
   const audienceId = activeFriend?.id;
   if (!currentConversationId || !audienceId || !isMindUpStaffRole(currentProfile?.role)
     || activeFriend?.role !== 'parent') return;
+  setComposerEnabled(false);
   if (currentProfile?.role === 'admin') linkButton.classList.add('show');
   const expectedConversation = currentConversationId;
   const { data, error } = await sb.rpc('mindup_zalo_link_available', { p_audience_user_id: audienceId });
@@ -1464,6 +1465,10 @@ async function refreshZaloSendMode() {
   mode.value = 'auto';
   label.textContent = zaloLinkAvailable ? 'Web + Zalo tự động' : 'Chưa liên kết Zalo';
   label.style.color = zaloLinkAvailable ? '#08783e' : '#b45309';
+  setComposerEnabled(zaloLinkAvailable);
+  document.getElementById('messageInput').placeholder = zaloLinkAvailable
+    ? 'Nhập tin nhắn...'
+    : 'Cần liên kết Zalo trước khi gửi';
 }
 
 function resetZaloSendMode() {
@@ -1477,6 +1482,7 @@ function resetZaloSendMode() {
   mode.value = 'auto';
   zaloLinkAvailable = false;
   zaloDeliveryByMessage = new Map();
+  document.getElementById('messageInput').placeholder = 'Nhập tin nhắn...';
 }
 
 function setupParentMessageContext(item) {
