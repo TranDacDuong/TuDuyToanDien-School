@@ -36,6 +36,12 @@ let nextAliasSyncAt = 0;
 let gatewayBatchCount = 0;
 const pendingIncoming = new Map();
 let flushingIncoming = false;
+let historySync = {
+  status: 'idle', maxPages: 0, requestedPages: 0, received: 0,
+  queued: 0, startedAt: null, finishedAt: null, error: null
+};
+let historyCursor = null;
+let historyTimer = null;
 
 async function gatewayRequest(payload) {
   if (!GATEWAY_URL || !GATEWAY_TOKEN) throw new Error('Zalo gateway is not configured');
@@ -330,33 +336,104 @@ function startGatewayListener() {
   gatewayListening = true;
   zaloApi.listener.on('message', (message) => {
     if (message.isSelf) {
+      const isLinkCommand = !!parseParentLinkCommand(message.data?.content);
       handleParentLinkCommand(message).catch(error => {
         console.error('[ZaloBot] Không xử lý được lệnh liên kết phụ huynh:', error?.message || error);
       });
+      if (isLinkCommand) return;
+    }
+    queueZaloMessage(message, false);
+  });
+  zaloApi.listener.on('old_messages', (messages, type) => {
+    if (historySync.status !== 'running' || type !== 0) return;
+    const privateMessages = Array.isArray(messages) ? messages : [];
+    historySync.received += privateMessages.length;
+    for (const message of privateMessages) {
+      if (queueZaloMessage(message, true)) historySync.queued++;
+    }
+
+    const nextCursor = String(privateMessages.at(-1)?.data?.msgId || '');
+    if (!privateMessages.length || !nextCursor || nextCursor === historyCursor ||
+      historySync.requestedPages >= historySync.maxPages) {
+      finishHistorySync();
       return;
     }
-    if (message.type !== 0) return;
-    const content = message.data?.content;
-    if (typeof content !== 'string' || !content.trim()) return;
-    const externalId = String(message.data?.msgId || message.data?.cliMsgId || '');
-    const zaloUid = String(message.threadId || '');
-    if (!externalId || !zaloUid) return;
-    const payload = {
-      action: 'incoming', externalId: `${zaloUid}:${externalId}`, zaloUid,
-      content, displayName: String(message.data?.dName || '')
-    };
-    if (pendingIncoming.size >= 1000) {
-      console.error('[ZaloBot] Hàng đợi tin nhận đầy, cần kiểm tra kết nối gateway');
-      return;
-    }
-    pendingIncoming.set(payload.externalId, payload);
-    try { persistIncoming(); } catch (error) {
-      console.error('[ZaloBot] Không lưu được tin nhận trên máy:', error);
-    }
-    flushIncoming().catch(console.error);
+    historyCursor = nextCursor;
+    scheduleHistoryPage();
   });
   zaloApi.listener.on('error', error => console.warn('[ZaloBot] Zalo listener:', error));
   zaloApi.listener.start({ retryOnClose: true });
+}
+
+function messageTimestamp(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return null;
+  const date = new Date(numeric < 1e12 ? numeric * 1000 : numeric);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function queueZaloMessage(message, isHistory) {
+  if (message?.type !== 0) return false;
+  const content = message.data?.content;
+  if (typeof content !== 'string' || !content.trim()) return false;
+  if (message.isSelf && parseParentLinkCommand(content)) return false;
+  const messageId = String(message.data?.msgId || message.data?.cliMsgId || '');
+  const zaloUid = String(message.threadId || '');
+  if (!messageId || !zaloUid) return false;
+  const externalId = `${zaloUid}:${messageId}`;
+  if (pendingIncoming.has(externalId)) return false;
+  if (pendingIncoming.size >= 5000) {
+    console.error('[ZaloBot] Hàng đợi đồng bộ Zalo đầy, tạm dừng nhận thêm');
+    return false;
+  }
+  pendingIncoming.set(externalId, {
+    action: 'syncMessage', externalId, zaloUid, content: content.trim(),
+    displayName: String(message.data?.dName || ''), isSelf: message.isSelf === true,
+    sentAt: messageTimestamp(message.data?.ts), isHistory: isHistory === true
+  });
+  try { persistIncoming(); } catch (error) {
+    console.error('[ZaloBot] Không lưu được tin đồng bộ trên máy:', error);
+  }
+  flushIncoming().catch(console.error);
+  return true;
+}
+
+function scheduleHistoryPage() {
+  clearTimeout(historyTimer);
+  historyTimer = setTimeout(() => {
+    if (historySync.status !== 'running') return;
+    if (pendingIncoming.size > 800) {
+      scheduleHistoryPage();
+      return;
+    }
+    try {
+      historySync.requestedPages++;
+      zaloApi.listener.requestOldMessages(0, historyCursor);
+    } catch (error) {
+      finishHistorySync(error);
+    }
+  }, 1200);
+}
+
+function finishHistorySync(error = null) {
+  clearTimeout(historyTimer);
+  historyTimer = null;
+  historySync.status = error ? 'failed' : 'completed';
+  historySync.finishedAt = new Date().toISOString();
+  historySync.error = error ? String(error?.message || error) : null;
+  flushIncoming().catch(console.error);
+}
+
+function startHistorySync(maxPages) {
+  if (!zaloApi || botStatus !== 'connected') throw new Error('Zalo chưa kết nối');
+  if (historySync.status === 'running') return historySync;
+  historyCursor = null;
+  historySync = {
+    status: 'running', maxPages, requestedPages: 0, received: 0, queued: 0,
+    startedAt: new Date().toISOString(), finishedAt: null, error: null
+  };
+  scheduleHistoryPage();
+  return historySync;
 }
 
 async function handleParentLinkCommand(message) {
@@ -927,6 +1004,7 @@ app.get('/api/status', (req, res) => {
       progress: currentProgress,
       completedResults: completedResults.slice(-100)
     },
+    historySync: { ...historySync, pendingUpload: pendingIncoming.size },
     config: botConfig
   });
 });
@@ -1054,6 +1132,16 @@ app.post('/api/stop-campaign', (req, res) => {
   campaignStatus = 'idle';
   campaignQueue = [];
   res.json({ success: true, message: 'Đã hủy chiến dịch hiện tại.' });
+});
+
+app.post('/api/sync-zalo-history', (req, res) => {
+  try {
+    const requested = Number(req.body?.maxPages || 100);
+    const maxPages = Math.max(1, Math.min(200, Number.isFinite(requested) ? requested : 100));
+    res.json({ success: true, historySync: startHistorySync(maxPages) });
+  } catch (error) {
+    res.status(503).json({ success: false, error: String(error?.message || error) });
+  }
 });
 
 // 8. Gửi thử 1 tin nhắn test

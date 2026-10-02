@@ -144,6 +144,25 @@ Deno.serve(async (request) => {
       });
       return json({ result });
     }
+    if (payload.action === "syncMessage") {
+      const { externalId, zaloUid, content, displayName, isSelf, sentAt, isHistory } = payload;
+      if (typeof externalId !== "string" || typeof zaloUid !== "string" ||
+        typeof content !== "string" || typeof isSelf !== "boolean" ||
+        typeof isHistory !== "boolean" ||
+        (sentAt !== null && sentAt !== undefined && typeof sentAt !== "string")) {
+        return json({ error: "Invalid synchronized message" }, 400);
+      }
+      const result = await rpc("sync_mindup_zalo_message", {
+        p_external_id: externalId,
+        p_zalo_uid: zaloUid,
+        p_content: content,
+        p_display_name: typeof displayName === "string" ? displayName : null,
+        p_is_self: isSelf,
+        p_sent_at: typeof sentAt === "string" ? sentAt : null,
+        p_is_history: isHistory,
+      });
+      return json({ result });
+    }
     if (payload.action === "linkParent") {
       const { externalId, phone, zaloUid, isFriend } = payload;
       if (typeof externalId !== "string" || externalId.length > 220 ||

@@ -58,3 +58,19 @@ test('local Zalo bot acknowledges failed outbox jobs with the claimed job id', (
   expect(server).toContain("jobId: job.job_id, status: 'uncertain'");
   expect(server).not.toContain("jobId: job.job, status: 'uncertain'");
 });
+
+test('Zalo history sync imports both directions without leaking unlinked chats', () => {
+  const sql = read('SQL Zalo message history sync.sql');
+  const gateway = read(path.join('supabase', 'functions', 'zalo-gateway', 'index.ts'));
+  const server = read(path.join('services', 'zalo-bot', 'server.js'));
+
+  expect(sql).toContain('sync_mindup_zalo_message');
+  expect(sql).toContain("RETURN 'ignored_unlinked'");
+  expect(sql).toContain('WHEN p_is_self');
+  expect(sql).toContain("'zalo'");
+  expect(sql).toContain('p_is_history');
+  expect(gateway).toContain('payload.action === "syncMessage"');
+  expect(server).toContain("listener.on('old_messages'");
+  expect(server).toContain("app.post('/api/sync-zalo-history'");
+  expect(server).toContain('isSelf: message.isSelf === true');
+});
