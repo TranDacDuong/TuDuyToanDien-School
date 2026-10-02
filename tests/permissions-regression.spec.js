@@ -115,6 +115,9 @@ test.describe("Granular permissions regression", () => {
 
   test("full staff grants switch role-shaped pages into their administrative views", () => {
     const dashboard = fs.readFileSync(path.join(root, "dashboard.html"), "utf8");
+    const coursesHtml = fs.readFileSync(path.join(root, "courses.html"), "utf8");
+    const classesHtml = fs.readFileSync(path.join(root, "class.html"), "utf8");
+    const gameHtml = fs.readFileSync(path.join(root, "game.html"), "utf8");
     const home = fs.readFileSync(path.join(root, "home.html"), "utf8");
     const courses = fs.readFileSync(path.join(root, "courses_logic.js"), "utf8");
     const classes = fs.readFileSync(path.join(root, "class_list.js"), "utf8");
@@ -131,6 +134,10 @@ test.describe("Granular permissions regression", () => {
     expect(game).toContain('"game.content.create", "game.content.update", "game.content.delete"');
     expect(income).toContain('hasIncomePermission("income.all.view"');
     expect(income).not.toContain('hasIncomePermission("income.manage"');
+    expect(dashboard).toContain('supabaseClient.js?v=20261002-permissions2');
+    expect(coursesHtml).toContain('courses_logic.js?v=20261002-permissions2');
+    expect(classesHtml).toContain('class_list.js?v=20261002-permissions2');
+    expect(gameHtml).toContain('game.js?v=20261002-permissions2');
   });
 
   test("teacher and assistant income defaults only expose personal income", () => {
