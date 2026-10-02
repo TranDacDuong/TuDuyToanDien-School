@@ -34,6 +34,8 @@ test.describe("Granular permissions regression", () => {
     expect(source).toContain("Theo chức vụ");
     expect(source).toContain("Quản lý cơ bản");
     expect(source).toContain("Mở tất cả");
+    expect(source).toContain("Khôi phục theo chức vụ");
+    expect(source).toContain("applyAllPermissionPreset");
     expect(source).not.toContain('<option value="accountant">Kế toán</option>');
   });
 
