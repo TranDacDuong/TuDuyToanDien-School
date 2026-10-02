@@ -1487,7 +1487,9 @@ async function initDashboard(userOverride = null){
   setupMenu();
   checkProfile(profile);
   loadUserInfo(profile);
-  if(profile.role === "admin") window.DashboardOps?.loadAdminOps?.();
+  const canViewOps = ["ops.overview.view", "ops.learning.view", "ops.staff.view"]
+    .some(key => window.AppPermissions?.has?.(key, profile.role === "admin"));
+  if(canViewOps) window.DashboardOps?.loadAdminOps?.();
   loadFriendRequestBadge(user.id);
   loadMessageBadge(user.id);
   subscribeBadgeChanges(user.id);

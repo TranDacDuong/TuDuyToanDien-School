@@ -2071,6 +2071,11 @@ body {
 <script src="image_upload.js"></script>
 <script>
 let currentUser, role, currentProfile;
+function hasHomePermission(key, fallback = false) {
+  return window.AppPermissions?.has?.(key, fallback) ?? fallback;
+}
+function canUpdateHomeInfo() { return hasHomePermission("home.info.update", role === "admin"); }
+function canModerateHomeDiscussion() { return hasHomePermission("home.discussion.moderate", role === "admin" || role === "teacher"); }
 let friendIds = new Set();
 let likedPostIds = new Set();
 let feedChannel = null;
@@ -2459,6 +2464,7 @@ async function init() {
   enhanceHomeHub();
   const { data: p } = await sb.from("users").select("*").eq("id", user.id).single();
   role = p.role; currentProfile = p;
+  await window.AppPermissions?.load?.({ id: user.id, role });
   await loadFriendIds();
   await loadLikedPosts();
   await loadOverviewSettings();
@@ -2468,11 +2474,12 @@ async function init() {
   document.getElementById("composeAvatar").src = p.avatar_url || "default-avatar.png";
   document.getElementById("composeName").textContent = p.full_name || "Bạn";
   if (role === "student") document.getElementById("composeNote").classList.add("show");
-  document.getElementById("overviewAdminCard")?.classList.toggle("show", role === "admin");
-  document.getElementById("countdownAdminBlock")?.style.setProperty("display", role === "admin" ?"block" : "none");
-  document.getElementById("contactAdminBlock")?.style.setProperty("display", role === "admin" ?"block" : "none");
-  document.getElementById("overviewTeachersAdminBlock")?.style.setProperty("display", role === "admin" ?"block" : "none");
-  document.getElementById("overviewIntroAdminBlock")?.style.setProperty("display", role === "admin" ?"block" : "none");
+  const canEditHome = canUpdateHomeInfo();
+  document.getElementById("overviewAdminCard")?.classList.toggle("show", canEditHome);
+  document.getElementById("countdownAdminBlock")?.style.setProperty("display", canEditHome ?"block" : "none");
+  document.getElementById("contactAdminBlock")?.style.setProperty("display", canEditHome ?"block" : "none");
+  document.getElementById("overviewTeachersAdminBlock")?.style.setProperty("display", canEditHome ?"block" : "none");
+  document.getElementById("overviewIntroAdminBlock")?.style.setProperty("display", canEditHome ?"block" : "none");
   setupHomeLinks();
   updateHomeTabs();
   renderCountdown();
@@ -3325,7 +3332,7 @@ function renderAdminExamList() {
             <div>${esc(event.title || "Kỳ thi")}</div>
             <div class="admin-list-meta">${formatPostTime(event.exam_at)}</div>
           </div>
-          ${role === "admin" ?`<button class="tiny-btn" type="button" onclick="deleteExamEvent('${event.id}')">Xóa</button>` : ""}
+          ${canUpdateHomeInfo() ?`<button class="tiny-btn" type="button" onclick="deleteExamEvent('${event.id}')">Xóa</button>` : ""}
         </div>
       `).join("")
     : `<div class="empty-feed" style="padding:14px 12px;"><p>Chưa có kỳ thi nào.</p></div>`;
@@ -3524,7 +3531,7 @@ function canViewPost(post) {
   if (!currentUser) return post.status === "approved" && (post.visibility || "public") === "public";
   if (post.user_id === currentUser.id) return true;
   if (post.status === "pending" || post.status === "rejected") {
-    return role === "admin" || role === "teacher";
+    return canModerateHomeDiscussion();
   }
 
   const visibility = post.visibility || "public";
@@ -3728,15 +3735,15 @@ async function loadComments(pid) {
   }
   list.innerHTML = tops.map(c => {
     const t = new Date(c.created_at).toLocaleString("vi-VN",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
-    const canDeleteTop = role === "admin" || c.user_id === currentUser.id;
-    const canEditTop = role === "admin" || c.user_id === currentUser.id;
+    const canDeleteTop = canModerateHomeDiscussion() || c.user_id === currentUser.id;
+    const canEditTop = canModerateHomeDiscussion() || c.user_id === currentUser.id;
     const rHtml = replies.filter(r => r.parent_id === c.id).map(r => `
       <div class="cmt-item reply-indent">
         <img class="cmt-avatar" src="${r.users?.avatar_url||'default-avatar.png'}" onerror="this.src='default-avatar.png'">
         <div class="cmt-bubble">
           <div class="cmt-name">${esc(r.users?.full_name || "User")}</div>
           <div class="cmt-text">${formatRichText(r.content)}</div>
-          ${(role === "admin" || r.user_id === currentUser.id) ?`<div class="cmt-tools"><span class="edit-link" onclick="editComment('${pid}','${r.id}',${JSON.stringify(String(r.content || ""))})">Sửa</span><span class="delete-link" onclick="deleteComment('${pid}','${r.id}')">Xóa</span></div>` : ""}
+          ${(canModerateHomeDiscussion() || r.user_id === currentUser.id) ?`<div class="cmt-tools"><span class="edit-link" onclick="editComment('${pid}','${r.id}',${JSON.stringify(String(r.content || ""))})">Sửa</span><span class="delete-link" onclick="deleteComment('${pid}','${r.id}')">Xóa</span></div>` : ""}
         </div>
       </div>`).join("");
     return `
@@ -3888,7 +3895,7 @@ async function createPost() {
   const imageFile = document.getElementById("postImage").files?.[0];
   if (!text && !imageFile) return;
 
-  const status = (role === "admin" || role === "teacher") ?"approved" : "pending";
+  const status = canModerateHomeDiscussion() ?"approved" : "pending";
   const title = inferTitleFromContent(text) || null;
   const { data: insertedPost, error } = await sb
     .from("posts")
@@ -3942,7 +3949,7 @@ async function createPost() {
 }
 
 window.createExamEvent = async function() {
-  if (role !== "admin") return;
+  if (!canUpdateHomeInfo()) return;
   const titleInput = document.getElementById("examEventTitleInline");
   const timeInput = document.getElementById("examEventAtInline");
   const title = titleInput?.value.trim();
@@ -3969,7 +3976,7 @@ window.createExamEvent = async function() {
 }
 
 window.deleteExamEvent = async function(eventId) {
-  if (role !== "admin") return;
+  if (!canUpdateHomeInfo()) return;
   if (!confirm("Xóa kỳ thi này?")) return;
   const { error } = await sb.from("exam_events").delete().eq("id", eventId);
   if (error) {
@@ -3980,7 +3987,7 @@ window.deleteExamEvent = async function(eventId) {
 }
 
 window.saveContactInfo = async function() {
-  if (role !== "admin") return;
+  if (!canUpdateHomeInfo()) return;
   const input = document.getElementById("contactInfoInputInline");
   const value = input?.value.trim() || "";
   const { error } = await sb.from("site_settings").upsert({
@@ -4003,8 +4010,8 @@ function buildCard(post) {
   const isPending = post.status === "pending";
   const isRejected = post.status === "rejected";
   const isMyPost = !!currentUser && post.user_id === currentUser.id;
-  const canMod = role === "admin" || role === "teacher";
-  const isAdmin = role === "admin";
+  const canMod = canModerateHomeDiscussion();
+  const isAdmin = canModerateHomeDiscussion();
 
   const div = document.createElement("div");
   div.id = "post_" + post.id;
@@ -4218,7 +4225,7 @@ function renderOverviewSection(posts) {
           <div class="overview-news-main">
             <a class="overview-news-link" href="post.html?id=${post.id}">${esc(extractPostTitle(post))}</a>
           </div>
-          ${role === "admin" ? `
+          ${canUpdateHomeInfo() ? `
             <div class="overview-news-actions">
               <button class="tiny-btn edit" type="button" onclick="editOverviewPost('${post.id}')">Sửa</button>
               <button class="tiny-btn" type="button" onclick="deleteOverviewPost('${post.id}')">Xóa</button>
@@ -4268,7 +4275,7 @@ function handleTeacherDragEnd(event) {
 }
 
 window.addTeacherToHome = async function() {
-  if (role !== "admin") return;
+  if (!canUpdateHomeInfo()) return;
   const select = document.getElementById("homeTeacherSelectInline");
   const userId = select?.value;
   if (!userId) {
@@ -4296,7 +4303,7 @@ window.addTeacherToHome = async function() {
 };
 
 window.removeTeacherFromHome = async function(homeTeacherId) {
-  if (role !== "admin") return;
+  if (!canUpdateHomeInfo()) return;
   const { error } = await sb.from("home_teachers").delete().eq("id", homeTeacherId);
   if (error) {
     alert("Lỗi khi xóa giáo viên khỏi Trang chủ: " + error.message);
@@ -4306,7 +4313,7 @@ window.removeTeacherFromHome = async function(homeTeacherId) {
 };
 
 window.saveCenterIntro = async function() {
-  if (role !== "admin") return;
+  if (!canUpdateHomeInfo()) return;
   const title = document.getElementById("centerIntroTitleInline")?.value.trim() || "Giới thiệu trung tâm";
   const content = document.getElementById("centerIntroContentInline")?.value.trim() || "";
   const value = JSON.stringify({ title, content });
@@ -4373,7 +4380,7 @@ function renderHomeTeacherAdminList() {
 }
 
 window.createOverviewPost = async function() {
-  if (role !== "admin") return;
+  if (!canUpdateHomeInfo()) return;
   const titleInput = document.getElementById("overviewPostTitle");
   const contentInput = document.getElementById("overviewPostContent");
   const rawContent = contentInput?.value.trim() || "";
@@ -4430,7 +4437,7 @@ function resetOverviewPostForm() {
 window.cancelOverviewPostEdit = resetOverviewPostForm;
 
 window.editOverviewPost = function(postId) {
-  if (role !== "admin") return;
+  if (!canUpdateHomeInfo()) return;
   const post = cachedVisiblePosts.find(item => item.id === postId);
   if (!post) {
     alert("Không tìm thấy tin tức cần sửa. Hãy tải lại trang rồi thử lại.");
@@ -4450,7 +4457,7 @@ window.editOverviewPost = function(postId) {
 };
 
 window.deleteOverviewPost = async function(postId) {
-  if (role !== "admin") return;
+  if (!canUpdateHomeInfo()) return;
   if (!confirm("Xóa tin tức này khỏi Trang chủ?")) return;
   const { data: mediaRows } = await sb.from("post_media").select("file_url").eq("post_id", postId);
   await sb.from("comments").delete().eq("post_id", postId);

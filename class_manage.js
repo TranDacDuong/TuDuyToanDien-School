@@ -493,18 +493,18 @@
   }
 
   function canTakeAttendance(role = _role){
-    return window.AppPermissions?.has?.("class.attendance", role === "admin" || role === "teacher" || role === "assistant")
-      ?? (role === "admin" || role === "teacher" || role === "assistant");
+    return ["class.attendance.view", "class.attendance.take", "class.attendance.update"]
+      .some(key => window.AppPermissions?.has?.(key, role === "admin"));
   }
 
   function canManageClassContent(role = _role){
-    return window.AppPermissions?.has?.("classes.manage", role === "admin" || role === "teacher")
-      ?? (role === "admin" || role === "teacher");
+    return ["classes.update", "classes.staff.assign"]
+      .some(key => window.AppPermissions?.has?.(key, role === "admin"));
   }
 
   function canManageClassStudents(role = _role){
-    return window.AppPermissions?.has?.("class.students.manage", role === "admin" || role === "teacher")
-      ?? (role === "admin" || role === "teacher");
+    return ["class.students.add", "class.students.transfer", "class.students.remove"]
+      .some(key => window.AppPermissions?.has?.(key, role === "admin"));
   }
 
   function canDeleteClasses(role = _role){
@@ -512,13 +512,13 @@
   }
 
   function canManageClassSessions(role = _role){
-    return window.AppPermissions?.has?.("class.sessions.manage", role === "admin" || role === "teacher" || role === "assistant")
-      ?? (role === "admin" || role === "teacher" || role === "assistant");
+    return ["class.sessions.create", "class.sessions.update", "class.sessions.delete"]
+      .some(key => window.AppPermissions?.has?.(key, role === "admin"));
   }
 
   function canEvaluateClassSession(role = _role){
-    return window.AppPermissions?.has?.("class.evaluations.manage", role === "admin" || role === "teacher" || role === "assistant")
-      ?? (role === "admin" || role === "teacher" || role === "assistant");
+    return ["class.evaluations.view", "class.evaluations.update", "class.evaluations.send"]
+      .some(key => window.AppPermissions?.has?.(key, role === "admin"));
   }
 
   
@@ -552,7 +552,7 @@
   async function getStudentSearchPool(){
     if(_studentSearchPool) return _studentSearchPool;
     const sb = getSb();
-    const selectFields = _role === "admin"
+    const selectFields = window.AppPermissions?.has?.("class.students.view", _role === "admin")
       ? "id,full_name,email,phone"
       : "id,full_name,email";
     const { data, error } = await sb
@@ -2736,7 +2736,7 @@
       if(!playerMap[p.room_id]) playerMap[p.room_id]=[];
       playerMap[p.room_id].push(p);
     });
-    const openCreateBtn = (role==="admin"||role==="teacher")
+    const openCreateBtn = window.AppPermissions?.has?.("game.rooms.create", role === "admin")
       ? '<button onclick="cvOpenClassGame()" class="btn btn-outline btn-sm">🎮 Tạo phòng game cho lớp</button>'
       : "";
     const roomsHtml = (rooms||[]).length

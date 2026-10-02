@@ -1297,8 +1297,15 @@
     return window.AppPermissions?.has?.(key, fallback) ?? fallback;
   }
   function canViewAllIncome() { return hasIncomePermission("income.all.view", viewerProfile?.role === "admin"); }
-  function canManageIncome() { return hasIncomePermission("income.manage", viewerProfile?.role === "admin"); }
-  function canManagePayroll() { return hasIncomePermission("income.payroll.manage", viewerProfile?.role === "admin"); }
+  function canManageIncome() {
+    return ["income.ledger.create", "income.ledger.update", "income.ledger.delete", "income.reconcile"]
+      .some(key => hasIncomePermission(key, viewerProfile?.role === "admin"));
+  }
+  function canManagePayroll() {
+    return ["income.payroll.view", "income.payroll.configure", "income.payroll.calculate", "income.bonus.manage"]
+      .some(key => hasIncomePermission(key, viewerProfile?.role === "admin"));
+  }
+  function canConfigurePayroll() { return hasIncomePermission("income.payroll.configure", viewerProfile?.role === "admin"); }
 
   function ensureSelectedTeacherId() {
     if (selectedTeacherId === "OVERVIEW") return "OVERVIEW";
@@ -1356,7 +1363,8 @@
 
   function syncIncomeModePanels() {
     const adminOverviewMode = isSelectedAdminOverview();
-    const fixedStaffSelfMode = viewerProfile?.role !== "admin" && isFixedSalaryStaffRole(viewerProfile?.role);
+    const selfOnlyMode = !canViewAllIncome() && !hasIncomePermission("income.payroll.view", false);
+    const fixedStaffSelfMode = selfOnlyMode && isFixedSalaryStaffRole(viewerProfile?.role);
     const adminPanel = document.getElementById("adminProfitPanel");
     const staffSelfPanel = document.getElementById("staffSelfIncomePanel");
     const teacherSections = document.getElementById("teacherIncomeSections");
@@ -1364,8 +1372,8 @@
     if (adminPanel) adminPanel.style.display = adminOverviewMode ? "block" : "none";
     if (staffSelfPanel) staffSelfPanel.style.display = fixedStaffSelfMode ? "block" : "none";
     if (teacherSections) teacherSections.style.display = (adminOverviewMode || fixedStaffSelfMode) ? "none" : "flex";
-    if (adminConfig && viewerProfile?.role === "admin") {
-      adminConfig.style.display = (!adminOverviewMode && !isDbFallback) ? "block" : "none";
+    if (adminConfig) {
+      adminConfig.style.display = canConfigurePayroll() && !adminOverviewMode && !isDbFallback ? "block" : "none";
     }
   }
 
@@ -2894,7 +2902,7 @@
 
   async function saveLedgerDescription(event) {
     event.preventDefault();
-    if (viewerProfile?.role !== "admin") return;
+    if (!hasIncomePermission("income.ledger.update", viewerProfile?.role === "admin")) return;
     const id = document.getElementById("ledgerDescriptionId").value;
     const description = document.getElementById("ledgerDescriptionText").value.trim();
     if (!id || description.length < 3) return alert("Vui lòng nhập mô tả chi tiết.");
@@ -2988,7 +2996,7 @@
     selectedTeacherId = safeSelectedTeacherId;
     syncIncomeModePanels();
 
-    if (viewerProfile?.role !== "admin" && isFixedSalaryStaffRole(viewerProfile?.role)) {
+    if (!canViewAllIncome() && !hasIncomePermission("income.payroll.view", false) && isFixedSalaryStaffRole(viewerProfile?.role)) {
       try {
         await renderFixedStaffSelfIncome(ym);
       } catch (err) {

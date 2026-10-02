@@ -64,11 +64,12 @@
   };
 
   function canManageGame() {
-    return window.AppPermissions?.has?.("game.manage", GAME.role === "admin") ?? GAME.role === "admin";
+    return ["game.content.create", "game.content.update", "game.content.delete", "game.rooms.manage", "game.rounds.manage"]
+      .some(key => window.AppPermissions?.has?.(key, GAME.role === "admin"));
   }
 
   function canManageCompetition() {
-    return window.AppPermissions?.has?.("game.competition.manage", GAME.role === "admin") ?? GAME.role === "admin";
+    return window.AppPermissions?.has?.("game.rounds.manage", GAME.role === "admin") ?? GAME.role === "admin";
   }
 
   const EL = {

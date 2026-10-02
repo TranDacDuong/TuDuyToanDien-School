@@ -110,4 +110,33 @@ test.describe("Granular permissions regression", () => {
     expect(tasks).toContain('hasTaskPermission("tasks.delete"');
     expect(tasks).not.toContain('hasTaskPermission("tasks.manage"');
   });
+
+  test("full staff grants switch role-shaped pages into their administrative views", () => {
+    const dashboard = fs.readFileSync(path.join(root, "dashboard.html"), "utf8");
+    const home = fs.readFileSync(path.join(root, "home.html"), "utf8");
+    const courses = fs.readFileSync(path.join(root, "courses_logic.js"), "utf8");
+    const classes = fs.readFileSync(path.join(root, "class_list.js"), "utf8");
+    const game = fs.readFileSync(path.join(root, "game.js"), "utf8");
+    const income = fs.readFileSync(path.join(root, "income.html"), "utf8");
+
+    expect(dashboard).toContain('"ops.overview.view", "ops.learning.view", "ops.staff.view"');
+    expect(home).toContain('hasHomePermission("home.info.update"');
+    expect(home).toContain("await window.AppPermissions?.load?.({ id: user.id, role })");
+    expect(courses).toContain("canViewAllCourses()");
+    expect(courses).toContain("assignedIds.has(course.id)");
+    expect(courses).not.toContain("$1\n");
+    expect(classes).toContain('has?.("classes.all.view"');
+    expect(game).toContain('"game.content.create", "game.content.update", "game.content.delete"');
+    expect(income).toContain('hasIncomePermission("income.all.view"');
+    expect(income).not.toContain('hasIncomePermission("income.manage"');
+  });
+
+  test("teacher and assistant income defaults only expose personal income", () => {
+    const sql = fs.readFileSync(path.join(root, "SQL align staff permission behavior.sql"), "utf8");
+    const client = fs.readFileSync(path.join(root, "supabaseClient.js"), "utf8");
+    expect(sql).toContain("permission_key IN ('page.income', 'income.self.view')");
+    expect(sql).toContain("('income.all.view')");
+    expect(sql).toContain("('income.payroll.view')");
+    expect(client).not.toContain('"income.manage", "facebook.manage"');
+  });
 });

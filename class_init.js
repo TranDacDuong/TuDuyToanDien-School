@@ -43,17 +43,17 @@
         return;
       }
       window.AppPermissions?.applyToDom?.();
-      const canManageClasses = window.AppPermissions?.has?.("classes.manage", role === "admin" || role === "teacher")
-        ?? (role === "admin" || role === "teacher");
+      const canViewAllClasses = window.AppPermissions?.has?.("classes.all.view", role === "admin") ?? role === "admin";
+      const canCreateClasses = window.AppPermissions?.has?.("classes.create", role === "admin") ?? role === "admin";
 
-      if(role === "admin" || canManageClasses){
+      if(canViewAllClasses){
         /* Admin: hiện filter bar + nút tạo lớp */
-        if(openBtn)   openBtn.style.display = canManageClasses ? "" : "none";
+        if(openBtn)   openBtn.style.display = canCreateClasses ? "" : "none";
         if(filters)   filters.style.display = "contents";
         if(filterBar) filterBar.style.display = "none"; /* class_list sẽ bật sau khi load */
       } else if(role === "teacher"){
         /* Teacher: hiện nút tạo lớp trong khối thao tác gọn */
-        if(openBtn)   openBtn.style.display = canManageClasses ? "" : "none";
+        if(openBtn)   openBtn.style.display = canCreateClasses ? "" : "none";
         if(filters)   filters.style.display = "none";
         if(filterBar) filterBar.style.display = "flex";
       } else if(role === "accountant"){
@@ -90,6 +90,7 @@
 
   if(openBtn){
     openBtn.onclick = () => {
+      if(!window.AppPermissions?.has?.("classes.create", window._currentRole === "admin")) return;
       popup.classList.remove("hidden");
       if(window.resetClassForm) window.resetClassForm();
     };

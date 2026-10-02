@@ -11,8 +11,13 @@
 
   function canManageClasses(){
     const role = window._currentRole;
-    return window.AppPermissions?.has?.("classes.manage", role === "admin" || role === "teacher")
-      ?? (role === "admin" || role === "teacher");
+    return ["classes.create", "classes.update", "classes.delete", "classes.staff.assign"]
+      .some(key => window.AppPermissions?.has?.(key, role === "admin"));
+  }
+
+  function canViewAllClasses(){
+    return window.AppPermissions?.has?.("classes.all.view", window._currentRole === "admin")
+      ?? window._currentRole === "admin";
   }
 
   function canDeleteClasses(){
@@ -51,7 +56,7 @@
       let classIds = null;
       let parentStudentIds = [];
 
-      if(role === "teacher" || role === "assistant"){
+      if((role === "teacher" || role === "assistant") && !canViewAllClasses()){
         const { data: myRows } = await getSb()
           .from("class_teachers").select("class_id").eq("teacher_id", uid);
         classIds = (myRows||[]).map(r => r.class_id);
@@ -97,7 +102,7 @@
         const { data: suppData, error: suppErr } = await suppQuery;
         if (!suppErr && Array.isArray(suppData)) {
           _suppSessions = suppData.filter(s => {
-            if (role === "admin" || role === "accountant") return true;
+            if (role === "admin" || role === "accountant" || canViewAllClasses()) return true;
             if (role === "teacher" || role === "assistant") {
               return s.teacher_id === uid || (Array.isArray(classIds) && classIds.includes(s.parent_class_id));
             }
@@ -126,7 +131,7 @@
           .order("class_name", { ascending: true });
         if(classIds !== null) classQuery = classQuery.in("id", classIds);
         // Teacher và student chỉ thấy lớp không bị ẩn
-        if(role !== "admin" && role !== "accountant") classQuery = classQuery.eq("hidden", false);
+        if(role !== "admin" && role !== "accountant" && !canViewAllClasses()) classQuery = classQuery.eq("hidden", false);
 
         const [
           { data: resClasses,  error: e1 },
@@ -188,7 +193,7 @@
 
       await loadFilterOptions(sb, role);
 
-      if(role === "admin" || role === "accountant"){
+      if(role === "admin" || role === "accountant" || canViewAllClasses()){
         const filterBar = document.getElementById("filterBar");
         if(filterBar) filterBar.style.display = "flex";
         bindFilters();
@@ -213,7 +218,7 @@
       _teacherRoleMap[t.id] = t.role;
     });
 
-    if(role !== "admin" && role !== "accountant") return;
+    if(role !== "admin" && role !== "accountant" && !canViewAllClasses()) return;
 
     const [{ data: grades }, { data: subjects }] = await Promise.all([
       sb.from("grades").select("id,name").order("name"),

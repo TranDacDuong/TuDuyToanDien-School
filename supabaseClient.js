@@ -292,7 +292,7 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
         "page.public_exam", "page.game", "page.income", "page.resources", "page.question_bank",
         "page.exam_editor", "page.trial_requests", "page.facebook", "class.sessions.manage",
         "class.attendance", "classes.manage", "courses.results.view", "tasks.manage", "question.manage", "exam.manage", "trial.manage",
-        "income.manage", "facebook.manage", "tasks.self_update", "class.evaluations.manage",
+        "facebook.manage", "tasks.self_update", "class.evaluations.manage",
         "class.students.manage", "public_exam.manage", "income.self.view", "resources.manage",
         "question.import", "facebook.generate", "facebook.schedule", "facebook.publish"
       ],
