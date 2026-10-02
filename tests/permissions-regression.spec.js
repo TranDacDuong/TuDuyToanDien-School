@@ -137,6 +137,8 @@ test.describe("Granular permissions regression", () => {
     expect(income).not.toContain('hasIncomePermission("income.manage"');
     expect(dashboard).toContain('supabaseClient.js?v=20261002-permissions2');
     expect(coursesHtml).toContain('courses_logic.js?v=20261002-permissions3');
+    expect(coursesHtml).toContain('data-permission-any="courses.create,courses.update"');
+    expect(coursesHtml).not.toContain('data-permission="courses.manage"');
     expect(classesHtml).toContain('class_list.js?v=20261002-permissions2');
     expect(gameHtml).toContain('game.js?v=20261002-permissions2');
   });
