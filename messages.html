@@ -577,9 +577,12 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
   color: rgba(15,31,61,.62);
 }
 .message-transport { font-size: .68rem; opacity: .72; margin-top: 5px; }
-.zalo-send-mode { display: none; align-items: center; gap: 6px; font-size: .78rem; }
+.zalo-send-mode { display: none; align-items: center; gap: 6px; font-size: .78rem; color: var(--ink-mid); }
 .zalo-send-mode.show { display: inline-flex; }
-.zalo-send-mode select { font: inherit; padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
+.zalo-send-mode strong { color: #08783e; }
+.message-context { display: none; align-items: center; gap: 7px; font-size: .78rem; color: var(--ink-mid); }
+.message-context.show { display: inline-flex; }
+.message-context select { max-width: 240px; font: inherit; padding: 6px 28px 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--navy); }
 .zalo-link-button { display: none; margin-left: auto; font: inherit; font-size: .76rem; padding: 6px 9px; border: 1px solid var(--border); border-radius: 6px; background: #fff; cursor: pointer; }
 .zalo-link-button.show { display: inline-flex; }
 .zalo-link-dialog { border: 1px solid var(--border); border-radius: 8px; max-width: min(440px, calc(100vw - 24px)); width: 100%; padding: 18px; font: inherit; }
@@ -697,12 +700,11 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
           <button class="btn btn-primary" id="sendBtn" onclick="sendMessage()" title="Gửi tin nhắn" aria-label="Gửi tin nhắn" disabled><svg class="composer-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 3-7.6 18-3.1-7.3L3 10.6 21 3Zm-10.7 10.7L21 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
         <div class="composer-tools">
-          <label id="zaloSendModeWrap" class="zalo-send-mode">Gửi qua
-            <select id="zaloSendMode" aria-label="Kênh gửi tin nhắn">
-              <option value="web">Web</option>
-              <option value="both">Web + Zalo</option>
-            </select>
+          <label id="messageContextWrap" class="message-context">Trao đổi về
+            <select id="messageContextStudent" aria-label="Học sinh liên quan"></select>
           </label>
+          <span id="zaloSendModeWrap" class="zalo-send-mode"><strong id="zaloSendModeLabel">Web + Zalo tự động</strong></span>
+          <input id="zaloSendMode" type="hidden" value="auto">
           <div class="attach-wrap">
             <input id="messageImage" class="hidden-input" type="file" accept="image/*" onchange="previewMessageImage()">
             <span id="attachName" class="attach-name"></span>
@@ -761,6 +763,7 @@ const TRAY_CONVERSATION_LIMIT = 5;
 const FULL_CONVERSATION_PAGE_SIZE = 10;
 let visibleConversationCount = FULL_CONVERSATION_PAGE_SIZE;
 let selectedTeacherFromQuery = null;
+let parentInboxById = new Map();
 
 const CHAT_IMAGE_PREFIX = "__CHAT_IMAGE__";
 const ACTIVE_WINDOW_MS = 2 * 60 * 1000;
@@ -902,7 +905,9 @@ function makeConversationListItem(user, options = {}) {
     audienceUserId: options.audienceUserId || null,
     audienceName: options.audienceName || "",
     audienceLabel: options.audienceLabel || "",
-    metaName: options.metaName || ""
+    metaName: options.metaName || "",
+    children: Array.isArray(options.children) ? options.children : [],
+    zaloLinked: Boolean(options.zaloLinked)
   };
 }
 
@@ -1040,6 +1045,34 @@ async function fetchTeacherOfficialAudienceIds() {
   }
 }
 
+async function fetchMindupParentInboxItems() {
+  if (!isMindUpStaffRole(currentProfile?.role) || !['admin', 'teacher'].includes(currentProfile?.role || '')) {
+    parentInboxById = new Map();
+    return [];
+  }
+  const { data, error } = await sb.rpc('list_mindup_parent_inbox');
+  if (error) {
+    console.warn('Could not load MindUp parent inbox', error);
+    parentInboxById = new Map();
+    return [];
+  }
+  const items = (data || []).map(row => makeConversationListItem({
+    id: row.parent_id,
+    full_name: row.parent_name,
+    avatar_url: row.parent_avatar_url || 'default-avatar.png',
+    role: 'parent'
+  }, {
+    conversationId: row.conversation_id || null,
+    preview: row.last_content ? getMessagePreview(row.last_content) : '',
+    lastActivity: row.last_at || null,
+    isOfficialMindUpChannel: true,
+    children: Array.isArray(row.children) ? row.children : [],
+    zaloLinked: row.zalo_linked
+  }));
+  parentInboxById = new Map(items.map(item => [item.friend_id, item]));
+  return items;
+}
+
 async function fetchLearningConversationItems() {
   // Learning/system notices now live inside the single official MindUp channel
   // for each student/parent, so we intentionally do not render separate
@@ -1058,7 +1091,7 @@ async function loadFriends() {
   const wrap = document.getElementById("friendList");
   const topActions = document.getElementById("friendListTopActions");
 
-  const [{ data: friendships, error: friendshipError }, { data: conversations, error: conversationError }, { data: unreadNotifications }, learningItems, mindUpTeacherItems] = await Promise.all([
+  const [{ data: friendships, error: friendshipError }, { data: conversations, error: conversationError }, { data: unreadNotifications }, learningItems, mindUpTeacherItems, parentInboxItems] = await Promise.all([
     sb
       .from("friendships")
       .select("friend_id, users!friendships_friend_id_fkey(id, full_name, email, avatar_url, role, birth_year)")
@@ -1078,7 +1111,8 @@ async function loadFriends() {
       .eq("type", "message_new")
       .eq("is_read", false),
     fetchLearningConversationItems(),
-    fetchMindUpTeacherConversationItems()
+    fetchMindUpTeacherConversationItems(),
+    fetchMindupParentInboxItems()
   ]);
 
   if (friendshipError || conversationError) {
@@ -1202,7 +1236,18 @@ async function loadFriends() {
 
   if (requestToken !== friendsLoadToken) return;
 
-  let merged = [...(mindUpTeacherItems || []), ...(learningItems || []), ...enriched]
+  const scopedEnriched = enriched.filter(item => {
+    const role = item.users?.role || '';
+    if (currentProfile?.role === 'student') {
+      return role === 'student' || item.friend_id === MINDUP_BOT_ID;
+    }
+    if (['admin', 'teacher'].includes(currentProfile?.role || '')) {
+      return role === 'parent';
+    }
+    return item.friend_id === MINDUP_BOT_ID;
+  });
+
+  let merged = [...(parentInboxItems || []), ...(mindUpTeacherItems || []), ...(learningItems || []), ...scopedEnriched]
     .filter((item, index, list) => list.findIndex(other => other.friend_id === item.friend_id) === index);
 
   await prefetchUserContextProfiles(merged.map(item => item.users).filter(Boolean));
@@ -1315,7 +1360,7 @@ window.filterFriends = function() {
   clearTimeout(userSearchTimer);
   visibleConversationCount = FULL_CONVERSATION_PAGE_SIZE;
 
-  if (keyword.length < 2) {
+  if (keyword.length < 2 || currentProfile?.role !== 'student') {
     userSearchResults = [];
     userSearchToken += 1;
   } else {
@@ -1337,6 +1382,7 @@ async function searchUsersForConversation(keyword) {
     .from("users")
     .select("id, full_name, email, avatar_url, role, birth_year")
     .ilike("full_name", `%${searchText}%`)
+    .eq("role", "student")
     .neq("id", currentUser.id)
     .limit(12);
 
@@ -1401,32 +1447,50 @@ function setComposerEnabled(enabled) {
 
 async function refreshZaloSendMode() {
   resetZaloSendMode();
+  setupParentMessageContext(parentInboxById.get(activeFriend?.id) || friendMap.get(activeFriend?.id));
   const wrap = document.getElementById('zaloSendModeWrap');
-  const select = document.getElementById('zaloSendMode');
+  const mode = document.getElementById('zaloSendMode');
+  const label = document.getElementById('zaloSendModeLabel');
   const linkButton = document.getElementById('zaloLinkButton');
   const audienceId = activeFriend?.id;
   if (!currentConversationId || !audienceId || !isMindUpStaffRole(currentProfile?.role)
-    || !isStudentOrParentRole(activeFriend?.role)) return;
+    || activeFriend?.role !== 'parent') return;
   if (currentProfile?.role === 'admin') linkButton.classList.add('show');
   const expectedConversation = currentConversationId;
   const { data, error } = await sb.rpc('mindup_zalo_link_available', { p_audience_user_id: audienceId });
   if (error || expectedConversation !== currentConversationId) return;
   zaloLinkAvailable = !!data;
-  if (!zaloLinkAvailable) return;
   wrap.classList.add('show');
-  const lastInbound = loadedMessages.slice().reverse().find(row => row.sender_id === audienceId);
-  select.value = lastInbound?.transport === 'zalo' ? 'both' : 'web';
+  mode.value = 'auto';
+  label.textContent = zaloLinkAvailable ? 'Web + Zalo tự động' : 'Chưa liên kết Zalo';
+  label.style.color = zaloLinkAvailable ? '#08783e' : '#b45309';
 }
 
 function resetZaloSendMode() {
   const wrap = document.getElementById('zaloSendModeWrap');
-  const select = document.getElementById('zaloSendMode');
+  const mode = document.getElementById('zaloSendMode');
   const linkButton = document.getElementById('zaloLinkButton');
+  const contextWrap = document.getElementById('messageContextWrap');
   wrap.classList.remove('show');
   linkButton.classList.remove('show');
-  select.value = 'web';
+  contextWrap.classList.remove('show');
+  mode.value = 'auto';
   zaloLinkAvailable = false;
   zaloDeliveryByMessage = new Map();
+}
+
+function setupParentMessageContext(item) {
+  const wrap = document.getElementById('messageContextWrap');
+  const select = document.getElementById('messageContextStudent');
+  select.replaceChildren();
+  const children = Array.isArray(item?.children) ? item.children : [];
+  for (const child of children) {
+    const option = document.createElement('option');
+    option.value = child.id || '';
+    option.textContent = child.name || 'Học sinh';
+    select.appendChild(option);
+  }
+  wrap.classList.toggle('show', activeFriend?.role === 'parent' && children.length > 0);
 }
 
 async function refreshZaloDeliveryStatus() {
@@ -1479,6 +1543,7 @@ window.confirmZaloLink = async function() {
 
 window.openConversation = async function(friendId, friendName, friendAvatar, friendRole) {
   resetZaloSendMode();
+  const inboxItem = parentInboxById.get(friendId) || friendMap.get(friendId);
   const shouldUseMindUpOfficial = shouldRouteToMindUpOfficial(friendRole);
   const shouldOpenMindUpBotTarget = shouldOpenMindUpBotConversation(friendRole);
   if (isTrayMode) {
@@ -1503,7 +1568,14 @@ window.openConversation = async function(friendId, friendName, friendAvatar, fri
   document.querySelectorAll(".friend-card").forEach(el => el.classList.remove("active"));
   document.getElementById("friend_" + friendId)?.classList.add("active");
 
-  activeFriend = { id: friendId, name: friendName, avatar: friendAvatar, role: friendRole };
+  activeFriend = {
+    id: friendId,
+    name: friendName,
+    avatar: friendAvatar,
+    role: friendRole,
+    children: Array.isArray(inboxItem?.children) ? inboxItem.children : []
+  };
+  setupParentMessageContext(inboxItem);
   loadedMessages = [];
   isLoadingOlderMessages = false;
   hasOlderMessages = true;
@@ -1664,6 +1736,14 @@ async function ensureConversation(friendId, friendRole, knownConversationId = nu
   const isTargetStudentOrParent = ['student', 'parent'].includes(friendRole || '');
   const isCurrentStaff = isMindUpStaffRole(currentProfile?.role || '');
 
+  if (currentProfile?.role === 'student' && friendRole === 'student') {
+    const { data, error } = await sb.rpc('ensure_student_direct_conversation', {
+      p_other_student_id: friendId
+    });
+    if (error) throw error;
+    return data;
+  }
+
   if (friendId === BOT_ID || (isTargetStudentOrParent && isCurrentStaff)) {
     const supportUserId = friendId === BOT_ID ? currentUser.id : friendId;
     const { data: officialConversationId, error: officialError } = await sb.rpc("ensure_bot_conversation", {
@@ -1794,6 +1874,7 @@ async function handleRealtimeMessagePayload(payload) {
       sender_id: row.sender_id,
       real_sender_id: row.real_sender_id,
       transport: row.transport || 'web',
+      context_student_id: row.context_student_id || null,
     };
     const byId = new Map(loadedMessages.map(item => [item.id, item]));
     byId.set(next.id, { ...(byId.get(next.id) || {}), ...next });
@@ -1920,12 +2001,16 @@ function renderLoadedMessages() {
       : zaloDelivery === 'failed' ? 'Gửi Zalo lỗi'
       : zaloDelivery === 'uncertain' ? 'Cần kiểm tra trên Zalo'
       : zaloDelivery ? 'Chờ bot gửi Zalo' : '';
+    const contextStudent = (activeFriend?.children || []).find(child => child.id === item.context_student_id);
+    const contextLabel = contextStudent
+      ? `<div class="message-transport">Về học sinh: ${esc(contextStudent.name || 'Học sinh')}</div>` : '';
     return `
       <div class="message-row ${isMine ? 'mine' : ''}">
         <div class="bubble ${isBot ? 'bot-bubble' : ''} ${item._pending ? 'message-pending' : ''} ${item._failed ? 'message-failed' : ''}">
           ${senderLabel}
           ${renderMessageBody(item.content)}
           ${statusLabel || `<div class="bubble-time">${formatTime(item.created_at)}</div>`}
+          ${contextLabel}
           ${transportLabel ? `<div class="message-transport">${transportLabel}</div>` : ''}
         </div>
       </div>
@@ -1942,7 +2027,7 @@ async function loadMessages({ reset = false, scrollToBottom = false } = {}) {
   const wasNearBottom = wrap.scrollHeight - wrap.clientHeight - wrap.scrollTop < 80;
   const { data, error } = await sb
     .from("messages")
-    .select("id, content, created_at, sender_id, real_sender_id, transport")
+    .select("id, content, created_at, sender_id, real_sender_id, transport, context_student_id")
     .eq("conversation_id", currentConversationId)
     .order("created_at", { ascending: false })
     .limit(MESSAGE_PAGE_SIZE);
@@ -1991,7 +2076,7 @@ async function loadOlderMessages() {
 
   const { data, error } = await sb
     .from("messages")
-    .select("id, content, created_at, sender_id, real_sender_id, transport")
+    .select("id, content, created_at, sender_id, real_sender_id, transport, context_student_id")
     .eq("conversation_id", currentConversationId)
     .lt("created_at", loadedMessages[0].created_at)
     .order("created_at", { ascending: false })
@@ -2120,6 +2205,23 @@ async function sendMessageContentToServer(content) {
   const isTargetStudentOrParent = ['student', 'parent'].includes(activeFriendInfo?.users?.role || activeFriend?.role || '');
   const isCurrentStaff = isMindUpStaffRole(currentProfile?.role || '');
 
+  if (currentProfile?.role === 'student' && activeFriend?.role === 'student') {
+    return sb.rpc('send_student_direct_message', {
+      p_other_student_id: activeFriend.id,
+      p_content: content
+    });
+  }
+
+  if (activeFriend?.role === 'parent' && ['admin', 'teacher'].includes(currentProfile?.role || '')) {
+    const studentId = document.getElementById('messageContextStudent')?.value || null;
+    if (!studentId) return { data: null, error: new Error('Hãy chọn học sinh liên quan trước khi gửi.') };
+    return sb.rpc('send_mindup_parent_message', {
+      p_parent_id: activeFriend.id,
+      p_student_id: studentId,
+      p_content: content
+    });
+  }
+
   if (activeFriend?.mindUpTeacherThread || activeFriendInfo?.isMindUpTeacherThread) {
     return sb.rpc('send_mindup_teacher_message', {
       p_conversation_id: currentConversationId,
@@ -2158,6 +2260,8 @@ function appendOptimisticMessage(content) {
     created_at: new Date().toISOString(),
     sender_id: senderIds.sender_id,
     real_sender_id: senderIds.real_sender_id,
+    context_student_id: activeFriend?.role === 'parent'
+      ? (document.getElementById('messageContextStudent')?.value || null) : null,
     _pending: true,
   };
   loadedMessages.push(temp);
@@ -2185,16 +2289,11 @@ window.retryOptimisticMessage = async function(tempId) {
   item._failed = false;
   item._pending = true;
   renderLoadedMessages();
-  const mode = document.getElementById('zaloSendMode').value;
   const { data, error } = await sendMessageContentToServer(item.content);
   if (error) {
     markOptimisticMessageFailed(tempId);
     alert("Không gửi được tin nhắn: " + error.message);
     return;
-  }
-  if (mode === 'both' && zaloLinkAvailable && data) {
-    const queued = await sb.rpc('enqueue_mindup_zalo_message', { p_message_id: data });
-    if (queued.error) alert('Đã lưu trên web nhưng chưa xếp hàng gửi Zalo: ' + queued.error.message);
   }
   removeOptimisticMessage(tempId);
   await loadFriends();
@@ -2207,9 +2306,10 @@ window.sendMessage = async function() {
   const imageFile = imageInput.files?.[0];
   const text = input.value.trim();
   if ((!text && !imageFile) || !currentConversationId) return;
-  const sendViaZalo = document.getElementById('zaloSendMode').value === 'both' && zaloLinkAvailable;
-  if (sendViaZalo && imageFile) {
-    alert('Hiện chỉ hỗ trợ gửi văn bản qua Zalo. Hãy chuyển sang Web để gửi ảnh.');
+  const isParentZaloMessage = activeFriend?.role === 'parent'
+    && ['admin', 'teacher'].includes(currentProfile?.role || '');
+  if (isParentZaloMessage && imageFile) {
+    alert('Kênh phụ huynh hiện hỗ trợ tin nhắn văn bản. Ảnh chưa được gửi qua Zalo.');
     return;
   }
 
@@ -2234,12 +2334,6 @@ window.sendMessage = async function() {
     markOptimisticMessageFailed(optimistic.id);
     alert("Không gửi được tin nhắn: " + error.message);
     return;
-  }
-
-  if (sendViaZalo) {
-    const queued = data ? await sb.rpc('enqueue_mindup_zalo_message', { p_message_id: data })
-      : { error: new Error('Không xác định được tin đã lưu') };
-    if (queued.error) alert('Tin đã lưu trên web nhưng chưa gửi Zalo: ' + queued.error.message);
   }
 
   removeOptimisticMessage(optimistic.id);
