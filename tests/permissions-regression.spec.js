@@ -128,6 +128,7 @@ test.describe("Granular permissions regression", () => {
     expect(home).toContain('hasHomePermission("home.info.update"');
     expect(home).toContain("await window.AppPermissions?.load?.({ id: user.id, role })");
     expect(courses).toContain("canViewAllCourses()");
+    expect(courses).toContain("const S={user:null,profile:null,role:'student'");
     expect(courses).toContain("assignedIds.has(course.id)");
     expect(courses).not.toContain("$1\n");
     expect(classes).toContain('has?.("classes.all.view"');
@@ -135,7 +136,7 @@ test.describe("Granular permissions regression", () => {
     expect(income).toContain('hasIncomePermission("income.all.view"');
     expect(income).not.toContain('hasIncomePermission("income.manage"');
     expect(dashboard).toContain('supabaseClient.js?v=20261002-permissions2');
-    expect(coursesHtml).toContain('courses_logic.js?v=20261002-permissions2');
+    expect(coursesHtml).toContain('courses_logic.js?v=20261002-permissions3');
     expect(classesHtml).toContain('class_list.js?v=20261002-permissions2');
     expect(gameHtml).toContain('game.js?v=20261002-permissions2');
   });

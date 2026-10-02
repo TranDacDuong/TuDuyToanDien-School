@@ -1,4 +1,5 @@
 const q=new URLSearchParams(location.search),avatarFallback='default-avatar.png';
+const S={user:null,profile:null,role:'student',grades:[],subjects:[],teachers:[],assistants:[],staff:[],exams:[],courses:[],managers:[],lessons:[],sessions:[],enrollments:[],requests:[],examResults:[],selectedManagers:[],selectedAssistants:[],editingCourseId:null,editingSessionId:null,activeCourseId:null,existingCoverUrl:'',submissionContext:null,studentDirectory:null,studentDirectoryPromise:null};
 function hasCoursePermission(key,fallback=false){return window.AppPermissions?.has?.(key,fallback)??fallback}
 function canViewAllCourses(){return hasCoursePermission('courses.all.view',S.role==='admin')}
 function canViewAssignedCourses(){return hasCoursePermission('courses.assigned.view',S.role==='teacher'||S.role==='assistant')}
