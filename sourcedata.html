@@ -1494,6 +1494,7 @@ async function saveStaffPermissionChanges(userId, changes){
 }
 
 async function applyPermissionPreset(userId, groupKey, preset, button){
+  await loadPermissionManagement(true);
   const user = (_permissionData?.users || []).find(item => item.id === userId);
   if(!user || user.role === 'admin') return;
   const permissions = (_permissionData.catalog || []).filter(item => permissionGroupKey(item) === groupKey);
@@ -1511,8 +1512,8 @@ async function applyPermissionPreset(userId, groupKey, preset, button){
   group?.querySelectorAll?.('button,select').forEach(control => control.disabled = true);
   try{
     await saveStaffPermissionChanges(userId, changes);
+    await loadPermissionManagement(true);
     toast('✅ Đã áp dụng gói quyền');
-    renderPermissionEditor();
   }catch(error){
     group?.querySelectorAll?.('button,select').forEach(control => control.disabled = false);
     toast('❌ Không lưu được quyền: ' + error.message, 3500);
@@ -1520,6 +1521,7 @@ async function applyPermissionPreset(userId, groupKey, preset, button){
 }
 
 async function applyAllPermissionPreset(userId, preset, button){
+  await loadPermissionManagement(true);
   const user = (_permissionData?.users || []).find(item => item.id === userId);
   if(!user || user.role === 'admin') return;
   const permissions = _permissionData.catalog || [];
@@ -1538,8 +1540,10 @@ async function applyAllPermissionPreset(userId, preset, button){
   if(button) button.textContent = isRestore ? 'Đang khôi phục...' : 'Đang cấp quyền...';
   try{
     await saveStaffPermissionChanges(userId, changes);
-    toast(isRestore ? '✅ Đã khôi phục quyền theo chức vụ' : '✅ Đã mở tất cả quyền');
-    renderPermissionEditor();
+    await loadPermissionManagement(true);
+    toast(isRestore
+      ? '✅ Đã khôi phục quyền theo chức vụ'
+      : `✅ Đã mở tất cả ${permissions.length} quyền`);
   }catch(error){
     editor?.querySelectorAll?.('button,select').forEach(control => control.disabled = false);
     if(button) button.textContent = isRestore ? 'Khôi phục theo chức vụ' : 'Mở tất cả';

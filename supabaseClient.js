@@ -291,7 +291,7 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
         "page.home", "page.courses", "page.classes", "page.tasks", "page.teacher_schedule",
         "page.public_exam", "page.game", "page.income", "page.resources", "page.question_bank",
         "page.exam_editor", "page.trial_requests", "page.facebook", "class.sessions.manage",
-        "class.attendance", "classes.manage", "courses.results.view", "tasks.manage", "question.manage", "exam.manage", "trial.manage",
+        "class.attendance", "classes.manage", "courses.results.view", "tasks.self.view", "tasks.self.update", "question.manage", "exam.manage", "trial.manage",
         "facebook.manage", "tasks.self_update", "class.evaluations.manage",
         "class.students.manage", "public_exam.manage", "income.self.view", "resources.manage",
         "question.import", "facebook.generate", "facebook.schedule", "facebook.publish"
@@ -299,7 +299,7 @@ const SUPABASE_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co";
       assistant: [
         "page.home", "page.courses", "page.classes", "page.tasks", "page.teacher_schedule",
         "page.resources", "page.question_bank", "page.exam_editor", "page.trial_requests",
-        "page.facebook", "class.sessions.manage", "class.attendance", "tasks.manage",
+        "page.facebook", "class.sessions.manage", "class.attendance", "tasks.self.view", "tasks.self.update",
         "question.manage", "exam.manage", "trial.manage", "facebook.manage", "tasks.self_update",
         "class.evaluations.manage", "question.import", "facebook.generate", "facebook.schedule",
         "facebook.publish"

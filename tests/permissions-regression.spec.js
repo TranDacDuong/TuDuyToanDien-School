@@ -36,6 +36,8 @@ test.describe("Granular permissions regression", () => {
     expect(source).toContain("Mở tất cả");
     expect(source).toContain("Khôi phục theo chức vụ");
     expect(source).toContain("applyAllPermissionPreset");
+    expect(source).toContain("await loadPermissionManagement(true)");
+    expect(source).toContain("permissions.length} quyền");
     expect(source).not.toContain('<option value="accountant">Kế toán</option>');
   });
 
@@ -138,5 +140,19 @@ test.describe("Granular permissions regression", () => {
     expect(sql).toContain("('income.all.view')");
     expect(sql).toContain("('income.payroll.view')");
     expect(client).not.toContain('"income.manage", "facebook.manage"');
+  });
+
+  test("teacher task defaults only expose personal work and attendance", () => {
+    const sql = fs.readFileSync(path.join(root, "SQL fix teacher task permission defaults.sql"), "utf8");
+    const client = fs.readFileSync(path.join(root, "supabaseClient.js"), "utf8");
+    expect(sql).toContain("permission_key IN ('page.tasks', 'tasks.self.view', 'tasks.self.update', 'tasks.self_update')");
+    expect(sql).toContain("('tasks.staff_overview')");
+    expect(sql).toContain("('tasks.manage')");
+    const teacherFallback = client.slice(client.indexOf("teacher: ["), client.indexOf("assistant: ["));
+    const assistantFallback = client.slice(client.indexOf("assistant: ["), client.indexOf("student: ["));
+    expect(teacherFallback).toContain('"tasks.self.view"');
+    expect(assistantFallback).toContain('"tasks.self.view"');
+    expect(teacherFallback).not.toContain('"tasks.manage"');
+    expect(assistantFallback).not.toContain('"tasks.manage"');
   });
 });
