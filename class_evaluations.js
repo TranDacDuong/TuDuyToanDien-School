@@ -41,7 +41,11 @@
       .se-card{background:#fff;border:1px solid #dbe3ee;border-radius:8px;padding:15px}
       .se-card-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
       .se-name{font-weight:800;color:#0f1f3d}.se-state{font-size:.74rem;font-weight:800;padding:4px 9px;border-radius:999px;background:#f1f5f9;color:#475569}
-      .se-state.sent{background:#dcfce7;color:#166534}.se-state.failed{background:#fee2e2;color:#b91c1c}
+      .se-state.sent{background:#dcfce7;color:#166534}
+      .se-state.pending{background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd}
+      .se-state.normal{background:#f1f5f9;color:#64748b}
+      .se-state.saving{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
+      .se-state.failed{background:#fee2e2;color:#b91c1c}
       .se-statuses{display:flex;gap:7px;flex-wrap:wrap}.se-chip{border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:999px;padding:7px 10px;font:inherit;font-size:.78rem;font-weight:700;cursor:pointer}
       .se-chip.active{border-color:#1d6bd1;background:#eaf3ff;color:#174779}.se-chip.attention.active{border-color:#f59e0b;background:#fff7ed;color:#9a3412}
       .se-status-groups{display:grid;gap:12px}.se-status-group{display:grid;gap:7px}.se-status-label{font-size:.72rem;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:#64748b}
@@ -73,7 +77,7 @@
             <span class="se-progress" id="sessionEvaluationProgress">Đang tải...</span>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               <button class="se-btn" type="button" id="sessionEvaluationSaveAll" onclick="saveAllSessionEvaluationDrafts()">Lưu tất cả bản nháp</button>
-              <button class="se-btn send" type="button" id="sessionEvaluationAutoSendAll" onclick="autoEvaluateAndSendAllRemainingStudents()" style="background:#15803d;border-color:#15803d;color:#fff;font-weight:800">⚡ Tự động đánh giá buổi học</button>
+              <button class="se-btn send" type="button" id="sessionEvaluationAutoSendAll" onclick="sendEvaluatedDraftsNow()" style="background:#15803d;border-color:#15803d;color:#fff;font-weight:800">⚡ Gửi ngay các đánh giá đã chấm</button>
             </div>
           </div>
           <div class="se-list" id="sessionEvaluationList"><div class="se-loading">Đang tải danh sách học sinh...</div></div>
@@ -305,26 +309,41 @@
   function studentCard(student) {
     const evaluation = state.evaluations.get(student.id);
     const sent = evaluation.state === "sent";
-    const isAuto = Boolean(evaluation.template_selection?.auto_generated);
+    const isAuto = Boolean(evaluation.template_selection?.auto_generated || evaluation.template_selection?.auto_sent_after_30m);
+    const hasStatuses = Boolean(evaluation.statusIds && evaluation.statusIds.size > 0);
     const hasMessage = Boolean(evaluation.message);
-    const stateLabel = sent ? (isAuto ? "Đã gửi (Tự động 23h)" : "Đã gửi") : evaluation.state === "failed" ? "Gửi lỗi" : evaluation.id ? "Bản nháp" : "Chưa đánh giá";
+
+    let stateLabel = "Không gửi (Bình thường)";
+    let stateClass = "normal";
+
+    if (sent) {
+      stateLabel = isAuto ? "Đã gửi tự động" : "✓ Đã gửi";
+      stateClass = "sent";
+    } else if (evaluation.state === "failed") {
+      stateLabel = "Gửi lỗi";
+      stateClass = "failed";
+    } else if (hasStatuses) {
+      stateLabel = "⏳ Sẽ gửi sau tan học 30p";
+      stateClass = "pending";
+    }
+
     return `
       <article class="se-card" id="se-card-${student.id}">
         <div class="se-card-head">
           <div class="se-name">${esc(student.full_name || student.email)}</div>
-          <span class="se-state ${esc(evaluation.state)} ${isAuto ? "auto" : ""}" id="se-state-${student.id}">${stateLabel}</span>
+          <span class="se-state ${stateClass}" id="se-state-${student.id}">${stateLabel}</span>
         </div>
         <div class="se-status-groups">
           ${statusGroup("Điểm tích cực", state.statuses.filter(status => status.category !== "needs_attention"), evaluation, student, sent)}
           ${statusGroup("Điểm cần khắc phục", state.statuses.filter(status => status.category === "needs_attention"), evaluation, student, sent)}
         </div>
         <div class="se-editor ${hasMessage ? "open" : ""}" id="se-editor-${student.id}">
-          <textarea id="se-message-${student.id}" ${sent ? "readonly" : ""} oninput="updateSessionEvaluationMessage('${student.id}',this.value)">${esc(evaluation.message)}</textarea>
+          <textarea id="se-message-${student.id}" ${sent ? "readonly" : ""} oninput="updateSessionEvaluationMessage('${student.id}',this.value)" placeholder="Nội dung nhận xét sẽ tự động tạo khi chọn trạng thái...">${esc(evaluation.message)}</textarea>
         </div>
         <div class="se-actions">
           <button type="button" class="se-btn" onclick="generateSessionEvaluationMessage('${student.id}')" ${sent ? "disabled" : ""}>${hasMessage ? "Đổi mẫu" : "Tạo nội dung"}</button>
           <button type="button" class="se-btn primary" onclick="saveSessionEvaluationDraft('${student.id}')" ${sent ? "disabled" : ""}>Lưu nháp</button>
-          <button type="button" class="se-btn send" onclick="sendSessionEvaluation('${student.id}')" ${sent ? "disabled" : ""}>Gửi phụ huynh</button>
+          <button type="button" class="se-btn send" onclick="sendSessionEvaluation('${student.id}')" ${sent ? "disabled" : ""}>Gửi ngay</button>
         </div>
       </article>`;
   }
@@ -346,9 +365,12 @@
   function updateProgress() {
     const values = [...state.evaluations.values()];
     const sent = values.filter(item => item.state === "sent").length;
-    const drafted = values.filter(item => item.id && item.state !== "sent").length;
+    const pending = values.filter(item => item.state !== "sent" && item.statusIds && item.statusIds.size > 0).length;
+    const normal = Math.max(0, state.students.length - sent - pending);
     const el = document.getElementById("sessionEvaluationProgress");
-    if (el) el.textContent = `${state.students.length} học sinh · ${sent} đã gửi · ${drafted} bản nháp`;
+    if (el) {
+      el.textContent = `${state.students.length} HS · ${sent} đã gửi · ${pending} sẽ gửi sau tan học 30p · ${normal} bình thường (không gửi)`;
+    }
   }
 
   function choose(items, previousIds = []) {
@@ -406,55 +428,96 @@
     joinPhrases: joinVietnamesePhrases,
   });
 
-  window.toggleSessionEvaluationStatus = function (studentId, statusId) {
-    const evaluation = state.evaluations.get(studentId);
-    if (!evaluation || evaluation.state === "sent") return;
-    const status = state.statuses.find(item => item.id === statusId);
-    if (!status) return;
-    if (evaluation.statusIds.has(statusId)) {
-      evaluation.statusIds.delete(statusId);
-    } else {
-      evaluation.statusIds.add(statusId);
+  const autoSaveTimers = new Map();
+
+  function cancelAutoSaveDraft(studentId) {
+    if (autoSaveTimers.has(studentId)) {
+      clearTimeout(autoSaveTimers.get(studentId));
+      autoSaveTimers.delete(studentId);
     }
-    evaluation.message = "";
-    evaluation.template_selection = {};
-    document.getElementById(`se-card-${studentId}`).outerHTML = studentCard(state.students.find(item => item.id === studentId));
-  };
+  }
 
-  window.updateSessionEvaluationMessage = function (studentId, value) {
+  function scheduleAutoSaveDraft(studentId) {
+    cancelAutoSaveDraft(studentId);
+    const badge = document.getElementById(`se-state-${studentId}`);
+    if (badge) {
+      badge.className = "se-state saving";
+      badge.textContent = "Đang lưu...";
+    }
+    const timer = setTimeout(async () => {
+      autoSaveTimers.delete(studentId);
+      try {
+        await persist(studentId, "draft");
+        const b = document.getElementById(`se-state-${studentId}`);
+        if (b) {
+          b.className = "se-state pending";
+          b.textContent = "⏳ Sẽ gửi sau tan học 30p";
+        }
+        updateProgress();
+      } catch (err) {
+        console.error("Auto save draft error:", err);
+        const b = document.getElementById(`se-state-${studentId}`);
+        if (b) {
+          b.className = "se-state failed";
+          b.textContent = "Lỗi lưu nháp";
+        }
+      }
+    }, 600);
+    autoSaveTimers.set(studentId, timer);
+  }
+
+  async function deleteDraftIfEmpty(studentId) {
+    cancelAutoSaveDraft(studentId);
     const evaluation = state.evaluations.get(studentId);
-    if (evaluation) evaluation.message = value;
-  };
+    if (!evaluation) return;
+    if (evaluation.id && evaluation.state === "draft") {
+      try {
+        const client = getSb();
+        await client.from("session_student_evaluations").delete().eq("id", evaluation.id).eq("state", "draft");
+        evaluation.id = null;
+      } catch (err) {
+        console.warn("Delete draft error:", err);
+      }
+    }
+    const badge = document.getElementById(`se-state-${studentId}`);
+    if (badge) {
+      badge.className = "se-state normal";
+      badge.textContent = "Không gửi (Bình thường)";
+    }
+    updateProgress();
+  }
 
-  window.generateSessionEvaluationMessage = function (studentId) {
+  function generateMessageForStudent(studentId, { silent = false } = {}) {
     const student = state.students.find(item => item.id === studentId);
     const evaluation = state.evaluations.get(studentId);
-    if (!student || !evaluation || evaluation.state === "sent") return;
+    if (!student || !evaluation || evaluation.state === "sent") return "";
     const selected = state.statuses.filter(status => evaluation.statusIds.has(status.id));
     if (!selected.length) {
-      alert("Hãy chọn ít nhất một trạng thái cho học sinh.");
-      return;
+      if (!silent) alert("Hãy chọn ít nhất một trạng thái cho học sinh.");
+      return "";
     }
     const previous = evaluation.template_selection?.format_version === 2 ? evaluation.template_selection : {};
     const positiveStatuses = selected.filter(status => status.category !== "needs_attention");
     const attentionStatuses = selected.filter(status => status.category === "needs_attention");
-    const positiveDescriptions = positiveStatuses.map(status => choose(
-      state.templates.filter(item => item.section_type === "status" && item.status_id === status.id),
-      previous.positive_descriptions || [],
-    )).filter(Boolean);
-    const attentionDescriptions = attentionStatuses.map(status => choose(
-      state.templates.filter(item => item.section_type === "status" && item.status_id === status.id),
-      previous.attention_descriptions || [],
-    )).filter(Boolean);
-    if (positiveDescriptions.length !== positiveStatuses.length || attentionDescriptions.length !== attentionStatuses.length) {
-      alert("Một trạng thái đang thiếu mẫu câu. Vui lòng báo quản trị viên bổ sung thư viện nhận xét.");
-      return;
-    }
+    const positiveDescriptions = positiveStatuses.map(status => {
+      const match = choose(
+        state.templates.filter(item => item.section_type === "status" && item.status_id === status.id),
+        previous.positive_descriptions || [],
+      );
+      return match || { id: status.id, content: status.name };
+    }).filter(Boolean);
+    const attentionDescriptions = attentionStatuses.map(status => {
+      const match = choose(
+        state.templates.filter(item => item.section_type === "status" && item.status_id === status.id),
+        previous.attention_descriptions || [],
+      );
+      return match || { id: status.id, content: status.name };
+    }).filter(Boolean);
+
     const closingSection = attentionStatuses.length ? "closing" : "opening";
-    const closing = choose(state.templates.filter(item => item.section_type === closingSection), [previous.closing]);
+    let closing = choose(state.templates.filter(item => item.section_type === closingSection), [previous.closing]);
     if (!closing) {
-      alert("Thư viện đang thiếu câu kết thúc phù hợp.");
-      return;
+      closing = { id: null, content: "Thầy/cô mong con tiếp tục phát huy và cố gắng trong các buổi học tới" };
     }
 
     evaluation.message = buildSessionEvaluationMessage({
@@ -468,14 +531,64 @@
     });
     evaluation.template_selection = {
       format_version: 2,
-      positive_descriptions: positiveDescriptions.map(item => item.id),
-      attention_descriptions: attentionDescriptions.map(item => item.id),
+      positive_descriptions: positiveDescriptions.map(item => item.id).filter(Boolean),
+      attention_descriptions: attentionDescriptions.map(item => item.id).filter(Boolean),
       closing: closing?.id || null,
     };
     const editor = document.getElementById(`se-editor-${studentId}`);
     const textarea = document.getElementById(`se-message-${studentId}`);
     if (editor) editor.classList.add("open");
     if (textarea) textarea.value = evaluation.message;
+    return evaluation.message;
+  }
+
+  window.toggleSessionEvaluationStatus = function (studentId, statusId) {
+    const evaluation = state.evaluations.get(studentId);
+    if (!evaluation || evaluation.state === "sent") return;
+    const status = state.statuses.find(item => item.id === statusId);
+    if (!status) return;
+
+    if (evaluation.statusIds.has(statusId)) {
+      evaluation.statusIds.delete(statusId);
+    } else {
+      evaluation.statusIds.add(statusId);
+    }
+
+    const student = state.students.find(item => item.id === studentId);
+
+    if (evaluation.statusIds.size > 0) {
+      generateMessageForStudent(studentId, { silent: true });
+      const cardEl = document.getElementById(`se-card-${studentId}`);
+      if (cardEl) {
+        cardEl.outerHTML = studentCard(student);
+      }
+      scheduleAutoSaveDraft(studentId);
+    } else {
+      evaluation.message = "";
+      evaluation.template_selection = {};
+      const cardEl = document.getElementById(`se-card-${studentId}`);
+      if (cardEl) {
+        cardEl.outerHTML = studentCard(student);
+      }
+      deleteDraftIfEmpty(studentId);
+    }
+  };
+
+  window.updateSessionEvaluationMessage = function (studentId, value) {
+    const evaluation = state.evaluations.get(studentId);
+    if (evaluation) {
+      evaluation.message = value;
+      if (evaluation.statusIds && evaluation.statusIds.size > 0 && evaluation.state !== "sent") {
+        scheduleAutoSaveDraft(studentId);
+      }
+    }
+  };
+
+  window.generateSessionEvaluationMessage = function (studentId) {
+    const msg = generateMessageForStudent(studentId, { silent: false });
+    if (msg) {
+      scheduleAutoSaveDraft(studentId);
+    }
   };
 
   const DEFAULT_31_TEMPLATES = [
@@ -571,18 +684,18 @@
     return data;
   }
 
-  window.autoEvaluateAndSendAllRemainingStudents = async function () {
-    const unsentStudents = state.students.filter(student => {
+  window.sendEvaluatedDraftsNow = async function () {
+    const candidates = state.students.filter(student => {
       const evaluation = state.evaluations.get(student.id);
-      return evaluation.state !== "sent";
+      return evaluation.state !== "sent" && evaluation.statusIds && evaluation.statusIds.size > 0;
     });
 
-    if (!unsentStudents.length) {
-      alert("Tất cả học sinh trong buổi học này đã được gửi đánh giá.");
+    if (!candidates.length) {
+      alert("Hiện chưa có học sinh nào được chọn trạng thái đánh giá.\n\nLưu ý: Những học sinh không chọn trạng thái sẽ được xem là bình thường và không gửi nhận xét.");
       return;
     }
 
-    if (!confirm(`Tự động tạo nội dung và gửi nhận xét cho ${unsentStudents.length} học sinh chưa được đánh giá?`)) {
+    if (!confirm(`Bạn có chắc muốn gửi ngay nhận xét cho ${candidates.length} học sinh đã chấm trạng thái?\n(Các học sinh còn lại không có trạng thái sẽ không gửi)`)) {
       return;
     }
 
@@ -590,13 +703,12 @@
     if (button) button.disabled = true;
 
     let count = 0;
-    for (const student of unsentStudents) {
+    for (const student of candidates) {
       try {
         setBusy(student.id, true);
         const evaluation = state.evaluations.get(student.id);
-        if (!evaluation.message) {
-          evaluation.message = generateAutoNormalMessageForStudent(student);
-          evaluation.template_selection = { auto_generated: true, format_version: "auto" };
+        if (!evaluation.message && evaluation.statusIds.size) {
+          generateMessageForStudent(student.id, { silent: true });
         }
         const editor = document.getElementById(`se-editor-${student.id}`);
         const textarea = document.getElementById(`se-message-${student.id}`);
@@ -619,7 +731,6 @@
               class_session_id: state.sessionId,
               evaluation_id: saved.id,
               session_date: state.session.session_date,
-              auto_generated: true,
               sender_name: "MindUp - Tư duy Toàn Diện",
               sender_avatar: "pwa-icon-192.png",
               branded_sender: true,
@@ -631,15 +742,18 @@
         document.getElementById(`se-card-${student.id}`).outerHTML = studentCard(student);
         count += 1;
       } catch (error) {
-        console.error(`Lỗi tự động gửi cho ${student.full_name}:`, error);
+        console.error(`Lỗi gửi nhận xét cho ${student.full_name}:`, error);
         setBusy(student.id, false);
       }
     }
 
     if (button) button.disabled = false;
     updateProgress();
-    alert(`Đã tự động tạo nội dung và gửi nhận xét cho ${count}/${unsentStudents.length} học sinh thành công!`);
+    alert(`Đã gửi nhận xét cho ${count}/${candidates.length} học sinh thành công!`);
   };
+
+  // Giữ alias tương thích ngược
+  window.autoEvaluateAndSendAllRemainingStudents = window.sendEvaluatedDraftsNow;
 
   function setBusy(studentId, busy) {
     const card = document.getElementById(`se-card-${studentId}`);
@@ -651,10 +765,11 @@
   }
 
   window.saveSessionEvaluationDraft = async function (studentId, silent = false) {
+    cancelAutoSaveDraft(studentId);
     try {
       setBusy(studentId, true);
       await persist(studentId, "draft");
-      if (!silent) alert("Đã lưu bản nháp.");
+      if (!silent) alert("Đã lưu bản nháp (sẽ tự động gửi sau tan học 30 phút).");
       const student = state.students.find(item => item.id === studentId);
       document.getElementById(`se-card-${studentId}`).outerHTML = studentCard(student);
       updateProgress();
