@@ -51,3 +51,9 @@ test('user search is restricted to students for direct web chat', () => {
 
   expect(searchSection).toContain('.eq("role", "student")');
 });
+
+test('local Zalo bot acknowledges failed outbox jobs with the claimed job id', () => {
+  const server = read(path.join('services', 'zalo-bot', 'server.js'));
+  expect(server).toContain("jobId: job.job_id, status: 'uncertain'");
+  expect(server).not.toContain("jobId: job.job, status: 'uncertain'");
+});

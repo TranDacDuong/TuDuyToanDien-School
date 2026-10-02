@@ -66,7 +66,7 @@ async function syncGatewayOutbox() {
         console.error('[ZaloBot] Tin đã gửi nhưng chưa xác nhận được:', ackError);
       }
     } catch (error) {
-      await gatewayRequest({ action: 'finish', jobId: job.job, status: 'uncertain', error: String(error?.message || error) });
+      await gatewayRequest({ action: 'finish', jobId: job.job_id, status: 'uncertain', error: String(error?.message || error) });
     }
   } catch (error) {
     console.warn('[ZaloBot] Không đồng bộ được hàng đợi:', error?.message || error);
