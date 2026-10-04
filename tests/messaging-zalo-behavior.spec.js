@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { GatewayQueue, HistorySync, validateMessage } = require('../services/zalo-bot/message-sync');
+const { writeJsonAtomic } = require('../services/zalo-bot/sync-store');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -303,4 +304,35 @@ test('teacher cannot use admin link dialog', async () => {
   await d.context.window.openZaloLinkDialog();
   expect(d.calls).toHaveLength(0);
   expect(d.dialog.shown).toBe(false);
+});
+
+test('Windows destination sharing locks retry the atomic rename without rewriting the destination', () => {
+  const writes = []; const waits = []; let renames = 0;
+  writeJsonAtomic('queue.json', [{ id: 'saved' }], {
+    io: { writeFileSync: (...args) => writes.push(args), renameSync: () => {
+      if (++renames < 3) throw Object.assign(new Error('sharing lock'), { code: 'EPERM' });
+    } }, wait: ms => waits.push(ms)
+  });
+  expect(renames).toBe(3); expect(waits).toEqual([20, 60]);
+  expect(writes).toHaveLength(1);
+  expect(writes[0][0]).not.toBe('queue.json');
+  expect(writes[0][1]).toBe('[{"id":"saved"}]');
+  expect(writes[0][2].mode).toBe(0o600);
+});
+
+test('permanent disk errors fail explicitly without replacing the previous queue', () => {
+  let renames = 0; let destinationWrites = 0;
+  expect(() => writeJsonAtomic('queue.json', [], { io: {
+    writeFileSync: file => { if (file === 'queue.json') destinationWrites++; },
+    renameSync: () => { renames++; throw Object.assign(new Error('Disk full'), { code: 'ENOSPC' }); }
+  }, wait() {} })).toThrow('Disk full');
+  expect(renames).toBe(1); expect(destinationWrites).toBe(0);
+});
+
+test('persistent Windows locks have bounded retries rather than hanging the bot', () => {
+  let attempts = 0;
+  expect(() => writeJsonAtomic('queue.json', [], { io: { writeFileSync() {},
+    renameSync: () => { attempts++; throw Object.assign(new Error('Locked'), { code: 'EBUSY' }); }
+  }, wait() {} })).toThrow('Locked');
+  expect(attempts).toBe(4);
 });

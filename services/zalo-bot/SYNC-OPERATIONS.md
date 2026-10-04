@@ -22,6 +22,8 @@ existing verified parent with an actively assigned teacher and an admin.
 - Transient upload failures retry with backoff. Invalid messages are isolated in
   `session/rejected-incoming.json`, not allowed to block subsequent messages.
   These private files must not be committed or exposed as web assets.
+- Queue snapshots use atomic replacement with bounded retries for Windows sharing
+  locks. Imported history is persisted once per page rather than once per message.
 - Startup/reconnection requests text history. Every page has a response timeout
   and bounded retries. Progress is saved in `session/history-sync.json`.
 - `GET http://127.0.0.1:3456/api/status` reports listener health, upload errors,

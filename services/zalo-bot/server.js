@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { buildParentAlias, parseParentLinkCommand } = require('./link-command');
 const { GatewayQueue, HistorySync } = require('./message-sync');
+const { writeJsonAtomic } = require('./sync-store');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -395,6 +396,11 @@ function startGatewayListener() {
   zaloApi.listener.on('old_messages', (messages, type) => {
     if (zaloApi !== listeningApi) return;
     historyController.receive(messages, type);
+    try { persistIncoming(); } catch (error) {
+      incomingQueue.lastError = String(error?.message || error);
+      console.error('[ZaloBot] Cannot persist history page:', error);
+    }
+    flushIncoming().catch(console.error);
   });
   zaloApi.listener.on('error', error => console.warn('[ZaloBot] Zalo listener:', error));
   zaloApi.listener.start({ retryOnClose: true });
@@ -426,10 +432,13 @@ function queueZaloMessage(message, isHistory) {
     displayName: String(message.data?.dName || ''), isSelf: message.isSelf === true,
     sentAt: messageTimestamp(message.data?.ts), isHistory: isHistory === true
   });
-  try { persistIncoming(); } catch (error) {
-    console.error('[ZaloBot] Không lưu được tin đồng bộ trên máy:', error);
+  if (!isHistory) {
+    try { persistIncoming(); } catch (error) {
+      incomingQueue.lastError = String(error?.message || error);
+      console.error('[ZaloBot] Không lưu được tin đồng bộ trên máy:', error);
+    }
+    flushIncoming().catch(console.error);
   }
-  flushIncoming().catch(console.error);
   return true;
 }
 
@@ -512,9 +521,7 @@ try {
 
 function persistHistory(state) {
   try {
-    const tempFile = `${HISTORY_FILE}.tmp`;
-    fs.writeFileSync(tempFile, JSON.stringify(state), { mode: 0o600 });
-    fs.renameSync(tempFile, HISTORY_FILE);
+    writeJsonAtomic(HISTORY_FILE, state);
   } catch (error) {
     console.error('[ZaloBot] Cannot save history progress:', error);
   }
@@ -522,16 +529,12 @@ function persistHistory(state) {
 
 function quarantineIncoming(payload, error) {
   const next = [...rejectedIncoming, { payload, error, rejectedAt: new Date().toISOString() }].slice(-500);
-  const tempFile = `${REJECTED_FILE}.tmp`;
-  fs.writeFileSync(tempFile, JSON.stringify(next), { mode: 0o600 });
-  fs.renameSync(tempFile, REJECTED_FILE);
+  writeJsonAtomic(REJECTED_FILE, next);
   rejectedIncoming = next;
 }
 
 function persistIncoming() {
-  const tempFile = `${INCOMING_FILE}.tmp`;
-  fs.writeFileSync(tempFile, JSON.stringify([...pendingIncoming.values()]), { mode: 0o600 });
-  fs.renameSync(tempFile, INCOMING_FILE);
+  writeJsonAtomic(INCOMING_FILE, [...pendingIncoming.values()]);
 }
 
 // Bot State
