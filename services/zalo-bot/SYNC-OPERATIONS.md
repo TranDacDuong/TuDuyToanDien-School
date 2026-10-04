@@ -6,6 +6,8 @@
 2. Deploy `supabase/functions/zalo-gateway/index.ts` with its existing gateway token authentication.
 3. Restart the laptop bot. Do not delete its `session/` directory.
 4. Deploy `messages.html` with the link-candidates dialog.
+5. Apply `SQL unify parent Zalo identity.sql` to reuse the directory/tuition UID
+   mapping for Messages. The running bot detects its link revision automatically.
 
 The migration is transactional and does not guess parent links or delete existing
 history. `tests/zalo-sync-database.sql` can replace the migration's final COMMIT
@@ -38,11 +40,20 @@ Only private text messages are supported; attachments, stickers, groups,
 recalls, and edited-message replication are not a full Zalo mirror. Available
 history depends on what Zalo returns and is capped at 200 pages per run.
 
-Only enabled verified parent links enter the web inbox. Existing friend/contact
-lookups are offered in the admin link dialog for explicit identity confirmation;
-neither a matching nickname nor friend status automatically verifies identity.
+Only enabled verified parent links enter the web inbox. Successful directory
+phone lookups with a unique UID and a matching, unique current parent phone now
+populate this mapping automatically (friend, invited, or not_friend contacts).
+Changing/removing a UID or invalidating the phone disables the derived mapping.
+Transient lookup errors do not erase an unchanged, established identity. Ambiguous
+UIDs/phones and explicit disabled/admin links are not silently overwritten.
+Manual confirmation in Messages also supplies the directory/tuition contact UID.
+Neither a matching nickname nor friend status alone establishes identity.
 Confirmed link changes trigger another history import within the next minute.
 Historical unlinked messages are deliberately not persisted as readable content.
+
+`tests/zalo-unified-identity-database.sql` replaces the unification migration's
+final COMMIT for a rollback-only integration test. It requires two eligible
+existing contacts. No test messages are sent to parents.
 
 Teachers see correctly scoped outgoing messages for students they manage and
 shared incoming replies from linked parents of those students. Outgoing messages
