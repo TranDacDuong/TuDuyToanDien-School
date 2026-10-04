@@ -1514,9 +1514,9 @@ async function refreshZaloDeliveryStatus() {
 
 window.openZaloLinkDialog = async function() {
   if (currentProfile?.role !== 'admin' || !activeFriend?.id) return;
-  const { data, error } = await sb.from('zalo_unmatched_inbox')
-    .select('zalo_uid,display_name,received_at')
-    .is('resolved_at', null).order('received_at', { ascending: false }).limit(100);
+  const targetId = activeFriend.id;
+  const { data, error } = await sb.rpc('list_mindup_zalo_link_candidates', { p_parent_id: targetId });
+  if (activeFriend?.id !== targetId) return;
   if (error) return alert('Không tải được danh sách chờ: ' + error.message);
   const unique = new Map((data || []).map(row => [row.zalo_uid, row]));
   const select = document.getElementById('zaloPendingSelect');
@@ -1524,23 +1524,28 @@ window.openZaloLinkDialog = async function() {
   for (const row of unique.values()) {
     const option = document.createElement('option');
     option.value = row.zalo_uid;
-    option.textContent = `${row.display_name || 'Không có tên'} (${row.zalo_uid.slice(-6)})`;
+    option.textContent = `${row.display_name || 'Không có tên'} (${row.zalo_uid.slice(-6)})${row.source === 'contact' ? ' · Danh bạ đã kết bạn' : ''}`;
     select.appendChild(option);
   }
   if (!select.options.length) return alert('Chưa có tài khoản Zalo nào đang chờ xác minh.');
   document.getElementById('zaloLinkTarget').textContent = activeFriend.name;
   document.getElementById('zaloIdentityConfirmed').checked = false;
+  document.getElementById('zaloLinkDialog').dataset.parentId = targetId;
   document.getElementById('zaloLinkDialog').showModal();
 };
 
 window.confirmZaloLink = async function() {
   if (currentProfile?.role !== 'admin' || !activeFriend?.id) return;
+  const dialog = document.getElementById('zaloLinkDialog');
+  const parentId = dialog.dataset.parentId;
+  if (!parentId || activeFriend.id !== parentId) return dialog.close();
   if (!document.getElementById('zaloIdentityConfirmed').checked) {
     return alert('Cần đối chiếu danh tính trước khi liên kết.');
   }
   const uid = document.getElementById('zaloPendingSelect').value;
+  if (!uid) return;
   const { error } = await sb.rpc('verify_mindup_zalo_link', {
-    p_audience_user_id: activeFriend.id, p_zalo_uid: uid
+    p_audience_user_id: parentId, p_zalo_uid: uid
   });
   if (error) return alert('Không liên kết được: ' + error.message);
   document.getElementById('zaloLinkDialog').close();

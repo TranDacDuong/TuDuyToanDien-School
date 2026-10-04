@@ -3,6 +3,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const { buildParentAlias, parseParentLinkCommand } = require('./link-command');
+const { GatewayQueue, HistorySync } = require('./message-sync');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -35,13 +36,22 @@ let nextParentPollAt = 0;
 let nextAliasSyncAt = 0;
 let gatewayBatchCount = 0;
 const pendingIncoming = new Map();
-let flushingIncoming = false;
-let historySync = {
-  status: 'idle', maxPages: 0, requestedPages: 0, received: 0,
-  queued: 0, startedAt: null, finishedAt: null, error: null
-};
-let historyCursor = null;
-let historyTimer = null;
+let listenerConnected = false;
+let rejectedIncoming = [];
+let syncStateBusy = false;
+let syncLinkRevision = null;
+let verifiedParentCount = null;
+const historyController = new HistorySync({
+  requestPage: cursor => zaloApi.listener.requestOldMessages(0, cursor),
+  enqueue: queueZaloMessage,
+  pendingCount: () => [...pendingIncoming.values()].filter(p => p.isHistory).length,
+  onChange: persistHistory
+});
+const incomingQueue = new GatewayQueue({
+  pending: pendingIncoming, request: gatewayRequest, persist: persistIncoming,
+  quarantine: quarantineIncoming,
+  onResult: (payload, result) => historyController.result(payload, result)
+});
 
 async function gatewayRequest(payload) {
   if (!GATEWAY_URL || !GATEWAY_TOKEN) throw new Error('Zalo gateway is not configured');
@@ -51,22 +61,35 @@ async function gatewayRequest(payload) {
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(15000)
   });
-  if (!response.ok) throw new Error(`Gateway HTTP ${response.status}`);
+  if (!response.ok) {
+    const error = new Error(`Gateway HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
   return response.json();
 }
 
 async function syncGatewayOutbox() {
-  if (gatewayBusy || !zaloApi || !GATEWAY_URL || !GATEWAY_TOKEN
+  if (gatewayBusy || !zaloApi || !listenerConnected || !GATEWAY_URL || !GATEWAY_TOKEN
     || campaignStatus !== 'idle' || Date.now() < nextGatewaySendAt) return;
+  if ([...pendingIncoming.values()].some(p => p.action === 'finish')) return;
   gatewayBusy = true;
   try {
     const { job } = await gatewayRequest({ action: 'claim' });
     if (!job) return;
     scheduleNextGatewayAction();
     try {
-      await zaloApi.sendMessage(job.content, job.zalo_uid);
+      const sent = await zaloApi.sendMessage(job.content, job.zalo_uid);
+      const messageId = sent?.message?.msgId;
+      if (messageId == null) throw new Error('Zalo returned no message id; verify delivery before retrying');
+      const acknowledgement = { action: 'finish', jobId: job.job_id, status: 'sent',
+        externalId: `${job.zalo_uid}:${messageId}` };
+      pendingIncoming.set(`ack:${job.job_id}`, acknowledgement);
+      persistIncoming();
       try {
-        await gatewayRequest({ action: 'finish', jobId: job.job_id, status: 'sent' });
+        await gatewayRequest(acknowledgement);
+        pendingIncoming.delete(`ack:${job.job_id}`);
+        persistIncoming();
       } catch (ackError) {
         // An unacknowledged send must never be retried automatically.
         console.error('[ZaloBot] Tin đã gửi nhưng chưa xác nhận được:', ackError);
@@ -313,28 +336,53 @@ async function syncParentTuition() {
 }
 
 async function flushIncoming() {
-  if (flushingIncoming || !GATEWAY_URL || !GATEWAY_TOKEN || !pendingIncoming.size) return;
-  flushingIncoming = true;
+  if (!GATEWAY_URL || !GATEWAY_TOKEN) return;
   try {
-    for (const [key, payload] of pendingIncoming) {
-      try {
-        await gatewayRequest(payload);
-        pendingIncoming.delete(key);
-        persistIncoming();
-      } catch (error) {
-        console.warn('[ZaloBot] Chờ gửi lại tin nhận:', error?.message || error);
-        break;
-      }
-    }
+    await incomingQueue.flush();
+  } catch (error) {
+    incomingQueue.lastError = String(error?.message || error);
+    console.error('[ZaloBot] Cannot persist the sync queue:', incomingQueue.lastError);
+  }
+}
+
+async function refreshSyncLinks() {
+  if (syncStateBusy || !listenerConnected || !GATEWAY_URL || !GATEWAY_TOKEN) return;
+  syncStateBusy = true;
+  try {
+    const { state } = await gatewayRequest({ action: 'syncState' });
+    if (typeof state?.revision !== 'string' || !Number.isFinite(state?.linked)) throw new Error('Invalid sync state');
+    const changed = syncLinkRevision !== null && syncLinkRevision !== state.revision;
+    verifiedParentCount = state.linked;
+    syncLinkRevision = state.revision;
+    if (changed || historyController.state.status === 'failed') historyController.requestCatchup();
+  } catch (error) {
+    console.warn('[ZaloBot] Cannot refresh verified Zalo links:', error?.message || error);
   } finally {
-    flushingIncoming = false;
+    syncStateBusy = false;
   }
 }
 
 function startGatewayListener() {
   if (!zaloApi || gatewayListening || !GATEWAY_URL || !GATEWAY_TOKEN) return;
   gatewayListening = true;
+  const listeningApi = zaloApi;
+  zaloApi.listener.on('connected', () => {
+    if (zaloApi !== listeningApi) return;
+    listenerConnected = true;
+    botStatus = 'connected';
+    historyController.connection(true);
+    refreshSyncLinks().catch(console.error);
+  });
+  const disconnected = () => {
+    if (zaloApi !== listeningApi) return;
+    listenerConnected = false;
+    botStatus = 'disconnected';
+    historyController.connection(false);
+  };
+  zaloApi.listener.on('disconnected', disconnected);
+  zaloApi.listener.on('closed', disconnected);
   zaloApi.listener.on('message', (message) => {
+    if (zaloApi !== listeningApi) return;
     if (message.isSelf) {
       const isLinkCommand = !!parseParentLinkCommand(message.data?.content);
       handleParentLinkCommand(message).catch(error => {
@@ -345,21 +393,8 @@ function startGatewayListener() {
     queueZaloMessage(message, false);
   });
   zaloApi.listener.on('old_messages', (messages, type) => {
-    if (historySync.status !== 'running' || type !== 0) return;
-    const privateMessages = Array.isArray(messages) ? messages : [];
-    historySync.received += privateMessages.length;
-    for (const message of privateMessages) {
-      if (queueZaloMessage(message, true)) historySync.queued++;
-    }
-
-    const nextCursor = String(privateMessages.at(-1)?.data?.msgId || '');
-    if (!privateMessages.length || !nextCursor || nextCursor === historyCursor ||
-      historySync.requestedPages >= historySync.maxPages) {
-      finishHistorySync();
-      return;
-    }
-    historyCursor = nextCursor;
-    scheduleHistoryPage();
+    if (zaloApi !== listeningApi) return;
+    historyController.receive(messages, type);
   });
   zaloApi.listener.on('error', error => console.warn('[ZaloBot] Zalo listener:', error));
   zaloApi.listener.start({ retryOnClose: true });
@@ -398,42 +433,8 @@ function queueZaloMessage(message, isHistory) {
   return true;
 }
 
-function scheduleHistoryPage() {
-  clearTimeout(historyTimer);
-  historyTimer = setTimeout(() => {
-    if (historySync.status !== 'running') return;
-    if (pendingIncoming.size > 800) {
-      scheduleHistoryPage();
-      return;
-    }
-    try {
-      historySync.requestedPages++;
-      zaloApi.listener.requestOldMessages(0, historyCursor);
-    } catch (error) {
-      finishHistorySync(error);
-    }
-  }, 1200);
-}
-
-function finishHistorySync(error = null) {
-  clearTimeout(historyTimer);
-  historyTimer = null;
-  historySync.status = error ? 'failed' : 'completed';
-  historySync.finishedAt = new Date().toISOString();
-  historySync.error = error ? String(error?.message || error) : null;
-  flushIncoming().catch(console.error);
-}
-
 function startHistorySync(maxPages) {
-  if (!zaloApi || botStatus !== 'connected') throw new Error('Zalo chưa kết nối');
-  if (historySync.status === 'running') return historySync;
-  historyCursor = null;
-  historySync = {
-    status: 'running', maxPages, requestedPages: 0, received: 0, queued: 0,
-    startedAt: new Date().toISOString(), finishedAt: null, error: null
-  };
-  scheduleHistoryPage();
-  return historySync;
+  return historyController.start(maxPages);
 }
 
 async function handleParentLinkCommand(message) {
@@ -478,15 +479,53 @@ async function handleParentLinkCommand(message) {
 const SESSION_DIR = path.join(__dirname, 'session');
 const SESSION_FILE = path.join(SESSION_DIR, 'session.json');
 const INCOMING_FILE = path.join(SESSION_DIR, 'pending-incoming.json');
+const REJECTED_FILE = path.join(SESSION_DIR, 'rejected-incoming.json');
+const HISTORY_FILE = path.join(SESSION_DIR, 'history-sync.json');
 if (!fs.existsSync(SESSION_DIR)) {
   fs.mkdirSync(SESSION_DIR, { recursive: true });
 }
 try {
   for (const payload of JSON.parse(fs.readFileSync(INCOMING_FILE, 'utf8'))) {
-    if (payload?.externalId) pendingIncoming.set(payload.externalId, payload);
+    if (payload?.action === 'finish' && payload.jobId) pendingIncoming.set(`ack:${payload.jobId}`, payload);
+    else if (payload?.externalId) pendingIncoming.set(payload.externalId, payload);
   }
 } catch (error) {
   if (error.code !== 'ENOENT') console.error('[ZaloBot] Không đọc được tin nhận đang chờ:', error);
+}
+try {
+  const saved = JSON.parse(fs.readFileSync(REJECTED_FILE, 'utf8'));
+  if (!Array.isArray(saved)) throw new Error('Invalid rejected sync data');
+  rejectedIncoming = saved;
+} catch (error) {
+  if (error.code !== 'ENOENT') console.error('[ZaloBot] Cannot read rejected sync messages:', error);
+}
+try {
+  const saved = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'));
+  historyController.state = { ...historyController.state, ...saved };
+  if (['running', 'uploading'].includes(historyController.state.status)) {
+    historyController.state.status = 'interrupted';
+    historyController.state.error = 'Bot restarted; history will restart after connecting';
+  }
+} catch (error) {
+  if (error.code !== 'ENOENT') console.error('[ZaloBot] Cannot read history progress:', error);
+}
+
+function persistHistory(state) {
+  try {
+    const tempFile = `${HISTORY_FILE}.tmp`;
+    fs.writeFileSync(tempFile, JSON.stringify(state), { mode: 0o600 });
+    fs.renameSync(tempFile, HISTORY_FILE);
+  } catch (error) {
+    console.error('[ZaloBot] Cannot save history progress:', error);
+  }
+}
+
+function quarantineIncoming(payload, error) {
+  const next = [...rejectedIncoming, { payload, error, rejectedAt: new Date().toISOString() }].slice(-500);
+  const tempFile = `${REJECTED_FILE}.tmp`;
+  fs.writeFileSync(tempFile, JSON.stringify(next), { mode: 0o600 });
+  fs.renameSync(tempFile, REJECTED_FILE);
+  rejectedIncoming = next;
 }
 
 function persistIncoming() {
@@ -1004,7 +1043,10 @@ app.get('/api/status', (req, res) => {
       progress: currentProgress,
       completedResults: completedResults.slice(-100)
     },
-    historySync: { ...historySync, pendingUpload: pendingIncoming.size },
+    historySync: { ...historyController.state, listenerConnected, verifiedParents: verifiedParentCount,
+      pendingUpload: [...pendingIncoming.values()].filter(p => p.action === 'syncMessage').length,
+      pendingAcknowledgements: [...pendingIncoming.values()].filter(p => p.action === 'finish').length,
+      rejectedMessages: rejectedIncoming.length, lastUploadError: incomingQueue.lastError },
     config: botConfig
   });
 });
@@ -1056,6 +1098,8 @@ app.post('/api/logout', (req, res) => {
   try {
     try { zaloApi?.listener?.stop(); } catch (_) {}
     gatewayListening = false;
+    listenerConnected = false;
+    historyController.connection(false);
     if (fs.existsSync(SESSION_FILE)) {
       fs.unlinkSync(SESSION_FILE);
     }
@@ -1173,4 +1217,5 @@ app.listen(PORT, HOST, () => {
     await syncParentTuition();
   }, 12000).unref();
   setInterval(flushIncoming, 10000).unref();
+  setInterval(refreshSyncLinks, 60000).unref();
 });

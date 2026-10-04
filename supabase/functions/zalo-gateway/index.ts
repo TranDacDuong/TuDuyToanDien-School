@@ -30,6 +30,7 @@ async function rpc(name: string, body: Record<string, unknown>) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(12000),
   });
   if (!response.ok) throw new Error(`Database operation failed: ${response.status}`);
   const raw = await response.text();
@@ -47,6 +48,9 @@ Deno.serve(async (request) => {
 
   try {
     const payload = await request.json();
+    if (payload.action === "syncState") {
+      return json({ state: await rpc("get_mindup_zalo_sync_state", {}) });
+    }
     if (payload.action === "claim") {
       const rows = await rpc("claim_mindup_zalo_message", {});
       return json({ job: rows?.[0] || null });
@@ -124,10 +128,15 @@ Deno.serve(async (request) => {
       if (typeof payload.jobId !== "string" || !["sent", "failed", "uncertain"].includes(payload.status)) {
         return json({ error: "Invalid completion" }, 400);
       }
-      await rpc("finish_mindup_zalo_message", {
+      if (payload.status === "sent" && (typeof payload.externalId !== "string" ||
+        !payload.externalId.trim() || payload.externalId.length > 220)) {
+        return json({ error: "Zalo message id is required" }, 400);
+      }
+      await rpc("finish_mindup_zalo_message_v2", {
         p_job_id: payload.jobId,
         p_status: payload.status,
         p_error: typeof payload.error === "string" ? payload.error.slice(0, 500) : null,
+        p_external_id: payload.status === "sent" ? payload.externalId : null,
       });
       return json({ ok: true });
     }
@@ -148,8 +157,11 @@ Deno.serve(async (request) => {
       const { externalId, zaloUid, content, displayName, isSelf, sentAt, isHistory } = payload;
       if (typeof externalId !== "string" || typeof zaloUid !== "string" ||
         typeof content !== "string" || typeof isSelf !== "boolean" ||
+        !externalId.trim() || externalId.length > 220 || !zaloUid.trim() || zaloUid.length > 100 ||
+        !content.trim() || content.length > 10000 ||
         typeof isHistory !== "boolean" ||
-        (sentAt !== null && sentAt !== undefined && typeof sentAt !== "string")) {
+        (sentAt !== null && sentAt !== undefined &&
+          (typeof sentAt !== "string" || !Number.isFinite(Date.parse(sentAt))))) {
         return json({ error: "Invalid synchronized message" }, 400);
       }
       const result = await rpc("sync_mindup_zalo_message", {
