@@ -1149,11 +1149,13 @@ Nhập số tiền hoàn lại (>0):`,
     });
 
     const attMap = {};
+    const overrideMap = {};
     const attRowsByStudentClass = {};
     (attData || []).forEach(a => {
       const date = String(a.date || "").slice(0, 10);
       if (date < mStart || date > mEnd) return;
       attMap[`${a.student_id}_${a.class_id}_${date}_${a.schedule_id || 0}`] = a.status;
+      overrideMap[`${a.student_id}_${a.class_id}_${date}_${a.schedule_id || 0}`] = a.status_overridden === true;
       const key = `${a.student_id}_${a.class_id}`;
       if (!attRowsByStudentClass[key]) attRowsByStudentClass[key] = [];
       attRowsByStudentClass[key].push({ ...a, date });
@@ -1225,7 +1227,11 @@ Nhập số tiền hoàn lại (>0):`,
           trialDateMap[`${cs.student_id}_${item.date}`]
         );
         let rawStatus = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item);
-        let status = (rawStatus === "trial" || isTrial) ? "trial" : (rawStatus || (item.date < joined ? "absent" : "present"));
+        const attendanceKey = `${cs.student_id}_${cs.class_id}_${item.date}`;
+        const overridden = Object.prototype.hasOwnProperty.call(attMap, `${attendanceKey}_${item.schedule_id}`)
+          ? overrideMap[`${attendanceKey}_${item.schedule_id}`] : overrideMap[`${attendanceKey}_0`];
+        let status = overridden && rawStatus ? rawStatus
+          : (rawStatus === "trial" || isTrial) ? "trial" : (rawStatus || (item.date < joined ? "absent" : "present"));
 
         if (status === "trial") trialCount++;
         else if (status === "present") present++;
@@ -1472,7 +1478,7 @@ Nhập số tiền hoàn lại (>0):`,
       }
 
       let attendanceQuery = sb.from("attendance")
-        .select("student_id, class_id, date, status, schedule_id")
+        .select("student_id, class_id, date, status, status_overridden, schedule_id")
         .gte("date", mStart).lte("date", mEnd);
       let paymentsQuery = sb.from("tuition_payments").select("*").eq("month", mStart);
       let schedulesQuery = sb.from("class_student_schedules")
@@ -1710,7 +1716,7 @@ Nhập số tiền hoàn lại (>0):`,
     const studentIds = [...new Set(scopedClassStudents.map(row => row.student_id).filter(Boolean))];
     const [{ data: attData, error: e4 }, { data: payments, error: e5 }, { data: trialReqs }, { data: suppSessions }] = await Promise.all([
       sb.from("attendance")
-        .select("student_id, class_id, date, status, schedule_id")
+        .select("student_id, class_id, date, status, status_overridden, schedule_id")
         .in("student_id", studentIds)
         .gte("date", queryStart)
         .lte("date", todayEnd),

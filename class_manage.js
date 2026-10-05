@@ -878,7 +878,7 @@
       }
     }
 
-    const {data:attData} = await sb.from("attendance").select("student_id,date,status,schedule_id")
+    const {data:attData} = await sb.from("attendance").select("student_id,date,status,status_overridden,schedule_id")
       .eq("class_id",_classId).gte("date",mStart).lte("date",mEnd);
     _attendanceMap = {};
     (attData||[]).forEach(a=>{ _attendanceMap[a.student_id+"_"+a.date+"_"+(a.schedule_id || 0)]=a.status; });
@@ -897,6 +897,12 @@
         if (tr.trial_session_2_at) {
           _trialDateMap[tr.student_id + "_" + tr.trial_session_2_at.slice(0, 10)] = true;
         }
+      }
+    });
+
+    (attData || []).forEach(a => {
+      if (!a.status_overridden && _trialDateMap[a.student_id + "_" + a.date]) {
+        _attendanceMap[a.student_id + "_" + a.date + "_" + (a.schedule_id || 0)] = "trial";
       }
     });
 
@@ -1788,7 +1794,7 @@
   }
 
   window.cvToggleAtt = async function(classId,studentId,date,current,scheduleId,sessionNo){
-    const next=statusCycle[(statusCycle.indexOf(current)+1)%3];
+    const next=statusCycle[(statusCycle.indexOf(current)+1)%statusCycle.length];
     const sb=getSb();
     const sid = Number(scheduleId || 0) || null;
     const attBtn=document.getElementById("cvatt_"+studentId+"_"+date+"_"+(sid || 0));
@@ -1805,7 +1811,7 @@
     };
     applyOptimisticAttendance(next, true);
     const{error}=await sb.from("attendance").upsert(
-      [{class_id:classId,student_id:studentId,date,status:next,schedule_id:sid,session_no:Number(sessionNo || 1)}],
+      [{class_id:classId,student_id:studentId,date,status:next,status_overridden:true,schedule_id:sid,session_no:Number(sessionNo || 1)}],
       {onConflict:"class_id,student_id,date"}
     );
     if(error) applyOptimisticAttendance(current, false);
