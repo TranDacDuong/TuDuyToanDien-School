@@ -700,7 +700,7 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
     <div id="sImportResult" class="s-import-result" style="margin-bottom:14px"></div>
     <input id="sImportFile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="sHandleImportFile(event)">
     <div class="s-search">
-      <div class="sg"><label>Tên</label><input id="sSName"     placeholder="Nhập tên..."></div>
+      <div class="sg"><label>Tên HS / PH</label><input id="sSName"     placeholder="Tên học sinh hoặc phụ huynh..."></div>
       <div class="sg"><label>SĐT</label><input id="sSPhone"    placeholder="SĐT..."></div>
       <div class="sg"><label>Năm sinh</label><input id="sSBirth" type="number" placeholder="VD: 2008"></div>
       <div class="sg"><label>Tỉnh</label><input id="sSProv"    placeholder="Tỉnh/thành..."></div>
@@ -2937,7 +2937,8 @@ function sApplyFilter(){
   const sc = sRmVN(document.getElementById('sSSchool').value);
   const zs = document.getElementById('sSZaloStatus').value;
   _sFilt = _sAll.filter(s =>
-    (!n  || sRmVN(s.full_name).includes(n)) &&
+    (!n  || [s.full_name, s.parent_full_name, ...(_sLinkedParents[s.id] || []).map(parent => parent.full_name)]
+      .some(name => sRmVN(name).includes(n))) &&
     (!p  || (s.phone||'').includes(p)) &&
     (!b  || String(s.birth_year)===b) &&
     (!pv || sRmVN(s.province).includes(pv)) &&
