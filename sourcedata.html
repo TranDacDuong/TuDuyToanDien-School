@@ -2466,6 +2466,7 @@ async function loadStudents(){
   if(!_sZaloBulkTimer) _sZaloBulkTimer=setInterval(()=>{
     if(document.getElementById('students')?.classList.contains('active')){
       sLoadZaloBulkStatus(); sLoadZaloAliasStatus();
+      sLoadZaloContactsForStudents().then(()=>sRender());
     }
   },15000);
   document.getElementById('sStatTotal').textContent = _sAll.length;
@@ -2828,10 +2829,13 @@ async function sLoadZaloContactsForStudents(){
   const parentIds = [...new Set(Object.values(_sLinkedParents).flat().map(parent => parent.id).filter(Boolean))];
   if(!parentIds.length) return;
   const {data,error} = await sb.from('zalo_parent_contacts')
-    .select('parent_id,status,last_checked_at,last_error,link_source,linked_at,zalo_alias,alias_error')
+    .select('parent_id,status,zalo_uid,last_checked_at,last_error,link_source,linked_at,zalo_alias,alias_error,manual_check_requested_at,lease_until')
     .in('parent_id',parentIds);
   if(error){ console.warn('Không tải được trạng thái Zalo PH:',error); return; }
   _sZaloContacts = Object.fromEntries((data||[]).map(row => [row.parent_id,row]));
+  const {data:aliasJobs} = await sb.from('zalo_parent_alias_jobs').select('parent_id,status')
+    .in('parent_id',parentIds).in('status',['pending','processing']);
+  (aliasJobs||[]).forEach(job=>{if(_sZaloContacts[job.parent_id]) _sZaloContacts[job.parent_id].alias_pending=true;});
 }
 
 function sZaloParentStatusHtml(parents){
@@ -2848,8 +2852,31 @@ function sZaloParentStatusHtml(parents){
     const detail = `${parent.full_name || 'PH'} (${parent.phone || 'chưa có SĐT'}): `;
     const alias = row?.zalo_alias ? ` · Biệt danh: ${row.zalo_alias}` : '';
     const error = [row?.last_error,row?.alias_error].filter(Boolean).join(' · ');
-    return `<div style="font-size:.72rem;color:var(--ink-mid);margin-top:3px" title="${esc(error)}">${esc(detail)}Trạng thái: ${esc(label + checked + alias)}</div>`;
+    const busy = _sParentZaloBusy.has(parent.id);
+    const checking = row?.lease_until && new Date(row.lease_until)>new Date()
+      || row?.manual_check_requested_at && (!row.last_checked_at || row.manual_check_requested_at>row.last_checked_at) && row.status!=='error';
+    const controls = window.AppPermissions?.has?.('system.zalo.manage',false)
+      ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px">
+        <button type="button" class="btn btn-outline btn-sm" onclick="sRequestParentZalo('${esc(parent.id)}','check')" ${busy||checking||!parent.phone?'disabled':''}>${checking?'Đang chờ kiểm tra':'Kiểm tra & Kết nối Zalo'}</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="sRequestParentZalo('${esc(parent.id)}','alias')" ${busy||row?.alias_pending||row?.status!=='friend'||!row?.zalo_uid?'disabled':''} title="Đồng bộ biệt danh cho phụ huynh đã kết bạn">${row?.alias_pending?'Đang đồng bộ biệt danh':'Đồng bộ biệt danh'}</button>
+      </div>` : '';
+    return `<div style="font-size:.72rem;color:var(--ink-mid);margin-top:3px" title="${esc(error)}">${esc(detail)}Trạng thái: ${esc(label + checked + alias)}</div>${controls}`;
   }).join('');
+}
+
+const _sParentZaloBusy = new Set();
+async function sRequestParentZalo(parentId,action){
+  if(!window.AppPermissions?.require?.('system.zalo.manage') || _sParentZaloBusy.has(parentId)) return;
+  _sParentZaloBusy.add(parentId);
+  sRender();
+  try{
+    const {data,error}=await sb.rpc('request_parent_zalo_action',{p_parent_id:parentId,p_action:action});
+    if(error) throw error;
+    toast(data?.already_running?'Phụ huynh này đã có tác vụ đang chờ xử lý.':'Đã xếp hàng chạy ngầm cho phụ huynh này.',4000);
+    await sLoadZaloContactsForStudents();
+    sRender();
+  }catch(error){alert(error.message);}
+  finally{_sParentZaloBusy.delete(parentId);sRender();}
 }
 
 function sMobileStatusPill(text, type){
