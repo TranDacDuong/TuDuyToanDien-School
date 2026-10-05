@@ -920,7 +920,6 @@ tbody td { padding: 10px 14px; vertical-align: middle; }
           <option value="scheduled">Đã chốt lịch học thử</option>
           <option value="trial_1_done">Đã học thử buổi đầu tiên</option>
           <option value="trial_2_done">Đã học thử xong 2 buổi</option>
-          <option value="enrolled">Đã thêm vào lớp</option>
           <option value="cancelled">Hủy</option>
           <option value="all">Tất cả trạng thái (gồm đã vào lớp)</option>
         </select>
@@ -3987,6 +3986,7 @@ function renderTrialRequests(){
   const subjectFilter = rmVN(document.getElementById('trialRequestSubjectFilter')?.value || '');
   const rows = _trialRequests.filter(item => {
     const effectiveStatus = trialComputedStatus(item);
+    if (effectiveStatus === 'enrolled') return false;
     const haystack = rmVN(`${item.student_name||''} ${item.phone||''} ${item.school||''} ${item.parent_full_name||''} ${item.parent_phone||''} ${item.grade||''} ${item.subject||''} ${item.teacher?.full_name||''} ${item.teacher?.email||''} ${trialClassLabel(item.trial_class_id)} ${trialSourceDisplay(item)} ${item.linkedStudent?.full_name||''} ${item.linkedStudent?.email||''}`);
     const classInfo = _trialClassMap[item.trial_class_id] || {};
     const itemGrade = rmVN(item.grade || classInfo.grades?.name || classInfo.grade?.name || '');
