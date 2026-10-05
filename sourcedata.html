@@ -2779,6 +2779,7 @@ async function sToggleZaloBulkRun(pause){
 
 async function sLoadLinkedParentsForStudents(students){
   _sLinkedParents = {};
+  _sParentDirectoryError = false;
   const studentIds = [...new Set((students || []).map(item => item.id).filter(Boolean))];
   if(!studentIds.length) return;
   const { data: links, error: linkError } = await sb.from('parent_students')
@@ -2786,6 +2787,7 @@ async function sLoadLinkedParentsForStudents(students){
     .in('student_id', studentIds)
     .is('revoked_at', null);
   if(linkError){
+    _sParentDirectoryError = true;
     console.warn('Không tải được liên kết phụ huynh:', linkError);
     return;
   }
@@ -2795,6 +2797,7 @@ async function sLoadLinkedParentsForStudents(students){
     .select('id,full_name,email,phone,role,account_password')
     .in('id', parentIds);
   if(parentError){
+    _sParentDirectoryError = true;
     console.warn('Không tải được tài khoản phụ huynh:', parentError);
     return;
   }
@@ -2825,13 +2828,13 @@ async function sLoadMobileStatusesForStudents(students){
 }
 
 async function sLoadZaloContactsForStudents(){
-  _sZaloContacts = {};
+  _sZaloContactsError = false;
   const parentIds = [...new Set(Object.values(_sLinkedParents).flat().map(parent => parent.id).filter(Boolean))];
   if(!parentIds.length) return;
   const {data,error} = await sb.from('zalo_parent_contacts')
     .select('parent_id,status,zalo_uid,last_checked_at,last_error,link_source,linked_at,zalo_alias,alias_error,manual_check_requested_at,lease_until')
     .in('parent_id',parentIds);
-  if(error){ console.warn('Không tải được trạng thái Zalo PH:',error); return; }
+  if(error){ _sZaloContactsError=true; console.warn('Không tải được trạng thái Zalo PH:',error); return; }
   _sZaloContacts = Object.fromEntries((data||[]).map(row => [row.parent_id,row]));
   const {data:aliasJobs} = await sb.from('zalo_parent_alias_jobs').select('parent_id,status')
     .in('parent_id',parentIds).in('status',['pending','processing']);
@@ -2839,6 +2842,7 @@ async function sLoadZaloContactsForStudents(){
 }
 
 function sZaloParentStatusHtml(parents){
+  if(_sParentDirectoryError) return '<div style="font-size:.72rem;color:#b91c1c">Không tải được liên kết tài khoản PH. Vui lòng tải lại trang.</div>';
   if(!parents.length) return '<div style="font-size:.72rem;color:var(--ink-light)">Chưa liên kết tài khoản PH</div>';
   const labels = {friend:'Đã kết bạn',invited:'Đã gửi lời mời kết bạn',
     not_friend:'Chưa kết bạn',not_found:'Không tìm thấy Zalo',
@@ -2846,7 +2850,7 @@ function sZaloParentStatusHtml(parents){
   return parents.map(parent => {
     const row = _sZaloContacts[parent.id];
     const label = !parent.phone ? 'Thiếu SĐT PH' : row?.status === 'friend' && row.link_source === 'zalo_self_command'
-      ? 'Đã liên kết thủ công' : row ? (labels[row.status] || 'Đang đồng bộ') : 'Đang đồng bộ';
+      ? 'Đã liên kết thủ công' : _sZaloContactsError ? 'Không tải được trạng thái Zalo' : row ? (labels[row.status] || 'Chưa kiểm tra Zalo') : 'Chưa có kết quả kiểm tra Zalo';
     const checked = row?.last_checked_at
       ? ` · ${new Date(row.last_checked_at).toLocaleString('vi-VN')}` : '';
     const detail = `${parent.full_name || 'PH'} (${parent.phone || 'chưa có SĐT'}): `;
@@ -2865,6 +2869,7 @@ function sZaloParentStatusHtml(parents){
 }
 
 const _sParentZaloBusy = new Set();
+let _sParentDirectoryError = false, _sZaloContactsError = false;
 async function sRequestParentZalo(parentId,action){
   if(!window.AppPermissions?.require?.('system.zalo.manage') || _sParentZaloBusy.has(parentId)) return;
   _sParentZaloBusy.add(parentId);

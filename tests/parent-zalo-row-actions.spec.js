@@ -4,7 +4,7 @@ const vm = require('vm');
 
 function render(contact, allowed = true) {
   const src = fs.readFileSync('sourcedata.html', 'utf8');
-  const ctx = { _sZaloContacts: { parent: contact }, _sParentZaloBusy: new Set(),
+  const ctx = { _sParentDirectoryError:false, _sZaloContactsError:false, _sZaloContacts: { parent: contact }, _sParentZaloBusy: new Set(),
     window: { AppPermissions: { has: () => allowed } }, esc: s => String(s || '') };
   vm.createContext(ctx);
   vm.runInContext(src.slice(src.indexOf('function sZaloParentStatusHtml'), src.indexOf('const _sParentZaloBusy')), ctx);
