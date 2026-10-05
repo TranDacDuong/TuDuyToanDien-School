@@ -333,17 +333,19 @@ async function syncParentTuition() {
   let processedKind = null;
   try {
     nextParentPollAt = Date.now() + 5 * 60 * 1000;
+    if (Date.now() >= nextAliasSyncAt) {
+      const { job: aliasJob } = await gatewayRequest({ action: 'claimParentAlias' });
+      if (aliasJob) {
+        processedKind = 'alias';
+        await syncQueuedParentAlias(aliasJob);
+        return;
+      }
+    }
     const { job: parentJob } = await gatewayRequest({ action: 'claimParent' });
     if (parentJob) {
       processedKind = 'parent';
       await checkQueuedParent(parentJob);
       return;
-    }
-    if (Date.now() < nextAliasSyncAt) return;
-    const { job: aliasJob } = await gatewayRequest({ action: 'claimParentAlias' });
-    if (aliasJob) {
-      processedKind = 'alias';
-      await syncQueuedParentAlias(aliasJob);
     }
   } catch (error) {
     console.warn('[ZaloBot] Đồng bộ phụ huynh/học phí:', error?.message || error);
