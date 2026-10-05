@@ -974,7 +974,6 @@ Nhập số tiền hoàn lại (>0):`,
     const paidFilter = document.getElementById("paidFilter");
     const searchInput = document.getElementById("tuitionSearch");
     const monthInput = document.getElementById("monthPicker");
-    const notifyBtn = document.getElementById("notifyTuitionBtn");
     const lockBtn = document.getElementById("lockTuitionBtn");
     const rowCount = document.getElementById("rowCount");
     const summary = document.querySelector(".summary-row");
@@ -992,7 +991,6 @@ Nhập số tiền hoàn lại (>0):`,
       if (paidFilter) paidFilter.style.display = "none";
       if (searchInput) searchInput.style.display = "none";
       if (monthInput) monthInput.style.display = "none";
-      if (notifyBtn) notifyBtn.style.display = "none";
       if (zaloReminderBtn) zaloReminderBtn.style.display = "none";
       if (unmatchedBtn) unmatchedBtn.style.display = "none";
       if (lockBtn) lockBtn.style.display = "none";
@@ -1013,7 +1011,6 @@ Nhập số tiền hoàn lại (>0):`,
     if (tableWrap) tableWrap.style.display = "";
     if (reloadBtn) reloadBtn.style.display = "";
     if (printBtn) printBtn.style.display = "";
-    if (notifyBtn) notifyBtn.style.display = hasTuitionPermission("tuition.notify", false) ? "" : "none";
     if (zaloReminderBtn) zaloReminderBtn.style.display = hasTuitionPermission("tuition.zalo_queue.manage", false) ? "" : "none";
     if (unmatchedBtn) unmatchedBtn.style.display = hasTuitionPermission("tuition.transactions.view", false) ? "" : "none";
     if (lockBtn) lockBtn.style.display = hasTuitionPermission("tuition.lock", false) ? "" : "none";
@@ -2154,52 +2151,7 @@ Nhập số tiền hoàn lại (>0):`,
      INIT
   ───────────────────────────────────────────── */
   window.notifyPendingTuition = async function () {
-    if (!hasTuitionPermission("tuition.notify", false)) {
-      alert("Bạn không có quyền gửi thông báo học phí.");
-      return;
-    }
-    if (!window.NotificationHelper) {
-      alert("Không tải được bộ gửi thông báo.");
-      return;
-    }
-
-    const ym = monthPicker.value;
-    const pendingRows = (currentRows || []).filter(group => {
-      const amountPaid = paymentMap[group.studentId]?.amount_paid || 0;
-      const status = getStatus(group.amount, amountPaid);
-      return status === "unpaid" || status === "partial";
-    });
-
-    if (!pendingRows.length) {
-      alert("Không có học sinh nào đang chưa nộp hoặc chưa nộp đủ trong bộ lọc hiện tại.");
-      return;
-    }
-    if (!confirm(`Gửi thông báo học phí cho ${pendingRows.length} học sinh đang chưa nộp hoặc chưa nộp đủ?`)) {
-      return;
-    }
-
-    try {
-      await window.NotificationHelper.createBulkNotifications(
-        pendingRows.map(group => {
-          const amountPaid = paymentMap[group.studentId]?.amount_paid || 0;
-          const remaining = Math.max(0, Math.round(group.amount - amountPaid));
-          const status = getStatus(group.amount, amountPaid);
-          return {
-            userId: group.studentId,
-            type: status === "unpaid" ? "tuition_due" : "tuition_reminder",
-            title: `Học phí tháng ${ym}`,
-            message: status === "unpaid"
-              ? `Bạn có học phí tháng ${ym} chưa thanh toán. Số tiền cần nộp là ${fmt(group.amount)}đ.`
-              : `Bạn còn thiếu ${fmt(remaining)}đ học phí tháng ${ym}. Hãy kiểm tra và hoàn tất thanh toán.`,
-            targetUrl: `tuition.html?month=${encodeURIComponent(ym)}`,
-            meta: { month: ym, remaining_amount: remaining, total_amount: Math.round(group.amount) }
-          };
-        })
-      );
-      alert(`Đã gửi thông báo học phí cho ${pendingRows.length} học sinh.`);
-    } catch (error) {
-      alert("Không thể gửi thông báo học phí: " + error.message);
-    }
+    return window.openZaloReminderModal();
   };
 
   /* Cập nhật tiêu đề nút chốt dựa vào trạng thái hiện tại */
