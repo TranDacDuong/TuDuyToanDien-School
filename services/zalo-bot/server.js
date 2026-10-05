@@ -34,6 +34,7 @@ let gatewayBusy = false;
 let gatewayListening = false;
 let nextGatewaySendAt = 0;
 let nextParentPollAt = 0;
+let nextManualParentPollAt = 0;
 let nextAliasSyncAt = 0;
 let gatewayBatchCount = 0;
 const pendingIncoming = new Map();
@@ -328,10 +329,21 @@ async function syncQueuedParentAlias(job) {
 
 async function syncParentTuition() {
   if (gatewayBusy || !zaloApi || !listenerConnected || !GATEWAY_URL || !GATEWAY_TOKEN ||
-    campaignStatus !== 'idle' || Date.now() < nextParentPollAt) return;
+    campaignStatus !== 'idle') return;
   gatewayBusy = true;
   let processedKind = null;
   try {
+    if (Date.now() >= nextManualParentPollAt) {
+      nextManualParentPollAt = Date.now() + 2000;
+      const { dispatch } = await gatewayRequest({ action: 'claimManualParentAction', allowAlias: Date.now() >= nextAliasSyncAt });
+      if (dispatch?.job) {
+        processedKind = dispatch.kind;
+        if (dispatch.kind === 'alias') await syncQueuedParentAlias(dispatch.job);
+        else await checkQueuedParent(dispatch.job);
+        return;
+      }
+    }
+    if (Date.now() < nextParentPollAt) return;
     nextParentPollAt = Date.now() + 5 * 60 * 1000;
     if (Date.now() >= nextAliasSyncAt) {
       const { job: aliasJob } = await gatewayRequest({ action: 'claimParentAlias' });

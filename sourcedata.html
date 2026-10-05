@@ -2877,7 +2877,7 @@ async function sRequestParentZalo(parentId,action){
   try{
     const {data,error}=await sb.rpc('request_parent_zalo_action',{p_parent_id:parentId,p_action:action});
     if(error) throw error;
-    toast(data?.already_running?'Phụ huynh này đã có tác vụ đang chờ xử lý.':'Đã xếp hàng chạy ngầm cho phụ huynh này.',4000);
+    toast(data?.already_running?'Phụ huynh này đã có tác vụ đang xử lý hoặc được ưu tiên chờ bot.':'Đã yêu cầu bot ưu tiên thực hiện ngay khi rảnh.',4000);
     await sLoadZaloContactsForStudents();
     sRender();
   }catch(error){alert(error.message);}

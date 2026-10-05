@@ -79,6 +79,9 @@ Deno.serve(async (request) => {
     if (["claim", "claimTuition", "claimTuitionReceipt"].includes(payload.action)) {
       return json({ error: "Restart the updated bot to use unified dispatch" }, 409);
     }
+    if (payload.action === "claimManualParentAction") {
+      return json({ dispatch: await rpc("claim_manual_parent_zalo_action", { p_allow_alias: payload.allowAlias !== false }) });
+    }
     if (payload.action === "claimParent") {
       const rows = await rpc("claim_zalo_parent_check", {});
       return json({ job: rows?.[0] || null });
