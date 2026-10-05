@@ -14,9 +14,20 @@ BEGIN
   PERFORM public.reconcile_parent_zalo_identity(a);
   IF (SELECT count(*) FROM public.zalo_verified_links WHERE enabled) <> n THEN
     RAISE EXCEPTION 'Reconciliation is not idempotent'; END IF;
+  DELETE FROM public.zalo_verified_links WHERE audience_user_id = a;
   UPDATE public.zalo_parent_contacts SET status = 'error' WHERE parent_id = a;
+  IF NOT EXISTS (SELECT 1 FROM public.zalo_verified_links
+      WHERE audience_user_id = a AND zalo_uid = uid_a AND enabled) THEN
+    RAISE EXCEPTION 'Resolved UID must link even when relationship lookup fails'; END IF;
+  UPDATE public.zalo_parent_contacts SET status = 'rate_limited' WHERE parent_id = a;
   IF NOT (SELECT enabled FROM public.zalo_verified_links WHERE audience_user_id = a) THEN
-    RAISE EXCEPTION 'Transient errors must not destroy an established identity'; END IF;
+    RAISE EXCEPTION 'Messaging limits must not erase a resolved identity'; END IF;
+  UPDATE public.zalo_parent_contacts SET status = 'not_found' WHERE parent_id = a;
+  IF (SELECT enabled FROM public.zalo_verified_links WHERE audience_user_id = a) THEN
+    RAISE EXCEPTION 'Not found must not link a stale UID'; END IF;
+  UPDATE public.zalo_parent_contacts SET status = 'not_friend' WHERE parent_id = a;
+  IF NOT (SELECT enabled FROM public.zalo_verified_links WHERE audience_user_id = a) THEN
+    RAISE EXCEPTION 'Resolved non-friend must link without a greeting'; END IF;
   UPDATE public.zalo_parent_contacts SET status = 'invited' WHERE parent_id = a;
   IF NOT (SELECT enabled FROM public.zalo_verified_links WHERE audience_user_id = a) THEN
     RAISE EXCEPTION 'Invited contacts cannot synchronize'; END IF;

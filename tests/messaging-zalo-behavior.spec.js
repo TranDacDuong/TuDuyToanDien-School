@@ -201,6 +201,25 @@ test('validation rejects empty identifiers and malformed timestamps', () => {
   expect(validateMessage(message('bad', { zaloUid: '' }))).toBe(false);
 });
 
+test('parent lookup retains a resolved UID when relationship lookup fails', async () => {
+  const source = fs.readFileSync(path.join(__dirname, '../services/zalo-bot/server.js'), 'utf8');
+  const reports = [];
+  const context = vm.createContext({ friendPhoneMap: new Map(),
+    console: { warn() {} }, isZaloLimitError: () => false,
+    zaloApi: { async findUser() { return { uid: 'resolved-parent' }; },
+      async getFriendRequestStatus() { throw new Error('relationship unavailable'); } },
+    async gatewayRequest(payload) { reports.push(payload); }
+  });
+  vm.runInContext(source.slice(source.indexOf('async function checkQueuedParent(job)'),
+    source.indexOf('async function sendQueuedTuition(job)')), context);
+  await context.checkQueuedParent({ parent_id: 'parent', phone: '0912422333', status: 'pending' });
+  expect(reports).toHaveLength(1);
+  expect(reports[0].uid).toBe('resolved-parent');
+  expect(reports[0].status).toBe('error');
+  expect(reports[0].invited).toBe(false);
+  expect(reports[0].greeted).toBe(false);
+});
+
 function makeSender({ failAck = false, noId = false } = {}) {
   const source = fs.readFileSync(path.join(__dirname, '../services/zalo-bot/server.js'), 'utf8');
   const functionSource = source.slice(source.indexOf('async function syncGatewayOutbox()'),

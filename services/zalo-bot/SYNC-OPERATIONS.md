@@ -8,6 +8,8 @@
 4. Deploy `messages.html` with the link-candidates dialog.
 5. Apply `SQL unify parent Zalo identity.sql` to reuse the directory/tuition UID
    mapping for Messages. The running bot detects its link revision automatically.
+6. Apply `SQL link resolved Zalo UID before friendship.sql` so resolved contacts
+   also link when relationship lookup, invitation, or greeting subsequently fails.
 
 The migration is transactional and does not guess parent links or delete existing
 history. `tests/zalo-sync-database.sql` can replace the migration's final COMMIT
@@ -42,7 +44,8 @@ history depends on what Zalo returns and is capped at 200 pages per run.
 
 Only enabled verified parent links enter the web inbox. Successful directory
 phone lookups with a unique UID and a matching, unique current parent phone now
-populate this mapping automatically (friend, invited, or not_friend contacts).
+populate this mapping automatically, independently of friendship/greeting success.
+Contacts explicitly marked not_found do not link a stale retained UID.
 Changing/removing a UID or invalidating the phone disables the derived mapping.
 Transient lookup errors do not erase an unchanged, established identity. Ambiguous
 UIDs/phones and explicit disabled/admin links are not silently overwritten.
@@ -51,7 +54,7 @@ Neither a matching nickname nor friend status alone establishes identity.
 Confirmed link changes trigger another history import within the next minute.
 Historical unlinked messages are deliberately not persisted as readable content.
 
-`tests/zalo-unified-identity-database.sql` replaces the unification migration's
+`tests/zalo-unified-identity-database.sql` replaces the resolved-UID migration's
 final COMMIT for a rollback-only integration test. It requires two eligible
 existing contacts. No test messages are sent to parents.
 
