@@ -104,7 +104,6 @@ tbody tr:hover td{background:#fff7ed}
       <option value="scheduled">Đã chốt lịch học thử</option>
       <option value="trial_1_done">Đã học thử buổi đầu tiên</option>
       <option value="trial_2_done">Đã học thử xong 2 buổi</option>
-      <option value="enrolled">Đã thêm vào lớp</option>
       <option value="cancelled">Hủy</option>
       <option value="all">Tất cả trạng thái (gồm đã vào lớp)</option>
     </select>
@@ -518,6 +517,7 @@ function renderRequests(){
   const subjectFilter = rmVN(document.getElementById("subjectFilter")?.value || "");
   const rows = S.requests.filter(item=>{
     const effective = computedStatus(item);
+    if(effective === "enrolled") return false;
     const haystack = rmVN(`${item.student_name||""} ${item.phone||""} ${item.school||""} ${item.parent_full_name||""} ${item.parent_phone||""} ${item.grade||""} ${item.subject||""} ${item.teacher?.full_name||""} ${classLabel(item.trial_class_id)} ${sourceDisplay(item)} ${item.linkedStudent?.full_name||""} ${item.linkedStudent?.email||""} ${item.linkedParent?.full_name||""} ${item.linkedParent?.email||""}`);
     const cls = S.classMap[item.trial_class_id] || {};
     const itemGrade = rmVN(item.grade || cls.grades?.name || cls.grade?.name || "");
