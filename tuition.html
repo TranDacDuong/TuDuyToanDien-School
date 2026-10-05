@@ -360,8 +360,7 @@ button.hint-link:hover { text-decoration: underline; }
   font-size: 12px;
   font-weight: 600;
 }
-.status-badge.unpaid    { background: #fee2e2; color: #b91c1c; }
-.status-badge.partial   { background: #fef9c3; color: #854d0e; }
+.status-badge.outstanding { background: #fee2e2; color: #b91c1c; }
 .status-badge.paid      { background: #dcfce7; color: #15803d; }
 .status-badge.overpaid  { background: #e0f2fe; color: #0369a1; }
 
@@ -975,8 +974,7 @@ tr.recalc-needed td:first-child { border-left: 3px solid #ef4444; }
       </select>
       <select id="paidFilter" onchange="renderRows()">
         <option value="">Tất cả trạng thái</option>
-        <option value="unpaid">Chưa nộp</option>
-        <option value="partial">Chưa nộp đủ</option>
+        <option value="outstanding">Còn thiếu</option>
         <option value="paid">Đã nộp đủ</option>
         <option value="overpaid">Nộp thừa</option>
       </select>
@@ -1079,6 +1077,6 @@ tr.recalc-needed td:first-child { border-left: 3px solid #ef4444; }
   <div id="printArea"></div>
 </div>
 
-<script src="./tuition.js?v=20261006-unified-tuition-notice1"></script>
+<script src="./tuition.js?v=20261006-outstanding-status1"></script>
 </body>
 </html>

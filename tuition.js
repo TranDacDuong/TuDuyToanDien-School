@@ -302,15 +302,13 @@
   /* Trạng thái dựa vào amount_paid vs amount_due */
   function getStatus(amountDue, amountPaid) {
     if ((Number(amountDue) || 0) <= 0) return "paid";
-    if (!amountPaid || amountPaid <= 0) return "unpaid";
-    if (amountPaid < amountDue)         return "partial";
+    if ((Number(amountPaid) || 0) < Number(amountDue)) return "outstanding";
     if (amountPaid > amountDue)         return "overpaid";
     return "paid";
   }
 
   const statusLabel = {
-    unpaid:   "Chưa nộp",
-    partial:  "Chưa nộp đủ",
+    outstanding: "Còn thiếu",
     paid:     "Đã nộp đủ",
     overpaid: "Nộp thừa",
   };
@@ -1973,9 +1971,8 @@ Nhập số tiền hoàn lại (>0):`,
         </td>
 
         <td class="right" style="vertical-align:top;padding-top:12px;white-space:nowrap">
-          ${status === "partial"  ? `<div style="font-weight:700;color:var(--red)">${fmt(remaining)}đ</div>` : ""}
+          ${status === "outstanding" ? `<div style="font-weight:700;color:var(--red)">${fmt(remaining)}đ</div>` : ""}
           ${status === "overpaid" ? `<div style="font-weight:700;color:#0369a1">+${fmt(overpaid)}đ</div>` : ""}
-          ${status === "unpaid"   ? `<div style="font-weight:700;color:var(--red)">${fmt(g.amount)}đ</div>` : ""}
           ${status === "paid"     ? `<span style="color:var(--green)">✓</span>` : ""}
         </td>
 
@@ -2125,7 +2122,7 @@ Nhập số tiền hoàn lại (>0):`,
       const status  = getStatus(g.amount, paid);
       total     += g.amount;
       collected += paid;
-      if (status === "partial" || status === "unpaid") deficit  += (g.amount - paid);
+      if (status === "outstanding") deficit += (g.amount - paid);
       if (status === "overpaid") {
         surplus  += (paid - g.amount);
         overpaidCount++;
@@ -2357,7 +2354,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     const rows = (currentRows || []).map(group => {
       const amountPaid = paymentMap[group.studentId]?.amount_paid || 0;
       const status = getStatus(group.amount, amountPaid);
-      return { group, due: status === "unpaid" || status === "partial" };
+      return { group, due: status === "outstanding" };
     });
 
     currentZaloCampaignItems = rows.map(({ group, due }) => {
