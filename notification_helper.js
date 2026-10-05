@@ -259,7 +259,7 @@
     return data?.[0] || null;
   }
 
-  async function createBulkNotifications(items, { allowSelf = false, push = true } = {}) {
+  async function createBulkNotifications(items, { allowSelf = false, push = true, requireInsert = false } = {}) {
     const rows = Array.isArray(items) ? items : [];
     if (!rows.length) return { count: 0 };
 
@@ -292,7 +292,7 @@
       if (canFallbackToDirectPush(chunk)) {
         const { error } = await getSb().from("notifications").insert(chunk);
         if (error) {
-          if (push !== false && isRowLevelSecurityError(error) && await sendDirectPushFallback(chunk)) {
+          if (!requireInsert && push !== false && isRowLevelSecurityError(error) && await sendDirectPushFallback(chunk)) {
             console.warn("MindUp notification insert blocked by RLS; sent session evaluation push directly.", error);
             continue;
           }
@@ -304,7 +304,7 @@
 
       const { data, error } = await getSb().from("notifications").insert(chunk).select("id");
       if (error) {
-        if (push !== false && isRowLevelSecurityError(error) && await sendDirectPushFallback(chunk)) {
+        if (!requireInsert && push !== false && isRowLevelSecurityError(error) && await sendDirectPushFallback(chunk)) {
           console.warn("MindUp notification insert blocked by RLS; sent session evaluation push directly.", error);
           continue;
         }

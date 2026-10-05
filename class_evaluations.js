@@ -9,6 +9,8 @@
     students: [],
     parents: new Map(),
     parentIds: new Map(),
+    parentNames: new Map(),
+    zaloPublications: new Map(),
     evaluations: new Map(),
   };
 
@@ -77,7 +79,7 @@
             <span class="se-progress" id="sessionEvaluationProgress">Đang tải...</span>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               <button class="se-btn" type="button" id="sessionEvaluationSaveAll" onclick="saveAllSessionEvaluationDrafts()">Lưu tất cả bản nháp</button>
-              <button class="se-btn send" type="button" id="sessionEvaluationAutoSendAll" onclick="sendEvaluatedDraftsNow()" style="background:#15803d;border-color:#15803d;color:#fff;font-weight:800">⚡ Gửi ngay các đánh giá đã chấm</button>
+              <button class="se-btn send" type="button" id="sessionEvaluationAutoSendAll" onclick="sendEvaluatedDraftsNow()" style="background:#15803d;border-color:#15803d;color:#fff;font-weight:800">⚡ Công bố các đánh giá đã chấm</button>
             </div>
           </div>
           <div class="se-list" id="sessionEvaluationList"><div class="se-loading">Đang tải danh sách học sinh...</div></div>
@@ -267,6 +269,7 @@
     state.students = users || [];
     state.parents = parents;
     state.parentIds = parentIdsByStudent;
+    state.parentNames = parentNames;
     state.evaluations = new Map((evaluationsResult.data || []).map(item => [
       item.student_id,
       {
@@ -287,7 +290,66 @@
         });
       }
     });
+    await loadZaloPublications();
   }
+
+  let zaloReadVersion = 0;
+
+  async function loadZaloPublications() {
+    const readVersion = ++zaloReadVersion;
+    const sessionId = state.sessionId;
+    const ids = [...new Set([...state.evaluations.values()].map(item => item.id).filter(Boolean))];
+    const publications = new Map();
+    try {
+      for (let offset = 0; offset < ids.length; offset += 100) {
+        const { data, error } = await getSb().from("evaluation_zalo_publications")
+          .select("evaluation_id,parent_id,message_id,outbox_id,zalo_delivery_status,zalo_delivered_at,delivery_error")
+          .in("evaluation_id", ids.slice(offset, offset + 100));
+        if (error) throw error;
+        for (const row of data || []) {
+          if (!ids.includes(row.evaluation_id) || !row.parent_id) continue;
+          if (!publications.has(row.evaluation_id)) publications.set(row.evaluation_id, new Map());
+          publications.get(row.evaluation_id).set(row.parent_id, row);
+        }
+      }
+    } catch (error) {
+      // Missing ledger/RLS must never imply delivery or block legacy evaluations.
+      publications.clear();
+      console.warn("Chưa đọc được trạng thái gửi nhận xét trên Zalo:", error);
+    }
+    if (state.sessionId === sessionId && readVersion === zaloReadVersion) state.zaloPublications = publications;
+  }
+
+  function zaloDeliveryHtml(studentId) {
+    const evaluation = state.evaluations.get(studentId);
+    const rows = state.zaloPublications.get(evaluation?.id) || new Map();
+    const parentIds = [...new Set([...(state.parentIds.get(studentId) || []), ...rows.keys()])];
+    const labels = {
+      pending: "Chờ gửi", processing: "Đang gửi", sent: "Đã gửi",
+      failed: "Gửi lỗi", uncertain: "Chưa xác nhận, cần kiểm tra",
+      cancelled: "Đã hủy", not_queued: "Chưa vào hàng đợi", unknown: "Chưa xác định",
+    };
+    const lines = (parentIds.length ? parentIds : [null]).map((parentId, index) => {
+      const row = rows.get(parentId);
+      const status = Object.prototype.hasOwnProperty.call(labels, row?.zalo_delivery_status)
+        ? row.zalo_delivery_status : "unknown";
+      const name = state.parentNames.get(parentId) || (parentId ? `Phụ huynh ${index + 1}` : "Phụ huynh");
+      const delivered = status === "sent" && row?.zalo_delivered_at
+        ? new Date(row.zalo_delivered_at) : null;
+      const time = delivered && !Number.isNaN(delivered.getTime()) ? ` · ${delivered.toLocaleString("vi-VN")}` : "";
+      const error = row?.delivery_error ? `<div style="overflow-wrap:anywhere">${esc(row.delivery_error)}</div>` : "";
+      return `<div data-zalo-status="${status}" style="overflow-wrap:anywhere">${esc(name)} · Zalo: ${labels[status]}${esc(time)}${error}</div>`;
+    });
+    return `${lines.join("")}<button type="button" class="se-btn" title="Cập nhật trạng thái Zalo" aria-label="Cập nhật trạng thái Zalo" onclick="refreshSessionEvaluationDelivery()">&#8635;</button>`;
+  }
+
+  window.refreshSessionEvaluationDelivery = async function () {
+    await loadZaloPublications();
+    for (const student of state.students) {
+      const element = document.getElementById(`se-zalo-${student.id}`);
+      if (element) element.innerHTML = zaloDeliveryHtml(student.id);
+    }
+  };
 
   function render() {
     const title = document.getElementById("sessionEvaluationTitle");
@@ -317,13 +379,13 @@
     let stateClass = "normal";
 
     if (sent) {
-      stateLabel = isAuto ? "Đã gửi tự động" : "✓ Đã gửi";
+      stateLabel = isAuto ? "Đã công bố thông báo tự động" : "Đã công bố thông báo";
       stateClass = "sent";
     } else if (evaluation.state === "failed") {
-      stateLabel = "Gửi lỗi";
+      stateLabel = "Công bố lỗi";
       stateClass = "failed";
     } else if (hasStatuses) {
-      stateLabel = "⏳ Sẽ gửi sau tan học 30p";
+      stateLabel = "⏳ Sẽ công bố sau tan học 30p";
       stateClass = "pending";
     }
 
@@ -333,6 +395,7 @@
           <div class="se-name">${esc(student.full_name || student.email)}</div>
           <span class="se-state ${stateClass}" id="se-state-${student.id}">${stateLabel}</span>
         </div>
+        <div id="se-zalo-${student.id}" style="padding:8px 0;font-size:.8rem">${zaloDeliveryHtml(student.id)}</div>
         <div class="se-status-groups">
           ${statusGroup("Điểm tích cực", state.statuses.filter(status => status.category !== "needs_attention"), evaluation, student, sent)}
           ${statusGroup("Điểm cần khắc phục", state.statuses.filter(status => status.category === "needs_attention"), evaluation, student, sent)}
@@ -343,7 +406,7 @@
         <div class="se-actions">
           <button type="button" class="se-btn" onclick="generateSessionEvaluationMessage('${student.id}')" ${sent ? "disabled" : ""}>${hasMessage ? "Đổi mẫu" : "Tạo nội dung"}</button>
           <button type="button" class="se-btn primary" onclick="saveSessionEvaluationDraft('${student.id}')" ${sent ? "disabled" : ""}>Lưu nháp</button>
-          <button type="button" class="se-btn send" onclick="sendSessionEvaluation('${student.id}')" ${sent ? "disabled" : ""}>Gửi ngay</button>
+          <button type="button" class="se-btn send" onclick="sendSessionEvaluation('${student.id}')" ${sent ? "disabled" : ""}>Công bố ngay</button>
         </div>
       </article>`;
   }
@@ -369,7 +432,7 @@
     const normal = Math.max(0, state.students.length - sent - pending);
     const el = document.getElementById("sessionEvaluationProgress");
     if (el) {
-      el.textContent = `${state.students.length} HS · ${sent} đã gửi · ${pending} sẽ gửi sau tan học 30p · ${normal} bình thường (không gửi)`;
+      el.textContent = `${state.students.length} HS · ${sent} đã công bố thông báo · ${pending} sẽ công bố sau tan học 30p · ${normal} bình thường (không tạo thông báo)`;
     }
   }
 
@@ -451,7 +514,7 @@
         const b = document.getElementById(`se-state-${studentId}`);
         if (b) {
           b.className = "se-state pending";
-          b.textContent = "⏳ Sẽ gửi sau tan học 30p";
+          b.textContent = "⏳ Sẽ công bố sau tan học 30p";
         }
         updateProgress();
       } catch (err) {
@@ -643,7 +706,7 @@
   async function persist(studentId, nextState) {
     const evaluation = state.evaluations.get(studentId);
     if (!evaluation) throw new Error("Không tìm thấy đánh giá.");
-    if (evaluation.state === "sent") throw new Error("Nhận xét này đã được gửi.");
+    if (evaluation.state === "sent") throw new Error("Thông báo nhận xét này đã được công bố.");
     const textarea = document.getElementById(`se-message-${studentId}`);
     if (textarea && textarea.value.trim()) evaluation.message = textarea.value.trim();
     if (!evaluation.message && evaluation.statusIds.size) window.generateSessionEvaluationMessage(studentId);
@@ -684,6 +747,37 @@
     return data;
   }
 
+  async function createEvaluationNotifications(items) {
+    const result = await window.NotificationHelper.createBulkNotifications(items, { requireInsert: true });
+    if (result?.error) throw result.error;
+    if (!result || result.count !== items.length) throw new Error("Chưa tạo đủ thông báo tới phụ huynh.");
+  }
+
+  async function markEvaluationPublished(studentId) {
+    const evaluation = state.evaluations.get(studentId);
+    const sentAt = new Date().toISOString();
+    const { error } = await getSb().from("session_student_evaluations")
+      .update({ state: "sent", sent_at: sentAt }).eq("id", evaluation.id);
+    if (error) throw error;
+    evaluation.state = "sent";
+    evaluation.sent_at = sentAt;
+    await loadZaloPublications();
+  }
+
+  async function markEvaluationFailed(studentId) {
+    const evaluation = state.evaluations.get(studentId);
+    evaluation.state = "failed";
+    evaluation.sent_at = null;
+    if (!evaluation.id) return;
+    try {
+      const { error } = await getSb().from("session_student_evaluations")
+        .update({ state: "failed", sent_at: null }).eq("id", evaluation.id);
+      if (error) throw error;
+    } catch (error) {
+      console.error("Chưa lưu được trạng thái công bố lỗi:", error);
+    }
+  }
+
   window.sendEvaluatedDraftsNow = async function () {
     const candidates = state.students.filter(student => {
       const evaluation = state.evaluations.get(student.id);
@@ -695,7 +789,7 @@
       return;
     }
 
-    if (!confirm(`Bạn có chắc muốn gửi ngay nhận xét cho ${candidates.length} học sinh đã chấm trạng thái?\n(Các học sinh còn lại không có trạng thái sẽ không gửi)`)) {
+    if (!confirm(`Công bố thông báo nhận xét tới phụ huynh của ${candidates.length} học sinh đã chấm trạng thái?\n(Các học sinh còn lại không có trạng thái sẽ không tạo thông báo)`)) {
       return;
     }
 
@@ -715,10 +809,11 @@
         if (editor) editor.classList.add("open");
         if (textarea) textarea.value = evaluation.message;
 
-        const saved = await persist(student.id, "sent");
         const parentIds = [...new Set(state.parentIds.get(student.id) || [])];
+        if (!parentIds.length) throw new Error("Học sinh chưa được liên kết với tài khoản phụ huynh.");
+        const saved = await persist(student.id, "draft");
         if (parentIds.length) {
-          await window.NotificationHelper.createBulkNotifications(parentIds.map(parentId => ({
+          await createEvaluationNotifications(parentIds.map(parentId => ({
             userId: parentId,
             type: "session_evaluation",
             title: "MindUp - Tư duy Toàn Diện",
@@ -737,19 +832,20 @@
             },
           })));
         }
-        evaluation.state = "sent";
-        evaluation.sent_at = saved.sent_at;
+        await markEvaluationPublished(student.id);
         document.getElementById(`se-card-${student.id}`).outerHTML = studentCard(student);
         count += 1;
       } catch (error) {
-        console.error(`Lỗi gửi nhận xét cho ${student.full_name}:`, error);
+        await markEvaluationFailed(student.id);
+        document.getElementById(`se-card-${student.id}`).outerHTML = studentCard(student);
+        console.error(`Lỗi công bố nhận xét cho ${student.full_name}:`, error);
         setBusy(student.id, false);
       }
     }
 
     if (button) button.disabled = false;
     updateProgress();
-    alert(`Đã gửi nhận xét cho ${count}/${candidates.length} học sinh thành công!`);
+    alert(`Đã công bố thông báo nhận xét tới phụ huynh của ${count}/${candidates.length} học sinh.`);
   };
 
   // Giữ alias tương thích ngược
@@ -769,7 +865,7 @@
     try {
       setBusy(studentId, true);
       await persist(studentId, "draft");
-      if (!silent) alert("Đã lưu bản nháp (sẽ tự động gửi sau tan học 30 phút).");
+      if (!silent) alert("Đã lưu bản nháp (sẽ tự động công bố thông báo sau tan học 30 phút).");
       const student = state.students.find(item => item.id === studentId);
       document.getElementById(`se-card-${studentId}`).outerHTML = studentCard(student);
       updateProgress();
@@ -803,14 +899,14 @@
   window.sendSessionEvaluation = async function (studentId) {
     const student = state.students.find(item => item.id === studentId);
     const evaluation = state.evaluations.get(studentId);
-    if (!student || !evaluation) return;
-    if (!confirm(`Gửi nhận xét buổi học của ${student.full_name} tới phụ huynh? Sau khi gửi sẽ không thể gửi trùng.`)) return;
+    if (!student || !evaluation || evaluation.state === "sent") return;
+    if (!confirm(`Công bố thông báo nhận xét buổi học của ${student.full_name} tới phụ huynh? Sau khi công bố sẽ không thể công bố trùng.`)) return;
     try {
       setBusy(studentId, true);
-      const saved = await persist(studentId, "sent");
       const parentIds = [...new Set(state.parentIds.get(studentId) || [])];
       if (!parentIds.length) throw new Error("Học sinh chưa được liên kết với tài khoản phụ huynh.");
-      await window.NotificationHelper.createBulkNotifications(parentIds.map(parentId => ({
+      const saved = await persist(studentId, "draft");
+      await createEvaluationNotifications(parentIds.map(parentId => ({
         userId: parentId,
         type: "session_evaluation",
         title: "MindUp - Tư duy Toàn Diện",
@@ -828,19 +924,15 @@
           branded_sender: true,
         },
       })));
-      evaluation.state = "sent";
-      evaluation.sent_at = saved.sent_at;
+      await markEvaluationPublished(studentId);
       document.getElementById(`se-card-${studentId}`).outerHTML = studentCard(student);
       updateProgress();
-      alert("Đã gửi nhận xét và thông báo tới phụ huynh.");
+      alert("Đã công bố thông báo nhận xét tới phụ huynh.");
     } catch (error) {
-      evaluation.state = "failed";
-      if (evaluation.id) {
-        await getSb().from("session_student_evaluations").update({ state: "failed", sent_at: null }).eq("id", evaluation.id);
-      }
+      await markEvaluationFailed(studentId);
       document.getElementById(`se-card-${studentId}`).outerHTML = studentCard(student);
       updateProgress();
-      alert(`Chưa gửi được: ${error.message}`);
+      alert(`Chưa công bố được thông báo: ${error.message}`);
     }
   };
 

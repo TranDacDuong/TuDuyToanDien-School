@@ -26,6 +26,7 @@
   }
 
   async function getTemplate(templateId, defaultContent) {
+    if (!['session_score_notice','offline_test_score_notice','exam_score_notice','session_evaluation_notice','session_evaluation','tuition_reminder','tuition_confirmed','absent_notification'].includes(templateId)) return null;
     if (!templateId) return defaultContent;
     try {
       const { data, error } = await getSb()
@@ -66,6 +67,24 @@
     return `__CHART__${JSON.stringify({ type, title, buckets })}`;
   }
 
+  function scoreTableToken({ rows = [], studentId, studentName = "", maxScore = 10 } = {}) {
+    const safeRows = rows.filter(row => row?.score != null).map(row => {
+      const score = Number(row.score);
+      const maximum = Number(row.max_score ?? row.maxScore ?? maxScore);
+      const id = row.student_id ?? row.studentId;
+      const own = studentId != null && id != null && String(id) === String(studentId);
+      return {
+        studentId: own ? String(studentId) : null,
+        label: own ? cleanText(studentName) || "Con của phụ huynh" : "",
+        score,
+        maxScore: maximum,
+      };
+    }).filter(row => Number.isFinite(row.score) && Number.isFinite(row.maxScore)
+      && row.score >= 0 && row.maxScore > 0 && row.score <= row.maxScore);
+    if (!safeRows.length) return "";
+    return `__CHART__${JSON.stringify({ type: "score_table", title: "Bảng điểm lớp", focusStudentId: studentId == null ? null : String(studentId), rows: safeRows })}`;
+  }
+
   function appendActionIfMissing(content, action) {
     const text = cleanText(content);
     if (!text || hasEmbeddedAction(text) || !action) return text;
@@ -80,13 +99,18 @@
     const text = cleanText(content);
     if (!studentId || !text) return { skipped: true };
     try {
+      const { data: links, error: linkError } = await getSb().from('parent_students')
+        .select('parent_id').eq('student_id', studentId).is('revoked_at', null);
+      if (linkError) throw linkError;
+      const parentIds = [...new Set((links || []).map(link => link.parent_id).filter(Boolean))];
+      if (!parentIds.length) return { skipped: true, reason: 'no_linked_parent' };
       if (messageKey) {
         const { data, error } = await getSb().rpc("upsert_student_learning_message", {
           p_student_id: studentId,
           p_content: text,
           p_message_key: messageKey,
           p_real_sender_id: realSenderId || null,
-          p_audience_user_ids: null,
+          p_audience_user_ids: parentIds,
         });
         if (!error) return { count: data || 0, upserted: true };
         if (!isMissingLearningRpc(error)) {
@@ -98,7 +122,7 @@
         p_student_id: studentId,
         p_content: text,
         p_real_sender_id: realSenderId || null,
-        p_audience_user_ids: null,
+        p_audience_user_ids: parentIds,
       });
       if (error) {
         if (!isMissingLearningRpc(error)) console.warn("[LearningMessages] send all failed:", error);
@@ -115,6 +139,11 @@
     const text = cleanText(content);
     if (!studentId || !audienceUserId || !text) return { skipped: true };
     try {
+      const { data: link, error: linkError } = await getSb().from("parent_students")
+        .select("parent_id").eq("student_id", studentId).eq("parent_id", audienceUserId)
+        .is("revoked_at", null).maybeSingle();
+      if (linkError) throw linkError;
+      if (!link) return { skipped: true, reason: "no_linked_parent" };
       const { data, error } = await getSb().rpc("send_student_learning_message_to_audience", {
         p_student_id: studentId,
         p_audience_user_id: audienceUserId,
@@ -295,6 +324,7 @@
     getTemplate,
     renderTemplate,
     templateContent,
+    scoreTableToken,
     sendToAllAudiences,
     sendToAudience,
     sessionEvaluationContent,

@@ -29,6 +29,7 @@
    * Lấy template tin nhắn từ database (hoặc dùng mặc định nếu chưa có)
    */
   async function getTemplate(templateId, defaultContent) {
+    if (!['absent_notification','tuition_confirmed'].includes(templateId)) return null;
     try {
       const sb = getSb();
       const { data } = await sb
@@ -47,7 +48,7 @@
    * Render template: thay thế các placeholder {{key}} bằng giá trị thực tế
    */
   function renderTemplate(template, vars) {
-    return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] || '');
+    return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? '');
   }
 
   function buildSessionUnderstandingScale(sessionId) {
@@ -72,6 +73,12 @@
     if (!userId || !content) return null;
     try {
       const sb = getSb();
+      const { data: recipient, error: recipientError } = await sb.from('users').select('role').eq('id', userId).maybeSingle();
+      if (recipientError) throw recipientError;
+      if (recipient?.role === 'student') {
+        return await mirrorStudentBotMessage(userId, content, realSenderId);
+      }
+      if (recipient?.role !== 'parent') return null;
       const conversationId = await ensureBotConversation(userId);
 
       // Dùng SECURITY DEFINER RPC để bypass RLS
@@ -85,7 +92,6 @@
         console.warn('[MindUpBot] Không gửi được tin nhắn:', error.message);
         return null;
       }
-      mirrorStudentBotMessage(userId, content, realSenderId).catch(() => {});
       return msgId || null;
     } catch (err) {
       console.warn('[MindUpBot] Lỗi khi gửi tin nhắn:', err);
@@ -99,7 +105,7 @@
       const sb = getSb();
       const { data } = await sb.from('users').select('id,role').eq('id', userId).maybeSingle();
       if (data?.role !== 'student') return;
-      await window.LearningMessages.sendToAllAudiences({
+      return await window.LearningMessages.sendToAllAudiences({
         studentId: userId,
         content,
         realSenderId: realSenderId || null

@@ -1541,7 +1541,7 @@ async function refreshZaloDispatchStatus() {
   if (error || !data) return;
   const bar = document.getElementById('zaloDispatchBar');
   bar.hidden = false;
-  const waiting = Number(data.waitingWeb || 0) + Number(data.waitingReceipts || 0) + Number(data.waitingTuition || 0);
+  const waiting = Number(data.waitingWeb || 0) + Number(data.waitingReceipts || 0) + Number(data.waitingTuition || 0) + Number(data.waitingAutomatic || 0);
   document.getElementById('zaloDispatchSummary').textContent =
     `Zalo: ${waiting} chờ · ${data.processing || 0} đang gửi · ${data.sent || 0} đã gửi · ${data.failed || 0} lỗi${data.paused ? ' · Tạm dừng' : ''}`;
   document.getElementById('zaloDispatchSummary').title = data.reason || '';
@@ -2599,7 +2599,7 @@ function extractEmbeddedJsonToken(source, token) {
 
   let start = tokenIndex + token.length;
   while (start < text.length && /\s/.test(text[start])) start += 1;
-  if (text[start] !== "{") return { text: text.replace(token, "").trim(), json: null };
+  if (text[start] !== "{") return { text: text.slice(0, tokenIndex).trim(), json: null };
 
   let depth = 0;
   let inString = false;
@@ -2625,14 +2625,17 @@ function extractEmbeddedJsonToken(source, token) {
     }
   }
 
-  return { text: text.replace(token, "").trim(), json: null };
+  return { text: text.slice(0, tokenIndex).trim(), json: null };
 }
 
 function stripEmbeddedMessageTokens(value) {
   let text = String(value || "");
   text = extractEmbeddedJsonToken(text, "__ACTION__").text;
   text = extractEmbeddedJsonToken(text, "__EVALUATION__").text;
-  text = extractEmbeddedJsonToken(text, "__CHART__").text;
+  while (/__CHART__/i.test(text)) {
+    const marker = text.match(/__CHART__/i)[0];
+    text = extractEmbeddedJsonToken(text, marker).text;
+  }
   return text.trim();
 }
 
@@ -2672,6 +2675,19 @@ function buildMessageActionHtml(action) {
 }
 
 function buildMessageChartHtml(chart) {
+  if (chart?.type === "score_table") {
+    const rows = Array.isArray(chart.rows) ? chart.rows : [];
+    const validRows = rows.filter(row => row && typeof row.score === "number" && Number.isFinite(row.score)
+      && typeof row.maxScore === "number" && Number.isFinite(row.maxScore)
+      && row.score >= 0 && row.maxScore > 0 && row.score <= row.maxScore);
+    if (!validRows.length) return "";
+    return `<div class="bubble-chart"><div class="bubble-chart-title">Bảng điểm lớp</div>
+      <table style="width:100%;border-collapse:collapse;font-size:.85rem"><thead><tr><th style="text-align:left">Học sinh</th><th>Điểm</th></tr></thead><tbody>${validRows.map((row, index) => {
+        const own = chart.focusStudentId != null && row.studentId != null && String(row.studentId) === String(chart.focusStudentId);
+        const label = own ? row.label || "Con của phụ huynh" : `Học sinh ${index + 1}`;
+        return `<tr${own ? ' class="score-table-focus" style="font-weight:700;background:rgba(22,135,123,.12)"' : ''}><td style="padding:6px;overflow-wrap:anywhere">${esc(label)}</td><td style="padding:6px;text-align:center;white-space:nowrap">${esc(row.score)}/${esc(row.maxScore)}</td></tr>`;
+      }).join("")}</tbody></table></div>`;
+  }
   const buckets = Array.isArray(chart?.buckets) ? chart.buckets : [];
   if (!buckets.length) return "";
   const maxCount = Math.max(1, ...buckets.map(item => Number(item.count || 0)));
@@ -2740,12 +2756,15 @@ function renderMessageBody(value) {
   let text = payload.text;
   let actionHtml = '';
   let chartHtml = '';
-  const chartPart = extractEmbeddedJsonToken(text, "__CHART__");
-  text = chartPart.text;
-  if (chartPart.json) {
-    try {
-      chartHtml += buildMessageChartHtml(JSON.parse(chartPart.json));
-    } catch {}
+  while (/__CHART__/i.test(text)) {
+    const marker = text.match(/__CHART__/i)[0];
+    const chartPart = extractEmbeddedJsonToken(text, marker);
+    text = chartPart.text;
+    if (chartPart.json) {
+      try {
+        chartHtml += buildMessageChartHtml(JSON.parse(chartPart.json));
+      } catch {}
+    }
   }
   const legacyChart = extractLegacyScoreChart(text);
   text = legacyChart.text;
@@ -2783,7 +2802,7 @@ function getMessagePreview(value) {
 }
 
 function esc(value) {
-  return String(value || "")
+  return String(value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")

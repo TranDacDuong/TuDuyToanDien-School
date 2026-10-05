@@ -5,6 +5,8 @@ const path = require('path');
 const { buildParentAlias, parseParentLinkCommand } = require('./link-command');
 const { GatewayQueue, HistorySync } = require('./message-sync');
 const { writeJsonAtomic } = require('./sync-store');
+const { prepareScoreMessageMedia } = require('./score-message-media');
+const { createScheduler } = require('./tuition-reminder-scheduler');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -36,6 +38,7 @@ let nextGatewaySendAt = 0;
 let nextParentPollAt = 0;
 let nextManualParentPollAt = 0;
 let nextAliasSyncAt = 0;
+let nextAutomaticTuitionTickAt = 0;
 let gatewayBatchCount = 0;
 const pendingIncoming = new Map();
 let listenerConnected = false;
@@ -53,6 +56,22 @@ const incomingQueue = new GatewayQueue({
   pending: pendingIncoming, request: gatewayRequest, persist: persistIncoming,
   quarantine: quarantineIncoming,
   onResult: (payload, result) => historyController.result(payload, result)
+});
+const automaticTuitionActions = {
+  automatic_tuition_candidates: 'automaticTuitionCandidates',
+  enqueue_automatic_tuition_reminder: 'enqueueAutomaticTuition',
+  begin_automatic_tuition_part: 'beginAutomaticTuitionPart',
+  finish_automatic_tuition_part: 'finishAutomaticTuitionPart',
+  uncertain_automatic_tuition_reminder: 'uncertainAutomaticTuition'
+};
+const automaticTuitionScheduler = createScheduler({
+  rpc: async (name, args) => {
+    const action = automaticTuitionActions[name];
+    if (!action) throw new Error('Unsupported automatic tuition RPC');
+    const result = await gatewayRequest({ action, args });
+    return { data: result.data };
+  },
+  bank: async () => (await gatewayRequest({ action: 'automaticTuitionConfig' })).data
 });
 
 async function gatewayRequest(payload) {
@@ -77,8 +96,18 @@ async function syncGatewayOutbox() {
   if ([...pendingIncoming.values()].some(p => p.action.startsWith('finish'))) return;
   gatewayBusy = true;
   try {
-    const { job } = await gatewayRequest({ action: 'claimDispatch', pacing: dispatchPacing() });
+    if (Date.now() >= nextAutomaticTuitionTickAt) {
+      nextAutomaticTuitionTickAt = Date.now() + 60000;
+      await automaticTuitionScheduler.tick().catch(error =>
+        console.warn('[ZaloBot] Automatic tuition scheduler:', error?.message || error));
+    }
+    const { job } = await gatewayRequest({ action: 'claimDispatch', pacing: dispatchPacing(),
+      automaticSchedule: automaticTuitionScheduler.schedule() });
     if (!job) return;
+    if (job.kind === 'automatic_tuition') {
+      await sendQueuedAutomaticTuition(job);
+      return;
+    }
     if (job.kind === 'receipt') {
       await sendQueuedTuitionReceipt(job);
       return;
@@ -89,8 +118,13 @@ async function syncGatewayOutbox() {
     }
     if (job.kind !== 'web') throw new Error('Unknown dispatch kind');
     let acknowledgement;
+    let media;
     try {
-      const sent = await zaloApi.sendMessage(job.content, job.zalo_uid);
+      media = await prepareScoreMessageMedia({ text: job.content, audience: 'parent', studentId: job.context_student_id },
+        { browserChannel: process.platform === 'win32' ? 'msedge' : undefined });
+      if (media.errors.length) throw new Error('Không tạo được ảnh bảng điểm/phổ điểm; chưa gửi tin');
+      const text = media.text.replace(/__(ACTION|EVALUATION)__[\s\S]*$/, '').trim();
+      const sent = await zaloApi.sendMessage(media.attachments.length ? { msg: text, attachments: media.attachments } : text, job.zalo_uid);
       const messageId = sent?.message?.msgId;
       if (messageId == null) throw new Error('Zalo returned no message id; verify delivery before retrying');
       acknowledgement = { action: 'finish', jobId: job.job_id, status: 'sent',
@@ -101,6 +135,8 @@ async function syncGatewayOutbox() {
         status: isUncertainSendError(error) || /no message id/.test(String(error?.message)) ? 'uncertain' : 'failed',
         error: String(error?.message || error) });
       return;
+    } finally {
+      if (media) await media.cleanup().catch(error => console.warn('[ZaloBot] Không dọn được ảnh tạm:', error?.message));
     }
     await acknowledgeDispatch(acknowledgement);
   } catch (error) {
@@ -108,6 +144,36 @@ async function syncGatewayOutbox() {
   } finally {
     gatewayBusy = false;
   }
+}
+
+async function sendQueuedAutomaticTuition(job) {
+  await automaticTuitionScheduler.dispatchClaimed(job, async ({ uid, part, prepared }) => {
+    try {
+      const sent = await zaloApi.sendMessage(part.kind === 'text' ? part.content : {
+        msg: 'Mã QR thanh toán học phí MindUp', attachments: [prepared.file]
+      }, uid);
+      if (sent?.message?.msgId == null) throw new Error('Zalo returned no message id');
+      return `${uid}:${sent.message.msgId}`;
+    } catch (error) {
+      if (isZaloLimitError(error)) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
+      throw error;
+    }
+  }, async (part, claimed, index) => {
+    let file;
+    const cleanup = async () => { if (file) await fs.promises.unlink(file).catch(() => {}); };
+    try {
+      const { sendAt } = await gatewayRequest({ action: 'reserveAutomaticTuitionSlot',
+        jobId: claimed.id, token: claimed.token, pacing: dispatchPacing() });
+      if (!sendAt) throw new Error('Shared Zalo dispatcher paused');
+      await sleep(Math.max(0, new Date(sendAt).getTime() - Date.now()));
+      if (part.kind === 'qr') {
+        file = path.join(__dirname, 'temp', `automatic_tuition_${claimed.id}_${index}.png`);
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        await downloadImage(part.url, file);
+      }
+      return { file, cleanup };
+    } catch (error) { await cleanup(); throw error; }
+  });
 }
 
 function dispatchPacing() {
