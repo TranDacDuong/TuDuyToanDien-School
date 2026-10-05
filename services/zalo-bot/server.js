@@ -316,7 +316,19 @@ async function syncQueuedParentAlias(job) {
       return;
     }
     const alias = buildParentAlias(job.student_names, job.phone);
-    if (job.current_alias !== alias) await zaloApi.changeFriendAlias(alias, job.zalo_uid);
+    await zaloApi.changeFriendAlias(alias, job.zalo_uid);
+    let verified = false;
+    for (let page = 1; page <= 100; page++) {
+      const result = await zaloApi.getAliasList(100, page);
+      if (!Array.isArray(result?.items)) throw new Error('Không đọc được biệt danh từ Zalo');
+      const entry = result.items.find(item => String(item.userId) === String(job.zalo_uid));
+      if (entry) {
+        verified = entry.alias === alias;
+        break;
+      }
+      if (result.items.length < 100) break;
+    }
+    if (!verified) throw new Error('Zalo chưa xác nhận biệt danh mới; hãy thử đồng bộ lại');
     await gatewayRequest({ action: 'finishParentAlias', jobId: job.job_id,
       status: 'success', alias, error: null, relationshipStatus: 'friend' });
   } catch (error) {
