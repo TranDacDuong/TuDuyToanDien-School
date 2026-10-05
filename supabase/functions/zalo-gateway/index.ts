@@ -51,9 +51,33 @@ Deno.serve(async (request) => {
     if (payload.action === "syncState") {
       return json({ state: await rpc("get_mindup_zalo_sync_state", {}) });
     }
-    if (payload.action === "claim") {
-      const rows = await rpc("claim_mindup_zalo_message", {});
+    if (payload.action === "claimDispatch") {
+      const pacing = payload.pacing;
+      if (!pacing || !Number.isInteger(pacing.spacingSeconds) ||
+        !Number.isInteger(pacing.batchSize) || !Number.isInteger(pacing.batchPauseSeconds)) {
+        return json({ error: "Invalid dispatch pacing" }, 400);
+      }
+      const rows = await rpc("claim_next_mindup_zalo_dispatch", {
+        p_spacing_seconds: pacing.spacingSeconds,
+        p_batch_size: pacing.batchSize,
+        p_batch_pause_seconds: pacing.batchPauseSeconds,
+      });
       return json({ job: rows?.[0] || null });
+    }
+    if (payload.action === "reserveDispatchSlot") {
+      const pacing = payload.pacing;
+      if (!pacing || !Number.isInteger(pacing.spacingSeconds) ||
+        !Number.isInteger(pacing.batchSize) || !Number.isInteger(pacing.batchPauseSeconds)) {
+        return json({ error: "Invalid dispatch pacing" }, 400);
+      }
+      return json({ sendAt: await rpc("reserve_mindup_zalo_dispatch_slot", {
+        p_spacing_seconds: pacing.spacingSeconds,
+        p_batch_size: pacing.batchSize,
+        p_batch_pause_seconds: pacing.batchPauseSeconds,
+      }) });
+    }
+    if (["claim", "claimTuition", "claimTuitionReceipt"].includes(payload.action)) {
+      return json({ error: "Restart the updated bot to use unified dispatch" }, 409);
     }
     if (payload.action === "claimParent") {
       const rows = await rpc("claim_zalo_parent_check", {});
@@ -64,6 +88,16 @@ Deno.serve(async (request) => {
         p_reason: typeof payload.reason === "string" ? payload.reason.slice(0, 500) : null,
       });
       return json({ ok: true });
+    }
+    if (payload.action === "queueParentGreeting") {
+      if (typeof payload.parentId !== "string" || typeof payload.phone !== "string" ||
+        typeof payload.uid !== "string" || typeof payload.content !== "string") {
+        return json({ error: "Invalid greeting" }, 400);
+      }
+      return json({ jobId: await rpc("enqueue_mindup_parent_greeting", {
+        p_parent_id: payload.parentId, p_phone: payload.phone,
+        p_uid: payload.uid, p_content: payload.content,
+      }) });
     }
     if (payload.action === "markParentAttempt") {
       if (typeof payload.parentId !== "string" || typeof payload.phone !== "string" ||
@@ -93,15 +127,13 @@ Deno.serve(async (request) => {
       });
       return json({ ok: true });
     }
-    if (payload.action === "claimTuition") {
-      const rows = await rpc("claim_zalo_tuition_delivery", {});
-      return json({ job: rows?.[0] || null });
-    }
     if (payload.action === "finishTuition") {
       if (typeof payload.jobId !== "string" || !["sent", "failed", "uncertain"].includes(payload.status)) {
         return json({ error: "Invalid tuition result" }, 400);
       }
-      await rpc("finish_zalo_tuition_delivery", {
+      await rpc("finish_mindup_tuition_dispatch", {
+        p_kind: "tuition",
+        p_external_id: typeof payload.externalId === "string" ? payload.externalId : null,
         p_job_id: payload.jobId,
         p_status: payload.status,
         p_qr_sent: payload.qrSent === true,
@@ -109,15 +141,13 @@ Deno.serve(async (request) => {
       });
       return json({ ok: true });
     }
-    if (payload.action === "claimTuitionReceipt") {
-      const rows = await rpc("claim_zalo_tuition_receipt", {});
-      return json({ job: rows?.[0] || null });
-    }
     if (payload.action === "finishTuitionReceipt") {
       if (typeof payload.jobId !== "string" || !["sent", "failed", "uncertain"].includes(payload.status)) {
         return json({ error: "Invalid tuition receipt result" }, 400);
       }
-      await rpc("finish_zalo_tuition_receipt", {
+      await rpc("finish_mindup_tuition_dispatch", {
+        p_kind: "receipt",
+        p_external_id: typeof payload.externalId === "string" ? payload.externalId : null,
         p_job_id: payload.jobId,
         p_status: payload.status,
         p_error: typeof payload.error === "string" ? payload.error.slice(0, 500) : null,

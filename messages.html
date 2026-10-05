@@ -585,6 +585,19 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
 .message-context select { max-width: 240px; font: inherit; padding: 6px 28px 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--navy); }
 .zalo-link-button { display: none; margin-left: auto; font: inherit; font-size: .76rem; padding: 6px 9px; border: 1px solid var(--border); border-radius: 6px; background: #fff; cursor: pointer; }
 .zalo-link-button.show { display: inline-flex; }
+.zalo-dispatch-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: .78rem; color: var(--ink-mid); }
+.zalo-dispatch-bar[hidden] { display: none; }
+.zalo-dispatch-bar button { flex: none; font: inherit; border: 1px solid var(--border); background: #fff; color: var(--navy); padding: 5px 8px; border-radius: 5px; cursor: pointer; }
+.zalo-dispatch-bar { flex-wrap: wrap; }
+.zalo-dispatch-dialog { width: min(960px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); border: 1px solid var(--border); border-radius: 8px; padding: 16px; color: var(--ink); }
+.zalo-dispatch-dialog::backdrop { background: rgba(0,0,0,.45); }
+.zalo-dispatch-dialog header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.zalo-dispatch-dialog button { font:inherit; cursor:pointer; }
+.zalo-dispatch-table-wrap { overflow:auto; max-height:calc(100dvh - 160px); }
+.zalo-dispatch-dialog table { width:100%; border-collapse:collapse; font-size:.8rem; }
+.zalo-dispatch-dialog th { position:sticky; top:0; background:#f4f7fa; text-align:left; }
+.zalo-dispatch-dialog td,.zalo-dispatch-dialog th { padding:9px; border-bottom:1px solid var(--border); vertical-align:top; }
+.zalo-dispatch-dialog td { overflow-wrap:anywhere; }
 .zalo-link-dialog { border: 1px solid var(--border); border-radius: 8px; max-width: min(440px, calc(100vw - 24px)); width: 100%; padding: 18px; font: inherit; }
 .zalo-link-dialog::backdrop { background: rgba(0,0,0,.45); }
 .zalo-link-dialog select { width: 100%; margin: 12px 0; padding: 9px; }
@@ -670,6 +683,11 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
         <button class="friend-list-action-btn tray-full-messages" type="button" onclick="openFullMessagesPage()">Xem toàn bộ tin nhắn</button>
       </div>
       <div class="search-wrap">
+        <div id="zaloDispatchBar" class="zalo-dispatch-bar" hidden>
+          <span id="zaloDispatchSummary"></span>
+          <button id="zaloDispatchToggle" type="button" onclick="toggleZaloDispatch()"></button>
+          <button type="button" onclick="openZaloDispatchDetails()">Xem chi tiết</button>
+        </div>
         <input id="friendSearch" class="search-input" placeholder="Tìm người dùng hoặc cuộc trò chuyện..." oninput="filterFriends()">
       </div>
       <div id="friendListTopActions" class="friend-list-actions"></div>
@@ -824,6 +842,7 @@ async function init() {
   currentUser = user;
   const { data: profile } = await sb.from("users").select("*").eq("id", user.id).single();
   currentProfile = profile;
+  if (currentProfile?.role === 'admin') refreshZaloDispatchStatus();
   selectedUserFromQuery = queryParams.get("user");
   selectedTeacherFromQuery = queryParams.get("teacher");
   document.querySelector(".chat-head-bar")?.appendChild(document.getElementById("chatTitle"));
@@ -884,6 +903,7 @@ function makeConversationListItem(user, options = {}) {
     users: {
       id: user?.id || options.friend_id || "",
       full_name: user?.full_name || options.full_name || "Người dùng",
+      zalo_alias: user?.zalo_alias || null,
       email: user?.email || options.email || "",
       avatar_url: user?.avatar_url || options.avatar_url || "default-avatar.png",
       role: user?.role || options.role || "",
@@ -1056,9 +1076,12 @@ async function fetchMindupParentInboxItems() {
     parentInboxById = new Map();
     return [];
   }
+  const { data: aliasRows } = await sb.rpc('list_mindup_parent_zalo_aliases');
+  const aliases = new Map((aliasRows || []).map(row => [row.parent_id, row.zalo_alias]));
   const items = (data || []).map(row => makeConversationListItem({
     id: row.parent_id,
     full_name: row.parent_name,
+    zalo_alias: aliases.get(row.parent_id) || null,
     avatar_url: row.parent_avatar_url || 'default-avatar.png',
     role: 'parent'
   }, {
@@ -1503,14 +1526,86 @@ async function refreshZaloDeliveryStatus() {
   if (document.hidden || !currentConversationId || !isMindUpStaffRole(currentProfile?.role)) return;
   const ids = loadedMessages.map(row => row.id).filter(id => !String(id).startsWith('temp:'));
   if (!ids.length) return;
-  const { data, error } = await sb.from('zalo_outbox').select('message_id,status').in('message_id', ids);
+  const { data, error } = await sb.rpc('list_mindup_zalo_message_deliveries', { p_message_ids: ids });
   if (error) return;
-  const next = new Map((data || []).map(job => [job.message_id, job.status]));
+  const next = new Map((data || []).map(job => [job.message_id, { id: job.id, status: job.status, kind: job.kind, error: job.error_message }]));
   if (JSON.stringify([...next]) !== JSON.stringify([...zaloDeliveryByMessage])) {
     zaloDeliveryByMessage = next;
     renderLoadedMessages();
   }
 }
+
+async function refreshZaloDispatchStatus() {
+  if (currentProfile?.role !== 'admin' || document.hidden) return;
+  const { data, error } = await sb.rpc('get_mindup_zalo_dispatch_status');
+  if (error || !data) return;
+  const bar = document.getElementById('zaloDispatchBar');
+  bar.hidden = false;
+  const waiting = Number(data.waitingWeb || 0) + Number(data.waitingReceipts || 0) + Number(data.waitingTuition || 0);
+  document.getElementById('zaloDispatchSummary').textContent =
+    `Zalo: ${waiting} chờ · ${data.processing || 0} đang gửi · ${data.sent || 0} đã gửi · ${data.failed || 0} lỗi${data.paused ? ' · Tạm dừng' : ''}`;
+  document.getElementById('zaloDispatchSummary').title = data.reason || '';
+  const toggle = document.getElementById('zaloDispatchToggle');
+  toggle.textContent = data.paused ? 'Tiếp tục' : 'Tạm dừng';
+  toggle.dataset.paused = data.paused ? 'true' : 'false';
+}
+
+window.toggleZaloDispatch = async function() {
+  const toggle = document.getElementById('zaloDispatchToggle');
+  toggle.disabled = true;
+  const { error } = await sb.rpc('set_mindup_zalo_dispatch_paused', {
+    p_paused: toggle.dataset.paused !== 'true'
+  });
+  toggle.disabled = false;
+  if (error) return alert('Không đổi được trạng thái hàng gửi: ' + error.message);
+  await refreshZaloDispatchStatus();
+};
+
+window.openZaloDispatchDetails = async function() {
+  if (currentProfile?.role !== 'admin') return;
+  let dialog = document.getElementById('zaloDispatchDetails');
+  if (!dialog) {
+    dialog = document.createElement('dialog');
+    dialog.id = 'zaloDispatchDetails';
+    dialog.className = 'zalo-dispatch-dialog';
+    dialog.innerHTML = '<header><b>Hàng gửi Zalo</b><button type="button" aria-label="Đóng">×</button></header><div class="zalo-dispatch-table-wrap"></div>';
+    dialog.querySelector('header button').onclick = () => dialog.close();
+    dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+    document.body.appendChild(dialog);
+  }
+  if (!dialog.open) dialog.showModal();
+  const body = dialog.querySelector('.zalo-dispatch-table-wrap');
+  body.textContent = 'Đang tải...';
+  const { data, error } = await sb.rpc('list_mindup_zalo_dispatch_jobs');
+  if (error) { body.textContent = 'Không tải được hàng gửi: ' + error.message; return; }
+  const labels = { pending:'Đang chờ', queued:'Đang chờ', processing:'Đang gửi', sent:'Đã gửi', failed:'Gửi lỗi', uncertain:'Cần kiểm tra trên Zalo', cancelled:'Đã hủy', not_found:'Chờ tìm Zalo', not_friend:'Chờ kết nối', invited:'Đang chờ', greeted:'Đang chờ' };
+  body.innerHTML = '<table><thead><tr><th>Người nhận</th><th>Nội dung</th><th>Kết quả</th><th>Thao tác</th></tr></thead><tbody>' + (data || []).map(job => {
+    const waiting = ['pending','queued','not_found','not_friend','invited','greeted'].includes(job.status);
+    return `<tr><td>${esc(job.parent_name || 'Phụ huynh')}<br>${esc(job.student_name || '')}<br>${esc(new Date(job.created_at).toLocaleString('vi-VN'))}</td><td>${esc(job.content)}</td><td>${esc(labels[job.status] || job.status)}${job.error_message ? `<br>${esc(job.error_message)}` : ''}</td><td>${waiting || job.status === 'failed' ? `<button type="button" data-kind="${esc(job.kind)}" data-id="${esc(job.id)}" data-action="${waiting ? 'cancel' : 'retry'}">${waiting ? 'Hủy gửi' : 'Gửi lại'}</button>` : ''}</td></tr>`;
+  }).join('') + '</tbody></table>';
+  if (!data?.length) body.textContent = 'Chưa có tin trong hàng gửi.';
+  body.querySelectorAll('button[data-action]').forEach(button => {
+    button.onclick = async () => {
+      button.disabled = true;
+      const { data: changed, error: actionError } = await sb.rpc(button.dataset.action === 'cancel' ? 'cancel_mindup_zalo_dispatch' : 'retry_mindup_zalo_dispatch', { p_kind:button.dataset.kind, p_job_id:button.dataset.id });
+      if (actionError || !changed) alert(actionError?.message || 'Trạng thái tin đã thay đổi.');
+      await openZaloDispatchDetails();
+      await refreshZaloDispatchStatus();
+      await refreshZaloDeliveryStatus();
+    };
+  });
+};
+
+window.cancelQueuedZaloMessage = async function(messageId) {
+  const job = zaloDeliveryByMessage.get(messageId);
+  if (!job || !['pending','queued','not_found','not_friend','invited','greeted'].includes(job.status) || currentProfile?.role !== 'admin') return;
+  const { data, error } = await sb.rpc('cancel_mindup_zalo_dispatch', {
+    p_kind: job.kind, p_job_id: job.id
+  });
+  if (error || !data) return alert('Tin đã được bot nhận hoặc không thể hủy.');
+  await refreshZaloDeliveryStatus();
+  await refreshZaloDispatchStatus();
+};
 
 window.openZaloLinkDialog = async function() {
   if (currentProfile?.role !== 'admin' || !activeFriend?.id) return;
@@ -1555,6 +1650,7 @@ window.confirmZaloLink = async function() {
 window.openConversation = async function(friendId, friendName, friendAvatar, friendRole) {
   resetZaloSendMode();
   const inboxItem = parentInboxById.get(friendId) || friendMap.get(friendId);
+  friendName = inboxItem?.users?.zalo_alias || friendName;
   const shouldUseMindUpOfficial = shouldRouteToMindUpOfficial(friendRole);
   const shouldOpenMindUpBotTarget = shouldOpenMindUpBotConversation(friendRole);
   if (isTrayMode) {
@@ -1632,7 +1728,7 @@ window.openLearningConversation = async function(conversationId) {
   currentConversationId = conversationId;
   loadedMessages = [];
   hasOlderMessages = true;
-  document.getElementById("chatTitle").textContent = item.users?.full_name || "MindUp - Tư Duy Toàn Diện";
+  document.getElementById("chatTitle").textContent = item.users?.zalo_alias || item.users?.full_name || "MindUp - Tư Duy Toàn Diện";
   document.getElementById("chatSub").textContent = item.metaName || "Hồ sơ học tập";
   if (document.getElementById("chatAvatar")) document.getElementById("chatAvatar").src = item.users?.avatar_url || "favicon.png";
   document.getElementById("messageList").innerHTML = '<div class="empty"><strong>Đang tải hội thoại học tập</strong>MindUp đang tổng hợp dữ liệu.</div>';
@@ -2006,12 +2102,16 @@ function renderLoadedMessages() {
     const statusLabel = item._pending
       ? '<div class="bubble-time">Đang gửi...</div>'
       : (item._failed ? `<div class="bubble-time">Gửi lỗi • <button class="message-retry-btn" type="button" onclick="retryOptimisticMessage('${esc(item.id)}')">Gửi lại</button></div>` : '');
-    const zaloDelivery = zaloDeliveryByMessage.get(item.id);
+    const zaloDelivery = zaloDeliveryByMessage.get(item.id)?.status;
     const transportLabel = item.transport === 'zalo' ? 'Nhận qua Zalo'
       : zaloDelivery === 'sent' ? 'Đã gửi Zalo'
       : zaloDelivery === 'failed' ? 'Gửi Zalo lỗi'
       : zaloDelivery === 'uncertain' ? 'Cần kiểm tra trên Zalo'
+      : zaloDelivery === 'cancelled' ? 'Đã hủy gửi Zalo'
+      : zaloDelivery === 'processing' ? 'Đang gửi Zalo'
       : zaloDelivery ? 'Chờ bot gửi Zalo' : '';
+    const cancelZalo = isBot && currentProfile?.role === 'admin' && ['pending','queued','not_found','not_friend','invited','greeted'].includes(zaloDelivery)
+      ? `<button class="message-retry-btn" type="button" onclick="cancelQueuedZaloMessage('${esc(item.id)}')">Hủy gửi</button>` : '';
     const contextStudent = (activeFriend?.children || []).find(child => child.id === item.context_student_id);
     const contextLabel = contextStudent
       ? `<div class="message-transport">Về học sinh: ${esc(contextStudent.name || 'Học sinh')}</div>` : '';
@@ -2022,7 +2122,7 @@ function renderLoadedMessages() {
           ${renderMessageBody(item.content)}
           ${statusLabel || `<div class="bubble-time">${formatTime(item.created_at)}</div>`}
           ${contextLabel}
-          ${transportLabel ? `<div class="message-transport">${transportLabel}</div>` : ''}
+          ${transportLabel ? `<div class="message-transport">${transportLabel} ${cancelZalo}</div>` : ''}
         </div>
       </div>
     `;
@@ -2769,7 +2869,8 @@ function formatParentCardName(profile) {
 function getParentCardNameParts(profile) {
   const name = profile?.full_name || profile?.email || "Phụ huynh";
   const children = _parentChildrenLabels.get(profile?.id) || [];
-  return { title: name, subtitles: children.map(child => `PH ${child}`) };
+  return { title: profile?.zalo_alias || name,
+    subtitles: [...(profile?.zalo_alias ? [name] : []), ...children.map(child => `PH ${child}`)] };
 }
 
 function getOfficialAudienceDisplayName(user) {
@@ -3169,7 +3270,10 @@ function renderFriendList(list) { _renderFriendListCore(list); }
 
 
 
-zaloStatusTimer = setInterval(refreshZaloDeliveryStatus, 15000);
+zaloStatusTimer = setInterval(() => {
+  refreshZaloDeliveryStatus();
+  refreshZaloDispatchStatus();
+}, 15000);
 init();
 </script>
 </body>

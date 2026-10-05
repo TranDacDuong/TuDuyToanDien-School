@@ -10,6 +10,9 @@
    mapping for Messages. The running bot detects its link revision automatically.
 6. Apply `SQL link resolved Zalo UID before friendship.sql` so resolved contacts
    also link when relationship lookup, invitation, or greeting subsequently fails.
+7. Apply `SQL unified Zalo dispatch.sql`, deploy the gateway and web files, then
+   restart the bot. Web chat, system notices, greetings, tuition and receipts
+   now use one serialized dispatcher. Existing history is not re-enqueued.
 
 The migration is transactional and does not guess parent links or delete existing
 history. `tests/zalo-sync-database.sql` can replace the migration's final COMMIT
@@ -21,6 +24,16 @@ existing verified parent with an actively assigned teacher and an admin.
 - Web messages and outbox jobs are created atomically. The returned Zalo message
   id is acknowledged against the original web message, preserving author and
   student scope. Early self echoes wait for this acknowledgement.
+- Dispatch starts as soon as the worker can claim a job; there is no fixed send
+  delay or batch sleep. Parent lookups and alias changes retain their separate
+  pacing. A database lock and active delivery leases prevent concurrent claims.
+- Receipts and tuition notices appear in the same parent conversation and retain
+  child scope. Every outgoing result is persisted locally before acknowledging
+  Supabase. Uncertain deliveries cannot be retried from the web automatically.
+- Admin can pause/resume dispatch and inspect the latest 100 jobs in Messages,
+  cancel waiting jobs and retry explicit failures. Rate-limit errors pause all
+  delivery sources. Incoming synchronization continues while sending is paused.
+- Legacy in-memory campaign and test-send endpoints no longer send messages.
 - Unconfirmed deliveries are never automatically sent again. Pending successful
   acknowledgements are saved to disk and replayed after restart.
 - Transient upload failures retry with backoff. Invalid messages are isolated in

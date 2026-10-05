@@ -229,6 +229,10 @@ function makeSender({ failAck = false, noId = false } = {}) {
   const saved = [];
   const context = vm.createContext({ gatewayBusy: false, listenerConnected: true,
     GATEWAY_URL: 'configured', GATEWAY_TOKEN: 'configured', campaignStatus: 'idle',
+    botConfig: { minDelaySeconds: 45, maxDelaySeconds: 90, batchSize: 50, batchPauseMinutes: 30 },
+    getRandomDelay: () => 45,
+    isZaloLimitError: () => false,
+    isUncertainSendError: () => false,
     nextGatewaySendAt: 0, Date, console: { error() {}, warn() {} }, pendingIncoming: new Map(),
     scheduleNextGatewayAction() {},
     persistIncoming() { saved.push([...context.pendingIncoming.values()]); },
@@ -236,7 +240,7 @@ function makeSender({ failAck = false, noId = false } = {}) {
       return { message: noId ? null : { msgId: '123' } }; } },
     async gatewayRequest(payload) {
       requests.push(payload);
-      if (payload.action === 'claim') return { job: { job_id: 'job', zalo_uid: 'parent', content: 'Hello' } };
+      if (payload.action === 'claimDispatch') return { job: { kind: 'web', job_id: 'job', zalo_uid: 'parent', content: 'Hello' } };
       if (failAck && payload.status === 'sent') throw new Error('network timeout');
       return { ok: true };
     }
@@ -256,14 +260,49 @@ test('real sender retains failed acknowledgement and does not claim another job'
   const s = makeSender({ failAck: true });
   await s.context.syncGatewayOutbox(); await s.context.syncGatewayOutbox();
   expect(s.sends).toHaveLength(1);
-  expect(s.requests.filter(r => r.action === 'claim')).toHaveLength(1);
-  expect(s.context.pendingIncoming.get('ack:job').externalId).toBe('parent:123');
+  expect(s.requests.filter(r => r.action === 'claimDispatch')).toHaveLength(1);
+  expect(s.context.pendingIncoming.get('ack:finish:job').externalId).toBe('parent:123');
 });
 
 test('real sender marks missing Zalo delivery id uncertain instead of reporting success', async () => {
   const s = makeSender({ noId: true }); await s.context.syncGatewayOutbox();
   expect(s.requests.at(-1).status).toBe('uncertain');
   expect(s.requests.at(-1).jobId).toBe('job');
+});
+
+test('sender requests immediate dispatch regardless of old anti-ban configuration', async () => {
+  const s = makeSender();
+  await s.context.syncGatewayOutbox();
+  expect(s.requests[0].pacing).toEqual({ spacingSeconds:0, batchSize:50, batchPauseSeconds:0 });
+});
+
+test('all outgoing acknowledgements are replayed before incoming message echoes', async () => {
+  const calls = [];
+  const q = makeQueue([message('echo'), { action:'finishTuitionReceipt',jobId:'receipt',status:'sent',externalId:'parent:receipt' },
+    { action:'finishTuition',jobId:'tuition',status:'sent',externalId:'parent:tuition' }], async p => { calls.push(p.action); return {ok:true}; });
+  await q.queue.flush();
+  expect(calls).toEqual(['finishTuitionReceipt','finishTuition','syncMessage']);
+});
+
+test('receipt acknowledgement failure retains success without sending again', async () => {
+  const source = fs.readFileSync(path.join(__dirname,'../services/zalo-bot/server.js'),'utf8');
+  const pending = new Map();
+  let sends=0;
+  const context = vm.createContext({ pendingIncoming:pending,persistIncoming(){},
+    console:{error(){}},isZaloLimitError:()=>false,isUncertainSendError:()=>false,
+    zaloApi:{async sendMessage(){ sends++; return {message:{msgId:'receipt-id'}}; }},
+    async gatewayRequest(){throw new Error('Gateway unavailable');} });
+  vm.runInContext(source.slice(source.indexOf('async function acknowledgeDispatch('),source.indexOf('function scheduleNextGatewayAction()')),context);
+  vm.runInContext(source.slice(source.indexOf('async function sendQueuedTuitionReceipt('),source.indexOf('async function syncQueuedParentAlias(')),context);
+  await context.sendQueuedTuitionReceipt({job_id:'receipt',zalo_uid:'parent',content:'Received'});
+  expect(sends).toBe(1);
+  expect([...pending.values()]).toEqual([{action:'finishTuitionReceipt',jobId:'receipt',status:'sent',externalId:'parent:receipt-id'}]);
+});
+
+test('simultaneous sender polls cannot send two jobs', async () => {
+  const s=makeSender();
+  await Promise.all([s.context.syncGatewayOutbox(),s.context.syncGatewayOutbox()]);
+  expect(s.sends).toHaveLength(1);
 });
 
 test('queue prioritizes acknowledgements and limits each flush batch', async () => {

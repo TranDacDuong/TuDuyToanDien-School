@@ -72,36 +72,61 @@ async function gatewayRequest(payload) {
 
 async function syncGatewayOutbox() {
   if (gatewayBusy || !zaloApi || !listenerConnected || !GATEWAY_URL || !GATEWAY_TOKEN
-    || campaignStatus !== 'idle' || Date.now() < nextGatewaySendAt) return;
-  if ([...pendingIncoming.values()].some(p => p.action === 'finish')) return;
+    || campaignStatus !== 'idle') return;
+  if ([...pendingIncoming.values()].some(p => p.action.startsWith('finish'))) return;
   gatewayBusy = true;
   try {
-    const { job } = await gatewayRequest({ action: 'claim' });
+    const { job } = await gatewayRequest({ action: 'claimDispatch', pacing: dispatchPacing() });
     if (!job) return;
-    scheduleNextGatewayAction();
+    if (job.kind === 'receipt') {
+      await sendQueuedTuitionReceipt(job);
+      return;
+    }
+    if (job.kind === 'tuition') {
+      await sendQueuedTuition(job);
+      return;
+    }
+    if (job.kind !== 'web') throw new Error('Unknown dispatch kind');
+    let acknowledgement;
     try {
       const sent = await zaloApi.sendMessage(job.content, job.zalo_uid);
       const messageId = sent?.message?.msgId;
       if (messageId == null) throw new Error('Zalo returned no message id; verify delivery before retrying');
-      const acknowledgement = { action: 'finish', jobId: job.job_id, status: 'sent',
+      acknowledgement = { action: 'finish', jobId: job.job_id, status: 'sent',
         externalId: `${job.zalo_uid}:${messageId}` };
-      pendingIncoming.set(`ack:${job.job_id}`, acknowledgement);
-      persistIncoming();
-      try {
-        await gatewayRequest(acknowledgement);
-        pendingIncoming.delete(`ack:${job.job_id}`);
-        persistIncoming();
-      } catch (ackError) {
-        // An unacknowledged send must never be retried automatically.
-        console.error('[ZaloBot] Tin đã gửi nhưng chưa xác nhận được:', ackError);
-      }
     } catch (error) {
-      await gatewayRequest({ action: 'finish', jobId: job.job_id, status: 'uncertain', error: String(error?.message || error) });
+      if (isZaloLimitError(error)) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
+      await acknowledgeDispatch({ action: 'finish', jobId: job.job_id,
+        status: isUncertainSendError(error) || /no message id/.test(String(error?.message)) ? 'uncertain' : 'failed',
+        error: String(error?.message || error) });
+      return;
     }
+    await acknowledgeDispatch(acknowledgement);
   } catch (error) {
     console.warn('[ZaloBot] Không đồng bộ được hàng đợi:', error?.message || error);
   } finally {
     gatewayBusy = false;
+  }
+}
+
+function dispatchPacing() {
+  return {
+    spacingSeconds: 0,
+    batchSize: 50,
+    batchPauseSeconds: 0
+  };
+}
+
+async function acknowledgeDispatch(payload) {
+  const key = `ack:${payload.action}:${payload.jobId}`;
+  pendingIncoming.set(key, payload);
+  try {
+    persistIncoming();
+    await gatewayRequest(payload);
+    pendingIncoming.delete(key);
+    persistIncoming();
+  } catch (error) {
+    console.error('[ZaloBot] Chưa lưu được kết quả gửi:', error?.message || error);
   }
 }
 
@@ -205,11 +230,10 @@ async function checkQueuedParent(job) {
     // A successful greeting is the capability check that unlocks the tuition notice.
     if (['friend', 'invited'].includes(result.status) && !job.greeting_attempted_at &&
       !job.greeting_sent_at && (result.invited || job.invitation_sent_at || job.invitation_attempted_at)) {
-      await gatewayRequest({ action: 'markParentAttempt', parentId: job.parent_id,
-        phone: job.phone, kind: 'greeting' });
-      stage = 'Gửi tin chào';
-      await zaloApi.sendMessage(buildParentGreeting(job.student_name, job.parent_id), result.uid);
-      result.greeted = true;
+      stage = 'Xếp hàng tin chào';
+      await gatewayRequest({ action: 'queueParentGreeting', parentId: job.parent_id,
+        phone: job.phone, uid: result.uid,
+        content: buildParentGreeting(job.student_name, job.parent_id) });
     }
   } catch (error) {
     result.status = isZaloLimitError(error) ? 'rate_limited'
@@ -223,15 +247,18 @@ async function checkQueuedParent(job) {
 
 async function sendQueuedTuition(job) {
   let qrSent = false;
+  let externalId = null;
   try {
-    await zaloApi.sendMessage(job.content, job.zalo_uid);
+    const sent = await zaloApi.sendMessage(job.content, job.zalo_uid);
+    if (sent?.message?.msgId == null) throw new Error('Zalo returned no message id; verify delivery before retrying');
+    externalId = `${job.zalo_uid}:${sent.message.msgId}`;
   } catch (error) {
     if (isZaloLimitError(error)) {
       await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
     }
     const detail = String(error?.message || error);
-    await gatewayRequest({ action: 'finishTuition', jobId: job.job_id,
-      status: isUncertainSendError(error) ? 'uncertain' : 'failed',
+    await acknowledgeDispatch({ action: 'finishTuition', jobId: job.job_id,
+      status: isUncertainSendError(error) || /no message id/.test(String(error?.message)) ? 'uncertain' : 'failed',
       error: `Chưa gửi được tin nhắn: ${detail}` });
     return;
   }
@@ -239,33 +266,42 @@ async function sendQueuedTuition(job) {
   if (job.qr_url) {
     const tempFile = path.join(__dirname, 'temp', `tuition_${job.job_id}.png`);
     try {
+      const { sendAt } = await gatewayRequest({ action: 'reserveDispatchSlot', pacing: dispatchPacing() });
+      if (!sendAt) throw new Error('Hàng gửi Zalo đang tạm dừng');
+      await sleep(Math.max(0, new Date(sendAt).getTime() - Date.now()));
       fs.mkdirSync(path.dirname(tempFile), { recursive: true });
       await downloadImage(job.qr_url, tempFile);
-      await zaloApi.sendMessage({ msg: 'Mã QR thanh toán học phí MindUp', attachments: [tempFile] }, job.zalo_uid);
+      const sent = await zaloApi.sendMessage({ msg: 'Mã QR thanh toán học phí MindUp', attachments: [tempFile] }, job.zalo_uid);
+      if (sent?.message?.msgId == null) throw new Error('Zalo returned no QR message id');
       qrSent = true;
     } catch (error) {
       qrError = `Đã gửi nội dung, ảnh QR lỗi: ${error?.message || error}`;
+      if (isZaloLimitError(error)) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
     } finally {
       try { fs.unlinkSync(tempFile); } catch (_) {}
     }
   }
-  await gatewayRequest({ action: 'finishTuition', jobId: job.job_id,
-    status: 'sent', qrSent, error: qrError });
+  await acknowledgeDispatch({ action: 'finishTuition', jobId: job.job_id,
+    status: 'sent', externalId, qrSent, error: qrError });
 }
 
 async function sendQueuedTuitionReceipt(job) {
+  let externalId = null;
   try {
-    await zaloApi.sendMessage(job.content, job.zalo_uid);
-    await gatewayRequest({ action: 'finishTuitionReceipt', jobId: job.job_id, status: 'sent' });
+    const sent = await zaloApi.sendMessage(job.content, job.zalo_uid);
+    if (sent?.message?.msgId == null) throw new Error('Zalo returned no message id; verify delivery before retrying');
+    externalId = `${job.zalo_uid}:${sent.message.msgId}`;
   } catch (error) {
     if (isZaloLimitError(error)) {
       await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
     }
     const detail = String(error?.message || error);
-    await gatewayRequest({ action: 'finishTuitionReceipt', jobId: job.job_id,
-      status: isUncertainSendError(error) ? 'uncertain' : 'failed',
+    await acknowledgeDispatch({ action: 'finishTuitionReceipt', jobId: job.job_id,
+      status: isUncertainSendError(error) || /no message id/.test(String(error?.message)) ? 'uncertain' : 'failed',
       error: `Chưa gửi được tin nhắn xác nhận học phí: ${detail}` });
+    return;
   }
+  await acknowledgeDispatch({ action: 'finishTuitionReceipt', jobId: job.job_id, status: 'sent', externalId });
 }
 
 async function syncQueuedParentAlias(job) {
@@ -291,27 +327,11 @@ async function syncQueuedParentAlias(job) {
 }
 
 async function syncParentTuition() {
-  if (gatewayBusy || !zaloApi || !GATEWAY_URL || !GATEWAY_TOKEN ||
-    campaignStatus !== 'idle') return;
+  if (gatewayBusy || !zaloApi || !listenerConnected || !GATEWAY_URL || !GATEWAY_TOKEN ||
+    campaignStatus !== 'idle' || Date.now() < nextParentPollAt) return;
   gatewayBusy = true;
   let processedKind = null;
   try {
-    // Payment acknowledgements bypass the anti-ban reminder delay and are sent on
-    // the next 12-second poll. The durable row prevents loss while the bot is offline.
-    const { job: receiptJob } = await gatewayRequest({ action: 'claimTuitionReceipt' });
-    if (receiptJob) {
-      processedKind = 'receipt';
-      await sendQueuedTuitionReceipt(receiptJob);
-      return;
-    }
-    if (Date.now() < nextGatewaySendAt) return;
-    const { job: tuitionJob } = await gatewayRequest({ action: 'claimTuition' });
-    if (tuitionJob) {
-      processedKind = 'tuition';
-      await sendQueuedTuition(tuitionJob);
-      return;
-    }
-    if (Date.now() < nextParentPollAt) return;
     nextParentPollAt = Date.now() + 5 * 60 * 1000;
     const { job: parentJob } = await gatewayRequest({ action: 'claimParent' });
     if (parentJob) {
@@ -328,7 +348,7 @@ async function syncParentTuition() {
   } catch (error) {
     console.warn('[ZaloBot] Đồng bộ phụ huynh/học phí:', error?.message || error);
   } finally {
-    if (processedKind && processedKind !== 'receipt') {
+    if (processedKind) {
       scheduleNextGatewayAction();
       nextParentPollAt = nextGatewaySendAt;
     }
@@ -1128,37 +1148,7 @@ app.post('/api/config', (req, res) => {
 
 // 6. Khởi động chiến dịch gửi danh sách phụ huynh
 app.post('/api/start-campaign', (req, res) => {
-  const { items, config } = req.body || {};
-  if (!items || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ success: false, error: 'Danh sách học sinh trống.' });
-  }
-
-  if (config) {
-    if (config.minDelaySeconds) botConfig.minDelaySeconds = Math.max(30, Number(config.minDelaySeconds));
-    if (config.maxDelaySeconds) botConfig.maxDelaySeconds = Math.max(botConfig.minDelaySeconds, Number(config.maxDelaySeconds));
-  }
-
-  campaignQueue = [...items];
-  completedResults = [];
-  currentProgress = {
-    total: items.length,
-    sent: 0,
-    friendRequested: 0,
-    failed: 0,
-    skipped: 0,
-    currentStudent: '',
-    currentPhone: '',
-    nextSendInSeconds: 0,
-    batchCount: 0
-  };
-
-  startCampaignWorker();
-
-  res.json({
-    success: true,
-    message: `Đã đưa ${items.length} tin nhắn vào hàng đợi an toàn.`,
-    queueLength: campaignQueue.length
-  });
+  return res.status(409).json({ success: false, error: 'Hãy xếp hàng gửi học phí trên web để sử dụng hàng đợi chung.' });
 });
 
 // 7. Tạm dừng / Tiếp tục / Hủy chiến dịch
@@ -1193,24 +1183,14 @@ app.post('/api/sync-zalo-history', (req, res) => {
 
 // 8. Gửi thử 1 tin nhắn test
 app.post('/api/test-send', async (req, res) => {
-  const { phone, studentName, messageText, qrUrl } = req.body || {};
-  if (!phone || !messageText) {
-    return res.status(400).json({ success: false, error: 'Thiếu số điện thoại hoặc nội dung.' });
-  }
-
-  try {
-    const result = await sendMessageToParent({ phone, studentName: studentName || 'Học sinh Test', messageText, qrUrl });
-    res.json({ success: true, message: `Đã xử lý gửi tin nhắn tới ${phone}`, result });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+  return res.status(409).json({ success: false, error: 'Hãy gửi qua Tin nhắn trên web để sử dụng hàng đợi chung.' });
 });
 
 // Khởi động server
 app.listen(PORT, HOST, () => {
   console.log(`=======================================================`);
   console.log(`🤖 Dịch vụ Zalo Bot MindUp đang chạy tại: http://localhost:${PORT}`);
-  console.log(`🛡️  Chế độ Anti-Ban: Giãn cách ngẫu nhiên ${botConfig.minDelaySeconds}s - ${botConfig.maxDelaySeconds}s/tin`);
+  console.log('Hàng gửi Zalo chung: gửi tuần tự ngay khi có tin, tự dừng khi Zalo giới hạn.');
   console.log(`=======================================================`);
 
   // Tự động kiểm tra session Zalo khi khởi động
@@ -1218,7 +1198,7 @@ app.listen(PORT, HOST, () => {
   setInterval(async () => {
     await syncGatewayOutbox();
     await syncParentTuition();
-  }, 12000).unref();
+  }, 500).unref();
   setInterval(flushIncoming, 10000).unref();
   setInterval(refreshSyncLinks, 60000).unref();
 });

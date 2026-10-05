@@ -796,21 +796,6 @@ Nhập số tiền thu thêm lần này:`,
       // Ghi nhận lời cảm ơn trên web và xếp hàng Zalo cho đúng lần thu này.
       try {
         const sb = getSb();
-        const [{ data: studentInfo }, { data: parentLinks }] = await Promise.all([
-          sb.from("users").select("full_name").eq("id", studentId).maybeSingle(),
-          sb.from("parent_students").select("parent_id").eq("student_id", studentId).is("revoked_at", null)
-        ]);
-        const parentIds = [...new Set((parentLinks || []).map(item => item.parent_id).filter(Boolean))];
-        const studentName = studentInfo?.full_name || "học sinh";
-        const [year, month] = ym.split("-");
-        const monthLabel = `${parseInt(month, 10)}/${year}`;
-        if (window.MindUpBot && parentIds.length) {
-          await Promise.allSettled(parentIds.map(parentId =>
-            window.MindUpBot.sendTuitionConfirmMessage(parentId, {
-              studentName, className: "", monthLabel, amount: addAmount
-            })
-          ));
-        }
         const paymentId = paymentMap[studentId]?.id;
         if (paymentId) {
           const { error: receiptError } = await sb.rpc("enqueue_zalo_tuition_receipt", {
@@ -2592,7 +2577,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       }).join("");
       const action = isZaloTuitionItemEligible(item)
         ? `<button type="button" onclick="sendSingleZaloTest(${idx})" style="margin-top:5px;border:1px solid #cbd5e1;background:#fff;padding:4px 8px;border-radius:6px;cursor:pointer">Xếp hàng</button>` : "";
-      cell.innerHTML = `<div style="font-size:11px;color:#64748b">PH: ${esc(contactLabel)}</div>${rows}${action}`;
+      cell.innerHTML = `${contact?.zalo_alias ? `<div style="font-size:11px;font-weight:600">${esc(contact.zalo_alias)}</div>` : ''}<div style="font-size:11px;color:#64748b">PH: ${esc(contactLabel)}</div>${rows}${action}`;
     });
   }
 
@@ -2616,7 +2601,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       }
       if (parentIds.length) {
         const { data, error } = await getSb().from("zalo_parent_contacts")
-          .select("parent_id,status,zalo_uid,greeting_sent_at,last_checked_at,next_check_at,lease_until,last_error")
+          .select("parent_id,status,zalo_uid,zalo_alias,greeting_sent_at,last_checked_at,next_check_at,lease_until,last_error")
           .in("parent_id", parentIds);
         if (error) throw error;
         zaloParentContactStatus = new Map((data || []).map(row => [row.parent_id, row]));
@@ -2979,7 +2964,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
             <div>
               <span style="font-weight:700;color:#15803d">Zalo Cá Nhân: Đang kết nối</span>
               <span style="font-size:12px;color:#166534">${userTitle}</span>
-              <div style="font-size:11px;color:#15803d;margin-top:2px">🛡️ Chế độ Anti-ban kích hoạt: Giãn cách 45s - 90s/tin</div>
+              <div style="font-size:11px;color:#15803d;margin-top:2px">Hàng gửi Zalo đang hoạt động</div>
             </div>
           </div>
           <div style="display:flex;gap:8px">

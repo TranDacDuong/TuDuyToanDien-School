@@ -19,7 +19,7 @@ class GatewayQueue {
     if (this.busy) return;
     this.busy = true;
     try {
-      const batch = [...this.pending].sort((a, b) => Number(b[1].action === 'finish') - Number(a[1].action === 'finish'));
+      const batch = [...this.pending].sort((a, b) => Number(b[1].action.startsWith('finish')) - Number(a[1].action.startsWith('finish')));
       let processed = 0;
       for (const [key, payload] of batch) {
         if (payload.retryAt > this.now()) continue;
