@@ -951,7 +951,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   .ops-link { width: 100%; min-height: 44px; }
 }
 </style>
-<script src="visual-effects.js?v=20260602-mindup1" defer></script>
+<script src="visual-effects.js?v=20261007-clean1" defer></script>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0f1f3d">
 <meta name="mobile-web-app-capable" content="yes">
@@ -959,6 +959,8 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 <meta name="apple-mobile-web-app-title" content="MindUp">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <script src="pwa.js?v=20260721-android-install1" defer></script>
+<link rel="stylesheet" href="mindup-ui.css?v=20261006-1">
+<script defer src="mindup-ui.js?v=20261006-1"></script>
 </head>
 <body>
 <div id="mindupEntrySplash" class="mindup-entry-splash" aria-hidden="true">
@@ -975,7 +977,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 <div id="sidebarOverlay" onclick="closeSidebar()"></div>
 
 <aside id="sidebar">
-  <div class="logo">Tư Duy Toàn Diện</div>
+  <div class="logo"><img src="assets/mindup-logo-round.png" width="40" height="40" alt="MindUp">MindUp <span class="brand-caption">Tư Duy Toàn Diện</span></div>
 
   <div id="userBox">
     <img id="userAvatar" src="default-avatar.png">

@@ -1,0 +1,173 @@
+/* Shared presentation only. Keep visibility, permissions and workflow selectors intact. */
+html:root {
+  --navy: #142d50;
+  --navy-mid: #23466e;
+  --navy-light: #215b9c;
+  --blue: #1768cc;
+  --blue-bg: #eaf3ff;
+  --green: #16805a;
+  --green-bg: #e6f7ee;
+  --red: #ca3b4d;
+  --red-bg: #fff0f2;
+  --gold: #a16a08;
+  --gold-light: #f5c44b;
+  --gold-pale: #fff7de;
+  --gold-border: #eed898;
+  --cream: #f5f7fa;
+  --surface: #f0f4f8;
+  --border: #dce4ed;
+  --ink: #24364d;
+  --ink-mid: #53667d;
+  --ink-light: #697d94;
+  --font-display: 'DM Sans', system-ui, sans-serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+  --radius: 8px;
+  --radius-lg: 8px;
+  --shadow: 0 3px 12px rgb(20 45 80 / 6%);
+  --shadow-lg: 0 14px 40px rgb(20 45 80 / 14%);
+}
+html, html body, body.academic-page {
+  background: #f5f7fa !important;
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+html body::before, .mindup-petal-layer, .mindup-effect-settings { display: none !important; }
+*, *::before, *::after { letter-spacing: 0 !important; }
+h1, h2, h3, .page-title, .page-hero-title, .overview-card-title {
+  font-family: var(--font-display) !important;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.page-hero, .page-hd, .page-head, .ops-hero,
+body:not(.mindup-page-profile) .hero {
+  background: transparent !important;
+  color: var(--navy) !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 12px 0 22px !important;
+  margin-bottom: 20px;
+  animation: none !important;
+}
+.page-hero h1, .page-hd h1, .page-head h1, .ops-hero h1, .hero h1,
+.page-hero-title { color: var(--navy) !important; font-size: 1.6rem !important; }
+.page-hero p, .page-hd p, .page-head p, .ops-hero p, .hero p,
+.page-hero-subtitle { color: var(--ink-mid) !important; }
+.page-hero::before, .page-hero::after, .ops-hero::before, .ops-hero::after { display: none !important; }
+.page-hd #userInfo, .page-hero .count, .page-head .count { color: var(--ink-mid) !important; }
+.surface-toolbar, .academic-page .toolbar, .academic-page .filter-bar,
+.filter-bar, .filterBar, .tabs.surface-toolbar, .task-toolbar, .ledger-toolbar {
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--border) !important;
+  padding: 12px 0 !important;
+  gap: 10px;
+}
+.card, .surface-card, .academic-card, .academic-page .card,
+.academic-page .course-card, .academic-page .class-card, .academic-page .exam-card,
+.academic-page .exam-box, .academic-page .detail-card,
+.table-shell, .table-wrap, .screen-panel, .box, .hero-kpi,
+.permission-group, .permission-panel, .post-card {
+  border-radius: 8px !important;
+  box-shadow: var(--shadow) !important;
+  border-color: var(--border) !important;
+}
+.kpi-card, .config-card, .projection-card, .summary-card, .chat-sidebar,
+.chat-main, .permission-user-card { border-radius: 8px !important; box-shadow: var(--shadow) !important; }
+.surface-card, .screen-panel, .box, .overview-card,
+.surface-toolbar, .table-shell, .hero-kpi { transform: none !important; }
+.surface-card:hover, .screen-panel:hover, .box:hover, .overview-card:hover,
+.surface-toolbar:hover, .table-shell:hover { box-shadow: none !important; }
+.academic-page .card, .academic-page .course-card, .academic-page .class-card,
+.academic-page .exam-card { background: #fff !important; }
+.academic-page .cover, .academic-page .card-cover { background: #23466e !important; }
+.academic-page .exam-card, .academic-page .class-card { border-left-color: #49ac91 !important; }
+.academic-page .exam-card.official { border-left-color: var(--red) !important; }
+.btn, button { font-family: var(--font-body); transition: background-color .16s, border-color .16s, box-shadow .16s, transform .16s; }
+.btn { border-radius: 6px !important; min-height: 34px; white-space: normal; }
+.btn-primary { background: var(--blue) !important; color: #fff !important; box-shadow: none !important; }
+.btn-primary:hover:not(:disabled) { background: #1254a5 !important; }
+.btn-outline { background: #fff !important; border-color: #ccd8e5 !important; color: var(--navy) !important; }
+.btn-gold { background: #f5c44b !important; color: #493706 !important; }
+button:disabled { cursor: not-allowed; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, [tabindex]:focus-visible { outline: 3px solid #5b9bea; outline-offset: 3px; }
+input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea {
+  border-radius: 6px !important;
+  border-color: #ccd8e5;
+  font-family: var(--font-body);
+}
+input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb(23 104 204 / 10%); }
+.table thead tr, table thead, table thead tr { background: #eef3f9 !important; }
+.table thead th, table thead th { color: var(--navy) !important; font-family: var(--font-body) !important; }
+.table tbody tr:hover { background: #f0f7ff; }
+.badge { border-radius: 5px; }
+.popup-card, .modal-card, .sheet-modal-card, .academic-page .modal-card,
+.academic-page .popup-card, .academic-page .sheet-modal-card { border-radius: 8px !important; box-shadow: var(--shadow-lg); }
+.empty-state { border-radius: 8px; background: #fff; }
+.mindup-page-home .empty { border-radius: 8px; background: #fff; border-color: var(--border); }
+.mindup-page-dashboard #sidebar { background: #fff !important; box-shadow: 4px 0 22px rgb(20 45 80 / 7%); }
+.mindup-page-dashboard #userBox { background: #f3f6fa; box-shadow: none; border-radius: 8px; }
+.mindup-page-dashboard #menu li { min-height: 42px; border-radius: 6px; }
+.mindup-page-dashboard #menu li.active { background: #eaf3ff; color: #175daa; box-shadow: inset 3px 0 #1768cc; }
+.mindup-page-dashboard .logo { font-family: var(--font-body); }
+.mindup-page-dashboard .logo::before { display: none; }
+.mindup-page-dashboard .logo { flex-wrap: wrap; gap: 8px; font-size: 1.2rem; }
+.brand-caption { flex-basis: 100%; font-size: .72rem; font-weight: 500; color: var(--ink-mid); padding-left: 48px; }
+.mindup-page-home .overview-side > .overview-card:first-child { border: 1px solid var(--border) !important; border-top: 3px solid #f5c44b !important; border-radius: 8px !important; background: #fff; box-shadow: none !important; padding: 0 18px; animation: none !important; }
+.mindup-page-home .overview-side > .overview-card:first-child .overview-card-head { background: #fff; }
+.trial-submit { background: var(--blue) !important; box-shadow: none !important; border-radius: 6px; animation: none !important; }
+.mindup-page-tuition .toolbar button { border-radius: 6px; box-shadow: none; }
+.mindup-page-tuition .toolbar button:not(.secondary) { background: var(--blue); }
+.mindup-page-dashboard #mobileNav { background: #fff; }
+.mindup-page-dashboard #mobileNav .mobile-nav-item.active { background: #eaf3ff; color: #175daa; }
+.mindup-page-home .feed-wrap { max-width: 1280px; padding-top: 24px; }
+.home-tabs { border-radius: 6px; box-shadow: none; padding: 4px; }
+.home-tab-btn { border-radius: 4px; }
+.home-tab-btn.active { background: var(--navy); box-shadow: none; }
+.overview-card { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.overview-card-head { background: transparent; padding: 14px 0; position: relative; }
+.overview-card-head::before { display: none; }
+.overview-card-title, .overview-card-sub { padding-left: 0; }
+.overview-card-body { padding: 18px 0; }
+.teacher-card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+.teacher-grid { gap: 16px; }
+.mindup-welcome { margin-bottom: 24px; }
+.mindup-welcome img { display: block; width: 100%; height: auto; aspect-ratio: 4400 / 1759; }
+.mindup-welcome-copy { position: relative; z-index: 1; color: #fff; }
+.mindup-welcome h1 { color: #fff; font-size: 2rem; margin: 0 0 8px; }
+.mindup-welcome p { color: #fff; margin: 0; font-size: 1rem; }
+.mindup-page-messages .panel, .mindup-page-messages .chat-panel { border-radius: 8px !important; box-shadow: none !important; }
+.mindup-page-game .mode-card, .mindup-page-game .game-card { border-radius: 8px; border-top: 3px solid #49ac91; }
+.mindup-page-tuition .toolbar, .mindup-page-income .toolbar { border-radius: 0 !important; box-shadow: none !important; background: transparent !important; }
+@media (prefers-reduced-motion: no-preference) {
+  .mindup-welcome-copy { animation: mindup-reveal .3s ease-out both; }
+  .popup-card, .modal-card { animation: mindup-reveal .18s ease-out; }
+  .teacher-card:hover, .course-card:hover, .class-card:hover { transform: translateY(-2px); border-color: #73a7d8 !important; }
+  .btn:active:not(:disabled) { transform: translateY(1px); }
+  [role=progressbar], .progress-bar-fill { transition: width .3s ease; }
+  .loading-text, .loading { animation: mindup-loading 1.4s ease-in-out infinite; }
+}
+@keyframes mindup-reveal { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes mindup-loading { 50% { opacity: .65; } }
+@media (max-width: 640px) {
+  .income-container, .header-section, .controls-row { min-width: 0; max-width: 100%; }
+  .mindup-page-income .header-section { flex-wrap: wrap; }
+  .mindup-page-income .controls-row { flex-wrap: wrap; }
+  .mindup-page-income .projection-form { grid-template-columns: minmax(0, 1fr); }
+  .mindup-page-income .projection-form > * { min-width: 0; max-width: 100%; }
+  .mindup-page-income .details-grid, .mindup-page-income .admin-staff-income { grid-template-columns: minmax(0, 1fr); }
+  .mindup-page-income .details-grid > *, .mindup-page-income .details-card { min-width: 0; max-width: 100%; }
+  .mindup-page-income .table-responsive { overflow-x: auto; max-width: 100%; }
+  .page-hero, .page-hd, .page-head, .ops-hero { padding: 8px 0 16px !important; }
+  .page-hero h1, .page-hd h1, .hero h1 { font-size: 1.35rem !important; }
+  .mindup-welcome { margin-bottom: 16px; }
+  .mindup-welcome h1 { font-size: 1.65rem; }
+  .mindup-page-home .feed-wrap { padding: 14px 14px 40px; }
+  .overview-section.active { grid-template-columns: minmax(0, 1fr); }
+  .teacher-grid { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+  .toolbar > *, .surface-toolbar > * { min-width: 0; max-width: 100%; }
+}
