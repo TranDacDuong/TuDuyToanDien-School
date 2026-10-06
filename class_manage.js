@@ -1833,14 +1833,9 @@
       btn.className="att-btn "+s.cls; btn.textContent=s.text;
       btn.setAttribute("onclick","cvToggleAtt('"+classId+"','"+studentId+"','"+date+"','"+next+"','"+sid+"','"+Number(sessionNo || 1)+"')");
     }
-    // === MINDUP BOT: Gửi tin nhắn tự động sau điểm danh ===
+    // Absence notifications are published by the server after the lesson ends.
     try {
-      if(next === 'absent' && date === todayInVietnam()) {
-        const { error: notifyError } = await sb.rpc('notify_explicit_attendance_absence', {
-          p_class_id: classId, p_student_id: studentId, p_date: date
-        });
-        if(notifyError) throw notifyError;
-      } else if(next === 'present' && window.MindUpBot && date === todayStr()
+      if(next === 'present' && window.MindUpBot && date === todayStr()
           && hasAttendanceSessionEnded(date, sid, sessionNo)) {
         const className = _cachedClass?.name || _cachedClass?.class_name || 'lớp học';
         const sessionId = `${classId}_${date}_${sessionNo||1}`;
@@ -1848,7 +1843,6 @@
       }
     } catch(botErr){
       console.warn('[MindUpBot] Lỗi gửi tin nhắn điểm danh:',botErr);
-      if(next === 'absent') alert("Đã lưu điểm danh, nhưng chưa tạo được thông báo vắng học: " + (botErr.message || "Lỗi kết nối."));
     }
     // === END MINDUP BOT ===
   };

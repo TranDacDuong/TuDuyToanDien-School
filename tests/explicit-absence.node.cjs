@@ -33,17 +33,15 @@ function harness({ ended = true, saveError, rpcError, rpcThrows = false, withBot
   return { window, calls, alerts, button, attendanceMap };
 }
 
-test('deliberate saved absence today calls RPC during class or after, without a bot dependency', async () => {
+test('deliberate absence only saves attendance, before or after class', async () => {
   for (const [withBot, ended] of [[false, false], [true, false], [false, true], [true, true]]) {
     const h = harness({ withBot, ended });
     assert.equal(h.calls.length, 0);
     await h.window.cvToggleAtt('class', 'student', '2026-10-06', 'present', '268', 2);
-    assert.equal(h.calls.length, 2);
+    assert.equal(h.calls.length, 1);
     assert.equal(h.calls[0].type, 'save');
     assert.equal(h.calls[0].rows[0].status_overridden, true);
     assert.equal(h.calls[0].rows[0].status, 'absent');
-    assert.equal(h.calls[1].name, 'notify_explicit_attendance_absence');
-    assert.deepEqual(JSON.parse(JSON.stringify(h.calls[1].args)), { p_class_id: 'class', p_student_id: 'student', p_date: '2026-10-06' });
     assert.equal(h.alerts.length, 0);
   }
 });
@@ -75,19 +73,19 @@ test('absence today uses the Vietnam date across UTC midnight boundaries', () =>
   }
 });
 
-test('RPC errors warn the user while keeping saved absence; never fall back', async () => {
+test('absence saving has no notification RPC dependency', async () => {
   for (const options of [{ rpcError: { message: 'permission denied' } }, { rpcThrows: true }]) {
     const h = harness({ ...options, withBot: true });
     await h.window.cvToggleAtt('class', 'student', '2026-10-06', 'present', 268, 2);
-    assert.equal(h.calls.length, 2);
+    assert.equal(h.calls.length, 1);
     assert.equal(h.attendanceMap['student_2026-10-06_268'], 'absent');
     assert.equal(h.button.disabled, false);
-    assert.match(h.alerts[0], /Đã lưu điểm danh, nhưng chưa tạo được thông báo vắng học/);
+    assert.equal(h.alerts.length, 0);
   }
 });
 
-test('notification RPC has only one callsite, inside the deliberate toggle', () => {
-  assert.equal((source.match(/rpc\('notify_explicit_attendance_absence'/g) || []).length, 1);
+test('attendance clicks never call the immediate notification RPC', () => {
+  assert.equal((source.match(/rpc\('notify_explicit_attendance_absence'/g) || []).length, 0);
   assert.doesNotMatch(source, /\.sendAbsentMessage\(|\.sendConsecutiveAbsentMessage\(/);
 });
 
