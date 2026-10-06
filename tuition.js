@@ -2482,7 +2482,8 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     zaloDurableProgress = {
       total, finalized, reviewed, percent: total ? Math.round(reviewed * 100 / total) : 0,
       counts, startedAt: newest.created_at, latestActivity,
-      batchId: newest.batch_id || null
+      batchId: newest.batch_id || null,
+      paused: campaignRows.some(row => row.dispatch_paused && !["sent", "cancelled"].includes(row.status))
     };
   }
 
@@ -2545,7 +2546,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     try {
       if (studentIds.length && /^20\d{2}-(0[1-9]|1[0-2])$/.test(ym)) {
         const { data, error } = await getSb().from("zalo_tuition_deliveries")
-          .select("student_id,parent_id,batch_id,attempt_no,status,created_at,updated_at,error_message,qr_sent_at")
+          .select("student_id,parent_id,batch_id,attempt_no,status,created_at,updated_at,error_message,qr_sent_at,dispatch_paused")
           .in("student_id", studentIds).eq("month", `${ym}-01`).order("attempt_no");
         if (error) throw error;
         (data || []).forEach(row => {
@@ -2581,6 +2582,27 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       console.warn("Không tải được lịch sử Zalo học phí:", error);
     }
   }
+
+  let batchControlBusy = false;
+  window.controlZaloTuitionBatch = async function (action) {
+    if (!hasTuitionPermission("tuition.zalo_queue.manage", false) || batchControlBusy || !zaloDurableProgress?.batchId) return;
+    const batchId = zaloDurableProgress.batchId;
+    const uncertain = zaloDurableProgress.counts.uncertain > 0;
+    if (action === "retry" && !confirm(uncertain
+      ? "Đợt này có tin chưa xác nhận. Chỉ thử lại sau khi kiểm tra trên Zalo rằng các tin này chưa đến phụ huynh. Tiếp tục? Những tin đã gửi thành công sẽ không gửi lại."
+      : "Thử lại các tin chưa gửi được trong đợt này? Những tin đã gửi thành công sẽ không gửi lại.")) return;
+    batchControlBusy = true;
+    updateZaloDynamicStatus();
+    try {
+      const { data, error } = await getSb().rpc("control_zalo_tuition_batch", {
+        p_batch_id: batchId, p_action: action, p_confirm_uncertain: action === "retry" && uncertain
+      });
+      if (error) throw error;
+      if (action === "retry" && !data) alert("Không có tin đủ điều kiện thử lại. Kiểm tra học phí đã thay đổi hoặc số lần thử lại.");
+      await loadZaloTuitionHistory();
+    } catch (error) { alert("Không thực hiện được: " + error.message); }
+    finally { batchControlBusy = false; updateZaloDynamicStatus(); }
+  };
 
   window.resumeZaloParentAutomation = async function () {
     if (!confirm("Tiếp tục kiểm tra/kết bạn Zalo tự động sau khi đã xem lại giới hạn tài khoản?")) return;
@@ -2974,15 +2996,16 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     const durable = zaloDurableProgress;
     if (durable?.total) {
       const c = durable.counts;
-      const active = durable.finalized < durable.total;
+      const active = c.sent + c.cancelled < durable.total;
       const started = durable.startedAt ? new Date(durable.startedAt).toLocaleString("vi-VN") : "";
       const latestActivity = durable.latestActivity
         ? new Date(durable.latestActivity).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
       const remainingMinutes = Math.ceil(c.checking * 67.5 / 60);
-      const blocked = active && (!isConnected || zaloAutomationState?.paused);
+      const blocked = active && (!isConnected || zaloAutomationState?.paused || durable.paused);
       const deliveryPercent = Math.round(durable.finalized * 100 / durable.total);
       const blockedReason = !isConnected
         ? "Chưa kết nối Zalo. Hàng chờ được giữ nguyên; hãy đăng nhập Zalo để tiếp tục gửi."
+        : durable.paused ? "Đợt gửi đã tạm dừng. Hàng chờ được giữ nguyên."
         : "Zalo đang tạm dừng tự động. Hàng chờ được giữ nguyên.";
       liveProgressHtml = `
         <div style="background:#0f1f3d;color:#fff;border-radius:8px;padding:16px 18px;margin-bottom:16px;box-shadow:0 10px 24px rgba(15,31,61,.16)">
@@ -3009,6 +3032,11 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
             ${c.cancelled ? `<span style="color:#cbd5e1">Đã hủy: <b>${c.cancelled}</b></span>` : ""}
           </div>
           ${c.uncertain ? '<div role="status" style="font-size:11px;color:#fde68a;margin-top:10px">Có tin chưa được Zalo xác nhận. Cần kiểm tra cuộc trò chuyện trước khi gửi lại để tránh trùng.</div>' : ""}
+          ${durable.batchId ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px">
+            <button type="button" style="border:1px solid #94a3b8;border-radius:6px;padding:7px 14px;background:#fff;color:#0f1f3d;cursor:pointer" onclick="controlZaloTuitionBatch('pause')" ${batchControlBusy || durable.paused ? "disabled" : ""}>Dừng</button>
+            <button type="button" style="border:1px solid #93c5fd;border-radius:6px;padding:7px 14px;background:#dbeafe;color:#0f1f3d;cursor:pointer" onclick="controlZaloTuitionBatch('retry')" ${batchControlBusy || c.processing || c.sent === durable.total ? "disabled" : ""}>Thử lại</button>
+            ${batchControlBusy ? '<span role="status">Đang xử lý…</span>' : ""}
+          </div>` : ""}
           ${c.checking && !blocked ? `<div style="font-size:11px;color:#cbd5e1;margin-top:10px">Còn ${c.checking} hồ sơ cần kiểm tra, dự kiến khoảng ${remainingMinutes} phút với nhịp chống chặn 45-90 giây.</div>` : ""}
         </div>`;
     } else if (isRunning || isPaused) {

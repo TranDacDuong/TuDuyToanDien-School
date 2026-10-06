@@ -12,7 +12,7 @@ test('durable queue distinguishes delivery progress from reviewed profiles', () 
 });
 
 test('disconnected or paused workers show a blocked queue and no time estimate', () => {
-  assert.match(source, /blocked = active && \(!isConnected \|\| zaloAutomationState\?\.paused\)/);
+  assert.match(source, /blocked = active && \(!isConnected \|\| zaloAutomationState\?\.paused \|\| durable.paused\)/);
   assert.match(source, /Chưa kết nối Zalo\. Hàng chờ được giữ nguyên/);
   assert.match(source, /c.checking && !blocked/);
 });

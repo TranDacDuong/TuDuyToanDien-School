@@ -319,7 +319,7 @@ async function sendQueuedTuition(job) {
     const sent = await zaloApi.sendMessage(job.content, job.zalo_uid);
     externalId = `${job.zalo_uid}:${requireSendAcknowledgement(sent)}`;
   } catch (error) {
-    if (isZaloLimitError(error) || error.deliveryUncertain) {
+    if (isZaloLimitError(error)) {
       await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
     }
     const detail = String(error?.message || error);
@@ -342,7 +342,7 @@ async function sendQueuedTuition(job) {
       qrSent = true;
     } catch (error) {
       qrError = `Đã gửi nội dung, ảnh QR lỗi: ${error?.message || error}`;
-      if (isZaloLimitError(error) || error.deliveryUncertain) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
+      if (isZaloLimitError(error)) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
     } finally {
       try { fs.unlinkSync(tempFile); } catch (_) {}
     }
