@@ -613,7 +613,11 @@ if (!fs.existsSync(SESSION_DIR)) {
 }
 try {
   for (const payload of JSON.parse(fs.readFileSync(INCOMING_FILE, 'utf8'))) {
-    if (payload?.action === 'finish' && payload.jobId) pendingIncoming.set(`ack:${payload.jobId}`, payload);
+    if (['finish', 'finishTuition', 'finishTuitionReceipt'].includes(payload?.action) && payload.jobId) {
+      // Replaying a durable acknowledgement cannot send another Zalo message.
+      payload.retryAt = 0;
+      pendingIncoming.set(`ack:${payload.action}:${payload.jobId}`, payload);
+    }
     else if (payload?.externalId) pendingIncoming.set(payload.externalId, payload);
   }
 } catch (error) {
@@ -1166,7 +1170,7 @@ app.get('/api/status', (req, res) => {
     },
     historySync: { ...historyController.state, listenerConnected, verifiedParents: verifiedParentCount,
       pendingUpload: [...pendingIncoming.values()].filter(p => p.action === 'syncMessage').length,
-      pendingAcknowledgements: [...pendingIncoming.values()].filter(p => p.action === 'finish').length,
+      pendingAcknowledgements: [...pendingIncoming.values()].filter(p => p.action.startsWith('finish')).length,
       rejectedMessages: rejectedIncoming.length, lastUploadError: incomingQueue.lastError },
     config: botConfig
   });
