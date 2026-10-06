@@ -8,6 +8,7 @@ const { writeJsonAtomic } = require('./sync-store');
 const { prepareScoreMessageMedia } = require('./score-message-media');
 const { createScheduler } = require('./tuition-reminder-scheduler');
 const { requireSendAcknowledgement } = require('./send-acknowledgement');
+const { retryPreparation, sendTuitionQr } = require('./tuition-qr');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -315,7 +316,7 @@ async function checkQueuedParent(job) {
 async function sendQueuedTuition(job) {
   let qrSent = false;
   let externalId = null;
-  try {
+  if (job.content !== null) try {
     const sent = await zaloApi.sendMessage(job.content, job.zalo_uid);
     externalId = `${job.zalo_uid}:${requireSendAcknowledgement(sent)}`;
   } catch (error) {
@@ -331,17 +332,19 @@ async function sendQueuedTuition(job) {
   let qrError = null;
   if (job.qr_url) {
     const tempFile = path.join(__dirname, 'temp', `tuition_${job.job_id}.png`);
+    let qrStage = 'Giữ lượt gửi QR';
     try {
-      const { sendAt } = await gatewayRequest({ action: 'reserveDispatchSlot', pacing: dispatchPacing() });
+      const { sendAt } = await retryPreparation(() => gatewayRequest({ action: 'reserveDispatchSlot', pacing: dispatchPacing() }));
       if (!sendAt) throw new Error('Hàng gửi Zalo đang tạm dừng');
       await sleep(Math.max(0, new Date(sendAt).getTime() - Date.now()));
       fs.mkdirSync(path.dirname(tempFile), { recursive: true });
-      await downloadImage(job.qr_url, tempFile);
-      const sent = await zaloApi.sendMessage({ msg: 'Mã QR thanh toán học phí MindUp', attachments: [tempFile] }, job.zalo_uid);
-      requireSendAcknowledgement(sent, 1);
+      qrStage = 'Tải ảnh từ VietQR';
+      await retryPreparation(() => downloadImage(job.qr_url, tempFile));
+      qrStage = 'Gửi ảnh QR qua Zalo';
+      await sendTuitionQr(zaloApi, job.zalo_uid, tempFile);
       qrSent = true;
     } catch (error) {
-      qrError = `Đã gửi nội dung, ảnh QR lỗi: ${error?.message || error}`;
+      qrError = `Đã gửi nội dung, ảnh QR lỗi (${error.qrStage || qrStage}): ${error?.message || error}${error?.cause?.code ? ' [' + error.cause.code + ']' : ''}`;
       if (isZaloLimitError(error)) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
     } finally {
       try { fs.unlinkSync(tempFile); } catch (_) {}

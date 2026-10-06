@@ -2529,7 +2529,8 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
         const time = entry.updated_at ? new Date(entry.updated_at).toLocaleString("vi-VN") : "";
         const warning = entry.error_message ? ` · ${esc(entry.error_message)}` : "";
         return `<div style="font-size:11px;color:#475569;line-height:1.45" title="${esc(entry.error_message || "")}">
-          Lần ${entry.attempt_no}: <b>${zaloTuitionStatusLabel(entry.status)}</b> · ${esc(time)}${warning}</div>`;
+          Lần ${entry.attempt_no}: <b>${zaloTuitionStatusLabel(entry.status)}</b> · ${esc(time)}${warning}
+          ${entry.status === "sent" && !entry.qr_sent_at && entry.error_message && entry.id ? `<button type="button" onclick="requestTuitionQrRepair('${entry.id}')" style="margin:4px 0">Gửi bù QR</button>` : ""}</div>`;
       }).join("");
       const action = isZaloTuitionItemEligible(item)
         ? `<button type="button" onclick="sendSingleZaloTest(${idx})" style="margin-top:5px;border:1px solid #cbd5e1;background:#fff;padding:4px 8px;border-radius:6px;cursor:pointer">Xếp hàng</button>` : "";
@@ -2546,7 +2547,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     try {
       if (studentIds.length && /^20\d{2}-(0[1-9]|1[0-2])$/.test(ym)) {
         const { data, error } = await getSb().from("zalo_tuition_deliveries")
-          .select("student_id,parent_id,batch_id,attempt_no,status,created_at,updated_at,error_message,qr_sent_at,dispatch_paused")
+          .select("id,student_id,parent_id,batch_id,attempt_no,status,created_at,updated_at,error_message,qr_sent_at,dispatch_paused")
           .in("student_id", studentIds).eq("month", `${ym}-01`).order("attempt_no");
         if (error) throw error;
         (data || []).forEach(row => {
@@ -2584,6 +2585,19 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
   }
 
   let batchControlBusy = false;
+  window.requestTuitionQrRepair = async function (jobId) {
+    if (!hasTuitionPermission("tuition.zalo_queue.manage", false) || batchControlBusy) return;
+    if (!confirm("Chỉ gửi bù ảnh QR, không gửi lại nội dung học phí. Bạn đã kiểm tra rằng phụ huynh chưa nhận được ảnh QR?")) return;
+    batchControlBusy = true;
+    try {
+      const { data, error } = await getSb().rpc("request_tuition_qr_repair", { p_job_id: jobId });
+      if (error) throw error;
+      if (!data) alert("Không thể gửi bù: QR đã gửi hoặc học phí đã thay đổi.");
+      else alert("Đã xếp hàng gửi bù QR. Nội dung học phí không gửi lại.");
+      await loadZaloTuitionHistory();
+    } catch (error) { alert("Không gửi bù được: " + error.message); }
+    finally { batchControlBusy = false; }
+  };
   window.controlZaloTuitionBatch = async function (action) {
     if (!hasTuitionPermission("tuition.zalo_queue.manage", false) || batchControlBusy || !zaloDurableProgress?.batchId) return;
     const batchId = zaloDurableProgress.batchId;
