@@ -666,6 +666,28 @@ let userInfo = null;
 let zaloInstance = null;
 let zaloApi = null;
 let isLoggingIn = false;
+let automaticLoginEnabled = true;
+let disconnectedSince = 0;
+let nextSessionRetryAt = 0;
+let sessionRetryCount = 0;
+
+async function recoverSavedSession() {
+  if (!automaticLoginEnabled || isLoggingIn || gatewayBusy || listenerConnected
+      || !fs.existsSync(SESSION_FILE) || botStatus === 'qr_ready') {
+    if (listenerConnected) {
+      disconnectedSince = 0;
+      sessionRetryCount = 0;
+      nextSessionRetryAt = 0;
+    }
+    return;
+  }
+  const now = Date.now();
+  if (!disconnectedSince) disconnectedSince = now;
+  if (now - disconnectedSince < 60000 || now < nextSessionRetryAt) return;
+  nextSessionRetryAt = now + Math.min(300000, 30000 * (2 ** Math.min(sessionRetryCount++, 4)));
+  console.log('[ZaloBot] Restoring saved session after connection loss.');
+  await initZaloClient();
+}
 
 let friendPhoneMap = new Map();
 let friendUserIdSet = new Set();
@@ -771,7 +793,7 @@ function sleep(ms) {
 // Zalo Connection Management
 // ==========================================
 async function initZaloClient(forceQr = false) {
-  if (isLoggingIn && !forceQr) return;
+  if (isLoggingIn) return;
   isLoggingIn = true;
 
   try {
@@ -829,8 +851,13 @@ async function initZaloClient(forceQr = false) {
           }
         }
       } catch (sessErr) {
-        console.warn("[ZaloBot] Session cũ hết hạn hoặc không hợp lệ, sẽ quét QR mới:", sessErr?.message || sessErr);
+        console.warn('[ZaloBot] Cannot restore saved session; will retry without deleting it:', sessErr?.message || sessErr);
       }
+      // A failed request does not prove that the saved credentials have expired.
+      // QR replacement is explicit, so temporary outages cannot discard recovery.
+      botStatus = 'disconnected';
+      isLoggingIn = false;
+      return;
     }
 
     // 2. Start QR login flow
@@ -1211,6 +1238,7 @@ app.get('/api/qr', (req, res) => {
 // 3. Yêu cầu tạo mới QR đăng nhập
 app.post('/api/login-qr', async (req, res) => {
   try {
+    automaticLoginEnabled = true;
     initZaloClient(true).catch(console.error);
     res.json({ success: true, message: 'Đang khởi tạo mã QR...' });
   } catch (err) {
@@ -1221,6 +1249,7 @@ app.post('/api/login-qr', async (req, res) => {
 // 4. Đăng xuất Zalo
 app.post('/api/logout', (req, res) => {
   try {
+    automaticLoginEnabled = false;
     try { zaloApi?.listener?.stop(); } catch (_) {}
     gatewayListening = false;
     gatewayListenerApi = null;
@@ -1304,4 +1333,5 @@ app.listen(PORT, HOST, () => {
   }, 500).unref();
   setInterval(flushIncoming, 10000).unref();
   setInterval(refreshSyncLinks, 60000).unref();
+  setInterval(() => recoverSavedSession().catch(console.error), 10000).unref();
 });
