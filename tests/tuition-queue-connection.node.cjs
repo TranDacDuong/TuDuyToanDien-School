@@ -16,3 +16,9 @@ test('disconnected or paused workers show a blocked queue and no time estimate',
   assert.match(source, /Chưa kết nối Zalo\. Hàng chờ được giữ nguyên/);
   assert.match(source, /c.checking && !blocked/);
 });
+
+test('unconfirmed sends remain distinct from definite failures', () => {
+  assert.match(source, /Lỗi: <b>\$\{c.failed\}/);
+  assert.match(source, /Chưa xác nhận: <b>\$\{c.uncertain\}/);
+  assert.match(source, /trước khi gửi lại để tránh trùng/);
+});

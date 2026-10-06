@@ -7,6 +7,7 @@ const { GatewayQueue, HistorySync } = require('./message-sync');
 const { writeJsonAtomic } = require('./sync-store');
 const { prepareScoreMessageMedia } = require('./score-message-media');
 const { createScheduler } = require('./tuition-reminder-scheduler');
+const { requireSendAcknowledgement } = require('./send-acknowledgement');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -126,12 +127,11 @@ async function syncGatewayOutbox() {
       if (media.errors.length) throw new Error('Không tạo được ảnh bảng điểm/phổ điểm; chưa gửi tin');
       const text = media.text.replace(/__(ACTION|EVALUATION)__[\s\S]*$/, '').trim();
       const sent = await zaloApi.sendMessage(media.attachments.length ? { msg: text, attachments: media.attachments } : text, job.zalo_uid);
-      const messageId = sent?.message?.msgId;
-      if (messageId == null) throw new Error('Zalo returned no message id; verify delivery before retrying');
+      const messageId = requireSendAcknowledgement(sent, media.attachments.length);
       acknowledgement = { action: 'finish', jobId: job.job_id, status: 'sent',
         externalId: `${job.zalo_uid}:${messageId}` };
     } catch (error) {
-      if (isZaloLimitError(error)) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
+      if (isZaloLimitError(error) || error.deliveryUncertain) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
       await acknowledgeDispatch({ action: 'finish', jobId: job.job_id,
         status: isUncertainSendError(error) || /no message id/.test(String(error?.message)) ? 'uncertain' : 'failed',
         error: String(error?.message || error) });
@@ -153,10 +153,9 @@ async function sendQueuedAutomaticTuition(job) {
       const sent = await zaloApi.sendMessage(part.kind === 'text' ? part.content : {
         msg: 'Mã QR thanh toán học phí MindUp', attachments: [prepared.file]
       }, uid);
-      if (sent?.message?.msgId == null) throw new Error('Zalo returned no message id');
-      return `${uid}:${sent.message.msgId}`;
+      return `${uid}:${requireSendAcknowledgement(sent, part.kind === 'text' ? 0 : 1)}`;
     } catch (error) {
-      if (isZaloLimitError(error)) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
+      if (isZaloLimitError(error) || error.deliveryUncertain) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
       throw error;
     }
   }, async (part, claimed, index) => {
@@ -318,10 +317,9 @@ async function sendQueuedTuition(job) {
   let externalId = null;
   try {
     const sent = await zaloApi.sendMessage(job.content, job.zalo_uid);
-    if (sent?.message?.msgId == null) throw new Error('Zalo returned no message id; verify delivery before retrying');
-    externalId = `${job.zalo_uid}:${sent.message.msgId}`;
+    externalId = `${job.zalo_uid}:${requireSendAcknowledgement(sent)}`;
   } catch (error) {
-    if (isZaloLimitError(error)) {
+    if (isZaloLimitError(error) || error.deliveryUncertain) {
       await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
     }
     const detail = String(error?.message || error);
@@ -340,11 +338,11 @@ async function sendQueuedTuition(job) {
       fs.mkdirSync(path.dirname(tempFile), { recursive: true });
       await downloadImage(job.qr_url, tempFile);
       const sent = await zaloApi.sendMessage({ msg: 'Mã QR thanh toán học phí MindUp', attachments: [tempFile] }, job.zalo_uid);
-      if (sent?.message?.msgId == null) throw new Error('Zalo returned no QR message id');
+      requireSendAcknowledgement(sent, 1);
       qrSent = true;
     } catch (error) {
       qrError = `Đã gửi nội dung, ảnh QR lỗi: ${error?.message || error}`;
-      if (isZaloLimitError(error)) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
+      if (isZaloLimitError(error) || error.deliveryUncertain) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
     } finally {
       try { fs.unlinkSync(tempFile); } catch (_) {}
     }
@@ -357,10 +355,9 @@ async function sendQueuedTuitionReceipt(job) {
   let externalId = null;
   try {
     const sent = await zaloApi.sendMessage(job.content, job.zalo_uid);
-    if (sent?.message?.msgId == null) throw new Error('Zalo returned no message id; verify delivery before retrying');
-    externalId = `${job.zalo_uid}:${sent.message.msgId}`;
+    externalId = `${job.zalo_uid}:${requireSendAcknowledgement(sent)}`;
   } catch (error) {
-    if (isZaloLimitError(error)) {
+    if (isZaloLimitError(error) || error.deliveryUncertain) {
       await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
     }
     const detail = String(error?.message || error);

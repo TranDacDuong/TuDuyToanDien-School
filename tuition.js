@@ -3004,9 +3004,11 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
             <span style="color:#fde68a">Sẵn sàng: <b>${c.ready}</b></span>
             <span style="color:#e2e8f0">Chờ kiểm tra Zalo: <b>${c.checking}</b></span>
             <span style="color:#fdba74">Chờ thử lại: <b>${c.retry}</b></span>
-            <span style="color:#fca5a5">Lỗi: <b>${c.failed + c.uncertain}</b></span>
+            <span style="color:#fca5a5">Lỗi: <b>${c.failed}</b></span>
+            ${c.uncertain ? `<span style="color:#fde68a">Chưa xác nhận: <b>${c.uncertain}</b></span>` : ""}
             ${c.cancelled ? `<span style="color:#cbd5e1">Đã hủy: <b>${c.cancelled}</b></span>` : ""}
           </div>
+          ${c.uncertain ? '<div role="status" style="font-size:11px;color:#fde68a;margin-top:10px">Có tin chưa được Zalo xác nhận. Cần kiểm tra cuộc trò chuyện trước khi gửi lại để tránh trùng.</div>' : ""}
           ${c.checking && !blocked ? `<div style="font-size:11px;color:#cbd5e1;margin-top:10px">Còn ${c.checking} hồ sơ cần kiểm tra, dự kiến khoảng ${remainingMinutes} phút với nhịp chống chặn 45-90 giây.</div>` : ""}
         </div>`;
     } else if (isRunning || isPaused) {
