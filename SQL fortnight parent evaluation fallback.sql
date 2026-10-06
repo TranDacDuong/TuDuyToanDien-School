@@ -1,4 +1,4 @@
--- REVIEW ONLY. Apply after parent notification policy and evaluation Zalo bridge.
+-- Apply after parent notification policy and evaluation Zalo bridge.
 -- No migration-time dispatch, historical attendance writes, or message backfill.
 BEGIN;
 

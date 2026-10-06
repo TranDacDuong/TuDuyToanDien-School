@@ -8,6 +8,7 @@ const root = path.join(__dirname, '..');
 const source = file => fs.readFileSync(path.join(root, file), 'utf8');
 const quiet = { warn() {}, error() {}, log() {} };
 function load(file, window = {}, extras = {}) {
+  window.crypto ||= require('node:crypto').webcrypto;
   const ctx = vm.createContext({ window, console: quiet, ...extras });
   vm.runInContext(source(file), ctx);
   return window;
@@ -146,7 +147,10 @@ test('single and batch evaluation publications target parents and recover failed
         if (!cards.has(id)) cards.set(id, { value: '', classList: { add() {} }, querySelectorAll: () => [] });
         return cards.get(id);
       } };
-      const window = { sb: { from: () => ({ update: value => ({ eq: async () => { updates.push(value); return {}; } }) }) },
+      const window = { sb: { from: () => ({ update: value => ({ eq: () => {
+        updates.push(value);
+        return Object.assign(Promise.resolve({}), { select: () => ({ single: async () => ({ data: { updated_at: '2026-10-06T00:00:02Z' } }) }) });
+      } }) }) },
         NotificationHelper: { createBulkNotifications: async (rows, options) => {
           assert.equal(options.requireInsert, true);
           notifications.push(...rows);
@@ -184,10 +188,16 @@ test('actual helper and manual persistence never save sent when insert fails or 
     const alerts = [];
     const cards = new Map();
     const document = { getElementById(id) {
-      if (!cards.has(id)) cards.set(id, { value: '', classList: { add() {} }, querySelectorAll: () => [] });
+      if (!cards.has(id)) cards.set(id, { value: id.startsWith('se-message-') ? 'Review' : '', classList: { add() {} }, querySelectorAll: () => [] });
       return cards.get(id);
     } };
-    const sb = { auth: { getUser: async () => ({ data: { user: { id: scenario === 'self-skipped' ? 'p1' : 'teacher' } } }) }, from(table) {
+    const sb = { auth: { getUser: async () => ({ data: { user: { id: scenario === 'self-skipped' ? 'p1' : 'teacher' } } }) },
+      rpc: async (name, args) => {
+        assert.equal(name, 'save_session_evaluation_draft');
+        Object.assign(stored, { id: 'evaluation', state: 'draft', updated_at: '2026-10-06T00:00:00Z', final_message: args.p_message });
+        writes.push({ ...stored });
+        return { data: { ...stored } };
+      }, from(table) {
       let payload;
       const q = {
         select() { return q; }, in() { return q; }, is: async () => ({ data: [] }),
@@ -195,13 +205,19 @@ test('actual helper and manual persistence never save sent when insert fails or 
         single: async () => { Object.assign(stored, payload, { id: 'evaluation' }); writes.push({ ...payload }); return { data: { ...stored } }; },
         delete() { return q; },
         update(data) { payload = data; return q; },
-        eq: async () => {
+        eq: () => {
+          const result = (async () => {
           if (payload) {
             if (scenario === 'rollback-error') throw new Error('rollback offline');
             if (scenario === 'publish-state-error' && payload.state === 'sent') return { error: new Error('state write failed') };
-            Object.assign(stored, payload); writes.push({ ...payload });
+            Object.assign(stored, payload, { updated_at: '2026-10-06T00:00:02Z' }); writes.push({ ...payload });
           }
           return {};
+          })();
+          return Object.assign(result, { select: () => ({ single: async () => {
+            const response = await result;
+            return response.error ? response : { data: { updated_at: stored.updated_at } };
+          } }) });
         },
         insert: async () => ({ error: table === 'notifications' && ['insert-error', 'rls-error', 'rollback-error'].includes(scenario)
           ? { code: scenario === 'rls-error' ? '42501' : 'DB_ERROR', message: 'notification insert failed' } : null })

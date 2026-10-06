@@ -368,6 +368,10 @@
     updateProgress();
   }
 
+  function pendingEvaluationLabel(evaluation) {
+    return evaluation.statusIds.size ? "⏳ Sẽ công bố sau tan học 30p" : "Không gửi (Bình thường)";
+  }
+
   function studentCard(student) {
     const evaluation = state.evaluations.get(student.id);
     const sent = evaluation.state === "sent";
@@ -385,7 +389,7 @@
       stateLabel = "Công bố lỗi";
       stateClass = "failed";
     } else if (hasStatuses) {
-      stateLabel = "⏳ Sẽ công bố sau tan học 30p";
+      stateLabel = pendingEvaluationLabel(evaluation);
       stateClass = "pending";
     }
 
@@ -492,6 +496,7 @@
   });
 
   const autoSaveTimers = new Map();
+  const draftSaveQueues = new Map();
 
   function cancelAutoSaveDraft(studentId) {
     if (autoSaveTimers.has(studentId)) {
@@ -502,6 +507,8 @@
 
   function scheduleAutoSaveDraft(studentId) {
     cancelAutoSaveDraft(studentId);
+    const evaluation = state.evaluations.get(studentId);
+    const revision = evaluation?.localRevision || 0;
     const badge = document.getElementById(`se-state-${studentId}`);
     if (badge) {
       badge.className = "se-state saving";
@@ -511,13 +518,16 @@
       autoSaveTimers.delete(studentId);
       try {
         await persist(studentId, "draft");
+        if (state.evaluations.get(studentId) !== evaluation || (evaluation.localRevision || 0) !== revision || evaluation.state === "sent") return;
         const b = document.getElementById(`se-state-${studentId}`);
         if (b) {
-          b.className = "se-state pending";
-          b.textContent = "⏳ Sẽ công bố sau tan học 30p";
+          const selected = state.evaluations.get(studentId)?.statusIds.size > 0;
+          b.className = selected ? "se-state pending" : "se-state normal";
+          b.textContent = selected ? pendingEvaluationLabel(evaluation) : "Không gửi (Bình thường)";
         }
         updateProgress();
       } catch (err) {
+        if (state.evaluations.get(studentId) !== evaluation || (evaluation.localRevision || 0) !== revision || evaluation.state === "sent") return;
         console.error("Auto save draft error:", err);
         const b = document.getElementById(`se-state-${studentId}`);
         if (b) {
@@ -527,27 +537,6 @@
       }
     }, 600);
     autoSaveTimers.set(studentId, timer);
-  }
-
-  async function deleteDraftIfEmpty(studentId) {
-    cancelAutoSaveDraft(studentId);
-    const evaluation = state.evaluations.get(studentId);
-    if (!evaluation) return;
-    if (evaluation.id && evaluation.state === "draft") {
-      try {
-        const client = getSb();
-        await client.from("session_student_evaluations").delete().eq("id", evaluation.id).eq("state", "draft");
-        evaluation.id = null;
-      } catch (err) {
-        console.warn("Delete draft error:", err);
-      }
-    }
-    const badge = document.getElementById(`se-state-${studentId}`);
-    if (badge) {
-      badge.className = "se-state normal";
-      badge.textContent = "Không gửi (Bình thường)";
-    }
-    updateProgress();
   }
 
   function generateMessageForStudent(studentId, { silent = false } = {}) {
@@ -592,6 +581,7 @@
       attentionPhrases: attentionDescriptions.map(item => applyVariables(item.content, student)),
       closing: applyVariables(closing.content, student),
     });
+    evaluation.localRevision = (evaluation.localRevision || 0) + 1;
     evaluation.template_selection = {
       format_version: 2,
       positive_descriptions: positiveDescriptions.map(item => item.id).filter(Boolean),
@@ -619,28 +609,19 @@
 
     const student = state.students.find(item => item.id === studentId);
 
-    if (evaluation.statusIds.size > 0) {
-      generateMessageForStudent(studentId, { silent: true });
-      const cardEl = document.getElementById(`se-card-${studentId}`);
-      if (cardEl) {
-        cardEl.outerHTML = studentCard(student);
-      }
-      scheduleAutoSaveDraft(studentId);
-    } else {
-      evaluation.message = "";
-      evaluation.template_selection = {};
-      const cardEl = document.getElementById(`se-card-${studentId}`);
-      if (cardEl) {
-        cardEl.outerHTML = studentCard(student);
-      }
-      deleteDraftIfEmpty(studentId);
-    }
+    evaluation.message = "";
+    evaluation.template_selection = {};
+    evaluation.localRevision = (evaluation.localRevision || 0) + 1;
+    const cardEl = document.getElementById(`se-card-${studentId}`);
+    if (cardEl) cardEl.outerHTML = studentCard(student);
+    scheduleAutoSaveDraft(studentId);
   };
 
   window.updateSessionEvaluationMessage = function (studentId, value) {
     const evaluation = state.evaluations.get(studentId);
-    if (evaluation) {
+    if (evaluation && evaluation.state !== "sent") {
       evaluation.message = value;
+      evaluation.localRevision = (evaluation.localRevision || 0) + 1;
       if (evaluation.statusIds && evaluation.statusIds.size > 0 && evaluation.state !== "sent") {
         scheduleAutoSaveDraft(studentId);
       }
@@ -708,43 +689,50 @@
     if (!evaluation) throw new Error("Không tìm thấy đánh giá.");
     if (evaluation.state === "sent") throw new Error("Thông báo nhận xét này đã được công bố.");
     const textarea = document.getElementById(`se-message-${studentId}`);
-    if (textarea && textarea.value.trim()) evaluation.message = textarea.value.trim();
-    if (!evaluation.message && evaluation.statusIds.size) window.generateSessionEvaluationMessage(studentId);
-    if (!evaluation.message) throw new Error("Chưa có nội dung nhận xét.");
-
-    const client = getSb();
-    const payload = {
-      class_session_id: state.sessionId,
-      class_id: state.session.class_id,
-      student_id: studentId,
-      evaluator_id: state.evaluator.id,
-      generated_message: evaluation.message,
-      final_message: evaluation.message,
-      template_selection: evaluation.template_selection || {},
-      state: nextState,
-      sent_at: nextState === "sent" ? new Date().toISOString() : null,
-    };
-    const { data, error } = await client
-      .from("session_student_evaluations")
-      .upsert(payload, { onConflict: "class_session_id,student_id" })
-      .select()
-      .single();
-    if (error) throw error;
-    const { error: deleteError } = await client
-      .from("session_student_evaluation_statuses")
-      .delete()
-      .eq("evaluation_id", data.id);
-    if (deleteError) throw deleteError;
-    if (evaluation.statusIds.size) {
-      const statusRows = [...evaluation.statusIds].map(statusId => ({
-        evaluation_id: data.id,
-        status_id: statusId,
-      }));
-      const { error: statusError } = await client.from("session_student_evaluation_statuses").insert(statusRows);
-      if (statusError) throw statusError;
+    if (textarea) evaluation.message = textarea.value.trim();
+    if (nextState !== "draft") throw new Error("Chỉ lưu bản nháp qua thao tác này.");
+    const sessionId = state.sessionId;
+    const revision = evaluation.localRevision || 0;
+    const statusIds = [...evaluation.statusIds];
+    const message = String(evaluation.message || "").trim() || null;
+    const selection = { ...(evaluation.template_selection || {}) };
+    const signature = JSON.stringify([sessionId, statusIds, message, selection]);
+    let request = evaluation.pendingDraftRequest;
+    if (!request || request.signature !== signature) {
+      request = { signature, id: (window.crypto || globalThis.crypto).randomUUID() };
+      evaluation.pendingDraftRequest = request;
     }
-    Object.assign(evaluation, data, { message: data.final_message, statusIds: new Set(evaluation.statusIds) });
-    return data;
+    const key = `${sessionId}:${studentId}`;
+    const previous = draftSaveQueues.get(key) || Promise.resolve();
+    const saving = previous.catch(() => {}).then(async () => {
+      if (state.sessionId !== sessionId || state.evaluations.get(studentId) !== evaluation) throw new Error("Buổi học đã thay đổi.");
+      if (evaluation.state === "sent") throw new Error("Thông báo nhận xét này đã được công bố.");
+      if (!("expectedUpdatedAt" in request)) request.expectedUpdatedAt = evaluation.updated_at || null;
+      const { data, error } = await getSb().rpc("save_session_evaluation_draft", {
+        p_class_session_id: sessionId,
+        p_student_id: studentId,
+        p_status_ids: statusIds,
+        p_message: message,
+        p_template_selection: selection,
+        p_request_id: request.id,
+        p_expected_updated_at: request.expectedUpdatedAt,
+      });
+      if (error) throw error;
+      const saved = Array.isArray(data) ? data[0] : data;
+      if (!saved?.id || !saved.updated_at || saved.state !== "draft") throw new Error("Không xác nhận được bản nháp đã lưu.");
+      if (evaluation.pendingDraftRequest === request) delete evaluation.pendingDraftRequest;
+      if (state.sessionId === sessionId && state.evaluations.get(studentId) === evaluation) {
+        evaluation.id = saved.id;
+        evaluation.updated_at = saved.updated_at;
+        if ((evaluation.localRevision || 0) === revision && evaluation.state !== "sent") {
+          Object.assign(evaluation, saved, { message: message || "", template_selection: selection, statusIds: new Set(statusIds) });
+        }
+      }
+      return saved;
+    });
+    draftSaveQueues.set(key, saving);
+    try { return await saving; }
+    finally { if (draftSaveQueues.get(key) === saving) draftSaveQueues.delete(key); }
   }
 
   async function createEvaluationNotifications(items) {
@@ -770,9 +758,11 @@
     evaluation.sent_at = null;
     if (!evaluation.id) return;
     try {
-      const { error } = await getSb().from("session_student_evaluations")
-        .update({ state: "failed", sent_at: null }).eq("id", evaluation.id);
+      const { data, error } = await getSb().from("session_student_evaluations")
+        .update({ state: "failed", sent_at: null }).eq("id", evaluation.id)
+        .select("updated_at").single();
       if (error) throw error;
+      if (data?.updated_at) evaluation.updated_at = data.updated_at;
     } catch (error) {
       console.error("Chưa lưu được trạng thái công bố lỗi:", error);
     }
@@ -811,6 +801,7 @@
 
         const parentIds = [...new Set(state.parentIds.get(student.id) || [])];
         if (!parentIds.length) throw new Error("Học sinh chưa được liên kết với tài khoản phụ huynh.");
+        cancelAutoSaveDraft(student.id);
         const saved = await persist(student.id, "draft");
         if (parentIds.length) {
           await createEvaluationNotifications(parentIds.map(parentId => ({
@@ -865,7 +856,7 @@
     try {
       setBusy(studentId, true);
       await persist(studentId, "draft");
-      if (!silent) alert("Đã lưu bản nháp (sẽ tự động công bố thông báo sau tan học 30 phút).");
+      if (!silent) alert("Đã lưu bản nháp. " + (state.evaluations.get(studentId)?.statusIds.size ? pendingEvaluationLabel(state.evaluations.get(studentId)) : "Không tạo thông báo."));
       const student = state.students.find(item => item.id === studentId);
       document.getElementById(`se-card-${studentId}`).outerHTML = studentCard(student);
       updateProgress();
@@ -905,6 +896,9 @@
       setBusy(studentId, true);
       const parentIds = [...new Set(state.parentIds.get(studentId) || [])];
       if (!parentIds.length) throw new Error("Học sinh chưa được liên kết với tài khoản phụ huynh.");
+      cancelAutoSaveDraft(studentId);
+      if (!evaluation.message && evaluation.statusIds.size) generateMessageForStudent(studentId, { silent: true });
+      if (!evaluation.message) throw new Error("Chưa có nội dung nhận xét.");
       const saved = await persist(studentId, "draft");
       await createEvaluationNotifications(parentIds.map(parentId => ({
         userId: parentId,

@@ -7,6 +7,7 @@ Apply these migrations in order, after the existing unified Zalo dispatcher:
 1. `SQL parent notification policy.sql`
 2. `SQL automatic evaluation Zalo bridge.sql`
 3. `SQL parent automatic tuition reminders.sql`
+4. `SQL fortnight parent evaluation fallback.sql`
 
 Deploy `supabase/functions/zalo-gateway/index.ts`, install bot dependencies with
 `npm ci` in this directory, and restart the bot. Preserve its session directory.
@@ -28,6 +29,16 @@ Score images use Playwright Chromium (Microsoft Edge on Windows).
 - Receipt confirmations share the dispatcher with direct messages and reminders.
 - Session evaluations publish after 30 minutes; the cron scan runs every
   10 minutes. Publication and acknowledged Zalo delivery are separate states.
+- Status buttons save a draft without generating or opening a message. The
+  dispatch job composes it from active evaluation templates; manual previews
+  and edits remain available.
+- Half-month evaluations cover days 1-15 and 16 through the month's last day.
+  They reuse the knowledge-good and focused status templates with the lead-in
+  "Trong 2 tuan vua qua". They do not add attendance or session status records.
+  Only attended students without a delivered evaluation qualify; unresolved
+  individual evaluations suppress automatic positive summaries.
+  Scans start after the half-month closes, between 07:00 and 22:00 Vietnam time.
+  The installation cutoff prevents historical backlog dispatch.
 - Deliberately saved absences notify parents; attendance backfills do not.
 - Score tables/distributions are PNGs with other students anonymized.
 - Historical messages remain intact. Obsolete template rows remain disabled
