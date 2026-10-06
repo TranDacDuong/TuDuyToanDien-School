@@ -13,7 +13,7 @@ test('one tuition notification button opens the existing guarded Zalo modal', ()
   assert.doesNotMatch(html, /id="notifyTuitionBtn"|Nhắc Zalo Tự Động/);
   assert.match(html, /id="zaloReminderBtn"[^>]*data-permission="tuition\.zalo_queue\.manage"[^>]*onclick="openZaloReminderModal\(\)"[^>]*>Thông báo học phí<\/button>/);
   assert.match(html, />Thông báo học phí qua Zalo<\/h3>/);
-  assert.match(html, /tuition\.js\?v=20261006-outstanding-status1/);
+  assert.match(html, /tuition\.js\?v=20261006-zalo-queue-connection1/);
 });
 
 test('legacy entry point delegates without notifying students', async () => {
