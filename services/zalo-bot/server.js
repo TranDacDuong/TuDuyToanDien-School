@@ -34,6 +34,7 @@ app.use((req, res, next) => {
 app.use(express.json());
 let gatewayBusy = false;
 let gatewayListening = false;
+let gatewayListenerApi = null;
 let nextGatewaySendAt = 0;
 let nextParentPollAt = 0;
 let nextManualParentPollAt = 0;
@@ -476,7 +477,12 @@ async function refreshSyncLinks() {
 }
 
 function startGatewayListener() {
-  if (!zaloApi || gatewayListening || !GATEWAY_URL || !GATEWAY_TOKEN) return;
+  if (!zaloApi || !GATEWAY_URL || !GATEWAY_TOKEN) return;
+  if (gatewayListening && gatewayListenerApi === zaloApi) return;
+  try { gatewayListenerApi?.listener?.stop(); } catch (_) {}
+  gatewayListenerApi = zaloApi;
+  listenerConnected = false;
+  historyController.connection(false);
   gatewayListening = true;
   const listeningApi = zaloApi;
   zaloApi.listener.on('connected', () => {
@@ -1213,6 +1219,7 @@ app.post('/api/logout', (req, res) => {
   try {
     try { zaloApi?.listener?.stop(); } catch (_) {}
     gatewayListening = false;
+    gatewayListenerApi = null;
     listenerConnected = false;
     historyController.connection(false);
     if (fs.existsSync(SESSION_FILE)) {
