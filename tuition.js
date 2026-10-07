@@ -3040,7 +3040,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     const durable = zaloDurableProgress;
     if (durable?.total) {
       const c = durable.counts;
-      const active = c.sent + c.cancelled < durable.total;
+      const active = durable.finalized < durable.total;
       const started = durable.startedAt ? new Date(durable.startedAt).toLocaleString("vi-VN") : "";
       const latestActivity = durable.latestActivity
         ? new Date(durable.latestActivity).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
@@ -3070,8 +3070,8 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
             <span style="color:#7dd3fc">Đang gửi: <b>${c.processing}</b></span>
             <span style="color:#fde68a">Sẵn sàng: <b>${c.ready}</b></span>
             <span style="color:#e2e8f0">Chờ kiểm tra Zalo: <b>${c.checking}</b></span>
-            <span style="color:#fdba74">Chờ thử lại: <b>${c.retry}</b></span>
-            <span style="color:#fca5a5">Lỗi: <b>${c.failed}</b></span>
+            <span style="color:#fdba74">Chờ kết quả kiểm tra: <b>${c.retry}</b></span>
+            <span style="color:#fca5a5">Lỗi / đã bỏ qua: <b>${c.failed}</b></span>
             ${c.uncertain ? `<span style="color:#fde68a">Chưa xác nhận: <b>${c.uncertain}</b></span>` : ""}
             ${c.cancelled ? `<span style="color:#cbd5e1">Đã hủy: <b>${c.cancelled}</b></span>` : ""}
           </div>
