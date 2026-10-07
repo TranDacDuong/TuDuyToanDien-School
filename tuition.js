@@ -2483,7 +2483,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       total, finalized, reviewed, percent: total ? Math.round(reviewed * 100 / total) : 0,
       counts, startedAt: newest.created_at, latestActivity,
       batchId: newest.batch_id || null,
-      paused: campaignRows.some(row => row.dispatch_paused && !["sent", "cancelled"].includes(row.status))
+      paused: campaignRows.some(row => row.dispatch_paused && !["sent", "cancelled", "uncertain"].includes(row.status))
     };
   }
 
@@ -3045,9 +3045,10 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
             ${c.uncertain ? `<span style="color:#fde68a">Chưa xác nhận: <b>${c.uncertain}</b></span>` : ""}
             ${c.cancelled ? `<span style="color:#cbd5e1">Đã hủy: <b>${c.cancelled}</b></span>` : ""}
           </div>
-          ${c.uncertain ? '<div role="status" style="font-size:11px;color:#fde68a;margin-top:10px">Có tin chưa được Zalo xác nhận. Cần kiểm tra cuộc trò chuyện trước khi gửi lại để tránh trùng.</div>' : ""}
+          ${c.uncertain ? '<div role="status" style="font-size:11px;color:#fde68a;margin-top:10px">Tin chưa được Zalo xác nhận được giữ riêng; các tin khác vẫn tiếp tục gửi. Kiểm tra cuộc trò chuyện trước khi thử lại tin chưa xác nhận để tránh trùng.</div>' : ""}
           ${durable.batchId ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px">
             <button type="button" style="border:1px solid #94a3b8;border-radius:6px;padding:7px 14px;background:#fff;color:#0f1f3d;cursor:pointer" onclick="controlZaloTuitionBatch('pause')" ${batchControlBusy || durable.paused ? "disabled" : ""}>Dừng</button>
+            ${durable.paused ? `<button type="button" style="border:1px solid #93c5fd;border-radius:6px;padding:7px 14px;background:#dbeafe;color:#0f1f3d;cursor:pointer" onclick="controlZaloTuitionBatch('resume')" ${batchControlBusy ? "disabled" : ""}>Tiếp tục</button>` : ""}
             <button type="button" style="border:1px solid #93c5fd;border-radius:6px;padding:7px 14px;background:#dbeafe;color:#0f1f3d;cursor:pointer" onclick="controlZaloTuitionBatch('retry')" ${batchControlBusy || c.processing || c.sent === durable.total ? "disabled" : ""}>Thử lại</button>
             ${batchControlBusy ? '<span role="status">Đang xử lý…</span>' : ""}
           </div>` : ""}

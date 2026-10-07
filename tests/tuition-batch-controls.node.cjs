@@ -34,3 +34,12 @@ test('tuition-only pause and pacing preserve immediate teacher messaging', () =>
   assert.match(sql, /NEW.status='uncertain' AND OLD.status IS DISTINCT FROM NEW.status/);
   assert.doesNotMatch(sql, /UPDATE public.zalo_outbox|SET paused=true/);
 });
+
+test('uncertainty no longer pauses peers and resume never requeues ambiguous sends', () => {
+  const migration = fs.readFileSync(path.join(root, 'SQL tuition isolate uncertain deliveries.sql'), 'utf8');
+  assert.match(migration, /DROP TRIGGER IF EXISTS pause_uncertain_tuition_batch/);
+  assert.match(migration, /status NOT IN \(''sent'',''cancelled'',''uncertain''\)/);
+  assert.doesNotMatch(migration, /SET status=/);
+  assert.match(ui, /controlZaloTuitionBatch\('resume'\)/);
+  assert.match(ui, /!\["sent", "cancelled", "uncertain"\]\.includes\(row.status\)/);
+});
