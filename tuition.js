@@ -2303,6 +2303,23 @@ Nhập số tiền hoàn lại (>0):`,
   let zaloParentContactStatus = new Map();
   let zaloAutomationState = null;
   let zaloDurableProgress = null;
+  let zaloArrears = new Map();
+
+  async function loadZaloArrears() {
+    const { data, error } = await getSb().rpc("list_tuition_arrears", { p_month: ymToDate(monthPicker.value) });
+    if (error) throw error;
+    zaloArrears = new Map((data || []).map(row => [row.student_id, row]));
+  }
+
+  function applyZaloDebts(item, debts) {
+    item.debts = debts.filter(debt => Number(debt.remaining) > 0);
+    item.remaining = window.TuitionArrears.total(item.debts);
+    item.due = item.remaining > 0;
+    if (item.due && /^(0\d{9}|84\d{9})$/.test(item.studentPhone)) {
+      item.transferMemo = window.TuitionArrears.memo(item.studentName, item.studentPhone, item.debts);
+      item.qrUrl = `https://img.vietqr.io/image/${STATIC_BANK_INFO.bankCode}-${STATIC_BANK_INFO.account}-compact2.png?amount=${item.remaining}&addInfo=${encodeURIComponent(item.transferMemo)}`;
+    }
+  }
   let zaloHistoryFetchedAt = 0;
   let zaloQueueBusy = false;
 
@@ -2340,6 +2357,8 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     const modal = document.getElementById("zaloReminderModal");
     if (!modal) return;
     modal.style.display = "flex";
+    try { await loadZaloArrears(); }
+    catch (error) { modal.style.display = "none"; alert("Không tải được công nợ: " + error.message); return; }
     prepareZaloCampaignList();
     renderZaloInitialLayout(); // Render khung và danh sách học sinh DUY NHẤT 1 LẦN
     await loadZaloTuitionHistory();
@@ -2351,7 +2370,13 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
 
   function prepareZaloCampaignList() {
     const ym = monthPicker?.value || "";
-    const rows = (currentRows || []).map(group => {
+    const groups = [...(currentRows || [])];
+    const visibleIds = new Set(groups.map(group => group.studentId));
+    zaloArrears.forEach(row => {
+      if (!visibleIds.has(row.student_id)) groups.push({ studentId: row.student_id, studentName: row.student_name,
+        phone: row.phone, amount: Number(row.current_amount_due || 0), parentContacts: row.parents, classes: [], ym });
+    });
+    const rows = groups.map(group => {
       const amountPaid = paymentMap[group.studentId]?.amount_paid || 0;
       const status = getStatus(group.amount, amountPaid);
       return { group, due: status === "outstanding" };
@@ -2388,7 +2413,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
         studentPhone
       );
 
-      return {
+      const item = {
         studentId: group.studentId,
         parentId: parent?.id || null,
         studentName: group.studentName,
@@ -2407,6 +2432,11 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
           && /^(0\d{9}|84\d{9})$/.test(studentPhone)),
         due
       };
+      const prior = (zaloArrears.get(item.studentId)?.debts || []).filter(debt => debt.month.slice(0, 7) < ym);
+      const current = remaining > 0 ? [{ payment_id: paymentMap[item.studentId]?.id || null, month: ymToDate(ym), remaining }] : [];
+      applyZaloDebts(item, [...prior, ...current]);
+      item.selected = item.due && Boolean(parent?.id && /^(0\d{9}|84\d{9})$/.test(cleanPhone) && /^(0\d{9}|84\d{9})$/.test(studentPhone));
+      return item;
     });
   }
 
@@ -2769,31 +2799,31 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
           locked_snapshot: existing.locked_snapshot || null,
         };
       });
-      const { data: savedPayments, error: saveError } = await getSb()
-        .from("tuition_payments")
-        .upsert(paymentRows, { onConflict: "student_id,month" })
-        .select();
+      const { data: savedPayments, error: saveError } = await getSb().rpc("save_tuition_notice_amounts", {
+        p_month: ymToDate(ym), p_rows: paymentRows
+      });
       if (saveError) throw saveError;
       (savedPayments || []).forEach(payment => { paymentMap[payment.student_id] = payment; });
 
+      await loadZaloArrears();
+      items.forEach(item => applyZaloDebts(item, zaloArrears.get(item.studentId)?.debts || []));
       const template = document.getElementById("zaloTemplateText")?.value || DEFAULT_ZALO_TEMPLATE;
       const batchId = crypto.randomUUID();
       const payload = items.map(item => {
         const paymentId = paymentMap[item.studentId]?.id || "";
-        item.transferMemo = buildTransferContent(item.studentName, ym, item.studentId, paymentId, item.studentPhone);
-        item.qrUrl = buildPaymentQrUrl(item.studentName, ym, item.remaining, item.studentId, paymentId, item.studentPhone);
         return {
           request_key: crypto.randomUUID(), batch_id: batchId,
           student_id: item.studentId, parent_id: item.parentId,
-          content: fillZaloTemplate(template, item), qr_url: item.qrUrl, remaining: item.remaining
+          content: fillZaloTemplate(template, item), qr_url: item.qrUrl, remaining: item.remaining,
+          debts: item.debts, memo: item.transferMemo, encoded_memo: encodeURIComponent(item.transferMemo)
         };
       });
       let queuedCount = 0;
       let cancelledCount = 0;
       let processingCount = 0;
       if (replaceExisting) {
-        const { data, error } = await getSb().rpc("replace_zalo_tuition_deliveries_v2", {
-          p_month: ym, p_items: payload
+        const { data, error } = await getSb().rpc("queue_grouped_tuition", {
+          p_month: ymToDate(ym), p_items: payload, p_replace: true
         });
         if (error) throw error;
         queuedCount = Number(data?.queued) || 0;
@@ -2801,11 +2831,11 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
         processingCount = Number(data?.processing) || 0;
       } else {
         for (let start = 0; start < payload.length; start += 100) {
-          const { data, error } = await getSb().rpc("queue_zalo_tuition_deliveries_v2", {
-            p_month: ym, p_items: payload.slice(start, start + 100)
+          const { data, error } = await getSb().rpc("queue_grouped_tuition", {
+            p_month: ymToDate(ym), p_items: payload.slice(start, start + 100), p_replace: false
           });
           if (error) throw error;
-          queuedCount += Number(data) || 0;
+          queuedCount += Number(data?.queued) || 0;
         }
       }
       await loadZaloTuitionHistory();
@@ -2845,6 +2875,13 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
   function fillZaloTemplate(template, item) {
     const ym = monthPicker?.value || "";
     const [year, month] = ym ? ym.split("-") : ["2026", "09"];
+    const debtLines = (item.debts || []).map(debt => {
+      const [y, m] = debt.month.slice(0, 7).split("-");
+      return `• Tháng ${m}/${y}: còn thiếu ${fmt(debt.remaining)}đ`;
+    }).join("\n");
+    if (item.debts?.length > 1 || item.debts?.[0]?.month.slice(0, 7) !== ym) {
+      return `Trung tâm MindUp kính gửi Quý phụ huynh ${item.parentName || ""} thông báo học phí còn thiếu của em ${item.studentName}:\n\n${debtLines}\n\nTổng cần thanh toán: ${fmt(item.remaining)}đ.\nNgân hàng: ${STATIC_BANK_INFO.bankName}\nSố tài khoản: ${STATIC_BANK_INFO.account}\nNội dung chuyển khoản: ${item.transferMemo}\n\nQuý phụ huynh vui lòng quét ảnh QR đính kèm và giữ nguyên nội dung chuyển khoản. Tiền được thanh toán cho tháng cũ nhất trước. Trung tâm xin cảm ơn!`;
+    }
     return template
       .replaceAll("{TenHS}", item.studentName || "")
       .replaceAll("{TenPH}", item.parentName || "Quý phụ huynh")
@@ -2878,6 +2915,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
           <td style="padding:10px 8px">
             <div style="font-weight:700;color:#0f172a">${esc(item.studentName)}</div>
             <div style="font-size:11px;color:#64748b">${esc(item.className)} (${item.sessionsCount} buổi)</div>
+            <div style="font-size:11px;color:#475569">${(item.debts || []).map(debt => `${esc(debt.month.slice(5, 7))}/${esc(debt.month.slice(0, 4))}: ${fmt(debt.remaining)}đ`).join(" · ")}</div>
           </td>
           <td style="padding:10px 8px">
             ${parentBadge}

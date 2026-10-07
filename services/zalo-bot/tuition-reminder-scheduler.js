@@ -73,8 +73,12 @@ function buildPayload(candidate, month, bank) {
       .replace(/\u0111/g, 'd').replace(/\u0110/g, 'D').replace(/[^a-zA-Z0-9\s]/g, ' ')
       .trim().split(/\s+/).slice(-2).map(w => w[0].toUpperCase() + w.slice(1).toLowerCase()).join(' ');
     if (!ascii) throw new Error('Invalid transfer name');
-    const transfer = `SEVQR HP${month.slice(5)}${month.slice(2, 4)} ${ascii} ${phone(child.payment_phone).slice(-4)}`;
+    const transfer = child.transfer_memo || `SEVQR HP${month.slice(5)}${month.slice(2, 4)} ${ascii} ${phone(child.payment_phone).slice(-4)}`;
     lines.push(`${name}: còn cần thanh toán ${remaining.toLocaleString('vi-VN')} VNĐ`);
+    for (const debt of child.debts || []) {
+      const date = String(debt.month).slice(0, 7);
+      lines.push(`  • Tháng ${date.slice(5)}/${date.slice(0, 4)}: ${Number(debt.remaining).toLocaleString('vi-VN')} VNĐ`);
+    }
     qrs.push({ kind: 'qr', student_id: child.student_id, url:
       `https://img.vietqr.io/image/${bank.code}-${bank.account}-compact2.png?amount=${remaining}&addInfo=${encodeURIComponent(transfer)}` });
   }

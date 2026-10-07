@@ -47,6 +47,20 @@ test('group contains both names, separate exact-amount QRs and established SEVQR
   assert.throws(() => buildPayload({ children: [child(), child()] }, '2026-10', bank), /duplicate/);
   assert.throws(() => buildPayload(candidate, '2026-10', { code: '../bad', account: '1' }), /bank/);
 });
+test('arrears QR preserves registered multi-month memo and itemized balances', () => {
+  const debts = [
+    { month: '2026-08-01', remaining: 240000 },
+    { month: '2026-09-01', remaining: 360000 },
+    { month: '2026-10-01', remaining: 960000 }
+  ];
+  const transfer_memo = 'SEVQR HP0826 0926 1026 Gia Linh 2333';
+  const payload = buildPayload({ children: [{ ...child('x', 1560000), debts, transfer_memo }] }, '2026-10', bank);
+  const qr = new URL(payload.parts[1].url);
+  assert.equal(qr.searchParams.get('addInfo'), transfer_memo);
+  assert.equal(qr.searchParams.get('amount'), '1560000');
+  for (const month of ['08', '09', '10']) assert.ok(payload.content.includes(`Tháng ${month}/2026`));
+});
+
 test('tick retries use same persisted month/slot; lunar excluded day makes zero RPCs', async () => {
   const calls = [];
   let inserted = false;

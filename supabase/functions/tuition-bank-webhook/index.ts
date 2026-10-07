@@ -318,6 +318,22 @@ serve(async (req: Request) => {
         continue;
       }
 
+      // Registered bundles are reconciled atomically, oldest month first. Never
+      // allow a failed bundle lookup to fall through to the single-month parser.
+      let bundleResult: any;
+      try {
+        bundleResult = await fetchJson<any>("rpc/reconcile_tuition_bundle", {
+          method: "POST", body: JSON.stringify({ p_log_id: claimedLogs[0].id }),
+        });
+      } catch (err) {
+        console.error("Bundle reconciliation failed:", err);
+        results.push({ txId: item.txId, status: "failed" });
+        continue;
+      }
+      if (bundleResult?.handled) {
+        results.push({ txId: item.txId, ...bundleResult, amount: item.amount });
+        continue;
+      }
       const parsedInfos = extractTuitionParsedInfo(item.content);
       let matchedTuition: any = null;
 
