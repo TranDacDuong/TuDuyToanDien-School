@@ -75,14 +75,16 @@
     return `https://img.vietqr.io/image/${STATIC_BANK_INFO.bankCode}-${STATIC_BANK_INFO.account}-compact2.png?amount=${encodeURIComponent(finalAmount)}&addInfo=${encodeURIComponent(addInfo)}`;
   }
 
-  function buildPaymentQrBlock(studentName, ym, amount, studentId, paymentId = "", phone = "") {
+  function buildPaymentQrBlock(studentName, ym, amount, studentId, paymentId = "", phone = "", bundleMemo = "") {
     const finalAmount = Math.max(0, Math.round(Number(amount) || 0));
     if (!finalAmount) {
       return `<div class="qr-payment-card"><div class="qr-payment-text"><div class="qr-payment-title">Mã QR thanh toán</div><div class="qr-payment-note">Học phí đã được thanh toán đủ nên không cần tạo mã QR.</div></div></div>`;
     }
 
-    const qrUrl = buildPaymentQrUrl(studentName, ym, finalAmount, studentId, paymentId, phone);
-    const transferContent = buildTransferContent(studentName, ym, studentId, paymentId, phone);
+    const transferContent = bundleMemo || buildTransferContent(studentName, ym, studentId, paymentId, phone);
+    const qrUrl = bundleMemo
+      ? `https://img.vietqr.io/image/${STATIC_BANK_INFO.bankCode}-${STATIC_BANK_INFO.account}-compact2.png?amount=${finalAmount}&addInfo=${encodeURIComponent(bundleMemo)}`
+      : buildPaymentQrUrl(studentName, ym, finalAmount, studentId, paymentId, phone);
     if (!qrUrl || !transferContent) {
       return `<div class="qr-payment-card"><div class="qr-payment-text"><div class="qr-payment-title">Không thể tạo mã QR</div><div class="qr-payment-note">Học sinh đang thiếu SĐT hợp lệ. Vui lòng cập nhật SĐT học sinh trước khi gửi thông báo học phí.</div></div></div>`;
     }
@@ -96,7 +98,7 @@
           <div class="qr-payment-line"><span>Ngân hàng:</span><b>${STATIC_BANK_INFO.bankName}</b></div>
           <div class="qr-payment-line"><span>Số tài khoản:</span><b>${STATIC_BANK_INFO.account}</b></div>
           <div class="qr-payment-line"><span>Số tiền:</span><b>${fmt(finalAmount)}đ</b></div>
-          <div class="qr-payment-line"><span>Nội dung CK:</span><b>${transferContent}</b></div>
+          <div class="qr-payment-line"><span>Nội dung CK:</span><b>${esc(transferContent)}</b></div>
           <div class="qr-payment-note">Khi quét QR, ứng dụng ngân hàng sẽ tự điền sẵn số tiền và mã chuyển khoản để hệ thống tự động gạch nợ 24/7 trong vài giây.</div>
         </div>
       </div>
@@ -429,13 +431,13 @@
       || null;
   }
 
-  function buildTuitionDetailHtml(group) {
+  function buildTuitionDetailHtml(group, bundle) {
     const payment = group.payment || paymentMap[group.studentId];
     const amountPaid = payment?.amount_paid || 0;
     const status = getStatus(group.amount, amountPaid);
     const remaining = Math.max(0, group.amount - amountPaid);
     const overpaid = Math.max(0, amountPaid - group.amount);
-    const qrAmount = remaining > 0 ? remaining : 0;
+    const qrAmount = bundle ? Number(bundle.remaining) : remaining;
 
     return `
       <div class="tuition-payment-top">
@@ -463,9 +465,13 @@
               </div>` : ""}
             </div>` : ""}
             <div class="tuition-payment-number"><span>Ngày thu gần nhất</span><b>${fmtDate(payment?.paid_at)}</b></div>
+            ${bundle ? `<div class="tuition-payment-number"><span>Công nợ đến tháng ${esc(group.ym)}</span></div>
+              ${(bundle.debts || []).map(debt => `<div class="tuition-payment-number"><span>Tháng ${esc(debt.month.slice(5, 7))}/${esc(debt.month.slice(0, 4))}</span><b>${fmt(debt.remaining)}đ</b></div>`).join("")}
+              <div class="tuition-payment-number remaining"><span>Tổng còn thiếu các tháng</span><b>${fmt(qrAmount)}đ</b></div>` : ""}
           </div>
           <div>
-            ${buildPaymentQrBlock(group.studentName, group.ym, qrAmount, group.studentId, payment?.id || "", group.phone || group.rawPhone || group.parentContacts?.[0]?.phone || "")}
+            ${buildPaymentQrBlock(group.studentName, group.ym, qrAmount, group.studentId, payment?.id || "", group.phone || group.rawPhone || group.parentContacts?.[0]?.phone || "", bundle?.memo || "")}
+            ${bundle && qrAmount > 0 ? `<div class="qr-payment-note" style="margin-top:8px">QR thanh toán tổng công nợ. Tiền được phân bổ vào tháng cũ nhất trước.</div>` : ""}
             ${payment?.note ? `<div class="invoice-note" style="margin-top:12px">${payment.note}</div>` : ""}
           </div>
         </div>
@@ -1997,7 +2003,8 @@ Nhập số tiền hoàn lại (>0):`,
     updateLockButton();
   }
 
-  window.openTuitionDetail = function(studentId) {
+  let tuitionDetailRequest = 0;
+  window.openTuitionDetail = async function(studentId) {
     const group = getStudentGroup(studentId);
     if (!group) return;
 
@@ -2007,15 +2014,32 @@ Nhập số tiền hoàn lại (>0):`,
     if (!body || !title || !modal) return;
 
     title.textContent = `Chi tiết học phí - ${group.studentName}`;
-    body.innerHTML = buildTuitionDetailHtml(group);
+    const request = ++tuitionDetailRequest;
+    body.textContent = "Đang tải công nợ và mã QR…";
     body.scrollTop = 0;
     modal.classList.add("show");
     document.body.classList.add("tuition-modal-open");
     modal.querySelector(".modal-close")?.focus({ preventScroll: true });
+    try {
+      const { data, error } = await getSb().rpc("prepare_tuition_detail_bundle", {
+        p_student: studentId, p_month: ymToDate(group.ym), p_amount_due: group.amount
+      });
+      if (error) throw error;
+      if (!data || !Array.isArray(data.debts) || (Number(data.remaining) > 0 && !data.memo)) {
+        throw new Error("Dữ liệu công nợ chưa đầy đủ");
+      }
+      if (request !== tuitionDetailRequest || !modal.classList.contains("show")) return;
+      if (data?.payment) paymentMap[studentId] = data.payment;
+      body.innerHTML = buildTuitionDetailHtml({ ...group, payment: data.payment }, data);
+    } catch (error) {
+      if (request !== tuitionDetailRequest || !modal.classList.contains("show")) return;
+      body.innerHTML = `<div role="alert">Không tải được công nợ và QR tổng: ${esc(error.message)}. Vui lòng đóng và mở lại chi tiết.</div>`;
+    }
   };
 
   window.closeTuitionDetail = function(evt) {
     if (evt && evt.target !== evt.currentTarget) return;
+    tuitionDetailRequest++;
     document.getElementById("tuitionDetailModal")?.classList.remove("show");
     document.body.classList.remove("tuition-modal-open");
   };
