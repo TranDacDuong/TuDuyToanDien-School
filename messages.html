@@ -663,6 +663,50 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
 .eval-option.selected { background: #0f3c73; color: #fff; border-color: #0f3c73; }
 .eval-option.disabled { opacity: .7; cursor: default; }
 .eval-submitted { font-size: .82rem; color: #16a34a; font-weight: 600; margin-top: 6px; }
+/* Compact messaging layout, shared by the full page and embedded inbox. */
+body { background: #eef0f4; }
+.page { padding: 0; }
+.shell { gap: 0; height: 100dvh; grid-template-columns: 340px minmax(0, 1fr); }
+.panel { border-radius: 0; box-shadow: none; border: 0; }
+aside.panel { border-right: 1px solid #dce1e8; }
+.sidebar-head, .chat-head { padding: 16px 18px; background: #fff; }
+.sidebar-title, .chat-title { font-family: inherit; font-size: 1rem; font-weight: 700; }
+.chat-head-bar { min-width: 0; }
+.chat-title { overflow-wrap: anywhere; }
+.search-wrap { padding: 12px; }
+.search-input { border-radius: 6px; background: #f0f2f5; border-color: transparent; }
+.search-input:focus { background: #fff; border-color: #3488e5; }
+.friend-list { padding: 0; gap: 0; }
+.friend-card { position: relative; border: 0; border-radius: 0; padding: 14px 16px; gap: 12px; background: #fff; box-shadow: none; }
+.friend-card:hover { background: #f3f6fa; }
+.friend-card.active { background: #e4f0ff; border-color: transparent; }
+.friend-main { min-width: 0; }
+.friend-card .avatar { width: 48px; height: 48px; flex-shrink: 0; }
+.friend-card .name { font-size: .9rem; }
+.friend-card .preview { -webkit-line-clamp: 1; color: #65758a; }
+.friend-card .friend-time { font-size: .68rem; }
+.friend-card .friend-footer { margin-top: 3px; }
+.mindup-pinned::before { display: none; }
+.friend-list-actions { padding: 6px 12px; }
+.friend-list-action-btn { border-radius: 6px; }
+.message-list { background: #e9ebf0; padding: 20px; scrollbar-color: #b6c1cf #e9ebf0; }
+.bubble { border-radius: 7px; background: #fff; border-color: #dce1e8; box-shadow: 0 1px 1px rgba(20,40,70,.04); max-width: min(80%, 720px); }
+.message-row.mine .bubble { background: #e3f0ff; color: #23344d; border-color: #d4e3f4; }
+.bot-bubble { background: #fff !important; border-color: #dce1e8 !important; }
+.message-row.mine .bot-bubble { background: #e3f0ff !important; border-color: #d4e3f4 !important; }
+.bot-msg-label { color: #506b8f; letter-spacing: 0; }
+.real-sender-label, .message-row.mine .real-sender-label { color: #65758a; }
+.bubble-action-btn, .bot-bubble .bubble-action-btn { border-radius: 6px; background: #1768b8; border-color: #1768b8; }
+.composer { border-top: 1px solid #dce1e8; background: #fff; border-radius: 0; }
+.composer textarea { border-radius: 6px; background: #fff; }
+.composer .btn { border-radius: 6px; }
+@media (max-width: 860px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  html.mobile-chat-open .chat-panel { min-height: 0; }
+  .message-list { padding: 12px; }
+  .bubble { max-width: 92%; }
+}
+.tray-mode .shell, .popup-mode .shell { grid-template-columns: minmax(0, 1fr); }
 </style>
 <script src="visual-effects.js?v=20260602-mindup1" defer></script>
 <link rel="manifest" href="manifest.webmanifest">
@@ -688,7 +732,7 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
           <button id="zaloDispatchToggle" type="button" onclick="toggleZaloDispatch()"></button>
           <button type="button" onclick="openZaloDispatchDetails()">Xem chi tiết</button>
         </div>
-        <input id="friendSearch" class="search-input" placeholder="Tìm người dùng hoặc cuộc trò chuyện..." oninput="filterFriends()">
+      <input id="friendSearch" class="search-input" aria-label="Tìm cuộc trò chuyện" placeholder="Tìm tên PH, biệt danh Zalo, học sinh..." oninput="filterFriends()">
       </div>
       <div id="friendListTopActions" class="friend-list-actions"></div>
       <div id="friendList" class="friend-list">
@@ -2553,17 +2597,24 @@ function buildChatSub(friendId, friendRole) {
   return roleText + " • Hoạt động gần đây";
 }
 
+function normalizeConversationSearch(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase().trim();
+}
+
 function getFilteredFriendList() {
-  const keyword = document.getElementById("friendSearch")?.value?.trim().toLowerCase() || "";
+  const keyword = normalizeConversationSearch(document.getElementById("friendSearch")?.value);
   const localMatches = !keyword
     ? allFriends
-    : allFriends.filter(item =>
-        String(item.users?.full_name || "").toLowerCase().includes(keyword) ||
-        String(item.studentName || "").toLowerCase().includes(keyword) ||
-        String(item.audienceName || "").toLowerCase().includes(keyword) ||
-        String(formatRole(item.users?.role || "")).toLowerCase().includes(keyword) ||
-        String(item.preview || "").toLowerCase().includes(keyword)
-      );
+    : allFriends.filter(item => [
+        item.users?.full_name,
+        item.users?.zalo_alias,
+        item.zalo_alias,
+        item.studentName,
+        item.audienceName,
+        ...(_parentChildrenLabels.get(item.users?.id) || []),
+        formatRole(item.users?.role || ""),
+        item.preview
+      ].some(value => normalizeConversationSearch(value).includes(keyword)));
 
   if (!userSearchResults.length) return localMatches;
 
