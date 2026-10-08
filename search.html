@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="theme.css?v=20260615-ios1">
 <style>
 * { box-sizing: border-box; }
+#incomingRequests[hidden], #searchResults[hidden], .tabs[hidden] { display: none; }
 body {
   margin: 0;
   font-family: var(--font-body);
@@ -286,7 +287,10 @@ body {
     </div>
   </section>
 
-  <section class="results-card">
+  <section id="incomingRequests" hidden>
+    <iframe title="Lời mời kết bạn nhận được" src="friend_requests.html?incoming=1" style="width:100%;height:65dvh;min-height:280px;border:0;display:block"></iframe>
+  </section>
+  <section class="results-card" id="searchResults">
     <div class="results-body">
       <div id="resultList" class="result-list">
         <div class="empty">Chưa có kết quả nào. Hãy nhập từ khóa rồi bấm tìm kiếm.</div>
@@ -303,6 +307,12 @@ let activeTab = "all";
 let friendIds = new Set();
 let searchDebounceTimer = null;
 let searchCache = new Map();
+let searchRevision = 0;
+function showSearchMode(keyword) {
+  document.getElementById("incomingRequests").hidden = Boolean(keyword);
+  document.getElementById("searchResults").hidden = !keyword;
+  document.querySelector(".tabs").hidden = !keyword;
+}
 const isHomeSearchTray = new URLSearchParams(location.search).get("tray") === "1";
 document.body.classList.toggle("tray-mode", isHomeSearchTray);
 if (isHomeSearchTray) {
@@ -323,7 +333,7 @@ async function init() {
   if (keyword) {
     document.getElementById("keywordInput").value = keyword;
     await performSearch();
-  }
+  } else resetSearch();
 }
 
 async function loadFriendIds() {
@@ -343,15 +353,19 @@ window.setTab = function(tab) {
 };
 
 window.resetSearch = function() {
+  searchRevision++;
   if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
   searchCache.clear();
   document.getElementById("keywordInput").value = "";
   document.getElementById("resultList").innerHTML = '<div class="empty">Chưa có kết quả nào. Hãy nhập từ khóa rồi bấm tìm kiếm.</div>';
+  showSearchMode("");
 };
 
 window.performSearch = async function() {
+  const revision = ++searchRevision;
   const keyword = document.getElementById("keywordInput").value.trim();
   const resultList = document.getElementById("resultList");
+  showSearchMode(keyword);
 
   if (!keyword) {
     resultList.innerHTML = '<div class="empty">Hãy nhập từ khóa để tìm kiếm.</div>';
@@ -382,6 +396,7 @@ window.performSearch = async function() {
   }
 
   if (!parts.length) {
+    if (revision !== searchRevision) return;
     const emptyHtml = '<div class="empty">Không tìm thấy kết quả phù hợp.</div>';
     resultList.innerHTML = emptyHtml;
     searchCache.set(cacheKey, emptyHtml);
@@ -389,13 +404,16 @@ window.performSearch = async function() {
   }
 
   const nextHtml = parts.join("");
+  if (revision !== searchRevision) return;
   resultList.innerHTML = nextHtml;
   searchCache.set(cacheKey, nextHtml);
 };
 
 window.performRealtimeUserSearch = async function() {
+  const revision = ++searchRevision;
   const keyword = document.getElementById("keywordInput").value.trim();
   const resultList = document.getElementById("resultList");
+  showSearchMode(keyword);
 
   if (!keyword) {
     resetSearch();
@@ -410,6 +428,7 @@ window.performRealtimeUserSearch = async function() {
 
   resultList.innerHTML = '<div class="loading">Đang tìm người dùng...</div>';
   const users = await searchUsers(keyword);
+  if (revision !== searchRevision) return;
   const nextHtml = users.length
     ? users.map(renderUserItemFullscreen).join("")
     : '<div class="empty">Không tìm thấy người dùng phù hợp.</div>';
@@ -424,7 +443,7 @@ window.submitSearch = function() {
     return;
   }
   if (!keyword) {
-    document.getElementById("resultList").innerHTML = '<div class="empty">Hãy nhập từ khóa để tìm kiếm.</div>';
+    resetSearch();
     return;
   }
   openSearchTarget("search.html?q=" + encodeURIComponent(keyword));
@@ -587,8 +606,10 @@ document.getElementById("keywordInput").addEventListener("keydown", function(eve
 });
 
 document.getElementById("keywordInput").addEventListener("input", function() {
+  searchRevision++;
   if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
   const keyword = this.value.trim();
+  showSearchMode(keyword);
   if (!keyword) {
     resetSearch();
     return;

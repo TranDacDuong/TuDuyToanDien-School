@@ -179,6 +179,12 @@ body {
 <script src="supabaseClient.js"></script>
 <script>
 let currentUser = null;
+const incomingOnly = new URLSearchParams(location.search).get("incoming") === "1";
+if (incomingOnly) {
+  document.querySelector(".hero")?.remove();
+  document.getElementById("outgoingList")?.closest("section")?.remove();
+  document.querySelector(".grid").style.gridTemplateColumns = "1fr";
+}
 
 async function createNotification(userId, type, message, refId) {
   if (!userId || userId === currentUser.id) return;
@@ -198,7 +204,17 @@ async function init() {
     return;
   }
   currentUser = user;
-  await Promise.all([loadIncoming(), loadOutgoing()]);
+  await refreshRequests();
+  if (incomingOnly) {
+    const channel = sb.channel("search-incoming:" + currentUser.id)
+      .on("postgres_changes", { event: "*", schema: "public", table: "friend_requests", filter: "receiver_id=eq." + currentUser.id }, loadIncoming)
+      .subscribe();
+    window.addEventListener("pagehide", () => sb.removeChannel(channel), { once: true });
+  }
+}
+
+async function refreshRequests() {
+  await Promise.all(incomingOnly ? [loadIncoming()] : [loadIncoming(), loadOutgoing()]);
 }
 
 async function loadIncoming() {
@@ -294,7 +310,7 @@ window.acceptRequest = async function(requestId, senderId) {
   }
   await createNotification(senderId, "friend_accept", "Lời mời kết bạn của bạn đã được chấp nhận.", null);
 
-  await Promise.all([loadIncoming(), loadOutgoing()]);
+  await refreshRequests();
 };
 
 window.rejectRequest = async function(requestId) {
