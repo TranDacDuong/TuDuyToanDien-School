@@ -18,7 +18,7 @@ test('disconnected or paused workers show a blocked queue and no time estimate',
 });
 
 test('unconfirmed sends remain distinct from definite failures', () => {
-  assert.match(source, /Lỗi: <b>\$\{c.failed\}/);
+  assert.match(source, /Lỗi(?: \/ đã bỏ qua)?: <b>\$\{c.failed\}/);
   assert.match(source, /Chưa xác nhận: <b>\$\{c.uncertain\}/);
-  assert.match(source, /trước khi gửi lại để tránh trùng/);
+  assert.match(source, /Kiểm tra cuộc trò chuyện trước khi thử lại tin chưa xác nhận để tránh trùng/);
 });

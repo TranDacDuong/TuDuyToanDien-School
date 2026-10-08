@@ -15,6 +15,25 @@
 <script src="./learning_messages.js?v=20261006-parent-notifications1"></script>
 <style>
 * { box-sizing: border-box; }
+#tuitionDiscountDialog { width: min(1000px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); margin: auto; overflow: auto; border: 1px solid #cbd5e1; border-radius: 8px; padding: 20px; color: #0f1f3d; }
+#tuitionDiscountDialog::backdrop { background: #0f172a66; }
+.discount-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.discount-header h3 { margin: 0; font-size: 18px; }
+.discount-header button { width: 36px; height: 36px; padding: 0; }
+.discount-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.discount-layout section, .discount-layout form { min-width: 0; }
+.discount-layout input, .discount-layout select { width: 100%; min-width: 0; padding: 10px; border: 1px solid #d8e1ef; border-radius: 6px; background: #fff; font: inherit; }
+#tuitionDiscountDialog button { padding: 8px 12px; border: 1px solid #d8e1ef; border-radius: 6px; background: #fff; color: #0f1f3d; font: inherit; cursor: pointer; }
+#tuitionDiscountDialog #discountSave { background: #165bb5; color: white; border-color: #165bb5; }
+#tuitionDiscountDialog button:disabled { opacity: .55; cursor: wait; }
+#tuitionDiscountDialog .discount-header button { padding: 0; }
+.discount-layout label { display: block; margin: 12px 0; font-size: 13px; }
+#discountClassesLabel[hidden] { display: none; }
+.discount-item { border-bottom: 1px solid #e2e8f0; padding: 14px 0; overflow-wrap: anywhere; font-size: 13px; }
+.discount-item div { margin: 5px 0; }
+.discount-actions { display: flex; gap: 8px; }
+#discountError { color: #b91c1c; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .discount-layout { grid-template-columns: 1fr; } }
 :root {
   --bg: var(--cream);
 }
@@ -982,6 +1001,7 @@ tr.recalc-needed td:first-child { border-left: 3px solid #ef4444; }
     </div>
     <div class="toolbar-group actions">
       <button onclick="loadTuition()">Tải lại</button>
+      <button type="button" id="tuitionDiscountBtn" hidden onclick="TuitionDiscounts.open()">Miễn/Giảm học phí</button>
       <button class="secondary" id="transferAllSurplusBtn" data-permission="tuition.surplus.manage" onclick="transferAllSurplusToNextMonth()" style="display:none;background:#e0f2fe;color:#0369a1;border-color:#bae6fd;font-weight:700">➡️ Chuyển dư tất cả</button>
       <button class="secondary" id="zaloReminderBtn" data-permission="tuition.zalo_queue.manage" onclick="openZaloReminderModal()" style="display:none;background:linear-gradient(135deg, #0068ff 0%, #0052cc 100%);color:#fff;border:none;font-weight:700">Thông báo học phí</button>
       <button class="secondary" id="unmatchedBankBtn" data-permission="tuition.transactions.view" onclick="openUnmatchedBankModal()" style="display:none;background:#fff7ed;color:#9a3412;border-color:#fdba74;font-weight:700">Giao dịch chưa khớp <span id="unmatchedBankCount"></span></button>
@@ -1079,6 +1099,7 @@ tr.recalc-needed td:first-child { border-left: 3px solid #ef4444; }
   <div id="printArea"></div>
 
 <script src="./tuition-arrears.js?v=20261007-grouped1"></script>
-<script src="./tuition.js?v=20261007-detail-arrears1"></script>
+<script src="./tuition-discounts.js?v=20261008-discounts1"></script>
+<script src="./tuition.js?v=20261008-discounts1"></script>
 </body>
 </html>

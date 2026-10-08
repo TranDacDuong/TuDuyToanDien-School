@@ -451,6 +451,7 @@
         <div class="tuition-payment-grid">
           <div class="tuition-payment-numbers">
             <div class="tuition-payment-number"><span>Tổng cần nộp</span><b>${fmt(group.amount)}đ</b></div>
+            ${group.discountAmount > 0 ? `<div class="tuition-payment-number"><span>Học phí gốc</span><b>${fmt(group.grossAmount)}đ</b></div><div class="tuition-payment-number paid"><span>Miễn/Giảm học phí</span><b>−${fmt(group.discountAmount)}đ</b></div>` : ""}
             <div class="tuition-payment-number paid"><span>Đã nộp</span><b>${fmt(amountPaid)}đ</b></div>
             <div class="tuition-payment-number remaining"><span>Còn thiếu</span><b>${fmt(remaining)}đ</b></div>
             ${overpaid > 0 ? `
@@ -1109,7 +1110,7 @@ Nhập số tiền hoàn lại (>0):`,
     if (currentValue && classMap[currentValue]) sel.value = currentValue;
   }
 
-  function buildRowsForMonth({ ym, classes, classStudents, attData, chosenSchedules, trialReqs, suppSessions }) {
+  function buildRowsForMonth({ ym, classes, classStudents, attData, chosenSchedules, trialReqs, suppSessions, payments = paymentMap }) {
     const mStart = ymToDate(ym);
     const mEnd = monthEnd(ym);
     const classMap = {};
@@ -1389,7 +1390,12 @@ Nhập số tiền hoàn lại (>0):`,
       });
     });
 
-    return rows;
+    return window.TuitionDiscounts.apply(rows.map(row => {
+      const payment = payments[row.studentId];
+      if (!payment?.locked_at || String(payment.month).slice(0, 7) !== row.ym) return row;
+      const component = payment.gross_components?.find(c => c.class_id === row.classId);
+      return { ...row, frozenPercent: Number(component?.percent || 0) };
+    }));
   }
 
   /* ─────────────────────────────────────────────
@@ -1434,10 +1440,12 @@ Nhập số tiền hoàn lại (>0):`,
 
     try {
       if (currentRole === "student" || currentRole === "parent") {
+        await window.TuitionDiscounts.load(currentRole);
         await loadPortalTuition();
         return;
       }
       const restrictedToAssignedClasses = isStaffTuitionView() && currentRole !== "admin" && !canViewAllTuition();
+      await window.TuitionDiscounts.load(currentRole);
       const scopedClassIds = [...staffClassIds];
       if (restrictedToAssignedClasses && !scopedClassIds.length) {
         allRows = [];
@@ -1558,6 +1566,8 @@ Nhập số tiền hoàn lại (>0):`,
 
       // Gộp theo studentId
       buildGrouped();
+      const discountPayments = await window.TuitionDiscounts.persist(ym, grouped, canViewAllTuition());
+      (discountPayments || []).forEach(payment => { paymentMap[payment.student_id] = payment; });
       syncClassFilterOptions();
       renderRows();
 
@@ -1590,6 +1600,7 @@ Nhập số tiền hoàn lại (>0):`,
           present: 0, absent: 0, makeup: 0,
           billableSessions: 0,
           amount: 0,
+          grossAmount: 0, discountAmount: 0,
         };
       }
       const g = map[r.studentId];
@@ -1614,6 +1625,9 @@ Nhập số tiền hoàn lại (>0):`,
         billableSessions: r.billableSessions,
         feePerSession:    r.feePerSession,
         amount:           r.amount,
+        grossAmount: r.grossAmount ?? r.amount,
+        discountAmount: r.discountAmount || 0,
+        discountPercent: r.discountPercent || 0,
         noteCalc:         r.noteCalc,
       });
       g.totalSessions   += r.totalSessions;
@@ -1622,6 +1636,8 @@ Nhập số tiền hoàn lại (>0):`,
       g.makeup          += r.makeup;
       g.billableSessions += r.billableSessions;
       g.amount          += r.amount;
+      g.grossAmount += r.grossAmount ?? r.amount;
+      g.discountAmount += r.discountAmount || 0;
     });
 
     return Object.values(map).sort((a, b) =>
@@ -1746,7 +1762,7 @@ Nhập số tiền hoàn lại (>0):`,
     const paymentByMonth = buildPaymentByMonth(payments || []);
     const groupedByMonth = {};
     allCandidateMonths.forEach(ym => {
-      const rows = buildRowsForMonth({ ym, classes, classStudents: scopedClassStudents, attData, chosenSchedules, trialReqs, suppSessions });
+      const rows = buildRowsForMonth({ ym, classes, classStudents: scopedClassStudents, attData, chosenSchedules, trialReqs, suppSessions, payments: paymentByMonth[ym] || {} });
       const groups = groupRows(rows).map(group => ({
         ...group,
         payment: paymentByMonth[ym]?.[group.studentId] || null,
@@ -1775,7 +1791,7 @@ Nhập số tiền hoàn lại (>0):`,
       .filter(ym => ym <= today)
       .sort()
       .map(ym => {
-        const rows = groupedByMonth[ym] || groupRows(buildRowsForMonth({ ym, classes, classStudents: scopedClassStudents, attData, chosenSchedules, trialReqs, suppSessions }));
+        const rows = groupedByMonth[ym] || groupRows(buildRowsForMonth({ ym, classes, classStudents: scopedClassStudents, attData, chosenSchedules, trialReqs, suppSessions, payments: paymentByMonth[ym] || {} }));
         const groups = rows.map(group => ({
           ...group,
           payment: paymentByMonth[ym]?.[group.studentId] || null,
@@ -2113,6 +2129,7 @@ Nhập số tiền hoàn lại (>0):`,
           ${payment?.note ? `<div class="invoice-note">Ghi chú: ${payment.note}</div>` : ""}
 
           <div class="invoice-summary">
+            ${g.discountAmount > 0 ? `<div class="invoice-summary-row"><span>Học phí gốc</span><b>${fmt(g.grossAmount)}đ</b></div><div class="invoice-summary-row"><span>Miễn/Giảm học phí</span><b>−${fmt(g.discountAmount)}đ</b></div>` : ""}
             <div class="invoice-summary-row"><span>Tổng cần thu</span><b>${fmt(g.amount)}đ</b></div>
             <div class="invoice-summary-row"><span>Đã nộp</span><b>${fmt(amountPaid)}đ</b></div>
             <div class="invoice-summary-row"><span>Còn thiếu</span><b>${fmt(remaining)}đ</b></div>
