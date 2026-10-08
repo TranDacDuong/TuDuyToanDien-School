@@ -453,6 +453,7 @@ button.hint-link:hover { text-decoration: underline; }
 #tuitionDetailModal .modal-card {
   display: flex;
   flex-direction: column;
+  max-height: calc(100dvh - 40px);
   overflow: hidden;
 }
 #tuitionDetailModal .modal-header {
@@ -1032,6 +1033,7 @@ tr.recalc-needed td:first-child { border-left: 3px solid #ef4444; }
       </tbody>
     </table>
   </div>
+</div>
 
   <div id="tuitionDetailModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="tuitionDetailTitle" onclick="closeTuitionDetail(event)">
     <div class="modal-card" onclick="event.stopPropagation()">
@@ -1075,7 +1077,6 @@ tr.recalc-needed td:first-child { border-left: 3px solid #ef4444; }
   </div>
 
   <div id="printArea"></div>
-</div>
 
 <script src="./tuition-arrears.js?v=20261007-grouped1"></script>
 <script src="./tuition.js?v=20261007-detail-arrears1"></script>
