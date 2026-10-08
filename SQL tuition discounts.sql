@@ -73,14 +73,14 @@ BEGIN
   PERFORM pg_advisory_xact_lock(hashtextextended(p_student::text,0));
   IF p_id IS NOT NULL THEN
     SELECT * INTO old FROM public.tuition_discounts WHERE id=p_id FOR UPDATE;
-    IF old.cancelled OR old.ends_month<current_month THEN RAISE EXCEPTION 'Historical discount cannot be changed'; END IF;
-    UPDATE public.tuition_discounts SET ends_month=CASE WHEN starts_month<current_month THEN current_month-INTERVAL '1 month' ELSE ends_month END,
-      cancelled=starts_month>=current_month WHERE id=p_id;
+    IF old.cancelled OR (p_action='stop' AND old.ends_month<current_month) THEN RAISE EXCEPTION 'Historical discount cannot be changed'; END IF;
+    UPDATE public.tuition_discounts SET ends_month=CASE WHEN p_action='stop' AND starts_month<current_month THEN current_month-INTERVAL '1 month' ELSE ends_month END,
+      cancelled=p_action='save' OR starts_month>=current_month WHERE id=p_id;
     INSERT INTO public.tuition_discount_audit(discount_id,actor_id,action,before_value,after_value)
       SELECT id,auth.uid(),p_action,to_jsonb(old),to_jsonb(d) FROM public.tuition_discounts d WHERE id=p_id;
   END IF;
   IF p_action='save' THEN
-    IF p_start IS NULL OR p_start<current_month OR p_start<>date_trunc('month',p_start)::date
+    IF p_start IS NULL OR p_start<>date_trunc('month',p_start)::date
       OR p_percent IS NULL OR p_percent<=0 OR p_percent>100 OR p_percent<>round(p_percent,2)
       OR (p_end IS NOT NULL AND (p_end<p_start OR p_end<>date_trunc('month',p_end)::date)) OR length(coalesce(p_reason,''))>1000 THEN RAISE EXCEPTION 'Invalid discount period or percentage'; END IF;
     IF cardinality(p_classes)=0 THEN p_classes:=NULL; END IF;
@@ -93,7 +93,13 @@ BEGIN
     INSERT INTO public.tuition_discount_audit(discount_id,actor_id,action,after_value)
       SELECT id,auth.uid(),'create',to_jsonb(d) FROM public.tuition_discounts d WHERE id=new_id;
   END IF;
-  FOR payment IN SELECT * FROM public.tuition_payments WHERE student_id=p_student AND month>=current_month AND locked_at IS NULL AND gross_components IS NOT NULL ORDER BY month FOR UPDATE LOOP
+  IF EXISTS(SELECT 1 FROM public.tuition_payments WHERE student_id=p_student AND locked_at IS NULL AND gross_components IS NULL
+    AND ((p_action='save' AND month>=p_start AND (p_end IS NULL OR month<=p_end))
+      OR (old.id IS NOT NULL AND month>=old.starts_month AND (old.ends_month IS NULL OR month<=old.ends_month)
+        AND (p_action='save' OR month>=current_month)))) THEN
+    RAISE EXCEPTION 'Cần tải học phí các tháng áp dụng bằng tài khoản có quyền xem toàn bộ học phí trước khi lưu miễn/giảm';
+  END IF;
+  FOR payment IN SELECT * FROM public.tuition_payments WHERE student_id=p_student AND locked_at IS NULL AND gross_components IS NOT NULL ORDER BY month FOR UPDATE LOOP
     totals:=public.tuition_discount_totals(p_student,payment.month,payment.gross_components);
     UPDATE public.tuition_payments SET amount_due=(totals->>'due')::numeric,gross_amount=(totals->>'gross')::numeric,
       discount_amount=(totals->>'discount')::numeric,gross_components=totals->'components',updated_at=now() WHERE id=payment.id;
@@ -108,7 +114,7 @@ DECLARE item jsonb; student uuid; totals jsonb;
 BEGIN
   IF auth.uid() IS NULL OR NOT (public.mindup_is_admin(auth.uid()) OR public.has_app_permission('tuition.discounts.manage')) THEN RAISE EXCEPTION 'Discount permission required'; END IF;
   IF NOT public.mindup_is_admin(auth.uid()) AND NOT public.has_app_permission('tuition.view_all') THEN RAISE EXCEPTION 'Full tuition scope required'; END IF;
-  IF p_month IS NULL OR p_month<date_trunc('month',now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date OR p_month<>date_trunc('month',p_month)::date OR jsonb_typeof(p_rows) IS DISTINCT FROM 'array' OR jsonb_array_length(p_rows)>500 THEN RAISE EXCEPTION 'Invalid basis'; END IF;
+  IF p_month IS NULL OR p_month<>date_trunc('month',p_month)::date OR jsonb_typeof(p_rows) IS DISTINCT FROM 'array' OR jsonb_array_length(p_rows)>500 THEN RAISE EXCEPTION 'Invalid basis'; END IF;
   FOR item IN SELECT value FROM jsonb_array_elements(p_rows) LOOP
     student:=(item->>'student_id')::uuid;
     PERFORM pg_advisory_xact_lock(hashtextextended(student::text,0));

@@ -1419,8 +1419,8 @@ Nhập số tiền hoàn lại (>0):`,
   /* ─────────────────────────────────────────────
      MAIN LOAD
   ───────────────────────────────────────────── */
-  window.loadTuition = async function () {
-    const ym = monthPicker.value;
+  window.loadTuition = async function (options = {}) {
+    const ym = options.ymOverride || monthPicker.value;
     if (!ym) return;
     try {
       localStorage.setItem("tuition_selected_month", ym);
@@ -1566,14 +1566,28 @@ Nhập số tiền hoàn lại (>0):`,
 
       // Gộp theo studentId
       buildGrouped();
-      const discountPayments = await window.TuitionDiscounts.persist(ym, grouped, canViewAllTuition());
+      const discountPayments = await window.TuitionDiscounts.persist(ym, options.basisStudent ? grouped.filter(g => g.studentId === options.basisStudent) : grouped, canViewAllTuition());
       (discountPayments || []).forEach(payment => { paymentMap[payment.student_id] = payment; });
+      if (options.basisStudent) return;
       syncClassFilterOptions();
       renderRows();
 
     } catch (err) {
+      if (options.strict) throw err;
       console.error(err);
       tbody.innerHTML = `<tr><td colspan="8" class="empty">❌ Lỗi: ${err.message}</td></tr>`;
+    }
+  };
+
+  window.prepareTuitionDiscountBasis = async function (studentId) {
+    if (!canViewAllTuition()) return;
+    const { data, error } = await getSb().from('tuition_payments').select('month,gross_components,locked_at').eq('student_id', studentId);
+    if (error) throw error;
+    const months = [...new Set((data || []).filter(p => !p.locked_at && !p.gross_components).map(p => String(p.month).slice(0, 7)))].sort();
+    try {
+      for (const ym of months) await window.loadTuition({ ymOverride: ym, basisStudent: studentId, strict: true });
+    } finally {
+      if (months.length) await window.loadTuition();
     }
   };
 

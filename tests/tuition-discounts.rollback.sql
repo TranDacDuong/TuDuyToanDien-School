@@ -32,10 +32,14 @@ BEGIN
  PERFORM public.save_tuition_discount_basis('2090-10-01',basis);
  SELECT * INTO p FROM public.tuition_payments WHERE student_id=s AND month='2090-10-01';
  IF p.amount_due<>75000 THEN RAISE EXCEPTION 'Locked basis changed'; END IF;
- BEGIN
-  PERFORM public.save_tuition_discount_basis('2000-01-01',basis);
-  RAISE EXCEPTION 'Past basis allowed';
- EXCEPTION WHEN raise_exception THEN IF SQLERRM<>'Invalid basis' THEN RAISE; END IF; END;
+ PERFORM public.save_tuition_discount_basis('2000-01-01',basis);
+ d:=public.manage_tuition_discount(NULL,'save',s,50,'2000-01-01','2000-01-01',ARRAY[c],'retroactive');
+ SELECT * INTO p FROM public.tuition_payments WHERE student_id=s AND month='2000-01-01';
+ IF p.amount_due<>50000 THEN RAISE EXCEPTION 'Past discount failed'; END IF;
+ UPDATE public.tuition_payments SET amount_paid=20000 WHERE id=p.id;
+ d:=public.manage_tuition_discount(d,'save',s,100,'2000-01-01','2000-01-01',ARRAY[c],'revised');
+ SELECT * INTO p FROM public.tuition_payments WHERE student_id=s AND month='2000-01-01';
+ IF p.amount_due<>0 OR p.amount_paid<>20000 THEN RAISE EXCEPTION 'Past revision lost paid balance'; END IF;
  PERFORM set_config('request.jwt.claim.sub',s::text,true);
  PERFORM set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',s)::text,true);
  BEGIN

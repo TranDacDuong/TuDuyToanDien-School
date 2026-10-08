@@ -34,12 +34,12 @@
         <p id="discountError" role="alert"></p><div class="discount-layout"><section><h4>Danh sách miễn/giảm</h4>
         <input id="discountListSearch" type="search" placeholder="Tìm học sinh hoặc SĐT"><div id="discountList"></div></section>
         <form id="discountForm"><h4 id="discountFormTitle">Thêm miễn/giảm</h4><label>Tìm học sinh<input id="discountStudentSearch" type="search" placeholder="Tên hoặc SĐT"></label>
-        <label>Học sinh<select id="discountStudent" required></select></label>
+        <label>Học sinh<select id="discountStudent" size="5" required></select></label>
         <label>Tỷ lệ miễn/giảm (%)<input id="discountPercent" type="number" min="0.01" max="100" step="0.01" required></label>
         <label>Từ tháng<input id="discountStart" type="month" required></label>
         <label>Đến tháng<input id="discountEnd" type="month"></label>
         <label>Phạm vi<select id="discountScope"><option value="all">Tất cả lớp</option><option value="classes">Chọn lớp</option></select></label>
-        <label id="discountClassesLabel" hidden>Lớp áp dụng<select id="discountClasses" multiple size="5"></select></label>
+        <fieldset id="discountClassesLabel" hidden><legend>Lớp áp dụng</legend><div id="discountClasses"></div></fieldset>
         <label>Lý do<input id="discountReason" maxlength="1000"></label>
         <div class="discount-actions"><button type="submit" id="discountSave">Lưu</button><button type="button" id="discountNew">Thêm mới</button></div></form></div>`;
       document.body.appendChild(element);
@@ -64,7 +64,7 @@
     document.getElementById('discountSave').disabled = true;
     try {
       catalog = await rpc('tuition_discount_catalog', {});
-      document.getElementById('discountClasses').innerHTML = catalog.classes.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+      document.getElementById('discountClasses').innerHTML = catalog.classes.map(c => `<label class="discount-class-option"><input type="checkbox" value="${esc(c.id)}">${esc(c.name)}</label>`).join('');
       renderList(); edit(null);
       document.getElementById('discountSave').disabled = false;
     } catch (error) { showError(error); }
@@ -73,8 +73,10 @@
     if (!catalog) return;
     const select = document.getElementById('discountStudent');
     const selected = editing?.student_id || select.value;
-    const query = document.getElementById('discountStudentSearch').value.trim().toLocaleLowerCase('vi');
-    select.innerHTML = '<option value="">Chọn học sinh</option>' + catalog.students.filter(s => s.id === selected || (s.name + ' ' + (s.phone || '')).toLocaleLowerCase('vi').includes(query))
+    const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+    const query = normalize(document.getElementById('discountStudentSearch').value.trim());
+    const matches = catalog.students.filter(s => (editing && s.id === selected) || normalize(s.name + ' ' + (s.phone || '')).includes(query));
+    select.innerHTML = '<option value="" disabled>' + (matches.length ? 'Chọn học sinh' : 'Không tìm thấy học sinh') + '</option>' + matches
       .map(s => `<option value="${esc(s.id)}">${esc(s.name)}${s.phone ? ' · ' + esc(s.phone) : ''}</option>`).join('');
     select.value = selected;
   }
@@ -89,22 +91,21 @@
       const ended = r.cancelled || (r.ends_month && r.ends_month.slice(0, 7) < currentMonth());
       const scope = r.class_ids ? r.class_ids.map(id => catalog.classes.find(c => c.id === id)?.name || 'Lớp cũ').join(', ') : 'Tất cả lớp';
       return `<article class="discount-item"><strong>${esc(student?.name || 'Học sinh')} · ${esc(r.percent)}%</strong><div>${esc(r.starts_month.slice(0, 7))} → ${esc(r.ends_month?.slice(0, 7) || 'Đến khi ngừng')} · ${ended ? 'Đã kết thúc' : 'Đang áp dụng / đã lên lịch'}</div><div>${esc(scope)}</div><div>${esc(r.reason)}</div>
-        ${ended ? '' : `<button type="button" data-id="${esc(r.id)}" data-action="edit">Sửa</button> <button type="button" data-id="${esc(r.id)}" data-action="stop">Ngừng áp dụng</button>`}</article>`;
+        ${r.cancelled ? '' : `<button type="button" data-id="${esc(r.id)}" data-action="edit">Sửa</button>${ended ? '' : ` <button type="button" data-id="${esc(r.id)}" data-action="stop">Ngừng áp dụng</button>`}`}</article>`;
     }).join('') || '<p>Chưa có học sinh trong danh sách.</p>';
   }
   function edit(item) {
     if (busy) return;
     editing = item;
     document.getElementById('discountForm').reset();
-    document.getElementById('discountFormTitle').textContent = item ? 'Sửa miễn/giảm từ tháng này' : 'Thêm miễn/giảm';
-    document.getElementById('discountStart').min = currentMonth();
-    document.getElementById('discountStart').value = item && item.starts_month.slice(0, 7) > currentMonth() ? item.starts_month.slice(0, 7) : currentMonth();
+    document.getElementById('discountFormTitle').textContent = item ? 'Sửa miễn/giảm' : 'Thêm miễn/giảm';
+    document.getElementById('discountStart').value = item?.starts_month.slice(0, 7) || currentMonth();
     document.getElementById('discountEnd').value = item?.ends_month?.slice(0, 7) || '';
     document.getElementById('discountPercent').value = item?.percent || '';
     document.getElementById('discountReason').value = item?.reason || '';
     document.getElementById('discountScope').value = item?.class_ids ? 'classes' : 'all';
     document.getElementById('discountClassesLabel').hidden = !item?.class_ids;
-    [...document.getElementById('discountClasses').options].forEach(o => { o.selected = Boolean(item?.class_ids?.includes(o.value)); });
+    document.querySelectorAll('#discountClasses input').forEach(o => { o.checked = Boolean(item?.class_ids?.includes(o.value)); });
     renderStudents();
     document.getElementById('discountStudent').value = item?.student_id || '';
     document.getElementById('discountStudent').disabled = Boolean(item);
@@ -114,6 +115,7 @@
     busy = true; document.getElementById('discountSave').disabled = true;
     document.getElementById('discountError').textContent = '';
     try {
+      if (args.p_action === 'save') await root.prepareTuitionDiscountBasis(args.p_student, args.p_start);
       await rpc('manage_tuition_discount', args);
       await root.loadTuition();
       catalog = await rpc('tuition_discount_catalog', {});
@@ -124,7 +126,7 @@
   function save() {
     const start = document.getElementById('discountStart').value;
     const end = document.getElementById('discountEnd').value;
-    const classes = document.getElementById('discountScope').value === 'classes' ? [...document.getElementById('discountClasses').selectedOptions].map(o => o.value) : null;
+    const classes = document.getElementById('discountScope').value === 'classes' ? [...document.querySelectorAll('#discountClasses input:checked')].map(o => o.value) : null;
     if ((end && end < start) || (classes && !classes.length)) { showError(new Error('Kiểm tra tháng kết thúc và lớp áp dụng.')); return; }
     perform({ p_id: editing?.id || null, p_action: 'save', p_student: document.getElementById('discountStudent').value,
       p_percent: Number(document.getElementById('discountPercent').value), p_start: start + '-01', p_end: end ? end + '-01' : null,
@@ -145,7 +147,7 @@
       rules = data || [];
     },
     async persist(ym, groups, fullScope) {
-      if (!manager || !fullScope || ym < currentMonth() || !groups.length) return [];
+      if (!manager || !fullScope || !groups.length) return [];
       return rpc('save_tuition_discount_basis', { p_month: ym + '-01', p_rows: groups.map(g => ({ student_id: g.studentId,
         components: g.classes.map(c => ({ class_id: c.classId, amount: c.grossAmount ?? c.amount, percent: c.discountPercent || 0 })) })) });
     }

@@ -17,7 +17,7 @@
 * { box-sizing: border-box; }
 #tuitionDiscountDialog { width: min(1000px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); margin: auto; overflow: auto; border: 1px solid #cbd5e1; border-radius: 8px; padding: 20px; color: #0f1f3d; }
 #tuitionDiscountDialog::backdrop { background: #0f172a66; }
-.discount-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.discount-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; position: sticky; top: -20px; z-index: 3; background: #fff; margin: -20px -20px 16px; padding: 16px 20px; border-bottom: 1px solid #e2e8f0; }
 .discount-header h3 { margin: 0; font-size: 18px; }
 .discount-header button { width: 36px; height: 36px; padding: 0; }
 .discount-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
@@ -29,6 +29,10 @@
 #tuitionDiscountDialog .discount-header button { padding: 0; }
 .discount-layout label { display: block; margin: 12px 0; font-size: 13px; }
 #discountClassesLabel[hidden] { display: none; }
+#discountClassesLabel { border: 1px solid #d8e1ef; border-radius: 6px; padding: 10px; margin-bottom: 12px; }
+#discountClasses { max-height: 200px; overflow: auto; }
+.discount-layout .discount-class-option { display: flex; align-items: center; gap: 8px; margin: 8px 0; text-transform: none; }
+.discount-layout .discount-class-option input { width: 18px; flex: 0 0 18px; }
 .discount-item { border-bottom: 1px solid #e2e8f0; padding: 14px 0; overflow-wrap: anywhere; font-size: 13px; }
 .discount-item div { margin: 5px 0; }
 .discount-actions { display: flex; gap: 8px; }
@@ -1099,7 +1103,7 @@ tr.recalc-needed td:first-child { border-left: 3px solid #ef4444; }
   <div id="printArea"></div>
 
 <script src="./tuition-arrears.js?v=20261007-grouped1"></script>
-<script src="./tuition-discounts.js?v=20261008-discounts1"></script>
-<script src="./tuition.js?v=20261008-discounts1"></script>
+<script src="./tuition-discounts.js?v=20261008-discounts2"></script>
+<script src="./tuition.js?v=20261008-discounts2"></script>
 </body>
 </html>
