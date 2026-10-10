@@ -1804,6 +1804,8 @@ body {
   }
 }
 </style>
+<link rel="stylesheet" href="home-overview.css?v=20261010-home1">
+<script src="home-overview.js?v=20261010-home1" defer></script>
 <script src="visual-effects.js?v=20260602-mindup1" defer></script>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0f1f3d">
@@ -1826,6 +1828,17 @@ body {
 
   <section class="overview-section active" id="overviewSection">
     <div class="overview-main" id="overviewMain">
+      <section class="home-banner" aria-label="Thông tin trung tâm MindUp" aria-roledescription="carousel">
+        <a class="home-banner-slide" href="#trialLessonForm"><img src="assets/home/banner.webp" width="1800" height="899" alt="MindUp - tuyển sinh Toán, Lý, Hóa với thầy Đắc Dương, cô Ngô Hương và thầy Hồng Thái" fetchpriority="high"></a>
+        <a class="home-banner-slide" href="#trialLessonForm" hidden><img src="assets/home/welcome.webp" width="1800" height="900" alt="Đội ngũ giáo viên và các môn học tại MindUp" loading="lazy"></a>
+        <div class="home-banner-controls">
+          <button type="button" data-direction="-1" aria-label="Banner trước" title="Banner trước">‹</button>
+          <button type="button" data-slide="0" aria-label="Banner tuyển sinh" aria-current="true"><span class="home-banner-dot"></span></button>
+          <button type="button" data-slide="1" aria-label="Banner giáo viên" aria-current="false"><span class="home-banner-dot"></span></button>
+          <button type="button" data-direction="1" aria-label="Banner tiếp theo" title="Banner tiếp theo">›</button>
+          <button type="button" id="homeBannerPause" aria-label="Tạm dừng banner" aria-pressed="false" title="Tạm dừng / tiếp tục">Ⅱ</button>
+        </div>
+      </section>
       <!-- Báo cáo học tập cá nhân của Học sinh/Phụ huynh -->
       <div class="overview-card" id="studentReportCard" style="display:none; border: 1.5px solid rgba(29,107,209,0.18); box-shadow: 0 14px 36px rgba(29,107,209,0.06); margin-bottom: 22px;">
         <div class="overview-card-head" style="background: radial-gradient(circle at top right, rgba(29,107,209,0.08), transparent 38%), linear-gradient(180deg, #f7faff 0%, #ffffff 100%); position: relative; padding-left: 36px;">
@@ -1911,7 +1924,7 @@ body {
           </div>
         </div>
       </div>
-      <div class="overview-card">
+      <div class="overview-card home-teachers-section">
         <div class="overview-card-head">
           <div class="overview-card-title">Giáo viên của trung tâm</div>
         </div>
@@ -1929,13 +1942,18 @@ body {
           </div>
         </div>
       </div>
-      <div class="overview-card">
+      <div class="overview-card home-intro-section">
         <div class="overview-card-head">
           <div class="overview-card-title">Giới thiệu trung tâm</div>
         </div>
         <div class="overview-card-body">
           <div class="overview-list" id="overviewIntro">
             <div class="empty-feed" style="padding:24px 16px;"><p>Đang tải bài giới thiệu...</p></div>
+          </div>
+          <div class="home-photo-strip">
+            <figure><img src="assets/home/class-session.webp" alt="Buổi học trực tiếp tại trung tâm MindUp" loading="lazy" width="1000" height="1333"><figcaption>Học tập tại MindUp</figcaption></figure>
+            <figure><img src="assets/home/teaching.webp" alt="Thầy Đắc Dương giảng bài tại lớp" loading="lazy" width="1000" height="750"><figcaption>Đồng hành cùng học sinh</figcaption></figure>
+            <figure><img src="assets/home/classroom.webp" alt="Phòng học của trung tâm MindUp" loading="lazy" width="1000" height="750"><figcaption>Không gian lớp học</figcaption></figure>
           </div>
           <div class="inline-admin-block" id="overviewIntroAdminBlock" style="display:none;">
             <div class="inline-admin-title">Chỉnh sửa giới thiệu trung tâm</div>
@@ -1948,7 +1966,7 @@ body {
           </div>
         </div>
       </div>
-      <div class="overview-card">
+      <div class="overview-card home-courses-section">
         <div class="overview-card-head">
           <div class="overview-card-title">Khóa học nổi bật</div>
         </div>
@@ -2005,7 +2023,7 @@ body {
           </form>
         </div>
       </div>
-      <div class="overview-card">
+      <div class="overview-card home-countdown-section">
         <div class="overview-card-head">
           <div class="overview-card-title">Đếm ngược ngày thi</div>
         </div>
@@ -2024,7 +2042,7 @@ body {
           </div>
         </div>
       </div>
-      <div class="overview-card">
+      <div class="overview-card home-contact-section">
         <div class="overview-card-head">
           <div class="overview-card-title">Liên hệ</div>
         </div>
@@ -2039,7 +2057,7 @@ body {
           </div>
         </div>
       </div>
-      <div class="overview-card">
+      <div class="overview-card home-news-section">
         <div class="overview-card-head">
           <div class="overview-card-title">Tin tức</div>
         </div>
@@ -4145,9 +4163,7 @@ function renderPinnedCourseCard(course) {
   const statusLabel = course.status === "open" ?"Đang mở" : "Đã đóng";
   const sessionsLabel = Number(course.planned_sessions || 0) > 0 ?`${course.planned_sessions} buổi` : "Theo lịch học";
   const managerLabel = getCourseManagerLabel(course.id);
-  const coverMedia = course.cover_url
-    ?`<img src="${escAttr(course.cover_url)}" alt="${escAttr(course.name || "Khóa học")}">`
-    : "";
+  const coverMedia = `<img src="${escAttr(course.cover_url || 'assets/home/classroom.webp')}" alt="${escAttr(course.name || "Khóa học")}" loading="lazy" onerror="this.onerror=null;this.src='assets/home/classroom.webp'">`;
   return `
     <article class="featured-course-card">
       <div class="featured-course-cover">
@@ -4329,9 +4345,13 @@ function renderHomeTeachers() {
     const teacher = item.user || allTeachers.find(entry => entry.id === item.user_id) || {};
     const teacherName = teacher.full_name || `Giáo viên ${String(item.user_id || "").slice(0, 8)}`;
     const teacherSubject = teacher.subject || "Chưa cập nhật môn";
+    const normalizedName = teacherName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+    const localPhoto = normalizedName.includes('dac duong') ? 'assets/home/teacher-duong.webp'
+      : normalizedName.includes('ngo huong') ? 'assets/home/teacher-huong.webp'
+      : normalizedName.includes('hong thai') ? 'assets/home/teacher-thai.webp' : null;
     return `
       <a class="teacher-card" href="profile.html?id=${item.user_id}">
-        <img class="teacher-card-avatar" src="${teacher.avatar_url || 'default-avatar.png'}" alt="${esc(teacherName)}" onerror="this.src='default-avatar.png'">
+        <img class="teacher-card-avatar" src="${escAttr(localPhoto || teacher.avatar_url || 'default-avatar.png')}" alt="${escAttr(teacherName)}" loading="lazy" onerror="this.onerror=null;this.src='default-avatar.png'">
         <div class="teacher-card-name">${esc(teacherName)}</div>
         <div class="teacher-card-subject">${esc(teacherSubject)}</div>
       </a>
