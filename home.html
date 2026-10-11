@@ -1804,7 +1804,7 @@ body {
   }
 }
 </style>
-<link rel="stylesheet" href="home-overview.css?v=20261010-home1">
+<link rel="stylesheet" href="home-overview.css?v=20261012-photos1">
 <script src="home-overview.js?v=20261010-home1" defer></script>
 <script src="visual-effects.js?v=20260602-mindup1" defer></script>
 <link rel="manifest" href="manifest.webmanifest">
@@ -1950,10 +1950,15 @@ body {
           <div class="overview-list" id="overviewIntro">
             <div class="empty-feed" style="padding:24px 16px;"><p>Đang tải bài giới thiệu...</p></div>
           </div>
-          <div class="home-photo-strip">
+          <div class="home-photo-strip" id="homePhotoStrip">
             <figure><img src="assets/home/class-session.webp" alt="Buổi học trực tiếp tại trung tâm MindUp" loading="lazy" width="1000" height="1333"><figcaption>Học tập tại MindUp</figcaption></figure>
             <figure><img src="assets/home/teaching.webp" alt="Thầy Đắc Dương giảng bài tại lớp" loading="lazy" width="1000" height="750"><figcaption>Đồng hành cùng học sinh</figcaption></figure>
             <figure><img src="assets/home/classroom.webp" alt="Phòng học của trung tâm MindUp" loading="lazy" width="1000" height="750"><figcaption>Không gian lớp học</figcaption></figure>
+          </div>
+          <div class="home-photo-admin" id="homePhotoAdmin" hidden>
+            <label for="homePhotoUpload">Thêm ảnh Trang chủ</label>
+            <input id="homePhotoUpload" type="file" accept="image/jpeg,image/png,image/webp" multiple onchange="uploadHomePhotos(this)">
+            <p id="homePhotoStatus" role="status" aria-live="polite"></p>
           </div>
           <div class="inline-admin-block" id="overviewIntroAdminBlock" style="display:none;">
             <div class="inline-admin-title">Chỉnh sửa giới thiệu trung tâm</div>
@@ -3304,6 +3309,7 @@ async function loadOverviewSettings() {
   renderTeacherSelectOptions();
   renderHomeTeacherAdminList();
   renderCenterIntro();
+  renderHomePhotos();
   syncCenterIntroInputs();
   syncContactInput();
 }
@@ -4318,7 +4324,8 @@ window.saveCenterIntro = async function() {
   if (!canUpdateHomeInfo()) return;
   const title = document.getElementById("centerIntroTitleInline")?.value.trim() || "Giới thiệu trung tâm";
   const content = document.getElementById("centerIntroContentInline")?.value.trim() || "";
-  const value = JSON.stringify({ title, content });
+  const nextIntro = { ...centerIntro, title, content };
+  const value = JSON.stringify(nextIntro);
   const { error } = await sb.from("site_settings").upsert({
     setting_key: "home_center_intro",
     setting_value: value,
@@ -4329,8 +4336,70 @@ window.saveCenterIntro = async function() {
     alert("Lỗi khi lưu bài giới thiệu: " + error.message);
     return;
   }
-  centerIntro = { title, content };
+  centerIntro = nextIntro;
   renderCenterIntro();
+};
+
+const defaultHomePhotos = [
+  { url: 'assets/home/class-session.webp', caption: 'Học tập tại MindUp' },
+  { url: 'assets/home/teaching.webp', caption: 'Đồng hành cùng học sinh' },
+  { url: 'assets/home/classroom.webp', caption: 'Không gian lớp học' }
+];
+let homePhotoBusy = false;
+function getHomePhotos() {
+  return Array.isArray(centerIntro.photos) ? centerIntro.photos : defaultHomePhotos;
+}
+function renderHomePhotos() {
+  const wrap = document.getElementById('homePhotoStrip');
+  const admin = role === 'admin';
+  document.getElementById('homePhotoAdmin').hidden = !admin;
+  wrap.innerHTML = getHomePhotos().map((photo, index) => `
+    <figure><img src="${escAttr(photo.url)}" alt="${escAttr(photo.caption || 'Ảnh trung tâm MindUp')}" loading="lazy">
+    <figcaption>${esc(photo.caption || '')}</figcaption>
+    ${admin ? `<button class="btn btn-danger btn-sm photo-delete" type="button" onclick="deleteHomePhoto(${index})" ${homePhotoBusy ? 'disabled' : ''}>Xóa ảnh</button>` : ''}</figure>`).join('');
+}
+async function saveHomePhotos(photos) {
+  const next = { ...centerIntro, photos };
+  const { error } = await sb.from('site_settings').upsert({ setting_key: 'home_center_intro',
+    setting_value: JSON.stringify(next), updated_by: currentUser.id, updated_at: new Date().toISOString()
+  }, { onConflict: 'setting_key' });
+  if (error) throw error;
+  centerIntro = next;
+}
+window.uploadHomePhotos = async function(input) {
+  if (role !== 'admin' || homePhotoBusy) return;
+  const files = [...input.files];
+  if (!files.length) return;
+  const status = document.getElementById('homePhotoStatus');
+  if (getHomePhotos().length + files.length > 12) { status.textContent = 'Tối đa 12 ảnh Trang chủ.'; input.value = ''; return; }
+  if (files.some(file => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 20 * 1024 * 1024)) {
+    status.textContent = 'Chọn ảnh JPG, PNG hoặc WebP không quá 20 MB.'; input.value = ''; return;
+  }
+  homePhotoBusy = true; input.disabled = true; renderHomePhotos();
+  let completed = 0;
+  try {
+    for (const file of files) {
+      status.textContent = `Đang tải ảnh ${completed + 1}/${files.length}...`;
+      const uploaded = await window.MindupImageUpload.uploadCompressedImage(file, { kind: 'post', folder: 'home-media' });
+      const url = window.MindupImageUpload.getDisplayUrl(uploaded);
+      try { await saveHomePhotos([...getHomePhotos(), { url, caption: '' }]); }
+      catch (error) { await window.MindupImageUpload.deleteUploadedImage(url).catch(console.warn); throw error; }
+      completed++;
+    }
+    status.textContent = `Đã thêm ${completed} ảnh.`;
+  } catch (error) { status.textContent = `Đã thêm ${completed} ảnh. Không thể thêm ảnh tiếp theo: ${error.message}`; }
+  finally { homePhotoBusy = false; input.disabled = false; input.value = ''; renderHomePhotos(); }
+};
+window.deleteHomePhoto = async function(index) {
+  if (role !== 'admin' || homePhotoBusy) return;
+  const photos = getHomePhotos();
+  if (!Number.isInteger(index) || !photos[index] || !confirm('Xóa ảnh này khỏi Trang chủ?')) return;
+  homePhotoBusy = true; renderHomePhotos();
+  try {
+    await saveHomePhotos(photos.filter((_, i) => i !== index));
+    document.getElementById('homePhotoStatus').textContent = 'Đã xóa ảnh khỏi Trang chủ.';
+  } catch (error) { document.getElementById('homePhotoStatus').textContent = 'Không thể xóa ảnh: ' + error.message; }
+  finally { homePhotoBusy = false; renderHomePhotos(); }
 };
 
 function renderHomeTeachers() {
