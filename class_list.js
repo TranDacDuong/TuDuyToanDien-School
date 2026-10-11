@@ -418,6 +418,7 @@
   }
 
   function renderSupplementarySessions(sessions, role){
+    sessions = (sessions || []).filter(session => session.status !== "completed");
     if(!sessions || !sessions.length) return "";
     const canManage = ["admin","accountant","teacher","assistant"].includes(role);
     const sorted = [...sessions].sort((a,b) => {

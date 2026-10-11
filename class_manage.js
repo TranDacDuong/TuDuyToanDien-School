@@ -2653,14 +2653,15 @@
       });
 
     const gameSectionHtml = buildClassGamesSection(role, gameRooms||[], gamePlayers||[]);
-    const suppSectionHtml = (suppSessions && suppSessions.length > 0)
+    const visibleSuppSessions = (suppSessions || []).filter(session => session.status !== "completed");
+    const suppSectionHtml = (visibleSuppSessions.length > 0)
       ? '<div style="background:var(--white);border:1px solid rgba(217,119,6,.25);border-radius:14px;padding:16px 18px;margin-bottom:14px;box-shadow:0 6px 18px rgba(217,119,6,.06)">'+
           '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">'+
             '<div><div style="font-weight:700;color:var(--navy)">⭐ Buổi dạy bổ sung của lớp (Phụ đạo)</div><div style="font-size:.78rem;color:var(--ink-mid);margin-top:2px">Bấm "Điểm danh & Hoàn thành" để chốt sĩ số và tự động tính học phí.</div></div>'+
-            '<span style="font-size:.78rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#fef3c7;color:#92400e">'+suppSessions.length+' buổi</span>'+
+            '<span style="font-size:.78rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#fef3c7;color:#92400e">'+visibleSuppSessions.length+' buổi</span>'+
           '</div>'+
           '<div style="display:grid;gap:10px">'+
-            suppSessions.map(s => {
+            visibleSuppSessions.map(s => {
               const isDone = s.status === "completed";
               const stuCount = (s.students || []).length;
               const feeStr = Number(s.fee_per_student || 0).toLocaleString("vi-VN") + "đ";
