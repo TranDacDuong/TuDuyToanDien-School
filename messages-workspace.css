@@ -13,9 +13,11 @@ body { background: #e9ebf0; }
 .inbox-tabs button[aria-pressed="true"] { color: #0869dc; border-bottom-color: #0869dc; }
 .inbox-tabs button:disabled { opacity: .5; cursor: not-allowed; }
 .waiting-reply-label { display: inline-block; margin-top: 4px; color: #b45309; background: #fff1d6; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
-.friend-list-actions { padding: 0 12px; }
+.friend-list-actions { padding: 0 12px 8px; }
+.friend-list { justify-content: flex-start; }
+.friend-list > * { flex-shrink: 0; }
 .friend-list-action-btn { font-size: 12px; padding: 7px; background: #fff; font-weight: 500; }
-.friend-card { min-height: 88px; padding: 12px 14px; }
+.friend-card { min-height: 88px; height: auto; padding: 12px 14px; }
 .friend-card .avatar { width: 48px; height: 48px; }
 .friend-main { flex: 1; overflow: hidden; padding-right: 0; }
 .friend-card .name-primary { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

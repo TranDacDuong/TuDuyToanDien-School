@@ -5,6 +5,11 @@ const vm = require('node:vm');
 const path = require('node:path');
 const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'messages.html'), 'utf8');
+test('conversation rows cannot shrink and overlap the load-more control', () => {
+  const css = fs.readFileSync(path.join(root, 'messages-workspace.css'), 'utf8');
+  assert.match(css, /\.friend-list > \*\s*\{\s*flex-shrink:\s*0;/);
+  assert.match(css, /\.friend-list-actions\s*\{\s*padding:\s*0 12px 8px;/);
+});
 function element() {
   return { children: [], hidden: true, textContent: '', attrs: {}, classList: { toggle() {} },
     append(...items) { this.children.push(...items); }, replaceChildren() { this.children = []; },
