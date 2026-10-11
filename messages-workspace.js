@@ -1,9 +1,10 @@
 (function () {
   window.inboxUnreadOnly = false;
+  window.inboxWaitingOnly = true;
   window.setInboxFilter = function (unread) {
     window.inboxWaitingOnly = unread === 'reply';
     window.inboxUnreadOnly = unread === true;
-    document.querySelectorAll('.inbox-tabs button').forEach((button, index) => button.setAttribute('aria-pressed', String(index === (unread === 'reply' ? 2 : unread ? 1 : 0))));
+    document.querySelectorAll('.inbox-tabs button').forEach((button, index) => button.setAttribute('aria-pressed', String(index === (unread === 'reply' ? 0 : 1))));
     filterFriends();
   };
   window.toggleConversationInfo = function (force) {

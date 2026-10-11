@@ -27,12 +27,17 @@ function harness() {
   vm.runInContext(fs.readFileSync(path.join(root, 'messages-workspace.js'), 'utf8'), context);
   return { context, ids, tabs, filters: () => filters };
 }
-test('unread toggle refreshes existing search and exposes selected state', () => {
-  const h = harness(); h.context.window.setInboxFilter(true);
-  assert.equal(h.context.window.inboxUnreadOnly, true);
+test('waiting replies are default and All refreshes existing search', () => {
+  const h = harness();
+  assert.equal(h.context.window.inboxWaitingOnly, true);
+  h.context.window.setInboxFilter(false);
+  assert.equal(h.context.window.inboxWaitingOnly, false);
   assert.equal(h.tabs[1].attrs['aria-pressed'], 'true');
   assert.equal(h.filters(), 1);
-  assert.match(html, /list = list.filter\(item => Number\(item.unreadCount\) > 0\)/);
+  h.context.window.setInboxFilter('reply');
+  assert.equal(h.tabs[0].attrs['aria-pressed'], 'true');
+  assert.equal(h.context.window.inboxWaitingOnly, true);
+  assert.doesNotMatch(html, />Chưa đọc<\/button>/);
 });
 test('info panel opens/closes and clears stale conversation data', () => {
   const h = harness(); h.context.activeFriend = { id: 'parent', name: '<Parent>', avatar: 'favicon.png', role: 'parent', children: [{ name: 'Student' }] };
