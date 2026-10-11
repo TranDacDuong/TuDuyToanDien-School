@@ -132,7 +132,7 @@ async function syncGatewayOutbox() {
       acknowledgement = { action: 'finish', jobId: job.job_id, status: 'sent',
         externalId: `${job.zalo_uid}:${messageId}` };
     } catch (error) {
-      if (isZaloLimitError(error) || error.deliveryUncertain) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
+      if (isZaloLimitError(error)) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
       await acknowledgeDispatch({ action: 'finish', jobId: job.job_id,
         status: isUncertainSendError(error) || /no message id/.test(String(error?.message)) ? 'uncertain' : 'failed',
         error: String(error?.message || error) });
@@ -156,7 +156,7 @@ async function sendQueuedAutomaticTuition(job) {
       }, uid);
       return `${uid}:${requireSendAcknowledgement(sent, part.kind === 'text' ? 0 : 1)}`;
     } catch (error) {
-      if (isZaloLimitError(error) || error.deliveryUncertain) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
+      if (isZaloLimitError(error)) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
       throw error;
     }
   }, async (part, claimed, index) => {
@@ -360,7 +360,7 @@ async function sendQueuedTuitionReceipt(job) {
     const sent = await zaloApi.sendMessage(job.content, job.zalo_uid);
     externalId = `${job.zalo_uid}:${requireSendAcknowledgement(sent)}`;
   } catch (error) {
-    if (isZaloLimitError(error) || error.deliveryUncertain) {
+    if (isZaloLimitError(error)) {
       await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
     }
     const detail = String(error?.message || error);
