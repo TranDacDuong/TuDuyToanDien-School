@@ -1,8 +1,9 @@
 (function () {
   window.inboxUnreadOnly = false;
   window.setInboxFilter = function (unread) {
-    window.inboxUnreadOnly = !!unread;
-    document.querySelectorAll('.inbox-tabs button').forEach((button, index) => button.setAttribute('aria-pressed', String(index === (unread ? 1 : 0))));
+    window.inboxWaitingOnly = unread === 'reply';
+    window.inboxUnreadOnly = unread === true;
+    document.querySelectorAll('.inbox-tabs button').forEach((button, index) => button.setAttribute('aria-pressed', String(index === (unread === 'reply' ? 2 : unread ? 1 : 0))));
     filterFriends();
   };
   window.toggleConversationInfo = function (force) {
