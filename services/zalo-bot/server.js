@@ -35,6 +35,7 @@ app.use((req, res, next) => {
 });
 app.use(express.json());
 let gatewayBusy = false;
+let shuttingDown = false;
 let gatewayListening = false;
 let gatewayListenerApi = null;
 let nextGatewaySendAt = 0;
@@ -1319,6 +1320,27 @@ app.post('/api/test-send', async (req, res) => {
 });
 
 // Khởi động server
+app.post('/api/shutdown', async (req, res) => {
+  // Only the local launcher may stop the service, never a web page.
+  if (req.headers.origin || req.headers['sec-fetch-site']) return res.status(403).json({ error: 'Launcher only' });
+  if (shuttingDown) return res.status(409).json({ error: 'Shutdown already in progress' });
+  shuttingDown = true;
+  const deadline = Date.now() + 120000;
+  while (gatewayBusy && Date.now() < deadline) await sleep(250);
+  if (gatewayBusy) {
+    shuttingDown = false;
+    return res.status(409).json({ error: 'Active send has not finished; retry later' });
+  }
+  try {
+    persistIncoming();
+    res.json({ success: true });
+    setTimeout(() => process.exit(0), 300);
+  } catch (error) {
+    shuttingDown = false;
+    res.status(500).json({ error: 'Could not persist pending messages' });
+  }
+});
+
 app.listen(PORT, HOST, () => {
   console.log(`=======================================================`);
   console.log(`🤖 Dịch vụ Zalo Bot MindUp đang chạy tại: http://localhost:${PORT}`);
@@ -1328,7 +1350,9 @@ app.listen(PORT, HOST, () => {
   // Tự động kiểm tra session Zalo khi khởi động
   initZaloClient().catch(console.error);
   setInterval(async () => {
+    if (shuttingDown) return;
     await syncGatewayOutbox();
+    if (shuttingDown) return;
     await syncParentTuition();
   }, 500).unref();
   setInterval(flushIncoming, 10000).unref();

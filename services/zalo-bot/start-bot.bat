@@ -11,13 +11,11 @@ echo     MINDUP ZALO BOT - TU DONG NHAC HOC PHI
 echo =======================================================
 echo.
 
-powershell -NoProfile -Command "try { $s = Invoke-RestMethod -Uri 'http://127.0.0.1:3456/api/status' -TimeoutSec 2; if ($s.botStatus) { exit 0 } } catch {}; exit 1" > nul 2>&1
-if not errorlevel 1 (
-    echo Zalo Bot dang chay san tren may tinh nay.
-    echo Khong can mo them mot cua so bot thu hai.
-    echo.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0restart-bot.ps1"
+if errorlevel 1 (
+    echo Khong dung duoc bot cu an toan. Khong khoi dong them bot moi.
     pause
-    exit /b 0
+    exit /b 1
 )
 
 if not exist "node_modules" (
@@ -39,7 +37,7 @@ echo * Co the thu nho cua so nay de bot tiep tuc chay.
 echo * Khong tat cua so khi dang gui chien dich hoc phi.
 echo.
 
-node server.js
+node "%~dp0server.js"
 
 echo.
 echo Zalo Bot da dung hoac gap loi. Xem thong bao phia tren de biet chi tiet.
