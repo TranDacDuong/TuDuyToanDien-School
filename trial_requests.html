@@ -1298,6 +1298,9 @@ async function addTrialToClassFromModal(){
   el.addEventListener("input",()=>{ clearTimeout(t); t=setTimeout(renderRequests,160); });
 });
 document.getElementById("statusFilter").addEventListener("change",renderRequests);
+if (new URLSearchParams(location.search).get('show') === 'pending') {
+  document.getElementById('statusFilter').value = 'pending_schedule';
+}
 document.getElementById("gradeFilter").addEventListener("change",()=>{ renderSubjectFilter(); renderRequests(); });
 document.getElementById("subjectFilter").addEventListener("change",renderRequests);
 document.getElementById("studentName")?.addEventListener("keydown", event => {

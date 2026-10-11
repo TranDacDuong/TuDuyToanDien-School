@@ -2330,6 +2330,11 @@ Nhập số tiền hoàn lại (>0):`,
     await loadClassFilter();
     await loadTuition();
 
+    if (new URLSearchParams(location.search).get('show') === 'unmatched'
+      && currentRole === 'admin' && hasTuitionPermission('tuition.transactions.view', false)) {
+      await openUnmatchedBankModal();
+    }
+
     if (window.MindupLiveUI?.watchTable) {
       realtimeChannel = window.MindupLiveUI.watchTable("tuition_payments", () => {
         loadTuition();

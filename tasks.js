@@ -723,6 +723,12 @@
   }
 
   function visibleAssignments() {
+    const summaryFilter = new URLSearchParams(location.search).get('show');
+    if (['overdue', 'current'].includes(summaryFilter)) {
+      return S.assignments.filter(item => item.user_id === S.user.id && !isReminderTask(item)
+        && effectiveStatus(item) !== 'completed' && item.status !== 'cancelled'
+        && (summaryFilter === 'overdue' ? isOverdue(item) : !isOverdue(item)));
+    }
     const selected = S.selectedDate || localDate();
     const { start, end } = activeViewRange();
     return S.assignments.filter(item => {

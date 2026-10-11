@@ -1150,14 +1150,13 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     <div class="recent-message-head">
       <div>
         <h3 id="recentMessageTitle" class="recent-message-title">Thông báo mới</h3>
-        <div id="recentMessageSub" class="recent-message-sub">Các tin nhắn/thông báo mới nhất trong 24 giờ qua.</div>
+        <div id="recentMessageSub" class="recent-message-sub">Những việc cần xử lý trong phạm vi của bạn.</div>
       </div>
       <button class="recent-message-close" type="button" onclick="closeRecentMessagesPopup()" aria-label="Đóng">×</button>
     </div>
     <div id="recentMessageList" class="recent-message-list"></div>
     <div class="recent-message-actions">
       <button class="recent-message-btn" type="button" onclick="closeRecentMessagesPopup()">Để sau</button>
-      <button class="recent-message-btn primary" type="button" onclick="openRecentMessagesPage()">Mở tin nhắn</button>
     </div>
   </div>
 </div>
@@ -1210,6 +1209,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js?v=20261002-permissions2"></script>
 <script src="dashboard_ops.js?v=20260713-revenue-tuition-sync1"></script>
+<script src="dashboard-action-summary.js?v=20261012-actions1"></script>
 <script>
 let badgeChannels = [];
 let currentDashboardUser = null;
@@ -1319,68 +1319,39 @@ function openRecentMessagesPage(){
   openDashboardPage("messages.html", { syncMenu: true, syncMobile: true });
 }
 
-async function loadRecentMessagesPopup(userId){
-  if(recentMessagesPopupShown || !userId) return;
+async function loadRecentMessagesPopup(profile){
+  if(recentMessagesPopupShown || !profile?.id) return;
   recentMessagesPopupShown = true;
-  try{
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { data: memberships, error: memberError } = await sb
-      .from("conversation_members")
-      .select("conversation_id")
-      .eq("user_id", userId);
-    if(memberError) throw memberError;
-    const conversationIds = [...new Set((memberships || []).map(row => row.conversation_id).filter(Boolean))];
-    if(!conversationIds.length) return;
-
-    const { data: rows, error: messageError } = await sb
-      .from("messages")
-      .select("id,conversation_id,sender_id,real_sender_id,content,created_at")
-      .in("conversation_id", conversationIds)
-      .gte("created_at", cutoff)
-      .order("created_at", { ascending: false })
-      .limit(40);
-    if(messageError) throw messageError;
-
-    const incoming = (rows || [])
-      .filter(row => String(row.sender_id || "") !== String(userId) && String(row.real_sender_id || "") !== String(userId))
-      .map(row => ({ ...row, cleanContent: cleanRecentMessageContent(row.content) }))
-      .filter(row => row.cleanContent)
-      .slice(0, 6);
-    if(!incoming.length) return;
-
-    const senderIds = [...new Set(incoming
-      .map(row => row.real_sender_id || row.sender_id)
-      .filter(id => id && !String(id).startsWith("00000000-0000-0000-0000-000000000001")))];
-    const senderMap = new Map();
-    if(senderIds.length){
-      const { data: senders } = await sb
-        .from("users")
-        .select("id,full_name,role")
-        .in("id", senderIds);
-      (senders || []).forEach(item => senderMap.set(item.id, item));
-    }
-
-    const list = document.getElementById("recentMessageList");
-    const sub = document.getElementById("recentMessageSub");
-    if(!list) return;
-    if(sub) sub.textContent = `Có ${incoming.length} tin nhắn/thông báo mới trong 24 giờ qua.`;
-    list.innerHTML = incoming.map(row => {
-      const sender = senderMap.get(row.real_sender_id || row.sender_id);
-      const senderName = sender?.full_name || "MindUp - Tư Duy Toàn Diện";
-      return `
-        <article class="recent-message-card">
-          <div class="recent-message-card-title">
-            <span>${dashboardEsc(senderName)}</span>
-            <span class="recent-message-time">${dashboardEsc(formatRecentMessageTime(row.created_at))}</span>
-          </div>
-          <div class="recent-message-content">${dashboardEsc(row.cleanContent)}</div>
-        </article>
-      `;
-    }).join("");
-    document.getElementById("recentMessageOverlay")?.classList.add("show");
-  } catch(error){
-    console.warn("[RecentMessages] Không tải được thông báo 24h:", error);
+  const has = (key, fallback) => window.AppPermissions?.has?.(key, fallback) ?? fallback;
+  const { items, failures } = await window.DashboardActionSummary.load(sb, profile, has);
+  const list = document.getElementById('recentMessageList');
+  if(!list || !items.length) return;
+  document.getElementById('recentMessageSub').textContent = failures.length
+    ? 'Những việc cần xử lý. Một số nhóm chưa tải được, hãy kiểm tra lại sau.'
+    : 'Những việc cần xử lý trong phạm vi của bạn.';
+  list.replaceChildren();
+  for(const item of items){
+    const article = document.createElement('article');
+    article.className = 'recent-message-card';
+    const title = document.createElement('div');
+    title.className = 'recent-message-card-title';
+    title.style.flexWrap = 'wrap';
+    title.style.gap = '12px';
+    const label = document.createElement('span');
+    label.textContent = `Bạn có ${item.count} ${item.label}.`;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'recent-message-btn primary';
+    button.textContent = 'Xem ngay';
+    button.addEventListener('click', () => {
+      closeRecentMessagesPopup();
+      openDashboardPage(item.page, { syncMenu: true, syncMobile: true });
+    });
+    title.append(label, button);
+    article.append(title);
+    list.append(article);
   }
+  document.getElementById('recentMessageOverlay')?.classList.add('show');
 }
 
 function setupMindupEntrySplash(){
@@ -1491,7 +1462,7 @@ async function initDashboard(userOverride = null){
   loadMessageBadge(user.id);
   subscribeBadgeChanges(user.id);
   document.body.style.visibility = "visible";
-  setTimeout(() => loadRecentMessagesPopup(user.id), 650);
+  setTimeout(() => loadRecentMessagesPopup(profile), 650);
 }
 
 function loadUserInfo(profile){

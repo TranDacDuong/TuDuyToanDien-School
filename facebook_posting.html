@@ -2465,7 +2465,24 @@ function renderTypes(){
     row.addEventListener("dragend", () => row.classList.remove("dragging"));
   });
 }
+async function renderPendingReview(){
+  const box = $('todoBox');
+  const { data, error } = await sb.from('facebook_scheduled_posts').select('*')
+    .eq('approval_status', 'pending').not('status', 'in', '(published,cancelled)')
+    .or('content.neq.,image_url.neq.,link_url.neq.').order('scheduled_at');
+  if (error) { box.textContent = 'Không tải được bài chờ duyệt.'; return; }
+  const rows = data || [];
+  for (const row of rows) {
+    if (!S.posts.some(post => post.id === row.id)) S.posts.push(row);
+  }
+  box.innerHTML = rows.length ? rows.map(row => `<div class="mini-row"><div><strong>${esc(typeName(row.post_type_id))}</strong><div class="hint">${formatDateTime(new Date(row.scheduled_at))}</div></div><button class="icon-small" type="button" data-review-post="${esc(row.id)}" aria-label="Xem bài chờ duyệt">✎</button></div>`).join('') : '<div class="hint">Không có bài chờ duyệt.</div>';
+  box.querySelectorAll('[data-review-post]').forEach(button => button.addEventListener('click', () => openPostModal(button.dataset.reviewPost)));
+}
 function renderTodo(){
+  if (new URLSearchParams(location.search).get('show') === 'pending') {
+    renderPendingReview();
+    return;
+  }
   const rows = S.posts.filter(p => p.page_id === S.activePageId && !postHasContent(p) && !["cancelled","published"].includes(p.status)).slice(0,12);
   $("todoBox").innerHTML = rows.length ? rows.map(p => `
     <div class="mini-row">
