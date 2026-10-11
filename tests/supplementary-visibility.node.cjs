@@ -23,7 +23,7 @@ test('class detail filters display list without deleting source sessions', () =>
   const section = source.slice(source.indexOf('    const visibleSuppSessions ='), source.indexOf('    const actionsHtml =', source.indexOf('    const visibleSuppSessions =')));
   assert.match(section, /filter\(session => session.status !== "completed"\)/);
   assert.ok(section.includes('visibleSuppSessions.map'));
-  assert.ok(section.includes("visibleSuppSessions.length+' buổi'"));
+  assert.match(section, /visibleSuppSessions\.length\+' buổi/);
   new vm.Script(source);
   new vm.Script(read('class_list.js'));
 });
