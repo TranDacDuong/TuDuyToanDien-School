@@ -2471,6 +2471,15 @@ function markOptimisticMessageFailed(tempId) {
   renderLoadedMessages();
 }
 
+function markParentConversationReplied(parentId, repliedAt) {
+  for (const item of allFriends) {
+    if (item.friend_id !== parentId || item.users?.role !== 'parent') continue;
+    if (item.lastParentAt && new Date(item.lastParentAt) > new Date(repliedAt)) continue;
+    item.waitingReply = false;
+  }
+  filterFriends();
+}
+
 function removeOptimisticMessage(tempId) {
   loadedMessages = loadedMessages.filter(row => row.id !== tempId);
 }
@@ -2481,6 +2490,7 @@ window.retryOptimisticMessage = async function(tempId) {
   item._failed = false;
   item._pending = true;
   renderLoadedMessages();
+  const repliedParentId = activeFriend?.role === 'parent' ? activeFriend.id : null;
   const { data, error } = await sendMessageContentToServer(item.content);
   if (error) {
     markOptimisticMessageFailed(tempId);
@@ -2488,6 +2498,7 @@ window.retryOptimisticMessage = async function(tempId) {
     return;
   }
   removeOptimisticMessage(tempId);
+  if (repliedParentId) markParentConversationReplied(repliedParentId, new Date().toISOString());
   await loadFriends();
   await loadMessages({ scrollToBottom: true });
 };
@@ -2517,6 +2528,7 @@ window.sendMessage = async function() {
   input.value = "";
   clearMessageImage();
   const optimistic = appendOptimisticMessage(content);
+  const repliedParentId = activeFriend?.role === 'parent' ? activeFriend.id : null;
   const { data, error } = await sendMessageContentToServer(content);
   if (error) {
     const failedPayload = parseMessageContent(content);
@@ -2529,6 +2541,7 @@ window.sendMessage = async function() {
   }
 
   removeOptimisticMessage(optimistic.id);
+  if (repliedParentId) markParentConversationReplied(repliedParentId, optimistic.created_at);
   await loadFriends();
   await loadMessages({ scrollToBottom: true });
 };

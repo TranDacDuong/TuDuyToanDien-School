@@ -35,6 +35,14 @@ test('database: automatic notices cannot clear waiting; manual replies can', asy
   assert.equal(await waiting(), false);
   await db.exec(`INSERT INTO messages(conversation_id,sender_id,created_at) VALUES('${parent}','${parent}',now()+interval '1 second');`);
   assert.equal(await waiting(), true);
+  await db.exec(`INSERT INTO messages(conversation_id,sender_id,transport,created_at,zalo_dispatch_source)
+    VALUES('${parent}','${bot}','zalo',now()+interval '2 seconds','receipt');`);
+  assert.equal(await waiting(), true, 'automatic Zalo receipt cannot clear waiting');
+  await db.exec(`INSERT INTO messages(conversation_id,sender_id,transport,created_at)
+    VALUES('${parent}','${bot}','zalo',now()+interval '3 seconds');`);
+  assert.equal(await waiting(), false, 'direct reply on Zalo clears waiting without staff real_sender_id');
+  await db.exec(`INSERT INTO messages(conversation_id,sender_id,created_at) VALUES('${parent}','${parent}',now()+interval '4 seconds');`);
+  assert.equal(await waiting(), true, 'new parent message reopens waiting');
   await db.exec(`UPDATE users SET role='teacher' WHERE id='${staff}';
     DELETE FROM messages WHERE sender_id='${parent}';
     INSERT INTO messages(conversation_id,sender_id,context_student_id,created_at) VALUES('${parent}','${parent}','${bot}',now()+interval '1 second');`);
@@ -55,4 +63,21 @@ test('UI prioritizes waiting parents above unread and automatic activity', () =>
   assert.equal(context.sortConversationsByFamily(list).map(item => item.friend_id).join(','), 'waiting,unread,auto');
   assert.match(html, /window.inboxWaitingOnly/);
   assert.match(html, /send_mindup_parent_reply/);
+});
+test('successful reply removes only its parent from waiting, preserving a newer incoming message', () => {
+  const html = read('messages.html');
+  let refreshes = 0;
+  const context = { allFriends: [
+    { friend_id: 'answered', users: { role: 'parent' }, waitingReply: true, lastParentAt: '2026-10-12T01:00:00Z' },
+    { friend_id: 'other', users: { role: 'parent' }, waitingReply: true },
+    { friend_id: 'newer', users: { role: 'parent' }, waitingReply: true, lastParentAt: '2026-10-12T03:00:00Z' }
+  ], filterFriends: () => refreshes++ };
+  vm.createContext(context);
+  vm.runInContext(html.slice(html.indexOf('function markParentConversationReplied('), html.indexOf('function removeOptimisticMessage(')), context);
+  context.markParentConversationReplied('answered', '2026-10-12T02:00:00Z');
+  assert.equal(context.allFriends[0].waitingReply, false);
+  assert.equal(context.allFriends[1].waitingReply, true);
+  context.markParentConversationReplied('newer', '2026-10-12T02:00:00Z');
+  assert.equal(context.allFriends[2].waitingReply, true);
+  assert.equal(refreshes, 2);
 });

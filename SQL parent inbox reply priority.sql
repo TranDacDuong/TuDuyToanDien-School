@@ -23,8 +23,13 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   FROM public.list_mindup_parent_inbox() inbox
   LEFT JOIN LATERAL (
     SELECT max(m.created_at) FILTER (WHERE m.sender_id = inbox.parent_id) AS incoming_at,
-      max(m.created_at) FILTER (WHERE m.support_reply AND EXISTS (
+      max(m.created_at) FILTER (WHERE (m.support_reply AND EXISTS (
         SELECT 1 FROM public.users u WHERE u.id = m.real_sender_id AND u.role::text IN ('admin','teacher')
+      )) OR (
+        m.transport = 'zalo' AND m.sender_id = '00000000-0000-0000-0000-000000000001'::uuid
+        AND m.real_sender_id IS NULL AND m.message_key IS NULL
+        AND m.zalo_dispatch_source = 'automatic'
+        AND NOT EXISTS (SELECT 1 FROM public.zalo_outbox o WHERE o.message_id = m.id)
       )) AS reply_at
     FROM public.messages m
     WHERE m.conversation_id = inbox.conversation_id
