@@ -1,7 +1,7 @@
 -- Apply after SQL unified Zalo dispatch.sql and current Zalo sync/identity migrations.
 -- Separate grouped queue: existing single-QR dispatchers must NOT consume this table.
 -- Scheduler service supplies lunar-approved dates using @nghiavuive/lunar_date_vi@2.0.1.
--- No pg_cron job or live sends are installed. Only saved, locked tuition is eligible.
+-- No pg_cron job or live sends are installed. Saved outstanding tuition is eligible.
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.automatic_tuition_reminders (
@@ -83,7 +83,7 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
   FROM public.tuition_payments t
   JOIN public.users s ON s.id=t.student_id
   JOIN public.users p ON p.id=p_parent AND p.role::text='parent'
-  WHERE t.month=p_month AND t.locked_at IS NOT NULL
+  WHERE t.month=p_month
     AND regexp_replace(coalesce(s.phone,''),'[^0-9]','','g') ~ '^(0[0-9]{9}|84[0-9]{9})$'
     AND t.amount_due>t.amount_paid AND t.amount_paid>=0
     AND t.amount_due-t.amount_paid=trunc(t.amount_due-t.amount_paid)

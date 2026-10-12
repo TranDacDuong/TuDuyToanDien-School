@@ -235,12 +235,12 @@ test('migration and persisted grouped queue against local PostgreSQL', async t =
     assert.equal(await enqueue(), false);
     await db.exec(`UPDATE users SET phone='0912422333' WHERE id='${CHILD1}'`);
   });
-  await t.test('paused state, revoked links, unlocked balances and shared phone aliases excluded', async () => {
+  await t.test('unlocked balances eligible; pauses, revoked links and shared phone aliases excluded', async () => {
     await db.exec('UPDATE zalo_automation_state SET paused=true'); assert.equal((await candidates()).length, 0);
     await db.exec(`UPDATE zalo_automation_state SET paused=false; UPDATE parent_students SET revoked_at=now()`);
     assert.equal((await candidates()).length, 0);
     await db.exec('UPDATE parent_students SET revoked_at=NULL; UPDATE tuition_payments SET locked_at=NULL');
-    assert.equal((await candidates()).length, 0);
+    assert.equal((await candidates()).length, 1);
     await db.exec(`UPDATE tuition_payments SET locked_at=now(); INSERT INTO users VALUES
       ('00000000-0000-0000-0000-000000000004','parent','84912422333','Alias')`);
     assert.equal((await candidates()).length, 1); // No active links: ignore the alias.

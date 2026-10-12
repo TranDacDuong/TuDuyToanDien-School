@@ -219,7 +219,7 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$
   CROSS JOIN LATERAL (SELECT debt.debts,sum((value->>'remaining')::numeric) AS remaining
     FROM jsonb_array_elements(debt.debts) GROUP BY debt.debts) a
   CROSS JOIN LATERAL (SELECT * FROM public.tuition_payments t WHERE t.student_id=s.id
-    AND t.month<=p_month AND t.locked_at IS NOT NULL AND t.amount_due>t.amount_paid ORDER BY t.month DESC LIMIT 1) t
+    AND t.month<=p_month AND t.amount_due>t.amount_paid ORDER BY t.month DESC LIMIT 1) t
   WHERE regexp_replace(coalesce(s.phone,''),'[^0-9]','','g') ~ '^(0[0-9]{9}|84[0-9]{9})$'
     AND a.remaining>0 AND a.remaining=trunc(a.remaining)
     AND EXISTS(SELECT 1 FROM public.parent_students ps WHERE ps.parent_id=p_parent AND ps.student_id=s.id AND ps.revoked_at IS NULL);
