@@ -2534,6 +2534,59 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       cancelled: "Đã hủy" })[status] || "Đang đồng bộ";
   }
 
+  let automaticTuitionRows = [];
+  let automaticTuitionError = "";
+  const automaticLabels = { queued: "Chờ gửi", processing: "Đang gửi", sent: "Đã gửi đủ nội dung và QR", cancelled: "Đã bỏ qua", uncertain: "Chưa xác nhận gửi" };
+
+  async function loadAutomaticTuitionProgress() {
+    if (currentRole !== "admin" || !hasTuitionPermission("tuition.zalo_queue.manage", false)) return;
+    const ym = monthPicker?.value;
+    if (!/^\d{4}-\d{2}$/.test(ym || "")) return;
+    try {
+      const { data, error } = await getSb().rpc("list_automatic_tuition_reminders", { p_month: `${ym}-01` });
+      if (error) throw error;
+      if (monthPicker.value !== ym) return;
+      automaticTuitionRows = data || [];
+      automaticTuitionError = "";
+    } catch (error) {
+      automaticTuitionRows = [];
+      automaticTuitionError = "Không tải được trạng thái gửi tự động: " + error.message;
+    }
+    if (document.getElementById("automaticTuitionDetails")?.open) renderAutomaticTuitionDetails();
+  }
+
+  function automaticTuitionProgressHtml() {
+    if (currentRole !== "admin" || !hasTuitionPermission("tuition.zalo_queue.manage", false)) return "";
+    const latest = automaticTuitionRows[0]?.due_date;
+    const rows = automaticTuitionRows.filter(row => row.due_date === latest);
+    const counts = rows.reduce((result, row) => { result[row.status] = (result[row.status] || 0) + 1; return result; }, {});
+    const finished = rows.filter(row => ["sent", "cancelled", "uncertain"].includes(row.status)).length;
+    return `<section style="padding:16px;margin-bottom:14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#0f1f3d">
+      <b>Nhắc học phí tự động tháng ${esc(monthPicker?.value || "")}</b>
+      <div style="margin:10px 0">${automaticTuitionError ? esc(automaticTuitionError) : !rows.length ? "Chưa có lượt gửi tự động được tạo trong tháng này." : `Đợt ngày ${esc(latest)} · Đã xử lý ${finished}/${rows.length} phụ huynh${finished === rows.length ? " · Đã hoàn tất" : ""}`}</div>
+      ${rows.length ? `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">${Object.entries(automaticLabels).map(([key, label]) => `<span>${label}: <b>${counts[key] || 0}</b></span>`).join("")}</div><button type="button" onclick="openAutomaticTuitionDetails()">Xem chi tiết gửi tự động</button>` : ""}
+    </section>`;
+  }
+
+  function renderAutomaticTuitionDetails() {
+    const target = document.getElementById("automaticTuitionRows");
+    if (!target) return;
+    target.innerHTML = `<table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px"><thead><tr><th>Đợt gửi</th><th>Phụ huynh / học sinh</th><th>Trạng thái</th><th>Cập nhật / lỗi</th></tr></thead><tbody>${automaticTuitionRows.map(row => `<tr style="border-top:1px solid #e2e8f0"><td style="padding:12px">${esc(row.due_date)}<br>Ngày nhắc ${esc(row.slot)}</td><td style="padding:12px">${esc(row.parent_name || "Phụ huynh")}<br>${esc(row.phone)}<br>${esc(row.students || "")}</td><td style="padding:12px">${esc(automaticLabels[row.status] || row.status)}<br>Đã xác nhận ${esc(row.completed_parts)}/${esc(row.total_parts)} phần (nội dung + QR)</td><td style="padding:12px;overflow-wrap:anywhere">${esc(new Date(row.updated_at).toLocaleString("vi-VN"))}<br>${esc(row.error_message || "")}</td></tr>`).join("")}</tbody></table>`;
+  }
+
+  window.openAutomaticTuitionDetails = function () {
+    let dialog = document.getElementById("automaticTuitionDetails");
+    if (!dialog) {
+      dialog = document.createElement("dialog");
+      dialog.id = "automaticTuitionDetails";
+      dialog.style.cssText = "width:min(1100px,calc(100vw - 32px));max-height:85dvh;padding:18px;border:1px solid #cbd5e1;border-radius:8px";
+      dialog.innerHTML = `<header style="display:flex;justify-content:space-between;gap:12px"><h3>Chi tiết nhắc học phí tự động</h3><button type="button" onclick="document.getElementById('automaticTuitionDetails').close()">Đóng</button></header><div id="automaticTuitionRows" style="overflow:auto;max-height:65dvh"></div>`;
+      document.body.appendChild(dialog);
+    }
+    renderAutomaticTuitionDetails();
+    if (!dialog.open) dialog.showModal();
+  };
+
   function rebuildZaloDurableProgress(rows) {
     const ordered = [...(rows || [])]
       .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
@@ -2668,6 +2721,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
   window.renderZaloTuitionDetails = renderZaloTuitionDetails;
 
   async function loadZaloTuitionHistory() {
+    await loadAutomaticTuitionProgress();
     const ym = monthPicker?.value || "";
     const studentIds = [...new Set(currentZaloCampaignItems.map(item => item.studentId).filter(Boolean))];
     const parentIds = [...new Set(currentZaloCampaignItems.map(item => item.parentId).filter(Boolean))];
@@ -3153,7 +3207,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
         <div style="background:#0f1f3d;color:#fff;border-radius:8px;padding:16px 18px;margin-bottom:16px;box-shadow:0 10px 24px rgba(15,31,61,.16)">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;flex-wrap:wrap">
             <div>
-              <div style="font-weight:800;font-size:14px">${active ? "Tiến độ xử lý đợt gửi học phí" : "Đợt gửi học phí gần nhất đã hoàn tất"}</div>
+              <div style="font-weight:800;font-size:14px">${active ? "Tiến độ gửi học phí thủ công" : "Đợt gửi thủ công gần nhất đã hoàn tất"}</div>
               <div style="font-size:11px;color:#cbd5e1;margin-top:3px">Bắt đầu ${esc(started)}${latestActivity ? ` · Hoạt động gần nhất ${esc(latestActivity)}` : ""}</div>
             </div>
             <div style="font-weight:800;color:#7dd3fc">Đã xử lý ${durable.finalized}/${durable.total} lượt gửi · ${deliveryPercent}%</div>
@@ -3229,6 +3283,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       `;
     }
 
+    liveProgressHtml = automaticTuitionProgressHtml() + liveProgressHtml;
     if (liveProgressHtml !== lastRenderedProgressHtml) {
       progressSection.innerHTML = liveProgressHtml;
       lastRenderedProgressHtml = liveProgressHtml;
