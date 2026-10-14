@@ -193,25 +193,6 @@
       || null;
   }
 
-  function calcTuition({ tuition_type, tuition_fee, makeup_fee, present, makeup, totalSessions }) {
-    const fee = Number(tuition_fee) || 0;
-    const makeupFee = (makeup_fee != null && makeup_fee !== "") ? Number(makeup_fee) : null;
-
-    if (tuition_type === "per_session") {
-      const mFee = makeupFee !== null ? makeupFee : fee;
-      return (present * fee) + (makeup * mFee);
-    }
-
-    if (tuition_type === "per_month") {
-      const perSession = totalSessions > 0 ? fee / totalSessions : 0;
-      const mFee = makeupFee !== null ? makeupFee : perSession;
-      return Math.max(0, fee + (makeup * mFee));
-    }
-
-    if (tuition_type === "per_course") return fee;
-    return 0;
-  }
-
   async function fetchAllPages(buildQuery, pageSize = 1000) {
     const rows = [];
     for (let from = 0; ; from += pageSize) {
@@ -339,6 +320,7 @@
 
   async function loadAdminOps() {
     try {
+      await window.TuitionDiscounts.load("admin");
       const now = new Date();
       const thisMonth = ym(now);
       const thisMonthStart = monthStart(now);
@@ -354,17 +336,21 @@
           chosenScheduleRes,
           examResultRes,
           sessionScoreRes,
+          trialRes,
+          supplementaryRes,
         ] = await Promise.all([
-        fetchAllPages(() => sb.from("tuition_payments").select("month,amount_due,amount_paid").lte("month", thisMonthStart).order("month", { ascending: true })),
+        fetchAllPages(() => sb.from("tuition_payments").select("student_id,month,amount_due,amount_paid,locked_at,gross_components").lte("month", thisMonthStart).order("month", { ascending: true })),
         fetchAllPages(() => sb.from("users").select("id,role,created_at").eq("role", "student").order("created_at", { ascending: true })),
         fetchAllPages(() => sb.from("class_students").select("class_id,student_id,joined_at,left_at").order("joined_at", { ascending: true })),
         fetchAllPages(() => sb.from("classes").select("id,class_name,hidden,tuition_fee,tuition_type,makeup_fee,subjects(name),class_schedules(id,session_no,weekday,start_time,end_time,effective_from)").eq("hidden", false).order("class_name", { ascending: true })),
-          fetchAllPages(() => sb.from("attendance").select("class_id,student_id,date,status,schedule_id").lte("date", toDate).order("date", { ascending: true })),
+          fetchAllPages(() => sb.from("attendance").select("class_id,student_id,date,status,status_overridden,schedule_id").lte("date", toDate).order("date", { ascending: true })),
           fetchAllPages(() => sb.from("class_student_schedules").select("class_id,student_id,schedule_id,effective_from")),
           fetchAllPages(() => sb.from("exam_results").select("class_id,submitted_at,score_auto,score_total,exam:exams(total_points,classes(class_name,subjects(name)))").not("submitted_at", "is", null).order("submitted_at", { ascending: true })),
           fetchAllPages(() => sb.from("class_session_scores").select("class_id,score,max_score,created_at,class_sessions(session_date)").order("created_at", { ascending: true })),
+          fetchAllPages(() => sb.from("trial_lesson_requests").select("student_id,trial_class_id,trial_session_1_at,trial_session_2_at")),
+          fetchAllPages(() => sb.from("supplementary_sessions").select("id,parent_class_id,topic,session_date,fee_per_student,status,students:supplementary_session_students(student_id,attendance_status,tuition_fee,tuition_charged)").eq("status", "completed").lte("session_date", toDate)),
         ]);
-        const firstError = tuitionRes.error || studentRes.error || classStudentRes.error || classRes.error || attendanceRes.error || chosenScheduleRes.error || examResultRes.error || sessionScoreRes.error;
+        const firstError = tuitionRes.error || studentRes.error || classStudentRes.error || classRes.error || attendanceRes.error || chosenScheduleRes.error || examResultRes.error || sessionScoreRes.error || trialRes.error || supplementaryRes.error;
       if (firstError) throw firstError;
 
       const tuitions = tuitionRes.data || [];
@@ -381,6 +367,7 @@
           ...collectDataMonths(students, ["created_at"]),
           ...collectDataMonths(classStudents, ["joined_at", "left_at"]),
           ...collectDataMonths(attendance, ["date"]),
+          ...collectDataMonths(supplementaryRes.data || [], ["session_date"]),
           ...collectDataMonths(examResults, ["submitted_at"]),
           ...collectDataMonths(sessionScores, ["created_at"]),
         ].forEach(key => monthsWithData.add(key));
@@ -415,63 +402,14 @@
       });
 
       keys.forEach(monthKey => {
-        const mStart = ymToDate(monthKey);
-        const mEnd = monthEndByKey(monthKey);
-
-        classStudents.forEach(classStudent => {
-          const cls = classMap[classStudent.class_id];
-          if (!cls) return;
-          const joined = classStudent.joined_at ? String(classStudent.joined_at).slice(0, 10) : "0000-00-00";
-          const left = classStudent.left_at ? String(classStudent.left_at).slice(0, 10) : "9999-99-99";
-          if (joined > mEnd || left < mStart) return;
-
-          const chosenRows = chosenMap[`${classStudent.student_id}_${classStudent.class_id}`];
-          const activeOccurrences = generateOccurrencesForStudent(cls.class_schedules || [], monthKey, chosenRows).filter(occurrence => {
-            if (occurrence.date > left) return false;
-            if (occurrence.date >= joined) return true;
-            const actualStatus = attendanceStatusFor(attendanceMap, classStudent.student_id, classStudent.class_id, occurrence);
-            return actualStatus === "present" || actualStatus === "makeup";
-          });
-          const occurrenceKeys = new Set(activeOccurrences.map(occurrence => `${occurrence.date}_${occurrence.schedule_id || 0}`));
-          (attendanceRowsByStudentClass[`${classStudent.student_id}_${classStudent.class_id}`] || []).forEach(row => {
-            const date = String(row.date || "").slice(0, 10);
-            const status = String(row.status || "");
-            const scheduleId = Number(row.schedule_id || 0);
-            const key = `${date}_${scheduleId}`;
-            if (!date || date < mStart || date > mEnd || occurrenceKeys.has(key) || date > left) return;
-            if (date < joined && status !== "present" && status !== "makeup") return;
-            activeOccurrences.push({
-              date,
-              schedule_id: scheduleId,
-              session_no: 0,
-              schedule: null,
-              from_attendance_only: true,
-            });
-            occurrenceKeys.add(key);
-          });
-          activeOccurrences.sort((a, b) =>
-            String(a.date || "").localeCompare(String(b.date || ""))
-            || Number(a.schedule_id || 0) - Number(b.schedule_id || 0)
-          );
-          const totalSessions = activeOccurrences.length;
-
-          let present = 0;
-          let makeup = 0;
-          activeOccurrences.forEach(occurrence => {
-            const status = attendanceStatusFor(attendanceMap, classStudent.student_id, classStudent.class_id, occurrence) || "present";
-            if (status === "present") present += 1;
-            else if (status === "makeup") makeup += 1;
-          });
-
-          revenueByMonth[monthKey].due += calcTuition({
-            tuition_type: cls.tuition_type,
-            tuition_fee: cls.tuition_fee,
-            makeup_fee: cls.makeup_fee,
-            present,
-            makeup,
-            totalSessions,
-          });
+        const payments = Object.fromEntries(tuitions
+          .filter(payment => String(payment.month).slice(0, 7) === monthKey)
+          .map(payment => [payment.student_id, payment]));
+        const rows = window.TuitionCalculation.buildRowsForMonth({
+          ym: monthKey, classes, classStudents, attData: attendance, chosenSchedules,
+          trialReqs: trialRes.data || [], suppSessions: supplementaryRes.data || [], payments
         });
+        revenueByMonth[monthKey].due = rows.reduce((sum, row) => sum + row.amount, 0);
       });
 
       const studentAdds = Object.fromEntries(keys.map(key => [key, 0]));
