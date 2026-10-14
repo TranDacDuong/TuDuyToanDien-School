@@ -1000,11 +1000,6 @@
     <div id="teacherIncomeSections" style="display:flex;flex-direction:column;gap:24px;">
     <!-- KPI cards -->
     <div class="kpi-grid">
-      <div class="kpi-card revenue">
-        <span class="kpi-label">Doanh thu thực thu</span>
-        <div class="kpi-value" id="kpiRevenue">0đ</div>
-        <span class="kpi-sub" id="kpiRevenueSub">Tổng gộp các lớp & khóa học</span>
-      </div>
       <div class="kpi-card salary">
         <span class="kpi-label">Lương cứng</span>
         <div class="kpi-value" id="kpiSalary">0đ</div>
@@ -1019,11 +1014,6 @@
         <span class="kpi-label">Tổng thu nhập tháng</span>
         <div class="kpi-value" id="kpiTotalIncome">0đ</div>
         <span class="kpi-sub">Lương cứng + Thưởng</span>
-      </div>
-      <div class="kpi-card projected">
-        <span class="kpi-label">Dự kiến khi thu đủ</span>
-        <div class="kpi-value" id="kpiProjectedIncome">0đ</div>
-        <span class="kpi-sub" id="kpiProjectedSub">Nếu thu đủ học phí dự kiến</span>
       </div>
     </div>
 
@@ -1040,8 +1030,8 @@
     <div class="milestone-card">
       <div class="milestone-head">
         <div>
-          <h3 class="milestone-title">🎯 Cột mốc doanh thu thực tế</h3>
-          <p class="milestone-subtitle">Theo dõi doanh thu đã thu, mốc đã đạt và chặng tiếp theo trong tháng.</p>
+          <h3 class="milestone-title">🎯 Cột mốc doanh thu khi thu đủ</h3>
+          <p class="milestone-subtitle">Doanh thu học phí khi thu đủ trong tháng.</p>
         </div>
         <div class="milestone-current" id="milestoneCurrentRevenue">0đ</div>
       </div>
@@ -2734,16 +2724,14 @@
         const personCustomBonus = Number(customBonusMapByStaff[person.id] || 0);
         let salary, projectedSalary;
         if (isTeacher) {
-          const specBonus = Number(staffRevenue.specialBonusTotal || 0);
           const specProjBonus = Number(staffRevenue.specialProjectedBonusTotal || 0);
 
-          const basicSal = calculateSalaryBreakdown(staffRevenue.basicPerSessionActualRevenue, effectiveBaseSalary, Number(cfg.base_tier_percent || 0));
           const basicProjSal = calculateSalaryBreakdown(staffRevenue.basicPerSessionProjectedRevenue, effectiveBaseSalary, Number(cfg.base_tier_percent || 0));
 
           salary = {
             baseSalary: effectiveBaseSalary,
-            totalBonus: basicSal.totalBonus + specBonus + personCustomBonus,
-            totalIncome: effectiveBaseSalary + basicSal.totalBonus + specBonus + personCustomBonus,
+            totalBonus: basicProjSal.totalBonus + specProjBonus + personCustomBonus,
+            totalIncome: effectiveBaseSalary + basicProjSal.totalBonus + specProjBonus + personCustomBonus,
           };
           projectedSalary = {
             baseSalary: effectiveBaseSalary,
@@ -3418,9 +3406,9 @@
             className: item.className,
             classId: cId,
             rate: specialPct,
-            revenue: classActualRev,
+            revenue: classProjRev,
             projectedRevenue: classProjRev,
-            bonus: classBonus,
+            bonus: classProjBonus,
             projectedBonus: classProjBonus
           });
         } else if (tuitionType === "per_session") {
@@ -3431,11 +3419,6 @@
 
       // Basic Classes Progressive Breakdown (applies only to per-session basic classes)
       const basicSalaryDetails = calculateSalaryBreakdown(
-        basicPerSessionActualRevenue,
-        teacherSalaryConfig.base_salary,
-        teacherSalaryConfig.base_tier_percent
-      );
-      const basicProjectedSalaryDetails = calculateSalaryBreakdown(
         basicPerSessionProjectedRevenue,
         teacherSalaryConfig.base_salary,
         teacherSalaryConfig.base_tier_percent
@@ -3448,37 +3431,25 @@
       const totalProjectedRevenue = totalProjectedClassRevenue + totalCourseRevenue;
 
       // Total Bonus & Total Income (inclusive of custom bonuses)
-      const totalBonus = basicSalaryDetails.totalBonus + totalSpecialBonus + totalCustomBonus;
+      const totalBonus = basicSalaryDetails.totalBonus + totalSpecialProjectedBonus + totalCustomBonus;
       const totalIncome = teacherSalaryConfig.base_salary + totalBonus;
 
-      const totalProjectedBonus = basicProjectedSalaryDetails.totalBonus + totalSpecialProjectedBonus + totalCustomBonus;
-      const totalProjectedIncome = teacherSalaryConfig.base_salary + totalProjectedBonus;
-      lastTeacherRevenueForProjection = totalRevenue;
+      lastTeacherRevenueForProjection = totalProjectedRevenue;
 
       // Render KPIs
-      document.getElementById("kpiRevenue").textContent = fmt(totalRevenue) + "đ";
       document.getElementById("kpiSalary").textContent = fmt(teacherSalaryConfig.base_salary) + "đ";
       document.getElementById("kpiBonus").textContent = fmt(totalBonus) + "đ";
       document.getElementById("kpiTotalIncome").textContent = fmt(totalIncome) + "đ";
-      document.getElementById("kpiProjectedIncome").textContent = fmt(totalProjectedIncome) + "đ";
       
-      const subParts = [];
-      subParts.push(`Cơ bản: ${fmt(basicPerSessionActualRevenue)}đ`);
-      if (totalSpecialActualRevenue > 0) {
-        subParts.push(`Đặc biệt (${specialBreakdownItems.length} lớp): ${fmt(totalSpecialActualRevenue)}đ`);
-      }
-      if (totalCourseRevenue > 0) subParts.push(`Khóa: ${fmt(totalCourseRevenue)}đ`);
-      document.getElementById("kpiRevenueSub").innerHTML = subParts.join(" | ");
 
       const bonusSubParts = [];
       if (basicSalaryDetails.totalBonus > 0) bonusSubParts.push(`Cơ bản: +${fmt(basicSalaryDetails.totalBonus)}đ`);
-      if (totalSpecialBonus > 0) bonusSubParts.push(`Đặc biệt: +${fmt(totalSpecialBonus)}đ`);
+      if (totalSpecialProjectedBonus > 0) bonusSubParts.push(`Đặc biệt: +${fmt(totalSpecialProjectedBonus)}đ`);
       if (totalCustomBonus > 0) bonusSubParts.push(`Thưởng thêm: +${fmt(totalCustomBonus)}đ`);
       document.getElementById("kpiBonusSub").innerHTML = bonusSubParts.length
         ? bonusSubParts.join(" | ")
         : (specialBreakdownItems.length > 0 ? "Theo lớp đặc biệt" : "Tính lũy tiến từng phần");
 
-      document.getElementById("kpiProjectedSub").innerHTML = `Doanh thu đủ: ${fmt(totalProjectedRevenue)}đ | Thưởng: ${fmt(totalProjectedBonus)}đ`;
       const projectedInput = document.getElementById("projectedRevenueInput");
       if (projectedInput && !projectedInput.value) projectedInput.value = Math.round(totalProjectedRevenue || totalRevenue || 0);
       calculateCustomProjection();
@@ -3520,7 +3491,7 @@
       `).join("");
 
       // Render milestones & progress bar for basic per-session classes
-      renderMilestones(basicPerSessionActualRevenue, basicSalaryDetails.breakdown);
+      renderMilestones(basicPerSessionProjectedRevenue, basicSalaryDetails.breakdown);
 
 
       loader.style.display = "none";
