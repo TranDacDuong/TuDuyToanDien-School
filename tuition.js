@@ -2536,6 +2536,19 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
 
   let automaticTuitionRows = [];
   let automaticTuitionError = "";
+  let automaticTuitionControl = null;
+  let automaticTuitionControlBusy = false;
+  window.controlAutomaticTuition = async function (action) {
+    if (automaticTuitionControlBusy || !hasTuitionPermission("tuition.zalo_queue.manage", false)) return;
+    automaticTuitionControlBusy = true;
+    updateZaloDynamicStatus();
+    try {
+      const { data, error } = await getSb().rpc("control_automatic_tuition", { p_action: action });
+      if (error) throw error;
+      automaticTuitionControl = data;
+    } catch (error) { alert("Không thay đổi được trạng thái nhắc học phí tự động: " + error.message); }
+    finally { automaticTuitionControlBusy = false; updateZaloDynamicStatus(); }
+  };
   const automaticLabels = { queued: "Chờ gửi", processing: "Đang gửi", sent: "Đã gửi đủ nội dung và QR", cancelled: "Đã bỏ qua", uncertain: "Chưa xác nhận gửi" };
 
   async function loadAutomaticTuitionProgress() {
@@ -2547,6 +2560,9 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       if (error) throw error;
       if (monthPicker.value !== ym) return;
       automaticTuitionRows = data || [];
+      const control = await getSb().rpc("control_automatic_tuition", { p_action: "status" });
+      if (control.error) throw control.error;
+      automaticTuitionControl = control.data;
       automaticTuitionError = "";
     } catch (error) {
       automaticTuitionRows = [];
@@ -2563,6 +2579,7 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
     const finished = rows.filter(row => ["sent", "cancelled", "uncertain"].includes(row.status)).length;
     return `<section style="padding:16px;margin-bottom:14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#0f1f3d">
       <b>Nhắc học phí tự động tháng ${esc(monthPicker?.value || "")}</b>
+      ${automaticTuitionControl ? `<div style="margin-top:10px"><b>${automaticTuitionControl.paused ? "Đã tạm dừng nhắc tự động" : "Nhắc tự động đang bật"}</b><button type="button" style="margin-left:12px;padding:7px 12px" ${automaticTuitionControlBusy ? "disabled" : ""} onclick="controlAutomaticTuition('${automaticTuitionControl.paused ? "resume" : "pause"}')">${automaticTuitionControl.paused ? "Tiếp tục" : "Dừng"}</button>${automaticTuitionControl.paused ? '<div style="margin-top:6px">Hàng chờ được giữ nguyên. Lượt đang gửi hoàn tất trước khi dừng.</div>' : ""}</div>` : ""}
       <div style="margin:10px 0">${automaticTuitionError ? esc(automaticTuitionError) : !rows.length ? "Chưa có lượt gửi tự động được tạo trong tháng này." : `Đợt ngày ${esc(latest)} · Đã xử lý ${finished}/${rows.length} phụ huynh${finished === rows.length ? " · Đã hoàn tất" : ""}`}</div>
       ${rows.length ? `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">${Object.entries(automaticLabels).map(([key, label]) => `<span>${label}: <b>${counts[key] || 0}</b></span>`).join("")}</div><button type="button" onclick="openAutomaticTuitionDetails()">Xem chi tiết gửi tự động</button>` : ""}
     </section>`;
