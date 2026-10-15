@@ -70,7 +70,18 @@
         link.append(image(url, '', 'Ảnh hội thoại')); grid.append(link);
       });
       media.append(grid);
-    } else media.append(textElement('p', 'Chưa có ảnh trong các tin nhắn đã tải.'));
+    }
+    const zaloMedia=loadedMessages.filter(item=>{
+      const state=window.getZaloMessageMetadata?.(item.external_message_id);
+      return !state?.revoked && state?.metadata?.media;
+    });
+    zaloMedia.forEach(item=>{
+      const details=window.getZaloMessageMetadata(item.external_message_id).metadata.media;
+      const button=textElement('button',details.kind==='image'?'[Hình ảnh] · Xem ảnh':details.name || (details.kind==='video'?'[Video]':'[Tệp / âm thanh]'));
+      button.type='button';button.style.cssText='display:block;margin:8px 0;max-width:100%;overflow-wrap:anywhere';
+      button.onclick=()=>window.openZaloMedia(item.external_message_id);media.append(button);
+    });
+    if(!urls.length && !zaloMedia.length) media.append(textElement('p', 'Chưa có ảnh trong các tin nhắn đã tải.'));
     body.append(media);
   };
   document.addEventListener('keydown', event => { if (event.key === 'Escape') window.toggleConversationInfo(false); });

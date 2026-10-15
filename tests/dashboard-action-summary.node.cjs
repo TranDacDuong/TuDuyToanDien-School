@@ -40,18 +40,20 @@ test('counts use Bangkok date and exclude completed, cancelled and reminders', (
 test('admin counts messages from authorized inbox RPC and tasks only assigned to self', async () => {
   const { sb, calls } = client('admin');
   const result = await summary.load(sb, { id: 'self', role: 'admin' }, () => true);
-  assert.equal(result.items.find(x => x.key === 'messages').count, 1);
+  assert.equal(result.items.find(x => x.key === 'messages').count, 2);
+  assert.ok(calls.some(c => c[0] === 'rpc' && c[1] === 'list_zalo_external_inbox'));
   assert.ok(calls.some(c => c[0] === 'rpc' && c[1] === 'list_mindup_parent_reply_priority'));
   assert.ok(calls.some(c => c[0] === 'task_assignments' && c[1] === 'eq' && c[2] === 'user_id' && c[3] === 'self'));
   assert.ok(result.items.some(x => x.key === 'bank'));
 });
 test('teacher cannot see admin banking; failed source does not hide other work', async () => {
-  const { sb } = client('teacher', 'facebook_scheduled_posts');
+  const { sb, calls } = client('teacher', 'facebook_scheduled_posts');
   const result = await summary.load(sb, { id: 'teacher', role: 'teacher' }, () => true);
   assert.ok(!result.items.some(x => x.key === 'bank'));
   assert.ok(result.items.some(x => x.key === 'messages'));
   assert.ok(result.items.some(x => x.key === 'overdue'));
   assert.ok(result.failures.includes('facebook'));
+  assert.ok(!calls.some(c => c[0] === 'rpc' && c[1] === 'list_zalo_external_inbox'));
 });
 test('denied permissions and student role do not request staff work', async () => {
   const { sb, calls } = client('student');

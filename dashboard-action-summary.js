@@ -42,7 +42,12 @@
         if (!['admin', 'teacher'].includes(profile.role) || !has('page.messages', true)) return;
         // This RPC applies the same family/student authorization as the inbox.
         const { data } = await checked(sb.rpc('list_mindup_parent_reply_priority'));
-        add('messages', (data || []).filter(row => row.waiting_reply).length, 'cuộc trò chuyện chưa phản hồi', 'messages.html');
+        let waiting=(data || []).filter(row => row.waiting_reply).length;
+        if(profile.role==='admin') {
+          const external=await sb.rpc('list_zalo_external_inbox');
+          if(!external.error) waiting+=(external.data || []).filter(row=>row.waiting_reply).length;
+        }
+        add('messages', waiting, 'cuộc trò chuyện chưa phản hồi', 'messages.html');
       }),
       source('facebook', async () => {
         if (!has('page.facebook', ['admin', 'teacher', 'assistant'].includes(profile.role))) return;

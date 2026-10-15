@@ -4,6 +4,9 @@ const fs = require('fs');
 const path = require('path');
 const { buildParentAlias, parseParentLinkCommand } = require('./link-command');
 const { GatewayQueue, HistorySync } = require('./message-sync');
+const { encodeMessage, encodeUpdate } = require('./zalo-sync-content');
+const { registerOnDemand } = require('./zalo-on-demand');
+const friendProfiles = new Map();
 const { writeJsonAtomic } = require('./sync-store');
 const { prepareScoreMessageMedia } = require('./score-message-media');
 const { createScheduler } = require('./tuition-reminder-scheduler');
@@ -522,6 +525,11 @@ function startGatewayListener() {
     flushIncoming().catch(console.error);
   });
   zaloApi.listener.on('error', error => console.warn('[ZaloBot] Zalo listener:', error));
+  for (const kind of ['undo','reaction']) zaloApi.listener.on(kind,event=>{if(zaloApi===listeningApi) queueZaloUpdate(kind,event);});
+  for (const [eventName,kind] of [['seen_messages','seen'],['delivered_messages','delivered']]) {
+    zaloApi.listener.on(eventName,events=>{if(zaloApi===listeningApi) for(const event of events || []) queueZaloUpdate(kind,event); });
+  }
+  zaloApi.listener.on('old_reactions',(events,isGroup)=>{if(zaloApi===listeningApi && !isGroup) for(const event of events || []) queueZaloUpdate('reaction',event);});
   zaloApi.listener.start({ retryOnClose: true });
 }
 
@@ -535,7 +543,6 @@ function messageTimestamp(value) {
 function queueZaloMessage(message, isHistory) {
   if (message?.type !== 0) return false;
   const content = message.data?.content;
-  if (typeof content !== 'string' || !content.trim()) return false;
   if (message.isSelf && parseParentLinkCommand(content)) return false;
   const messageId = String(message.data?.msgId || message.data?.cliMsgId || '');
   const zaloUid = String(message.threadId || '');
@@ -546,11 +553,9 @@ function queueZaloMessage(message, isHistory) {
     console.error('[ZaloBot] Hàng đợi đồng bộ Zalo đầy, tạm dừng nhận thêm');
     return false;
   }
-  pendingIncoming.set(externalId, {
-    action: 'syncMessage', externalId, zaloUid, content: content.trim(),
-    displayName: String(message.data?.dName || ''), isSelf: message.isSelf === true,
-    sentAt: messageTimestamp(message.data?.ts), isHistory: isHistory === true
-  });
+  const normalized = encodeMessage(message,friendProfiles.get(zaloUid));
+  if(!normalized) return false;
+  pendingIncoming.set(externalId, {...normalized,isHistory:isHistory===true});
   if (!isHistory) {
     try { persistIncoming(); } catch (error) {
       incomingQueue.lastError = String(error?.message || error);
@@ -559,6 +564,14 @@ function queueZaloMessage(message, isHistory) {
     flushIncoming().catch(console.error);
   }
   return true;
+}
+
+function queueZaloUpdate(kind,event) {
+  const payload=encodeUpdate(kind,event);
+  if(!payload || pendingIncoming.has(payload.externalId) || pendingIncoming.size>=5000) return;
+  pendingIncoming.set(payload.externalId,payload);
+  try { persistIncoming(); } catch(error) { console.error('[ZaloBot] Cannot persist update:',error.message); }
+  flushIncoming().catch(console.error);
 }
 
 function startHistorySync(maxPages) {
@@ -703,10 +716,11 @@ async function syncFriendsList() {
 
     friendPhoneMap.clear();
     friendUserIdSet.clear();
+    friendProfiles.clear();
 
     for (const f of friends) {
       const uid = String(f.userId || f.uid || '');
-      if (uid) friendUserIdSet.add(uid);
+      if (uid) { friendUserIdSet.add(uid); friendProfiles.set(uid,{displayName:f.displayName,zaloName:f.zaloName,avatar:f.avatar}); }
 
       const rawPhone = String(f.phoneNumber || f.phone || '').replace(/\D/g, '');
       if (rawPhone) {
@@ -1184,6 +1198,12 @@ async function sendMessageToParent(item) {
 // ==========================================
 
 // 1. Trạng thái Bot và Tiến độ hiện tại
+if(GATEWAY_URL) registerOnDemand(app,{gatewayUrl:GATEWAY_URL,persistResult:async payload=>{
+    const key=payload.externalId;pendingIncoming.set(key,payload);persistIncoming();
+    const result=await gatewayRequest(payload);pendingIncoming.delete(key);persistIncoming();return result;
+  },
+  getApi:()=>listenerConnected?zaloApi:null,isBusy:()=>gatewayBusy,setBusy:value=>{gatewayBusy=value;},requireAck:requireSendAcknowledgement});
+
 app.get('/api/status', (req, res) => {
   res.json({
     botStatus,
@@ -1357,5 +1377,6 @@ app.listen(PORT, HOST, () => {
   }, 500).unref();
   setInterval(flushIncoming, 10000).unref();
   setInterval(refreshSyncLinks, 60000).unref();
+  setInterval(()=>{if(listenerConnected) syncFriendsList().catch(console.error);},300000).unref();
   setInterval(() => recoverSavedSession().catch(console.error), 10000).unref();
 });
