@@ -5,6 +5,8 @@
 // Host must install @nghiavuive/lunar_date_vi@2.0.1 and explicitly call tick().
 const TIME_ZONE = 'Asia/Ho_Chi_Minh';
 const SLOTS = [5, 10, 15];
+const TuitionNotice = require('../../tuition-notice');
+const TuitionCalculation = require('../../tuition-calculation');
 
 function vnDate(now = new Date()) {
   if (!(now instanceof Date) || !Number.isFinite(now.getTime())) throw new TypeError('Invalid clock');
@@ -58,8 +60,11 @@ function buildPayload(candidate, month, bank) {
   const children = candidate.children;
   if (!Array.isArray(children) || !children.length) throw new Error('Empty parent balance');
   const seen = new Set();
-  const monthLabel = `${month.slice(5)}/${month.slice(0, 4)}`;
-  const lines = [`Trung tâm MindUp kính gửi Quý phụ huynh thông báo học phí tháng ${monthLabel}:`];
+  const lines = [];
+  const billing = bank.billing_context;
+  const billingRows = billing ? TuitionCalculation.buildRowsForMonth({
+    ...billing, ym: month, payments: Object.fromEntries((billing.payments || []).map(p=>[p.student_id,p]))
+  }, {discountRules:billing.discountRules || []}) : [];
   const qrs = [];
   for (const child of children) {
     const remaining = Number(child.remaining);
@@ -74,16 +79,17 @@ function buildPayload(candidate, month, bank) {
       .trim().split(/\s+/).slice(-2).map(w => w[0].toUpperCase() + w.slice(1).toLowerCase()).join(' ');
     if (!ascii) throw new Error('Invalid transfer name');
     const transfer = child.transfer_memo || `SEVQR HP${month.slice(5)}${month.slice(2, 4)} ${ascii} ${phone(child.payment_phone).slice(-4)}`;
-    lines.push(`${name}: còn cần thanh toán ${remaining.toLocaleString('vi-VN')} VNĐ`);
-    for (const debt of child.debts || []) {
-      const date = String(debt.month).slice(0, 7);
-      lines.push(`  • Tháng ${date.slice(5)}/${date.slice(0, 4)}: ${Number(debt.remaining).toLocaleString('vi-VN')} VNĐ`);
-    }
+    const details = billingRows.filter(row=>row.studentId===child.student_id);
+    lines.push(TuitionNotice.render({studentName:name,remaining,transferMemo:transfer,debts:child.debts,
+      parentName:bank.parent_names?.[candidate.parent_id] || '',
+      className:details.map(row=>row.className).filter(Boolean).join(', ') || 'Lớp học',
+      sessionsCount:details.reduce((sum,row)=>sum+Number(row.billableSessions || 0),0)
+        || details.reduce((sum,row)=>sum+Number(row.totalSessions || 0),0)
+    },month,{bankName:bank.bankName || bank.code,account:bank.account},bank.notice_template || TuitionNotice.DEFAULT_TEMPLATE));
     qrs.push({ kind: 'qr', student_id: child.student_id, url:
       `https://img.vietqr.io/image/${bank.code}-${bank.account}-compact2.png?amount=${remaining}&addInfo=${encodeURIComponent(transfer)}` });
   }
-  lines.push('Quý phụ huynh vui lòng thanh toán bằng mã QR của từng con và giữ nguyên nội dung chuyển khoản. Trung tâm trân trọng cảm ơn!');
-  const content = lines.join('\n');
+  const content = lines.join('\n\n──────────\n\n');
   if (content.length > 5000) throw new Error('Grouped notice exceeds message limit');
   // Worker bridge format: strip marker before displaying text, then attach each
   // URL in JSON order. Do not send this envelope through a single-QR dispatcher.

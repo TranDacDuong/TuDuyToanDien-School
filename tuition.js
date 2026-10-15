@@ -2102,21 +2102,7 @@ Nhập số tiền hoàn lại (>0):`,
   let zaloHistoryFetchedAt = 0;
   let zaloQueueBusy = false;
 
-  const DEFAULT_ZALO_TEMPLATE = `Trung tâm MindUp xin chào Quý phụ huynh em {TenHS}! 🌸
-
-Trung tâm xin gửi thông báo chi tiết học phí tháng {Thang}/{Nam} của con như sau:
-• Lớp học: {TenLop}
-• Số buổi học trong tháng: {SoBuoi} buổi
-• Số tiền cần thanh toán: {SoTien} VNĐ
-• Hạn thanh toán: Trước ngày {HanDong}
-
-Quý phụ huynh có thể thanh toán nhanh bằng cách quét ảnh mã QR đính kèm hoặc chuyển khoản theo thông tin:
-• Ngân hàng: {TenNganHang}
-• Số tài khoản: {SoTaiKhoan}
-• Nội dung chuyển khoản: {NoiDungCK}
-
-(Lưu ý: Quý phụ huynh vui lòng giữ nguyên nội dung chuyển khoản trên để hệ thống tự động gạch nợ ngay khi nhận được tiền).
-Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
+  const DEFAULT_ZALO_TEMPLATE = window.TuitionNotice.DEFAULT_TEMPLATE;
 
   window.closeZaloReminderModal = function (e) {
     if (e && e.target && e.target.id !== "zaloReminderModal" && !e.target.classList?.contains("modal-close")) return;
@@ -2133,6 +2119,11 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
       alert("Bạn không có quyền quản lý gửi học phí qua Zalo.");
       return;
     }
+    try {
+      const { data, error } = await getSb().rpc("tuition_notice_template", {});
+      if (error) throw error;
+      savedTuitionNoticeTemplate = data || DEFAULT_ZALO_TEMPLATE;
+    } catch (error) { console.warn("Không tải được mẫu học phí chung:", error.message); }
     const modal = document.getElementById("zaloReminderModal");
     if (!modal) return;
     modal.style.display = "flex";
@@ -2723,28 +2714,19 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
   };
 
   function fillZaloTemplate(template, item) {
-    const ym = monthPicker?.value || "";
-    const [year, month] = ym ? ym.split("-") : ["2026", "09"];
-    const debtLines = (item.debts || []).map(debt => {
-      const [y, m] = debt.month.slice(0, 7).split("-");
-      return `• Tháng ${m}/${y}: còn thiếu ${fmt(debt.remaining)}đ`;
-    }).join("\n");
-    if (item.debts?.length > 1 || item.debts?.[0]?.month.slice(0, 7) !== ym) {
-      return `Trung tâm MindUp kính gửi Quý phụ huynh ${item.parentName || ""} thông báo học phí còn thiếu của em ${item.studentName}:\n\n${debtLines}\n\nTổng cần thanh toán: ${fmt(item.remaining)}đ.\nNgân hàng: ${STATIC_BANK_INFO.bankName}\nSố tài khoản: ${STATIC_BANK_INFO.account}\nNội dung chuyển khoản: ${item.transferMemo}\n\nQuý phụ huynh vui lòng quét ảnh QR đính kèm và giữ nguyên nội dung chuyển khoản. Tiền được thanh toán cho tháng cũ nhất trước. Trung tâm xin cảm ơn!`;
-    }
-    return template
-      .replaceAll("{TenHS}", item.studentName || "")
-      .replaceAll("{TenPH}", item.parentName || "Quý phụ huynh")
-      .replaceAll("{Thang}", month)
-      .replaceAll("{Nam}", year)
-      .replaceAll("{TenLop}", item.className || "")
-      .replaceAll("{SoBuoi}", String(item.sessionsCount || 0))
-      .replaceAll("{SoTien}", fmt(item.remaining))
-      .replaceAll("{HanDong}", `15/${month}/${year}`)
-      .replaceAll("{TenNganHang}", STATIC_BANK_INFO.bankName)
-      .replaceAll("{SoTaiKhoan}", STATIC_BANK_INFO.account)
-      .replaceAll("{NoiDungCK}", item.transferMemo || "");
+    return window.TuitionNotice.render(item, monthPicker.value, STATIC_BANK_INFO, template);
   }
+
+  let savedTuitionNoticeTemplate = DEFAULT_ZALO_TEMPLATE;
+  window.saveTuitionNoticeTemplate = async function () {
+    try {
+      const template = document.getElementById("zaloTemplateText").value;
+      const { error } = await getSb().rpc("tuition_notice_template", { p_template: template });
+      if (error) throw error;
+      savedTuitionNoticeTemplate = template;
+      alert("Đã lưu mẫu chung cho gửi thủ công và nhắc học phí tự động.");
+    } catch (error) { alert("Không lưu được mẫu: " + error.message); }
+  };
 
   // Khởi tạo giao diện khung và danh sách học sinh (Chỉ chạy 1 lần khi mở popup)
   function renderZaloInitialLayout() {
@@ -2789,7 +2771,8 @@ Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
           <span style="font-size:11px;color:#64748b">Bấm để sửa</span>
         </summary>
         <div style="margin-top:10px">
-          <textarea id="zaloTemplateText" rows="7" style="width:100%;font-family:inherit;font-size:12px;padding:10px;border-radius:8px;border:1px solid #cbd5e1;resize:vertical;line-height:1.5">${DEFAULT_ZALO_TEMPLATE}</textarea>
+          <textarea id="zaloTemplateText" rows="7" style="width:100%;font-family:inherit;font-size:12px;padding:10px;border-radius:8px;border:1px solid #cbd5e1;resize:vertical;line-height:1.5">${esc(savedTuitionNoticeTemplate)}</textarea>
+          <button type="button" onclick="saveTuitionNoticeTemplate()">Lưu mẫu chung</button>
           <div style="font-size:11px;color:#64748b;margin-top:4px">
             Biến hỗ trợ: <code>{TenHS}</code>, <code>{TenPH}</code>, <code>{Thang}</code>, <code>{Nam}</code>, <code>{TenLop}</code>, <code>{SoBuoi}</code>, <code>{SoTien}</code>, <code>{HanDong}</code>, <code>{NoiDungCK}</code>, <code>{TenNganHang}</code>, <code>{SoTaiKhoan}</code>.
           </div>

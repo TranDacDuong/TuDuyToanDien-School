@@ -1,4 +1,6 @@
 (function () {
+  const isNode = typeof module === 'object' && module.exports;
+  const discounts = isNode ? require('./tuition-discounts.js') : window.TuitionDiscounts;
   function fmt(v) { return new Intl.NumberFormat("vi-VN").format(Math.round(v)); }
   function ymToDate(ym) { return ym + "-01"; }
 
@@ -415,14 +417,15 @@
       });
     });
 
-    return window.TuitionDiscounts.apply(rows.map(row => {
+    return discounts.apply(rows.map(row => {
       const payment = payments[row.studentId];
       if (!payment?.locked_at || String(payment.month).slice(0, 7) !== row.ym) return row;
       const component = payment.gross_components?.find(c => c.class_id === row.classId);
       return { ...row, frozenPercent: Number(component?.percent || 0) };
-    }));
+    }), viewer.discountRules || []);
   }
 
 
-  window.TuitionCalculation = { buildRowsForMonth };
+  if (isNode) module.exports = { buildRowsForMonth };
+  else window.TuitionCalculation = { buildRowsForMonth };
 })();
