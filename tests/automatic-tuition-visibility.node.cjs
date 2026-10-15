@@ -32,7 +32,7 @@ test('pause gates automatic claims only and preserves all delivery records', () 
   assert.match(sql, /role::text='admin'/);
   assert.match(sql, /has_app_permission/);
   assert.match(sql, /claim_automatic_tuition_reminder/);
-  assert.match(sql, /AND paused\) THEN RETURN/);
+  assert.match(sql, /AND pause_control.paused\) THEN RETURN/);
   assert.doesNotMatch(sql, /UPDATE public\.(automatic_tuition_reminders|zalo_outbox)|DELETE FROM/);
 });
 test('read RPC is admin scoped and does not return dispatch credentials', () => {

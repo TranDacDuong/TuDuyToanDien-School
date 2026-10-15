@@ -27,9 +27,14 @@ DO $migration$
 DECLARE source text; anchor text := 'PERFORM 1 FROM public.mindup_zalo_dispatch_control c WHERE c.id=1 FOR UPDATE;';
 BEGIN
   SELECT pg_get_functiondef('public.claim_automatic_tuition_reminder(date,integer)'::regprocedure) INTO source;
-  IF position('automatic_tuition_control' IN source)>0 THEN RETURN; END IF;
+  IF position('automatic_tuition_control' IN source)>0 THEN
+    source:=replace(source,'FROM public.automatic_tuition_control WHERE id=1 AND paused',
+      'FROM public.automatic_tuition_control pause_control WHERE pause_control.id=1 AND pause_control.paused');
+    EXECUTE source;
+    RETURN;
+  END IF;
   IF position(anchor IN source)=0 THEN RAISE EXCEPTION 'Automatic claim lock anchor changed'; END IF;
-  source:=replace(source,anchor,anchor||E'\n  IF EXISTS(SELECT 1 FROM public.automatic_tuition_control WHERE id=1 AND paused) THEN RETURN; END IF;');
+  source:=replace(source,anchor,anchor||E'\n  IF EXISTS(SELECT 1 FROM public.automatic_tuition_control pause_control WHERE pause_control.id=1 AND pause_control.paused) THEN RETURN; END IF;');
   EXECUTE source;
 END;
 $migration$;
