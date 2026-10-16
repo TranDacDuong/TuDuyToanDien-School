@@ -1,10 +1,10 @@
 (function () {
   window.inboxUnreadOnly = false;
-  window.inboxWaitingOnly = true;
+  window.inboxWaitingOnly = false;
   window.setInboxFilter = function (unread) {
-    window.inboxWaitingOnly = unread === 'reply';
-    window.inboxUnreadOnly = unread === true;
-    document.querySelectorAll('.inbox-tabs button').forEach((button, index) => button.setAttribute('aria-pressed', String(index === (unread === 'reply' ? 0 : 1))));
+    window.inboxWaitingOnly = false;
+    window.inboxUnreadOnly = false;
+    document.querySelectorAll('.inbox-tabs button').forEach(button => button.setAttribute('aria-pressed', 'true'));
     filterFriends();
     if (unread === 'reply' && window.parentPriorityLoadFailed) window.retryParentReplyPriority?.();
   };

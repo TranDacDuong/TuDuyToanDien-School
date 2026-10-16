@@ -712,8 +712,10 @@ aside.panel { border-right: 1px solid #dce1e8; }
 <script src="tuition-discounts.js?v=20261008-discounts2" defer></script>
 <script src="tuition-calculation.js?v=20261015-shared1" defer></script>
 <script src="conversation-family-model.js?v=20261016-family1" defer></script>
-<script src="conversation-family-info.js?v=20261016-family1" defer></script>
-<script src="messages-workspace.js?v=20261016-family-info" defer></script>
+<script src="tuition-notice.js?v=20261017-chat1" defer></script>
+<script src="conversation-tuition-actions.js?v=20261017-chat1" defer></script>
+<script src="conversation-family-info.js?v=20261017-chat1" defer></script>
+<script src="messages-workspace.js?v=20261017-chat1" defer></script>
 <script src="visual-effects.js?v=20261016-no-particles" defer></script>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0f1f3d">
@@ -742,8 +744,7 @@ aside.panel { border-right: 1px solid #dce1e8; }
         </details>
       <input id="friendSearch" class="search-input" aria-label="Tìm cuộc trò chuyện" placeholder="Tìm tên PH, biệt danh Zalo, học sinh..." oninput="filterFriends()">
       <div class="inbox-tabs" role="group" aria-label="Lọc hội thoại">
-        <button type="button" aria-pressed="true" onclick="setInboxFilter('reply')">Chưa phản hồi</button>
-        <button type="button" aria-pressed="false" onclick="setInboxFilter(false)">Tất cả</button>
+        <button type="button" aria-pressed="true" onclick="setInboxFilter(false)">Tất cả</button>
       </div>
       </div>
       <div id="friendListTopActions" class="friend-list-actions"></div>
@@ -778,7 +779,7 @@ aside.panel { border-right: 1px solid #dce1e8; }
           <button class="btn btn-primary" id="sendBtn" onclick="sendMessage()" title="Gửi tin nhắn" aria-label="Gửi tin nhắn" disabled><svg class="composer-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 3-7.6 18-3.1-7.3L3 10.6 21 3Zm-10.7 10.7L21 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
         <div class="composer-tools">
-          <span id="zaloSendModeWrap" class="zalo-send-mode"><strong id="zaloSendModeLabel">Web + Zalo tự động</strong></span>
+          <span id="zaloSendModeWrap" hidden><strong id="zaloSendModeLabel"></strong></span>
           <input id="zaloSendMode" type="hidden" value="auto">
           <div class="attach-wrap">
             <input id="messageImage" class="hidden-input" type="file" accept="image/*" onchange="previewMessageImage()">
@@ -1139,7 +1140,7 @@ async function fetchTeacherOfficialAudienceIds() {
 
 async function fetchMindupParentInboxItems() {
   if (!isMindUpStaffRole(currentProfile?.role) || !['admin', 'teacher'].includes(currentProfile?.role || '')) {
-    document.querySelector('.inbox-tabs button:first-child').hidden = true;
+    document.querySelector('.inbox-tabs button:first-child').hidden = false;
     window.setInboxFilter(false);
     parentInboxById = new Map();
     return [];
@@ -1169,7 +1170,7 @@ async function fetchMindupParentInboxItems() {
   const priorityButton = document.querySelector('.inbox-tabs button:first-child');
   priorityButton.hidden = false;
   priorityButton.disabled = false;
-  priorityButton.title = 'Chưa phản hồi';
+  priorityButton.title = 'Tất cả';
   const priorities = parentReplyPriorityCache;
   const aliases = new Map((aliasRows || []).map(row => [row.parent_id, row.zalo_alias]));
   const profileResult=await sb.rpc('list_zalo_contact_profiles');
@@ -1589,7 +1590,7 @@ async function refreshZaloSendMode() {
   zaloLinkAvailable = !!data;
   wrap.classList.add('show');
   mode.value = 'auto';
-  label.textContent = zaloLinkAvailable ? 'Web + Zalo tự động' : 'Chưa liên kết Zalo';
+  label.textContent = '';
   label.style.color = zaloLinkAvailable ? '#08783e' : '#b45309';
   setComposerEnabled(zaloLinkAvailable);
   document.getElementById('messageInput').placeholder = zaloLinkAvailable

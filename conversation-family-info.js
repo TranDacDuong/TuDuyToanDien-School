@@ -66,6 +66,7 @@
       if(!totals.calculated) finance.append(node('p','Học phí tháng theo bản ghi đã lưu.','family-muted'));
       finance.append(button('Xem học phí',()=>navigate('tuition.html?month='+state.month+'&student='+encodeURIComponent(student.id))));
       if(totals.total>0) finance.append(button('Xem QR tổng công nợ',event=>showQr(student,state,event.currentTarget)));
+      window.ConversationTuitionActions?.mount(finance,student,state);
       const payments=group(detail,'Thanh toán đã ghi nhận theo kỳ');
       const paid=totals.payments.filter(p=>Number(p.amount_paid)>0).sort((a,b)=>String(b.paid_at || b.month).localeCompare(String(a.paid_at || a.month))).slice(0,10);
       if(!paid.length) payments.append(node('p','Chưa có khoản thu được ghi nhận.'));
