@@ -16,6 +16,7 @@ function fixture() {
     currentConversationId: 'first', activeFriend: { id: 'first' }, loadedMessages: [],
     MESSAGE_PAGE_SIZE: 10, hasOlderMessages: true, renders: 0, extras: 0,
     document: { getElementById: () => wrap }, sb: { from: () => query },
+    queryConversationMessages: () => result,
     renderLoadedMessages() { ctx.renders++; },
     refreshConversationExtras() { ctx.extras++; }, loadOlderMessages() {}
   };

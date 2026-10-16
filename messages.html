@@ -2230,6 +2230,26 @@ function renderLoadedMessages() {
   window.refreshMessageWorkspace?.();
 }
 
+async function queryConversationMessages(conversationId, before = null) {
+  const columns = 'id, content, created_at, sender_id, real_sender_id, transport, context_student_id, external_message_id';
+  const result = await sb.rpc('list_mindup_conversation_messages', {
+    p_conversation_id: conversationId, p_before: before, p_limit: MESSAGE_PAGE_SIZE
+  }).select(columns);
+  if (!['PGRST202','42883'].includes(result.error?.code)) return result;
+  let query = sb.from('messages').select(columns).eq('conversation_id', conversationId);
+  if (before) query = query.lt('created_at', before);
+  return query.order('created_at', { ascending: false }).limit(MESSAGE_PAGE_SIZE);
+}
+
+window.retryConversationMessages = () => loadMessages({ reset: true, scrollToBottom: true }).catch(console.warn);
+function showMessageLoadError(error) {
+  console.warn('[Messages] Load failed', error?.code, error?.message);
+  const reason = error?.code === '57014' ? 'Máy chủ xử lý quá lâu.'
+    : error?.code === '42501' ? 'Tài khoản chưa có quyền đọc hội thoại này.'
+    : 'Không kết nối được với máy chủ.';
+  document.getElementById('messageList').innerHTML = `<div class="empty"><strong>Không tải được tin nhắn</strong>${reason}<button type="button" onclick="retryConversationMessages()">Thử lại</button></div>`;
+}
+
 async function loadMessages({ reset = false, scrollToBottom = false } = {}) {
   if(activeFriend?.isZaloExternal) return loadExternalZaloMessages(scrollToBottom);
   if (!currentConversationId) return;
@@ -2239,17 +2259,12 @@ async function loadMessages({ reset = false, scrollToBottom = false } = {}) {
   const wrap = document.getElementById("messageList");
   const previousScrollTop = wrap.scrollTop;
   const wasNearBottom = wrap.scrollHeight - wrap.clientHeight - wrap.scrollTop < 80;
-  const { data, error } = await sb
-    .from("messages")
-    .select("id, content, created_at, sender_id, real_sender_id, transport, context_student_id, external_message_id")
-    .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: false })
-    .limit(MESSAGE_PAGE_SIZE);
+  const { data, error } = await queryConversationMessages(conversationId);
 
   if (conversationId !== currentConversationId || loadingFriend !== activeFriend) return;
 
   if (error) {
-    wrap.innerHTML = '<div class="empty"><strong>Không tải được tin nhắn</strong>Hãy thử lại sau ít phút.</div>';
+    showMessageLoadError(error);
     return;
   }
   if (!data || !data.length) {
@@ -2292,13 +2307,7 @@ async function loadOlderMessages() {
   const previousScrollTop = wrap.scrollTop;
   isLoadingOlderMessages = true;
 
-  const { data, error } = await sb
-    .from("messages")
-    .select("id, content, created_at, sender_id, real_sender_id, transport, context_student_id, external_message_id")
-    .eq("conversation_id", conversationId)
-    .lt("created_at", loadedMessages[0].created_at)
-    .order("created_at", { ascending: false })
-    .limit(MESSAGE_PAGE_SIZE);
+  const { data, error } = await queryConversationMessages(conversationId, loadedMessages[0].created_at);
 
   if (conversationId !== currentConversationId || loadingFriend !== activeFriend) return;
   isLoadingOlderMessages = false;
