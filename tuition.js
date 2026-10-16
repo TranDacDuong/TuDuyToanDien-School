@@ -918,6 +918,7 @@ Nhập số tiền hoàn lại (>0):`,
   const monthPicker = document.getElementById("monthPicker");
   const monthQuery = new URLSearchParams(location.search).get("month");
   const savedMonth = (() => { try { return localStorage.getItem("tuition_selected_month"); } catch (_) { return ""; } })();
+  let pendingConversationStudent = new URLSearchParams(location.search).get('student');
   monthPicker.value = /^\d{4}-\d{2}$/.test(monthQuery || "") ? monthQuery : (/^\d{4}-\d{2}$/.test(savedMonth || "") ? savedMonth : todayYM());
 
   async function loadViewerContext() {
@@ -1290,6 +1291,15 @@ Nhập số tiền hoàn lại (>0):`,
       if (options.basisStudent) return;
       syncClassFilterOptions();
       renderRows();
+      if (pendingConversationStudent) {
+        const target = grouped.find(group => group.studentId === pendingConversationStudent);
+        pendingConversationStudent = null;
+        if (target) {
+          document.getElementById('tuitionSearch').value = target.studentName;
+          renderRows();
+          await window.openTuitionDetail(target.studentId);
+        }
+      }
 
     } catch (err) {
       if (options.strict) throw err;

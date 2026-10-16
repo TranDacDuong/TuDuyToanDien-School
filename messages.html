@@ -708,8 +708,12 @@ aside.panel { border-right: 1px solid #dce1e8; }
 }
 .tray-mode .shell, .popup-mode .shell { grid-template-columns: minmax(0, 1fr); }
 </style>
-<link rel="stylesheet" href="messages-workspace.css?v=20261012-list-layout">
-<script src="messages-workspace.js?v=20261016-staff-dock" defer></script>
+<link rel="stylesheet" href="messages-workspace.css?v=20261016-family-info">
+<script src="tuition-discounts.js?v=20261008-discounts2" defer></script>
+<script src="tuition-calculation.js?v=20261015-shared1" defer></script>
+<script src="conversation-family-model.js?v=20261016-family1" defer></script>
+<script src="conversation-family-info.js?v=20261016-family1" defer></script>
+<script src="messages-workspace.js?v=20261016-family-info" defer></script>
 <script src="visual-effects.js?v=20261016-no-particles" defer></script>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0f1f3d">
@@ -808,6 +812,7 @@ aside.panel { border-right: 1px solid #dce1e8; }
 <script>
 let currentUser = null;
 let currentProfile = null;
+window.getConversationFamilyViewer = () => currentProfile;
 let currentConversationId = null;
 let activeFriend = null;
 let friendMap = new Map();

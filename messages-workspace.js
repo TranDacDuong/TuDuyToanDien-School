@@ -36,16 +36,21 @@
       return ['https:', 'http:'].includes(url.protocol) ? url.href : '';
     } catch { return ''; }
   }
+  let renderedFriend = null, mediaSection = null, familySection = null;
   window.refreshMessageWorkspace = function () {
     const avatar = document.getElementById('chatAvatar');
     if (!avatar) return;
     avatar.src = mediaUrl(activeFriend?.avatar || 'favicon.png');
     const body = document.getElementById('conversationInfoBody');
-    body.replaceChildren();
     if (!activeFriend) {
+      renderedFriend = mediaSection = familySection = null;
+      body.replaceChildren();
       body.append(textElement('p', 'Chưa chọn cuộc trò chuyện.'));
       return;
     }
+    if (renderedFriend !== activeFriend.id) {
+    renderedFriend = activeFriend.id;
+    body.replaceChildren();
     const identity = document.createElement('section');
     identity.append(image(activeFriend.avatar, 'info-avatar'), textElement('div', activeFriend.name || document.getElementById('chatTitle').textContent, 'info-name'));
     const info = friendMap.get(activeFriend.id) || parentInboxById.get(activeFriend.id);
@@ -55,13 +60,23 @@
     if (activeFriend.role === 'parent' && transport) identity.append(textElement('p', transport.textContent));
     body.append(identity);
     const children = activeFriend.children || info?.children || [];
-    if (children.length) {
+    if (children.length && !window.FamilyConversationInfo) {
       const section = document.createElement('section');
       section.append(textElement('h3', 'Học sinh liên quan'));
       children.forEach(child => section.append(textElement('div', child.name || child.full_name || 'Học sinh', 'info-child')));
       body.append(section);
     }
-    const media = document.createElement('section');
+    mediaSection = document.createElement('section');
+    familySection = null;
+    if (window.FamilyConversationInfo && (activeFriend.role === 'parent' || activeFriend.isZaloExternal)) {
+      familySection = document.createElement('section');
+      familySection.className = 'conversation-family-info';
+      body.append(familySection);
+    }
+    body.append(mediaSection);
+    }
+    const media = mediaSection;
+    media.replaceChildren();
     media.append(textElement('h3', 'Ảnh trong hội thoại'));
     const urls = [...new Set(loadedMessages.map(item => parseMessageContent(item.content)).filter(payload => payload.type === 'image').map(payload => payload.url).filter(Boolean))];
     if (urls.length) {
@@ -83,7 +98,7 @@
       button.onclick=()=>window.openZaloMedia(item.external_message_id);media.append(button);
     });
     if(!urls.length && !zaloMedia.length) media.append(textElement('p', 'Chưa có ảnh trong các tin nhắn đã tải.'));
-    body.append(media);
+    if (familySection && !document.getElementById('conversationInfo').hidden) window.FamilyConversationInfo.mount(familySection, activeFriend);
   };
   document.addEventListener('keydown', event => { if (event.key === 'Escape') window.toggleConversationInfo(false); });
   window.refreshMessageWorkspace();
