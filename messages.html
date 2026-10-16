@@ -1138,7 +1138,24 @@ async function fetchTeacherOfficialAudienceIds() {
   }
 }
 
-async function fetchMindupParentInboxItems() {
+const inboxMetadataRequests = new Map();
+function inboxMetadata(name, ttl = 60000) {
+  const key = currentUser.id + ':' + name;
+  const cached = inboxMetadataRequests.get(key);
+  if (cached && cached.expires > Date.now()) return cached.request;
+  const entry = {expires:Infinity};
+  let request = sb.rpc(name);
+  if (request.abortSignal) request = request.abortSignal(AbortSignal.timeout(12000));
+  entry.request = Promise.resolve(request).then(result => {
+    if (result.error) inboxMetadataRequests.delete(key);
+    else entry.expires = Date.now() + ttl;
+    return result;
+  }, error => { inboxMetadataRequests.delete(key); return {data:null,error}; });
+  inboxMetadataRequests.set(key, entry);
+  return entry.request;
+}
+
+async function fetchMindupParentInboxItems(onCore) {
   if (!isMindUpStaffRole(currentProfile?.role) || !['admin', 'teacher'].includes(currentProfile?.role || '')) {
     document.querySelector('.inbox-tabs button:first-child').hidden = false;
     window.setInboxFilter(false);
@@ -1151,8 +1168,24 @@ async function fetchMindupParentInboxItems() {
     window.parentPriorityLoadFailed = true;
     return [...parentInboxById.values()];
   }
-  const { data: aliasRows } = await sb.rpc('list_mindup_parent_zalo_aliases');
-  const { data: priorityRows, error: priorityError } = await sb.rpc('list_mindup_parent_reply_priority');
+  // The scoped inbox already includes conversation IDs, children and previews.
+  // Paint it before optional Zalo metadata or legacy direct-chat queries finish.
+  const coreItems = (data || []).map(row => {
+    const cached = friendMap.get(row.parent_id);
+    const priority = parentReplyPriorityCache.get(row.parent_id);
+    return makeConversationListItem({id:row.parent_id, full_name:row.parent_name,
+      zalo_alias:cached?.users?.zalo_alias, avatar_url:cached?.users?.avatar_url || row.parent_avatar_url,
+      role:'parent'}, {conversationId:row.conversation_id, preview:getMessagePreview(row.last_content || ''),
+      lastActivity:row.last_at, isOfficialMindUpChannel:true, children:row.children, zaloLinked:row.zalo_linked,
+      unreadCount:cached?.unreadCount, waitingReply:priority?.waiting_reply, lastParentAt:priority?.last_parent_at});
+  });
+  onCore?.(coreItems);
+  const [{data:aliasRows}, {data:priorityRows,error:priorityError}, profileResult, external] = await Promise.all([
+    inboxMetadata('list_mindup_parent_zalo_aliases'),
+    inboxMetadata('list_mindup_parent_reply_priority', 0),
+    inboxMetadata('list_zalo_contact_profiles'),
+    currentProfile?.role === 'admin' ? sb.rpc('list_zalo_external_inbox') : Promise.resolve({data:[]})
+  ]);
   window.parentPriorityLoadFailed = !!priorityError;
   if (!priorityError) {
     window.parentPriorityAvailable = true;
@@ -1173,7 +1206,6 @@ async function fetchMindupParentInboxItems() {
   priorityButton.title = 'Tất cả';
   const priorities = parentReplyPriorityCache;
   const aliases = new Map((aliasRows || []).map(row => [row.parent_id, row.zalo_alias]));
-  const profileResult=await sb.rpc('list_zalo_contact_profiles');
   const zaloProfiles=new Map((profileResult.error?[]:profileResult.data || []).map(row=>[row.parent_id,row]));
   for(const [id,profile] of zaloProfiles) if(profile.display_name) aliases.set(id,profile.display_name);
   const items = (data || []).map(row => makeConversationListItem({
@@ -1194,7 +1226,6 @@ async function fetchMindupParentInboxItems() {
   }));
   parentInboxById = new Map(items.map(item => [item.friend_id, item]));
   if(currentProfile?.role==='admin') {
-    const external=await sb.rpc('list_zalo_external_inbox');
     if(!external.error) for(const row of external.data || []) items.push(makeConversationListItem({id:row.id,full_name:row.display_name || 'Người dùng Zalo',avatar_url:row.avatar || 'default-avatar.png',role:'zalo_external'},
       {isZaloExternal:true,preview:row.last_content,lastActivity:row.last_at,waitingReply:row.waiting_reply,lastParentAt:row.last_parent_at}));
   }
@@ -1214,7 +1245,17 @@ async function fetchMindUpTeacherConversationItems() {
   return [];
 }
 
-async function loadFriends() {
+let friendsLoading = null, friendsReloadPending = false;
+function loadFriends() {
+  if (friendsLoading) { friendsReloadPending = true; return friendsLoading; }
+  friendsLoading = loadFriendsNow().finally(() => {
+    friendsLoading = null;
+    if (friendsReloadPending) { friendsReloadPending = false; scheduleFriendsReload(250); }
+  });
+  return friendsLoading;
+}
+
+async function loadFriendsNow() {
   const requestToken = ++friendsLoadToken;
   const wrap = document.getElementById("friendList");
   const topActions = document.getElementById("friendListTopActions");
@@ -1240,15 +1281,35 @@ async function loadFriends() {
       .eq("is_read", false),
     fetchLearningConversationItems(),
     fetchMindUpTeacherConversationItems(),
-    fetchMindupParentInboxItems()
+    fetchMindupParentInboxItems(items => {
+      if (requestToken !== friendsLoadToken) return;
+      parentInboxById = new Map(items.map(item => [item.friend_id,item]));
+      if (!allFriends.length) {
+        allFriends = sortConversationsByFamily(items);
+        friendMap = new Map(items.map(item => [item.friend_id,item]));
+        renderFriendList(getFilteredFriendList());
+      }
+      const selected = items.find(item => item.friend_id === selectedUserFromQuery);
+      if (!currentConversationId && selected) {
+        selectedUserFromQuery = null;
+        openConversation(selected.friend_id, selected.users.full_name, selected.users.avatar_url, 'parent');
+      }
+    })
   ]);
 
   if (friendshipError || conversationError) {
+    if (parentInboxItems?.length) {
+      allFriends = sortConversationsByFamily(parentInboxItems);
+      friendMap = new Map(allFriends.map(item => [item.friend_id,item]));
+      renderFriendList(getFilteredFriendList());
+      return;
+    }
     wrap.innerHTML = '<div class="empty"><strong>Không thể tải tin nhắn</strong>Hãy thử lại sau ít phút.</div>';
     return;
   }
 
-  const friendRows = friendships || [];
+  const coveredParents = new Set((parentInboxItems || []).map(item => item.friend_id));
+  const friendRows = (friendships || []).filter(item => !coveredParents.has(item.friend_id));
   const friendById = new Map(friendRows.map(item => [item.friend_id, item]));
   let directConversations = (conversations || [])
     .filter(item => {
@@ -1256,9 +1317,10 @@ async function loadFriends() {
       return !key.startsWith("mindup_student:") && !key.startsWith("mindup_teacher:");
     })
     .map(item => ({ ...item, partnerId: getDirectPartnerId(item.direct_key) }))
-    .filter(item => item.partnerId && item.partnerId !== currentUser.id);
+    .filter(item => item.partnerId && item.partnerId !== currentUser.id && !coveredParents.has(item.partnerId));
 
-  const teacherOfficialAudienceIds = await fetchTeacherOfficialAudienceIds();
+  const teacherOfficialAudienceIds = directConversations.length || friendRows.length
+    ? await fetchTeacherOfficialAudienceIds() : null;
   if (teacherOfficialAudienceIds) {
     directConversations = directConversations.filter(item =>
       !isOfficialMindUpDirectKey(item.direct_key) || teacherOfficialAudienceIds.has(item.partnerId)
@@ -1378,7 +1440,10 @@ async function loadFriends() {
   let merged = [...(parentInboxItems || []), ...(mindUpTeacherItems || []), ...(learningItems || []), ...scopedEnriched]
     .filter((item, index, list) => list.findIndex(other => other.friend_id === item.friend_id) === index);
 
-  await prefetchUserContextProfiles(merged.map(item => item.users).filter(Boolean));
+  // Keep context/grade enrichment off the initial rendering path.
+  prefetchUserContextProfiles(merged.map(item => item.users).filter(Boolean)).then(() => {
+    if (requestToken === friendsLoadToken) renderFriendList(getFilteredFriendList());
+  }).catch(console.warn);
   merged = sortConversationsByFamily(merged);
 
   allFriends = merged;
@@ -2422,7 +2487,7 @@ window.sendMessage = async function() {
 
   input.value = "";
   clearMessageImage();
-  await loadFriends();
+  loadFriends().catch(console.warn);
   await loadMessages({ scrollToBottom: true });
 };
 
@@ -2550,7 +2615,7 @@ window.retryOptimisticMessage = async function(tempId) {
   }
   removeOptimisticMessage(tempId);
   if (repliedParentId) markParentConversationReplied(repliedParentId, new Date().toISOString());
-  await loadFriends();
+  loadFriends().catch(console.warn);
   await loadMessages({ scrollToBottom: true });
 };
 
@@ -2594,7 +2659,7 @@ window.sendMessage = async function() {
 
   removeOptimisticMessage(optimistic.id);
   if (repliedParentId) markParentConversationReplied(repliedParentId, optimistic.created_at);
-  await loadFriends();
+  loadFriends().catch(console.warn);
   await loadMessages({ scrollToBottom: true });
 };
 
@@ -3257,19 +3322,30 @@ async function prefetchUserContextProfiles(profiles) {
   }
 }
 
+const senderProfilesLoading = new Set(), senderProfileRetryAfter = new Map();
 async function prefetchRealSenderProfiles() {
   const ids = [...new Set(loadedMessages.flatMap(m => [m.real_sender_id, m.sender_id]).filter(Boolean))];
-  const missing = ids.filter(id => !_realSenderProfiles.has(id));
+  const missing = ids.filter(id => !_realSenderProfiles.has(id) && !senderProfilesLoading.has(id)
+    && (senderProfileRetryAfter.get(id) || 0) <= Date.now());
   if (!missing.length) return;
+  const friend = activeFriend, conversation = currentConversationId;
+  missing.forEach(id => senderProfilesLoading.add(id));
   try {
-    const { data } = await sb.from('users').select('id,full_name,email,role,birth_year').in('id', missing);
+    const { data, error } = await sb.from('users').select('id,full_name,email,role,birth_year').in('id', missing);
+    if (error) throw error;
     (data || []).forEach(u => {
       _realSenderProfiles.set(u.id, u);
       _realSenderNames.set(u.id, u.full_name || u.id);
     });
     await prefetchUserContextProfiles(data || []);
-    renderLoadedMessages();
-  } catch {}
+    if (data?.length && friend === activeFriend && conversation === currentConversationId) renderLoadedMessages();
+  } catch (error) { console.warn('Could not enrich message senders', error); }
+  finally {
+    missing.forEach(id => {
+      senderProfilesLoading.delete(id);
+      if (!_realSenderProfiles.has(id)) senderProfileRetryAfter.set(id, Date.now()+60000);
+    });
+  }
 }
 
 // Render markdown **bold** and *italic*
@@ -3591,12 +3667,20 @@ window.linkExternalZalo = async function() {
   document.body.appendChild(dialog);dialog.showModal();
 };
 
+let lastInboxPoll = Date.now();
+document.querySelector('.dispatch-disclosure')?.addEventListener('toggle', event => {
+  if (event.currentTarget.open) refreshZaloDispatchStatus().catch(console.warn);
+});
 zaloStatusTimer = setInterval(() => {
+  if (document.hidden) return;
+  if (window.frameElement && !window.frameElement.getClientRects().length) return;
   if(!activeFriend?.isZaloExternal) refreshZaloDeliveryStatus();
   refreshZaloMessageStates().then(()=>{if(loadedMessages.length) renderLoadedMessages();}).catch(console.warn);
   if(activeFriend?.isZaloExternal) loadExternalZaloMessages(false).catch(console.warn);
-  if(currentProfile?.role==='admin') loadFriends().catch(console.warn);
-  refreshZaloDispatchStatus();
+  if(currentProfile?.role==='admin' && Date.now()-lastInboxPoll>=60000) {
+    lastInboxPoll=Date.now();loadFriends().catch(console.warn);
+  }
+  if(document.querySelector('.dispatch-disclosure')?.open) refreshZaloDispatchStatus();
 }, 15000);
 init();
 </script>
