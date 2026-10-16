@@ -8,6 +8,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="theme.css?v=20260615-ios1">
+<link rel="stylesheet" href="staff-message-dock.css?v=20261016-dock1">
 <style>
 * { box-sizing: border-box; }
 body {
@@ -1212,6 +1213,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 <script src="tuition-calculation.js?v=20261015-shared1"></script>
 <script src="dashboard_ops.js?v=20261015-shared1"></script>
 <script src="dashboard-action-summary.js?v=20261016-zalo-sync"></script>
+<script src="staff-message-dock.js?v=20261016-dock1"></script>
 <script>
 let badgeChannels = [];
 let currentDashboardUser = null;
@@ -1441,6 +1443,7 @@ async function initDashboard(userOverride = null){
 
   currentDashboardProfile = profile;
   await window.AppPermissions?.load?.(profile);
+  window.StaffMessageDock?.configure(profile);
   const userBox = document.getElementById("userBox");
   if(userBox && !document.getElementById("userName")){
     userBox.innerHTML = `
@@ -1482,11 +1485,13 @@ function loadUserInfo(profile){
 }
 
 async function logout(){
+  window.StaffMessageDock?.configure(null);
   await sb.auth.signOut();
   window.location.href = "dashboard.html";
 }
 
 function applyGuestMenu(){
+  window.StaffMessageDock?.configure(null);
   currentDashboardProfile = null;
   document.getElementById("guestAuthBar")?.classList.add("show");
   const userBox = document.getElementById("userBox");
@@ -1953,6 +1958,7 @@ async function loadMessageBadge(userId){
     .eq("type", "message_new");
 
   updateBadgeElements(["messageBadge", "messageBadgeTop"], messageError ? 0 : messageCount || 0);
+  window.StaffMessageDock?.updateBadge(messageError ? 0 : messageCount || 0);
 }
 
 function subscribeBadgeChanges(userId){

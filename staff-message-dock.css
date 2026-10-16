@@ -1,0 +1,18 @@
+#staffMessageDock { position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 450; font-family: var(--font-body, sans-serif); }
+#staffMessageLauncher { position: relative; display: grid; place-items: center; width: 52px; height: 52px; padding: 0; border: 0; border-radius: 50%; background: #0869dc; box-shadow: 0 4px 16px #172b4d40; cursor: pointer; }
+#staffMessageLauncher > img { width: 26px; height: 26px; filter: brightness(0) invert(1); }
+.staff-message-badge { position: absolute; top: -3px; right: -5px; min-width: 21px; padding: 3px 5px; border-radius: 12px; background: #d92d3e; color: #fff; border: 2px solid #fff; font-size: 10px; font-weight: 600; }
+#staffMessagePanel { position: absolute; left: 0; bottom: 64px; width: min(430px, calc(100vw - 32px)); height: min(680px, calc(100dvh - 112px)); display: grid; grid-template-rows: 48px minmax(0, 1fr); overflow: hidden; background: #fff; border: 1px solid #dce1e8; border-radius: 8px; box-shadow: 0 8px 36px #172b4d40; }
+#staffMessagePanel[hidden], .staff-message-badge[hidden] { display: none; }
+#staffMessagePanel.expanded { width: min(1050px, calc(100vw - 32px)); height: calc(100dvh - 112px); }
+#staffMessagePanel > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 10px 0 16px; border-bottom: 1px solid #dce1e8; color: #172b4d; }
+#staffMessagePanel > header strong { font-size: 14px; }
+#staffMessagePanel > header div { display: flex; gap: 2px; }
+#staffMessagePanel > header button { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 4px; background: transparent; cursor: pointer; padding: 0; }
+#staffMessagePanel > header button:hover { background: #e4f0ff; }
+#staffMessagePanel iframe { width: 100%; height: 100%; min-height: 0; border: 0; background: #fff; }
+#staffMessageDock button:focus-visible { outline: 2px solid #0869dc; outline-offset: 3px; }
+@media (max-width: 760px) {
+  #staffMessageDock { left: 12px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  #staffMessagePanel, #staffMessagePanel.expanded { width: calc(100vw - 24px); height: calc(100dvh - 172px); max-height: 680px; }
+}

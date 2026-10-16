@@ -709,7 +709,7 @@ aside.panel { border-right: 1px solid #dce1e8; }
 .tray-mode .shell, .popup-mode .shell { grid-template-columns: minmax(0, 1fr); }
 </style>
 <link rel="stylesheet" href="messages-workspace.css?v=20261012-list-layout">
-<script src="messages-workspace.js?v=20261016-zalo-sync" defer></script>
+<script src="messages-workspace.js?v=20261016-staff-dock" defer></script>
 <script src="visual-effects.js?v=20261016-no-particles" defer></script>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0f1f3d">
@@ -774,9 +774,6 @@ aside.panel { border-right: 1px solid #dce1e8; }
           <button class="btn btn-primary" id="sendBtn" onclick="sendMessage()" title="Gửi tin nhắn" aria-label="Gửi tin nhắn" disabled><svg class="composer-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 3-7.6 18-3.1-7.3L3 10.6 21 3Zm-10.7 10.7L21 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
         <div class="composer-tools">
-          <label id="messageContextWrap" class="message-context">Trao đổi về
-            <select id="messageContextStudent" aria-label="Học sinh liên quan"></select>
-          </label>
           <span id="zaloSendModeWrap" class="zalo-send-mode"><strong id="zaloSendModeLabel">Web + Zalo tự động</strong></span>
           <input id="zaloSendMode" type="hidden" value="auto">
           <div class="attach-wrap">
@@ -842,6 +839,14 @@ const FULL_CONVERSATION_PAGE_SIZE = 10;
 let visibleConversationCount = FULL_CONVERSATION_PAGE_SIZE;
 let selectedTeacherFromQuery = null;
 let parentInboxById = new Map();
+let parentReplyPriorityCache = new Map();
+
+window.retryParentReplyPriority = () => loadFriends().catch(console.warn);
+document.addEventListener('keydown', event => {
+  if (queryParams.get('dock') === '1' && event.key === 'Escape' && !document.querySelector('dialog[open]')) {
+    window.parent.postMessage({type:'staff-messages:close'}, location.origin);
+  }
+});
 
 const CHAT_IMAGE_PREFIX = "__CHAT_IMAGE__";
 const ACTIVE_WINDOW_MS = 2 * 60 * 1000;
@@ -1137,18 +1142,30 @@ async function fetchMindupParentInboxItems() {
   const { data, error } = await sb.rpc('list_mindup_parent_inbox');
   if (error) {
     console.warn('Could not load MindUp parent inbox', error);
-    parentInboxById = new Map();
-    return [];
+    window.parentPriorityLoadFailed = true;
+    return [...parentInboxById.values()];
   }
   const { data: aliasRows } = await sb.rpc('list_mindup_parent_zalo_aliases');
   const { data: priorityRows, error: priorityError } = await sb.rpc('list_mindup_parent_reply_priority');
-  window.parentPriorityAvailable = !priorityError;
+  window.parentPriorityLoadFailed = !!priorityError;
+  if (!priorityError) {
+    window.parentPriorityAvailable = true;
+    parentReplyPriorityCache = new Map((priorityRows || []).map(row => [row.parent_id, row]));
+  } else if (['PGRST202', '42883'].includes(priorityError.code)) {
+    window.parentPriorityAvailable = false;
+  }
+  if (priorityError) for (const item of allFriends) {
+    if (item.users?.role !== 'parent') continue;
+    parentReplyPriorityCache.set(item.friend_id, {
+      ...parentReplyPriorityCache.get(item.friend_id),
+      waiting_reply: item.waitingReply, last_parent_at: item.lastParentAt
+    });
+  }
   const priorityButton = document.querySelector('.inbox-tabs button:first-child');
   priorityButton.hidden = false;
-  priorityButton.disabled = !!priorityError;
-  priorityButton.title = priorityError ? 'Cần cập nhật database để bật Chưa phản hồi' : '';
-  if (priorityError) window.setInboxFilter(false);
-  const priorities = new Map((priorityRows || []).map(row => [row.parent_id, row]));
+  priorityButton.disabled = false;
+  priorityButton.title = 'Chưa phản hồi';
+  const priorities = parentReplyPriorityCache;
   const aliases = new Map((aliasRows || []).map(row => [row.parent_id, row.zalo_alias]));
   const profileResult=await sb.rpc('list_zalo_contact_profiles');
   const zaloProfiles=new Map((profileResult.error?[]:profileResult.data || []).map(row=>[row.parent_id,row]));
@@ -1552,7 +1569,6 @@ function setComposerEnabled(enabled) {
 
 async function refreshZaloSendMode() {
   resetZaloSendMode();
-  setupParentMessageContext(parentInboxById.get(activeFriend?.id) || friendMap.get(activeFriend?.id));
   const wrap = document.getElementById('zaloSendModeWrap');
   const mode = document.getElementById('zaloSendMode');
   const label = document.getElementById('zaloSendModeLabel');
@@ -1581,28 +1597,20 @@ function resetZaloSendMode() {
   const wrap = document.getElementById('zaloSendModeWrap');
   const mode = document.getElementById('zaloSendMode');
   const linkButton = document.getElementById('zaloLinkButton');
-  const contextWrap = document.getElementById('messageContextWrap');
   wrap.classList.remove('show');
   linkButton.classList.remove('show');
-  contextWrap.classList.remove('show');
   mode.value = 'auto';
   zaloLinkAvailable = false;
   zaloDeliveryByMessage = new Map();
   document.getElementById('messageInput').placeholder = 'Nhập tin nhắn...';
 }
 
-function setupParentMessageContext(item) {
-  const wrap = document.getElementById('messageContextWrap');
-  const select = document.getElementById('messageContextStudent');
-  select.replaceChildren();
+function resolveParentMessageStudentId() {
+  const item = parentInboxById.get(activeFriend?.id) || friendMap.get(activeFriend?.id) || activeFriend;
   const children = Array.isArray(item?.children) ? item.children : [];
-  for (const child of children) {
-    const option = document.createElement('option');
-    option.value = child.id || '';
-    option.textContent = child.name || 'Học sinh';
-    select.appendChild(option);
-  }
-  wrap.classList.toggle('show', activeFriend?.role === 'parent' && children.length > 0);
+  const allowed = new Set(children.map(child => child.id));
+  const recent = [...loadedMessages].reverse().find(message => allowed.has(message.context_student_id));
+  return recent?.context_student_id || children[0]?.id || null;
 }
 
 async function refreshZaloDeliveryStatus() {
@@ -1771,7 +1779,6 @@ window.openConversation = async function(friendId, friendName, friendAvatar, fri
   const openingFriend = activeFriend;
   currentConversationId = null;
   if (messageChannel) { sb.removeChannel(messageChannel); messageChannel = null; }
-  setupParentMessageContext(inboxItem);
   loadedMessages = [];
   isLoadingOlderMessages = false;
   hasOlderMessages = true;
@@ -2443,9 +2450,9 @@ async function sendMessageContentToServer(content) {
   }
 
   if (activeFriend?.role === 'parent' && ['admin', 'teacher'].includes(currentProfile?.role || '')) {
-    const studentId = document.getElementById('messageContextStudent')?.value || null;
-    if (!studentId) return { data: null, error: new Error('Hãy chọn học sinh liên quan trước khi gửi.') };
-    return sb.rpc(window.parentPriorityAvailable ? 'send_mindup_parent_reply' : 'send_mindup_parent_message', {
+    const studentId = resolveParentMessageStudentId();
+    if (!studentId) return { data: null, error: new Error('Không có học sinh thuộc phạm vi phụ trách để gửi cho phụ huynh này.') };
+    return sb.rpc(window.parentPriorityAvailable !== false ? 'send_mindup_parent_reply' : 'send_mindup_parent_message', {
       p_parent_id: activeFriend.id,
       p_student_id: studentId,
       p_content: content
@@ -2491,7 +2498,7 @@ function appendOptimisticMessage(content) {
     sender_id: senderIds.sender_id,
     real_sender_id: senderIds.real_sender_id,
     context_student_id: activeFriend?.role === 'parent'
-      ? (document.getElementById('messageContextStudent')?.value || null) : null,
+      ? resolveParentMessageStudentId() : null,
     _pending: true,
   };
   loadedMessages.push(temp);
@@ -3357,7 +3364,9 @@ const _renderFriendListCore = (list) => {
   const topActions = document.getElementById("friendListTopActions");
   if (!list.length) {
     if (topActions) topActions.innerHTML = "";
-    wrap.innerHTML = '<div class="empty"><strong>Không tìm thấy kết quả</strong>Hãy thử tên người dùng khác.</div>';
+    wrap.innerHTML = window.inboxWaitingOnly && window.parentPriorityLoadFailed
+      ? '<div class="empty"><strong>Chưa tải được danh sách chưa phản hồi</strong><button type="button" onclick="retryParentReplyPriority()">Thử lại</button></div>'
+      : '<div class="empty"><strong>Không tìm thấy kết quả</strong>Hãy thử tên người dùng khác.</div>';
     return;
   }
   const BOT_ID = MINDUP_BOT_ID;
@@ -3518,7 +3527,7 @@ async function openExternalZaloConversation(item) {
   document.getElementById('messageList').innerHTML='<div class="empty">Đang tải hội thoại Zalo…</div>';
   document.getElementById('chatTitle').textContent=activeFriend.name;
   document.getElementById('chatSub').innerHTML='Zalo · Chưa liên kết <button type="button" onclick="linkExternalZalo()">Liên kết phụ huynh</button>';
-  setupParentMessageContext(null);setComposerEnabled(true);syncMobileConversationState(true);
+  setComposerEnabled(true);syncMobileConversationState(true);
   await loadExternalZaloMessages(true);
 }
 async function loadExternalZaloMessages(scrollToBottom=false,older=false) {

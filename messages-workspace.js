@@ -6,6 +6,7 @@
     window.inboxUnreadOnly = unread === true;
     document.querySelectorAll('.inbox-tabs button').forEach((button, index) => button.setAttribute('aria-pressed', String(index === (unread === 'reply' ? 0 : 1))));
     filterFriends();
+    if (unread === 'reply' && window.parentPriorityLoadFailed) window.retryParentReplyPriority?.();
   };
   window.toggleConversationInfo = function (force) {
     const panel = document.getElementById('conversationInfo');

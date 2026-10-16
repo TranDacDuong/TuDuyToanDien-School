@@ -39,6 +39,31 @@ test('waiting replies are default and All refreshes existing search', () => {
   assert.equal(h.context.window.inboxWaitingOnly, true);
   assert.doesNotMatch(html, />Chưa đọc<\/button>/);
 });
+
+test('waiting tab remains usable and retries after a temporary priority failure', () => {
+  const h = harness(); let retries = 0;
+  h.context.window.parentPriorityLoadFailed = true;
+  h.context.window.retryParentReplyPriority = () => retries++;
+  h.context.window.setInboxFilter(false);
+  h.context.window.setInboxFilter('reply');
+  assert.equal(h.context.window.inboxWaitingOnly, true);
+  assert.equal(retries, 1);
+  assert.match(html, /priorityButton.disabled = false/);
+  assert.doesNotMatch(html, /priorityButton.disabled = !!priorityError/);
+});
+
+test('parent context is automatic and restricted to authorized children', () => {
+  const ctx = { activeFriend: {id:'parent',children:[{id:'allowed-a'},{id:'allowed-b'}]},
+    parentInboxById:new Map(), friendMap:new Map(),
+    loadedMessages:[{context_student_id:'allowed-b'},{context_student_id:'unmanaged'}] };
+  vm.createContext(ctx);
+  vm.runInContext(html.slice(html.indexOf('function resolveParentMessageStudentId('),html.indexOf('async function refreshZaloDeliveryStatus(')),ctx);
+  assert.equal(ctx.resolveParentMessageStudentId(),'allowed-b');
+  ctx.loadedMessages=[];
+  assert.equal(ctx.resolveParentMessageStudentId(),'allowed-a');
+  ctx.activeFriend.children=[];
+  assert.equal(ctx.resolveParentMessageStudentId(),null);
+});
 test('info panel opens/closes and clears stale conversation data', () => {
   const h = harness(); h.context.activeFriend = { id: 'parent', name: '<Parent>', avatar: 'favicon.png', role: 'parent', children: [{ name: 'Student' }] };
   h.context.loadedMessages = [{ content: 'https://example.com/qr.png' }, { content: 'https://example.com/qr.png' }];
@@ -63,9 +88,10 @@ test('media links cannot navigate to javascript URLs', () => {
   assert.equal(h.ids.chatAvatar.src, '');
 });
 test('existing composer hooks and Zalo delivery states remain intact', () => {
-  for (const id of ['messageInput', 'sendBtn', 'attachBtn', 'messageContextStudent', 'zaloDispatchToggle', 'chatTitle', 'chatSub']) {
+  for (const id of ['messageInput', 'sendBtn', 'attachBtn', 'zaloDispatchToggle', 'chatTitle', 'chatSub']) {
     assert.equal((html.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1);
   }
+  assert.doesNotMatch(html, /id="messageContextStudent"|id="messageContextWrap"/);
   for (const state of ['sent', 'failed', 'uncertain', 'cancelled', 'processing']) assert.ok(html.includes(`zaloDelivery === '${state}'`));
   for (const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) if (match[1].trim()) new vm.Script(match[1]);
 });
