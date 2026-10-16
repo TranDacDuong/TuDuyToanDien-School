@@ -1610,8 +1610,9 @@ async function refreshZaloDeliveryStatus() {
   if (document.hidden || !currentConversationId || !isMindUpStaffRole(currentProfile?.role)) return;
   const ids = loadedMessages.map(row => row.id).filter(id => !String(id).startsWith('temp:'));
   if (!ids.length) return;
+  const conversationId = currentConversationId, loadingFriend = activeFriend;
   const { data, error } = await sb.rpc('list_mindup_zalo_message_deliveries', { p_message_ids: ids });
-  if (error) return;
+  if (error || conversationId !== currentConversationId || loadingFriend !== activeFriend) return;
   const next = new Map((data || []).map(job => [job.message_id, { id: job.id, status: job.status, kind: job.kind, error: job.error_message }]));
   if (JSON.stringify([...next]) !== JSON.stringify([...zaloDeliveryByMessage])) {
     zaloDeliveryByMessage = next;
@@ -1767,6 +1768,9 @@ window.openConversation = async function(friendId, friendName, friendAvatar, fri
     role: friendRole,
     children: Array.isArray(inboxItem?.children) ? inboxItem.children : []
   };
+  const openingFriend = activeFriend;
+  currentConversationId = null;
+  if (messageChannel) { sb.removeChannel(messageChannel); messageChannel = null; }
   setupParentMessageContext(inboxItem);
   loadedMessages = [];
   isLoadingOlderMessages = false;
@@ -1778,16 +1782,20 @@ window.openConversation = async function(friendId, friendName, friendAvatar, fri
   syncMobileConversationState(true);
 
   try {
-    currentConversationId = await ensureConversation(friendId, friendRole, friendMap.get(friendId)?.conversationId);
+    const conversationId = await ensureConversation(friendId, friendRole, inboxItem?.conversationId);
+    if (activeFriend !== openingFriend) return;
+    currentConversationId = conversationId;
     rememberConversationUser(friendId, friendName, friendAvatar, friendRole);
     setComposerEnabled(true);
     await loadMessages({ reset: true, scrollToBottom: true });
-    await refreshZaloSendMode();
+    if (activeFriend !== openingFriend) return;
+    refreshZaloSendMode().catch(console.warn);
     subscribeConversationMessages(currentConversationId);
     markMessageNotificationsRead(friendId, currentConversationId)
       .then(() => isPopupMode ? null : loadFriends())
       .catch(console.warn);
   } catch (error) {
+    if (activeFriend !== openingFriend) return;
     currentConversationId = null;
     setComposerEnabled(false);
     syncMobileConversationState(false);
@@ -2225,6 +2233,8 @@ function renderLoadedMessages() {
 async function loadMessages({ reset = false, scrollToBottom = false } = {}) {
   if(activeFriend?.isZaloExternal) return loadExternalZaloMessages(scrollToBottom);
   if (!currentConversationId) return;
+  const conversationId = currentConversationId;
+  const loadingFriend = activeFriend;
 
   const wrap = document.getElementById("messageList");
   const previousScrollTop = wrap.scrollTop;
@@ -2232,9 +2242,11 @@ async function loadMessages({ reset = false, scrollToBottom = false } = {}) {
   const { data, error } = await sb
     .from("messages")
     .select("id, content, created_at, sender_id, real_sender_id, transport, context_student_id, external_message_id")
-    .eq("conversation_id", currentConversationId)
+    .eq("conversation_id", conversationId)
     .order("created_at", { ascending: false })
     .limit(MESSAGE_PAGE_SIZE);
+
+  if (conversationId !== currentConversationId || loadingFriend !== activeFriend) return;
 
   if (error) {
     wrap.innerHTML = '<div class="empty"><strong>Không tải được tin nhắn</strong>Hãy thử lại sau ít phút.</div>';
@@ -2259,21 +2271,21 @@ async function loadMessages({ reset = false, scrollToBottom = false } = {}) {
     loadedMessages = Array.from(messagesById.values()).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
   }
 
-  await refreshZaloDeliveryStatus();
-  await refreshZaloMessageStates();
-
   renderLoadedMessages();
   if (scrollToBottom || wasNearBottom) {
     wrap.scrollTop = wrap.scrollHeight;
   } else {
     wrap.scrollTop = previousScrollTop;
   }
+  refreshConversationExtras();
   if (reset && hasOlderMessages && wrap.scrollHeight <= wrap.clientHeight) loadOlderMessages();
 }
 
 async function loadOlderMessages() {
   if(activeFriend?.isZaloExternal) return loadExternalZaloMessages(false,true);
   if (!currentConversationId || isLoadingOlderMessages || !hasOlderMessages || !loadedMessages.length) return;
+  const conversationId = currentConversationId;
+  const loadingFriend = activeFriend;
 
   const wrap = document.getElementById("messageList");
   const previousScrollHeight = wrap.scrollHeight;
@@ -2283,11 +2295,12 @@ async function loadOlderMessages() {
   const { data, error } = await sb
     .from("messages")
     .select("id, content, created_at, sender_id, real_sender_id, transport, context_student_id, external_message_id")
-    .eq("conversation_id", currentConversationId)
+    .eq("conversation_id", conversationId)
     .lt("created_at", loadedMessages[0].created_at)
     .order("created_at", { ascending: false })
     .limit(MESSAGE_PAGE_SIZE);
 
+  if (conversationId !== currentConversationId || loadingFriend !== activeFriend) return;
   isLoadingOlderMessages = false;
   if (error) {
     console.warn("Không tải được tin nhắn cũ:", error);
@@ -2300,9 +2313,9 @@ async function loadOlderMessages() {
 
   const loadedIds = new Set(loadedMessages.map(item => item.id));
   loadedMessages = olderMessages.filter(item => !loadedIds.has(item.id)).concat(loadedMessages);
-  await refreshZaloMessageStates();
   renderLoadedMessages();
   wrap.scrollTop = previousScrollTop + wrap.scrollHeight - previousScrollHeight;
+  refreshConversationExtras();
   if (hasOlderMessages && wrap.scrollHeight <= wrap.clientHeight) loadOlderMessages();
 }
 
@@ -3423,13 +3436,29 @@ window.getZaloMessageMetadata = id => zaloMessageStates[id];
 let externalZaloLoading = null;
 let externalSendAttempt = null;
 let externalSending = false;
+const conversationExtrasRequests = new WeakMap();
+function refreshConversationExtras() {
+  const friend = activeFriend, conversation = currentConversationId;
+  if (!friend || conversationExtrasRequests.has(friend)) return;
+  const request = Promise.allSettled([refreshZaloDeliveryStatus(), refreshZaloMessageStates()])
+    .then(() => {
+      if (friend !== activeFriend || conversation !== currentConversationId) return;
+      const wrap = document.getElementById('messageList');
+      const top = wrap.scrollTop, nearBottom = wrap.scrollHeight - wrap.clientHeight - top < 80;
+      const pendingReplies = [...wrap.querySelectorAll('.zalo-pending-reply')];
+      renderLoadedMessages();
+      pendingReplies.forEach(note => wrap.appendChild(note));
+      wrap.scrollTop = nearBottom ? wrap.scrollHeight : top;
+    }).finally(() => conversationExtrasRequests.delete(friend));
+  conversationExtrasRequests.set(friend, request);
+}
 async function refreshZaloMessageStates() {
   const ids=loadedMessages.map(m=>m.external_message_id).filter(Boolean);
   if(!ids.length) return;
-  const conversation=currentConversationId;
+  const conversation=currentConversationId, loadingFriend=activeFriend;
   for(let offset=0;offset<ids.length;offset+=500) {
     const {data,error}=await sb.rpc('zalo_message_states',{p_ids:ids.slice(offset,offset+500)});
-    if(conversation!==currentConversationId) return;
+    if(conversation!==currentConversationId || loadingFriend!==activeFriend) return;
     if(!error) zaloMessageStates={...zaloMessageStates,...data};
   }
 }
@@ -3484,29 +3513,31 @@ async function openExternalZaloConversation(item) {
   await loadExternalZaloMessages(true);
 }
 async function loadExternalZaloMessages(scrollToBottom=false,older=false) {
-  if(!activeFriend?.isZaloExternal || externalZaloLoading===activeFriend.id || (older && !hasOlderMessages)) return;
-  const thread=activeFriend.id;externalZaloLoading=thread;
+  if(!activeFriend?.isZaloExternal || externalZaloLoading===activeFriend || (older && !hasOlderMessages)) return;
+  const loadingFriend=activeFriend, thread=activeFriend.id;externalZaloLoading=loadingFriend;
   const wrap=document.getElementById('messageList'),top=wrap.scrollTop,height=wrap.scrollHeight;
   try {
     const before=older?loadedMessages[0]?.created_at:null;
     const {data,error}=await sb.rpc('list_zalo_external_messages',{p_thread:thread,p_before:before || null,p_before_id:older?loadedMessages[0]?.external_message_id:null});
-    if(error) throw error;if(activeFriend?.id!==thread) return;
+    if(error) throw error;if(activeFriend!==loadingFriend) return;
     const map=new Map(loadedMessages.map(m=>[m.id,m]));
     for(const r of data || []) map.set(r.external_id,{id:r.external_id,external_message_id:r.external_id,content:r.content,created_at:r.sent_at,
       sender_id:r.is_self?MINDUP_BOT_ID:thread,transport:'zalo'});
     loadedMessages=[...map.values()].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)||a.id.localeCompare(b.id));
     if(older || !before) hasOlderMessages=(data || []).length===100;
-    await refreshZaloMessageStates();renderLoadedMessages();
+    renderLoadedMessages();
+    wrap.scrollTop=scrollToBottom?wrap.scrollHeight:older?top+wrap.scrollHeight-height:top;
+    refreshConversationExtras();
     const replies=await sb.from('zalo_external_replies').select('status,error_message,created_at').eq('thread_id',thread).in('status',['processing','uncertain']).order('created_at',{ascending:false}).limit(10);
-    if(activeFriend?.id!==thread) return;
+    if(activeFriend!==loadingFriend) return;
     if(!replies.error) for(const pending of replies.data || []) {
-      const note=document.createElement('div');note.className='message-transport';note.style.cssText='padding:10px;color:#9a6700';
+      const note=document.createElement('div');note.className='message-transport zalo-pending-reply';note.style.cssText='padding:10px;color:#9a6700';
       note.textContent=`${pending.status==='uncertain'?'Chưa xác nhận gửi':'Đang chờ xác nhận gửi'} · ${new Date(pending.created_at).toLocaleString('vi-VN')}${pending.error_message?' · '+pending.error_message:''}`;wrap.appendChild(note);
     }
     if(!loadedMessages.length) wrap.innerHTML='<div class="empty">Chưa có tin nhắn được đồng bộ.</div>';
     wrap.scrollTop=scrollToBottom?wrap.scrollHeight:older?top+wrap.scrollHeight-height:top;
-  } catch(error) {if(activeFriend?.id===thread) wrap.innerHTML=`<div class="empty">${esc(error.message)}</div>`;}
-  finally {if(externalZaloLoading===thread) externalZaloLoading=null;}
+  } catch(error) {if(activeFriend===loadingFriend) wrap.innerHTML=`<div class="empty">${esc(error.message)}</div>`;}
+  finally {if(externalZaloLoading===loadingFriend) externalZaloLoading=null;}
 }
 async function sendExternalZaloMessage() {
   if(externalSending) return;
