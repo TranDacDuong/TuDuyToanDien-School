@@ -26,7 +26,6 @@
   let activeTheme = localStorage.getItem(STORAGE_THEME) || DEFAULT_THEME;
   let examMode = EXAM_PAGES.has(location.pathname.split("/").pop());
   let layer = null;
-  let settings = null;
 
   function isEnabled() {
     return localStorage.getItem(STORAGE_ENABLED) !== "0";
@@ -96,51 +95,16 @@
     document.body.appendChild(layer);
   }
 
-  function syncSettingsPanel() {
-    if (!settings) return;
-    settings.querySelector("[data-effect-toggle]").checked = isEnabled();
-    settings.querySelector("[data-effect-theme]").textContent = getTheme(activeTheme).name;
-  }
-
-  function ensureSettings() {
-    if (!document.body || settings) return;
-    settings = document.createElement("div");
-    settings.className = "mindup-effect-settings";
-    settings.innerHTML = `
-      <button class="mindup-effect-trigger" type="button" title="Cai dat hieu ung" aria-label="Cai dat hieu ung">&#10024;</button>
-      <div class="mindup-effect-panel">
-        <div class="mindup-effect-panel-title">Hieu ung giao dien</div>
-        <div class="mindup-effect-panel-copy">Giao dien he thong: <strong data-effect-theme></strong></div>
-        <label class="mindup-effect-toggle">
-          <input type="checkbox" data-effect-toggle>
-          <span></span>
-          <b>Bat hieu ung tren thiet bi nay</b>
-        </label>
-      </div>
-    `;
-    settings.querySelector(".mindup-effect-trigger").addEventListener("click", () => {
-      settings.classList.toggle("open");
-    });
-    settings.querySelector("[data-effect-toggle]").addEventListener("change", (event) => {
-      localStorage.setItem(STORAGE_ENABLED, event.target.checked ? "1" : "0");
-      renderLayer();
-    });
-    document.body.appendChild(settings);
-    syncSettingsPanel();
-  }
-
   function applyTheme(themeId) {
     activeTheme = getTheme(themeId).id;
     localStorage.setItem(STORAGE_THEME, activeTheme);
     document.documentElement.dataset.mindupTheme = activeTheme;
-    syncSettingsPanel();
     renderLayer();
   }
 
   function setExamMode(active) {
     examMode = !!active;
     document.documentElement.classList.toggle("mindup-exam-mode", examMode);
-    settings?.classList.toggle("hidden", examMode);
     renderLayer();
   }
 
@@ -158,7 +122,6 @@
   }
 
   function init() {
-    ensureSettings();
     applyTheme(activeTheme);
     setExamMode(examMode);
     loadSystemTheme().catch(() => {});
