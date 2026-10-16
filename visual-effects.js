@@ -1,5 +1,4 @@
 (function () {
-  const STORAGE_ENABLED = "mindup_effects_enabled";
   const STORAGE_THEME = "mindup_system_theme";
   const DEFAULT_THEME = "spring";
   const SEASON_THEMES = new Set(["spring", "summer", "autumn", "winter", "mindup"]);
@@ -25,74 +24,14 @@
 
   let activeTheme = localStorage.getItem(STORAGE_THEME) || DEFAULT_THEME;
   let examMode = EXAM_PAGES.has(location.pathname.split("/").pop());
-  let layer = null;
-
-  function isEnabled() {
-    return localStorage.getItem(STORAGE_ENABLED) !== "0";
-  }
-
-  function isReducedMotion() {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  }
 
   function getTheme(themeId) {
     return THEMES.find((theme) => theme.id === themeId) || THEMES[0];
   }
 
-  function random(min, max) {
-    return min + Math.random() * (max - min);
-  }
-
-  function addPetal(target) {
-    const item = document.createElement("span");
-    item.className = "mindup-petal";
-    item.style.setProperty("--petal-left", `${random(0, 100)}%`);
-    item.style.setProperty("--petal-size", `${random(8, 17)}px`);
-    item.style.setProperty("--petal-delay", `${-random(0, 16)}s`);
-    item.style.setProperty("--petal-duration", `${random(11, 21)}s`);
-    item.style.setProperty("--petal-drift", `${random(-55, 55)}px`);
-    item.style.setProperty("--petal-turn", `${random(210, 600)}deg`);
-    item.style.setProperty("--petal-opacity", `${random(.28, .62)}`);
-    target.appendChild(item);
-  }
-
-  function addLeaf(target) {
-    const item = document.createElement("span");
-    item.className = "mindup-leaf";
-    item.style.setProperty("--leaf-left", `${random(0, 100)}%`);
-    item.style.setProperty("--leaf-size", `${random(9, 18)}px`);
-    item.style.setProperty("--leaf-delay", `${-random(0, 20)}s`);
-    item.style.setProperty("--leaf-duration", `${random(15, 25)}s`);
-    item.style.setProperty("--leaf-drift", `${random(-90, 90)}px`);
-    item.style.setProperty("--leaf-turn", `${random(320, 860)}deg`);
-    target.appendChild(item);
-  }
-
-  function addRibbon(target) {
-    const item = document.createElement("span");
-    item.className = "mindup-ribbon";
-    item.style.setProperty("--ribbon-top", `${random(12, 78)}%`);
-    item.style.setProperty("--ribbon-delay", `${-random(0, 24)}s`);
-    item.style.setProperty("--ribbon-duration", `${random(18, 28)}s`);
-    item.style.setProperty("--ribbon-scale", `${random(.72, 1.27)}`);
-    target.appendChild(item);
-  }
-
   function renderLayer() {
-    layer?.remove();
-    layer = null;
-    if (!document.body || !isEnabled() || examMode || isReducedMotion()) return;
-
-    const theme = getTheme(activeTheme);
-    const scale = window.matchMedia("(max-width: 640px)").matches ? .55 : 1;
-    layer = document.createElement("div");
-    layer.className = "mindup-petal-layer";
-    layer.dataset.theme = theme.id;
-    layer.setAttribute("aria-hidden", "true");
-    for (let index = 0; index < Math.ceil(theme.petals * scale); index += 1) addPetal(layer);
-    for (let index = 0; index < Math.ceil(theme.leaves * scale); index += 1) addLeaf(layer);
-    for (let index = 0; index < Math.ceil(theme.ribbons * scale); index += 1) addRibbon(layer);
-    document.body.appendChild(layer);
+    // Retain the shared API without creating decorative animation layers.
+    document.querySelectorAll('.mindup-petal-layer').forEach(layer => layer.remove());
   }
 
   function applyTheme(themeId) {
@@ -132,7 +71,6 @@
     if (event.data?.type === "mindup:theme-changed") applyTheme(event.data.theme);
   });
   window.addEventListener("storage", (event) => {
-    if (event.key === STORAGE_ENABLED) renderLayer();
     if (event.key === STORAGE_THEME && event.newValue) applyTheme(event.newValue);
   });
 
