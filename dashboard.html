@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="theme.css?v=20260615-ios1">
-<link rel="stylesheet" href="staff-message-dock.css?v=20261017-dock-right">
+<link rel="stylesheet" href="staff-message-dock.css?v=20261017-mobile-menu">
 <style>
 * { box-sizing: border-box; }
 body {
@@ -952,6 +952,37 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
   .ops-link { width: 100%; min-height: 44px; }
 }
 </style>
+<style>
+.mobile-menu-close, #sidebarTab > img { display: none; }
+@media (max-width: 768px) {
+  #mobileNav { display: none !important; }
+  #sidebarTab, aside.open ~ #sidebarTab, #sidebarTab.open {
+    display: flex; top: auto; left: auto; right: 12px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    transform: none; width: 52px; height: 52px; padding: 0;
+    border: 1px solid #dce1e8; border-radius: 50%; background: #fff;
+    z-index: 1199; box-shadow: 0 4px 16px #172b4d30;
+  }
+  #sidebarTab::after { display: none; }
+  #sidebarTab > img { display: block; width: 24px; height: 24px; }
+  #sidebarOverlay { z-index: 1200; }
+  #sidebar {
+    top: auto; left: auto; right: 12px;
+    bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    width: min(360px, calc(100vw - 24px)); height: auto;
+    max-height: calc(100dvh - 104px - env(safe-area-inset-bottom, 0px));
+    padding: 16px; border: 1px solid #dce1e8; border-radius: 8px;
+    background: #fff; transform: none; visibility: hidden; pointer-events: none;
+    z-index: 1201; overflow: hidden; transition: none;
+  }
+  #sidebar.open { visibility: visible; pointer-events: auto; box-shadow: 0 8px 32px #172b4d30; }
+  #sidebar .logo { margin: 0 40px 12px 0; font-size: 16px; }
+  #sidebar #userBox { padding: 8px; margin-bottom: 10px; border-radius: 6px; }
+  #sidebar #menu { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  #sidebar li { min-height: 44px; padding: 10px; margin-bottom: 2px; border-radius: 4px; font-size: 14px; }
+  .mobile-menu-close { display: grid; place-items: center; position: absolute; right: 12px; top: 10px; width: 36px; height: 36px; padding: 0; background: #fff; border: 0; border-radius: 4px; cursor: pointer; }
+}
+</style>
 <script src="visual-effects.js?v=20261016-no-particles" defer></script>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0f1f3d">
@@ -976,6 +1007,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 <div id="sidebarOverlay" onclick="closeSidebar()"></div>
 
 <aside id="sidebar">
+  <button class="mobile-menu-close" type="button" onclick="closeSidebar()" aria-label="Đóng menu" title="Đóng menu"><img src="assets/icons/x.svg" alt="" width="20" height="20"></button>
   <div class="logo">Tư Duy Toàn Diện</div>
 
   <div id="userBox">
@@ -1010,7 +1042,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 </aside>
 
 <!-- Tab kéo nhỏ cạnh trái -->
-<div id="sidebarTab" onclick="toggleSidebar()"></div>
+<button id="sidebarTab" type="button" onclick="toggleSidebar()" aria-label="Mở menu" title="Menu" aria-expanded="false" aria-controls="sidebar"><img src="assets/icons/menu.svg" alt=""></button>
 
 <main>
   <div id="guestAuthBar" class="guest-auth-bar">
@@ -1213,7 +1245,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 <script src="tuition-calculation.js?v=20261015-shared1"></script>
 <script src="dashboard_ops.js?v=20261015-shared1"></script>
 <script src="dashboard-action-summary.js?v=20261016-zalo-sync"></script>
-<script src="staff-message-dock.js?v=20261016-dock1"></script>
+<script src="staff-message-dock.js?v=20261017-mobile-menu"></script>
 <script>
 let badgeChannels = [];
 let currentDashboardUser = null;
@@ -1388,14 +1420,27 @@ function syncSidebarPin(page) {
 }
 function openSidebar() {
   if (isHomeSidebarPinned()) return;
+  if (window.matchMedia('(max-width: 768px)').matches) {
+    window.StaffMessageDock?.close();
+    sidebar.setAttribute('role', 'dialog');
+    sidebar.setAttribute('aria-modal', 'true');
+    sidebar.setAttribute('aria-label', 'Menu điều hướng');
+  }
   sidebar.classList.add("open");
   tab.classList.add("open");
   overlay.classList.add("show");
+  tab.setAttribute('aria-expanded', 'true');
+  if (window.matchMedia('(max-width: 768px)').matches) sidebar.querySelector('.mobile-menu-close').focus();
 }
 function closeSidebar() {
+  const returnFocus = sidebar.contains(document.activeElement);
   sidebar.classList.remove("open");
   tab.classList.remove("open");
   overlay.classList.remove("show");
+  tab.setAttribute('aria-expanded', 'false');
+  sidebar.removeAttribute('role');
+  sidebar.removeAttribute('aria-modal');
+  if (returnFocus && window.matchMedia('(max-width: 768px)').matches) tab.focus();
 }
 function toggleSidebar() {
   sidebar.classList.contains("open") ? closeSidebar() : openSidebar();
@@ -1406,12 +1451,25 @@ trigger.addEventListener("mouseenter", openSidebar);
 
 // Giữ sidebar mở khi chuột ở trong sidebar
 sidebar.addEventListener("mouseleave", e => {
+  if (window.matchMedia('(max-width: 768px)').matches) return;
   // Chỉ đóng nếu chuột không sang tab
   if (!tab.matches(":hover")) closeSidebar();
 });
 tab.addEventListener("mouseleave", e => {
+  if (window.matchMedia('(max-width: 768px)').matches) return;
   if (!sidebar.matches(":hover")) closeSidebar();
 });
+
+document.addEventListener('keydown', event => {
+  if (!sidebar.classList.contains('open') || !window.matchMedia('(max-width: 768px)').matches) return;
+  if (event.key === 'Escape') { closeSidebar(); return; }
+  if (event.key !== 'Tab') return;
+  const nodes = [...sidebar.querySelectorAll('button, a[href], [tabindex="0"]')].filter(node => !node.disabled && node.getClientRects().length);
+  const first = nodes[0], last = nodes[nodes.length-1];
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+});
+window.matchMedia('(max-width: 768px)').addEventListener('change', () => closeSidebar());
 
 /* ── Dashboard init ── */
 async function initDashboard(userOverride = null){
@@ -1713,6 +1771,11 @@ function setupMenu(){
   dashboardMenuReady = true;
   const items = document.querySelectorAll("#menu li");
   items.forEach(item => {
+    item.tabIndex = 0;
+    item.setAttribute('role', 'link');
+    item.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); item.click(); }
+    });
     item.addEventListener("click", () => {
       openDashboardPage(item.dataset.page);
     });

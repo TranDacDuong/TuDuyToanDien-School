@@ -10,6 +10,7 @@
   }
   function open() {
     if (!panel) return;
+    if (window.matchMedia('(max-width: 768px)').matches) window.closeSidebar?.();
     if (!frame.getAttribute('src')) frame.src = 'messages.html?popup=1&dock=1&v=20261016-staff-dock';
     panel.hidden = false;
     launcher.setAttribute('aria-expanded', 'true');
