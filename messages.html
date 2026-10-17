@@ -1448,6 +1448,7 @@ async function loadFriendsNow() {
 
   allFriends = merged;
   friendMap = new Map(merged.map(item => [item.friend_id, item]));
+  syncActiveConversationProfile();
 
   if (!merged.length && !document.getElementById("friendSearch")?.value?.trim()) {
     wrap.innerHTML = '<div class="empty"><strong>Chưa có cuộc trò chuyện</strong>Tìm người dùng để bắt đầu nhắn tin.</div>';
@@ -3495,6 +3496,7 @@ function refreshExternalInbox() {
       {isZaloExternal:true,preview:row.last_content,lastActivity:row.last_at,waitingReply:row.waiting_reply,lastParentAt:row.last_parent_at}));
     allFriends = sortConversationsByFamily([...allFriends.filter(item => !item.isZaloExternal),...external]);
     friendMap = new Map(allFriends.map(item => [item.friend_id,item]));
+    syncActiveConversationProfile();
     renderFriendList(getFilteredFriendList());
   })().finally(() => {externalInboxRefresh = null;});
   return externalInboxRefresh;
@@ -3520,6 +3522,15 @@ window.openFullMessagesPage = function() {
 // Hook renderFriendList to use MindUp-aware version
 const _origRFL = renderFriendList;
 function renderFriendList(list) { _renderFriendListCore(list); }
+
+function syncActiveConversationProfile() {
+  const item = activeFriend && friendMap.get(activeFriend.id);
+  if (!item || !['parent','zalo_external'].includes(item.users?.role)) return;
+  activeFriend.name = item.users.zalo_alias || item.users.full_name || activeFriend.name;
+  activeFriend.avatar = item.users.avatar_url || activeFriend.avatar;
+  document.getElementById('chatTitle').textContent = activeFriend.name;
+  window.refreshMessageWorkspace?.();
+}
 
 
 

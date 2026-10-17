@@ -2,6 +2,27 @@ const test=require('node:test');const assert=require('node:assert/strict');
 const fs=require('node:fs');const vm=require('node:vm');const path=require('node:path');const {createRequire}=require('node:module');
 const {PGlite}=createRequire(path.resolve('services/zalo-bot/package.json'))('@electric-sql/pglite');
 const {PREFIX,encodeMessage,encodeUpdate,safeRemote}=require('../services/zalo-bot/zalo-sync-content');
+const {readContacts,contactPayload}=require('../services/zalo-bot/zalo-contact-sync');
+const {GatewayQueue}=require('../services/zalo-bot/message-sync');
+
+test('live profile updates and messages are not held behind historical uploads',async()=>{
+ const make=(id,history)=>({action:'syncMessage',externalId:'123:'+id,zaloUid:'123',content:'Content',isSelf:false,isHistory:history});
+ const pending=new Map([['old',make('old',true)],['profile',contactPayload('123',{aliasKnown:true,alias:'Name'})],['new',make('new',false)],['ack',{action:'finish',jobId:'job'}]]);
+ const order=[];
+ await new GatewayQueue({pending,request:async p=>{order.push(p.action==='finish'?'finish':p.isHistory?'history':p.content.includes('contact_profile')?'profile':'live');},persist(){},quarantine(){}}).flush();
+ assert.deepEqual(order,['finish','profile','live','history']);assert.equal(pending.size,0);
+});
+
+test('alias pagination distinguishes removal from failed or incomplete snapshots',async()=>{
+ const api={getAllFriends:async()=>[{userId:'123',displayName:'Profile name'}],getAliasList:async(count,page)=>({
+   updateTime:'same',items:page===1?Array.from({length:100},(_,i)=>({userId:String(i),alias:'Alias '+i})):[{userId:'123',alias:'Nickname'}]})};
+ const full=await readContacts(api);assert.equal(full.aliasesKnown,true);assert.equal(full.aliases.get('123'),'Nickname');
+ const removed=await readContacts({...api,getAliasList:async()=>({items:[]})});assert.equal(removed.aliasesKnown,true);
+ const failed=await readContacts({...api,getAliasList:async()=>{throw new Error('offline');}});assert.equal(failed.aliasesKnown,false);
+ const p=contactPayload('123',{displayName:'Real name',aliasKnown:true,alias:'Nickname'});
+ assert.equal(p.externalId,contactPayload('123',{displayName:'Real name',aliasKnown:true,alias:'Nickname'}).externalId);
+ assert.equal(JSON.parse(p.content.slice(PREFIX.length)).alias,'Nickname');
+});
 test('normalizer imports media references only and rejects unsafe remote sources',()=>{
   const m={type:0,threadId:'123',isSelf:false,data:{msgId:'456',content:{href:'https://photo.zaloapp.com/photo.jpg',title:'Photo'},msgType:'chat.photo',ts:1700000000000,quote:{msg:'Hello',globalMsgId:3}}};
   const p=encodeMessage(m);const body=JSON.parse(p.content.slice(PREFIX.length));
@@ -25,6 +46,7 @@ test('sync stores unlinked history, metadata, recall and scoped media; linking r
    ALTER TABLE messages ENABLE ROW LEVEL SECURITY;GRANT SELECT ON messages TO authenticated;
    CREATE POLICY own_message ON messages FOR SELECT TO authenticated USING(owner_id=auth.uid());
    CREATE TABLE zalo_verified_links(audience_user_id uuid,zalo_uid text,enabled boolean);
+   CREATE FUNCTION list_mindup_parent_inbox() RETURNS TABLE(parent_id uuid) LANGUAGE sql AS $$SELECT audience_user_id FROM zalo_verified_links WHERE enabled$$;
    CREATE TABLE zalo_unmatched_inbox(external_id text PRIMARY KEY,zalo_uid text,display_name text,content text);
    CREATE TABLE zalo_outbox(zalo_uid text,status text);
    CREATE TABLE automatic_tuition_reminders(dispatch_uid text,status text);
@@ -38,9 +60,21 @@ test('sync stores unlinked history, metadata, recall and scoped media; linking r
    SELECT set_config('request.jwt.claim.role','service_role',false);`);
   await db.exec(fs.readFileSync('SQL full Zalo conversation sync.sql','utf8'));
   await db.exec(fs.readFileSync('SQL full Zalo conversation sync.sql','utf8'));
+  await db.exec(fs.readFileSync('SQL Zalo contact nicknames.sql','utf8'));
+  await db.exec(fs.readFileSync('SQL Zalo contact nicknames.sql','utf8'));
   const payload=encodeMessage({type:0,threadId:'123',isSelf:false,data:{msgId:'456',msgType:'chat.photo',content:{href:'https://photo.zaloapp.com/a.jpg'},ts:1700000000000}});
   const send=p=>db.query('SELECT sync_mindup_zalo_message($1,$2,$3,$4,$5,$6,$7)',[p.externalId,p.zaloUid,p.content,'Thu Trang',p.isSelf,p.sentAt,true]);
   await send(payload);await send(payload);
+  const profile=contactPayload('123',{displayName:'Real profile',alias:'Nickname',aliasKnown:true});
+  await send(profile);
+  assert.equal((await db.query("SELECT zalo_alias FROM zalo_external_threads WHERE zalo_uid='123'")).rows[0].zalo_alias,'Nickname');
+  await send({...contactPayload('123',{displayName:'Real profile',aliasKnown:false}),sentAt:new Date(Date.parse(profile.sentAt)+100).toISOString()});
+  assert.equal((await db.query("SELECT zalo_alias FROM zalo_external_threads WHERE zalo_uid='123'")).rows[0].zalo_alias,'Nickname');
+  await send({...contactPayload('123',{displayName:'Real profile',alias:'Old alias',aliasKnown:true}),sentAt:new Date(Date.parse(profile.sentAt)-1000).toISOString()});
+  assert.equal((await db.query("SELECT zalo_alias FROM zalo_external_threads WHERE zalo_uid='123'")).rows[0].zalo_alias,'Nickname');
+  await send({...contactPayload('123',{displayName:'Real profile',alias:'',aliasKnown:true}),sentAt:new Date(Date.parse(profile.sentAt)+200).toISOString()});
+  assert.equal((await db.query("SELECT zalo_alias FROM zalo_external_threads WHERE zalo_uid='123'")).rows[0].zalo_alias,null);
+  await send({...profile,sentAt:new Date(Date.parse(profile.sentAt)+300).toISOString()});
   const thread=(await db.query("SELECT id FROM zalo_external_threads WHERE zalo_uid='123'")).rows[0].id;
   assert.equal((await db.query('SELECT count(*)::int n FROM zalo_message_mirrors')).rows[0].n,1);
   assert.equal((await db.query('SELECT count(*)::int n FROM messages')).rows[0].n,0);
@@ -51,12 +85,14 @@ test('sync stores unlinked history, metadata, recall and scoped media; linking r
   await db.exec("UPDATE zalo_outbox SET status='sent'");
   await db.exec(`SELECT set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000011',false);`);
   assert.equal((await db.query('SELECT jsonb_array_length(list_zalo_external_inbox()) n')).rows[0].n,1);
+  assert.equal((await db.query("SELECT list_zalo_external_inbox()->0->>'display_name' name")).rows[0].name,'Nickname');
   const replyId='00000000-0000-0000-0000-000000000099';
   assert.equal((await db.query('SELECT reserve_zalo_external_reply($1,$2,$3) result',[thread,replyId,'Hello'])).rows[0].result.claimed,true);
   assert.equal((await db.query('SELECT reserve_zalo_external_reply($1,$2,$3) result',[thread,replyId,'Hello'])).rows[0].result.claimed,false);
   await send({...payload,externalId:'123:reply-result',content:PREFIX+JSON.stringify({version:2,event:'reply_result',reply_id:replyId,status:'sent',external_id:'123:999'})});
   assert.equal((await db.query('SELECT status FROM zalo_external_replies')).rows[0].status,'sent');
   await db.exec(`INSERT INTO zalo_verified_links VALUES('00000000-0000-0000-0000-000000000012','123',true);`);
+  assert.equal((await db.query('SELECT display_name FROM list_zalo_contact_profiles()')).rows[0].display_name,'Nickname');
   await db.query('SELECT reconcile_zalo_message_mirrors()');await db.query('SELECT reconcile_zalo_message_mirrors()');
   assert.equal((await db.query('SELECT count(*)::int n FROM messages')).rows[0].n,2);
   await db.exec(`SELECT set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000013',false);SET ROLE authenticated;`);

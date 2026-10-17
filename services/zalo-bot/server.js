@@ -5,8 +5,10 @@ const path = require('path');
 const { buildParentAlias, parseParentLinkCommand } = require('./link-command');
 const { GatewayQueue, HistorySync } = require('./message-sync');
 const { encodeMessage, encodeUpdate } = require('./zalo-sync-content');
+const { readContacts, contactPayload } = require('./zalo-contact-sync');
 const { registerOnDemand } = require('./zalo-on-demand');
 const friendProfiles = new Map();
+const contactFingerprints = new Map();
 const { writeJsonAtomic } = require('./sync-store');
 const { prepareScoreMessageMedia } = require('./score-message-media');
 const { createScheduler } = require('./tuition-reminder-scheduler');
@@ -711,8 +713,8 @@ async function syncFriendsList() {
   if (!zaloApi || typeof zaloApi.getAllFriends !== 'function') return;
   try {
     console.log("[ZaloBot] Đang đồng bộ danh bạ bạn bè Zalo vào bộ nhớ cache...");
-    const res = await zaloApi.getAllFriends().catch(() => null);
-    const friends = (res && Array.isArray(res)) ? res : (res && res.data && Array.isArray(res.data)) ? res.data : [];
+    const {friends,aliases,aliasesKnown} = await readContacts(zaloApi);
+    const previousProfiles = new Map(friendProfiles);
 
     friendPhoneMap.clear();
     friendUserIdSet.clear();
@@ -720,7 +722,17 @@ async function syncFriendsList() {
 
     for (const f of friends) {
       const uid = String(f.userId || f.uid || '');
-      if (uid) { friendUserIdSet.add(uid); friendProfiles.set(uid,{displayName:f.displayName,zaloName:f.zaloName,avatar:f.avatar}); }
+      if (uid) {
+        friendUserIdSet.add(uid);
+        const profile={displayName:f.displayName,zaloName:f.zaloName,avatar:f.avatar,
+          alias:aliasesKnown?(aliases.get(uid) || ''):previousProfiles.get(uid)?.alias,aliasKnown:aliasesKnown};
+        friendProfiles.set(uid,profile);
+        const payload=contactPayload(uid,profile);
+        if(contactFingerprints.get(uid)!==payload.externalId) {
+          pendingIncoming.set(payload.externalId,payload);
+          contactFingerprints.set(uid,payload.externalId);
+        }
+      }
 
       const rawPhone = String(f.phoneNumber || f.phone || '').replace(/\D/g, '');
       if (rawPhone) {
@@ -732,7 +744,18 @@ async function syncFriendsList() {
         }
       }
     }
-    console.log(`[ZaloBot] ✓ Đã đồng bộ ${friendUserIdSet.size} bạn bè vào bộ nhớ cache!`);
+    // Aliases can outlive friendship. Mirror them without treating that UID as a friend.
+    if(aliasesKnown) for(const uid of new Set([...aliases.keys(),...previousProfiles.keys()])) {
+      if(friendUserIdSet.has(uid)) continue;
+      const profile={...previousProfiles.get(uid),alias:aliases.get(uid) || '',aliasKnown:true};
+      friendProfiles.set(uid,profile);
+      const payload=contactPayload(uid,profile);
+      if(contactFingerprints.get(uid)!==payload.externalId) {
+        pendingIncoming.set(payload.externalId,payload);contactFingerprints.set(uid,payload.externalId);
+      }
+    }
+    persistIncoming();flushIncoming().catch(console.error);
+    console.log(`[ZaloBot] ✓ Đã đồng bộ ${friendUserIdSet.size} bạn bè vào bộ nhớ cache! Biệt danh: ${aliasesKnown?'đã đọc đầy đủ':'chưa đọc đầy đủ, giữ dữ liệu cũ'}`);
   } catch (err) {
     console.warn("[ZaloBot] Lỗi khi đồng bộ danh bạ bạn bè:", err?.message || err);
   }
