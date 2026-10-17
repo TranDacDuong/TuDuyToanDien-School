@@ -37,6 +37,8 @@ test('staff dock is role restricted, lazy, persistent when minimized and fits de
     assert.equal(await page.locator('#staffMessageLauncher').count(),1);
   }
   await page.evaluate(()=>window.StaffMessageDock.configure({id:'admin',role:'admin'}));
+  const launcher=await page.locator('#staffMessageLauncher').boundingBox();
+  assert.equal(1440-launcher.x-launcher.width,16);
   assert.equal(await page.locator('#staffMessagePanel iframe').getAttribute('src'),null);
   await page.getByRole('button',{name:'Mở tin nhắn',exact:true}).click();
   await page.frameLocator('#staffMessagePanel iframe').getByText('Phụ huynh thử nghiệm',{exact:true}).waitFor();
@@ -51,6 +53,8 @@ test('staff dock is role restricted, lazy, persistent when minimized and fits de
   await page.getByRole('button',{name:'Phóng to hoặc thu gọn tin nhắn'}).click();
   assert.equal(await page.locator('#staffMessagePanel').evaluate(node=>node.classList.contains('expanded')),true);
   await page.setViewportSize({width:390,height:844});
+  const mobileLauncher=await page.locator('#staffMessageLauncher').boundingBox();
+  assert.equal(390-mobileLauncher.x-mobileLauncher.width,12);
   const box=await page.locator('#staffMessagePanel').boundingBox();
   assert.ok(box.x>=0 && box.y>=0 && box.x+box.width<=390 && box.y+box.height<=844);
   await page.screenshot({path:'scratch/staff-dock-mobile.png'});
