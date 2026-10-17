@@ -50,7 +50,7 @@ test('database: automatic notices cannot clear waiting; manual replies can', asy
   await db.exec(`UPDATE users SET role='student' WHERE id='${staff}'`);
   assert.equal((await db.query('SELECT * FROM list_mindup_parent_reply_priority()')).rows.length, 0);
 });
-test('UI prioritizes waiting parents above unread and automatic activity', () => {
+test('UI orders conversations by latest activity regardless of waiting or unread', () => {
   const html = read('messages.html');
   const context = { shouldRenderOfficialAudienceItem: () => false, officialFamilySortWeight: () => 0 };
   vm.createContext(context);
@@ -60,7 +60,7 @@ test('UI prioritizes waiting parents above unread and automatic activity', () =>
     { friend_id: 'unread', unreadCount: 2, lastActivity: '2026-10-11T12:00:00Z', users: {} },
     { friend_id: 'waiting', waitingReply: true, lastParentAt: '2026-10-10T12:00:00Z', users: {} }
   ];
-  assert.equal(context.sortConversationsByFamily(list).map(item => item.friend_id).join(','), 'waiting,unread,auto');
+  assert.equal(context.sortConversationsByFamily(list).map(item => item.friend_id).join(','), 'auto,unread,waiting');
   assert.match(html, /window.inboxWaitingOnly/);
   assert.match(html, /send_mindup_parent_reply/);
 });
@@ -71,7 +71,7 @@ test('successful reply removes only its parent from waiting, preserving a newer 
     { friend_id: 'answered', users: { role: 'parent' }, waitingReply: true, lastParentAt: '2026-10-12T01:00:00Z' },
     { friend_id: 'other', users: { role: 'parent' }, waitingReply: true },
     { friend_id: 'newer', users: { role: 'parent' }, waitingReply: true, lastParentAt: '2026-10-12T03:00:00Z' }
-  ], filterFriends: () => refreshes++ };
+  ], getFilteredFriendList: () => [], renderFriendList: () => refreshes++ };
   vm.createContext(context);
   vm.runInContext(html.slice(html.indexOf('function markParentConversationReplied('), html.indexOf('function removeOptimisticMessage(')), context);
   context.markParentConversationReplied('answered', '2026-10-12T02:00:00Z');

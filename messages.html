@@ -2190,11 +2190,20 @@ function subscribeNotificationChanges() {
     .subscribe();
 }
 
+let inboxRealtimeTimer = null;
 function subscribeConversationListChanges() {
   if (conversationListChannel) {
     sb.removeChannel(conversationListChannel);
     conversationListChannel = null;
   }
+  clearTimeout(inboxRealtimeTimer);inboxRealtimeTimer = null;
+  conversationListChannel = sb.channel('inbox-message-changes:' + currentUser.id)
+    .on('postgres_changes', {event:'*',schema:'public',table:'messages'}, () => {
+      if (document.hidden || inboxRealtimeTimer !== null) return;
+      inboxRealtimeTimer = setTimeout(() => {
+        inboxRealtimeTimer = null;loadFriends().catch(console.warn);
+      }, 1000);
+    }).subscribe();
 }
 
 function subscribePresence() {
@@ -2593,7 +2602,7 @@ function markParentConversationReplied(parentId, repliedAt) {
     if (item.lastParentAt && new Date(item.lastParentAt) > new Date(repliedAt)) continue;
     item.waitingReply = false;
   }
-  filterFriends();
+  renderFriendList(getFilteredFriendList());
 }
 
 function removeOptimisticMessage(tempId) {
@@ -3165,49 +3174,12 @@ function officialFamilySortWeight(user) {
 }
 
 function sortConversationsByFamily(list) {
-  const groupLatest = new Map();
-  const groupNames = new Map();
-  (list || []).forEach(item => {
-    const user = item.users || {};
-    const groupKey = shouldRenderOfficialAudienceItem(item) ? getOfficialFamilyKey(user) : `solo:${item.friend_id}`;
-    item._familyGroupKey = groupKey;
-    const ts = item.lastActivity ? new Date(item.lastActivity).getTime() : 0;
-    groupLatest.set(groupKey, Math.max(groupLatest.get(groupKey) || 0, ts));
-    const groupName = groupNames.get(groupKey);
-    const candidateName = user.role === "parent"
-      ? (user.full_name || user.email || "")
-      : (groupName || user.full_name || user.email || "");
-    if (!groupName || (candidateName && String(candidateName).localeCompare(groupName, "vi") < 0)) {
-      groupNames.set(groupKey, candidateName);
-    }
-  });
-  const groupRank = new Map([...groupLatest.keys()]
-    .sort((a, b) => {
-      const latestA = groupLatest.get(a) || 0;
-      const latestB = groupLatest.get(b) || 0;
-      if (latestA !== latestB) return latestB - latestA;
-      return String(groupNames.get(a) || "").localeCompare(String(groupNames.get(b) || ""), "vi");
-    })
-    .map((key, index) => [key, index]));
+  // Keep the existing helper name for callers; ordering is strictly chronological.
   return (list || []).slice().sort((a, b) => {
-    const priorityA = a.waitingReply ? 0 : Number(a.unreadCount) > 0 ? 1 : 2;
-    const priorityB = b.waitingReply ? 0 : Number(b.unreadCount) > 0 ? 1 : 2;
-    if (priorityA !== priorityB) return priorityA - priorityB;
-    if (a.waitingReply && b.waitingReply) {
-      const incomingA = new Date(a.lastParentAt || 0).getTime();
-      const incomingB = new Date(b.lastParentAt || 0).getTime();
-      if (incomingA !== incomingB) return incomingB - incomingA;
-    }
-    if (a._familyGroupKey !== b._familyGroupKey) {
-      return (groupRank.get(a._familyGroupKey) || 0) - (groupRank.get(b._familyGroupKey) || 0);
-    }
-    const weightA = officialFamilySortWeight(a.users);
-    const weightB = officialFamilySortWeight(b.users);
-    if (weightA !== weightB) return weightA - weightB;
-    const timeA = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
-    const timeB = b.lastActivity ? new Date(b.lastActivity).getTime() : 0;
+    const timeA = Date.parse(a.lastActivity) || 0;
+    const timeB = Date.parse(b.lastActivity) || 0;
     if (timeA !== timeB) return timeB - timeA;
-    return String(a.users?.full_name || "").localeCompare(String(b.users?.full_name || ""), "vi");
+    return String(a.friend_id || '').localeCompare(String(b.friend_id || ''));
   });
 }
 
@@ -3440,6 +3412,7 @@ async function ensureMindupInFriendList() {
 
 // == Override renderFriendList to handle MindUp pinned card ==
 const _renderFriendListCore = (list) => {
+  list = sortConversationsByFamily(list);
   if (window.inboxUnreadOnly) list = list.filter(item => Number(item.unreadCount) > 0);
   if (window.inboxWaitingOnly) list = list.filter(item => item.waitingReply);
   const wrap = document.getElementById("friendList");
@@ -3456,7 +3429,8 @@ const _renderFriendListCore = (list) => {
   const displayLimit = isTrayMode ? TRAY_CONVERSATION_LIMIT : (hasKeyword ? list.length : visibleConversationCount);
   const visibleList = list.slice(0, displayLimit);
   const hasMore = !isTrayMode && !hasKeyword && list.length > visibleList.length;
-  if (topActions) topActions.innerHTML = renderFriendListActions(list.length, visibleList.length, hasMore);
+  if (topActions) topActions.innerHTML = '';
+  const scrollTop = wrap.scrollTop;
   wrap.innerHTML = visibleList.map(item => {
     const isMindUp = item.friend_id === BOT_ID;
     const isLearning = item.isLearningThread;
@@ -3488,25 +3462,43 @@ const _renderFriendListCore = (list) => {
         <div class="friend-badge ${item.unreadCount ? 'show' : ''}">${item.unreadCount > 99 ? '99+' : item.unreadCount || ''}</div>
       </div>
     `;
-  }).join('');
+  }).join('') + (hasMore ? '<div class="inbox-scroll-end" aria-hidden="true" style="height:1px"></div>' : '');
+  wrap.scrollTop = scrollTop;
 };
-
-function renderFriendListActions(total, visible, hasMore) {
-  if (isTrayMode) {
-    return "";
-  }
-  if (!hasMore) return "";
-  return `
-    <div class="friend-list-actions">
-      <button class="friend-list-action-btn" type="button" onclick="loadMoreConversations()">Xem thêm 10 đoạn tin nhắn (${visible}/${total})</button>
-    </div>
-  `;
-}
 
 window.loadMoreConversations = function() {
+  if (isTrayMode || document.getElementById('friendSearch')?.value?.trim()) return;
+  const list = getFilteredFriendList();
+  if (visibleConversationCount >= list.length) return;
   visibleConversationCount += FULL_CONVERSATION_PAGE_SIZE;
-  loadFriends().catch(console.warn);
+  renderFriendList(list);
 };
+let inboxScrollFrame = null;
+document.getElementById('friendList').addEventListener('scroll', event => {
+  const wrap = event.currentTarget;
+  if (inboxScrollFrame !== null) return;
+  inboxScrollFrame = requestAnimationFrame(() => {
+    inboxScrollFrame = null;
+    if (wrap.scrollTop > 0 && wrap.scrollHeight - wrap.clientHeight - wrap.scrollTop <= 60) loadMoreConversations();
+  });
+}, {passive:true});
+
+let externalInboxRefresh = null;
+function refreshExternalInbox() {
+  if (currentProfile?.role !== 'admin' || friendsLoading) return Promise.resolve();
+  if (externalInboxRefresh) return externalInboxRefresh;
+  externalInboxRefresh = (async () => {
+    const {data,error} = await sb.rpc('list_zalo_external_inbox');
+    if (error) throw error;
+    const external = (data || []).map(row => makeConversationListItem({id:row.id,
+      full_name:row.display_name || 'Người dùng Zalo',avatar_url:row.avatar || 'default-avatar.png',role:'zalo_external'},
+      {isZaloExternal:true,preview:row.last_content,lastActivity:row.last_at,waitingReply:row.waiting_reply,lastParentAt:row.last_parent_at}));
+    allFriends = sortConversationsByFamily([...allFriends.filter(item => !item.isZaloExternal),...external]);
+    friendMap = new Map(allFriends.map(item => [item.friend_id,item]));
+    renderFriendList(getFilteredFriendList());
+  })().finally(() => {externalInboxRefresh = null;});
+  return externalInboxRefresh;
+}
 
 window.openFullMessagesPage = function() {
   const target = "messages.html?v=20260713-message-list9";
@@ -3680,6 +3672,7 @@ zaloStatusTimer = setInterval(() => {
   if(currentProfile?.role==='admin' && Date.now()-lastInboxPoll>=60000) {
     lastInboxPoll=Date.now();loadFriends().catch(console.warn);
   }
+  refreshExternalInbox().catch(console.warn);
   if(document.querySelector('.dispatch-disclosure')?.open) refreshZaloDispatchStatus();
 }, 15000);
 init();
