@@ -1449,6 +1449,7 @@ async function loadFriendsNow() {
   allFriends = merged;
   friendMap = new Map(merged.map(item => [item.friend_id, item]));
   syncActiveConversationProfile();
+  reconcileActiveConversationFromInbox();
 
   if (!merged.length && !document.getElementById("friendSearch")?.value?.trim()) {
     wrap.innerHTML = '<div class="empty"><strong>Chưa có cuộc trò chuyện</strong>Tìm người dùng để bắt đầu nhắn tin.</div>';
@@ -2133,7 +2134,10 @@ function subscribeConversationMessages(conversationId) {
         handleRealtimeMessagePayload(payload);
       }
     )
-    .subscribe();
+    .subscribe(status => {
+      // Catch messages committed between the initial read and subscription.
+      if (status === 'SUBSCRIBED' && currentConversationId === conversationId) refreshActiveConversation();
+    });
 }
 
 async function handleRealtimeMessagePayload(payload) {
@@ -2142,6 +2146,7 @@ async function handleRealtimeMessagePayload(payload) {
   const wasNearBottom = wrap.scrollHeight - wrap.clientHeight - wrap.scrollTop < 96;
   const row = payload?.new || payload?.old || null;
   if (!row || String(row.conversation_id || "") !== String(currentConversationId)) return;
+  messageReadGeneration++;
 
   if (payload.eventType === "DELETE") {
     loadedMessages = loadedMessages.filter(item => item.id !== row.id);
@@ -2157,7 +2162,7 @@ async function handleRealtimeMessagePayload(payload) {
     };
     const byId = new Map(loadedMessages.map(item => [item.id, item]));
     byId.set(next.id, { ...(byId.get(next.id) || {}), ...next });
-    loadedMessages = Array.from(byId.values()).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    loadedMessages = Array.from(byId.values()).sort((a, b) => new Date(a.created_at) - new Date(b.created_at) || String(a.id).localeCompare(String(b.id)));
   } else {
     await loadMessages({ scrollToBottom: wasNearBottom });
     scheduleFriendsReload();
@@ -2318,12 +2323,16 @@ function renderLoadedMessages() {
   window.refreshMessageWorkspace?.();
 }
 
-async function queryConversationMessages(conversationId, before = null) {
+async function queryConversationMessages(conversationId, before = null, beforeId = null) {
   const columns = 'id, content, created_at, sender_id, real_sender_id, transport, context_student_id, external_message_id';
-  const result = await sb.rpc('list_mindup_conversation_messages', {
-    p_conversation_id: conversationId, p_before: before, p_limit: MESSAGE_PAGE_SIZE
+  const result = await sb.rpc('list_mindup_conversation_messages_v2', {
+    p_conversation_id: conversationId, p_before: before, p_before_id: beforeId, p_limit: MESSAGE_PAGE_SIZE
   }).select(columns);
   if (!['PGRST202','42883'].includes(result.error?.code)) return result;
+  const legacy = await sb.rpc('list_mindup_conversation_messages', {
+    p_conversation_id: conversationId, p_before: before, p_limit: MESSAGE_PAGE_SIZE
+  }).select(columns);
+  if (!['PGRST202','42883'].includes(legacy.error?.code)) return legacy;
   let query = sb.from('messages').select(columns).eq('conversation_id', conversationId);
   if (before) query = query.lt('created_at', before);
   return query.order('created_at', { ascending: false }).limit(MESSAGE_PAGE_SIZE);
@@ -2338,20 +2347,23 @@ function showMessageLoadError(error) {
   document.getElementById('messageList').innerHTML = `<div class="empty"><strong>Không tải được tin nhắn</strong>${reason}<button type="button" onclick="retryConversationMessages()">Thử lại</button></div>`;
 }
 
+let messageReadGeneration = 0;
 async function loadMessages({ reset = false, scrollToBottom = false } = {}) {
   if(activeFriend?.isZaloExternal) return loadExternalZaloMessages(scrollToBottom);
   if (!currentConversationId) return;
   const conversationId = currentConversationId;
   const loadingFriend = activeFriend;
+  const generation = ++messageReadGeneration;
 
   const wrap = document.getElementById("messageList");
   const previousScrollTop = wrap.scrollTop;
   const wasNearBottom = wrap.scrollHeight - wrap.clientHeight - wrap.scrollTop < 80;
-  const { data, error } = await queryConversationMessages(conversationId);
+  let { data, error } = await queryConversationMessages(conversationId);
 
-  if (conversationId !== currentConversationId || loadingFriend !== activeFriend) return;
+  if (conversationId !== currentConversationId || loadingFriend !== activeFriend || generation !== messageReadGeneration) return;
 
   if (error) {
+    if (!reset && loadedMessages.length && error.code !== '42501') { console.warn('Chat refresh failed; keeping visible messages', error); return; }
     showMessageLoadError(error);
     return;
   }
@@ -2364,14 +2376,28 @@ async function loadMessages({ reset = false, scrollToBottom = false } = {}) {
     return;
   }
 
+  const knownIds = new Set(loadedMessages.filter(row => !row._pending && !row._failed).map(row => row.id));
+  let page = data, catchupPages = 1;
+  // Bridge a missed realtime window before merging, rather than silently skipping
+  // messages between the newest page and the previously displayed history.
+  if (!reset && knownIds.size) while (page.length === MESSAGE_PAGE_SIZE && !page.some(row => knownIds.has(row.id)) && catchupPages < 10) {
+    const tail = page[page.length-1];
+    const result = await queryConversationMessages(conversationId, tail.created_at, tail.id);
+    if (conversationId !== currentConversationId || loadingFriend !== activeFriend || generation !== messageReadGeneration) return;
+    if (result.error) { console.warn('Could not catch up chat history', result.error); return; }
+    const next = result.data || [];
+    if (next.some(row => data.some(existing => existing.id === row.id))) break;
+    page = next;data = data.concat(next);catchupPages++;
+  }
+  const gapRemaining = !reset && knownIds.size && page.length === MESSAGE_PAGE_SIZE && !data.some(row => knownIds.has(row.id));
   const latestMessages = data.slice().reverse();
-  if (reset) {
+  if (reset || gapRemaining) {
     loadedMessages = latestMessages;
-    hasOlderMessages = data.length === MESSAGE_PAGE_SIZE;
+    hasOlderMessages = gapRemaining || data.length === MESSAGE_PAGE_SIZE;
   } else {
     const messagesById = new Map(loadedMessages.map(item => [item.id, item]));
     latestMessages.forEach(item => messagesById.set(item.id, item));
-    loadedMessages = Array.from(messagesById.values()).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    loadedMessages = Array.from(messagesById.values()).sort((a, b) => new Date(a.created_at) - new Date(b.created_at) || String(a.id).localeCompare(String(b.id)));
   }
 
   renderLoadedMessages();
@@ -2389,16 +2415,18 @@ async function loadOlderMessages() {
   if (!currentConversationId || isLoadingOlderMessages || !hasOlderMessages || !loadedMessages.length) return;
   const conversationId = currentConversationId;
   const loadingFriend = activeFriend;
+  const generation = messageReadGeneration;
 
   const wrap = document.getElementById("messageList");
   const previousScrollHeight = wrap.scrollHeight;
   const previousScrollTop = wrap.scrollTop;
   isLoadingOlderMessages = true;
 
-  const { data, error } = await queryConversationMessages(conversationId, loadedMessages[0].created_at);
+  const { data, error } = await queryConversationMessages(conversationId, loadedMessages[0].created_at, loadedMessages[0].id);
 
   if (conversationId !== currentConversationId || loadingFriend !== activeFriend) return;
   isLoadingOlderMessages = false;
+  if (generation !== messageReadGeneration) return;
   if (error) {
     console.warn("Không tải được tin nhắn cũ:", error);
     return;
@@ -3497,6 +3525,7 @@ function refreshExternalInbox() {
     allFriends = sortConversationsByFamily([...allFriends.filter(item => !item.isZaloExternal),...external]);
     friendMap = new Map(allFriends.map(item => [item.friend_id,item]));
     syncActiveConversationProfile();
+    reconcileActiveConversationFromInbox();
     renderFriendList(getFilteredFriendList());
   })().finally(() => {externalInboxRefresh = null;});
   return externalInboxRefresh;
@@ -3530,6 +3559,25 @@ function syncActiveConversationProfile() {
   activeFriend.avatar = item.users.avatar_url || activeFriend.avatar;
   document.getElementById('chatTitle').textContent = activeFriend.name;
   window.refreshMessageWorkspace?.();
+}
+
+const activeConversationRefreshes = new WeakMap();
+function refreshActiveConversation() {
+  const friend = activeFriend;
+  if (!friend || (!currentConversationId && !friend.isZaloExternal)) return Promise.resolve();
+  if (activeConversationRefreshes.has(friend)) return activeConversationRefreshes.get(friend);
+  const request = loadMessages({scrollToBottom:false}).catch(console.warn)
+    .finally(() => activeConversationRefreshes.delete(friend));
+  activeConversationRefreshes.set(friend,request);
+  return request;
+}
+function reconcileActiveConversationFromInbox() {
+  const item = activeFriend && friendMap.get(activeFriend.id);
+  if (!item || !loadedMessages.length) return;
+  if (!activeFriend.isZaloExternal && item.conversationId !== currentConversationId) return;
+  const lastLoaded = loadedMessages.filter(row => !row._pending && !row._failed)
+    .reduce((latest,row) => Math.max(latest,Date.parse(row.created_at)||0),0);
+  if ((Date.parse(item.lastActivity)||0) > lastLoaded) refreshActiveConversation();
 }
 
 
@@ -3679,13 +3727,18 @@ zaloStatusTimer = setInterval(() => {
   if (window.frameElement && !window.frameElement.getClientRects().length) return;
   if(!activeFriend?.isZaloExternal) refreshZaloDeliveryStatus();
   refreshZaloMessageStates().then(()=>{if(loadedMessages.length) renderLoadedMessages();}).catch(console.warn);
-  if(activeFriend?.isZaloExternal) loadExternalZaloMessages(false).catch(console.warn);
+  refreshActiveConversation();
   if(currentProfile?.role==='admin' && Date.now()-lastInboxPoll>=60000) {
     lastInboxPoll=Date.now();loadFriends().catch(console.warn);
   }
   refreshExternalInbox().catch(console.warn);
   if(document.querySelector('.dispatch-disclosure')?.open) refreshZaloDispatchStatus();
 }, 15000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && currentUser) {
+    refreshActiveConversation();scheduleFriendsReload();
+  }
+});
 init();
 </script>
 </body>
