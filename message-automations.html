@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tin nhắn tự động</title>
+<link rel="stylesheet" href="message-automations.css?v=20261019-1">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+<script src="supabaseClient.js" defer></script>
+<script src="message-automations.js?v=20261019-1" defer></script>
+</head>
+<body>
+<header><h1>Tin nhắn tự động</h1><div class="commands"><button id="refresh" type="button">Cập nhật</button><button id="create" class="primary" type="button" disabled>Tạo tin nhắn</button></div></header>
+<nav aria-label="Nhóm tin nhắn"><button id="customTab" aria-pressed="true">Tin theo lịch</button><button id="systemTab" aria-pressed="false">Thông báo hệ thống</button></nav>
+<p id="feedback" role="status" aria-live="polite">Đang tải…</p>
+<main id="list"></main>
+<dialog id="editor" aria-labelledby="editorTitle">
+<form id="draftForm">
+<div class="dialog-head"><h2 id="editorTitle">Tạo tin nhắn</h2><button type="button" data-close="editor">Đóng</button></div>
+<div class="editor-grid">
+<section>
+<label>Tên đợt gửi<input id="campaignName" maxlength="150" required></label>
+<div class="two-col"><label>Thời gian gửi (Việt Nam)<input id="sendAt" type="datetime-local" required></label><label>Lặp lại<select id="recurrence"><option value="once">Một lần</option><option value="yearly">Hằng năm</option></select></label></div>
+<label>Hết hạn sau thời điểm gửi<select id="windowHours"><option value="6">6 giờ</option><option value="12">12 giờ</option><option value="24" selected>24 giờ</option><option value="48">48 giờ</option><option value="168">7 ngày</option></select></label>
+<label>Chèn thông tin<select id="variable"><option value="">Chọn thông tin…</option value="Ten_hoc_sinh">Tên học sinh</option><option value="Ten_phu_huynh">Tên phụ huynh</option><option value="Ten_lop">Tên lớp</option><option value="Ngay_gui">Ngày gửi</option><option value="Ten_trung_tam">Tên trung tâm</option></select></label>
+<label>Nội dung<textarea id="template" rows="10" maxlength="4000" required></textarea></label>
+<label>Phạm vi lớp học<select id="classes" multiple size="5" aria-label="Phạm vi lớp học"></select></label>
+<label><input id="allClasses" type="checkbox" checked> Tất cả lớp trong phạm vi phụ trách</label>
+</section>
+<section>
+<h3>Người nhận</h3><div class="commands"><button type="button" id="selectAll">Chọn tất cả</button><button type="button" id="selectNone">Bỏ chọn tất cả</button></div>
+<label>Tìm phụ huynh / học sinh<input id="recipientSearch" type="search"></label>
+<p id="recipientCount" role="status"></p><div id="recipients" class="recipients"></div>
+<label>Xem trước theo phụ huynh<select id="previewParent"></select></label><pre id="previewText"></pre>
+</section>
+</div>
+<p id="editorFeedback" role="status" aria-live="polite"></p>
+<footer><button type="submit" id="saveDraft">Lưu bản nháp</button><button id="publish" type="button" class="primary">Xem trước &amp; lên lịch</button></footer>
+</form>
+</dialog>
+<dialog id="details" aria-labelledby="detailsTitle"><div class="dialog-head"><h2 id="detailsTitle">Chi tiết đợt gửi</h2><button type="button" data-close="details">Đóng</button></div><div id="detailBody"></div></dialog>
+<dialog id="systemEditor" aria-labelledby="systemTitle"><form id="systemForm"><div class="dialog-head"><h2 id="systemTitle">Thông báo hệ thống</h2><button type="button" data-close="systemEditor">Đóng</button></div><p id="systemCondition"></p><label><input type="checkbox" id="systemEnabled"> Đang bật</label><label>Nội dung<textarea id="systemContent" rows="14" maxlength="10000"></textarea></label><p id="systemFeedback" role="status"></p><footer><button class="primary" id="saveSystem" type="submit">Lưu thay đổi</button></footer></form></dialog>
+</body></html>

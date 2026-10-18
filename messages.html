@@ -716,6 +716,14 @@ aside.panel { border-right: 1px solid #dce1e8; }
 <script src="conversation-tuition-actions.js?v=20261017-chat1" defer></script>
 <script src="conversation-family-info.js?v=20261017-chat1" defer></script>
 <script src="messages-workspace.js?v=20261017-chat1" defer></script>
+<script src="message-automations-entry.js?v=20261019-1" defer></script>
+<style>
+.message-automations-dialog { width:min(1260px,calc(100vw - 20px));height:calc(100dvh - 20px);max-height:none;padding:8px;border:1px solid #d9e1e9;border-radius:8px; }
+.message-automations-dialog::backdrop {background:#15243b80;}
+.message-automations-dialog>button {display:block;margin-left:auto;margin-bottom:6px;}
+.message-automations-dialog iframe {display:block;width:100%;height:calc(100% - 40px);border:0;}
+#messageAutomationsEntry {margin-top:8px;}
+</style>
 <script src="visual-effects.js?v=20261016-no-particles" defer></script>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0f1f3d">
@@ -731,6 +739,7 @@ aside.panel { border-right: 1px solid #dce1e8; }
     <aside class="panel">
       <div class="sidebar-head">
         <div class="sidebar-title">Nhắn tin</div>
+        <button id="messageAutomationsEntry" type="button" hidden>Tin nhắn tự động</button>
         <div class="sidebar-sub">Chọn một người bạn để bắt đầu trò chuyện</div>
         <button class="friend-list-action-btn tray-full-messages" type="button" onclick="openFullMessagesPage()">Xem toàn bộ tin nhắn</button>
       </div>
@@ -914,6 +923,7 @@ async function init() {
   currentUser = user;
   const { data: profile } = await sb.from("users").select("*").eq("id", user.id).single();
   currentProfile = profile;
+  window.MessageAutomations?.configure(profile);
   if (currentProfile?.role === 'admin') refreshZaloDispatchStatus();
   selectedUserFromQuery = queryParams.get("user");
   selectedTeacherFromQuery = queryParams.get("teacher");
