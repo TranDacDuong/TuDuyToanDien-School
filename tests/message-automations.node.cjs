@@ -170,3 +170,37 @@ test('overdue failures skip the recipient, never replay sent or uncertain, and u
  assert.equal(await scalar(db,'SELECT process_overdue_tuition_notices()'),1);assert.equal(await scalar(db,'SELECT count(*) FROM zalo_outbox'),2);
  assert.match(await scalar(db,"SELECT content FROM zalo_outbox WHERE status='pending'"),/20\/11\/2026/);
 });
+
+async function manualFixture(t){
+ const db=await overdueFixture(t);
+ await db.exec(fs.readFileSync('SQL manual overdue tuition notices.sql','utf8').replaceAll("now() AT TIME ZONE 'Asia/Ho_Chi_Minh'","timestamp '2026-10-19 09:00'"));
+ return db;
+}
+async function manualSend(db,request=30,parents=[id(3)]){
+ return scalar(db,"SELECT queue_overdue_tuition_manual($1,(SELECT content FROM message_templates WHERE id='tuition_overdue_notice'),$2)",[id(request),parents]);
+}
+test('manual notice never schedules itself; explicit send is scoped, idempotent and payment aware',async t=>{
+ const db=await manualFixture(t);
+ await assert.rejects(overdueEnable(db),/chỉ gửi thủ công/);
+ await db.exec("UPDATE tuition_overdue_settings SET activated=true;UPDATE message_templates SET is_enabled=true WHERE id='tuition_overdue_notice'");
+ await scalar(db,'SELECT process_overdue_tuition_notices()');assert.equal(await scalar(db,'SELECT count(*) FROM zalo_outbox'),0);
+ const preview=await scalar(db,'SELECT preview_overdue_tuition_notices()');assert.equal(preview.recipients[0].can_send,true);
+ const first=await manualSend(db);assert.equal(first.queued,1);assert.equal((await manualSend(db)).queued,1);assert.equal(await scalar(db,'SELECT count(*) FROM zalo_outbox'),1);
+ assert.equal((await manualSend(db,31)).skipped,1);assert.equal(await scalar(db,'SELECT count(*) FROM zalo_outbox'),1);
+ await db.query('UPDATE tuition_payments SET amount_paid=amount_due WHERE student_id=$1',[id(4)]);
+ assert.equal(await scalar(db,'SELECT overdue_tuition_job_valid(id) FROM zalo_outbox'),false);
+ await scalar(db,'SELECT process_overdue_tuition_notices()');assert.match(await scalar(db,'SELECT content FROM zalo_outbox'),/500\.000đ/);
+ await db.query('UPDATE tuition_payments SET amount_paid=amount_due WHERE student_id=$1',[id(5)]);await scalar(db,'SELECT process_overdue_tuition_notices()');assert.equal(await scalar(db,'SELECT status FROM zalo_outbox'),'cancelled');
+ await scalar(db,'SELECT process_message_campaigns()');assert.equal(await scalar(db,'SELECT count(*) FROM zalo_outbox'),1);
+ await db.query("SELECT set_config('request.jwt.claim.sub',$1,false)",[id(2)]);await assert.rejects(manualSend(db,32),/Không có quyền/);
+});
+test('manual repeat requires another action, blocks uncertain delivery, and ignores automatic tuition pause',async t=>{
+ const db=await manualFixture(t);await db.exec('UPDATE automatic_tuition_control SET paused=true');
+ await manualSend(db);await db.exec("UPDATE zalo_outbox SET status='sent',sent_at=now()");
+ const preview=await scalar(db,'SELECT preview_overdue_tuition_notices()');assert.equal(preview.recipients[0].can_send,true);assert.ok(preview.recipients[0].last_sent_at);
+ assert.equal((await manualSend(db,33)).queued,1);assert.equal(await scalar(db,'SELECT count(*) FROM zalo_outbox'),2);
+ await db.exec("UPDATE zalo_outbox SET status='uncertain' WHERE status='pending'");assert.equal((await manualSend(db,34)).skipped,1);
+ assert.equal((await scalar(db,'SELECT preview_overdue_tuition_notices()')).recipients[0].can_send,false);
+ await db.exec('UPDATE mindup_zalo_dispatch_control SET paused=true');await assert.rejects(manualSend(db,35),/tạm dừng/);
+ assert.equal(await scalar(db,'SELECT count(*) FROM zalo_outbox'),2);
+});
