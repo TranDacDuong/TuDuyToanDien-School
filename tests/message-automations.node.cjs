@@ -107,3 +107,66 @@ test('system catalog preserves business templates and greeting identity / dedupl
  assert.ok(job);assert.equal(await scalar(db,'SELECT content FROM zalo_outbox'),'Hi Child A và Child B');
  assert.equal(await scalar(db,"SELECT enqueue_mindup_parent_greeting($1,'','zalo-3','original')",[id(3)]),job);
 });
+
+async function overdueFixture(t){
+ const db=await fixture(t);
+ await db.exec(`CREATE TABLE message_templates(id text PRIMARY KEY,name text,content text,is_enabled boolean,updated_at timestamptz);
+ CREATE TABLE automatic_tuition_control(id integer,paused boolean);INSERT INTO automatic_tuition_control VALUES(1,false);
+ CREATE TABLE mindup_zalo_dispatch_control(id integer,paused boolean);INSERT INTO mindup_zalo_dispatch_control VALUES(1,false);
+ CREATE TABLE zalo_automation_state(id integer,paused boolean);INSERT INTO zalo_automation_state VALUES(1,false);
+ CREATE TABLE tuition_payments(student_id uuid,month date,amount_due numeric,amount_paid numeric);
+ INSERT INTO message_templates VALUES('tuition_overdue','Legacy overdue','Legacy {{student_name}}',true,now());
+ INSERT INTO tuition_payments VALUES('${id(4)}','2026-10-01',960000,100000),('${id(5)}','2026-10-01',500000,0),('${id(7)}','2026-10-01',800000,800000),('${id(7)}','2026-09-01',300000,0);
+ CREATE FUNCTION tuition_debt_snapshot(p_student uuid,p_month date) RETURNS jsonb LANGUAGE sql STABLE AS $$
+ SELECT coalesce(jsonb_agg(jsonb_build_object('month',month,'remaining',amount_due-amount_paid)),'[]') FROM tuition_payments WHERE student_id=p_student AND month<=p_month AND amount_due>amount_paid$$;
+ CREATE FUNCTION message_automation_systems() RETURNS jsonb LANGUAGE sql AS $$SELECT coalesce(jsonb_agg(to_jsonb(t)),'[]') FROM message_templates t WHERE id IN('tuition_overdue','tuition_confirmed')$$;`);
+ const sql=fs.readFileSync('SQL overdue tuition notice.sql','utf8').replaceAll("now() AT TIME ZONE 'Asia/Ho_Chi_Minh'","timestamp '2026-10-19 09:00'");
+ await db.exec(sql);await db.exec(sql);
+ await db.query("SELECT set_config('request.jwt.claim.sub',$1,false)",[id(1)]);
+ return db;
+}
+async function overdueEnable(db,enabled=true,day=16){return db.query("SELECT set_overdue_tuition_settings((SELECT content FROM message_templates WHERE id='tuition_overdue_notice'),$1,$2)",[enabled,day]);}
+test('overdue template previews actual month, deadline, date and discounted current-month balance without sending',async t=>{
+ const db=await overdueFixture(t);
+ assert.equal(await scalar(db,"SELECT is_enabled FROM message_templates WHERE id='tuition_overdue_notice'"),false);
+ assert.equal(await scalar(db,"SELECT is_enabled FROM message_templates WHERE id='tuition_overdue'"),true);
+ assert.equal(await scalar(db,"SELECT content FROM message_templates WHERE id='tuition_overdue'"),'Legacy {{student_name}}');
+ assert.equal((await scalar(db,'SELECT message_automation_systems()')).some(r=>r.id==='tuition_overdue'),false);
+ assert.equal(await scalar(db,'SELECT process_overdue_tuition_notices()'),0);
+ const preview=await scalar(db,'SELECT preview_overdue_tuition_notices()');assert.equal(preview.recipients.length,1);
+ const row=preview.recipients[0];assert.equal(row.remaining,1360000);assert.equal(row.students,'Child A và Child B');
+ assert.match(row.content,/tháng 10\/2026/);assert.match(row.content,/15\/10\/2026/);assert.match(row.content,/19\/10\/2026/);assert.match(row.content,/quá hạn 4 ngày/);assert.match(row.content,/1\.360\.000đ/);
+ assert.equal(await scalar(db,'SELECT count(*) FROM messages'),0);
+ await assert.rejects(db.query("SELECT render_overdue_tuition_notice('[Unknown]','{}','2026-10-01','2026-10-19')"),/Biến không hỗ trợ/);
+ await assert.rejects(db.query("SELECT render_overdue_tuition_notice('Any','{}','2026-10-01','2026-10-15')"),/Chưa quá hạn/);
+ await assert.rejects(overdueEnable(db,true,15),/Ngày gửi/);
+ await db.query("SELECT set_config('request.jwt.claim.sub',$1,false)",[id(2)]);
+ await assert.rejects(db.query('SELECT preview_overdue_tuition_notices()'),/Không có quyền/);await assert.rejects(overdueEnable(db),/Không có quyền/);
+ await db.exec('SET ROLE authenticated');await assert.rejects(db.query('SELECT * FROM tuition_overdue_notices'),/permission denied/);await assert.rejects(db.query('SELECT process_overdue_tuition_notices()'),/permission denied/);
+});
+test('overdue delivery groups once per month, rechecks paid children and pauses safely',async t=>{
+ const db=await overdueFixture(t);await overdueEnable(db,true,20);assert.equal(await scalar(db,'SELECT process_overdue_tuition_notices()'),0);
+ await overdueEnable(db);assert.equal(await scalar(db,'SELECT process_overdue_tuition_notices()'),1);
+ assert.equal(await scalar(db,'SELECT process_overdue_tuition_notices()'),0);assert.equal(await scalar(db,'SELECT count(*) FROM zalo_outbox'),1);
+ assert.equal(await scalar(db,'SELECT status FROM zalo_outbox'),'pending',await scalar(db,'SELECT error_message FROM zalo_outbox'));
+ assert.equal(await scalar(db,'SELECT overdue_tuition_job_valid(id) FROM zalo_outbox'),true);
+ await overdueEnable(db,false);assert.equal(await scalar(db,'SELECT automation_paused FROM zalo_outbox'),true);assert.equal(await scalar(db,'SELECT overdue_tuition_job_valid(id) FROM zalo_outbox'),false);
+ await overdueEnable(db);await scalar(db,'SELECT process_overdue_tuition_notices()');assert.equal(await scalar(db,'SELECT automation_paused FROM zalo_outbox'),false);
+ await db.query('UPDATE tuition_payments SET amount_paid=amount_due WHERE student_id=$1',[id(4)]);
+ assert.equal(await scalar(db,'SELECT overdue_tuition_job_valid(id) FROM zalo_outbox'),false);
+ await scalar(db,'SELECT process_overdue_tuition_notices()');const text=await scalar(db,'SELECT content FROM zalo_outbox');assert.match(text,/Child B/);assert.doesNotMatch(text,/Child A/);assert.match(text,/500\.000đ/);
+ await db.query('UPDATE tuition_payments SET amount_paid=amount_due WHERE student_id=$1',[id(5)]);await scalar(db,'SELECT process_overdue_tuition_notices()');assert.equal(await scalar(db,'SELECT status FROM zalo_outbox'),'cancelled');
+ await db.query('UPDATE tuition_payments SET amount_paid=0 WHERE student_id=$1',[id(5)]);await scalar(db,'SELECT process_overdue_tuition_notices()');assert.equal(await scalar(db,'SELECT count(*) FROM zalo_outbox'),1);
+});
+test('overdue failures skip the recipient, never replay sent or uncertain, and use fresh dates for the next month',async t=>{
+ const db=await overdueFixture(t);await db.query('UPDATE tuition_payments SET amount_paid=0 WHERE student_id=$1',[id(7)]);
+ await db.exec(`CREATE OR REPLACE FUNCTION ensure_mindup_official_audience_conversation(p uuid) RETURNS uuid LANGUAGE plpgsql AS $$BEGIN IF p='${id(3)}' THEN RAISE EXCEPTION 'Injected failure';END IF;RETURN p;END$$;`);
+ await overdueEnable(db);assert.equal(await scalar(db,'SELECT process_overdue_tuition_notices()'),1);
+ assert.match(await scalar(db,'SELECT error_message FROM tuition_overdue_notices WHERE parent_id=$1',[id(3)]),/Injected failure/);
+ await db.exec("UPDATE zalo_outbox SET status='uncertain'");await scalar(db,'SELECT process_overdue_tuition_notices()');assert.equal(await scalar(db,'SELECT count(*) FROM zalo_outbox'),1);
+ await db.exec("UPDATE zalo_outbox SET status='sent'");await scalar(db,'SELECT process_overdue_tuition_notices()');assert.equal(await scalar(db,'SELECT count(*) FROM zalo_outbox'),1);
+ await db.query("INSERT INTO tuition_payments VALUES($1,'2026-11-01',700000,0)",[id(7)]);
+ const definition=await scalar(db,"SELECT pg_get_functiondef('process_overdue_tuition_notices()'::regprocedure)");await db.exec(definition.replaceAll('2026-10-19 09:00','2026-11-20 09:00'));
+ assert.equal(await scalar(db,'SELECT process_overdue_tuition_notices()'),1);assert.equal(await scalar(db,'SELECT count(*) FROM zalo_outbox'),2);
+ assert.match(await scalar(db,"SELECT content FROM zalo_outbox WHERE status='pending'"),/20\/11\/2026/);
+});

@@ -10,7 +10,10 @@ test('automation editor previews, groups, validates, schedules and fits desktop/
  if(name==='preview_message_campaign')data=targets.filter(r=>(!args.p_class_ids.length||args.p_class_ids.includes(r.parent_id==='p1'?'c1':'c2'))&&(!args.p_parent_ids.length||args.p_parent_ids.includes(r.parent_id))&&!args.p_excluded_ids.includes(r.parent_id)).map(r=>({...r,content:args.p_template.replaceAll('[Ten_hoc_sinh]',r.students).replaceAll('[Ten_phu_huynh]',r.parent_name)}));
  if(name==='save_message_campaign'){window.campaigns=[{id:args.p_id,name:args.p_name,template:args.p_template,author:'Admin',send_at:args.p_send_at,recurrence:args.p_recurrence,window_hours:args.p_window_hours,class_ids:args.p_class_ids,parent_ids:args.p_parent_ids,excluded_ids:args.p_excluded_ids,state:'draft',total:0,sent:0,failed:0}];data=args.p_id;}
  if(name==='control_message_campaign'){campaigns[0].state=args.p_action==='publish'?'scheduled':args.p_action==='pause'?'paused':args.p_action==='cancel'?'cancelled':'scheduled';data={success:true};}
- if(name==='message_automation_systems')data={admin:true,tuition:{paused:false,template:'Học phí {TenHS}'},templates:[{id:'session_evaluation_notice',name:'Đánh giá buổi học',content:'Keep {{message}}',is_enabled:true}],history:[]};
+ if(name==='message_automation_systems')data={admin:true,tuition:{paused:false,template:'Học phí {TenHS}'},templates:[{id:'tuition_overdue_notice',name:'Nhắc học phí quá hạn',content:'Học phí tháng [Thang_hoc_phi] của [Ten_hoc_sinh], hạn [Han_thanh_toan], hôm nay [Ngay_hien_tai].',is_enabled:false},{id:'session_evaluation_notice',name:'Đánh giá buổi học',content:'Keep {{message}}',is_enabled:true}],history:[]};
+ if(name==='overdue_tuition_settings')data={send_day:16};
+ if(name==='preview_overdue_tuition_notices')data={month:'2026-10-01',overdue:true,recipients:[{parent_name:'PH thử nghiệm',remaining:500000,linked:true,content:'Học phí tháng 10/2026 của An, hạn 15/10/2026, hôm nay 19/10/2026.'}]};
+ if(name==='set_overdue_tuition_settings')data=null;
  if(name==='message_campaign_details')data={recipients:[{parent:'PH thử nghiệm',content:'Hello An và Bình',scheduled_at:new Date().toISOString(),status:'uncertain',error:'Chưa xác nhận từ Zalo'}],runs:[]};
  return Promise.resolve({data,error:null});}};
  </script>`;
@@ -43,5 +46,15 @@ test('automation editor previews, groups, validates, schedules and fits desktop/
  await page.getByRole('button',{name:'Chi tiết',exact:true}).click();await page.getByText('Chưa xác nhận từ Zalo',{exact:true}).waitFor();await page.locator('#details [data-close]').click();
  await page.getByRole('button',{name:'Thông báo hệ thống',exact:true}).click();await page.getByText('Nhắc nộp học phí',{exact:true}).waitFor();
  await page.getByRole('button',{name:'Cài đặt',exact:true}).last().click();assert.equal(await page.locator('#systemContent').inputValue(),'Keep {{message}}');assert.equal(await page.locator('#systemContent').getAttribute('readonly'),'');
+ await page.locator('#systemEditor [data-close]').click();
+ await page.locator('.system-row').filter({hasText:'Nhắc học phí quá hạn'}).getByRole('button',{name:'Cài đặt',exact:true}).click();
+ assert.equal(await page.locator('#systemEnabled').isChecked(),false);assert.equal(await page.locator('#overdueSendDay').inputValue(),'16');
+ await page.getByRole('button',{name:'Xem người nhận & nội dung',exact:true}).click();await page.getByText('Học phí tháng 10/2026 của An, hạn 15/10/2026, hôm nay 19/10/2026.',{exact:true}).waitFor();
+ assert.equal(await page.evaluate(()=>calls.some(c=>c.name==='set_overdue_tuition_settings')),false);
+ await page.setViewportSize({width:1365,height:950});await page.screenshot({path:'scratch/overdue-tuition-preview-desktop.png'});
+ await page.setViewportSize({width:390,height:844});assert.ok(await page.locator('#details').evaluate(e=>e.scrollWidth<=e.clientWidth+1));await page.screenshot({path:'scratch/overdue-tuition-preview-mobile.png'});
+ await page.locator('#details [data-close]').click();await page.locator('#overdueSendDay').fill('20');await page.getByRole('button',{name:'Lưu thay đổi',exact:true}).click();
+ await page.locator('#systemEditor').waitFor({state:'hidden'});
+ const overdueSaved=await page.evaluate(()=>calls.find(c=>c.name==='set_overdue_tuition_settings').args);assert.equal(overdueSaved.p_send_day,20);assert.equal(overdueSaved.p_enabled,false);
  assert.deepEqual(errors,[]);
 });

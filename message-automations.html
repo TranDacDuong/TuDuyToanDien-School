@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Tin nhắn tự động</title>
-<link rel="stylesheet" href="message-automations.css?v=20261019-1">
+<link rel="stylesheet" href="message-automations.css?v=20261019-2">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
 <script src="supabaseClient.js" defer></script>
-<script src="message-automations.js?v=20261019-1" defer></script>
+<script src="message-automations.js?v=20261019-2" defer></script>
 </head>
 <body>
 <header><h1>Tin nhắn tự động</h1><div class="commands"><button id="refresh" type="button">Cập nhật</button><button id="create" class="primary" type="button" disabled>Tạo tin nhắn</button></div></header>
@@ -38,5 +38,7 @@
 </form>
 </dialog>
 <dialog id="details" aria-labelledby="detailsTitle"><div class="dialog-head"><h2 id="detailsTitle">Chi tiết đợt gửi</h2><button type="button" data-close="details">Đóng</button></div><div id="detailBody"></div></dialog>
-<dialog id="systemEditor" aria-labelledby="systemTitle"><form id="systemForm"><div class="dialog-head"><h2 id="systemTitle">Thông báo hệ thống</h2><button type="button" data-close="systemEditor">Đóng</button></div><p id="systemCondition"></p><label><input type="checkbox" id="systemEnabled"> Đang bật</label><label>Nội dung<textarea id="systemContent" rows="14" maxlength="10000"></textarea></label><p id="systemFeedback" role="status"></p><footer><button class="primary" id="saveSystem" type="submit">Lưu thay đổi</button></footer></form></dialog>
+<dialog id="systemEditor" aria-labelledby="systemTitle"><form id="systemForm"><div class="dialog-head"><h2 id="systemTitle">Thông báo hệ thống</h2><button type="button" data-close="systemEditor">Đóng</button></div><p id="systemCondition"></p><label><input type="checkbox" id="systemEnabled"> Đang bật</label>
+<div id="overdueOptions" hidden><label>Ngày gửi hằng tháng<input id="overdueSendDay" type="number" min="16" max="28" value="16"></label><label>Chèn thông tin<select id="overdueVariable"><option value="">Chọn thông tin…</option value="Ten_hoc_sinh">Tên học sinh</option><option value="Ten_phu_huynh">Tên phụ huynh</option><option value="Thang_hoc_phi">Tháng học phí</option><option value="Han_thanh_toan">Hạn thanh toán</option><option value="Ngay_hien_tai">Ngày hiện tại</option><option value="So_ngay_qua_han">Số ngày quá hạn</option><option value="So_tien_con_thieu">Số tiền còn thiếu</option></select></label></div>
+<label>Nội dung<textarea id="systemContent" rows="14" maxlength="10000"></textarea></label><p id="systemFeedback" role="status"></p><footer><button id="previewOverdue" type="button" hidden>Xem người nhận &amp; nội dung</button><button class="primary" id="saveSystem" type="submit">Lưu thay đổi</button></footer></form></dialog>
 </body></html>

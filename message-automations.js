@@ -3,6 +3,7 @@
   const labels = {draft:'Bản nháp',scheduled:'Đã lên lịch',paused:'Tạm dừng',cancelled:'Đã hủy',finished:'Hoàn tất',pending:'Đang chờ',queued:'Đang chờ',processing:'Đang gửi',sent:'Đã gửi',failed:'Gửi lỗi',uncertain:'Chưa xác nhận',skipped:'Đã bỏ qua',expired:'Hết hạn'};
   const systemInfo = {
     tuition:{name:'Nhắc nộp học phí',condition:'Ngày 5, 10, 15 hằng tháng; lịch tránh đầu tháng âm lịch. Gộp công nợ các tháng trước. Không yêu cầu chốt học phí.'},
+    tuition_overdue_notice:{condition:'Hạn ngày 15. Chỉ nhắc công nợ tháng hiện tại, một lần mỗi phụ huynh mỗi tháng, từ ngày gửi đã chọn, trong khung 08:00–21:00 giờ Việt Nam. Ngày và số dư được kiểm tra lại trước khi gửi. Không gửi lại tin đã gửi, lỗi hoặc chưa xác nhận.'},
     tuition_confirmed:{condition:'Khi hệ thống ghi nhận thanh toán học phí.'},
     absent_notification:{condition:'Sau khi buổi học kết thúc, dựa trên điểm danh vắng đã lưu.'},
     session_evaluation_notice:{condition:'Nhận xét buổi học và đánh giá định kỳ theo điều kiện nghiệp vụ. Nội dung chi tiết lấy từ bộ mẫu đánh giá.',pool:true},
@@ -146,8 +147,10 @@
     const rows=[{id:'tuition',name:'Nhắc nộp học phí',content:data.tuition?.template||'',is_enabled:!data.tuition?.paused},...data.templates];
     const grid=el('div',null,'system-grid');
     for(const row of rows){const info=systemInfo[row.id]||{},section=el('section',null,'system-row'),name=el('div');name.append(el('h3',row.name),status(row.is_enabled?'scheduled':'paused'));section.append(name,el('p',info.condition||''));
-      const actions=el('div',null,'commands');actions.append(button(data.admin?'Cài đặt':'Xem mẫu',()=>{
+      const actions=el('div',null,'commands');actions.append(button(data.admin?'Cài đặt':'Xem mẫu',async()=>{
         systemId=row.id;$('systemTitle').textContent=row.name;$('systemCondition').textContent=info.condition||'';$('systemEnabled').checked=row.is_enabled;$('systemEnabled').disabled=!data.admin;$('systemContent').value=row.content;$('systemContent').readOnly=!data.admin||!!info.pool;$('saveSystem').hidden=!data.admin;$('systemFeedback').textContent='';$('systemEditor').showModal();
+        const overdue=row.id==='tuition_overdue_notice';$('overdueOptions').hidden=!overdue;$('previewOverdue').hidden=!overdue||!data.admin;$('overdueSendDay').disabled=!overdue||!data.admin;$('overdueVariable').disabled=!data.admin;
+        if(overdue&&data.admin){$('saveSystem').disabled=true;try{const settings=await rpc('overdue_tuition_settings');if(systemId===row.id)$('overdueSendDay').value=settings.send_day;}catch(e){if(systemId===row.id)$('systemFeedback').textContent=errorText(e);}finally{$('saveSystem').disabled=false;}}
       }));
       if(info.pool&&data.admin)actions.append(button('Bộ mẫu đánh giá',()=>{window.open('sourcedata.html?tab=evaluationTemplates','_blank','noopener');}));
       section.append(actions);grid.append(section);
@@ -168,7 +171,28 @@
   $('variable').onchange=()=>{if(!$('variable').value)return;const field=$('template');field.setRangeText('['+$('variable').value+']',field.selectionStart,field.selectionEnd,'end');$('variable').value='';field.focus();updatePreviewLocal();};
   document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).close());
   $('editor').addEventListener('close',()=>generation++);
-  $('systemForm').onsubmit=async e=>{e.preventDefault();$('saveSystem').disabled=true;try{await rpc('update_message_automation_system',{p_id:systemId,p_content:$('systemContent').value,p_enabled:$('systemEnabled').checked});$('systemEditor').close();await refresh();}catch(err){$('systemFeedback').textContent=errorText(err);}finally{$('saveSystem').disabled=false;}};
+  $('overdueVariable').onchange=()=>{if(!$('overdueVariable').value)return;const field=$('systemContent');field.setRangeText('['+$('overdueVariable').value+']',field.selectionStart,field.selectionEnd,'end');$('overdueVariable').value='';field.focus();};
+  $('previewOverdue').onclick=async()=>{
+    $('previewOverdue').disabled=true;
+    try{
+      const data=await rpc('preview_overdue_tuition_notices',{p_template:$('systemContent').value});
+      $('detailsTitle').textContent=(data.overdue?'Phụ huynh còn thiếu học phí tháng ':'Dự kiến nhắc quá hạn tháng ')+data.month.slice(0,7);
+      const {wrap,body}=table(['Phụ huynh','Còn thiếu','Zalo','Nội dung']);
+      wrap.classList.add('overdue-preview');
+      for(const r of data.recipients){const tr=el('tr');cell(tr,r.parent_name);cell(tr,Number(r.remaining).toLocaleString('vi-VN')+'đ');cell(tr,r.linked?'Đã liên kết':'Chưa liên kết');cell(tr,el('pre',r.content));body.append(tr);}
+      $('detailBody').replaceChildren(el('p',data.recipients.length+' phụ huynh còn thiếu · '+data.recipients.filter(r=>r.linked).length+' đã liên kết Zalo'),wrap);$('details').showModal();
+    }catch(e){$('systemFeedback').textContent=errorText(e);}finally{$('previewOverdue').disabled=false;}
+  };
+  $('systemForm').onsubmit=async e=>{
+    e.preventDefault();$('saveSystem').disabled=true;
+    try{
+      if(systemId==='tuition_overdue_notice'){
+        if($('systemEnabled').checked&&!confirm('Bật nhắc học phí quá hạn từ ngày '+$('overdueSendDay').value+' hằng tháng? Nếu đã qua ngày này, hệ thống sẽ gửi cho phụ huynh còn nợ trong khung 08:00–21:00. Mỗi phụ huynh chỉ một lần mỗi tháng; tin đang gửi không thể thu hồi.'))return;
+        await rpc('set_overdue_tuition_settings',{p_content:$('systemContent').value,p_enabled:$('systemEnabled').checked,p_send_day:Number($('overdueSendDay').value)});
+      }else await rpc('update_message_automation_system',{p_id:systemId,p_content:$('systemContent').value,p_enabled:$('systemEnabled').checked});
+      $('systemEditor').close();await refresh();
+    }catch(err){$('systemFeedback').textContent=errorText(err);}finally{$('saveSystem').disabled=false;}
+  };
   window.MessageAutomationModel={renderTemplate,localTime};
   refresh();
   window.addEventListener('message',event=>{

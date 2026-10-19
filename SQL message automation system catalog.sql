@@ -9,7 +9,7 @@ DECLARE templates jsonb; history jsonb;
 BEGIN
  IF NOT public.can_manage_message_campaigns() THEN RAISE EXCEPTION 'Không có quyền quản lý tin tự động'; END IF;
  SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY t.name),'[]') INTO templates FROM public.message_templates t
- WHERE id IN('tuition_confirmed','absent_notification','session_evaluation_notice','session_score_notice','offline_test_score_notice','exam_score_notice','parent_greeting');
+ WHERE id IN('tuition_overdue_notice','tuition_confirmed','absent_notification','session_evaluation_notice','session_score_notice','offline_test_score_notice','exam_score_notice','parent_greeting');
  SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.created_at DESC),'[]') INTO history FROM (
   SELECT o.id,u.full_name AS parent,o.status,o.error_message,o.created_at,o.sent_at,m.content,m.zalo_dispatch_source AS source
   FROM public.zalo_outbox o JOIN public.messages m ON m.id=o.message_id JOIN public.users u ON u.id=o.audience_user_id
