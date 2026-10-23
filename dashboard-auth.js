@@ -29,6 +29,13 @@
       }
       const status = Number(result.status || result.error.status || 0);
       const code = result.error.code || (status ? `HTTP_${status}` : "PROFILE_NETWORK");
+      // A newly issued token can precede the API server clock; refreshing it
+      // immediately would issue another token with the same problem.
+      if (status === 401 && code === "PGRST303" && /issued at future|not yet valid/i.test(result.error.message || "")) {
+        if (attempt === 2) return { kind: "session", code };
+        await wait(2000 * (attempt + 1));
+        continue;
+      }
       if (status === 401 && !refreshed) {
         refreshed = true;
         let refreshTimer;

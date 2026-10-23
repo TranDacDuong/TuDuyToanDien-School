@@ -50,6 +50,13 @@ test('persistent 401 is reported, not converted into a missing account', async (
   assert.equal(result.code, 'PGRST301');
   assert.equal(c.refreshes(), 1);
 });
+test('clock validation errors wait for the existing token instead of issuing more tokens', async () => {
+  const c = clientFor([{status:401,error:{code:'PGRST303',message:'JWT issued at future'}},{data:profile}]);
+  const waits = [];
+  assert.equal((await loadProfile(c.client, 'user', {...fast,wait:async ms=>waits.push(ms)})).profile, profile);
+  assert.deepEqual(waits,[2000]);
+  assert.equal(c.refreshes(),0);
+});
 test('missing profile and denied access are not retried or bypassed', async () => {
   for (const [response, kind] of [[{ data: null }, 'missing'], [{ status: 403, error: { code: '42501' } }, 'unavailable']]) {
     const c = clientFor([response]);
