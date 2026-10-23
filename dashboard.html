@@ -1045,6 +1045,17 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 <button id="sidebarTab" type="button" onclick="toggleSidebar()" aria-label="Mở menu" title="Menu" aria-expanded="false" aria-controls="sidebar"><img src="assets/icons/menu.svg" alt=""></button>
 
 <main>
+  <section id="dashboardAuthRecovery" hidden role="status" aria-live="polite" style="position:fixed;inset:0;z-index:2500;background:#f6f8fc;overflow:auto;padding:24px;display:none;align-items:center;justify-content:center">
+    <div style="width:100%;max-width:520px;background:white;border:1px solid #d6dfed;border-radius:8px;padding:24px">
+      <h2 id="dashboardAuthTitle" style="font-size:20px;margin:0 0 12px">Đang tải tài khoản</h2>
+      <p id="dashboardAuthMessage" style="line-height:1.6"></p>
+      <p id="dashboardAuthCode" style="font-size:12px;color:#52627a;overflow-wrap:anywhere"></p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <button id="dashboardAuthRetry" type="button" class="authBtn primary" onclick="retryDashboardProfile()">Thử lại</button>
+        <button type="button" class="authBtn secondary" onclick="logout()">Đăng xuất</button>
+      </div>
+    </div>
+  </section>
   <div id="guestAuthBar" class="guest-auth-bar">
     <button class="authBtn primary" type="button" onclick="openAuthModal('login')">Đăng nhập</button>
     <button class="authBtn secondary" type="button" onclick="openAuthModal('register')">Đăng ký</button>
@@ -1241,6 +1252,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js?v=20261002-permissions2"></script>
+<script src="dashboard-auth.js?v=20261023-profile-recovery"></script>
 <script src="tuition-discounts.js?v=20261008-discounts2"></script>
 <script src="tuition-calculation.js?v=20261015-shared1"></script>
 <script src="dashboard_ops.js?v=20261015-shared1"></script>
@@ -1250,6 +1262,7 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
 let badgeChannels = [];
 let currentDashboardUser = null;
 let currentDashboardProfile = null;
+let dashboardInitGeneration = 0;
 let authMode = "login";
 const HIDDEN_NOTIFICATION_TYPES = ["friend_request", "friend_accept", "message_new"];
 const PUBLIC_DASHBOARD_PAGES = new Set(["home.html", "courses.html"]);
@@ -1472,22 +1485,58 @@ document.addEventListener('keydown', event => {
 window.matchMedia('(max-width: 768px)').addEventListener('change', () => closeSidebar());
 
 /* ── Dashboard init ── */
+function showDashboardAuthState(result = null){
+  const panel = document.getElementById("dashboardAuthRecovery");
+  panel.hidden = false;
+  panel.style.display = "flex";
+  document.body.style.visibility = "visible";
+  document.getElementById("dashboardAuthTitle").textContent = result ? "Chưa tải được hồ sơ tài khoản" : "Đang tải tài khoản";
+  document.getElementById("dashboardAuthMessage").textContent = !result
+    ? "Đang kết nối để tải thông tin và quyền truy cập của bạn."
+    : result.kind === "missing"
+      ? "Đăng nhập thành công nhưng chưa đọc được hồ sơ tương ứng. Hãy thử lại; nếu vẫn gặp lỗi, cần kiểm tra hồ sơ và quyền truy cập trên hệ thống."
+      : result.kind === "session"
+        ? "Máy chủ chưa chấp nhận phiên truy cập dữ liệu. Phiên đăng nhập chưa bị xóa. Hãy thử lại hoặc đăng xuất rồi đăng nhập lại."
+        : "Chưa kết nối được để tải hồ sơ. Phiên đăng nhập của bạn vẫn được giữ nguyên. Hãy thử lại sau ít phút.";
+  document.getElementById("dashboardAuthCode").textContent = result?.code ? `Mã kiểm tra: ${result.code}` : "";
+  document.getElementById("dashboardAuthRetry").disabled = !result;
+}
+
+async function retryDashboardProfile(){
+  if(await initDashboard()) {
+    openDashboardPage(getDashboardUrlPage() || "home.html", { replaceUrl: true, forceReload: true });
+  }
+}
+
 async function initDashboard(userOverride = null){
-  const user = userOverride || await window.AppAuth?.getUser?.();
+  const generation = ++dashboardInitGeneration;
+  let user;
+  try {
+    user = userOverride || await window.AppAuth?.getUser?.();
+  } catch (_) {
+    if(generation === dashboardInitGeneration) showDashboardAuthState({ kind: "unavailable", code: "AUTH_UNAVAILABLE" });
+    return false;
+  }
+  if(generation !== dashboardInitGeneration) return false;
   currentDashboardUser = user || null;
   if(!user){
+    document.getElementById("dashboardAuthRecovery").hidden = true;
+    document.getElementById("dashboardAuthRecovery").style.display = "none";
     applyGuestMenu();
     setupMenu();
     document.body.style.visibility = "visible";
-    return;
+    return false;
   }
 
-  const { data: storedProfile, error } = await sb.from("users").select("*").eq("id", user.id).maybeSingle();
-  let profile = storedProfile;
-  if(error || !profile){
-    alert("Không tìm thấy thông tin người dùng. Hệ thống sẽ đăng xuất.");
-    logout();
-    return;
+  currentDashboardProfile = null;
+  window.StaffMessageDock?.configure(null);
+  showDashboardAuthState();
+  const result = await window.DashboardAuth.loadProfile(sb, user.id);
+  if(generation !== dashboardInitGeneration) return false;
+  let profile = result.profile;
+  if(!profile){
+    showDashboardAuthState(result);
+    return false;
   }
   if(profile.role === "student"){
     const { data: parentLink } = await sb.from("parent_students")
@@ -1499,8 +1548,10 @@ async function initDashboard(userOverride = null){
     if(parentLink) profile = { ...profile, role: "parent" };
   }
 
-  currentDashboardProfile = profile;
+  if(generation !== dashboardInitGeneration) return false;
   await window.AppPermissions?.load?.(profile);
+  if(generation !== dashboardInitGeneration) return false;
+  currentDashboardProfile = profile;
   window.StaffMessageDock?.configure(profile);
   const userBox = document.getElementById("userBox");
   if(userBox && !document.getElementById("userName")){
@@ -1525,7 +1576,10 @@ async function initDashboard(userOverride = null){
   loadMessageBadge(user.id);
   subscribeBadgeChanges(user.id);
   document.body.style.visibility = "visible";
+  document.getElementById("dashboardAuthRecovery").hidden = true;
+  document.getElementById("dashboardAuthRecovery").style.display = "none";
   setTimeout(() => loadRecentMessagesPopup(profile), 650);
+  return true;
 }
 
 function loadUserInfo(profile){
@@ -1543,6 +1597,7 @@ function loadUserInfo(profile){
 }
 
 async function logout(){
+  dashboardInitGeneration++;
   window.StaffMessageDock?.configure(null);
   await sb.auth.signOut();
   window.location.href = "dashboard.html";
@@ -1727,6 +1782,7 @@ function openDashboardPage(page, options = {}){
   const { syncMenu = true, syncMobile = true, updateUrl = true, replaceUrl = false, forceReload = false } = options;
   page = resolveRoleDashboardPage(page);
   if(!page) return;
+  if(currentDashboardUser && !currentDashboardProfile) return;
   const basePage = page.split("?")[0];
   if(!currentDashboardUser && !PUBLIC_DASHBOARD_PAGES.has(basePage)){
     openAuthModal("login");
@@ -1970,8 +2026,9 @@ async function submitAuthForm(){
         return;
       }
       closeAuthModal();
-      await initDashboard(data?.user || null);
-      openDashboardPage(currentDashboardProfile?.role === "admin" ? "ops-center" : "home.html", { replaceUrl: true, forceReload: true });
+      if(await initDashboard(data?.user || null)) {
+        openDashboardPage(currentDashboardProfile?.role === "admin" ? "ops-center" : "home.html", { replaceUrl: true, forceReload: true });
+      }
       return;
     }
     const { error } = await sb.auth.signUp({ email, password });
