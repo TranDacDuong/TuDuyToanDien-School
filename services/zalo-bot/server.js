@@ -16,6 +16,7 @@ const { requireSendAcknowledgement } = require('./send-acknowledgement');
 const { retryPreparation, sendTuitionQr } = require('./tuition-qr');
 const { LocalDatabase, eventKey } = require('./local-database');
 const { LocalStorageWorker } = require('./local-storage-worker');
+const { readParentRelationship } = require('./parent-relationship');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -111,14 +112,15 @@ async function syncGatewayOutbox() {
   if (gatewayBusy || !zaloApi || !listenerConnected || !GATEWAY_URL || !GATEWAY_TOKEN
     || campaignStatus !== 'idle' || Date.now() < nextDispatchPollAt) return;
   if ([...pendingIncoming.values()].some(p => p.action.startsWith('finish'))) return;
+  if (Date.now() >= nextAutomaticTuitionTickAt) {
+      nextAutomaticTuitionTickAt = Date.now() + 60000;
+      // Enumerating the whole center must not hold the single Zalo sender lock.
+      automaticTuitionScheduler.tick().catch(error =>
+        console.warn('[ZaloBot] Automatic tuition scheduler:', error?.message || error));
+  }
   gatewayBusy = true;
   nextDispatchPollAt = Date.now() + 15000;
   try {
-    if (Date.now() >= nextAutomaticTuitionTickAt) {
-      nextAutomaticTuitionTickAt = Date.now() + 60000;
-      await automaticTuitionScheduler.tick().catch(error =>
-        console.warn('[ZaloBot] Automatic tuition scheduler:', error?.message || error));
-    }
     const { job } = await gatewayRequest({ action: 'claimDispatch', pacing: dispatchPacing(),
       automaticSchedule: automaticTuitionScheduler.schedule() });
     if (!job) {
@@ -291,7 +293,7 @@ async function checkQueuedParent(job) {
     }
     result.uid = String(uid);
     stage = 'Kiểm tra quan hệ Zalo';
-    const relationship = await zaloApi.getFriendRequestStatus(result.uid);
+    const relationship = await readParentRelationship(zaloApi, result.uid, friendUserIdSet);
     if (!relationship) throw new Error('Không đọc được trạng thái kết bạn');
     if (relationship.is_friend === 1) {
       result.status = 'friend';
@@ -442,9 +444,10 @@ async function syncParentTuition() {
   let processedKind = null;
   try {
     if (Date.now() >= nextManualParentPollAt) {
-      nextManualParentPollAt = Date.now() + 30000;
+      nextManualParentPollAt = Date.now() + 5000;
       const { dispatch } = await gatewayRequest({ action: 'claimManualParentAction', allowAlias: Date.now() >= nextAliasSyncAt });
       if (dispatch?.job) {
+        nextManualParentPollAt = Date.now() + 5000;
         processedKind = dispatch.kind;
         if (dispatch.kind === 'alias') await syncQueuedParentAlias(dispatch.job);
         else await checkQueuedParent(dispatch.job);
