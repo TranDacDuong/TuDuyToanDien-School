@@ -10,6 +10,7 @@ test('uncertain receipt is isolated and next receipt is sent without pausing aut
   let sends = 0;
   const context = {
     zaloApi: { sendMessage: async () => ++sends === 1 ? { message: 'unconfirmed' } : { message: { msgId: '123' } } },
+    localStore: {send: async (key,identity,operation) => operation()},
     requireSendAcknowledgement, isZaloLimitError: () => false, isUncertainSendError: () => false,
     gatewayRequest: async p => calls.push(p), acknowledgeDispatch: async p => calls.push(p)
   };
@@ -28,6 +29,7 @@ test('actual Zalo rate limit still pauses automation for account safety', async 
   const calls = [];
   const context = {
     zaloApi: { sendMessage: async () => { throw new Error('429 rate limit'); } },
+    localStore: {send: async (key,identity,operation) => operation()},
     requireSendAcknowledgement, isZaloLimitError: () => true, isUncertainSendError: () => false,
     gatewayRequest: async p => calls.push(p), acknowledgeDispatch: async p => calls.push(p)
   };

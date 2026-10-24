@@ -14,6 +14,7 @@ test('QR-only repair does not resend tuition text', async () => {
     gatewayRequest:async()=>({sendAt:new Date().toISOString()}),dispatchPacing:()=>({}),
     retryPreparation:async fn=>fn(),sleep:async()=>{},downloadImage:async()=>{},
     sendTuitionQr:async()=>{qrCalls++;return '123';},
+    localStore:{send:async(key,identity,operation)=>operation()},
     acknowledgeDispatch:async result=>results.push(result),isZaloLimitError:()=>false};
   vm.createContext(context); vm.runInContext(fn,context);
   await context.sendQueuedTuition({job_id:'repair',zalo_uid:'parent',content:null,qr_url:'https://img.vietqr.io/image/test.png'});

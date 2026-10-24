@@ -14,6 +14,8 @@ const { prepareScoreMessageMedia } = require('./score-message-media');
 const { createScheduler } = require('./tuition-reminder-scheduler');
 const { requireSendAcknowledgement } = require('./send-acknowledgement');
 const { retryPreparation, sendTuitionQr } = require('./tuition-qr');
+const { LocalDatabase, eventKey } = require('./local-database');
+const { LocalStorageWorker } = require('./local-storage-worker');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -48,6 +50,8 @@ let nextParentPollAt = 0;
 let nextManualParentPollAt = 0;
 let nextAliasSyncAt = 0;
 let nextAutomaticTuitionTickAt = 0;
+let nextDispatchPollAt = 0;
+let emptyDispatchPolls = 0;
 let gatewayBatchCount = 0;
 const pendingIncoming = new Map();
 let listenerConnected = false;
@@ -64,7 +68,10 @@ const historyController = new HistorySync({
 const incomingQueue = new GatewayQueue({
   pending: pendingIncoming, request: gatewayRequest, persist: persistIncoming,
   quarantine: quarantineIncoming,
-  onResult: (payload, result) => historyController.result(payload, result)
+  onResult: (payload, result) => {
+    localStore.acknowledgeEvent(payload);
+    historyController.result(payload, result);
+  }
 });
 const automaticTuitionActions = {
   automatic_tuition_candidates: 'automaticTuitionCandidates',
@@ -101,9 +108,10 @@ async function gatewayRequest(payload) {
 
 async function syncGatewayOutbox() {
   if (gatewayBusy || !zaloApi || !listenerConnected || !GATEWAY_URL || !GATEWAY_TOKEN
-    || campaignStatus !== 'idle') return;
+    || campaignStatus !== 'idle' || Date.now() < nextDispatchPollAt) return;
   if ([...pendingIncoming.values()].some(p => p.action.startsWith('finish'))) return;
   gatewayBusy = true;
+  nextDispatchPollAt = Date.now() + 15000;
   try {
     if (Date.now() >= nextAutomaticTuitionTickAt) {
       nextAutomaticTuitionTickAt = Date.now() + 60000;
@@ -112,7 +120,12 @@ async function syncGatewayOutbox() {
     }
     const { job } = await gatewayRequest({ action: 'claimDispatch', pacing: dispatchPacing(),
       automaticSchedule: automaticTuitionScheduler.schedule() });
-    if (!job) return;
+    if (!job) {
+      nextDispatchPollAt = Date.now() + Math.min(15000, 1000 * 2 ** Math.min(++emptyDispatchPolls, 4));
+      return;
+    }
+    emptyDispatchPolls = 0;
+    nextDispatchPollAt = Date.now() + 500;
     if (job.kind === 'automatic_tuition') {
       await sendQueuedAutomaticTuition(job);
       return;
@@ -133,8 +146,10 @@ async function syncGatewayOutbox() {
         { browserChannel: process.platform === 'win32' ? 'msedge' : undefined });
       if (media.errors.length) throw new Error('Không tạo được ảnh bảng điểm/phổ điểm; chưa gửi tin');
       const text = media.text.replace(/__(ACTION|EVALUATION)__[\s\S]*$/, '').trim();
-      const sent = await zaloApi.sendMessage(media.attachments.length ? { msg: text, attachments: media.attachments } : text, job.zalo_uid);
-      const messageId = requireSendAcknowledgement(sent, media.attachments.length);
+      const messageId = await localStore.send(`web:${job.job_id}`, { uid: job.zalo_uid, text, attachments: media.attachments.length }, async () => {
+        const sent = await zaloApi.sendMessage(media.attachments.length ? { msg: text, attachments: media.attachments } : text, job.zalo_uid);
+        return requireSendAcknowledgement(sent, media.attachments.length);
+      });
       acknowledgement = { action: 'finish', jobId: job.job_id, status: 'sent',
         externalId: `${job.zalo_uid}:${messageId}` };
     } catch (error) {
@@ -157,10 +172,12 @@ async function syncGatewayOutbox() {
 async function sendQueuedAutomaticTuition(job) {
   await automaticTuitionScheduler.dispatchClaimed(job, async ({ uid, part, prepared }) => {
     try {
-      const sent = await zaloApi.sendMessage(part.kind === 'text' ? part.content : {
-        msg: 'Mã QR thanh toán học phí MindUp', attachments: [prepared.file]
-      }, uid);
-      return `${uid}:${requireSendAcknowledgement(sent, part.kind === 'text' ? 0 : 1)}`;
+      return await localStore.send(`automatic:${job.id}:${job.payload.parts.indexOf(part)}`, { uid, part }, async () => {
+        const sent = await zaloApi.sendMessage(part.kind === 'text' ? part.content : {
+          msg: 'Mã QR thanh toán học phí MindUp', attachments: [prepared.file]
+        }, uid);
+        return `${uid}:${requireSendAcknowledgement(sent, part.kind === 'text' ? 0 : 1)}`;
+      });
     } catch (error) {
       if (isZaloLimitError(error)) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
       throw error;
@@ -193,10 +210,11 @@ function dispatchPacing() {
 
 async function acknowledgeDispatch(payload) {
   const key = `ack:${payload.action}:${payload.jobId}`;
-  pendingIncoming.set(key, payload);
+    pendingIncoming.set(key, payload);
   try {
     persistIncoming();
     await gatewayRequest(payload);
+    localStore.acknowledgeEvent(payload);
     pendingIncoming.delete(key);
     persistIncoming();
   } catch (error) {
@@ -219,7 +237,7 @@ function isZaloLimitError(error) {
 }
 
 function isUncertainSendError(error) {
-  return /timeout|timed out|network|fetch failed|econn|socket|connection|aborted|reset/i
+  return /uncertain delivery|timeout|timed out|network|fetch failed|econn|socket|connection|aborted|reset/i
     .test(String(error?.message || error));
 }
 
@@ -323,8 +341,10 @@ async function sendQueuedTuition(job) {
   let qrSent = false;
   let externalId = null;
   if (job.content !== null) try {
-    const sent = await zaloApi.sendMessage(job.content, job.zalo_uid);
-    externalId = `${job.zalo_uid}:${requireSendAcknowledgement(sent)}`;
+    externalId = await localStore.send(`tuition:${job.job_id}:text`, { uid: job.zalo_uid, content: job.content }, async () => {
+      const sent = await zaloApi.sendMessage(job.content, job.zalo_uid);
+      return `${job.zalo_uid}:${requireSendAcknowledgement(sent)}`;
+    });
   } catch (error) {
     if (isZaloLimitError(error)) {
       await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
@@ -347,7 +367,7 @@ async function sendQueuedTuition(job) {
       qrStage = 'Tải ảnh từ VietQR';
       await retryPreparation(() => downloadImage(job.qr_url, tempFile));
       qrStage = 'Gửi ảnh QR qua Zalo';
-      await sendTuitionQr(zaloApi, job.zalo_uid, tempFile);
+      await localStore.send(`tuition:${job.job_id}:qr`, { uid: job.zalo_uid, qr: job.qr_url }, () => sendTuitionQr(zaloApi, job.zalo_uid, tempFile));
       qrSent = true;
     } catch (error) {
       qrError = `Đã gửi nội dung, ảnh QR lỗi (${error.qrStage || qrStage}): ${error?.message || error}${error?.cause?.code ? ' [' + error.cause.code + ']' : ''}`;
@@ -363,8 +383,10 @@ async function sendQueuedTuition(job) {
 async function sendQueuedTuitionReceipt(job) {
   let externalId = null;
   try {
-    const sent = await zaloApi.sendMessage(job.content, job.zalo_uid);
-    externalId = `${job.zalo_uid}:${requireSendAcknowledgement(sent)}`;
+    externalId = await localStore.send(`receipt:${job.job_id}`, { uid: job.zalo_uid, content: job.content }, async () => {
+      const sent = await zaloApi.sendMessage(job.content, job.zalo_uid);
+      return `${job.zalo_uid}:${requireSendAcknowledgement(sent)}`;
+    });
   } catch (error) {
     if (isZaloLimitError(error)) {
       await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
@@ -419,7 +441,7 @@ async function syncParentTuition() {
   let processedKind = null;
   try {
     if (Date.now() >= nextManualParentPollAt) {
-      nextManualParentPollAt = Date.now() + 2000;
+      nextManualParentPollAt = Date.now() + 30000;
       const { dispatch } = await gatewayRequest({ action: 'claimManualParentAction', allowAlias: Date.now() >= nextAliasSyncAt });
       if (dispatch?.job) {
         processedKind = dispatch.kind;
@@ -458,6 +480,10 @@ async function syncParentTuition() {
 async function flushIncoming() {
   if (!GATEWAY_URL || !GATEWAY_TOKEN) return;
   try {
+    for (const payload of localStore.pendingEvents()) {
+      const key = eventKey(payload);
+      if (!pendingIncoming.has(key)) pendingIncoming.set(key,payload);
+    }
     await incomingQueue.flush();
   } catch (error) {
     incomingQueue.lastError = String(error?.message || error);
@@ -550,13 +576,14 @@ function queueZaloMessage(message, isHistory) {
   const zaloUid = String(message.threadId || '');
   if (!messageId || !zaloUid) return false;
   const externalId = `${zaloUid}:${messageId}`;
+  const normalized = encodeMessage(message,friendProfiles.get(zaloUid));
+  if(!normalized) return false;
+  localStore.recordEvent({...normalized,isHistory:isHistory===true});
   if (pendingIncoming.has(externalId)) return false;
   if (pendingIncoming.size >= 5000) {
     console.error('[ZaloBot] Hàng đợi đồng bộ Zalo đầy, tạm dừng nhận thêm');
     return false;
   }
-  const normalized = encodeMessage(message,friendProfiles.get(zaloUid));
-  if(!normalized) return false;
   pendingIncoming.set(externalId, {...normalized,isHistory:isHistory===true});
   if (!isHistory) {
     try { persistIncoming(); } catch (error) {
@@ -570,6 +597,7 @@ function queueZaloMessage(message, isHistory) {
 
 function queueZaloUpdate(kind,event) {
   const payload=encodeUpdate(kind,event);
+  if(payload) localStore.recordEvent(payload);
   if(!payload || pendingIncoming.has(payload.externalId) || pendingIncoming.size>=5000) return;
   pendingIncoming.set(payload.externalId,payload);
   try { persistIncoming(); } catch(error) { console.error('[ZaloBot] Cannot persist update:',error.message); }
@@ -627,8 +655,11 @@ const HISTORY_FILE = path.join(SESSION_DIR, 'history-sync.json');
 if (!fs.existsSync(SESSION_DIR)) {
   fs.mkdirSync(SESSION_DIR, { recursive: true });
 }
+const localStore = new LocalDatabase(path.join(SESSION_DIR,'zalo-local.sqlite'), GATEWAY_URL);
+const localStorageWorker = new LocalStorageWorker({ store: localStore, request: gatewayRequest });
 try {
   for (const payload of JSON.parse(fs.readFileSync(INCOMING_FILE, 'utf8'))) {
+    if (payload?.externalId || (payload?.action?.startsWith('finish') && payload.jobId)) localStore.recordEvent(payload);
     if (['finish', 'finishTuition', 'finishTuitionReceipt'].includes(payload?.action) && payload.jobId) {
       // Replaying a durable acknowledgement cannot send another Zalo message.
       payload.retryAt = 0;
@@ -672,6 +703,7 @@ function quarantineIncoming(payload, error) {
 }
 
 function persistIncoming() {
+  for (const payload of pendingIncoming.values()) localStore.recordEvent(payload);
   writeJsonAtomic(INCOMING_FILE, [...pendingIncoming.values()]);
 }
 
@@ -1243,6 +1275,7 @@ app.get('/api/status', (req, res) => {
       pendingUpload: [...pendingIncoming.values()].filter(p => p.action === 'syncMessage').length,
       pendingAcknowledgements: [...pendingIncoming.values()].filter(p => p.action.startsWith('finish')).length,
       rejectedMessages: rejectedIncoming.length, lastUploadError: incomingQueue.lastError },
+    localStorage: { ...localStore.status(), lastError: localStorageWorker.lastError },
     config: botConfig
   });
 });
@@ -1399,6 +1432,7 @@ app.listen(PORT, HOST, () => {
     await syncParentTuition();
   }, 500).unref();
   setInterval(flushIncoming, 10000).unref();
+  setInterval(() => { if (!shuttingDown && GATEWAY_URL && GATEWAY_TOKEN) localStorageWorker.tick().catch(console.error); }, 1000).unref();
   setInterval(refreshSyncLinks, 60000).unref();
   setInterval(()=>{if(listenerConnected) syncFriendsList().catch(console.error);},300000).unref();
   setInterval(() => recoverSavedSession().catch(console.error), 10000).unref();

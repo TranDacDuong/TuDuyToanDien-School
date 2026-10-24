@@ -48,6 +48,16 @@ Deno.serve(async (request) => {
 
   try {
     const payload = await request.json();
+    if (payload.action === "localStorageCycle") {
+      if (typeof payload.storageId !== "string" || !/^[0-9a-f-]{36}$/i.test(payload.storageId) ||
+        !Array.isArray(payload.receipts) || payload.receipts.length > 100 ||
+        !Array.isArray(payload.results) || payload.results.length > 5 || JSON.stringify(payload.results).length > 1500000) {
+        return json({ error: "Invalid local storage cycle" }, 400);
+      }
+      return json({ data: await rpc("local_zalo_storage_cycle", {
+        p_storage_id: payload.storageId, p_receipts: payload.receipts, p_results: payload.results,
+      }) });
+    }
     if (payload.action === "automaticTuitionConfig") {
       return json({ data: await rpc("automatic_tuition_config", {}) });
     }

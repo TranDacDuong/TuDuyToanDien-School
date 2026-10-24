@@ -816,6 +816,7 @@ aside.panel { border-right: 1px solid #dce1e8; }
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
+<script src="local-message-history.js?v=20261024-local1"></script>
 <script src="image_upload.js"></script>
 <script src="mindup_bot.js"></script>
 <script src="learning_messages.js"></script>
@@ -2338,7 +2339,12 @@ async function queryConversationMessages(conversationId, before = null, beforeId
   const result = await sb.rpc('list_mindup_conversation_messages_v2', {
     p_conversation_id: conversationId, p_before: before, p_before_id: beforeId, p_limit: MESSAGE_PAGE_SIZE
   }).select(columns);
-  if (!['PGRST202','42883'].includes(result.error?.code)) return result;
+  if (!['PGRST202','42883'].includes(result.error?.code)) {
+    if(!result.error && result.data?.length) try {
+      result.data = await window.LocalMessageHistory.hydrate(sb,result.data);
+    } catch(error) { return {data:null,error}; }
+    return result;
+  }
   const legacy = await sb.rpc('list_mindup_conversation_messages', {
     p_conversation_id: conversationId, p_before: before, p_limit: MESSAGE_PAGE_SIZE
   }).select(columns);
@@ -2352,6 +2358,7 @@ window.retryConversationMessages = () => loadMessages({ reset: true, scrollToBot
 function showMessageLoadError(error) {
   console.warn('[Messages] Load failed', error?.code, error?.message);
   const reason = error?.code === '57014' ? 'Máy chủ xử lý quá lâu.'
+    : error?.code === 'LOCAL_HISTORY_UNAVAILABLE' ? 'Máy lưu trữ của trung tâm đang ngoại tuyến. Hãy bật bot rồi thử lại.'
     : error?.code === '42501' ? 'Tài khoản chưa có quyền đọc hội thoại này.'
     : 'Không kết nối được với máy chủ.';
   document.getElementById('messageList').innerHTML = `<div class="empty"><strong>Không tải được tin nhắn</strong>${reason}<button type="button" onclick="retryConversationMessages()">Thử lại</button></div>`;
@@ -2438,6 +2445,9 @@ async function loadOlderMessages() {
   isLoadingOlderMessages = false;
   if (generation !== messageReadGeneration) return;
   if (error) {
+    if(error.code === 'LOCAL_HISTORY_UNAVAILABLE') {
+      const note=document.createElement('div');note.className='message-transport';note.textContent=error.message;wrap.prepend(note);
+    }
     console.warn("Không tải được tin nhắn cũ:", error);
     return;
   }
@@ -3679,7 +3689,8 @@ async function loadExternalZaloMessages(scrollToBottom=false,older=false) {
   const wrap=document.getElementById('messageList'),top=wrap.scrollTop,height=wrap.scrollHeight;
   try {
     const before=older?loadedMessages[0]?.created_at:null;
-    const {data,error}=await sb.rpc('list_zalo_external_messages',{p_thread:thread,p_before:before || null,p_before_id:older?loadedMessages[0]?.external_message_id:null});
+    let {data,error}=await sb.rpc('list_zalo_external_messages',{p_thread:thread,p_before:before || null,p_before_id:older?loadedMessages[0]?.external_message_id:null});
+    if(!error && data?.length) data=await window.LocalMessageHistory.hydrate(sb,data);
     if(error) throw error;if(activeFriend!==loadingFriend) return;
     const map=new Map(loadedMessages.map(m=>[m.id,m]));
     for(const r of data || []) map.set(r.external_id,{id:r.external_id,external_message_id:r.external_id,content:r.content,created_at:r.sent_at,

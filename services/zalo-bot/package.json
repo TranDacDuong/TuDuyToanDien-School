@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Dịch vụ Zalo Bot tự động nhắc học phí - Trung tâm MindUp",
   "main": "server.js",
+  "engines": { "node": ">=22.18.0" },
   "scripts": {
     "start": "node server.js",
     "test:tuition-scheduler": "node --test tuition-reminder-scheduler.test.js tuition-reminder-scheduler.database.test.js tuition-reminder-scheduler.integration.test.js"

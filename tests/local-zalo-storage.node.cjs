@@ -1,0 +1,85 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const os=require('node:os');
+const path=require('node:path');
+const {createRequire}=require('node:module');
+const {LocalDatabase,digest}=require('../services/zalo-bot/local-database');
+const {LocalStorageWorker}=require('../services/zalo-bot/local-storage-worker');
+const {PGlite}=createRequire(path.resolve('services/zalo-bot/package.json'))('@electric-sql/pglite');
+function local(){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'mindup-local-'));return path.join(dir,'local.sqlite');}
+test('durable local history and task receipts survive restart, without crossing project boundaries',async t=>{
+ const file=local();t.after(()=>fs.rmSync(path.dirname(file),{recursive:true,force:true}));let db=new LocalDatabase(file,'project');const id=db.id;
+ const payload={action:'syncMessage',externalId:'123:456',content:'Xin chào phụ huynh'};
+ db.recordEvent(payload);db.recordEvent({action:'finish',jobId:'job',externalId:'123:456',status:'sent'});
+ assert.equal(db.pendingEvents().length,2);
+ db.acknowledgeEvent(payload);db.recordEvent(payload);assert.equal(db.pendingEvents().length,1);
+ const row={key:'m:one',content:'Nội dung đầy đủ',hash:digest('Nội dung đầy đủ')};
+ db.saveArchive([row]);assert.deepEqual(db.receipts(),[{key:row.key,hash:row.hash}]);
+ let sends=0;
+ await db.send('send:one',{uid:'123',text:'Hello'},async()=>{sends++;return 'confirmed-id'});
+ db.close();db=new LocalDatabase(file,'project');assert.equal(db.id,id);
+ assert.equal(db.readArchive([row.key])[0].content,row.content);
+ assert.equal(await db.send('send:one',{uid:'123',text:'Hello'},async()=>{sends++;return 'duplicate'}),'confirmed-id');assert.equal(sends,1);
+ await assert.rejects(()=>db.send('send:one',{uid:'other'},async()=>''),/payload changed/);
+ await assert.rejects(()=>db.send('send:two',{},async()=>{throw Error('timeout')}),/timeout/);
+ await assert.rejects(()=>db.send('send:two',{},async()=>{sends++;}),/Uncertain delivery/);
+ assert.throws(()=>db.saveArchive([{...row,hash:'bad'}]),/checksum/);
+ db.close();assert.throws(()=>new LocalDatabase(file,'other-project'),/another project/);
+});
+test('worker only acknowledges disk-verified bodies after cloud success and read requests never send Zalo',async t=>{
+ const file=local();const db=new LocalDatabase(file,'project');t.after(()=>{db.close();fs.rmSync(path.dirname(file),{recursive:true,force:true});});
+ const row={key:'m:one',content:'hello',hash:digest('hello')};let phase=0;let now=0;
+ const worker=new LocalStorageWorker({store:db,clock:()=>now,request:async body=>{
+  if(phase++===0)return {data:{exports:[row],reads:[]}};
+  if(phase===2){assert.equal(body.receipts[0].hash,row.hash);throw Error('cloud offline');}
+  assert.equal(body.receipts[0].hash,row.hash);return {data:{exports:[],reads:[]}};
+ }});
+ await worker.tick();now+=500;await worker.tick();assert.equal(db.receipts().length,1);assert.match(worker.lastError,/offline/);
+ now+=30000;await worker.tick();assert.equal(db.receipts().length,0);
+});
+const uid='00000000-0000-0000-0000-000000000011',other='00000000-0000-0000-0000-000000000012',sid='00000000-0000-0000-0000-000000000099';
+test('cloud migration: checksum-confirmed 48h retention, latest previews, caller scope and instance pinning',async()=>{
+ const db=new PGlite();
+ try{
+ await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role;CREATE SCHEMA auth;
+ CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+ CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$SELECT current_setting('request.jwt.claim.role',true)$$;
+ CREATE TABLE users(id uuid PRIMARY KEY);INSERT INTO users VALUES('${uid}'),('${other}');
+ CREATE TABLE conversations(id uuid PRIMARY KEY,direct_key text);
+ CREATE TABLE messages(id uuid PRIMARY KEY,conversation_id uuid,context_student_id uuid,content text,created_at timestamptz);
+ CREATE TABLE zalo_message_mirrors(external_id text PRIMARY KEY,zalo_uid text,message_id uuid,content text,sent_at timestamptz);
+ CREATE FUNCTION is_mindup_official_direct_key(text) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$SELECT $1 LIKE 'official:%'$$;
+ CREATE FUNCTION mindup_official_audience_id(text) RETURNS uuid LANGUAGE sql IMMUTABLE AS $$SELECT substring($1 FROM 10)::uuid$$;
+ CREATE FUNCTION can_access_mindup_official_direct_key(text) RETURNS boolean LANGUAGE sql STABLE AS $$SELECT mindup_official_audience_id($1)=auth.uid()$$;
+ CREATE FUNCTION is_admin_actor() RETURNS boolean LANGUAGE sql STABLE AS $$SELECT false$$;
+ CREATE FUNCTION teacher_manages_student(uuid) RETURNS boolean LANGUAGE sql STABLE AS $$SELECT false$$;
+ INSERT INTO conversations VALUES('${uid}','official:${uid}');
+ INSERT INTO messages VALUES('${uid}','${uid}',NULL,'Old message',now()-interval '3 days'),('${other}','${uid}',NULL,'Latest preview',now()-interval '2 days');
+ INSERT INTO zalo_message_mirrors VALUES('123:old','123','${uid}','Old message',now()-interval '3 days'),('123:last','123','${other}','Latest preview',now()-interval '2 days');
+ SELECT set_config('request.jwt.claim.role','service_role',false);`);
+ const sql=fs.readFileSync('SQL local Zalo storage.sql','utf8');await db.exec(sql);await db.exec(sql);
+ const cycle=async(receipts=[],results=[])=> (await db.query('SELECT local_zalo_storage_cycle($1,$2,$3) data',[sid,JSON.stringify(receipts),JSON.stringify(results)])).rows[0].data;
+ let result=await cycle();assert.equal(result.exports.length,2);assert.equal(result.exports.some(r=>r.content==='Latest preview'),false);
+ const receipts=result.exports.map(r=>({key:r.key,hash:r.hash}));await cycle(receipts);
+ assert.equal((await db.query('SELECT content FROM messages WHERE id=$1',[uid])).rows[0].content,'Old message');
+ await db.exec('UPDATE zalo_local_storage SET compact_enabled=true,next_scan_at=now()');result=await cycle();assert.equal(result.exports.length,2);
+ await cycle(receipts);
+ assert.equal((await db.query('SELECT content FROM messages WHERE id=$1',[uid])).rows[0].content,'__MINDUP_LOCAL_V1__:m:'+uid);
+ assert.equal((await cycle()).exports.length,0);
+ await assert.rejects(()=>db.query('SELECT local_zalo_storage_cycle($1)',[other]),/Different local storage/);
+ await db.exec(`SELECT set_config('request.jwt.claim.sub','${uid}',false);SELECT set_config('request.jwt.claim.role','authenticated',false);SET ROLE authenticated;`);
+ const request=(await db.query('SELECT request_local_zalo_history($1) id',[[`m:${uid}`]])).rows[0].id;
+ await db.exec('RESET ROLE');await db.exec(`SELECT set_config('request.jwt.claim.role','service_role',false)`);
+ const read=(await cycle()).reads[0];assert.equal(read.id,request);
+ await cycle([],[{id:read.id,token:read.token,items:[{key:`m:${uid}`,content:'Old message',hash:digest('Old message')}]}]);
+ await db.exec(`SELECT set_config('request.jwt.claim.role','authenticated',false);SET ROLE authenticated;`);
+ assert.equal((await db.query('SELECT read_local_zalo_history($1) result',[request])).rows[0].result.items[0].content,'Old message');
+ await db.exec(`RESET ROLE;UPDATE messages SET content='[Tin nhắn đã thu hồi]' WHERE id='${uid}';SET ROLE authenticated;`);
+ assert.equal((await db.query('SELECT read_local_zalo_history($1) result',[request])).rows[0].result.items[0].content,'[Tin nhắn đã thu hồi]');
+ await db.exec(`RESET ROLE;SELECT set_config('request.jwt.claim.sub','${other}',false);SET ROLE authenticated;`);
+ await assert.rejects(()=>db.query('SELECT request_local_zalo_history($1)',[[`m:${uid}`]]),/access denied/);
+ assert.equal((await db.query('SELECT read_local_zalo_history($1) result',[request])).rows[0].result.status,'expired');
+ await assert.rejects(()=>db.query('SELECT * FROM zalo_local_reads'),/permission denied/);
+ } finally{await db.close();}
+});
