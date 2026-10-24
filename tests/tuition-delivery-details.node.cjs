@@ -11,7 +11,7 @@ test('main selection table hides paid students and keeps original checkbox index
   const container = {};
   const context = {
     document: { getElementById: () => container }, esc, fmt: String,
-    DEFAULT_ZALO_TEMPLATE: '', monthPicker: { value: '2026-10' },
+    DEFAULT_ZALO_TEMPLATE: '', savedTuitionNoticeTemplate: '', monthPicker: { value: '2026-10' },
     isZaloTuitionItemBaseEligible: item => item.due,
     currentZaloCampaignItems: [
       { studentName: 'Paid student', due: false, remaining: 0 },
@@ -62,6 +62,7 @@ test('a failed tuition message does not pause peers and the following job succee
   const end = server.indexOf('async function sendQueuedTuitionReceipt', start);
   const acknowledgements = [];
   const context = {
+    localStore: { send: async (key, identity, operation) => operation() },
     zaloApi: { sendMessage: async text => { if (text === 'bad') throw Error('Recipient unavailable'); return 'id'; } },
     requireSendAcknowledgement: value => value,
     isZaloLimitError: () => false, isUncertainSendError: () => false,

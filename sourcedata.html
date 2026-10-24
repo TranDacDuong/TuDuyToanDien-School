@@ -2472,17 +2472,27 @@ async function loadStudents(){
   sApplyFilter();
 }
 
+function sZaloPauseNotice(state){
+  if(!state?.paused) return '';
+  return `<div role="alert" style="border:1px solid #fca5a5;padding:10px;margin-bottom:8px;background:#fff1f2;color:#991b1b">
+    <strong>Zalo đang tạm dừng gửi và kiểm tra</strong> · ${esc(state.reason||'Đã tạm dừng')}
+    <div>Lệnh đã nhận vẫn được giữ lại. Với lỗi 429, hãy chờ Zalo hết giới hạn trước khi tiếp tục.</div>
+    <button class="btn btn-outline btn-sm" type="button" onclick="sToggleZaloBulkRun(false)">Tiếp tục sau khi kiểm tra</button>
+  </div>`;
+}
+
 async function sLoadZaloBulkStatus(){
   const box=document.getElementById('sZaloBulkStatus');
   if(!box) return;
   const {data:state,error}=await sb.from('zalo_automation_state')
     .select('paused,reason,bulk_run_id,bulk_started_at,bulk_total,bulk_cancelled_at').eq('id',1).maybeSingle();
   if(error){box.textContent='Không tải được tiến độ Zalo: '+error.message;return;}
-  if(!state?.bulk_run_id){box.textContent='Chưa có đợt kiểm tra Zalo hàng loạt.';return;}
+  const pauseNotice=sZaloPauseNotice(state);
+  if(!state?.bulk_run_id){box.innerHTML=pauseNotice+'Chưa có đợt kiểm tra Zalo hàng loạt.';return state;}
   _sZaloBulkRunId=state.bulk_run_id;
   const {data:contacts,error:contactError}=await sb.from('zalo_parent_contacts')
     .select('status,bulk_checked_at,invitation_sent_at,last_error').eq('bulk_run_id',state.bulk_run_id);
-  if(contactError){box.textContent='Không tải được tiến độ Zalo: '+contactError.message;return;}
+  if(contactError){box.innerHTML=pauseNotice+'Không tải được tiến độ Zalo: '+esc(contactError.message);return state;}
   const checked=(contacts||[]).filter(row=>row.bulk_checked_at);
   const completed=checked.length;
   const counts=checked.reduce((acc,row)=>{
@@ -2494,14 +2504,15 @@ async function sLoadZaloBulkStatus(){
   const newInvites=(contacts||[]).filter(row=>row.invitation_sent_at && new Date(row.invitation_sent_at).getTime()>=startedAt).length;
   const active=total>0 && completed<total && !state.bulk_cancelled_at;
   const phase=state.bulk_cancelled_at?'Đã hủy':state.paused && active?'Đang tạm dừng':active?'Đang chạy ngầm':'Đã hoàn thành';
-  box.innerHTML=`<div style="border:1px solid #cbd5e1;padding:10px;background:#f8fafc">
+  box.innerHTML=pauseNotice+`<div style="border:1px solid #cbd5e1;padding:10px;background:#f8fafc">
     <strong>${phase}</strong> · Đã xử lý ${completed}/${total} phụ huynh
     <span style="color:var(--ink-mid)"> · Kết quả: ${counts.friend||0} đã kết bạn, ${counts.invited||0} đã gửi lời mời, ${counts.not_friend||0} chưa kết bạn, ${counts.not_found||0} không tìm thấy, ${counts.error||0} lỗi${warnings?`, ${warnings} có cảnh báo`:''} · Mới gửi trong đợt: ${newInvites} lời mời</span>
     <button class="btn btn-outline btn-sm" type="button" onclick="sOpenZaloBulkDetails()" style="margin-left:8px">Xem chi tiết</button>
     ${state.paused&&active?`<span style="color:#b91c1c"> · ${esc(state.reason||'Đã tạm dừng')}</span>`:''}
-    ${active?`<button class="btn btn-outline btn-sm" type="button" onclick="sToggleZaloBulkRun(${state.paused?'false':'true'})" style="margin-left:8px">${state.paused?'Tiếp tục':'Tạm dừng'}</button>`:''}
+    ${active&&!state.paused?`<button class="btn btn-outline btn-sm" type="button" onclick="sToggleZaloBulkRun(true)" style="margin-left:8px">Tạm dừng</button>`:''}
     ${active?'<button class="btn btn-outline btn-sm" type="button" onclick="sCancelZaloBulkRun()" style="margin-left:8px;color:#b91c1c">Hủy đợt</button>':''}
   </div>`;
+  return state;
 }
 
 function sZaloDetailDate(value){
@@ -2770,6 +2781,7 @@ function sRenderZaloAliasDetails(){
 }
 
 async function sToggleZaloBulkRun(pause){
+  if(!pause&&!confirm('Chỉ tiếp tục khi đã kiểm tra Zalo và không còn bị giới hạn. Tiếp tục xử lý các lệnh đang chờ?')) return;
   const rpc=pause?'pause_zalo_parent_bulk_run':'resume_zalo_parent_automation';
   const {error}=await sb.rpc(rpc);
   if(error) return alert('Không đổi được trạng thái: '+error.message);
@@ -2876,7 +2888,8 @@ async function sRequestParentZalo(parentId,action){
   try{
     const {data,error}=await sb.rpc('request_parent_zalo_action',{p_parent_id:parentId,p_action:action});
     if(error) throw error;
-    toast(data?.already_running?'Phụ huynh này đã có tác vụ đang xử lý hoặc được ưu tiên chờ bot.':'Đã yêu cầu bot ưu tiên thực hiện ngay khi rảnh.',4000);
+    const automation=await sLoadZaloBulkStatus();
+    toast(automation?.paused?'Đã ghi nhận yêu cầu, nhưng Zalo đang tạm dừng. Xem lý do ở phần trạng thái Zalo.':data?.already_running?'Phụ huynh này đã có tác vụ đang xử lý hoặc được ưu tiên chờ bot.':'Đã yêu cầu bot ưu tiên thực hiện ngay khi rảnh.',4000);
     await sLoadZaloContactsForStudents();
     sRender();
   }catch(error){alert(error.message);}

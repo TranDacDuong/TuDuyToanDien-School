@@ -35,3 +35,37 @@ test('center-wide enumeration never holds the sender or delays a pending dispatc
   await ctx.syncGatewayOutbox();
   assert.deepEqual(calls,['claimDispatch','receipt-sent']);assert.equal(ctx.gatewayBusy,false);release();
 });
+
+function parentWorker(api) {
+  const source=fs.readFileSync('services/zalo-bot/server.js','utf8');
+  const results=[];
+  const context=vm.createContext({zaloApi:api,readParentRelationship,friendUserIdSet:new Set(),friendPhoneMap:new Map(),
+    gatewayRequest:async payload=>{results.push(payload);return {};},
+    isZaloLimitError:error=>/429|rate.?limit/i.test(error.message),
+    buildFriendRequestGreeting:()=> 'greeting',buildParentGreeting:()=> 'greeting',console:{warn(){}}});
+  vm.runInContext(source.slice(source.indexOf('async function checkQueuedParent(job)'),source.indexOf('async function sendQueuedTuition(job)')),context);
+  return {run:context.checkQueuedParent,results};
+}
+const parentJob={parent_id:'parent',phone:'0900000000',zalo_uid:'uid',status:'invited',invitation_attempted_at:'2026-10-20',greeting_sent_at:'2026-10-20'};
+test('actual parent worker records outgoing invitation without accepting it or sending another greeting',async()=>{
+  const worker=parentWorker({getFriendRequestStatus:async()=>({is_requested:1}),getSentFriendRequest:async()=>({uid:{userId:'uid'}}),
+    acceptFriendRequest:async()=>{throw Error('must not accept');},sendFriendRequest:async()=>{throw Error('must not resend');}});
+  await worker.run(parentJob);
+  assert.equal(worker.results.length,1);assert.equal(worker.results[0].action,'finishParent');
+  assert.equal(worker.results[0].status,'invited');assert.equal(worker.results[0].error,null);
+});
+test('actual parent worker accepts a verified incoming request exactly once and records friendship',async()=>{
+  let accepts=0;
+  const worker=parentWorker({getFriendRequestStatus:async()=>({is_requested:1}),getSentFriendRequest:async()=>({}),
+    getFriendRecommendations:async()=>({recommItems:[{dataInfo:{userId:'uid',recommType:2}}]}),acceptFriendRequest:async()=>{accepts++;}});
+  await worker.run(parentJob);
+  assert.equal(accepts,1);assert.equal(worker.results[0].status,'friend');
+});
+test('actual parent worker preserves a rate-limit result and a not-found result without issuing invitations',async()=>{
+  const limited=parentWorker({getFriendRequestStatus:async()=>{throw Error('Request failed with status code 429');}});
+  await limited.run(parentJob);
+  assert.equal(limited.results[0].status,'rate_limited');assert.match(limited.results[0].error,/429/);
+  const missing=parentWorker({findUser:async()=>null});
+  await missing.run({...parentJob,zalo_uid:null});
+  assert.equal(missing.results.length,1);assert.equal(missing.results[0].status,'not_found');
+});
