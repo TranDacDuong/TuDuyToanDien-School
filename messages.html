@@ -2332,19 +2332,40 @@ function renderLoadedMessages() {
   }).join('');
   prefetchRealSenderProfiles();
   window.refreshMessageWorkspace?.();
+  window.refreshLocalMessageBodies?.();
 }
+
+let localBodiesBusy = false;
+let localBodiesRetryAt = 0;
+window.refreshLocalMessageBodies = async function(force = false) {
+  if(localBodiesBusy || (!force && Date.now()<localBodiesRetryAt)) return;
+  const rows=loadedMessages.filter(row=>String(row.content || '').startsWith('__MINDUP_LOCAL_V1__:'));
+  if(!rows.length) return;
+  localBodiesBusy=true;
+  const friend=activeFriend,conversation=currentConversationId;
+  const wrap=document.getElementById('messageList');
+  try {
+    const hydrated=await window.LocalMessageHistory.hydrate(sb,rows);
+    if(friend!==activeFriend || conversation!==currentConversationId) return;
+    const byId=new Map(hydrated.map(row=>[row.id,row]));
+    loadedMessages=loadedMessages.map(row=>byId.has(row.id) && String(row.content || '').startsWith('__MINDUP_LOCAL_V1__:') ? byId.get(row.id) : row);
+    const top=wrap.scrollTop,nearBottom=wrap.scrollHeight-wrap.clientHeight-top<80;
+    renderLoadedMessages();wrap.scrollTop=nearBottom?wrap.scrollHeight:top;
+  } catch(error) {
+    localBodiesRetryAt=Date.now()+30000;
+    if(force && friend===activeFriend) alert(error.message || 'Chưa tải được lịch sử từ máy trung tâm.');
+  } finally {
+    localBodiesBusy=false;
+    if(friend!==activeFriend) window.refreshLocalMessageBodies?.();
+  }
+};
 
 async function queryConversationMessages(conversationId, before = null, beforeId = null) {
   const columns = 'id, content, created_at, sender_id, real_sender_id, transport, context_student_id, external_message_id';
   const result = await sb.rpc('list_mindup_conversation_messages_v2', {
     p_conversation_id: conversationId, p_before: before, p_before_id: beforeId, p_limit: MESSAGE_PAGE_SIZE
   }).select(columns);
-  if (!['PGRST202','42883'].includes(result.error?.code)) {
-    if(!result.error && result.data?.length) try {
-      result.data = await window.LocalMessageHistory.hydrate(sb,result.data);
-    } catch(error) { return {data:null,error}; }
-    return result;
-  }
+  if (!['PGRST202','42883'].includes(result.error?.code)) return result;
   const legacy = await sb.rpc('list_mindup_conversation_messages', {
     p_conversation_id: conversationId, p_before: before, p_limit: MESSAGE_PAGE_SIZE
   }).select(columns);
@@ -3636,6 +3657,7 @@ async function refreshZaloMessageStates() {
 function renderMessageBody(value,externalId) {
   const state=zaloMessageStates[externalId];
   if(state?.revoked) return '<span>[Tin nhắn đã thu hồi]</span>';
+  if(String(value || '').startsWith('__MINDUP_LOCAL_V1__:')) return '<div>Lịch sử lưu trên máy trung tâm</div><button type="button" onclick="refreshLocalMessageBodies(true)">Tải nội dung</button>';
   const meta=state?.metadata || {};
   const quote=meta.quote ? `<blockquote style="margin:0 0 8px;padding:6px 10px;border-left:3px solid #94a3b8">${esc(meta.quote.name || '')}<br>${esc(meta.quote.text || '[Tin nhắn được trích dẫn]')}</blockquote>` : '';
   const labels={image:'Xem ảnh',video:'Xem video',audio:'Nghe tin nhắn',file:'Tải tệp'};
@@ -3690,7 +3712,6 @@ async function loadExternalZaloMessages(scrollToBottom=false,older=false) {
   try {
     const before=older?loadedMessages[0]?.created_at:null;
     let {data,error}=await sb.rpc('list_zalo_external_messages',{p_thread:thread,p_before:before || null,p_before_id:older?loadedMessages[0]?.external_message_id:null});
-    if(!error && data?.length) data=await window.LocalMessageHistory.hydrate(sb,data);
     if(error) throw error;if(activeFriend!==loadingFriend) return;
     const map=new Map(loadedMessages.map(m=>[m.id,m]));
     for(const r of data || []) map.set(r.external_id,{id:r.external_id,external_message_id:r.external_id,content:r.content,created_at:r.sent_at,

@@ -24,6 +24,8 @@ test('durable local history and task receipts survive restart, without crossing 
  await assert.rejects(()=>db.send('send:one',{uid:'other'},async()=>''),/payload changed/);
  await assert.rejects(()=>db.send('send:two',{},async()=>{throw Error('timeout')}),/timeout/);
  await assert.rejects(()=>db.send('send:two',{},async()=>{sends++;}),/Uncertain delivery/);
+ await assert.rejects(()=>db.send('send:retry',{},async()=>{throw Error('recipient does not accept messages')}),/recipient/);
+ assert.equal(await db.send('send:retry',{},async()=>'manual-reclaim-id'),'manual-reclaim-id');
  assert.throws(()=>db.saveArchive([{...row,hash:'bad'}]),/checksum/);
  db.close();assert.throws(()=>new LocalDatabase(file,'other-project'),/another project/);
 });
