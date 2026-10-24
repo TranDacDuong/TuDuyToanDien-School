@@ -8,6 +8,23 @@ const {LocalDatabase,digest}=require('../services/zalo-bot/local-database');
 const {LocalStorageWorker}=require('../services/zalo-bot/local-storage-worker');
 const {PGlite}=createRequire(path.resolve('services/zalo-bot/package.json'))('@electric-sql/pglite');
 function local(){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'mindup-local-'));return path.join(dir,'local.sqlite');}
+test('queue checkpoints batch writes and never rewrite unchanged or acknowledged events',t=>{
+ const file=local();let db=new LocalDatabase(file,'project');
+ t.after(()=>{db.close();fs.rmSync(path.dirname(file),{recursive:true,force:true});});
+ const rows=Array.from({length:6000},(_,i)=>({action:'syncMessage',externalId:`queue:${i}`,content:'pending'}));
+ db.recordEvents(rows);
+ db.acknowledgeEvent(rows[0]);
+ const changes=()=>db.db.prepare('SELECT total_changes() n').get().n;
+ const before=changes();
+ for(let i=0;i<10;i++)db.recordEvents(rows.values());
+ assert.equal(changes(),before);
+ assert.equal(db.db.prepare('SELECT acknowledged FROM events WHERE id=?').get(rows[0].externalId).acknowledged,1);
+ rows[1].attempts=1;db.recordEvents(rows);assert.equal(changes(),before+1);
+ db.close();db=new LocalDatabase(file,'project');
+ const count=changes();db.recordEvents(rows);
+ assert.equal(changes(),count);
+ assert.equal(db.db.prepare('SELECT acknowledged FROM events WHERE id=?').get(rows[0].externalId).acknowledged,1);
+});
 test('durable local history and task receipts survive restart, without crossing project boundaries',async t=>{
  const file=local();t.after(()=>fs.rmSync(path.dirname(file),{recursive:true,force:true}));let db=new LocalDatabase(file,'project');const id=db.id;
  const payload={action:'syncMessage',externalId:'123:456',content:'Xin chào phụ huynh'};

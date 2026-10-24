@@ -2084,7 +2084,7 @@ Nhập số tiền hoàn lại (>0):`,
   // ============================================================
   // ZALO BOT AUTOMATION INTEGRATION (Anti-Ban Protocol)
   // ============================================================
-  const ZALO_BOT_API = "http://localhost:3456/api";
+  const ZALO_BOT_API = "http://127.0.0.1:3456/api";
   let zaloBotStatus = { botStatus: "checking", hasQr: false, userInfo: null, campaign: null };
   let zaloModalPollingTimer = null;
   let currentZaloCampaignItems = [];
@@ -2547,14 +2547,14 @@ Nhập số tiền hoàn lại (>0):`,
 
   async function checkZaloBotStatus() {
     try {
-      const res = await fetch(`${ZALO_BOT_API}/status`, { signal: AbortSignal.timeout(2500) });
+      const res = await fetch(`${ZALO_BOT_API}/status`, { signal: AbortSignal.timeout(8000) });
       if (res.ok) {
         zaloBotStatus = await res.json();
       } else {
         zaloBotStatus = { botStatus: "offline", error: "HTTP " + res.status };
       }
     } catch (err) {
-      zaloBotStatus = { botStatus: "offline", error: "Chưa kết nối bot" };
+      zaloBotStatus = { botStatus: "offline", timedOut: err.name === "TimeoutError" || err.name === "AbortError", error: "Chưa kết nối bot" };
     }
     updateZaloDynamicStatus(); // CHỈ cập nhật thẻ trạng thái & tiến độ, KHÔNG chạm vào bảng
     if (Date.now() - zaloHistoryFetchedAt > 15000) await loadZaloTuitionHistory();
@@ -2848,10 +2848,10 @@ Nhập số tiền hoàn lại (>0):`,
         <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:14px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
           <div>
             <div style="font-weight:700;color:#be123c;display:flex;align-items:center;gap:6px">
-              <span>⚠️</span> Dịch vụ Zalo Bot chưa khởi động trên máy tính
+              <span>⚠️</span> ${bot.timedOut ? "Zalo Bot đang không phản hồi" : "Web chưa kết nối được với Zalo Bot"}
             </div>
             <div style="font-size:12px;color:#881337;margin-top:4px">
-              Vui lòng nhấp đúp chạy file <b>services/zalo-bot/start-bot.bat</b> trên máy tính để kích hoạt dịch vụ chạy ngầm.
+              ${bot.timedOut ? "Bot có thể đang bị nghẽn xử lý. Hãy khởi động lại bằng start-bot.bat, không mở thêm nhiều bot cùng lúc." : "Kiểm tra bot trên laptop và quyền truy cập mạng cục bộ của trình duyệt. Nếu bot chưa mở, chạy services/zalo-bot/start-bot.bat."}
             </div>
           </div>
           <button onclick="checkZaloBotStatus()" style="background:#be123c;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:600">Thử lại</button>
@@ -2859,6 +2859,7 @@ Nhập số tiền hoàn lại (>0):`,
       `;
     } else if (isConnected) {
       const userTitle = bot.userInfo?.name ? ` (${bot.userInfo.name})` : "";
+      const syncDelayed = !!(bot.historySync?.lastUploadError || bot.localStorage?.lastError);
       statusCardHtml = `
         <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:12px 18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
           <div style="display:flex;align-items:center;gap:10px">
@@ -2866,7 +2867,7 @@ Nhập số tiền hoàn lại (>0):`,
             <div>
               <span style="font-weight:700;color:#15803d">Zalo Cá Nhân: Đang kết nối</span>
               <span style="font-size:12px;color:#166534">${userTitle}</span>
-              <div style="font-size:11px;color:#15803d;margin-top:2px">Hàng gửi Zalo đang hoạt động</div>
+              <div style="font-size:11px;color:${syncDelayed ? '#b45309' : '#15803d'};margin-top:2px">${syncDelayed ? "Zalo đã đăng nhập, nhưng đồng bộ dữ liệu đang gặp lỗi. Tin chờ vẫn được giữ lại." : "Hàng gửi Zalo đang hoạt động"}</div>
             </div>
           </div>
           <div style="display:flex;gap:8px">

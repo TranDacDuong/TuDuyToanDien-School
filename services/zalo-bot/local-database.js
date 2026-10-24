@@ -21,11 +21,31 @@ class LocalDatabase {
     this.db.prepare("INSERT OR IGNORE INTO settings VALUES('project',?)").run(project);
     this.db.prepare("INSERT OR IGNORE INTO settings VALUES('storage_id',?)").run(randomUUID());
     this.id = this.db.prepare("SELECT value FROM settings WHERE key='storage_id'").get().value;
+    this.eventWrite = this.db.prepare('INSERT INTO events(id,payload,recorded_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,recorded_at=excluded.recorded_at,acknowledged=0 WHERE events.payload<>excluded.payload');
+    this.eventSnapshots = new Map();
   }
   recordEvent(payload) {
     const id = eventKey(payload);
-    this.db.prepare('INSERT INTO events(id,payload,recorded_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,recorded_at=excluded.recorded_at,acknowledged=CASE WHEN events.payload=excluded.payload THEN events.acknowledged ELSE 0 END')
-      .run(id, JSON.stringify(payload), new Date().toISOString());
+    const serialized = JSON.stringify(payload);
+    if (this.eventSnapshots.get(id) === serialized) return;
+    this.eventWrite.run(id, serialized, new Date().toISOString());
+    this.eventSnapshots.set(id, serialized);
+  }
+  recordEvents(payloads) {
+    // Persist a queue checkpoint with one durable commit, not one fsync per item.
+    const changes = [];
+    for (const payload of payloads) {
+      const id = eventKey(payload), serialized = JSON.stringify(payload);
+      if (this.eventSnapshots.get(id) !== serialized) changes.push([id, serialized]);
+    }
+    if (!changes.length) return;
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const now = new Date().toISOString();
+      for (const [id, serialized] of changes) this.eventWrite.run(id, serialized, now);
+      this.db.exec('COMMIT');
+    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+    for (const [id, serialized] of changes) this.eventSnapshots.set(id, serialized);
   }
   acknowledgeEvent(payload) {
     this.db.prepare('UPDATE events SET acknowledged=1 WHERE id=?').run(eventKey(payload));

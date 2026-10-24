@@ -704,7 +704,7 @@ function quarantineIncoming(payload, error) {
 }
 
 function persistIncoming() {
-  for (const payload of pendingIncoming.values()) localStore.recordEvent(payload);
+  localStore.recordEvents(pendingIncoming.values());
   writeJsonAtomic(INCOMING_FILE, [...pendingIncoming.values()]);
 }
 
