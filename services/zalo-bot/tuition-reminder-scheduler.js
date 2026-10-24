@@ -100,7 +100,7 @@ function buildPayload(candidate, month, bank) {
     parts: [{ kind: 'text', content }, ...qrs] };
 }
 
-function createScheduler({ rpc, bank, clock = () => new Date(), convert = lunarDay }) {
+function createScheduler({ rpc, bank, clock = () => new Date(), convert = lunarDay, stopRequested = () => false }) {
   if (typeof rpc !== 'function') throw new TypeError('rpc required');
   async function call(name, args) {
     const result = await rpc(name, args);
@@ -142,6 +142,7 @@ function createScheduler({ rpc, bank, clock = () => new Date(), convert = lunarD
     schedule: () => plan(clock(), convert),
     dispatchClaimed,
     async tick() {
+      if(stopRequested()) return { skipped: 'stopping' };
       if (busy) return { skipped: 'busy' };
       busy = true;
       try {
@@ -151,6 +152,9 @@ function createScheduler({ rpc, bank, clock = () => new Date(), convert = lunarD
         const currentBank = typeof bank === 'function' ? await bank() : bank;
         let queued = 0;
         for (const candidate of candidates || []) {
+          // Enumeration is resumable and idempotent; stop between parents rather
+          // than holding the launcher behind an entire center-wide scan.
+          if(stopRequested()) break;
           const payload = buildPayload(candidate, current.month, currentBank);
           const inserted = await call('enqueue_automatic_tuition_reminder', {
             p_parent: candidate.parent_id, p_month: `${current.month}-01`,

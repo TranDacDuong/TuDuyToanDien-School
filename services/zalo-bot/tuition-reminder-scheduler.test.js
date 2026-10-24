@@ -9,6 +9,17 @@ const child = (id = 'child-1', remaining = 500000) => ({
 const candidate = { parent_id: 'parent-1', phone: '0912422333', children: [child(), child('child-2', 300000)] };
 const clock = () => new Date('2026-10-06T03:00:00Z');
 
+test('safe shutdown stops between parent task enqueues and resumes idempotently later', async () => {
+  let stopping=false,queued=0;
+  const scheduler=createScheduler({bank,clock,stopRequested:()=>stopping,rpc:async name=>{
+    if(name==='automatic_tuition_candidates') return {data:[candidate,{...candidate,parent_id:'parent-2'}]};
+    queued++;stopping=true;return {data:true};
+  }});
+  assert.deepEqual(await scheduler.tick(),{queued:1});
+  assert.deepEqual(await scheduler.tick(),{skipped:'stopping'});
+  assert.equal(queued,1);
+});
+
 test('Vietnam clock crosses day and month at UTC 17:00', () => {
   assert.equal(vnDate(new Date('2026-09-30T16:59:59Z')), '2026-09-30');
   assert.equal(vnDate(new Date('2026-09-30T17:00:00Z')), '2026-10-01');

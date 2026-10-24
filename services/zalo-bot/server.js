@@ -81,6 +81,7 @@ const automaticTuitionActions = {
   uncertain_automatic_tuition_reminder: 'uncertainAutomaticTuition'
 };
 const automaticTuitionScheduler = createScheduler({
+  stopRequested: () => shuttingDown,
   rpc: async (name, args) => {
     const action = automaticTuitionActions[name];
     if (!action) throw new Error('Unsupported automatic tuition RPC');
