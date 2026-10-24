@@ -13,12 +13,14 @@ class LocalStorageWorker {
     this.nextAt = this.clock() + 15000;
     try {
       const receipts = this.store.receipts();
-      const sentResults = this.results;
+      // Keep each upload below the gateway limit, even when several readers
+      // requested full 100-message pages at the same time.
+      const sentResults = this.results.slice(0,1);
       const response = await this.request({ action: 'localStorageCycle', storageId: this.store.id,
         receipts, results: sentResults });
       if (!response?.data) throw new Error('Invalid local storage response');
       this.store.confirmReceipts(receipts);
-      this.results = [];
+      this.results = this.results.slice(sentResults.length);
       this.store.saveArchive(response.data.exports || []);
       for (const job of response.data.reads || []) {
         this.results.push({ id: job.id, token: job.token, items: this.store.readArchive(job.keys) });
