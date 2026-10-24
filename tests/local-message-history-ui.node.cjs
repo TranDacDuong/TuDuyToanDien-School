@@ -2,7 +2,7 @@ const test=require('node:test');const assert=require('node:assert/strict');const
 const html=fs.readFileSync('messages.html','utf8');
 const source=html.slice(html.indexOf('let localBodiesBusy ='),html.indexOf('async function queryConversationMessages('));
 function fixture(){let resolve;const hydration=new Promise(done=>resolve=done);const wrap={scrollTop:10,scrollHeight:1000,clientHeight:300};
- const ctx={window:{LocalMessageHistory:{hydrate:()=>hydration}},loadedMessages:[{id:'old',content:'__MINDUP_LOCAL_V1__:m:old'},{id:'new',content:'Recent message'}],
+ const ctx={sb:{},window:{LocalMessageHistory:{hydrate:()=>hydration}},loadedMessages:[{id:'old',content:'__MINDUP_LOCAL_V1__:m:old'},{id:'new',content:'Recent message'}],
   activeFriend:{id:'parent'},currentConversationId:'conversation',document:{getElementById:()=>wrap},Date,console,alerts:[],renders:0,
   alert:text=>ctx.alerts.push(text),renderLoadedMessages:()=>ctx.renders++};
  vm.createContext(ctx);vm.runInContext(source,ctx);return {ctx,resolve,wrap};}
