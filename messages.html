@@ -600,7 +600,6 @@ aside.panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); 
 .zalo-dispatch-dialog td { overflow-wrap:anywhere; }
 .zalo-dispatch-controls { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
 .zalo-dispatch-controls select { font:inherit; padding:6px; max-width:100%; }
-#pendingZaloMessagesEntry { margin-top:8px; font:inherit; padding:7px 10px; border:1px solid var(--border); border-radius:5px; background:#fff; color:var(--navy); cursor:pointer; }
 .zalo-link-dialog { border: 1px solid var(--border); border-radius: 8px; max-width: min(440px, calc(100vw - 24px)); width: 100%; padding: 18px; font: inherit; }
 .zalo-link-dialog::backdrop { background: rgba(0,0,0,.45); }
 .zalo-link-dialog select { width: 100%; margin: 12px 0; padding: 9px; }
@@ -742,7 +741,6 @@ aside.panel { border-right: 1px solid #dce1e8; }
     <aside class="panel">
       <div class="sidebar-head">
         <div class="sidebar-title">Nhắn tin</div>
-        <button id="pendingZaloMessagesEntry" type="button" hidden onclick="openZaloDispatchDetails('waiting')">Tin nhắn chờ gửi</button>
         <button id="messageAutomationsEntry" type="button" hidden>Tin nhắn tự động</button>
         <div class="sidebar-sub">Chọn một người bạn để bắt đầu trò chuyện</div>
         <button class="friend-list-action-btn tray-full-messages" type="button" onclick="openFullMessagesPage()">Xem toàn bộ tin nhắn</button>
@@ -929,7 +927,6 @@ async function init() {
   const { data: profile } = await sb.from("users").select("*").eq("id", user.id).single();
   currentProfile = profile;
   window.MessageAutomations?.configure(profile);
-  document.getElementById('pendingZaloMessagesEntry').hidden = currentProfile?.role !== 'admin';
   if (currentProfile?.role === 'admin') refreshZaloDispatchStatus();
   selectedUserFromQuery = queryParams.get("user");
   selectedTeacherFromQuery = queryParams.get("teacher");

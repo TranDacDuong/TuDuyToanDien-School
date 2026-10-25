@@ -29,7 +29,7 @@ test('admin queue includes automatic tuition and prioritizes waiting messages wi
   await assert.rejects(()=>db.query('SELECT * FROM list_mindup_zalo_dispatch_jobs()'),/permission denied/);
  } finally {await db.close();}
 });
-test('queue shortcut opens waiting messages, handles pause/filter/reload/errors and fits mobile',async t=>{
+test('existing Zalo queue opens waiting messages, handles pause/filter/reload/errors and fits mobile',async t=>{
  const {chromium}=require('@playwright/test');
  const browser=await chromium.launch({headless:true});t.after(()=>browser.close());
  const page=await browser.newPage({viewport:{width:1280,height:800}});
@@ -37,7 +37,8 @@ test('queue shortcut opens waiting messages, handles pause/filter/reload/errors 
  const fn=source.slice(source.indexOf("let zaloDispatchView ="),source.indexOf('window.cancelQueuedZaloMessage'));
  const css=source.slice(source.indexOf('.zalo-dispatch-dialog {'),source.indexOf('.zalo-link-panel',source.indexOf('.zalo-dispatch-dialog {')));
  const cssEnd=css.includes('</style>')?css.indexOf('</style>'):css.length;
- await page.setContent(`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;--border:#dbe2eb;--ink:#172c48;--navy:#173b67} ${css.slice(0,cssEnd)}</style><button id="pendingZaloMessagesEntry" onclick="openZaloDispatchDetails('waiting')">Tin nhắn chờ gửi</button><script>
+ const disclosure=source.slice(source.indexOf('<details class="dispatch-disclosure">'),source.indexOf('</details>',source.indexOf('<details class="dispatch-disclosure">'))+10).replace('class="zalo-dispatch-bar" hidden','class="zalo-dispatch-bar"');
+ await page.setContent(`<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;--border:#dbe2eb;--ink:#172c48;--navy:#173b67} ${css.slice(0,cssEnd)}</style>${disclosure}<script>
  let currentProfile={role:'admin'};let rows=[
  {id:'1',kind:'web',parent_name:'Test parent',content:'<img src=x onerror=alert(1)>',status:'pending'},
  {id:'2',kind:'automatic_tuition',parent_name:'Parent two',content:'Automatic tuition',status:'queued'},
@@ -48,7 +49,8 @@ test('queue shortcut opens waiting messages, handles pause/filter/reload/errors 
  const sb={rpc:async name=>{calls.push(name);return name==='list_mindup_zalo_dispatch_jobs'?{data:rows,error:window.fail?{message:'Network unavailable'}:null}:{data:{paused:true,reason:'429 test'}};}};
  ${fn}
  </script>`);
- await page.getByRole('button',{name:'Tin nhắn chờ gửi',exact:true}).click();
+ await page.getByText('Hàng gửi Zalo',{exact:true}).click();
+ await page.getByRole('button',{name:'Xem chi tiết',exact:true}).click();
  await page.getByText('3 tin hiển thị',{exact:true}).waitFor();
  assert.equal(await page.locator('tbody tr').count(),3);
  assert.equal(await page.getByText('Already delivered',{exact:true}).count(),0);
@@ -68,5 +70,5 @@ test('queue shortcut opens waiting messages, handles pause/filter/reload/errors 
  await page.getByLabel('Đóng',{exact:true}).click();assert.equal(await page.getByRole('dialog').isVisible(),false);
  const before=await page.evaluate(()=>calls.length);await page.evaluate(()=>{currentProfile={role:'teacher'};openZaloDispatchDetails('waiting');});
  assert.equal(await page.evaluate(()=>calls.length),before);
- assert.ok(source.includes("document.getElementById('pendingZaloMessagesEntry').hidden = currentProfile?.role !== 'admin'"));
+ assert.ok(!source.includes('pendingZaloMessagesEntry'));
 });
