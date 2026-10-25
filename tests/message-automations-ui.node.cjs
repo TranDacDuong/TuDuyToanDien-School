@@ -12,7 +12,7 @@ test('automation editor previews, groups, validates, schedules and fits desktop/
  if(name==='control_message_campaign'){campaigns[0].state=args.p_action==='publish'?'scheduled':args.p_action==='pause'?'paused':args.p_action==='cancel'?'cancelled':'scheduled';data={success:true};}
  if(name==='message_automation_systems')data={admin:true,tuition:{paused:false,template:'Học phí {TenHS}'},templates:[{id:'tuition_overdue_notice',name:'Nhắc học phí quá hạn',content:'Học phí tháng [Thang_hoc_phi] của [Ten_hoc_sinh], hạn [Han_thanh_toan], hôm nay [Ngay_hien_tai].',is_enabled:false},{id:'session_evaluation_notice',name:'Đánh giá buổi học',content:'Keep {{message}}',is_enabled:true}],history:[]};
  if(name==='overdue_tuition_settings')data={send_day:16};
- if(name==='preview_overdue_tuition_notices')data={month:'2026-10-01',overdue:true,manual:true,recipients:[{parent_id:'p1',parent_name:'PH thử nghiệm',remaining:500000,linked:true,can_send:true,content:'Học phí tháng 10/2026 của An, hạn 15/10/2026, hôm nay 19/10/2026.'}]};
+ if(name==='preview_overdue_tuition_notices')data={month:'2026-10-01',overdue:true,manual:true,recipients:[{parent_id:'p1',parent_name:'PH thử nghiệm',remaining:500000,linked:true,can_send:true,content:'Học phí tháng 10/2026 của An, hạn 15/10/2026, hôm nay 19/10/2026.',qrs:[{student_name:'An',remaining:500000,memo:'SEVQR HP0926 1026 An 1234',qr_url:'https://img.vietqr.io/image/vietinbank-104888332556-compact2.png?amount=500000&addInfo=SEVQR%20HP0926%201026%20An%201234'}]}]};
  if(name==='save_overdue_tuition_template')data=null;
  if(name==='queue_overdue_tuition_manual'){window.manualAttempts++;if(manualAttempts===1)error={message:'Mất kết nối thử nghiệm'};else data={queued:1,skipped:0};}
  if(name==='message_campaign_details')data={recipients:[{parent:'PH thử nghiệm',content:'Hello An và Bình',scheduled_at:new Date().toISOString(),status:'uncertain',error:'Chưa xác nhận từ Zalo'}],runs:[]};
@@ -26,6 +26,9 @@ test('automation editor previews, groups, validates, schedules and fits desktop/
  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
  const browser=await chromium.launch({headless:true});t.after(()=>browser.close());
  const page=await browser.newPage({viewport:{width:1365,height:950},timezoneId:'America/New_York'}),errors=[];let acceptDialogs=true;page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>acceptDialogs?d.accept():d.dismiss());
+ const {createRequire}=require('node:module'),path=require('node:path');
+ const testQr=await createRequire(path.resolve('services/zalo-bot/package.json'))('qrcode').toBuffer('TEST overdue tuition preview; not for payment',{width:180});
+ await page.route('https://img.vietqr.io/**',route=>route.fulfill({contentType:'image/png',body:testQr}));
  await page.goto(`http://127.0.0.1:${server.address().port}/preview`);
  await page.getByRole('button',{name:'Tạo tin nhắn',exact:true}).click();await page.getByText('2 phụ huynh đã chọn · 1 đã liên kết Zalo',{exact:true}).waitFor();
  assert.match(await page.locator('#previewText').innerText(),/An và Bình/);
@@ -52,7 +55,9 @@ test('automation editor previews, groups, validates, schedules and fits desktop/
  assert.equal(await page.locator('#systemEnabledWrap').isVisible(),false);assert.equal(await page.locator('#overdueSendDay').count(),0);
  await page.getByRole('button',{name:'Xem người nhận & nội dung',exact:true}).click();await page.getByText('Học phí tháng 10/2026 của An, hạn 15/10/2026, hôm nay 19/10/2026.',{exact:true}).waitFor();
  assert.equal(await page.evaluate(()=>calls.some(c=>c.name==='queue_overdue_tuition_manual')),false);
- await page.setViewportSize({width:1365,height:950});await page.screenshot({path:'scratch/overdue-tuition-preview-desktop.png'});
+ assert.equal(await page.getByRole('img',{name:'QR học phí An'}).count(),1);
+ assert.match(await page.locator('#detailBody').innerText(),/SEVQR HP0926 1026 An 1234/);
+ await page.setViewportSize({width:1365,height:950});await page.getByRole('img',{name:'QR học phí An'}).scrollIntoViewIfNeeded();await page.waitForFunction(()=>document.querySelector('#details img')?.naturalWidth>0);await page.screenshot({path:'scratch/overdue-tuition-preview-desktop.png'});
  await page.setViewportSize({width:390,height:844});assert.ok(await page.locator('#details').evaluate(e=>e.scrollWidth<=e.clientWidth+1));await page.screenshot({path:'scratch/overdue-tuition-preview-mobile.png'});
  acceptDialogs=false;await page.getByRole('button',{name:'Gửi cho 1 phụ huynh',exact:true}).click();assert.equal(await page.evaluate(()=>manualAttempts),0);
  acceptDialogs=true;await page.getByRole('button',{name:'Gửi cho 1 phụ huynh',exact:true}).click();await page.getByText('Mất kết nối thử nghiệm',{exact:true}).waitFor();

@@ -18,6 +18,7 @@ const { LocalDatabase, eventKey } = require('./local-database');
 const { LocalStorageWorker } = require('./local-storage-worker');
 const { readParentRelationship } = require('./parent-relationship');
 const { downloadQrImage, readImageMetadata } = require('./zalo-image');
+const { prepareOverdueTuitionMedia } = require('./overdue-tuition-media');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -146,11 +147,16 @@ async function syncGatewayOutbox() {
     let acknowledgement;
     let media;
     try {
-      media = await prepareScoreMessageMedia({ text: job.content, audience: 'parent', studentId: job.context_student_id },
+      media = await prepareOverdueTuitionMedia(job.content) || await prepareScoreMessageMedia({ text: job.content, audience: 'parent', studentId: job.context_student_id },
         { browserChannel: process.platform === 'win32' ? 'msedge' : undefined });
       if (media.errors.length) throw new Error('Không tạo được ảnh bảng điểm/phổ điểm; chưa gửi tin');
+      if (media.qrUrls) {
+        const {valid}=await gatewayRequest({action:'validateOverdueTuition',jobId:job.job_id});
+        if(!valid) throw new Error('Công nợ, mã QR hoặc liên kết đã thay đổi; bỏ qua lượt gửi quá hạn');
+      }
       const text = media.text.replace(/__(ACTION|EVALUATION)__[\s\S]*$/, '').trim();
-      const messageId = await localStore.send(`web:${job.job_id}`, { uid: job.zalo_uid, text, attachments: media.attachments.length }, async () => {
+      const messageId = await localStore.send(`web:${job.job_id}`, { uid: job.zalo_uid, text, attachments: media.attachments.length,
+        ...(media.qrUrls ? {qrUrls:media.qrUrls} : {}) }, async () => {
         const sent = await zaloApi.sendMessage(media.attachments.length ? { msg: text, attachments: media.attachments } : text, job.zalo_uid);
         return requireSendAcknowledgement(sent, media.attachments.length);
       });

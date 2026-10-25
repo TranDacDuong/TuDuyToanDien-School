@@ -54,6 +54,15 @@ test('gateway uses one combined claim and token-bound shared reservation', async
   assert.equal(g.calls.at(-1).args.p_token, 'token');
 });
 
+test('overdue final validation is token-protected and accepts only a job UUID', async () => {
+  const g=gatewayHarness(),jobId='00000000-0000-0000-0000-000000000011';
+  assert.equal((await g.request({action:'validateOverdueTuition',jobId},'wrong')).status,401);
+  assert.equal((await g.request({action:'validateOverdueTuition',jobId:'invalid'})).status,400);
+  assert.equal(g.calls.length,0);
+  assert.equal((await g.request({action:'validateOverdueTuition',jobId,unexpected:'ignored'})).status,200);
+  assert.deepEqual(g.calls[0],{name:'validate_overdue_tuition_dispatch',args:{p_job:jobId}});
+});
+
 test('claimed dispatch downloads/reserves before final check and always cleans up', async () => {
   const order = [];
   const candidate = { children: [{ student_id: 'c', student_name: 'Nguyễn Gia Linh', remaining: 100000, payment_phone: '0912422333' }] };

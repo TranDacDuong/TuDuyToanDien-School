@@ -179,6 +179,53 @@ async function manualFixture(t){
 async function manualSend(db,request=30,parents=[id(3)]){
  return scalar(db,"SELECT queue_overdue_tuition_manual($1,(SELECT content FROM message_templates WHERE id='tuition_overdue_notice'),$2)",[id(request),parents]);
 }
+
+async function arrearsQrFixture(t){
+ const db=await manualFixture(t);
+ await db.exec(`ALTER TABLE tuition_payments ADD id uuid DEFAULT gen_random_uuid();ALTER TABLE tuition_payments ADD locked_at timestamptz;
+ CREATE TABLE zalo_bot_config(id text,bank_name text,bank_account_no text,is_active boolean);
+ INSERT INTO zalo_bot_config VALUES('default','VietinBank','104888332556',true);
+ CREATE TABLE tuition_transfer_bundles(memo_key text PRIMARY KEY,memo text,student_id uuid,months date[]);
+ CREATE SCHEMA extensions;CREATE FUNCTION extensions.unaccent(text) RETURNS text LANGUAGE sql IMMUTABLE AS $$SELECT $1$$;
+ UPDATE users SET phone='0987654321' WHERE role='student';
+ INSERT INTO tuition_payments(student_id,month,amount_due,amount_paid) VALUES('${id(4)}','2026-08-01',300000,100000),('${id(4)}','2026-09-01',400000,0),('${id(4)}','2026-11-01',900000,0);`);
+ const canonical=fs.readFileSync('SQL grouped tuition arrears.sql','utf8');
+ await db.exec(canonical.slice(canonical.indexOf('CREATE OR REPLACE FUNCTION public.tuition_debt_snapshot('),canonical.indexOf('CREATE OR REPLACE FUNCTION public.list_tuition_arrears(')));
+ await db.exec(canonical.slice(canonical.indexOf('CREATE OR REPLACE FUNCTION public.automatic_tuition_snapshot('),canonical.indexOf('CREATE OR REPLACE FUNCTION public.register_automatic_tuition_bundles(')));
+ const migration=fs.readFileSync('SQL overdue tuition arrears QR.sql','utf8');await db.exec(migration);await db.exec(migration);
+ return db;
+}
+test('overdue uses canonical all-month debt and a matching total QR per child including old-only balances',async t=>{
+ const db=await arrearsQrFixture(t),preview=await scalar(db,'SELECT preview_overdue_tuition_notices()');
+ assert.equal(preview.recipients.length,2);
+ const row=preview.recipients.find(r=>r.parent_id===id(3));assert.equal(row.remaining,1960000);assert.equal(row.qrs.length,2);
+ assert.match(row.content,/08\/2026: 200\.000đ/);assert.match(row.content,/09\/2026: 400\.000đ/);assert.doesNotMatch(row.content,/11\/2026/);
+ const normal=await scalar(db,"SELECT automatic_tuition_snapshot($1,'2026-10-01')",[id(3)]);assert.deepEqual(row.children,normal);
+ for(const qr of row.qrs){const child=normal.find(c=>c.student_id===qr.student_id),url=new URL(qr.qr_url);assert.equal(Number(url.searchParams.get('amount')),child.remaining);assert.equal(url.searchParams.get('addInfo'),child.transfer_memo);}
+ assert.equal(preview.recipients.find(r=>r.parent_id===id(6)).remaining,300000);
+ assert.equal(await scalar(db,'SELECT count(*) FROM zalo_outbox'),0);
+ const ledger=await scalar(db,'SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM tuition_payments t');
+ assert.equal((await manualSend(db)).queued,1);assert.equal((await manualSend(db)).queued,1);
+ assert.equal(await scalar(db,'SELECT count(*) FROM tuition_transfer_bundles'),2);
+ assert.equal(await scalar(db,'SELECT count(*) FROM messages WHERE content LIKE \'%__TUITION_QRS__%\''),0);
+ assert.match(await scalar(db,'SELECT content FROM zalo_outbox'),/__TUITION_QRS__/);
+ assert.equal(await scalar(db,'SELECT overdue_tuition_job_valid(id) FROM zalo_outbox'),true);
+ assert.deepEqual(await scalar(db,'SELECT jsonb_agg(to_jsonb(t) ORDER BY id) FROM tuition_payments t'),ledger);
+});
+test('overdue final dispatch blocks changed debt, bank, link and expired lease; pending job refreshes plain message plus QR',async t=>{
+ const db=await arrearsQrFixture(t);await manualSend(db);
+ await db.exec("UPDATE zalo_outbox SET status='processing',locked_until=now()+interval '1 minute'");
+ assert.equal(await scalar(db,'SELECT validate_overdue_tuition_dispatch(id) FROM zalo_outbox'),true);
+ await db.exec("UPDATE zalo_bot_config SET bank_account_no='104888332557'");assert.equal(await scalar(db,'SELECT validate_overdue_tuition_dispatch(id) FROM zalo_outbox'),false);
+ await db.exec("UPDATE zalo_bot_config SET bank_account_no='104888332556';UPDATE tuition_payments SET amount_paid=amount_due WHERE month='2026-08-01'");
+ assert.equal(await scalar(db,'SELECT validate_overdue_tuition_dispatch(id) FROM zalo_outbox'),false);
+ await db.exec("UPDATE zalo_outbox SET status='pending'");await scalar(db,'SELECT process_overdue_tuition_notices()');
+ assert.equal(await scalar(db,'SELECT overdue_tuition_job_valid(id) FROM zalo_outbox'),true);
+ assert.doesNotMatch(await scalar(db,'SELECT content FROM messages'),/08\/2026|__TUITION_QRS__/);
+ await db.exec("UPDATE zalo_outbox SET status='processing',locked_until=now()-interval '1 second'");assert.equal(await scalar(db,'SELECT validate_overdue_tuition_dispatch(id) FROM zalo_outbox'),false);
+ await db.exec("UPDATE zalo_outbox SET locked_until=now()+interval '1 minute';UPDATE zalo_verified_links SET enabled=false");assert.equal(await scalar(db,'SELECT validate_overdue_tuition_dispatch(id) FROM zalo_outbox'),false);
+ await db.exec('SET ROLE authenticated');await assert.rejects(db.query('SELECT validate_overdue_tuition_dispatch(gen_random_uuid())'),/permission denied/);
+});
 test('manual notice never schedules itself; explicit send is scoped, idempotent and payment aware',async t=>{
  const db=await manualFixture(t);
  await assert.rejects(overdueEnable(db),/chỉ gửi thủ công/);

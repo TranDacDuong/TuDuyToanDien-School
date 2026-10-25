@@ -15,7 +15,7 @@
             const close = document.createElement('button');
             close.type = 'button'; close.textContent = 'Đóng'; close.onclick = () => dialog.close();
             const frame = document.createElement('iframe');
-            frame.title = 'Tin nhắn tự động'; frame.src = 'message-automations.html?v=20261019-3';
+            frame.title = 'Tin nhắn tự động'; frame.src = 'message-automations.html?v=20261025-arrears-qr';
             const visibility = () => frame.contentWindow?.postMessage({type:'message-automations-visibility',visible:dialog.open},location.origin);
             frame.onload = visibility;
             dialog.addEventListener('close',visibility);

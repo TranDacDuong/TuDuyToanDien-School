@@ -3,7 +3,7 @@
   const labels = {draft:'Bản nháp',scheduled:'Đã lên lịch',paused:'Tạm dừng',cancelled:'Đã hủy',finished:'Hoàn tất',pending:'Đang chờ',queued:'Đang chờ',processing:'Đang gửi',sent:'Đã gửi',failed:'Gửi lỗi',uncertain:'Chưa xác nhận',skipped:'Đã bỏ qua',expired:'Hết hạn'};
   const systemInfo = {
     tuition:{name:'Nhắc nộp học phí',condition:'Ngày 5, 10, 15 hằng tháng; lịch tránh đầu tháng âm lịch. Gộp công nợ các tháng trước. Không yêu cầu chốt học phí.'},
-    tuition_overdue_notice:{condition:'Gửi thủ công sau hạn ngày 15, chỉ cho phụ huynh còn thiếu học phí tháng hiện tại. Kiểm tra lại công nợ trước khi gửi; bỏ qua tin đang gửi hoặc chưa xác nhận.'},
+    tuition_overdue_notice:{condition:'Gửi thủ công sau hạn ngày 15, gồm toàn bộ học phí còn nợ đến tháng hiện tại và QR thanh toán tổng nợ của từng học sinh. Kiểm tra lại công nợ trước khi gửi; bỏ qua tin đang gửi hoặc chưa xác nhận.'},
     tuition_confirmed:{condition:'Khi hệ thống ghi nhận thanh toán học phí.'},
     absent_notification:{condition:'Sau khi buổi học kết thúc, dựa trên điểm danh vắng đã lưu.'},
     session_evaluation_notice:{condition:'Nhận xét buổi học và đánh giá định kỳ theo điều kiện nghiệp vụ. Nội dung chi tiết lấy từ bộ mẫu đánh giá.',pool:true},
@@ -174,8 +174,8 @@
   $('overdueVariable').onchange=()=>{if(!$('overdueVariable').value)return;const field=$('systemContent');field.setRangeText('['+$('overdueVariable').value+']',field.selectionStart,field.selectionEnd,'end');$('overdueVariable').value='';field.focus();};
   async function openOverduePreview(template){
       const data=await rpc('preview_overdue_tuition_notices',{p_template:template});
-      $('detailsTitle').textContent=(data.overdue?'Phụ huynh còn thiếu học phí tháng ':'Dự kiến nhắc quá hạn tháng ')+data.month.slice(0,7);
-      const {wrap,body}=table(['Phụ huynh','Còn thiếu','Zalo','Nội dung']),selected=new Set(data.recipients.filter(r=>r.can_send).map(r=>r.parent_id));
+      $('detailsTitle').textContent=(data.overdue?'Phụ huynh còn công nợ đến tháng ':'Dự kiến nhắc quá hạn tháng ')+data.month.slice(0,7);
+      const {wrap,body}=table(['Phụ huynh','Tổng còn thiếu','Zalo','Nội dung','QR thanh toán']),selected=new Set(data.recipients.filter(r=>r.can_send).map(r=>r.parent_id));
       wrap.classList.add('overdue-preview');
       const feedback=el('p');feedback.setAttribute('role','status');
       const requestId=crypto.randomUUID();let complete=false,submittedIds=null;
@@ -195,7 +195,13 @@
       function updateSelection(){send.textContent='Gửi cho '+selected.size+' phụ huynh';send.disabled=complete||!selected.size;}
       for(const r of data.recipients){const tr=el('tr'),label=el('label',null,'recipient'),check=el('input');check.type='checkbox';check.checked=selected.has(r.parent_id);check.disabled=!r.can_send;
         check.onchange=()=>{check.checked?selected.add(r.parent_id):selected.delete(r.parent_id);updateSelection();};label.append(check,el('span',r.parent_name));
-        cell(tr,label);cell(tr,Number(r.remaining).toLocaleString('vi-VN')+'đ');const state=el('div',r.blocked?'Đang gửi / chưa xác nhận':r.linked?'Đã liên kết':'Chưa liên kết');if(r.last_sent_at)state.append(el('small','Đã nhắc '+when(r.last_sent_at)));cell(tr,state);cell(tr,el('pre',r.content));body.append(tr);}
+        cell(tr,label);cell(tr,Number(r.remaining).toLocaleString('vi-VN')+'đ');const state=el('div',r.blocked?'Đang gửi / chưa xác nhận':r.linked?'Đã liên kết':'Chưa liên kết');if(r.last_sent_at)state.append(el('small','Đã nhắc '+when(r.last_sent_at)));cell(tr,state);cell(tr,el('pre',r.content));
+        const images=el('div');for(const qr of r.qrs||[]){
+          let url;try{url=new URL(qr.qr_url);}catch{continue;}
+          if(url.origin!=='https://img.vietqr.io'||!/^\/image\/[a-z0-9]+-[0-9]{6,30}-compact2\.png$/i.test(url.pathname))continue;
+          const figure=el('figure'),img=el('img');img.src=url.href;img.alt='QR học phí '+qr.student_name;img.width=180;img.height=180;img.loading='lazy';img.style.objectFit='contain';
+          figure.style.margin='0 0 12px';figure.append(img,el('figcaption',qr.student_name+' · '+Number(qr.remaining).toLocaleString('vi-VN')+'đ'),el('small',qr.memo));images.append(figure);
+        }cell(tr,images);body.append(tr);}
       const footer=el('footer');footer.append(send);updateSelection();
       $('detailBody').replaceChildren(el('p',data.overdue?data.recipients.length+' phụ huynh còn thiếu · '+selected.size+' có thể gửi':'Chưa quá hạn ngày 15; chưa thể gửi thông báo quá hạn.'),wrap,feedback,footer);$('details').showModal();
   }

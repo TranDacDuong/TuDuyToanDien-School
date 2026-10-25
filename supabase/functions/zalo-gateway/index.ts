@@ -98,6 +98,12 @@ Deno.serve(async (request) => {
     if (payload.action === "syncState") {
       return json({ state: await rpc("get_mindup_zalo_sync_state", {}) });
     }
+    if (payload.action === "validateOverdueTuition") {
+      if (typeof payload.jobId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.jobId)) {
+        return json({ error: "Invalid overdue tuition job" }, 400);
+      }
+      return json({ valid: await rpc("validate_overdue_tuition_dispatch", { p_job: payload.jobId }) });
+    }
     if (payload.action === "claimDispatch") {
       const pacing = payload.pacing;
       if (!pacing || !Number.isInteger(pacing.spacingSeconds) ||
