@@ -17,6 +17,7 @@ const { retryPreparation, sendTuitionQr } = require('./tuition-qr');
 const { LocalDatabase, eventKey } = require('./local-database');
 const { LocalStorageWorker } = require('./local-storage-worker');
 const { readParentRelationship } = require('./parent-relationship');
+const { downloadQrImage, readImageMetadata } = require('./zalo-image');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -821,37 +822,9 @@ let botConfig = {
   batchPauseMinutes: 30
 };
 
-const https = require('https');
-const http = require('http');
-
 // Helper: Download image to local file for Zalo attachment upload
 function downloadImage(url, destPath) {
-  return new Promise((resolve, reject) => {
-    const client = url.startsWith('https') ? https : http;
-    const req = client.get(url, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return downloadImage(res.headers.location, destPath).then(resolve).catch(reject);
-      }
-      if (res.statusCode !== 200) {
-        return reject(new Error(`HTTP ${res.statusCode} khi tải ảnh QR`));
-      }
-      const fileStream = fs.createWriteStream(destPath);
-      res.pipe(fileStream);
-      fileStream.on('finish', () => {
-        fileStream.close();
-        resolve(destPath);
-      });
-      fileStream.on('error', (err) => {
-        fs.unlink(destPath, () => {});
-        reject(err);
-      });
-    });
-    req.on('error', reject);
-    req.setTimeout(15000, () => {
-      req.destroy();
-      reject(new Error('Timeout khi tải ảnh QR từ VietQR'));
-    });
-  });
+  return downloadQrImage(url, destPath);
 }
 
 // Helper: Random Delay (Anti-Ban)
@@ -889,20 +862,7 @@ async function initZaloClient(forceQr = false) {
     zaloInstance = new Zalo({
       selfListen: true,
       checkUpdate: false,
-      imageMetadataGetter: async (filePath) => {
-        try {
-          const buf = Buffer.alloc(32);
-          const fd = fs.openSync(filePath, 'r');
-          fs.readSync(fd, buf, 0, 32, 0);
-          fs.closeSync(fd);
-          const width = buf.readUInt32BE(16) || 540;
-          const height = buf.readUInt32BE(20) || 640;
-          const size = fs.statSync(filePath).size;
-          return { width, height, size };
-        } catch (e) {
-          return { width: 540, height: 640, size: 100000 };
-        }
-      }
+      imageMetadataGetter: readImageMetadata
     });
 
     // 1. Try saved session if available and not forcing new QR

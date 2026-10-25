@@ -1,5 +1,6 @@
 'use strict';
 const { safeRemote, PREFIX } = require('./zalo-sync-content');
+const { isSvgImage, normalizeImage } = require('./zalo-image');
 function registerOnDemand(app, {gatewayUrl,persistResult,getApi,isBusy,setBusy,requireAck}) {
   const base = new URL(gatewayUrl).origin;
   async function userRpc(req,name,args) {
@@ -25,8 +26,12 @@ function registerOnDemand(app, {gatewayUrl,persistResult,getApi,isBusy,setBusy,r
       if(Number(response.headers.get('content-length'))>limit) {await response.body?.cancel();throw new Error('Tệp vượt quá giới hạn xem 50 MB');}
       for await(const chunk of response.body) {size+=chunk.length;if(size>limit) throw new Error('Tệp vượt quá giới hạn xem 50 MB');chunks.push(chunk);}
       const type=(response.headers.get('content-type') || '').split(';')[0];
+      const buffer=Buffer.concat(chunks);
+      if(ref.kind==='image' && isSvgImage(buffer)) {
+        return res.type('image/png').send(await normalizeImage(buffer));
+      }
       if(!/^(image\/(jpeg|png|gif|webp)|video\/(mp4|webm)|audio\/[a-z0-9.+-]+|application\/(pdf|octet-stream|zip|vnd\.[a-z0-9.+-]+))$/i.test(type)) throw new Error('Định dạng media không được hỗ trợ');
-      res.type(type).send(Buffer.concat(chunks));
+      res.type(type).send(buffer);
     } catch(error) {if(!res.headersSent) res.status(400).json({error:error.message});}
   });
   app.post('/api/zalo-external-reply',async(req,res)=>{

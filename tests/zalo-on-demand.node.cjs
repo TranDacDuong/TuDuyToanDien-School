@@ -31,3 +31,15 @@ test('an already reserved external reply is not sent a second time',async()=>{
   assert.equal(sent,0);assert.equal(res.code,409);
  }finally{global.fetch=original;}
 });
+
+test('old SVG QR uploaded with a JPEG label is served as a safe PNG, never raw SVG',async()=>{
+ const {routes,response}=setup();const original=global.fetch;
+ const req={headers:{authorization:'Bearer token'},body:{apiKey:'public',externalId:'a:qr'}};
+ const svg='<svg xmlns="http://www.w3.org/2000/svg" width="540" height="640"><rect width="540" height="640" fill="white"/></svg>';
+ try {
+  let calls=0;global.fetch=async()=>++calls===1?new Response(JSON.stringify({url:'https://photo.zaloapp.com/qr.jpg',kind:'image'})):new Response(svg,{headers:{'content-type':'image/jpeg'}});
+  const res=response();await routes['/api/zalo-media'](req,res);
+  assert.equal(res.mime,'image/png');assert.equal(res.body.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+  assert.match(res.headers['Cache-Control'],/no-store/);
+ }finally{global.fetch=original;}
+});
