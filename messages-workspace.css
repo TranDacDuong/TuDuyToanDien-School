@@ -12,7 +12,6 @@ body { background: #e9ebf0; }
 .inbox-tabs button { border: 0; border-bottom: 2px solid transparent; padding: 10px 0; background: none; color: #64748b; font: inherit; font-size: 13px; cursor: pointer; }
 .inbox-tabs button[aria-pressed="true"] { color: #0869dc; border-bottom-color: #0869dc; }
 .inbox-tabs button:disabled { opacity: .5; cursor: not-allowed; }
-.waiting-reply-label { display: inline-block; margin-top: 4px; color: #b45309; background: #fff1d6; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
 .friend-list-actions { padding: 0 12px 8px; }
 .friend-list { justify-content: flex-start; }
 .friend-list > * { flex-shrink: 0; }
@@ -20,7 +19,11 @@ body { background: #e9ebf0; }
 .friend-card { min-height: 88px; height: auto; padding: 12px 14px; }
 .friend-card .avatar { width: 48px; height: 48px; }
 .friend-main { flex: 1; overflow: hidden; padding-right: 0; }
-.friend-card .name-primary { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.friend-card .name-primary { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.friend-card .name { font-weight:500; }
+.friend-card.unread .name, .friend-card.unread .name-primary { font-weight:700; }
+.friend-card.unread .preview { color:var(--ink); font-weight:600; }
+.friend-card.unread .friend-time { color:#40516b; font-weight:600; }
 .friend-card .name-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
 .friend-card .name-sub ~ .name-sub { display: none; }
 .friend-card .preview { font-size: 12px; margin-top: 4px; }

@@ -17,7 +17,7 @@ function element() {
 }
 function harness() {
   const ids = Object.fromEntries(['conversationInfo', 'conversationInfoToggle', 'conversationInfoBody', 'chatAvatar', 'chatTitle', 'zaloSendModeLabel'].map(id => [id, element()]));
-  const tabs = [element(), element()];
+  const tabs = [element()];
   let filters = 0;
   const context = { window: {}, URL, activeFriend: null, friendMap: new Map(), parentInboxById: new Map(), loadedMessages: [],
     document: { baseURI: 'https://example.com/', getElementById: id => ids[id], createElement: element,
@@ -27,29 +27,30 @@ function harness() {
   vm.runInContext(fs.readFileSync(path.join(root, 'messages-workspace.js'), 'utf8'), context);
   return { context, ids, tabs, filters: () => filters };
 }
-test('waiting replies are default and All refreshes existing search', () => {
+test('All is the only inbox view and keeps the existing search', () => {
   const h = harness();
-  assert.equal(h.context.window.inboxWaitingOnly, true);
+  assert.equal(h.context.window.inboxWaitingOnly, false);
   h.context.window.setInboxFilter(false);
   assert.equal(h.context.window.inboxWaitingOnly, false);
-  assert.equal(h.tabs[1].attrs['aria-pressed'], 'true');
+  assert.equal(h.tabs[0].attrs['aria-pressed'], 'true');
   assert.equal(h.filters(), 1);
   h.context.window.setInboxFilter('reply');
   assert.equal(h.tabs[0].attrs['aria-pressed'], 'true');
-  assert.equal(h.context.window.inboxWaitingOnly, true);
+  assert.equal(h.context.window.inboxWaitingOnly, false);
   assert.doesNotMatch(html, />Chưa đọc<\/button>/);
 });
 
-test('waiting tab remains usable and retries after a temporary priority failure', () => {
+test('obsolete reply-filter requests do not hide conversations or start priority queries', () => {
   const h = harness(); let retries = 0;
   h.context.window.parentPriorityLoadFailed = true;
   h.context.window.retryParentReplyPriority = () => retries++;
   h.context.window.setInboxFilter(false);
   h.context.window.setInboxFilter('reply');
-  assert.equal(h.context.window.inboxWaitingOnly, true);
-  assert.equal(retries, 1);
+  assert.equal(h.context.window.inboxWaitingOnly, false);
+  assert.equal(retries, 0);
   assert.match(html, /priorityButton.disabled = false/);
   assert.doesNotMatch(html, /priorityButton.disabled = !!priorityError/);
+  assert.doesNotMatch(html, /waiting-reply-label/);
 });
 
 test('parent context is automatic and restricted to authorized children', () => {

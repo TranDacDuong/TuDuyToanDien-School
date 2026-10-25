@@ -61,7 +61,7 @@ test('UI orders conversations by latest activity regardless of waiting or unread
     { friend_id: 'waiting', waitingReply: true, lastParentAt: '2026-10-10T12:00:00Z', users: {} }
   ];
   assert.equal(context.sortConversationsByFamily(list).map(item => item.friend_id).join(','), 'auto,unread,waiting');
-  assert.match(html, /window.inboxWaitingOnly/);
+  assert.doesNotMatch(html, /waiting-reply-label/);
   assert.match(html, /send_mindup_parent_reply/);
 });
 test('successful reply removes only its parent from waiting, preserving a newer incoming message', () => {

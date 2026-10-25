@@ -710,14 +710,14 @@ aside.panel { border-right: 1px solid #dce1e8; }
 }
 .tray-mode .shell, .popup-mode .shell { grid-template-columns: minmax(0, 1fr); }
 </style>
-<link rel="stylesheet" href="messages-workspace.css?v=20261016-family-info">
+<link rel="stylesheet" href="messages-workspace.css?v=20261025-unread">
 <script src="tuition-discounts.js?v=20261008-discounts2" defer></script>
 <script src="tuition-calculation.js?v=20261015-shared1" defer></script>
 <script src="conversation-family-model.js?v=20261016-family1" defer></script>
 <script src="tuition-notice.js?v=20261017-chat1" defer></script>
 <script src="conversation-tuition-actions.js?v=20261017-chat1" defer></script>
 <script src="conversation-family-info.js?v=20261017-chat1" defer></script>
-<script src="messages-workspace.js?v=20261017-chat1" defer></script>
+<script src="messages-workspace.js?v=20261025-unread" defer></script>
 <script src="message-automations-entry.js?v=20261019-3" defer></script>
 <style>
 .message-automations-dialog { width:min(1260px,calc(100vw - 20px));height:calc(100dvh - 20px);max-height:none;padding:8px;border:1px solid #d9e1e9;border-radius:8px; }
@@ -1341,7 +1341,10 @@ async function loadFriendsNow() {
   }
 
   const conversationByUserId = new Map(directConversations.map(item => [item.partnerId, item]));
-  const partnerIdByConversationId = new Map(directConversations.map(item => [item.id, item.partnerId]));
+  const partnerIdByConversationId = new Map([
+    ...directConversations.map(item => [item.id, item.partnerId]),
+    ...(parentInboxItems || []).filter(item => item.conversationId).map(item => [item.conversationId,item.friend_id])
+  ]);
   let participantIds = [...new Set([
     ...friendRows.map(item => item.friend_id),
     ...directConversations.map(item => item.partnerId)
@@ -1387,6 +1390,9 @@ async function loadFriendsNow() {
     item.unreadCount = unreadMap.get(item.friend_id) || 0;
   });
   (mindUpTeacherItems || []).forEach(item => {
+    item.unreadCount = unreadMap.get(item.friend_id) || 0;
+  });
+  (parentInboxItems || []).forEach(item => {
     item.unreadCount = unreadMap.get(item.friend_id) || 0;
   });
   const conversationIds = directConversations.map(item => item.id);
@@ -1903,11 +1909,11 @@ window.openConversation = async function(friendId, friendName, friendAvatar, fri
     currentConversationId = conversationId;
     rememberConversationUser(friendId, friendName, friendAvatar, friendRole);
     setComposerEnabled(true);
-    await loadMessages({ reset: true, scrollToBottom: true });
+    const messagesLoaded = await loadMessages({ reset: true, scrollToBottom: true });
     if (activeFriend !== openingFriend) return;
     refreshZaloSendMode().catch(console.warn);
     subscribeConversationMessages(currentConversationId);
-    markMessageNotificationsRead(friendId, currentConversationId)
+    if (messagesLoaded !== false) markMessageNotificationsRead(friendId, currentConversationId)
       .then(() => isPopupMode ? null : loadFriends())
       .catch(console.warn);
   } catch (error) {
@@ -2029,18 +2035,26 @@ async function markMindUpTeacherNotificationsRead(conversationId) {
 
 async function markMessageNotificationsRead(friendId, conversationId = null) {
   if (!friendId && !conversationId) return;
+  const readAt = new Date().toISOString();
   let query = sb
     .from("notifications")
     .update({ is_read: true })
     .eq("user_id", currentUser.id)
     .eq("type", "message_new")
-    .eq("is_read", false);
+    .eq("is_read", false)
+    .lte("created_at", readAt);
   if (conversationId) {
     query = query.eq("ref_id", conversationId);
   } else {
     query = query.eq("actor_id", friendId);
   }
-  await query;
+  const {error} = await query;
+  if(error) throw error;
+  const item = friendMap.get(friendId);
+  if(item && (Date.parse(item.lastActivity) || 0) <= Date.parse(readAt)) {
+    item.unreadCount = 0;
+    renderFriendList(getFilteredFriendList());
+  }
 }
 
 async function ensureConversation(friendId, friendRole, knownConversationId = null) {
@@ -2212,6 +2226,9 @@ async function handleRealtimeMessagePayload(payload) {
     if (wasNearBottom || payload.eventType === "INSERT") {
       wrap.scrollTop = wrap.scrollHeight;
     }
+  }
+  if (payload.eventType === 'INSERT' && row.sender_id !== currentUser.id && row.sender_id !== MINDUP_BOT_ID && !document.hidden && wasNearBottom && activeFriend?.id) {
+    markMessageNotificationsRead(activeFriend.id, currentConversationId).catch(console.warn);
   }
   scheduleFriendsReload();
 }
@@ -2428,7 +2445,7 @@ async function loadMessages({ reset = false, scrollToBottom = false } = {}) {
   if (error) {
     if (!reset && loadedMessages.length && error.code !== '42501') { console.warn('Chat refresh failed; keeping visible messages', error); return; }
     showMessageLoadError(error);
-    return;
+    return false;
   }
   if (!data || !data.length) {
     if (reset) {
@@ -3509,14 +3526,11 @@ async function ensureMindupInFriendList() {
 const _renderFriendListCore = (list) => {
   list = sortConversationsByFamily(list);
   if (window.inboxUnreadOnly) list = list.filter(item => Number(item.unreadCount) > 0);
-  if (window.inboxWaitingOnly) list = list.filter(item => item.waitingReply);
   const wrap = document.getElementById("friendList");
   const topActions = document.getElementById("friendListTopActions");
   if (!list.length) {
     if (topActions) topActions.innerHTML = "";
-    wrap.innerHTML = window.inboxWaitingOnly && window.parentPriorityLoadFailed
-      ? '<div class="empty"><strong>Chưa tải được danh sách chưa phản hồi</strong><button type="button" onclick="retryParentReplyPriority()">Thử lại</button></div>'
-      : '<div class="empty"><strong>Không tìm thấy kết quả</strong>Hãy thử tên người dùng khác.</div>';
+    wrap.innerHTML = '<div class="empty"><strong>Không tìm thấy kết quả</strong>Hãy thử tên người dùng khác.</div>';
     return;
   }
   const BOT_ID = MINDUP_BOT_ID;
@@ -3542,7 +3556,7 @@ const _renderFriendListCore = (list) => {
       ? `openLearningConversation('${escapeJs(item.conversationId)}')`
       : `openConversation('${item.friend_id}', '${escapeJs(rawDisplayName)}', '${escapeJs(avatar)}', '${escapeJs(item.users?.role || '')}')`;
     return `
-      <div class="friend-card ${activeFriend?.id === item.friend_id ? 'active' : ''} ${isMindUp || isLearning ? 'mindup-pinned' : ''} ${isOfficialAudience ? 'official-audience' : ''}" id="friend_${item.friend_id}" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}" onclick="${click}">
+      <div class="friend-card ${item.unreadCount > 0 ? 'unread' : ''} ${activeFriend?.id === item.friend_id ? 'active' : ''} ${isMindUp || isLearning ? 'mindup-pinned' : ''} ${isOfficialAudience ? 'official-audience' : ''}" id="friend_${item.friend_id}" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}" onclick="${click}">
         <img class="avatar" src="${avatar}" alt="Avatar" onerror="this.src='default-avatar.png'">
         <div class="friend-main">
           <div class="friend-top">
@@ -3551,10 +3565,9 @@ const _renderFriendListCore = (list) => {
           </div>
           <div class="meta">${item.isZaloExternal ? 'Zalo · Chưa liên kết' : esc(metaText)}</div>
           <div class="preview">${esc(preview)}</div>
-          ${item.waitingReply ? '<span class="waiting-reply-label">Chưa phản hồi</span>' : ''}
           ${item.lastActivity ? `<div class="friend-footer"><span class="friend-time">${esc(formatListTime(item.lastActivity))}</span></div>` : ''}
         </div>
-        <div class="friend-badge ${item.unreadCount ? 'show' : ''}">${item.unreadCount > 99 ? '99+' : item.unreadCount || ''}</div>
+        <div class="friend-badge ${item.unreadCount ? 'show' : ''}" aria-label="${Number(item.unreadCount) || 0} tin nhắn chưa đọc">${item.unreadCount > 99 ? '99+' : item.unreadCount || ''}</div>
       </div>
     `;
   }).join('') + (hasMore ? '<div class="inbox-scroll-end" aria-hidden="true" style="height:1px"></div>' : '');
