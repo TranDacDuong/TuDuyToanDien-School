@@ -70,9 +70,9 @@ class GatewayQueue {
 class HistorySync {
   constructor({ requestPage, enqueue, pendingCount, onChange = () => {},
     setTimer = setTimeout, clearTimer = clearTimeout, now = () => new Date().toISOString(),
-    responseTimeout = 20000, maxRetries = 3 }) {
+    responseTimeout = 20000, maxRetries = 3, threadType = 0 }) {
     Object.assign(this, { requestPage, enqueue, pendingCount, onChange, setTimer, clearTimer, now,
-      responseTimeout, maxRetries });
+      responseTimeout, maxRetries, threadType });
     this.timer = null;
     this.connected = false;
     this.catchupAfterUpload = false;
@@ -138,7 +138,7 @@ class HistorySync {
   }
 
   receive(messages, type) {
-    if (type !== 0 || this.state.status !== 'running' || !this.awaitingPage) return;
+    if (type !== this.threadType || this.state.status !== 'running' || !this.awaitingPage) return;
     this.cancelTimer();
     this.retries = 0;
     const page = Array.isArray(messages) ? messages : [];

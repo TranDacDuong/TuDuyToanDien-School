@@ -48,6 +48,22 @@ Deno.serve(async (request) => {
 
   try {
     const payload = await request.json();
+    if (payload.action === 'classGroupState') return json({data:await rpc('class_group_worker_state',{})});
+    if (payload.action === 'claimClassGroup') return json({job:await rpc('claim_zalo_class_group_job',{})});
+    if (payload.action === 'validateClassGroup') {
+      if (!/^[0-9a-f-]{36}$/i.test(payload.jobId||'') || !/^[0-9a-f-]{36}$/i.test(payload.token||'')) return json({error:'Invalid group lease'},400);
+      return json({valid:await rpc('validate_zalo_class_group_job',{p_id:payload.jobId,p_token:payload.token})});
+    }
+    if (payload.action === 'finishClassGroup') {
+      if (!/^[0-9a-f-]{36}$/i.test(payload.jobId||'') || !/^[0-9a-f-]{36}$/i.test(payload.token||'') ||
+        !['sent','failed','uncertain'].includes(payload.status) || JSON.stringify(payload.result||{}).length>100000) return json({error:'Invalid group result'},400);
+      await rpc('finish_zalo_class_group_job',{p_id:payload.jobId,p_token:payload.token,p_status:payload.status,p_result:payload.result||{},p_error:String(payload.error||'').slice(0,500)});
+      return json({success:true});
+    }
+    if (payload.action === 'syncClassGroup') {
+      if (typeof payload.content!=='string' || payload.content.length>10000 || typeof payload.isSelf!=='boolean' || typeof payload.zaloUid!=='string' || !/^[0-9]{1,100}$/.test(payload.zaloUid) || typeof payload.externalId!=='string' || payload.externalId.length>220) return json({error:'Invalid group event'},400);
+      return json({result:await rpc('sync_zalo_class_group_event',{p_event:payload})});
+    }
     if (payload.action === "localStorageCycle") {
       if (typeof payload.storageId !== "string" || !/^[0-9a-f-]{36}$/i.test(payload.storageId) ||
         !Array.isArray(payload.receipts) || payload.receipts.length > 100 ||

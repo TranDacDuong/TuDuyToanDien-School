@@ -19,6 +19,7 @@ const { LocalStorageWorker } = require('./local-storage-worker');
 const { readParentRelationship } = require('./parent-relationship');
 const { downloadQrImage, readImageMetadata } = require('./zalo-image');
 const { prepareOverdueTuitionMedia } = require('./overdue-tuition-media');
+const {provisionGroup,encodeGroup,encodeGroupUpdate}=require('./class-parent-groups');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -62,18 +63,56 @@ let rejectedIncoming = [];
 let syncStateBusy = false;
 let syncLinkRevision = null;
 let verifiedParentCount = null;
+let classGroupUids=new Set(),nextClassGroupPoll=0,nextClassGroupState=0;
+async function syncClassGroups(){
+  if(shuttingDown || gatewayBusy || !listenerConnected || !zaloApi || !GATEWAY_TOKEN || campaignStatus!=='idle' || Date.now()<nextClassGroupPoll)return;
+  nextClassGroupPoll=Date.now()+20000;gatewayBusy=true;
+  try{
+    if(Date.now()>=nextClassGroupState){
+      const {data}=await gatewayRequest({action:'classGroupState'}),next=new Set((data||[]).map(g=>g.group_uid));
+      const added=[...next].some(uid=>!classGroupUids.has(uid));classGroupUids=next;nextClassGroupState=Date.now()+60000;
+      if(classGroupUids.size && !classGroupHistory.connected)classGroupHistory.connection(true);else if(added)classGroupHistory.requestCatchup();
+    }
+    const {job}=await gatewayRequest({action:'claimClassGroup'});if(!job)return;
+    let status='sent',result={},errorText;
+    try{
+      const guard=async()=>{const {valid}=await gatewayRequest({action:'validateClassGroup',jobId:job.id,token:job.token});if(!valid)throw Error('Danh sách phụ huynh, lớp hoặc quyền đã thay đổi; chưa thực hiện thao tác Zalo');};
+      await guard();
+      if(job.kind==='setup'){
+        result=await provisionGroup(zaloApi,localStore,job,guard);
+      }else{
+        if(!job.group_uid)throw Error('Nhóm Zalo chưa liên kết');
+        const id=await localStore.send(`class-group:message:${job.id}`,{uid:job.group_uid,text:job.content},async()=>requireSendAcknowledgement(await zaloApi.sendMessage(job.content,job.group_uid,1),0));
+        result={external_id:`${job.group_uid}:${id}`};
+      }
+    }catch(error){
+      errorText=String(error.message||error);status=isUncertainSendError(error)||/uncertain|timeout|network|fetch failed/i.test(errorText)?'uncertain':'failed';
+      if(isZaloLimitError(error))await gatewayRequest({action:'pauseAutomation',reason:errorText});
+    }
+    const ack={action:'finishClassGroup',jobId:job.id,token:job.token,status,result,error:errorText};
+    const key=eventKey(ack);pendingIncoming.set(key,ack);localStore.recordEvent(ack);persistIncoming();await flushIncoming();
+    // Catch up only after the cloud mapping is acknowledged, including replies
+    // received while the new group was being provisioned.
+    if(job.kind==='setup'&&status==='sent')nextClassGroupState=0;
+  }catch(error){console.warn('[ZaloBot] Nhóm phụ huynh:',error.message);}
+  finally{gatewayBusy=false;}
+}
 const historyController = new HistorySync({
   requestPage: cursor => zaloApi.listener.requestOldMessages(0, cursor),
   enqueue: queueZaloMessage,
-  pendingCount: () => [...pendingIncoming.values()].filter(p => p.isHistory).length,
+  pendingCount: () => [...pendingIncoming.values()].filter(p => p.action==='syncMessage'&&p.isHistory).length,
   onChange: persistHistory
 });
+const classGroupHistory=new HistorySync({threadType:1,
+  requestPage:cursor=>zaloApi.listener.requestOldMessages(1,cursor),enqueue:queueZaloMessage,
+  pendingCount:()=>[...pendingIncoming.values()].filter(p=>p.action==='syncClassGroup'&&p.isHistory).length});
 const incomingQueue = new GatewayQueue({
   pending: pendingIncoming, request: gatewayRequest, persist: persistIncoming,
   quarantine: quarantineIncoming,
   onResult: (payload, result) => {
     localStore.acknowledgeEvent(payload);
-    historyController.result(payload, result);
+    if(payload.action==='syncClassGroup')classGroupHistory.result(payload,result);
+    else historyController.result(payload, result);
   }
 });
 const automaticTuitionActions = {
@@ -540,12 +579,13 @@ function startGatewayListener() {
     listenerConnected = false;
     botStatus = 'disconnected';
     historyController.connection(false);
+    classGroupHistory.connection(false);
   };
   zaloApi.listener.on('disconnected', disconnected);
   zaloApi.listener.on('closed', disconnected);
   zaloApi.listener.on('message', (message) => {
     if (zaloApi !== listeningApi) return;
-    if (message.isSelf) {
+    if (message.isSelf && message.type===0) {
       const isLinkCommand = !!parseParentLinkCommand(message.data?.content);
       handleParentLinkCommand(message).catch(error => {
         console.error('[ZaloBot] Không xử lý được lệnh liên kết phụ huynh:', error?.message || error);
@@ -557,6 +597,7 @@ function startGatewayListener() {
   zaloApi.listener.on('old_messages', (messages, type) => {
     if (zaloApi !== listeningApi) return;
     historyController.receive(messages, type);
+    classGroupHistory.receive(messages,type);
     try { persistIncoming(); } catch (error) {
       incomingQueue.lastError = String(error?.message || error);
       console.error('[ZaloBot] Cannot persist history page:', error);
@@ -580,6 +621,11 @@ function messageTimestamp(value) {
 }
 
 function queueZaloMessage(message, isHistory) {
+  if(message?.type===1){
+    const payload=encodeGroup(message,classGroupUids);if(!payload)return false;payload.isHistory=isHistory===true;
+    localStore.recordEvent(payload);if(pendingIncoming.has(payload.externalId)||pendingIncoming.size>=5000)return false;
+    pendingIncoming.set(payload.externalId,payload);persistIncoming();if(!isHistory)flushIncoming().catch(console.error);return true;
+  }
   if (message?.type !== 0) return false;
   const content = message.data?.content;
   if (message.isSelf && parseParentLinkCommand(content)) return false;
@@ -607,7 +653,7 @@ function queueZaloMessage(message, isHistory) {
 }
 
 function queueZaloUpdate(kind,event) {
-  const payload=encodeUpdate(kind,event);
+  const payload=encodeGroupUpdate(kind,event,classGroupUids)||encodeUpdate(kind,event);
   if(payload) localStore.recordEvent(payload);
   if(!payload || pendingIncoming.has(payload.externalId) || pendingIncoming.size>=5000) return;
   pendingIncoming.set(payload.externalId,payload);
@@ -1246,6 +1292,7 @@ app.get('/api/status', (req, res) => {
       pendingAcknowledgements: [...pendingIncoming.values()].filter(p => p.action.startsWith('finish')).length,
       rejectedMessages: rejectedIncoming.length, lastUploadError: incomingQueue.lastError },
     localStorage: { ...localStore.status(), lastError: localStorageWorker.lastError },
+    classGroups:{known:classGroupUids.size,history:classGroupHistory.state},
     config: botConfig
   });
 });
@@ -1395,6 +1442,7 @@ app.listen(PORT, HOST, () => {
 
   // Tự động kiểm tra session Zalo khi khởi động
   initZaloClient().catch(console.error);
+  setInterval(()=>syncClassGroups().catch(console.error),1000).unref();
   setInterval(async () => {
     if (shuttingDown) return;
     await syncGatewayOutbox();

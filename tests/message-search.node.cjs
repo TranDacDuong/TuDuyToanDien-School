@@ -8,6 +8,7 @@ const start = html.indexOf('function normalizeConversationSearch');
 const end = html.indexOf('function parseMessageContent', start);
 assert.ok(start >= 0 && end > start);
 const context = {
+  window: {},
   document: { getElementById: () => ({ value: context.keyword }) },
   allFriends: [
     { friend_id: '1', users: { id: 'p1', full_name: 'Nguyễn Lan Phương', zalo_alias: 'PH Bảo Hân 2222', role: 'parent' } },

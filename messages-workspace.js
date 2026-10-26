@@ -2,9 +2,11 @@
   window.inboxUnreadOnly = false;
   window.inboxWaitingOnly = false;
   window.setInboxFilter = function (unread) {
+    window.inboxClassGroupsOnly = unread === 'groups';
     window.inboxWaitingOnly = false;
     window.inboxUnreadOnly = false;
-    document.querySelectorAll('.inbox-tabs button').forEach(button => button.setAttribute('aria-pressed', 'true'));
+    document.querySelectorAll('.inbox-tabs button').forEach(button => button.setAttribute('aria-pressed', String((button.dataset.inbox==='groups')===window.inboxClassGroupsOnly)));
+    window.ClassGroupChats?.onFilter();
     filterFriends();
   };
   window.toggleConversationInfo = function (force) {
@@ -41,6 +43,7 @@
     if (!avatar) return;
     avatar.src = mediaUrl(activeFriend?.avatar || 'favicon.png');
     const body = document.getElementById('conversationInfoBody');
+    if(activeFriend?.isClassGroup){renderedFriend=null;window.ClassGroupChats.info(body);return;}
     if (!activeFriend) {
       renderedFriend = mediaSection = familySection = null;
       body.replaceChildren();

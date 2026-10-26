@@ -58,6 +58,9 @@ body { background: #e9ebf0; }
 .conversation-info section { padding: 18px 16px; border-bottom: 6px solid #eef0f4; overflow-wrap: anywhere; }
 .conversation-info h3 { font-family: inherit; font-size: 14px; margin: 0 0 12px; }
 .conversation-info p { font-size: 13px; line-height: 1.6; color: #60718a; }
+.class-group-sync { padding: 8px 12px; border: 1px solid #c7d7eb; border-radius: 6px; background: #f4f8ff; color: #1558a6; font: inherit; font-size: 13px; cursor: pointer; }
+.conversation-info .class-group-sync { margin: 0 0 18px; }
+.class-group-sync:disabled { opacity: .6; cursor: wait; }
 .conversation-info .info-avatar { display: block; width: 72px; height: 72px; border-radius: 50%; object-fit: cover; margin: 0 auto 12px; }
 .info-name { text-align: center; font-size: 16px; font-weight: 600; }
 .info-media { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }

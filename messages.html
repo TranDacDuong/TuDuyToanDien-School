@@ -710,14 +710,14 @@ aside.panel { border-right: 1px solid #dce1e8; }
 }
 .tray-mode .shell, .popup-mode .shell { grid-template-columns: minmax(0, 1fr); }
 </style>
-<link rel="stylesheet" href="messages-workspace.css?v=20261025-unread">
+<link rel="stylesheet" href="messages-workspace.css?v=20261026-groups">
 <script src="tuition-discounts.js?v=20261008-discounts2" defer></script>
 <script src="tuition-calculation.js?v=20261015-shared1" defer></script>
 <script src="conversation-family-model.js?v=20261016-family1" defer></script>
 <script src="tuition-notice.js?v=20261017-chat1" defer></script>
 <script src="conversation-tuition-actions.js?v=20261017-chat1" defer></script>
 <script src="conversation-family-info.js?v=20261017-chat1" defer></script>
-<script src="messages-workspace.js?v=20261025-unread" defer></script>
+<script src="messages-workspace.js?v=20261026-groups" defer></script>
 <script src="message-automations-entry.js?v=20261025-arrears-qr" defer></script>
 <style>
 .message-automations-dialog { width:min(1260px,calc(100vw - 20px));height:calc(100dvh - 20px);max-height:none;padding:8px;border:1px solid #d9e1e9;border-radius:8px; }
@@ -755,8 +755,10 @@ aside.panel { border-right: 1px solid #dce1e8; }
         </details>
       <input id="friendSearch" class="search-input" aria-label="Tìm cuộc trò chuyện" placeholder="Tìm tên PH, biệt danh Zalo, học sinh..." oninput="filterFriends()">
       <div class="inbox-tabs" role="group" aria-label="Lọc hội thoại">
-        <button type="button" aria-pressed="true" onclick="setInboxFilter(false)">Tất cả</button>
+        <button type="button" data-inbox="all" aria-pressed="true" onclick="setInboxFilter(false)">Tất cả</button>
+        <button type="button" data-inbox="groups" aria-pressed="false" onclick="setInboxFilter('groups')">Nhóm lớp</button>
       </div>
+      <div id="classGroupActions" hidden style="padding:0 12px 8px"><button type="button" class="class-group-sync" onclick="ClassGroupChats.syncAll()">Cập nhật nhóm lớp</button></div>
       </div>
       <div id="friendListTopActions" class="friend-list-actions"></div>
       <div id="friendList" class="friend-list">
@@ -819,6 +821,7 @@ aside.panel { border-right: 1px solid #dce1e8; }
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
 <script src="local-message-history.js?v=20261024-local1"></script>
+<script src="class-group-chats.js?v=20261026-1"></script>
 <script src="image_upload.js"></script>
 <script src="mindup_bot.js"></script>
 <script src="learning_messages.js"></script>
@@ -1273,7 +1276,7 @@ async function loadFriendsNow() {
   const wrap = document.getElementById("friendList");
   const topActions = document.getElementById("friendListTopActions");
 
-  const [{ data: friendships, error: friendshipError }, { data: conversations, error: conversationError }, { data: unreadNotifications }, learningItems, mindUpTeacherItems, parentInboxItems] = await Promise.all([
+  const [{ data: friendships, error: friendshipError }, { data: conversations, error: conversationError }, { data: unreadNotifications }, learningItems, mindUpTeacherItems, parentInboxItems, classGroupItems] = await Promise.all([
     sb
       .from("friendships")
       .select("friend_id, users!friendships_friend_id_fkey(id, full_name, email, avatar_url, role, birth_year)")
@@ -1307,12 +1310,13 @@ async function loadFriendsNow() {
         selectedUserFromQuery = null;
         openConversation(selected.friend_id, selected.users.full_name, selected.users.avatar_url, 'parent');
       }
-    })
+    }),
+    window.ClassGroupChats?.fetchItems() || Promise.resolve([])
   ]);
 
   if (friendshipError || conversationError) {
-    if (parentInboxItems?.length) {
-      allFriends = sortConversationsByFamily(parentInboxItems);
+    if (parentInboxItems?.length || classGroupItems?.length) {
+      allFriends = sortConversationsByFamily([...(parentInboxItems||[]),...(classGroupItems||[])]);
       friendMap = new Map(allFriends.map(item => [item.friend_id,item]));
       renderFriendList(getFilteredFriendList());
       return;
@@ -1456,7 +1460,7 @@ async function loadFriendsNow() {
     return item.friend_id === MINDUP_BOT_ID;
   });
 
-  let merged = [...(parentInboxItems || []), ...(mindUpTeacherItems || []), ...(learningItems || []), ...scopedEnriched]
+  let merged = [...(parentInboxItems || []), ...(classGroupItems || []), ...(mindUpTeacherItems || []), ...(learningItems || []), ...scopedEnriched]
     .filter((item, index, list) => list.findIndex(other => other.friend_id === item.friend_id) === index);
 
   // Keep context/grade enrichment off the initial rendering path.
@@ -1856,6 +1860,7 @@ window.confirmZaloLink = async function() {
 };
 
 window.openConversation = async function(friendId, friendName, friendAvatar, friendRole) {
+  if(friendMap.get(friendId)?.isClassGroup)return window.ClassGroupChats.open(friendMap.get(friendId));
   if(friendMap.get(friendId)?.isZaloExternal) return openExternalZaloConversation(friendMap.get(friendId));
   resetZaloSendMode();
   const inboxItem = parentInboxById.get(friendId) || friendMap.get(friendId);
@@ -2323,6 +2328,7 @@ window.addEventListener("resize", () => {
 });
 
 function renderLoadedMessages() {
+  if(activeFriend?.isClassGroup)return window.ClassGroupChats.render();
   const wrap = document.getElementById("messageList");
   const BOT_ID = window.MindUpBot?.BOT_ID || '00000000-0000-0000-0000-000000000001';
   const viewerIsStaff = isMindUpStaffRole(currentProfile?.role);
@@ -2429,6 +2435,7 @@ function showMessageLoadError(error) {
 
 let messageReadGeneration = 0;
 async function loadMessages({ reset = false, scrollToBottom = false } = {}) {
+  if(activeFriend?.isClassGroup)return window.ClassGroupChats.load({reset,scrollToBottom});
   if(activeFriend?.isZaloExternal) return loadExternalZaloMessages(scrollToBottom);
   if (!currentConversationId) return;
   const conversationId = currentConversationId;
@@ -2491,6 +2498,7 @@ async function loadMessages({ reset = false, scrollToBottom = false } = {}) {
 }
 
 async function loadOlderMessages() {
+  if(activeFriend?.isClassGroup)return window.ClassGroupChats.load({older:true});
   if(activeFriend?.isZaloExternal) return loadExternalZaloMessages(false,true);
   if (!currentConversationId || isLoadingOlderMessages || !hasOlderMessages || !loadedMessages.length) return;
   const conversationId = currentConversationId;
@@ -2532,6 +2540,7 @@ document.getElementById("messageList").addEventListener("scroll", () => {
 });
 
 window.sendMessage = async function() {
+  if(activeFriend?.isClassGroup)return window.ClassGroupChats.send();
   if(activeFriend?.isZaloExternal) return sendExternalZaloMessage();
   const input = document.getElementById("messageInput");
   const imageInput = document.getElementById("messageImage");
@@ -2741,6 +2750,7 @@ window.retryOptimisticMessage = async function(tempId) {
 };
 
 window.sendMessage = async function() {
+  if(activeFriend?.isClassGroup)return window.ClassGroupChats.send();
   const input = document.getElementById("messageInput");
   if(activeFriend?.isZaloExternal) return sendExternalZaloMessage();
   const imageInput = document.getElementById("messageImage");
@@ -2892,8 +2902,8 @@ function normalizeConversationSearch(value) {
 function getFilteredFriendList() {
   const keyword = normalizeConversationSearch(document.getElementById("friendSearch")?.value);
   const localMatches = !keyword
-    ? allFriends
-    : allFriends.filter(item => [
+    ? allFriends.filter(item=>window.inboxClassGroupsOnly?item.isClassGroup:!item.isClassGroup)
+    : allFriends.filter(item => (window.inboxClassGroupsOnly?item.isClassGroup:!item.isClassGroup) && [
         item.users?.full_name,
         item.users?.zalo_alias,
         item.zalo_alias,
@@ -3550,9 +3560,9 @@ const _renderFriendListCore = (list) => {
     const nameHtml = renderConversationNameHtml(item, rawDisplayName, isOfficialAudience);
     const avatar = (isMindUp || isLearning) ? 'favicon.png' : (item.users?.avatar_url || 'default-avatar.png');
     const relationLabel = isLearning ? (item.metaName || 'Hồ sơ học tập') : (isMindUp || isOfficialAudience ? '' : (item.isFriend ? 'Bạn bè' : (item.conversationId ? 'Đã nhắn tin' : 'Người dùng')));
-    const metaText = (isMindUp || isOfficialAudience) ? "" : `${isLearning ? '🤖 MindUp' : formatRole(item.users?.role || '')} • ${relationLabel}`;
+    const metaText = item.isClassGroup ? window.ClassGroupChats.statusText(item.group) : (isMindUp || isOfficialAudience) ? "" : `${isLearning ? '🤖 MindUp' : formatRole(item.users?.role || '')} • ${relationLabel}`;
     const preview = item.preview || (item.isSearchResult ? 'Bắt đầu trò chuyện' : 'Chưa có tin nhắn nào');
-    const click = item.isZaloExternal ? `openConversation('${item.friend_id}', '', '', 'zalo_external')` : isLearning
+    const click = item.isClassGroup ? `openConversation('${item.friend_id}')` : item.isZaloExternal ? `openConversation('${item.friend_id}', '', '', 'zalo_external')` : isLearning
       ? `openLearningConversation('${escapeJs(item.conversationId)}')`
       : `openConversation('${item.friend_id}', '${escapeJs(rawDisplayName)}', '${escapeJs(avatar)}', '${escapeJs(item.users?.role || '')}')`;
     return `
@@ -3668,6 +3678,7 @@ let externalSendAttempt = null;
 let externalSending = false;
 const conversationExtrasRequests = new WeakMap();
 function refreshConversationExtras() {
+  if(activeFriend?.isClassGroup)return;
   const friend = activeFriend, conversation = currentConversationId;
   if (!friend || conversationExtrasRequests.has(friend)) return;
   const request = Promise.allSettled([refreshZaloDeliveryStatus(), refreshZaloMessageStates()])
@@ -3683,6 +3694,7 @@ function refreshConversationExtras() {
   conversationExtrasRequests.set(friend, request);
 }
 async function refreshZaloMessageStates() {
+  if(activeFriend?.isClassGroup)return;
   const ids=loadedMessages.map(m=>m.external_message_id).filter(Boolean);
   if(!ids.length) return;
   const conversation=currentConversationId, loadingFriend=activeFriend;

@@ -17,7 +17,7 @@ function element() {
 }
 function harness() {
   const ids = Object.fromEntries(['conversationInfo', 'conversationInfoToggle', 'conversationInfoBody', 'chatAvatar', 'chatTitle', 'zaloSendModeLabel'].map(id => [id, element()]));
-  const tabs = [element()];
+  const tabs = [element(),element()];tabs[0].dataset={inbox:'all'};tabs[1].dataset={inbox:'groups'};
   let filters = 0;
   const context = { window: {}, URL, activeFriend: null, friendMap: new Map(), parentInboxById: new Map(), loadedMessages: [],
     document: { baseURI: 'https://example.com/', getElementById: id => ids[id], createElement: element,
@@ -27,7 +27,7 @@ function harness() {
   vm.runInContext(fs.readFileSync(path.join(root, 'messages-workspace.js'), 'utf8'), context);
   return { context, ids, tabs, filters: () => filters };
 }
-test('All is the only inbox view and keeps the existing search', () => {
+test('private chats and class groups have independent tabs and keep the existing search', () => {
   const h = harness();
   assert.equal(h.context.window.inboxWaitingOnly, false);
   h.context.window.setInboxFilter(false);
@@ -38,6 +38,9 @@ test('All is the only inbox view and keeps the existing search', () => {
   assert.equal(h.tabs[0].attrs['aria-pressed'], 'true');
   assert.equal(h.context.window.inboxWaitingOnly, false);
   assert.doesNotMatch(html, />Chưa đọc<\/button>/);
+  h.context.window.setInboxFilter('groups');assert.equal(h.context.window.inboxClassGroupsOnly,true);
+  assert.equal(h.tabs[0].attrs['aria-pressed'],'false');assert.equal(h.tabs[1].attrs['aria-pressed'],'true');
+  h.context.window.setInboxFilter(false);assert.equal(h.context.window.inboxClassGroupsOnly,false);
 });
 
 test('obsolete reply-filter requests do not hide conversations or start priority queries', () => {

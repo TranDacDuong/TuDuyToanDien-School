@@ -1,0 +1,67 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{createRequire}=require('node:module');
+const {PGlite}=createRequire(path.resolve('services/zalo-bot/package.json'))('@electric-sql/pglite');
+const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
+async function value(db,sql,args=[]){return Object.values((await db.query(sql,args)).rows[0])[0];}
+async function fixture(t){
+ const db=new PGlite();t.after(()=>db.close());
+ await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role;CREATE SCHEMA auth;
+ CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+ CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$SELECT coalesce(nullif(current_setting('request.jwt.claim.role',true),''),'service_role')$$;
+ CREATE TABLE users(id uuid PRIMARY KEY,role text,full_name text);
+ CREATE FUNCTION is_admin_actor() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$SELECT EXISTS(SELECT 1 FROM users WHERE id=auth.uid() AND role='admin')$$;
+ CREATE TABLE classes(id uuid PRIMARY KEY,class_name text,hidden boolean);
+ CREATE TABLE class_teachers(class_id uuid,teacher_id uuid);
+ CREATE TABLE class_students(class_id uuid,student_id uuid,joined_at timestamptz,left_at timestamptz);
+ CREATE TABLE parent_students(parent_id uuid,student_id uuid,revoked_at timestamptz);
+ CREATE TABLE zalo_verified_links(audience_user_id uuid,zalo_uid text,enabled boolean);
+ CREATE TABLE conversations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),kind text CHECK(kind='direct'),direct_key text UNIQUE,created_at timestamptz DEFAULT now());
+ CREATE TABLE messages(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),conversation_id uuid REFERENCES conversations(id),sender_id uuid,real_sender_id uuid,content text,transport text,external_message_id text UNIQUE,created_at timestamptz DEFAULT now());
+ ALTER TABLE messages ENABLE ROW LEVEL SECURITY;GRANT SELECT,INSERT ON messages TO authenticated;
+ CREATE TABLE notifications(id uuid DEFAULT gen_random_uuid(),user_id uuid,actor_id uuid,type text,ref_id uuid,target_url text,message text,is_read boolean DEFAULT false);
+ CREATE TABLE mindup_zalo_dispatch_control(id integer,paused boolean);INSERT INTO mindup_zalo_dispatch_control VALUES(1,false);
+ CREATE TABLE zalo_automation_state(id integer,paused boolean);INSERT INTO zalo_automation_state VALUES(1,false);
+ CREATE FUNCTION resolve_zalo_media(text) RETURNS jsonb LANGUAGE sql AS $$SELECT NULL::jsonb$$;
+ GRANT EXECUTE ON FUNCTION resolve_zalo_media(text) TO authenticated;
+ INSERT INTO users VALUES('${id(1)}','admin','Admin'),('${id(2)}','teacher','Teacher'),('${id(3)}','parent','Parent A'),('${id(4)}','parent','Parent B'),('${id(5)}','student','Child'),('${id(6)}','parent','Unlinked'),('${id(7)}','teacher','Outside teacher'),('${id(8)}','parent','Departed');
+ INSERT INTO classes VALUES('${id(10)}','Math',false),('${id(11)}','Hidden',true);
+ INSERT INTO class_teachers VALUES('${id(10)}','${id(2)}');
+ INSERT INTO class_students VALUES('${id(10)}','${id(5)}',now()-interval '1 day',NULL),('${id(10)}','${id(9)}',NULL,now()-interval '1 day');
+ INSERT INTO parent_students VALUES('${id(3)}','${id(5)}',NULL),('${id(4)}','${id(5)}',now()),('${id(6)}','${id(5)}',NULL),('${id(8)}','${id(9)}',NULL);
+ INSERT INTO zalo_verified_links VALUES('${id(3)}','300',true),('${id(4)}','400',true);
+ SELECT set_config('request.jwt.claim.sub','${id(1)}',false);`);
+ const sql=fs.readFileSync('SQL Zalo class parent groups.sql','utf8');await db.exec(sql);await db.exec(sql);return db;
+}
+test('class group provisioning is explicit, idempotent and uses only current non-revoked parents',async t=>{
+ const db=await fixture(t);assert.equal(await value(db,'SELECT count(*) FROM zalo_class_groups'),0);
+ assert.equal(await value(db,'SELECT queue_zalo_class_groups()'),1);assert.equal(await value(db,'SELECT queue_zalo_class_groups()'),0);
+ const job=await value(db,'SELECT claim_zalo_class_group_job()');assert.equal(job.members.length,2);assert.deepEqual(job.members.map(m=>m.name),['Parent A','Unlinked']);
+ assert.equal(await value(db,'SELECT validate_zalo_class_group_job($1,$2)',[job.id,job.token]),true);
+ await db.query('UPDATE parent_students SET revoked_at=now() WHERE parent_id=$1',[id(3)]);
+ assert.equal(await value(db,'SELECT validate_zalo_class_group_job($1,$2)',[job.id,job.token]),false);
+ await assert.rejects(db.query('SELECT finish_zalo_class_group_job($1,$2,\'sent\',\'{}\')',[job.id,id(99)]),/Invalid task lease/);
+ await db.query("SELECT set_config('request.jwt.claim.sub',$1,false)",[id(2)]);await assert.rejects(db.query('SELECT queue_zalo_class_groups()'),/Chỉ admin/);
+ await db.exec('SET ROLE authenticated');await assert.rejects(db.query('SELECT claim_zalo_class_group_job()'),/permission denied/);
+});
+test('real group result, scoped inbox, idempotent sends and group message/media sync',async t=>{
+ const db=await fixture(t);await value(db,'SELECT queue_zalo_class_groups()');const job=await value(db,'SELECT claim_zalo_class_group_job()');
+ await db.query("SELECT finish_zalo_class_group_job($1,$2,'sent',$3)",[job.id,job.token,JSON.stringify({group_uid:'999',members:[{user_id:id(3),status:'joined'},{user_id:id(6),status:'missing_link'}]})]);
+ let groups=await value(db,'SELECT list_zalo_class_groups()');assert.equal(groups.length,1);assert.equal(groups[0].status,'partial');assert.equal(groups[0].members.length,2);
+ const mid=await value(db,"SELECT send_zalo_class_group_message($1,$2,'Hello parents')",[id(10),id(20)]);
+ assert.equal(await value(db,"SELECT send_zalo_class_group_message($1,$2,'Hello parents')",[id(10),id(20)]),mid);
+ const send=await value(db,'SELECT claim_zalo_class_group_job()');assert.equal(send.kind,'send');
+ const event={externalId:'999:123',zaloUid:'999',content:'__ZALO_SYNC_V2__'+JSON.stringify({version:2,event:'message',text:'Hello parents',metadata:{kind:'text'}}),actorUid:'bot',isSelf:true,isHistory:false};
+ assert.equal(await value(db,'SELECT sync_zalo_class_group_event($1)',[event]),'deferred');
+ await db.query("SELECT finish_zalo_class_group_job($1,$2,'sent',$3)",[send.id,send.token,JSON.stringify({external_id:'999:123'})]);
+ assert.equal(await value(db,'SELECT sync_zalo_class_group_event($1)',[event]),'duplicate');
+ event.externalId='999:124';event.isSelf=false;event.displayName='Parent A';event.actorUid='300';event.content='__ZALO_SYNC_V2__'+JSON.stringify({version:2,event:'message',text:'[Hình ảnh]',metadata:{kind:'image',media:{kind:'image'}},media:{url:'https://photo.zdn.vn/test.jpg'}});
+ assert.equal(await value(db,'SELECT sync_zalo_class_group_event($1)',[event]),'received');assert.equal(await value(db,'SELECT sync_zalo_class_group_event($1)',[event]),'duplicate');
+ assert.equal(await value(db,'SELECT count(*) FROM notifications'),2);
+ const rows=await value(db,'SELECT list_zalo_class_group_messages($1)',[id(10)]);assert.equal(rows.length,2);assert.equal(rows.find(m=>m.external_message_id==='999:124').group_is_self,false);
+ await db.query("SELECT set_config('request.jwt.claim.sub',$1,false)",[id(2)]);await db.exec('SET ROLE authenticated');
+ assert.equal((await value(db,"SELECT resolve_zalo_media('999:124')")).url,'https://photo.zdn.vn/test.jpg');
+ assert.equal(await value(db,'SELECT count(*) FROM messages'),2);
+ await db.query("SELECT set_config('request.jwt.claim.sub',$1,false)",[id(7)]);
+ assert.equal((await value(db,'SELECT list_zalo_class_groups()')).length,0);assert.equal(await value(db,'SELECT count(*) FROM messages'),0);
+ await assert.rejects(db.query('SELECT list_zalo_class_group_messages($1)',[id(10)]),/Không có quyền/);
+ assert.equal(await value(db,"SELECT resolve_zalo_media('999:124')"),null);
+});
