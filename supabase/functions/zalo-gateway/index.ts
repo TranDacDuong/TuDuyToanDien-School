@@ -56,7 +56,7 @@ Deno.serve(async (request) => {
     }
     if (payload.action === 'finishClassGroup') {
       if (!/^[0-9a-f-]{36}$/i.test(payload.jobId||'') || !/^[0-9a-f-]{36}$/i.test(payload.token||'') ||
-        !['sent','failed','uncertain'].includes(payload.status) || JSON.stringify(payload.result||{}).length>100000) return json({error:'Invalid group result'},400);
+        !['sent','failed','uncertain','limited'].includes(payload.status) || JSON.stringify(payload.result||{}).length>100000) return json({error:'Invalid group result'},400);
       await rpc('finish_zalo_class_group_job',{p_id:payload.jobId,p_token:payload.token,p_status:payload.status,p_result:payload.result||{},p_error:String(payload.error||'').slice(0,500)});
       return json({success:true});
     }

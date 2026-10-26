@@ -18,6 +18,10 @@ CREATE TABLE IF NOT EXISTS public.zalo_class_group_jobs(
  status text NOT NULL DEFAULT 'pending',token uuid,locked_until timestamptz,error_message text,result jsonb,
  created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now());
 CREATE INDEX IF NOT EXISTS zalo_class_group_pending ON public.zalo_class_group_jobs(status,created_at);
+CREATE TABLE IF NOT EXISTS public.zalo_class_group_control(id integer PRIMARY KEY CHECK(id=1),create_blocked_until timestamptz,last_error text);
+INSERT INTO public.zalo_class_group_control(id) VALUES(1) ON CONFLICT DO NOTHING;
+ALTER TABLE public.zalo_class_group_control ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.zalo_class_group_control FROM PUBLIC,anon,authenticated;
 ALTER TABLE public.zalo_class_group_jobs ADD COLUMN IF NOT EXISTS member_snapshot jsonb;
 CREATE TABLE IF NOT EXISTS public.zalo_class_group_events(
  external_id text PRIMARY KEY,class_id uuid NOT NULL REFERENCES public.zalo_class_groups(class_id),
@@ -66,7 +70,7 @@ BEGIN
    INSERT INTO public.zalo_class_groups(class_id,conversation_id,group_name)
     VALUES(c.id,cid,'MindUp - PH '||left(c.class_name,75)||' ['||left(c.id::text,6)||']');
   END IF;
-  IF NOT EXISTS(SELECT 1 FROM public.zalo_class_group_jobs WHERE class_id=c.id AND kind='setup' AND status IN('pending','processing','uncertain')) THEN
+  IF NOT EXISTS(SELECT 1 FROM public.zalo_class_group_jobs WHERE class_id=c.id AND kind='setup' AND status IN('pending','processing','uncertain','limited')) THEN
    INSERT INTO public.zalo_class_group_jobs(class_id,kind,requested_by,request_key) VALUES(c.id,'setup',auth.uid(),gen_random_uuid());
    UPDATE public.zalo_class_groups SET status='pending',error_message=NULL WHERE class_id=c.id;n:=n+1;
   END IF;
@@ -76,11 +80,14 @@ END;$$;
 CREATE OR REPLACE FUNCTION public.list_zalo_class_groups()
 RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public SET jit=off AS $$
  SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.last_at DESC NULLS LAST,x.class_name),'[]') FROM(
-  SELECT g.class_id,g.conversation_id,g.group_name,g.avatar,g.status,g.error_message,c.class_name,
+  SELECT g.class_id,g.conversation_id,g.group_name,g.avatar,
+   CASE WHEN g.group_uid IS NULL AND g.status IN('pending','limited') AND ctl.create_blocked_until>now() THEN 'limited' ELSE g.status END AS status,
+   coalesce(g.error_message,CASE WHEN g.group_uid IS NULL AND ctl.create_blocked_until>now() THEN ctl.last_error END) AS error_message,
+   CASE WHEN g.group_uid IS NULL AND g.status IN('pending','limited') AND ctl.create_blocked_until>now() THEN ctl.create_blocked_until END AS retry_after,c.class_name,
    g.group_uid IS NOT NULL AS connected,g.member_report,lm.content AS last_content,lm.created_at AS last_at,
    (SELECT count(*) FROM public.notifications n WHERE n.user_id=auth.uid() AND n.type='message_new' AND n.ref_id=g.conversation_id AND NOT n.is_read) AS unread_count,
    (SELECT coalesce(jsonb_agg(jsonb_build_object('name',m->>'name','status',coalesce((SELECT r->>'status' FROM jsonb_array_elements(g.member_report)r WHERE r->>'user_id'=m->>'user_id'),CASE WHEN m->>'uid' IS NULL THEN 'missing_link' ELSE 'pending' END))),'[]') FROM jsonb_array_elements(public.zalo_class_parent_members(g.class_id))m) AS members
-  FROM public.zalo_class_groups g JOIN public.classes c ON c.id=g.class_id
+  FROM public.zalo_class_groups g JOIN public.classes c ON c.id=g.class_id CROSS JOIN public.zalo_class_group_control ctl
   LEFT JOIN LATERAL(SELECT content,created_at FROM public.messages WHERE conversation_id=g.conversation_id ORDER BY created_at DESC,id DESC LIMIT 1)lm ON true
   WHERE public.can_access_zalo_class_group(g.class_id) AND NOT coalesce(c.hidden,false)
  )x;
@@ -100,7 +107,10 @@ BEGIN
  IF EXISTS(SELECT 1 FROM public.zalo_class_group_jobs WHERE status='processing') THEN RETURN NULL; END IF;
  IF NOT EXISTS(SELECT 1 FROM public.mindup_zalo_dispatch_control WHERE id=1 AND NOT paused)
   OR NOT EXISTS(SELECT 1 FROM public.zalo_automation_state WHERE id=1 AND NOT paused) THEN RETURN NULL; END IF;
- SELECT * INTO j FROM public.zalo_class_group_jobs WHERE status='pending' ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED;
+ SELECT jobs.* INTO j FROM public.zalo_class_group_jobs jobs JOIN public.zalo_class_groups groups ON groups.class_id=jobs.class_id
+ WHERE jobs.status IN('pending','limited') AND (jobs.kind<>'setup' OR groups.group_uid IS NOT NULL
+  OR NOT EXISTS(SELECT 1 FROM public.zalo_class_group_control WHERE create_blocked_until>now()))
+ ORDER BY jobs.created_at,jobs.id LIMIT 1 FOR UPDATE OF jobs SKIP LOCKED;
  IF NOT FOUND THEN RETURN NULL; END IF;
  SELECT * INTO g FROM public.zalo_class_groups WHERE class_id=j.class_id FOR UPDATE;
  IF NOT EXISTS(SELECT 1 FROM public.classes WHERE id=j.class_id AND NOT coalesce(hidden,false))
@@ -124,11 +134,15 @@ RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE j public.zalo_class_group_jobs;
 BEGIN
  IF auth.role() IS DISTINCT FROM 'service_role' THEN RAISE EXCEPTION 'Service role required'; END IF;
- IF p_status NOT IN('sent','failed','uncertain') OR length(p_result::text)>100000 THEN RAISE EXCEPTION 'Invalid result'; END IF;
+ IF p_status NOT IN('sent','failed','uncertain','limited') OR length(p_result::text)>100000 THEN RAISE EXCEPTION 'Invalid result'; END IF;
  SELECT * INTO j FROM public.zalo_class_group_jobs WHERE id=p_id AND token=p_token FOR UPDATE;
  IF NOT FOUND THEN RAISE EXCEPTION 'Invalid task lease'; END IF;
- IF j.status='sent' THEN RETURN; END IF;
+ IF j.status='sent' OR (j.status='limited' AND p_status='limited') THEN RETURN; END IF;
  IF j.status NOT IN('processing','uncertain') THEN RAISE EXCEPTION 'Task not claimed'; END IF;
+ IF p_status='limited' THEN
+  IF j.kind<>'setup' OR EXISTS(SELECT 1 FROM public.zalo_class_groups WHERE class_id=j.class_id AND group_uid IS NOT NULL) THEN RAISE EXCEPTION 'Invalid creation quota result'; END IF;
+  UPDATE public.zalo_class_group_control SET create_blocked_until=now()+interval '24 hours',last_error=left(p_error,500) WHERE id=1;
+ END IF;
  IF j.kind='setup' AND p_status='sent' THEN
   IF coalesce(p_result->>'group_uid','') !~ '^[0-9]{1,100}$' OR jsonb_typeof(p_result->'members')<>'array' THEN RAISE EXCEPTION 'Invalid group result'; END IF;
   UPDATE public.zalo_class_groups SET group_uid=p_result->>'group_uid',avatar=p_result->>'avatar',member_report=p_result->'members',
@@ -141,6 +155,14 @@ BEGIN
   UPDATE public.messages SET external_message_id=p_result->>'external_id' WHERE id=j.message_id;
  END IF;
  UPDATE public.zalo_class_group_jobs SET status=p_status,result=p_result,error_message=left(p_error,500),locked_until=NULL,updated_at=now() WHERE id=j.id;
+END;$$;
+-- Preserve explicitly requested work when a bot version previously recorded the daily quota as a failure.
+DO $$BEGIN
+ IF EXISTS(SELECT 1 FROM public.zalo_class_group_jobs WHERE kind='setup' AND status='failed' AND error_message LIKE '%đạt giới hạn tạo nhóm%') THEN
+  UPDATE public.zalo_class_group_control SET create_blocked_until=greatest(create_blocked_until,now()+interval '24 hours'),last_error='Bạn đã đạt giới hạn tạo nhóm trong ngày.' WHERE id=1;
+  UPDATE public.zalo_class_group_jobs SET status='limited' WHERE kind='setup' AND status='failed' AND error_message LIKE '%đạt giới hạn tạo nhóm%';
+  UPDATE public.zalo_class_groups SET status='limited' WHERE group_uid IS NULL AND class_id IN(SELECT class_id FROM public.zalo_class_group_jobs WHERE status='limited');
+ END IF;
 END;$$;
 CREATE OR REPLACE FUNCTION public.send_zalo_class_group_message(p_class uuid,p_request uuid,p_content text)
 RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$

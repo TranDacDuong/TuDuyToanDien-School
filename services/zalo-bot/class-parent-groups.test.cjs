@@ -1,5 +1,9 @@
 const test=require('node:test'),assert=require('node:assert/strict');
-const {provisionGroup,encodeGroup,encodeGroupUpdate}=require('./class-parent-groups');
+const {provisionGroup,encodeGroup,encodeGroupUpdate,isGroupCreationLimit}=require('./class-parent-groups');
+test('daily group creation quota is distinct from message/account limits',()=>{
+ assert.equal(isGroupCreationLimit(Error('Bạn đã đạt giới hạn tạo nhóm trong ngày.')),true);
+ assert.equal(isGroupCreationLimit(Error('429 Too many messages')),false);assert.equal(isGroupCreationLimit(Error('Không thêm được thành viên')),false);
+});
 function fixture(){
  const groups={},calls=[],receipts=new Map();let seq=900;
  const store={send:async(key,identity,run)=>{if(receipts.has(key))return receipts.get(key);const result=await run();receipts.set(key,result);return result;}};

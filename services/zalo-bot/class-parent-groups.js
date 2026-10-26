@@ -1,5 +1,9 @@
 'use strict';
 const {encodeMessage,encodeUpdate,safeRemote}=require('./zalo-sync-content');
+function isGroupCreationLimit(error){
+  const message=String(error?.message||error).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').toLowerCase();
+  return /gioi han.*tao nhom|group creation.*limit|limit.*creat.*group/.test(message);
+}
 function groupMembers(info){
   const members=new Set([...(info.memberIds||[]),...(info.memVerList||[])].map(id=>String(id).split('_')[0]));
   for(const m of info.currentMems||[])members.add(String(m.id).split('_')[0]);members.add(String(info.creatorId));
@@ -47,4 +51,4 @@ function encodeGroupUpdate(kind,event,known){
   if(!known.has(String(event?.threadId||'')) || !(event?.isGroup || event?.type===1))return null;
   const payload=encodeUpdate(kind,{...event,type:0,isGroup:false});return payload&&{...payload,action:'syncClassGroup',actorUid:String(event.data?.uidFrom||'')};
 }
-module.exports={provisionGroup,encodeGroup,encodeGroupUpdate,groupMembers};
+module.exports={provisionGroup,encodeGroup,encodeGroupUpdate,groupMembers,isGroupCreationLimit};

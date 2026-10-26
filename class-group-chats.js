@@ -1,7 +1,7 @@
 (function(){
   'use strict';
   let busy=false,attempt=null,loading=null;
-  const statuses={pending:'Chờ bot tạo/cập nhật nhóm',ready:'Đã kết nối Zalo',partial:'Đã có nhóm · còn thành viên cần kiểm tra',failed:'Tạo/cập nhật nhóm lỗi',uncertain:'Chưa xác nhận · cần kiểm tra Zalo'};
+  const statuses={pending:'Chờ bot tạo/cập nhật nhóm',ready:'Đã kết nối Zalo',partial:'Đã có nhóm · còn thành viên cần kiểm tra',failed:'Tạo/cập nhật nhóm lỗi',uncertain:'Chưa xác nhận · cần kiểm tra Zalo',limited:'Zalo giới hạn tạo nhóm · đang chờ'};
   const memberStatuses={joined:'Đã trong nhóm',missing_link:'Chưa liên kết Zalo',not_added:'Zalo chưa xác nhận thêm vào nhóm',pending:'Chờ kiểm tra'};
   function statusText(group){return statuses[group.status]||group.status;}
   async function fetchItems(){
@@ -11,6 +11,12 @@
     onFilter();
     const {data,error}=await sb.rpc('list_zalo_class_groups');
     if(error){console.warn('Không tải được nhóm lớp',error);return allFriends.filter(item=>item.isClassGroup);}
+    if(activeFriend?.isClassGroup){
+      const current=(data||[]).find(g=>g.class_id===activeFriend.id);
+      if(current){activeFriend.group=current;activeFriend.name=current.class_name;setComposerEnabled(current.connected);document.getElementById('chatSub').textContent='Nhóm phụ huynh · '+statusText(current);}
+      else{loadedMessages=[];activeFriend=null;currentConversationId=null;setComposerEnabled(false);document.getElementById('messageList').textContent='Không còn quyền truy cập nhóm lớp này.';}
+      window.refreshMessageWorkspace?.();
+    }
     return (data||[]).map(group=>({...makeConversationListItem({id:group.class_id,full_name:group.class_name,role:'class_group',avatar_url:group.avatar||'favicon.png'},
       {conversationId:group.conversation_id,preview:group.last_content||'',lastActivity:group.last_at,unreadCount:Number(group.unread_count)||0}),isClassGroup:true,group}));
   }
@@ -35,7 +41,7 @@
       if(reset||older)hasOlderMessages=rows.length===40;
       render();wrap.scrollTop=scrollToBottom?wrap.scrollHeight:older?top+wrap.scrollHeight-height:top;
       await markMessageNotificationsRead(friend.id,currentConversationId);
-    }catch(error){if(friend===activeFriend){if(!loadedMessages.length)wrap.innerHTML='<div class="empty">'+esc(error.message||'Không tải được nhóm')+'</div>';else console.warn(error);}}
+    }catch(error){if(friend===activeFriend){if(error.code==='42501'||/Không có quyền/.test(error.message||'')){loadedMessages=[];setComposerEnabled(false);}if(!loadedMessages.length)wrap.innerHTML='<div class="empty">'+esc(error.message||'Không tải được nhóm')+'</div>';else console.warn(error);}}
     finally{if(loading===friend)loading=null;}
   }
   function render(){
@@ -61,6 +67,7 @@
     const section=document.createElement('section');body.replaceChildren(section);
     const add=(tag,text)=>{const el=document.createElement(tag);el.textContent=text;section.append(el);return el;};
     add('h3',group.class_name);add('p',statusText(group));if(group.error_message)add('p',group.error_message);
+    if(group.retry_after)add('p','Thử tạo lại sau: '+new Date(group.retry_after).toLocaleString('vi-VN'));
     if(currentProfile?.role==='admin'){
       const button=add('button','Cập nhật phụ huynh');button.type='button';button.className='class-group-sync';button.onclick=async()=>{
         if(!confirm('Kiểm tra nhóm và thêm các phụ huynh hiện đang học trong lớp? Không xóa thành viên cũ.'))return;

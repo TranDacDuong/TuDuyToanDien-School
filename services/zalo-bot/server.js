@@ -19,7 +19,7 @@ const { LocalStorageWorker } = require('./local-storage-worker');
 const { readParentRelationship } = require('./parent-relationship');
 const { downloadQrImage, readImageMetadata } = require('./zalo-image');
 const { prepareOverdueTuitionMedia } = require('./overdue-tuition-media');
-const {provisionGroup,encodeGroup,encodeGroupUpdate}=require('./class-parent-groups');
+const {provisionGroup,encodeGroup,encodeGroupUpdate,isGroupCreationLimit}=require('./class-parent-groups');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -66,6 +66,7 @@ let verifiedParentCount = null;
 let classGroupUids=new Set(),nextClassGroupPoll=0,nextClassGroupState=0;
 async function syncClassGroups(){
   if(shuttingDown || gatewayBusy || !listenerConnected || !zaloApi || !GATEWAY_TOKEN || campaignStatus!=='idle' || Date.now()<nextClassGroupPoll)return;
+  if([...pendingIncoming.values()].some(p=>p.action.startsWith('finish')))return;
   nextClassGroupPoll=Date.now()+20000;gatewayBusy=true;
   try{
     if(Date.now()>=nextClassGroupState){
@@ -86,8 +87,8 @@ async function syncClassGroups(){
         result={external_id:`${job.group_uid}:${id}`};
       }
     }catch(error){
-      errorText=String(error.message||error);status=isUncertainSendError(error)||/uncertain|timeout|network|fetch failed/i.test(errorText)?'uncertain':'failed';
-      if(isZaloLimitError(error))await gatewayRequest({action:'pauseAutomation',reason:errorText});
+      errorText=String(error.message||error);status=job.kind==='setup'&&!job.group_uid&&isGroupCreationLimit(error)?'limited':isUncertainSendError(error)||/uncertain|timeout|network|fetch failed/i.test(errorText)?'uncertain':'failed';
+      if(status!=='limited'&&isZaloLimitError(error))await gatewayRequest({action:'pauseAutomation',reason:errorText});
     }
     const ack={action:'finishClassGroup',jobId:job.id,token:job.token,status,result,error:errorText};
     const key=eventKey(ack);pendingIncoming.set(key,ack);localStore.recordEvent(ack);persistIncoming();await flushIncoming();

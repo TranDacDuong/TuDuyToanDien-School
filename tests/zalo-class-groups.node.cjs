@@ -65,3 +65,22 @@ test('real group result, scoped inbox, idempotent sends and group message/media 
  await assert.rejects(db.query('SELECT list_zalo_class_group_messages($1)',[id(10)]),/Không có quyền/);
  assert.equal(await value(db,"SELECT resolve_zalo_media('999:124')"),null);
 });
+test('daily creation quota defers outstanding classes, remains idempotent and does not pause messages',async t=>{
+ const db=await fixture(t);await value(db,'SELECT queue_zalo_class_groups()');const job=await value(db,'SELECT claim_zalo_class_group_job()');
+ const args=[job.id,job.token,'limited',{},'Bạn đã đạt giới hạn tạo nhóm trong ngày.'];
+ await db.query('SELECT finish_zalo_class_group_job($1,$2,$3,$4,$5)',args);
+ const until=await value(db,'SELECT create_blocked_until FROM zalo_class_group_control');await db.query('SELECT finish_zalo_class_group_job($1,$2,$3,$4,$5)',args);
+ assert.equal(String(await value(db,'SELECT create_blocked_until FROM zalo_class_group_control')),String(until));
+ assert.equal(await value(db,'SELECT claim_zalo_class_group_job()'),null);assert.equal(await value(db,'SELECT queue_zalo_class_groups()'),0);
+ assert.equal((await value(db,'SELECT list_zalo_class_groups()'))[0].status,'limited');assert.equal(await value(db,'SELECT paused FROM mindup_zalo_dispatch_control'),false);
+ await db.exec("UPDATE zalo_class_group_control SET create_blocked_until=now()-interval '1 second'");assert.equal((await value(db,'SELECT claim_zalo_class_group_job()')).id,job.id);
+});
+test('existing class-group replies can still dispatch while new-group creation is quota blocked',async t=>{
+ const db=await fixture(t);await value(db,'SELECT queue_zalo_class_groups()');const first=await value(db,'SELECT claim_zalo_class_group_job()');
+ await db.query("SELECT finish_zalo_class_group_job($1,$2,'sent',$3)",[first.id,first.token,{group_uid:'999',members:[]}]);
+ await db.query('UPDATE classes SET hidden=false WHERE id=$1',[id(11)]);await db.query('INSERT INTO class_students VALUES($1,$2,NULL,NULL)',[id(11),id(5)]);
+ await value(db,'SELECT queue_zalo_class_groups($1)',[id(11)]);const second=await value(db,'SELECT claim_zalo_class_group_job()');
+ await db.query("SELECT finish_zalo_class_group_job($1,$2,'limited','{}','Bạn đã đạt giới hạn tạo nhóm trong ngày.')",[second.id,second.token]);
+ await value(db,"SELECT send_zalo_class_group_message($1,$2,'Reply in existing group')",[id(10),id(21)]);
+ assert.equal((await value(db,'SELECT claim_zalo_class_group_job()')).kind,'send');
+});
