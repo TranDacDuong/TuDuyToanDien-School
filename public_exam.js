@@ -595,7 +595,7 @@
         + '<span style="margin-left:auto;font-size:.75rem;color:var(--ink-mid)">'+eq.points+' điểm</span>'
         + '</div>'
         + (q.question_img ? '<img src="'+q.question_img+'" style="max-width:100%;border-radius:6px;margin-bottom:8px;display:block">' : "")
-        + '<div style="font-size:.88rem;line-height:1.6;color:var(--navy);white-space:pre-line">'+(q.question_text||"")+'</div>'
+        + '<div style="font-size:.88rem;line-height:1.6;color:var(--navy);white-space:pre-line">'+window.WordQuestionContent.render(q.question_text||"")+'</div>'
         + ansDisplay
         + '</div>';
     }).join("");

@@ -12,3 +12,7 @@ services/zalo-bot/session/
 services/zalo-bot/.env
 session/
 *.session.json
+services/word-import/.venv/
+services/word-import/.state/
+services/word-import/.env
+__pycache__/

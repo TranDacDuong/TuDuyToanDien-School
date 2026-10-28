@@ -487,9 +487,9 @@ button {
     </button>
     <div class="quickOp" data-testid="question-quick-import-word">
       <div class="quickOp-title"><span class="quickOp-icon" aria-hidden="true">W</span><strong>Nhập Từ Word</strong></div>
-      <span>Đưa file `.docx` vào popup tạo câu hỏi để giáo viên duyệt và lưu từng câu.</span>
+      <span id="wordImportSummary">Danh sách nhập và câu hỏi chờ kiểm duyệt</span>
       <div class="quickOp-actions">
-        <button class="quickOp-mini primary" data-permission="question.import" type="button" onclick="document.getElementById('wordImportInput').click()">Chọn file Word</button>
+        <button class="quickOp-mini primary" data-permission="question.import" type="button" onclick="window.WordQuestionImports.open()">Nhập Word / Chờ kiểm duyệt</button>
         <a class="quickOp-mini" href="question-word-template.docx" download>Tải file mẫu</a>
       </div>
     </div>
@@ -1211,5 +1211,8 @@ function resetQuestionForm() {
 <script src="question_AI.js"></script>
 <script src="question_modal_ai.js"></script>
 <script src="question_word_import.js"></script>
+<link rel="stylesheet" href="word-question-imports.css">
+<script src="word-question-content.js"></script>
+<script src="word-question-imports.js"></script>
 </body>
 </html>

@@ -1,4 +1,8 @@
 ﻿(function () {
+  if (typeof module === "object" && module.exports) {
+    module.exports = { parseWordQuestions, normalizeWordText, normalizeMathText };
+    return;
+  }
   const importInput = document.getElementById("wordImportInput");
   if (!importInput) return;
 
@@ -461,7 +465,10 @@
     const warnings = [];
 
     blocks.forEach((block, index) => {
-      const parsed = parseQuestionBlock(block, index, imageMap);
+      const explanation = block.match(/(?:^|\n)(?:Lời giải|Hướng dẫn giải|Giải thích|Loi giai)\s*[:.-]?\s*([\s\S]*)$/iu);
+      const parsed = parseQuestionBlock(explanation ? block.slice(0, explanation.index) : block, index, imageMap);
+      if (parsed.question) parsed.question._sourceOrdinal = index + 1;
+      if (parsed.question && explanation) parsed.question.answer_text = explanation[1].trim();
       if (parsed.question) questions.push(parsed.question);
       if (parsed.warnings.length) warnings.push(...parsed.warnings);
     });
@@ -517,7 +524,7 @@
       .replace(/(\S)(\$[^$]+\$)(?=\S)/g, "$1 $2 ")
       .replace(/(\S)(\$[^$]+\$)/g, "$1 $2")
       .replace(/(\$[^$]+\$)(\S)/g, "$1 $2")
-      .replace(/\s{2,}/g, " ")
+      .replace(/[ \t]{2,}/g, " ")
       .replace(/[ ]*\n[ ]*/g, "\n")
       .trim();
   }
@@ -706,7 +713,7 @@
       if (!optionMap.has(label)) {
         optionMap.set(label, match);
       }
-      if (optionMap.size === 4) break;
+      if (optionMap.size === orderedLabels.length) break;
     }
 
     const required = orderedLabels.filter((label, idx) => idx === 0 || label.charCodeAt(0) === orderedLabels[idx - 1].charCodeAt(0) + 1);
@@ -882,10 +889,10 @@
 
     const hasRawAnswer = Boolean(String(rawAnswer || "").trim());
     const answerTokensRaw = hasRawAnswer
-      ? matches.map((item) => extractTrueFalseToken(item.label, rawAnswer) || "F").join("")
+      ? matches.map((item) => extractTrueFalseToken(item.label, rawAnswer)).join("")
       : "";
-    const answerTokens = hasRawAnswer
-      ? (window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(answerTokensRaw, matches.length) || answerTokensRaw)
+    const answerTokens = hasRawAnswer && answerTokensRaw.length === matches.length
+      ? (globalThis.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(answerTokensRaw, matches.length) || answerTokensRaw)
       : "";
     warnings.push(`Câu ${index + 1}: hệ thống nhận đây là câu Đúng/Sai, bạn nên rà lại từng mệnh đề trước khi lưu.`);
     const questionStem = normalizeMathText(preparedBody.slice(0, matches[0]?.index || 0).trim());

@@ -517,7 +517,7 @@
       const hasImg = !!q.question_img;
       div.innerHTML = `
         <span class="type-chip ${TYPE_CLASS[q.question_type] || ""}">${TYPE_LABEL[q.question_type] || q.question_type}</span>
-        <div class="q-text">${q.question_text || "<i style='color:var(--muted)'>(Xem ảnh bên dưới)</i>"}</div>
+        <div class="q-text">${window.WordQuestionContent.render(q.question_text || '(Xem ảnh bên dưới)')}</div>
         ${hasImg ? `<img src="${q.question_img}" style="width:100%;max-height:120px;object-fit:contain;border-radius:5px;margin-top:5px;display:block;border:1px solid var(--border)">` : ""}
         <div class="q-meta">Mức ${q.difficulty || "?"} • ${q.topics?.name || ""}</div>
         ${!inExam ? `<button class="bank-add-btn" onclick="addFromBank('${q.id}')">+ Thêm</button>` : ""}`;
@@ -742,7 +742,7 @@
 
     const qtext = document.createElement("div");
     qtext.className = "eq-qtext";
-    qtext.innerHTML = `<b>Câu ${displayNum}:</b> ${q.question_text || "<i>(Câu hỏi bằng ảnh)</i>"}`;
+    qtext.innerHTML = `<b>Câu ${displayNum}:</b> ${window.WordQuestionContent.render(q.question_text || '(Câu hỏi bằng ảnh)')}`;
     main.appendChild(qtext);
 
     if (q.question_img) {
