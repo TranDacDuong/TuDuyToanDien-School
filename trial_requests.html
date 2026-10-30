@@ -99,8 +99,7 @@ tbody tr:hover td{background:#fff7ed}
     <select id="gradeFilter" class="select"><option value="">Tất cả khối</option></select>
     <select id="subjectFilter" class="select"><option value="">Tất cả môn</option></select>
     <select id="statusFilter" class="select">
-      <option value="">Đang học thử (chưa vào lớp)</option>
-      <option value="pending_schedule">Chưa chốt lịch học thử</option>
+      <option value="">Đang học thử</option>
       <option value="scheduled">Đã chốt lịch học thử</option>
       <option value="trial_1_done">Đã học thử buổi đầu tiên</option>
       <option value="trial_2_done">Đã học thử xong 2 buổi</option>
@@ -176,6 +175,14 @@ tbody tr:hover td{background:#fff7ed}
 
 <script>
 const DAYS = {1:"T2",2:"T3",3:"T4",4:"T5",5:"T6",6:"T7",7:"CN"};
+const classTrialParams = new URLSearchParams(location.search);
+const embeddedTrialClass = classTrialParams.get('classTrial');
+if(embeddedTrialClass){
+  document.body.classList.add('class-trial-embedded');
+  const style=document.createElement('style');
+  style.textContent='body.class-trial-embedded .page{display:none}body.class-trial-embedded .modal{padding:0;background:#fff;align-items:stretch}body.class-trial-embedded .modal-card{width:100%;max-height:100dvh;border:0;border-radius:0;box-shadow:none}';
+  document.head.append(style);
+}
 let S = { requests:[], classes:[], grades:[], subjects:[], classMap:{}, scheduleMap:{}, studentMap:{}, parentMap:{}, accountCheckTimers:{}, newAccountMode:{student:false,parent:false} };
 function canTrial(permission){ return window.AppPermissions?.has?.(permission, false) === true; }
 
@@ -204,14 +211,20 @@ function statusLabel(status){
   if(status === "enrolled") return "Đã thêm vào lớp";
   if(status === "cancelled") return "Hủy";
   if(status === "closed") return "Đã đóng";
-  return "Chưa chốt lịch học thử";
+  return "Đăng ký từ website";
 }
 function computedStatus(item){
   const stored = statusKey(item?.status);
   if(["cancelled","enrolled","closed"].includes(stored)) return stored;
-  if(item?.isEnrolled || item?.enrolled_in_class) return "enrolled";
+  if(!item?.managed_in_class && (item?.isEnrolled || item?.enrolled_in_class)) return "enrolled";
   if(!item?.trial_class_id || !item?.trial_session_1_at || !item?.trial_session_2_at) return "pending_schedule";
   const now = Date.now();
+  if(item.managed_in_class && item.trial_sessions?.length){
+    const ends=item.trial_sessions.map(s=>Date.parse(s.ends_at)).filter(Number.isFinite);
+    if(ends.length && now>=Math.max(...ends))return 'trial_2_done';
+    if(now>=Date.parse(item.trial_sessions[0].ends_at))return 'trial_1_done';
+    return 'scheduled';
+  }
   const first = new Date(item.trial_session_1_at).getTime();
   const second = new Date(item.trial_session_2_at).getTime();
   if(Number.isFinite(second) && now >= second) return "trial_2_done";
@@ -455,12 +468,12 @@ async function loadTrialRequests(){
     if(studentIds.length && classIds.length){
       try {
         const { data: enrolledStudents } = await sb.from("class_students")
-          .select("class_id,student_id")
+        .select("class_id,student_id,is_trial")
           .in("student_id", studentIds)
           .in("class_id", classIds)
           .is("left_at", null);
         (enrolledStudents || []).forEach(cs => {
-          enrolledStudentClassSet.add(`${cs.student_id}_${cs.class_id}`);
+          if(!cs.is_trial)enrolledStudentClassSet.add(`${cs.student_id}_${cs.class_id}`);
         });
       } catch(err) {
         console.warn("Lỗi kiểm tra học sinh đã vào lớp:", err);
@@ -498,7 +511,7 @@ async function loadTrialRequests(){
       return {
         ...item,
         isEnrolled,
-        status: (isEnrolled && item.status !== "enrolled") ? "enrolled" : item.status,
+      status: (!item.managed_in_class && isEnrolled && item.status !== "enrolled") ? "enrolled" : item.status,
         teacher: teacherMap[item.teacher_id] || null,
         linkedStudent: S.studentMap[item.student_id] || null,
         linkedParent: directParentMap[item.parent_id] || S.parentMap[item.student_id] || null
@@ -528,7 +541,7 @@ function renderRequests(){
     } else if (status) {
       matchesStatus = (effective === status);
     } else {
-      matchesStatus = (effective !== "enrolled" && effective !== "cancelled" && effective !== "closed");
+      matchesStatus = !["pending_schedule","enrolled","cancelled","closed"].includes(effective);
     }
     return (!q || haystack.includes(q)) && (!gradeFilter || itemGrade===gradeFilter) && (!subjectFilter || itemSubject===subjectFilter) && matchesStatus;
   }).sort((a,b)=>{
@@ -558,7 +571,7 @@ async function syncStatuses(){
     const current = statusKey(item.status);
     if(next === current) return false;
     if(next === "enrolled") return current !== "enrolled";
-    return ["pending_schedule","scheduled","trial_1_done"].includes(current);
+    return !item.managed_in_class && ["pending_schedule","scheduled","trial_1_done"].includes(current);
   });
   if(!updates.length) return;
   await Promise.all(updates.map(({item,next})=>sb.from("trial_lesson_requests").update({status:next, handled_at:new Date().toISOString()}).eq("id",item.id)));
@@ -1035,8 +1048,17 @@ function openTrialModal(id){
   setAccountInfo("student", item?.linkedStudent ? editableAccountHtml("student", "Đã liên kết với tài khoản học sinh", item.linkedStudent.email || "", item.linkedStudent.account_password || "", newAccountButtonHtml("student")) : "");
   setAccountInfo("parent", item?.linkedParent ? editableAccountHtml("parent", "Đã liên kết với tài khoản phụ huynh", item.linkedParent.email || "", item.linkedParent.account_password || "", newAccountButtonHtml("parent")) : "");
   document.getElementById("trialModal").classList.add("show");
+  const officialButton=document.querySelector('[onclick="addTrialToClassFromModal()"]');
+  if(officialButton){officialButton.textContent='Chuyển học chính thức';officialButton.style.display=item?.managed_in_class?'':'none';}
+  if(embeddedTrialClass){
+    const cls=S.classMap[embeddedTrialClass];
+    if(!cls){alert('Không có quyền xem lớp này.');return;}
+    renderGradeOptions(cls.grades?.name||item?.grade||'');renderSubjectOptions(cls.subjects?.name||item?.subject||'');populateClassSelect();
+    document.getElementById('gradeText').disabled=true;document.getElementById('subjectText').disabled=true;
+    document.getElementById('classId').value=embeddedTrialClass;document.getElementById('classId').disabled=true;loadClassSchedules(item);
+  }
 }
-function closeTrialModal(){ document.getElementById("trialModal").classList.remove("show"); }
+function closeTrialModal(){ document.getElementById("trialModal").classList.remove("show"); if(embeddedTrialClass)parent.postMessage({type:'class-trial-close'},location.origin); }
 function payloadFromForm(){
   const schedule1 = document.getElementById("schedule1Id").value || null;
   const schedule2 = document.getElementById("schedule2Id").value || null;
@@ -1073,7 +1095,15 @@ async function saveTrialPayload(id, payload){
   }
   return result;
 }
+let savingTrial=false;
 async function saveTrialRequest(options={}){
+  if(savingTrial)return null;
+  savingTrial=true;
+  try{return await saveTrialRequestOnce(options);}
+  catch(error){alert('Không thể lưu học thử: '+(error.message||error));return null;}
+  finally{savingTrial=false;}
+}
+async function saveTrialRequestOnce(options={}){
   const id = document.getElementById("editId").value;
   if(!canTrial(id ? 'trial.update' : 'trial.create')){ alert("Bạn không có quyền cập nhật đăng ký học thử."); return null; }
   let payload = payloadFromForm();
@@ -1081,8 +1111,8 @@ async function saveTrialRequest(options={}){
     alert("Vui lòng nhập đủ họ tên học sinh, SĐT học sinh, trường học sinh, họ tên phụ huynh, SĐT phụ huynh, khối và môn.");
     return null;
   }
-  if((payload.trial_class_id || payload.trial_schedule_1_id || payload.trial_schedule_2_id || payload.trial_session_1_at || payload.trial_session_2_at) && !(payload.trial_class_id && payload.trial_schedule_1_id && payload.trial_schedule_2_id && payload.trial_session_1_at && payload.trial_session_2_at)){
-    alert("Nếu chốt lịch học thử, vui lòng chọn đủ lớp, lịch và thời gian cho cả 2 buổi.");
+  if(!(payload.trial_class_id && payload.trial_schedule_1_id && payload.trial_schedule_2_id && payload.trial_session_1_at && payload.trial_session_2_at)){
+    alert("Chọn đủ lớp và lịch cho cả 2 buổi học thử trước khi lưu.");
     return null;
   }
   if(payload._schedule1 && payload._date1 && !dateMatchesSchedule(payload._date1, payload._schedule1)){ alert("Ngày học thử buổi 1 phải đúng thứ của lịch đã chọn."); return null; }
@@ -1109,8 +1139,10 @@ async function saveTrialRequest(options={}){
     payload.status = computedStatus({...payload, status: payload.trial_class_id ? "scheduled" : "pending_schedule"});
   }
   if(!id) payload.source_url = "admin";
-  const result = await saveTrialPayload(id, payload);
+  const legacyTerminal=currentItem && !currentItem.managed_in_class && ['enrolled','closed','cancelled'].includes(currentStatus);
+  const result = legacyTerminal ? await saveTrialPayload(id,payload) : await sb.rpc('save_class_trial',{p_id:id||null,p_payload:payload});
   if(result.error){ alert("Không thể lưu học thử: "+result.error.message); return null; }
+  if(embeddedTrialClass){parent.postMessage({type:'class-trial-saved'},location.origin);return true;}
   if(!options.keepOpen) closeTrialModal();
   if(!options.silent) toast("Đã lưu học thử");
   await loadTrialRequests();
@@ -1132,6 +1164,11 @@ async function deleteTrial(id){
   if(!canTrial('trial.delete')){ alert("Bạn không có quyền xóa đăng ký học thử."); return; }
   if(!id) return;
   if(!confirm("Xóa học sinh này khỏi danh sách học thử? Chỉ xóa khỏi danh sách học thử, không xóa tài khoản học sinh nếu đã tạo.")) return;
+  const managed=S.requests.find(row=>row.id===id&&row.managed_in_class);
+  if(managed){
+    const {error}=await sb.rpc('control_class_trial',{p_id:id,p_action:'stop',p_date:null,p_schedule:null});
+    if(error){alert(error.message);return;}closeTrialModal();await loadTrialRequests();return;
+  }
   const previous = S.requests.slice();
   S.requests = S.requests.filter(row => String(row.id) !== String(id));
   closeTrialModal();
@@ -1184,6 +1221,13 @@ async function addTrialToClass(id){
   if(!canTrial('trial.class.assign')){ alert("Bạn không có quyền xếp học sinh vào lớp."); return; }
   const item = S.requests.find(row=>row.id===id);
   if(!item){ alert("Không tìm thấy học sinh học thử này."); return; }
+  if(item.managed_in_class){
+    const last=(item.trial_sessions||[]).map(s=>s.date).sort().at(-1);
+    const next=new Date(last+'T12:00:00Z');next.setUTCDate(next.getUTCDate()+1);
+    const date=askClassJoinDate(next.toISOString().slice(0,10));if(!date)return;
+    const {error}=await sb.rpc('control_class_trial',{p_id:id,p_action:'official',p_date:date,p_schedule:null});
+    if(error){alert(error.message);return;}closeTrialModal();await loadTrialRequests();return;
+  }
   if(!item.student_id){ alert("Hãy tạo hoặc link tài khoản học sinh trước khi thêm vào lớp."); return; }
   if(!item.trial_class_id){ alert("Chưa chọn lớp học thử."); return; }
   if(computedStatus(item)!=="trial_2_done" && !confirm("Học sinh chưa hoàn thành đủ 2 buổi học thử. Bạn vẫn muốn thêm vào lớp?")) return;
@@ -1287,6 +1331,7 @@ async function addTrialToClass(id){
 async function addTrialToClassFromModal(){
   const id = document.getElementById("editId").value;
   if(!id){ alert("Hãy lưu học sinh học thử trước khi thêm vào lớp."); return; }
+    if(S.requests.some(row=>row.id===id&&row.managed_in_class)){await addTrialToClass(id);return;}
   const saved = await saveTrialRequest({keepOpen:true,silent:true});
   if(!saved) return;
   await addTrialToClass(id);
@@ -1299,7 +1344,7 @@ async function addTrialToClassFromModal(){
 });
 document.getElementById("statusFilter").addEventListener("change",renderRequests);
 if (new URLSearchParams(location.search).get('show') === 'pending') {
-  document.getElementById('statusFilter').value = 'pending_schedule';
+  document.getElementById('statusFilter').value = 'all';
 }
 document.getElementById("gradeFilter").addEventListener("change",()=>{ renderSubjectFilter(); renderRequests(); });
 document.getElementById("subjectFilter").addEventListener("change",renderRequests);
@@ -1322,9 +1367,10 @@ window.MindupLiveUI?.watchTable?.("trial_lesson_requests", loadTrialRequests);
   if(!user){ location.href = "index.html"; return; }
   const {data:profile} = await sb.from("users").select("id,role").eq("id",user.id).maybeSingle();
   await window.AppPermissions?.load?.(profile || {id:user.id,role:""});
-  if(!window.AppPermissions?.has?.("page.trial_requests", false)){ location.href = "dashboard.html"; return; }
+  if(!window.AppPermissions?.has?.(embeddedTrialClass ? "page.classes" : "page.trial_requests", false)){ location.href = "dashboard.html"; return; }
   window.AppPermissions?.applyToDom?.();
   await loadTrialRequests();
+  if(embeddedTrialClass)openTrialModal(classTrialParams.get('trialId')||null);
 })();
 </script>
 </body>

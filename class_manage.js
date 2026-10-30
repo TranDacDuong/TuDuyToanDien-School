@@ -711,7 +711,7 @@
       "id,class_name,tuition_fee,tuition_type,makeup_fee,sessions_per_week",
       "grades(name),subjects(name)",
       "class_schedules(id,session_no,weekday,start_time,end_time,effective_from,rooms:rooms(room_name,capacity))",
-      "students:class_students!fk_class(id,student_id,joined_at,left_at,user:users!fk_student(id,full_name,school))"
+      "students:class_students!fk_class(id,student_id,joined_at,left_at,is_trial,tuition_starts_on,user:users!fk_student(id,full_name,school))"
     ].join(",")).eq("id",_classId).single();
 
     if(error){
@@ -892,21 +892,35 @@
     const evaluationSessionMap = buildSessionMapByDate(evaluationSessions);
 
     const { data: trialReqs } = await sb.from("trial_lesson_requests")
-      .select("student_id,trial_class_id,trial_session_1_at,trial_session_2_at")
+      .select("id,student_id,trial_class_id,trial_session_1_at,trial_session_2_at,trial_sessions,managed_in_class,status")
       .eq("trial_class_id", _classId);
 
     const _trialDateMap = {};
+    const trialOccurrenceKeys = new Set();
+    window.ClassTrials?.setContext({classId:_classId,className:_className,requests:trialReqs || [],schedules:data.class_schedules || [],refresh:loadAndRender});
     (trialReqs || []).forEach(tr => {
       if (tr.student_id) {
-        if (tr.trial_session_1_at) {
+        (tr.trial_sessions || []).forEach(session => {
+          if (!session.date) return;
+          const membership=visibleStudents.find(s=>s.student_id===tr.student_id);
+          if(membership?.left_at && session.date>membership.left_at.slice(0,10))return;
+          _trialDateMap[tr.student_id + "_" + session.date] = true;
+          trialOccurrenceKeys.add(tr.student_id + "_" + session.date + "_" + session.schedule_id);
+          if(session.date < mStart || session.date > mEnd || !visibleStudents.some(s=>s.student_id===tr.student_id))return;
+          const schedule=(data.class_schedules||[]).find(s=>Number(s.id)===Number(session.schedule_id));
+          if(schedule && !dates.some(item=>item.date===session.date && Number(item.schedule_id)===Number(session.schedule_id)))
+            dates.push({date:session.date,schedule_id:Number(session.schedule_id),session_no:Number(session.session_no)||1,schedule});
+        });
+        if (!tr.trial_sessions?.length && tr.trial_session_1_at) {
           _trialDateMap[tr.student_id + "_" + tr.trial_session_1_at.slice(0, 10)] = true;
         }
-        if (tr.trial_session_2_at) {
+        if (!tr.trial_sessions?.length && tr.trial_session_2_at) {
           _trialDateMap[tr.student_id + "_" + tr.trial_session_2_at.slice(0, 10)] = true;
         }
       }
     });
 
+    dates.sort((a,b)=>a.date.localeCompare(b.date)||a.session_no-b.session_no);
     (attData || []).forEach(a => {
       if (!a.status_overridden && _trialDateMap[a.student_id + "_" + a.date]) {
         _attendanceMap[a.student_id + "_" + a.date + "_" + (a.schedule_id || 0)] = "trial";
@@ -930,7 +944,7 @@
       dates.forEach(item=>{
         const d = item.date, scheduleId = item.schedule_id;
         const cellStyle = 'padding:4px;'+attendanceSessionStyle(item.session_no);
-        if(!getStudentSchedules(me.student_id, schedulesThisMonth, d).some(s => Number(s.id) === scheduleId)){
+        if(!getStudentSchedules(me.student_id, schedulesThisMonth, d).some(s => Number(s.id) === scheduleId) && !trialOccurrenceKeys.has(me.student_id+"_"+d+"_"+scheduleId)){
           myCells+='<td class="center" style="'+cellStyle+'"></td>';
           return;
         }
@@ -1013,7 +1027,7 @@
       dates.forEach(item=>{
         const d = item.date, scheduleId = item.schedule_id, sessionNo = item.session_no;
         const cellStyle = 'padding:4px;'+attendanceSessionStyle(sessionNo);
-          if(!getStudentSchedules(s.student_id, schedulesThisMonth, d).some(sc => Number(sc.id) === scheduleId)){
+          if(!getStudentSchedules(s.student_id, schedulesThisMonth, d).some(sc => Number(sc.id) === scheduleId) && !trialOccurrenceKeys.has(s.student_id+"_"+d+"_"+scheduleId)){
           cells+='<td class="center" style="'+cellStyle+'"></td>';
           return;
         }
@@ -1061,6 +1075,7 @@
         '<td style="text-align:left;font-weight:600;position:sticky;left:0;background:#fff;z-index:1;'+
         'border-right:1px solid var(--border);padding:6px 10px">'+
         studentNameHtml+
+        (window.ClassTrials?.studentActions(s) || "")+
         inlineStopBtn+
         (!isActive?'<br><span style="font-size:.7rem;color:var(--ink-light);font-weight:400">nghỉ '+left+"</span>":"")+
         "</td>"+cells+
@@ -1095,6 +1110,7 @@
     tc.innerHTML= scheduleLoadWarning +
       '<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">'+
       '<button onclick="cvOpenAddStudent()" class="btn btn-primary btn-sm">+ Thêm học sinh</button>'+
+      (window.ClassTrials?.canManage() ? '<button type="button" onclick="ClassTrials.openAdd()" class="btn btn-outline btn-sm">+ Học sinh học thử</button>' : '')+
       (canEvaluateClassSession(role) ? '<button onclick="cvOpenOfflineTestScoreModal()" class="btn btn-outline btn-sm">+ Thêm điểm đề kiểm tra</button>' : '')+
       '</div>'+
       '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">'+
@@ -1849,6 +1865,9 @@
 
 
   window.cvStopStudent = async function(classId,studentId){
+    if(_cachedClass?.students?.some(s=>s.student_id===studentId&&s.is_trial)){
+      window.ClassTrials?.stopStudent(studentId);return;
+    }
     if(!confirm("Xác nhận ngừng học cho học sinh này?")) return;
     const sb=getSb(), today=todayStr();
     await sb.from("class_students").update({left_at:new Date().toISOString()}).eq("class_id",classId).eq("student_id",studentId);

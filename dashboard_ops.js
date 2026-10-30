@@ -341,13 +341,13 @@
         ] = await Promise.all([
         fetchAllPages(() => sb.from("tuition_payments").select("student_id,month,amount_due,amount_paid,locked_at,gross_components").lte("month", thisMonthStart).order("month", { ascending: true })),
         fetchAllPages(() => sb.from("users").select("id,role,created_at").eq("role", "student").order("created_at", { ascending: true })),
-        fetchAllPages(() => sb.from("class_students").select("class_id,student_id,joined_at,left_at").order("joined_at", { ascending: true })),
+        fetchAllPages(() => sb.from("class_students").select("class_id,student_id,joined_at,left_at,is_trial,tuition_starts_on").order("joined_at", { ascending: true })),
         fetchAllPages(() => sb.from("classes").select("id,class_name,hidden,tuition_fee,tuition_type,makeup_fee,subjects(name),class_schedules(id,session_no,weekday,start_time,end_time,effective_from)").eq("hidden", false).order("class_name", { ascending: true })),
           fetchAllPages(() => sb.from("attendance").select("class_id,student_id,date,status,status_overridden,schedule_id").lte("date", toDate).order("date", { ascending: true })),
           fetchAllPages(() => sb.from("class_student_schedules").select("class_id,student_id,schedule_id,effective_from")),
           fetchAllPages(() => sb.from("exam_results").select("class_id,submitted_at,score_auto,score_total,exam:exams(total_points,classes(class_name,subjects(name)))").not("submitted_at", "is", null).order("submitted_at", { ascending: true })),
           fetchAllPages(() => sb.from("class_session_scores").select("class_id,score,max_score,created_at,class_sessions(session_date)").order("created_at", { ascending: true })),
-          fetchAllPages(() => sb.from("trial_lesson_requests").select("student_id,trial_class_id,trial_session_1_at,trial_session_2_at")),
+          fetchAllPages(() => sb.from("trial_lesson_requests").select("student_id,trial_class_id,trial_session_1_at,trial_session_2_at,trial_sessions")),
           fetchAllPages(() => sb.from("supplementary_sessions").select("id,parent_class_id,topic,session_date,fee_per_student,status,students:supplementary_session_students(student_id,attendance_status,tuition_fee,tuition_charged)").eq("status", "completed").lte("session_date", toDate)),
         ]);
         const firstError = tuitionRes.error || studentRes.error || classStudentRes.error || classRes.error || attendanceRes.error || chosenScheduleRes.error || examResultRes.error || sessionScoreRes.error || trialRes.error || supplementaryRes.error;

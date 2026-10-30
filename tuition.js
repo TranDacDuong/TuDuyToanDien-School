@@ -1182,7 +1182,7 @@ Nhập số tiền hoàn lại (>0):`,
                  class_schedules(id, session_no, weekday, start_time, end_time, effective_from)`)
         .eq("hidden", false);
       let studentsQuery = sb.from("class_students")
-        .select(`id, class_id, student_id, joined_at, left_at,
+        .select(`id, class_id, student_id, joined_at, left_at, is_trial, tuition_starts_on,
                  user:users!fk_student(id, full_name, email, phone)`);
       if (restrictedToAssignedClasses) {
         classesQuery = classesQuery.in("id", scopedClassIds);
@@ -1213,7 +1213,7 @@ Nhập số tiền hoàn lại (>0):`,
       let schedulesQuery = sb.from("class_student_schedules")
         .select("class_id, student_id, schedule_id, effective_from");
       let trialsQuery = sb.from("trial_lesson_requests")
-        .select("student_id, trial_class_id, trial_session_1_at, trial_session_2_at");
+        .select("student_id, trial_class_id, trial_session_1_at, trial_session_2_at, trial_sessions");
       let supplementaryQuery = sb.from("supplementary_sessions")
         .select(`
           id, parent_class_id, topic, session_date, starts_at, ends_at, fee_per_student, status,
@@ -1445,7 +1445,7 @@ Nhập số tiền hoàn lại (>0):`,
                  class_schedules(id, session_no, weekday, start_time, end_time, effective_from)`)
         .eq("hidden", false),
       sb.from("class_students")
-        .select(`id, class_id, student_id, joined_at, left_at,
+        .select(`id, class_id, student_id, joined_at, left_at, is_trial, tuition_starts_on,
                  user:users!fk_student(id, full_name, email, phone)`),
       sb.from("class_student_schedules")
         .select("class_id, student_id, schedule_id, effective_from"),
@@ -1486,7 +1486,7 @@ Nhập số tiền hoàn lại (>0):`,
         .gte("month", queryStart)
         .lte("month", ymToDate(today)),
       sb.from("trial_lesson_requests")
-        .select("student_id, trial_class_id, trial_session_1_at, trial_session_2_at")
+        .select("student_id, trial_class_id, trial_session_1_at, trial_session_2_at, trial_sessions")
         .in("student_id", studentIds),
       sb.from("supplementary_sessions")
         .select(`

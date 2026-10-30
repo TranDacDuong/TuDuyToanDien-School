@@ -147,15 +147,18 @@
     (trialReqs || []).forEach(tr => {
       if (tr.student_id) {
         const cId = tr.trial_class_id || "";
+        (tr.trial_sessions || []).forEach(session => {
+          if (cId && session.date) trialDateMap[`${tr.student_id}_${cId}_${session.date}`] = true;
+        });
         if (tr.trial_session_1_at) {
           const d1 = tr.trial_session_1_at.slice(0, 10);
           if (cId) trialDateMap[`${tr.student_id}_${cId}_${d1}`] = true;
-          trialDateMap[`${tr.student_id}_${d1}`] = true;
+          if (!tr.trial_sessions?.length) trialDateMap[`${tr.student_id}_${d1}`] = true;
         }
         if (tr.trial_session_2_at) {
           const d2 = tr.trial_session_2_at.slice(0, 10);
           if (cId) trialDateMap[`${tr.student_id}_${cId}_${d2}`] = true;
-          trialDateMap[`${tr.student_id}_${d2}`] = true;
+          if (!tr.trial_sessions?.length) trialDateMap[`${tr.student_id}_${d2}`] = true;
         }
       }
     });
@@ -206,6 +209,11 @@
       const cls = classMap[cs.class_id];
       if (!cls) return;
 
+      // New in-class trials cannot leak into the supplementary-only fallback below.
+      if (cs.is_trial) { processedStudentClasses.add(`${cs.student_id}_${cs.class_id}`); return; }
+      const billingStart = cs.tuition_starts_on || "";
+      if (billingStart && billingStart > mEnd) { processedStudentClasses.add(`${cs.student_id}_${cs.class_id}`); return; }
+
       const joined = cs.joined_at ? cs.joined_at.slice(0, 10) : "0000-00-00";
       const left = cs.left_at ? cs.left_at.slice(0, 10) : "9999-99-99";
       if (joined > mEnd || left < mStart) return;
@@ -215,6 +223,7 @@
       const schedules = cls.class_schedules || [];
       const chosenRows = chosenMap[`${cs.student_id}_${cs.class_id}`];
       const activeOccurrences = generateOccurrencesForStudent(schedules, ym, chosenRows).filter(item => {
+        if (billingStart && item.date < billingStart) return false;
         if (item.date > left) return false;
         if (item.date >= joined) return true;
         const actualStatus = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item);
@@ -231,6 +240,7 @@
         const scheduleId = Number(row.schedule_id || 0);
         const key = `${date}_${scheduleId}`;
         if (!date || occurrenceKeys.has(key) || date > left) return;
+        if (billingStart && date < billingStart) return;
         const isTrial = Boolean(
           trialDateMap[`${cs.student_id}_${cs.class_id}_${date}`] ||
           trialDateMap[`${cs.student_id}_${date}`]
@@ -294,6 +304,7 @@
       let suppTotalFee = 0;
 
       studentSupps.forEach(item => {
+        if (billingStart && item.date < billingStart) return;
         const sess = item.session;
         const st = item.student;
         const attStatus = st.attendance_status || "present";

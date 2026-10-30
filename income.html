@@ -1992,13 +1992,16 @@
       const cls = context.classesMap[cs.class_id];
       if (!cls) return;
 
+      if (cs.is_trial) return;
+      const billingStart = cs.tuition_starts_on || "";
+      if (billingStart && billingStart > mEnd) return;
       const joined = cs.joined_at ? cs.joined_at.slice(0, 10) : "0000-00-00";
       const left = cs.left_at ? cs.left_at.slice(0, 10) : "9999-99-99";
       if (joined > mEnd || left < mStart) return;
 
       const chosenIds = context.chosenMap[`${cs.student_id}_${cs.class_id}`];
       const activeOccurrences = generateOccurrencesForStudent(cls.class_schedules || [], ym, chosenIds).filter(item => {
-        if (item.date > left) return false;
+        if (item.date > left || (billingStart && item.date < billingStart)) return false;
         if (item.date >= joined) return true;
         const actualStatus = attendanceStatusFor(context.attMap, cs.student_id, cs.class_id, item);
         return actualStatus === "present" || actualStatus === "makeup";
@@ -2010,6 +2013,7 @@
         const scheduleId = Number(row.schedule_id || 0);
         const key = `${date}_${scheduleId}`;
         if (!date || occurrenceKeys.has(key) || date > left) return;
+        if (billingStart && date < billingStart) return;
         if (date < joined && status !== "present" && status !== "makeup") return;
         activeOccurrences.push({ date, schedule_id: scheduleId, session_no: 0, schedule: null });
         occurrenceKeys.add(key);
@@ -2110,13 +2114,16 @@
       const cls = context.classesMap[cs.class_id];
       if (!cls) return;
 
+      if (cs.is_trial) return;
+      const billingStart = cs.tuition_starts_on || "";
+      if (billingStart && billingStart > mEnd) return;
       const joined = cs.joined_at ? cs.joined_at.slice(0, 10) : "0000-00-00";
       const left = cs.left_at ? cs.left_at.slice(0, 10) : "9999-99-99";
       if (joined > mEnd || left < mStart) return;
 
       const chosenIds = context.chosenMap[`${cs.student_id}_${cs.class_id}`];
       const activeOccurrences = generateOccurrencesForStudent(cls.class_schedules || [], ym, chosenIds).filter(item => {
-        if (item.date > left) return false;
+        if (item.date > left || (billingStart && item.date < billingStart)) return false;
         if (item.date >= joined) return true;
         const actualStatus = attendanceStatusFor(context.attMap, cs.student_id, cs.class_id, item);
         return actualStatus === "present" || actualStatus === "makeup";
@@ -2128,6 +2135,7 @@
         const scheduleId = Number(row.schedule_id || 0);
         const key = `${date}_${scheduleId}`;
         if (!date || occurrenceKeys.has(key) || date > left) return;
+        if (billingStart && date < billingStart) return;
         if (date < joined && status !== "present" && status !== "makeup") return;
         activeOccurrences.push({ date, schedule_id: scheduleId, session_no: 0, schedule: null });
         occurrenceKeys.add(key);
@@ -2643,7 +2651,7 @@
         safeFetchAllRows(() => sb.from("class_teachers").select("teacher_id, class_id")),
         safeFetchAllRows(() => sb.from("course_managers").select("teacher_id, course_id")),
         safeFetchAllRows(() => sb.from("classes").select("id, class_name, tuition_fee, tuition_type, makeup_fee, class_schedules(id, session_no, weekday, start_time, end_time, effective_from)").eq("hidden", false)),
-        safeFetchAllRows(() => sb.from("class_students").select("class_id, student_id, joined_at, left_at")),
+        safeFetchAllRows(() => sb.from("class_students").select("class_id, student_id, joined_at, left_at, is_trial, tuition_starts_on")),
         safeFetchAllRows(() => sb.from("attendance").select("student_id, class_id, date, status, schedule_id").gte("date", mStart).lte("date", mEnd)),
         safeFetchAllRows(() => sb.from("tuition_payments").select("*").eq("month", mStart)),
         safeFetchAllRows(() => sb.from("class_student_schedules").select("class_id, student_id, schedule_id, effective_from")),
@@ -3089,7 +3097,7 @@
         { data: coursesData }
       ] = await Promise.all([
         sb.from("classes").select("id, class_name, tuition_fee, tuition_type, makeup_fee, class_schedules(id, session_no, weekday, start_time, end_time, effective_from)").eq("hidden", false),
-        sb.from("class_students").select("class_id, student_id, joined_at, left_at, user:users!fk_student(id, full_name)"),
+        sb.from("class_students").select("class_id, student_id, joined_at, left_at, is_trial, tuition_starts_on, user:users!fk_student(id, full_name)"),
         sb.from("attendance").select("student_id, class_id, date, status, schedule_id").gte("date", mStart).lte("date", mEnd),
         sb.from("tuition_payments").select("*").eq("month", mStart),
         sb.from("class_student_schedules").select("class_id, student_id, schedule_id, effective_from"),
@@ -3160,13 +3168,16 @@
         const cls = classesMap[cs.class_id];
         if (!cls) return;
 
+        if (cs.is_trial) return;
+        const billingStart = cs.tuition_starts_on || "";
+        if (billingStart && billingStart > mEnd) return;
         const joined = cs.joined_at ? cs.joined_at.slice(0, 10) : "0000-00-00";
         const left = cs.left_at ? cs.left_at.slice(0, 10) : "9999-99-99";
         if (joined > mEnd || left < mStart) return;
 
         const chosenIds = chosenMap[`${cs.student_id}_${cs.class_id}`];
         const activeOccurrences = generateOccurrencesForStudent(cls.class_schedules || [], ym, chosenIds).filter(item => {
-          if (item.date > left) return false;
+          if (item.date > left || (billingStart && item.date < billingStart)) return false;
           if (item.date >= joined) return true;
           const actualStatus = attendanceStatusFor(attMap, cs.student_id, cs.class_id, item);
           return actualStatus === "present" || actualStatus === "makeup";
@@ -3178,6 +3189,7 @@
           const scheduleId = Number(row.schedule_id || 0);
           const key = `${date}_${scheduleId}`;
           if (!date || occurrenceKeys.has(key) || date > left) return;
+          if (billingStart && date < billingStart) return;
           if (date < joined && status !== "present" && status !== "makeup") return;
           activeOccurrences.push({
             date,

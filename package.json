@@ -16,6 +16,7 @@
     "cleanup:e2e": "node scripts/cleanup-live-test-data.js"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.13",
     "@playwright/test": "^1.54.2"
   }
 }
