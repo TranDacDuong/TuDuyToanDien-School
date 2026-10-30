@@ -19,17 +19,20 @@ protected during question splitting, then restored. Plain LaTeX remains editable
 `[[WIMG:job-id/sha256.png]]`; tables use bounded base64 JSON `[[WTABLE:...]]`, never arbitrary HTML.
 `word-question-content.js` renders these safely on question-bank and exam surfaces.
 
-## Review Isolation
+## Immediate Availability And Review
 
-Drafts live in `word_question_import_items`, not `question_bank`. They are not eligible for exams,
-random questions, games, or student assignments. Teachers/assistants see their own imports; admins
-can review all imports. Both import and create permissions are checked in the database before approval.
-Approval inserts the existing question-bank fields transactionally. Repeated approval returns the same ID.
-Answers are never inferred with AI or defaulted to false. A missing answer must be filled before approval.
+Each saved worker batch also creates usable `question_bank` records with a separate pending review flag.
+`word_question_import_items` retains source payloads, warnings and the linked question ID for later review.
+Teachers/assistants see their own imports; admins can review all imports. Import and create permissions
+are checked before publishing; updating or hiding an existing record also requires the corresponding permission.
+Approval updates that same question ID, preserving exam references; rejection hides it without deleting it.
+Retries and migration backfills never duplicate a linked question or resurrect one deleted from the bank.
+Answers are never inferred with AI or defaulted to false. Missing answers do not block initial availability,
+but must be filled before approval. Reviewing opens the latest bank content, including edits made there.
 
 ## Setup
 
-1. Apply `SQL Word question imports.sql` to the project.
+1. Apply `SQL Word question imports.sql`, then `SQL Word questions immediate bank.sql` to the project.
 2. Deploy `supabase/functions/word-import-gateway` with `verify_jwt=false`. It authenticates the laptop
    using the existing project secret `ZALO_GATEWAY_TOKEN`; no service-role key is placed on the web or laptop.
 3. Run `install-worker.ps1` on the center laptop (requires Python 3.10+, Git, Node.js, and Office XSL files).
@@ -58,5 +61,5 @@ node --test services/word-import/word-import.test.cjs
 npx playwright test tests/word-question-imports.spec.js --workers=1
 ```
 
-`database.test.sql` exercises permission guards, drafts, duplicate batches, pause/resume and approval
+`database.test.sql` exercises permission guards, immediate availability, duplicate batches, pause/resume and approval
 inside a transaction that rolls back all test rows, including its approved test question.

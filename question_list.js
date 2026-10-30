@@ -309,11 +309,13 @@ function isAnswerMissing(q) {
 function getAnswerStatusValue(q) {
   if (q?.question_type === "essay") return "not_required"
   if (isAnswerMissing(q)) return "missing"
+  if (["pending","needs_attention"].includes(q?.word_import_review_status)) return "unreviewed"
   return q?.answer_status === "ai" ? "ai" : "reviewed"
 }
 
 function getAnswerStatusMeta(q) {
   const status = getAnswerStatusValue(q)
+  if (status === "unreviewed") return { label: "Chưa kiểm duyệt", className: "status-ai" }
   if (status === "missing") return { label: "Chưa có đáp án", className: "status-missing" }
   if (status === "ai") return { label: "Đáp án AI", className: "status-ai" }
   if (status === "not_required") return { label: "Không bắt buộc", className: "status-neutral" }
@@ -676,6 +678,8 @@ function render() {
             missingAnswer ? "row-missing-answer" : "",
           ].filter(Boolean).join(" ")
           const hiddenBadge = q.hidden ? `<span class="hidden-badge">Ẩn</span>` : ""
+          const importBadge = ["pending","needs_attention"].includes(q.word_import_review_status)
+            ? '<span class="status-badge status-ai">Chưa kiểm duyệt</span>' : ""
           const statusBadge = missingAnswer
             ? `<span class="status-badge status-missing">Chưa có đáp án</span>`
             : `<span class="status-badge status-ok">${q.question_type === "essay" ? "Không bắt buộc" : "Đã có đáp án"}</span>`
@@ -694,7 +698,7 @@ function render() {
         <td class="${faded}">${questionSubject(q)?.name || ""}</td>
         <td class="${faded}">${questionTopicName(q)}</td>
         <td class="${faded}">${typeText[q.question_type] || q.question_type}</td>
-        <td class="${faded}">${statusBadge}</td>
+        <td class="${faded}">${statusBadge}${importBadge}</td>
         <td class="${faded}">${q.difficulty ?? ""}</td>
         <td class="${faded}">${q.answer_count || 0}</td>
         <td class="answerCell ${faded}">${escapeHtml(q.answer || "")}</td>

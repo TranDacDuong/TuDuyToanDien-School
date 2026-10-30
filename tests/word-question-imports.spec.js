@@ -8,11 +8,13 @@ async function setup(page){
     const job={id:'00000000-0000-4000-8000-000000000000',file_name:'Mẫu tài liệu sách.docx',status:'completed',progress:{saved:22,total:22,converted:128}};
     const table=btoa(JSON.stringify([[{text:'x',colspan:1,rowspan:1},{text:'$\\frac{1}{2}$',colspan:1,rowspan:1}]]));
     const data=[{job_id:job.id,ordinal:1,review_status:'needs_attention',warnings:['Kiểm tra công thức và đáp án trước khi duyệt.'],payload:{question_text:'Cho tam giác $ABC$.\nA. $\\vec{AB}+\\vec{BC}=\\vec{AC}$\nB. 2\nC. 3\nD. 4\n[[WTABLE:'+table+']]',question_type:'multi_choice',answer:'B',answer_count:4,difficulty:5}}];
-    window._calls=[];window.AppPermissions={has:()=>true};
+    data[0].linked_question_id='question-id';
+    const liveQuestion={...data[0].payload,id:'question-id',answer:'C'};
+    window._calls=[];window._liveQuestion=liveQuestion;window.AppPermissions={has:()=>true};
     window.sb={
-      from(table){let result={data:table==='word_question_imports'?[job]:table==='topics'?[{id:'topic',name:'Vectơ',subjects:{name:'Toán',grades:{name:'10'}}}]:table==='word_question_worker_state'?{last_seen:new Date().toISOString()}:data,count:1};
+      from(table){let result={data:table==='word_question_imports'?[job]:table==='topics'?[{id:'topic',name:'Vectơ',subjects:{name:'Toán',grades:{name:'10'}}}]:table==='word_question_worker_state'?{last_seen:new Date().toISOString()}:table==='question_bank'?liveQuestion:data,count:1};
         const query={select(){return this},order(){return this},limit(){return Promise.resolve(result)},eq(){return this},maybeSingle(){return Promise.resolve(result)},range(){return Promise.resolve(result)},then(resolve){return Promise.resolve(result).then(resolve)}};return query;},
-      rpc(name,args){window._calls.push({name,args});if(name==='review_word_question_import')data[0].review_status=args.p_approve?'approved':'rejected';return Promise.resolve({data:'question-id'});},
+      rpc(name,args){window._calls.push({name,args});if(name==='review_word_question_import'){data[0].review_status=args.p_approve?'approved':'rejected';Object.assign(liveQuestion,args.p_payload,{hidden:!args.p_approve});}return Promise.resolve({data:'question-id'});},
     };
   });
   await page.addScriptTag({path:path.join(root,'word-question-content.js')});
@@ -21,17 +23,26 @@ async function setup(page){
   await page.getByRole('button',{name:'Nhập Word / Chờ kiểm duyệt'}).click();
   await page.locator('[data-job]').click();
 }
-test('Word draft review preserves tables, edits and publishes only explicitly',async({page})=>{
+test('already published Word questions stay reviewable and use the latest bank content',async({page})=>{
   await setup(page);
   await expect(page.getByRole('dialog')).toBeVisible();
   expect(await page.evaluate(()=>window._calls)).toHaveLength(0);
   await page.getByRole('button',{name:'Kiểm duyệt',exact:true}).click();
+  await expect(page.locator('[name="answer"]')).toHaveValue('C');
   await expect(page.locator('.wi-preview table td')).toHaveCount(2);
   await page.locator('[name="answer"]').fill('A');
-  await page.getByRole('button',{name:'Duyệt vào ngân hàng',exact:true}).click();
+  await page.getByRole('button',{name:'Lưu và duyệt',exact:true}).click();
   await expect(page.locator('.wi-item-head')).toContainText('Đã duyệt');
   const calls=await page.evaluate(()=>window._calls);
   expect(calls).toHaveLength(1);expect(calls[0].args.p_payload.answer).toBe('A');expect(calls[0].args.p_approve).toBe(true);
+});
+
+test('rejecting an imported bank question asks before hiding it',async({page})=>{
+  await setup(page);await expect(page.locator('.wi-item-head')).toContainText('Đã lưu ngân hàng');
+  await page.getByRole('button',{name:'Kiểm duyệt',exact:true}).click();
+  page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'Ẩn câu khỏi ngân hàng',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>window._liveQuestion.hidden)).toBe(true);
+  await expect(page.locator('.wi-item-head')).toContainText('Đã ẩn trong ngân hàng');
 });
 test('review popup fits desktop and mobile without horizontal overflow',async({page})=>{
   for(const width of [1366,390]){

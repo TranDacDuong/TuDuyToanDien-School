@@ -22,7 +22,9 @@ BEGIN
  IF NOT public.word_question_import_cycle(job,lease,batch) THEN RAISE EXCEPTION 'Batch refused'; END IF;
  PERFORM public.word_question_import_cycle(job,lease,batch);
  IF (SELECT count(*) FROM public.word_question_import_items WHERE job_id=job)<>1 THEN RAISE EXCEPTION 'Duplicate drafts'; END IF;
- IF (SELECT count(*) FROM public.question_bank)<>before_count THEN RAISE EXCEPTION 'Unreviewed draft was published'; END IF;
+ IF (SELECT count(*) FROM public.question_bank)<>before_count+1 THEN RAISE EXCEPTION 'Unreviewed question was not published exactly once'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM public.question_bank WHERE word_import_job_id=job AND word_import_ordinal=1 AND word_import_review_status='pending' AND NOT hidden)
+ THEN RAISE EXCEPTION 'Pending question is not usable in bank'; END IF;
  PERFORM set_config('request.jwt.claims',jsonb_build_object('sub',actor,'role','authenticated')::text,true);
  PERFORM public.control_word_question_import(job,'pause');
  PERFORM set_config('request.jwt.claims','{"role":"service_role"}',true);
@@ -49,5 +51,5 @@ BEGIN
  PERFORM set_config('request.jwt.claims',jsonb_build_object('sub',gen_random_uuid(),'role','authenticated')::text,true);
  IF public.can_manage_word_import(job) THEN RAISE EXCEPTION 'Unrelated user can view import'; END IF;
 END;$$;
-SELECT 'PASS: claims, draft isolation, duplicate protection, pause/resume, explicit approval, permissions' AS word_import_tests;
+SELECT 'PASS: claims, immediate publishing, duplicate protection, pause/resume, same-ID approval, permissions' AS word_import_tests;
 ROLLBACK;
