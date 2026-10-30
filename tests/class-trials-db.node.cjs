@@ -6,7 +6,7 @@ test('trial RPC lifecycle and permissions in isolated PostgreSQL',async t=>{
  const db=new PGlite();
  const admin='00000000-0000-0000-0000-000000000001',student='00000000-0000-0000-0000-000000000002',cid='00000000-0000-0000-0000-000000000003';
  try{
- await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE SCHEMA auth;
+ await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role; CREATE SCHEMA auth;
  CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$SELECT '${admin}'::uuid$$;
  CREATE FUNCTION public.has_app_permission(text) RETURNS boolean LANGUAGE sql AS $$SELECT current_setting('test.deny',true) IS DISTINCT FROM 'yes'$$;
  CREATE TABLE users(id uuid PRIMARY KEY,role text);
@@ -68,6 +68,41 @@ test('trial RPC lifecycle and permissions in isolated PostgreSQL',async t=>{
    INSERT INTO trial_lesson_requests(student_id,trial_class_id,status) VALUES('${student}','${cid}','scheduled');
    INSERT INTO class_students(student_id,class_id) VALUES('${student}','${cid}');`);
   assert.equal((await db.query('select status from trial_lesson_requests')).rows[0].status,'enrolled');
+ });
+ await db.exec(`CREATE SCHEMA cron;
+  CREATE TABLE cron.job(jobid bigserial PRIMARY KEY,jobname text,schedule text,command text);
+  CREATE FUNCTION cron.unschedule(bigint) RETURNS boolean LANGUAGE sql AS $$DELETE FROM cron.job WHERE jobid=$1 RETURNING true$$;
+  CREATE FUNCTION cron.schedule(text,text,text) RETURNS bigint LANGUAGE sql AS $$INSERT INTO cron.job(jobname,schedule,command) VALUES($1,$2,$3) RETURNING jobid$$;`);
+ const automaticSql=fs.readFileSync('SQL automatic class trial promotion.sql','utf8');
+ await db.exec(automaticSql);
+ const reset=()=>db.exec('TRUNCATE attendance,class_student_schedules,class_students,trial_lesson_requests');
+ const promote=async()=>(await db.query('select promote_finished_class_trials() as n')).rows[0].n;
+ await t.test('automatic promotion runs once, retains trial history and bills from following day',async()=>{
+  await reset();await save();assert.equal(await promote(),1);assert.equal(await promote(),0);
+  const cs=(await db.query('select * from class_students')).rows[0];assert.equal(cs.is_trial,false);
+  assert.equal(new Date(cs.tuition_starts_on).toISOString().slice(0,10),'2020-01-14');
+  assert.equal(new Date(cs.joined_at).toISOString(),'2020-01-06T11:00:00.000Z');
+  const r=(await db.query('select * from trial_lesson_requests')).rows[0];assert.equal(r.status,'enrolled');assert.equal(r.trial_sessions.length,2);assert.equal(r.handled_by,null);
+  assert.equal((await db.query("select count(*)::integer as n from attendance where status='trial'")).rows[0].n,2);
+ });
+ await t.test('started but not ended final session and future extension both defer promotion',async()=>{
+  await reset();const rid=await save();
+  await db.exec("UPDATE trial_lesson_requests SET trial_sessions=jsonb_set(trial_sessions,'{1,ends_at}',to_jsonb(now()+interval '1 hour'))");
+  assert.equal(await promote(),0);
+  await control(rid,'extend','2099-01-19',1);assert.equal(await promote(),0);
+ });
+ await t.test('stopped trials, removed memberships, hidden classes and legacy requests are never auto-promoted',async()=>{
+  await reset();let rid=await save();await control(rid,'stop');assert.equal(await promote(),0);
+  await reset();await save();await db.exec('UPDATE class_students SET left_at=now()');assert.equal(await promote(),0);
+  await reset();await save();await db.exec('UPDATE classes SET hidden=true');assert.equal(await promote(),0);await db.exec('UPDATE classes SET hidden=false');
+  await db.exec('UPDATE trial_lesson_requests SET managed_in_class=false');assert.equal(await promote(),0);
+ });
+ await t.test('cron migration is idempotent and public clients cannot promote arbitrary classes',async()=>{
+  await db.exec(automaticSql);
+  const jobs=(await db.query("select * from cron.job where jobname='mindup-finished-class-trials'")).rows;
+  assert.equal(jobs.length,1);assert.equal(jobs[0].schedule,'* * * * *');
+  assert.equal((await db.query("select has_function_privilege('authenticated','promote_finished_class_trials()','execute') as allowed")).rows[0].allowed,false);
+  assert.equal((await db.query("select has_function_privilege('service_role','promote_finished_class_trials()','execute') as allowed")).rows[0].allowed,true);
  });
  }finally{await db.close();}
 });

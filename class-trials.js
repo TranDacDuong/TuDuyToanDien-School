@@ -14,7 +14,7 @@
     if(!student.is_trial)return student.tuition_starts_on?`<div class="class-trial-note">Thu phí từ ${esc(student.tuition_starts_on)}</div>`:'';
     const request=(context.requests||[]).find(r=>r.student_id===student.student_id&&r.managed_in_class&&!['enrolled','closed','cancelled'].includes(r.status));
     const done=finished(request);
-    return `<div class="class-trial-note"><b>${student.left_at?'Học thử · đã dừng':done?'Học thử xong · chờ quyết định':'Học thử · chưa tính phí'}</b>${request?'<br>'+sessions(request).map(s=>esc(s.date)).join(' · '):''}</div>`+
+    return `<div class="class-trial-note"><b>${student.left_at?'Học thử · đã dừng':done?'Học thử xong · đang chuyển chính thức':'Học thử · chưa tính phí'}</b>${request?'<br>'+sessions(request).map(s=>esc(s.date)).join(' · '):''}</div>`+
       (request&&canManage()?`<div class="class-trial-actions"><button type="button" class="btn btn-outline btn-sm" onclick="ClassTrials.decide('${request.id}')">${done?'Kết quả học thử':'Quản lý học thử'}</button></div>`:'');
   }
   function openAdd(){openForm();}
@@ -46,16 +46,16 @@
     const dialog=document.createElement('dialog');dialog.className='class-trial-decision';
     const lastDay=sessions(request).map(s=>s.date).sort().at(-1);
     const next=lastDay?new Date(lastDay+'T12:00:00Z'):new Date();next.setUTCDate(next.getUTCDate()+1);
-    const min=next.toISOString().slice(0,10),done=finished(request);
-    dialog.innerHTML=`<header><h3>Kết quả học thử</h3><button type="button" aria-label="Đóng" title="Đóng" data-close>×</button></header><p>${sessions(request).map(s=>esc(s.date)).join(' · ')}</p>
-      <form><label>Ngày bắt đầu tính học phí<input name="billing" type="date" min="${min}" value="${min}"></label><button class="btn btn-primary" name="action" value="official" ${done?'':'disabled'}>Chuyển học chính thức</button>
-      <hr><label>Ngày học thử bổ sung<input name="date" type="date" min="${min}"></label><label>Lịch học<select name="schedule"><option value="">Chọn lịch</option>${(context.schedules||[]).map(s=>`<option value="${Number(s.id)}">Buổi ${Number(s.session_no)||1} · Thứ ${s.weekday===7?'CN':Number(s.weekday)+1} ${esc(s.start_time?.slice(0,5))}–${esc(s.end_time?.slice(0,5))}</option>`).join('')}</select></label>
+    const min=next.toISOString().slice(0,10);
+    dialog.innerHTML=`<header><h3>Quản lý học thử</h3><button type="button" aria-label="Đóng" title="Đóng" data-close>×</button></header><p>${sessions(request).map(s=>esc(s.date)).join(' · ')}</p>
+      <p>Tự chuyển chính thức sau buổi học thử cuối · Thu phí từ ${min}</p>
+      <form><label>Ngày học thử bổ sung<input name="date" type="date" min="${min}"></label><label>Lịch học<select name="schedule"><option value="">Chọn lịch</option>${(context.schedules||[]).map(s=>`<option value="${Number(s.id)}">Buổi ${Number(s.session_no)||1} · Thứ ${s.weekday===7?'CN':Number(s.weekday)+1} ${esc(s.start_time?.slice(0,5))}–${esc(s.end_time?.slice(0,5))}</option>`).join('')}</select></label>
       <button class="btn btn-outline" name="action" value="extend">Gia hạn học thử</button><button class="btn btn-outline" name="action" value="stop">Không tiếp tục</button><p role="status"></p></form>`;
     document.body.append(dialog);dialog.showModal();
     dialog.querySelector('[data-close]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());
     dialog.querySelector('form').onsubmit=async event=>{
       event.preventDefault();const form=event.target,action=event.submitter?.value;
-      const date=action==='official'?form.elements.billing.value:action==='extend'?form.elements.date.value:null;
+      const date=action==='extend'?form.elements.date.value:null;
       const schedule=action==='extend'?Number(form.elements.schedule.value):null;
       if(action==='extend'&&(!date||!schedule)){form.querySelector('[role=status]').textContent='Chọn ngày và lịch gia hạn.';return;}
       if(action==='stop'&&!confirm('Kết thúc học thử, không chuyển sang học chính thức?'))return;
@@ -63,7 +63,7 @@
       let error;
       try{({error}=await(root.sb||sb).rpc('control_class_trial',{p_id:id,p_action:action,p_date:date||null,p_schedule:schedule}));}
       catch(cause){error=cause;}
-      if(error){form.querySelector('[role=status]').textContent=error.message;form.querySelectorAll('button').forEach(b=>b.disabled=false);if(!done)form.querySelector('[value=official]').disabled=true;return;}
+      if(error){form.querySelector('[role=status]').textContent=error.message;form.querySelectorAll('button').forEach(b=>b.disabled=false);return;}
       dialog.close();await context.refresh?.();
     };
   }

@@ -52,17 +52,21 @@ test('attendance keeps pre-join absences and ordinary students, shows alternate 
  await expect(page.getByRole('button',{name:'+ Học sinh học thử',exact:true})).toBeVisible();
  await expect(page.getByText('Chưa tham gia',{exact:true})).toHaveCount(0);
 });
-for(const width of [1280,390])test(`decision dialog fits ${width}px and saves billing boundary`,async({page})=>{
+for(const width of [1280,390])test(`automatic promotion dialog fits ${width}px and can extend trial`,async({page})=>{
  await page.setViewportSize({width,height:800});await page.setContent('<main></main>');
  await page.addStyleTag({path:path.join(root,'class-trials.css')});
  await page.evaluate(()=>{window.AppPermissions={has:()=>true};window.__calls=[];window.sb={rpc:async(name,args)=>{window.__calls.push({name,args});return {error:null}}};});
  await page.addScriptTag({path:path.join(root,'class-trials.js')});
  await page.evaluate(()=>{ClassTrials.setContext({requests:[{id:'r1',trial_sessions:[{date:'2020-01-13',ends_at:'2020-01-13T12:00:00Z'}]}],schedules:[{id:1,weekday:1,start_time:'18:00',end_time:'19:30'}]});ClassTrials.decide('r1');});
  await expect(page.getByRole('dialog')).toBeVisible();
+ await expect(page.getByText('Tự chuyển chính thức sau buổi học thử cuối · Thu phí từ 2020-01-14')).toBeVisible();
+ await expect(page.getByRole('button',{name:'Chuyển học chính thức',exact:true})).toHaveCount(0);
  const box=await page.getByRole('dialog').boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);expect(box.height).toBeLessThanOrEqual(800);
  await page.screenshot({path:`test-results/class-trial-decision-${width}.png`});
- await page.getByRole('button',{name:'Chuyển học chính thức',exact:true}).click();
- await expect.poll(()=>page.evaluate(()=>window.__calls)).toEqual([{name:'control_class_trial',args:{p_id:'r1',p_action:'official',p_date:'2020-01-14',p_schedule:null}}]);
+ await page.getByLabel('Ngày học thử bổ sung').fill('2020-01-20');
+ await page.getByRole('combobox').selectOption('1');
+ await page.getByRole('button',{name:'Gia hạn học thử',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>window.__calls)).toEqual([{name:'control_class_trial',args:{p_id:'r1',p_action:'extend',p_date:'2020-01-20',p_schedule:1}}]);
  await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 test('trial form requires schedules before account creation and debounces saving',async({page})=>{

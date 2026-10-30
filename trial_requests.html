@@ -1049,7 +1049,7 @@ function openTrialModal(id){
   setAccountInfo("parent", item?.linkedParent ? editableAccountHtml("parent", "Đã liên kết với tài khoản phụ huynh", item.linkedParent.email || "", item.linkedParent.account_password || "", newAccountButtonHtml("parent")) : "");
   document.getElementById("trialModal").classList.add("show");
   const officialButton=document.querySelector('[onclick="addTrialToClassFromModal()"]');
-  if(officialButton){officialButton.textContent='Chuyển học chính thức';officialButton.style.display=item?.managed_in_class?'':'none';}
+  if(officialButton)officialButton.style.display='none';
   if(embeddedTrialClass){
     const cls=S.classMap[embeddedTrialClass];
     if(!cls){alert('Không có quyền xem lớp này.');return;}
