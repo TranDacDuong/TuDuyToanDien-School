@@ -11,7 +11,7 @@
   const canManage=()=>['trial.class.assign','class.students.add'].every(p=>root.AppPermissions?.has?.(p,false));
   function setContext(value){context=value;}
   function studentActions(student){
-    if(!student.is_trial)return student.tuition_starts_on?`<div class="class-trial-note">Thu phí từ ${esc(student.tuition_starts_on)}</div>`:'';
+    if(!student.is_trial)return '';
     const request=(context.requests||[]).find(r=>r.student_id===student.student_id&&r.managed_in_class&&!['enrolled','closed','cancelled'].includes(r.status));
     const done=finished(request);
     return `<div class="class-trial-note"><b>${student.left_at?'Học thử · đã dừng':done?'Học thử xong · đang chuyển chính thức':'Học thử · chưa tính phí'}</b>${request?'<br>'+sessions(request).map(s=>esc(s.date)).join(' · '):''}</div>`+

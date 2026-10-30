@@ -51,6 +51,7 @@ test('attendance keeps pre-join absences and ordinary students, shows alternate 
  await expect(page.locator('[id="cvatt_regular_2026-10-01_1"]')).toHaveText('Có');
  await expect(page.getByRole('button',{name:'+ Học sinh học thử',exact:true})).toBeVisible();
  await expect(page.getByText('Chưa tham gia',{exact:true})).toHaveCount(0);
+ expect(await page.evaluate(()=>ClassTrials.studentActions({student_id:'regular',is_trial:false,tuition_starts_on:'2026-10-18'}))).toBe('');
 });
 for(const width of [1280,390])test(`automatic promotion dialog fits ${width}px and can extend trial`,async({page})=>{
  await page.setViewportSize({width,height:800});await page.setContent('<main></main>');
