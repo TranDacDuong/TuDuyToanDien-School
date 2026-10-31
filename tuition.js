@@ -2305,10 +2305,24 @@ Nhập số tiền hoàn lại (>0):`,
     </section>`;
   }
 
+  function automaticTuitionDeliveryNote(row) {
+    if (row.waiting_reason) return row.waiting_reason;
+    const error = String(row.error_message || "");
+    if (row.status === "uncertain" && /no message id|Interrupted dispatcher|fetch failed/i.test(error)) {
+      return "Chưa xác nhận được kết quả từ Zalo. Tin có thể đã đến; kiểm tra cuộc trò chuyện trước khi gửi lại.";
+    }
+    if (error === "Saved calculation changed") return "Đã bỏ qua vì công nợ thay đổi so với lúc xếp hàng. Cần tạo thông báo mới theo số tiền hiện tại.";
+    if (error === "Superseded slot") return "Đã thay bằng đợt nhắc học phí mới hơn.";
+    return error || "—";
+  }
+
   function renderAutomaticTuitionDetails() {
     const target = document.getElementById("automaticTuitionRows");
     if (!target) return;
-    target.innerHTML = `<table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px"><thead><tr><th>Đợt gửi</th><th>Phụ huynh / học sinh</th><th>Trạng thái</th><th>Cập nhật / lỗi</th></tr></thead><tbody>${automaticTuitionRows.map(row => `<tr style="border-top:1px solid #e2e8f0"><td style="padding:12px">${esc(row.due_date)}<br>Ngày nhắc ${esc(row.slot)}</td><td style="padding:12px">${esc(row.parent_name || "Phụ huynh")}<br>${esc(row.phone)}<br>${esc(row.students || "")}</td><td style="padding:12px">${esc(automaticLabels[row.status] || row.status)}<br>Đã xác nhận ${esc(row.completed_parts)}/${esc(row.total_parts)} phần (nội dung + QR)</td><td style="padding:12px;overflow-wrap:anywhere">${esc(new Date(row.updated_at).toLocaleString("vi-VN"))}<br>${esc(row.error_message || "")}</td></tr>`).join("")}</tbody></table>`;
+    target.innerHTML = `<table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px"><thead><tr><th>Đợt gửi</th><th>Phụ huynh / học sinh</th><th>Trạng thái</th><th>Cập nhật / lý do</th></tr></thead><tbody>${automaticTuitionRows.map(row => `<tr style="border-top:1px solid #e2e8f0"><td style="padding:12px">${esc(row.due_date)}<br>Ngày nhắc ${esc(row.slot)}</td><td style="padding:12px">${esc(row.parent_name || "Phụ huynh")}<br>${esc(row.phone)}<br>${esc(row.students || "")}</td><td style="padding:12px">${esc(automaticLabels[row.status] || row.status)}<br>Đã xác nhận ${esc(row.completed_parts)}/${esc(row.total_parts)} phần (nội dung + QR)</td><td style="padding:12px;overflow-wrap:anywhere" title="${esc(row.error_message || "")}">${esc(new Date(row.updated_at).toLocaleString("vi-VN"))}<br>${esc(automaticTuitionDeliveryNote(row))}</td></tr>`).join("")}</tbody></table>`;
+    const table = target.querySelector("table");
+    table.style.minWidth = "860px";
+    table.style.tableLayout = "fixed";
   }
 
   window.openAutomaticTuitionDetails = function () {
@@ -2626,10 +2640,16 @@ Nhập số tiền hoàn lại (>0):`,
     }
     const existing = items.filter(item => (zaloTuitionHistory.get(`${item.studentId}:${item.parentId}`) || []).length);
     const repeatNote = existing.length ? `\n${existing.length} học sinh đã có lịch sử gửi trong tháng; lần này sẽ là lượt nhắc tiếp theo.` : "";
+    const unconfirmedParents = new Set(items.filter(item =>
+      (zaloTuitionHistory.get(`${item.studentId}:${item.parentId}`) || []).some(row => row.status === "uncertain") ||
+      automaticTuitionRows.some(row => row.parent_id === item.parentId && row.status === "uncertain")
+    ).map(item => item.parentId));
+    const unconfirmedNote = unconfirmedParents.size
+      ? `\nLưu ý: ${unconfirmedParents.size} phụ huynh có lượt gửi chưa xác nhận. Tin có thể đã đến; chỉ tiếp tục nếu bạn đã kiểm tra Zalo và muốn gửi lượt nhắc mới.` : "";
     const replaceNote = replaceExisting
       ? "\nCác lượt chưa gửi cũ của tháng này sẽ bị hủy và thay bằng danh sách đang chọn. Tin đang được bot gửi sẽ được giữ lại."
       : "";
-    if (!confirm(`Xếp hàng gửi học phí tháng ${ym} cho ${items.length} học sinh?${repeatNote}${replaceNote}\nBot sẽ xử lý khi laptop online.`)) return;
+    if (!confirm(`Xếp hàng gửi học phí tháng ${ym} cho ${items.length} học sinh?${repeatNote}${unconfirmedNote}${replaceNote}\nBot sẽ xử lý khi laptop online.`)) return;
     zaloQueueBusy = true;
     try {
       const paymentRows = items.map(item => {
