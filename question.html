@@ -501,7 +501,7 @@ button {
     <button class="quickOp" data-testid="question-quick-ai-answer" data-permission="question.ai.generate" type="button" onclick="fillMissingAnswersWithAI()">
       <div class="quickOp-title"><span class="quickOp-icon" aria-hidden="true">✦</span><strong>Điền Đáp Án AI</strong></div>
       <span>Chạy AI theo từng lô cho các câu đang trống đáp án và gắn trạng thái Đáp án AI để giáo viên rà lại sau.</span>
-      <span class="quickStat" id="quickAiAnswerCount">0 chờ xử lý</span>
+      <span class="quickStat" id="quickAiAnswerCount" role="status" aria-live="polite">0 chờ xử lý</span>
     </button>
     <button class="quickOp" data-testid="question-quick-report-review" type="button" onclick="openQuestionIssueReview()">
       <div class="quickOp-title"><span class="quickOp-icon" aria-hidden="true">!</span><strong>Báo Lỗi Câu Hỏi</strong></div>
@@ -1205,7 +1205,7 @@ function resetQuestionForm() {
 }
 
 </script>
-<script src="question_list.js?v=20261031-word-immediate1"></script>
+<script src="question_list.js?v=20261102-ai-answer-errors1"></script>
 <script src="image_upload.js"></script>
 <script src="question_create.js"></script>
 <script src="question_AI.js"></script>

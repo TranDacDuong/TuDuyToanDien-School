@@ -8,8 +8,8 @@ const PAGE_SIZE = 25
 const FUZZY_THRESHOLD = 0.86
 const MAX_FUZZY_RESULTS = 3
 const AI_ANSWER_BATCH_SIZE = 15
+let aiAnswerBusy = false
 const QUESTION_AI_URL = "https://lgydjaaqfxqzgbdpqvkp.supabase.co/functions/v1/ai-solution"
-const QUESTION_AI_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdWIiLCJyZWYiOiJsZ3lkamFhcWZ4cXpnYmRwcXZrcCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzcyMTg2NjQ0LCJleHAiOjIwODc3NjI2NDR9.l6ojk0fH5wYMK4H_RIGTepatUd1Uy2KHOTiRfAS1JD4"
 
 const formTitle = document.getElementById("formTitle")
 const saveBtn = document.getElementById("saveBtn")
@@ -335,7 +335,7 @@ function updateQuickActionStats() {
   const reportEl = document.getElementById("quickReportCount")
   if (missingEl) missingEl.textContent = `${questions.filter(isAnswerMissing).length} câu`
   if (duplicateEl) duplicateEl.textContent = `${exactDuplicateIds.size} câu`
-  if (aiAnswerEl) aiAnswerEl.textContent = `${questions.filter(isAnswerMissing).length} chờ xử lý`
+  if (aiAnswerEl && !aiAnswerBusy) aiAnswerEl.textContent = `${questions.filter(isAnswerMissing).length} chờ xử lý`
   if (reportEl) {
     if (questionIssueTableMissing) reportEl.textContent = "Cần SQL"
     else reportEl.textContent = `${new Set(questionIssueReports.map((item) => item.question_id)).size} câu`
@@ -1327,49 +1327,59 @@ function extractAiJsonArray(raw) {
 }
 
 async function callAiAnswerBatch(items) {
-  const headers = window.AppAuth?.getAnonEdgeFunctionHeaders?.() || {
-    "Content-Type": "application/json",
-    apikey: QUESTION_AI_ANON_KEY,
-    Authorization: `Bearer ${QUESTION_AI_ANON_KEY}`,
-  }
-  const response = await fetch(QUESTION_AI_URL, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ messages: buildAiAnswerPrompt(items) }),
-  })
-
-  const rawText = await response.text()
-  if (!response.ok) {
-    throw new Error(rawText || "Không gọi được AI để điền đáp án.")
-  }
-
+  const headers = window.AppAuth?.getAnonEdgeFunctionHeaders?.()
+  if (!headers) throw new Error("Chưa tải được cấu hình kết nối AI. Hãy tải lại trang rồi thử lại.")
+  let response
   try {
-    const payload = JSON.parse(rawText)
-    const merged = Array.isArray(payload?.content)
-      ? payload.content.map((part) => part?.text || "").join("")
-      : payload?.result || payload?.text || rawText
-    return extractAiJsonArray(merged)
-  } catch {
-    return extractAiJsonArray(rawText)
+    response = await fetch(QUESTION_AI_URL, {
+      method: "POST", headers,
+      body: JSON.stringify({ messages: buildAiAnswerPrompt(items) }),
+      signal: AbortSignal.timeout(90000),
+    })
+  } catch (error) {
+    throw new Error(error?.name === "TimeoutError" || error?.name === "AbortError"
+      ? "Dịch vụ AI phản hồi quá lâu. Đã dừng và giữ nguyên những câu chưa xử lý."
+      : "Không kết nối được dịch vụ AI. Hãy kiểm tra mạng và thử lại sau.")
   }
+  const rawText = await response.text()
+  let payload
+  try { payload = JSON.parse(rawText) } catch {}
+  if (response.status === 429) {
+    throw new Error("Dịch vụ AI đang bị giới hạn lượt gọi/hạn mức (HTTP 429). Cần chờ hạn mức khôi phục hoặc kiểm tra cấu hình khóa API trước khi tiếp tục.")
+  }
+  if ([401,403].includes(response.status)) throw new Error(`Kết nối AI không được cấp quyền (HTTP ${response.status}). Hãy tải lại trang hoặc đăng nhập lại.`)
+  if (!response.ok || payload?.error) {
+    throw new Error(`Dịch vụ AI gặp lỗi (HTTP ${response.status}). Chưa thể điền đáp án; hãy thử lại sau hoặc kiểm tra cấu hình AI.`)
+  }
+  const merged = Array.isArray(payload?.content)
+    ? payload.content.map(part => part?.text || "").join("") : payload?.result || payload?.text || rawText
+  const rows = extractAiJsonArray(merged)
+  if (!Array.isArray(rows)) throw new Error("AI trả về sai định dạng danh sách đáp án. Chưa lưu kết quả này.")
+  const ids = new Set(items.map(item => item.id)), seen = new Set()
+  for (const row of rows) {
+    if (!ids.has(row?.id) || seen.has(row.id)) throw new Error("AI trả về mã câu hỏi không khớp hoặc bị trùng. Chưa lưu kết quả này.")
+    if (row.answer != null && !["string","number"].includes(typeof row.answer)) throw new Error("AI trả về đáp án không hợp lệ. Chưa lưu kết quả này.")
+    seen.add(row.id)
+  }
+  return rows
 }
 
 function normalizeAiAnswerValue(question, answerValue) {
   const type = question?.question_type || "multi_choice"
-  const raw = String(answerValue || "").trim()
+  const raw = String(answerValue ?? "").trim()
   if (!raw) return ""
 
   if (type === "multi_choice") {
-    return [...new Set(raw.toUpperCase().match(/[A-F]/g) || [])].join("")
+    const dense = raw.toUpperCase().replace(/[\s,;|/]+/g, "")
+    const count = Math.max(1, Math.min(6, Number(question?.answer_count) || 4))
+    if (!/^[A-F]+$/.test(dense) || [...dense].some(letter => letter.charCodeAt(0) - 64 > count)) return ""
+    return [...new Set(dense)].sort().join("")
   }
 
   if (type === "true_false") {
-    return (
-      window.QuestionAnswerFormat?.normalizeTrueFalseAnswer?.(
-        raw,
-        Math.max(Number(question?.answer_count) || 0, 4)
-      ) || ""
-    )
+    const dense = raw.toUpperCase().replace(/[\s,;|/]+/g, "")
+    const count = Math.max(1, Math.min(6, Number(question?.answer_count) || 4))
+    return /^[TF]+$/.test(dense) && dense.length === count ? dense : ""
   }
 
   if (type === "short_answer") {
@@ -1380,6 +1390,7 @@ function normalizeAiAnswerValue(question, answerValue) {
 }
 
 async function fillMissingAnswersWithAI() {
+  if (aiAnswerBusy) return
   if (!hasQuestionPermission("question.ai.generate")) return alert("Bạn không có quyền dùng AI để bổ sung đáp án.")
   const candidates = getBaseFilteredQuestions().filter(
     (q) => q.question_type !== "essay" && isAnswerMissing(q)
@@ -1405,41 +1416,60 @@ async function fillMissingAnswersWithAI() {
 
   let updatedCount = 0
   let failedCount = 0
-
-  for (const batch of batches) {
-    try {
-      const aiRows = await callAiAnswerBatch(batch)
+  let processedCount = 0
+  let stoppedReason = ""
+  const button = document.querySelector('[data-testid="question-quick-ai-answer"]')
+  const progress = document.getElementById("quickAiAnswerCount")
+  aiAnswerBusy = true
+  if (button) button.disabled = true
+  try {
+    batchesLoop: for (const batch of batches) {
+      if (progress) progress.textContent = `Đang xử lý ${processedCount}/${candidates.length} · Đã lưu ${updatedCount}`
+      let aiRows
+      try { aiRows = await callAiAnswerBatch(batch) }
+      catch (error) { stoppedReason = error.message; break }
       const aiMap = new Map((aiRows || []).map((row) => [row?.id, row]))
       for (const question of batch) {
         const answer = normalizeAiAnswerValue(question, aiMap.get(question.id)?.answer)
         if (!answer) {
           failedCount += 1
+          processedCount += 1
           continue
         }
-        const { error } = await sb
-          .from("question_bank")
-          .update({ answer, answer_status: "ai" })
-          .eq("id", question.id)
-        if (error) throw error
-        updatedCount += 1
+        try {
+          const { data, error } = await sb.from("question_bank")
+            .update({ answer, answer_status: "ai" }).eq("id", question.id)
+            .or("answer.is.null,answer.eq.").select("id")
+          if (error) throw error
+          if (data?.length) updatedCount += 1
+          else failedCount += 1
+          processedCount += 1
+        } catch (error) {
+          stoppedReason = "Không lưu được đáp án vào ngân hàng: " + error.message
+          break batchesLoop
+        }
       }
-    } catch (error) {
-      console.error(error)
-      failedCount += batch.length
     }
+    try {
+      await window.AppAdminTools?.recordAudit?.("question_ai_answers_fill", {
+        target_type: "question_bank", scope: "filtered", total: candidates.length,
+        processed: processedCount, updated: updatedCount, failed: failedCount,
+        not_started: candidates.length - processedCount,
+      })
+    } catch (error) { console.warn("Không ghi được nhật ký điền đáp án AI:", error.message) }
+    try { await loadQuestions() }
+    catch (error) { console.warn("Chưa tải lại được ngân hàng câu hỏi:", error.message) }
+  } finally {
+    aiAnswerBusy = false
+    if (button) button.disabled = false
+    updateQuickActionStats()
   }
-
-  await window.AppAdminTools?.recordAudit?.("question_ai_answers_fill", {
-    target_type: "question_bank",
-    scope: "filtered",
-    processed: candidates.length,
-    updated: updatedCount,
-    failed: failedCount,
-  })
-
-  await loadQuestions()
+  if (stoppedReason) {
+    alert(`Đã dừng điền đáp án AI.\n${stoppedReason}\n\nĐã lưu ${updatedCount}/${candidates.length} câu; ${candidates.length - processedCount} câu chưa xử lý. Các đáp án đã lưu được giữ nguyên.`)
+    return
+  }
   if (!updatedCount) {
-    alert("AI chưa điền được đáp án nào. Hãy thử phạm vi nhỏ hơn hoặc rà lại nội dung câu hỏi.")
+    alert("AI không trả về đáp án hợp lệ hoặc câu hỏi đã được người khác cập nhật. Chưa ghi đáp án mới; hãy kiểm tra lại nội dung và loại câu hỏi.")
     return
   }
   alert(
