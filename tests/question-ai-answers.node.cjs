@@ -65,3 +65,14 @@ test('network and authorization failures remain visible even if audit or refresh
 test('missing connection configuration never falls back to the invalid embedded JWT',async()=>{
  const s=setup(1);delete s.ctx.window.AppAuth;await s.ctx.fillMissingAnswersWithAI();assert.equal(s.calls.length,0);assert.match(s.alerts[0],/cấu hình kết nối/);
 });
+
+test('answer requests opt into Flash-Lite and retry a temporary quota only once',async()=>{
+ const s=setup(1,n=>n===1?new Response('{"retry_after_seconds":2}',{status:429}):new Response('[{"id":"q0","answer":"B"}]'));
+ const waits=[];s.ctx.setTimeout=(fn,ms)=>{waits.push(ms);fn()};
+ await s.ctx.fillMissingAnswersWithAI();assert.equal(s.writes.length,1);assert.deepEqual(waits,[3000]);
+ assert.equal(s.calls[0].purpose,'question_answers');
+ const exhausted=setup(1,()=>new Response('{"retry_after_seconds":1}',{status:429}));
+ exhausted.ctx.setTimeout=fn=>fn();await exhausted.ctx.fillMissingAnswersWithAI();assert.equal(exhausted.calls.length,2);
+ const daily=setup(1,()=>new Response('{"retry_after_seconds":86400}',{status:429}));
+ await daily.ctx.fillMissingAnswersWithAI();assert.equal(daily.calls.length,1);
+});

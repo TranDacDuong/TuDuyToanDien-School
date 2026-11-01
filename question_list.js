@@ -1326,14 +1326,14 @@ function extractAiJsonArray(raw) {
   throw new Error("Không phân tích được dữ liệu JSON từ phản hồi AI.")
 }
 
-async function callAiAnswerBatch(items) {
+async function callAiAnswerBatch(items, retried = false) {
   const headers = window.AppAuth?.getAnonEdgeFunctionHeaders?.()
   if (!headers) throw new Error("Chưa tải được cấu hình kết nối AI. Hãy tải lại trang rồi thử lại.")
   let response
   try {
     response = await fetch(QUESTION_AI_URL, {
       method: "POST", headers,
-      body: JSON.stringify({ messages: buildAiAnswerPrompt(items) }),
+      body: JSON.stringify({ messages: buildAiAnswerPrompt(items), purpose: "question_answers" }),
       signal: AbortSignal.timeout(90000),
     })
   } catch (error) {
@@ -1345,7 +1345,14 @@ async function callAiAnswerBatch(items) {
   let payload
   try { payload = JSON.parse(rawText) } catch {}
   if (response.status === 429) {
-    throw new Error("Dịch vụ AI đang bị giới hạn lượt gọi/hạn mức (HTTP 429). Cần chờ hạn mức khôi phục hoặc kiểm tra cấu hình khóa API trước khi tiếp tục.")
+    const seconds = Number(payload?.retry_after_seconds)
+    if (!retried && Number.isFinite(seconds) && seconds > 0 && seconds <= 60) {
+      const progress = document.getElementById("quickAiAnswerCount")
+      if (progress) progress.textContent = `Đang chờ hạn mức Gemini ${Math.ceil(seconds)} giây, sau đó tiếp tục`
+      await new Promise(resolve => setTimeout(resolve, Math.ceil(seconds) * 1000 + 1000))
+      return callAiAnswerBatch(items, true)
+    }
+    throw new Error("Dịch vụ AI đang bị giới hạn lượt gọi/hạn mức (HTTP 429). Đã thử các model phù hợp; các API key cùng dự án dùng chung quota. Hãy chờ khôi phục hạn mức hoặc kiểm tra Google AI Studio.")
   }
   if ([401,403].includes(response.status)) throw new Error(`Kết nối AI không được cấp quyền (HTTP ${response.status}). Hãy tải lại trang hoặc đăng nhập lại.`)
   if (!response.ok || payload?.error) {
