@@ -1,11 +1,43 @@
 (function () {
   let dialog, timer, jobs = [], selected = null, page = 0, busy = false, items = [], requestVersion = 0;
+  let catalog = {grades:[],subjects:[],topics:[]}, catalogLoaded = false;
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const labels = {queued:'Đang chờ laptop',processing:'Đang xử lý',paused:'Tạm dừng',completed:'Đã xử lý xong',failed:'Xử lý lỗi',cancelled:'Đã hủy',pending:'Chưa kiểm duyệt',needs_attention:'Cần kiểm tra',approved:'Đã duyệt',rejected:'Đã bỏ qua'};
   const $ = id => dialog.querySelector('#'+id);
   const client = () => typeof sb !== 'undefined' ? sb : window.sb;
   function status(message, error = false) { $('wiStatus').textContent = message; $('wiStatus').classList.toggle('error', error); }
   async function rpc(name, args) { const result = await client().rpc(name,args); if(result.error) throw result.error; return result.data; }
+  function setChoices(id, placeholder, rows) {
+    const select=$(id);
+    select.replaceChildren(new Option(placeholder,''),...rows.map(row=>new Option(row.name,row.id)));
+  }
+  function chooseSubject() {
+    const subject=$('wiSubject').value, grade=$('wiGrade').value;
+    const valid=catalog.subjects.some(row=>row.id===subject&&row.grade_id===grade);
+    const topics=valid?catalog.topics.filter(row=>row.subject_id===subject):[];
+    setChoices('wiTopic',valid&&!topics.length?'Chưa có chủ đề':'Chọn chủ đề',topics);
+    $('wiTopic').disabled=!topics.length;
+  }
+  function chooseGrade() {
+    const grade=$('wiGrade').value;
+    const subjects=grade?catalog.subjects.filter(row=>row.grade_id===grade):[];
+    setChoices('wiSubject',grade&&!subjects.length?'Chưa có môn':'Chọn môn',subjects);
+    $('wiSubject').disabled=!subjects.length;
+    chooseSubject();
+  }
+  async function loadCatalog() {
+    if(catalogLoaded)return;
+    const results=await Promise.all([
+      client().from('grades').select('id,name').order('name'),
+      client().from('subjects').select('id,name,grade_id').order('name'),
+      client().from('topics').select('id,name,subject_id').order('name')
+    ]);
+    const failed=results.find(result=>result.error);if(failed)throw failed.error;
+    const sort=rows=>[...(rows||[])].sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'vi',{numeric:true}));
+    catalog={grades:sort(results[0].data),subjects:sort(results[1].data),topics:sort(results[2].data)};
+    setChoices('wiGrade','Chọn khối',catalog.grades);
+    chooseGrade();catalogLoaded=true;
+  }
   async function refresh() {
     const result = await client().from('word_question_imports').select('*').order('created_at',{ascending:false}).limit(30);
     if (result.error) throw result.error;
@@ -77,8 +109,10 @@
   async function enqueue(event) {
     event.preventDefault(); if(busy)return;
     if(!window.AppPermissions?.has?.('question.create',false)){status('Bạn chưa có quyền tạo câu hỏi trong ngân hàng.',true);return;}
-    const file=$('wiFile').files[0], topic=$('wiTopic').value;
-    if(!file||!topic){status('Chọn chủ đề và file Word trước.',true);return;}
+    const file=$('wiFile').files[0], topic=$('wiTopic').value, subject=$('wiSubject').value, grade=$('wiGrade').value;
+    if(!file||!catalog.subjects.some(row=>row.id===subject&&row.grade_id===grade)||!catalog.topics.some(row=>row.id===topic&&row.subject_id===subject)){
+      status('Chọn đủ Khối, Môn, Chủ đề và file Word trước.',true);return;
+    }
     if(!/\.docx$/i.test(file.name)||file.size>20*1024*1024){status('Chỉ nhận DOCX tối đa 20 MB.',true);return;}
     busy=true;$('wiUpload').disabled=true;status('Đang tải file lên…');
     try{
@@ -94,9 +128,17 @@
     if(!window.AppPermissions?.has?.('question.import',false)){alert('Bạn không có quyền nhập câu hỏi.');return;}
     if(!dialog){
       dialog=document.createElement('dialog');dialog.id='wordImportsDialog';
-      dialog.innerHTML='<header class="wi-header"><h3>Nhập Word và kiểm duyệt câu hỏi</h3><button class="wi-icon" type="button" aria-label="Đóng" title="Đóng" data-close>×</button></header><form class="wi-toolbar" id="wiForm"><label>Khối · Môn · Chủ đề<select id="wiTopic" required><option value="">Chọn chủ đề</option></select></label><label>File Word<input id="wiFile" type="file" accept=".docx" required></label><button class="wi-button primary" id="wiUpload" type="submit">Xếp hàng xử lý</button><button class="wi-button" type="button" data-refresh>Tải lại</button></form><div id="wiStatus" class="wi-status" role="status"></div><div class="wi-layout"><aside class="wi-jobs" id="wiJobs"></aside><main class="wi-main" id="wiMain">Chọn đợt nhập để xem các câu chờ kiểm duyệt.</main></div>';
+      dialog.innerHTML=`<header class="wi-header"><h3>Nhập Word và kiểm duyệt câu hỏi</h3><button class="wi-icon" type="button" aria-label="Đóng" title="Đóng" data-close>×</button></header>
+        <form class="wi-toolbar" id="wiForm"><div class="wi-classification">
+          <label>Khối<select id="wiGrade" required><option value="">Chọn khối</option></select></label>
+          <label>Môn<select id="wiSubject" required disabled><option value="">Chọn môn</option></select></label>
+          <label>Chủ đề<select id="wiTopic" required disabled><option value="">Chọn chủ đề</option></select></label>
+        </div><label>File Word<input id="wiFile" type="file" accept=".docx" required></label><button class="wi-button primary" id="wiUpload" type="submit">Xếp hàng xử lý</button><button class="wi-button" type="button" data-refresh>Tải lại</button></form>
+        <div id="wiStatus" class="wi-status" role="status"></div><div class="wi-layout"><aside class="wi-jobs" id="wiJobs"></aside><main class="wi-main" id="wiMain">Chọn đợt nhập để xem các câu chờ kiểm duyệt.</main></div>`;
       document.body.append(dialog);
       $('wiForm').addEventListener('submit',enqueue);
+      $('wiGrade').addEventListener('change',chooseGrade);
+      $('wiSubject').addEventListener('change',chooseSubject);
       dialog.addEventListener('close',()=>{clearInterval(timer);window.loadQuestions?.();});
       dialog.addEventListener('submit',e=>{if(e.target.matches('.wi-editor')){e.preventDefault();review(e.target,true);}});
       dialog.addEventListener('click',async e=>{
@@ -116,8 +158,7 @@
     }
     if(!dialog.open)dialog.showModal();
     try{
-      if($('wiTopic').options.length===1){const {data,error}=await client().from('topics').select('id,name,subjects(name,grades(name))').order('name');if(error)throw error;
-        for(const t of data||[])$('wiTopic').add(new Option(`${t.subjects?.grades?.name||''} · ${t.subjects?.name||''} · ${t.name}`,t.id));}
+      await loadCatalog();
       await refresh();clearInterval(timer);timer=setInterval(()=>refresh().catch(e=>status(e.message,true)),10000);
     }catch(e){status('Chưa mở được nhập Word: '+e.message,true);}
   }
