@@ -29,16 +29,37 @@ test('private makeup links grade on server and convert only absent attendance at
  INSERT INTO daily_tasks(source_key,reviewer)VALUES($2,$1) ON CONFLICT(source_key)DO UPDATE SET reviewer=excluded.reviewer RETURNING id INTO result;RETURN result;END;$$;
  SET test.uid='${admin}';`);
  const migration=fs.readFileSync('SQL makeup learning links.sql','utf8');await db.exec(migration);await db.exec(migration);
+ const unreviewedMigration=fs.readFileSync('SQL makeup allow unreviewed questions.sql','utf8');await db.exec(unreviewedMigration);await db.exec(unreviewedMigration);
  const create=async(date='2020-01-06',top=topic,rev=reviewer)=>(await db.query('select create_makeup_learning($1,$2,$3,$4,$5) as r',[cid,student,date,top,rev])).rows[0].r;
  const open=async tok=>(await db.query('select get_makeup_learning($1) as r',[tok])).rows[0].r;
  const submit=async(answers,paths,tok=token)=>(await db.query('select submit_makeup_learning($1,$2,$3) as r',[tok,JSON.stringify(answers),JSON.stringify(paths)])).rows[0].r;
  const answersFor=count=>Object.fromEntries(questions.map((q,i)=>[q.id,i<count?'B':'A']));
- await t.test('class authority, topic and reviewed bank filters are enforced',async()=>{
+ await t.test('class authority, topic, usable answers and explicit rejection filters are enforced',async()=>{
   await db.exec(`SET test.uid='${other}'`);await assert.rejects(create(),/quyền/);await db.exec(`SET test.uid='${admin}'`);
   await assert.rejects(create('2020-01-06',id(90)),/Chủ đề/);await assert.rejects(create('2020-01-06',topic,other),/phụ trách/);
-  await db.exec("UPDATE question_bank SET answer_status='ai'");await assert.rejects(create(),/chưa đủ 10/);
-  await db.exec("UPDATE question_bank SET answer_status='reviewed',word_import_review_status='pending'");await assert.rejects(create(),/chưa đủ 10/);
-  await db.exec("UPDATE question_bank SET word_import_review_status='approved'");
+  for(const update of ["answer=''","answer='Đáp án B'","hidden=true","word_import_review_status='rejected'"]){
+   await db.exec('BEGIN');try{await db.exec('UPDATE question_bank SET '+update);await assert.rejects(create(),/chưa đủ 10/);}finally{await db.exec('ROLLBACK');}
+  }
+ });
+ await t.test('unreviewed imports and AI answers are usable without changing their review flags',async()=>{
+  for(const review of ['pending','needs_attention',null]){
+   await db.exec('BEGIN');
+   try{
+    await db.query("UPDATE question_bank SET answer_status='ai',word_import_review_status=$1",[review]);
+    const created=await create(),m=await open(created.token);assert.equal(m.questions.length,10);
+    const flags=(await db.query('SELECT answer_status,word_import_review_status FROM question_bank LIMIT 1')).rows[0];
+    assert.equal(flags.answer_status,'ai');assert.equal(flags.word_import_review_status,review);
+   }finally{await db.exec('ROLLBACK');}
+  }
+ });
+ await t.test('forward migration also upgrades the older deployed reviewed-only function',async()=>{
+  const signature='public.create_makeup_learning(uuid,uuid,date,uuid,uuid)';
+  const current=(await db.query('SELECT pg_get_functiondef($1::regprocedure) AS source',[signature])).rows[0].source;
+  await db.exec(current.replace("AND coalesce(word_import_review_status,'pending')<>'rejected'","AND coalesce(answer_status,'reviewed')='reviewed'\n  AND coalesce(word_import_review_status,'approved')='approved'"));
+  await db.exec(unreviewedMigration);
+  const upgraded=(await db.query('SELECT pg_get_functiondef($1::regprocedure) AS source',[signature])).rows[0].source;
+  assert.ok(upgraded.includes("coalesce(word_import_review_status,'pending')<>'rejected'"));
+  assert.ok(!upgraded.includes("coalesce(answer_status,'reviewed')='reviewed'"));
  });
  await t.test('link is random, key is private, question snapshot and draft persist',async()=>{
   const created=await create();assignment=created.id;token=created.token;assert.match(token,/^[a-f0-9]{64}$/);

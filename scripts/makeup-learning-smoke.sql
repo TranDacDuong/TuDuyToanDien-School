@@ -15,8 +15,7 @@ BEGIN
  AND (cs.left_at IS NULL OR a.date<=(cs.left_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)
  AND NOT EXISTS(SELECT 1 FROM public.makeup_learning m WHERE m.class_id=a.class_id AND m.student_id=a.student_id AND m.study_date=a.date)
  AND (SELECT count(*) FROM public.question_bank q WHERE q.topic_id=t.id AND NOT coalesce(q.hidden,false)
-  AND q.question_type::text='multi_choice' AND coalesce(q.answer_status,'reviewed')='reviewed'
-  AND coalesce(q.word_import_review_status,'approved')='approved'
+  AND q.question_type::text='multi_choice' AND coalesce(q.word_import_review_status,'pending')<>'rejected'
   AND upper(trim(q.answer))~'^[A-F]$' AND q.answer_count BETWEEN 2 AND 6
   AND ascii(upper(trim(q.answer)))-64<=q.answer_count)>=10 LIMIT 1;
  IF candidate.class_id IS NULL THEN

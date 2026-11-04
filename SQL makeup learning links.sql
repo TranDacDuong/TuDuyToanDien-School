@@ -82,12 +82,11 @@ BEGIN
  SELECT jsonb_agg(jsonb_build_object('id',id,'text',question_text,'answer_count',answer_count,'image',question_img)),
   jsonb_object_agg(id::text,upper(trim(answer))) INTO qs,key
  FROM (SELECT * FROM public.question_bank WHERE topic_id=p_topic AND NOT coalesce(hidden,false)
-  AND question_type::text='multi_choice' AND coalesce(answer_status,'reviewed')='reviewed'
-  AND coalesce(word_import_review_status,'approved')='approved'
+  AND question_type::text='multi_choice' AND coalesce(word_import_review_status,'pending')<>'rejected'
   AND upper(trim(answer)) ~ '^[A-F]$' AND answer_count BETWEEN 2 AND 6
   AND ascii(upper(trim(answer)))-64<=answer_count
   ORDER BY random() LIMIT 10)q;
- IF coalesce(jsonb_array_length(qs),0)<>10 THEN RAISE EXCEPTION 'Chủ đề chưa đủ 10 câu trắc nghiệm một đáp án đã kiểm duyệt'; END IF;
+ IF coalesce(jsonb_array_length(qs),0)<>10 THEN RAISE EXCEPTION 'Chủ đề chưa đủ 10 câu trắc nghiệm một đáp án hợp lệ để chấm tự động (dùng được cả câu chưa kiểm duyệt và đáp án AI)'; END IF;
  INSERT INTO public.makeup_learning(class_id,student_id,study_date,schedule_id,topic_id,reviewer_id,token_hash,questions,answer_key,created_by)
  VALUES(p_class,p_student,p_date,a.schedule_id,p_topic,p_reviewer,encode(digest(token,'sha256'),'hex'),qs,key,auth.uid()) RETURNING id INTO mid;
  RETURN jsonb_build_object('id',mid,'token',token);
