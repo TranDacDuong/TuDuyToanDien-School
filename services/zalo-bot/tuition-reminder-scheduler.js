@@ -17,6 +17,20 @@ function vnDate(now = new Date()) {
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
+function isSendingTime(now = new Date()) {
+  if (!(now instanceof Date) || !Number.isFinite(now.getTime())) throw new TypeError('Invalid clock');
+  const hour = Number(new Intl.DateTimeFormat('en-GB', {
+    timeZone: TIME_ZONE, hour: '2-digit', hourCycle: 'h23'
+  }).format(now));
+  return hour >= 6;
+}
+
+function quietHoursError() {
+  const error = new Error('Automatic tuition deferred until 06:00 Vietnam time');
+  error.code = 'AUTOMATIC_TUITION_QUIET_HOURS';
+  return error;
+}
+
 function lunarDay(date) {
   const { SolarDate } = require('@nghiavuive/lunar_date_vi');
   const [year, month, day] = date.split('-').map(Number);
@@ -44,7 +58,7 @@ function plan(now = new Date(), convert = lunarDay) {
   });
   // On restart catch up only the latest due slot, never burst all missed notices.
   const due = slots.filter(s => s.date <= today).at(-1) || null;
-  return { today, month, slots, due, allowed: allowed(today, convert) };
+  return { today, month, slots, due, allowed: allowed(today, convert) && isSendingTime(now) };
 }
 
 function phone(value) {
@@ -110,9 +124,18 @@ function createScheduler({ rpc, bank, clock = () => new Date(), convert = lunarD
   async function dispatchClaimed(job, sendPart, preparePart) {
     if (typeof sendPart !== 'function') throw new TypeError('sendPart required');
     if (!job) return null;
-    for (let index = 0; index < job.payload.parts.length; index++) {
+    async function defer(index) {
+      const current = plan(clock(), convert);
+      await call('begin_automatic_tuition_part', {
+        p_id: job.id, p_token: job.token, p_index: index,
+        p_today: current.today, p_allowed: false, p_slot: current.due?.slot || 0
+      });
+      return { id: job.id, status: 'deferred' };
+    }
+    for (let index = Number(job.payload.next_part || 0); index < job.payload.parts.length; index++) {
       let prepared;
       try {
+        if (!isSendingTime(clock())) return await defer(index);
         // Download and reserve pacing BEFORE the final ledger check, not after it.
         prepared = preparePart ? await preparePart(job.payload.parts[index], job, index) : null;
         const actual = plan(clock(), convert);
@@ -120,13 +143,15 @@ function createScheduler({ rpc, bank, clock = () => new Date(), convert = lunarD
           p_id: job.id, p_token: job.token, p_index: index,
           p_today: actual.today, p_allowed: actual.allowed, p_slot: actual.due?.slot || 0
         });
-        if (!approved) return { id: job.id, status: 'cancelled' };
+        if (!approved) return { id: job.id, status: isSendingTime(clock()) ? 'cancelled' : 'deferred' };
+        if (!isSendingTime(clock())) return await defer(index);
         const externalId = await sendPart({ uid: job.zalo_uid, part: job.payload.parts[index], jobId: job.id, index, prepared });
         if (typeof externalId !== 'string' || !externalId.trim()) throw new Error('Missing verified message ID');
         await call('finish_automatic_tuition_part', {
           p_id: job.id, p_token: job.token, p_index: index, p_external_id: externalId
         });
       } catch (error) {
+        if (error.code === 'AUTOMATIC_TUITION_QUIET_HOURS') return await defer(index);
         await call('uncertain_automatic_tuition_reminder', {
           p_id: job.id, p_token: job.token, p_error: String(error.message || error).slice(0, 500)
         });
@@ -179,4 +204,4 @@ function createScheduler({ rpc, bank, clock = () => new Date(), convert = lunarD
   };
 }
 
-module.exports = { TIME_ZONE, SLOTS, vnDate, lunarDay, plan, buildPayload, createScheduler };
+module.exports = { TIME_ZONE, SLOTS, vnDate, lunarDay, plan, buildPayload, createScheduler, isSendingTime, quietHoursError };

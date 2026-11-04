@@ -11,7 +11,7 @@ const friendProfiles = new Map();
 const contactFingerprints = new Map();
 const { writeJsonAtomic } = require('./sync-store');
 const { prepareScoreMessageMedia } = require('./score-message-media');
-const { createScheduler } = require('./tuition-reminder-scheduler');
+const { createScheduler, isSendingTime, quietHoursError } = require('./tuition-reminder-scheduler');
 const { requireSendAcknowledgement } = require('./send-acknowledgement');
 const { retryPreparation, sendTuitionQr } = require('./tuition-qr');
 const { LocalDatabase, eventKey } = require('./local-database');
@@ -223,6 +223,7 @@ async function sendQueuedAutomaticTuition(job) {
   await automaticTuitionScheduler.dispatchClaimed(job, async ({ uid, part, prepared }) => {
     try {
       return await localStore.send(`automatic:${job.id}:${job.payload.parts.indexOf(part)}`, { uid, part }, async () => {
+        if (!isSendingTime()) throw quietHoursError();
         const sent = await zaloApi.sendMessage(part.kind === 'text' ? part.content : {
           msg: 'Mã QR thanh toán học phí MindUp', attachments: [prepared.file]
         }, uid);
@@ -238,8 +239,12 @@ async function sendQueuedAutomaticTuition(job) {
     try {
       const { sendAt } = await gatewayRequest({ action: 'reserveAutomaticTuitionSlot',
         jobId: claimed.id, token: claimed.token, pacing: dispatchPacing() });
-      if (!sendAt) throw new Error('Shared Zalo dispatcher paused');
+      if (!sendAt) {
+        if (!isSendingTime()) throw quietHoursError();
+        throw new Error('Shared Zalo dispatcher paused');
+      }
       await sleep(Math.max(0, new Date(sendAt).getTime() - Date.now()));
+      if (!isSendingTime()) throw quietHoursError();
       if (part.kind === 'qr') {
         file = path.join(__dirname, 'temp', `automatic_tuition_${claimed.id}_${index}.png`);
         fs.mkdirSync(path.dirname(file), { recursive: true });
