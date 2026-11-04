@@ -802,6 +802,7 @@
         'cursor:pointer;font-family:var(--font-body);background:transparent;color:var(--ink-mid);'+(role==="student"?'display:none;':'')+'">'+
         '📘 Học tập</button>'+
       '</div>'+
+      (['admin','teacher','assistant'].includes(role) ? '<div style="margin-bottom:12px"><button type="button" class="btn btn-outline btn-sm" onclick="MakeupLearning.open(\''+_classId+'\')">Học bù qua video</button></div>' : '')+
       '<div id="cvTabContent">Đang tải...</div>';
   }
 

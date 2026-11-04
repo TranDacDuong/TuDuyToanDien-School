@@ -76,6 +76,7 @@
           window._openingClassFromUrl = true;
           try {
             await window.openClassView(openClassId, qs.get("className") || "Chi tiết lớp");
+            if(qs.get("makeup")) await window.MakeupLearning?.open(openClassId);
             if(openTab === "exams" && window.cvSwitchTab){
               setTimeout(() => window.cvSwitchTab("exams"), 250);
             }

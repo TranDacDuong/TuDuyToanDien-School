@@ -767,7 +767,7 @@
       session_evaluation: "Đánh giá", student_exam: "Bài tập", tuition: "Học phí",
       course_session: "Khóa học",
       exam_grading: "Chấm bài", trial_request: "Học thử", parent_link: "Phụ huynh",
-      class_staff: "Nhân sự", manual: "Được giao",
+      class_staff: "Nhân sự", manual: "Được giao", makeup_notebook: "Kiểm tra vở học bù",
     }[value] || "Công việc";
   }
 

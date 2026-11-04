@@ -3,20 +3,14 @@ const fs = require('fs');
 const vm = require('vm');
 
 function calculate(status, overridden, trial = true) {
-  const source = fs.readFileSync('tuition.js', 'utf8');
-  const ctx = {
-    ymToDate: ym => ym + '-01', monthEnd: () => '2026-08-31',
-    currentRole: 'admin', currentUserId: 'admin', parentStudentIds: new Set(),
-    isStaffTuitionView: () => false, canViewStudentPhone: () => false,
-    parentContactMap: {}, fmt: String,
-    generateOccurrencesForStudent: () => [{ date: '2026-08-13', schedule_id: 268, session_no: 1 }]
-  };
+  const source = fs.readFileSync('tuition-calculation.js', 'utf8');
+  const ctx = { window: { TuitionDiscounts: { apply: rows => rows } } };
   vm.createContext(ctx);
-  vm.runInContext(source.slice(source.indexOf('  function attendanceStatusFor'), source.indexOf('  const tuitionLabel')), ctx);
-  vm.runInContext(source.slice(source.indexOf('  function buildRowsForMonth'), source.indexOf('  async function loadClassFilter')), ctx);
-  return ctx.buildRowsForMonth({ ym: '2026-08',
-    classes: [{ id: 'class', class_name: 'Physics', tuition_type: 'per_session', tuition_fee: 120000 }],
-    classStudents: [{ student_id: 'student', class_id: 'class', joined_at: '2026-08-13' }],
+  vm.runInContext(source, ctx);
+  return ctx.window.TuitionCalculation.buildRowsForMonth({ ym: '2026-08',
+    classes: [{ id: 'class', class_name: 'Physics', tuition_type: 'per_session', tuition_fee: 120000,
+      class_schedules: [{ id: 268, session_no: 1, weekday: 4, start_time: '18:00', end_time: '19:00', effective_from: '2026-01-01' }] }],
+    classStudents: [{ student_id: 'student', class_id: 'class', joined_at: '2026-08-13', left_at: '2026-08-13' }],
     attData: [{ student_id: 'student', class_id: 'class', date: '2026-08-13', schedule_id: 268, status, status_overridden: overridden }],
     chosenSchedules: [], suppSessions: [],
     trialReqs: trial ? [{ student_id: 'student', trial_class_id: 'class', trial_session_1_at: '2026-08-13' }] : []
