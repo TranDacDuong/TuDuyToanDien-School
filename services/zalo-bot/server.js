@@ -13,7 +13,9 @@ const { writeJsonAtomic } = require('./sync-store');
 const { prepareScoreMessageMedia } = require('./score-message-media');
 const { createScheduler, isSendingTime, quietHoursError } = require('./tuition-reminder-scheduler');
 const { requireSendAcknowledgement } = require('./send-acknowledgement');
-const { createSendPacer, installSendPacing } = require('./send-pacing');
+const { createSendPacer, installSendPacing, fetchWithDeadline } = require('./send-pacing');
+const { sendNotification } = require('./tuition-notification');
+const TuitionNoticeCommand = require('../../tuition-notice');
 const { retryPreparation, sendTuitionQr } = require('./tuition-qr');
 const { LocalDatabase, eventKey } = require('./local-database');
 const { LocalStorageWorker } = require('./local-storage-worker');
@@ -57,6 +59,7 @@ let nextAliasSyncAt = 0;
 let nextAutomaticTuitionTickAt = 0;
 let nextDispatchPollAt = 0;
 let emptyDispatchPolls = 0;
+let unifiedTuitionStreak = 0;
 let gatewayBatchCount = 0;
 const pendingIncoming = new Map();
 let listenerConnected = false;
@@ -144,7 +147,8 @@ async function gatewayRequest(payload) {
     signal: AbortSignal.timeout(15000)
   });
   if (!response.ok) {
-    const error = new Error(`Gateway HTTP ${response.status}`);
+    const failure=await response.json().catch(()=>null);
+    const error = new Error(String(failure?.error || `Gateway HTTP ${response.status}`).slice(0,500));
     error.status = response.status;
     throw error;
   }
@@ -158,12 +162,23 @@ async function syncGatewayOutbox() {
   if (Date.now() >= nextAutomaticTuitionTickAt) {
       nextAutomaticTuitionTickAt = Date.now() + 60000;
       // Enumerating the whole center must not hold the single Zalo sender lock.
-      automaticTuitionScheduler.tick().catch(error =>
+      automaticTuitionScheduler.tick().then(result=>{if(result.errors?.length)console.warn('[ZaloBot] Không tạo được một số thông báo học phí:',result.errors.map(e=>e.error).join('; '));}).catch(error =>
         console.warn('[ZaloBot] Automatic tuition scheduler:', error?.message || error));
   }
   gatewayBusy = true;
   nextDispatchPollAt = Date.now() + 15000;
   try {
+    const noticeSchedule=automaticTuitionScheduler.schedule();
+    const tuition = unifiedTuitionStreak<5 ? await gatewayRequest({action:'claimTuitionNotice',args:{p_allowed:noticeSchedule.allowed,p_slot:noticeSchedule.due?.slot||0}}) : {data:null};
+    if(tuition.data) {
+      unifiedTuitionStreak++;
+      await sendNotification(tuition.data,{api:zaloApi,store:localStore,
+        rpc:async(action,args)=>(await gatewayRequest({action,args})).data,
+        acknowledge:acknowledgeDispatch,schedule:()=>automaticTuitionScheduler.schedule()});
+      nextDispatchPollAt=Date.now()+500;
+      return;
+    }
+    unifiedTuitionStreak=0;
     const { job } = await gatewayRequest({ action: 'claimDispatch', pacing: dispatchPacing(),
       automaticSchedule: automaticTuitionScheduler.schedule() });
     if (!job) {
@@ -272,8 +287,10 @@ async function acknowledgeDispatch(payload) {
     localStore.acknowledgeEvent(payload);
     pendingIncoming.delete(key);
     persistIncoming();
+    return true;
   } catch (error) {
     console.error('[ZaloBot] Chưa lưu được kết quả gửi:', error?.message || error);
+    return false;
   }
 }
 
@@ -592,6 +609,10 @@ function startGatewayListener() {
   zaloApi.listener.on('message', (message) => {
     if (zaloApi !== listeningApi) return;
     if (message.isSelf && message.type===0) {
+      if(typeof message.data?.content==='string' && /^#hocphi(?:\s|$)/i.test(message.data.content.trim())) {
+        handleTuitionNoticeCommand(message).catch(error=>console.error('[ZaloBot] Lệnh học phí:',error.message));
+        return;
+      }
       const isLinkCommand = !!parseParentLinkCommand(message.data?.content);
       handleParentLinkCommand(message).catch(error => {
         console.error('[ZaloBot] Không xử lý được lệnh liên kết phụ huynh:', error?.message || error);
@@ -627,6 +648,7 @@ function messageTimestamp(value) {
 }
 
 function queueZaloMessage(message, isHistory) {
+  if(message.isSelf && typeof message.data?.content==='string' && /^#hocphi(?:\s|$)/i.test(message.data.content.trim())) return false;
   if(message?.type===1){
     const payload=encodeGroup(message,classGroupUids);if(!payload)return false;payload.isHistory=isHistory===true;
     localStore.recordEvent(payload);if(pendingIncoming.has(payload.externalId)||pendingIncoming.size>=5000)return false;
@@ -669,6 +691,27 @@ function queueZaloUpdate(kind,event) {
 
 function startHistorySync(maxPages) {
   return historyController.start(maxPages);
+}
+
+async function handleTuitionNoticeCommand(message) {
+  if(!message.isSelf || message.type!==0) return;
+  const id=String(message.data?.msgId||'');
+  if(!id || !message.threadId) return;
+  let data;
+  try {
+    const command=TuitionNoticeCommand.parseCommand(message.data?.content);
+    if(!command)return;
+    ({data}=await gatewayRequest({action:'queueTuitionCommand',args:{p_uid:String(message.threadId),p_month:command.month+'-01',p_external_id:id}}));
+  } catch(error){data={queued:0,reason:error.message};}
+  if(!data?.queued) {
+    const reason=data?.reason||'Không tạo thêm yêu cầu';console.warn('[ZaloBot] Lệnh học phí:',reason);
+    const own=zaloApi.getOwnId?.();
+    if(own) await localStore.send(`tuition-command-feedback:${message.threadId}:${id}`,{uid:String(own),reason},async()=>
+      requireSendAcknowledgement(await zaloApi.sendMessage('Không xếp hàng được lệnh #hocphi: '+reason,String(own)),0)).catch(error=>console.warn('[ZaloBot] Phản hồi lệnh học phí:',error.message));
+  }
+  if(message.data.cliMsgId && typeof zaloApi.undo==='function') {
+    await zaloApi.undo({msgId:id,cliMsgId:message.data.cliMsgId},String(message.threadId),0).catch(()=>console.warn('[ZaloBot] Không thu hồi được lệnh học phí; yêu cầu vẫn đã xếp hàng'));
+  }
 }
 
 async function handleParentLinkCommand(message) {
@@ -923,6 +966,7 @@ async function initZaloClient(forceQr = false) {
 
     zaloInstance = new Zalo({
       selfListen: true,
+      polyfill: fetchWithDeadline,
       checkUpdate: false,
       imageMetadataGetter: readImageMetadata
     });
@@ -1304,7 +1348,8 @@ app.get('/api/status', (req, res) => {
     localStorage: { ...localStore.status(), lastError: localStorageWorker.lastError },
     classGroups:{known:classGroupUids.size,history:classGroupHistory.state},
     config: botConfig,
-    sendPacing: { minimumIntervalSeconds: 10 }
+    sendPacing: { minimumIntervalSeconds: 10 },
+    tuitionNotifications: { version: 1, command: '#hocphi', statementQr: true }
   });
 });
 

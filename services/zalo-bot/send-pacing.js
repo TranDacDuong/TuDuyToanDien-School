@@ -19,6 +19,14 @@ function createSendPacer({ readDeadline, writeDeadline, clock = Date.now,
 }
 
 function installSendPacing(api, pace) {
+  if(typeof api.uploadAttachment==='function') {
+    const upload=api.uploadAttachment;
+    api.uploadAttachment=async function(...args) {
+      let timer;
+      try {return await Promise.race([upload.apply(api,args),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Timeout khi tải ảnh lên Zalo; chưa phát tin')),45000);})]);}
+      finally {clearTimeout(timer);}
+    };
+  }
   const original = api.sendMessage;
   api.sendMessage = function (message, threadId, type, beforeSend) {
     return pace(async () => {
@@ -29,4 +37,7 @@ function installSendPacing(api, pace) {
   return api;
 }
 
-module.exports = { createSendPacer, installSendPacing };
+function fetchWithDeadline(url,options={}) {
+  return fetch(url,{...options,signal:options.signal?AbortSignal.any([options.signal,AbortSignal.timeout(45000)]):AbortSignal.timeout(45000)});
+}
+module.exports = { createSendPacer, installSendPacing, fetchWithDeadline };

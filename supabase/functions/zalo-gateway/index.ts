@@ -32,7 +32,10 @@ async function rpc(name: string, body: Record<string, unknown>) {
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(12000),
   });
-  if (!response.ok) throw new Error(`Database operation failed: ${response.status}`);
+  if (!response.ok) {
+    const failure=await response.json().catch(()=>null);
+    throw new Error(String(failure?.message || `Database operation failed: ${response.status}`).slice(0,500));
+  }
   const raw = await response.text();
   return raw ? JSON.parse(raw) : null;
 }
@@ -48,6 +51,24 @@ Deno.serve(async (request) => {
 
   try {
     const payload = await request.json();
+    const tuitionActions: Record<string,{name:string;fields:string[]}> = {
+      claimTuitionNotice:{name:'claim_tuition_notification_v1',fields:['p_allowed','p_slot']},
+      prepareTuitionNotice:{name:'prepare_tuition_notification',fields:['p_id','p_token','p_manifest','p_text']},
+      beginTuitionNoticePart:{name:'begin_tuition_notification_part',fields:['p_id','p_token','p_index','p_allowed']},
+      finishTuitionNoticePart:{name:'finish_tuition_notification_part',fields:['p_id','p_token','p_index','p_external_id']},
+      failTuitionNotice:{name:'fail_tuition_notification',fields:['p_id','p_token','p_error']},
+      queueTuitionCommand:{name:'queue_tuition_notice_zalo_command',fields:['p_uid','p_month','p_external_id']}
+    };
+    if (Object.hasOwn(tuitionActions,payload.action)) {
+      const spec=tuitionActions[payload.action],args=payload.args;
+      if(!args || typeof args!=='object' || Array.isArray(args) || Object.keys(args).some(k=>!spec.fields.includes(k)) || spec.fields.some(k=>!(k in args)) || JSON.stringify(args).length>30000
+        || ['p_id','p_token'].some(k=>k in args && !/^[0-9a-f-]{36}$/i.test(args[k]))
+        || ('p_index' in args && (!Number.isInteger(args.p_index)||args.p_index<0||args.p_index>99))
+        || ('p_allowed' in args && typeof args.p_allowed!=='boolean')
+        || ('p_slot' in args && ![0,5,10,15].includes(args.p_slot))
+        || ('p_manifest' in args && (!Array.isArray(args.p_manifest)||args.p_manifest.length>100||args.p_manifest.some((x:unknown)=>typeof x!=='string'||x.length>200)))) return json({error:'Invalid tuition request'},400);
+      return json({data:await rpc(spec.name,args)});
+    }
     if (payload.action === 'classGroupState') return json({data:await rpc('class_group_worker_state',{})});
     if (payload.action === 'claimClassGroup') return json({job:await rpc('claim_zalo_class_group_job',{})});
     if (payload.action === 'validateClassGroup') {

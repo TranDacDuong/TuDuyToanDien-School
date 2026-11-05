@@ -78,6 +78,11 @@ class LocalDatabase {
       return row;
     });
   }
+  confirmedSend(keys, identity) {
+    const fingerprint=createHash('sha256').update(JSON.stringify(identity)).digest('hex');
+    for(const key of keys){const receipt=this.db.prepare("SELECT result FROM effects WHERE key=? AND fingerprint=? AND status='sent'").get(key,fingerprint);if(receipt)return JSON.parse(receipt.result);}
+    return null;
+  }
   async send(key, identity, operation, reuseKeys = []) {
     const fingerprint = createHash('sha256').update(JSON.stringify(identity)).digest('hex');
     for (const reuseKey of reuseKeys) {

@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {chromium}=require('@playwright/test');
 test('conversation tuition previews shared template and queues once with durable retry keys',async t=>{
-  const browser=await chromium.launch({headless:true});t.after(()=>browser.close());
+  const browser=await chromium.launch({headless:true,channel:'chrome'});t.after(()=>browser.close());
   const page=await browser.newPage({viewport:{width:1440,height:960}});
   await page.route('https://**/*',route=>route.abort());
   await page.route('http://localhost/fixture',route=>route.fulfill({contentType:'text/html',body:'<main id="host"></main>'}));
@@ -13,15 +13,17 @@ test('conversation tuition previews shared template and queues once with durable
   await page.evaluate(()=>{
     window.calls=[];window.permission=true;window.linked=true;window.remaining=900000;window.rows=[];window.failOnce=true;
     window.ConversationFamilyModel={summarize:()=>({due:600000,rows:[{billableSessions:8}]})};
-    window.TuitionCalculation={};
+    window.TuitionCalculation={buildRowsForMonth:()=>[{studentId:'student',className:'Toán',billableSessions:8}]};
     window.sb={rpc:async(name,args)=>{
       calls.push({name,args});let data;
       if(name==='has_app_permission')data=permission;
       if(name==='get_mindup_family_info')data={parent:{linked,name:'Phụ huynh'},students:[{id:'student',name:'Học sinh',classes:[{class_name:'Toán'}]}]};
       if(name==='prepare_tuition_detail_bundle')data={remaining,memo:'SEVQR HP0926 1026 HOC SINH',debts:[{month:'2026-09-01',remaining:300000},{month:'2026-10-01',remaining:600000}]};
       if(name==='tuition_notice_template')data='Mẫu chung {TenHS} {SoTien} {NoiDungCK}';
+      if(name==='list_tuition_notification_rows')data=[];
+      if(name==='preview_tuition_notification')data=remaining>0?{month:'2026-10',parentName:'Phụ huynh',bank:{code:'vietinbank',bankName:'VietinBank',account:'104888332556'},template:'Mẫu chung {TenHS} {SoTien} {NoiDungCK}',billing_context:{payments:[]},children:[{student_id:'student',student_name:'Học sinh',remaining,transfer_memo:'SEVQR HP0926 1026 HOC SINH',debts:[{month:'2026-09-01',remaining:300000},{month:'2026-10-01',remaining:600000}]}]}:null;
       if(name==='request_tuition_qr_repair')data=true;
-      if(name==='queue_grouped_tuition'){
+      if(name==='queue_tuition_notification'){
         if(failOnce){failOnce=false;return {error:{message:'Network response lost'}};}
         rows=[{id:'job',status:'queued',created_at:new Date().toISOString()}];data={queued:1};
       }
@@ -35,16 +37,17 @@ test('conversation tuition previews shared template and queues once with durable
   assert.equal(await page.evaluate(()=>calls.some(c=>c.name==='prepare_tuition_detail_bundle')),false);
   await page.getByRole('button',{name:'Gửi thông báo học phí',exact:true}).click();
   const dialog=page.getByRole('dialog');await dialog.waitFor();
+  assert.equal(await page.evaluate(()=>calls.some(c=>c.name==='prepare_tuition_detail_bundle')),false);
   assert.match(await dialog.innerText(),/300.000đ/);assert.match(await dialog.innerText(),/900.000đ/);
-  assert.equal(await page.evaluate(()=>calls.filter(c=>c.name==='queue_grouped_tuition').length),0);
+  assert.equal(await page.evaluate(()=>calls.filter(c=>c.name==='queue_tuition_notification').length),0);
   await dialog.getByRole('button',{name:'Xác nhận gửi thông báo',exact:true}).click();
   await dialog.getByText(/Network response lost/).waitFor();
   await dialog.getByRole('button',{name:'Xác nhận gửi thông báo',exact:true}).click();
   await dialog.getByText(/Đã xếp hàng/).waitFor();
-  const queue=await page.evaluate(()=>calls.filter(c=>c.name==='queue_grouped_tuition'));
-  assert.equal(queue.length,2);assert.equal(queue[0].args.p_items[0].request_key,queue[1].args.p_items[0].request_key);
-  assert.equal(queue[0].args.p_replace,false);assert.equal(queue[0].args.p_items[0].parent_id,'parent');
-  assert.equal(queue[0].args.p_items[0].remaining,900000);
+  const queue=await page.evaluate(()=>calls.filter(c=>c.name==='queue_tuition_notification'));
+  assert.equal(queue.length,2);assert.equal(queue[0].args.p_request,queue[1].args.p_request);
+  assert.equal(queue[0].args.p_source,'conversation');assert.equal(queue[0].args.p_parent,'parent');
+  assert.deepEqual(queue[0].args.p_students,['student']);assert.equal('amount' in queue[0].args,false);
   assert.equal(await dialog.getByRole('button',{name:'Xác nhận gửi thông báo',exact:true}).isDisabled(),true);
   await page.screenshot({path:'scratch/conversation-tuition-desktop.png'});
   await page.setViewportSize({width:390,height:844});
@@ -62,7 +65,7 @@ test('conversation tuition previews shared template and queues once with durable
   page.once('dialog',d=>d.accept());
   await dialog.getByRole('button',{name:'Gửi bù riêng ảnh QR',exact:true}).click();
   await dialog.getByText('Đã yêu cầu gửi bù QR, không gửi lại nội dung.',{exact:true}).waitFor();
-  assert.equal(await page.evaluate(()=>calls.filter(c=>c.name==='queue_grouped_tuition').length),2);
+  assert.equal(await page.evaluate(()=>calls.filter(c=>c.name==='queue_tuition_notification').length),2);
   assert.equal(await page.evaluate(()=>calls.find(c=>c.name==='request_tuition_qr_repair').args.p_job_id),'old-job');
   await dialog.getByRole('button',{name:'Đóng',exact:true}).click();
   await page.evaluate(()=>{rows=[];linked=false;});
@@ -70,7 +73,7 @@ test('conversation tuition previews shared template and queues once with durable
   await page.getByText('Cần liên kết Zalo của phụ huynh trước khi gửi.',{exact:true}).waitFor();
   await page.evaluate(()=>{linked=true;remaining=0;});
   await page.getByRole('button',{name:'Gửi thông báo học phí',exact:true}).click();
-  await page.getByText('Đã thanh toán đủ công nợ đến tháng 2026-10.',{exact:true}).waitFor();
+  await page.getByText('Đã thanh toán đủ hoặc chưa có công nợ được lưu đến tháng 2026-10.',{exact:true}).waitFor();
   await page.evaluate(async()=>{permission=false;state.host.replaceChildren();await ConversationTuitionActions.mount(state.host,{id:'student'},state);});
   assert.equal(await page.getByRole('button',{name:'Gửi thông báo học phí',exact:true}).count(),0);
 });

@@ -17,7 +17,7 @@ test('shared saved template and arrears renderer keep payment memo and balances'
   const debts=[{month:'2026-09-01',remaining:200000},{month:'2026-10-01',remaining:500000}];
   const c={...child,remaining:700000,debts,transfer_memo:'SEVQR HP0926 1026 Gia Huy 5678'};
   const payload=buildPayload({parent_id:'p',children:[c]},'2026-10',bank);
-  assert.equal(payload.content,Notice.render({studentName:c.student_name,parentName:'Nguyễn Thu Trang',remaining:700000,debts,transferMemo:c.transfer_memo},'2026-10',bank));
+  assert.equal(payload.content,Notice.render({studentName:c.student_name,parentName:'Nguyễn Thu Trang',className:'Toán 10',sessionsCount:5,remaining:700000,debts,transferMemo:c.transfer_memo},'2026-10',bank));
   assert.equal(new URL(payload.parts[1].url).searchParams.get('amount'),'700000');
   assert.equal(new URL(payload.parts[1].url).searchParams.get('addInfo'),c.transfer_memo);
 });

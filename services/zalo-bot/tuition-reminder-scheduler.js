@@ -175,21 +175,22 @@ function createScheduler({ rpc, bank, clock = () => new Date(), convert = lunarD
         const current = plan(clock(), convert);
         if (!current.allowed || !current.due) return { queued: 0 };
         const candidates = await call('automatic_tuition_candidates', {});
-        const currentBank = typeof bank === 'function' ? await bank() : bank;
         let queued = 0;
+        const errors=[];
         for (const candidate of candidates || []) {
           // Enumeration is resumable and idempotent; stop between parents rather
           // than holding the launcher behind an entire center-wide scan.
           if(stopRequested()) break;
-          const payload = buildPayload(candidate, current.month, currentBank);
+          try {
           const inserted = await call('enqueue_automatic_tuition_reminder', {
             p_parent: candidate.parent_id, p_month: `${current.month}-01`,
             p_slot: current.due.slot, p_due: current.due.date, p_today: current.today,
-            p_phone: candidate.phone, p_payload: payload
+            p_phone: candidate.phone, p_payload: {children:candidate.children}
           });
           if (inserted) queued++;
+          } catch(error) { errors.push({parent_id:candidate.parent_id,error:sendErrorMessage(error)}); }
         }
-        return { queued };
+        return errors.length?{queued,errors}:{queued};
       } finally { busy = false; }
     },
     // sendPart must resolve only with a verified external message ID. Never retry

@@ -24,6 +24,17 @@ function gatewayHarness() {
   })) };
 }
 
+test('unified tuition gateway rejects injected fields and invalid schedule/part values',async()=>{
+  const g=gatewayHarness();
+  assert.equal((await g.request({action:'claimTuitionNotice',args:{p_allowed:true,p_slot:5,sql:'never'}})).status,400);
+  assert.equal((await g.request({action:'claimTuitionNotice',args:{p_allowed:true,p_slot:7}})).status,400);
+  assert.equal(g.calls.length,0);
+  await g.request({action:'claimTuitionNotice',args:{p_allowed:true,p_slot:5}});
+  assert.equal(g.calls[0].name,'claim_tuition_notification_v1');
+  assert.equal((await g.request({action:'finishTuitionNoticePart',args:{p_id:'bad',p_token:'bad',p_index:-1,p_external_id:'123:4'}})).status,400);
+  assert.equal(g.calls.length,1);
+});
+
 test('gateway authenticates scheduler actions and allowlists RPCs/arguments', async () => {
   const g = gatewayHarness();
   assert.equal((await g.request({ action: 'automaticTuitionCandidates' }, 'wrong')).status, 401);

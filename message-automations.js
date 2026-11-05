@@ -149,7 +149,8 @@
     for(const row of rows){const info=systemInfo[row.id]||{},section=el('section',null,'system-row'),name=el('div');name.append(el('h3',row.name),row.id==='tuition_overdue_notice'?el('span','Gửi thủ công','status'):status(row.is_enabled?'scheduled':'paused'));section.append(name,el('p',info.condition||''));
       const actions=el('div',null,'commands');actions.append(button(data.admin?'Cài đặt':'Xem mẫu',async()=>{
         systemId=row.id;$('systemTitle').textContent=row.name;$('systemCondition').textContent=info.condition||'';$('systemEnabled').checked=row.is_enabled;$('systemEnabled').disabled=!data.admin;$('systemContent').value=row.content;$('systemContent').readOnly=!data.admin||!!info.pool;$('saveSystem').hidden=!data.admin;$('systemFeedback').textContent='';$('systemEditor').showModal();
-        const overdue=row.id==='tuition_overdue_notice';$('overdueOptions').hidden=!overdue;$('previewOverdue').hidden=!overdue||!data.admin;$('systemEnabledWrap').hidden=overdue;$('overdueVariable').disabled=!data.admin;
+        const overdue=row.id==='tuition_overdue_notice';$('overdueOptions').hidden=!overdue;$('previewOverdue').hidden=!overdue||!data.admin;$('systemEnabledWrap').hidden=overdue;$('overdueVariable').disabled=!data.admin;$('overdueVariable').hidden=overdue;
+        if(overdue){$('systemContent').value=await rpc('tuition_notice_template',{})||window.TuitionNotice.DEFAULT_TEMPLATE;$('systemCondition').textContent+=' Nội dung dùng chung với trang học phí, nhắc tự động và lệnh #hocphi. Sửa tại đây sẽ cập nhật mẫu chung.';}
       }));
       if(row.id==='tuition_overdue_notice'&&data.admin)actions.append(button('Gửi',()=>openOverduePreview(row.content),'primary'));
       if(info.pool&&data.admin)actions.append(button('Bộ mẫu đánh giá',()=>{window.open('sourcedata.html?tab=evaluationTemplates','_blank','noopener');}));
@@ -174,6 +175,7 @@
   $('overdueVariable').onchange=()=>{if(!$('overdueVariable').value)return;const field=$('systemContent');field.setRangeText('['+$('overdueVariable').value+']',field.selectionStart,field.selectionEnd,'end');$('overdueVariable').value='';field.focus();};
   async function openOverduePreview(template){
       const data=await rpc('preview_overdue_tuition_notices',{p_template:template});
+      for(const row of data.recipients){if(!row.notification)continue;const c=row.notification.billing_context;const rows=window.TuitionCalculation.buildRowsForMonth({...c,ym:row.notification.month,payments:Object.fromEntries((c.payments||[]).map(p=>[p.student_id,p]))},{discountRules:c.discountRules||[]});row.content=window.TuitionNotice.build({...row.notification,rows}).text;}
       $('detailsTitle').textContent=(data.overdue?'Phụ huynh còn công nợ đến tháng ':'Dự kiến nhắc quá hạn tháng ')+data.month.slice(0,7);
       const {wrap,body}=table(['Phụ huynh','Tổng còn thiếu','Zalo','Nội dung','QR thanh toán']),selected=new Set(data.recipients.filter(r=>r.can_send).map(r=>r.parent_id));
       wrap.classList.add('overdue-preview');
@@ -212,7 +214,7 @@
     e.preventDefault();$('saveSystem').disabled=true;
     try{
       if(systemId==='tuition_overdue_notice'){
-        await rpc('save_overdue_tuition_template',{p_content:$('systemContent').value});
+        await rpc('tuition_notice_template',{p_template:$('systemContent').value});
       }else await rpc('update_message_automation_system',{p_id:systemId,p_content:$('systemContent').value,p_enabled:$('systemEnabled').checked});
       $('systemEditor').close();await refresh();
     }catch(err){$('systemFeedback').textContent=errorText(err);}finally{$('saveSystem').disabled=false;}

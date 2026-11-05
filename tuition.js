@@ -2255,6 +2255,7 @@ Nhập số tiền hoàn lại (>0):`,
   }
 
   let automaticTuitionRows = [];
+  let unifiedTuitionRows = [];
   let automaticTuitionError = "";
   let automaticTuitionControl = null;
   let automaticTuitionControlBusy = false;
@@ -2268,10 +2269,13 @@ Nhập số tiền hoàn lại (>0):`,
     automaticTuitionRetryBusy = true;
     updateZaloDynamicStatus();
     try {
-      const { data, error } = await getSb().rpc("retry_failed_automatic_tuition", {
-        p_month: `${ym}-01`, p_due: due, p_confirm_uncertain: true
-      });
-      if (error) throw error;
+      let data=0;
+      if(automaticTuitionRows.some(row=>!row.unified && row.due_date===due && row.status==='uncertain')) {
+        const legacy=await getSb().rpc("retry_failed_automatic_tuition", {p_month:`${ym}-01`,p_due:due,p_confirm_uncertain:true});
+        if(legacy.error) throw legacy.error; data+=Number(legacy.data||0);
+      }
+      const batches=[...new Set(automaticTuitionRows.filter(row=>row.unified && row.due_date===due && row.status==='uncertain').map(row=>row.batch_id))];
+      for(const batch of batches){const result=await getSb().rpc('control_tuition_notification_batch',{p_batch:batch,p_action:'retry',p_confirm:true});if(result.error)throw result.error;data+=Number(result.data||0);}
       await loadAutomaticTuitionProgress();
       alert(`Đã xếp lại ${data || 0} phụ huynh bị lỗi. Các lượt đã gửi thành công được giữ nguyên. Lượt có công nợ hoặc liên kết thay đổi sẽ không được gửi lại.`);
     } catch (error) { alert("Không xếp lại được: " + error.message); }
@@ -2288,7 +2292,7 @@ Nhập số tiền hoàn lại (>0):`,
     } catch (error) { alert("Không thay đổi được trạng thái nhắc học phí tự động: " + error.message); }
     finally { automaticTuitionControlBusy = false; updateZaloDynamicStatus(); }
   };
-  const automaticLabels = { queued: "Chờ gửi", retry_waiting: "Chờ quét lượt 2", processing: "Đang gửi", sent: "Đã gửi đủ nội dung và QR", cancelled: "Đã bỏ qua", uncertain: "Gửi chưa thành công" };
+  const automaticLabels = { queued: "Chờ gửi", retry_waiting: "Chờ quét lượt 2", processing: "Đang gửi", sent: "Đã gửi đủ nội dung và ảnh", cancelled: "Đã bỏ qua", uncertain: "Lỗi / chưa xác nhận" };
 
   async function loadAutomaticTuitionProgress() {
     if (currentRole !== "admin" || !hasTuitionPermission("tuition.zalo_queue.manage", false)) return;
@@ -2298,7 +2302,16 @@ Nhập số tiền hoàn lại (>0):`,
       const { data, error } = await getSb().rpc("list_automatic_tuition_reminders", { p_month: `${ym}-01` });
       if (error) throw error;
       if (monthPicker.value !== ym) return;
-      automaticTuitionRows = data || [];
+      const legacyRows = data || [];
+      const unified=await getSb().rpc('list_tuition_notification_rows',{p_month:`${ym}-01`});
+      if(unified.error) throw unified.error;
+      if(monthPicker.value!==ym) return;
+      automaticTuitionRows=legacyRows;
+      unifiedTuitionRows=unified.data||[];
+      const grouped=new Map();
+      for(const row of unifiedTuitionRows){if(!grouped.has(row.id))grouped.set(row.id,{...row,students:[]});grouped.get(row.id).students.push(row.student_name);}
+      automaticTuitionRows.push(...[...grouped.values()].map(row=>({...row,students:row.students.join(', ')})));
+      automaticTuitionRows.sort((a,b)=>String(b.due_date).localeCompare(String(a.due_date))||String(b.created_at).localeCompare(String(a.created_at)));
       const control = await getSb().rpc("control_automatic_tuition", { p_action: "status" });
       if (control.error) throw control.error;
       automaticTuitionControl = control.data;
@@ -2318,7 +2331,7 @@ Nhập số tiền hoàn lại (>0):`,
     const counts = rows.reduce((result, row) => { const status = row.auto_retry_pending || (row.status === "queued" && row.scan_pass === 2) ? "retry_waiting" : row.status; result[status] = (result[status] || 0) + 1; return result; }, {});
     const finished = rows.filter(row => ["sent", "cancelled", "uncertain"].includes(row.status) && !row.auto_retry_pending).length;
     return `<section style="padding:16px;margin-bottom:14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#0f1f3d">
-      <b>Nhắc học phí tự động tháng ${esc(monthPicker?.value || "")}</b>
+      <b>Tiến độ thông báo học phí tháng ${esc(monthPicker?.value || "")}</b>
       ${supportsTwoSweeps ? '<div style="margin-top:8px">Gửi lần lượt từng phụ huynh · Tối đa 2 lượt quét · Mỗi tin cách nhau ít nhất 10 giây</div>' : '<div role="alert" style="margin-top:10px;padding:12px;border:1px solid #fca5a5;border-radius:8px;background:#fff1f2;color:#991b1b"><b>Hàng đợi trên máy chủ chưa được cập nhật cơ chế 2 lượt.</b><br>Các hồ sơ không đủ điều kiện có thể còn nằm ở Chờ gửi và khóa nút gửi lại. Cần cập nhật hàng đợi trên máy chủ để xử lý tiếp.</div>'}
       ${automaticTuitionControl ? `<div style="margin-top:10px"><b>${automaticTuitionControl.paused ? "Đã tạm dừng nhắc tự động" : "Nhắc tự động đang bật"}</b><button type="button" style="margin-left:12px;padding:7px 12px" ${automaticTuitionControlBusy ? "disabled" : ""} onclick="controlAutomaticTuition('${automaticTuitionControl.paused ? "resume" : "pause"}')">${automaticTuitionControl.paused ? "Tiếp tục" : "Dừng"}</button>${automaticTuitionControl.paused ? '<div style="margin-top:6px">Hàng chờ được giữ nguyên. Lượt đang gửi hoàn tất trước khi dừng.</div>' : ""}</div>` : ""}
       <div style="margin:10px 0">${automaticTuitionError ? esc(automaticTuitionError) : !rows.length ? "Chưa có lượt gửi tự động được tạo trong tháng này." : `Đợt ngày ${esc(latest)} · Đã xử lý ${finished}/${rows.length} phụ huynh${finished === rows.length ? " · Đã hoàn tất" : ""}`}</div>
@@ -2340,7 +2353,7 @@ Nhập số tiền hoàn lại (>0):`,
   function renderAutomaticTuitionDetails() {
     const target = document.getElementById("automaticTuitionRows");
     if (!target) return;
-    target.innerHTML = `<table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px"><thead><tr><th>Đợt gửi</th><th>Phụ huynh / học sinh</th><th>Trạng thái</th><th>Cập nhật / lý do</th></tr></thead><tbody>${automaticTuitionRows.map(row => `<tr style="border-top:1px solid #e2e8f0"><td style="padding:12px">${esc(row.due_date)}<br>Ngày nhắc ${esc(row.slot)}</td><td style="padding:12px">${esc(row.parent_name || "Phụ huynh")}<br>${esc(row.phone)}<br>${esc(row.students || "")}</td><td style="padding:12px">${esc(row.auto_retry_pending || (row.status === "queued" && row.scan_pass === 2) ? "Chờ quét lượt 2" : automaticLabels[row.status] || row.status)}${row.scan_attempts != null ? `<br>Đã thử ${esc(row.scan_attempts)}/2 lần · Lượt ${esc(row.scan_pass || 1)}` : ""}<br>Đã xác nhận ${esc(row.completed_parts)}/${esc(row.total_parts)} phần (nội dung + QR)</td><td style="padding:12px;overflow-wrap:anywhere" title="${esc(row.error_message || "")}">${esc(new Date(row.updated_at).toLocaleString("vi-VN"))}<br>${esc(automaticTuitionDeliveryNote(row))}</td></tr>`).join("")}</tbody></table>`;
+    target.innerHTML = `<table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px"><thead><tr><th>Đợt gửi</th><th>Phụ huynh / học sinh</th><th>Trạng thái</th><th>Cập nhật / lý do</th></tr></thead><tbody>${automaticTuitionRows.map(row => `<tr style="border-top:1px solid #e2e8f0"><td style="padding:12px">${esc(row.due_date)}<br>${esc(row.source ? ({automatic:"Tự động",manual:"Trang học phí",conversation:"Hồ sơ gia đình",overdue:"Nhắc quá hạn",command:"Lệnh #hocphi"}[row.source] || row.source) : `Ngày nhắc ${row.slot}`)}</td><td style="padding:12px">${esc(row.parent_name || "Phụ huynh")}<br>${esc(row.phone)}<br>${esc(row.students || "")}</td><td style="padding:12px">${esc(row.auto_retry_pending || (row.status === "queued" && row.scan_pass === 2) ? "Chờ quét lượt 2" : (typeof window!=="undefined" && window.TuitionNotice?.deliveryState(row)) || automaticLabels[row.status] || row.status)}${row.scan_attempts != null ? `<br>Đã thử ${esc(row.scan_attempts)}/2 lần · Lượt ${esc(row.scan_pass || 1)}` : ""}<br>Đã xác nhận ${esc(row.completed_parts)}/${esc(row.total_parts)} phần (nội dung + QR)</td><td style="padding:12px;overflow-wrap:anywhere" title="${esc(row.error_message || "")}">${esc(new Date(row.updated_at).toLocaleString("vi-VN"))}<br>${esc(automaticTuitionDeliveryNote(row))}</td></tr>`).join("")}</tbody></table>`;
     const table = target.querySelector("table");
     table.style.minWidth = "860px";
     table.style.tableLayout = "fixed";
@@ -2446,7 +2459,7 @@ Nhập số tiền hoàn lại (>0):`,
         const time = entry.updated_at ? new Date(entry.updated_at).toLocaleString("vi-VN") : "";
         const warning = entry.error_message ? ` · ${esc(entry.error_message)}` : "";
         return `<div style="font-size:11px;color:#475569;line-height:1.45" title="${esc(entry.error_message || "")}">
-          Lần ${entry.attempt_no}: <b>${zaloTuitionStatusLabel(entry.status)}</b> · ${esc(time)}${warning}
+          Lần ${entry.attempt_no}: <b>${esc(window.TuitionNotice?.deliveryState(entry)||zaloTuitionStatusLabel(entry.status))}</b> · ${esc(time)}${warning}
           ${entry.status === "sent" && !entry.qr_sent_at && entry.error_message && entry.id ? `<button type="button" onclick="requestTuitionQrRepair('${entry.id}')" style="margin:4px 0">Gửi bù QR</button>` : ""}</div>`;
       }).join("");
       const action = isZaloTuitionItemEligible(item)
@@ -2485,7 +2498,7 @@ Nhập số tiền hoàn lại (>0):`,
       const item = items.get(`${row.student_id}:${row.parent_id}`);
       const contact = zaloParentContactStatus.get(row.parent_id);
       const pending = !["sent", "failed", "uncertain", "cancelled", "processing"].includes(row.status);
-      const status = pending && item ? pendingZaloTuitionLabel(item) : zaloTuitionStatusLabel(row.status);
+      const status = pending && item ? pendingZaloTuitionLabel(item) : (typeof window!=='undefined' && window.TuitionNotice?.deliveryState(row)) || zaloTuitionStatusLabel(row.status);
       const color = row.status === "sent" ? "#15803d" : ["failed", "uncertain"].includes(row.status) ? "#b91c1c" : "#9a6700";
       return `<tr style="border-top:1px solid #e2e8f0"><td style="padding:12px 8px;vertical-align:top">${esc(item?.studentName || "Học sinh không còn trong danh sách")}<div style="color:#64748b">Lượt ${esc(row.attempt_no)}</div></td><td style="padding:12px 8px;vertical-align:top">${esc(contact?.zalo_alias || item?.parentName || "Phụ huynh")}<div>${esc(item?.phone || "")}</div></td><td style="padding:12px 8px;vertical-align:top;color:${color};font-weight:700">${esc(status)}${row.status === "sent" ? `<div style="font-weight:400">${row.qr_sent_at ? "Đã gửi QR" : "Chưa xác nhận ảnh QR"}</div>` : ""}</td><td style="padding:12px 8px;vertical-align:top">${esc(row.updated_at ? new Date(row.updated_at).toLocaleString("vi-VN") : "")}</td><td style="padding:12px 8px;vertical-align:top;max-width:340px;overflow-wrap:anywhere">${esc(row.error_message || (pending ? contact?.last_error : "") || "—")}${row.status === "sent" && !row.qr_sent_at && row.error_message && row.id ? `<div><button type="button" onclick="requestTuitionQrRepair('${esc(row.id)}')">Gửi bù QR</button></div>` : ""}</td></tr>`;
     }).join("") || '<tr><td colspan="5" style="padding:20px">Không có lượt gửi thuộc bộ lọc này.</td></tr>'}</tbody></table>`;
@@ -2510,6 +2523,9 @@ Nhập số tiền hoàn lại (>0):`,
           if (!zaloTuitionHistory.has(key)) zaloTuitionHistory.set(key, []);
           zaloTuitionHistory.get(key).push(row);
         });
+        const unified=await getSb().rpc('list_tuition_notification_rows',{p_month:`${ym}-01`});
+        if(unified.error) throw unified.error;
+        for(const row of unified.data||[]){const key=`${row.student_id}:${row.parent_id}`;if(!zaloTuitionHistory.has(key))zaloTuitionHistory.set(key,[]);zaloTuitionHistory.get(key).push(row);}
       }
       if (parentIds.length) {
         const { data, error } = await getSb().from("zalo_parent_contacts")
@@ -2563,9 +2579,10 @@ Nhập số tiền hoàn lại (>0):`,
     batchControlBusy = true;
     updateZaloDynamicStatus();
     try {
-      const { data, error } = await getSb().rpc("control_zalo_tuition_batch", {
-        p_batch_id: batchId, p_action: action, p_confirm_uncertain: action === "retry" && uncertain
-      });
+      const unified=zaloDurableProgress.rows.some(row=>row.unified);
+      const { data, error } = await getSb().rpc(unified?'control_tuition_notification_batch':'control_zalo_tuition_batch', unified?
+        {p_batch:batchId,p_action:action,p_confirm:action==='retry'}:
+        {p_batch_id:batchId,p_action:action,p_confirm_uncertain:action==='retry' && uncertain});
       if (error) throw error;
       if (action === "retry" && !data) alert("Không có tin đủ điều kiện thử lại. Kiểm tra học phí đã thay đổi hoặc số lần thử lại.");
       await loadZaloTuitionHistory();
@@ -2700,6 +2717,9 @@ Nhập số tiền hoàn lại (>0):`,
       await loadZaloArrears();
       items.forEach(item => applyZaloDebts(item, zaloArrears.get(item.studentId)?.debts || []));
       const template = document.getElementById("zaloTemplateText")?.value || DEFAULT_ZALO_TEMPLATE;
+      if(template.replace(/\r\n/g,'\n').trim() !== (savedTuitionNoticeTemplate || DEFAULT_ZALO_TEMPLATE).replace(/\r\n/g,'\n').trim()) {
+        throw new Error('Hãy lưu mẫu tin nhắn chung trước khi xếp hàng để mọi nơi gửi cùng nội dung.');
+      }
       const batchId = crypto.randomUUID();
       const payload = items.map(item => {
         const paymentId = paymentMap[item.studentId]?.id || "";

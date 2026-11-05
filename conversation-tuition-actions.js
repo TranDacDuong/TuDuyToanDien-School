@@ -1,7 +1,6 @@
 (function () {
   const labels={queued:'Đang chờ gửi',processing:'Đang gửi',sent:'Đã gửi nội dung',failed:'Gửi lỗi',cancelled:'Đã hủy',uncertain:'Chưa xác nhận'};
   const pending=new Set(['queued','processing','not_found','not_friend','invited','greeted']);
-  const bank={bankName:'VietinBank',account:'104888332556'};
   function el(tag,text) {const n=document.createElement(tag);if(text!=null)n.textContent=text;return n;}
   function button(text,action) {const n=el('button',text);n.type='button';n.className='family-action';n.onclick=action;return n;}
   async function rpc(name,args) {
@@ -13,11 +12,13 @@
     const {data,error}=await window.sb.from('zalo_tuition_deliveries')
       .select('id,status,created_at,sent_at,qr_sent_at,error_message,qr_url,qr_only_requested')
       .eq('student_id',student).eq('parent_id',parent).eq('month',month+'-01').order('created_at',{ascending:false}).limit(10);
-    if(error)throw error;return data || [];
+    if(error)throw error;
+    const unified=await rpc('list_tuition_notification_rows',{p_month:month+'-01'});
+    return [...(data||[]),...(unified||[]).filter(r=>r.student_id===student && r.parent_id===parent)].sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,10);
   }
   function when(value) {return new Date(value).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'});}
   function describe(row) {
-    return (labels[row.status] || row.status)+' · '+when(row.created_at)+
+    return (window.TuitionNotice.deliveryState(row)||labels[row.status] || row.status)+' · '+when(row.created_at)+
       (row.sent_at?' · '+(row.qr_sent_at?'Đã gửi QR':'Chưa xác nhận ảnh QR'):'')+
       (row.error_message?' · '+row.error_message:'');
   }
@@ -48,27 +49,24 @@
           if(!alive())return;
           if(!fresh.parent?.linked)throw new Error('Cần liên kết Zalo của phụ huynh trước khi gửi.');
           const current=fresh.students.find(s=>s.id===student.id);
-          const totals=current && window.ConversationFamilyModel.summarize(current,month,window.TuitionCalculation);
-          if(!totals)throw new Error('Không có quyền xem công nợ.');
-          const bundle=await rpc('prepare_tuition_detail_bundle',{p_student:student.id,p_month:month+'-01',p_amount_due:totals.due});
-          if(!alive())return;
-          if(!(Number(bundle.remaining)>0) || !bundle.memo)throw new Error('Đã thanh toán đủ công nợ đến tháng '+month+'.');
-          const template=await rpc('tuition_notice_template',{});
+          if(!current)throw new Error('Không có quyền xem công nợ.');
           const rows=await refresh();if(!alive())return;
-          const item={studentName:current.name,parentName:fresh.parent.name,remaining:Number(bundle.remaining),debts:bundle.debts,
-            transferMemo:bundle.memo,className:totals.rows.map(r=>r.className).filter(Boolean).join(', ') || (current.classes || []).map(c=>c.class_name).join(', '),
-            sessionsCount:totals.rows.reduce((n,r)=>n+Number(r.billableSessions || r.totalSessions || 0),0)};
-          const content=window.TuitionNotice.render(item,month,bank,template || window.TuitionNotice.DEFAULT_TEMPLATE);
-          const qr='https://img.vietqr.io/image/vietinbank-104888332556-compact2.png?amount='+bundle.remaining+'&addInfo='+encodeURIComponent(bundle.memo);
-          const payload={request_key:crypto.randomUUID(),batch_id:crypto.randomUUID(),student_id:student.id,parent_id:state.parent,
-            content,qr_url:qr,remaining:Number(bundle.remaining),debts:bundle.debts,memo:bundle.memo,encoded_memo:encodeURIComponent(bundle.memo)};
+          const canonical=await rpc('preview_tuition_notification',{p_parent:state.parent,p_month:month+'-01',p_students:[student.id]});
+          if(!canonical)throw Error('Đã thanh toán đủ hoặc chưa có công nợ được lưu đến tháng '+month+'.');
+          const context=canonical.billing_context;
+          const canonicalRows=window.TuitionCalculation.buildRowsForMonth({...context,ym:month,payments:Object.fromEntries((context.payments||[]).map(p=>[p.student_id,p]))},{discountRules:context.discountRules||[]});
+          const notice=window.TuitionNotice.build({...canonical,rows:canonicalRows});
+          const content=notice.text;
+          const qr=notice.students[0].qrUrl;
+          const payload={request_key:crypto.randomUUID()};
           const dialog=el('dialog');dialog.className='family-qr-dialog';
           const header=el('header');header.append(el('strong',current.name+' · '+month),button('Đóng',()=>dialog.close()));dialog.append(header);
           const text=el('p',content);text.style.whiteSpace='pre-wrap';dialog.append(text);
           const image=el('img');image.src=qr;image.alt='QR tổng công nợ';dialog.append(image);
+          dialog.append(el('p','Đây là QR xem trước. Khi gửi, bot ghép QR với bảng điểm danh theo từng lớp của con; bảng dài sẽ được chia trang.'));
           image.onerror=()=>{image.hidden=true;dialog.append(el('p','Không tải được ảnh xem trước. Bot vẫn sẽ thử lấy QR khi gửi.'));};
           const status=el('p');status.setAttribute('role','status');dialog.append(status);
-          const active=rows.some(r=>pending.has(r.status));
+          const active=rows.some(r=>pending.has(r.status)||r.auto_retry_pending);
           if(rows.length)dialog.append(el('p','Đã có lịch sử gửi tháng này. '+describe(rows[0])));
           const acknowledge=el('input');acknowledge.type='checkbox';
           if(rows.length && !active) {const label=el('label',' Tôi đã kiểm tra lịch sử và muốn gửi thêm một thông báo.');label.prepend(acknowledge);dialog.append(label);}
@@ -79,8 +77,8 @@
             busy=true;confirm.disabled=true;
             try {
               // Reusing the request key on network retries prevents duplicate jobs.
-              const result=await rpc('queue_grouped_tuition',{p_month:month+'-01',p_items:[payload],p_replace:false});
-              done=true;status.textContent=Number(result?.queued)>0?'Đã xếp hàng. Bot sẽ gửi nội dung và ảnh QR; chưa phải xác nhận đã gửi.':'Đã có lượt đang xử lý; không tạo thêm để tránh trùng.';
+              const result=await rpc('queue_tuition_notification',{p_parent:state.parent,p_month:month+'-01',p_students:[student.id],p_request:payload.request_key,p_source:'conversation'});
+              done=true;status.textContent=Number(result?.queued)>0?'Đã xếp hàng. Bot sẽ gửi nội dung và ảnh điểm danh kèm QR; chưa phải xác nhận đã gửi.':'Đã có lượt đang xử lý hoặc đã thanh toán đủ; không tạo thêm.';
               await refresh();
             }catch(e){status.textContent='Chưa xác nhận xếp hàng: '+e.message;}
             finally{busy=false;confirm.disabled=done;}

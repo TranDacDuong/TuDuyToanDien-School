@@ -36,6 +36,7 @@ function registerOnDemand(app, {gatewayUrl,persistResult,getApi,isBusy,setBusy,r
   });
   app.post('/api/zalo-external-reply',async(req,res)=>{
     res.set('Cache-Control','no-store');
+    if(/^#hocphi/i.test(String(req.body?.content||'').trim())) return res.status(400).json({error:'Cần liên kết cuộc trò chuyện với đúng phụ huynh trước khi dùng #hocphi'});
     if(!getApi()) return res.status(503).json({error:'Bot Zalo chưa kết nối'});
     if(isBusy()) return res.status(409).json({error:'Bot đang xử lý một tin khác. Vui lòng gửi lại sau ít giây'});
     setBusy(true);let claimed;
