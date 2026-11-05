@@ -48,4 +48,9 @@ test('automatic retry button enables only when the round finishes', async({page}
  await expect(page.getByRole('button',{name:/Gửi lại phụ huynh bị lỗi/})).toHaveCount(0);
  await page.evaluate(()=>{automaticTuitionRows[0].auto_retry_pending=false;document.querySelector('#progress').innerHTML=automaticTuitionProgressHtml();});
  await expect(page.getByRole('button',{name:/Gửi lại phụ huynh bị lỗi/})).toBeEnabled();
+ await expect(page.getByRole('alert')).toContainText('Hàng đợi trên máy chủ chưa được cập nhật');
+ await expect(page.getByText('Gửi lần lượt từng phụ huynh · Tối đa 2 lượt quét · Mỗi tin cách nhau ít nhất 10 giây',{exact:true})).toHaveCount(0);
+ await page.evaluate(()=>{for(const row of automaticTuitionRows){row.scan_pass=2;row.scan_attempts=2;}document.querySelector('#progress').innerHTML=automaticTuitionProgressHtml();});
+ await expect(page.getByRole('alert')).toHaveCount(0);
+ await expect(page.getByText(/Tối đa 2 lượt quét/)).toBeVisible();
 });

@@ -1,3 +1,4 @@
+param([switch]$RecoverUnresponsive)
 $ErrorActionPreference = 'Stop'
 try {
     $port = 3456
@@ -21,10 +22,27 @@ try {
         throw 'Port belongs to another application. It will not be stopped.'
     }
     $base = "http://127.0.0.1:$port/api"
-    $status = Invoke-RestMethod -Uri "$base/status" -TimeoutSec 5
-    if (!$status.botStatus) { throw 'Service is not recognized as Zalo Bot.' }
+    $status = $null
+    $unresponsive = $false
+    for ($probe = 0; $probe -lt 2; $probe++) {
+        try { $status = Invoke-RestMethod -Uri "$base/status" -TimeoutSec 5; break }
+        catch {
+            # Only recover a known worker that repeatedly cannot answer HTTP.
+            # A live error response or another application must not be killed.
+            if (!$RecoverUnresponsive -or $_.Exception.Response) { throw }
+            if ($probe -eq 1) { $unresponsive = $true }
+        }
+    }
+    if (!$unresponsive -and !$status.botStatus) { throw 'Service is not recognized as Zalo Bot.' }
     Write-Host 'Dang dung Zalo Bot cu...'
-    try {
+    if ($unresponsive) {
+        Write-Host 'Bot khong phan hoi sau 2 lan kiem tra; khoi phuc dung tien trinh da xac minh.'
+        $current = Get-CimInstance Win32_Process -Filter "ProcessId=$($owner.ProcessId)"
+        if (!$current -or $current.CreationDate -ne $owner.CreationDate -or $current.CommandLine -ne $owner.CommandLine) {
+            throw 'Worker identity changed during recovery. Nothing was stopped.'
+        }
+        Stop-Process -Id $owner.ProcessId -ErrorAction Stop
+    } else { try {
         Invoke-RestMethod -Method Post -Uri "$base/shutdown" -TimeoutSec 130 | Out-Null
     } catch {
         if ([int]$_.Exception.Response.StatusCode -ne 404) { throw }
@@ -34,7 +52,7 @@ try {
         if ($current -and $current.CreationDate -eq $owner.CreationDate) {
             Stop-Process -Id $owner.ProcessId -ErrorAction Stop
         }
-    }
+    } }
     $deadline = (Get-Date).AddSeconds(15)
     do {
         if (!(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue)) { exit 0 }

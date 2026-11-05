@@ -4,6 +4,16 @@ Deploy `SQL Zalo send pacing and automatic tuition retry.sql` after the existing
 automatic tuition, shared notice and quiet-hours migrations. Publish the web files
 and restart the laptop bot through `services/zalo-bot/restart-bot.ps1` before starting
 the updated `server.js`. The new retry button requires this SQL migration.
+The UI detects old status responses without sweep counters and displays a server
+update warning instead of claiming that the two-sweep mechanism is already active.
+
+`start-bot.bat` now delegates to `start-bot.ps1`, which starts a hidden worker with
+stdout/stderr logs under `session/worker-*.log`. Closing/selecting the launcher's
+console cannot suspend worker console output. Normal restarts still drain active
+sends. Explicit `-RecoverUnresponsive` recovery probes twice and only stops the
+previously verified server PID when HTTP cannot respond, with PID creation-time
+and command-line checks. Other Node processes are never stopped. Existing durable
+SQLite receipts and pending events are preserved.
 
 Every SDK `sendMessage` call shares a persistent local lane, waiting at least ten
 seconds after the previous call finishes (including failures). Text and QR calls

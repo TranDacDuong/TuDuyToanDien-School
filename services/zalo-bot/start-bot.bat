@@ -11,13 +11,6 @@ echo     MINDUP ZALO BOT - TU DONG NHAC HOC PHI
 echo =======================================================
 echo.
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0restart-bot.ps1"
-if errorlevel 1 (
-    echo Khong dung duoc bot cu an toan. Khong khoi dong them bot moi.
-    pause
-    exit /b 1
-)
-
 if not exist "node_modules" (
     echo [1/2] Dang cai dat thu vien can thiet lan dau...
     call npm install --no-fund --no-audit
@@ -33,12 +26,17 @@ if not exist "node_modules" (
 echo [2/2] Dang khoi dong Zalo Bot...
 echo Dia chi noi bo: http://localhost:3456
 echo.
-echo * Co the thu nho cua so nay de bot tiep tuc chay.
-echo * Khong tat cua so khi dang gui chien dich hoc phi.
+echo * Bot se chay nen va ghi log vao thu muc session.
+echo * Sau khi khoi dong thanh cong, co the dong cua so nay.
 echo.
 
-node "%~dp0server.js"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start-bot.ps1"
+if errorlevel 1 (
+    echo Khoi dong that bai. Vui long xem log trong thu muc session.
+    pause
+    exit /b 1
+)
 
 echo.
-echo Zalo Bot da dung hoac gap loi. Xem thong bao phia tren de biet chi tiet.
+echo Zalo Bot dang chay nen.
 pause
