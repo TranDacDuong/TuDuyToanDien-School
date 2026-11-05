@@ -2264,7 +2264,7 @@ Nhập số tiền hoàn lại (>0):`,
     const ym = monthPicker?.value;
     const due = automaticTuitionRows[0]?.due_date;
     if (!/^\d{4}-\d{2}$/.test(ym || "") || !due) return;
-    if (!confirm("Gửi lại các phụ huynh bị lỗi trong đợt tự động này? Chỉ gửi phần chưa được xác nhận, cách nhau ít nhất 10 giây. Tin chưa xác nhận có thể đã đến; hãy kiểm tra Zalo trước khi đồng ý gửi lại.")) return;
+    if (!confirm("Gửi lại các phụ huynh bị lỗi trong đợt này? Hệ thống sẽ quét tối đa 2 lượt, chỉ gửi phần chưa được xác nhận, cách nhau ít nhất 10 giây. Tin chưa xác nhận có thể đã đến; hãy kiểm tra Zalo trước khi đồng ý gửi lại.")) return;
     automaticTuitionRetryBusy = true;
     updateZaloDynamicStatus();
     try {
@@ -2288,7 +2288,7 @@ Nhập số tiền hoàn lại (>0):`,
     } catch (error) { alert("Không thay đổi được trạng thái nhắc học phí tự động: " + error.message); }
     finally { automaticTuitionControlBusy = false; updateZaloDynamicStatus(); }
   };
-  const automaticLabels = { queued: "Chờ gửi", processing: "Đang gửi", sent: "Đã gửi đủ nội dung và QR", cancelled: "Đã bỏ qua", uncertain: "Chưa xác nhận gửi" };
+  const automaticLabels = { queued: "Chờ gửi", retry_waiting: "Chờ quét lượt 2", processing: "Đang gửi", sent: "Đã gửi đủ nội dung và QR", cancelled: "Đã bỏ qua", uncertain: "Gửi chưa thành công" };
 
   async function loadAutomaticTuitionProgress() {
     if (currentRole !== "admin" || !hasTuitionPermission("tuition.zalo_queue.manage", false)) return;
@@ -2314,10 +2314,11 @@ Nhập số tiền hoàn lại (>0):`,
     if (currentRole !== "admin" || !hasTuitionPermission("tuition.zalo_queue.manage", false)) return "";
     const latest = automaticTuitionRows[0]?.due_date;
     const rows = automaticTuitionRows.filter(row => row.due_date === latest);
-    const counts = rows.reduce((result, row) => { result[row.status] = (result[row.status] || 0) + 1; return result; }, {});
-    const finished = rows.filter(row => ["sent", "cancelled", "uncertain"].includes(row.status)).length;
+    const counts = rows.reduce((result, row) => { const status = row.auto_retry_pending ? "retry_waiting" : row.status; result[status] = (result[status] || 0) + 1; return result; }, {});
+    const finished = rows.filter(row => ["sent", "cancelled", "uncertain"].includes(row.status) && !row.auto_retry_pending).length;
     return `<section style="padding:16px;margin-bottom:14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#0f1f3d">
       <b>Nhắc học phí tự động tháng ${esc(monthPicker?.value || "")}</b>
+      <div style="margin-top:8px">Gửi lần lượt từng phụ huynh · Tối đa 2 lượt quét · Mỗi tin cách nhau ít nhất 10 giây</div>
       ${automaticTuitionControl ? `<div style="margin-top:10px"><b>${automaticTuitionControl.paused ? "Đã tạm dừng nhắc tự động" : "Nhắc tự động đang bật"}</b><button type="button" style="margin-left:12px;padding:7px 12px" ${automaticTuitionControlBusy ? "disabled" : ""} onclick="controlAutomaticTuition('${automaticTuitionControl.paused ? "resume" : "pause"}')">${automaticTuitionControl.paused ? "Tiếp tục" : "Dừng"}</button>${automaticTuitionControl.paused ? '<div style="margin-top:6px">Hàng chờ được giữ nguyên. Lượt đang gửi hoàn tất trước khi dừng.</div>' : ""}</div>` : ""}
       <div style="margin:10px 0">${automaticTuitionError ? esc(automaticTuitionError) : !rows.length ? "Chưa có lượt gửi tự động được tạo trong tháng này." : `Đợt ngày ${esc(latest)} · Đã xử lý ${finished}/${rows.length} phụ huynh${finished === rows.length ? " · Đã hoàn tất" : ""}`}</div>
       ${rows.length ? `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">${Object.entries(automaticLabels).map(([key, label]) => `<span>${label}: <b>${counts[key] || 0}</b></span>`).join("")}</div><button type="button" onclick="openAutomaticTuitionDetails()">Xem chi tiết gửi tự động</button>${counts.uncertain ? `<button type="button" style="margin-left:12px;padding:7px 12px" onclick="retryFailedAutomaticTuition()" ${automaticTuitionRetryBusy || finished !== rows.length ? "disabled" : ""}>${automaticTuitionRetryBusy ? "Đang xếp lại…" : `Gửi lại phụ huynh bị lỗi (${counts.uncertain})`}</button><div style="margin-top:8px">${finished !== rows.length ? "Nút gửi lại sẽ bật khi đợt hiện tại xử lý xong." : "Gửi lại phần chưa xác nhận; mỗi tin cách nhau ít nhất 10 giây."}</div>` : ""}` : ""}
@@ -2338,7 +2339,7 @@ Nhập số tiền hoàn lại (>0):`,
   function renderAutomaticTuitionDetails() {
     const target = document.getElementById("automaticTuitionRows");
     if (!target) return;
-    target.innerHTML = `<table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px"><thead><tr><th>Đợt gửi</th><th>Phụ huynh / học sinh</th><th>Trạng thái</th><th>Cập nhật / lý do</th></tr></thead><tbody>${automaticTuitionRows.map(row => `<tr style="border-top:1px solid #e2e8f0"><td style="padding:12px">${esc(row.due_date)}<br>Ngày nhắc ${esc(row.slot)}</td><td style="padding:12px">${esc(row.parent_name || "Phụ huynh")}<br>${esc(row.phone)}<br>${esc(row.students || "")}</td><td style="padding:12px">${esc(automaticLabels[row.status] || row.status)}<br>Đã xác nhận ${esc(row.completed_parts)}/${esc(row.total_parts)} phần (nội dung + QR)</td><td style="padding:12px;overflow-wrap:anywhere" title="${esc(row.error_message || "")}">${esc(new Date(row.updated_at).toLocaleString("vi-VN"))}<br>${esc(automaticTuitionDeliveryNote(row))}</td></tr>`).join("")}</tbody></table>`;
+    target.innerHTML = `<table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px"><thead><tr><th>Đợt gửi</th><th>Phụ huynh / học sinh</th><th>Trạng thái</th><th>Cập nhật / lý do</th></tr></thead><tbody>${automaticTuitionRows.map(row => `<tr style="border-top:1px solid #e2e8f0"><td style="padding:12px">${esc(row.due_date)}<br>Ngày nhắc ${esc(row.slot)}</td><td style="padding:12px">${esc(row.parent_name || "Phụ huynh")}<br>${esc(row.phone)}<br>${esc(row.students || "")}</td><td style="padding:12px">${esc(row.auto_retry_pending ? "Chờ quét lượt 2" : automaticLabels[row.status] || row.status)}${row.scan_attempts != null ? `<br>Đã thử ${esc(row.scan_attempts)}/2 lần · Lượt ${esc(row.scan_pass || 1)}` : ""}<br>Đã xác nhận ${esc(row.completed_parts)}/${esc(row.total_parts)} phần (nội dung + QR)</td><td style="padding:12px;overflow-wrap:anywhere" title="${esc(row.error_message || "")}">${esc(new Date(row.updated_at).toLocaleString("vi-VN"))}<br>${esc(automaticTuitionDeliveryNote(row))}</td></tr>`).join("")}</tbody></table>`;
     const table = target.querySelector("table");
     table.style.minWidth = "860px";
     table.style.tableLayout = "fixed";

@@ -9,7 +9,7 @@ for(const width of [1280,390])test(`tuition detail reasons render safely at ${wi
   window.esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   window.automaticTuitionRows=[
    {status:'queued',parent_name:'Phụ huynh A',due_date:'2026-10-15',slot:15,completed_parts:0,total_parts:2,updated_at:'2026-10-31T12:00:00Z',waiting_reason:'Đã gửi lời mời kết bạn; hệ thống đang chờ xác nhận kết bạn.'},
-   {status:'uncertain',parent_name:'Phụ huynh B',due_date:'2026-10-15',slot:15,completed_parts:0,total_parts:2,updated_at:'2026-10-31T12:00:00Z',error_message:'Zalo returned no message id'},
+   {status:'uncertain',scan_pass:2,scan_attempts:2,parent_name:'Phụ huynh B',due_date:'2026-10-15',slot:15,completed_parts:0,total_parts:2,updated_at:'2026-10-31T12:00:00Z',error_message:'Zalo returned no message id'},
    {status:'uncertain',parent_name:'<img src=x onerror="window.xss=true">',due_date:'2026-10-15',slot:15,completed_parts:0,total_parts:2,updated_at:'2026-10-31T12:00:00Z',error_message:'Không thể nhận tin nhắn từ bạn.'}
   ];
  });
@@ -19,6 +19,7 @@ for(const width of [1280,390])test(`tuition detail reasons render safely at ${wi
  await expect(page.getByText(/hệ thống đang chờ xác nhận kết bạn/)).toBeVisible();
  await expect(page.getByText(/Tin có thể đã đến/)).toBeVisible();await expect(page.locator('img')).toHaveCount(0);
  await expect(page.getByText(/Chi tiết lỗi: Zalo returned no message id/)).toBeVisible();
+ await expect(page.getByText(/Đã thử 2\/2 lần/)).toBeVisible();
  expect(await page.evaluate(()=>window.xss)).toBeUndefined();
  const box=await page.locator('dialog').boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);
  if(width<860){
@@ -43,4 +44,8 @@ test('automatic retry button enables only when the round finishes', async({page}
  await expect(page.getByRole('button',{name:/Gửi lại phụ huynh bị lỗi/})).toBeDisabled();
  await page.evaluate(()=>{automaticTuitionRows[1].status='sent';document.querySelector('#progress').innerHTML=automaticTuitionProgressHtml();});
  await expect(page.getByRole('button',{name:/Gửi lại phụ huynh bị lỗi \(1\)/})).toBeEnabled();
+ await page.evaluate(()=>{automaticTuitionRows[0].auto_retry_pending=true;document.querySelector('#progress').innerHTML=automaticTuitionProgressHtml();});
+ await expect(page.getByRole('button',{name:/Gửi lại phụ huynh bị lỗi/})).toHaveCount(0);
+ await page.evaluate(()=>{automaticTuitionRows[0].auto_retry_pending=false;document.querySelector('#progress').innerHTML=automaticTuitionProgressHtml();});
+ await expect(page.getByRole('button',{name:/Gửi lại phụ huynh bị lỗi/})).toBeEnabled();
 });

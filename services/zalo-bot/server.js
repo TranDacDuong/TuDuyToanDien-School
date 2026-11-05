@@ -222,22 +222,17 @@ async function syncGatewayOutbox() {
 
 async function sendQueuedAutomaticTuition(job) {
   await automaticTuitionScheduler.dispatchClaimed(job, async ({ uid, part, prepared }) => {
-    try {
-      const attempt = Number(job.payload.retry_attempt || 0);
-      const baseKey = `automatic:${job.id}:${job.payload.parts.indexOf(part)}`;
-      const receiptKey = baseKey + (attempt ? `:retry:${attempt}` : '');
-      const priorKeys = Array.from({ length: attempt }, (_, n) => baseKey + (n ? `:retry:${n}` : ''));
-      return await localStore.send(receiptKey, { uid, part }, async () => {
-        if (!isSendingTime()) throw quietHoursError();
-        const sent = await zaloApi.sendMessage(part.kind === 'text' ? part.content : {
-          msg: 'Mã QR thanh toán học phí MindUp', attachments: [prepared.file]
-        }, uid, undefined, () => { if (!isSendingTime()) throw quietHoursError(); });
-        return `${uid}:${requireSendAcknowledgement(sent, part.kind === 'text' ? 0 : 1)}`;
-      }, priorKeys);
-    } catch (error) {
-      if (isZaloLimitError(error)) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
-      throw error;
-    }
+    const attempt = Number(job.payload.retry_attempt || 0);
+    const baseKey = `automatic:${job.id}:${job.payload.parts.indexOf(part)}`;
+    const receiptKey = baseKey + (attempt ? `:retry:${attempt}` : '');
+    const priorKeys = Array.from({ length: attempt }, (_, n) => baseKey + (n ? `:retry:${n}` : ''));
+    return await localStore.send(receiptKey, { uid, part }, async () => {
+      if (!isSendingTime()) throw quietHoursError();
+      const sent = await zaloApi.sendMessage(part.kind === 'text' ? part.content : {
+        msg: 'Mã QR thanh toán học phí MindUp', attachments: [prepared.file]
+      }, uid, undefined, () => { if (!isSendingTime()) throw quietHoursError(); });
+      return `${uid}:${requireSendAcknowledgement(sent, part.kind === 'text' ? 0 : 1)}`;
+    }, priorKeys);
   }, async (part, claimed, index) => {
     let file;
     const cleanup = async () => { if (file) await fs.promises.unlink(file).catch(() => {}); };
