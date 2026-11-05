@@ -35,7 +35,7 @@ test('automatic retry button enables only when the round finishes', async({page}
   window.currentRole='admin';window.hasTuitionPermission=()=>true;window.esc=v=>String(v??'');
   window.monthPicker={value:'2026-11'};window.automaticTuitionControl=null;window.automaticTuitionError='';
   window.automaticTuitionRetryBusy=false;
-  window.automaticLabels={queued:'Chờ gửi',sent:'Đã gửi',uncertain:'Chưa xác nhận'};
+  window.automaticLabels={queued:'Chờ gửi',retry_waiting:'Chờ quét lượt 2',sent:'Đã gửi',uncertain:'Chưa xác nhận'};
   window.automaticTuitionRows=[{due_date:'2026-11-05',status:'uncertain'},{due_date:'2026-11-05',status:'queued'}];
  });
  const start=source.indexOf('  function automaticTuitionProgressHtml('),end=source.indexOf('  function automaticTuitionDeliveryNote',start);
@@ -53,4 +53,7 @@ test('automatic retry button enables only when the round finishes', async({page}
  await page.evaluate(()=>{for(const row of automaticTuitionRows){row.scan_pass=2;row.scan_attempts=2;}document.querySelector('#progress').innerHTML=automaticTuitionProgressHtml();});
  await expect(page.getByRole('alert')).toHaveCount(0);
  await expect(page.getByText(/Tối đa 2 lượt quét/)).toBeVisible();
+ await page.evaluate(()=>{automaticTuitionRows[0].status='queued';automaticTuitionRows[0].scan_attempts=1;document.querySelector('#progress').innerHTML=automaticTuitionProgressHtml();});
+ await expect(page.getByText('Chờ quét lượt 2: 1',{exact:true})).toBeVisible();
+ await expect(page.getByText('Chờ gửi: 0',{exact:true})).toBeVisible();
 });

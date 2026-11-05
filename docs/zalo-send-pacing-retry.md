@@ -1,5 +1,15 @@
 # Zalo pacing and automatic tuition retries
 
+Production rollout: applied the complete migration successfully through the
+Supabase SQL Editor on 2026-11-05. Before rollout, six automatic reminders were
+stuck queued: five contacts were invited, one contact was not found. Post-rollout
+checks confirmed all six records completed first-sweep assessment, the first-sweep
+pending count reached zero, and the second sweep started. At verification, confirmed
+successful parents increased from 21 to 25 and one unsuccessful job had stopped
+after two attempts. Second-sweep queued records are displayed as **Chờ quét lượt 2**,
+separately from first-sweep queued records. No manual status edits or synthetic
+production messages were used for verification.
+
 Deploy `SQL Zalo send pacing and automatic tuition retry.sql` after the existing
 automatic tuition, shared notice and quiet-hours migrations. Publish the web files
 and restart the laptop bot through `services/zalo-bot/restart-bot.ps1` before starting
