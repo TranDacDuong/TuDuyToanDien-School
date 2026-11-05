@@ -8,6 +8,19 @@ const {LocalDatabase,digest}=require('../services/zalo-bot/local-database');
 const {LocalStorageWorker}=require('../services/zalo-bot/local-storage-worker');
 const {PGlite}=createRequire(path.resolve('services/zalo-bot/package.json'))('@electric-sql/pglite');
 function local(){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'mindup-local-'));return path.join(dir,'local.sqlite');}
+
+test('explicit retries reuse verified prior receipts but can resend an unconfirmed part',async t=>{
+ const file=local(),db=new LocalDatabase(file,'project');
+ t.after(()=>{db.close();fs.rmSync(path.dirname(file),{recursive:true,force:true});});
+ const identity={uid:'123',part:'text'};
+ await db.send('automatic:one:0',identity,async()=>'verified');
+ let sends=0;
+ assert.equal(await db.send('automatic:one:0:retry:1',identity,async()=>{sends++;return 'duplicate';},['automatic:one:0']),'verified');
+ assert.equal(sends,0);
+ await assert.rejects(db.send('automatic:two:0',identity,async()=>{throw Error('no message id');}));
+ assert.equal(await db.send('automatic:two:0:retry:1',identity,async()=>{sends++;return 'retry-verified';},['automatic:two:0']),'retry-verified');
+ assert.equal(sends,1);
+});
 test('queue checkpoints batch writes and never rewrite unchanged or acknowledged events',t=>{
  const file=local();let db=new LocalDatabase(file,'project');
  t.after(()=>{db.close();fs.rmSync(path.dirname(file),{recursive:true,force:true});});

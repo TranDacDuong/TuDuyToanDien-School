@@ -13,6 +13,7 @@ const { writeJsonAtomic } = require('./sync-store');
 const { prepareScoreMessageMedia } = require('./score-message-media');
 const { createScheduler, isSendingTime, quietHoursError } = require('./tuition-reminder-scheduler');
 const { requireSendAcknowledgement } = require('./send-acknowledgement');
+const { createSendPacer, installSendPacing } = require('./send-pacing');
 const { retryPreparation, sendTuitionQr } = require('./tuition-qr');
 const { LocalDatabase, eventKey } = require('./local-database');
 const { LocalStorageWorker } = require('./local-storage-worker');
@@ -222,13 +223,17 @@ async function syncGatewayOutbox() {
 async function sendQueuedAutomaticTuition(job) {
   await automaticTuitionScheduler.dispatchClaimed(job, async ({ uid, part, prepared }) => {
     try {
-      return await localStore.send(`automatic:${job.id}:${job.payload.parts.indexOf(part)}`, { uid, part }, async () => {
+      const attempt = Number(job.payload.retry_attempt || 0);
+      const baseKey = `automatic:${job.id}:${job.payload.parts.indexOf(part)}`;
+      const receiptKey = baseKey + (attempt ? `:retry:${attempt}` : '');
+      const priorKeys = Array.from({ length: attempt }, (_, n) => baseKey + (n ? `:retry:${n}` : ''));
+      return await localStore.send(receiptKey, { uid, part }, async () => {
         if (!isSendingTime()) throw quietHoursError();
         const sent = await zaloApi.sendMessage(part.kind === 'text' ? part.content : {
           msg: 'Mã QR thanh toán học phí MindUp', attachments: [prepared.file]
-        }, uid);
+        }, uid, undefined, () => { if (!isSendingTime()) throw quietHoursError(); });
         return `${uid}:${requireSendAcknowledgement(sent, part.kind === 'text' ? 0 : 1)}`;
-      });
+      }, priorKeys);
     } catch (error) {
       if (isZaloLimitError(error)) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
       throw error;
@@ -257,7 +262,7 @@ async function sendQueuedAutomaticTuition(job) {
 
 function dispatchPacing() {
   return {
-    spacingSeconds: 0,
+    spacingSeconds: 10,
     batchSize: 50,
     batchPauseSeconds: 0
   };
@@ -719,6 +724,10 @@ if (!fs.existsSync(SESSION_DIR)) {
   fs.mkdirSync(SESSION_DIR, { recursive: true });
 }
 const localStore = new LocalDatabase(path.join(SESSION_DIR,'zalo-local.sqlite'), GATEWAY_URL);
+const paceZaloSend = createSendPacer({
+  readDeadline: () => localStore.db.prepare("SELECT value FROM settings WHERE key='next_zalo_send_at'").get()?.value,
+  writeDeadline: deadline => localStore.db.prepare("INSERT INTO settings(key,value) VALUES('next_zalo_send_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(String(deadline))
+});
 const localStorageWorker = new LocalStorageWorker({ store: localStore, request: gatewayRequest });
 try {
   for (const payload of JSON.parse(fs.readFileSync(INCOMING_FILE, 'utf8'))) {
@@ -931,7 +940,7 @@ async function initZaloClient(forceQr = false) {
           console.log("[ZaloBot] Thử khôi phục đăng nhập bằng phiên đã lưu...");
           const api = await zaloInstance.login(savedSession);
           if (api) {
-            zaloApi = api;
+            zaloApi = installSendPacing(api, paceZaloSend);
             botStatus = 'connected';
             userInfo = { uid: api.getOwnId() };
             qrCodeDataUrl = null;
@@ -982,7 +991,7 @@ async function initZaloClient(forceQr = false) {
       }
     }).then(api => {
       if (api) {
-        zaloApi = api;
+        zaloApi = installSendPacing(api, paceZaloSend);
         botStatus = 'connected';
         userInfo = { uid: api.getOwnId() };
         qrCodeDataUrl = null;
@@ -1299,7 +1308,8 @@ app.get('/api/status', (req, res) => {
       rejectedMessages: rejectedIncoming.length, lastUploadError: incomingQueue.lastError },
     localStorage: { ...localStore.status(), lastError: localStorageWorker.lastError },
     classGroups:{known:classGroupUids.size,history:classGroupHistory.state},
-    config: botConfig
+    config: botConfig,
+    sendPacing: { minimumIntervalSeconds: 10 }
   });
 });
 
@@ -1443,7 +1453,7 @@ app.post('/api/shutdown', async (req, res) => {
 app.listen(PORT, HOST, () => {
   console.log(`=======================================================`);
   console.log(`🤖 Dịch vụ Zalo Bot MindUp đang chạy tại: http://localhost:${PORT}`);
-  console.log('Hàng gửi Zalo chung: gửi tuần tự ngay khi có tin, tự dừng khi Zalo giới hạn.');
+  console.log('Hàng gửi Zalo chung: mỗi tin cách nhau tối thiểu 10 giây, tự dừng khi Zalo giới hạn.');
   console.log(`=======================================================`);
 
   // Tự động kiểm tra session Zalo khi khởi động

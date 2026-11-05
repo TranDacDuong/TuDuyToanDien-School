@@ -15,3 +15,10 @@ test('single PNG uses SDK attachment acknowledgement even when message is null',
   assert.throws(() => ack({ attachment: [{ msgId: 321 }] }, 2));
   assert.throws(() => ack({ attachment: [{ msgId: 321 }, {}] }, 2));
 });
+
+test('Zalo rejection response and SDK code are preserved for delivery details', () => {
+  assert.throws(() => ack({ message: 'Không thể nhận tin nhắn từ bạn', error_code: 403 }), error =>
+    error.deliveryUncertain && /Zalo code: 403/.test(error.message) && /Không thể nhận tin nhắn từ bạn/.test(error.message));
+  const { sendErrorMessage } = require('./send-acknowledgement');
+  assert.equal(sendErrorMessage(Object.assign(Error('Zalo rejected'), { code: 429 })), '[429] Zalo rejected');
+});

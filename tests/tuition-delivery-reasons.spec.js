@@ -18,6 +18,7 @@ for(const width of [1280,390])test(`tuition detail reasons render safely at ${wi
  await page.evaluate(()=>{renderAutomaticTuitionDetails();document.querySelector('dialog').showModal();});
  await expect(page.getByText(/hệ thống đang chờ xác nhận kết bạn/)).toBeVisible();
  await expect(page.getByText(/Tin có thể đã đến/)).toBeVisible();await expect(page.locator('img')).toHaveCount(0);
+ await expect(page.getByText(/Chi tiết lỗi: Zalo returned no message id/)).toBeVisible();
  expect(await page.evaluate(()=>window.xss)).toBeUndefined();
  const box=await page.locator('dialog').boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);
  if(width<860){
@@ -25,4 +26,21 @@ for(const width of [1280,390])test(`tuition detail reasons render safely at ${wi
   await page.locator('#automaticTuitionRows').evaluate(el=>el.scrollLeft=el.scrollWidth);
  }
  await page.screenshot({path:`test-results/tuition-delivery-reasons-${width}.png`});
+});
+
+test('automatic retry button enables only when the round finishes', async({page})=>{
+ await page.setContent('<div id="progress"></div>');
+ await page.evaluate(()=>{
+  window.currentRole='admin';window.hasTuitionPermission=()=>true;window.esc=v=>String(v??'');
+  window.monthPicker={value:'2026-11'};window.automaticTuitionControl=null;window.automaticTuitionError='';
+  window.automaticTuitionRetryBusy=false;
+  window.automaticLabels={queued:'Chờ gửi',sent:'Đã gửi',uncertain:'Chưa xác nhận'};
+  window.automaticTuitionRows=[{due_date:'2026-11-05',status:'uncertain'},{due_date:'2026-11-05',status:'queued'}];
+ });
+ const start=source.indexOf('  function automaticTuitionProgressHtml('),end=source.indexOf('  function automaticTuitionDeliveryNote',start);
+ await page.addScriptTag({content:source.slice(start,end)});
+ await page.evaluate(()=>document.querySelector('#progress').innerHTML=automaticTuitionProgressHtml());
+ await expect(page.getByRole('button',{name:/Gửi lại phụ huynh bị lỗi/})).toBeDisabled();
+ await page.evaluate(()=>{automaticTuitionRows[1].status='sent';document.querySelector('#progress').innerHTML=automaticTuitionProgressHtml();});
+ await expect(page.getByRole('button',{name:/Gửi lại phụ huynh bị lỗi \(1\)/})).toBeEnabled();
 });

@@ -78,8 +78,12 @@ class LocalDatabase {
       return row;
     });
   }
-  async send(key, identity, operation) {
+  async send(key, identity, operation, reuseKeys = []) {
     const fingerprint = createHash('sha256').update(JSON.stringify(identity)).digest('hex');
+    for (const reuseKey of reuseKeys) {
+      const receipt = this.db.prepare("SELECT result FROM effects WHERE key=? AND fingerprint=? AND status='sent'").get(reuseKey, fingerprint);
+      if (receipt) return JSON.parse(receipt.result);
+    }
     const previous = this.db.prepare('SELECT * FROM effects WHERE key=?').get(key);
     if (previous && previous.status !== 'failed') {
       if (previous.fingerprint !== fingerprint) throw new Error('Uncertain delivery: task payload changed; verify in Zalo');

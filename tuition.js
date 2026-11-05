@@ -2258,6 +2258,25 @@ Nhập số tiền hoàn lại (>0):`,
   let automaticTuitionError = "";
   let automaticTuitionControl = null;
   let automaticTuitionControlBusy = false;
+  let automaticTuitionRetryBusy = false;
+  window.retryFailedAutomaticTuition = async function () {
+    if (automaticTuitionRetryBusy || !hasTuitionPermission("tuition.zalo_queue.manage", false)) return;
+    const ym = monthPicker?.value;
+    const due = automaticTuitionRows[0]?.due_date;
+    if (!/^\d{4}-\d{2}$/.test(ym || "") || !due) return;
+    if (!confirm("Gửi lại các phụ huynh bị lỗi trong đợt tự động này? Chỉ gửi phần chưa được xác nhận, cách nhau ít nhất 10 giây. Tin chưa xác nhận có thể đã đến; hãy kiểm tra Zalo trước khi đồng ý gửi lại.")) return;
+    automaticTuitionRetryBusy = true;
+    updateZaloDynamicStatus();
+    try {
+      const { data, error } = await getSb().rpc("retry_failed_automatic_tuition", {
+        p_month: `${ym}-01`, p_due: due, p_confirm_uncertain: true
+      });
+      if (error) throw error;
+      await loadAutomaticTuitionProgress();
+      alert(`Đã xếp lại ${data || 0} phụ huynh bị lỗi. Các lượt đã gửi thành công được giữ nguyên. Lượt có công nợ hoặc liên kết thay đổi sẽ không được gửi lại.`);
+    } catch (error) { alert("Không xếp lại được: " + error.message); }
+    finally { automaticTuitionRetryBusy = false; updateZaloDynamicStatus(); }
+  };
   window.controlAutomaticTuition = async function (action) {
     if (automaticTuitionControlBusy || !hasTuitionPermission("tuition.zalo_queue.manage", false)) return;
     automaticTuitionControlBusy = true;
@@ -2301,7 +2320,7 @@ Nhập số tiền hoàn lại (>0):`,
       <b>Nhắc học phí tự động tháng ${esc(monthPicker?.value || "")}</b>
       ${automaticTuitionControl ? `<div style="margin-top:10px"><b>${automaticTuitionControl.paused ? "Đã tạm dừng nhắc tự động" : "Nhắc tự động đang bật"}</b><button type="button" style="margin-left:12px;padding:7px 12px" ${automaticTuitionControlBusy ? "disabled" : ""} onclick="controlAutomaticTuition('${automaticTuitionControl.paused ? "resume" : "pause"}')">${automaticTuitionControl.paused ? "Tiếp tục" : "Dừng"}</button>${automaticTuitionControl.paused ? '<div style="margin-top:6px">Hàng chờ được giữ nguyên. Lượt đang gửi hoàn tất trước khi dừng.</div>' : ""}</div>` : ""}
       <div style="margin:10px 0">${automaticTuitionError ? esc(automaticTuitionError) : !rows.length ? "Chưa có lượt gửi tự động được tạo trong tháng này." : `Đợt ngày ${esc(latest)} · Đã xử lý ${finished}/${rows.length} phụ huynh${finished === rows.length ? " · Đã hoàn tất" : ""}`}</div>
-      ${rows.length ? `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">${Object.entries(automaticLabels).map(([key, label]) => `<span>${label}: <b>${counts[key] || 0}</b></span>`).join("")}</div><button type="button" onclick="openAutomaticTuitionDetails()">Xem chi tiết gửi tự động</button>` : ""}
+      ${rows.length ? `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">${Object.entries(automaticLabels).map(([key, label]) => `<span>${label}: <b>${counts[key] || 0}</b></span>`).join("")}</div><button type="button" onclick="openAutomaticTuitionDetails()">Xem chi tiết gửi tự động</button>${counts.uncertain ? `<button type="button" style="margin-left:12px;padding:7px 12px" onclick="retryFailedAutomaticTuition()" ${automaticTuitionRetryBusy || finished !== rows.length ? "disabled" : ""}>${automaticTuitionRetryBusy ? "Đang xếp lại…" : `Gửi lại phụ huynh bị lỗi (${counts.uncertain})`}</button><div style="margin-top:8px">${finished !== rows.length ? "Nút gửi lại sẽ bật khi đợt hiện tại xử lý xong." : "Gửi lại phần chưa xác nhận; mỗi tin cách nhau ít nhất 10 giây."}</div>` : ""}` : ""}
     </section>`;
   }
 
@@ -2309,7 +2328,7 @@ Nhập số tiền hoàn lại (>0):`,
     if (row.waiting_reason) return row.waiting_reason;
     const error = String(row.error_message || "");
     if (row.status === "uncertain" && /no message id|Interrupted dispatcher|fetch failed/i.test(error)) {
-      return "Chưa xác nhận được kết quả từ Zalo. Tin có thể đã đến; kiểm tra cuộc trò chuyện trước khi gửi lại.";
+      return "Chưa xác nhận được kết quả từ Zalo. Tin có thể đã đến; kiểm tra cuộc trò chuyện trước khi gửi lại. Chi tiết lỗi: " + error;
     }
     if (error === "Saved calculation changed") return "Đã bỏ qua vì công nợ thay đổi so với lúc xếp hàng. Cần tạo thông báo mới theo số tiền hiện tại.";
     if (error === "Superseded slot") return "Đã thay bằng đợt nhắc học phí mới hơn.";

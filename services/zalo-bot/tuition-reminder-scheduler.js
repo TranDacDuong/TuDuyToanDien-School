@@ -7,6 +7,7 @@ const TIME_ZONE = 'Asia/Ho_Chi_Minh';
 const SLOTS = [5, 10, 15];
 const TuitionNotice = require('../../tuition-notice');
 const TuitionCalculation = require('../../tuition-calculation');
+const { sendErrorMessage } = require('./send-acknowledgement');
 
 function vnDate(now = new Date()) {
   if (!(now instanceof Date) || !Number.isFinite(now.getTime())) throw new TypeError('Invalid clock');
@@ -153,7 +154,7 @@ function createScheduler({ rpc, bank, clock = () => new Date(), convert = lunarD
       } catch (error) {
         if (error.code === 'AUTOMATIC_TUITION_QUIET_HOURS') return await defer(index);
         await call('uncertain_automatic_tuition_reminder', {
-          p_id: job.id, p_token: job.token, p_error: String(error.message || error).slice(0, 500)
+          p_id: job.id, p_token: job.token, p_error: sendErrorMessage(error)
         });
         return { id: job.id, status: 'uncertain' };
       } finally {
