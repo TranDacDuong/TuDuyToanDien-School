@@ -62,8 +62,9 @@
           const dialog=el('dialog');dialog.className='family-qr-dialog';
           const header=el('header');header.append(el('strong',current.name+' · '+month),button('Đóng',()=>dialog.close()));dialog.append(header);
           const text=el('p',content);text.style.whiteSpace='pre-wrap';dialog.append(text);
-          const image=el('img');image.src=qr;image.alt='QR tổng công nợ';dialog.append(image);
-          dialog.append(el('p','Đây là QR xem trước. Khi gửi, bot ghép QR với bảng điểm danh theo từng lớp của con; bảng dài sẽ được chia trang.'));
+          for(const child of notice.students){dialog.append(el('p',child.name+' · Tổng cần thanh toán: '+new Intl.NumberFormat('vi-VN').format(child.remaining)+'đ'));for(const d of child.debts)dialog.append(el('p','Tháng '+Number(d.month.slice(5,7))+'/'+d.month.slice(0,4)+' · Cần thanh toán: '+new Intl.NumberFormat('vi-VN').format(d.remaining)+'đ'));}
+          const image=el('img');image.src=qr;image.alt='QR thanh toán tổng các tháng';dialog.append(image);
+          dialog.append(el('p','Đây là QR xem trước. Bot sẽ gửi riêng ảnh điểm danh và học phí của từng tháng cần thanh toán, sau đó gửi QR tổng ở cuối; bảng dài sẽ được chia trang.'));
           image.onerror=()=>{image.hidden=true;dialog.append(el('p','Không tải được ảnh xem trước. Bot vẫn sẽ thử lấy QR khi gửi.'));};
           const status=el('p');status.setAttribute('role','status');dialog.append(status);
           const active=rows.some(r=>pending.has(r.status)||r.auto_retry_pending);
@@ -78,7 +79,7 @@
             try {
               // Reusing the request key on network retries prevents duplicate jobs.
               const result=await rpc('queue_tuition_notification',{p_parent:state.parent,p_month:month+'-01',p_students:[student.id],p_request:payload.request_key,p_source:'conversation'});
-              done=true;status.textContent=Number(result?.queued)>0?'Đã xếp hàng. Bot sẽ gửi nội dung và ảnh điểm danh kèm QR; chưa phải xác nhận đã gửi.':'Đã có lượt đang xử lý hoặc đã thanh toán đủ; không tạo thêm.';
+              done=true;status.textContent=Number(result?.queued)>0?'Đã xếp hàng. Bot sẽ gửi nội dung, ảnh điểm danh từng tháng rồi ảnh QR riêng ở cuối; chưa phải xác nhận đã gửi.':'Đã có lượt đang xử lý hoặc đã thanh toán đủ; không tạo thêm.';
               await refresh();
             }catch(e){status.textContent='Chưa xác nhận xếp hàng: '+e.message;}
             finally{busy=false;confirm.disabled=done;}

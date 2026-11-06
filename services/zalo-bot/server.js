@@ -1349,7 +1349,7 @@ app.get('/api/status', (req, res) => {
     classGroups:{known:classGroupUids.size,history:classGroupHistory.state},
     config: botConfig,
     sendPacing: { minimumIntervalSeconds: 10 },
-    tuitionNotifications: { version: 1, command: '#hocphi', statementQr: true }
+    tuitionNotifications: { version: 2, command: '#hocphi', monthlyStatements: true, separateQr: true }
   });
 });
 

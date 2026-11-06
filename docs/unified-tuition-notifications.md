@@ -14,13 +14,17 @@ arrears. The conversation preview is read-only and no longer recalculates/saves
 fees as a side effect. On the tuition page, save the common template before queueing
 an edited draft. Overdue template editing updates this same saved template.
 
-Each parent gets one grouped text, followed by a statement for each selected child.
-The PNG statement includes class schedules, explicit attendance, pending/future
-sessions, saved amounts, reductions, payments, itemized outstanding months and a
-VietQR for that child's exact saved balance/memo. Unrecorded attendance is never
+Each parent gets one grouped text, followed by monthly statements for each
+selected child, then separate QR images at the end. Each month included in the
+payment bundle gets its own PNG with class schedules, explicit attendance,
+pending/future sessions, saved amounts, reductions, "Đã nộp" and "Cần thanh toán"
+for that month. Each child's final QR covers the total of the included months
+using the registered memo. Parent-facing text avoids debt/shortfall wording.
+The default text uses `{CacThang}` and `{AnhDinhKem}` for actual bundle months,
+including year labels when needed. Unrecorded attendance is never
 presented as confirmed presence. Calculated session fees are labelled estimates
 when they differ from saved amounts. Long schedules split at 24 rows with class
-headers repeated; the QR appears on the last page. Other students' attendance is
+headers repeated; monthly payment summaries repeat on each page. Other students' attendance is
 never included. Rendering uses SVG/sharp locally, with no student data sent to an
 external renderer. The existing VietQR image endpoint supplies the QR asset.
 
@@ -49,7 +53,8 @@ are not downloaded or rendered again. Balance, bank, parent phone, link and UID
 are checked again immediately before publication. A changed financial snapshot
 cancels the old notice rather than publishing an outdated QR.
 
-Deploy `SQL unified tuition notifications.sql`, then the updated `zalo-gateway`,
+Deploy `SQL unified tuition notifications.sql`, then
+`SQL monthly tuition statements and separate QR.sql` and the updated `zalo-gateway`,
 restart the local bot with `start-bot.ps1`, and publish web assets. Existing function
 JWT/token settings and credentials are unchanged. The SQL migration recognizes
 the metadata wrapper's `sync_mindup_zalo_message_text_v1` and defers self text echoes
@@ -66,3 +71,17 @@ worker. Read-only checks confirmed the queue/command functions, phone validation
 and command month parsing. The worker reported protocol version 1, a connected
 listener, ten-second pacing, zero pending acknowledgements and no upload/storage
 error. The final focused run passed 17 Node tests and three browser tests.
+
+Version 2 snapshots add a family-scoped historical statement context while keeping
+the current-month preview context unchanged. The monthly migration saves the new
+shared template and upgrades queued jobs only when no manifest or publication
+exists. Frozen version 1 jobs keep their original renderer, text, manifest and
+receipt identity so partial sends cannot shift indexes or duplicate attachments.
+Manual retry of an already frozen job therefore preserves its original format;
+new notifications use separate monthly statements and QR.
+
+On 2026-11-06 the monthly migration and shared template were applied live, and
+the restarted worker reported version 2, monthly statements and separate QR,
+connected listener, ten-second pacing and zero pending acknowledgements/errors.
+The focused run passed 12 tests, including three monthly PNGs, exact total QR
+decoding, family/month isolation, frozen retry compatibility and composer behavior.

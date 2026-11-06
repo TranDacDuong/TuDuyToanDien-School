@@ -2845,7 +2845,7 @@ Nhập số tiền hoàn lại (>0):`,
           <textarea id="zaloTemplateText" rows="7" style="width:100%;font-family:inherit;font-size:12px;padding:10px;border-radius:8px;border:1px solid #cbd5e1;resize:vertical;line-height:1.5">${esc(savedTuitionNoticeTemplate)}</textarea>
           <button type="button" onclick="saveTuitionNoticeTemplate()">Lưu mẫu chung</button>
           <div style="font-size:11px;color:#64748b;margin-top:4px">
-            Biến hỗ trợ: <code>{TenHS}</code>, <code>{TenPH}</code>, <code>{Thang}</code>, <code>{Nam}</code>, <code>{TenLop}</code>, <code>{SoBuoi}</code>, <code>{SoTien}</code>, <code>{HanDong}</code>, <code>{NoiDungCK}</code>, <code>{TenNganHang}</code>, <code>{SoTaiKhoan}</code>.
+            Biến hỗ trợ: <code>{TenHS}</code>, <code>{TenPH}</code>, <code>{Thang}</code>, <code>{Nam}</code>, <code>{CacThang}</code>, <code>{AnhDinhKem}</code>, <code>{TenLop}</code>, <code>{SoBuoi}</code>, <code>{SoTien}</code>, <code>{HanDong}</code>, <code>{NoiDungCK}</code>, <code>{TenNganHang}</code>, <code>{SoTaiKhoan}</code>.
           </div>
         </div>
       </details>

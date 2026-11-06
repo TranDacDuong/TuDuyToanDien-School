@@ -20,7 +20,7 @@ test('unified migration, permission-scoped commands, two sweeps and partial ackn
  CREATE TABLE class_schedules(id int,class_id uuid);
  CREATE TABLE class_students(student_id uuid,class_id uuid);
  CREATE TABLE class_student_schedules(student_id uuid);
- CREATE TABLE attendance(student_id uuid,date date);
+ CREATE TABLE attendance(student_id uuid,date date,class_id uuid);
  CREATE TABLE trial_lesson_requests(student_id uuid);
  CREATE TABLE supplementary_sessions(id uuid,parent_class_id uuid,status text,session_date date);
  CREATE TABLE supplementary_session_students(student_id uuid,session_id uuid);
@@ -56,6 +56,7 @@ test('unified migration, permission-scoped commands, two sweeps and partial ackn
   RETURN 'synced'; END;$$;
  CREATE FUNCTION sync_mindup_zalo_message(text,text,text,text,boolean,timestamptz,boolean) RETURNS text LANGUAGE sql AS $$SELECT 'wrapper without original anchor'$$;`);
  const sql=fs.readFileSync('SQL unified tuition notifications.sql','utf8');await db.exec(sql);await db.exec(sql);
+ const monthly=fs.readFileSync('SQL monthly tuition statements and separate QR.sql','utf8');await db.exec(monthly);await db.exec(monthly);
  const q=async(s,a=[])=> (await db.query(s,a)).rows;
  const [{month}]=await q("SELECT date_trunc('month',now())::date::text AS \"month\"");
  const batch=U(50),items=[{parent_id:U(2),student_id:U(4),batch_id:batch},{parent_id:U(2),student_id:U(5),batch_id:batch},{parent_id:U(3),student_id:U(6),batch_id:batch}];
@@ -64,6 +65,7 @@ test('unified migration, permission-scoped commands, two sweeps and partial ackn
  await db.exec("SELECT set_config('test.role','service_role',false)");
  const claim=async()=>{await db.exec("UPDATE mindup_zalo_dispatch_control SET next_automatic_scan_at='-infinity'");return (await q('SELECT claim_tuition_notification(true) job'))[0].job;};
  let job=await claim();assert.equal(job.parent_id,U(2));assert.equal(job.payload.children.length,2);assert.equal(job.scan_attempts,1);
+ assert.equal(job.payload.version,2);assert.ok(job.payload.statement_context);assert.match(job.payload.template,/CacThang/);assert.doesNotMatch(job.payload.template,/còn thiếu|còn nợ|gạch nợ|công nợ/i);
  const manifest=['text','student1','student2'];
  const prepare=j=>q('SELECT prepare_tuition_notification($1,$2,$3,$4)',[j.id,j.token,JSON.stringify(manifest),'Tuition common text']);
  await prepare(job);
@@ -100,4 +102,11 @@ test('unified migration, permission-scoped commands, two sweeps and partial ackn
  await q('UPDATE users SET phone=$1 WHERE id=$2',['0900000000',changed.parent_id]);
  assert.equal((await q('SELECT begin_tuition_notification_part($1,$2,0,true) ok',[changed.id,changed.token]))[0].ok,false);
  assert.equal((await q('SELECT status FROM tuition_notice_jobs WHERE id=$1',[changed.id]))[0].status,'cancelled');
+ await q("INSERT INTO tuition_payments(student_id,month,amount_due,amount_paid) VALUES($1,($2::date-interval '1 month')::date,700000,100000)",[U(4),month]);
+ await q("INSERT INTO attendance(student_id,date) VALUES($1,$2::date),($1,($2::date-interval '1 month')::date),($3,($2::date-interval '1 month')::date)",[U(4),month,U(6)]);
+ await db.exec(`CREATE OR REPLACE FUNCTION automatic_tuition_snapshot(p_parent uuid,p_month date) RETURNS jsonb LANGUAGE sql AS $$SELECT coalesce(jsonb_agg(jsonb_build_object('student_id',s.student_id,'student_name','Child','remaining',s.total,'transfer_memo','SEVQR SAMPLE','debts',s.debts)),'[]') FROM (SELECT t.student_id,sum(t.amount_due-t.amount_paid) total,jsonb_agg(jsonb_build_object('month',t.month,'remaining',t.amount_due-t.amount_paid)) debts FROM tuition_payments t JOIN parent_students ps ON ps.student_id=t.student_id WHERE ps.parent_id=p_parent AND ps.revoked_at IS NULL AND t.month<=p_month AND t.amount_due>t.amount_paid GROUP BY t.student_id)s$$`);
+ const scoped=(await q('SELECT tuition_notice_context($1,$2,$3) data',[U(2),month,[U(4)]]))[0].data;
+ assert.equal(scoped.statement_context.payments.length,2);assert.equal(scoped.billing_context.payments.length,1);
+ assert.equal(scoped.statement_context.attData.length,2);assert.equal(scoped.billing_context.attData.length,1);
+ assert.ok(scoped.statement_context.attData.every(r=>r.student_id===U(4)));
 });

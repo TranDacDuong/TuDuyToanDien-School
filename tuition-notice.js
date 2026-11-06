@@ -2,33 +2,24 @@
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.TuitionNotice = factory();
 })(typeof window === 'undefined' ? globalThis : window, function () {
-  const DEFAULT_TEMPLATE = `Trung tâm MindUp xin chào Quý phụ huynh em {TenHS}! 🌸
-
-Trung tâm xin gửi thông báo chi tiết học phí tháng {Thang}/{Nam} của con như sau:
-• Lớp học: {TenLop}
-• Số buổi học trong tháng: {SoBuoi} buổi
-• Số tiền cần thanh toán: {SoTien} VNĐ
-• Hạn thanh toán: Trước ngày {HanDong}
-
-Quý phụ huynh có thể thanh toán nhanh bằng cách quét ảnh mã QR đính kèm hoặc chuyển khoản theo thông tin:
-• Ngân hàng: {TenNganHang}
-• Số tài khoản: {SoTaiKhoan}
-• Nội dung chuyển khoản: {NoiDungCK}
-
-(Lưu ý: Quý phụ huynh vui lòng giữ nguyên nội dung chuyển khoản trên để hệ thống tự động gạch nợ ngay khi nhận được tiền).
-Trung tâm MindUp xin chân thành cảm ơn Quý phụ huynh! ❤️`;
+  const DEFAULT_TEMPLATE = `Trung tâm MindUp kính gửi Quý phụ huynh thông báo học phí của em {TenHS} tháng {Thang} năm {Nam}:
+Tổng số tiền: {SoTien}đ bao gồm học phí của {CacThang}.
+Ngân hàng: {TenNganHang}
+Số tài khoản: {SoTaiKhoan}
+Nội dung chuyển khoản: {NoiDungCK}
+Gửi kèm: {AnhDinhKem} (mỗi ảnh kèm theo số tiền trong từng tháng) và ảnh QR chuyển khoản chung.`;
   const fmt = value => new Intl.NumberFormat('vi-VN').format(Math.round(value));
   function render(item, ym, bank, template = DEFAULT_TEMPLATE) {
     const [year, month] = ym.split('-');
+    const months=[...new Set((item.debts?.length?item.debts:[{month:ym}]).map(d=>d.month.slice(0,7)))].sort();
+    const sameYear=months.every(m=>m.slice(0,4)===year);
+    const labels=months.map(m=>sameYear?String(Number(m.slice(5))):`${Number(m.slice(5))}/${m.slice(0,4)}`);
     const values = {TenHS:item.studentName || '',TenPH:item.parentName || 'Quý phụ huynh',
-      Thang:month,Nam:year,TenLop:item.className || '',SoBuoi:String(item.sessionsCount || 0),
+      Thang:String(Number(month)),Nam:year,TenLop:item.className || '',SoBuoi:String(item.sessionsCount || 0),
+      CacThang:`${labels.length>1?'các tháng':'tháng'} ${labels.join(', ')}`,AnhDinhKem:labels.map(m=>`Ảnh điểm danh tháng ${m}`).join(', '),
       SoTien:fmt(item.remaining),HanDong:`15/${month}/${year}`,TenNganHang:bank.bankName,
       SoTaiKhoan:bank.account,NoiDungCK:item.transferMemo || ''};
-    let content = (template || DEFAULT_TEMPLATE).replace(/\{(TenHS|TenPH|Thang|Nam|TenLop|SoBuoi|SoTien|HanDong|TenNganHang|SoTaiKhoan|NoiDungCK)\}/g, (_,key)=>values[key]);
-    if (item.debts?.length > 1 || item.debts?.some(d=>d.month.slice(0,7)!==ym)) {
-      content += '\n\nChi tiết công nợ đã lưu:\n'+item.debts.map(d=>`• Tháng ${d.month.slice(5,7)}/${d.month.slice(0,4)}: ${fmt(d.remaining)}đ`).join('\n')+
-        `\nTổng còn phải đóng: ${fmt(item.remaining)}đ. Thanh toán cho tháng cũ nhất trước.`;
-    }
+    let content = (template || DEFAULT_TEMPLATE).replace(/\{(TenHS|TenPH|Thang|Nam|TenLop|SoBuoi|SoTien|HanDong|TenNganHang|SoTaiKhoan|NoiDungCK|CacThang|AnhDinhKem)\}/g, (_,key)=>values[key]);
     return content;
   }
   function build({month,parentName,children,bank,rows=[],template}) {

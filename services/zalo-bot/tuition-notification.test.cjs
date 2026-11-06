@@ -1,6 +1,6 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
 const sharp=require('sharp'),QR=require('qrcode'),jsQR=require('jsqr');
-const {prepareNotification,attendanceLabel,sendNotification}=require('./tuition-notification');
+const {prepareNotification,attendanceLabel,sendNotification,monthContext,statementSvg,statementLines}=require('./tuition-notification');
 const {LocalDatabase}=require('./local-database');
 const Notice=require('../../tuition-notice');
 const S='00000000-0000-0000-0000-000000000011';
@@ -49,3 +49,32 @@ test('lost cloud ACK reuses a verified publication; explicit retry sends only an
  await sendNotification({...job,revision:1},options);assert.equal(sends,2);assert.equal(begins,3); // replay also begins a new cloud part
 });
 module.exports={payload};
+
+test('three monthly statements have isolated saved amounts and attendance, followed by a single total QR',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'monthly-notice-test-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+ const sample=structuredClone(payload);sample.version=2;sample.template=Notice.DEFAULT_TEMPLATE;
+ sample.children[0]={...sample.children[0],student_name:'Nguyễn Tùng Anh (DỮ LIỆU MẪU)',remaining:1800000,
+  debts:['09','10','11'].map(m=>({month:`2026-${m}-01`,remaining:600000}))};
+ sample.statement_context={...sample.billing_context,
+  payments:['09','10','11'].map((m,i)=>({student_id:S,month:`2026-${m}-01`,amount_due:700000+i*100000,amount_paid:100000+i*100000,discount_amount:0})),
+  attData:[{student_id:S,class_id:'class1',date:'2026-09-03',schedule_id:1,status:'absent'},...sample.billing_context.attData]};
+ let downloads=0;const qr='SYNTHETIC-TOTAL-1800000';
+ const download=async(url,file)=>{downloads++;assert.equal(new URL(url).searchParams.get('amount'),'1800000');await QR.toFile(file,qr,{width:500,margin:4});};
+ const result=await prepareNotification(sample,{download,outputDir:dir});
+ assert.equal(result.parts.length,5);assert.equal(downloads,1);
+ assert.match(result.text,/tháng 11 năm 2026/);assert.match(result.text,/1\.800\.000đ bao gồm học phí của các tháng 9, 10, 11/);
+ assert.match(result.text,/Ảnh điểm danh tháng 9, Ảnh điểm danh tháng 10, Ảnh điểm danh tháng 11/);
+ assert.doesNotMatch(result.text,/còn thiếu|còn nợ|gạch nợ|công nợ/i);
+ for(let i=1;i<=3;i++){
+  assert.match(result.parts[i].identity,new RegExp(`:2026-${String(i+8).padStart(2,'0')}:0$`));
+  const {data,info}=await sharp(result.parts[i].file).ensureAlpha().raw().toBuffer({resolveWithObject:true});
+  assert.equal(jsQR(new Uint8ClampedArray(data),info.width,info.height),null);
+ }
+ const context=monthContext(sample,'2026-09',S);assert.equal(context.attData.length,1);assert.equal(context.payments.length,1);
+ assert.equal(context.payments[0].amount_paid,100000);
+ const svg=statementSvg({id:S,name:'Mẫu'},'2026-09',[],0,1,context,sample.captured_at,600000).svg;
+ assert.match(svg,/Đã nộp: 100\.000đ/);assert.match(svg,/CẦN THANH TOÁN THÁNG 9\/2026: 600\.000đ/);assert.doesNotMatch(svg,/còn thiếu|còn nợ|công nợ|qrTop/i);
+ const {data,info}=await sharp(result.parts[4].file).ensureAlpha().raw().toBuffer({resolveWithObject:true});assert.equal(jsQR(new Uint8ClampedArray(data),info.width,info.height)?.data,qr);
+ const retry=await prepareNotification(sample,{download:()=>{throw Error('Confirmed QR downloaded again');},outputDir:dir,startPart:3,isConfirmed:()=>true});assert.deepEqual(retry.manifest,result.manifest);
+ if(process.env.NOTICE_PREVIEW_DIR){for(let i=1;i<=4;i++)await fs.copyFile(result.parts[i].file,path.join(process.env.NOTICE_PREVIEW_DIR,`monthly-tuition-sample-${i}.png`));await fs.writeFile(path.join(process.env.NOTICE_PREVIEW_DIR,'monthly-tuition-message.txt'),result.text);}
+});
