@@ -101,15 +101,19 @@ DELETE FROM public.parent_students s USING parent_cleanup_plan p
 WHERE s.parent_id=p.removed_id AND s.revoked_at IS NOT NULL AND EXISTS(
  SELECT 1 FROM public.parent_students k WHERE k.parent_id=p.retained_id AND k.student_id=s.student_id);
 
--- Preserve all conversation IDs/messages. A key collision requires a separate
--- conversation merge plan; never delete a conversation as a side effect.
+-- Preserve all conversation IDs/messages. Keep an empty legacy conversation's
+-- old key when the canonical key already exists; never delete either thread.
+-- A populated legacy conversation still needs a separate reviewed merge plan.
 DO $conversations$ DECLARE p record;BEGIN
  FOR p IN SELECT * FROM parent_cleanup_plan LOOP
   IF EXISTS(SELECT 1 FROM public.conversations c JOIN public.conversations k
    ON k.direct_key=replace(c.direct_key,p.removed_id::text,p.retained_id::text) AND k.id<>c.id
-   WHERE position(p.removed_id::text IN c.direct_key)>0) THEN RAISE EXCEPTION 'Có hội thoại cần gộp riêng';END IF;
-  UPDATE public.conversations SET direct_key=replace(direct_key,p.removed_id::text,p.retained_id::text)
-  WHERE position(p.removed_id::text IN direct_key)>0;
+   WHERE position(p.removed_id::text IN c.direct_key)>0
+   AND EXISTS(SELECT 1 FROM public.messages m WHERE m.conversation_id=c.id)) THEN RAISE EXCEPTION 'Có hội thoại cần gộp riêng';END IF;
+  UPDATE public.conversations c SET direct_key=replace(c.direct_key,p.removed_id::text,p.retained_id::text)
+  WHERE position(p.removed_id::text IN c.direct_key)>0
+   AND NOT EXISTS(SELECT 1 FROM public.conversations k WHERE k.id<>c.id
+    AND k.direct_key=replace(c.direct_key,p.removed_id::text,p.retained_id::text));
  END LOOP;
 END;$conversations$;
 -- Handle unique per-conversation membership and per-user device status.

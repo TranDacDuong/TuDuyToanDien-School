@@ -46,9 +46,11 @@ subscription and three mobile-status records. All 197 active family links stay.
 
 `SQL merge duplicate parent profiles.sql` archives affected rows privately, moves
 reviewed ownership references, preserves conversation IDs and normalizes their
-keys. It coalesces redundant revoked family links/memberships/device-status rows,
+keys. An empty legacy thread retains its old key when the canonical key already
+exists, preserving both thread IDs. A populated colliding thread still aborts
+for separate review. It coalesces redundant revoked family links/memberships/device-status rows,
 preserving their original records in the private archive. Push keys and passwords
-are excluded from the archive. Unknown dependencies and conversation-key
+are excluded from the archive. Unknown dependencies and populated conversation-key
 collisions abort the entire transaction. A fingerprint approved from the preview
 must be supplied through `app.parent_cleanup.approved_fingerprint`; a changed plan
 is rejected. Auth logins of removed profiles are permanently deleted.
@@ -65,7 +67,22 @@ while preserving its login/name/phone and existing authorization. The UI reads
 the resulting active family link, and preserves credentials when reusing a
 different existing email. This supports one parent with several children.
 
-The reviewed merge is **not yet applied**: browser-based permanent deletion
-requires action-time confirmation of the concrete 22-account plan. Local tests
+The reviewed merge was applied on **2026-11-06**, after action-time confirmation
+of the concrete 22-account plan. Local tests
 cover preservation, rollback guards, nine-digit phones, enum-role indexes,
 fingerprint enforcement, import reuse and credential preservation.
+
+Live verification confirmed 208 remaining parent profiles, zero duplicate phone
+groups, 22 archived removals and zero remaining Auth identities for the removed
+IDs. All 197 active family links remain, with zero students having multiple active
+parents. Both uniqueness indexes are valid, and the import reuse patch is active.
+The two legacy conversation IDs, all 133 affected notifications and the affected
+push subscription were preserved. Archive schema access is denied to anon and
+authenticated roles. The two reported families' Zalo links are now verified.
+
+The first transaction rolled back on a conversation-key collision, before any
+commit. The corrected transaction retained empty legacy threads with their old
+keys instead of deleting them. Eight merge tests and two credential tests passed;
+the laptop worker was restarted and reported a connected listener, ten-second
+pacing and zero pending acknowledgements/upload/storage errors. No synthetic
+tuition notification was sent to a real parent for validation.

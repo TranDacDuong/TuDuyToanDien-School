@@ -63,6 +63,14 @@ test('import reuses an existing canonical phone instead of creating a second par
  assert.equal((await db.query('SELECT full_name FROM users WHERE id=$1',[id(1)])).rows[0].full_name,'Parent');
  assert.equal((await db.query("SELECT count(*) n FROM auth.users WHERE email='new-alias@example.test'")).rows[0].n,0);
 });
+test('empty legacy thread with a canonical-key collision is preserved with both conversation IDs',async t=>{
+ const db=await fixture(t);await db.exec(`DELETE FROM messages;INSERT INTO conversations VALUES('${id(11)}','mindup:audience:${id(1)}','${id(1)}')`);
+ await db.exec(migration);
+ const rows=(await db.query('SELECT id,audience_user_id FROM conversations')).rows;
+ assert.equal(rows.length,2);assert.ok(rows.every(r=>r.audience_user_id===id(1)));
+ assert.ok(rows.some(r=>r.id===id(10)));assert.ok(rows.some(r=>r.id===id(11)));
+ assert.equal((await db.query('SELECT count(*) n FROM users')).rows[0].n,4);
+});
 for(const [name,setup,reason] of [
  ['unreviewed message ownership',`INSERT INTO messages(conversation_id,sender_id,content) VALUES('${id(10)}','${id(2)}','Do not discard')`,'kế hoạch gộp thêm'],
  ['conversation-key collision',`INSERT INTO conversations VALUES('${id(11)}','mindup:audience:${id(1)}','${id(1)}')`,'hội thoại cần gộp riêng'],
