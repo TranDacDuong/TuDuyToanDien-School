@@ -27,10 +27,45 @@ on cascading deletes or silently discard revoked links/messages/history. The
 four students without links must be investigated separately; do not invent a
 parent or infer one from matching names alone.
 
-The cleanup has **not** been applied to production. The Supabase browser session
-expired during the reference audit. Browser-based permanent deletion additionally
-requires action-time confirmation before the final destructive execution.
+The first conservative audit was resumed after restoring the Supabase session.
+It found dependencies, so the empty-profile-only script must not be used for the
+full production cleanup. The comprehensive preview below replaces that plan.
 
 Local PGlite tests cover enum roles, Vietnamese phone normalization, preservation
 of siblings/Zalo identity, private archive permissions, idempotence and rollback
 for message/revoked-link dependencies, prior logins and ambiguous identities.
+
+## Reviewed merge plan
+
+`SQL preview duplicate parent merge.sql` rolls back all temporary/function
+changes. The production preview identified all 22 duplicate profiles after
+normalizing a nine-digit mobile phone that had lost its leading zero. Four
+duplicates have prior logins. Dependencies are six memberships, two conversations
+(zero messages in those two), 133 notifications, 20 old family links, one push
+subscription and three mobile-status records. All 197 active family links stay.
+
+`SQL merge duplicate parent profiles.sql` archives affected rows privately, moves
+reviewed ownership references, preserves conversation IDs and normalizes their
+keys. It coalesces redundant revoked family links/memberships/device-status rows,
+preserving their original records in the private archive. Push keys and passwords
+are excluded from the archive. Unknown dependencies and conversation-key
+collisions abort the entire transaction. A fingerprint approved from the preview
+must be supplied through `app.parent_cleanup.approved_fingerprint`; a changed plan
+is rejected. Auth logins of removed profiles are permanently deleted.
+
+The retained account is the sole profile already owning family/Zalo data. A
+same-phone alias with a different name is accepted only with shared child-link
+history. Existing ambiguity or a competing Zalo identity aborts. No student's
+active parent is selected merely by latest timestamp. Four students without
+links have no class enrollments; they are outside this duplicate merge and no
+parent is invented for them.
+
+The import RPC is patched in place to reuse the existing canonical-phone account
+while preserving its login/name/phone and existing authorization. The UI reads
+the resulting active family link, and preserves credentials when reusing a
+different existing email. This supports one parent with several children.
+
+The reviewed merge is **not yet applied**: browser-based permanent deletion
+requires action-time confirmation of the concrete 22-account plan. Local tests
+cover preservation, rollback guards, nine-digit phones, enum-role indexes,
+fingerprint enforcement, import reuse and credential preservation.

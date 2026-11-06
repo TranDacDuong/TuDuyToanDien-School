@@ -3150,17 +3150,14 @@ async function sSyncParentAccountForStudent(studentId, payload){
     }]
   });
   if(error) throw error;
-  const { data: parentAfterSave } = await sb.from('users').select('id,email').eq('email', email).maybeSingle();
-  if(parentAfterSave?.id){
-    const { error: revokeError } = await sb.from('parent_students')
-      .update({ revoked_at:new Date().toISOString() })
-      .eq('student_id', studentId)
-      .neq('parent_id', parentAfterSave.id)
-      .is('revoked_at', null);
-    if(revokeError) throw revokeError;
-  }
-  if(parentAfterSave?.id && (email || password)){
+  const parentAfterSave = await sLoadLinkedParentForStudent(studentId);
+  if(!parentAfterSave?.id) throw new Error('Chưa đọc được liên kết phụ huynh sau khi lưu.');
+  // A shared phone may resolve to an existing login with a different email.
+  // Keep that login's credentials when linking another child.
+  if(parentAfterSave.email?.toLowerCase() === email && (email || password)){
     await updateManagedCredentials(parentAfterSave.id, email, password);
+  } else if(parentAfterSave.email){
+    document.getElementById('seParentEmail').value = parentAfterSave.email;
   }
 }
 
@@ -3491,15 +3488,10 @@ async function plLinkParentStudent(){
     operation: async () => {
       const { data, error } = await sb.rpc('admin_import_parents_batch', { p_rows: [{ email, full_name, phone, password, student_id, relationship }] });
       if(error) throw error;
-      const { data: parent } = await sb.from('users').select('id').eq('email', email).maybeSingle();
-      if(parent?.id){
-        const { error: revokeError } = await sb.from('parent_students')
-          .update({ revoked_at:new Date().toISOString() })
-          .eq('student_id', student_id)
-          .neq('parent_id', parent.id)
-          .is('revoked_at', null);
-        if(revokeError) throw revokeError;
-      }
+      const { data: savedLink, error: linkError } = await sb.from('parent_students').select('parent_id').eq('student_id',student_id).is('revoked_at',null).maybeSingle();
+      if(linkError) throw linkError;
+      if(!savedLink?.parent_id) throw new Error('Chưa đọc được liên kết phụ huynh sau khi lưu.');
+      const parent = {id:savedLink.parent_id};
       if(note){
         if(parent?.id){
           const { error: noteError } = await sb.from('parent_students')
