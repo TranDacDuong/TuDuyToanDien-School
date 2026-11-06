@@ -9,6 +9,29 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const money=v=>new Intl.NumberFormat('vi-VN').format(Number(v)||0)+'đ';
 const short=(v,n)=>Array.from(String(v||'')).length>n?Array.from(String(v)).slice(0,n-1).join('')+'…':String(v||'');
 
+function attendanceLabel(detail,student,cls,context,today) {
+  if(detail.date>today)return 'Chưa diễn ra';
+  // Use the same resolved status as the attendance/tuition screens: a scheduled
+  // membership defaults to present, with saved overrides and trials resolved by
+  // TuitionCalculation. Looking only for explicit rows discards that default.
+  return {present:'Có mặt',absent:'Vắng',makeup:'Học bù',trial:'Học thử',late:'Đi muộn'}[detail.status]||'Chưa xác định';
+}
+
+function statementLines(student,context,today) {
+  const lines=[];
+  const payment=(context.payments||[]).find(p=>p.student_id===student.id);
+  const matches=payment&&Math.abs(student.rows.reduce((n,r)=>n+Number(r.amount||0),0)-Number(payment.amount_due))<1;
+  for(const row of student.rows) {
+    const component=payment?.gross_components?.find(c=>c.class_id===row.classId);
+    const amount=component?Math.round(Number(component.amount)*(1-Number(component.percent||0)/100)):row.amount;
+    lines.push({classTitle:row.className,summary:`${matches?'Buổi tính phí':'Số buổi theo lịch'}: ${row.billableSessions||0} · ${component?'Học phí đã lưu':matches?'Học phí':'Dự kiến theo lịch'}: ${money(amount)}${component?.percent?` (giảm ${component.percent}%)`:''}`});
+    for(const detail of row.attendanceDetails||[])lines.push({date:detail.date,label:attendanceLabel(detail,student.id,row.classId,context,today),schedule:detail.scheduleLabel||''});
+    if(!row.attendanceDetails?.length)lines.push({label:'Chưa có lịch/điểm danh của lớp trong tháng này'});
+  }
+  if(!lines.length)lines.push({label:'Chưa có dữ liệu lịch/điểm danh trong tháng được chọn.'});
+  return lines;
+}
+
 function monthContext(payload,month,studentId) {
   const source=payload.statement_context||payload.billing_context;
   const attendance=(source.attData||[]).filter(r=>r.student_id===studentId&&String(r.date).slice(0,7)===month);
@@ -69,7 +92,7 @@ async function prepareNotification(payload,options={}) {
       for(const month of months) {
         const context=monthContext(payload,month,student.id);
         const rows=Calculation.buildRowsForMonth({...context,ym:month,payments:Object.fromEntries(context.payments.map(p=>[p.student_id,p]))},{discountRules:context.discountRules});
-        const lines=legacy.statementLines({...student,rows},context,today),chunks=[];let chunk=[],classHeader;
+        const lines=statementLines({...student,rows},context,today),chunks=[];let chunk=[],classHeader;
         for(const line of lines){if(chunk.length>=24){chunks.push(chunk);chunk=[];if(!line.classTitle&&classHeader)chunk.push(classHeader);}if(line.classTitle)classHeader=line;chunk.push(line);}
         if(chunk.length)chunks.push(chunk);
         const remaining=student.debts.filter(d=>d.month.slice(0,7)===month).reduce((n,d)=>n+Number(d.remaining),0);
@@ -89,4 +112,4 @@ async function prepareNotification(payload,options={}) {
 async function sendNotification(job,options) {
   return legacy.sendNotification(job,{...options,prepare:options.prepare||prepareNotification});
 }
-module.exports={prepareNotification,sendNotification,monthContext,statementSvg,attendanceLabel:legacy.attendanceLabel,statementLines:legacy.statementLines};
+module.exports={prepareNotification,sendNotification,monthContext,statementSvg,attendanceLabel,statementLines};

@@ -21,8 +21,11 @@ pending/future sessions, saved amounts, reductions, "Đã nộp" and "Cần than
 for that month. Each child's final QR covers the total of the included months
 using the registered memo. Parent-facing text avoids debt/shortfall wording.
 The default text uses `{CacThang}` and `{AnhDinhKem}` for actual bundle months,
-including year labels when needed. Unrecorded attendance is never
-presented as confirmed presence. Calculated session fees are labelled estimates
+including year labels when needed. Past-session labels use the same resolved
+status as the attendance and tuition screens: scheduled membership defaults to
+present, saved absences/makeup override it, and trial status follows the shared
+trial/explicit-override rules. Future dates show "Chưa diễn ra". A missing explicit
+row does not create a separate "Chưa điểm danh" state. Calculated session fees are labelled estimates
 when they differ from saved amounts. Long schedules split at 24 rows with class
 headers repeated; monthly payment summaries repeat on each page. Other students' attendance is
 never included. Rendering uses SVG/sharp locally, with no student data sent to an
@@ -85,3 +88,7 @@ the restarted worker reported version 2, monthly statements and separate QR,
 connected listener, ten-second pacing and zero pending acknowledgements/errors.
 The focused run passed 12 tests, including three monthly PNGs, exact total QR
 decoding, family/month isolation, frozen retry compatibility and composer behavior.
+
+The follow-up attendance correction passed eight focused tests, including all
+four past-session labels, default presence without an explicit row, null-schedule
+makeup records, trial detection/overrides and future-session labels.

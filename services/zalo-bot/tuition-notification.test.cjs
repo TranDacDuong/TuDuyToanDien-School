@@ -20,8 +20,28 @@ test('statement contains only explicit attendance and a readable exact QR; retry
   const recovered=await prepareNotification(payload,{download:()=>{throw Error('Confirmed QR must not download again');},outputDir:dir,startPart:1,isConfirmed:()=>true});assert.deepEqual(recovered.manifest,result.manifest);assert.equal(recovered.parts[1].file,undefined);
  if(process.env.NOTICE_PREVIEW_DIR){await fs.mkdir(process.env.NOTICE_PREVIEW_DIR,{recursive:true});await fs.copyFile(result.parts[1].file,path.join(process.env.NOTICE_PREVIEW_DIR,'tuition-attendance-sample.png'));}
  const detail={date:'2026-11-12',schedule_id:1,status:'present'};
- assert.equal(attendanceLabel(detail,S,'class1',payload.billing_context,'2026-11-12'),'Chưa điểm danh');
+ assert.equal(attendanceLabel(detail,S,'class1',payload.billing_context,'2026-11-12'),'Có mặt');
  assert.equal(attendanceLabel({...detail,date:'2026-11-19'},S,'class1',payload.billing_context,'2026-11-12'),'Chưa diễn ra');
+});
+
+test('monthly report uses the same resolved session statuses as attendance and tuition, including default presence and trial overrides',()=>{
+ const Calculation=require('../../tuition-calculation');
+ const context=structuredClone(payload.billing_context);
+ context.attData=[
+  {student_id:S,class_id:'class1',date:'2026-11-05',schedule_id:1,status:'absent'},
+  {student_id:S,class_id:'class1',date:'2026-11-12',schedule_id:null,status:'makeup'},
+  {student_id:S,class_id:'class1',date:'2026-11-19',schedule_id:1,status:'present'}];
+ context.trialReqs=[{student_id:S,trial_class_id:'class1',trial_sessions:[{date:'2026-11-19',schedule_id:1}]}];
+ const rows=Calculation.buildRowsForMonth({...context,ym:'2026-11',payments:{}},{});
+ const lines=statementLines({id:S,rows},context,'2026-11-30');
+ const byDate=Object.fromEntries(lines.filter(l=>l.date).map(l=>[l.date,l.label]));
+ assert.equal(byDate['2026-11-05'],'Vắng');assert.equal(byDate['2026-11-12'],'Học bù');
+ assert.equal(byDate['2026-11-19'],'Học thử');assert.equal(byDate['2026-11-26'],'Có mặt');
+ assert.ok(lines.every(l=>l.label!=='Chưa điểm danh'));
+ const future=statementLines({id:S,rows},context,'2026-11-06');assert.equal(future.find(l=>l.date==='2026-11-12').label,'Chưa diễn ra');
+ context.attData[2].status_overridden=true;
+ const overridden=Calculation.buildRowsForMonth({...context,ym:'2026-11',payments:{}},{});
+ assert.equal(statementLines({id:S,rows:overridden},context,'2026-11-30').find(l=>l.date==='2026-11-19').label,'Có mặt');
 });
 test('commands are exact and use Vietnam month boundaries',()=>{
  assert.deepEqual(Notice.parseCommand('#hocphi',new Date('2026-10-31T18:00:00Z')),{month:'2026-11'});
