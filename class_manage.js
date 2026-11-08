@@ -38,6 +38,38 @@
       row
     ])).values()];
   }
+  function classEnrollmentPeriods(student){
+    return student.enrollment_periods || [student];
+  }
+  function isClassStudentEnrolledOn(student,date){
+    return classEnrollmentPeriods(student).some(period =>
+      (period.joined_at || "0000-00-00").slice(0,10)<=date &&
+      (period.left_at || "9999-99-99").slice(0,10)>=date);
+  }
+  function classStudentOverlapsMonth(student,start,end){
+    return classEnrollmentPeriods(student).some(period =>
+      (period.joined_at || "0000-00-00").slice(0,10)<=end &&
+      (period.left_at || "9999-99-99").slice(0,10)>=start);
+  }
+  function mergeClassStudentRows(rows){
+    // One roster row per student; retain separate enrollment periods for historical dates and gaps.
+    const groups=new Map();
+    for(const row of rows || []) for(const period of classEnrollmentPeriods(row)){
+      if(!period.student_id) continue;
+      if(!groups.has(period.student_id)) groups.set(period.student_id,[]);
+      const periods=groups.get(period.student_id);
+      if(!periods.some(p=>period.id ? p.id===period.id : p===period)) periods.push(period);
+    }
+    return [...groups.values()].map(periods=>{
+      const ordered=[...periods].sort((a,b)=>String(b.joined_at || '').localeCompare(String(a.joined_at || '')) || String(b.id || '').localeCompare(String(a.id || '')));
+      const primary=ordered.find(p=>!p.left_at) || ordered[0];
+      return {...primary,
+        user:primary.user || ordered.find(p=>p.user)?.user,
+        joined_at:periods.some(p=>!p.joined_at)?null:periods.map(p=>p.joined_at).sort()[0],
+        left_at:periods.some(p=>!p.left_at)?null:periods.map(p=>p.left_at).sort().at(-1),
+        enrollment_periods:periods.map(p=>({...p}))};
+    });
+  }
   function esc(value){
     return String(value ?? "")
       .replace(/&/g, "&amp;")
@@ -718,6 +750,7 @@
       body.innerHTML = "<p style='color:var(--red);padding:20px'>Lỗi: "+error.message+"</p>";
       return;
     }
+    data.students=mergeClassStudentRows(data.students || []);
     _cachedClass = data;
     renderShell();
     const { data: chosenSchedules, error: chosenScheduleError } = await sb
@@ -860,11 +893,9 @@
     const today  = todayStr();
 
     const schedulesThisMonth = getSchedulesForMonth(data.class_schedules||[], _currentMonth, _currentYear);
-    const visibleStudents = (data.students||[]).filter(s=>{
-      const j = s.joined_at?s.joined_at.slice(0,10):"0000-00-00";
-      const l = s.left_at  ?s.left_at.slice(0,10)  :"9999-99-99";
+    const visibleStudents = mergeClassStudentRows(data.students||[]).filter(s=>{
       if(role === "parent" && !_parentStudentIds.has(s.student_id)) return false;
-      return j<=mEnd && l>=mStart;
+      return classStudentOverlapsMonth(s,mStart,mEnd);
     });
     const dates = role === "student"
       ? generateStudentOccurrences(window._currentUserId, schedulesThisMonth, _currentMonth, _currentYear)
@@ -955,7 +986,7 @@
           myCells+='<td class="center" style="'+cellStyle+'"><span class="att-btn '+sm.cls+'" style="cursor:default;font-weight:700">'+ sm.text+'</span></td>';
         } else {
           const isTrial = Boolean(_trialDateMap[me.student_id + "_" + d]);
-          const defaultStatus = isTrial ? "trial" : (d < joined ? "absent" : "present");
+          const defaultStatus = isTrial ? "trial" : (isClassStudentEnrolledOn(me,d) ? "present" : "absent");
           const status=_attendanceMap[me.student_id+"_"+d+"_"+scheduleId]||_attendanceMap[me.student_id+"_"+d+"_0"]||defaultStatus;
           const sm=statusMap[status]||statusMap.present;
           myCells+='<td class="center" style="'+cellStyle+'"><span class="att-btn '+sm.cls+'" style="cursor:default;font-weight:700">'+ sm.text+'</span></td>';
@@ -996,7 +1027,7 @@
             const sm=statusMap[status]||statusMap.absent;
             cells+='<td class="center" style="padding:4px"><span class="att-btn '+sm.cls+'" style="cursor:default;'+(isMe?"font-weight:700":"")+'">'+ sm.text+'</span></td>';
           } else {
-            const defaultStatus = d < joined ? "absent" : "present";
+            const defaultStatus = isClassStudentEnrolledOn(s,d) ? "present" : "absent";
             const status=_attendanceMap[s.student_id+"_"+d]||defaultStatus;
             const sm=statusMap[status]||statusMap.present;
             cells+='<td class="center" style="padding:4px"><span class="att-btn '+sm.cls+'" style="cursor:default;'+(isMe?"font-weight:700":"")+'">'+ sm.text+'</span></td>';
@@ -1045,7 +1076,7 @@
             '</td>';
         } else {
           const isTrial = Boolean(_trialDateMap[s.student_id + "_" + d]);
-          const defaultStatus = isTrial ? "trial" : (d < joined ? "absent" : "present");
+          const defaultStatus = isTrial ? "trial" : (isClassStudentEnrolledOn(s,d) ? "present" : "absent");
           const status=_attendanceMap[s.student_id+"_"+d+"_"+scheduleId]||_attendanceMap[s.student_id+"_"+d+"_0"]||defaultStatus;
           const key="cvatt_"+s.student_id+"_"+d+"_"+scheduleId;
           const sm=statusMap[status]||statusMap.present;
@@ -1129,9 +1160,7 @@
     const schedules = getSchedulesForMonth(_cachedClass?.class_schedules || [], dateFromStr(date).getMonth(), dateFromStr(date).getFullYear());
     return (_cachedClass?.students || [])
       .filter(s => {
-        const joined = s.joined_at ? s.joined_at.slice(0,10) : "0000-00-00";
-        const left = s.left_at ? s.left_at.slice(0,10) : "9999-99-99";
-        if(joined > date || left < date) return false;
+        if(!isClassStudentEnrolledOn(s,date)) return false;
         const studentSchedules = getStudentSchedules(s.student_id, schedules, date);
         if(!sid) return studentSchedules.length > 0;
         return studentSchedules.some(sc => Number(sc.id) === sid);
@@ -1871,7 +1900,8 @@
     }
     if(!confirm("Xác nhận ngừng học cho học sinh này?")) return;
     const sb=getSb(), today=todayStr();
-    await sb.from("class_students").update({left_at:new Date().toISOString()}).eq("class_id",classId).eq("student_id",studentId);
+    const {error:stopError}=await sb.from("class_students").update({left_at:new Date().toISOString()}).eq("class_id",classId).eq("student_id",studentId).is("left_at",null);
+    if(stopError){alert("Lỗi ngừng học: "+stopError.message);return;}
     const sched=getSchedulesForMonth(_cachedClass.class_schedules||[],_currentMonth,_currentYear);
     const futureRows=generateStudentOccurrences(studentId,sched,_currentMonth,_currentYear)
       .filter(item=>item.date>today)
@@ -1883,7 +1913,6 @@
       );
     }
     const st=_cachedClass.students.find(s=>s.student_id===studentId);
-    if(st) st.left_at=new Date().toISOString();
     await window.AppAdminTools?.recordAudit?.("class_student_stopped", {
       target_type: "class_student",
       target_id: classId,
@@ -1891,7 +1920,7 @@
       student_id: studentId,
       student_name: st?.user?.full_name || null,
     });
-    await renderAttendanceTab();
+    await loadAndRender();
   };
 
   window.cvClassOff = async function(classId){
@@ -2131,8 +2160,14 @@
       '</div>';
   };
 
+  const pendingClassStudentAdds=new Set();
   window.cvConfirmAddStudent = async function(studentId,studentName){
     const sb=getSb(), classId=_classId, today=todayStr();
+    const pendingKey=classId+':'+studentId;
+    if(pendingClassStudentAdds.has(pendingKey)) return;
+    if((_cachedClass.students || []).some(s=>s.student_id===studentId && !s.left_at)){
+      alert("Học sinh đang ở trong lớp.");return;
+    }
     const joinedDate = document.getElementById("cvAddStudentJoinedAt")?.value || "";
     if(!joinedDate){
       alert("Vui lòng chọn ngày bắt đầu vào lớp.");
@@ -2146,6 +2181,8 @@
       alert("Lớp chưa có lịch học hợp lệ.");
       return;
     }
+    pendingClassStudentAdds.add(pendingKey);
+    try{
     const{data:newRow,error}=await sb.from("class_students")
       .insert([{class_id:classId,student_id:studentId,joined_at:joinedAt}])
       .select().single();
@@ -2167,13 +2204,14 @@
       .filter(item=>item.date>=joinedDate && item.date<today)
       .map(item=>({class_id:classId,student_id:studentId,date:item.date,status:"absent",schedule_id:item.schedule_id,session_no:item.session_no}));
     if(pastRows.length>0){
+      // Rejoining must not replace attendance already recorded during an earlier enrollment.
       await sb.from("attendance").upsert(
         uniqueAttendanceRows(pastRows),
-        {onConflict:"class_id,student_id,date"}
+        {onConflict:"class_id,student_id,date",ignoreDuplicates:true}
       );
     }
     const{data:userData}=await sb.from("users").select("id,full_name").eq("id",studentId).single();
-    _cachedClass.students.push({id:newRow.id,student_id:studentId,joined_at:newRow.joined_at,left_at:null,user:userData});
+    _cachedClass.students=mergeClassStudentRows([...(_cachedClass.students || []),{id:newRow.id,student_id:studentId,joined_at:newRow.joined_at,left_at:null,user:userData}]);
     await window.AppAdminTools?.recordAudit?.("class_student_added", {
       target_type: "class_student",
       target_id: classId,
@@ -2192,7 +2230,8 @@
       console.warn("Lỗi đồng bộ trạng thái học thử:", trialErr);
     }
     cvCloseAddStudent();
-    await renderAttendanceTab();
+    await loadAndRender();
+    }finally{pendingClassStudentAdds.delete(pendingKey);}
   };
 
   /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
