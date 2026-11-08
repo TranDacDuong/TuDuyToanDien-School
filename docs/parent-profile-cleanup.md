@@ -86,3 +86,20 @@ keys instead of deleting them. Eight merge tests and two credential tests passed
 the laptop worker was restarted and reported a connected listener, ten-second
 pacing and zero pending acknowledgements/upload/storage errors. No synthetic
 tuition notification was sent to a real parent for validation.
+
+## Student-directory display correction, 2026-11-08
+
+A fresh read-only audit confirmed zero duplicate parent-phone groups and zero
+students with multiple active parent links. The two students in the reported
+screenshot each had exactly one distinct active parent. The repeated names,
+emails, Zalo controls and PH status lines came from overlapping directory loads
+appending into the same shared map. Deterministic tests reproduced the duplicate
+and stale-response behavior before the fix.
+
+Student loads now share an in-flight request. Parent-directory loads build their
+own map and publish it atomically only when their request is still current.
+Repeated link rows are deduplicated by student/parent IDs, without masking
+different parent identities that happen to share a name. Validation passed seven
+Node tests (including existing credential behavior), one Chrome rendering test
+with overlapping requests and mobile assertions, and five existing row-action
+and search regression tests. No production records were deleted for this fix.

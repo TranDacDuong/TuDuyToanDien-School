@@ -2316,6 +2316,7 @@ document.getElementById('tSMon').addEventListener('change', tApplyFilter);
    HỌC SINH
 ══════════════════════════════ */
 let _sAll=[], _sFilt=[], _sPage=1, _sSortF='full_name', _sSortD=1, _sEditId=null, _sLinkedParents={}, _sMobileStatus={}, _sZaloContacts={};
+let _sStudentsLoadPromise=null, _sParentDirectoryVersion=0;
 let _sZaloBulkBusy=false, _sZaloBulkTimer=null, _sZaloBulkRunId=null, _sZaloDetailRows=[];
 let _sZaloAliasBusy=false, _sZaloAliasRunId=null, _sZaloAliasRows=[];
 let _sZaloTemplateParents=[], _sZaloTemplateParent=null;
@@ -2454,8 +2455,12 @@ async function sHandleImportFile(event){
   }
 }
 
-async function loadStudents(){
-  const {data} = await sb.from('users').select('*').eq('role','student').order('full_name');
+function loadStudents(){
+  // Tab activation and page initialization can request this simultaneously.
+  if(_sStudentsLoadPromise) return _sStudentsLoadPromise;
+  _sStudentsLoadPromise = (async()=>{
+  const {data,error} = await sb.from('users').select('*').eq('role','student').order('full_name');
+  if(error) throw error;
   _sAll = data||[];
   await sLoadLinkedParentsForStudents(_sAll);
   await sLoadMobileStatusesForStudents(_sAll);
@@ -2470,6 +2475,8 @@ async function loadStudents(){
   },15000);
   document.getElementById('sStatTotal').textContent = _sAll.length;
   sApplyFilter();
+  })().finally(()=>{_sStudentsLoadPromise=null;});
+  return _sStudentsLoadPromise;
 }
 
 function sZaloPauseNotice(state){
@@ -2789,36 +2796,48 @@ async function sToggleZaloBulkRun(pause){
 }
 
 async function sLoadLinkedParentsForStudents(students){
-  _sLinkedParents = {};
-  _sParentDirectoryError = false;
+  const version=++_sParentDirectoryVersion;
+  const linkedParents={};
+  const publish=(error=false)=>{
+    if(version!==_sParentDirectoryVersion) return;
+    _sLinkedParents=linkedParents;
+    _sParentDirectoryError=error;
+  };
   const studentIds = [...new Set((students || []).map(item => item.id).filter(Boolean))];
-  if(!studentIds.length) return;
+  if(!studentIds.length){publish();return;}
   const { data: links, error: linkError } = await sb.from('parent_students')
     .select('parent_id,student_id')
     .in('student_id', studentIds)
     .is('revoked_at', null);
+  if(version!==_sParentDirectoryVersion) return;
   if(linkError){
-    _sParentDirectoryError = true;
+    publish(true);
     console.warn('Không tải được liên kết phụ huynh:', linkError);
     return;
   }
   const parentIds = [...new Set((links || []).map(item => item.parent_id).filter(Boolean))];
-  if(!parentIds.length) return;
+  if(!parentIds.length){publish();return;}
   const { data: parents, error: parentError } = await sb.from('users')
     .select('id,full_name,email,phone,role,account_password')
     .in('id', parentIds);
+  if(version!==_sParentDirectoryVersion) return;
   if(parentError){
-    _sParentDirectoryError = true;
+    publish(true);
     console.warn('Không tải được tài khoản phụ huynh:', parentError);
     return;
   }
   const parentMap = Object.fromEntries((parents || []).filter(item => item.role === 'parent').map(item => [item.id, item]));
+  const seen=new Set();
   (links || []).forEach(link => {
     const parent = parentMap[link.parent_id];
     if(!parent) return;
-    if(!_sLinkedParents[link.student_id]) _sLinkedParents[link.student_id] = [];
-    _sLinkedParents[link.student_id].push(parent);
+    const key=link.student_id+':'+parent.id;
+    if(seen.has(key)) return;
+    seen.add(key);
+    if(!linkedParents[link.student_id]) linkedParents[link.student_id] = [];
+    linkedParents[link.student_id].push(parent);
   });
+  publish();
 }
 
 async function sLoadMobileStatusesForStudents(students){
