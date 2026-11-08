@@ -1034,7 +1034,6 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     <li data-role="admin,teacher,assistant,student,parent" data-permission="page.resources" data-page="resources.html"><span class="menu-label">📚 Tài liệu tham khảo</span></li>
     <li data-role="admin,teacher,assistant" data-permission="page.question_bank" data-page="question.html"><span class="menu-label">🧠 Ngân hàng câu hỏi</span></li>
     <li data-role="admin,teacher,assistant" data-permission="page.exam_editor" data-page="exam.html"><span class="menu-label">✅ Đề kiểm tra</span></li>
-    <li data-role="admin,teacher,assistant" data-permission="page.trial_requests" data-page="trial_requests.html"><span class="menu-label">🌱 Đăng ký học thử</span></li>
     <li data-role="admin" data-permission="page.push_debug" data-page="push_debug.html"><span class="menu-label">🔔 Test thông báo</span></li>
     <li data-role="admin" data-permission="page.system" data-page="sourcedata.html"><span class="menu-label">⚙️ Hệ thống</span></li>
     <li data-role="admin,teacher,assistant" data-permission="page.facebook" data-page="facebook_posting.html"><span class="menu-label">📣 Đăng bài Facebook</span></li>
@@ -1175,10 +1174,6 @@ iframe { width: 100%; height: 100%; border: none; background: var(--white); }
     <span>📅</span>
     <span>Lịch học</span>
   </button>
-  <button class="mobile-nav-item" type="button" data-role="assistant" data-permission="page.trial_requests" data-page="trial_requests.html">
-    <span>🌱</span>
-    <span>Học thử</span>
-  </button>
   <button class="mobile-nav-item" type="button" data-role="admin" data-permission="page.system" data-page="sourcedata.html">
     <span>⚙️</span>
     <span>Hệ thống</span>
@@ -1272,7 +1267,7 @@ const mobileQuickActionItems = [...document.querySelectorAll("#mobileQuickAction
 const mobileToolsToggle = document.getElementById("mobileToolsToggle");
 const MOBILE_NAV_ORDER = {
   teacher: ["home.html", "courses.html", "class.html", "tasks.html", "public_exam.html", "income.html", "menu"],
-  assistant: ["home.html", "courses.html", "class.html", "tasks.html", "teacher_schedule.html", "trial_requests.html", "menu"],
+  assistant: ["home.html", "courses.html", "class.html", "tasks.html", "teacher_schedule.html", "menu"],
   parent: ["home.html", "courses.html", "class.html", "teacher_schedule.html", "personal_schedule.html", "tuition.html", "menu"],
   student: ["home.html", "courses.html", "class.html", "public_exam.html", "game.html", "tuition.html", "menu"],
   admin: ["home.html", "courses.html", "class.html", "tuition.html", "income.html", "sourcedata.html", "menu"],
