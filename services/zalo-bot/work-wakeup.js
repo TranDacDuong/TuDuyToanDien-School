@@ -1,6 +1,15 @@
 'use strict';
 const IDLE_CHECK_MS = 60 * 60 * 1000;
 
+function isAllowedRealtimeUrl(value) {
+  try {
+    const url = new URL(value);
+    if (url.username || url.password || url.search || url.hash) return false;
+    return url.protocol === 'https:' || (url.protocol === 'http:' &&
+      ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname));
+  } catch { return false; }
+}
+
 // Realtime carries hints only. Existing authenticated claim RPCs remain authoritative.
 class WorkWakeup {
   constructor({ request, wake, createClient, clock = Date.now }) {
@@ -17,7 +26,7 @@ class WorkWakeup {
     this.nextConnectAt = this.clock() + IDLE_CHECK_MS;
     try {
       const config = await this.request({ action: 'workWakeupConfig' });
-      if (!/^https:\/\//.test(config.url || '') || !config.anonKey || !/^zalo-work:[a-f0-9]{64}$/.test(config.topic || '')) {
+      if (!isAllowedRealtimeUrl(config.url) || !config.anonKey || !/^zalo-work:[a-f0-9]{64}$/.test(config.topic || '')) {
         throw new Error('Invalid work notification configuration');
       }
       const client = this.createClient(`${config.url}/realtime/v1`, { params: { apikey: config.anonKey } });
@@ -54,4 +63,4 @@ class GatewayCooldown {
     }
   }
 }
-module.exports = { WorkWakeup, GatewayCooldown, IDLE_CHECK_MS };
+module.exports = { WorkWakeup, GatewayCooldown, IDLE_CHECK_MS, isAllowedRealtimeUrl };

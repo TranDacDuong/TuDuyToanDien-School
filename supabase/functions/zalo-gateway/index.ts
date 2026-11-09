@@ -52,7 +52,7 @@ Deno.serve(async (request) => {
   try {
     const payload = await request.json();
     if (payload.action === 'workWakeupConfig') {
-      const url = Deno.env.get('SUPABASE_URL');
+      const url = Deno.env.get('SUPABASE_PUBLIC_URL') || Deno.env.get('SUPABASE_URL');
       const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
       if (!url || !anonKey) throw new Error('Realtime is not configured');
       const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('zalo-work:' + expected));

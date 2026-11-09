@@ -14,6 +14,7 @@ const { prepareScoreMessageMedia } = require('./score-message-media');
 const { createScheduler, isSendingTime, quietHoursError } = require('./tuition-reminder-scheduler');
 const { requireSendAcknowledgement } = require('./send-acknowledgement');
 const { createSendPacer, installSendPacing, fetchWithDeadline } = require('./send-pacing');
+const { installReadOnly } = require('./zalo-read-only');
 const { sendNotification } = require('./tuition-notification');
 const TuitionNoticeCommand = require('../../tuition-notice');
 const { retryPreparation, sendTuitionQr } = require('./tuition-qr');
@@ -32,12 +33,15 @@ const PORT = process.env.PORT || 3456;
 const HOST = '127.0.0.1';
 const GATEWAY_URL = process.env.ZALO_GATEWAY_URL || '';
 const GATEWAY_TOKEN = process.env.ZALO_GATEWAY_TOKEN || '';
+const READ_ONLY = process.env.ZALO_READ_ONLY === 'true';
 const ALLOWED_ORIGINS = new Set([
   'https://www.mindup.edu.vn',
   'https://mindup.edu.vn',
   'https://tuduytoandien.vercel.app',
   'http://localhost:3000',
-  'http://127.0.0.1:3000'
+  'http://127.0.0.1:3000',
+  'http://localhost:14173',
+  'http://127.0.0.1:14173'
 ]);
 
 app.use(cors({ origin(origin, callback) {
@@ -1005,7 +1009,7 @@ async function initZaloClient(forceQr = false) {
           console.log("[ZaloBot] Thử khôi phục đăng nhập bằng phiên đã lưu...");
           const api = await zaloInstance.login(savedSession);
           if (api) {
-            zaloApi = installSendPacing(api, paceZaloSend);
+            zaloApi = installReadOnly(installSendPacing(api, paceZaloSend), READ_ONLY);
             botStatus = 'connected';
             userInfo = { uid: api.getOwnId() };
             qrCodeDataUrl = null;
@@ -1056,7 +1060,7 @@ async function initZaloClient(forceQr = false) {
       }
     }).then(api => {
       if (api) {
-        zaloApi = installSendPacing(api, paceZaloSend);
+        zaloApi = installReadOnly(installSendPacing(api, paceZaloSend), READ_ONLY);
         botStatus = 'connected';
         userInfo = { uid: api.getOwnId() };
         qrCodeDataUrl = null;
@@ -1358,6 +1362,7 @@ if(GATEWAY_URL) registerOnDemand(app,{gatewayUrl:GATEWAY_URL,persistResult:async
 app.get('/api/status', (req, res) => {
   res.json({
     botStatus,
+    readOnly: READ_ONLY,
     hasQr: !!qrCodeDataUrl,
     userInfo,
     friendsCount: friendUserIdSet.size,
