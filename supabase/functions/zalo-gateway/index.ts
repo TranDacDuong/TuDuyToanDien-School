@@ -51,6 +51,15 @@ Deno.serve(async (request) => {
 
   try {
     const payload = await request.json();
+    if (payload.action === 'workWakeupConfig') {
+      const url = Deno.env.get('SUPABASE_URL');
+      const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+      if (!url || !anonKey) throw new Error('Realtime is not configured');
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('zalo-work:' + expected));
+      const topic = 'zalo-work:' + [...new Uint8Array(digest)].map(n=>n.toString(16).padStart(2,'0')).join('');
+      await rpc('configure_zalo_work_wakeup', {p_topic:topic});
+      return json({url,anonKey,topic});
+    }
     const tuitionActions: Record<string,{name:string;fields:string[]}> = {
       claimTuitionNotice:{name:'claim_tuition_notification_v1',fields:['p_allowed','p_slot']},
       prepareTuitionNotice:{name:'prepare_tuition_notification',fields:['p_id','p_token','p_manifest','p_text']},
@@ -67,6 +76,7 @@ Deno.serve(async (request) => {
         || ('p_allowed' in args && typeof args.p_allowed!=='boolean')
         || ('p_slot' in args && ![0,5,10,15].includes(args.p_slot))
         || ('p_manifest' in args && (!Array.isArray(args.p_manifest)||args.p_manifest.length>100||args.p_manifest.some((x:unknown)=>typeof x!=='string'||x.length>200)))) return json({error:'Invalid tuition request'},400);
+      if (payload.action==='claimTuitionNotice') return json(await rpc('claim_tuition_notification_wakeup',args));
       return json({data:await rpc(spec.name,args)});
     }
     if (payload.action === 'classGroupState') return json({data:await rpc('class_group_worker_state',{})});

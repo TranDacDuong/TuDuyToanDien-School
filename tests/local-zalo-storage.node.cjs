@@ -68,7 +68,8 @@ test('worker only acknowledges disk-verified bodies after cloud success and read
   assert.equal(body.receipts[0].hash,row.hash);return {data:{exports:[],reads:[]}};
  }});
  await worker.tick();now+=500;await worker.tick();assert.equal(db.receipts().length,1);assert.match(worker.lastError,/offline/);
- now+=30000;await worker.tick();assert.equal(db.receipts().length,0);
+ now+=30000;await worker.tick();assert.equal(db.receipts().length,1);
+ now+=3600000;await worker.tick();assert.equal(db.receipts().length,0);
 });
 const uid='00000000-0000-0000-0000-000000000011',other='00000000-0000-0000-0000-000000000012',sid='00000000-0000-0000-0000-000000000099';
 test('cloud migration: checksum-confirmed 48h retention, latest previews, caller scope and instance pinning',async()=>{

@@ -19,6 +19,8 @@ const TuitionNoticeCommand = require('../../tuition-notice');
 const { retryPreparation, sendTuitionQr } = require('./tuition-qr');
 const { LocalDatabase, eventKey } = require('./local-database');
 const { LocalStorageWorker } = require('./local-storage-worker');
+const { RealtimeClient } = require('@supabase/realtime-js');
+const { WorkWakeup, GatewayCooldown, IDLE_CHECK_MS } = require('./work-wakeup');
 const { readParentRelationship } = require('./parent-relationship');
 const { downloadQrImage, readImageMetadata } = require('./zalo-image');
 const { prepareOverdueTuitionMedia } = require('./overdue-tuition-media');
@@ -58,7 +60,6 @@ let nextManualParentPollAt = 0;
 let nextAliasSyncAt = 0;
 let nextAutomaticTuitionTickAt = 0;
 let nextDispatchPollAt = 0;
-let emptyDispatchPolls = 0;
 let unifiedTuitionStreak = 0;
 let gatewayBatchCount = 0;
 const pendingIncoming = new Map();
@@ -66,19 +67,39 @@ let listenerConnected = false;
 let rejectedIncoming = [];
 let syncStateBusy = false;
 let syncLinkRevision = null;
+let nextSyncLinksAt = 0;
+const gatewayCooldown = new GatewayCooldown();
+const pendingWorkWakeups = new Set();
+const workWakeup = new WorkWakeup({ request: payload => gatewayRequest(payload),
+  wake: kind => pendingWorkWakeups.add(kind), createClient: (url, options) => new RealtimeClient(url, options) });
+function applyWorkWakeups() {
+  if (gatewayBusy || !listenerConnected || !pendingWorkWakeups.size) return;
+  const kinds = new Set(pendingWorkWakeups); pendingWorkWakeups.clear();
+  const has = kind => kinds.has('all') || kinds.has(kind);
+  if (has('dispatch')) nextDispatchPollAt = 0;
+  if (has('parents')) { nextManualParentPollAt = 0; nextParentPollAt = 0; }
+  if (has('groups')) { nextClassGroupPoll = 0; nextClassGroupState = 0; }
+  if (has('storage')) {
+    if (localStorageWorker.busy) pendingWorkWakeups.add('storage');
+    else localStorageWorker.nextAt = 0;
+  }
+  if (has('links')) nextSyncLinksAt = 0;
+  if (kinds.has('all')) nextAutomaticTuitionTickAt = 0;
+}
 let verifiedParentCount = null;
 let classGroupUids=new Set(),nextClassGroupPoll=0,nextClassGroupState=0;
 async function syncClassGroups(){
-  if(shuttingDown || gatewayBusy || !listenerConnected || !zaloApi || !GATEWAY_TOKEN || campaignStatus!=='idle' || Date.now()<nextClassGroupPoll)return;
+  if(shuttingDown || gatewayBusy || !listenerConnected || !zaloApi || !GATEWAY_TOKEN || campaignStatus!=='idle' || Date.now()<nextClassGroupPoll || Date.now()<gatewayCooldown.until)return;
   if([...pendingIncoming.values()].some(p=>p.action.startsWith('finish')))return;
-  nextClassGroupPoll=Date.now()+20000;gatewayBusy=true;
+  nextClassGroupPoll=Date.now()+IDLE_CHECK_MS;gatewayBusy=true;
   try{
     if(Date.now()>=nextClassGroupState){
       const {data}=await gatewayRequest({action:'classGroupState'}),next=new Set((data||[]).map(g=>g.group_uid));
-      const added=[...next].some(uid=>!classGroupUids.has(uid));classGroupUids=next;nextClassGroupState=Date.now()+60000;
+      const added=[...next].some(uid=>!classGroupUids.has(uid));classGroupUids=next;nextClassGroupState=Date.now()+IDLE_CHECK_MS;
       if(classGroupUids.size && !classGroupHistory.connected)classGroupHistory.connection(true);else if(added)classGroupHistory.requestCatchup();
     }
     const {job}=await gatewayRequest({action:'claimClassGroup'});if(!job)return;
+    nextClassGroupPoll=Date.now()+1000;
     let status='sent',result={},errorText;
     try{
       const guard=async()=>{const {valid}=await gatewayRequest({action:'validateClassGroup',jobId:job.id,token:job.token});if(!valid)throw Error('Danh sách phụ huynh, lớp hoặc quyền đã thay đổi; chưa thực hiện thao tác Zalo');};
@@ -140,6 +161,7 @@ const automaticTuitionScheduler = createScheduler({
 
 async function gatewayRequest(payload) {
   if (!GATEWAY_URL || !GATEWAY_TOKEN) throw new Error('Zalo gateway is not configured');
+  gatewayCooldown.check();
   const response = await fetch(GATEWAY_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-zalo-gateway-token': GATEWAY_TOKEN },
@@ -147,6 +169,7 @@ async function gatewayRequest(payload) {
     signal: AbortSignal.timeout(15000)
   });
   if (!response.ok) {
+    gatewayCooldown.reject(response.status);
     const failure=await response.json().catch(()=>null);
     const error = new Error(String(failure?.error || `Gateway HTTP ${response.status}`).slice(0,500));
     error.status = response.status;
@@ -157,19 +180,20 @@ async function gatewayRequest(payload) {
 
 async function syncGatewayOutbox() {
   if (gatewayBusy || !zaloApi || !listenerConnected || !GATEWAY_URL || !GATEWAY_TOKEN
-    || campaignStatus !== 'idle' || Date.now() < nextDispatchPollAt) return;
+    || campaignStatus !== 'idle' || Date.now() < nextDispatchPollAt || Date.now()<gatewayCooldown.until) return;
   if ([...pendingIncoming.values()].some(p => p.action.startsWith('finish'))) return;
   if (Date.now() >= nextAutomaticTuitionTickAt) {
-      nextAutomaticTuitionTickAt = Date.now() + 60000;
+      nextAutomaticTuitionTickAt = Date.now() + IDLE_CHECK_MS;
       // Enumerating the whole center must not hold the single Zalo sender lock.
       automaticTuitionScheduler.tick().then(result=>{if(result.errors?.length)console.warn('[ZaloBot] Không tạo được một số thông báo học phí:',result.errors.map(e=>e.error).join('; '));}).catch(error =>
         console.warn('[ZaloBot] Automatic tuition scheduler:', error?.message || error));
   }
   gatewayBusy = true;
-  nextDispatchPollAt = Date.now() + 15000;
+  nextDispatchPollAt = Date.now() + IDLE_CHECK_MS;
   try {
     const noticeSchedule=automaticTuitionScheduler.schedule();
-    const tuition = unifiedTuitionStreak<5 ? await gatewayRequest({action:'claimTuitionNotice',args:{p_allowed:noticeSchedule.allowed,p_slot:noticeSchedule.due?.slot||0}}) : {data:null};
+    const yieldUnifiedTurn=unifiedTuitionStreak>=5;
+    const tuition = !yieldUnifiedTurn ? await gatewayRequest({action:'claimTuitionNotice',args:{p_allowed:noticeSchedule.allowed,p_slot:noticeSchedule.due?.slot||0}}) : {data:null};
     if(tuition.data) {
       unifiedTuitionStreak++;
       await sendNotification(tuition.data,{api:zaloApi,store:localStore,
@@ -182,10 +206,9 @@ async function syncGatewayOutbox() {
     const { job } = await gatewayRequest({ action: 'claimDispatch', pacing: dispatchPacing(),
       automaticSchedule: automaticTuitionScheduler.schedule() });
     if (!job) {
-      nextDispatchPollAt = Date.now() + Math.min(15000, 1000 * 2 ** Math.min(++emptyDispatchPolls, 4));
+      nextDispatchPollAt = Date.now() + (yieldUnifiedTurn ? 500 : Math.max(10000,Math.min(IDLE_CHECK_MS,Number(tuition.retryAfterMs)||IDLE_CHECK_MS)));
       return;
     }
-    emptyDispatchPolls = 0;
     nextDispatchPollAt = Date.now() + 500;
     if (job.kind === 'automatic_tuition') {
       await sendQueuedAutomaticTuition(job);
@@ -508,12 +531,12 @@ async function syncQueuedParentAlias(job) {
 
 async function syncParentTuition() {
   if (gatewayBusy || !zaloApi || !listenerConnected || !GATEWAY_URL || !GATEWAY_TOKEN ||
-    campaignStatus !== 'idle') return;
+    campaignStatus !== 'idle' || Date.now()<gatewayCooldown.until || Date.now()<nextGatewaySendAt) return;
   gatewayBusy = true;
   let processedKind = null;
   try {
     if (Date.now() >= nextManualParentPollAt) {
-      nextManualParentPollAt = Date.now() + 5000;
+      nextManualParentPollAt = Date.now() + IDLE_CHECK_MS;
       const { dispatch } = await gatewayRequest({ action: 'claimManualParentAction', allowAlias: Date.now() >= nextAliasSyncAt });
       if (dispatch?.job) {
         nextManualParentPollAt = Date.now() + 5000;
@@ -524,7 +547,7 @@ async function syncParentTuition() {
       }
     }
     if (Date.now() < nextParentPollAt) return;
-    nextParentPollAt = Date.now() + 5 * 60 * 1000;
+    nextParentPollAt = Date.now() + IDLE_CHECK_MS;
     if (Date.now() >= nextAliasSyncAt) {
       const { job: aliasJob } = await gatewayRequest({ action: 'claimParentAlias' });
       if (aliasJob) {
@@ -551,7 +574,7 @@ async function syncParentTuition() {
 }
 
 async function flushIncoming() {
-  if (!GATEWAY_URL || !GATEWAY_TOKEN) return;
+  if (!GATEWAY_URL || !GATEWAY_TOKEN || Date.now()<gatewayCooldown.until) return;
   try {
     for (const payload of localStore.pendingEvents()) {
       const key = eventKey(payload);
@@ -565,7 +588,8 @@ async function flushIncoming() {
 }
 
 async function refreshSyncLinks() {
-  if (syncStateBusy || !listenerConnected || !GATEWAY_URL || !GATEWAY_TOKEN) return;
+  if (syncStateBusy || !listenerConnected || !GATEWAY_URL || !GATEWAY_TOKEN || Date.now()<nextSyncLinksAt || Date.now()<gatewayCooldown.until) return;
+  nextSyncLinksAt = Date.now() + IDLE_CHECK_MS;
   syncStateBusy = true;
   try {
     const { state } = await gatewayRequest({ action: 'syncState' });
@@ -593,6 +617,8 @@ function startGatewayListener() {
   zaloApi.listener.on('connected', () => {
     if (zaloApi !== listeningApi) return;
     listenerConnected = true;
+    pendingWorkWakeups.add('all');
+    workWakeup.connect().catch(console.error);
     botStatus = 'connected';
     historyController.connection(true);
     refreshSyncLinks().catch(console.error);
@@ -1346,6 +1372,8 @@ app.get('/api/status', (req, res) => {
       pendingAcknowledgements: [...pendingIncoming.values()].filter(p => p.action.startsWith('finish')).length,
       rejectedMessages: rejectedIncoming.length, lastUploadError: incomingQueue.lastError },
     localStorage: { ...localStore.status(), lastError: localStorageWorker.lastError },
+    workNotifications: { status: workWakeup.status, lastError: workWakeup.lastError,
+      fallbackIntervalSeconds: IDLE_CHECK_MS/1000, gatewayPausedUntil: gatewayCooldown.until || null },
     classGroups:{known:classGroupUids.size,history:classGroupHistory.state},
     config: botConfig,
     sendPacing: { minimumIntervalSeconds: 10 },
@@ -1482,6 +1510,7 @@ app.post('/api/shutdown', async (req, res) => {
   }
   try {
     persistIncoming();
+    workWakeup.close();
     res.json({ success: true });
     setTimeout(() => process.exit(0), 300);
   } catch (error) {
@@ -1501,13 +1530,15 @@ app.listen(PORT, HOST, () => {
   setInterval(()=>syncClassGroups().catch(console.error),1000).unref();
   setInterval(async () => {
     if (shuttingDown) return;
+    applyWorkWakeups();
+    workWakeup.connect().catch(console.error);
     await syncGatewayOutbox();
     if (shuttingDown) return;
     await syncParentTuition();
   }, 500).unref();
   setInterval(flushIncoming, 10000).unref();
-  setInterval(() => { if (!shuttingDown && GATEWAY_URL && GATEWAY_TOKEN) localStorageWorker.tick().catch(console.error); }, 1000).unref();
-  setInterval(refreshSyncLinks, 60000).unref();
+  setInterval(() => { if (!shuttingDown && GATEWAY_URL && GATEWAY_TOKEN && Date.now()>=gatewayCooldown.until) localStorageWorker.tick().catch(console.error); }, 1000).unref();
+  setInterval(refreshSyncLinks, 1000).unref();
   setInterval(()=>{if(listenerConnected) syncFriendsList().catch(console.error);},300000).unref();
   setInterval(() => recoverSavedSession().catch(console.error), 10000).unref();
 });

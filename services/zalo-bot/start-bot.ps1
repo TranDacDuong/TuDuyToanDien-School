@@ -1,5 +1,12 @@
 $ErrorActionPreference = 'Stop'
 try {
+    if (!(Test-Path -LiteralPath (Join-Path $PSScriptRoot 'node_modules/@supabase/realtime-js/package.json'))) {
+        Push-Location $PSScriptRoot
+        try {
+            & npm.cmd ci --no-fund --no-audit
+            if ($LASTEXITCODE -ne 0) { throw 'Could not install updated bot dependencies.' }
+        } finally { Pop-Location }
+    }
     # A separate process is necessary: restart-bot intentionally exits after its
     # port checks. Never attach the worker to the interactive batch console.
     & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'restart-bot.ps1') -RecoverUnresponsive

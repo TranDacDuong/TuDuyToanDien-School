@@ -1,4 +1,5 @@
 'use strict';
+const { IDLE_CHECK_MS } = require('./work-wakeup');
 class LocalStorageWorker {
   constructor({ store, request, clock = Date.now }) {
     Object.assign(this, { store, request, clock });
@@ -10,7 +11,7 @@ class LocalStorageWorker {
   async tick() {
     if (this.busy || this.clock() < this.nextAt) return;
     this.busy = true;
-    this.nextAt = this.clock() + 15000;
+    this.nextAt = this.clock() + IDLE_CHECK_MS;
     try {
       const receipts = this.store.receipts();
       // Keep each upload below the gateway limit, even when several readers
@@ -29,7 +30,7 @@ class LocalStorageWorker {
       if (receipts.length || response.data.exports?.length || this.results.length) this.nextAt = this.clock() + 500;
     } catch (error) {
       this.lastError = String(error.message || error);
-      this.nextAt = this.clock() + 30000;
+      this.nextAt = this.clock() + IDLE_CHECK_MS;
     } finally { this.busy = false; }
   }
 }

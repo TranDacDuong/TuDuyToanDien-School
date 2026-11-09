@@ -3,13 +3,16 @@
   "version": "1.0.0",
   "description": "Dịch vụ Zalo Bot tự động nhắc học phí - Trung tâm MindUp",
   "main": "server.js",
-  "engines": { "node": ">=22.18.0" },
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "scripts": {
     "start": "node server.js",
     "test:tuition-scheduler": "node --test tuition-reminder-scheduler.test.js tuition-reminder-scheduler.database.test.js tuition-reminder-scheduler.integration.test.js"
   },
   "dependencies": {
     "@nghiavuive/lunar_date_vi": "2.0.1",
+    "@supabase/realtime-js": "2.119.0",
     "@xmldom/xmldom": "0.9.12",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

@@ -16,7 +16,7 @@ test('QR relogin starts a listener for the new API and ignores old connection ev
   const first = makeApi();
   const second = makeApi();
   const context = vm.createContext({ console, first, second, historyController: { connection() {} },
-    refreshSyncLinks: async () => {}, GATEWAY_URL: 'gateway', GATEWAY_TOKEN: 'test' });
+    refreshSyncLinks: async () => {}, pendingWorkWakeups: new Set(), workWakeup: {connect:async()=>{}}, GATEWAY_URL: 'gateway', GATEWAY_TOKEN: 'test' });
   const body = source.slice(source.indexOf('function startGatewayListener()'), source.indexOf('function messageTimestamp('));
   vm.runInContext(`let zaloApi=first, gatewayListening=false, gatewayListenerApi=null, listenerConnected=false, botStatus='disconnected'; ${body}
     startGatewayListener(); first.events.connected(); startGatewayListener();
