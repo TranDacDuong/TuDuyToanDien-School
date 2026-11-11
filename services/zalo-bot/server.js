@@ -74,13 +74,15 @@ let syncLinkRevision = null;
 let nextSyncLinksAt = 0;
 const gatewayCooldown = new GatewayCooldown();
 const pendingWorkWakeups = new Set();
+// Keep draining after skipped/temporarily unavailable claims; idle fallback remains hourly.
+let workDrainUntil = Date.now() + IDLE_CHECK_MS;
 const workWakeup = new WorkWakeup({ request: payload => gatewayRequest(payload),
   wake: kind => pendingWorkWakeups.add(kind), createClient: (url, options) => new RealtimeClient(url, options) });
 function applyWorkWakeups() {
   if (gatewayBusy || !listenerConnected || !pendingWorkWakeups.size) return;
   const kinds = new Set(pendingWorkWakeups); pendingWorkWakeups.clear();
   const has = kind => kinds.has('all') || kinds.has(kind);
-  if (has('dispatch')) nextDispatchPollAt = 0;
+  if (has('dispatch')) { nextDispatchPollAt = 0; workDrainUntil = Date.now() + IDLE_CHECK_MS; }
   if (has('parents')) { nextManualParentPollAt = 0; nextParentPollAt = 0; }
   if (has('groups')) { nextClassGroupPoll = 0; nextClassGroupState = 0; }
   if (has('storage')) {
@@ -183,7 +185,7 @@ async function gatewayRequest(payload) {
 }
 
 async function syncGatewayOutbox() {
-  if (gatewayBusy || !zaloApi || !listenerConnected || !GATEWAY_URL || !GATEWAY_TOKEN
+  if (READ_ONLY || gatewayBusy || !zaloApi || !listenerConnected || !GATEWAY_URL || !GATEWAY_TOKEN
     || campaignStatus !== 'idle' || Date.now() < nextDispatchPollAt || Date.now()<gatewayCooldown.until) return;
   if ([...pendingIncoming.values()].some(p => p.action.startsWith('finish'))) return;
   if (Date.now() >= nextAutomaticTuitionTickAt) {
@@ -199,6 +201,7 @@ async function syncGatewayOutbox() {
     const yieldUnifiedTurn=unifiedTuitionStreak>=5;
     const tuition = !yieldUnifiedTurn ? await gatewayRequest({action:'claimTuitionNotice',args:{p_allowed:noticeSchedule.allowed,p_slot:noticeSchedule.due?.slot||0}}) : {data:null};
     if(tuition.data) {
+      workDrainUntil = Date.now() + IDLE_CHECK_MS;
       unifiedTuitionStreak++;
       await sendNotification(tuition.data,{api:zaloApi,store:localStore,
         rpc:async(action,args)=>(await gatewayRequest({action,args})).data,
@@ -210,7 +213,7 @@ async function syncGatewayOutbox() {
     const { job } = await gatewayRequest({ action: 'claimDispatch', pacing: dispatchPacing(),
       automaticSchedule: automaticTuitionScheduler.schedule() });
     if (!job) {
-      nextDispatchPollAt = Date.now() + (yieldUnifiedTurn ? 500 : Math.max(10000,Math.min(IDLE_CHECK_MS,Number(tuition.retryAfterMs)||IDLE_CHECK_MS)));
+      nextDispatchPollAt = Date.now() + (yieldUnifiedTurn ? 500 : Math.max(10000,Math.min(IDLE_CHECK_MS,Number(tuition.retryAfterMs)||(Date.now()<workDrainUntil ? 10000 : IDLE_CHECK_MS))));
       return;
     }
     nextDispatchPollAt = Date.now() + 500;
