@@ -1359,6 +1359,14 @@ if(GATEWAY_URL) registerOnDemand(app,{gatewayUrl:GATEWAY_URL,persistResult:async
   },
   getApi:()=>listenerConnected?zaloApi:null,isBusy:()=>gatewayBusy,setBusy:value=>{gatewayBusy=value;},requireAck:requireSendAcknowledgement});
 
+app.post('/api/check-work', (req, res) => {
+  if (req.headers.origin && !ALLOWED_ORIGINS.has(req.headers.origin)) return res.status(403).json({ error: 'Origin not allowed' });
+  if (shuttingDown || !listenerConnected || !zaloApi) return res.status(503).json({ error: 'Bot chưa kết nối Zalo. Hãy kết nối lại trước.' });
+  if (READ_ONLY) return res.status(409).json({ error: 'Bot đang ở chế độ chỉ đọc.' });
+  pendingWorkWakeups.add('all');
+  res.json({ accepted: true, busy: gatewayBusy, cooldownUntil: gatewayCooldown.until || null });
+});
+
 app.get('/api/status', (req, res) => {
   res.json({
     botStatus,

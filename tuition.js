@@ -2281,6 +2281,19 @@ Nhập số tiền hoàn lại (>0):`,
     } catch (error) { alert("Không xếp lại được: " + error.message); }
     finally { automaticTuitionRetryBusy = false; updateZaloDynamicStatus(); }
   };
+  let manualWorkCheckBusy = false;
+  window.checkZaloWorkNow = async function () {
+    if (manualWorkCheckBusy || !hasTuitionPermission('tuition.zalo_queue.manage', false)) return;
+    manualWorkCheckBusy = true;
+    updateZaloDynamicStatus();
+    try {
+      const response = await fetch(`${ZALO_BOT_API}/check-work`, { method: 'POST', signal: AbortSignal.timeout(10000) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+      alert(result.cooldownUntil > Date.now() ? 'Bot đã nhận tín hiệu. Bot sẽ kiểm tra khi hết thời gian tạm nghỉ.' : result.busy ? 'Bot đã nhận tín hiệu và sẽ kiểm tra sau khi hoàn tất việc đang xử lý.' : 'Bot đã nhận tín hiệu kiểm tra hàng đợi. Các lệnh tạm dừng và khoảng cách gửi vẫn được giữ nguyên.');
+    } catch (error) { alert('Không đánh thức được bot trên máy này. Hãy mở Zalo Bot trên laptop rồi thử lại. Chi tiết: ' + error.message); }
+    finally { manualWorkCheckBusy = false; updateZaloDynamicStatus(); }
+  };
   window.controlAutomaticTuition = async function (action) {
     if (automaticTuitionControlBusy || !hasTuitionPermission("tuition.zalo_queue.manage", false)) return;
     automaticTuitionControlBusy = true;
@@ -2332,6 +2345,7 @@ Nhập số tiền hoàn lại (>0):`,
     const finished = rows.filter(row => ["sent", "cancelled", "uncertain"].includes(row.status) && !row.auto_retry_pending).length;
     return `<section style="padding:16px;margin-bottom:14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#0f1f3d">
       <b>Tiến độ thông báo học phí tháng ${esc(monthPicker?.value || "")}</b>
+      <div style="margin-top:10px"><button type="button" onclick="checkZaloWorkNow()" ${manualWorkCheckBusy ? 'disabled' : ''}>${manualWorkCheckBusy ? 'Đang gửi tín hiệu…' : 'Kiểm tra hàng đợi ngay'}</button><div style="margin-top:6px">Dùng trên máy đang chạy bot. Giữ nguyên tạm dừng, giới hạn thử lại và khoảng cách gửi.</div></div>
       ${supportsTwoSweeps ? '<div style="margin-top:8px">Gửi lần lượt từng phụ huynh · Tối đa 2 lượt quét · Mỗi tin cách nhau ít nhất 10 giây</div>' : '<div role="alert" style="margin-top:10px;padding:12px;border:1px solid #fca5a5;border-radius:8px;background:#fff1f2;color:#991b1b"><b>Hàng đợi trên máy chủ chưa được cập nhật cơ chế 2 lượt.</b><br>Các hồ sơ không đủ điều kiện có thể còn nằm ở Chờ gửi và khóa nút gửi lại. Cần cập nhật hàng đợi trên máy chủ để xử lý tiếp.</div>'}
       ${automaticTuitionControl ? `<div style="margin-top:10px"><b>${automaticTuitionControl.paused ? "Đã tạm dừng nhắc tự động" : "Nhắc tự động đang bật"}</b><button type="button" style="margin-left:12px;padding:7px 12px" ${automaticTuitionControlBusy ? "disabled" : ""} onclick="controlAutomaticTuition('${automaticTuitionControl.paused ? "resume" : "pause"}')">${automaticTuitionControl.paused ? "Tiếp tục" : "Dừng"}</button>${automaticTuitionControl.paused ? '<div style="margin-top:6px">Hàng chờ được giữ nguyên. Lượt đang gửi hoàn tất trước khi dừng.</div>' : ""}</div>` : ""}
       <div style="margin:10px 0">${automaticTuitionError ? esc(automaticTuitionError) : !rows.length ? "Chưa có lượt gửi tự động được tạo trong tháng này." : `Đợt ngày ${esc(latest)} · Đã xử lý ${finished}/${rows.length} phụ huynh${finished === rows.length ? " · Đã hoàn tất" : ""}`}</div>
