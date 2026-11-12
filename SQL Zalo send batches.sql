@@ -51,7 +51,7 @@ SELECT id, 'web'::text AS queue, CASE
     nullif(left(replace(split_part(content, E'\n', 1), '**', ''), 110), ''), 'Tin nhắn Zalo') AS title,
   audience_user_id AS parent_id, coalesce(context_student_id,
     CASE WHEN key_type IN ('offline_test_score','session_score','exam_score','session_evaluation')
-      THEN substring(message_key from ':([0-9a-fA-F-]{36})$')::uuid END) AS student_id, thread_id, status,
+      THEN substring(message_key from ':([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$')::uuid END) AS student_id, thread_id, status,
   automation_paused AS paused, error_message, created_at, updated_at,
   left(regexp_replace(content, '__(ACTION|CHART|EVALUATION)__.*$', '', 's'), 5000) AS body,
   score_parts_done AS completed_parts, score_parts_total AS total_parts,
@@ -80,7 +80,20 @@ FROM public.zalo_tuition_deliveries j LEFT JOIN public.messages m ON m.id=j.mess
 UNION ALL
 SELECT j.id,'receipt','receipt','receipt:' || j.id,'Xác nhận đã nộp học phí',j.parent_id,j.student_id,m.conversation_id,
   j.status,false,j.error_message,j.created_at,j.updated_at,left(j.content,5000),NULL,NULL,NULL,false
-FROM public.zalo_tuition_receipts j LEFT JOIN public.messages m ON m.id=j.message_id;
+FROM public.zalo_tuition_receipts j LEFT JOIN public.messages m ON m.id=j.message_id
+UNION ALL
+SELECT md5(p.evaluation_id::text || ':' || p.parent_id)::uuid,'evaluation_missing','evaluation',
+  'session_evaluation:' || e.class_session_id,'Nhận xét buổi học',p.parent_id,e.student_id,m.conversation_id,
+  'not_queued',false,coalesce(p.delivery_error,'Chưa xếp hàng Zalo. Kiểm tra liên kết phụ huynh.'),
+  m.created_at,p.updated_at,left(m.content,5000),NULL,NULL,NULL,false
+FROM public.evaluation_zalo_publications p JOIN public.session_student_evaluations e ON e.id=p.evaluation_id
+JOIN public.messages m ON m.id=p.message_id WHERE p.outbox_id IS NULL AND p.zalo_delivery_status='not_queued'
+UNION ALL
+SELECT md5(r.run_id::text || ':' || r.parent_id)::uuid,'campaign_missing','campaign','campaign:' || r.run_id,c.name,
+  r.parent_id,CASE WHEN cardinality(r.student_ids)=1 THEN r.student_ids[1] END,NULL,
+  'not_queued',false,r.error_message,run.created_at,run.created_at,left(r.content,5000),NULL,NULL,NULL,false
+FROM public.message_campaign_recipients r JOIN public.message_campaign_runs run ON run.id=r.run_id
+JOIN public.message_campaigns c ON c.id=run.campaign_id WHERE r.outbox_id IS NULL;
 
 REVOKE ALL ON public.zalo_send_batch_items FROM PUBLIC, anon, authenticated;
 
@@ -97,7 +110,8 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $
     WHEN public.is_admin_actor() THEN true
     WHEN p_queue IN ('notice','automatic_tuition','tuition','receipt') THEN
       public.has_app_permission('tuition.zalo_queue.manage') AND (public.has_app_permission('tuition.view_all')
-        OR (public.can_access_mindup_official_audience(p_parent) AND (p_student IS NULL OR public.teacher_manages_student(p_student))))
+        OR (public.can_access_mindup_official_audience(p_parent) AND (public.teacher_manages_student(p_student)
+          OR (p_student IS NULL AND NOT EXISTS(SELECT 1 FROM public.parent_students ps WHERE ps.parent_id=p_parent AND ps.revoked_at IS NULL AND NOT coalesce(public.teacher_manages_student(ps.student_id),false))))))
     ELSE public.can_manage_message_campaigns() AND (public.has_app_permission('messages.automation.all')
       OR (public.can_access_mindup_official_audience(p_parent) AND (p_student IS NULL OR public.teacher_manages_student(p_student)))) END;
 $$;
@@ -114,14 +128,14 @@ BEGIN
       count(*) FILTER (WHERE status IN ('pending','queued','not_found','not_friend','invited','greeted') OR awaiting_second_scan) AS waiting,
       count(*) FILTER (WHERE status='processing') AS processing,
       count(*) FILTER (WHERE status='sent') AS sent,
-      count(*) FILTER (WHERE status IN ('failed','uncertain') AND NOT awaiting_second_scan) AS errors,
+      count(*) FILTER (WHERE status IN ('failed','uncertain','not_queued') AND NOT awaiting_second_scan) AS errors,
       count(*) FILTER (WHERE status='cancelled') AS skipped,
       count(*) FILTER (WHERE paused AND status IN ('pending','queued','not_found','not_friend','invited','greeted','uncertain')) AS paused
     FROM public.zalo_send_batch_items WHERE (p_category IS NULL OR category=p_category)
       AND public.can_manage_zalo_send_item(queue,parent_id,student_id)
     GROUP BY batch_key,category
     HAVING p_state IS NULL OR (p_state='active' AND bool_or(status IN ('pending','queued','processing','not_found','not_friend','invited','greeted') OR awaiting_second_scan))
-      OR (p_state='errors' AND bool_or(status IN ('failed','uncertain') AND NOT awaiting_second_scan))
+      OR (p_state='errors' AND bool_or(status IN ('failed','uncertain','not_queued') AND NOT awaiting_second_scan))
     ORDER BY latest DESC,batch_key LIMIT 40 OFFSET greatest(coalesce(p_offset,0),0)
   ) b),'[]');
 END; $$;
@@ -139,7 +153,7 @@ END; $$;
 
 CREATE OR REPLACE FUNCTION public.control_zalo_send_batch(p_batch text, p_action text, p_job uuid DEFAULT NULL, p_checked boolean DEFAULT false)
 RETURNS integer LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE j record; changed integer := 0; n integer;
+DECLARE j record; changed integer := 0; n integer; new_job uuid;
 BEGIN
   IF NOT public.can_manage_zalo_send_batches() THEN RAISE EXCEPTION 'Zalo batch permission required'; END IF;
   IF p_action IS NULL OR p_action NOT IN ('pause','resume','skip','retry') THEN RAISE EXCEPTION 'Invalid action'; END IF;
@@ -181,6 +195,22 @@ BEGIN
       ELSIF j.queue='tuition' THEN
         UPDATE public.zalo_tuition_deliveries SET status='cancelled',updated_at=now()
           WHERE id=j.id AND status IN ('queued','not_found','not_friend','invited','greeted');
+        GET DIAGNOSTICS n=ROW_COUNT;
+      END IF;
+    ELSIF j.queue='evaluation_missing' THEN
+      -- Recheck that the published evaluation still belongs to this verified parent.
+      INSERT INTO public.zalo_outbox(message_id,conversation_id,audience_user_id,zalo_uid,content,dispatch_priority)
+      SELECT m.id,m.conversation_id,p.parent_id,l.zalo_uid,regexp_replace(m.content,'__(ACTION|CHART|EVALUATION)__.*$','','s'),1
+      FROM public.evaluation_zalo_publications p JOIN public.messages m ON m.id=p.message_id
+      JOIN public.zalo_verified_links l ON l.audience_user_id=p.parent_id AND l.enabled
+      JOIN public.parent_students ps ON ps.parent_id=p.parent_id AND ps.student_id=j.student_id AND ps.revoked_at IS NULL
+      WHERE p.outbox_id IS NULL AND p.zalo_delivery_status='not_queued'
+        AND md5(p.evaluation_id::text || ':' || p.parent_id)::uuid=j.id
+        AND m.sender_id='00000000-0000-0000-0000-000000000001' AND nullif(btrim(j.body),'') IS NOT NULL
+      ON CONFLICT(message_id) DO NOTHING RETURNING id INTO new_job;
+      IF new_job IS NOT NULL THEN
+        UPDATE public.evaluation_zalo_publications SET outbox_id=new_job,zalo_delivery_status='pending',delivery_error=NULL,updated_at=now()
+          WHERE md5(evaluation_id::text || ':' || parent_id)::uuid=j.id AND outbox_id IS NULL;
         GET DIAGNOSTICS n=ROW_COUNT;
       END IF;
     ELSIF j.queue='notice' THEN

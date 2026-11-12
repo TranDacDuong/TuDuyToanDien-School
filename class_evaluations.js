@@ -9,8 +9,6 @@
     students: [],
     parents: new Map(),
     parentIds: new Map(),
-    parentNames: new Map(),
-    zaloPublications: new Map(),
     evaluations: new Map(),
   };
 
@@ -72,7 +70,7 @@
       overlay.innerHTML = `
         <section class="se-modal" role="dialog" aria-modal="true" aria-labelledby="sessionEvaluationTitle">
           <header class="se-head">
-            <div><h2 class="se-title" id="sessionEvaluationTitle">Đánh giá buổi học</h2><p class="se-sub" id="sessionEvaluationSubtitle"></p></div>
+            <div><h2 class="se-title" id="sessionEvaluationTitle">Đánh giá buổi học</h2><p class="se-sub" id="sessionEvaluationSubtitle"></p><a id="sessionEvaluationZaloBatch" class="se-btn" target="_top">Xem đợt gửi Zalo</a></div>
             <button class="se-icon-btn" type="button" onclick="closeSessionEvaluation()" aria-label="Đóng" title="Đóng">×</button>
           </header>
           <div class="se-toolbar">
@@ -269,7 +267,6 @@
     state.students = users || [];
     state.parents = parents;
     state.parentIds = parentIdsByStudent;
-    state.parentNames = parentNames;
     state.evaluations = new Map((evaluationsResult.data || []).map(item => [
       item.student_id,
       {
@@ -290,66 +287,12 @@
         });
       }
     });
-    await loadZaloPublications();
   }
 
-  let zaloReadVersion = 0;
-
-  async function loadZaloPublications() {
-    const readVersion = ++zaloReadVersion;
-    const sessionId = state.sessionId;
-    const ids = [...new Set([...state.evaluations.values()].map(item => item.id).filter(Boolean))];
-    const publications = new Map();
-    try {
-      for (let offset = 0; offset < ids.length; offset += 100) {
-        const { data, error } = await getSb().from("evaluation_zalo_publications")
-          .select("evaluation_id,parent_id,message_id,outbox_id,zalo_delivery_status,zalo_delivered_at,delivery_error")
-          .in("evaluation_id", ids.slice(offset, offset + 100));
-        if (error) throw error;
-        for (const row of data || []) {
-          if (!ids.includes(row.evaluation_id) || !row.parent_id) continue;
-          if (!publications.has(row.evaluation_id)) publications.set(row.evaluation_id, new Map());
-          publications.get(row.evaluation_id).set(row.parent_id, row);
-        }
-      }
-    } catch (error) {
-      // Missing ledger/RLS must never imply delivery or block legacy evaluations.
-      publications.clear();
-      console.warn("Chưa đọc được trạng thái gửi nhận xét trên Zalo:", error);
-    }
-    if (state.sessionId === sessionId && readVersion === zaloReadVersion) state.zaloPublications = publications;
+  function evaluationBatchLink(sessionId) {
+    const params = new URLSearchParams({ zaloBatches: '1', category: 'evaluation', batch: `session_evaluation:${sessionId}` });
+    return `dashboard.html?page=${encodeURIComponent('messages.html?' + params)}`;
   }
-
-  function zaloDeliveryHtml(studentId) {
-    const evaluation = state.evaluations.get(studentId);
-    const rows = state.zaloPublications.get(evaluation?.id) || new Map();
-    const parentIds = [...new Set([...(state.parentIds.get(studentId) || []), ...rows.keys()])];
-    const labels = {
-      pending: "Chờ gửi", processing: "Đang gửi", sent: "Đã gửi",
-      failed: "Gửi lỗi", uncertain: "Chưa xác nhận, cần kiểm tra",
-      cancelled: "Đã hủy", not_queued: "Chưa vào hàng đợi", unknown: "Chưa xác định",
-    };
-    const lines = (parentIds.length ? parentIds : [null]).map((parentId, index) => {
-      const row = rows.get(parentId);
-      const status = Object.prototype.hasOwnProperty.call(labels, row?.zalo_delivery_status)
-        ? row.zalo_delivery_status : "unknown";
-      const name = state.parentNames.get(parentId) || (parentId ? `Phụ huynh ${index + 1}` : "Phụ huynh");
-      const delivered = status === "sent" && row?.zalo_delivered_at
-        ? new Date(row.zalo_delivered_at) : null;
-      const time = delivered && !Number.isNaN(delivered.getTime()) ? ` · ${delivered.toLocaleString("vi-VN")}` : "";
-      const error = row?.delivery_error ? `<div style="overflow-wrap:anywhere">${esc(row.delivery_error)}</div>` : "";
-      return `<div data-zalo-status="${status}" style="overflow-wrap:anywhere">${esc(name)} · Zalo: ${labels[status]}${esc(time)}${error}</div>`;
-    });
-    return `${lines.join("")}<button type="button" class="se-btn" title="Cập nhật trạng thái Zalo" aria-label="Cập nhật trạng thái Zalo" onclick="refreshSessionEvaluationDelivery()">&#8635;</button>`;
-  }
-
-  window.refreshSessionEvaluationDelivery = async function () {
-    await loadZaloPublications();
-    for (const student of state.students) {
-      const element = document.getElementById(`se-zalo-${student.id}`);
-      if (element) element.innerHTML = zaloDeliveryHtml(student.id);
-    }
-  };
 
   function render() {
     const title = document.getElementById("sessionEvaluationTitle");
@@ -358,6 +301,8 @@
     if (subtitle) {
       subtitle.textContent = `${formatDate(state.session?.session_date)} · ${state.session?.lesson?.name || state.classInfo?.subjects?.name || "Buổi học"}`;
     }
+    const link = document.getElementById("sessionEvaluationZaloBatch");
+    if (link) link.href = evaluationBatchLink(state.sessionId);
     const list = document.getElementById("sessionEvaluationList");
     if (!state.students.length) {
       list.innerHTML = '<div class="se-empty">Buổi học này chưa có học sinh.</div>';
@@ -399,7 +344,6 @@
           <div class="se-name">${esc(student.full_name || student.email)}</div>
           <span class="se-state ${stateClass}" id="se-state-${student.id}">${stateLabel}</span>
         </div>
-        <div id="se-zalo-${student.id}" style="padding:8px 0;font-size:.8rem">${zaloDeliveryHtml(student.id)}</div>
         <div class="se-status-groups">
           ${statusGroup("Điểm tích cực", state.statuses.filter(status => status.category !== "needs_attention"), evaluation, student, sent)}
           ${statusGroup("Điểm cần khắc phục", state.statuses.filter(status => status.category === "needs_attention"), evaluation, student, sent)}
@@ -749,7 +693,6 @@
     if (error) throw error;
     evaluation.state = "sent";
     evaluation.sent_at = sentAt;
-    await loadZaloPublications();
   }
 
   async function markEvaluationFailed(studentId) {

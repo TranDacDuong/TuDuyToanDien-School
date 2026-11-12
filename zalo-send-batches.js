@@ -1,6 +1,6 @@
 (() => {
   const labels = { tuition: 'Học phí', score: 'Báo điểm', evaluation: 'Nhận xét', absence: 'Báo vắng', receipt: 'Xác nhận thanh toán', campaign: 'Tin theo lịch', other: 'Tin khác' };
-  const states = { pending: 'Chờ gửi', queued: 'Chờ gửi', processing: 'Đang gửi', sent: 'Đã gửi', failed: 'Gửi lỗi', uncertain: 'Chưa xác nhận', cancelled: 'Đã bỏ qua', not_found: 'Chờ tìm Zalo', not_friend: 'Chờ kết nối', invited: 'Đã mời kết bạn', greeted: 'Chờ gửi' };
+  const states = { pending: 'Chờ gửi', queued: 'Chờ gửi', processing: 'Đang gửi', sent: 'Đã gửi', failed: 'Gửi lỗi', uncertain: 'Chưa xác nhận', cancelled: 'Đã bỏ qua', not_queued: 'Chưa xếp hàng', not_found: 'Chờ tìm Zalo', not_friend: 'Chờ kết nối', invited: 'Đã mời kết bạn', greeted: 'Chờ gửi' };
   const actions = { pause: 'Tạm dừng', resume: 'Tiếp tục', skip: 'Bỏ qua', retry: 'Gửi lại' };
   const waiting = new Set(['pending', 'queued', 'not_found', 'not_friend', 'invited', 'greeted']);
   const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -53,7 +53,8 @@
   function itemActions(item) {
     const out = [];
     if (waiting.has(item.status) || (['web', 'notice'].includes(item.queue) && ['failed', 'uncertain'].includes(item.status))) out.push(button('Bỏ qua', 'skip', item.id));
-    if ((item.status === 'failed' && (item.queue !== 'tuition' || item.completed_parts === 0)) || (item.queue === 'notice' && item.status === 'uncertain' && !item.awaiting_second_scan)) out.push(button('Gửi lại', 'retry', item.id));
+    if (item.queue === 'evaluation_missing' || (item.status === 'failed' && (item.queue !== 'tuition' || item.completed_parts === 0)) || (item.queue === 'notice' && item.status === 'uncertain' && !item.awaiting_second_scan)) out.push(button('Gửi lại', 'retry', item.id));
+    if (item.queue === 'tuition' && item.status === 'sent' && item.completed_parts < item.total_parts && item.error_message) out.push(button('Gửi bù QR', 'repairQr', item.id));
     if (item.parent_id) out.push(button('Mở hội thoại', 'thread', item.parent_id));
     return out.join(' ');
   }
@@ -123,6 +124,7 @@
     const item = value && items.find(row => row.id === value);
     const ambiguous = command === 'retry' && item?.status === 'uncertain';
     if (ambiguous && !confirm('Bạn đã kiểm tra hội thoại Zalo và xác nhận phần này chưa được gửi?')) return;
+    if (command === 'repairQr' && !confirm('Bạn đã kiểm tra hội thoại và xác nhận phụ huynh chưa nhận ảnh QR?')) return;
     if (command === 'skip' && !confirm(value ? 'Bỏ qua lượt gửi này?' : 'Bỏ qua các lượt chưa gửi trong đợt?')) return;
     if (command === 'retry' && !value && !confirm('Xếp lại những lượt xác định gửi lỗi trong đợt?')) return;
     busy = true;
@@ -133,6 +135,10 @@
         const result = await response.json();
         if (!response.ok || !result.accepted) throw new Error(result.error || 'Bot chưa nhận tín hiệu.');
         status('Bot đã nhận tín hiệu kiểm tra.');
+      } else if (command === 'repairQr') {
+        const { data, error } = await sb.rpc('request_tuition_qr_repair', { p_job_id: value });
+        if (error) throw error;
+        status(data ? 'Đã xếp hàng gửi bù QR.' : 'QR đã gửi hoặc học phí đã thay đổi.');
       } else if (command === 'global' || command === 'automatic') {
         const { error } = await (command === 'global'
           ? sb.rpc('set_mindup_zalo_dispatch_paused', { p_paused: value === 'pause' })

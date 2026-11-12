@@ -2874,7 +2874,6 @@ Nhập số tiền hoàn lại (>0):`,
             Học sinh còn thiếu học phí tháng ${esc(monthPicker?.value || "")} (${currentZaloCampaignItems.filter(item => item.due && item.remaining > 0).length} học sinh)
           </div>
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <button type="button" onclick="openZaloTuitionDetails()" style="border:1px solid #cbd5e1;background:#fff;color:#0f1f3d;padding:7px 12px;border-radius:6px;cursor:pointer">Xem chi tiết</button>
             <span id="zaloSelectedCount" style="font-size:12px;color:#475569;font-weight:600">${currentZaloCampaignItems.filter(item => item.selected).length}/${currentZaloCampaignItems.filter(isZaloTuitionItemBaseEligible).length} đã chọn · ${currentZaloCampaignItems.filter(isZaloTuitionItemBaseEligible).length}/${currentZaloCampaignItems.length} có thể gửi</span>
             <div id="zaloCampaignActionBtnWrap">
               <button onclick="startZaloCampaignAction()" style="background:linear-gradient(135deg, #0068ff 0%, #0052cc 100%);color:#fff;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-weight:700;box-shadow:0 4px 12px rgba(0,104,255,.25);font-size:13px">
@@ -2989,7 +2988,6 @@ Nhập số tiền hoàn lại (>0):`,
     const pauseHtml = zaloAutomationState?.paused
       ? `<div style="border:1px solid #fca5a5;background:#fff1f2;padding:10px;margin-bottom:12px;color:#991b1b">
           Zalo tạm dừng tự động: ${esc(zaloAutomationState.reason || "Đã chạm giới hạn")}
-          ${currentRole === "admin" ? '<button type="button" onclick="resumeZaloParentAutomation()">Tiếp tục sau khi kiểm tra</button>' : ""}
         </div>` : "";
     const newStatusHtml = statusCardHtml + qrBoxHtml + pauseHtml;
     if (newStatusHtml !== lastRenderedStatusHtml) {
