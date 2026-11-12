@@ -1527,7 +1527,7 @@
   };
 
   function showScoreZaloBatch(batchKey) {
-    if (_role !== 'admin') return;
+    if (!['admin', 'teacher', 'assistant'].includes(_role)) return;
     let link = document.getElementById('classScoreZaloBatch');
     if (!link) {
       link = document.createElement('a');

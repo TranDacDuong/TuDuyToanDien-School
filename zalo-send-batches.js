@@ -150,8 +150,12 @@
   }
 
   window.ZaloSendBatches = {
-    configure(client, profile) {
-      if (profile?.role !== 'admin') return;
+    async configure(client, profile) {
+      if (!profile || ['parent', 'student'].includes(profile.role)) return;
+      if (profile.role !== 'admin') {
+        const { data, error } = await client.rpc('can_manage_zalo_send_batches');
+        if (error || data !== true) return;
+      }
       sb = client;
       document.getElementById('zaloBatchesEntry').hidden = false;
       const params = new URLSearchParams(location.search);
