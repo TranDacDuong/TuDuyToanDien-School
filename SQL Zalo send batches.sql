@@ -24,7 +24,8 @@ CREATE TRIGGER zalo_score_parts BEFORE UPDATE OF error_message ON public.zalo_ou
 CREATE OR REPLACE VIEW public.zalo_send_batch_items AS
 WITH web AS (
   SELECT o.*, m.message_key, m.context_student_id, m.conversation_id AS thread_id,
-    e.class_session_id AS evaluation_session, a.class_id AS absence_class, a.attendance_date AS absence_date, cr.run_id AS campaign_run, c.name AS campaign_name,
+    e.class_session_id AS evaluation_session, a.class_id AS absence_class, a.attendance_date AS absence_date,
+    cls.class_name AS class_name, cr.run_id AS campaign_run, c.name AS campaign_name,
     split_part(m.message_key, ':', 1) AS key_type,
     substring(m.message_key from '^[^:]+:(.+):[^:]+$') AS key_event
   FROM public.zalo_outbox o
@@ -35,6 +36,7 @@ WITH web AS (
   LEFT JOIN public.evaluation_zalo_publications p ON p.outbox_id = o.id
   LEFT JOIN public.session_student_evaluations e ON e.id = p.evaluation_id
   LEFT JOIN public.attendance_parent_publications a ON a.message_id = o.message_id
+  LEFT JOIN public.classes cls ON cls.id=coalesce(e.class_id,a.class_id)
 )
 SELECT id, 'web'::text AS queue, CASE
     WHEN campaign_run IS NOT NULL THEN 'campaign'
@@ -47,7 +49,8 @@ SELECT id, 'web'::text AS queue, CASE
     WHEN absence_class IS NOT NULL THEN 'absence:' || absence_class || ':' || absence_date
     WHEN key_type IN ('offline_test_score','session_score','exam_score','session_evaluation') AND key_event <> '' THEN key_type || ':' || key_event
     ELSE 'web:' || id END AS batch_key,
-  coalesce(campaign_name, nullif(replace(substring(content from '(?m)^Đề kiểm tra:[ \t]*([^\r\n]+)'), '**', ''),''), CASE WHEN evaluation_session IS NOT NULL OR key_type = 'session_evaluation' THEN 'Nhận xét buổi học' END,
+  coalesce(campaign_name, nullif(replace(substring(content from '(?m)^Đề kiểm tra:[ \t]*([^\r\n]+)'), '**', ''),''), CASE WHEN evaluation_session IS NOT NULL OR key_type = 'session_evaluation' THEN concat_ws(' · ', 'Nhận xét buổi học', class_name) END,
+    CASE WHEN absence_class IS NOT NULL THEN concat_ws(' · ', 'Báo vắng', class_name, to_char(absence_date,'DD/MM/YYYY')) END,
     nullif(left(replace(split_part(content, E'\n', 1), '**', ''), 110), ''), 'Tin nhắn Zalo') AS title,
   audience_user_id AS parent_id, coalesce(context_student_id,
     CASE WHEN key_type IN ('offline_test_score','session_score','exam_score','session_evaluation')
@@ -83,11 +86,12 @@ SELECT j.id,'receipt','receipt','receipt:' || j.id,'Xác nhận đã nộp học
 FROM public.zalo_tuition_receipts j LEFT JOIN public.messages m ON m.id=j.message_id
 UNION ALL
 SELECT md5(p.evaluation_id::text || ':' || p.parent_id)::uuid,'evaluation_missing','evaluation',
-  'session_evaluation:' || e.class_session_id,'Nhận xét buổi học',p.parent_id,e.student_id,m.conversation_id,
+  'session_evaluation:' || e.class_session_id,concat_ws(' · ', 'Nhận xét buổi học', cls.class_name),p.parent_id,e.student_id,m.conversation_id,
   'not_queued',false,coalesce(p.delivery_error,'Chưa xếp hàng Zalo. Kiểm tra liên kết phụ huynh.'),
   m.created_at,p.updated_at,left(m.content,5000),NULL,NULL,NULL,false
 FROM public.evaluation_zalo_publications p JOIN public.session_student_evaluations e ON e.id=p.evaluation_id
-JOIN public.messages m ON m.id=p.message_id WHERE p.outbox_id IS NULL AND p.zalo_delivery_status='not_queued'
+JOIN public.messages m ON m.id=p.message_id LEFT JOIN public.classes cls ON cls.id=e.class_id
+WHERE p.outbox_id IS NULL AND p.zalo_delivery_status='not_queued'
 UNION ALL
 SELECT md5(r.run_id::text || ':' || r.parent_id)::uuid,'campaign_missing','campaign','campaign:' || r.run_id,c.name,
   r.parent_id,CASE WHEN cardinality(r.student_ids)=1 THEN r.student_ids[1] END,NULL,
