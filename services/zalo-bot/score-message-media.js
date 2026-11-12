@@ -144,13 +144,21 @@ async function prepareScoreMessageMedia(input, options = {}) {
 
 async function sendScoreNotice({ api, store, key, uid, text, content, attachments }) {
   if (!text) throw new Error('Thiếu nội dung báo điểm. Chưa gửi ảnh.');
-  const textId = await store.send(`${key}:score-text`, { uid, text }, async () =>
-    requireSendAcknowledgement(await api.sendMessage(text, uid)));
-  for (const [index, file] of attachments.entries()) {
-    await store.send(`${key}:score-chart:${index}`, { uid, content }, async () =>
-      requireSendAcknowledgement(await api.sendMessage({ attachments: [file] }, uid), 1));
+  let completed = 0;
+  try {
+    const textId = await store.send(`${key}:score-text`, { uid, text }, async () =>
+      requireSendAcknowledgement(await api.sendMessage(text, uid)));
+    completed++;
+    for (const [index, file] of attachments.entries()) {
+      await store.send(`${key}:score-chart:${index}`, { uid, content }, async () =>
+        requireSendAcknowledgement(await api.sendMessage({ attachments: [file] }, uid), 1));
+      completed++;
+    }
+    return textId;
+  } catch (error) {
+    error.scoreProgress = `[score-parts:${completed}:${attachments.length + 1}]`;
+    throw error;
   }
-  return textId;
 }
 
 module.exports = { prepareScoreMessageMedia, sendScoreNotice };

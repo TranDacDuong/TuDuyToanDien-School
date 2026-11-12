@@ -249,12 +249,13 @@ async function syncGatewayOutbox() {
         return requireSendAcknowledgement(sent, media.attachments.length);
       });
       acknowledgement = { action: 'finish', jobId: job.job_id, status: 'sent',
-        externalId: `${job.zalo_uid}:${messageId}` };
+        externalId: `${job.zalo_uid}:${messageId}`,
+        ...(media.isScoreNotice ? { error: `[score-parts:${media.attachments.length + 1}:${media.attachments.length + 1}]` } : {}) };
     } catch (error) {
       if (isZaloLimitError(error)) await gatewayRequest({ action: 'pauseAutomation', reason: String(error?.message || error) });
       await acknowledgeDispatch({ action: 'finish', jobId: job.job_id,
         status: isUncertainSendError(error) || /no message id/.test(String(error?.message)) ? 'uncertain' : 'failed',
-        error: String(error?.message || error) });
+        error: (error.scoreProgress || '') + String(error?.message || error) });
       return;
     } finally {
       if (media) await media.cleanup().catch(error => console.warn('[ZaloBot] Không dọn được ảnh tạm:', error?.message));

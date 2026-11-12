@@ -1510,7 +1510,8 @@
         alert("Không thể lưu điểm đề kiểm tra: " + error.message);
         return;
       }
-      mirrorOfflineTestScoresToLearningThreads(testId, upserts).catch(console.warn);
+      mirrorOfflineTestScoresToLearningThreads(testId, upserts)
+        .then(() => showScoreZaloBatch(`offline_test_score:${testId}`)).catch(console.warn);
     }
     window.AppAdminTools?.recordAudit?.("offline_test_scores_saved", {
       target_type: "class_offline_test",
@@ -1524,6 +1525,21 @@
     window.cvCloseOfflineTestScoreModal();
     alert("Đã lưu điểm đề kiểm tra.");
   };
+
+  function showScoreZaloBatch(batchKey) {
+    if (_role !== 'admin') return;
+    let link = document.getElementById('classScoreZaloBatch');
+    if (!link) {
+      link = document.createElement('a');
+      link.id = 'classScoreZaloBatch';
+      link.target = '_top';
+      link.className = 'cv-btn';
+      link.textContent = 'Xem đợt gửi báo điểm';
+      document.getElementById('filterBar')?.after(link);
+    }
+    const params = new URLSearchParams({ zaloBatches: '1', category: 'score', batch: batchKey });
+    link.href = `dashboard.html?page=${encodeURIComponent('messages.html?' + params)}`;
+  }
 
   async function mirrorOfflineTestScoresToLearningThreads(testId, scoreRows){
     if(!window.LearningMessages || !testId || !scoreRows?.length) return;
@@ -1702,7 +1718,8 @@
         alert("Không thể lưu điểm: " + upsertError.message);
         return;
       }
-      mirrorSessionScoresToLearningThreads(sessionId, upserts).catch(console.warn);
+      mirrorSessionScoresToLearningThreads(sessionId, upserts)
+        .then(groupKey => groupKey && showScoreZaloBatch(`session_score:${groupKey}`)).catch(console.warn);
     }
     window.cvCloseSessionScoreModal();
     alert("Đã lưu điểm buổi học.");
@@ -1744,6 +1761,7 @@
         messageKey: `session_score:${groupInfo.messageGroupKey || sessionId}:${row.student_id}`,
       });
     }));
+    return groupInfo.messageGroupKey || sessionId;
   }
 
   async function loadSessionScoreGroupInfo(sb, session, fallbackSessionId){

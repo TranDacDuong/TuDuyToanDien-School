@@ -297,20 +297,3 @@ test('browser renders focused table alongside distribution at desktop and mobile
     }
   } finally { await browser.close(); }
 });
-
-test('global dispatch adds automatic waiting only, retaining existing delivery aggregates', async () => {
-  const html = source('messages.html');
-  const fn = html.slice(html.indexOf('async function refreshZaloDispatchStatus()'), html.indexOf('window.toggleZaloDispatch'));
-  for (const automatic of [undefined, 4, '4']) {
-    const elements = new Map(['zaloDispatchBar', 'zaloDispatchSummary', 'zaloDispatchToggle'].map(id => [id, { dataset: {} }]));
-    const ctx = vm.createContext({ currentProfile: { role: 'admin' }, document: { hidden: false, getElementById: id => elements.get(id) },
-      sb: { rpc: async name => {
-        assert.equal(name, 'get_mindup_zalo_dispatch_status');
-        return { data: { waitingWeb: 1, waitingReceipts: 2, waitingTuition: 3, waitingAutomatic: automatic,
-          processing: 7, sent: 8, failed: 9 } };
-      } } });
-    vm.runInContext(fn, ctx);
-    await ctx.refreshZaloDispatchStatus();
-    assert.equal(elements.get('zaloDispatchSummary').textContent, `Zalo: ${automatic === undefined ? 6 : 10} chờ · 7 đang gửi · 8 đã gửi · 9 lỗi`);
-  }
-});

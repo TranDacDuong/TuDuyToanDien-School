@@ -2765,10 +2765,14 @@ Nhập số tiền hoàn lại (>0):`,
         }
       }
       await loadZaloTuitionHistory();
+      if (queuedCount > 0) {
+        lastCreatedZaloBatch = `notice:${batchId}`;
+        updateZaloDynamicStatus();
+      }
       const skippedCount = items.length - queuedCount;
       const cancelledNote = replaceExisting ? ` Đã hủy ${cancelledCount} lượt chưa gửi cũ.` : "";
       const processingNote = processingCount > 0 ? ` Giữ lại ${processingCount} lượt bot đang gửi để tránh gửi trùng.` : "";
-      alert(`Đã xếp hàng ${queuedCount} thông báo học phí.${cancelledNote}${processingNote}${skippedCount > 0 ? ` Bỏ qua ${skippedCount} lượt chưa thể tạo lại.` : ""} Có thể đóng trang; tiến độ được lưu trên máy chủ.`);
+      alert(`Đã xếp hàng ${queuedCount} thông báo học phí.${cancelledNote}${processingNote}${skippedCount > 0 ? ` Bỏ qua ${skippedCount} lượt chưa thể tạo lại.` : ""} Bấm Xem đợt gửi để theo dõi trong Tin nhắn.`);
     } catch (error) {
       alert("Không xếp hàng được: " + error.message);
     } finally {
@@ -2903,6 +2907,7 @@ Nhập số tiền hoàn lại (>0):`,
   let lastRenderedStatusHtml = "";
   let lastRenderedProgressHtml = "";
 
+  let lastCreatedZaloBatch = "";
   function updateZaloDynamicStatus() {
     const statusSection = document.getElementById("zaloStatusSection");
     const progressSection = document.getElementById("zaloLiveProgressSection");
@@ -2992,148 +2997,12 @@ Nhập số tiền hoàn lại (>0):`,
       lastRenderedStatusHtml = newStatusHtml;
     }
 
-    // Durable queue progress remains visible after the page or bot is restarted.
-    let liveProgressHtml = "";
-    const durable = zaloDurableProgress;
-    if (durable?.total) {
-      const c = durable.counts;
-      const active = durable.finalized < durable.total;
-      const started = durable.startedAt ? new Date(durable.startedAt).toLocaleString("vi-VN") : "";
-      const latestActivity = durable.latestActivity
-        ? new Date(durable.latestActivity).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
-      const remainingMinutes = Math.ceil(c.checking * 67.5 / 60);
-      const blocked = active && (!isConnected || zaloAutomationState?.paused || durable.paused);
-      const deliveryPercent = Math.round(durable.finalized * 100 / durable.total);
-      const blockedReason = !isConnected
-        ? "Chưa kết nối Zalo. Hàng chờ được giữ nguyên; hãy đăng nhập Zalo để tiếp tục gửi."
-        : durable.paused ? "Đợt gửi đã tạm dừng. Hàng chờ được giữ nguyên."
-        : "Zalo đang tạm dừng tự động. Hàng chờ được giữ nguyên.";
-      liveProgressHtml = `
-        <div style="background:#0f1f3d;color:#fff;border-radius:8px;padding:16px 18px;margin-bottom:16px;box-shadow:0 10px 24px rgba(15,31,61,.16)">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-            <div>
-              <div style="font-weight:800;font-size:14px">${active ? "Tiến độ gửi học phí thủ công" : "Đợt gửi thủ công gần nhất đã hoàn tất"}</div>
-              <div style="font-size:11px;color:#cbd5e1;margin-top:3px">Bắt đầu ${esc(started)}${latestActivity ? ` · Hoạt động gần nhất ${esc(latestActivity)}` : ""}</div>
-            </div>
-            <div style="font-weight:800;color:#7dd3fc">Đã xử lý ${durable.finalized}/${durable.total} lượt gửi · ${deliveryPercent}%</div>
-          </div>
-          <div style="height:12px;background:#334155;border-radius:999px;overflow:hidden" role="progressbar" aria-label="Tiến độ xử lý gửi học phí" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${deliveryPercent}">
-            <div style="width:${deliveryPercent}%;height:100%;background:#22c55e;transition:width .4s ease"></div>
-          </div>
-          ${blocked ? `<div role="status" style="color:#fde68a;font-weight:700;margin-top:10px">Đang dừng: ${blockedReason}</div>` : ""}
-          <div style="font-size:11px;color:#cbd5e1;margin-top:10px">Đã kiểm tra hồ sơ: ${durable.reviewed}/${durable.total}</div>
-          <div style="display:flex;gap:8px 14px;flex-wrap:wrap;margin-top:12px;font-size:11px">
-            <span style="color:#86efac">Đã gửi: <b>${c.sent}</b></span>
-            <span style="color:#7dd3fc">Đang gửi: <b>${c.processing}</b></span>
-            <span style="color:#fde68a">Sẵn sàng: <b>${c.ready}</b></span>
-            <span style="color:#e2e8f0">Chờ kiểm tra Zalo: <b>${c.checking}</b></span>
-            <span style="color:#fdba74">Chờ kết quả kiểm tra: <b>${c.retry}</b></span>
-            <span style="color:#fca5a5">Lỗi / đã bỏ qua: <b>${c.failed}</b></span>
-            ${c.uncertain ? `<span style="color:#fde68a">Chưa xác nhận: <b>${c.uncertain}</b></span>` : ""}
-            ${c.cancelled ? `<span style="color:#cbd5e1">Đã hủy: <b>${c.cancelled}</b></span>` : ""}
-          </div>
-          ${c.uncertain ? '<div role="status" style="font-size:11px;color:#fde68a;margin-top:10px">Tin chưa được Zalo xác nhận được giữ riêng; các tin khác vẫn tiếp tục gửi. Kiểm tra cuộc trò chuyện trước khi thử lại tin chưa xác nhận để tránh trùng.</div>' : ""}
-          ${durable.batchId ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px">
-            <button type="button" style="border:1px solid #94a3b8;border-radius:6px;padding:7px 14px;background:#fff;color:#0f1f3d;cursor:pointer" onclick="openZaloTuitionDetails()">Xem chi tiết</button>
-            <button type="button" style="border:1px solid #94a3b8;border-radius:6px;padding:7px 14px;background:#fff;color:#0f1f3d;cursor:pointer" onclick="controlZaloTuitionBatch('pause')" ${batchControlBusy || durable.paused ? "disabled" : ""}>Dừng</button>
-            ${durable.paused ? `<button type="button" style="border:1px solid #93c5fd;border-radius:6px;padding:7px 14px;background:#dbeafe;color:#0f1f3d;cursor:pointer" onclick="controlZaloTuitionBatch('resume')" ${batchControlBusy ? "disabled" : ""}>Tiếp tục</button>` : ""}
-            <button type="button" style="border:1px solid #93c5fd;border-radius:6px;padding:7px 14px;background:#dbeafe;color:#0f1f3d;cursor:pointer" onclick="controlZaloTuitionBatch('retry')" ${batchControlBusy || c.processing || c.sent === durable.total ? "disabled" : ""}>Thử lại</button>
-            ${batchControlBusy ? '<span role="status">Đang xử lý…</span>' : ""}
-          </div>` : ""}
-          ${c.checking && !blocked ? `<div style="font-size:11px;color:#cbd5e1;margin-top:10px">Còn ${c.checking} hồ sơ cần kiểm tra, dự kiến khoảng ${remainingMinutes} phút với nhịp chống chặn 45-90 giây.</div>` : ""}
-        </div>`;
-    } else if (isRunning || isPaused) {
-      const total = progress.total || currentZaloCampaignItems.length || 1;
-      const sent = progress.sent || 0;
-      const friendRequested = progress.friendRequested || 0;
-      const failed = progress.failed || 0;
-      const processed = sent + friendRequested + failed;
-      const percent = Math.min(100, Math.round((processed / total) * 100));
-
-      liveProgressHtml = `
-        <div style="background:linear-gradient(135deg, #1e293b 0%, #0f172a 100%);color:#fff;border-radius:16px;padding:16px 20px;margin-bottom:16px;box-shadow:0 10px 25px rgba(0,0,0,.15)">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px">
-              <span>${isRunning ? "⏳ Đang gửi ngầm..." : "⏸ Đang tạm dừng"}</span>
-              <span style="font-size:12px;color:#94a3b8">(${processed}/${total} học sinh)</span>
-            </div>
-            <div style="font-size:13px;font-weight:700;color:#38bdf8">${percent}%</div>
-          </div>
-          <div style="width:100%;height:10px;background:#334155;border-radius:999px;overflow:hidden;margin-bottom:10px">
-            <div style="width:${percent}%;height:100%;background:linear-gradient(90deg, #38bdf8 0%, #22c55e 100%);transition:width .4s ease"></div>
-          </div>
-
-          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;margin-bottom:10px;padding:6px 12px;background:rgba(255,255,255,0.06);border-radius:8px">
-            <span style="color:#4ade80;font-weight:600">✓ Đã gửi (Bạn bè): <b>${sent}</b></span>
-            <span style="color:#fbbf24;font-weight:600">⚠️ Chưa kết bạn (Đã mời): <b>${friendRequested}</b></span>
-            <span style="color:#f87171;font-weight:600">✗ Lỗi: <b>${failed}</b></span>
-          </div>
-
-          ${friendRequested > 0 ? `
-            <div style="margin-bottom:10px;padding:8px 12px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);border-radius:8px;font-size:11px;color:#fde68a;display:flex;align-items:center;gap:6px">
-              <span>📞</span> Có <b>${friendRequested}</b> phụ huynh chưa kết bạn Zalo. Hệ thống đã gửi lời mời kết bạn & tin nhắn chào. Thầy/Cô hãy gọi điện thoại trực tiếp để nhắc phụ huynh bấm xác nhận.
-            </div>
-          ` : ""}
-
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:12px">
-            <div style="color:#cbd5e1">
-              ${progress.nextSendInSeconds > 0 ? `⏱ Gửi tiếp sau: <b style="color:#fbbf24;font-size:14px">${progress.nextSendInSeconds}s</b> cho PH em <b>${progress.currentStudent || ""}</b>` : "Đang chuẩn bị gói tin..."}
-            </div>
-            <div style="display:flex;gap:8px">
-              ${isRunning ? `<button onclick="pauseZaloCampaignAction()" style="background:#f59e0b;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600">⏸ Tạm dừng</button>` : `<button onclick="resumeZaloCampaignAction()" style="background:#16a34a;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600">▶ Tiếp tục</button>`}
-              <button onclick="stopZaloCampaignAction()" style="background:#dc2626;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600">⏹ Hủy chiến dịch</button>
-            </div>
-          </div>
-        </div>
-      `;
-    }
-
-    liveProgressHtml = automaticTuitionProgressHtml() + liveProgressHtml;
-    if (liveProgressHtml !== lastRenderedProgressHtml) {
-      progressSection.innerHTML = liveProgressHtml;
-      lastRenderedProgressHtml = liveProgressHtml;
-    }
-
-    // Cập nhật trạng thái từng hàng học sinh trong bảng (KHÔNG làm reload bảng hay mất thanh cuộn)
-    const completedResults = campaign.completedResults || [];
-    const resultMap = new Map();
-    for (const r of completedResults) {
-      if (r.studentId) resultMap.set(String(r.studentId), r);
-      if (r.phone) resultMap.set(String(r.phone).replace(/\D/g, ""), r);
-    }
-
-    currentZaloCampaignItems.forEach((item, idx) => {
-      const cell = document.getElementById(`zaloActionCell-${idx}`);
-      if (!cell) return;
-
-      const cleanItemPhone = String(item.phone || "").replace(/\D/g, "");
-      const r = resultMap.get(String(item.studentId)) || (cleanItemPhone ? resultMap.get(cleanItemPhone) : null);
-
-      if (r) {
-        if (r.status === "sent") {
-          cell.innerHTML = `<span style="color:#16a34a;background:#dcfce7;border:1px solid #bbf7d0;padding:3px 8px;border-radius:999px;font-weight:700;font-size:11px;display:inline-block">✓ Đã gửi (Bạn bè)</span>`;
-        } else if (r.status === "friend_requested") {
-          cell.innerHTML = `
-            <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
-              <span style="color:#b45309;background:#fef3c7;border:1px solid #fde68a;padding:2px 8px;border-radius:999px;font-weight:700;font-size:11px;display:inline-block" title="${r.note || 'Chưa kết bạn Zalo'}">⚠️ Đã mời KB (Chưa là bạn)</span>
-              <a href="tel:${cleanItemPhone}" style="color:#c2410c;background:#ffedd5;border:1px solid #fdba74;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:3px" title="Bấm để gọi điện trực tiếp cho phụ huynh">
-                📞 Gọi điện: ${item.phone}
-              </a>
-            </div>
-          `;
-        } else if (r.status === "failed") {
-          cell.innerHTML = `
-            <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
-              <span style="color:#dc2626;background:#fee2e2;border:1px solid #fecaca;padding:2px 8px;border-radius:999px;font-weight:700;font-size:11px;display:inline-block">✗ Thất bại</span>
-              <span style="font-size:10px;color:#ef4444;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.error || ''}">${r.error || 'Lỗi gửi'}</span>
-            </div>
-          `;
-        }
-      } else if (isRunning && progress.currentPhone && cleanItemPhone === String(progress.currentPhone).replace(/\D/g, "")) {
-        cell.innerHTML = `<span style="color:#2563eb;background:#dbeafe;border:1px solid #bfdbfe;padding:3px 8px;border-radius:999px;font-weight:700;font-size:11px;display:inline-block">⏳ Đang gửi...</span>`;
-      }
-    });
-
+    const batchKey = lastCreatedZaloBatch || (zaloDurableProgress?.batchId
+      ? `${zaloDurableProgress.rows.some(row => row.unified) ? 'notice' : 'tuition'}:${zaloDurableProgress.batchId}` : '');
+    const params = new URLSearchParams({ zaloBatches: '1', category: 'tuition' });
+    if (batchKey) params.set('batch', batchKey);
+    const progressLink = `dashboard.html?page=${encodeURIComponent('messages.html?' + params)}`;
+    const liveProgressHtml = `<a class="zalo-send-button" target="_top" href="${esc(progressLink)}">${batchKey ? 'Xem đợt gửi' : 'Xem các đợt gửi học phí'}</a>`;
     if (liveProgressHtml !== lastRenderedProgressHtml) {
       progressSection.innerHTML = liveProgressHtml;
       lastRenderedProgressHtml = liveProgressHtml;
