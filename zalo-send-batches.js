@@ -74,7 +74,7 @@
       ${canPause ? button('Tạm dừng đợt', 'pause') + button('Tiếp tục đợt', 'resume') : ''}
       ${button('Bỏ qua lượt đang chờ', 'skip')}${button('Gửi lại lượt lỗi', 'retry')}</div>`;
     return `<h3>${escape(title)}</h3>${controls}${items.length ? `<table><thead><tr><th>Người nhận</th><th>Trạng thái</th><th>Chi tiết</th><th>Thao tác</th></tr></thead><tbody>${items.map(item => `
-      <tr><td><strong>${escape(item.parent_name || 'Phụ huynh')}</strong><br>${escape(item.student_name || '')}<br>${escape(date(item.updated_at))}</td>
+      <tr><td><strong>${escape(item.parent_name || 'Chưa có tên Zalo')}</strong><br>${escape(item.student_name || '')}<br>${escape(date(item.updated_at))}</td>
       <td>${escape(item.paused && (waiting.has(item.status) || item.awaiting_second_scan) ? 'Tạm dừng' : item.awaiting_second_scan ? 'Chờ quét lượt 2' : states[item.status] || item.status)}
       ${partStatus(item)}</td>
       <td>${item.error_message ? `<div class="zalo-batch-error">${escape(item.error_message)}</div>` : ''}${item.body ? `<details><summary>Xem nội dung</summary><div class="zalo-batch-body">${escape(item.body)}</div></details>` : ''}</td>

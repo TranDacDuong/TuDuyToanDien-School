@@ -144,13 +144,32 @@ BEGIN
   ) b),'[]');
 END; $$;
 
+CREATE OR REPLACE FUNCTION public.zalo_parent_display_name(p_parent uuid)
+RETURNS text LANGUAGE sql STABLE SET search_path=public AS $$
+  SELECT coalesce(nullif(btrim(t.zalo_alias),''),nullif(btrim(t.display_name),''),nullif(btrim(c.zalo_alias),''))
+  FROM public.users p
+  LEFT JOIN public.zalo_verified_links l ON l.audience_user_id=p.id AND l.enabled
+  LEFT JOIN public.zalo_external_threads t ON t.zalo_uid=l.zalo_uid
+  LEFT JOIN public.zalo_parent_contacts c ON c.parent_id=p.id AND (l.zalo_uid IS NULL OR c.zalo_uid=l.zalo_uid)
+  WHERE p.id=p_parent AND p.role::text='parent';
+$$;
+REVOKE ALL ON FUNCTION public.zalo_parent_display_name(uuid) FROM PUBLIC,anon,authenticated;
+
+CREATE OR REPLACE FUNCTION public.get_mindup_parent_zalo_display_name(p_parent uuid)
+RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$
+  SELECT public.zalo_parent_display_name(p_parent)
+  WHERE auth.uid() IS NOT NULL AND public.can_access_mindup_official_audience(p_parent);
+$$;
+REVOKE ALL ON FUNCTION public.get_mindup_parent_zalo_display_name(uuid) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.get_mindup_parent_zalo_display_name(uuid) TO authenticated;
+
 CREATE OR REPLACE FUNCTION public.list_zalo_send_batch_items(p_batch text, p_offset integer DEFAULT 0)
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF NOT public.can_manage_zalo_send_batches() THEN RAISE EXCEPTION 'Zalo batch permission required'; END IF;
   RETURN coalesce((SELECT jsonb_agg(to_jsonb(b) ORDER BY b.created_at,b.id) FROM (
-    SELECT j.*, p.full_name AS parent_name, s.full_name AS student_name
-    FROM public.zalo_send_batch_items j LEFT JOIN public.users p ON p.id=j.parent_id LEFT JOIN public.users s ON s.id=j.student_id
+    SELECT j.*, public.zalo_parent_display_name(j.parent_id) AS parent_name, s.full_name AS student_name
+    FROM public.zalo_send_batch_items j LEFT JOIN public.users s ON s.id=j.student_id
     WHERE j.batch_key=p_batch AND public.can_manage_zalo_send_item(j.queue,j.parent_id,j.student_id) ORDER BY j.created_at,j.id LIMIT 100 OFFSET greatest(coalesce(p_offset,0),0)
   ) b),'[]');
 END; $$;

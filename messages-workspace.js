@@ -56,7 +56,7 @@
     const identity = document.createElement('section');
     identity.append(image(activeFriend.avatar, 'info-avatar'), textElement('div', activeFriend.name || document.getElementById('chatTitle').textContent, 'info-name'));
     const info = friendMap.get(activeFriend.id) || parentInboxById.get(activeFriend.id);
-    if (info?.users?.full_name && info.users.full_name !== activeFriend.name) identity.append(textElement('p', info.users.full_name));
+    if (activeFriend.role !== 'parent' && info?.users?.full_name && info.users.full_name !== activeFriend.name) identity.append(textElement('p', info.users.full_name));
     if (info?.users?.phone) identity.append(textElement('p', info.users.phone));
     const transport = document.getElementById('zaloSendModeLabel');
     if (activeFriend.role === 'parent' && transport) identity.append(textElement('p', transport.textContent));
