@@ -1565,8 +1565,7 @@
       if(!content) return { skipped: true };
       return window.LearningMessages.sendToAllAudiences({
         studentId,
-        content: [content, window.LearningMessages.scoreTableToken({ rows: allScores || [], studentId,
-          studentName: nameMap.get(studentId), maxScore: test?.max_score ?? 10 })].filter(Boolean).join('\n\n'),
+        content,
         realSenderId: window._currentUserId || null,
         messageKey: `offline_test_score:${testId}:${studentId}`,
       });
@@ -1740,8 +1739,7 @@
       if (!content) return { skipped: true };
       return window.LearningMessages.sendToAllAudiences({
         studentId: row.student_id,
-        content: [content, window.LearningMessages.scoreTableToken({ rows: groupInfo.scoreRows || [], studentId: row.student_id,
-          studentName: nameMap.get(row.student_id) })].filter(Boolean).join('\n\n'),
+        content,
         realSenderId: window._currentUserId || null,
         messageKey: `session_score:${groupInfo.messageGroupKey || sessionId}:${row.student_id}`,
       });

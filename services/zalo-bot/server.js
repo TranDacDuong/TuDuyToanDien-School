@@ -10,7 +10,7 @@ const { registerOnDemand } = require('./zalo-on-demand');
 const friendProfiles = new Map();
 const contactFingerprints = new Map();
 const { writeJsonAtomic } = require('./sync-store');
-const { prepareScoreMessageMedia } = require('./score-message-media');
+const { prepareScoreMessageMedia, sendScoreNotice } = require('./score-message-media');
 const { createScheduler, isSendingTime, quietHoursError } = require('./tuition-reminder-scheduler');
 const { requireSendAcknowledgement } = require('./send-acknowledgement');
 const { createSendPacer, installSendPacing, fetchWithDeadline } = require('./send-pacing');
@@ -234,7 +234,7 @@ async function syncGatewayOutbox() {
     let media;
     try {
       media = await prepareOverdueTuitionMedia(job.content) || await prepareScoreMessageMedia({ text: job.content, audience: 'parent', studentId: job.context_student_id },
-        { browserChannel: process.platform === 'win32' ? 'msedge' : undefined });
+        { browserChannel: process.platform === 'win32' ? 'msedge' : undefined, omitScoreTable: true });
       if (media.errors.length) throw new Error('Không tạo được ảnh bảng điểm/phổ điểm; chưa gửi tin');
       if (media.qrUrls) {
         const {valid}=await gatewayRequest({action:'validateOverdueTuition',jobId:job.job_id});
@@ -243,6 +243,8 @@ async function syncGatewayOutbox() {
       const text = media.text.replace(/__(ACTION|EVALUATION)__[\s\S]*$/, '').trim();
       const messageId = await localStore.send(`web:${job.job_id}`, { uid: job.zalo_uid, text, attachments: media.attachments.length,
         ...(media.qrUrls ? {qrUrls:media.qrUrls} : {}) }, async () => {
+        if (media.isScoreNotice) return sendScoreNotice({ api: zaloApi, store: localStore,
+          key: `web:${job.job_id}`, uid: job.zalo_uid, text, content: job.content, attachments: media.attachments });
         const sent = await zaloApi.sendMessage(media.attachments.length ? { msg: text, attachments: media.attachments } : text, job.zalo_uid);
         return requireSendAcknowledgement(sent, media.attachments.length);
       });

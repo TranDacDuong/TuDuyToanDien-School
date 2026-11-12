@@ -104,3 +104,50 @@ test('real raster backend creates PNGs with visible bars and isolated cleanup', 
     await fs.access(b.attachments[0]);
   } finally { await a.cleanup(); await b.cleanup(); }
 });
+
+test('legacy score table is omitted when preparing a Zalo score notice', async () => {
+  const table = token({ type: 'score_table', rows: [{ score: 9, maxScore: 10 }] });
+  let rendered = 0;
+  const result = await prepare(input(`Grade 9\n${token(chart)}\n${table}`), {
+    omitScoreTable: true,
+    render: async (_, file) => {
+      rendered++;
+      await fs.writeFile(file, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, ...Array(16).fill(0)]));
+    }
+  });
+  try {
+    assert.equal(result.text, 'Grade 9');
+    assert.equal(result.isScoreNotice, true);
+    assert.equal(rendered, 1);
+    assert.equal(result.attachments.length, 1);
+    assert.deepEqual(result.errors, []);
+  } finally { await result.cleanup(); }
+});
+
+test('score notice waits for a text receipt and reuses it if only the image fails', async () => {
+  const { sendScoreNotice } = require('./score-message-media');
+  const calls = [];
+  const receipts = new Map();
+  let textAcknowledged = false;
+  let imageAccepted = false;
+  const input = {
+    key: 'web:test', uid: '123', text: 'Grade 9', content: 'Grade 9 with chart', attachments: ['chart.png'],
+    store: { async send(key, _, operation) {
+      if (!receipts.has(key)) receipts.set(key, await operation());
+      return receipts.get(key);
+    } },
+    api: { async sendMessage(message) {
+      calls.push(message);
+      if (typeof message === 'string') return textAcknowledged ? { message: { msgId: 10 } } : { message: null };
+      if (!imageAccepted) throw new Error('Image rejected');
+      return { attachment: [{ msgId: 11 }] };
+    } }
+  };
+  await assert.rejects(sendScoreNotice(input), /no message id/);
+  assert.deepEqual(calls, ['Grade 9']);
+  textAcknowledged = true;
+  await assert.rejects(sendScoreNotice(input), /Image rejected/);
+  imageAccepted = true;
+  assert.equal(await sendScoreNotice(input), '10');
+  assert.deepEqual(calls, ['Grade 9', 'Grade 9', { attachments: ['chart.png'] }, { attachments: ['chart.png'] }]);
+});

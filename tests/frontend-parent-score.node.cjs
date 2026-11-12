@@ -86,7 +86,7 @@ test('generated tables focus the actual child and remove other names/IDs', () =>
     { student_id: 'invalid', score: 99, max_score: 10 }
   ] });
   assert.doesNotMatch(token, /Other Secret|other-private-id|invalid/);
-  const html = messageRenderer().renderMessageBody(token);
+  const html = messageRenderer().renderPlainMessageBody(token);
   assert.match(html, /score-table-focus/);
   assert.match(html, /Minh/);
   assert.match(html, /0\/10/);
@@ -102,7 +102,7 @@ test('web renders both chart tokens, strips previews, escapes names and malforme
     { studentId: 'other', label: 'Secret', score: 8, maxScore: 10 }
   ] });
   const text = `Before\n${distribution}\n${table}\nAfter`;
-  const html = ctx.renderMessageBody(text);
+  const html = ctx.renderPlainMessageBody(text);
   assert.match(html, /score-chart-bars/);
   assert.match(html, /score-table-focus/);
   assert.match(html, /&lt;img/);
@@ -247,7 +247,7 @@ test('actual helper and manual persistence never save sent when insert fails or 
   }
 });
 
-test('class score integrations attach focused tables for both score sources', async () => {
+test('class score integrations send the student result and distribution for both score sources', async () => {
   const code = source('class_manage.js');
   const rows = [{ student_id: 'own', score: 0, max_score: 10 }, { student_id: 'other', score: 9, max_score: 10 }];
   const calls = [];
@@ -259,7 +259,7 @@ test('class score integrations attach focused tables for both score sources', as
     return q;
   } };
   const ctx = vm.createContext({ window: { LearningMessages: api }, getSb: () => sb, _className: 'Class', _cachedClass: null,
-    normalizeScoreToTen: score => score, buildSessionScoreStats: () => ({ rankByStudentId: new Map(), totalRanked: 2, distribution: [] }),
+    normalizeScoreToTen: score => score, buildSessionScoreStats: () => ({ rankByStudentId: new Map(), totalRanked: 2, distribution: [{ label: '0-5', count: 1 }, { label: '5-10', count: 1 }] }),
     loadSessionScoreGroupInfo: async () => ({ scoreRows: rows, messageGroupKey: 'group' }) });
   vm.runInContext(code.slice(code.indexOf('  async function mirrorOfflineTestScoresToLearningThreads('), code.indexOf('  window.cvCloseSessionScoreModal')), ctx);
   vm.runInContext(code.slice(code.indexOf('  async function mirrorSessionScoresToLearningThreads('), code.indexOf('  async function loadSessionScoreGroupInfo(')), ctx);
@@ -268,10 +268,11 @@ test('class score integrations attach focused tables for both score sources', as
   assert.equal(calls.length, 2);
   for (const call of calls) {
     assert.equal(call.studentId, 'own');
-    assert.match(call.content, /focusStudentId/);
+    assert.match(call.content, /score_distribution/);
+    assert.doesNotMatch(call.content, /score_table/);
     assert.match(call.content, /Minh/);
     assert.doesNotMatch(call.content, /"other"/);
-    assert.match(messageRenderer().renderMessageBody(call.content), /score-table-focus/);
+    assert.match(messageRenderer().renderPlainMessageBody(call.content), /score-chart-bars/);
   }
 });
 
@@ -282,7 +283,7 @@ test('browser renders focused table alongside distribution at desktop and mobile
     const page = await browser.newPage();
     const api = load('learning_messages.js').LearningMessages;
     const token = api.scoreTableToken({ studentId: 'own', studentName: 'Minh', rows: [{ student_id: 'own', score: 0, max_score: 10 }, { student_id: 'other', score: 9, max_score: 10 }] });
-    const content = messageRenderer().renderMessageBody(api.sessionScoreContent({ score: 0, distribution: [{ label: '0-5', count: 0 }, { label: '5-10', count: 2 }] }) + '\n' + token);
+    const content = messageRenderer().renderPlainMessageBody(api.sessionScoreContent({ score: 0, distribution: [{ label: '0-5', count: 0 }, { label: '5-10', count: 2 }] }) + '\n' + token);
     const css = source('messages.html').match(/<style>([\s\S]*?)<\/style>/)[1];
     for (const width of [390, 1280]) {
       await page.setViewportSize({ width, height: 800 });

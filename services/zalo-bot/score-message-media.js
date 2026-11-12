@@ -3,6 +3,7 @@
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
+const { requireSendAcknowledgement } = require('./send-acknowledgement');
 
 const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -117,6 +118,7 @@ async function prepareScoreMessageMedia(input, options = {}) {
   const errors = result.errors;
   let text = result.text;
   for (const [index, raw] of result.charts.entries()) {
+    if (options.omitScoreTable && raw?.type === 'score_table') continue;
     let chart;
     try {
       if (index >= 5) throw new Error('CHART_LIMIT');
@@ -137,7 +139,18 @@ async function prepareScoreMessageMedia(input, options = {}) {
       text = `${text}\n\n${fallback}`.trim();
     }
   }
-  return { text, attachments, errors, skipped: false, cleanup };
+  return { text, attachments, errors, isScoreNotice: result.charts.some(chart => ['score_distribution', 'score_table'].includes(chart?.type)), skipped: false, cleanup };
 }
 
-module.exports = { prepareScoreMessageMedia };
+async function sendScoreNotice({ api, store, key, uid, text, content, attachments }) {
+  if (!text) throw new Error('Thiếu nội dung báo điểm. Chưa gửi ảnh.');
+  const textId = await store.send(`${key}:score-text`, { uid, text }, async () =>
+    requireSendAcknowledgement(await api.sendMessage(text, uid)));
+  for (const [index, file] of attachments.entries()) {
+    await store.send(`${key}:score-chart:${index}`, { uid, content }, async () =>
+      requireSendAcknowledgement(await api.sendMessage({ attachments: [file] }, uid), 1));
+  }
+  return textId;
+}
+
+module.exports = { prepareScoreMessageMedia, sendScoreNotice };
