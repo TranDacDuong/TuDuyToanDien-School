@@ -237,14 +237,14 @@ BEGIN
         GET DIAGNOSTICS n=ROW_COUNT;
       END IF;
     ELSIF j.queue='notice' THEN
-      -- An ambiguous send is only retried individually after checking its conversation.
+      -- Retry ambiguous deliveries only after the operator confirms checking Zalo.
       UPDATE public.tuition_notice_jobs SET status='queued',scan_pass=1,scan_attempts=0,scan_started=false,
         part_started=false,paused=false,revision=revision+1,token=NULL,lease_until=NULL,
         history=history||jsonb_build_array(jsonb_build_object('error',error_message,'at',now(),'by',auth.uid(),'kind','manual_retry')),
         error_message=NULL,updated_at=now()
         WHERE id=j.id AND status='uncertain' AND NOT (scan_pass=1 AND scan_attempts<2)
           AND (NOT part_started AND coalesce(error_message,'') !~* 'timeout|timed out|uncertain|no message id|interrupted|network|fetch failed|econn|abort|reset'
-            OR (p_job IS NOT NULL AND p_checked IS TRUE));
+            OR p_checked IS TRUE);
       GET DIAGNOSTICS n=ROW_COUNT;
     ELSIF j.queue IN ('web','receipt','tuition') AND j.status='failed'
       AND (j.queue <> 'tuition' OR j.completed_parts=0) THEN

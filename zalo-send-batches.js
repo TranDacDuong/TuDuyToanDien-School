@@ -122,11 +122,12 @@
     }
     if (command === 'thread') { location.href = `messages.html?user=${encodeURIComponent(value)}`; return; }
     const item = value && items.find(row => row.id === value);
+    const bulkRetry = command === 'retry' && !value;
     const ambiguous = command === 'retry' && item?.status === 'uncertain';
     if (ambiguous && !confirm('Bạn đã kiểm tra hội thoại Zalo và xác nhận phần này chưa được gửi?')) return;
     if (command === 'repairQr' && !confirm('Bạn đã kiểm tra hội thoại và xác nhận phụ huynh chưa nhận ảnh QR?')) return;
     if (command === 'skip' && !confirm(value ? 'Bỏ qua lượt gửi này?' : 'Bỏ qua các lượt chưa gửi trong đợt?')) return;
-    if (command === 'retry' && !value && !confirm('Xếp lại những lượt xác định gửi lỗi trong đợt?')) return;
+    if (bulkRetry && !confirm('Gửi lại các lượt lỗi và chưa xác nhận trong đợt? Chỉ tiếp tục nếu bạn đã kiểm tra trên Zalo rằng các phần chưa xác nhận chưa đến người nhận.')) return;
     busy = true;
     target.disabled = true;
     try {
@@ -146,7 +147,7 @@
         if (error) throw error;
         status('Đã cập nhật trạng thái.');
       } else {
-        const { data, error } = await sb.rpc('control_zalo_send_batch', { p_batch: batch, p_action: command, p_job: value || null, p_checked: !!ambiguous });
+        const { data, error } = await sb.rpc('control_zalo_send_batch', { p_batch: batch, p_action: command, p_job: value || null, p_checked: bulkRetry || !!ambiguous });
         if (error) throw error;
         status(data ? `${actions[command]}: đã cập nhật ${data} lượt.` : 'Không có lượt đủ điều kiện cho thao tác này.');
       }
