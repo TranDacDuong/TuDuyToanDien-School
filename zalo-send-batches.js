@@ -54,6 +54,7 @@
       const summary = ['evaluation','absence'].includes(row.category)
         ? `Hôm qua: ${(row.classes || []).join(', ') || 'Chưa có lợt gửi'}`
         : row.category === 'receipt' ? `${row.total} tin từ 00:00 hôm qua đến nay`
+        : row.category === 'other' ? `${row.total} tin trong 1 tháng gần nhất`
         : row.title ? `${row.title}${row.class_name && row.category === 'score' ? ` · ${row.class_name}` : ''} · ${date(row.latest)}` : 'Chưa có đợt gửi';
       return `<tr><td><strong>${escape(labels[row.category])}</strong></td><td>${escape(summary)}</td><td>${progress(row)}</td><td>${button('Xem đợt', 'category', row.category)}</td></tr>`;
     }).join('')}</tbody></table>`;
@@ -146,7 +147,7 @@
     if (command === 'category') {
       categoryView = value;
       const row = overview.find(entry => entry.category === value);
-      batch = ['evaluation','absence','receipt'].includes(value) ? null : row?.batch_key || null;
+      batch = ['evaluation','absence','receipt','other'].includes(value) ? null : row?.batch_key || null;
       classView = null;
       historyMode = false;
       itemOffset = 0;

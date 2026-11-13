@@ -15,6 +15,7 @@ REVOKE ALL ON public.zalo_send_overview_items FROM PUBLIC,anon,authenticated;
 CREATE OR REPLACE FUNCTION public.get_zalo_send_overview()
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=public AS $$
 DECLARE today date := (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date;
+  month_ago timestamptz := ((now() AT TIME ZONE 'Asia/Ho_Chi_Minh') - interval '1 month') AT TIME ZONE 'Asia/Ho_Chi_Minh';
 BEGIN
   IF NOT public.can_manage_zalo_send_batches() THEN RAISE EXCEPTION 'Zalo batch permission required'; END IF;
   RETURN (WITH visible AS MATERIALIZED (
@@ -28,6 +29,7 @@ BEGIN
     SELECT v.* FROM visible v JOIN latest l USING(category)
     WHERE CASE WHEN v.category IN ('evaluation','absence') THEN v.lesson_day=today-1
       WHEN v.category='receipt' THEN v.created_at >= ((today-1)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh') AND v.created_at<=now()
+      WHEN v.category='other' THEN v.created_at BETWEEN month_ago AND now()
       ELSE v.batch_key=l.batch_key END
   ) SELECT jsonb_agg(to_jsonb(o)) FROM (
     SELECT kinds.category,l.batch_key,l.title,l.created_at AS latest,l.class_name,
@@ -47,6 +49,7 @@ END; $$;
 CREATE OR REPLACE FUNCTION public.list_zalo_recipient_status(p_category text, p_batch text DEFAULT NULL, p_offset integer DEFAULT 0, p_state text DEFAULT NULL, p_class text DEFAULT NULL)
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=public AS $$
 DECLARE today date := (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date;
+  month_ago timestamptz := ((now() AT TIME ZONE 'Asia/Ho_Chi_Minh') - interval '1 month') AT TIME ZONE 'Asia/Ho_Chi_Minh';
 BEGIN
   IF NOT public.can_manage_zalo_send_batches() THEN RAISE EXCEPTION 'Zalo batch permission required'; END IF;
   RETURN (WITH visible AS MATERIALIZED (
@@ -59,6 +62,7 @@ BEGIN
     WHERE CASE WHEN p_batch IS NOT NULL THEN j.batch_key=p_batch
       WHEN p_category IN ('evaluation','absence') THEN j.lesson_day=today-1 AND (p_class IS NULL OR j.class_name=p_class)
       WHEN p_category='receipt' THEN j.created_at>=((today-1)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh') AND j.created_at<=now()
+      WHEN p_category='other' THEN j.created_at BETWEEN month_ago AND now()
       ELSE false END
     ORDER BY j.parent_id,j.created_at DESC,j.id DESC
   ), page AS (
