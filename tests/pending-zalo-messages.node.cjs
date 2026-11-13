@@ -41,8 +41,8 @@ test('batch tab shows recipient progress and only retries the selected row', asy
    window.calls = [];
    window.client = { async rpc(name, args) {
      calls.push([name, args]);
-     if (name === 'list_zalo_send_batches') return { data: [{ batch_key: 'offline_test_score:test', category: 'score', title: 'Motion test', recipients: 2, total: 2, waiting: 0, processing: 0, sent: 0, errors: 2, skipped: 0, paused: 0 }] };
-     if (name === 'list_zalo_send_batch_items') return { data: [
+     if (name === 'get_zalo_send_overview') return { data: [{ batch_key: 'offline_test_score:test', category: 'score', title: 'Motion test', recipients: 2, total: 2, waiting: 0, processing: 0, sent: 0, errors: 2, skipped: 0, paused: 0 }] };
+     if (name === 'list_zalo_recipient_status') return { data: [
        { id: 'job-one', queue: 'web', category: 'score', title: 'Motion test', parent_name: 'First parent', status: 'failed', body: '<img src=x>', total_parts: 2, completed_parts: 1, error_message: 'Image rejected' },
        { id: 'job-two', queue: 'web', category: 'score', title: 'Motion test', parent_name: 'Second parent', status: 'uncertain', total_parts: 2, completed_parts: 0 }
      ] };
@@ -54,7 +54,7 @@ test('batch tab shows recipient progress and only retries the selected row', asy
  assert.equal(await page.getByRole('button', { name: 'Batch tab' }).count(), 0);
  await page.evaluate(() => ZaloSendBatches.configure(client, { role: 'admin' }));
  await page.getByRole('button', { name: 'Batch tab' }).click();
- await page.locator('tbody button[data-command=open]').click();
+ await page.locator('tbody button[data-command=category]').click();
  await page.getByText('Image rejected', { exact: true }).waitFor();
  assert.equal(await page.locator('tbody img').count(), 0);
  assert.equal(await page.locator('tbody button[data-command=retry]').count(), 1);

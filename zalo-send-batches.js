@@ -1,12 +1,12 @@
 (() => {
-  const labels = { tuition: 'Học phí', score: 'Báo điểm', evaluation: 'Nhận xét', absence: 'Báo vắng', receipt: 'Xác nhận thanh toán', campaign: 'Tin theo lịch', other: 'Tin khác' };
+  const labels = { tuition: 'Học phí', score: 'Báo điểm', evaluation: 'Đánh giá buổi học', absence: 'Báo vắng', receipt: 'Xác nhận thanh toán', campaign: 'Tin theo lịch', other: 'Tin khác' };
   const states = { pending: 'Chờ gửi', queued: 'Chờ gửi', processing: 'Đang gửi', sent: 'Đã gửi', failed: 'Gửi lỗi', uncertain: 'Chưa xác nhận', cancelled: 'Đã bỏ qua', not_queued: 'Chưa xếp hàng', not_found: 'Chờ tìm Zalo', not_friend: 'Chờ kết nối', invited: 'Đã mời kết bạn', greeted: 'Chờ gửi' };
   const actions = { pause: 'Tạm dừng', resume: 'Tiếp tục', skip: 'Bỏ qua', retry: 'Gửi lại' };
   const waiting = new Set(['pending', 'queued', 'not_found', 'not_friend', 'invited', 'greeted']);
   const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const date = value => value ? new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '';
-  let sb, dialog, batch, batchOffset = 0, itemOffset = 0, revision = 0, busy = false;
-  let rows = [], items = [], timer;
+  let sb, dialog, batch, categoryView, classView, batchOffset = 0, itemOffset = 0, revision = 0, busy = false;
+  let rows = [], items = [], overview = [], timer, historyMode = false;
 
   function button(label, command, value = '') {
     return `<button type="button" data-command="${command}" data-value="${escape(value)}">${escape(label)}</button>`;
@@ -31,9 +31,12 @@
       <div class="zalo-dispatch-table-wrap" data-content></div>`;
     dialog.addEventListener('click', onClick);
     dialog.addEventListener('change', event => {
-      if (!event.target.dataset.filter) return;
-      batch = null;
-      batchOffset = 0;
+      if (!event.target.dataset.filter || busy) return;
+      if (event.target.dataset.filter === "category") {
+        batch = categoryView = classView = null;
+        historyMode = false;
+        batchOffset = itemOffset = 0;
+      } else { itemOffset = 0; }
       load();
     });
     dialog.addEventListener('close', () => { revision++; clearInterval(timer); });
@@ -42,9 +45,23 @@
 
   const status = message => { dialog.querySelector('[role=status]').textContent = message; };
 
+  function progress(row) {
+    return `<strong>${row.sent}/${row.total} đã gửi</strong><br>${row.waiting} chờ · ${row.processing} đang gửi · ${row.errors} lỗi · ${row.uncertain || 0} chưa xác nhận · ${row.skipped} bỏ qua`;
+  }
+
+  function overviewList() {
+    return `<table><thead><tr><th>Thông tin</th><th>Đợt gửi gần nhất</th><th>Tiến độ</th><th>Thao tác</th></tr></thead><tbody>${overview.map(row => {
+      const summary = ['evaluation','absence'].includes(row.category)
+        ? `Hôm qua: ${(row.classes || []).join(', ') || 'Chưa có lợt gửi'}`
+        : row.category === 'receipt' ? `${row.total} tin từ 00:00 hôm qua đến nay`
+        : row.title ? `${row.title}${row.class_name && row.category === 'score' ? ` · ${row.class_name}` : ''} · ${date(row.latest)}` : 'Chưa có đợt gửi';
+      return `<tr><td><strong>${escape(labels[row.category])}</strong></td><td>${escape(summary)}</td><td>${progress(row)}</td><td>${button('Xem đợt', 'category', row.category)}</td></tr>`;
+    }).join('')}</tbody></table>`;
+  }
+
   function batchList() {
-    if (!rows.length) return '<p>Không có đợt gửi phù hợp.</p>';
-    return `<table><thead><tr><th>Đợt gửi</th><th>Phụ huynh</th><th>Tiến độ</th><th></th></tr></thead><tbody>${rows.map(row => `
+    if (!rows.length) return button('← Tổng quan', 'home') + '<p>Không có đợt gửi phù hợp.</p>';
+    return `${button('← Tổng quan', 'home')}<table><thead><tr><th>Đợt gửi</th><th>Phụ huynh</th><th>Tiến độ</th><th></th></tr></thead><tbody>${rows.map(row => `
       <tr><td><strong>${escape(row.title)}</strong><br>${escape(labels[row.category])} · ${escape(date(row.started))}</td>
       <td>${row.recipients}</td><td><strong>${row.sent}/${row.total} đã gửi</strong><br>${row.waiting} chờ · ${row.processing} đang gửi · ${row.errors} lỗi · ${row.skipped} bỏ qua${row.paused ? ` · ${row.paused} tạm dừng` : ''}</td>
       <td>${button('Xem đợt', 'open', row.batch_key)}</td></tr>`).join('')}</tbody></table>${pager(batchOffset,40,rows.length)}`;
@@ -68,15 +85,17 @@
   }
 
   function batchDetails() {
-    const title = items[0]?.title || rows.find(row => row.batch_key === batch)?.title || 'Chi tiết đợt gửi';
-    const canPause = ['web','notice','tuition','campaign','session_evaluation','offline_test_score','session_score','exam_score','absence'].includes(batch.split(':')[0]);
-    const controls = `<div class="zalo-dispatch-controls">${button('← Tất cả đợt', 'back')}
+    const title = batch ? items[0]?.title || rows.find(row => row.batch_key === batch)?.title : classView || labels[categoryView];
+    const canPause = ['web','notice','tuition','campaign','session_evaluation','offline_test_score','session_score','exam_score','absence'].includes(batch?.split(':')[0]);
+    const controls = `<div class="zalo-dispatch-controls">${button('← Tổng quan', 'home')} ${categoryView ? button('Các đợt cũ', 'back') : ''}
+      ${!batch && categoryView === 'evaluation' ? (overview.find(row => row.category === categoryView)?.classes || []).map(name => button(name, 'class', name)).join('') + (classView ? button('Tất cả lớp', 'class') : '') : ''}
       ${canPause ? button('Tạm dừng đợt', 'pause') + button('Tiếp tục đợt', 'resume') : ''}
-      ${button('Bỏ qua lượt đang chờ', 'skip')}${button('Gửi lại lượt lỗi', 'retry')}</div>`;
-    return `<h3>${escape(title)}</h3>${controls}${items.length ? `<table><thead><tr><th>Người nhận</th><th>Trạng thái</th><th>Chi tiết</th><th>Thao tác</th></tr></thead><tbody>${items.map(item => `
-      <tr><td><strong>${escape(item.parent_name || 'Chưa có tên Zalo')}</strong><br>${escape(item.student_name || '')}<br>${escape(date(item.updated_at))}</td>
+      ${batch ? button('Bỏ qua lượt đang chờ', 'skip') + button('Gửi lại lượt lỗi', 'retry') : ''}</div>`;
+    return `<h3>${escape(title || 'Chi tiết đợt gửi')}</h3>${controls}${items.length ? `<table><thead><tr><th>Người nhận</th><th>Lần gửi thành công gần nhất</th><th>Trạng thái lần gửi mới nhất</th><th>Chi tiết</th><th>Thao tác</th></tr></thead><tbody>${items.map(item => `
+      <tr><td><strong>${escape(item.parent_name || 'Chưa có tên Zalo')}</strong><br>${escape(item.student_name || '')}<br>${escape(item.class_name || item.title || '')}${item.lesson_day ? `<br>${escape(item.lesson_day.split('-').reverse().join('/'))}` : ''}</td>
+      <td>${escape(date(item.last_success) || '—')}</td>
       <td>${escape(item.paused && (waiting.has(item.status) || item.awaiting_second_scan) ? 'Tạm dừng' : item.awaiting_second_scan ? 'Chờ quét lượt 2' : states[item.status] || item.status)}
-      ${partStatus(item)}</td>
+      ${partStatus(item)}<br>${escape(date(item.updated_at))}</td>
       <td>${item.error_message ? `<div class="zalo-batch-error">${escape(item.error_message)}</div>` : ''}${item.body ? `<details><summary>Xem nội dung</summary><div class="zalo-batch-body">${escape(item.body)}</div></details>` : ''}</td>
       <td>${itemActions(item)}</td></tr>`).join('')}</tbody></table>` : '<p>Không tìm thấy lượt gửi trong đợt này.</p>'}${pager(itemOffset,100,items.length)}`;
   }
@@ -88,9 +107,13 @@
     const category = dialog.querySelector('[data-filter=category]').value || null;
     const state = dialog.querySelector('[data-filter=state]').value || null;
     content.setAttribute('aria-busy', 'true');
-    const [result, dispatch, automatic] = await Promise.all([selectedBatch
-      ? sb.rpc('list_zalo_send_batch_items', { p_batch: selectedBatch, p_offset: itemOffset })
-      : sb.rpc('list_zalo_send_batches', { p_category: category, p_state: state, p_offset: batchOffset }),
+    const selectedCategory = categoryView || category;
+    const recipients = !!(selectedBatch || (categoryView && !historyMode));
+    const query = recipients
+      ? sb.rpc('list_zalo_recipient_status', { p_category: selectedCategory || null, p_batch: selectedBatch, p_offset: itemOffset, p_state: state, p_class: classView || null })
+      : historyMode ? sb.rpc('list_zalo_send_batches', { p_category: selectedCategory, p_state: state, p_offset: batchOffset })
+      : sb.rpc('get_zalo_send_overview');
+    const [result, dispatch, automatic] = await Promise.all([query,
       sb.rpc('get_mindup_zalo_dispatch_status'),
       sb.rpc('control_automatic_tuition', { p_action: 'status' })
     ]);
@@ -102,8 +125,16 @@
       automatic.data ? button(automatic.data.paused ? 'Bật nhắc học phí tự động' : 'Dừng nhắc học phí tự động', 'automatic', automatic.data.paused ? 'resume' : 'pause') : ''
     ].join('');
     if (result.error) { content.textContent = 'Không tải được đợt gửi. ' + result.error.message; return; }
-    if (selectedBatch) { items = result.data || []; content.innerHTML = batchDetails(); }
-    else { rows = result.data || []; content.innerHTML = batchList(); }
+    if (recipients) { items = result.data || []; content.innerHTML = batchDetails(); }
+    else if (historyMode) { rows = result.data || []; content.innerHTML = batchList(); }
+    else {
+      overview = result.data || [];
+      const full = overview;
+      overview = full.filter(row => (!category || row.category === category) &&
+        (!state || (state === 'active' ? row.waiting + row.processing > 0 : row.errors + row.uncertain > 0)));
+      content.innerHTML = overviewList();
+      overview = full;
+    }
   }
 
   async function onClick(event) {
@@ -112,11 +143,22 @@
     const command = target.dataset.command;
     const value = target.dataset.value;
     if (command === 'close') return dialog.close();
+    if (command === 'category') {
+      categoryView = value;
+      const row = overview.find(entry => entry.category === value);
+      batch = ['evaluation','absence','receipt'].includes(value) ? null : row?.batch_key || null;
+      classView = null;
+      historyMode = false;
+      itemOffset = 0;
+      return load();
+    }
+    if (command === 'class') { classView = value || null; itemOffset = 0; return load(); }
     if (command === 'open') { batch = value; itemOffset = 0; return load(); }
-    if (command === 'back') { batch = null; return load(); }
+    if (command === 'back') { batch = null; historyMode = true; batchOffset = 0; return load(); }
+    if (command === 'home') { batch = categoryView = classView = null; historyMode = false; return load(); }
     if (command === 'refresh') return load();
     if (command === 'page') {
-      if (batch) itemOffset += Number(value);
+      if (batch || (categoryView && !historyMode)) itemOffset += Number(value);
       else batchOffset += Number(value);
       return load();
     }
@@ -147,7 +189,7 @@
         if (error) throw error;
         status('Đã cập nhật trạng thái.');
       } else {
-        const { data, error } = await sb.rpc('control_zalo_send_batch', { p_batch: batch, p_action: command, p_job: value || null, p_checked: bulkRetry || !!ambiguous });
+        const { data, error } = await sb.rpc('control_zalo_send_batch', { p_batch: item?.batch_key || batch, p_action: command, p_job: value || null, p_checked: bulkRetry || !!ambiguous });
         if (error) throw error;
         status(data ? `${actions[command]}: đã cập nhật ${data} lượt.` : 'Không có lượt đủ điều kiện cho thao tác này.');
       }
@@ -172,8 +214,12 @@
       if (!sb) return;
       if (!dialog) makeDialog();
       batch = batchKey || null;
+      categoryView = batch && category && labels[category] ? category : null;
+      classView = null;
+      historyMode = false;
       batchOffset = itemOffset = 0;
-      if (category && labels[category]) dialog.querySelector('[data-filter=category]').value = category;
+      dialog.querySelector('[data-filter=category]').value = category && labels[category] ? category : '';
+      dialog.querySelector('[data-filter=state]').value = '';
       status('');
       if (!dialog.open) dialog.showModal();
       clearInterval(timer);
