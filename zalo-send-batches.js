@@ -22,23 +22,12 @@
     dialog.setAttribute('aria-labelledby', 'zaloBatchesTitle');
     dialog.innerHTML = `<header><h2 id="zaloBatchesTitle">Đợt gửi Zalo</h2>${button('Đóng', 'close')}</header>
       <div class="zalo-dispatch-controls">
-        <label>Loại tin <select data-filter="category"><option value="">Tất cả</option>${Object.entries(labels).map(([key,label]) => `<option value="${key}">${label}</option>`).join('')}</select></label>
-        <label>Trạng thái <select data-filter="state"><option value="">Tất cả</option><option value="active">Còn việc chờ</option><option value="errors">Có lỗi</option></select></label>
         ${button('Tải lại', 'refresh')}${button('Kiểm tra hàng đợi ngay', 'wake')}
+        <span data-global style="display:contents"></span>
       </div>
-      <div class="zalo-dispatch-controls" data-global></div>
       <div class="zalo-batch-status" role="status"></div>
       <div class="zalo-dispatch-table-wrap" data-content></div>`;
     dialog.addEventListener('click', onClick);
-    dialog.addEventListener('change', event => {
-      if (!event.target.dataset.filter || busy) return;
-      if (event.target.dataset.filter === "category") {
-        batch = categoryView = classView = null;
-        historyMode = false;
-        batchOffset = itemOffset = 0;
-      } else { itemOffset = 0; }
-      load();
-    });
     dialog.addEventListener('close', () => { revision++; clearInterval(timer); });
     document.body.appendChild(dialog);
   }
@@ -105,14 +94,12 @@
     const request = ++revision;
     const content = dialog.querySelector('[data-content]');
     const selectedBatch = batch;
-    const category = dialog.querySelector('[data-filter=category]').value || null;
-    const state = dialog.querySelector('[data-filter=state]').value || null;
     content.setAttribute('aria-busy', 'true');
-    const selectedCategory = categoryView || category;
+    const selectedCategory = categoryView || null;
     const recipients = !!(selectedBatch || (categoryView && !historyMode));
     const query = recipients
-      ? sb.rpc('list_zalo_recipient_status', { p_category: selectedCategory || null, p_batch: selectedBatch, p_offset: itemOffset, p_state: state, p_class: classView || null })
-      : historyMode ? sb.rpc('list_zalo_send_batches', { p_category: selectedCategory, p_state: state, p_offset: batchOffset })
+      ? sb.rpc('list_zalo_recipient_status', { p_category: selectedCategory || null, p_batch: selectedBatch, p_offset: itemOffset, p_class: classView || null })
+      : historyMode ? sb.rpc('list_zalo_send_batches', { p_category: selectedCategory, p_offset: batchOffset })
       : sb.rpc('get_zalo_send_overview');
     const [result, dispatch, automatic] = await Promise.all([query,
       sb.rpc('get_mindup_zalo_dispatch_status'),
@@ -130,11 +117,7 @@
     else if (historyMode) { rows = result.data || []; content.innerHTML = batchList(); }
     else {
       overview = result.data || [];
-      const full = overview;
-      overview = full.filter(row => (!category || row.category === category) &&
-        (!state || (state === 'active' ? row.waiting + row.processing > 0 : row.errors + row.uncertain > 0)));
       content.innerHTML = overviewList();
-      overview = full;
     }
   }
 
@@ -219,8 +202,6 @@
       classView = null;
       historyMode = false;
       batchOffset = itemOffset = 0;
-      dialog.querySelector('[data-filter=category]').value = category && labels[category] ? category : '';
-      dialog.querySelector('[data-filter=state]').value = '';
       status('');
       if (!dialog.open) dialog.showModal();
       clearInterval(timer);
