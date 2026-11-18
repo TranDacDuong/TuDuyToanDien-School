@@ -327,6 +327,10 @@
         });
       });
 
+      const firstRegularOn = attendanceDetails.find(detail =>
+        detail.status === "present" || detail.status === "makeup"
+      )?.date || null;
+      const trialOnly = trialCount > 0 && !firstRegularOn;
       const { billableSessions, feePerSession, amount: baseAmount, noteCalc: baseNote } = calcTuition({
         tuition_type: cls.tuition_type,
         tuition_fee: cls.tuition_fee,
@@ -334,9 +338,9 @@
         present, absent, makeup, totalSessions: Math.max(0, totalSessions - trialCount),
       });
 
-      const finalAmount = baseAmount + suppTotalFee;
-      let noteCalc = baseNote;
-      if (suppTotalFee > 0) {
+      const finalAmount = trialOnly ? 0 : baseAmount + suppTotalFee;
+      let noteCalc = trialOnly ? "Học thử miễn phí" : baseNote;
+      if (!trialOnly && suppTotalFee > 0) {
         noteCalc = (noteCalc ? `${noteCalc} • ` : "") + `Dạy bổ sung (${suppCount} buổi): +${fmt(suppTotalFee)}đ`;
       }
 
@@ -364,7 +368,8 @@
         totalSessions, present, absent, makeup, trialCount,
         suppCount, suppTotalFee,
         attendanceDetails,
-        billableSessions, feePerSession, amount: finalAmount, noteCalc, ym,
+        billableSessions: trialOnly ? 0 : billableSessions,
+        firstRegularOn, feePerSession, amount: finalAmount, noteCalc, ym,
       });
     });
 

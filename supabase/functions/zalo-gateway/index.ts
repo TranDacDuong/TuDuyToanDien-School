@@ -111,6 +111,18 @@ Deno.serve(async (request) => {
     if (payload.action === "automaticTuitionCandidates") {
       return json({ data: await rpc("automatic_tuition_candidates", {}) });
     }
+    if (payload.action === "trialTuitionBillingContext") {
+      return json({ data: await rpc("tuition_trial_billing_context", {}) });
+    }
+    if (payload.action === "saveTrialTuitionBasis") {
+      const { month, rows } = payload;
+      if (typeof month !== "string" || !/^\d{4}-\d{2}-01$/.test(month) ||
+        !Array.isArray(rows) || rows.length > 100) {
+        return json({ error: "Invalid trial tuition basis" }, 400);
+      }
+      await rpc("save_trial_tuition_basis", { p_month: month, p_rows: rows });
+      return json({ success: true });
+    }
     const automaticActions: Record<string, { rpc: string; fields: string[] }> = {
       enqueueAutomaticTuition: { rpc: "enqueue_automatic_tuition_reminder", fields:
         ["p_parent", "p_month", "p_slot", "p_due", "p_today", "p_phone", "p_payload"] },

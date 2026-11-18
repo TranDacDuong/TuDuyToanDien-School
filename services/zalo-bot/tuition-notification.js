@@ -92,7 +92,17 @@ async function prepareNotification(payload,options={}) {
       for(const month of months) {
         const context=monthContext(payload,month,student.id);
         const rows=Calculation.buildRowsForMonth({...context,ym:month,payments:Object.fromEntries(context.payments.map(p=>[p.student_id,p]))},{discountRules:context.discountRules});
-        const lines=statementLines({...student,rows},context,today),chunks=[];let chunk=[],classHeader;
+        const debt=student.debts.find(d=>d.month.slice(0,7)===month);
+        const deferredClasses=new Set(debt?.deferred_class_ids||[]);
+        const statementRows=rows.filter(row=>!deferredClasses.has(row.classId));
+        if(deferredClasses.size) {
+          context.payments=context.payments.map(payment=>({
+            ...payment,amount_due:Number(debt.remaining)+Number(payment.amount_paid||0),
+            discount_amount:(payment.gross_components||[]).filter(c=>!deferredClasses.has(c.class_id))
+              .reduce((sum,c)=>sum+Math.round(Number(c.amount)*Number(c.percent||0)/100),0)
+          }));
+        }
+        const lines=statementLines({...student,rows:statementRows},context,today),chunks=[];let chunk=[],classHeader;
         for(const line of lines){if(chunk.length>=24){chunks.push(chunk);chunk=[];if(!line.classTitle&&classHeader)chunk.push(classHeader);}if(line.classTitle)classHeader=line;chunk.push(line);}
         if(chunk.length)chunks.push(chunk);
         const remaining=student.debts.filter(d=>d.month.slice(0,7)===month).reduce((n,d)=>n+Number(d.remaining),0);

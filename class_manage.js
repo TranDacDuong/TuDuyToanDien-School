@@ -1142,7 +1142,6 @@
     tc.innerHTML= scheduleLoadWarning +
       '<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">'+
       '<button onclick="cvOpenAddStudent()" class="btn btn-primary btn-sm">+ Thêm học sinh</button>'+
-      (window.ClassTrials?.canManage() ? '<button type="button" onclick="ClassTrials.openAdd()" class="btn btn-outline btn-sm">+ Học sinh học thử</button>' : '')+
       (canEvaluateClassSession(role) ? '<button onclick="cvOpenOfflineTestScoreModal()" class="btn btn-outline btn-sm">+ Thêm điểm đề kiểm tra</button>' : '')+
       '</div>'+
       '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">'+

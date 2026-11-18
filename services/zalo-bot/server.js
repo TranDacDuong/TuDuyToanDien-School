@@ -11,7 +11,7 @@ const friendProfiles = new Map();
 const contactFingerprints = new Map();
 const { writeJsonAtomic } = require('./sync-store');
 const { prepareScoreMessageMedia, sendScoreNotice } = require('./score-message-media');
-const { createScheduler, isSendingTime, quietHoursError } = require('./tuition-reminder-scheduler');
+const { createScheduler, buildTrialTuitionBasis, isSendingTime, quietHoursError } = require('./tuition-reminder-scheduler');
 const { requireSendAcknowledgement } = require('./send-acknowledgement');
 const { createSendPacer, installSendPacing, fetchWithDeadline } = require('./send-pacing');
 const { installReadOnly } = require('./zalo-read-only');
@@ -156,6 +156,15 @@ const automaticTuitionActions = {
 };
 const automaticTuitionScheduler = createScheduler({
   stopRequested: () => shuttingDown,
+  refreshTrialBasis: async () => {
+    const { data: context } = await gatewayRequest({ action: 'trialTuitionBillingContext' });
+    for (const month of context.months) {
+      const rows = buildTrialTuitionBasis(context, month);
+      for (let offset = 0; offset < rows.length; offset += 100) {
+        await gatewayRequest({ action: 'saveTrialTuitionBasis', month: month + '-01', rows: rows.slice(offset, offset + 100) });
+      }
+    }
+  },
   rpc: async (name, args) => {
     const action = automaticTuitionActions[name];
     if (!action) throw new Error('Unsupported automatic tuition RPC');

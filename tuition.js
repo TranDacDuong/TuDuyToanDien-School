@@ -1366,6 +1366,7 @@ Nhập số tiền hoàn lại (>0):`,
         suppTotalFee:     r.suppTotalFee || 0,
         attendanceDetails: r.attendanceDetails || [],
         billableSessions: r.billableSessions,
+        firstRegularOn: r.firstRegularOn,
         feePerSession:    r.feePerSession,
         amount:           r.amount,
         grossAmount: r.grossAmount ?? r.amount,
@@ -2212,9 +2213,7 @@ Nhập số tiền hoàn lại (>0):`,
           && /^(0\d{9}|84\d{9})$/.test(studentPhone)),
         due
       };
-      const prior = (zaloArrears.get(item.studentId)?.debts || []).filter(debt => debt.month.slice(0, 7) < ym);
-      const current = remaining > 0 ? [{ payment_id: paymentMap[item.studentId]?.id || null, month: ymToDate(ym), remaining }] : [];
-      applyZaloDebts(item, [...prior, ...current]);
+      applyZaloDebts(item, zaloArrears.get(item.studentId)?.debts || []);
       item.selected = item.due && Boolean(parent?.id && /^(0\d{9}|84\d{9})$/.test(cleanPhone) && /^(0\d{9}|84\d{9})$/.test(studentPhone));
       return item;
     });

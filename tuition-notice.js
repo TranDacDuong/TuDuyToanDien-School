@@ -25,7 +25,10 @@ Gửi kèm: {AnhDinhKem} (mỗi ảnh kèm theo số tiền trong từng tháng)
   function build({month,parentName,children,bank,rows=[],template}) {
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !children?.length) throw Error('Invalid tuition notice');
     const students=children.map(child=>{
-      const details=rows.filter(r=>r.studentId===child.student_id);
+      const currentDebt=(child.debts||[]).find(debt=>debt.month.slice(0,7)===month);
+      const deferred=new Set(currentDebt?.deferred_class_ids||[]);
+      const details=rows.filter(r=>r.studentId===child.student_id&&!deferred.has(r.classId)
+        && (!child.debts?.length||currentDebt));
       if (!Number.isSafeInteger(Number(child.remaining)) || Number(child.remaining)<=0) throw Error('Invalid tuition balance');
       const memo=child.transfer_memo;
       if (!memo) throw Error('Missing registered transfer memo');

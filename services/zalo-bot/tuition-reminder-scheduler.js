@@ -7,6 +7,7 @@ const TIME_ZONE = 'Asia/Ho_Chi_Minh';
 const SLOTS = [5, 10, 15];
 const TuitionNotice = require('../../tuition-notice');
 const TuitionCalculation = require('../../tuition-calculation');
+const { basisComponent } = require('../../tuition-discounts');
 const { sendErrorMessage } = require('./send-acknowledgement');
 
 function vnDate(now = new Date()) {
@@ -115,7 +116,16 @@ function buildPayload(candidate, month, bank) {
     parts: [{ kind: 'text', content }, ...qrs] };
 }
 
-function createScheduler({ rpc, bank, clock = () => new Date(), convert = lunarDay, stopRequested = () => false }) {
+function buildTrialTuitionBasis(context, month) {
+  const groups = new Map();
+  for (const row of TuitionCalculation.buildRowsForMonth({ ...context, ym: month })) {
+    if (!groups.has(row.studentId)) groups.set(row.studentId, []);
+    groups.get(row.studentId).push(basisComponent(row));
+  }
+  return [...groups].map(([student_id, components]) => ({ student_id, components }));
+}
+
+function createScheduler({ rpc, bank, clock = () => new Date(), convert = lunarDay, stopRequested = () => false, refreshTrialBasis }) {
   if (typeof rpc !== 'function') throw new TypeError('rpc required');
   async function call(name, args) {
     const result = await rpc(name, args);
@@ -164,6 +174,7 @@ function createScheduler({ rpc, bank, clock = () => new Date(), convert = lunarD
     return { id: job.id, status: 'sent' };
   }
   let busy = false;
+  let trialBasisDate = null;
   return {
     schedule: () => plan(clock(), convert),
     dispatchClaimed,
@@ -174,6 +185,10 @@ function createScheduler({ rpc, bank, clock = () => new Date(), convert = lunarD
       try {
         const current = plan(clock(), convert);
         if (!current.allowed || !current.due) return { queued: 0 };
+        if (refreshTrialBasis && trialBasisDate !== current.today) {
+          await refreshTrialBasis();
+          trialBasisDate = current.today;
+        }
         const candidates = await call('automatic_tuition_candidates', {});
         let queued = 0;
         const errors=[];
@@ -206,4 +221,4 @@ function createScheduler({ rpc, bank, clock = () => new Date(), convert = lunarD
   };
 }
 
-module.exports = { TIME_ZONE, SLOTS, vnDate, lunarDay, plan, buildPayload, createScheduler, isSendingTime, quietHoursError };
+module.exports = { TIME_ZONE, SLOTS, vnDate, lunarDay, plan, buildPayload, buildTrialTuitionBasis, createScheduler, isSendingTime, quietHoursError };

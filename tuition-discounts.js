@@ -11,7 +11,14 @@
         noteCalc: (row.noteCalc || '') + (discountAmount ? ` • Giảm ${discountPercent}%: -${discountAmount.toLocaleString('vi-VN')}đ` : '') };
     });
   }
-  if (typeof module !== 'undefined' && module.exports) { module.exports = { apply }; return; }
+  function basisComponent(row) {
+    return {
+      class_id: row.classId,
+      amount: Math.round(row.grossAmount ?? row.amount),
+      first_regular_on: row.firstRegularOn || null,
+    };
+  }
+  if (typeof module !== 'undefined' && module.exports) { module.exports = { apply, basisComponent }; return; }
   let rules = [], catalog = null, editing = null, busy = false, manager = false;
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const currentMonth = () => {
@@ -149,7 +156,7 @@
     async persist(ym, groups, fullScope) {
       if (!manager || !fullScope || !groups.length) return [];
       return rpc('save_tuition_discount_basis', { p_month: ym + '-01', p_rows: groups.map(g => ({ student_id: g.studentId,
-        components: g.classes.map(c => ({ class_id: c.classId, amount: c.grossAmount ?? c.amount, percent: c.discountPercent || 0 })) })) });
+        components: g.classes.map(basisComponent) })) });
     }
   };
 })(typeof window === 'undefined' ? null : window);
