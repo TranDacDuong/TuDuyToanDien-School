@@ -1130,18 +1130,19 @@
       '<div id="cvAddStudentModal" class="popup-overlay hidden" style="z-index:1100" onclick="if(event.target===this)cvCloseAddStudent()">'+
       '<div class="popup-card" style="width:min(94vw,640px);padding:0;max-height:88vh">'+
       '<div class="popup-header" style="padding:16px 18px 12px;margin:0;border-bottom:1px solid var(--border)">'+
-      '<h3>Thêm học sinh</h3>'+
+      '<h3>Thêm học sinh vào lớp</h3>'+
       '<button onclick="cvCloseAddStudent()" class="close-btn" type="button">✕</button>'+
       "</div>"+
       '<div style="padding:16px 18px 18px">'+
       '<label for="cvStudentSearch">Tìm học sinh</label>'+
       '<input id="cvStudentSearch" type="text" placeholder="Nhập tên hoặc email..." oninput="cvSearchStudents()" />'+
+      '<button id="cvNewStudentButton" type="button" class="btn btn-outline btn-sm" style="margin-top:10px" onclick="cvOpenNewStudent()">+ Thêm học sinh mới</button>'+
       '<div id="cvSearchResults" style="margin-top:12px;max-height:52vh;overflow-y:auto"></div>'+
       "</div></div></div>";
 
     tc.innerHTML= scheduleLoadWarning +
       '<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">'+
-      '<button onclick="cvOpenAddStudent()" class="btn btn-primary btn-sm">+ Thêm học sinh</button>'+
+      '<button onclick="cvOpenAddStudent()" class="btn btn-primary btn-sm">+ Thêm học sinh vào lớp</button>'+
       (canEvaluateClassSession(role) ? '<button onclick="cvOpenOfflineTestScoreModal()" class="btn btn-outline btn-sm">+ Thêm điểm đề kiểm tra</button>' : '')+
       '</div>'+
       '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">'+
@@ -1985,7 +1986,8 @@
     const title=modal.querySelector(".popup-header h3");
     const label=modal.querySelector('label[for="cvStudentSearch"]');
     const inp=document.getElementById("cvStudentSearch");
-    if(title) title.textContent="Thêm học sinh";
+    if(title) title.textContent="Thêm học sinh vào lớp";
+    modal.querySelector("#cvNewStudentButton").style.display="";
     if(label) label.style.display="";
     if(inp){ inp.style.display=""; inp.disabled=false; inp.value=""; }
     modal.classList.remove("hidden");
@@ -1997,9 +1999,95 @@
 
   window.cvCloseAddStudent = function(){
     const modal=document.getElementById("cvAddStudentModal");
-    if(!modal) return;
+    if(!modal || modal.querySelector("#cvNewStudentForm[aria-busy=true]")) return;
     modal.classList.add("hidden");
     modal.style.display="none";
+  };
+
+  function hideClassStudentSearch(modal){
+    modal.querySelector('label[for="cvStudentSearch"]').style.display="none";
+    const input=modal.querySelector("#cvStudentSearch");
+    input.style.display="none";
+    input.disabled=true;
+    modal.querySelector("#cvNewStudentButton").style.display="none";
+  }
+
+  window.cvOpenNewStudent = function(){
+    const modal=document.getElementById("cvAddStudentModal");
+    const results=modal?.querySelector("#cvSearchResults");
+    if(!results) return;
+    hideClassStudentSearch(modal);
+    modal.querySelector(".popup-header h3").textContent="Thêm học sinh mới";
+    results.innerHTML=`
+      <form id="cvNewStudentForm">
+        <fieldset style="border:0;margin:0;padding:0;min-width:0">
+          <div class="fg"><label for="cvNewStudentName">Họ tên học sinh</label><input id="cvNewStudentName" name="student_name" required maxlength="150"></div>
+          <div class="fg"><label for="cvNewStudentPhone">Số điện thoại học sinh</label><input id="cvNewStudentPhone" name="student_phone" type="tel" required maxlength="30"></div>
+          <div class="fg"><label for="cvNewStudentSchool">Trường</label><input id="cvNewStudentSchool" name="school" required maxlength="200"></div>
+          <div class="fg"><label for="cvNewParentName">Họ tên phụ huynh</label><input id="cvNewParentName" name="parent_name" required maxlength="150"></div>
+          <div class="fg"><label for="cvNewParentPhone">Số điện thoại phụ huynh</label><input id="cvNewParentPhone" name="parent_phone" type="tel" required maxlength="30"></div>
+          <p data-feedback role="status" style="margin:8px 0"></p>
+          <div data-matches style="display:flex;gap:6px;flex-wrap:wrap"></div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+            <button type="button" class="btn btn-outline btn-sm" onclick="cvOpenAddStudent()">Quay lại</button>
+            <button type="submit" class="btn btn-primary btn-sm">Tạo mới</button>
+          </div>
+        </fieldset>
+      </form>`;
+    const form=results.querySelector("form");
+    const feedback=form.querySelector("[data-feedback]");
+    const matches=form.querySelector("[data-matches]");
+    const classId=_classId;
+    function action(label, callback){
+      const button=document.createElement("button");
+      button.type="button";
+      button.className="btn btn-outline btn-sm";
+      button.textContent=label;
+      button.addEventListener("click",callback);
+      matches.append(button);
+    }
+    async function submit(distinctPhone=false, parentId=null){
+      if(form.getAttribute("aria-busy")==="true" || !form.reportValidity()) return;
+      const payload=Object.fromEntries([...new FormData(form)].map(([key,value])=>["p_"+key,value.trim()]));
+      form.setAttribute("aria-busy","true");
+      form.querySelector("fieldset").disabled=true;
+      matches.replaceChildren();
+      feedback.textContent="Đang kiểm tra và tạo hồ sơ…";
+      try {
+        const {data,error}=await getSb().rpc("create_class_student_profile",{
+          ...payload,p_class:classId,p_confirm_parent:parentId,p_distinct_student_phone:distinctPhone,
+        });
+        if(error) throw error;
+        if(data?.status==="created"){
+          const {id,full_name,email}=data.student;
+          if(_studentSearchPool) _studentSearchPool.push({id,full_name,email});
+          if(form.isConnected && _classId===classId) cvOpenSchedulePicker(data.student.id,data.student.full_name,data);
+        } else if(data?.status==="student_exists"){
+          feedback.textContent="Số điện thoại này đã có hồ sơ học sinh. Chọn hồ sơ nếu đúng học sinh.";
+          for(const student of data.students) {
+            if((_cachedClass.students||[]).some(s=>s.student_id===student.id&&!s.left_at)){
+              feedback.textContent+= " "+student.full_name+" đã ở trong lớp.";
+              continue;
+            }
+            action("Chọn "+student.full_name,()=>cvOpenSchedulePicker(student.id,student.full_name));
+          }
+          if(data.can_create_distinct) action("Tạo hồ sơ cho học sinh khác",()=>submit(true));
+        } else if(data?.status==="confirm_parent"){
+          feedback.textContent="Đã có phụ huynh "+data.parent.full_name+" ("+data.parent.email+").";
+          action("Dùng tài khoản phụ huynh này",()=>submit(distinctPhone,data.parent.id));
+        } else {
+          throw new Error("Không nhận được thông tin hồ sơ vừa tạo.");
+        }
+      } catch(error) {
+        feedback.textContent=error.message || "Không tạo được hồ sơ.";
+      } finally {
+        form.removeAttribute("aria-busy");
+        form.querySelector("fieldset").disabled=false;
+      }
+    }
+    form.addEventListener("input",()=>{matches.replaceChildren();feedback.textContent="";});
+    form.addEventListener("submit",event=>{event.preventDefault();void submit();});
+    form.elements.student_name.focus();
   };
 
   window.cvOpenEditStudentSchedule = function(studentId, studentName){
@@ -2008,11 +2096,8 @@
     const resultsDiv=document.getElementById("cvSearchResults");
     if(!modal || !resultsDiv) return;
     const title=modal.querySelector(".popup-header h3");
-    const label=modal.querySelector('label[for="cvStudentSearch"]');
-    const inp=document.getElementById("cvStudentSearch");
     if(title) title.textContent="Sửa lịch học";
-    if(label) label.style.display="none";
-    if(inp){ inp.style.display="none"; inp.disabled=true; }
+    hideClassStudentSearch(modal);
 
     const sched=getSchedulesForMonth(_cachedClass.class_schedules||[],_currentMonth,_currentYear);
     const today = todayStr();
@@ -2088,7 +2173,9 @@
   };
 
   window.cvSearchStudents = async function(){
-    const q=(document.getElementById("cvStudentSearch")||{}).value||"";
+    const search=document.getElementById("cvStudentSearch");
+    if(!search || search.disabled) return;
+    const q=search.value;
     const resultsDiv=document.getElementById("cvSearchResults");
     if(!resultsDiv) return;
     if(q.trim().length<1){resultsDiv.innerHTML="";return;}
@@ -2097,9 +2184,11 @@
     try{
       localMatches = (await getStudentSearchPool()).filter(u => matchesStudentSearch(u, q)).slice(0, 10);
     }catch(error){
-      resultsDiv.innerHTML='<p style="font-size:13px;color:var(--red)">Lỗi tải danh sách học sinh: '+error.message+'</p>';
+      if(search.isConnected&&!search.disabled&&search.value===q)
+        resultsDiv.innerHTML='<p style="font-size:13px;color:var(--red)">Lỗi tải danh sách học sinh: '+esc(error.message)+'</p>';
       return;
     }
+    if(!search.isConnected||search.disabled||search.value!==q) return;
     if(!localMatches.length){
       resultsDiv.innerHTML='<p style="font-size:13px;color:var(--ink-light)">Không tìm thấy học sinh nào.</p>';
       return;
@@ -2107,53 +2196,40 @@
     let localHtml="";
     localMatches.forEach(u=>{
       const alreadyIn=existingActiveIds.includes(u.id);
-      const safeName=(u.full_name || "").replace(/'/g,"\\'");
       localHtml+='<div style="display:flex;justify-content:space-between;align-items:center;'+
         'padding:8px 10px;border-radius:8px;margin-bottom:4px;'+
         'background:'+(alreadyIn?"var(--surface)":"var(--white)")+';border:1px solid var(--border)">'+
         "<div>"+
-        '<div style="font-weight:600;font-size:.85rem;color:var(--navy)">'+(u.full_name||"—")+"</div>"+
-        '<div style="font-size:.75rem;color:var(--ink-mid)">'+(u.email||"")+"</div>"+
+        '<div style="font-weight:600;font-size:.85rem;color:var(--navy)">'+esc(u.full_name||"—")+"</div>"+
+        '<div style="font-size:.75rem;color:var(--ink-mid)">'+esc(u.email||"")+"</div>"+
         "</div>"+
         (alreadyIn
           ?'<span style="font-size:.75rem;color:var(--ink-light)">Đã trong lớp</span>'
-          :'<button onclick="cvOpenSchedulePicker(\''+u.id+'\',\''+safeName+'\')" class="btn btn-primary btn-sm">Thêm</button>')+
+          :'<button type="button" data-student-id="'+esc(u.id)+'" class="btn btn-primary btn-sm">Thêm</button>')+
         "</div>";
     });
     resultsDiv.innerHTML=localHtml;
-    return;
-    const sb=getSb();
-    const existingIds=(_cachedClass.students||[]).filter(s=>!s.left_at).map(s=>s.student_id);
-    const{data,error}=await sb.from("users").select("id,full_name,email,phone").eq("role","student")
-      .or("full_name.ilike.%"+q+"%,email.ilike.%"+q+"%").limit(10);
-    if(error||!data||data.length===0){
-      resultsDiv.innerHTML='<p style="font-size:13px;color:var(--ink-light)">Không tìm thấy học sinh nào.</p>';
-      return;
-    }
-    let html="";
-    data.forEach(u=>{
-      const alreadyIn=existingIds.includes(u.id);
-      const safeName=u.full_name.replace(/'/g,"\\'");
-      html+='<div style="display:flex;justify-content:space-between;align-items:center;'+
-        'padding:8px 10px;border-radius:8px;margin-bottom:4px;'+
-        'background:'+(alreadyIn?"var(--surface)":"var(--white)")+';border:1px solid var(--border)">'+
-        "<div>"+
-        '<div style="font-weight:600;font-size:.85rem;color:var(--navy)">'+u.full_name+"</div>"+
-        '<div style="font-size:.75rem;color:var(--ink-mid)">'+(u.email||"")+(u.phone?" • "+u.phone:"")+"</div>"+
-        "</div>"+
-        (alreadyIn
-          ?'<span style="font-size:.75rem;color:var(--ink-light)">Đã trong lớp</span>'
-          :'<button onclick="cvOpenSchedulePicker(\''+u.id+'\',\''+safeName+'\')" class="btn btn-primary btn-sm">Thêm</button>')+
-        "</div>";
+    resultsDiv.querySelectorAll("[data-student-id]").forEach(button=>{
+      const student=localMatches.find(item=>item.id===button.dataset.studentId);
+      button.addEventListener("click",()=>cvOpenSchedulePicker(student.id,student.full_name));
     });
-    resultsDiv.innerHTML=html;
   };
 
-  window.cvOpenSchedulePicker = function(studentId, studentName){
+  window.cvOpenSchedulePicker = function(studentId, studentName, createdAccounts){
     const resultsDiv=document.getElementById("cvSearchResults");
     if(!resultsDiv) return;
+    const modal=resultsDiv.closest("#cvAddStudentModal");
+    hideClassStudentSearch(modal);
+    modal.querySelector(".popup-header h3").textContent="Thêm học sinh vào lớp";
     const sched=getSchedulesForMonth(_cachedClass.class_schedules||[],_currentMonth,_currentYear);
     const today = todayStr();
+    const credentials=createdAccounts
+      ? '<details style="margin-top:10px"><summary>Tài khoản vừa tạo</summary>'+
+        [ ["Học sinh",createdAccounts.student], ["Phụ huynh",createdAccounts.parent] ]
+          .filter(([,account])=>account?.password)
+          .map(([label,account])=>'<p><b>'+label+'</b><br>'+esc(account.email)+'<br>Mật khẩu: '+esc(account.password)+'</p>').join("")+
+        '</details>'
+      : '';
     resultsDiv.innerHTML =
       '<div style="padding:10px;border-radius:10px;background:#fff;border:1px solid var(--border)">'+
         '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center">'+
@@ -2161,8 +2237,9 @@
             '<div style="font-weight:800;color:var(--navy)">Chọn lịch học</div>'+
             '<div style="font-size:.82rem;color:var(--ink-mid);margin-top:2px">'+esc(studentName)+'</div>'+
           '</div>'+
-          '<button onclick="cvSearchStudents()" class="btn btn-outline btn-sm">Đổi học sinh</button>'+
+          '<button type="button" onclick="cvOpenAddStudent()" class="btn btn-outline btn-sm">Đổi học sinh</button>'+
         '</div>'+
+        credentials+
         '<div style="margin-top:10px" class="fg">'+
           '<label>Ngày bắt đầu vào lớp</label>'+
           '<input id="cvAddStudentJoinedAt" type="date" value="'+today+'">'+
@@ -2170,9 +2247,10 @@
         '</div>'+
         buildSchedulePickerHtml(sched)+
         '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">'+
-          '<button onclick="cvConfirmAddStudent(\''+studentId+'\',\''+String(studentName || '').replace(/'/g,"\\'")+'\')" class="btn btn-primary btn-sm">Xác nhận thêm</button>'+
+          '<button type="button" data-confirm-enrollment class="btn btn-primary btn-sm">Xác nhận thêm</button>'+
         '</div>'+
       '</div>';
+    resultsDiv.querySelector("[data-confirm-enrollment]").addEventListener("click",()=>cvConfirmAddStudent(studentId,studentName));
   };
 
   const pendingClassStudentAdds=new Set();

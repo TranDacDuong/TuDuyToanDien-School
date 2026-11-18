@@ -49,9 +49,34 @@ test('attendance keeps pre-join absences and ordinary students, shows alternate 
  await expect(page.locator('[id="cvatt_trial_2026-10-15_1"]')).toHaveText('Học thử');
  await expect(page.locator('[id="cvatt_trial_2026-10-17_2"]')).toHaveText('Học thử');
  await expect(page.locator('[id="cvatt_regular_2026-10-01_1"]')).toHaveText('Có');
- await expect(page.getByRole('button',{name:'+ Học sinh học thử',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'+ Thêm học sinh vào lớp',exact:true})).toBeVisible();
  await expect(page.getByText('Chưa tham gia',{exact:true})).toHaveCount(0);
  expect(await page.evaluate(()=>ClassTrials.studentActions({student_id:'regular',is_trial:false,tuition_starts_on:'2026-10-18'}))).toBe('');
+ await page.getByRole('button',{name:'+ Thêm học sinh vào lớp',exact:true}).click();
+ await page.getByRole('button',{name:'+ Thêm học sinh mới',exact:true}).click();
+ await page.getByLabel('Họ tên học sinh').fill("Học sinh mới");
+ await page.getByLabel('Số điện thoại học sinh').fill("0900000001");
+ await page.getByLabel('Trường',{exact:true}).fill("Trường thử nghiệm");
+ await page.getByLabel('Họ tên phụ huynh').fill("Phụ huynh");
+ await page.getByLabel('Số điện thoại phụ huynh').fill("0900000002");
+ await page.evaluate(()=>{
+   window.__profileCalls=[];
+   window.sb.rpc=async(name,args)=>{
+     window.__profileCalls.push({name,args});
+     return {data:!args.p_confirm_parent
+       ? {status:'confirm_parent',parent:{id:'parent',full_name:'Phụ huynh',email:'parent@example.test'}}
+       : {status:'created',student:{id:'new-student',full_name:'Học sinh mới',email:'student@example.test'}}};
+   };
+ });
+ await page.getByRole('button',{name:'Tạo mới',exact:true}).click();
+ await page.getByRole('button',{name:'Dùng tài khoản phụ huynh này'}).click();
+ await expect(page.getByText('Chọn lịch học',{exact:true})).toBeVisible();
+ await expect(page.locator('#cvSearchResults').getByText('Học sinh mới',{exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Xác nhận thêm',exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>window.__profileCalls.map(call=>[call.name,call.args.p_confirm_parent])))
+   .toEqual([['create_class_student_profile',null],['create_class_student_profile','parent']]);
+ await page.locator('#cvAddStudentModal .close-btn').click();
+ await expect(page.locator('#cvAddStudentModal')).toBeHidden();
 });
 for(const width of [1280,390])test(`automatic promotion dialog fits ${width}px and can extend trial`,async({page})=>{
  await page.setViewportSize({width,height:800});await page.setContent('<main></main>');
