@@ -1,5 +1,32 @@
 BEGIN;
 
+CREATE OR REPLACE FUNCTION public.can_create_class_student_profile(p_class uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$
+  SELECT auth.uid() IS NOT NULL AND coalesce(public.has_app_permission('class.students.add'),false)
+    AND EXISTS (SELECT 1 FROM public.classes c WHERE c.id=p_class AND NOT coalesce(c.hidden,false))
+    AND EXISTS (SELECT 1 FROM public.users u WHERE u.id=auth.uid()
+      AND u.role::text IN ('admin','teacher','assistant')
+      AND (u.role::text='admin' OR public.has_app_permission('classes.all.view')
+        OR EXISTS (SELECT 1 FROM public.class_teachers ct WHERE ct.class_id=p_class AND ct.teacher_id=u.id)));
+$$;
+REVOKE ALL ON FUNCTION public.can_create_class_student_profile(uuid) FROM PUBLIC,anon,authenticated;
+
+CREATE OR REPLACE FUNCTION public.lookup_class_profile_phone(p_class uuid,p_role text,p_phone text)
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=public AS $$
+DECLARE normalized_phone text:=regexp_replace(regexp_replace(coalesce(p_phone,''),'[^0-9]','','g'),'^84([0-9]{9})$','0\1');
+BEGIN
+  IF NOT public.can_create_class_student_profile(p_class) THEN RAISE EXCEPTION 'Bạn không có quyền tạo học sinh từ lớp này'; END IF;
+  IF p_role IS NULL OR p_role NOT IN ('student','parent') OR normalized_phone !~ '^0[0-9]{9}$'
+  THEN RAISE EXCEPTION 'Số điện thoại không hợp lệ'; END IF;
+  RETURN (SELECT coalesce(jsonb_agg(jsonb_build_object('id',u.id,'full_name',u.full_name,'email',u.email)
+    ORDER BY u.full_name,u.id),'[]')
+    FROM public.users u WHERE u.role::text=p_role
+      AND regexp_replace(regexp_replace(coalesce(u.phone,''),'[^0-9]','','g'),'^84([0-9]{9})$','0\1')=normalized_phone);
+END;
+$$;
+REVOKE ALL ON FUNCTION public.lookup_class_profile_phone(uuid,text,text) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.lookup_class_profile_phone(uuid,text,text) TO authenticated;
+
 CREATE OR REPLACE FUNCTION public.create_class_student_profile(
   p_class uuid, p_student_name text, p_student_phone text, p_school text,
   p_parent_name text, p_parent_phone text, p_confirm_parent uuid DEFAULT NULL,
@@ -23,12 +50,7 @@ DECLARE
   password_value text;
   suffix integer;
 BEGIN
-  IF auth.uid() IS NULL OR NOT coalesce(public.has_app_permission('class.students.add'),false)
-    OR NOT EXISTS (SELECT 1 FROM public.classes c WHERE c.id=p_class AND NOT coalesce(c.hidden,false))
-    OR NOT EXISTS (SELECT 1 FROM public.users u WHERE u.id=auth.uid()
-      AND u.role::text IN ('admin','teacher','assistant')
-      AND (u.role::text='admin' OR public.has_app_permission('classes.all.view')
-        OR EXISTS (SELECT 1 FROM public.class_teachers ct WHERE ct.class_id=p_class AND ct.teacher_id=u.id)))
+  IF NOT public.can_create_class_student_profile(p_class)
   THEN RAISE EXCEPTION 'Bạn không có quyền tạo học sinh từ lớp này'; END IF;
 
   IF length(student_name) NOT BETWEEN 1 AND 150 OR length(parent_name) NOT BETWEEN 1 AND 150

@@ -2021,13 +2021,15 @@
     results.innerHTML=`
       <form id="cvNewStudentForm">
         <fieldset style="border:0;margin:0;padding:0;min-width:0">
-          <div class="fg"><label for="cvNewStudentName">Họ tên học sinh</label><input id="cvNewStudentName" name="student_name" required maxlength="150"></div>
           <div class="fg"><label for="cvNewStudentPhone">Số điện thoại học sinh</label><input id="cvNewStudentPhone" name="student_phone" type="tel" required maxlength="30"></div>
+          <p data-phone-status="student" role="status"></p>
+          <div data-student-matches style="display:flex;gap:6px;flex-wrap:wrap"></div>
+          <div class="fg"><label for="cvNewParentPhone">Số điện thoại phụ huynh</label><input id="cvNewParentPhone" name="parent_phone" type="tel" required maxlength="30"></div>
+          <p data-phone-status="parent" role="status"></p>
+          <div class="fg"><label for="cvNewStudentName">Họ tên học sinh</label><input id="cvNewStudentName" name="student_name" required maxlength="150"></div>
           <div class="fg"><label for="cvNewStudentSchool">Trường</label><input id="cvNewStudentSchool" name="school" required maxlength="200"></div>
           <div class="fg"><label for="cvNewParentName">Họ tên phụ huynh</label><input id="cvNewParentName" name="parent_name" required maxlength="150"></div>
-          <div class="fg"><label for="cvNewParentPhone">Số điện thoại phụ huynh</label><input id="cvNewParentPhone" name="parent_phone" type="tel" required maxlength="30"></div>
           <p data-feedback role="status" style="margin:8px 0"></p>
-          <div data-matches style="display:flex;gap:6px;flex-wrap:wrap"></div>
           <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
             <button type="button" class="btn btn-outline btn-sm" onclick="cvOpenAddStudent()">Quay lại</button>
             <button type="submit" class="btn btn-primary btn-sm">Tạo mới</button>
@@ -2036,45 +2038,122 @@
       </form>`;
     const form=results.querySelector("form");
     const feedback=form.querySelector("[data-feedback]");
-    const matches=form.querySelector("[data-matches]");
+    const matches=form.querySelector("[data-student-matches]");
+    const parentName=form.elements.parent_name;
     const classId=_classId;
-    function action(label, callback){
+    const lookups={student:{},parent:{}};
+    let distinctPhone=false;
+    let parentId=null;
+    function action(container,label,callback){
       const button=document.createElement("button");
       button.type="button";
       button.className="btn btn-outline btn-sm";
       button.textContent=label;
       button.addEventListener("click",callback);
-      matches.append(button);
+      container.append(button);
     }
-    async function submit(distinctPhone=false, parentId=null){
+    function showStudentMatches(students,canCreate){
+      const status=form.querySelector('[data-phone-status="student"]');
+      status.textContent="Số điện thoại này đã có hồ sơ học sinh.";
+      matches.replaceChildren();
+      for(const student of students){
+        if((_cachedClass.students||[]).some(s=>s.student_id===student.id&&!s.left_at)){
+          status.textContent+=" "+student.full_name+" đã ở trong lớp.";
+        }else{
+          const label="Chọn "+student.full_name+(student.email?" ("+student.email+")":"");
+          action(matches,label,()=>cvOpenSchedulePicker(student.id,student.full_name));
+        }
+      }
+      if(canCreate) action(matches,"Tạo hồ sơ cho học sinh khác",()=>{
+        distinctPhone=true;
+        status.textContent="Đã chọn tạo hồ sơ mới với số điện thoại này.";
+        matches.replaceChildren();
+        form.elements.parent_phone.focus();
+      });
+    }
+    function selectParent(parent){
+      parentId=parent.id;
+      if(parent.full_name) parentName.value=parent.full_name;
+      parentName.readOnly=Boolean(parent.full_name);
+      form.querySelector('[data-phone-status="parent"]').textContent=
+        "Đã tự chọn phụ huynh "+(parent.full_name||parent.email)+".";
+    }
+    function checkPhone(role){
+      const input=form.elements[role+"_phone"];
+      const status=form.querySelector('[data-phone-status="'+role+'"]');
+      const state=lookups[role];
+      clearTimeout(state.timer);
+      const request=state.request=Symbol();
+      state.ready=false;
+      state.count=0;
+      status.replaceChildren();
+      if(role==="student"){
+        distinctPhone=false;
+        matches.replaceChildren();
+      }else{
+        if(parentId&&parentName.readOnly) parentName.value="";
+        parentId=null;
+        parentName.readOnly=false;
+      }
+      const phone=input.value.replace(/[^0-9]/g,"").replace(/^84([0-9]{9})$/,"0$1");
+      if(!/^0[0-9]{9}$/.test(phone)) return;
+      status.textContent="Đang kiểm tra số điện thoại…";
+      state.timer=setTimeout(async()=>{
+        if(!form.isConnected||modal.classList.contains("hidden")||state.request!==request) return;
+        try{
+          const {data,error}=await getSb().rpc("lookup_class_profile_phone",{p_class:classId,p_role:role,p_phone:phone});
+          if(!form.isConnected||modal.classList.contains("hidden")||state.request!==request) return;
+          if(error) throw error;
+          state.count=data.length;
+          state.ready=true;
+          if(role==="student"&&data.length) showStudentMatches(data,true);
+          else if(role==="parent"&&data.length===1) selectParent(data[0]);
+          else status.textContent=data.length
+            ?"Số này có nhiều hồ sơ phụ huynh. Vui lòng nhờ quản trị viên kiểm tra."
+            :"Chưa có hồ sơ dùng số điện thoại này.";
+        }catch(error){
+          if(!form.isConnected||modal.classList.contains("hidden")||state.request!==request) return;
+          status.textContent=error.message||"Không kiểm tra được số điện thoại.";
+          action(status,"Kiểm tra lại",()=>checkPhone(role));
+        }
+      },250);
+    }
+    async function submit(){
       if(form.getAttribute("aria-busy")==="true" || !form.reportValidity()) return;
+      if(!lookups.student.ready||!lookups.parent.ready){
+        feedback.textContent="Vui lòng kiểm tra cả hai số điện thoại trước khi tạo hồ sơ.";
+        return;
+      }
+      if(lookups.student.count&&!distinctPhone || lookups.parent.count>1){
+        feedback.textContent="Vui lòng xử lý hồ sơ trùng số điện thoại trước khi tạo.";
+        return;
+      }
       const payload=Object.fromEntries([...new FormData(form)].map(([key,value])=>["p_"+key,value.trim()]));
       form.setAttribute("aria-busy","true");
       form.querySelector("fieldset").disabled=true;
-      matches.replaceChildren();
       feedback.textContent="Đang kiểm tra và tạo hồ sơ…";
       try {
-        const {data,error}=await getSb().rpc("create_class_student_profile",{
-          ...payload,p_class:classId,p_confirm_parent:parentId,p_distinct_student_phone:distinctPhone,
-        });
-        if(error) throw error;
+        const args={...payload,p_class:classId,p_confirm_parent:parentId,p_distinct_student_phone:distinctPhone};
+        const create=async()=>{
+          const {data,error}=await getSb().rpc("create_class_student_profile",args);
+          if(error) throw error;
+          return data;
+        };
+        let data=await create();
+        if(data?.status==="confirm_parent"){
+          selectParent(data.parent);
+          args.p_confirm_parent=parentId;
+          data=await create();
+        }
         if(data?.status==="created"){
           const {id,full_name,email}=data.student;
           if(_studentSearchPool) _studentSearchPool.push({id,full_name,email});
           if(form.isConnected && _classId===classId) cvOpenSchedulePicker(data.student.id,data.student.full_name,data);
         } else if(data?.status==="student_exists"){
-          feedback.textContent="Số điện thoại này đã có hồ sơ học sinh. Chọn hồ sơ nếu đúng học sinh.";
-          for(const student of data.students) {
-            if((_cachedClass.students||[]).some(s=>s.student_id===student.id&&!s.left_at)){
-              feedback.textContent+= " "+student.full_name+" đã ở trong lớp.";
-              continue;
-            }
-            action("Chọn "+student.full_name,()=>cvOpenSchedulePicker(student.id,student.full_name));
-          }
-          if(data.can_create_distinct) action("Tạo hồ sơ cho học sinh khác",()=>submit(true));
-        } else if(data?.status==="confirm_parent"){
-          feedback.textContent="Đã có phụ huynh "+data.parent.full_name+" ("+data.parent.email+").";
-          action("Dùng tài khoản phụ huynh này",()=>submit(distinctPhone,data.parent.id));
+          feedback.textContent="Vui lòng kiểm tra lại hồ sơ học sinh trùng.";
+          distinctPhone=false;
+          lookups.student.count=data.students.length;
+          showStudentMatches(data.students,data.can_create_distinct);
         } else {
           throw new Error("Không nhận được thông tin hồ sơ vừa tạo.");
         }
@@ -2085,9 +2164,12 @@
         form.querySelector("fieldset").disabled=false;
       }
     }
-    form.addEventListener("input",()=>{matches.replaceChildren();feedback.textContent="";});
+    form.addEventListener("input",()=>{feedback.textContent="";});
+    for(const role of ["student","parent"]){
+      form.elements[role+"_phone"].addEventListener("input",()=>checkPhone(role));
+    }
     form.addEventListener("submit",event=>{event.preventDefault();void submit();});
-    form.elements.student_name.focus();
+    form.elements.student_phone.focus();
   };
 
   window.cvOpenEditStudentSchedule = function(studentId, studentName){
